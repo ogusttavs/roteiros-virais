@@ -3,10 +3,7 @@ import { NextResponse } from "next/server";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, garantirClientePermitido } from "@/servicos/clientes";
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const sessao = await sessaoAtual();
   if (!sessao) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });

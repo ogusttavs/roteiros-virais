@@ -24,14 +24,14 @@ export function FormularioEntrar() {
     setErro(null);
     setEntrando(true);
 
-    const { error } = await authClient.signIn.email({ email, password: senha });
+    const { data, error } = await authClient.signIn.email({ email, password: senha });
 
     setEntrando(false);
-    if (error) {
+    if (error || !data) {
       setErro(textosEntrar.erroGenerico);
       return;
     }
-    router.push("/hoje");
+    router.push(data.user.role === "admin" ? "/admin/clientes" : "/hoje");
     router.refresh();
   }
 

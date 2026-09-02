@@ -25,7 +25,9 @@ export function Campo({ rotulo, ajuda, erro, className, ...props }: Props) {
       ) : null}
       <input
         id={id}
-        className={[styles.entrada, erro ? styles.comErro : "", className].filter(Boolean).join(" ")}
+        className={[styles.entrada, erro ? styles.comErro : "", className]
+          .filter(Boolean)
+          .join(" ")}
         aria-describedby={[idAjuda, idErro].filter(Boolean).join(" ") || undefined}
         aria-invalid={Boolean(erro)}
         {...props}

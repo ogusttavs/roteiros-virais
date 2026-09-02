@@ -188,7 +188,17 @@ export async function semear(db: Db): Promise<ResumoSeed> {
   let totalVideos = 0;
   let totalClientes = 0;
 
-  const clientesPorNicho: Record<string, { usuarioId: string; nome: string; cidade: string; bairro: string; perfil: string; quemGrava: "propria_pessoa" | "pessoa_e_equipe" }> = {
+  const clientesPorNicho: Record<
+    string,
+    {
+      usuarioId: string;
+      nome: string;
+      cidade: string;
+      bairro: string;
+      perfil: string;
+      quemGrava: "propria_pessoa" | "pessoa_e_equipe";
+    }
+  > = {
     dentistas: {
       usuarioId: "seed-cliente-dentistas",
       nome: "[exemplo] Sorriso Novo",

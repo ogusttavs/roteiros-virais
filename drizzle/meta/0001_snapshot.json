@@ -101,12 +101,8 @@
           "name": "account_userId_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -195,12 +191,8 @@
           "name": "avaliacoes_tema_cliente_id_clientes_id_fk",
           "tableFrom": "avaliacoes_tema",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -279,12 +271,8 @@
           "name": "briefings_cliente_id_clientes_id_fk",
           "tableFrom": "briefings",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -294,9 +282,7 @@
         "briefings_cliente_id_unique": {
           "name": "briefings_cliente_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "cliente_id"
-          ]
+          "columns": ["cliente_id"]
         }
       },
       "policies": {},
@@ -401,12 +387,8 @@
           "name": "clientes_usuario_id_user_id_fk",
           "tableFrom": "clientes",
           "tableTo": "user",
-          "columnsFrom": [
-            "usuario_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["usuario_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -414,12 +396,8 @@
           "name": "clientes_nicho_id_nichos_id_fk",
           "tableFrom": "clientes",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -429,9 +407,7 @@
         "clientes_usuario_id_unique": {
           "name": "clientes_usuario_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "usuario_id"
-          ]
+          "columns": ["usuario_id"]
         }
       },
       "policies": {},
@@ -550,12 +526,8 @@
           "name": "contas_nicho_id_nichos_id_fk",
           "tableFrom": "contas",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -703,12 +675,8 @@
           "name": "favoritos_cliente_id_clientes_id_fk",
           "tableFrom": "favoritos",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -716,12 +684,8 @@
           "name": "favoritos_video_id_videos_id_fk",
           "tableFrom": "favoritos",
           "tableTo": "videos",
-          "columnsFrom": [
-            "video_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["video_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -850,12 +814,8 @@
           "name": "geracoes_ia_cliente_id_clientes_id_fk",
           "tableFrom": "geracoes_ia",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -928,12 +888,8 @@
           "name": "metricas_video_cliente_video_cliente_id_videos_cliente_id_fk",
           "tableFrom": "metricas_video_cliente",
           "tableTo": "videos_cliente",
-          "columnsFrom": [
-            "video_cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["video_cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -997,12 +953,8 @@
           "name": "modelos_nicho_nicho_id_nichos_id_fk",
           "tableFrom": "modelos_nicho",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1081,9 +1033,7 @@
         "nichos_slug_unique": {
           "name": "nichos_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -1173,12 +1123,8 @@
           "name": "noticias_nicho_id_nichos_id_fk",
           "tableFrom": "noticias",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1188,9 +1134,7 @@
         "noticias_url_unique": {
           "name": "noticias_url_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "url"
-          ]
+          "columns": ["url"]
         }
       },
       "policies": {},
@@ -1322,12 +1266,8 @@
           "name": "roteiros_cliente_id_clientes_id_fk",
           "tableFrom": "roteiros",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1335,12 +1275,8 @@
           "name": "roteiros_referencia_video_id_videos_id_fk",
           "tableFrom": "roteiros",
           "tableTo": "videos",
-          "columnsFrom": [
-            "referencia_video_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["referencia_video_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1418,12 +1354,8 @@
           "name": "session_userId_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1433,9 +1365,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -1517,12 +1447,8 @@
           "name": "temas_dia_nicho_id_nichos_id_fk",
           "tableFrom": "temas_dia",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1615,9 +1541,7 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -1931,12 +1855,8 @@
           "name": "videos_conta_id_contas_id_fk",
           "tableFrom": "videos",
           "tableTo": "contas",
-          "columnsFrom": [
-            "conta_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["conta_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1944,12 +1864,8 @@
           "name": "videos_nicho_id_nichos_id_fk",
           "tableFrom": "videos",
           "tableTo": "nichos",
-          "columnsFrom": [
-            "nicho_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["nicho_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2031,12 +1947,8 @@
           "name": "videos_cliente_cliente_id_clientes_id_fk",
           "tableFrom": "videos_cliente",
           "tableTo": "clientes",
-          "columnsFrom": [
-            "cliente_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["cliente_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -2044,12 +1956,8 @@
           "name": "videos_cliente_roteiro_id_roteiros_id_fk",
           "tableFrom": "videos_cliente",
           "tableTo": "roteiros",
-          "columnsFrom": [
-            "roteiro_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["roteiro_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
