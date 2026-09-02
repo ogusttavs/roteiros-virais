@@ -35,8 +35,12 @@ const tsvector = customType<{ data: string }>({
 
 // ---------------------------------------------------------------------------
 // Autenticacao (better-auth, adaptador Drizzle). Schema gerado a partir de
-// betterAuth({ emailAndPassword: { enabled: true }, plugins: [magicLink(...)] })
-// via better-auth/db getSchema, na versao instalada (1.7.2).
+// betterAuth({ emailAndPassword: { enabled: true },
+// plugins: [magicLink(...), admin()] }) via better-auth/db getSchema, na
+// versao instalada (1.7.2). src/db/schema.auth.test.ts trava esse schema
+// contra a versao instalada, porque o @better-auth/cli (o jeito documentado
+// de gerar isso) esta desencontrado da versao do pacote principal (TODO.md,
+// decisoes pendentes).
 // ---------------------------------------------------------------------------
 
 export const user = pgTable("user", {
@@ -47,6 +51,11 @@ export const user = pgTable("user", {
   image: text("image"),
   createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+  /** "admin" ou "cliente" (plugin admin do better-auth). */
+  role: text("role"),
+  banned: boolean("banned").default(false),
+  banReason: text("banReason"),
+  banExpires: timestamp("banExpires", { withTimezone: true }),
 });
 
 export const session = pgTable("session", {
@@ -60,6 +69,8 @@ export const session = pgTable("session", {
   userId: text("userId")
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
+  /** Preenchido quando um admin esta vendo o painel como este cliente. */
+  impersonatedBy: text("impersonatedBy"),
 });
 
 export const account = pgTable("account", {
@@ -131,11 +142,15 @@ export const clientes = pgTable("clientes", {
   persona: text("persona").$type<"negocio" | "criador">().notNull().default("negocio"),
   perfis: jsonb("perfis").$type<PerfisCliente>(),
   quemGrava: text("quem_grava").$type<QuemGrava>(),
-  /** Camada exclusiva de pesquisa (escopo 5.6): concorrentes, termos e perfis dele. */
+  /**
+   * Camada exclusiva de pesquisa (escopo 5.6): concorrentes, termos e perfis
+   * admirados citados pelo cliente (nao confundir com clientes.perfis, que
+   * sao os @ do proprio cliente).
+   */
   camadaExclusiva: jsonb("camada_exclusiva")
-    .$type<{ concorrentes: string[]; termos: string[]; perfis: string[] }>()
+    .$type<{ concorrentes: string[]; termos: string[]; perfisAdmirados: string[] }>()
     .notNull()
-    .default({ concorrentes: [], termos: [], perfis: [] }),
+    .default({ concorrentes: [], termos: [], perfisAdmirados: [] }),
   ativo: boolean("ativo").notNull().default(true),
   criadoEm: criadoEm(),
 });
