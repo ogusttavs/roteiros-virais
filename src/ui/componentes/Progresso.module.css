@@ -1,0 +1,58 @@
+.passos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.trilha {
+  height: 4px;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  overflow: hidden;
+}
+
+.preenchido {
+  height: 100%;
+  background: var(--cor-acao);
+  border-radius: var(--raio-pill);
+  transition: width var(--duracao-base) var(--curva-saida);
+}
+
+.rotuloPassos {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  color: var(--cor-texto-suave);
+}
+
+.espera {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}
+
+.pulso {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  animation: pulsar 1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulsar {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulso {
+    animation: none;
+  }
+}

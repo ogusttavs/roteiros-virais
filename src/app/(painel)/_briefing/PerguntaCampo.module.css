@@ -1,0 +1,35 @@
+.fechado,
+.aberto {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.enunciado {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.fraseAjuste {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}
+
+.rodapeAberto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.indicadorSalvo {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  color: var(--cor-texto-suave);
+  min-height: 16px;
+}

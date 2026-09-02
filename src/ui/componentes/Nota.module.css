@@ -1,0 +1,45 @@
+.nota {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-1);
+}
+
+.numero {
+  font-family: var(--fonte-mono);
+  font-weight: 700;
+  color: var(--cor-titulo);
+  line-height: 1;
+}
+
+.md .numero {
+  font-size: 28px;
+}
+
+.lg .numero {
+  font-size: 40px;
+}
+
+.baixa {
+  color: var(--cor-erro);
+}
+
+.media {
+  color: var(--cor-atencao);
+}
+
+.alta {
+  color: var(--cor-positivo);
+}
+
+.legenda {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cor-texto-suave);
+}
+
+.rotulo {
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}

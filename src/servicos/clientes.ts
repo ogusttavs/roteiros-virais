@@ -1,12 +1,17 @@
 import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
+import { z } from "zod";
 
 import { db } from "@/db";
-import { briefings, clientes, nichos, user, type Cliente } from "@/db/schema";
+import { briefings, clientes, nichos, user, type Cliente, type PerfisCliente } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { sessaoAtual } from "@/lib/sessao";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroAcessoNegado extends Error {}
+
+/** Erros de dado do proprio recurso cliente, sem relacao com permissao. */
+export class ErroCliente extends Error {}
 
 /**
  * Segunda camada de defesa para acoes de admin (revisao da etapa 3,
@@ -49,6 +54,25 @@ export async function garantirClientePermitido(
   const cliente = await clienteDoUsuario(usuarioId);
   if (!cliente || cliente.id !== clienteIdPedido) {
     throw new ErroAcessoNegado("Este recurso pertence a outro cliente.");
+  }
+  return cliente;
+}
+
+/**
+ * O cliente da sessao atual, direto, sem receber nenhum id de fora. Usada
+ * pelas Server Actions do painel (/comecar, /briefing): como o clienteId
+ * nunca vem do cliente da requisicao, nao existe caminho para uma sessao
+ * ler ou gravar o briefing de outro cliente por essas rotas (isolamento no
+ * nivel de rota, plano de execucao etapa 5).
+ */
+export async function clienteDaSessaoAtual(): Promise<Cliente> {
+  const sessao = await sessaoAtual();
+  if (!sessao) {
+    throw new ErroAcessoNegado("E preciso entrar de novo.");
+  }
+  const cliente = await clienteDoUsuario(sessao.user.id);
+  if (!cliente) {
+    throw new ErroAcessoNegado("Nenhum cliente encontrado para esta sessao.");
   }
   return cliente;
 }
@@ -119,5 +143,73 @@ export async function criarClienteEConvidar(dados: {
     headers: cabecalhos,
   });
 
+  return cliente;
+}
+
+/** Nichos ativos para a lista de ramo em /comecar (briefing-e-rubricas.md, secao 1). */
+export async function listarNichosAtivos(): Promise<{ id: number; nome: string }[]> {
+  return db()
+    .select({ id: nichos.id, nome: nichos.nome })
+    .from(nichos)
+    .where(eq(nichos.ativo, true))
+    .orderBy(nichos.nome);
+}
+
+/**
+ * Dados fixos do briefing (briefing-e-rubricas.md, secao 1; brief-frontend.md,
+ * 6.2): sem nota, so validacao. "Ramo" e um nicho da lista (nichoId) ou, se o
+ * cliente escolher "outro", um texto livre em ramoOutro; os dois nunca
+ * coexistem. Perfis, bairro e quem grava sao opcionais aqui e continuam
+ * editaveis depois em /conta.
+ */
+export const dadosFixosSchema = z
+  .object({
+    nome: z.string().trim().min(1),
+    cidade: z.string().trim().min(1),
+    bairro: z.string().trim().optional(),
+    nichoId: z.number().int().positive().optional(),
+    ramoOutro: z.string().trim().optional(),
+    persona: z.enum(["negocio", "criador"]),
+    perfis: z
+      .object({
+        instagram: z.string().trim().optional(),
+        tiktok: z.string().trim().optional(),
+        youtube: z.string().trim().optional(),
+      })
+      .optional(),
+    quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe"]).optional(),
+  })
+  .refine((dados) => Boolean(dados.nichoId) || Boolean(dados.ramoOutro?.trim()), {
+    message: "escolha um ramo da lista ou descreva o seu",
+    path: ["ramo"],
+  });
+
+export type DadosFixos = z.infer<typeof dadosFixosSchema>;
+
+export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  const dados = dadosFixosSchema.parse(dadosBrutos);
+
+  const perfis: PerfisCliente = {
+    instagram: dados.perfis?.instagram?.trim() || null,
+    tiktok: dados.perfis?.tiktok?.trim() || null,
+    youtube: dados.perfis?.youtube?.trim() || null,
+  };
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({
+      nome: dados.nome,
+      cidade: dados.cidade,
+      bairro: dados.bairro?.trim() || null,
+      nichoId: dados.nichoId ?? null,
+      ramoOutro: dados.nichoId ? null : (dados.ramoOutro?.trim() ?? null),
+      persona: dados.persona,
+      perfis,
+      quemGrava: dados.quemGrava ?? null,
+    })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
   return cliente;
 }

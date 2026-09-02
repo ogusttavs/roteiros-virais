@@ -6,8 +6,8 @@ que a IA dá com a nota que o Gustavo daria (`estrategia/briefing-e-rubricas.md`
 ## Por que o arquivo real não está aqui
 
 O repositório é público (`plataforma/CLAUDE.md`). O conjunto de referência real usa as
-respostas de verdade da Dr.Wash, e respostas de verdade de cliente não entram no repositório,
-nem em teste nem em fixture.
+respostas de verdade do primeiro cliente de teste, e respostas de verdade de cliente não
+entram no repositório, nem em teste nem em fixture.
 
 O script `npm run avaliar:briefing` procura o arquivo real em
 `GOLDEN_SET_DIR/briefing.json`. `GOLDEN_SET_DIR` é uma variável de ambiente; o padrão, se ela

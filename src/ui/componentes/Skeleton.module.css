@@ -1,0 +1,31 @@
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--cor-superficie-recuada) 25%,
+    var(--cor-borda-forte) 37%,
+    var(--cor-superficie-recuada) 63%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--raio-sm);
+  animation: pulsar 1.4s ease-in-out infinite;
+}
+
+.arredondado {
+  border-radius: var(--raio-pill);
+}
+
+@keyframes pulsar {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: var(--cor-superficie-recuada);
+  }
+}

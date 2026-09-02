@@ -14,7 +14,7 @@ import { desc } from "drizzle-orm";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { semear } from "../../scripts/semear";
-import { db, getPool } from "../../src/db";
+import { db } from "../../src/db";
 import { verification } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
@@ -26,9 +26,8 @@ test.beforeAll(async () => {
   await semear(db());
 });
 
-test.afterAll(async () => {
-  await getPool().end();
-});
+// O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts):
+// mais de um arquivo de e2e roda no mesmo worker e compartilha o pool.
 
 test("admin entra, cria cliente, cliente entra por link magico e cai em /comecar", async ({
   page,
