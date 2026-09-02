@@ -6,6 +6,7 @@
 import "dotenv/config";
 
 import { listarAgendamentos } from "./agenda";
+import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
@@ -13,6 +14,7 @@ import { FILAS } from "./fila";
 
 const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.coletaYoutube]: rodarColetaYoutube,
+  [FILAS.coletaApify]: rodarColetaApify,
   [FILAS.coletaNoticias]: rodarColetaNoticias,
 };
 

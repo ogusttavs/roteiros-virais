@@ -1,0 +1,34 @@
+[
+  {
+    "id": "7345678901234567890",
+    "text": "[exemplo] 3 erros que estragam o seu sorriso #dentista",
+    "webVideoUrl": "https://www.tiktok.com/@exemplo.sorrisoemdia/video/7345678901234567890",
+    "createTimeISO": "2026-08-21T10:00:00.000Z",
+    "authorMeta": {
+      "name": "exemplo.sorrisoemdia",
+      "nickName": "[exemplo] Sorriso em Dia"
+    },
+    "videoMeta": { "duration": 34 },
+    "musicMeta": {
+      "musicId": "7111111111111111111",
+      "musicName": "[exemplo] som original",
+      "musicAuthor": "exemplo.sorrisoemdia",
+      "musicOriginal": true
+    },
+    "playCount": 245310,
+    "diggCount": 18320,
+    "commentCount": 421
+  },
+  {
+    "id": "7345678901234567891",
+    "text": "[exemplo] antes e depois de um clareamento",
+    "webVideoUrl": "https://www.tiktok.com/@exemplo.sorrisoemdia/video/7345678901234567891",
+    "createTimeISO": "2026-08-19T15:30:00.000Z",
+    "authorMeta": {
+      "name": "exemplo.sorrisoemdia",
+      "nickName": "[exemplo] Sorriso em Dia"
+    },
+    "videoMeta": { "duration": 21 },
+    "playCount": 58210
+  }
+]

@@ -12,6 +12,7 @@ import { PgBoss } from "pg-boss";
 
 export const FILAS = {
   coletaYoutube: "coleta-youtube",
+  coletaApify: "coleta-apify",
   coletaNoticias: "coleta-noticias",
 } as const;
 

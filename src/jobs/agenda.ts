@@ -21,6 +21,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "coleta do YouTube, todo dia as 03:00",
   },
   {
+    fila: FILAS.coletaApify,
+    cron: "30 3 * * *",
+    descricao: "coleta do TikTok e Instagram (Apify), todo dia as 03:30",
+  },
+  {
     fila: FILAS.coletaNoticias,
     cron: "0 6 * * *",
     descricao: "noticias do nicho, todo dia as 06:00",
