@@ -52,6 +52,7 @@ export function PerguntaCampo({
   const [avaliando, setAvaliando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState(true);
+  const [rascunhoComErro, setRascunhoComErro] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -64,16 +65,31 @@ export function PerguntaCampo({
   function aoMudarTexto(valor: string) {
     setTexto(valor);
     setRascunhoSalvo(false);
+    setRascunhoComErro(false);
     setErro(null);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       onSalvarRascunho(pergunta.id, valor)
         .then(() => setRascunhoSalvo(true))
-        .catch(() => undefined);
+        /**
+         * Antes, uma falha aqui nao aparecia em lugar nenhum (achado no code
+         * review desta rodada): o indicador so ficava sem o "salvo", igual a
+         * um rascunho que ainda nao tentou salvar. Se a pessoa saisse da
+         * tela nesse meio tempo, o texto digitado se perdia sem aviso.
+         */
+        .catch(() => setRascunhoComErro(true));
     }, 800);
   }
 
   async function avaliar() {
+    /**
+     * Sem isto, um clique no botao "avaliar" que tambem tira o foco da area
+     * de texto dispara aoSairDoCampo e o onClick quase juntos, antes do
+     * primeiro re-render desabilitar o campo (achado no code review desta
+     * rodada): as duas chamadas avaliam a mesma resposta em paralelo, cada
+     * uma pagando a IA de novo.
+     */
+    if (avaliando) return;
     if (timerRef.current) clearTimeout(timerRef.current);
     setAvaliando(true);
     setErro(null);
@@ -126,7 +142,9 @@ export function PerguntaCampo({
         <Progresso mensagem={t.avaliando} />
       ) : (
         <div className={styles.rodapeAberto}>
-          <span className={styles.indicadorSalvo}>{rascunhoSalvo ? t.rascunhoSalvo : ""}</span>
+          <span className={styles.indicadorSalvo}>
+            {rascunhoComErro ? t.rascunhoComErro : rascunhoSalvo ? t.rascunhoSalvo : ""}
+          </span>
           <Botao variante="secundario" onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
             {erro ? t.botaoTentarDeNovo : t.botaoAvaliar}
           </Botao>

@@ -215,4 +215,63 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
     expect(briefing.respostas.p1).toBe("rascunho da p1");
     expect(briefing.respostas.p2).toBe("rascunho da p2");
   });
+
+  it("rascunho que invalida uma avaliacao recalcula a nota geral, sem deixar a nota antiga", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-rascunho-nota-stale", name: "[teste] Nota stale", email: "notastale@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Nota stale", nichoId })
+      .returning();
+
+    // p1 pesa 2 de 16; uma nota alta so em p1 nao chega perto de 8, mas
+    // deixa a nota geral bem acima de zero, o que basta para o teste.
+    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"));
+    expect(primeira.notaGeral).toBeGreaterThan(0);
+
+    // rascunho troca o texto de p1 sem reavaliar: so um salvarRascunho, nunca avaliarResposta.
+    await salvarRascunho(cliente.id, "p1", "bom atendimento");
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect(briefing.avaliacoes.p1).toBeUndefined();
+    // a nota geral recalculada, sem a avaliacao de p1, tem que cair para 0
+    // (nenhuma outra pergunta foi avaliada ainda); a implementacao antiga
+    // deixava o valor de `primeira.notaGeral` gravado sem recalcular.
+    expect(Number(briefing.notaGeral)).toBe(0);
+  });
+
+  it("duas avaliacoes na mesma pergunta em paralelo nunca deixam a resposta gravada e a avaliacao guardada de textos diferentes", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({
+        id: "briefing-corrida-mesma-pergunta",
+        name: "[teste] Corrida",
+        email: "corrida@briefing.teste",
+      })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Corrida", nichoId })
+      .returning();
+
+    const textoA = respostaConcreta("corrida-a");
+    const textoB = respostaConcreta("corrida-b");
+
+    const [resultadoA, resultadoB] = await Promise.all([
+      avaliarResposta(cliente.id, "p1", textoA),
+      avaliarResposta(cliente.id, "p1", textoB),
+    ]);
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect([textoA, textoB]).toContain(briefing.respostas.p1);
+
+    // Qualquer que tenha vencido a corrida, a avaliacao guardada tem que ser
+    // a mesma que a chamada correspondente devolveu, nunca a da outra
+    // chamada nem uma mistura das duas (o bug que isto cobre: a avaliacao
+    // calculada para um texto sendo gravada ao lado do texto do outro).
+    const resultadoVencedor = briefing.respostas.p1 === textoA ? resultadoA : resultadoB;
+    expect(briefing.avaliacoes.p1).toEqual(resultadoVencedor.avaliacao);
+  });
 });

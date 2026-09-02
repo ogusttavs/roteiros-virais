@@ -39,6 +39,7 @@ export const textosBriefing = {
     erroAvaliacao: "não conseguimos avaliar agora; o seu texto está salvo, tente de novo em um minuto",
     botaoTentarDeNovo: "tentar de novo",
     rascunhoSalvo: "salvo",
+    rascunhoComErro: "não conseguimos salvar; o texto ainda está só nesta tela",
   },
   navegacaoBlocos: {
     botaoVoltar: "voltar",

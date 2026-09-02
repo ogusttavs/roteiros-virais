@@ -34,8 +34,16 @@ export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
   const [nome, setNome] = useState(inicial.nome);
   const [cidade, setCidade] = useState(inicial.cidade ?? "");
   const [bairro, setBairro] = useState(inicial.bairro ?? "");
+  /**
+   * Sem ramo escolhido ainda (cliente novo, sem nichoId nem ramoOutro), o
+   * select comeca em "outro" em vez do primeiro nicho da lista (achado no
+   * code review desta rodada): a pessoa tinha como continuar sem nunca
+   * tocar no campo, e o formulario gravava silenciosamente o primeiro nicho
+   * da lista como se fosse a escolha dela. Em "outro", precisa digitar
+   * alguma coisa (ou trocar para um nicho de verdade) antes de continuar.
+   */
   const [nichoId, setNichoId] = useState<number | typeof OUTRO>(
-    inicial.nichoId ?? (inicial.ramoOutro ? OUTRO : (nichos[0]?.id ?? OUTRO)),
+    inicial.nichoId ?? OUTRO,
   );
   const [ramoOutro, setRamoOutro] = useState(inicial.ramoOutro ?? "");
   const [persona, setPersona] = useState<Persona>(inicial.persona);
