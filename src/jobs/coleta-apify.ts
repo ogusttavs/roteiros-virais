@@ -76,11 +76,19 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
         resultadosUsados += itens.length;
         await registrarConsumo(itens.length);
         for (const item of itens) {
-          const { video, conta, audio } = normalizarVideoTiktok(item);
-          const contaId = await upsertConta(conta, nicho.id);
-          const resultado = await upsertVideo(video, contaId, nicho.id, audio);
-          if (resultado === "novo") videosNovos += 1;
-          else videosAtualizados += 1;
+          try {
+            const { video, conta, audio } = normalizarVideoTiktok(item);
+            const contaId = await upsertConta(conta, nicho.id);
+            const resultado = await upsertVideo(video, contaId, nicho.id, audio);
+            if (resultado === "novo") videosNovos += 1;
+            else videosAtualizados += 1;
+          } catch (erroItem) {
+            // Um item malformado nao pode derrubar o resto do lote (achado
+            // rodando com chave real: um item do apify sem dado essencial).
+            erros.push(
+              `tiktok / nicho "${nicho.slug}" / item "${item.id}": ${erroItem instanceof Error ? erroItem.message : String(erroItem)}`,
+            );
+          }
         }
       } catch (erro) {
         erros.push(`tiktok / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
@@ -106,11 +114,17 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
         resultadosUsados += itens.length;
         await registrarConsumo(itens.length);
         for (const item of itens) {
-          const { video, conta, audio } = normalizarVideoInstagram(item);
-          const contaId = await upsertConta(conta, nicho.id);
-          const resultado = await upsertVideo(video, contaId, nicho.id, audio);
-          if (resultado === "novo") videosNovos += 1;
-          else videosAtualizados += 1;
+          try {
+            const { video, conta, audio } = normalizarVideoInstagram(item);
+            const contaId = await upsertConta(conta, nicho.id);
+            const resultado = await upsertVideo(video, contaId, nicho.id, audio);
+            if (resultado === "novo") videosNovos += 1;
+            else videosAtualizados += 1;
+          } catch (erroItem) {
+            erros.push(
+              `instagram / nicho "${nicho.slug}" / item "${item.id}": ${erroItem instanceof Error ? erroItem.message : String(erroItem)}`,
+            );
+          }
         }
       } catch (erro) {
         erros.push(`instagram / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);

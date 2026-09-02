@@ -24,11 +24,29 @@ function cliente(): ApifyClient {
 
 export class ErroApify extends Error {}
 
-/** Roda um ator ate terminar e devolve os itens do dataset padrao da execucao. */
+/**
+ * Roda um ator ate terminar e devolve os itens do dataset padrao da
+ * execucao, cortados em `maxItems`. O `maxItems` da chamada ao ator so
+ * limita quanto e cobrado, nao quanto o ator devolve no dataset (achado
+ * rodando com chave real: pediu 20, o dataset trouxe mais); cortar aqui e o
+ * que faz o teto diario em `consumo_api` bater com o que de fato
+ * processamos.
+ */
 export async function rodarAtor<T>(ator: string, input: Record<string, unknown>, maxItems: number): Promise<T[]> {
   const execucao = await cliente().actor(ator).call(input, { maxItems });
   const { items } = await cliente().dataset(execucao.defaultDatasetId).listItems();
-  return items as T[];
+  return (items as T[]).slice(0, maxItems);
+}
+
+/**
+ * Hashtag valida nao tem espaco (achado rodando com chave real: um termo
+ * como "lente de contato dental" virou uma URL de hashtag do Instagram com
+ * espaco codificado, que nao existe, e voltou sem resultado). O TikTok
+ * aceita e normaliza sozinho; aqui normalizamos para os dois, para nao
+ * depender de comportamento nao documentado de cada ator.
+ */
+function paraHashtag(termo: string): string {
+  return termo.replace(/\s+/g, "");
 }
 
 /** Item bruto do TikTok (clockworks/tiktok-scraper), so os campos que a normalizacao usa. */
@@ -56,7 +74,7 @@ export async function buscarTiktok(
   maxItems: number,
 ): Promise<TiktokItemBruto[]> {
   const input: Record<string, unknown> = { resultsPerPage: maxItems };
-  if (hashtags.length > 0) input.hashtags = hashtags;
+  if (hashtags.length > 0) input.hashtags = hashtags.map(paraHashtag);
   if (perfis.length > 0) input.profiles = perfis;
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
 }
@@ -92,7 +110,7 @@ export async function buscarInstagram(
   maxItens: number,
 ): Promise<InstagramItemBruto[]> {
   const directUrls = [
-    ...hashtags.map((h) => `https://www.instagram.com/explore/tags/${encodeURIComponent(h)}/`),
+    ...hashtags.map((h) => `https://www.instagram.com/explore/tags/${encodeURIComponent(paraHashtag(h))}/`),
     ...perfis.map((p) => `https://www.instagram.com/${encodeURIComponent(p)}/`),
   ];
   if (directUrls.length === 0) return [];
