@@ -47,8 +47,12 @@ export type YoutubeSearchItem = {
   };
 };
 
+/**
+ * `items` vem ausente (nao um array vazio) quando a busca nao acha nada,
+ * confirmado rodando contra a API de verdade nesta etapa.
+ */
 export type YoutubeSearchResponse = {
-  items: YoutubeSearchItem[];
+  items?: YoutubeSearchItem[];
   nextPageToken?: string;
 };
 
@@ -91,7 +95,7 @@ export type YoutubeVideoItem = {
   statistics: { viewCount?: string; likeCount?: string; commentCount?: string };
 };
 
-export type YoutubeVideosResponse = { items: YoutubeVideoItem[] };
+export type YoutubeVideosResponse = { items?: YoutubeVideoItem[] };
 
 /** videos.list em lote (ate 50 ids por chamada, 1 unidade no total). */
 export async function buscarVideosPorId(ids: string[]): Promise<YoutubeVideosResponse> {
@@ -108,7 +112,7 @@ export type YoutubeChannelItem = {
   contentDetails: { relatedPlaylists: { uploads: string } };
 };
 
-export type YoutubeChannelsResponse = { items: YoutubeChannelItem[] };
+export type YoutubeChannelsResponse = { items?: YoutubeChannelItem[] };
 
 /** channels.list: resolve o canal (por id ou @handle) para a playlist de uploads dele. */
 export async function buscarCanal(idOuHandle: string): Promise<YoutubeChannelsResponse> {
@@ -126,7 +130,7 @@ export type YoutubePlaylistItem = {
   };
 };
 
-export type YoutubePlaylistItemsResponse = { items: YoutubePlaylistItem[] };
+export type YoutubePlaylistItemsResponse = { items?: YoutubePlaylistItem[] };
 
 /** playlistItems.list: os videos mais recentes da playlist de uploads de um canal. */
 export async function buscarUploadsDoCanal(playlistId: string): Promise<YoutubePlaylistItemsResponse> {

@@ -111,7 +111,7 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       try {
         const resultado = await buscarPorTermo(termo, publicadoApos);
         await gastar(CUSTO_SEARCH);
-        for (const item of resultado.items) {
+        for (const item of resultado.items ?? []) {
           if (item.id.videoId) idsCandidatos.add(item.id.videoId);
         }
       } catch (erro) {
@@ -130,12 +130,17 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       try {
         const canalResp = await buscarCanal(conta.handle);
         await gastar(CUSTO_LISTA);
-        const canal = canalResp.items[0];
+        /**
+         * Achado rodando com chave real: um handle que nao existe de verdade
+         * (as contas do seed sao ficticias) volta sem o campo `items` (nem
+         * um array vazio), nao so com zero resultados nele.
+         */
+        const canal = canalResp.items?.[0];
         if (!canal) continue;
 
         const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
         await gastar(CUSTO_LISTA);
-        for (const item of uploadsResp.items) {
+        for (const item of uploadsResp.items ?? []) {
           idsCandidatos.add(item.snippet.resourceId.videoId);
         }
       } catch (erro) {
@@ -150,7 +155,7 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       try {
         const resposta = await buscarVideosPorId(lote);
         await gastar(CUSTO_LISTA);
-        for (const item of resposta.items) {
+        for (const item of resposta.items ?? []) {
           const { video, conta } = normalizarVideoYoutube(item);
           const contaId = await upsertConta(conta, nicho.id);
           const resultado = await upsertVideo(video, contaId, nicho.id);

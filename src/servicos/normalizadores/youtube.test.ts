@@ -32,9 +32,10 @@ describe("parseDuracaoIso8601", () => {
 
 describe("normalizarVideoYoutube", () => {
   const fixture = carregarFixture();
+  const itens = fixture.items ?? [];
 
   it("normaliza o primeiro item da fixture, com todas as estatisticas", () => {
-    const { video, conta } = normalizarVideoYoutube(fixture.items[0]);
+    const { video, conta } = normalizarVideoYoutube(itens[0]);
 
     expect(video).toEqual({
       plataforma: "youtube",
@@ -57,7 +58,7 @@ describe("normalizarVideoYoutube", () => {
   });
 
   it("estatisticas ausentes (likes e comentarios desligados) viram zero, nunca NaN", () => {
-    const { video } = normalizarVideoYoutube(fixture.items[1]);
+    const { video } = normalizarVideoYoutube(itens[1]);
 
     expect(video.likes).toBe(0);
     expect(video.comentarios).toBe(0);
