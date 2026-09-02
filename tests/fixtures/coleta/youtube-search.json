@@ -1,0 +1,27 @@
+{
+  "kind": "youtube#searchListResponse",
+  "items": [
+    {
+      "kind": "youtube#searchResult",
+      "id": { "kind": "youtube#video", "videoId": "exVid00000a" },
+      "snippet": {
+        "publishedAt": "2026-08-20T14:00:00Z",
+        "channelId": "UCexemplo00000000001",
+        "title": "[exemplo] 3 erros que estragam o seu sorriso",
+        "description": "[exemplo] video ficticio de teste sobre cuidados com os dentes.",
+        "channelTitle": "[exemplo] Sorriso em Dia"
+      }
+    },
+    {
+      "kind": "youtube#searchResult",
+      "id": { "kind": "youtube#channel" },
+      "snippet": {
+        "publishedAt": "2026-08-21T09:15:00Z",
+        "channelId": "UCexemplo00000000002",
+        "title": "[exemplo] Consultorio Dental",
+        "description": "[exemplo] resultado de canal, sem videoId, deve ser ignorado.",
+        "channelTitle": "[exemplo] Consultorio Dental"
+      }
+    }
+  ]
+}

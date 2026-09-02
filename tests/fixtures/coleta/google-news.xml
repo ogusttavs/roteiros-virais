@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>"dentista" - Google Noticias</title>
+    <link>https://news.google.com/rss/search?q=dentista&amp;hl=pt-BR&amp;gl=BR&amp;ceid=BR:pt-419</link>
+    <language>pt-BR</language>
+    <item>
+      <title>[exemplo] Procura por clareamento dental cresce no verao - Jornal Exemplo</title>
+      <link>https://news.google.com/rss/articles/exemplo-1</link>
+      <pubDate>Mon, 24 Aug 2026 10:00:00 GMT</pubDate>
+      <description>&lt;p&gt;[exemplo] resumo ficticio da noticia, so para teste.&lt;/p&gt;</description>
+      <source url="https://exemplo.invalid">Jornal Exemplo</source>
+    </item>
+    <item>
+      <title>[exemplo] O que muda no atendimento odontologico este ano</title>
+      <link>https://news.google.com/rss/articles/exemplo-2</link>
+      <pubDate>Tue, 25 Aug 2026 08:30:00 GMT</pubDate>
+      <description>&lt;p&gt;[exemplo] outro resumo ficticio, sem fonte no titulo.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>
