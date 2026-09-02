@@ -53,6 +53,35 @@ export const config = {
   },
 };
 
+const SEGREDO_PADRAO = "troque-em-producao";
+
+export class ErroConfiguracao extends Error {}
+
+/**
+ * Em producao, recusa iniciar se o segredo de sessao ou a chave de jobs
+ * ainda forem o valor de exemplo do .env.example (etapa 4, revisao da
+ * etapa 3). Roda sozinha ao carregar este modulo; exportada para testar com
+ * um ambiente fabricado, sem depender do process.env real.
+ */
+export function verificarSegredosDeProducao(
+  env: { NODE_ENV?: string; BETTER_AUTH_SECRET?: string; JOBS_API_KEY?: string } = process.env,
+): void {
+  if (env.NODE_ENV !== "production") return;
+
+  if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET === SEGREDO_PADRAO) {
+    throw new ErroConfiguracao(
+      "BETTER_AUTH_SECRET ainda e o valor de exemplo do .env.example; gere um segredo de verdade antes de subir em producao.",
+    );
+  }
+  if (!env.JOBS_API_KEY || env.JOBS_API_KEY === SEGREDO_PADRAO) {
+    throw new ErroConfiguracao(
+      "JOBS_API_KEY ainda e o valor de exemplo do .env.example; gere uma chave de verdade antes de subir em producao.",
+    );
+  }
+}
+
+verificarSegredosDeProducao();
+
 export function hojeISO(d = new Date()): string {
   // Data local do Brasil (o servidor pode estar em UTC)
   const fmt = new Intl.DateTimeFormat("en-CA", {

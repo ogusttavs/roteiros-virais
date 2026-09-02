@@ -8,6 +8,18 @@ import { auth } from "@/lib/auth";
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroAcessoNegado extends Error {}
 
+/**
+ * Segunda camada de defesa para acoes de admin (revisao da etapa 3,
+ * PROXIMO.md): confere o papel explicitamente, em vez de confiar so no
+ * auth.api.createUser recusar quem nao e admin. Funcao pura, para testar
+ * sem precisar de uma sessao de verdade.
+ */
+export function garantirSessaoAdmin(sessao: { user: { role?: string | null } } | null): void {
+  if (!sessao || sessao.user.role !== "admin") {
+    throw new ErroAcessoNegado("So um administrador pode fazer isso.");
+  }
+}
+
 export async function clienteDoUsuario(usuarioId: string): Promise<Cliente | null> {
   const [cliente] = await db().select().from(clientes).where(eq(clientes.usuarioId, usuarioId));
   return cliente ?? null;
