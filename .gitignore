@@ -5,3 +5,9 @@ node_modules/
 dados/
 *.log
 .DS_Store
+next-env.d.ts
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+.vercel

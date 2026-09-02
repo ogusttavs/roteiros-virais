@@ -1,0 +1,23 @@
+# Ambiente local: so o Postgres. O app roda com `npm run dev` fora do Docker.
+# Subir: npm run db:up   (docker compose -f compose.dev.yml up -d)
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: roteiros-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: roteiros
+      POSTGRES_PASSWORD: roteiros
+      POSTGRES_DB: roteiros
+    ports:
+      - "5432:5432"
+    volumes:
+      - roteiros_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roteiros"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  roteiros_pg:

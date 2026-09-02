@@ -1,0 +1,369 @@
+/**
+ * Schema do banco. Postgres 16, local (compose.dev.yml) e em producao, o mesmo
+ * banco nos dois lugares. Nomes em portugues para bater com os documentos do
+ * projeto.
+ *
+ * Regra de ouro (escopo 5.8): o banco e a fonte da verdade. O roteiro sai sempre
+ * do que esta guardado aqui, nunca de busca ao vivo.
+ */
+import {
+  boolean,
+  date,
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
+const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
+
+// ---------------------------------------------------------------------------
+// Pessoas e contas de acesso
+// ---------------------------------------------------------------------------
+
+export const nichos = pgTable("nichos", {
+  id: id(),
+  slug: text("slug").notNull().unique(),
+  nome: text("nome").notNull(),
+  descricao: text("descricao"),
+  /** Termos de busca do nicho (chave de cache da pesquisa). */
+  termos: jsonb("termos").$type<string[]>().notNull().default([]),
+  ativo: boolean("ativo").notNull().default(true),
+  criadoEm: criadoEm(),
+});
+
+export const clientes = pgTable("clientes", {
+  id: id(),
+  nome: text("nome").notNull(),
+  nichoId: integer("nicho_id").references(() => nichos.id),
+  cidade: text("cidade"),
+  /** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
+  persona: text("persona").$type<"negocio" | "criador">().notNull().default("negocio"),
+  /** Camada exclusiva de pesquisa (escopo 5.6): concorrentes, termos e perfis dele. */
+  camadaExclusiva: jsonb("camada_exclusiva")
+    .$type<{ concorrentes: string[]; termos: string[]; perfis: string[] }>()
+    .notNull()
+    .default({ concorrentes: [], termos: [], perfis: [] }),
+  ativo: boolean("ativo").notNull().default(true),
+  criadoEm: criadoEm(),
+});
+
+export const usuarios = pgTable("usuarios", {
+  id: id(),
+  email: text("email").notNull().unique(),
+  senhaHash: text("senha_hash").notNull(),
+  nome: text("nome").notNull(),
+  papel: text("papel").$type<"admin" | "cliente">().notNull().default("cliente"),
+  clienteId: integer("cliente_id").references(() => clientes.id),
+  criadoEm: criadoEm(),
+});
+
+// ---------------------------------------------------------------------------
+// Briefing vivo (escopo 4.1)
+// ---------------------------------------------------------------------------
+
+export type AvaliacaoResposta = {
+  nota: number;
+  bom: string;
+  melhorar: string;
+  como: string;
+  impacto: string;
+};
+
+export const briefings = pgTable("briefings", {
+  id: id(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id)
+    .unique(),
+  /** perguntaId -> resposta do cliente */
+  respostas: jsonb("respostas").$type<Record<string, string>>().notNull().default({}),
+  /** perguntaId -> avaliacao em quatro partes */
+  avaliacoes: jsonb("avaliacoes").$type<Record<string, AvaliacaoResposta>>().notNull().default({}),
+  notaGeral: numeric("nota_geral", { precision: 4, scale: 2 }),
+  /** true quando a nota geral chegou a 8 (gate da plataforma) */
+  completo: boolean("completo").notNull().default(false),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Motor de pesquisa (escopo 5)
+// ---------------------------------------------------------------------------
+
+export type Plataforma = "youtube" | "tiktok" | "instagram";
+
+export const contas = pgTable(
+  "contas",
+  {
+    id: id(),
+    plataforma: text("plataforma").$type<Plataforma>().notNull(),
+    handle: text("handle").notNull(),
+    nome: text("nome"),
+    url: text("url"),
+    seguidores: integer("seguidores"),
+    nichoId: integer("nicho_id").references(() => nichos.id),
+    /** Entra na lista de vigilancia do nicho (escopo 5.3) */
+    vigiada: boolean("vigiada").notNull().default(false),
+    /** Mediana de views dos videos coletados da conta (base do fora-da-curva) */
+    medianaViews: numeric("mediana_views", { precision: 14, scale: 2 }),
+    /** Fracao dos videos da conta que ficaram fora da curva (ranking da vigilancia) */
+    taxaForaDaCurva: numeric("taxa_fora_da_curva", { precision: 6, scale: 4 }),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],
+);
+
+export type AnaliseVideo = {
+  assunto: string;
+  gancho: string;
+  estrutura: string;
+  fechamento: string;
+  cta: string;
+  formato: "fala_para_camera" | "podcast" | "caixinha" | "esquete" | "outro";
+  porQueFuncionou: string;
+};
+
+export type AnaliseVisual = {
+  falaParaCamera: boolean;
+  textoNaTela: { quando: string; onde: string; oQue: string }[];
+  cenario: string;
+  ritmoDeCorte: string;
+  recursos: string[];
+  momentoChave: { segundo: number; oQue: string } | null;
+};
+
+export const videos = pgTable(
+  "videos",
+  {
+    id: id(),
+    plataforma: text("plataforma").$type<Plataforma>().notNull(),
+    idExterno: text("id_externo").notNull(),
+    url: text("url").notNull(),
+    contaId: integer("conta_id").references(() => contas.id),
+    nichoId: integer("nicho_id").references(() => nichos.id),
+    titulo: text("titulo"),
+    descricao: text("descricao"),
+    publicadoEm: timestamp("publicado_em", { withTimezone: true }),
+    duracaoS: integer("duracao_s"),
+    views: integer("views").notNull().default(0),
+    likes: integer("likes").notNull().default(0),
+    comentarios: integer("comentarios").notNull().default(0),
+    /** views / mediana da conta (escopo 5.1) */
+    foraDaCurva: numeric("fora_da_curva", { precision: 10, scale: 3 }),
+    /** views por hora desde a postagem */
+    velocidade: numeric("velocidade", { precision: 14, scale: 3 }),
+    /** velocidade / mediana de velocidade da conta */
+    velocidadeRelativa: numeric("velocidade_relativa", { precision: 10, scale: 3 }),
+    transcricao: text("transcricao"),
+    analise: jsonb("analise").$type<AnaliseVideo>(),
+    analiseVisual: jsonb("analise_visual").$type<AnaliseVisual>(),
+    /** "coleta" veio do motor, "seed" e exemplo de desenvolvimento, "curadoria" foi posto pela equipe */
+    origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
+    coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("videos_plataforma_id_externo").on(t.plataforma, t.idExterno),
+    index("videos_nicho_publicado").on(t.nichoId, t.publicadoEm),
+    index("videos_nicho_fora_da_curva").on(t.nichoId, t.foraDaCurva),
+  ],
+);
+
+export const noticias = pgTable("noticias", {
+  id: id(),
+  nichoId: integer("nicho_id").references(() => nichos.id),
+  titulo: text("titulo").notNull(),
+  url: text("url").notNull().unique(),
+  fonte: text("fonte"),
+  publicadoEm: timestamp("publicado_em", { withTimezone: true }),
+  resumo: text("resumo"),
+  relevante: boolean("relevante"),
+  /** Angulo sugerido para virar roteiro ("saiu hoje que X, explique o que muda para o seu cliente") */
+  angulo: text("angulo"),
+  coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ModeloNicho = {
+  resumo: string;
+  ganchos: { tipo: string; exemplo: string; frequencia: string }[];
+  duracaoTipicaS: { min: number; max: number };
+  estruturas: string[];
+  fechamentos: string[];
+  ctas: string[];
+  formatos: { formato: string; participacao: string }[];
+  edicao: {
+    textoNaTela: string;
+    ritmoDeCorte: string;
+    recursos: string[];
+    audio: string | null;
+  };
+  assuntosQuentes: string[];
+  baseadoEm: number;
+};
+
+export const modelosNicho = pgTable("modelos_nicho", {
+  id: id(),
+  nichoId: integer("nicho_id")
+    .notNull()
+    .references(() => nichos.id),
+  semana: date("semana").notNull(),
+  modelo: jsonb("modelo").$type<ModeloNicho>().notNull(),
+  criadoEm: criadoEm(),
+});
+
+export type TemaDoDia = {
+  titulo: string;
+  descricao: string;
+  porQue: string;
+  /** ids de videos que sustentam o tema (evidencia) */
+  evidencias: number[];
+  /** objetivo que o tema puxa mais: alcance, engajamento ou conversao (taxonomia interna, escopo 4.3) */
+  puxaPara: "alcance" | "engajamento" | "conversao";
+};
+
+export const temasDia = pgTable(
+  "temas_dia",
+  {
+    id: id(),
+    nichoId: integer("nicho_id")
+      .notNull()
+      .references(() => nichos.id),
+    data: date("data").notNull(),
+    temas: jsonb("temas").$type<TemaDoDia[]>().notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("temas_dia_nicho_data").on(t.nichoId, t.data)],
+);
+
+// ---------------------------------------------------------------------------
+// O que o cliente faz no painel (escopo 4.2 a 4.9)
+// ---------------------------------------------------------------------------
+
+export type Pilar = "viralizar" | "gerarCliente" | "encaixe" | "novidade" | "facilidade";
+export type NotaPilar = { nota: number; justificativa: string };
+
+export const avaliacoesTema = pgTable("avaliacoes_tema", {
+  id: id(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id),
+  tema: text("tema").notNull(),
+  pilares: jsonb("pilares").$type<Record<Pilar, NotaPilar>>().notNull(),
+  nota: numeric("nota", { precision: 4, scale: 2 }).notNull(),
+  recomendacao: text("recomendacao").notNull(),
+  anguloSugerido: text("angulo_sugerido"),
+  evidencias: jsonb("evidencias").$type<number[]>().notNull().default([]),
+  criadoEm: criadoEm(),
+});
+
+export type Objetivo = "alcance" | "engajamento" | "conversao";
+
+export type ConteudoRoteiro = {
+  titulo: string;
+  duracaoS: number;
+  gancho: string;
+  corpo: string;
+  fechamento: string;
+  cta: string;
+  cenas: { momento: string; oQueFazer: string }[];
+  /** Por que este roteiro so funciona com a pessoa de verdade (tese do produto) */
+  ondeGravar: string;
+  edicao: {
+    textoNaTela: { quando: string; oQue: string; onde: string }[];
+    ritmoDeCorte: string;
+    recursos: string[];
+    audio: string | null;
+    referencia: { videoId: number | null; segundo: number | null; oQueOlhar: string } | null;
+  };
+};
+
+export const roteiros = pgTable(
+  "roteiros",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    data: date("data").notNull(),
+    tema: text("tema").notNull(),
+    origem: text("origem").$type<"sugerido" | "livre">().notNull(),
+    objetivo: text("objetivo").$type<Objetivo>().notNull(),
+    conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
+    referenciaVideoId: integer("referencia_video_id").references(() => videos.id),
+    versao: integer("versao").notNull().default(1),
+    status: text("status").$type<"gerado" | "gravado" | "postado">().notNull().default("gerado"),
+    urlPostado: text("url_postado"),
+    postadoEm: timestamp("postado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],
+);
+
+export const favoritos = pgTable(
+  "favoritos",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("favoritos_cliente_video").on(t.clienteId, t.videoId)],
+);
+
+/** Videos postados pelo cliente (acompanhamento da curva, escopo 4.8, fase 3) */
+export const videosCliente = pgTable("videos_cliente", {
+  id: id(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id),
+  roteiroId: integer("roteiro_id").references(() => roteiros.id),
+  plataforma: text("plataforma").$type<Plataforma>(),
+  url: text("url").notNull(),
+  idExterno: text("id_externo"),
+  postadoEm: timestamp("postado_em", { withTimezone: true }).notNull().defaultNow(),
+  ultimaColeta: timestamp("ultima_coleta", { withTimezone: true }),
+});
+
+export const metricasVideoCliente = pgTable("metricas_video_cliente", {
+  id: id(),
+  videoClienteId: integer("video_cliente_id")
+    .notNull()
+    .references(() => videosCliente.id),
+  coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
+  views: integer("views").notNull().default(0),
+  likes: integer("likes").notNull().default(0),
+  comentarios: integer("comentarios").notNull().default(0),
+});
+
+// ---------------------------------------------------------------------------
+// Operacao
+// ---------------------------------------------------------------------------
+
+export const execucoesJob = pgTable("execucoes_job", {
+  id: id(),
+  nome: text("nome").notNull(),
+  iniciadoEm: timestamp("iniciado_em", { withTimezone: true }).notNull().defaultNow(),
+  terminadoEm: timestamp("terminado_em", { withTimezone: true }),
+  status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
+  resumo: jsonb("resumo").$type<Record<string, unknown>>(),
+  erro: text("erro"),
+});
+
+export type Nicho = typeof nichos.$inferSelect;
+export type Cliente = typeof clientes.$inferSelect;
+export type Usuario = typeof usuarios.$inferSelect;
+export type Briefing = typeof briefings.$inferSelect;
+export type Conta = typeof contas.$inferSelect;
+export type Video = typeof videos.$inferSelect;
+export type Noticia = typeof noticias.$inferSelect;
+export type Roteiro = typeof roteiros.$inferSelect;
+export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
