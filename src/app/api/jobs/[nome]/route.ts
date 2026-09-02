@@ -1,20 +1,21 @@
 import { NextResponse } from "next/server";
 
-import { rodarColetaNoticias } from "@/jobs/coleta-noticias";
-import { rodarColetaYoutube } from "@/jobs/coleta-youtube";
-import { executarComRegistro } from "@/jobs/execucoes";
-import { FILAS } from "@/jobs/fila";
+import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
-const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
-  [FILAS.coletaYoutube]: rodarColetaYoutube,
-  [FILAS.coletaNoticias]: rodarColetaNoticias,
-};
+const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
 
 /**
  * Dispara um job de fora (etapa 6, decisao do Fable): cabecalho x-jobs-key
  * igual a JOBS_API_KEY, senao 401. O botao "rodar agora" do admin (parte 2)
  * chama esta mesma rota.
+ *
+ * Enfileira em vez de rodar o job dentro da requisicao (revisao da etapa 6,
+ * parte 1, PROXIMO.md): uma coleta pode levar minutos, tempo demais para uma
+ * requisicao HTTP seguir aberta. O worker (`src/jobs/worker.ts`) e quem
+ * processa a fila e grava o resultado em `execucoes_job`; esta rota so
+ * confirma que o job entrou na fila. `npm run job -- <nome>` continua
+ * rodando o job direto, sem passar pela fila, para os testes com chave real.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ nome: string }> }) {
   const chave = request.headers.get("x-jobs-key");
@@ -23,21 +24,19 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
   }
 
   const { nome } = await params;
-  const tarefa = TAREFAS[nome];
-  if (!tarefa) {
+  if (!NOMES_VALIDOS.has(nome)) {
     return NextResponse.json({ erro: `job desconhecido: ${nome}` }, { status: 404 });
   }
 
   try {
-    const resultado = await executarComRegistro(nome, tarefa);
-    if (resultado.status === "erro") {
-      return NextResponse.json({ ok: false, job: nome, erro: resultado.erro }, { status: 502 });
-    }
-    return NextResponse.json({ ok: true, job: nome, resumo: resultado.resumo });
+    await garantirBossPronto();
   } catch (erro) {
     return NextResponse.json(
-      { ok: false, job: nome, erro: erro instanceof Error ? erro.message : String(erro) },
-      { status: 502 },
+      { erro: `fila de jobs indisponivel: ${erro instanceof Error ? erro.message : String(erro)}` },
+      { status: 503 },
     );
   }
+
+  const id = await boss().send(nome);
+  return NextResponse.json({ ok: true, job: nome, enfileirado: id }, { status: 202 });
 }
