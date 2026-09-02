@@ -1,13 +1,17 @@
 /**
  * Schema do banco. Postgres 16, local (compose.dev.yml) e em producao, o mesmo
  * banco nos dois lugares. Nomes em portugues para bater com os documentos do
- * projeto.
+ * projeto; as quatro tabelas do better-auth (user, session, account,
+ * verification) ficam em ingles, que e o nome usual delas (CLAUDE.md,
+ * convencao de nomes).
  *
  * Regra de ouro (escopo 5.8): o banco e a fonte da verdade. O roteiro sai sempre
  * do que esta guardado aqui, nunca de busca ao vivo.
  */
+import { sql } from "drizzle-orm";
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -21,6 +25,71 @@ import {
 
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
+
+/** Coluna tsvector (Drizzle nao tem um tipo pronto para ela). */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Autenticacao (better-auth, adaptador Drizzle). Schema gerado a partir de
+// betterAuth({ emailAndPassword: { enabled: true }, plugins: [magicLink(...)] })
+// via better-auth/db getSchema, na versao instalada (1.7.2).
+// ---------------------------------------------------------------------------
+
+export const user = pgTable("user", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  emailVerified: boolean("emailVerified").notNull().default(false),
+  image: text("image"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const session = pgTable("session", {
+  id: text("id").primaryKey(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  token: text("token").notNull().unique(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+  ipAddress: text("ipAddress"),
+  userAgent: text("userAgent"),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+});
+
+export const account = pgTable("account", {
+  id: text("id").primaryKey(),
+  issuer: text("issuer").notNull(),
+  accountId: text("accountId").notNull(),
+  providerId: text("providerId").notNull(),
+  userId: text("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  accessToken: text("accessToken"),
+  refreshToken: text("refreshToken"),
+  idToken: text("idToken"),
+  accessTokenExpiresAt: timestamp("accessTokenExpiresAt", { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp("refreshTokenExpiresAt", { withTimezone: true }),
+  scope: text("scope"),
+  /** So a conta do provedor "credential" tem senha. */
+  password: text("password"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const verification = pgTable("verification", {
+  id: text("id").primaryKey(),
+  identifier: text("identifier").notNull(),
+  value: text("value").notNull(),
+  expiresAt: timestamp("expiresAt", { withTimezone: true }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
+});
 
 // ---------------------------------------------------------------------------
 // Pessoas e contas de acesso
@@ -37,29 +106,37 @@ export const nichos = pgTable("nichos", {
   criadoEm: criadoEm(),
 });
 
+/** Quem grava os videos do cliente (briefing-e-rubricas.md, secao 1). */
+export type QuemGrava = "propria_pessoa" | "pessoa_e_equipe";
+
+/** Perfis do cliente nas redes, coletados no briefing (secao 1). */
+export type PerfisCliente = {
+  instagram: string | null;
+  tiktok: string | null;
+  youtube: string | null;
+};
+
 export const clientes = pgTable("clientes", {
   id: id(),
+  /** Usuario do better-auth que administra esta conta de cliente. */
+  usuarioId: text("usuario_id")
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
   cidade: text("cidade"),
+  bairro: text("bairro"),
   /** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
   persona: text("persona").$type<"negocio" | "criador">().notNull().default("negocio"),
+  perfis: jsonb("perfis").$type<PerfisCliente>(),
+  quemGrava: text("quem_grava").$type<QuemGrava>(),
   /** Camada exclusiva de pesquisa (escopo 5.6): concorrentes, termos e perfis dele. */
   camadaExclusiva: jsonb("camada_exclusiva")
     .$type<{ concorrentes: string[]; termos: string[]; perfis: string[] }>()
     .notNull()
     .default({ concorrentes: [], termos: [], perfis: [] }),
   ativo: boolean("ativo").notNull().default(true),
-  criadoEm: criadoEm(),
-});
-
-export const usuarios = pgTable("usuarios", {
-  id: id(),
-  email: text("email").notNull().unique(),
-  senhaHash: text("senha_hash").notNull(),
-  nome: text("nome").notNull(),
-  papel: text("papel").$type<"admin" | "cliente">().notNull().default("cliente"),
-  clienteId: integer("cliente_id").references(() => clientes.id),
   criadoEm: criadoEm(),
 });
 
@@ -162,6 +239,12 @@ export const videos = pgTable(
     transcricao: text("transcricao"),
     analise: jsonb("analise").$type<AnaliseVideo>(),
     analiseVisual: jsonb("analise_visual").$type<AnaliseVisual>(),
+    /** Palavras-chave da extracao (etapa 8), usadas em filtro e evidencia. */
+    etiquetas: jsonb("etiquetas").$type<string[]>().notNull().default([]),
+    /** titulo + descricao + transcricao + analise.assunto, para busca de evidencia. */
+    busca: tsvector("busca").generatedAlwaysAs(
+      sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
+    ),
     /** "coleta" veio do motor, "seed" e exemplo de desenvolvimento, "curadoria" foi posto pela equipe */
     origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
@@ -171,6 +254,7 @@ export const videos = pgTable(
     uniqueIndex("videos_plataforma_id_externo").on(t.plataforma, t.idExterno),
     index("videos_nicho_publicado").on(t.nichoId, t.publicadoEm),
     index("videos_nicho_fora_da_curva").on(t.nichoId, t.foraDaCurva),
+    index("videos_busca_idx").using("gin", t.busca),
   ],
 );
 
@@ -358,12 +442,37 @@ export const execucoesJob = pgTable("execucoes_job", {
   erro: text("erro"),
 });
 
+/** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */
+export type AvaliacaoGeracao = "gostei" | "nao_gostei" | "outro_angulo";
+
+/** Registro de toda chamada de IA (escopo 5.9): entrada, saida, custo e nota. */
+export const geracoesIA = pgTable("geracoes_ia", {
+  id: id(),
+  tarefa: text("tarefa").notNull(),
+  versaoPrompt: text("versao_prompt").notNull(),
+  modelo: text("modelo").notNull(),
+  /** Nulo em tarefas de nicho ou do sistema, sem cliente especifico. */
+  clienteId: integer("cliente_id").references(() => clientes.id),
+  /** Nunca inclui dado de outro cliente (isolamento entre clientes). */
+  entradas: jsonb("entradas").$type<Record<string, unknown>>().notNull(),
+  /** ids de video ou noticia usados como evidencia. */
+  evidencias: jsonb("evidencias").$type<number[]>().notNull().default([]),
+  saida: jsonb("saida").$type<Record<string, unknown>>(),
+  tokensEntrada: integer("tokens_entrada").notNull().default(0),
+  tokensSaida: integer("tokens_saida").notNull().default(0),
+  tokensCache: integer("tokens_cache").notNull().default(0),
+  custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  avaliacao: text("avaliacao").$type<AvaliacaoGeracao>(),
+  motivoAvaliacao: text("motivo_avaliacao"),
+  criadoEm: criadoEm(),
+});
+
 export type Nicho = typeof nichos.$inferSelect;
 export type Cliente = typeof clientes.$inferSelect;
-export type Usuario = typeof usuarios.$inferSelect;
 export type Briefing = typeof briefings.$inferSelect;
 export type Conta = typeof contas.$inferSelect;
 export type Video = typeof videos.$inferSelect;
 export type Noticia = typeof noticias.$inferSelect;
 export type Roteiro = typeof roteiros.$inferSelect;
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
+export type GeracaoIA = typeof geracoesIA.$inferSelect;

@@ -7,7 +7,8 @@ import { globSync, readFileSync } from "node:fs";
 
 export const PADROES = ["src/**/*.tsx", "src/textos/**/*.ts", "src/ia/prompts/**/*.ts"];
 
-export const TRAVESSAO = /—/;
+/** Travessao, escrito como escape para o repositorio ficar limpo num grep pelo caractere. */
+export const TRAVESSAO = /\u2014/;
 export const EMOJI = /\p{Extended_Pictographic}/u;
 
 export const JARGAO: { proibido: RegExp; usar: string }[] = [
