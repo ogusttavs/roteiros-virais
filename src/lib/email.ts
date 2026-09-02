@@ -9,11 +9,15 @@ function resend(): Resend {
   return cliente;
 }
 
+/** Nome proprio para nao sumir num catch generico (revisao da etapa 3). */
+export class ErroEmail extends Error {}
+
 /**
  * Fora de producao, o e-mail sai no log em vez de ser enviado de verdade
  * (plano de execucao, etapa 3), mesmo que exista uma RESEND_API_KEY no
- * `.env` local. Em producao sem chave, tambem cai no log, para nao derrubar
- * o fluxo por uma chave que faltou configurar.
+ * `.env` local. Em producao sem chave, lanca ErroEmail em vez de cair no
+ * log em silencio: link magico que some sem aviso e o tipo de falha que
+ * ninguem percebe (revisao da etapa 3, PROXIMO.md).
  */
 export async function enviarEmail(opcoes: {
   para: string;
@@ -22,10 +26,14 @@ export async function enviarEmail(opcoes: {
 }): Promise<void> {
   const producao = process.env.NODE_ENV === "production";
 
-  if (!producao || !config.email.resendKey) {
+  if (!producao) {
     console.log(`[e-mail simulado] para ${opcoes.para}, assunto "${opcoes.assunto}"`);
     console.log(opcoes.html);
     return;
+  }
+
+  if (!config.email.resendKey) {
+    throw new ErroEmail("RESEND_API_KEY nao configurada em producao; o e-mail nao foi enviado.");
   }
 
   await resend().emails.send({

@@ -18,6 +18,13 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
+    /**
+     * plataforma/CLAUDE.md: todo teste roda em mock. So vale para um
+     * servidor novo, que este comando sobe; um `npm run dev` ja rodando na
+     * porta e reusado do jeito que esta (reuseExistingServer acima), com o
+     * provedor que ele ja tinha.
+     */
+    env: { AI_PROVIDER: "mock" },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });

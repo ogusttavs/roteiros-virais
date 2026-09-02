@@ -146,7 +146,7 @@ function gerarVideos(
       gancho: "os 3 primeiros segundos mostram o resultado antes de explicar",
       estrutura: "gancho, explicacao curta, demonstracao, fechamento",
       fechamento: "resumo do que foi mostrado",
-      cta: "comenta se voce ja passou por isso",
+      chamadaFinal: "comenta se voce ja passou por isso",
       formato: FORMATOS[i % FORMATOS.length],
       porQueFuncionou: "mostra o problema real acontecendo, nao so fala sobre ele",
     };
