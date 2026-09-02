@@ -17,6 +17,10 @@ export const config = {
   appName: env("APP_NAME", "seu painel"),
   appUrl: env("APP_URL", "http://localhost:3000"),
   jobsApiKey: env("JOBS_API_KEY", ""),
+  auth: {
+    secret: env("BETTER_AUTH_SECRET", "troque-em-producao"),
+    url: env("BETTER_AUTH_URL", "http://localhost:3000"),
+  },
   ia: {
     provedor: provedorIA(),
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),

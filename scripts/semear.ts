@@ -105,13 +105,14 @@ type ResumoSeed = {
 
 async function criarUsuarioComSenha(
   db: Db,
-  dados: { id: string; nome: string; email: string },
+  dados: { id: string; nome: string; email: string; role: "admin" | "cliente" },
 ): Promise<void> {
   await db.insert(user).values({
     id: dados.id,
     name: dados.nome,
     email: dados.email,
     emailVerified: true,
+    role: dados.role,
   });
   await db.insert(account).values({
     id: `${dados.id}-credential`,
@@ -178,6 +179,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
     id: "seed-admin",
     nome: "[exemplo] Administrador",
     email: "admin@exemplo.teste",
+    role: "admin",
   });
 
   const nichosCriados = await db.insert(nichos).values(NICHOS_SEED).returning();
@@ -225,6 +227,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       id: clienteSeed.usuarioId,
       nome: clienteSeed.nome,
       email: `${clienteSeed.usuarioId}@exemplo.teste`,
+      role: "cliente",
     });
     await db.insert(clientes).values({
       usuarioId: clienteSeed.usuarioId,
