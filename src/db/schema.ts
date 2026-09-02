@@ -127,6 +127,9 @@ export type PerfisCliente = {
   youtube: string | null;
 };
 
+/** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
+export type Persona = "negocio" | "criador";
+
 export const clientes = pgTable("clientes", {
   id: id(),
   /** Usuario do better-auth que administra esta conta de cliente. */
@@ -138,8 +141,9 @@ export const clientes = pgTable("clientes", {
   nichoId: integer("nicho_id").references(() => nichos.id),
   cidade: text("cidade"),
   bairro: text("bairro"),
-  /** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
-  persona: text("persona").$type<"negocio" | "criador">().notNull().default("negocio"),
+  /** Texto do ramo quando o cliente escolheu "outro" na lista (briefing-e-rubricas.md, secao 1). */
+  ramoOutro: text("ramo_outro"),
+  persona: text("persona").$type<Persona>().notNull().default("negocio"),
   perfis: jsonb("perfis").$type<PerfisCliente>(),
   quemGrava: text("quem_grava").$type<QuemGrava>(),
   /**
@@ -167,6 +171,22 @@ export type AvaliacaoResposta = {
   impacto: string;
 };
 
+/** Perfil compilado (briefing-e-rubricas.md, secao 4; tarefa compilarPerfil). */
+export type PerfilCompilado = {
+  fatos: {
+    oQueVende: string;
+    preco: string;
+    clienteIdeal: string;
+    medos: string[];
+    frasesDaFala: string[];
+    proibicoes: string[];
+    cenasFilmaveis: string[];
+    concorrentes: string[];
+    perfisAdmirados: string[];
+  };
+  resumo: string;
+};
+
 export const briefings = pgTable("briefings", {
   id: id(),
   clienteId: integer("cliente_id")
@@ -180,6 +200,8 @@ export const briefings = pgTable("briefings", {
   notaGeral: numeric("nota_geral", { precision: 4, scale: 2 }),
   /** true quando a nota geral chegou a 8 (gate da plataforma) */
   completo: boolean("completo").notNull().default(false),
+  /** Gerado na liberacao e recompilado a cada edicao posterior (tarefa compilarPerfil). */
+  perfil: jsonb("perfil").$type<PerfilCompilado>(),
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 

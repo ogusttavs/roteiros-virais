@@ -1,11 +1,15 @@
 import { z } from "zod";
 
+import type { EsforcoIA, NivelIA } from "../tipos";
+
 /**
  * Modelo semanal do nicho (escopo 5.9.5, base lenta; usado a partir da
  * etapa 9). Guarda ganchos e fechamentos como frases reais, nao como
  * descricoes abstratas: o modelo imita exemplo melhor do que segue regra.
  */
-export const versao = "1.0.0";
+export const versao = "1.1.0";
+export const nivel: NivelIA = "forte";
+export const esforco: EsforcoIA | undefined = "medium";
 
 const ganchoComExemplo = z.object({
   tipo: z.string(),
@@ -34,26 +38,28 @@ export const schema = z.object({
 export type SaidaModeloNicho = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(): string {
-  return `Voce junta as analises de trinta a sessenta videos fora da curva das ultimas doze
-semanas de um nicho, mais dez analises visuais dos melhores da semana, e escreve o modelo do
-nicho: o que estruturalmente funciona ali, para servir de referencia a quem escreve roteiro
+  return `Você junta as análises de trinta a sessenta vídeos fora da curva das últimas doze
+semanas de um nicho, mais dez análises visuais dos melhores da semana, e escreve o modelo do
+nicho: o que estruturalmente funciona ali, para servir de referência a quem escreve roteiro
 depois.
 
 - resumo: como esse nicho fala e o que funciona nele, em poucas frases.
 - ganchos: tipos de gancho que se repetem, cada um com um exemplo literal (copiado de um
-  video de verdade, nunca inventado) e a frequencia com que aparece.
-- duracaoTipicaS: a faixa de duracao dos videos que mais funcionam.
-- estruturas: os jeitos mais comuns de organizar o video.
+  vídeo de verdade, nunca inventado) e a frequência com que aparece.
+- duracaoTipicaS: a faixa de duração dos vídeos que mais funcionam.
+- estruturas: os jeitos mais comuns de organizar o vídeo.
 - fechamentos: frases ou jeitos de fechamento que se repetem.
-- chamadasFinais: o que os videos pedem no final, com frequencia.
+- chamadasFinais: o que os vídeos pedem no final, com frequência.
 - formatos: fala_para_camera, podcast, caixinha, esquete ou outro, com o quanto cada um
   aparece.
-- edicao: o texto na tela, o ritmo de corte, os recursos e o audio que se repetem entre os
+- edicao: o texto na tela, o ritmo de corte, os recursos e o áudio que se repetem entre os
   melhores da semana.
-- assuntosQuentes: os assuntos que mais aparecem nas evidencias recebidas.
+- assuntosQuentes: os assuntos que mais aparecem nas evidências recebidas.
 
-Sempre cite frases e exemplos literais das analises recebidas, nunca invente. Sem
-travessao, sem emoji.`;
+Sempre cite frases e exemplos literais das análises recebidas, nunca invente. Sem
+travessão, sem emoji.
+
+Escreva em português do Brasil, com acentuação correta.`;
 }
 
 export function montarEntrada(dados: {

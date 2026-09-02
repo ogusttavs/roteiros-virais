@@ -25,6 +25,11 @@ export async function clienteDoUsuario(usuarioId: string): Promise<Cliente | nul
   return cliente ?? null;
 }
 
+export async function clientePorId(clienteId: number): Promise<Cliente | null> {
+  const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+  return cliente ?? null;
+}
+
 export async function briefingCompleto(clienteId: number): Promise<boolean> {
   const [briefing] = await db()
     .select({ completo: briefings.completo })

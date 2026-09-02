@@ -3,6 +3,7 @@ node_modules/
 .env
 .env.local
 dados/
+avaliacoes-privadas/
 *.log
 .DS_Store
 next-env.d.ts

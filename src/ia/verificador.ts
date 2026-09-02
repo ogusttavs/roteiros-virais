@@ -99,7 +99,8 @@ async function tentarGerarEVerificar<T>(
     const textoJunto = Object.values(campos).join("\n");
     const verificacao = await gerarEstruturado({
       tarefa: "verificarTexto",
-      nivel: "barato",
+      nivel: verificarTexto.nivel,
+      effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
       sistemaEstavel: verificarTexto.montarSistemaEstavel(),
       entrada: verificarTexto.montarEntrada({
@@ -114,7 +115,7 @@ async function tentarGerarEVerificar<T>(
       tarefa: "verificarTexto",
       versaoPrompt: verificarTexto.versao,
       modelo: verificacao.modelo,
-      nivel: "barato",
+      nivel: verificarTexto.nivel,
       clienteId: params.clienteId,
       entradas: { texto: textoJunto },
       saida: verificacao.dados,

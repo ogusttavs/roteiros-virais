@@ -1,13 +1,16 @@
 import { z } from "zod";
 
 import { puxaParaEnum } from "../enums";
+import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
  * Os tres temas do dia (escopo 5.2, camada rapida; usado a partir da etapa
  * 10). puxaParaEnum vem de src/ia/enums.ts para o valor interno nao aparecer
  * como texto literal aqui (ver comentario la).
  */
-export const versao = "1.0.0";
+export const versao = "1.1.0";
+export const nivel: NivelIA = "forte";
+export const esforco: EsforcoIA | undefined = "medium";
 
 const temaDoDia = z.object({
   titulo: z.string(),
@@ -24,19 +27,21 @@ export const schema = z.object({
 export type SaidaTemasDoDia = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(dados: { modeloNicho: string }): string {
-  return `Voce sugere tres temas de video (nao titulos, temas) para donos de pequeno negocio
-de um nicho, a partir do que esta subindo mais rapido nos ultimos dias e das noticias
-relevantes do setor. Cada tema cita ids de video do banco como evidencia; nunca sugira um
-tema sem pelo menos uma evidencia.
+  return `Você sugere três temas de vídeo (não títulos, temas) para donos de pequeno negócio
+de um nicho, a partir do que está subindo mais rápido nos últimos dias e das notícias
+relevantes do setor. Cada tema cita ids de vídeo do banco como evidência; nunca sugira um
+tema sem pelo menos uma evidência.
 
-Para cada tema, diga em duas linhas por que ele esta funcionando agora, e classifique qual
-efeito ele mais puxa: mais gente conhecer o negocio, as pessoas lembrarem dele quando
+Para cada tema, diga em duas linhas por que ele está funcionando agora, e classifique qual
+efeito ele mais puxa: mais gente conhecer o negócio, as pessoas lembrarem dele quando
 precisarem, ou gente ser chamado para comprar.
 
-Sem travessao, sem emoji, sem jargao em titulo nem em descricao.
+Sem travessão, sem emoji, sem jargão em título nem em descrição.
 
 Modelo do nicho:
-${dados.modeloNicho}`;
+${dados.modeloNicho}
+
+Escreva em português do Brasil, com acentuação correta.`;
 }
 
 export function montarEntrada(dados: {
