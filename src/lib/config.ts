@@ -1,5 +1,7 @@
 import "dotenv/config";
 
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
+
 function env(nome: string, padrao = ""): string {
   const v = process.env[nome];
   return v === undefined || v === "" ? padrao : v;
@@ -62,11 +64,17 @@ export class ErroConfiguracao extends Error {}
  * ainda forem o valor de exemplo do .env.example (etapa 4, revisao da
  * etapa 3). Roda sozinha ao carregar este modulo; exportada para testar com
  * um ambiente fabricado, sem depender do process.env real.
+ *
+ * `next build` roda com NODE_ENV=production mesmo local, sem os segredos
+ * reais (que so existem no container em producao); NEXT_PHASE distingue
+ * esse passo de build do servidor rodando de verdade (etapa 4, achado ao
+ * rodar `npm run build` local com o .env.example ainda no .env).
  */
 export function verificarSegredosDeProducao(
-  env: { NODE_ENV?: string; BETTER_AUTH_SECRET?: string; JOBS_API_KEY?: string } = process.env,
+  env: { NODE_ENV?: string; NEXT_PHASE?: string; BETTER_AUTH_SECRET?: string; JOBS_API_KEY?: string } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
+  if (env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) return;
 
   if (!env.BETTER_AUTH_SECRET || env.BETTER_AUTH_SECRET === SEGREDO_PADRAO) {
     throw new ErroConfiguracao(

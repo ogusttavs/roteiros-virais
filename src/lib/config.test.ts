@@ -60,4 +60,15 @@ describe("verificarSegredosDeProducao", () => {
   it("recusa em producao sem nenhum dos dois definido", () => {
     expect(() => verificarSegredosDeProducao({ NODE_ENV: "production" })).toThrow(ErroConfiguracao);
   });
+
+  it("nao faz nada durante `next build`, mesmo com os valores padrao", () => {
+    expect(() =>
+      verificarSegredosDeProducao({
+        NODE_ENV: "production",
+        NEXT_PHASE: "phase-production-build",
+        BETTER_AUTH_SECRET: "troque-em-producao",
+        JOBS_API_KEY: "troque-em-producao",
+      }),
+    ).not.toThrow();
+  });
 });

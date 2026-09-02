@@ -215,7 +215,8 @@ export type AnaliseVideo = {
   gancho: string;
   estrutura: string;
   fechamento: string;
-  cta: string;
+  /** Chamada final do video (nome interno; nunca "CTA" em texto de tela). */
+  chamadaFinal: string;
   formato: "fala_para_camera" | "podcast" | "caixinha" | "esquete" | "outro";
   porQueFuncionou: string;
 };
@@ -293,7 +294,7 @@ export type ModeloNicho = {
   duracaoTipicaS: { min: number; max: number };
   estruturas: string[];
   fechamentos: string[];
-  ctas: string[];
+  chamadasFinais: string[];
   formatos: { formato: string; participacao: string }[];
   edicao: {
     textoNaTela: string;
@@ -368,7 +369,7 @@ export type ConteudoRoteiro = {
   gancho: string;
   corpo: string;
   fechamento: string;
-  cta: string;
+  chamadaFinal: string;
   cenas: { momento: string; oQueFazer: string }[];
   /** Por que este roteiro so funciona com a pessoa de verdade (tese do produto) */
   ondeGravar: string;
