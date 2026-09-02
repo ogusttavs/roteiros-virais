@@ -4,7 +4,7 @@
  * nota geral ponderada, gate de liberacao, perfil compilado e camada
  * exclusiva.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { briefings, clientes, type AvaliacaoResposta, type Briefing } from "@/db/schema";
@@ -15,7 +15,10 @@ import { config } from "@/lib/config";
 
 import { perguntaPorId, PERGUNTAS_BRIEFING } from "../config/briefing";
 
+import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
+
+export { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial };
 
 export class ErroBriefing extends Error {}
 
@@ -42,19 +45,22 @@ async function buscarBriefing(clienteId: number): Promise<Briefing | null> {
 }
 
 /**
- * Nota geral ponderada (secao 4): media ponderada das doze notas, P1, P5,
- * P9 e P11 pesam 2. Pergunta sem avaliacao ainda conta nota 0 na media.
+ * Salva o texto da resposta sem chamar IA (debounce fica na tela). Mesclagem
+ * atomica no proprio SQL (revisao da parte 1): duas chamadas em sequencia
+ * rapida, uma por pergunta, gravavam sobre o objeto lido pela outra e podiam
+ * perder uma resposta. O operador `||` do jsonb mescla so a chave desta
+ * pergunta, sem ler o resto do objeto antes.
+ *
+ * Se o texto do rascunho for diferente do que ja estava salvo, a avaliacao
+ * guardada desta pergunta e apagada na mesma escrita. Achado no teste manual
+ * desta parte: sem isto, um rascunho que muda o texto depois de uma edicao
+ * podia deixar `avaliacoes[perguntaId]` de uma resposta antiga ao lado de
+ * `respostas[perguntaId]` com o texto novo, e o "reusa a avaliacao guardada"
+ * de `avaliarResposta` (que compara so o texto) reusava a nota errada em vez
+ * de chamar a IA de novo. O `case` roda sobre o valor antigo da linha, dentro
+ * do mesmo UPDATE, entao a comparacao e sempre com o que estava salvo antes
+ * desta escrita.
  */
-export function calcularNotaGeral(avaliacoes: Record<string, AvaliacaoResposta>): number {
-  const somaPesos = PERGUNTAS_BRIEFING.reduce((soma, p) => soma + p.peso, 0);
-  const somaPonderada = PERGUNTAS_BRIEFING.reduce(
-    (soma, p) => soma + p.peso * (avaliacoes[p.id]?.nota ?? 0),
-    0,
-  );
-  return Math.round((somaPonderada / somaPesos) * 100) / 100;
-}
-
-/** Salva o texto da resposta sem chamar IA (debounce fica na tela). */
 export async function salvarRascunho(
   clienteId: number,
   perguntaId: string,
@@ -64,10 +70,17 @@ export async function salvarRascunho(
     throw new ErroBriefing(`pergunta desconhecida: ${perguntaId}`);
   }
   const briefing = await garantirBriefing(clienteId);
-  const respostas = { ...briefing.respostas, [perguntaId]: resposta };
   await db()
     .update(briefings)
-    .set({ respostas, atualizadoEm: new Date() })
+    .set({
+      respostas: sql`${briefings.respostas} || ${JSON.stringify({ [perguntaId]: resposta })}::jsonb`,
+      avaliacoes: sql`case
+        when ${briefings.respostas} ->> ${perguntaId} is distinct from ${resposta}
+        then ${briefings.avaliacoes} - ${perguntaId}
+        else ${briefings.avaliacoes}
+      end`,
+      atualizadoEm: new Date(),
+    })
     .where(eq(briefings.id, briefing.id));
 }
 
@@ -83,6 +96,18 @@ export type ResultadoAvaliarResposta = {
  * Avalia uma resposta (ou reusa a avaliacao guardada se o texto nao mudou),
  * recalcula a nota geral, atualiza o gate de liberacao e, quando o
  * briefing esta completo depois de uma avaliacao nova, recompila o perfil.
+ *
+ * O gate e de mao unica (revisao da parte 1): uma vez `completo = true`, uma
+ * edicao que derruba a nota geral abaixo da meta nunca volta a fechar o
+ * painel do cliente.
+ *
+ * A leitura e a escrita que recalculam a nota geral rodam dentro de uma
+ * transacao com `SELECT ... FOR UPDATE` (revisao da parte 1): duas avaliacoes
+ * na mesma pergunta ou em perguntas diferentes, disparadas quase juntas (a
+ * tela avalia ao sair do campo), liam o mesmo objeto `avaliacoes` antigo e a
+ * que gravava por ultimo apagava a da outra. A chamada de IA, que e a parte
+ * lenta, roda antes da transacao comecar, para o lock nao segurar a espera
+ * da rede.
  */
 export async function avaliarResposta(
   clienteId: number,
@@ -122,21 +147,32 @@ export async function avaliarResposta(
     });
   }
 
-  const respostas = { ...briefing.respostas, [perguntaId]: resposta };
-  const avaliacoes = { ...briefing.avaliacoes, [perguntaId]: avaliacao };
-  const notaGeral = calcularNotaGeral(avaliacoes);
-  const completo = notaGeral >= config.regras.notaMinimaBriefing;
+  const { respostas, notaGeral, completo } = await db().transaction(async (tx) => {
+    const [linha] = await tx
+      .select()
+      .from(briefings)
+      .where(eq(briefings.id, briefing.id))
+      .for("update");
+    if (!linha) throw new ErroBriefing("briefing nao encontrado.");
 
-  await db()
-    .update(briefings)
-    .set({
-      respostas,
-      avaliacoes,
-      notaGeral: notaGeral.toFixed(2),
-      completo,
-      atualizadoEm: new Date(),
-    })
-    .where(eq(briefings.id, briefing.id));
+    const respostas = { ...linha.respostas, [perguntaId]: resposta };
+    const avaliacoes = { ...linha.avaliacoes, [perguntaId]: avaliacao };
+    const notaGeral = calcularNotaGeral(avaliacoes);
+    const completo = linha.completo || notaGeral >= config.regras.notaMinimaBriefing;
+
+    await tx
+      .update(briefings)
+      .set({
+        respostas,
+        avaliacoes,
+        notaGeral: notaGeral.toFixed(2),
+        completo,
+        atualizadoEm: new Date(),
+      })
+      .where(eq(briefings.id, briefing.id));
+
+    return { respostas, notaGeral, completo };
+  });
 
   if (completo && !reusada) {
     await compilarEGravarPerfil(clienteId, briefing.id, respostas);

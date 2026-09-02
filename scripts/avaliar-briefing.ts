@@ -4,8 +4,8 @@
  * da com a nota que o Gustavo daria, e imprime a diferenca media. Meta do
  * plano: diferenca media abaixo de 1,0.
  *
- * O arquivo real, com respostas de verdade da Dr.Wash, fica fora do
- * repositorio publico (avaliacoes/README.md explica o formato e o porque).
+ * O arquivo real, com respostas de verdade do primeiro cliente de teste, fica
+ * fora do repositorio publico (avaliacoes/README.md explica o formato e o porque).
  * GOLDEN_SET_DIR aponta para a pasta que tem briefing.json; sem o arquivo
  * real la, roda com avaliacoes/briefing.exemplo.json e avisa que e exemplo.
  */

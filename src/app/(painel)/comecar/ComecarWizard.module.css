@@ -1,0 +1,31 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+}
+
+.corpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  max-width: 40rem;
+}
+
+.introducao {
+  color: var(--cor-texto-suave);
+}
+
+.navegacao {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-3);
+}
+
+.liberacao {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-6);
+  padding: var(--espaco-9) 0;
+}

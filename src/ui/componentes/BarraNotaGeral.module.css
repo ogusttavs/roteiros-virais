@@ -1,0 +1,58 @@
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  background: var(--cor-superficie);
+  border-bottom: 1px solid var(--cor-borda);
+  padding: var(--espaco-3) var(--espaco-4);
+}
+
+.notas {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-6);
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.numero {
+  font-family: var(--fonte-mono);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--cor-titulo);
+  line-height: 1;
+}
+
+.atingiu .numero {
+  color: var(--cor-positivo);
+}
+
+.rotulo {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cor-texto-suave);
+}
+
+.dica {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}
+
+@media (min-width: 768px) {
+  .barra {
+    position: static;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    background: var(--cor-superficie);
+    padding: var(--espaco-5);
+  }
+}

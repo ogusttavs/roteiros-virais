@@ -1,0 +1,59 @@
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  text-align: left;
+}
+
+.titulo {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.ajuda {
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}
+
+.area {
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: 16px;
+  line-height: 1.5;
+  padding: var(--espaco-3) var(--espaco-4);
+  min-height: 120px;
+  resize: vertical;
+}
+
+.area:focus-visible {
+  outline: 2px solid var(--cor-acao);
+  outline-offset: 1px;
+}
+
+.comErro {
+  border-color: var(--cor-erro);
+}
+
+.rodape {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  min-height: 18px;
+}
+
+.erro {
+  font-size: 13px;
+  color: var(--cor-erro);
+}
+
+.contador {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  color: var(--cor-texto-suave);
+  margin-left: auto;
+}

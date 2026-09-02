@@ -1,0 +1,57 @@
+.forma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  max-width: 32rem;
+}
+
+.rotulo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.ajuda {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--cor-texto-suave);
+}
+
+.select {
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: 16px;
+  padding: var(--espaco-3) var(--espaco-4);
+  min-height: 44px;
+}
+
+.grupoOpcoes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.opcao {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--cor-texto);
+  min-height: 44px;
+}
+
+.erro {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cor-erro);
+}

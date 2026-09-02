@@ -12,6 +12,22 @@ const baseURL = `http://localhost:${porta}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
+  /**
+   * Mais de um arquivo de e2e reseta o schema inteiro no beforeAll (o mesmo
+   * padrao dos testes de integracao do Vitest). Com mais de um worker, dois
+   * arquivos rodando em paralelo podiam derrubar o schema um do outro no
+   * meio do teste. Vitest resolve isso com fileParallelism: false no projeto
+   * de integracao; aqui o equivalente e travar num worker so (etapa 5, parte
+   * 2, achado ao acrescentar o segundo arquivo que toca o banco).
+   */
+  workers: 1,
+  /**
+   * Com um worker so, os arquivos de e2e rodam no mesmo processo Node, e
+   * dividem o mesmo pool do Postgres (globalThis, src/db/index.ts). Fechar o
+   * pool no afterAll de um arquivo quebrava o proximo arquivo no mesmo
+   * worker. O teardown global fecha uma vez so, depois de todos os arquivos.
+   */
+  globalTeardown: "./tests/e2e/global-teardown.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",

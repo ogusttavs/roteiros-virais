@@ -10,12 +10,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PERGUNTAS_BRIEFING } from "@/config/briefing";
 import { db, getPool } from "@/db";
 import { clientes, nichos, user } from "@/db/schema";
-import { avaliarResposta, garantirBriefing } from "@/servicos/briefing";
+import { avaliarResposta, garantirBriefing, salvarRascunho } from "@/servicos/briefing";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 let clienteId: number;
 let outroClienteId: number;
+let nichoId: number;
 
 function respostaCurta(): string {
   return "atendimento bom";
@@ -51,6 +52,7 @@ beforeAll(async () => {
 
   clienteId = clienteA.id;
   outroClienteId = clienteB.id;
+  nichoId = nicho.id;
 }, 30_000);
 
 afterAll(async () => {
@@ -87,6 +89,23 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
     expect(cliente?.camadaExclusiva.termos.length).toBeGreaterThan(0);
   });
 
+  it("gate de mao unica: cliente liberado nao fecha o painel se uma edicao derruba a nota geral", async () => {
+    const antes = await garantirBriefing(clienteId);
+    expect(antes.completo).toBe(true);
+
+    // p1 pesa 2; trocar por uma resposta curta derruba a nota geral para baixo de 8.
+    const resultado = await avaliarResposta(clienteId, "p1", respostaCurta());
+    expect(resultado.notaGeral).toBeLessThan(8);
+    expect(resultado.completo).toBe(true);
+
+    const depois = await garantirBriefing(clienteId);
+    expect(depois.completo).toBe(true);
+    expect(Number(depois.notaGeral)).toBeLessThan(8);
+
+    // devolve a resposta concreta, para nao atrapalhar os testes seguintes deste arquivo.
+    await avaliarResposta(clienteId, "p1", respostaConcreta("p1"));
+  });
+
   it("reavaliar a mesma resposta reusa a avaliacao guardada, sem chamar a IA de novo", async () => {
     const resposta =
       'Resposta unica so deste teste, com o numero 7 na frase e a fala "isso e novidade", mencionando o bairro de Realengo.';
@@ -106,5 +125,94 @@ describe("briefing: isolamento entre clientes", () => {
     expect(briefingOutro.respostas.p1).toBeUndefined();
     expect(briefingOutro.completo).toBe(false);
     expect(briefingOutro.perfil).toBeNull();
+  });
+});
+
+describe("briefing: escrita atomica (revisao da parte 1)", () => {
+  it("duas avaliacoes em paralelo, em perguntas diferentes, gravam as duas", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-concorrencia", name: "[teste] Concorrencia", email: "concorrencia@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Concorrencia", nichoId })
+      .returning();
+
+    await Promise.all([
+      avaliarResposta(cliente.id, "p1", respostaConcreta("p1")),
+      avaliarResposta(cliente.id, "p2", respostaConcreta("p2")),
+    ]);
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect(briefing.respostas.p1).toBeDefined();
+    expect(briefing.respostas.p2).toBeDefined();
+    expect(briefing.avaliacoes.p1).toBeDefined();
+    expect(briefing.avaliacoes.p2).toBeDefined();
+  });
+
+  it("rascunho com texto diferente do avaliado invalida a avaliacao guardada, para nao reusar nota errada", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-rascunho-invalida", name: "[teste] Invalida", email: "invalida@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Invalida", nichoId })
+      .returning();
+
+    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"));
+    expect(primeira.reusada).toBe(false);
+
+    // rascunho troca o texto sem passar por avaliarResposta (o que a tela faz a cada 800ms de digitacao).
+    await salvarRascunho(cliente.id, "p1", "bom atendimento");
+
+    const depoisDoRascunho = await garantirBriefing(cliente.id);
+    expect(depoisDoRascunho.respostas.p1).toBe("bom atendimento");
+    expect(depoisDoRascunho.avaliacoes.p1).toBeUndefined();
+
+    // avaliar o texto novo nao pode reusar a avaliacao da resposta concreta anterior.
+    const segunda = await avaliarResposta(cliente.id, "p1", "bom atendimento");
+    expect(segunda.reusada).toBe(false);
+    expect(segunda.avaliacao).not.toEqual(primeira.avaliacao);
+  });
+
+  it("rascunho com o mesmo texto ja avaliado nao apaga a avaliacao guardada", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-rascunho-mesmo-texto", name: "[teste] Mesmo texto", email: "mesmotexto@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Mesmo texto", nichoId })
+      .returning();
+
+    const resposta = respostaConcreta("p1");
+    const primeira = await avaliarResposta(cliente.id, "p1", resposta);
+
+    await salvarRascunho(cliente.id, "p1", resposta);
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect(briefing.avaliacoes.p1).toEqual(primeira.avaliacao);
+  });
+
+  it("salvarRascunho em paralelo, em perguntas diferentes, grava as duas", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-concorrencia-rascunho", name: "[teste] Rascunho", email: "rascunho@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Rascunho", nichoId })
+      .returning();
+
+    await Promise.all([
+      salvarRascunho(cliente.id, "p1", "rascunho da p1"),
+      salvarRascunho(cliente.id, "p2", "rascunho da p2"),
+    ]);
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect(briefing.respostas.p1).toBe("rascunho da p1");
+    expect(briefing.respostas.p2).toBe("rascunho da p2");
   });
 });
