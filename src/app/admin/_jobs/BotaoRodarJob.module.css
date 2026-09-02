@@ -1,0 +1,15 @@
+.envoltorio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.sucesso {
+  font-size: 13px;
+  color: var(--cor-positivo);
+}
+
+.erro {
+  font-size: 13px;
+  color: var(--cor-erro);
+}

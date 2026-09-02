@@ -11,10 +11,18 @@
  * que enfileira de verdade roda por ultimo, para que a instancia do pg-boss
  * que ele inicia seja a mesma que o `afterAll` encontra ao reimportar
  * `@/jobs/fila` (sem nenhum reset entre os dois).
+ *
+ * `resetarSchema` reseta o schema do Drizzle, mas o pg-boss guarda a fila
+ * dele num schema Postgres proprio (`pgboss`), que nao e tocado por isso.
+ * O `afterAll` limpa a fila "coleta-noticias" para nao deixar um job real
+ * parado la (achado rodando este teste contra o Postgres de desenvolvimento:
+ * sem essa limpeza, um `npm run worker` iniciado depois processa esses jobs
+ * de teste acumulados de verdade, contra a rede real).
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
+import { FILAS } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -25,6 +33,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const { boss } = await import("@/jobs/fila");
+  await boss()
+    .deleteAllJobs(FILAS.coletaNoticias)
+    .catch(() => undefined);
   await boss()
     .stop({ graceful: false, timeout: 1 })
     .catch(() => undefined);
