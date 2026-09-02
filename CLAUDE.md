@@ -64,6 +64,11 @@ tests/              integração e e2e; unitários ficam ao lado do arquivo (*.t
   rodam em `AI_PROVIDER=mock`.
 - **Commits** convencionais em português: `feat(briefing): nota por resposta`,
   `fix(coleta): cota do youtube`. Um PR por etapa, título `etapa N: nome`.
+- **Commit e push a cada bloco que compila**, com prefixo `wip:` enquanto a etapa não
+  terminou (`../FLUXO.md`, "Troca de conta"). A conta pode acabar no meio; a branch no
+  GitHub é o que a sessão seguinte, em outra conta, consegue continuar. Antes de abrir o
+  PR, o último commit recebe a mensagem final. Ao começar e ao terminar cada bloco, escreva
+  no cabeçalho "Em andamento agora" do `../TODO.md` onde parou.
 - **Antes de abrir o PR:** definição de pronto do plano, `../TODO.md` atualizado, decisão nova
   em `../HISTORICO.md`.
 
