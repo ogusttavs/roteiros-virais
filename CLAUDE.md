@@ -69,17 +69,25 @@ tests/              integração e e2e; unitários ficam ao lado do arquivo (*.t
 
 ## Repositório
 
-`git@github.com:ogusttavs/roteiros-virais.git` (privado, criado em 02/09/2026). A raiz do
-repositório é esta pasta `plataforma/`, não a pasta do projeto acima.
+`git@github.com:ogusttavs/roteiros-virais.git`, criado em 02/09/2026. **Público por
+enquanto** (decisão do Gustavo em 02/09/2026, para ter a `main` protegida sem pagar o GitHub
+Pro). Consequência: nada de dado de cliente, chave, briefing real ou material de venda
+entra no repositório, nem em teste nem em fixture. A raiz do repositório é esta pasta
+`plataforma/`, não a pasta do projeto acima. `main` tem ruleset: só entra por PR com a CI
+"qualidade" verde, merge por squash.
 
-## O que já existe (02/09/2026, etapa 1)
+## O que já existe (02/09/2026, etapa 2)
 
-`package.json`, `tsconfig.json`, `next.config.ts`, `drizzle.config.ts`, `.env.example`,
-`compose.dev.yml`, `src/db/schema.ts` (schema inicial, revisar na etapa 2), `src/db/index.ts`,
-`src/db/migrate.ts`, `src/lib/config.ts`. ESLint (`eslint.config.mjs`, flat config com
-`next/core-web-vitals` e `next/typescript` mais `import/order`), Prettier, Vitest
-(`vitest.config.mts`), Playwright (`playwright.config.ts`), `scripts/checar-texto.ts` (regras
-em `scripts/checar-texto-regras.ts`, testadas), `.github/workflows/ci.yml`. Página inicial
-mínima em `src/app/` com tokens provisórios em `src/ui/tokens.css` e `src/ui/base.css`
-(brief-frontend.md, seção 4; o design ainda não chegou). Não existe tela de produto, job nem
-prompt de IA ainda; migração do banco entra na etapa 2.
+Da etapa 1: `package.json`, `tsconfig.json`, `next.config.ts`, `drizzle.config.ts`,
+`.env.example`, `compose.dev.yml`, ESLint, Prettier, Vitest, Playwright,
+`scripts/checar-texto.ts`, `.github/workflows/ci.yml`, página inicial mínima com os tokens
+provisórios em `src/ui/`.
+
+Da etapa 2: `src/db/schema.ts` completo do MVP (`geracoes_ia`; `user`, `session`, `account`,
+`verification` do better-auth; `clientes` com `usuario_id` referenciando `user` e os dados
+fixos do briefing, seção 1, `bairro`, `perfis`, `quem_grava`; `videos.etiquetas` e
+`videos.busca`, tsvector gerado com índice GIN). Migração inicial em `drizzle/`.
+`scripts/semear.ts` (dados de exemplo, puro, testável), `scripts/seed.ts` e
+`scripts/reset.ts` (linha de comando), `scripts/resetar-schema.ts` (compartilhado entre o
+reset e o teste de integração). Não existe tela, job nem prompt de IA ainda; autenticação de
+verdade (rotas, middleware, papéis) entra na etapa 3.

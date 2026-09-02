@@ -8,7 +8,7 @@ describe("verificarLinha", () => {
   });
 
   it("reprova travessao", () => {
-    const motivos = verificarLinha("um texto — com travessao");
+    const motivos = verificarLinha("um texto \u2014 com travessao");
     expect(motivos.some((m) => m.includes("travessao"))).toBe(true);
   });
 

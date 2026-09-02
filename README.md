@@ -6,20 +6,23 @@ vai executar.
 
 ## Rodar localmente
 
-Precisa de Node 24 e Docker (Docker Desktop ou OrbStack).
+Precisa de Node 24 e Docker Desktop.
 
 ```bash
 npm ci
 cp .env.example .env
 npm run db:up
+npm run db:migrate
+npm run db:seed
 npm run dev
 ```
 
 Abra http://localhost:3000. Sem chave de IA o sistema responde em modo simulado
 (`AI_PROVIDER=mock`), o suficiente para ver as telas e rodar os testes.
 
-`npm run db:migrate` e `npm run db:seed` entram na etapa 2, junto com a primeira migracao do
-schema; ainda nao ha nada para migrar ou semear.
+`npm run db:reset` derruba o schema, migra e semeia de novo, para voltar ao estado de
+desenvolvimento do zero. O seed cria um administrador e um cliente de teste por nicho,
+todos com a senha `ExemploSenha123` (so funciona local, o seed nunca roda em producao).
 
 ## Qualidade
 
@@ -32,7 +35,8 @@ npm run test:e2e
 
 ## Estado
 
-Etapa 1 (02/09/2026): repositorio, ambiente local, ESLint, Prettier, Vitest, Playwright,
-`checar-texto` e CI no ar. Schema inicial do banco e conexao existem, mas sem migracao ainda.
-As telas de produto, os jobs e os prompts entram etapa por etapa, conforme o plano de
-execucao.
+Etapa 2 (02/09/2026): schema completo do MVP migrado, seed com administrador, dois nichos e
+um cliente de teste por nicho. Autenticacao ainda nao tem tela nem middleware (entra na
+etapa 3); as tabelas do better-auth (`user`, `session`, `account`, `verification`) ja
+existem porque `clientes` referencia `user`. As telas de produto, os jobs e os prompts
+entram etapa por etapa, conforme o plano de execucao.

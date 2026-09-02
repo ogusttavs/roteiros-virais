@@ -31,6 +31,7 @@ h4 {
   font-family: var(--fonte-titulo);
   font-weight: 600;
   line-height: 1.2;
+  color: var(--cor-titulo);
   margin: 0 0 var(--espaco-3);
 }
 
