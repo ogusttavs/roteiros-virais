@@ -22,16 +22,23 @@ export class ErroColeta extends Error {
   }
 }
 
+export type ResultadoExecucao =
+  | { status: "ok"; resumo: Record<string, unknown> }
+  | { status: "erro"; erro: string };
+
 /**
  * Roda uma tarefa de coleta com o registro completo: cria a linha "rodando"
  * antes, atualiza para "ok" (com o resumo) ou "erro" (com a mensagem) depois.
- * Um `ErroColeta` nao retentavel termina a execucao sem relancar, para o
- * pg-boss nao repetir um erro de dado; qualquer outro erro relanca.
+ * Um `ErroColeta` nao retentavel termina a execucao sem relancar (devolve
+ * `{ status: "erro" }` em vez de rejeitar), para o pg-boss nao repetir um
+ * erro de dado; quem chama ainda sabe que a execucao falhou olhando o
+ * `status` devolvido. Qualquer outro erro relanca (e o pg-boss tenta de
+ * novo).
  */
 export async function executarComRegistro(
   nome: string,
   tarefa: () => Promise<Record<string, unknown>>,
-): Promise<void> {
+): Promise<ResultadoExecucao> {
   const [execucao] = await db().insert(execucoesJob).values({ nome, status: "rodando" }).returning();
 
   try {
@@ -40,6 +47,7 @@ export async function executarComRegistro(
       .update(execucoesJob)
       .set({ status: "ok", resumo, terminadoEm: new Date() })
       .where(eq(execucoesJob.id, execucao.id));
+    return { status: "ok", resumo };
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : String(erro);
     await db()
@@ -48,7 +56,7 @@ export async function executarComRegistro(
       .where(eq(execucoesJob.id, execucao.id));
 
     if (erro instanceof ErroColeta && !erro.retentavel) {
-      return;
+      return { status: "erro", erro: mensagem };
     }
     throw erro;
   }

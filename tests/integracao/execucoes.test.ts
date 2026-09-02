@@ -31,8 +31,9 @@ async function ultimaExecucao(nome: string) {
 }
 
 describe("executarComRegistro", () => {
-  it("tarefa com sucesso grava status ok e o resumo", async () => {
-    await executarComRegistro("teste-ok", async () => ({ processados: 3 }));
+  it("tarefa com sucesso grava status ok, devolve o resumo", async () => {
+    const resultado = await executarComRegistro("teste-ok", async () => ({ processados: 3 }));
+    expect(resultado).toEqual({ status: "ok", resumo: { processados: 3 } });
 
     const execucao = await ultimaExecucao("teste-ok");
     expect(execucao.status).toBe("ok");
@@ -41,12 +42,11 @@ describe("executarComRegistro", () => {
     expect(execucao.erro).toBeNull();
   });
 
-  it("ErroColeta nao retentavel grava status erro mas nao relanca", async () => {
-    await expect(
-      executarComRegistro("teste-erro-dado", async () => {
-        throw new ErroColeta("resposta da api sem os campos esperados", false);
-      }),
-    ).resolves.toBeUndefined();
+  it("ErroColeta nao retentavel grava status erro, nao relanca, mas devolve o status de erro", async () => {
+    const resultado = await executarComRegistro("teste-erro-dado", async () => {
+      throw new ErroColeta("resposta da api sem os campos esperados", false);
+    });
+    expect(resultado).toEqual({ status: "erro", erro: "resposta da api sem os campos esperados" });
 
     const execucao = await ultimaExecucao("teste-erro-dado");
     expect(execucao.status).toBe("erro");

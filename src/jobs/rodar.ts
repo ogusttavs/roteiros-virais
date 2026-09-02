@@ -31,8 +31,13 @@ async function main(): Promise<void> {
     return;
   }
 
-  await executarComRegistro(nome, tarefa);
-  console.log(`${nome} rodou.`);
+  const resultado = await executarComRegistro(nome, tarefa);
+  if (resultado.status === "erro") {
+    console.error(`${nome} terminou com erro: ${resultado.erro}`);
+    process.exitCode = 1;
+    return;
+  }
+  console.log(`${nome} rodou:`, JSON.stringify(resultado.resumo, null, 2));
 }
 
 main().catch((erro) => {
