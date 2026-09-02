@@ -1,0 +1,81 @@
+/**
+ * Tokens visuais. Nenhuma cor, fonte, raio, sombra ou espaco e escrito direto em
+ * componente: tudo vem daqui (brief-frontend.md, secao 4).
+ *
+ * PROVISORIO: o agente de design ainda nao entregou a identidade propria. Os
+ * valores abaixo sao os "tokens provisorios" da secao 4 do brief-frontend.md.
+ * Quando a identidade chegar, so este arquivo, o Logo e as fontes mudam.
+ *
+ * Duas lacunas que o brief nao fecha (decisao tomada aqui, a mais simples):
+ * - a secao 4 cita duas cores de texto (#221912 e #3A2A1F) sem separar qual e
+ *   qual; usamos #221912 para --cor-texto e deixamos #3A2A1F de fora ate o
+ *   design chegar.
+ * - --cor-positivo, --cor-atencao e --cor-erro nao tem valor definido no brief;
+ *   os tons abaixo sao um palpite provisorio dentro da mesma paleta quente.
+ */
+
+:root {
+  --cor-fundo: #f7f3ea;
+  --cor-superficie: #fcfaf4;
+  --cor-superficie-recuada: #ede3d3;
+  --cor-texto: #221912;
+  --cor-texto-suave: #6e5a49;
+  --cor-acao: #4a3328;
+  --cor-acao-texto: #fcfaf4;
+  --cor-destaque: #e8c66a;
+  --cor-borda: rgba(74, 51, 40, 0.12);
+  --cor-borda-forte: rgba(74, 51, 40, 0.2);
+  --cor-positivo: #4b7051;
+  --cor-atencao: #b8863b;
+  --cor-erro: #a23e2e;
+
+  --fonte-texto:
+    var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-titulo:
+    var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-mono: var(--fonte-space-mono, "Space Mono"), ui-monospace, "SFMono-Regular", monospace;
+
+  --raio-sm: 6px;
+  --raio-md: 10px;
+  --raio-lg: 16px;
+  --raio-pill: 999px;
+
+  --sombra-sm: 0 1px 2px rgba(34, 25, 18, 0.08);
+  --sombra-md: 0 4px 12px rgba(34, 25, 18, 0.12);
+
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 20px;
+  --espaco-6: 24px;
+  --espaco-7: 32px;
+  --espaco-8: 40px;
+  --espaco-9: 48px;
+  --espaco-10: 64px;
+  --espaco-11: 80px;
+  --espaco-12: 96px;
+
+  --duracao-rapida: 120ms;
+  --duracao-base: 200ms;
+  --duracao-lenta: 320ms;
+  --curva-saida: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --app-name: "seu painel";
+}
+
+[data-tema="escuro"] {
+  --cor-fundo: #1c1610;
+  --cor-superficie: #241c15;
+  --cor-superficie-recuada: #2e2318;
+  --cor-texto: #f3ede1;
+  --cor-texto-suave: #c4b3a0;
+  --cor-acao: #c9a876;
+  --cor-acao-texto: #1c1610;
+  --cor-destaque: #e8c66a;
+  --cor-borda: rgba(243, 237, 225, 0.12);
+  --cor-borda-forte: rgba(243, 237, 225, 0.2);
+  --cor-positivo: #7fa885;
+  --cor-atencao: #d3a663;
+  --cor-erro: #d16d5c;
+}
