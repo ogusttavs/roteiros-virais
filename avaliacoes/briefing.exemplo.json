@@ -1,0 +1,92 @@
+[
+  {
+    "perguntaId": "p1",
+    "resposta": "Faço lavagem a seco de sofás, colchões e cadeiras estofadas na casa do cliente. Uso uma máquina que tira mancha e ácaro sem molhar o estofado, então em poucas horas já dá para sentar de novo.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "concreto, específico e filmável: dá para ver a máquina e o antes e depois"
+  },
+  {
+    "perguntaId": "p1",
+    "resposta": "Trabalho com limpeza de estofados com qualidade e cuidado.",
+    "notaEsperada": 3,
+    "pontoPrincipal": "generico demais, nao diz o que faz de verdade nem para quem"
+  },
+  {
+    "perguntaId": "p2",
+    "resposta": "O sofá de 3 lugares é o mais pedido, e custa 180 reais. Junto eu já aplico um impermeabilizante, então a pessoa para de se preocupar com mancha de suco ou vinho por uns meses.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "item nomeado, preco real e beneficio na linguagem do cliente"
+  },
+  {
+    "perguntaId": "p2",
+    "resposta": "Vendo o servico principal por um preco justo.",
+    "notaEsperada": 2,
+    "pontoPrincipal": "sem item, sem preco e sem beneficio, so vago"
+  },
+  {
+    "perguntaId": "p3",
+    "resposta": "A maioria so limpa a superficie. Eu abro o forro e limpo por dentro tambem, porque foi ai que achei um colchao com mofo escondido numa casa em Osasco.",
+    "notaEsperada": 10,
+    "pontoPrincipal": "diferenca especifica com um caso real e filmavel"
+  },
+  {
+    "perguntaId": "p3",
+    "resposta": "Tenho atendimento diferenciado e experiencia no ramo.",
+    "notaEsperada": 5,
+    "pontoPrincipal": "frase generica classica sem prova nenhuma"
+  },
+  {
+    "perguntaId": "p5",
+    "resposta": "A pessoa sempre pergunta se o produto vai estragar o tecido, porque ja mandou fazer em outro lugar e o sofa ficou manchado.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "medo real, em primeira pessoa, com um episodio por tras"
+  },
+  {
+    "perguntaId": "p5",
+    "resposta": "Ela tem duvida se vale a pena.",
+    "notaEsperada": 3,
+    "pontoPrincipal": "duvida generica, sem a palavra do cliente nem o motivo"
+  },
+  {
+    "perguntaId": "p6",
+    "resposta": "Da para tirar mancha de caneta, quanto tempo demora para secar, se serve para sofa de couro, se preciso tirar o sofa de casa, e se o cheiro do produto incomoda.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "cinco perguntas literais, cada uma vira tema"
+  },
+  {
+    "perguntaId": "p9",
+    "resposta": "Eu falo assim: relaxa que sai sim, ja vi pior. Fica tranquilo que eu resolvo. Se nao sair eu volto sem cobrar de novo.",
+    "notaEsperada": 10,
+    "pontoPrincipal": "tres frases literais, com o ritmo e a giria da pessoa"
+  },
+  {
+    "perguntaId": "p9",
+    "resposta": "Falo de forma educada e profissional com o cliente.",
+    "notaEsperada": 2,
+    "pontoPrincipal": "descreve o tom em vez de mostrar uma frase real"
+  },
+  {
+    "perguntaId": "p10",
+    "resposta": "Nunca prometo tirar mancha de tinta ou de vinho tinto sem ver a foto antes, porque as vezes nao sai e eu nao quero mentir para vender.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "limite explicito, vira proibicao dura no roteiro"
+  },
+  {
+    "perguntaId": "p11",
+    "resposta": "Da para mostrar a maquina ligada, o antes e depois do estofado, e o momento que eu chego na casa do cliente com o carro identificado. Nao pode aparecer o rosto de cliente sem autorizacao.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "lista de cenas filmaveis, com o limite claro"
+  },
+  {
+    "perguntaId": "p11",
+    "resposta": "Da para filmar o trabalho sendo feito.",
+    "notaEsperada": 4,
+    "pontoPrincipal": "vago, nao lista cena nenhuma de verdade"
+  },
+  {
+    "perguntaId": "p12",
+    "resposta": "Admiro o perfil arrumadeiraprofissional, porque explica bem o passo a passo. Concorrente direto e a empresa Limpa Tudo Express, que atende no mesmo bairro.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "handles e nomes citados, falta so o motivo do segundo perfil"
+  }
+]

@@ -15,6 +15,13 @@
       "when": 1788354428358,
       "tag": "0001_papel_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788370236568,
+      "tag": "0002_perfil_e_ramo_outro",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,8 @@
  * tarefas do plano uma vez cada, com dados ficticios encadeados (o resumo do
  * perfil e do modelo do nicho de uma chamada alimenta o sistema estavel da
  * proxima, como em producao), e imprime o resumo de cada saida com o custo.
+ * Nivel e esforco de cada chamada vem do que o proprio modulo do prompt
+ * exporta (etapa 5, revisao da etapa 4), nunca repetidos aqui.
  *
  * So faz sentido rodar com a chave de verdade (ANTHROPIC_API_KEY no .env,
  * sem AI_PROVIDER=mock). Nunca roda em teste automatizado: vitest.config.mts
@@ -69,11 +71,12 @@ async function main() {
 
   await chamar(
     "avaliarResposta",
-    "forte",
+    avaliarResposta.nivel,
     (d) => `nota ${d.nota}: ${d.bom.slice(0, 80)}`,
     gerarEstruturado({
       tarefa: "avaliarResposta",
-      nivel: "forte",
+      nivel: avaliarResposta.nivel,
+      effort: avaliarResposta.esforco,
       schema: avaliarResposta.schema,
       sistemaEstavel: avaliarResposta.montarSistemaEstavel(),
       entrada: avaliarResposta.montarEntrada({
@@ -87,11 +90,12 @@ async function main() {
 
   const perfil = await chamar(
     "compilarPerfil",
-    "barato",
+    compilarPerfil.nivel,
     (d) => d.resumo.slice(0, 100),
     gerarEstruturado({
       tarefa: "compilarPerfil",
-      nivel: "barato",
+      nivel: compilarPerfil.nivel,
+      effort: compilarPerfil.esforco,
       schema: compilarPerfil.schema,
       sistemaEstavel: compilarPerfil.montarSistemaEstavel(),
       entrada: compilarPerfil.montarEntrada({
@@ -109,11 +113,12 @@ async function main() {
 
   const extraido = await chamar(
     "extrairVideo",
-    "barato",
+    extrairVideo.nivel,
     (d) => `${d.assunto}: "${d.gancho.slice(0, 60)}"`,
     gerarEstruturado({
       tarefa: "extrairVideo",
-      nivel: "barato",
+      nivel: extrairVideo.nivel,
+      effort: extrairVideo.esforco,
       schema: extrairVideo.schema,
       sistemaEstavel: extrairVideo.montarSistemaEstavel(),
       entrada: extrairVideo.montarEntrada({
@@ -126,11 +131,12 @@ async function main() {
 
   await chamar(
     "analisarVisual",
-    "forte",
+    analisarVisual.nivel,
     (d) => `ritmo ${d.ritmoDeCorte}, ${d.recursos.length} recurso(s)`,
     gerarEstruturado({
       tarefa: "analisarVisual",
-      nivel: "forte",
+      nivel: analisarVisual.nivel,
+      effort: analisarVisual.esforco,
       schema: analisarVisual.schema,
       sistemaEstavel: analisarVisual.montarSistemaEstavel(),
       entrada: analisarVisual.montarEntrada({ titulo: "3 erros que estragam o sofa", duracaoS: 42 }),
@@ -140,11 +146,12 @@ async function main() {
 
   const nicho = await chamar(
     "modeloNicho",
-    "barato",
+    modeloNicho.nivel,
     (d) => d.resumo.slice(0, 100),
     gerarEstruturado({
       tarefa: "modeloNicho",
-      nivel: "barato",
+      nivel: modeloNicho.nivel,
+      effort: modeloNicho.esforco,
       schema: modeloNicho.schema,
       sistemaEstavel: modeloNicho.montarSistemaEstavel(),
       entrada: modeloNicho.montarEntrada({
@@ -164,11 +171,12 @@ async function main() {
 
   await chamar(
     "temasDoDia",
-    "barato",
+    temasDoDia.nivel,
     (d) => d.temas.map((t) => t.titulo).join(" | "),
     gerarEstruturado({
       tarefa: "temasDoDia",
-      nivel: "barato",
+      nivel: temasDoDia.nivel,
+      effort: temasDoDia.esforco,
       schema: temasDoDia.schema,
       sistemaEstavel: temasDoDia.montarSistemaEstavel({ modeloNicho: nicho.resumo }),
       entrada: temasDoDia.montarEntrada({
@@ -182,15 +190,17 @@ async function main() {
 
   await chamar(
     "avaliarTema",
-    "forte",
+    avaliarTema.nivel,
     (d) => `nota ${d.nota}: ${d.recomendacao.slice(0, 80)}`,
     gerarEstruturado({
       tarefa: "avaliarTema",
-      nivel: "forte",
+      nivel: avaliarTema.nivel,
+      effort: avaliarTema.esforco,
       schema: avaliarTema.schema,
       sistemaEstavel: avaliarTema.montarSistemaEstavel({
         perfilCompilado: perfil.resumo,
         modeloNicho: nicho.resumo,
+        persona: "negocio",
       }),
       entrada: avaliarTema.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
@@ -201,11 +211,12 @@ async function main() {
 
   const script = await chamar(
     "roteiro",
-    "forte",
+    roteiro.nivel,
     (d) => `"${d.titulo}": ${d.gancho.slice(0, 80)}`,
     gerarEstruturado({
       tarefa: "roteiro",
-      nivel: "forte",
+      nivel: roteiro.nivel,
+      effort: roteiro.esforco,
       schema: roteiro.schema,
       sistemaEstavel: roteiro.montarSistemaEstavel({
         perfilCompilado: perfil.resumo,
@@ -221,11 +232,12 @@ async function main() {
 
   await chamar(
     "verificarTexto",
-    "barato",
+    verificarTexto.nivel,
     (d) => (d.aprovado ? "aprovado" : `reprovado: ${d.motivo}`),
     gerarEstruturado({
       tarefa: "verificarTexto",
-      nivel: "barato",
+      nivel: verificarTexto.nivel,
+      effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
       sistemaEstavel: verificarTexto.montarSistemaEstavel(),
       entrada: verificarTexto.montarEntrada({

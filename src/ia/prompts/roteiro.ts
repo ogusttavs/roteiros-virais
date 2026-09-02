@@ -2,17 +2,24 @@ import { z } from "zod";
 
 import type { Objetivo } from "@/db/schema";
 
+import { NOME_OBJETIVO } from "../enums";
+import type { EsforcoIA, NivelIA } from "../tipos";
+
 /**
  * O roteiro (briefing-e-rubricas.md, secao 7, regras duras, texto literal:
- * a tese do produto vira regra de prompt). Gera a partir do perfil, do
- * modelo do nicho e da evidencia; nunca de busca ao vivo (escopo 5.8).
+ * a tese do produto vira regra de prompt; e secao 5, tabela de objetivo).
+ * Gera a partir do perfil, do modelo do nicho e da evidencia; nunca de
+ * busca ao vivo (escopo 5.8).
  *
  * "chamadaFinal" no schema (em vez do nome interno da secao 8 do
- * brief-frontend.md) e "objetivo" tipado a partir de src/db/schema.ts em vez
- * de reescrito aqui: os dois evitam que a palavra proibida apareca como
- * texto literal neste arquivo, que o checar-texto varre.
+ * brief-frontend.md), "objetivo" tipado a partir de src/db/schema.ts em vez
+ * de reescrito aqui, e NOME_OBJETIVO importado de src/ia/enums.ts: os tres
+ * evitam que a palavra proibida apareca como texto literal neste arquivo,
+ * que o checar-texto varre.
  */
-export const versao = "1.0.0";
+export const versao = "1.1.0";
+export const nivel: NivelIA = "forte";
+export const esforco: EsforcoIA | undefined = "high";
 
 const cena = z.object({ momento: z.string(), oQueFazer: z.string() });
 const textoNaTelaItem = z.object({ quando: z.string(), oQue: z.string(), onde: z.string() });
@@ -51,31 +58,41 @@ export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
 }): string {
-  return `Voce escreve o roteiro de um video curto e vertical para um dono de pequeno negocio
-gravar com a propria cara no celular. Regras duras:
+  return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
+gravar com a própria cara no celular. Regras duras:
 
 1. Todo roteiro diz onde gravar e o que mostrar, usando as cenas que o cliente disse que a
-   camera pode ver. Fala direta para a camera em frente a uma parede lisa so e aceita se o
-   proprio roteiro justificar por que nenhuma cena real cabe ali.
-2. O roteiro cita a evidencia (ids de video do banco) que sustenta o tema e a estrutura. Sem
-   evidencia, diga isso e nao invente.
-3. O roteiro usa frases que o cliente disse de verdade (estao no perfil) e nunca fere uma
-   proibicao dele.
-4. Sem travessao, sem emoji, sem jargao em nenhum campo de texto.
-5. Formato do MVP: fala direta para camera, vertical, curto. A duracao vem do modelo do
+   câmera pode ver. Fala direta para a câmera em frente a uma parede lisa só é aceita se o
+   próprio roteiro justificar por que nenhuma cena real cabe ali.
+2. O roteiro cita a evidência (ids de vídeo do banco) que sustenta o tema e a estrutura. Sem
+   evidência, diga isso e não invente.
+3. O roteiro usa frases que o cliente disse de verdade (estão no perfil) e nunca fere uma
+   proibição dele.
+4. Sem travessão, sem emoji, sem jargão em nenhum campo de texto.
+5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do
    nicho.
 
+O objetivo escolhido muda o roteiro:
+- Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
+  compartilhar.
+- As pessoas lembrarem de mim quando precisarem: responde uma dúvida real do cliente,
+  chamada final de comentar ou salvar.
+- Gente me chamar para comprar: ataca o medo antes da compra, mostra prova real, chamada
+  final de chamar ou agendar.
+
 Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
-Cenas com o momento e o que fazer. Bloco de edicao com o texto que entra na tela
-(quando, o que, onde), o ritmo de corte, os recursos, o audio quando houver, e a referencia
-(o video, o segundo exato e o que olhar) quando existir um video de evidencia com analise
+Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
+(quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
+(o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
 visual.
 
 Perfil do cliente:
 ${dados.perfilCompilado}
 
 Modelo do nicho:
-${dados.modeloNicho}`;
+${dados.modeloNicho}
+
+Escreva em português do Brasil, com acentuação correta.`;
 }
 
 export function montarEntrada(dados: {
@@ -93,7 +110,7 @@ export function montarEntrada(dados: {
 
   const partes = [
     `Tema escolhido: ${dados.tema}`,
-    `Objetivo interno: ${dados.objetivo}`,
+    `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     `Evidencia disponivel:\n${listaEvidencias}`,
   ].filter((parte): parte is string => Boolean(parte));
