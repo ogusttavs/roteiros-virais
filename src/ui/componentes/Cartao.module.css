@@ -1,0 +1,18 @@
+.cartao {
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-6);
+}
+
+.superficie {
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra-sm);
+}
+
+.recuada {
+  background: var(--cor-superficie-recuada);
+}
+
+.destaque {
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-destaque);
+}

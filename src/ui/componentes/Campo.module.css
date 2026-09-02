@@ -1,0 +1,42 @@
+.grupo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  text-align: left;
+}
+
+.rotulo {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.ajuda {
+  font-size: 13px;
+  color: var(--cor-texto-suave);
+}
+
+.entrada {
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: 16px;
+  padding: var(--espaco-3) var(--espaco-4);
+  min-height: 44px;
+}
+
+.entrada:focus-visible {
+  outline: 2px solid var(--cor-acao);
+  outline-offset: 1px;
+}
+
+.comErro {
+  border-color: var(--cor-erro);
+}
+
+.erro {
+  font-size: 13px;
+  color: var(--cor-erro);
+}

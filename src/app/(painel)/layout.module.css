@@ -1,0 +1,14 @@
+.pagina {
+  min-height: 100vh;
+}
+
+.corpo {
+  padding: var(--espaco-6) var(--espaco-4) calc(72px + var(--espaco-6));
+}
+
+@media (min-width: 768px) {
+  .corpo {
+    padding: var(--espaco-8);
+    margin-left: 88px;
+  }
+}

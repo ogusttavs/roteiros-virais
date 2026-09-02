@@ -1,0 +1,22 @@
+export const textosAdmin = {
+  clientes: {
+    titulo: "Clientes",
+    colunaNome: "Nome",
+    colunaEmail: "E-mail",
+    colunaNicho: "Nicho",
+    colunaStatus: "Status",
+    ativo: "ativo",
+    inativo: "inativo",
+    semNicho: "sem nicho",
+    vazio: "Nenhum cliente ainda.",
+    novoTitulo: "Criar cliente",
+    campoNome: "Nome do negócio",
+    campoEmail: "E-mail",
+    campoNicho: "Nicho",
+    escolherNicho: "escolher",
+    botaoCriar: "criar e convidar",
+    criando: "criando",
+    sucesso: (email: string) => `Cliente criado. O convite foi mandado para ${email}.`,
+    erro: "não conseguimos criar o cliente; confira os dados e tente de novo",
+  },
+};

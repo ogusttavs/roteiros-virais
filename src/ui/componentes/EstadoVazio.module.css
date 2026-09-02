@@ -1,0 +1,20 @@
+.estado {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-9) var(--espaco-6);
+  color: var(--cor-texto-suave);
+}
+
+.titulo {
+  color: var(--cor-titulo);
+  font-size: 17px;
+  margin: 0;
+}
+
+.descricao {
+  max-width: 32rem;
+  margin: 0;
+}
