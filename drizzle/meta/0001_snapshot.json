@@ -1,6 +1,6 @@
 {
-  "id": "63c9aa9f-d369-4ec2-abbb-1031a351ab7e",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "77a07f68-7d55-484c-b7a8-b5442dc355cd",
+  "prevId": "63c9aa9f-d369-4ec2-abbb-1031a351ab7e",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -364,7 +364,7 @@
           "type": "jsonb",
           "primaryKey": false,
           "notNull": true,
-          "default": "'{\"concorrentes\":[],\"termos\":[],\"perfis\":[]}'::jsonb"
+          "default": "'{\"concorrentes\":[],\"termos\":[],\"perfisAdmirados\":[]}'::jsonb"
         },
         "ativo": {
           "name": "ativo",
@@ -1340,6 +1340,12 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true
+        },
+        "impersonatedBy": {
+          "name": "impersonatedBy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},
@@ -1501,6 +1507,31 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banned": {
+          "name": "banned",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "banReason": {
+          "name": "banReason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "banExpires": {
+          "name": "banExpires",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

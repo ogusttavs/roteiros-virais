@@ -1,0 +1,56 @@
+.pagina {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-6);
+  padding: var(--espaco-6);
+}
+
+.cartao {
+  width: 100%;
+  max-width: 24rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+}
+
+.titulo {
+  margin: 0;
+  text-align: center;
+}
+
+.forma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.erro {
+  color: var(--cor-erro);
+  font-size: 14px;
+  text-align: center;
+}
+
+.separador {
+  text-align: center;
+  color: var(--cor-texto-suave);
+  font-size: 14px;
+}
+
+.linkSemSenha {
+  background: none;
+  border: none;
+  color: var(--cor-acao);
+  font-family: var(--fonte-texto);
+  font-size: 14px;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: var(--espaco-2);
+  min-height: 44px;
+}
+
+.confirmacao {
+  text-align: center;
+}

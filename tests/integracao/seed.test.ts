@@ -39,15 +39,13 @@ describe("seed", () => {
     const [existente] = await db().select().from(videos).limit(1);
 
     await expect(
-      db()
-        .insert(videos)
-        .values({
-          plataforma: existente.plataforma,
-          idExterno: existente.idExterno,
-          url: existente.url,
-          nichoId: existente.nichoId,
-          origem: "seed",
-        }),
+      db().insert(videos).values({
+        plataforma: existente.plataforma,
+        idExterno: existente.idExterno,
+        url: existente.url,
+        nichoId: existente.nichoId,
+        origem: "seed",
+      }),
     ).rejects.toThrow();
   });
 });
