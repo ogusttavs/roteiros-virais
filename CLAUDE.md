@@ -69,8 +69,12 @@ tests/              integração e e2e; unitários ficam ao lado do arquivo (*.t
 
 ## Repositório
 
-`git@github.com:ogusttavs/roteiros-virais.git` (privado, criado em 02/09/2026). A raiz do
-repositório é esta pasta `plataforma/`, não a pasta do projeto acima.
+`git@github.com:ogusttavs/roteiros-virais.git`, criado em 02/09/2026. **Público por
+enquanto** (decisão do Gustavo em 02/09/2026, para ter a `main` protegida sem pagar o GitHub
+Pro). Consequência: nada de dado de cliente, chave, briefing real ou material de venda
+entra no repositório, nem em teste nem em fixture. A raiz do repositório é esta pasta
+`plataforma/`, não a pasta do projeto acima. `main` tem ruleset: só entra por PR com a CI
+"qualidade" verde, merge por squash.
 
 ## O que já existe (02/09/2026, etapa 1)
 
