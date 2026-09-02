@@ -252,6 +252,18 @@ export type AnaliseVisual = {
   momentoChave: { segundo: number; oQue: string } | null;
 };
 
+/**
+ * Audio do video (etapa 6): TikTok e Instagram entregam isso junto com os
+ * metadados da coleta; o YouTube nao expoe pela API, fica nulo. Fonte do
+ * "audio da semana" (etapa 9).
+ */
+export type VideoAudio = {
+  id?: string;
+  nome?: string;
+  autor?: string;
+  original?: boolean;
+};
+
 export const videos = pgTable(
   "videos",
   {
@@ -277,6 +289,7 @@ export const videos = pgTable(
     transcricao: text("transcricao"),
     analise: jsonb("analise").$type<AnaliseVideo>(),
     analiseVisual: jsonb("analise_visual").$type<AnaliseVisual>(),
+    audio: jsonb("audio").$type<VideoAudio>(),
     /** Palavras-chave da extracao (etapa 8), usadas em filtro e evidencia. */
     etiquetas: jsonb("etiquetas").$type<string[]>().notNull().default([]),
     /** titulo + descricao + transcricao + analise.assunto, para busca de evidencia. */
@@ -480,6 +493,23 @@ export const execucoesJob = pgTable("execucoes_job", {
   erro: text("erro"),
 });
 
+/**
+ * Cota diaria por fonte (etapa 6): o YouTube Data API cobra por unidade
+ * (search.list custa 100, videos.list e playlistItems.list custam 1) e da
+ * 10 mil unidades por dia; paramos em 9 mil de propósito, com folga.
+ */
+export const consumoApi = pgTable(
+  "consumo_api",
+  {
+    id: id(),
+    fonte: text("fonte").notNull(),
+    data: date("data").notNull(),
+    unidades: integer("unidades").notNull().default(0),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("consumo_api_fonte_data").on(t.fonte, t.data)],
+);
+
 /** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */
 export type AvaliacaoGeracao = "gostei" | "nao_gostei" | "outro_angulo";
 
@@ -514,3 +544,5 @@ export type Noticia = typeof noticias.$inferSelect;
 export type Roteiro = typeof roteiros.$inferSelect;
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
+export type ExecucaoJob = typeof execucoesJob.$inferSelect;
+export type ConsumoApi = typeof consumoApi.$inferSelect;
