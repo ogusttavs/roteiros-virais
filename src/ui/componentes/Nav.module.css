@@ -1,47 +1,83 @@
 .nav {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  gap: var(--espaco-1);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--cor-superficie);
-  border-top: 1px solid var(--cor-borda);
-  padding: var(--espaco-2) var(--espaco-2) max(var(--espaco-2), env(safe-area-inset-bottom));
-  z-index: 10;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 64px;
 }
 
 .item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--espaco-1);
   color: var(--cor-texto-suave);
   text-decoration: none;
-  font-size: 11px;
-  min-width: 44px;
-  min-height: 44px;
-  justify-content: center;
-  border-radius: var(--raio-sm);
+  border-radius: var(--raio-md);
+  transition: color var(--duracao-rapida) var(--curva-saida);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
 }
 
 .ativo {
-  color: var(--cor-acao);
+  color: var(--cor-titulo);
+}
+
+.traco {
+  display: none;
+}
+
+.rotulo {
+  font-size: var(--tamanho-rotulo);
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 @media (min-width: 768px) {
   .nav {
-    top: 0;
-    bottom: 0;
-    right: auto;
-    width: 88px;
+    display: flex;
     flex-direction: column;
+    gap: var(--espaco-1);
+    height: auto;
+  }
+
+  .item {
+    flex-direction: row;
     justify-content: flex-start;
-    gap: var(--espaco-6);
-    padding-top: var(--espaco-8);
-    border-top: none;
-    border-right: 1px solid var(--cor-borda);
+    align-items: center;
+    gap: var(--espaco-3);
+    height: 40px;
+    padding: 0 var(--espaco-3);
+  }
+
+  .item:hover {
+    background: var(--cor-superficie-hover);
+  }
+
+  .traco {
+    display: block;
+    position: absolute;
+    left: -16px;
+    top: 10px;
+    bottom: 10px;
+    width: 2px;
+    border-radius: 1px;
+    background: var(--cor-titulo);
+    opacity: 0;
+    transition: opacity var(--duracao-rapida) var(--curva-saida);
+  }
+
+  .ativo .traco {
+    opacity: 1;
+  }
+
+  .rotulo {
+    font-size: var(--tamanho-secundario);
+    font-weight: 500;
+    letter-spacing: normal;
   }
 }

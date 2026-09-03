@@ -21,7 +21,7 @@ export function OpcaoObjetivo({ titulo, ajuda, marcada, recomendada = false, rot
       onClick={onEscolher}
       className={[styles.opcao, marcada ? styles.marcada : ""].filter(Boolean).join(" ")}
     >
-      <span className={styles.conteudo}>
+      <span className={styles.textos}>
         {recomendada && rotuloRecomendado ? <span className={styles.recomendado}>{rotuloRecomendado}</span> : null}
         <span className={styles.titulo}>{titulo}</span>
         <span className={styles.ajuda}>{ajuda}</span>

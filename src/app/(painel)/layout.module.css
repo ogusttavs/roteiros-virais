@@ -3,12 +3,107 @@
 }
 
 .corpo {
-  padding: var(--espaco-6) var(--espaco-4) calc(72px + var(--espaco-6));
+  padding: calc(56px + env(safe-area-inset-top) + var(--espaco-6)) var(--margem-celular)
+    calc(64px + var(--espaco-6) + env(safe-area-inset-bottom));
+  max-width: var(--largura-leitura);
+  margin: 0 auto;
+}
+
+.colunaDesktop {
+  display: none;
+}
+
+.barraInferior {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 6;
+  background: color-mix(in srgb, var(--cor-superficie) 85%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--cor-borda);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @media (min-width: 768px) {
+  .pagina {
+    display: flex;
+  }
+
   .corpo {
-    padding: var(--espaco-8);
-    margin-left: 88px;
+    flex: 1;
+    min-width: 0;
+    padding: var(--espaco-10);
+    max-width: none;
+    margin: 0;
+  }
+
+  .colunaDesktop {
+    flex: none;
+    width: 220px;
+    box-sizing: border-box;
+    border-right: 1px solid var(--cor-borda);
+    display: flex;
+    flex-direction: column;
+    padding: var(--espaco-6) var(--espaco-4);
+  }
+
+  .identidadeDesktop {
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    height: 32px;
+    padding: 0 var(--espaco-3);
+  }
+
+  .nomeDesktop {
+    font-size: var(--tamanho-secundario);
+    color: var(--cor-texto-suave);
+  }
+
+  .colunaDesktop > :global(nav) {
+    margin-top: var(--espaco-8);
+  }
+
+  .contaDesktop {
+    margin-top: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--espaco-3);
+    height: var(--altura-toque);
+    padding: 0 var(--espaco-3);
+    border-radius: var(--raio-md);
+    color: var(--cor-titulo);
+    font-size: var(--tamanho-secundario);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background var(--duracao-rapida) var(--curva-saida);
+  }
+
+  .contaDesktop:hover {
+    background: var(--cor-superficie-hover);
+  }
+
+  .contaDesktop:focus-visible {
+    outline: none;
+    box-shadow: var(--sombra-foco);
+  }
+
+  .avatarDesktop {
+    flex: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--cor-superficie-recuada);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--fonte-mono);
+    font-size: var(--tamanho-legenda);
+  }
+
+  .barraInferior {
+    display: none;
   }
 }

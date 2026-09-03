@@ -20,6 +20,7 @@ export const textosAdmin = {
     erro: "não conseguimos criar o cliente; confira os dados e tente de novo",
   },
   navegacao: {
+    equipe: "equipe",
     clientes: "Clientes",
     nichos: "Nichos",
     jobs: "Jobs",
