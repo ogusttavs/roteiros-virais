@@ -130,6 +130,9 @@ export type PerfisCliente = {
 /** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
 export type Persona = "negocio" | "criador";
 
+/** Preferencia de tema salva pelo cliente em /conta (etapa D, parte 2). */
+export type TemaPreferido = "claro" | "escuro" | "sistema";
+
 export const clientes = pgTable("clientes", {
   id: id(),
   /** Usuario do better-auth que administra esta conta de cliente. */
@@ -146,6 +149,7 @@ export const clientes = pgTable("clientes", {
   persona: text("persona").$type<Persona>().notNull().default("negocio"),
   perfis: jsonb("perfis").$type<PerfisCliente>(),
   quemGrava: text("quem_grava").$type<QuemGrava>(),
+  tema: text("tema").$type<TemaPreferido>().notNull().default("sistema"),
   /**
    * Camada exclusiva de pesquisa (escopo 5.6): concorrentes, termos e perfis
    * admirados citados pelo cliente (nao confundir com clientes.perfis, que

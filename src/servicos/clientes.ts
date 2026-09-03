@@ -3,7 +3,15 @@ import { headers } from "next/headers";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { briefings, clientes, nichos, user, type Cliente, type PerfisCliente } from "@/db/schema";
+import {
+  briefings,
+  clientes,
+  nichos,
+  user,
+  type Cliente,
+  type PerfisCliente,
+  type TemaPreferido,
+} from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { sessaoAtual } from "@/lib/sessao";
 
@@ -211,5 +219,27 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+  return cliente;
+}
+
+const TEMAS_VALIDOS: TemaPreferido[] = ["claro", "escuro", "sistema"];
+
+/**
+ * Preferencia de tema (etapa D, parte 2, decisao 3): so o cliente logado
+ * grava no banco; o admin, sem registro em `clientes`, usa so o
+ * `localStorage` do navegador (nunca chega a esta funcao).
+ */
+export async function salvarTema(clienteId: number, tema: string): Promise<Cliente> {
+  if (!TEMAS_VALIDOS.includes(tema as TemaPreferido)) {
+    throw new ErroCliente(`tema invalido: ${tema}`);
+  }
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ tema: tema as TemaPreferido })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar o tema; cliente nao encontrado.");
   return cliente;
 }
