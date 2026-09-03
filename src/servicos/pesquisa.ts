@@ -14,7 +14,9 @@
 import { and, asc, desc, eq, gte, isNotNull, lte, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { contas, videos, type Plataforma } from "@/db/schema";
+import { contas, modelosNicho, videos, type Plataforma } from "@/db/schema";
+
+export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 function diasAtras(dias: number): Date {
@@ -34,7 +36,12 @@ export type VideoRankeado = {
   publicadoEm: Date | null;
 };
 
-function incluirSeed(): boolean {
+/**
+ * Fora de desenvolvimento, vídeo de seed nunca aparece (regra do
+ * `plataforma/CLAUDE.md`). Exportada para os jobs de nicho (etapa 9, base
+ * lenta) aplicarem o mesmo filtro nas próprias consultas.
+ */
+export function incluirSeed(): boolean {
   return process.env.NODE_ENV === "development";
 }
 
@@ -114,4 +121,20 @@ export async function subindoHoje(nichoId: number, limite?: number): Promise<Vid
 
   const linhas = limite ? await consulta.limit(limite) : await consulta;
   return linhas.map(mapear);
+}
+
+/**
+ * Modelo do nicho mais recente (etapa 9, decisao 2 do `PROXIMO.md`): so o
+ * mais novo e usado por quem le. `null` quando o job semanal ainda nao
+ * rodou nenhuma vez para o nicho.
+ */
+export async function modeloNichoAtual(nichoId: number): Promise<ModeloNichoLinha | null> {
+  const [linha] = await db()
+    .select()
+    .from(modelosNicho)
+    .where(eq(modelosNicho.nichoId, nichoId))
+    .orderBy(desc(modelosNicho.semana), desc(modelosNicho.criadoEm))
+    .limit(1);
+
+  return linha ?? null;
 }

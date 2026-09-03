@@ -1,0 +1,100 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-10);
+}
+
+.voltar {
+  align-self: flex-start;
+}
+
+.subtitulo {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.metaLinha {
+  display: flex;
+  gap: var(--espaco-4);
+}
+
+.mono {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.secao h2 {
+  margin: 0;
+}
+
+.lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lista li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding-bottom: var(--espaco-3);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.lista li:last-child {
+  border-bottom: none;
+}
+
+.listaSimples {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding-left: var(--espaco-5);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.exemplo {
+  margin: 0;
+  font-style: italic;
+}
+
+.legenda {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.definicoes {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+}
+
+.definicoes dt {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.definicoes dd {
+  margin: 0;
+}

@@ -7,7 +7,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * etapa 9). Guarda ganchos e fechamentos como frases reais, nao como
  * descricoes abstratas: o modelo imita exemplo melhor do que segue regra.
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -67,7 +67,9 @@ export function montarEntrada(dados: {
     id: number;
     assunto: string;
     gancho: string;
+    estrutura: string;
     fechamento: string;
+    chamadaFinal: string;
     formato: string;
   }[];
   analisesVisuais: { id: number; ritmoDeCorte: string; recursos: string[] }[];
@@ -75,7 +77,7 @@ export function montarEntrada(dados: {
   const listaVideos = dados.videosAnalisados
     .map(
       (v) =>
-        `id ${v.id}: assunto "${v.assunto}", gancho "${v.gancho}", fechamento "${v.fechamento}", formato ${v.formato}`,
+        `id ${v.id}: assunto "${v.assunto}", gancho "${v.gancho}", estrutura "${v.estrutura}", fechamento "${v.fechamento}", chamada final "${v.chamadaFinal}", formato ${v.formato}`,
     )
     .join("\n");
 

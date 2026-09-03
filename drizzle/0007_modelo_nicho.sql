@@ -1,0 +1,1 @@
+ALTER TABLE "modelos_nicho" ADD COLUMN "audios_da_semana" jsonb DEFAULT '[]'::jsonb NOT NULL;

@@ -139,7 +139,12 @@ async function main() {
       effort: analisarVisual.esforco,
       schema: analisarVisual.schema,
       sistemaEstavel: analisarVisual.montarSistemaEstavel(),
-      entrada: analisarVisual.montarEntrada({ titulo: "3 erros que estragam o sofa", duracaoS: 42 }),
+      entrada: analisarVisual.montarEntrada({
+        titulo: "3 erros que estragam o sofa",
+        duracaoS: 42,
+        transcricao:
+          "Oi gente, hoje eu vou mostrar os 3 erros que quase todo mundo comete limpando o proprio sofa em casa.",
+      }),
       imagens: [QUADRO_PLACEHOLDER],
     }),
   );
@@ -160,7 +165,9 @@ async function main() {
             id: 1,
             assunto: extraido.assunto,
             gancho: extraido.gancho,
+            estrutura: extraido.estrutura,
             fechamento: extraido.fechamento,
+            chamadaFinal: extraido.chamadaFinal,
             formato: extraido.formato,
           },
         ],

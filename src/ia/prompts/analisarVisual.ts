@@ -7,7 +7,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * usado a partir da etapa 9). E a fonte do bloco "como editar" do roteiro.
  * Modelo forte, com imagens (quadros extraidos do video).
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -43,6 +43,6 @@ Sem travessão, sem emoji.
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
-export function montarEntrada(dados: { titulo: string; duracaoS: number }): string {
-  return `Titulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\n\nOs quadros do video estao anexados.`;
+export function montarEntrada(dados: { titulo: string; duracaoS: number; transcricao: string }): string {
+  return `Titulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\nTranscricao: ${dados.transcricao}\n\nOs quadros do video estao anexados.`;
 }

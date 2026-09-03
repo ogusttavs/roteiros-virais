@@ -50,6 +50,13 @@
       "when": 1788433996507,
       "tag": "0006_transcricao",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788450744690,
+      "tag": "0007_modelo_nicho",
+      "breakpoints": true
     }
   ]
 }
