@@ -166,7 +166,13 @@ export async function avaliarResposta(
         oQueAIAProcura: pergunta.oQueAIAProcura,
         resposta,
       }),
-      extrairCampos: (d) => ({ bom: d.bom, melhorar: d.melhorar, como: d.como, impacto: d.impacto }),
+      extrairCampos: (d) => ({
+        bom: d.bom,
+        melhorar: d.melhorar,
+        como: d.como,
+        exemplo: d.exemplo,
+        impacto: d.impacto,
+      }),
     });
   }
 

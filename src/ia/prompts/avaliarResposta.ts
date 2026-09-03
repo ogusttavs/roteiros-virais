@@ -6,7 +6,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Nota e analise de uma resposta do briefing (briefing-e-rubricas.md, secao
  * 3, texto literal, nao parafrasear).
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -16,15 +16,20 @@ export const schema = z.object({
   melhorar: z.string(),
   como: z.string(),
   impacto: z.string(),
+  exemplo: z.string(),
 });
 
 export type SaidaAvaliarResposta = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(): string {
   return `Você avalia uma resposta do briefing de um dono de pequeno negócio que vai gravar
-vídeos com a própria cara. A resposta recebe nota de 0 a 10 e uma análise em quatro partes:
-o que está bom, o que pode melhorar, como melhorar com um exemplo concreto já no formato da
-resposta que a pessoa deveria dar, e o impacto no resultado dela.
+vídeos com a própria cara. A resposta recebe nota de 0 a 10 e uma análise em cinco partes:
+o que está bom, o que pode melhorar, como melhorar, um exemplo da resposta melhorada, e o
+impacto no resultado dela.
+
+Em "como", diga o que fazer: o critério que faltou e a instrução para corrigir. Em
+"exemplo", escreva a resposta melhorada, no formato que o cliente deveria ter escrito, em
+primeira pessoa, como se fosse a própria resposta dele reescrita.
 
 A nota segue quatro critérios, e você precisa citar na análise qual critério faltou:
 - Concreto: tem exemplo, número, nome, frase real?
@@ -40,9 +45,8 @@ A nota segue quatro critérios, e você precisa citar na análise qual critério
 - 3 a 4: vaga, curta demais, ou cheia de termo do ramo sem explicação.
 - 0 a 2: em branco, fora do assunto, ou uma palavra só.
 
-A análise em quatro partes é escrita para o cliente ler: sem travessão, sem emoji, sem
-jargão, com o exemplo de melhoria já no formato da resposta que ele deveria dar. A nota
-educa, não pune.
+A análise inteira, incluindo o exemplo, é escrita para o cliente ler: sem travessão, sem
+emoji, sem jargão. A nota educa, não pune.
 
 Escreva em português do Brasil, com acentuação correta.`;
 }

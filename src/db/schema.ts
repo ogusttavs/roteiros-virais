@@ -169,6 +169,12 @@ export type AvaliacaoResposta = {
   melhorar: string;
   como: string;
   impacto: string;
+  /**
+   * A resposta melhorada, no formato que o cliente deveria ter escrito, em
+   * primeira pessoa (briefing-e-rubricas.md, secao 3; avaliarResposta 1.2.0).
+   * Opcional: avaliacoes gravadas antes desta versao nao tem o campo.
+   */
+  exemplo?: string;
 };
 
 /** Perfil compilado (briefing-e-rubricas.md, secao 4; tarefa compilarPerfil). */
