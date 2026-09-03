@@ -27,6 +27,7 @@ export default defineConfig({
    * pool no afterAll de um arquivo quebrava o proximo arquivo no mesmo
    * worker. O teardown global fecha uma vez so, depois de todos os arquivos.
    */
+  globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
