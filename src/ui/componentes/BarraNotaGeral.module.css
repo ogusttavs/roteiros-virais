@@ -1,58 +1,161 @@
-.barra {
+.barraCelular {
   position: sticky;
   top: 0;
   z-index: 5;
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-2);
-  background: var(--cor-superficie);
+  gap: var(--espaco-1);
+  width: 100%;
+  height: 48px;
+  padding: 0 var(--margem-celular);
+  border: 0;
   border-bottom: 1px solid var(--cor-borda);
-  padding: var(--espaco-3) var(--espaco-4);
-}
-
-.notas {
-  display: flex;
-  align-items: baseline;
-  gap: var(--espaco-6);
-}
-
-.bloco {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.numero {
+  background: color-mix(in srgb, var(--cor-superficie) 85%, transparent);
+  backdrop-filter: blur(12px);
   font-family: var(--fonte-mono);
-  font-weight: 700;
-  font-size: 20px;
+  font-size: var(--tamanho-legenda);
   color: var(--cor-titulo);
-  line-height: 1;
+  cursor: pointer;
+  text-align: left;
+  justify-content: center;
 }
 
-.atingiu .numero {
-  color: var(--cor-positivo);
+.resumo {
+  display: flex;
+  gap: var(--espaco-3);
+  align-items: baseline;
 }
 
-.rotulo {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+.numeroResumo {
+  font-weight: 400;
+}
+
+.metaResumo {
   color: var(--cor-texto-suave);
 }
 
-.dica {
+.dicaResumo {
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.veu {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--cor-titulo) 30%, transparent);
+}
+
+.folha {
+  position: fixed;
+  z-index: 21;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--cor-superficie);
+  border-top: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--sombra-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5) var(--margem-celular) var(--espaco-9);
+  max-height: 80%;
+  overflow-y: auto;
+}
+
+.cabecalhoFolha {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-4);
+}
+
+.numeroFolha {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-titulo);
+  line-height: 1;
+  color: var(--cor-titulo);
+}
+
+.numeroFolha.atingiu {
+  color: var(--cor-positivo);
+}
+
+.lista {
   margin: 0;
-  font-size: 13px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.itemLista {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 44px;
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: var(--tamanho-secundario);
+}
+
+.rotuloItem {
+  color: var(--cor-texto);
+}
+
+.notaItem {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.cartaoDesktop {
+  display: none;
+}
+
+.dicaCartao {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
+.rotuloCartao {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
   color: var(--cor-texto-suave);
 }
 
 @media (min-width: 768px) {
-  .barra {
-    position: static;
+  .barraCelular,
+  .veu {
+    display: none;
+  }
+
+  .cartaoDesktop {
+    position: sticky;
+    top: 0;
+    width: 320px;
+    background: var(--cor-superficie);
     border: 1px solid var(--cor-borda);
     border-radius: var(--raio-lg);
-    background: var(--cor-superficie);
-    padding: var(--espaco-5);
+    padding: var(--espaco-6);
+    display: flex;
+    flex-direction: column;
+    gap: var(--espaco-4);
+  }
+
+  .cartaoDesktop .lista {
+    margin-top: var(--espaco-2);
+  }
+
+  .cartaoDesktop .itemLista {
+    height: 36px;
+    font-size: var(--tamanho-legenda);
   }
 }

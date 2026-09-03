@@ -1,25 +1,18 @@
+import type { CSSProperties } from "react";
+
 import styles from "./Skeleton.module.css";
 
 type Props = {
-  altura?: number | string;
-  largura?: number | string;
-  arredondado?: boolean;
+  variante?: "titulo" | "corpo" | "numero" | "video";
+  /** Sobrescreve a largura padrao da variante (ex.: "60%", "38%"). */
+  largura?: string;
   className?: string;
 };
 
-export function Skeleton({ altura = 16, largura = "100%", arredondado = false, className }: Props) {
-  const classes = [styles.skeleton, arredondado ? styles.arredondado : "", className]
-    .filter(Boolean)
-    .join(" ");
-
+/** Um bloco por vez (entrega/README.md); quem monta a tela empilha varios. */
+export function Skeleton({ variante = "corpo", largura, className }: Props) {
+  const style: CSSProperties | undefined = largura ? { width: largura } : undefined;
   return (
-    <div
-      className={classes}
-      style={{
-        height: typeof altura === "number" ? `${altura}px` : altura,
-        width: typeof largura === "number" ? `${largura}px` : largura,
-      }}
-      aria-hidden="true"
-    />
+    <div className={[styles.skeleton, styles[variante], className].filter(Boolean).join(" ")} style={style} aria-hidden="true" />
   );
 }

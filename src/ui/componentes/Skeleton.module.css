@@ -1,25 +1,37 @@
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--cor-superficie-recuada) 25%,
-    var(--cor-borda-forte) 37%,
-    var(--cor-superficie-recuada) 63%
-  );
-  background-size: 400% 100%;
   border-radius: var(--raio-sm);
-  animation: pulsar 1.4s ease-in-out infinite;
+  background: linear-gradient(90deg, var(--cor-superficie-recuada) 25%, var(--cor-skeleton-brilho) 50%, var(--cor-superficie-recuada) 75%);
+  background-size: 200% 100%;
+  animation: brilho var(--duracao-skeleton) ease-in-out infinite;
 }
 
-.arredondado {
-  border-radius: var(--raio-pill);
+.titulo {
+  height: 28px;
+  width: 70%;
 }
 
-@keyframes pulsar {
-  0% {
-    background-position: 100% 50%;
+.corpo {
+  height: 20px;
+  width: 90%;
+}
+
+.numero {
+  height: 52px;
+  width: 96px;
+}
+
+.video {
+  aspect-ratio: 9 / 16;
+  width: 100%;
+  border-radius: var(--raio-lg);
+}
+
+@keyframes brilho {
+  from {
+    background-position: 200% 0;
   }
-  100% {
-    background-position: 0 50%;
+  to {
+    background-position: -200% 0;
   }
 }
 

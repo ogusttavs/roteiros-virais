@@ -49,7 +49,7 @@ export function BriefingVivo({
       <p className={styles.introducao}>{textosBriefing.briefing.introducao}</p>
 
       {notaGeral < meta && dica ? (
-        <Cartao variante="recuada">
+        <Cartao variante="recuado">
           <p className={styles.avisoNota}>{textosBriefing.notaCaiu(notaGeral, dica.id)}</p>
         </Cartao>
       ) : null}
@@ -75,7 +75,7 @@ export function BriefingVivo({
       })}
 
       {perfil ? (
-        <Cartao variante="recuada">
+        <Cartao variante="recuado">
           <h2 className={styles.perfilTitulo}>{textosBriefing.briefing.perfilTitulo}</h2>
           <p>{perfil.resumo}</p>
           <dl className={styles.perfilFatos}>

@@ -22,9 +22,9 @@ export function Botao({
     .join(" ");
 
   return (
-    <button className={classes} disabled={disabled ?? carregando} {...props}>
+    <button className={classes} disabled={disabled ?? carregando} aria-busy={carregando || undefined} {...props}>
+      <span className={carregando ? styles.rotuloEscondido : undefined}>{children}</span>
       {carregando ? <span className={styles.spinner} aria-hidden="true" /> : null}
-      {children}
     </button>
   );
 }

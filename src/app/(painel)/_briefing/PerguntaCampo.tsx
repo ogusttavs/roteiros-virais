@@ -129,7 +129,7 @@ export function PerguntaCampo({
   return (
     <div className={styles.aberto}>
       <AreaTexto
-        titulo={pergunta.enunciado}
+        rotulo={pergunta.enunciado}
         ajuda={pergunta.ajuda}
         value={texto}
         onChange={(evento) => aoMudarTexto(evento.target.value)}

@@ -1,7 +1,7 @@
 .analise {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-4);
+  gap: var(--espaco-5);
   margin: 0;
 }
 
@@ -13,14 +13,29 @@
 
 .rotulo {
   font-family: var(--fonte-mono);
-  font-size: 11px;
+  font-size: var(--tamanho-rotulo);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: var(--espacamento-rotulo);
   color: var(--cor-texto-suave);
 }
 
 .texto {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto);
+}
+
+.exemplo {
+  margin: 0;
+  background: var(--cor-superficie-recuada);
+  border-radius: var(--raio-md);
+  padding: var(--espaco-4);
+}
+
+.textoExemplo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
   color: var(--cor-texto);
 }
