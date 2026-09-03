@@ -1,4 +1,5 @@
 import styles from "./Chips.module.css";
+import { chipsAtivos } from "./chipsAtivo";
 
 type Props = {
   rotuloGrupo: string;
@@ -14,10 +15,12 @@ type Props = {
  * a lado, com um separador entre elas.
  */
 export function Chips({ rotuloGrupo, opcoes, selecionado, onChange }: Props) {
+  const ativos = chipsAtivos(opcoes.length, selecionado);
+
   return (
     <div role="group" aria-label={rotuloGrupo} className={styles.grupo}>
       {opcoes.map((rotulo, indice) => {
-        const ativo = indice === selecionado;
+        const ativo = ativos[indice];
         return (
           <button
             key={rotulo}

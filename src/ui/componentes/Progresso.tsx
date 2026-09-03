@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import styles from "./Progresso.module.css";
+import { segmentosPreenchidos } from "./progressoSegmentos";
 
 type Props = {
   /** "bloco 2 de 5", ja formatado por quem chama. */
@@ -42,7 +43,7 @@ export function Progresso({ rotulo, atual, total, mensagem, frases, intervaloMs 
   }
 
   if (rotulo && atual !== undefined && total !== undefined && total > 0) {
-    const segmentos = Array.from({ length: total }, (_, i) => i < atual);
+    const segmentos = segmentosPreenchidos(atual, total);
     return (
       <div className={styles.passos}>
         <span className={styles.rotuloPassos}>{rotulo}</span>

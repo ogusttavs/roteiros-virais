@@ -8,6 +8,7 @@ import type { ComponentType } from "react";
 import { textosNav } from "@/textos/nav";
 
 import styles from "./Nav.module.css";
+import { ehRotaAtiva } from "./navAtivo";
 
 /**
  * Quatro itens, sem "Conta" (foi para o avatar do cabecalho, decisao do
@@ -27,7 +28,7 @@ export function Nav() {
   return (
     <nav className={styles.nav} aria-label={textosNav.navegacaoPrincipal}>
       {ITENS.map(({ href, rotulo, Icone }) => {
-        const ativo = pathname === href;
+        const ativo = ehRotaAtiva(pathname, href);
         return (
           <Link
             key={href}

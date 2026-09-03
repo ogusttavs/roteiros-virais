@@ -54,4 +54,6 @@ jobs:
 
       - run: npm run checar-texto
 
+      - run: npm run checar-tokens
+
       - run: npm run build
