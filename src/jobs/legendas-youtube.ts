@@ -14,6 +14,23 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 
+const ENTIDADES_HTML: Record<string, string> = {
+  "&gt;": ">",
+  "&lt;": "<",
+  "&amp;": "&",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&nbsp;": " ",
+};
+
+/**
+ * A legenda automatica do YouTube vem com entidades HTML (achado rodando
+ * com chave real: "&gt;&gt;" aparecendo literal na transcricao gravada).
+ */
+function decodificarEntidadesHtml(texto: string): string {
+  return texto.replace(/&(gt|lt|amp|quot|#39|nbsp);/g, (entidade) => ENTIDADES_HTML[entidade] ?? entidade);
+}
+
 /**
  * Um bloco WEBVTT e "HH:MM:SS.mmm --> HH:MM:SS.mmm\ntexto"; junta so o texto,
  * pulando cabecalho, timestamp e linha vazia. Pura, sem tocar disco nem
@@ -31,7 +48,7 @@ export function interpretarVtt(conteudo: string): string {
     if (/^\d+$/.test(linha)) continue; // indice de cue, quando existe
 
     const semTags = linha.replace(/<[^>]+>/g, "");
-    partes.push(semTags);
+    partes.push(decodificarEntidadesHtml(semTags));
   }
 
   // A legenda automatica do YouTube as vezes repete a mesma linha em cues
