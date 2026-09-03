@@ -9,7 +9,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { dispararJobAction } from "./acoes";
 import styles from "./BotaoRodarJob.module.css";
 
-const t = textosAdmin.nichos;
+const t = textosAdmin.jobs;
 
 export function BotaoRodarJob({ nome }: { nome: string }) {
   const router = useRouter();
@@ -21,7 +21,7 @@ export function BotaoRodarJob({ nome }: { nome: string }) {
     setMensagem(null);
     const resultado = await dispararJobAction(nome);
     setMensagem(
-      resultado.ok ? { tipo: "sucesso", texto: t.sucesso } : { tipo: "erro", texto: t.erro(resultado.mensagem) },
+      resultado.ok ? { tipo: "sucesso", texto: t.sucesso } : { tipo: "erro", texto: t.erroDisparar(resultado.mensagem) },
     );
     setRodando(false);
     router.refresh();
@@ -30,7 +30,7 @@ export function BotaoRodarJob({ nome }: { nome: string }) {
   return (
     <span className={styles.envoltorio}>
       <Botao variante="secundario" tamanho="md" carregando={rodando} onClick={rodar}>
-        {nome}: {t.botaoRodarAgora}
+        {rodando ? t.disparando : t.botaoDisparar(nome)}
       </Botao>
       {mensagem ? (
         <span className={mensagem.tipo === "erro" ? styles.erro : styles.sucesso} role="status">

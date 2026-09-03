@@ -1,7 +1,25 @@
 .pagina {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-6);
+}
+
+.cabecalhoLista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+}
+
+.cabecalhoLista h1 {
+  margin: 0 0 var(--espaco-2);
+}
+
+.subtitulo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
 }
 
 .acoes {
@@ -11,47 +29,73 @@
 }
 
 .filtro {
-  display: flex;
-  gap: var(--espaco-3);
-  align-items: center;
+  margin-top: var(--espaco-6);
+}
+
+.tabelaEnvoltorio {
+  margin-top: var(--espaco-6);
+  overflow-x: auto;
 }
 
 .tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--tamanho-secundario);
 }
 
 .tabela th {
   text-align: left;
-  font-size: 12px;
+  padding: 0 var(--espaco-3) var(--espaco-3);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  font-weight: 400;
+  letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
   color: var(--cor-texto-suave);
-  padding: var(--espaco-2) var(--espaco-3);
-  border-bottom: 1px solid var(--cor-borda);
+  border-bottom: 1px solid var(--cor-borda-forte);
+  white-space: nowrap;
 }
 
 .tabela td {
   padding: var(--espaco-3);
   border-bottom: 1px solid var(--cor-borda);
-  vertical-align: top;
+  vertical-align: middle;
+  color: var(--cor-texto);
 }
 
-.resultado {
-  max-width: 32rem;
-  overflow-wrap: anywhere;
+.tabela tbody tr:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.mono {
   font-family: var(--fonte-mono);
-  font-size: 12px;
+  color: var(--cor-titulo);
+  white-space: nowrap;
 }
 
-.ok {
-  color: var(--cor-positivo);
+.resumo {
+  max-width: 32rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.erro {
-  color: var(--cor-erro);
+.ponto {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: var(--espaco-2);
 }
 
-.rodando {
-  color: var(--cor-atencao);
+.pontoPositivo {
+  background: var(--cor-positivo);
+}
+
+.pontoErro {
+  background: var(--cor-erro);
+}
+
+.pontoAtencao {
+  background: var(--cor-atencao);
 }
