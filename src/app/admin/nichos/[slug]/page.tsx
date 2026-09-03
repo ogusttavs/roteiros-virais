@@ -1,8 +1,9 @@
-import { ArrowLeft, Eye, TrendingUp, Video } from "lucide-react";
+import { ArrowLeft, Eye, Lightbulb, TrendingUp, Video } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { listarContasVigiadas, nichoPorSlug } from "@/servicos/admin-coleta";
+import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { listarContasVigiadas, nichoPorSlug, temaDoDiaAtual, videosPorId } from "@/servicos/admin-coleta";
 import { foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -54,11 +55,16 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas] = await Promise.all([
+  const [foraDaCurva, subindo, vigiadas, temasHoje] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
     listarContasVigiadas(nicho.id),
+    temaDoDiaAtual(nicho.id),
   ]);
+
+  const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
+  const evidencias = await videosPorId(idsEvidencia);
+  const videoPorId = new Map(evidencias.map((v) => [v.id, v]));
 
   return (
     <div className={styles.pagina}>
@@ -69,6 +75,38 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         <h1>{nicho.nome}</h1>
         <Link href={`/admin/nichos/${slug}/modelo`}>{t.verModelo}</Link>
       </div>
+
+      <section className={styles.secao}>
+        <div className={styles.tituloComContagem}>
+          <h2>{t.temasHojeTitulo}</h2>
+          <span className={styles.contagem}>{temasHoje?.length ?? 0}</span>
+        </div>
+        {!temasHoje || temasHoje.length === 0 ? (
+          <EstadoVazio icone={<Lightbulb size={24} strokeWidth={1.5} aria-hidden="true" />} frase={t.vazioTemasHoje} />
+        ) : (
+          <div className={styles.temasGrade}>
+            {temasHoje.map((tema, i) => (
+              <div key={i} className={styles.temaCartaoAdmin}>
+                <span className={styles.rotuloTema}>{ROTULO_TEMA_CARTAO[tema.puxaPara]}</span>
+                <h3 className={styles.temaTitulo}>{tema.titulo}</h3>
+                <p className={styles.temaPorque}>{tema.porQue}</p>
+                <div className={styles.evidenciasLista}>
+                  <span className={styles.evidenciasRotulo}>{t.evidenciasTitulo}</span>
+                  {tema.evidencias.map((id) => {
+                    const video = videoPorId.get(id);
+                    return (
+                      <Link key={id} href={video?.url ?? "#"} target="_blank" rel="noopener noreferrer" className={styles.mono}>
+                        {video?.titulo ?? `#${id}`}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <Link href="/admin/jobs">{t.verGeracao}</Link>
+      </section>
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>

@@ -66,6 +66,10 @@ export const textosAdmin = {
     vazioSubindoHoje: "nada subindo agora; volte em algumas horas.",
     vazioVigilancia: "nenhuma conta vigiada ainda; o job vigilancia roda todo domingo.",
     verModelo: "modelo do nicho",
+    temasHojeTitulo: "temas de hoje",
+    vazioTemasHoje: "nenhum tema hoje ainda; o job temasDoDia roda todo dia às 05:30.",
+    evidenciasTitulo: "evidências",
+    verGeracao: "ver geração em jobs",
   },
   nichoModelo: {
     voltar: "nicho",
