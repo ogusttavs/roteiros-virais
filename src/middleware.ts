@@ -11,10 +11,23 @@ import { NextResponse, type NextRequest } from "next/server";
  */
 const ROTAS_PUBLICAS = ["/entrar"];
 
+/**
+ * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho
+ * `x-jobs-key` faz esse papel para `/api/jobs/[nome]`, porque quem chama e o
+ * cron, um servico externo ou uma Server Action do admin, nunca um navegador
+ * logado. Achado rodando a etapa 6, parte 2, contra o servidor de verdade: os
+ * testes chamam a funcao da rota direto, sem passar pelo middleware, entao
+ * esse redirecionamento nunca tinha sido pego antes.
+ */
+const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs"];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota))) {
+  if (
+    ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota)) ||
+    ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota))
+  ) {
     return NextResponse.next();
   }
 

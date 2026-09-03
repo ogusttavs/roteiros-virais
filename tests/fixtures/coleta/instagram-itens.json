@@ -1,0 +1,31 @@
+[
+  {
+    "id": "3412345678901234567",
+    "shortCode": "Cx1Exemplo01",
+    "url": "https://www.instagram.com/reel/Cx1Exemplo01/",
+    "caption": "[exemplo] 3 erros que estragam o seu sorriso",
+    "timestamp": "2026-08-21T10:00:00.000Z",
+    "ownerUsername": "exemplo.sorrisoemdia",
+    "ownerFullName": "[exemplo] Sorriso em Dia",
+    "videoDuration": 33.5,
+    "videoPlayCount": 132045,
+    "likesCount": 9210,
+    "commentsCount": 187,
+    "musicInfo": {
+      "audio_id": "611111111111111",
+      "song_name": "[exemplo] som original",
+      "artist_name": "exemplo.sorrisoemdia",
+      "uses_original_audio": true
+    }
+  },
+  {
+    "id": "3412345678901234568",
+    "shortCode": "Cx1Exemplo02",
+    "url": "https://www.instagram.com/reel/Cx1Exemplo02/",
+    "caption": "[exemplo] antes e depois de um clareamento",
+    "timestamp": "2026-08-19T15:30:00.000Z",
+    "ownerUsername": "exemplo.sorrisoemdia",
+    "ownerFullName": "[exemplo] Sorriso em Dia",
+    "videoViewCount": 40210
+  }
+]

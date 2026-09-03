@@ -7,6 +7,13 @@ function env(nome: string, padrao = ""): string {
   return v === undefined || v === "" ? padrao : v;
 }
 
+function envNumero(nome: string, padrao: number): number {
+  const v = process.env[nome];
+  if (v === undefined || v === "") return padrao;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : padrao;
+}
+
 export type ProvedorIA = "anthropic" | "mock";
 
 function provedorIA(): ProvedorIA {
@@ -37,6 +44,10 @@ export const config = {
     apifyToken: env("APIFY_TOKEN"),
     atorTiktok: env("APIFY_ACTOR_TIKTOK", "clockworks/tiktok-scraper"),
     atorInstagram: env("APIFY_ACTOR_INSTAGRAM", "apify/instagram-scraper"),
+    /** `maxItems` de cada chamada ao ator (PROXIMO.md, etapa 6 parte 2): 50 em desenvolvimento, 200 em producao. */
+    apifyMaxItems: envNumero("APIFY_MAX_ITEMS", process.env.NODE_ENV === "production" ? 200 : 50),
+    /** Teto diario de resultados do Apify (fonte "apify" em consumo_api), somando TikTok e Instagram. */
+    apifyMaxResultadosDia: envNumero("APIFY_MAX_RESULTADOS_DIA", 1000),
   },
   email: {
     resendKey: env("RESEND_API_KEY"),

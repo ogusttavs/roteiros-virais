@@ -12,6 +12,7 @@ import { PgBoss } from "pg-boss";
 
 export const FILAS = {
   coletaYoutube: "coleta-youtube",
+  coletaApify: "coleta-apify",
   coletaNoticias: "coleta-noticias",
 } as const;
 
@@ -46,4 +47,28 @@ export async function garantirFilas(): Promise<void> {
   for (const nome of Object.values(FILAS)) {
     await b.createQueue(nome, { retryLimit: 2, retryBackoff: true });
   }
+}
+
+let prontoPromise: Promise<void> | null = null;
+
+/**
+ * Deixa o pg-boss pronto para enfileirar (`boss.start()` cria o schema se
+ * for a primeira vez, `garantirFilas()` cria as filas), uma vez por
+ * processo. Usado pela rota `POST /api/jobs/[nome]` (revisao da etapa 6,
+ * parte 1, PROXIMO.md: a rota enfileira, nao roda o job na propria
+ * requisicao). Se o Postgres do pg-boss estiver fora do ar, a promessa e
+ * descartada para a proxima chamada tentar de novo, em vez de ficar presa
+ * num erro antigo.
+ */
+export function garantirBossPronto(): Promise<void> {
+  if (!prontoPromise) {
+    prontoPromise = (async () => {
+      await boss().start();
+      await garantirFilas();
+    })().catch((erro: unknown) => {
+      prontoPromise = null;
+      throw erro;
+    });
+  }
+  return prontoPromise;
 }

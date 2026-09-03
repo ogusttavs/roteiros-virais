@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { db, getPool } from "@/db";
 import { consumoApi, contas, nichos, videos } from "@/db/schema";
 import { rodarColetaYoutube } from "@/jobs/coleta-youtube";
+import { ErroColeta } from "@/jobs/execucoes";
 import { hojeISO } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -141,5 +142,21 @@ describe("rodarColetaYoutube (rede mockada, banco real)", () => {
       .where(and(eq(consumoApi.fonte, "youtube"), eq(consumoApi.data, hojeISO())));
     // 1 termo (search.list, 100) + 1 lote de videos.list (1) = 101.
     expect(linha.unidades).toBe(101);
+  });
+
+  it("uma chamada que falha ainda assim consome a cota (o youtube cobra mesmo em erro)", async () => {
+    mockFetch.mockImplementation(async (url: URL) => {
+      if (url.toString().includes("/search")) throw new Error("timeout simulado");
+      throw new Error(`chamada inesperada nesta fixture: ${url.toString()}`);
+    });
+
+    await expect(rodarColetaYoutube()).rejects.toThrow(ErroColeta);
+
+    const [linha] = await db()
+      .select()
+      .from(consumoApi)
+      .where(and(eq(consumoApi.fonte, "youtube"), eq(consumoApi.data, hojeISO())));
+    // A busca falhou, mas a cota (100, search.list) ja tinha sido contada antes da chamada.
+    expect(linha.unidades).toBe(100);
   });
 });

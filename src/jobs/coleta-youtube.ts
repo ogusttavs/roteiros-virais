@@ -8,10 +8,11 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { consumoApi, contas, nichos, videos } from "@/db/schema";
+import { consumoApi, contas, nichos } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import { normalizarVideoYoutube } from "@/servicos/normalizadores/youtube";
 
+import { upsertConta, upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
 import {
   buscarCanal,
@@ -44,47 +45,6 @@ async function registrarConsumo(unidades: number): Promise<void> {
     });
 }
 
-async function upsertConta(
-  conta: { plataforma: "youtube"; handle: string; nome: string | null; url: string | null },
-  nichoId: number,
-): Promise<number> {
-  const [linha] = await db()
-    .insert(contas)
-    .values({ ...conta, nichoId })
-    .onConflictDoUpdate({
-      target: [contas.plataforma, contas.handle],
-      set: { nome: conta.nome, url: conta.url, atualizadoEm: new Date() },
-    })
-    .returning({ id: contas.id });
-  return linha.id;
-}
-
-async function upsertVideo(
-  video: ReturnType<typeof normalizarVideoYoutube>["video"],
-  contaId: number,
-  nichoId: number,
-): Promise<"novo" | "atualizado"> {
-  const existente = await db()
-    .select({ id: videos.id })
-    .from(videos)
-    .where(and(eq(videos.plataforma, video.plataforma), eq(videos.idExterno, video.idExterno)));
-
-  await db()
-    .insert(videos)
-    .values({ ...video, contaId, nichoId, origem: "coleta" })
-    .onConflictDoUpdate({
-      target: [videos.plataforma, videos.idExterno],
-      set: {
-        views: video.views,
-        likes: video.likes,
-        comentarios: video.comentarios,
-        atualizadoEm: new Date(),
-      },
-    });
-
-  return existente.length > 0 ? "atualizado" : "novo";
-}
-
 export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
   const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
   const publicadoApos = new Date(Date.now() - JANELA_DIAS * 24 * 60 * 60 * 1000);
@@ -109,8 +69,14 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       if (!cabe(CUSTO_SEARCH)) break;
       termosBuscados += 1;
       try {
-        const resultado = await buscarPorTermo(termo, publicadoApos);
+        /**
+         * A cota e contada antes da chamada (revisao da etapa 6, parte 1,
+         * PROXIMO.md): a API do YouTube desconta a unidade mesmo quando a
+         * chamada falha, entao gastar depois do await subestimaria o gasto
+         * real numa falha de rede.
+         */
         await gastar(CUSTO_SEARCH);
+        const resultado = await buscarPorTermo(termo, publicadoApos);
         for (const item of resultado.items ?? []) {
           if (item.id.videoId) idsCandidatos.add(item.id.videoId);
         }
@@ -128,8 +94,8 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       if (!cabe(CUSTO_LISTA * 2)) break;
       canaisChecados += 1;
       try {
-        const canalResp = await buscarCanal(conta.handle);
         await gastar(CUSTO_LISTA);
+        const canalResp = await buscarCanal(conta.handle);
         /**
          * Achado rodando com chave real: um handle que nao existe de verdade
          * (as contas do seed sao ficticias) volta sem o campo `items` (nem
@@ -138,8 +104,8 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
         const canal = canalResp.items?.[0];
         if (!canal) continue;
 
-        const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
         await gastar(CUSTO_LISTA);
+        const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
         for (const item of uploadsResp.items ?? []) {
           idsCandidatos.add(item.snippet.resourceId.videoId);
         }
@@ -153,8 +119,8 @@ export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
       if (!cabe(CUSTO_LISTA)) break;
       const lote = ids.slice(i, i + 50);
       try {
-        const resposta = await buscarVideosPorId(lote);
         await gastar(CUSTO_LISTA);
+        const resposta = await buscarVideosPorId(lote);
         for (const item of resposta.items ?? []) {
           const { video, conta } = normalizarVideoYoutube(item);
           const contaId = await upsertConta(conta, nicho.id);

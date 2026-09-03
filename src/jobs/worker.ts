@@ -7,6 +7,7 @@
 import "dotenv/config";
 
 import { agendarTudo, listarAgendamentos } from "./agenda";
+import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
@@ -19,6 +20,9 @@ async function main(): Promise<void> {
 
   await boss().work(FILAS.coletaYoutube, async () => {
     await executarComRegistro(FILAS.coletaYoutube, rodarColetaYoutube);
+  });
+  await boss().work(FILAS.coletaApify, async () => {
+    await executarComRegistro(FILAS.coletaApify, rodarColetaApify);
   });
   await boss().work(FILAS.coletaNoticias, async () => {
     await executarComRegistro(FILAS.coletaNoticias, rodarColetaNoticias);
