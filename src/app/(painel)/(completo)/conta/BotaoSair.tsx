@@ -5,7 +5,8 @@ import { useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { textosConta } from "@/textos/conta";
-import { Botao } from "@/ui/componentes/Botao";
+
+import styles from "./page.module.css";
 
 export function BotaoSair() {
   const router = useRouter();
@@ -19,8 +20,8 @@ export function BotaoSair() {
   }
 
   return (
-    <Botao variante="secundario" carregando={saindo} onClick={sair}>
-      {textosConta.sair}
-    </Botao>
+    <button type="button" className={styles.linkSair} onClick={() => void sair()} disabled={saindo}>
+      {saindo ? textosConta.saindo : textosConta.sair}
+    </button>
   );
 }

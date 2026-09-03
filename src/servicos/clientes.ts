@@ -222,6 +222,42 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   return cliente;
 }
 
+const perfilContaSchema = z.object({
+  nome: z.string().trim().min(1),
+  perfis: z.object({
+    instagram: z.string().trim().optional(),
+    tiktok: z.string().trim().optional(),
+    youtube: z.string().trim().optional(),
+  }),
+});
+
+/**
+ * /conta (etapa D, parte 2): so nome e perfis, gravados numa unica UPDATE.
+ * Diferente de salvarDadosFixos (/comecar), que exige cidade e persona:
+ * a tela de conta nao mostra esses campos, entao usar salvarDadosFixos
+ * aqui exigiria ler o cliente primeiro para preservar o resto (uma
+ * leitura-depois-escrita sem necessidade, no mesmo tipo de corrida de
+ * dado ja corrigido em src/servicos/briefing.ts).
+ */
+export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  const dados = perfilContaSchema.parse(dadosBrutos);
+
+  const perfis: PerfisCliente = {
+    instagram: dados.perfis.instagram?.trim() || null,
+    tiktok: dados.perfis.tiktok?.trim() || null,
+    youtube: dados.perfis.youtube?.trim() || null,
+  };
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ nome: dados.nome, perfis })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar a conta; cliente nao encontrado.");
+  return cliente;
+}
+
 const TEMAS_VALIDOS: TemaPreferido[] = ["claro", "escuro", "sistema"];
 
 /**
