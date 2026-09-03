@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
 import { PERGUNTAS_BRIEFING, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
+import { config } from "@/lib/config";
 import { perguntaQueMaisAjuda } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
+import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
-import { Botao } from "@/ui/componentes/Botao";
 import { Progresso } from "@/ui/componentes/Progresso";
-
-import { PerguntaCampo, type ResultadoAcaoBriefing } from "../_briefing/PerguntaCampo";
+import { Logo } from "@/ui/Logo";
 
 import { avaliarRespostaAction, salvarDadosFixosAction, salvarRascunhoAction } from "./acoes";
 import styles from "./ComecarWizard.module.css";
@@ -28,9 +29,23 @@ type Props = {
   meta: number;
 };
 
-type Etapa = "dadosFixos" | "blocos" | "liberado";
+type Etapa = "intro" | "dadosFixos" | "blocos" | "liberado";
 
-/** As duas partes de /comecar (brief-frontend.md, 6.2): dados fixos, depois os cinco blocos. */
+function CabecalhoSimples() {
+  return (
+    <div className={styles.cabecalho}>
+      <Logo tamanho={24} />
+      <span className={styles.nomeProduto}>{config.appName}</span>
+    </div>
+  );
+}
+
+/**
+ * As tres partes de /comecar (BriefingTela.dc.html): introducao, dados
+ * fixos, depois os cinco blocos do briefing. Sem a Nav principal do app
+ * (proposital: isto acontece antes do painel abrir), por isso esta rota
+ * mora fora do grupo (painel), sem a casca compartilhada.
+ */
 export function ComecarWizard({
   nichos,
   dadosFixosCompletos,
@@ -42,7 +57,7 @@ export function ComecarWizard({
   meta,
 }: Props) {
   const router = useRouter();
-  const [etapa, setEtapa] = useState<Etapa>(dadosFixosCompletos ? "blocos" : "dadosFixos");
+  const [etapa, setEtapa] = useState<Etapa>(dadosFixosCompletos ? "blocos" : "intro");
   const [bloco, setBloco] = useState(blocoInicial);
   const [respostas, setRespostas] = useState(respostasIniciais);
   const [avaliacoes, setAvaliacoes] = useState(avaliacoesIniciais);
@@ -62,15 +77,33 @@ export function ComecarWizard({
     setEtapa("blocos");
   }
 
+  if (etapa === "intro") {
+    return (
+      <div className={styles.pagina}>
+        <CabecalhoSimples />
+        <div className={styles.corpoIntro}>
+          <h1>{textosBriefing.comecar.titulo}</h1>
+          <p className={styles.introducao}>{textosBriefing.comecar.introducao}</p>
+          <p className={styles.introducaoSecundaria}>{textosBriefing.comecar.introNota}</p>
+        </div>
+        <BarraAcao primaria={{ rotulo: textosBriefing.comecar.botaoComecar, onClick: () => setEtapa("dadosFixos") }} />
+      </div>
+    );
+  }
+
   if (etapa === "dadosFixos") {
     return (
       <div className={styles.pagina}>
-        <h1>{textosBriefing.comecar.titulo}</h1>
-        <p className={styles.introducao}>{textosBriefing.comecar.introducao}</p>
+        <CabecalhoSimples />
         <div className={styles.corpo}>
-          <h2>{textosBriefing.dadosFixos.titulo}</h2>
+          <h1 className={styles.tituloSecao}>{textosBriefing.dadosFixos.titulo}</h1>
           <p className={styles.introducao}>{textosBriefing.dadosFixos.introducao}</p>
-          <DadosFixosForm nichos={nichos} inicial={dadosFixosIniciais} onSalvar={aoSalvarDadosFixos} />
+          <DadosFixosForm
+            nichos={nichos}
+            inicial={dadosFixosIniciais}
+            onSalvar={aoSalvarDadosFixos}
+            onVoltar={() => setEtapa("intro")}
+          />
         </div>
       </div>
     );
@@ -78,11 +111,14 @@ export function ComecarWizard({
 
   if (etapa === "liberado") {
     return (
-      <div className={styles.liberacao}>
-        <h1>{textosBriefing.liberacao.titulo}</h1>
-        <Botao tamanho="lg" onClick={() => router.push("/hoje")}>
-          {textosBriefing.liberacao.botao}
-        </Botao>
+      <div className={styles.pagina}>
+        <CabecalhoSimples />
+        <div className={styles.corpoLiberado}>
+          <h1>{textosBriefing.liberacao.titulo}</h1>
+        </div>
+        <BarraAcao
+          primaria={{ rotulo: textosBriefing.liberacao.botao, onClick: () => router.push("/hoje") }}
+        />
       </div>
     );
   }
@@ -106,12 +142,12 @@ export function ComecarWizard({
         }))}
       />
       <div className={styles.corpo}>
-        <h1>{textosBriefing.comecar.titulo}</h1>
         <Progresso
           rotulo={textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}
           atual={bloco}
           total={TOTAL_BLOCOS}
         />
+        <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
         {perguntas.map((pergunta) => (
           <PerguntaCampo
             key={pergunta.id}
@@ -123,21 +159,21 @@ export function ComecarWizard({
             onAtualizado={aoAtualizarPergunta}
           />
         ))}
-        <div className={styles.navegacao}>
-          {bloco > 1 ? (
-            <Botao variante="secundario" onClick={() => setBloco((atual) => atual - 1)}>
-              {textosBriefing.navegacaoBlocos.botaoVoltar}
-            </Botao>
-          ) : (
-            <span />
-          )}
-          {bloco < TOTAL_BLOCOS ? (
-            <Botao onClick={() => setBloco((atual) => atual + 1)}>
-              {textosBriefing.navegacaoBlocos.botaoProximoBloco}
-            </Botao>
-          ) : null}
-        </div>
       </div>
+      <BarraAcao
+        secundaria={{
+          rotulo: textosBriefing.navegacaoBlocos.botaoVoltar,
+          onClick: () => (bloco > 1 ? setBloco((atual) => atual - 1) : setEtapa("dadosFixos")),
+        }}
+        primaria={
+          bloco < TOTAL_BLOCOS
+            ? {
+                rotulo: textosBriefing.navegacaoBlocos.botaoProximoBloco,
+                onClick: () => setBloco((atual) => atual + 1),
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

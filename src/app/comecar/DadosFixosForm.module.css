@@ -1,57 +1,51 @@
 .forma {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-5);
-  max-width: 32rem;
+  gap: var(--espaco-6);
+  max-width: var(--largura-leitura);
 }
 
 .rotulo {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-2);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
   color: var(--cor-titulo);
 }
 
 .ajuda {
-  font-size: 13px;
+  font-size: var(--tamanho-legenda);
   font-weight: 400;
   color: var(--cor-texto-suave);
 }
 
 .select {
   border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-sm);
+  border-radius: var(--raio-md);
   background: var(--cor-superficie);
-  color: var(--cor-texto);
+  color: var(--cor-titulo);
   font-family: var(--fonte-texto);
-  font-size: 16px;
+  font-size: var(--tamanho-corpo);
   padding: var(--espaco-3) var(--espaco-4);
-  min-height: 44px;
+  min-height: var(--altura-toque);
 }
 
+.grupo,
 .grupoOpcoes {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-3);
-  border: none;
-  padding: 0;
-  margin: 0;
 }
 
-.opcao {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  font-size: 14px;
-  font-weight: 400;
-  color: var(--cor-texto);
-  min-height: 44px;
+.rotuloGrupo {
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  color: var(--cor-titulo);
 }
 
 .erro {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--tamanho-legenda);
   color: var(--cor-erro);
 }

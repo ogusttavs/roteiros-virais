@@ -1,0 +1,79 @@
+.pagina {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  height: 56px;
+  padding: 0 var(--margem-celular);
+  flex: none;
+}
+
+.nomeProduto {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.corpo,
+.corpoIntro,
+.corpoLiberado {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+  width: 100%;
+  max-width: var(--largura-leitura);
+  margin: 0 auto;
+  padding: var(--espaco-6) var(--margem-celular) calc(var(--espaco-9) + 96px);
+  box-sizing: border-box;
+}
+
+.corpoIntro {
+  padding-top: var(--espaco-8);
+}
+
+.corpoLiberado {
+  justify-content: center;
+  min-height: 480px;
+  animation: chegar 360ms var(--curva-saida) both;
+}
+
+.tituloSecao {
+  font-size: var(--tamanho-titulo-sm);
+}
+
+.introducao {
+  color: var(--cor-texto);
+}
+
+.introducaoSecundaria {
+  color: var(--cor-texto-suave);
+}
+
+@keyframes chegar {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (min-width: 768px) {
+  .cabecalho {
+    display: none;
+  }
+
+  .corpo,
+  .corpoIntro,
+  .corpoLiberado {
+    padding: var(--espaco-10);
+    margin: 0;
+  }
+}

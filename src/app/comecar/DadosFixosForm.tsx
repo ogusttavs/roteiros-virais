@@ -5,8 +5,10 @@ import { useState, type FormEvent } from "react";
 import { DADOS_FIXOS } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava } from "@/db/schema";
 import { textosBriefing } from "@/textos/briefing";
-import { Botao } from "@/ui/componentes/Botao";
+import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
+import { Chips } from "@/ui/componentes/Chips";
+import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 
 import styles from "./DadosFixosForm.module.css";
 
@@ -25,12 +27,14 @@ type Props = {
   nichos: { id: number; nome: string }[];
   inicial: DadosFixosIniciais;
   onSalvar: (dados: unknown) => Promise<void>;
+  onVoltar: () => void;
 };
 
 const t = textosBriefing.dadosFixos;
 const OUTRO = "outro" as const;
+const OPCOES_QUEM_GRAVA = DADOS_FIXOS.quemGrava.opcoes.map((opcao) => opcao.rotulo);
 
-export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
+export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
   const [nome, setNome] = useState(inicial.nome);
   const [cidade, setCidade] = useState(inicial.cidade ?? "");
   const [bairro, setBairro] = useState(inicial.bairro ?? "");
@@ -54,14 +58,21 @@ export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  const [tentouEnviar, setTentouEnviar] = useState(false);
+
   const podeContinuar =
     nome.trim().length > 0 &&
     cidade.trim().length > 0 &&
     (nichoId !== OUTRO || ramoOutro.trim().length > 0);
 
+  const indiceQuemGrava = DADOS_FIXOS.quemGrava.opcoes.findIndex((opcao) => opcao.valor === quemGrava);
+
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
-    if (!podeContinuar) return;
+    if (!podeContinuar) {
+      setTentouEnviar(true);
+      return;
+    }
     setSalvando(true);
     setErro(null);
     try {
@@ -92,13 +103,12 @@ export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
         rotulo={DADOS_FIXOS.nome.rotulo}
         value={nome}
         onChange={(evento) => setNome(evento.target.value)}
-        required
       />
       <Campo
         rotulo={DADOS_FIXOS.cidade.rotulo}
         value={cidade}
         onChange={(evento) => setCidade(evento.target.value)}
-        required
+        erro={tentouEnviar && cidade.trim().length === 0 ? t.cidadeObrigatoria : undefined}
       />
       <Campo
         rotulo={DADOS_FIXOS.bairro.rotulo}
@@ -131,53 +141,46 @@ export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
           ajuda={t.ajudaRamoOutro}
           value={ramoOutro}
           onChange={(evento) => setRamoOutro(evento.target.value)}
-          required
+          erro={tentouEnviar && ramoOutro.trim().length === 0 ? t.ramoObrigatorio : undefined}
         />
       ) : null}
 
-      <fieldset className={styles.grupoOpcoes}>
-        <legend className={styles.rotulo}>{DADOS_FIXOS.persona.rotulo}</legend>
+      <div className={styles.grupoOpcoes} role="radiogroup" aria-label={DADOS_FIXOS.persona.rotulo}>
+        <span className={styles.rotuloGrupo}>{DADOS_FIXOS.persona.rotulo}</span>
         {DADOS_FIXOS.persona.opcoes.map((opcao) => (
-          <label key={opcao.valor} className={styles.opcao}>
-            <input
-              type="radio"
-              name="persona"
-              value={opcao.valor}
-              checked={persona === opcao.valor}
-              onChange={() => setPersona(opcao.valor)}
-            />
-            {opcao.rotulo}
-          </label>
+          <OpcaoObjetivo
+            key={opcao.valor}
+            titulo={opcao.rotulo}
+            marcada={persona === opcao.valor}
+            onEscolher={() => setPersona(opcao.valor)}
+          />
         ))}
-      </fieldset>
+      </div>
 
-      <Campo
-        rotulo={t.campoInstagram}
-        value={instagram}
-        onChange={(evento) => setInstagram(evento.target.value)}
-      />
-      <Campo rotulo={t.campoTiktok} value={tiktok} onChange={(evento) => setTiktok(evento.target.value)} />
-      <Campo
-        rotulo={t.campoYoutube}
-        value={youtube}
-        onChange={(evento) => setYoutube(evento.target.value)}
-      />
+      <div className={styles.grupo}>
+        <span className={styles.rotuloGrupo}>{t.tituloRedes}</span>
+        <Campo
+          rotulo={t.campoInstagram}
+          value={instagram}
+          onChange={(evento) => setInstagram(evento.target.value)}
+        />
+        <Campo rotulo={t.campoTiktok} value={tiktok} onChange={(evento) => setTiktok(evento.target.value)} />
+        <Campo
+          rotulo={t.campoYoutube}
+          value={youtube}
+          onChange={(evento) => setYoutube(evento.target.value)}
+        />
+      </div>
 
-      <fieldset className={styles.grupoOpcoes}>
-        <legend className={styles.rotulo}>{DADOS_FIXOS.quemGrava.rotulo}</legend>
-        {DADOS_FIXOS.quemGrava.opcoes.map((opcao) => (
-          <label key={opcao.valor} className={styles.opcao}>
-            <input
-              type="radio"
-              name="quemGrava"
-              value={opcao.valor}
-              checked={quemGrava === opcao.valor}
-              onChange={() => setQuemGrava(opcao.valor)}
-            />
-            {opcao.rotulo}
-          </label>
-        ))}
-      </fieldset>
+      <div className={styles.grupo}>
+        <span className={styles.rotuloGrupo}>{DADOS_FIXOS.quemGrava.rotulo}</span>
+        <Chips
+          rotuloGrupo={DADOS_FIXOS.quemGrava.rotulo}
+          opcoes={OPCOES_QUEM_GRAVA}
+          selecionado={indiceQuemGrava === -1 ? null : indiceQuemGrava}
+          onChange={(indice) => setQuemGrava(DADOS_FIXOS.quemGrava.opcoes[indice].valor)}
+        />
+      </div>
 
       {erro ? (
         <p className={styles.erro} role="alert">
@@ -185,9 +188,14 @@ export function DadosFixosForm({ nichos, inicial, onSalvar }: Props) {
         </p>
       ) : null}
 
-      <Botao type="submit" tamanho="lg" carregando={salvando} disabled={!podeContinuar}>
-        {salvando ? t.salvando : t.botaoContinuar}
-      </Botao>
+      <BarraAcao
+        secundaria={{ rotulo: textosBriefing.navegacaoBlocos.botaoVoltar, onClick: onVoltar }}
+        primaria={{
+          rotulo: salvando ? t.salvando : t.botaoContinuar,
+          type: "submit",
+          disabled: salvando,
+        }}
+      />
     </form>
   );
 }

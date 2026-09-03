@@ -5,7 +5,8 @@ import styles from "./BarraAcao.module.css";
 export type AcaoBarra = { rotulo: string; onClick?: () => void; type?: "button" | "submit"; disabled?: boolean };
 
 type Props = {
-  primaria: AcaoBarra;
+  /** Opcional: o ultimo bloco do briefing nao tem para onde avancar manualmente (ComecarWizard). */
+  primaria?: AcaoBarra;
   secundaria?: AcaoBarra;
 };
 
@@ -29,14 +30,16 @@ export function BarraAcao({ primaria, secundaria }: Props) {
             {secundaria.rotulo}
           </button>
         ) : null}
-        <button
-          type={primaria.type ?? "button"}
-          onClick={primaria.onClick}
-          disabled={primaria.disabled}
-          className={styles.primaria}
-        >
-          {primaria.rotulo}
-        </button>
+        {primaria ? (
+          <button
+            type={primaria.type ?? "button"}
+            onClick={primaria.onClick}
+            disabled={primaria.disabled}
+            className={styles.primaria}
+          >
+            {primaria.rotulo}
+          </button>
+        ) : null}
       </div>
     </div>
   );

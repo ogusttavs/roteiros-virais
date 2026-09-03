@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useId, type InputHTMLAttributes } from "react";
 
 import styles from "./Campo.module.css";
@@ -56,6 +57,7 @@ export function Campo({ rotulo, ajuda, erro, contador, prefixo, className, ...pr
       )}
       {erro ? (
         <span className={styles.erro} id={idErro} role="alert">
+          <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
           {erro}
         </span>
       ) : null}

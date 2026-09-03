@@ -6,7 +6,8 @@ import styles from "./OpcaoObjetivo.module.css";
 
 type Props = {
   titulo: string;
-  ajuda: string;
+  /** Sem subtitulo quando a pergunta ja e curta o bastante sozinha (DadosFixosForm). */
+  ajuda?: string;
   marcada: boolean;
   recomendada?: boolean;
   rotuloRecomendado?: string;
@@ -26,7 +27,7 @@ export function OpcaoObjetivo({ titulo, ajuda, marcada, recomendada = false, rot
       <span className={styles.textos}>
         {recomendada && rotuloRecomendado ? <span className={styles.recomendado}>{rotuloRecomendado}</span> : null}
         <span className={styles.titulo}>{titulo}</span>
-        <span className={styles.ajuda}>{ajuda}</span>
+        {ajuda ? <span className={styles.ajuda}>{ajuda}</span> : null}
       </span>
       <span className={[styles.check, marcada ? styles.checkVisivel : ""].filter(Boolean).join(" ")} aria-hidden="true">
         <Check size={24} strokeWidth={1.5} />

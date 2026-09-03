@@ -17,7 +17,26 @@
   color: var(--cor-titulo);
 }
 
+.rotuloOculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .contador {
+  /**
+   * margin-inline-start:auto em vez de depender so do justify-content do pai
+   * (space-between): com o rotulo oculto (.rotuloOculto e position:absolute,
+   * sai do fluxo), o contador vira o unico item flex, e space-between
+   * sozinho o jogaria para o inicio em vez do fim.
+   */
+  margin-inline-start: auto;
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rotulo);
   color: var(--cor-texto-dica);
