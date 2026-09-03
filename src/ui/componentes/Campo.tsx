@@ -1,3 +1,5 @@
+"use client";
+
 import { useId, type InputHTMLAttributes } from "react";
 
 import styles from "./Campo.module.css";

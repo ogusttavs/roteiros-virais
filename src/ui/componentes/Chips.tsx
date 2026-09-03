@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "./Chips.module.css";
 import { chipsAtivos } from "./chipsAtivo";
 

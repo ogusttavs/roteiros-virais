@@ -1,3 +1,5 @@
+"use client";
+
 import styles from "./BarraAcao.module.css";
 
 export type AcaoBarra = { rotulo: string; onClick?: () => void; type?: "button" | "submit"; disabled?: boolean };

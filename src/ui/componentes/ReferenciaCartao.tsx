@@ -1,3 +1,5 @@
+"use client";
+
 import { Bookmark } from "lucide-react";
 
 import styles from "./ReferenciaCartao.module.css";

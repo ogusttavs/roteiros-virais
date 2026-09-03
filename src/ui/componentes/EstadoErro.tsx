@@ -1,3 +1,5 @@
+"use client";
+
 import { CircleAlert } from "lucide-react";
 
 import estiloErro from "./EstadoErro.module.css";
