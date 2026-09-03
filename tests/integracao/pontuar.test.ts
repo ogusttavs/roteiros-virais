@@ -154,10 +154,13 @@ describe("rodarPontuar", () => {
     const vFracaB = await linhaVideo("fraca-b"); // views=150
     expect(Number(vFracaB.foraDaCurva)).toBeCloseTo(15, 3);
 
-    // Conta fraca sem seguidores: mediana nula, videos sem fora_da_curva
+    // Conta fraca sem seguidores: mediana nula, videos sem fora_da_curva, e a taxa
+    // tambem fica nula (nao zero: sem fora_da_curva calculado em nenhum video, nao ha
+    // dado para dizer "zero fora da curva", revisao da etapa 7 no PROXIMO.md da etapa 8).
     const cFracaSem = await linhaConta(fracaSemSeguidores);
     expect(cFracaSem.baseFraca).toBe(true);
     expect(cFracaSem.medianaViews).toBeNull();
+    expect(cFracaSem.taxaForaDaCurva).toBeNull();
     const vFracaSemA = await linhaVideo("fsem-a");
     expect(vFracaSemA.foraDaCurva).toBeNull();
 
