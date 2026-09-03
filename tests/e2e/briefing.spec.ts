@@ -35,7 +35,7 @@ async function entrar(page: Page, email: string) {
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
 }
 
 const TITULO_LIBERACAO = "Seu painel está aberto.";
@@ -50,7 +50,8 @@ const TITULO_LIBERACAO = "Seu painel está aberto.";
  */
 async function responderEAvaliar(page: Page, rotulo: string, texto: string): Promise<boolean> {
   await page.getByLabel(rotulo).fill(texto);
-  await page.getByRole("button", { name: "avaliar", exact: true }).first().click();
+  // "avaliar" no wizard (/comecar), "avaliar de novo" no vivo (/briefing, editando).
+  await page.getByRole("button", { name: /^avaliar/ }).first().click();
   const liberado = page.getByRole("heading", { name: TITULO_LIBERACAO });
   const campoFechado = page.getByLabel(rotulo);
   await Promise.race([
@@ -77,7 +78,11 @@ test.describe("briefing pela tela", () => {
 
     await entrar(page, "seed-cliente-dentistas@exemplo.teste");
     await expect(page).toHaveURL(/\/comecar/);
-    await expect(page.getByRole("heading", { name: "Vamos montar o seu briefing" })).toBeVisible();
+    // o cliente do seed ja tem os dados fixos preenchidos: cai direto no
+    // bloco 1, cujo H1 e o nome do bloco, nao mais o titulo da introducao
+    // (achado da etapa D parte 2: o H1 repetia "Vamos montar o seu
+    // briefing" em toda tela de bloco em vez do nome do bloco atual).
+    await expect(page.getByRole("heading", { name: "Sobre o negócio" })).toBeVisible();
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();
 
     await responderEAvaliar(
@@ -264,16 +269,19 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
     await expect(page.getByText("como o sistema te entende")).toBeVisible();
 
-    await page.getByRole("button", { name: "ajustar resposta" }).first().click();
+    await page.getByRole("button", { name: "editar" }).first().click();
     const primeiraPergunta = "Em poucas palavras, o que o seu negócio faz hoje";
     await responderEAvaliar(page, primeiraPergunta, "atendimento bom");
 
-    await expect(page.getByText(/a sua nota caiu para/)).toBeVisible();
-    await expect(page.getByText(/reforçar a p1/i)).toBeVisible();
+    // BarraNotaGeral renderiza a mesma dica duas vezes (folha do celular +
+    // aside do desktop, so o CSS decide qual aparece); .last() pega a do
+    // desktop, que e o viewport padrao do Playwright aqui.
+    await expect(page.getByText(/a sua nota caiu para/).last()).toBeVisible();
+    await expect(page.getByText(/reforçar a p1/i).last()).toBeVisible();
 
     // o gate e de mao unica: o painel continua acessivel mesmo com a nota abaixo da meta.
     await page.reload();
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
-    await expect(page.getByText(/a sua nota caiu para/)).toBeVisible();
+    await expect(page.getByText(/a sua nota caiu para/).last()).toBeVisible();
   });
 });

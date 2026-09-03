@@ -36,13 +36,14 @@ test("admin entra, cria cliente, cliente entra por link magico e cai em /comecar
   await page.goto("/entrar");
   await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
   await page.getByLabel("Senha").fill(SENHA_ADMIN);
-  await page.getByRole("button", { name: "Entrar", exact: true }).click();
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
 
   await expect(page).toHaveURL(/\/admin\/clientes/);
 
-  await page.getByLabel("Nome do negócio").fill("[exemplo] Cliente e2e");
-  await page.getByLabel("E-mail").fill(EMAIL_NOVO_CLIENTE);
-  await page.getByRole("button", { name: "criar e convidar" }).click();
+  await page.getByRole("button", { name: "convidar cliente" }).click();
+  await page.getByLabel("nome", { exact: true }).fill("[exemplo] Cliente e2e");
+  await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_NOVO_CLIENTE);
+  await page.getByRole("button", { name: "convidar por e-mail" }).click();
 
   await expect(page.getByRole("status")).toContainText(EMAIL_NOVO_CLIENTE);
 
