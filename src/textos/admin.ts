@@ -72,7 +72,8 @@ export const textosAdmin = {
     naoEncontrado: "nicho não encontrado",
     titulo: "Modelo do nicho",
     semana: (data: string) => `semana de ${data}`,
-    baseadoEm: (n: number) => `baseado em ${n} vídeo${n === 1 ? "" : "s"} fora da curva`,
+    baseadoEm: (n: number, acimaDoLimiar: number) =>
+      `baseado em ${n} vídeo${n === 1 ? "" : "s"}, ${acimaDoLimiar} fora da curva`,
     vazio: "nenhum modelo ainda; o job modeloNicho roda todo domingo, depois da análise visual.",
     resumoTitulo: "resumo",
     ganchosTitulo: "ganchos",

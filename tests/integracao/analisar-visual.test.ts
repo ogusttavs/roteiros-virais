@@ -32,6 +32,18 @@ function diasAtras(dias: number): Date {
 
 const QUADROS_FALSOS = Array.from({ length: 8 }, (_, i) => ({ segundo: i, base64: "AAAA" }));
 
+const ANALISE_PADRAO = {
+  assunto: "assunto do video",
+  gancho: "abertura do video",
+  estrutura: "gancho, corpo, fechamento",
+  fechamento: "resumo do que foi mostrado",
+  chamadaFinal: "comenta se voce ja passou por isso",
+  formato: "fala_para_camera" as const,
+  porQueFuncionou: "mostra o problema acontecendo de verdade",
+  pertenceAoNicho: true,
+  motivoNicho: "fala do assunto do nicho",
+};
+
 let nichoId: number;
 
 async function criarVideo(
@@ -41,6 +53,7 @@ async function criarVideo(
     publicadoEm: Date;
     transcricao?: string;
     duracaoS?: number;
+    analise?: unknown;
     analiseVisual?: unknown;
   },
 ) {
@@ -57,6 +70,7 @@ async function criarVideo(
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
       transcricao: opcoes.transcricao,
       duracaoS: opcoes.duracaoS,
+      analise: opcoes.analise as never,
       analiseVisual: opcoes.analiseVisual as never,
     })
     .returning();
@@ -93,6 +107,7 @@ describe("rodarAnalisarVisual", () => {
       publicadoEm: diasAtras(2),
       transcricao: "falou sobre o produto principal",
       duracaoS: 40,
+      analise: ANALISE_PADRAO,
     });
 
     const resumo = await rodarAnalisarVisual();
@@ -113,6 +128,7 @@ describe("rodarAnalisarVisual", () => {
       publicadoEm: diasAtras(2),
       transcricao: "transcricao qualquer",
       duracaoS: 30,
+      analise: ANALISE_PADRAO,
       analiseVisual: {
         falaParaCamera: true,
         textoNaTela: [],
@@ -134,6 +150,7 @@ describe("rodarAnalisarVisual", () => {
       publicadoEm: diasAtras(10),
       transcricao: "transcricao qualquer",
       duracaoS: 30,
+      analise: ANALISE_PADRAO,
     });
 
     const resumo = await rodarAnalisarVisual();
@@ -146,12 +163,14 @@ describe("rodarAnalisarVisual", () => {
       publicadoEm: diasAtras(1),
       transcricao: "transcricao qualquer",
       duracaoS: 30,
+      analise: ANALISE_PADRAO,
     });
     const bom = await criarVideo("ok-depois-da-falha", {
       foraDaCurva: 5,
       publicadoEm: diasAtras(2),
       transcricao: "transcricao qualquer, para o segundo video",
       duracaoS: 30,
+      analise: ANALISE_PADRAO,
     });
 
     vi.mocked(baixarVideo480p).mockImplementation(async (url: string) => {
@@ -174,6 +193,7 @@ describe("rodarAnalisarVisual", () => {
       foraDaCurva: 5,
       publicadoEm: diasAtras(2),
       transcricao: "transcricao qualquer",
+      analise: ANALISE_PADRAO,
     });
 
     const resumo = await rodarAnalisarVisual();
@@ -189,10 +209,31 @@ describe("rodarAnalisarVisual", () => {
         publicadoEm: diasAtras(2),
         transcricao: "transcricao qualquer",
         duracaoS: 30,
+        analise: ANALISE_PADRAO,
       });
     }
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(10);
+  });
+
+  it("video sem analise, ou marcado como fora do nicho, fica de fora (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("sem-analise", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+    });
+    await criarVideo("fora-do-nicho", {
+      foraDaCurva: 9,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao de outro assunto",
+      duracaoS: 30,
+      analise: { ...ANALISE_PADRAO, pertenceAoNicho: false },
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(0);
+    expect(baixarVideo480p).not.toHaveBeenCalled();
   });
 });

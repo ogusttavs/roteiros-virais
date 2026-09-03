@@ -259,6 +259,14 @@ export type AnaliseVideo = {
   chamadaFinal: string;
   formato: "fala_para_camera" | "podcast" | "caixinha" | "esquete" | "outro";
   porQueFuncionou: string;
+  /**
+   * A vigilancia (etapa 7) escolhe conta, nao assunto: nem todo video da
+   * conta vigiada fala do nicho (etapa 10, ajuste da revisao da etapa 9).
+   * Ausente em analise gravada antes desse campo existir; nesse caso conta
+   * como relevante (ver `PERTENCE_AO_NICHO` em `src/servicos/pesquisa.ts`).
+   */
+  pertenceAoNicho?: boolean;
+  motivoNicho?: string;
 };
 
 export type AnaliseVisual = {
@@ -367,6 +375,13 @@ export type ModeloNicho = {
   };
   assuntosQuentes: string[];
   baseadoEm: number;
+  /**
+   * Quantos dos `baseadoEm` vídeos estão de fato fora da curva (etapa 10,
+   * ajuste da revisão da etapa 9): `baseadoEm` pode incluir um complemento
+   * abaixo do limiar para não modelar com pouca evidência (mínimo 10),
+   * `acimaDoLimiar` diz quantos vieram da evidência forte de verdade.
+   */
+  acimaDoLimiar: number;
 };
 
 /**

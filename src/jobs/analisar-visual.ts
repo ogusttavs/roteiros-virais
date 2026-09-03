@@ -15,7 +15,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
-import { incluirSeed } from "@/servicos/pesquisa";
+import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
 import { temposDeQuadro } from "@/servicos/quadros";
 
 import { apagarVideo, baixarVideo480p, extrairQuadros } from "./video";
@@ -36,7 +36,9 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     gte(videos.publicadoEm, new Date(Date.now() - SETE_DIAS_MS)),
     isNotNull(videos.foraDaCurva),
     isNotNull(videos.transcricao),
+    isNotNull(videos.analise),
     isNull(videos.analiseVisual),
+    PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 

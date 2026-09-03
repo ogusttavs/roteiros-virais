@@ -11,7 +11,7 @@
  * (desempate por id), para a mesma consulta não devolver ordens diferentes
  * em execuções iguais.
  */
-import { and, asc, desc, eq, gte, isNotNull, lte, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lte, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contas, modelosNicho, videos, type Plataforma } from "@/db/schema";
@@ -44,6 +44,17 @@ export type VideoRankeado = {
 export function incluirSeed(): boolean {
   return process.env.NODE_ENV === "development";
 }
+
+/**
+ * A vigilância (etapa 7) escolhe conta, não assunto: tudo que a conta posta
+ * entra na coleta. `extrairVideo` (etapa 10, ajuste da revisão da etapa 9)
+ * marca `pertenceAoNicho` na análise; aqui exclui só o que foi marcado como
+ * `false`. Vídeo sem análise, ou com análise anterior a esse campo (não tem
+ * a chave), continua contando, "is distinct from" trata os dois casos como
+ * não-falso sem precisar de um OR à parte. Exportada para `analisarVisual` e
+ * `modeloNicho` (etapa 9) aplicarem o mesmo filtro nas próprias consultas.
+ */
+export const PERTENCE_AO_NICHO = sql`(${videos.analise} ->> 'pertenceAoNicho') is distinct from 'false'`;
 
 function mapear(linha: {
   id: number;
@@ -88,6 +99,7 @@ export async function foraDaCurvaDoNicho(
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
     isNotNull(videos.foraDaCurva),
+    PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -109,6 +121,7 @@ export async function subindoHoje(nichoId: number, limite?: number): Promise<Vid
     lte(videos.publicadoEm, diasAtras(2)),
     gte(videos.publicadoEm, diasAtras(7)),
     isNotNull(videos.velocidadeRelativa),
+    PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 

@@ -63,6 +63,8 @@ export const config = {
     visuaisPorSemana: 10,
     /** Teto de vídeos com análise usados como evidência do modelo do nicho (etapa 9, decisão 2 do PROXIMO.md: "30 a 60"). */
     videosParaModeloNicho: 60,
+    /** Piso de vídeos usados como evidência do modelo do nicho (etapa 10, ajuste da revisão da etapa 9): abaixo de `limiarForaDaCurva`, completa até aqui em vez de modelar com pouca evidência. */
+    minimoEvidenciaModeloNicho: 10,
     janelaLinhaEditorial: 15,
     minimoParaAvisoLinhaEditorial: 5,
   },

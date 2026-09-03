@@ -125,6 +125,8 @@ async function main() {
         titulo: "3 erros que estragam o sofa",
         transcricao:
           "Oi gente, hoje eu vou mostrar os 3 erros que quase todo mundo comete limpando o proprio sofa em casa.",
+        nomeNicho: "Limpeza de estofados",
+        termosNicho: ["sofa", "estofado", "limpeza a seco"],
       }),
     }),
   );

@@ -191,6 +191,14 @@ function mockTemasDoDia(entrada: string) {
 
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
+  const nichoLinha = extrairCampo(entrada, "Nicho:");
+  const termos = (nichoLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  const textoBusca = entrada.toLowerCase();
+  const pertenceAoNicho = termos.length === 0 || termos.some((termo) => textoBusca.includes(termo));
+
   return {
     assunto: titulo,
     gancho: `abertura sobre ${titulo}`,
@@ -204,6 +212,10 @@ function mockExtrairVideo(entrada: string) {
       .split(" ")
       .filter((palavra) => palavra.length > 3)
       .slice(0, 4),
+    pertenceAoNicho,
+    motivoNicho: pertenceAoNicho
+      ? "a transcricao cita termo do nicho"
+      : "a transcricao nao cita nenhum termo do nicho",
   };
 }
 

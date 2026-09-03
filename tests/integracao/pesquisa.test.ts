@@ -26,6 +26,7 @@ async function criarVideo(
     velocidadeRelativa?: number;
     publicadoEm: Date;
     origem?: "coleta" | "seed";
+    analise?: unknown;
   },
 ) {
   await db()
@@ -41,6 +42,7 @@ async function criarVideo(
       origem: opcoes.origem ?? "coleta",
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
       velocidadeRelativa: opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
+      analise: opcoes.analise as never,
     });
 }
 
@@ -84,6 +86,24 @@ describe("foraDaCurvaDoNicho", () => {
     expect(resultado).toHaveLength(1);
     expect(resultado[0].foraDaCurva).toBe(9.5);
   });
+
+  it("exclui video marcado como fora do nicho, mas mantem sem analise e com analise antiga sem o campo (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("fc-fora-do-nicho", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(5),
+      analise: { pertenceAoNicho: false },
+    });
+    await criarVideo("fc-analise-antiga", {
+      foraDaCurva: 45,
+      publicadoEm: diasAtras(5),
+      analise: { assunto: "video antigo, sem o campo pertenceAoNicho" },
+    });
+
+    const resultado = await foraDaCurvaDoNicho(nichoId, 90);
+
+    expect(resultado.some((v) => v.foraDaCurva === 50)).toBe(false);
+    expect(resultado.some((v) => v.foraDaCurva === 45)).toBe(true);
+  });
 });
 
 describe("subindoHoje", () => {
@@ -99,5 +119,23 @@ describe("subindoHoje", () => {
     expect(resultado.map((v) => v.velocidadeRelativa)).toEqual([3.1, 1.1]);
     expect(resultado.some((v) => v.velocidadeRelativa === 99)).toBe(false);
     expect(resultado.some((v) => v.velocidadeRelativa === 50)).toBe(false);
+  });
+
+  it("exclui video marcado como fora do nicho, mas mantem sem analise e com analise antiga sem o campo (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("sh-fora-do-nicho", {
+      velocidadeRelativa: 80,
+      publicadoEm: diasAtras(3),
+      analise: { pertenceAoNicho: false },
+    });
+    await criarVideo("sh-analise-antiga", {
+      velocidadeRelativa: 70,
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "video antigo, sem o campo pertenceAoNicho" },
+    });
+
+    const resultado = await subindoHoje(nichoId);
+
+    expect(resultado.some((v) => v.velocidadeRelativa === 80)).toBe(false);
+    expect(resultado.some((v) => v.velocidadeRelativa === 70)).toBe(true);
   });
 });
