@@ -4,10 +4,21 @@
  * leitura, sem regra de negocio: as telas `/admin/nichos` e `/admin/jobs`
  * chamam direto.
  */
-import { count, desc, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, max } from "drizzle-orm";
 
 import { db } from "@/db";
-import { briefings, clientes, contas, execucoesJob, nichos, roteiros, user, videos, type Plataforma } from "@/db/schema";
+import {
+  briefings,
+  clientes,
+  contas,
+  execucoesJob,
+  nichos,
+  roteiros,
+  user,
+  videos,
+  type Nicho,
+  type Plataforma,
+} from "@/db/schema";
 
 export type ContagemPlataforma = Record<Plataforma, number>;
 
@@ -167,4 +178,41 @@ export async function ultimaExecucaoPorJob(nomes: string[]): Promise<Record<stri
     resultado[nome] = linha ? mapearExecucao(linha) : null;
   }
   return resultado;
+}
+
+/** Nicho pelo slug, para `/admin/nichos/[slug]` (etapa 7). */
+export async function nichoPorSlug(slug: string): Promise<Nicho | null> {
+  const [linha] = await db().select().from(nichos).where(eq(nichos.slug, slug));
+  return linha ?? null;
+}
+
+export type ContaVigiada = {
+  id: number;
+  plataforma: Plataforma;
+  handle: string;
+  taxaForaDaCurva: number | null;
+  medianaViews: number | null;
+};
+
+/** A lista de vigilância de um nicho (escopo 5.3): quem está `vigiada`, por taxa. */
+export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiada[]> {
+  const linhas = await db()
+    .select({
+      id: contas.id,
+      plataforma: contas.plataforma,
+      handle: contas.handle,
+      taxaForaDaCurva: contas.taxaForaDaCurva,
+      medianaViews: contas.medianaViews,
+    })
+    .from(contas)
+    .where(and(eq(contas.nichoId, nichoId), eq(contas.vigiada, true)))
+    .orderBy(desc(contas.taxaForaDaCurva));
+
+  return linhas.map((l) => ({
+    id: l.id,
+    plataforma: l.plataforma,
+    handle: l.handle,
+    taxaForaDaCurva: l.taxaForaDaCurva === null ? null : Number(l.taxaForaDaCurva),
+    medianaViews: l.medianaViews === null ? null : Number(l.medianaViews),
+  }));
 }

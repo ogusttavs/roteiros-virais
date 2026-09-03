@@ -1,4 +1,5 @@
 import { List } from "lucide-react";
+import Link from "next/link";
 
 import { listarNichosComContagem } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
@@ -47,7 +48,9 @@ export default async function AdminNichos() {
                   nicho.videosPorPlataforma.instagram;
                 return (
                   <tr key={nicho.id}>
-                    <td>{nicho.nome}</td>
+                    <td>
+                      <Link href={`/admin/nichos/${nicho.slug}`}>{nicho.nome}</Link>
+                    </td>
                     <td className={styles.mono}>{totalVideos.toLocaleString("pt-BR")}</td>
                     <td className={styles.mono}>{nicho.contasVigiadas}</td>
                     <td className={styles.mono}>{formatarData(nicho.ultimaLeitura)}</td>
