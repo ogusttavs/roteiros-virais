@@ -9,6 +9,7 @@
  */
 import { eq, inArray } from "drizzle-orm";
 
+import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
 import { nichos, videos } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
@@ -29,7 +30,10 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
   if (idsUnicos.length === 0) {
-    return { selecionados: [] as number[], porId: new Map<number, { url: string; plataforma: string }>() };
+    return {
+      selecionados: [] as number[],
+      porId: new Map<number, { url: string; plataforma: string; duracaoS: number | null }>(),
+    };
   }
 
   const linhas = await db()
@@ -37,6 +41,7 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
       id: videos.id,
       url: videos.url,
       plataforma: videos.plataforma,
+      duracaoS: videos.duracaoS,
       transcricao: videos.transcricao,
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
     })
@@ -57,18 +62,32 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
     new Date(),
   );
 
-  const porId = new Map(linhas.map((l) => [l.id, { url: l.url, plataforma: l.plataforma }]));
+  const porId = new Map(linhas.map((l) => [l.id, { url: l.url, plataforma: l.plataforma, duracaoS: l.duracaoS }]));
   return { selecionados, porId };
 }
 
 type ResultadoVideo =
-  | { tipo: "legenda" | "groq" | "pulado" }
+  | { tipo: "legenda" | "pulado" }
+  | { tipo: "groq"; duracaoS: number | null }
   | { tipo: "falhou"; motivo: string };
 
-async function transcreverUm(videoId: number, url: string, plataforma: string): Promise<ResultadoVideo> {
+/**
+ * Legenda automatica curta demais ("E ai", ou uma legenda confusa que virou
+ * poucas palavras depois de interpretarVtt) nao carrega informacao o
+ * bastante; tratada como "sem legenda" e cai para audio mais Groq (achado
+ * da revisao da etapa 8, calibrar depois com mais exemplos reais).
+ */
+const TAMANHO_MINIMO_LEGENDA = 200;
+
+async function transcreverUm(
+  videoId: number,
+  url: string,
+  plataforma: string,
+  duracaoS: number | null,
+): Promise<ResultadoVideo> {
   if (plataforma === "youtube") {
     const legenda = await baixarLegendaYoutube(url);
-    if (legenda) {
+    if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
       await db().update(videos).set({ transcricao: legenda }).where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
@@ -83,7 +102,7 @@ async function transcreverUm(videoId: number, url: string, plataforma: string): 
     caminhoAudio = await baixarAudio(url);
     const texto = await transcreverAudio(caminhoAudio);
     await db().update(videos).set({ transcricao: texto }).where(eq(videos.id, videoId));
-    return { tipo: "groq" };
+    return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {
       await db()
@@ -105,6 +124,7 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
   let porGroq = 0;
   let pulados = 0;
   let falhas = 0;
+  let segundosAudioGroq = 0;
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
@@ -115,10 +135,12 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
       if (!info) continue;
 
       try {
-        const resultado = await transcreverUm(videoId, info.url, info.plataforma);
+        const resultado = await transcreverUm(videoId, info.url, info.plataforma, info.duracaoS);
         if (resultado.tipo === "legenda") porLegenda += 1;
-        else if (resultado.tipo === "groq") porGroq += 1;
-        else if (resultado.tipo === "pulado") pulados += 1;
+        else if (resultado.tipo === "groq") {
+          porGroq += 1;
+          segundosAudioGroq += resultado.duracaoS ?? 0;
+        } else if (resultado.tipo === "pulado") pulados += 1;
         else if (resultado.tipo === "falhou") {
           falhas += 1;
           erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
@@ -136,6 +158,8 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
     transcritosPorGroq: porGroq,
     puladosSemChaveGroq: pulados,
     falhas,
+    segundosAudioGroq,
+    custoEstimadoGroqUsd: Number(((segundosAudioGroq / 3600) * PRECO_GROQ_USD_POR_HORA).toFixed(4)),
     erros: erros.length > 0 ? erros : undefined,
   };
 }

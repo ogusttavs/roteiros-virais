@@ -57,6 +57,7 @@ async function criarVideo(
     publicadoEm: Date;
     transcricao?: string;
     proximaTentativaTranscricao?: Date;
+    duracaoS?: number;
   },
 ) {
   const [v] = await db()
@@ -74,10 +75,16 @@ async function criarVideo(
         opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
       transcricao: opcoes.transcricao,
       proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
+      duracaoS: opcoes.duracaoS,
     })
     .returning();
   return v;
 }
+
+const LEGENDA_LONGA =
+  "legenda transcrita do video com bastante detalhe para passar do tamanho minimo exigido " +
+  "pelo job, contando a historia inteira do que foi dito do inicio ao fim sem cortar nada, " +
+  "com mais uma frase soh para garantir que passa dos duzentos caracteres pedidos no teste.";
 
 beforeAll(async () => {
   await resetarSchema(db());
@@ -111,7 +118,7 @@ afterEach(async () => {
 describe("rodarTranscrever", () => {
   it("video do YouTube com legenda disponivel grava a legenda, sem chamar audio nem Groq", async () => {
     await criarVideo("yt-com-legenda", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
-    vi.mocked(baixarLegendaYoutube).mockResolvedValue("legenda transcrita do video");
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(1);
@@ -119,11 +126,11 @@ describe("rodarTranscrever", () => {
     expect(baixarAudio).not.toHaveBeenCalled();
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-com-legenda"));
-    expect(linha.transcricao).toBe("legenda transcrita do video");
+    expect(linha.transcricao).toBe(LEGENDA_LONGA);
   });
 
-  it("video do YouTube sem legenda cai para audio mais Groq", async () => {
-    await criarVideo("yt-sem-legenda", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+  it("video do YouTube sem legenda cai para audio mais Groq, e o resumo acumula o custo", async () => {
+    await criarVideo("yt-sem-legenda", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 600 });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
     vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
@@ -131,8 +138,25 @@ describe("rodarTranscrever", () => {
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorGroq).toBe(1);
     expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-fake.mp3");
+    expect(resumo.segundosAudioGroq).toBe(600);
+    expect(resumo.custoEstimadoGroqUsd).toBeCloseTo((600 / 3600) * 0.04, 4);
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-legenda"));
+    expect(linha.transcricao).toBe("texto transcrito pela groq");
+  });
+
+  it("legenda curta demais e tratada como sem legenda e cai para audio mais Groq", async () => {
+    await criarVideo("yt-legenda-curta", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue("E ai, tudo bem com voce hoje?");
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.transcritosPorLegenda).toBe(0);
+    expect(resumo.transcritosPorGroq).toBe(1);
+    expect(baixarAudio).toHaveBeenCalled();
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-curta"));
     expect(linha.transcricao).toBe("texto transcrito pela groq");
   });
 
@@ -181,7 +205,7 @@ describe("rodarTranscrever", () => {
     await criarVideo("limite-1", { velocidadeRelativa: 5, publicadoEm: diasAtras(3) });
     await criarVideo("limite-2", { velocidadeRelativa: 4, publicadoEm: diasAtras(4) });
     await criarVideo("limite-3", { velocidadeRelativa: 3, publicadoEm: diasAtras(5) });
-    vi.mocked(baixarLegendaYoutube).mockResolvedValue("legenda");
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(2);

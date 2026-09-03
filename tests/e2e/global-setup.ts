@@ -13,18 +13,28 @@
  * antes do e2e. Este arquivo faz isso sozinho, forcando a compilacao e
  * esperando a rede ficar quieta (o que cobre a compilacao sob demanda do
  * bundle cliente) antes do primeiro teste de verdade tocar em /entrar.
+ *
+ * Mesma familia de achado, revisao da etapa 8: a suite completa falhou duas
+ * vezes nos dois primeiros testes (login caindo em /hoje em vez de /comecar;
+ * admin preso em /entrar) e passou quando um spec rodou sozinho, com o
+ * servidor ja quente. Por isso as outras rotas do fluxo tambem sao
+ * aquecidas aqui, nao so /entrar.
  */
 import { chromium } from "@playwright/test";
 
 const porta = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const baseURL = `http://localhost:${porta}`;
 
+const ROTAS = ["/entrar", "/comecar", "/hoje", "/admin/clientes", "/conta"];
+
 export default async function globalSetup() {
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
-    await page.goto(`${baseURL}/entrar`);
-    await page.waitForLoadState("networkidle");
+    for (const rota of ROTAS) {
+      await page.goto(`${baseURL}${rota}`);
+      await page.waitForLoadState("networkidle");
+    }
   } finally {
     await browser.close();
   }

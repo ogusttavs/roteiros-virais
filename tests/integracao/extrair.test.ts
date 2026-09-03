@@ -16,6 +16,9 @@ import { resetarSchema } from "../../scripts/resetar-schema";
 
 let nichoId: number;
 
+const TRANSCRICAO_BOA =
+  "falou sobre o produto principal, contando com detalhe o que ele resolve e para quem serve.";
+
 async function criarVideo(
   idExterno: string,
   opcoes: { transcricao?: string; analise?: unknown } = {},
@@ -56,7 +59,7 @@ afterEach(async () => {
 
 describe("rodarExtrair mais rodarExtrairColeta", () => {
   it("monta o lote so com video transcrito e sem analise, e o ciclo completo grava analise mais etiquetas", async () => {
-    await criarVideo("com-transcricao-sem-analise", { transcricao: "falou sobre o produto principal" });
+    await criarVideo("com-transcricao-sem-analise", { transcricao: TRANSCRICAO_BOA });
     await criarVideo("sem-transcricao"); // fica de fora do lote
     await criarVideo("ja-tem-analise", {
       transcricao: "outra transcricao",
@@ -93,6 +96,22 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
     expect(videoIntocado.analise!.assunto).toBe("ja analisado");
   });
 
+  it("transcricao curta demais nao entra no lote e ganha nova tentativa de transcricao", async () => {
+    await criarVideo("transcricao-curta", { transcricao: "E ai" });
+    const bom = await criarVideo("transcricao-boa", { transcricao: TRANSCRICAO_BOA });
+
+    const resumo = await rodarExtrair();
+    expect(resumo.videosNoLote).toBe(1);
+    expect(resumo.transcricaoCurtaDemais).toBe(1);
+
+    const [loteGravado] = await db().select().from(lotesIa);
+    expect(loteGravado.videoIds).toEqual([bom.id]);
+
+    const [videoCurto] = await db().select().from(videos).where(eq(videos.idExterno, "transcricao-curta"));
+    expect(videoCurto.proximaTentativaTranscricao).not.toBeNull();
+    expect(videoCurto.analise).toBeNull();
+  });
+
   it("sem nenhum video candidato, nao cria lote", async () => {
     const resumo = await rodarExtrair();
     expect(resumo.videosNoLote).toBe(0);
@@ -103,7 +122,7 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
   });
 
   it("rodar a coleta de novo depois de concluido nao reprocessa o mesmo lote", async () => {
-    await criarVideo("video-unico", { transcricao: "transcricao qualquer" });
+    await criarVideo("video-unico", { transcricao: TRANSCRICAO_BOA });
     await rodarExtrair();
     await rodarExtrairColeta();
 
