@@ -21,6 +21,7 @@ export const FILAS = {
   extrairColeta: "extrair-coleta",
   analisarVisual: "analisar-visual",
   modeloNicho: "modelo-nicho",
+  temasDoDia: "temas-do-dia",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

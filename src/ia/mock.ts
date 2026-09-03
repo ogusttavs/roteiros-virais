@@ -44,6 +44,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockAnalisarVisual();
     case "modeloNicho":
       return mockModeloNicho(entrada);
+    case "filtrarNoticias":
+      return mockFiltrarNoticias(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -171,6 +173,20 @@ function mockVerificarTexto(entrada: string) {
   return {
     aprovado: !gritando,
     motivo: gritando ? "tom exagerado para o texto de tela" : null,
+  };
+}
+
+/** As primeiras 8 noticias numeradas da entrada, com um angulo derivado do titulo. */
+function mockFiltrarNoticias(entrada: string) {
+  const blocoNoticias = entrada.split("Noticias:\n")[1] ?? "";
+  const linhas = blocoNoticias.split("\n").filter((l) => /^\d+\./.test(l));
+
+  return {
+    relevantes: linhas.slice(0, 8).map((linha) => {
+      const indice = Number(linha.match(/^(\d+)\./)?.[1] ?? 0);
+      const titulo = linha.replace(/^\d+\.\s*/, "").split(":")[0].trim();
+      return { indice, angulo: `saiu hoje que ${titulo}, explique o que muda para o seu cliente` };
+    }),
   };
 }
 

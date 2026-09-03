@@ -2,13 +2,14 @@ import type { NivelIA } from "@/config/precos-ia";
 
 export type { NivelIA };
 
-/** As nove tarefas do plano (plano de execucao, etapa 4). */
+/** As dez tarefas do plano (plano de execucao, etapas 4 e 10). */
 export type TarefaIA =
   | "avaliarResposta"
   | "compilarPerfil"
   | "extrairVideo"
   | "analisarVisual"
   | "modeloNicho"
+  | "filtrarNoticias"
   | "temasDoDia"
   | "avaliarTema"
   | "roteiro"
