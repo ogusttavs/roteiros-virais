@@ -6,6 +6,7 @@
 import "dotenv/config";
 
 import { listarAgendamentos } from "./agenda";
+import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
@@ -13,6 +14,7 @@ import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { FILAS } from "./fila";
+import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
@@ -26,6 +28,8 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.transcrever]: rodarTranscrever,
   [FILAS.extrair]: rodarExtrair,
   [FILAS.extrairColeta]: rodarExtrairColeta,
+  [FILAS.analisarVisual]: rodarAnalisarVisual,
+  [FILAS.modeloNicho]: rodarModeloNicho,
 };
 
 async function main(): Promise<void> {

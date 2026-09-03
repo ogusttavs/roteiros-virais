@@ -4,7 +4,7 @@
  * leitura, sem regra de negocio: as telas `/admin/nichos` e `/admin/jobs`
  * chamam direto.
  */
-import { and, count, desc, eq, max } from "drizzle-orm";
+import { and, count, desc, eq, inArray, max } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -215,4 +215,15 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
     taxaForaDaCurva: l.taxaForaDaCurva === null ? null : Number(l.taxaForaDaCurva),
     medianaViews: l.medianaViews === null ? null : Number(l.medianaViews),
   }));
+}
+
+export type VideoLinkavel = { id: number; titulo: string | null; url: string };
+
+/** Titulo e url de alguns videos por id (etapa 9: exemplos do audio da semana). */
+export async function videosPorId(ids: number[]): Promise<VideoLinkavel[]> {
+  if (ids.length === 0) return [];
+  return db()
+    .select({ id: videos.id, titulo: videos.titulo, url: videos.url })
+    .from(videos)
+    .where(inArray(videos.id, ids));
 }

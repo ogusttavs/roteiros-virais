@@ -369,6 +369,18 @@ export type ModeloNicho = {
   baseadoEm: number;
 };
 
+/**
+ * Audio da semana (etapa 9, decisao 3 do PROXIMO.md): calculado por
+ * matematica pura em `videos.audio` (so TikTok e Instagram), antes de
+ * chamar a IA, nao gerado pelo modelo.
+ */
+export type AudioDaSemana = {
+  nome: string | null;
+  autor: string | null;
+  contagem: number;
+  videoExemploId: number;
+};
+
 export const modelosNicho = pgTable("modelos_nicho", {
   id: id(),
   nichoId: integer("nicho_id")
@@ -376,6 +388,7 @@ export const modelosNicho = pgTable("modelos_nicho", {
     .references(() => nichos.id),
   semana: date("semana").notNull(),
   modelo: jsonb("modelo").$type<ModeloNicho>().notNull(),
+  audiosDaSemana: jsonb("audios_da_semana").$type<AudioDaSemana[]>().notNull().default([]),
   criadoEm: criadoEm(),
 });
 

@@ -67,6 +67,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
           <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" /> {t.voltar}
         </Link>
         <h1>{nicho.nome}</h1>
+        <Link href={`/admin/nichos/${slug}/modelo`}>{t.verModelo}</Link>
       </div>
 
       <section className={styles.secao}>

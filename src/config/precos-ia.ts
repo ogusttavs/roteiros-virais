@@ -27,3 +27,11 @@ export const FATOR_CACHE_ESCRITA = 1.25;
 
 /** API de lote: 50% de desconto em entrada e saida. */
 export const FATOR_LOTE = 0.5;
+
+/**
+ * Preco da transcricao pela Groq (etapa 8, ajuste da revisao pedido na
+ * etapa 9: nao ha tabela dedicada para isso, so essa constante). Confirmado
+ * em console.groq.com/docs/model/whisper-large-v3-turbo em 03/09/2026.
+ */
+export const DATA_PRECO_GROQ = "2026-09-03";
+export const PRECO_GROQ_USD_POR_HORA = 0.04;

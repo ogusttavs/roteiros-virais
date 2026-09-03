@@ -61,6 +61,8 @@ export const config = {
     limiarForaDaCurva: 3,
     transcricoesPorDia: 40,
     visuaisPorSemana: 10,
+    /** Teto de vídeos com análise usados como evidência do modelo do nicho (etapa 9, decisão 2 do PROXIMO.md: "30 a 60"). */
+    videosParaModeloNicho: 60,
     janelaLinhaEditorial: 15,
     minimoParaAvisoLinhaEditorial: 5,
   },

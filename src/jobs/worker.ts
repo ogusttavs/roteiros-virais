@@ -7,6 +7,7 @@
 import "dotenv/config";
 
 import { agendarTudo, listarAgendamentos } from "./agenda";
+import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
@@ -14,6 +15,7 @@ import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
+import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
@@ -46,6 +48,12 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.extrairColeta, async () => {
     await executarComRegistro(FILAS.extrairColeta, rodarExtrairColeta);
+  });
+  await boss().work(FILAS.analisarVisual, async () => {
+    await executarComRegistro(FILAS.analisarVisual, rodarAnalisarVisual);
+  });
+  await boss().work(FILAS.modeloNicho, async () => {
+    await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);
   });
 
   console.log("worker no ar.");
