@@ -14,6 +14,8 @@ export const FILAS = {
   coletaYoutube: "coleta-youtube",
   coletaApify: "coleta-apify",
   coletaNoticias: "coleta-noticias",
+  pontuar: "pontuar",
+  vigilancia: "vigilancia",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

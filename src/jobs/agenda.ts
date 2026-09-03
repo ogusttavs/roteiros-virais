@@ -1,7 +1,9 @@
 /**
  * Agendamentos em codigo (etapa 6, decisao do Fable): coleta as 03:00,
  * noticias as 06:00 e 14:00, horario de Brasilia. `npm run job -- listar`
- * imprime esta lista sem precisar do worker rodando.
+ * imprime esta lista sem precisar do worker rodando. `pontuar` entra logo
+ * depois de todas as coletas (03:45); `vigilancia` e semanal, domingo 04:30
+ * (etapa 7, decisao 1 e 5 do `PROXIMO.md`).
  */
 import { boss, FILAS } from "./fila";
 
@@ -36,6 +38,16 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "0 14 * * *",
     descricao: "noticias do nicho, todo dia as 14:00",
     chave: "tarde",
+  },
+  {
+    fila: FILAS.pontuar,
+    cron: "45 3 * * *",
+    descricao: "pontuacao (fora-da-curva, velocidade), todo dia as 03:45, depois das coletas",
+  },
+  {
+    fila: FILAS.vigilancia,
+    cron: "30 4 * * 0",
+    descricao: "lista de vigilancia, todo domingo as 04:30",
   },
 ];
 
