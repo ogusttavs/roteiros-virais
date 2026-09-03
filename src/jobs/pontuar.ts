@@ -15,7 +15,9 @@
  *    fórmula bruta, não da coluna `velocidade`, porque essa coluna só é
  *    preenchida na janela mais estreita de 2 a 7 dias) e velocidade_relativa
  *    por vídeo
- * 5. taxa_fora_da_curva por conta
+ * 5. taxa_fora_da_curva por conta (só conta vídeo com `fora_da_curva` calculado, no
+ *    numerador e no denominador; conta sem nenhum vídeo pontuado fica com taxa nula,
+ *    não zero, ajuste da revisão da etapa 7 no `PROXIMO.md` da etapa 8)
  */
 import { sql } from "drizzle-orm";
 
@@ -139,7 +141,9 @@ async function passo5TaxaForaDaCurvaPorConta() {
         count(v.id) AS n,
         count(v.id) FILTER (WHERE v.fora_da_curva >= ${config.regras.limiarForaDaCurva}) AS acima
       FROM contas c2
-      LEFT JOIN videos v ON v.conta_id = c2.id AND v.publicado_em >= now() - interval '90 days'
+      LEFT JOIN videos v ON v.conta_id = c2.id
+        AND v.publicado_em >= now() - interval '90 days'
+        AND v.fora_da_curva IS NOT NULL
       GROUP BY c2.id
     ) a
     WHERE c.id = a.conta_id

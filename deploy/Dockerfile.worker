@@ -1,0 +1,27 @@
+# Dockerfile do worker (etapa 8, decisao 5 do PROXIMO.md): so o processo de
+# jobs (pg-boss), nao a aplicacao web. Usado a partir da etapa 13; escrito
+# agora so para existir e buildar sem erro (criterio de aceite desta etapa).
+#
+# yt-dlp e ffmpeg sao dependencia de sistema (nao pacote npm, ver
+# HISTORICO.md), instalados aqui: ffmpeg via apt; yt-dlp e o zipapp
+# distribuido no release oficial, que precisa de python3 no PATH (achado
+# buildando esta imagem: o binario sem sufixo do release nao e standalone
+# de verdade, "/usr/bin/env: python3: No such file or directory").
+FROM node:24-slim
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl \
+  && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+  && chmod a+rx /usr/local/bin/yt-dlp \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+# tsx roda os jobs direto do TypeScript, sem passo de build separado (mesmo
+# padrao ja usado em desenvolvimento, npm run worker).
+CMD ["npm", "run", "worker"]
