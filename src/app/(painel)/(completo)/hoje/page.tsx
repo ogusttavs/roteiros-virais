@@ -1,6 +1,8 @@
+import { Video } from "lucide-react";
+
 import { textosVazio } from "@/textos/vazio";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 export default function Hoje() {
-  return <EstadoVazio titulo={textosVazio.hoje.titulo} descricao={textosVazio.hoje.descricao} />;
+  return <EstadoVazio icone={Video} frase={textosVazio.hoje.frase} />;
 }

@@ -1,18 +1,18 @@
-import type { LucideIcon } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 
+import estiloErro from "./EstadoErro.module.css";
 import styles from "./EstadoVazio.module.css";
 
 type Props = {
-  icone: LucideIcon;
   frase: string;
   acao?: { rotulo: string; onClick: () => void };
 };
 
-/** O que acontece aqui e o proximo passo, nunca "nenhum item" (brief-frontend.md, secao 2). */
-export function EstadoVazio({ icone: Icone, frase, acao }: Props) {
+/** Mesma forma de EstadoVazio, com o icone e a cor de erro (entrega/README.md). */
+export function EstadoErro({ frase, acao }: Props) {
   return (
     <div className={styles.estado}>
-      <Icone size={24} strokeWidth={1.5} aria-hidden="true" />
+      <CircleAlert size={24} strokeWidth={1.5} className={estiloErro.icone} aria-hidden="true" />
       <p className={styles.frase}>{frase}</p>
       {acao ? (
         <button type="button" className={styles.acao} onClick={acao.onClick}>

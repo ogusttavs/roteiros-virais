@@ -1,0 +1,58 @@
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: var(--espaco-3);
+  align-items: start;
+}
+
+.icone {
+  color: var(--cor-texto-suave);
+  margin-top: 2px;
+}
+
+.texto {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rotulo {
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.corpo {
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto);
+}
+
+.mono {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  margin-top: 2px;
+}

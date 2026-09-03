@@ -1,0 +1,35 @@
+.toast {
+  position: fixed;
+  left: var(--margem-celular);
+  right: var(--margem-celular);
+  bottom: var(--espaco-6);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  margin: 0 auto;
+  max-width: 360px;
+  border-radius: var(--raio-md);
+  background: var(--cor-titulo);
+  color: var(--cor-fundo);
+  font-size: var(--tamanho-secundario);
+  box-shadow: var(--sombra-md);
+  animation: surgir var(--duracao-base) var(--curva-saida);
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+}

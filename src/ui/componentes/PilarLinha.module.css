@@ -1,0 +1,58 @@
+.lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+}
+
+.linha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.medida {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-4);
+}
+
+.nome {
+  flex: none;
+  width: 44%;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.trilha {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--cor-borda);
+  overflow: hidden;
+}
+
+.preenchido {
+  display: block;
+  height: 100%;
+  background: var(--cor-titulo);
+}
+
+.valor {
+  flex: none;
+  width: 36px;
+  text-align: right;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.porque {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
