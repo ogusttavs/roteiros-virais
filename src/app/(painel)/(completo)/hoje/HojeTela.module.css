@@ -1,0 +1,72 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+  max-width: var(--largura-leitura);
+}
+
+.cabecalho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.data {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo);
+}
+
+.constancia {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.aviso {
+  margin: 0;
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+}
+
+.grade {
+  display: flex;
+  flex-direction: column;
+}
+
+.outraCoisa {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.outraCoisa:hover {
+  color: var(--cor-titulo);
+}
+
+.outraCoisa:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+@media (min-width: 768px) {
+  .grade {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--espaco-5);
+  }
+}

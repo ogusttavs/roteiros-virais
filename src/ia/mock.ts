@@ -126,13 +126,14 @@ function mockAvaliarTema(entrada: string) {
   };
   const nota =
     Object.values(pilares).reduce((soma, p) => soma + p.nota, 0) / Object.values(pilares).length;
+  const notaArredondada = Math.round(nota * 10) / 10;
+  const aprovado = notaArredondada >= 9;
 
   return {
     pilares,
-    nota: Math.round(nota * 10) / 10,
-    recomendacao:
-      evidencias > 0 ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
-    anguloSugerido: evidencias > 0 ? null : "angulo vizinho simulado",
+    nota: notaArredondada,
+    recomendacao: aprovado ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
+    anguloSugerido: aprovado ? null : "angulo vizinho simulado",
     evidencias: extrairIds(entrada),
   };
 }

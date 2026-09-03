@@ -20,3 +20,13 @@ export const NOME_OBJETIVO: Record<Objetivo, string> = {
   engajamento: "as pessoas lembrarem de mim quando precisarem",
   conversao: "gente me chamar para comprar",
 };
+
+/**
+ * Rótulo curto do `TemaCartao` em `/hoje` (etapa 10, brief-frontend.md
+ * 6.3): mesma razão de `NOME_OBJETIVO` estar aqui, fora do `checar-texto`.
+ */
+export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
+  alcance: "para te conhecerem",
+  engajamento: "para lembrarem de você",
+  conversao: "para te chamarem",
+};
