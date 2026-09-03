@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
 import { textosEntrar } from "@/textos/entrar";
-import { Cartao } from "@/ui/componentes/Cartao";
 import { Logo } from "@/ui/Logo";
 
 import { FormularioEntrar } from "./FormularioEntrar";
@@ -16,11 +15,11 @@ export default async function Entrar() {
 
   return (
     <div className={styles.pagina}>
-      <Logo tamanho={32} />
-      <Cartao className={styles.cartao}>
+      <div className={styles.envoltorio}>
+        <Logo />
         <h1 className={styles.titulo}>{textosEntrar.titulo}</h1>
         <FormularioEntrar />
-      </Cartao>
+      </div>
     </div>
   );
 }
