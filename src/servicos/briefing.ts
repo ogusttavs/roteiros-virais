@@ -7,7 +7,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { briefings, clientes, type AvaliacaoResposta, type Briefing } from "@/db/schema";
+import { briefings, clientes, type AvaliacaoResposta, type Briefing, type PerfilCompilado } from "@/db/schema";
 import * as avaliarRespostaIA from "@/ia/prompts/avaliarResposta";
 import * as compilarPerfilIA from "@/ia/prompts/compilarPerfil";
 import { gerarComVerificacao } from "@/ia/verificador";
@@ -273,4 +273,27 @@ async function compilarEGravarPerfil(
       },
     })
     .where(eq(clientes.id, clienteId));
+}
+
+/**
+ * `PerfilCompilado` em texto corrido para o bloco estável de um prompt (nota
+ * de tema, roteiro): os dois usam o mesmo perfil, então o formato vive aqui
+ * em vez de duplicado em cada um.
+ */
+export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
+  const linhas = [
+    perfil.resumo,
+    `O que vende: ${perfil.fatos.oQueVende}`,
+    `Preço: ${perfil.fatos.preco}`,
+    `Cliente ideal: ${perfil.fatos.clienteIdeal}`,
+  ];
+  if (perfil.fatos.medos.length > 0) linhas.push(`Medos do cliente: ${perfil.fatos.medos.join("; ")}`);
+  if (perfil.fatos.frasesDaFala.length > 0) {
+    linhas.push(`Frases que ele fala: ${perfil.fatos.frasesDaFala.join("; ")}`);
+  }
+  if (perfil.fatos.proibicoes.length > 0) linhas.push(`Nunca diria ou faria: ${perfil.fatos.proibicoes.join("; ")}`);
+  if (perfil.fatos.cenasFilmaveis.length > 0) {
+    linhas.push(`Cenas que dá para filmar: ${perfil.fatos.cenasFilmaveis.join("; ")}`);
+  }
+  return linhas.join("\n");
 }

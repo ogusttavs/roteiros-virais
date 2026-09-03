@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
-import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
+import { evidenciaParaTema, foraDaCurvaDoNicho, subindoHoje, subindoHojeComAnalise } from "@/servicos/pesquisa";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -27,9 +27,11 @@ async function criarVideo(
     publicadoEm: Date;
     origem?: "coleta" | "seed";
     analise?: unknown;
+    titulo?: string;
+    etiquetas?: string[];
   },
 ) {
-  await db()
+  const [v] = await db()
     .insert(videos)
     .values({
       plataforma: "tiktok",
@@ -37,13 +39,17 @@ async function criarVideo(
       url: `https://exemplo.invalido/${idExterno}`,
       contaId,
       nichoId,
+      titulo: opcoes.titulo,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
       origem: opcoes.origem ?? "coleta",
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
       velocidadeRelativa: opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
       analise: opcoes.analise as never,
-    });
+      etiquetas: opcoes.etiquetas,
+    })
+    .returning();
+  return v;
 }
 
 beforeAll(async () => {
@@ -137,5 +143,67 @@ describe("subindoHoje", () => {
 
     expect(resultado.some((v) => v.velocidadeRelativa === 80)).toBe(false);
     expect(resultado.some((v) => v.velocidadeRelativa === 70)).toBe(true);
+  });
+});
+
+describe("subindoHojeComAnalise", () => {
+  it("so traz video com analise, com o assunto e a velocidade relativa", async () => {
+    const comAnalise = await criarVideo("sca-com-analise", {
+      velocidadeRelativa: 5,
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "erro comum ao lavar sofa" },
+    });
+    const semAnalise = await criarVideo("sca-sem-analise", { velocidadeRelativa: 9, publicadoEm: diasAtras(3) });
+
+    const resultado = await subindoHojeComAnalise(nichoId);
+    const ids = resultado.map((v) => v.id);
+
+    expect(ids).toContain(comAnalise.id);
+    expect(ids).not.toContain(semAnalise.id);
+    expect(resultado.find((v) => v.id === comAnalise.id)).toEqual({
+      id: comAnalise.id,
+      assunto: "erro comum ao lavar sofa",
+      velocidadeRelativa: 5,
+    });
+  });
+});
+
+describe("evidenciaParaTema", () => {
+  it("casa por busca textual (titulo) ordenado por fora_da_curva desc", async () => {
+    await criarVideo("ev-titulo", {
+      foraDaCurva: 6,
+      publicadoEm: diasAtras(10),
+      titulo: "como limpar estofado de sofa em casa hoje",
+      analise: { assunto: "limpeza de estofado" },
+    });
+    await criarVideo("ev-sem-relacao", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(10),
+      titulo: "receita de bolo de chocolate",
+      analise: { assunto: "receita" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "limpar sofa estofado hoje");
+
+    expect(resultado.map((v) => v.assunto)).toEqual(["limpeza de estofado"]);
+  });
+
+  it("casa por etiqueta que contenha uma palavra do texto, mesmo sem casar o titulo", async () => {
+    await criarVideo("ev-etiqueta", {
+      foraDaCurva: 4,
+      publicadoEm: diasAtras(10),
+      titulo: "video sem nenhuma palavra em comum",
+      etiquetas: ["mancha", "estofado"],
+      analise: { assunto: "tira mancha do estofado" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "como tirar mancha de vinho do sofa");
+
+    expect(resultado.map((v) => v.assunto)).toContain("tira mancha do estofado");
+  });
+
+  it("sem casamento nenhum, a evidencia vem vazia", async () => {
+    const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
+    expect(resultado).toEqual([]);
   });
 });
