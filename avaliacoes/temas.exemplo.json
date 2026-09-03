@@ -1,0 +1,115 @@
+[
+  {
+    "tema": "como tirar mancha de vinho tinto do sofá em casa",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180, colchão de casal por R$ 150. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já mandou fazer em outro lugar e o sofá ficou manchado. Nunca promete tirar mancha de vinho tinto sem ver foto antes.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 101, "assunto": "o produto que tira qualquer mancha do estofado", "foraDaCurva": 6.2 },
+      { "id": 102, "assunto": "antes e depois da mancha de vinho no sofá", "foraDaCurva": 5.1 },
+      { "id": 103, "assunto": "erro que todo mundo comete ao tentar tirar mancha", "foraDaCurva": 4.3 }
+    ],
+    "notaEsperada": { "viralizar": 9, "gerarCliente": 8, "encaixe": 8, "novidade": 6, "facilidade": 9 },
+    "pontoPrincipal": "tres videos fora da curva sobre o mesmo assunto, responde o medo do briefing, facil de gravar"
+  },
+  {
+    "tema": "por que nunca uso produto caseiro para tirar mancha",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180. Nunca promete tirar mancha de vinho tinto sem ver foto antes, porque às vezes não sai.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação. Ganchos: mostrar o produto agindo antes de explicar.",
+    "persona": "negocio",
+    "evidencias": [],
+    "notaEsperada": { "viralizar": 3, "gerarCliente": 7, "encaixe": 6, "novidade": 7, "facilidade": 8 },
+    "pontoPrincipal": "sem nenhum video fora da curva sobre o assunto nos ultimos 90 dias, viralizar fica baixo mesmo respondendo um medo real"
+  },
+  {
+    "tema": "a maquina de lavagem a seco que uso, por dentro",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Cenas filmáveis: a máquina ligada, o antes e depois do estofado. Nunca mostra rosto de cliente sem autorização.",
+    "modeloNicho": "Formatos: fala para câmera, 60%; making of do equipamento, 20%.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 104, "assunto": "por dentro da maquina que tira mancha sem molhar", "foraDaCurva": 7.5 }
+    ],
+    "notaEsperada": { "viralizar": 7, "gerarCliente": 5, "encaixe": 9, "novidade": 8, "facilidade": 8 },
+    "pontoPrincipal": "curiosidade sobre o equipamento, nao responde medo de compra direto, encaixa bem na autoridade dele"
+  },
+  {
+    "tema": "clareamento dos dentes: vale a pena fazer em casa",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento. Frase que fala: aqui a gente explica tudo antes de fazer.",
+    "modeloNicho": "Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos: comparação antes e depois, alta frequência.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 201, "assunto": "como clarear os dentes em casa", "foraDaCurva": 8.9 },
+      { "id": 202, "assunto": "antes e depois do clareamento", "foraDaCurva": 6.4 },
+      { "id": 203, "assunto": "mito ou verdade sobre clareamento caseiro", "foraDaCurva": 5.0 },
+      { "id": 204, "assunto": "paciente reagindo ao resultado do clareamento", "foraDaCurva": 4.2 }
+    ],
+    "notaEsperada": { "viralizar": 10, "gerarCliente": 9, "encaixe": 9, "novidade": 5, "facilidade": 9 },
+    "pontoPrincipal": "quatro videos fora da curva, mas o angulo de clareamento ja apareceu tres vezes na evidencia, novidade cai"
+  },
+  {
+    "tema": "por que eu cobro mais caro que a clínica popular da esquina",
+    "perfilCompilado": "Clínica odontológica de bairro. Nunca promete resultado que não pode cumprir. Fala com o cliente de forma direta, sem ser fria.",
+    "modeloNicho": "Assuntos quentes: clareamento, aparelho, dor de dente.",
+    "persona": "negocio",
+    "evidencias": [],
+    "notaEsperada": { "viralizar": 4, "gerarCliente": 3, "encaixe": 4, "novidade": 7, "facilidade": 8 },
+    "pontoPrincipal": "compara preco em vez de resolver medo do cliente, sem evidencia de que esse assunto funciona no nicho"
+  },
+  {
+    "tema": "reagindo aos comentários mais engraçados que já recebi",
+    "perfilCompilado": "Quer virar criador de conteúdo sobre odontologia e atrair marcas parceiras. Autoridade: seis anos de consultório, já apareceu em três podcasts do nicho.",
+    "modeloNicho": "Assuntos quentes: bastidor do consultório, reação a comentário. Ganchos: reação de humor, media frequência.",
+    "persona": "criador",
+    "evidencias": [
+      { "id": 205, "assunto": "paciente reagindo ao resultado do clareamento", "foraDaCurva": 4.2 }
+    ],
+    "notaEsperada": { "viralizar": 6, "gerarCliente": 4, "encaixe": 7, "novidade": 7, "facilidade": 9 },
+    "pontoPrincipal": "para quem quer virar criador, gerar cliente significa aproximar de marca, entretenimento puro fica no meio da nota"
+  },
+  {
+    "tema": "o passo a passo completo de um implante dentário do início ao fim",
+    "perfilCompilado": "Clínica odontológica de bairro. Quem grava é só a própria pessoa, sem equipe. Autoridade em implante, formação recente na área.",
+    "modeloNicho": "Formatos: fala para câmera, 55%; making of do procedimento, 25%.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 206, "assunto": "implante dentario, vale a pena", "foraDaCurva": 5.8 }
+    ],
+    "notaEsperada": { "viralizar": 7, "gerarCliente": 8, "encaixe": 8, "novidade": 8, "facilidade": 3 },
+    "pontoPrincipal": "precisa de outra pessoa filmando um procedimento longo, sozinho no consultorio a facilidade cai bastante"
+  },
+  {
+    "tema": "faxina de 15 minutos por cômodo, sem produto caro",
+    "perfilCompilado": "Serviço de organização e limpeza residencial. Vende faxina completa por R$ 220. Cliente ideal trabalha fora o dia todo e não tem tempo de organizar a casa.",
+    "modeloNicho": "Assuntos quentes: faxina rápida, organização de armário, cheiro que dura. Ganchos: comparação antes e depois.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 301, "assunto": "faxina de 15 minutos por comodo", "foraDaCurva": 6.7 },
+      { "id": 302, "assunto": "erro que todo mundo comete ao limpar", "foraDaCurva": 5.5 }
+    ],
+    "notaEsperada": { "viralizar": 9, "gerarCliente": 7, "encaixe": 8, "novidade": 8, "facilidade": 10 },
+    "pontoPrincipal": "assunto quente com evidencia boa, facil de gravar sozinho em casa, angulo ainda pouco repetido"
+  },
+  {
+    "tema": "como deixar a casa cheirosa por dias sem produto forte que faz mal para os pets",
+    "perfilCompilado": "Serviço de organização e limpeza residencial. Cliente ideal tem animal de estimação. Nunca recomenda produto tóxico perto de criança ou pet.",
+    "modeloNicho": "Assuntos quentes: cheiro que dura, organização de armário.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 303, "assunto": "como deixar a casa cheirosa por dias", "foraDaCurva": 4.1 }
+    ],
+    "notaEsperada": { "viralizar": 7, "gerarCliente": 8, "encaixe": 9, "novidade": 7, "facilidade": 9 },
+    "pontoPrincipal": "um video fora da curva sobre o mesmo assunto, tema encaixa direto na proibicao dura do briefing sobre produto toxico"
+  },
+  {
+    "tema": "organizando o guarda roupa inteiro em uma tarde",
+    "perfilCompilado": "Serviço de organização e limpeza residencial. Quem grava é a própria pessoa mais um assistente que segura a câmera.",
+    "modeloNicho": "Assuntos quentes: organização de armário, faxina rápida.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 304, "assunto": "organizando o armario da cozinha", "foraDaCurva": 3.9 },
+      { "id": 305, "assunto": "antes e depois da organização da despensa", "foraDaCurva": 3.2 }
+    ],
+    "notaEsperada": { "viralizar": 7, "gerarCliente": 6, "encaixe": 8, "novidade": 6, "facilidade": 7 },
+    "pontoPrincipal": "evidencia sobre organizacao de outros comodos, nao do guarda roupa exato, projeto longo pesa um pouco na facilidade"
+  }
+]

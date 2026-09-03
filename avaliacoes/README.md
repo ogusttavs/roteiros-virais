@@ -51,3 +51,33 @@ npm run avaliar:briefing
 
 Imprime a nota que a IA deu, a nota esperada, a diferença e o ponto principal de cada caso, e
 a diferença média no final. Meta do plano: diferença média abaixo de 1,0.
+
+## Formato de `temas.json` e `temas.exemplo.json` (etapa 10)
+
+Mesma ideia, para a nota de tema em cinco pilares (`briefing-e-rubricas.md`, seção 6). Cada
+caso já traz a evidência e o perfil compilado fixos, para medir só o julgamento do modelo
+diante do mesmo material, sem tocar banco nem cliente real:
+
+```json
+[
+  {
+    "tema": "o assunto proposto pelo cliente",
+    "perfilCompilado": "o perfil compilado, como se fosse o resumo de um cliente real",
+    "modeloNicho": "o modelo do nicho, como se fosse o resumo do job modeloNicho",
+    "persona": "negocio",
+    "evidencias": [{ "id": 1, "assunto": "assunto do video", "foraDaCurva": 5.2 }],
+    "notaEsperada": { "viralizar": 9, "gerarCliente": 8, "encaixe": 8, "novidade": 6, "facilidade": 9 },
+    "pontoPrincipal": "por que essa e a nota certa, em uma frase"
+  }
+]
+```
+
+`GOLDEN_SET_DIR/temas.json` é o real (mesma variável de ambiente, mesmo padrão de fallback
+para o exemplo). `PROXIMO.md`, decisão 7 da etapa 10, pede 10 casos fictícios no exemplo.
+
+```bash
+npm run avaliar:temas
+```
+
+Imprime, por caso, a nota que a IA deu e a esperada em cada um dos cinco pilares, e a
+diferença média por pilar no final. Meta: diferença média abaixo de 1,5.
