@@ -49,6 +49,21 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "30 4 * * 0",
     descricao: "lista de vigilancia, todo domingo as 04:30",
   },
+  {
+    fila: FILAS.transcrever,
+    cron: "0 4 * * *",
+    descricao: "transcricao dos videos que passaram no filtro, todo dia as 04:00, depois de pontuar",
+  },
+  {
+    fila: FILAS.extrair,
+    cron: "0 5 * * *",
+    descricao: "monta o lote de extracao, todo dia as 05:00, depois de transcrever",
+  },
+  {
+    fila: FILAS.extrairColeta,
+    cron: "0 */4 * * *",
+    descricao: "busca o resultado do lote de extracao quando pronto, a cada 4 horas",
+  },
 ];
 
 export async function agendarTudo(): Promise<void> {

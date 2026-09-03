@@ -11,8 +11,11 @@ import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
+import { rodarExtrair } from "./extrair";
+import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarPontuar } from "./pontuar";
+import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
 async function main(): Promise<void> {
@@ -34,6 +37,15 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.vigilancia, async () => {
     await executarComRegistro(FILAS.vigilancia, rodarVigilancia);
+  });
+  await boss().work(FILAS.transcrever, async () => {
+    await executarComRegistro(FILAS.transcrever, rodarTranscrever);
+  });
+  await boss().work(FILAS.extrair, async () => {
+    await executarComRegistro(FILAS.extrair, rodarExtrair);
+  });
+  await boss().work(FILAS.extrairColeta, async () => {
+    await executarComRegistro(FILAS.extrairColeta, rodarExtrairColeta);
   });
 
   console.log("worker no ar.");

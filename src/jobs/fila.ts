@@ -16,6 +16,9 @@ export const FILAS = {
   coletaNoticias: "coleta-noticias",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
+  transcrever: "transcrever",
+  extrair: "extrair",
+  extrairColeta: "extrair-coleta",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

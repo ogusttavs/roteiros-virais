@@ -10,8 +10,11 @@ import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
+import { rodarExtrair } from "./extrair";
+import { rodarExtrairColeta } from "./extrair-coleta";
 import { FILAS } from "./fila";
 import { rodarPontuar } from "./pontuar";
+import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
 const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
@@ -20,6 +23,9 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.coletaNoticias]: rodarColetaNoticias,
   [FILAS.pontuar]: rodarPontuar,
   [FILAS.vigilancia]: rodarVigilancia,
+  [FILAS.transcrever]: rodarTranscrever,
+  [FILAS.extrair]: rodarExtrair,
+  [FILAS.extrairColeta]: rodarExtrairColeta,
 };
 
 async function main(): Promise<void> {

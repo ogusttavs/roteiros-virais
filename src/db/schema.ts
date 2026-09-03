@@ -310,6 +310,12 @@ export const videos = pgTable(
     audio: jsonb("audio").$type<VideoAudio>(),
     /** Palavras-chave da extracao (etapa 8), usadas em filtro e evidencia. */
     etiquetas: jsonb("etiquetas").$type<string[]>().notNull().default([]),
+    /**
+     * Transcricao falhou de vez (sem audio, erro definitivo): preenchida com
+     * "agora + 7 dias" (etapa 8, decisao 3 do PROXIMO.md). `transcrever`
+     * nunca seleciona video com essa data no futuro.
+     */
+    proximaTentativaTranscricao: timestamp("proxima_tentativa_transcricao", { withTimezone: true }),
     /** titulo + descricao + transcricao + analise.assunto, para busca de evidencia. */
     busca: tsvector("busca").generatedAlwaysAs(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
@@ -513,6 +519,26 @@ export const execucoesJob = pgTable("execucoes_job", {
   status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
   resumo: jsonb("resumo").$type<Record<string, unknown>>(),
   erro: text("erro"),
+});
+
+/**
+ * Um lote pendente na API de lote da Anthropic (etapa 8): a API e assincrona
+ * (ate 24h), entao o job `extrair` so cria o lote e grava a linha aqui;
+ * `extrairColeta`, rodado a parte, e quem confere o status e busca o
+ * resultado quando pronto. `videoIds` guarda a ordem usada como `customId`
+ * de cada item (`String(videoId)`), para o resultado voltar ligado ao video
+ * certo sem precisar de outra consulta.
+ */
+export const lotesIa = pgTable("lotes_ia", {
+  id: id(),
+  /** Nome da tarefa de src/ia/tipos.ts (TarefaIA); texto solto aqui para o schema do
+   * banco nao depender da camada de IA, so o codigo que le/escreve tipa certo. */
+  tarefa: text("tarefa").notNull(),
+  loteIdExterno: text("lote_id_externo").notNull().unique(),
+  videoIds: jsonb("video_ids").$type<number[]>().notNull().default([]),
+  status: text("status").$type<"em_andamento" | "concluido" | "erro">().notNull().default("em_andamento"),
+  criadoEm: criadoEm(),
+  concluidoEm: timestamp("concluido_em", { withTimezone: true }),
 });
 
 /**
