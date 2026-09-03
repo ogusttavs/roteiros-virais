@@ -45,6 +45,16 @@ async function buscarBriefing(clienteId: number): Promise<Briefing | null> {
 }
 
 /**
+ * O perfil compilado do cliente (etapa 10: `avaliarTema` precisa dele no
+ * bloco estável). `null` até o briefing chegar à nota mínima e liberar a
+ * primeira compilação.
+ */
+export async function perfilDoCliente(clienteId: number): Promise<PerfilCompilado | null> {
+  const briefing = await buscarBriefing(clienteId);
+  return briefing?.perfil ?? null;
+}
+
+/**
  * Salva o texto da resposta sem chamar IA (debounce fica na tela). Lock e
  * mesclagem em JS dentro de uma transacao (revisao da parte 2, achado no
  * code review desta rodada), no mesmo padrao de `avaliarResposta`: duas
