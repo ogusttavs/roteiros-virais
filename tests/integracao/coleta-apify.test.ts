@@ -92,7 +92,12 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
     const [videoInstagram] = await db()
       .select()
       .from(videos)
-      .where(and(eq(videos.plataforma, "instagram"), eq(videos.idExterno, instagramFixture[0].shortCode!)));
+      .where(
+        and(
+          eq(videos.plataforma, "instagram"),
+          eq(videos.idExterno, instagramFixture[0].shortCode!),
+        ),
+      );
     expect(videoInstagram).toBeDefined();
     expect(videoInstagram.audio).toEqual({
       id: "611111111111111",
@@ -131,6 +136,34 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
       .from(consumoApi)
       .where(and(eq(consumoApi.fonte, "apify"), eq(consumoApi.data, hojeISO())));
     expect(linha.unidades).toBe(3);
+  });
+
+  it("um item malformado no lote entra em erros e o resto do lote e gravado", async () => {
+    const itemQuebrado = {
+      ...tiktokFixture[0],
+      id: "item-quebrado",
+      authorMeta: undefined,
+    } as unknown as TiktokItemBruto;
+    vi.mocked(buscarTiktok).mockResolvedValue([itemQuebrado, tiktokFixture[1]]);
+    vi.mocked(buscarInstagram).mockResolvedValue([]);
+
+    const resumo = await rodarColetaApify();
+    const erros = resumo.erros as string[] | undefined;
+    expect(resumo.videosNovos).toBe(1);
+    expect(erros).toHaveLength(1);
+    expect(erros?.[0]).toMatch(/item-quebrado/);
+
+    const [videoBom] = await db()
+      .select()
+      .from(videos)
+      .where(and(eq(videos.plataforma, "tiktok"), eq(videos.idExterno, tiktokFixture[1].id)));
+    expect(videoBom).toBeDefined();
+
+    const quebrados = await db()
+      .select()
+      .from(videos)
+      .where(and(eq(videos.plataforma, "tiktok"), eq(videos.idExterno, "item-quebrado")));
+    expect(quebrados).toHaveLength(0);
   });
 
   it("ao atingir o teto diario de resultados, para de chamar (nao processa o segundo nicho)", async () => {

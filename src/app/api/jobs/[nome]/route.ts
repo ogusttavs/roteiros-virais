@@ -1,9 +1,22 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { NextResponse } from "next/server";
 
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
 const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
+
+/**
+ * Comparacao em tempo constante (revisao da etapa 6, parte 2): evita que o
+ * tempo de resposta vaze quantos caracteres da chave estao certos.
+ */
+function chaveValida(recebida: string): boolean {
+  const esperada = Buffer.from(config.jobsApiKey);
+  const dada = Buffer.from(recebida);
+  if (esperada.length !== dada.length) return false;
+  return timingSafeEqual(esperada, dada);
+}
 
 /**
  * Dispara um job de fora (etapa 6, decisao do Fable): cabecalho x-jobs-key
@@ -19,7 +32,7 @@ const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
  */
 export async function POST(request: Request, { params }: { params: Promise<{ nome: string }> }) {
   const chave = request.headers.get("x-jobs-key");
-  if (!chave || chave !== config.jobsApiKey) {
+  if (!chave || !chaveValida(chave)) {
     return NextResponse.json({ erro: "chave invalida ou ausente" }, { status: 401 });
   }
 

@@ -10,10 +10,9 @@
  */
 import { and, eq, sql } from "drizzle-orm";
 
-
 import { db } from "@/db";
 import { consumoApi, contas, nichos } from "@/db/schema";
-import { config , hojeISO } from "@/lib/config";
+import { config, hojeISO } from "@/lib/config";
 import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
 import { normalizarVideoTiktok } from "@/servicos/normalizadores/tiktok";
 
@@ -62,7 +61,13 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
     const vigiadasTiktok = await db()
       .select()
       .from(contas)
-      .where(and(eq(contas.plataforma, "tiktok"), eq(contas.nichoId, nicho.id), eq(contas.vigiada, true)));
+      .where(
+        and(
+          eq(contas.plataforma, "tiktok"),
+          eq(contas.nichoId, nicho.id),
+          eq(contas.vigiada, true),
+        ),
+      );
 
     if (nicho.termos.length > 0 || vigiadasTiktok.length > 0) {
       chamadasTiktok += 1;
@@ -91,7 +96,9 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
           }
         }
       } catch (erro) {
-        erros.push(`tiktok / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+        erros.push(
+          `tiktok / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`,
+        );
       }
     }
 
@@ -100,7 +107,13 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
     const vigiadasInstagram = await db()
       .select()
       .from(contas)
-      .where(and(eq(contas.plataforma, "instagram"), eq(contas.nichoId, nicho.id), eq(contas.vigiada, true)));
+      .where(
+        and(
+          eq(contas.plataforma, "instagram"),
+          eq(contas.nichoId, nicho.id),
+          eq(contas.vigiada, true),
+        ),
+      );
 
     if (nicho.termos.length > 0 || vigiadasInstagram.length > 0) {
       chamadasInstagram += 1;
@@ -127,7 +140,9 @@ export async function rodarColetaApify(): Promise<Record<string, unknown>> {
           }
         }
       } catch (erro) {
-        erros.push(`instagram / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+        erros.push(
+          `instagram / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`,
+        );
       }
     }
   }
