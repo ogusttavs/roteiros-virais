@@ -161,10 +161,10 @@ export default function Fundacao() {
               bom: "Você diz o que faz e para quem, sem rodeio.",
               melhorar: "A resposta serve para qualquer marca de limpeza. Falta o que só a sua tem.",
               como: "Troque o geral pelo concreto: um produto, um lugar, uma situação.",
+              exemplo: "Faço produtos de limpeza na minha cozinha no Cambuí, em Campinas, para quem quer a casa cheirosa sem produto forte.",
               impacto: "Os roteiros conseguem citar o seu produto e o seu bairro em vez de falar de limpeza em geral.",
             }}
             rotulos={{ bom: "o que está bom", melhorar: "o que pode melhorar", como: "como melhorar", impacto: "impacto no seu resultado" }}
-            exemplo="Faço produtos de limpeza na minha cozinha no Cambuí, em Campinas, para quem quer a casa cheirosa sem produto forte."
           />
         </div>
       </section>

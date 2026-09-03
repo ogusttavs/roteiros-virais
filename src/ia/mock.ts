@@ -83,6 +83,8 @@ function mockAvaliarResposta(entrada: string) {
       ? "Poderia trazer mais um numero ou exemplo."
       : "Falta um exemplo real, com numero ou nome.",
     como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
+    exemplo:
+      "Eu vendo o meu produto principal por um preco fixo, e mostro para o cliente exatamente o que ele leva junto, com um exemplo real de quem comprou essa semana.",
     impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
   };
 }

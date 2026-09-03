@@ -16,19 +16,21 @@ export function FormularioEntrar() {
   const [senha, setSenha] = useState("");
   const [entrando, setEntrando] = useState(false);
   const [mandandoLink, setMandandoLink] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
+  const [erroEmail, setErroEmail] = useState<string | null>(null);
   const [linkEnviadoPara, setLinkEnviadoPara] = useState<string | null>(null);
 
   async function entrarComSenha(evento: FormEvent) {
     evento.preventDefault();
-    setErro(null);
+    setErroSenha(null);
+    setErroEmail(null);
     setEntrando(true);
 
     const { data, error } = await authClient.signIn.email({ email, password: senha });
 
     setEntrando(false);
     if (error || !data) {
-      setErro(textosEntrar.erroGenerico);
+      setErroSenha(textosEntrar.erroGenerico);
       return;
     }
     router.push(data.user.role === "admin" ? "/admin/clientes" : "/hoje");
@@ -37,24 +39,32 @@ export function FormularioEntrar() {
 
   async function entrarSemSenha() {
     if (!email) {
-      setErro(textosEntrar.erroSemEmail);
+      setErroEmail(textosEntrar.erroSemEmail);
       return;
     }
-    setErro(null);
+    setErroEmail(null);
+    setErroSenha(null);
     setMandandoLink(true);
 
     const { error } = await authClient.signIn.magicLink({ email, callbackURL: "/hoje" });
 
     setMandandoLink(false);
     if (error) {
-      setErro(textosEntrar.erroGenerico);
+      setErroSenha(textosEntrar.erroGenerico);
       return;
     }
     setLinkEnviadoPara(email);
   }
 
   if (linkEnviadoPara) {
-    return <p className={styles.confirmacao}>{textosEntrar.linkEnviado(linkEnviadoPara)}</p>;
+    return (
+      <>
+        <p className={styles.confirmacao}>{textosEntrar.linkEnviado(linkEnviadoPara)}</p>
+        <button type="button" className={styles.linkAcao} onClick={() => void entrarSemSenha()}>
+          {mandandoLink ? textosEntrar.mandandoLink : textosEntrar.mandarDeNovo}
+        </button>
+      </>
+    );
   }
 
   return (
@@ -68,6 +78,7 @@ export function FormularioEntrar() {
           required
           value={email}
           onChange={(evento) => setEmail(evento.target.value)}
+          erro={erroEmail ?? undefined}
         />
         <Campo
           rotulo={textosEntrar.campoSenha}
@@ -77,21 +88,15 @@ export function FormularioEntrar() {
           required
           value={senha}
           onChange={(evento) => setSenha(evento.target.value)}
+          erro={erroSenha ?? undefined}
         />
-        {erro ? (
-          <p className={styles.erro} role="alert">
-            {erro}
-          </p>
-        ) : null}
         <Botao type="submit" tamanho="lg" carregando={entrando}>
           {entrando ? textosEntrar.entrando : textosEntrar.botaoEntrar}
         </Botao>
       </form>
-      <p className={styles.separador}>
-        <button type="button" className={styles.linkSemSenha} onClick={entrarSemSenha}>
-          {mandandoLink ? textosEntrar.mandandoLink : textosEntrar.linkSemSenha}
-        </button>
-      </p>
+      <button type="button" className={styles.linkAcao} onClick={() => void entrarSemSenha()}>
+        {mandandoLink ? textosEntrar.mandandoLink : textosEntrar.linkSemSenha}
+      </button>
     </>
   );
 }

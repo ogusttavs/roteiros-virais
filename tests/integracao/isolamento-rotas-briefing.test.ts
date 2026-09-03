@@ -24,7 +24,7 @@ import { avaliarRespostaAction as avaliarBriefingAction } from "../../src/app/(p
 import {
   avaliarRespostaAction as avaliarComecarAction,
   salvarRascunhoAction as salvarRascunhoComecarAction,
-} from "../../src/app/(painel)/comecar/acoes";
+} from "../../src/app/comecar/acoes";
 
 let clienteA: { id: number; usuarioId: string };
 let clienteB: { id: number; usuarioId: string };

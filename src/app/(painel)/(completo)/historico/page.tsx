@@ -5,6 +5,10 @@ import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 export default function Historico() {
   return (
-    <EstadoVazio icone={<History size={24} strokeWidth={1.5} aria-hidden="true" />} frase={textosVazio.historico.frase} />
+    <EstadoVazio
+      icone={<History size={24} strokeWidth={1.5} aria-hidden="true" />}
+      frase={textosVazio.historico.frase}
+      acao={{ rotulo: textosVazio.historico.verTema, href: "/hoje" }}
+    />
   );
 }

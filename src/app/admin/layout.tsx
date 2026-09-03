@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
 import { textosAdmin } from "@/textos/admin";
 import { Logo } from "@/ui/Logo";
@@ -9,10 +10,6 @@ import { AbasAdmin } from "./_casca/AbasAdmin";
 import styles from "./layout.module.css";
 
 const t = textosAdmin.navegacao;
-
-function iniciaisDe(nome: string): string {
-  return (nome.trim()[0] ?? "?").toUpperCase();
-}
 
 /** Casca do admin: abas, largura total, sem a navegacao do cliente (CascaAdmin.dc.html). */
 export default async function LayoutAdmin({ children }: { children: ReactNode }) {

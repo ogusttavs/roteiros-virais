@@ -1,6 +1,11 @@
+import { List } from "lucide-react";
+import Link from "next/link";
+
 import { FILAS, type NomeFila } from "@/jobs/fila";
 import { listarExecucoesRecentes } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
+import chipStyles from "@/ui/componentes/Chips.module.css";
+import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import { BotaoRodarJob } from "../_jobs/BotaoRodarJob";
 
@@ -30,55 +35,75 @@ export default async function AdminJobs({ searchParams }: { searchParams: Promis
 
   return (
     <div className={styles.pagina}>
-      <h1>{t.titulo}</h1>
-
-      <div className={styles.acoes}>
-        {NOMES_DE_JOB.map((nome) => (
-          <BotaoRodarJob key={nome} nome={nome} />
-        ))}
+      <div className={styles.cabecalhoLista}>
+        <div>
+          <h1>{t.titulo}</h1>
+          <p className={styles.subtitulo}>{t.subtitulo(execucoes.length)}</p>
+        </div>
+        <div className={styles.acoes}>
+          {NOMES_DE_JOB.map((nome) => (
+            <BotaoRodarJob key={nome} nome={nome} />
+          ))}
+        </div>
       </div>
 
-      <form method="GET" className={styles.filtro}>
-        <select name="job" defaultValue={filtro ?? ""}>
-          <option value="">{t.filtroTodos}</option>
-          {NOMES_DE_JOB.map((nome) => (
-            <option key={nome} value={nome}>
-              {nome}
-            </option>
-          ))}
-        </select>
-        <button type="submit">{t.botaoFiltrar}</button>
-      </form>
+      <nav className={[chipStyles.grupo, styles.filtro].join(" ")} aria-label={t.colunaJob}>
+        <Link href="/admin/jobs" className={[chipStyles.chip, !filtro ? chipStyles.ativo : ""].filter(Boolean).join(" ")}>
+          {t.filtroTodos}
+        </Link>
+        {NOMES_DE_JOB.map((nome) => (
+          <Link
+            key={nome}
+            href={`/admin/jobs?job=${nome}`}
+            className={[chipStyles.chip, filtro === nome ? chipStyles.ativo : ""].filter(Boolean).join(" ")}
+          >
+            {nome}
+          </Link>
+        ))}
+      </nav>
 
       {execucoes.length === 0 ? (
-        <p>{t.vazio}</p>
+        <EstadoVazio icone={<List size={24} strokeWidth={1.5} aria-hidden="true" />} frase={t.vazio} />
       ) : (
-        <table className={styles.tabela}>
-          <thead>
-            <tr>
-              <th>{t.colunaJob}</th>
-              <th>{t.colunaInicio}</th>
-              <th>{t.colunaDuracao}</th>
-              <th>{t.colunaStatus}</th>
-              <th>{t.colunaResultado}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {execucoes.map((execucao) => (
-              <tr key={execucao.id}>
-                <td>{execucao.nome}</td>
-                <td>{formatarData(execucao.iniciadoEm)}</td>
-                <td>{formatarDuracao(execucao.duracaoMs)}</td>
-                <td className={styles[execucao.status]}>
-                  {execucao.status === "ok" ? t.statusOk : execucao.status === "erro" ? t.statusErro : t.statusRodando}
-                </td>
-                <td className={styles.resultado}>
-                  {execucao.erro ?? (execucao.resumo ? JSON.stringify(execucao.resumo) : "-")}
-                </td>
+        <div className={styles.tabelaEnvoltorio}>
+          <table className={styles.tabela}>
+            <thead>
+              <tr>
+                <th>{t.colunaJob}</th>
+                <th>{t.colunaInicio}</th>
+                <th>{t.colunaDuracao}</th>
+                <th>{t.colunaEstado}</th>
+                <th>{t.colunaResumo}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {execucoes.map((execucao) => (
+                <tr key={execucao.id}>
+                  <td className={styles.mono}>{execucao.nome}</td>
+                  <td className={styles.mono}>{formatarData(execucao.iniciadoEm)}</td>
+                  <td className={styles.mono}>{formatarDuracao(execucao.duracaoMs)}</td>
+                  <td>
+                    <span
+                      className={[
+                        styles.ponto,
+                        execucao.status === "ok"
+                          ? styles.pontoPositivo
+                          : execucao.status === "erro"
+                            ? styles.pontoErro
+                            : styles.pontoAtencao,
+                      ].join(" ")}
+                      aria-hidden="true"
+                    />
+                    {execucao.status === "ok" ? t.estadoOk : execucao.status === "erro" ? t.estadoErro : t.estadoRodando}
+                  </td>
+                  <td className={styles.resumo}>
+                    {execucao.erro ?? (execucao.resumo ? JSON.stringify(execucao.resumo) : "-")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

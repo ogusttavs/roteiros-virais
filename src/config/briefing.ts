@@ -28,8 +28,8 @@ export const DADOS_FIXOS = {
   quemGrava: {
     rotulo: "Quem grava",
     opcoes: [
-      { valor: "propria_pessoa", rotulo: "A própria pessoa" },
-      { valor: "pessoa_e_equipe", rotulo: "A pessoa e a equipe" },
+      { valor: "propria_pessoa", rotulo: "Eu mesmo" },
+      { valor: "pessoa_e_equipe", rotulo: "Eu e a equipe" },
     ] satisfies QuemGravaOpcao[],
   },
 };

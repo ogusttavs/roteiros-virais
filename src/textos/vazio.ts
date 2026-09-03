@@ -1,18 +1,14 @@
 export const textosVazio = {
   hoje: {
     frase: "Ainda estamos lendo o que funciona no seu setor. Os temas de hoje aparecem aqui amanhã cedo.",
+    verReferencias: "ver referências",
   },
   referencias: {
     frase:
       "Os vídeos que estão funcionando no seu setor aparecem aqui depois da primeira leitura, que roda de madrugada.",
   },
   historico: {
-    frase: "Os roteiros que você gerar aparecem aqui, com o status de cada um.",
-  },
-  briefing: {
-    frase: "Esta tela mostra as respostas e a nota do seu briefing em breve.",
-  },
-  comecar: {
-    frase: "Esta tela ainda está sendo construída. Volte em breve para começar.",
+    frase: "O seu primeiro roteiro aparece aqui depois que você gravar. O tema de hoje está pronto.",
+    verTema: "ver o tema de hoje",
   },
 };

@@ -1,25 +1,84 @@
 .pagina {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-8);
+}
+
+.cabecalhoLista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+}
+
+.cabecalhoLista h1 {
+  margin: 0 0 var(--espaco-2);
+}
+
+.subtitulo {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.buscaCampo {
+  width: 220px;
+}
+
+.semResultado {
+  margin-top: var(--espaco-8);
+  color: var(--cor-texto-suave);
+}
+
+.tabelaEnvoltorio {
+  margin-top: var(--espaco-8);
+  overflow-x: auto;
 }
 
 .tabela {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: var(--tamanho-secundario);
 }
 
 .tabela th {
   text-align: left;
-  font-size: 12px;
+  padding: 0 var(--espaco-3) var(--espaco-3);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  font-weight: 400;
+  letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
   color: var(--cor-texto-suave);
-  padding: var(--espaco-2) var(--espaco-3);
-  border-bottom: 1px solid var(--cor-borda);
+  border-bottom: 1px solid var(--cor-borda-forte);
+  white-space: nowrap;
 }
 
 .tabela td {
   padding: var(--espaco-3);
   border-bottom: 1px solid var(--cor-borda);
+  vertical-align: middle;
+  color: var(--cor-texto);
+  white-space: nowrap;
+}
+
+.tabela tbody tr:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.mono {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.textoAtencao {
+  color: var(--cor-atencao);
 }

@@ -1,8 +1,9 @@
-"use client";
-
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import styles from "./EstadoVazio.module.css";
+
+type Acao = { rotulo: string } & ({ href: string; onClick?: never } | { href?: never; onClick: () => void });
 
 type Props = {
   /**
@@ -14,7 +15,12 @@ type Props = {
    */
   icone: ReactNode;
   frase: string;
-  acao?: { rotulo: string; onClick: () => void };
+  /**
+   * href (Link) para so navegar, sem estado nenhum: mantem quem chama como
+   * Server Component (/hoje, /historico). onClick exige "use client" em
+   * quem chama, pela mesma razao do comentario acima.
+   */
+  acao?: Acao;
 };
 
 /** O que acontece aqui e o proximo passo, nunca "nenhum item" (brief-frontend.md, secao 2). */
@@ -23,7 +29,11 @@ export function EstadoVazio({ icone, frase, acao }: Props) {
     <div className={styles.estado}>
       {icone}
       <p className={styles.frase}>{frase}</p>
-      {acao ? (
+      {acao?.href ? (
+        <Link href={acao.href} className={styles.acao}>
+          {acao.rotulo}
+        </Link>
+      ) : acao?.onClick ? (
         <button type="button" className={styles.acao} onClick={acao.onClick}>
           {acao.rotulo}
         </button>

@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, nichos, user } from "@/db/schema";
-import { listarNichosAtivos, salvarDadosFixos } from "@/servicos/clientes";
+import { listarNichosAtivos, salvarDadosFixos, salvarTema } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -111,5 +111,27 @@ describe("salvarDadosFixos", () => {
     const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
     expect(outroCliente?.cidade).toBeNull();
     expect(outroCliente?.nome).toBe("[teste] Negocio B");
+  });
+});
+
+describe("salvarTema", () => {
+  it("comeca em sistema por padrao", async () => {
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(cliente?.tema).toBe("sistema");
+  });
+
+  it("grava claro ou escuro", async () => {
+    const cliente = await salvarTema(clienteId, "escuro");
+    expect(cliente.tema).toBe("escuro");
+  });
+
+  it("recusa um valor que nao e claro, escuro ou sistema", async () => {
+    await expect(salvarTema(clienteId, "cinza")).rejects.toThrow();
+  });
+
+  it("salvar o tema de um cliente nao muda o de outro", async () => {
+    await salvarTema(clienteId, "claro");
+    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(outroCliente?.tema).toBe("sistema");
   });
 });

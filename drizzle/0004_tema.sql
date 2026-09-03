@@ -1,0 +1,1 @@
+ALTER TABLE "clientes" ADD COLUMN "tema" text DEFAULT 'sistema' NOT NULL;

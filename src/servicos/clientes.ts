@@ -3,7 +3,15 @@ import { headers } from "next/headers";
 import { z } from "zod";
 
 import { db } from "@/db";
-import { briefings, clientes, nichos, user, type Cliente, type PerfisCliente } from "@/db/schema";
+import {
+  briefings,
+  clientes,
+  nichos,
+  user,
+  type Cliente,
+  type PerfisCliente,
+  type TemaPreferido,
+} from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { sessaoAtual } from "@/lib/sessao";
 
@@ -211,5 +219,63 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+  return cliente;
+}
+
+const perfilContaSchema = z.object({
+  nome: z.string().trim().min(1),
+  perfis: z.object({
+    instagram: z.string().trim().optional(),
+    tiktok: z.string().trim().optional(),
+    youtube: z.string().trim().optional(),
+  }),
+});
+
+/**
+ * /conta (etapa D, parte 2): so nome e perfis, gravados numa unica UPDATE.
+ * Diferente de salvarDadosFixos (/comecar), que exige cidade e persona:
+ * a tela de conta nao mostra esses campos, entao usar salvarDadosFixos
+ * aqui exigiria ler o cliente primeiro para preservar o resto (uma
+ * leitura-depois-escrita sem necessidade, no mesmo tipo de corrida de
+ * dado ja corrigido em src/servicos/briefing.ts).
+ */
+export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  const dados = perfilContaSchema.parse(dadosBrutos);
+
+  const perfis: PerfisCliente = {
+    instagram: dados.perfis.instagram?.trim() || null,
+    tiktok: dados.perfis.tiktok?.trim() || null,
+    youtube: dados.perfis.youtube?.trim() || null,
+  };
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ nome: dados.nome, perfis })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar a conta; cliente nao encontrado.");
+  return cliente;
+}
+
+const TEMAS_VALIDOS: TemaPreferido[] = ["claro", "escuro", "sistema"];
+
+/**
+ * Preferencia de tema (etapa D, parte 2, decisao 3): so o cliente logado
+ * grava no banco; o admin, sem registro em `clientes`, usa so o
+ * `localStorage` do navegador (nunca chega a esta funcao).
+ */
+export async function salvarTema(clienteId: number, tema: string): Promise<Cliente> {
+  if (!TEMAS_VALIDOS.includes(tema as TemaPreferido)) {
+    throw new ErroCliente(`tema invalido: ${tema}`);
+  }
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ tema: tema as TemaPreferido })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar o tema; cliente nao encontrado.");
   return cliente;
 }

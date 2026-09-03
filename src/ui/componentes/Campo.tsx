@@ -1,11 +1,14 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useId, type InputHTMLAttributes } from "react";
 
 import styles from "./Campo.module.css";
 
 type Props = InputHTMLAttributes<HTMLInputElement> & {
   rotulo: string;
+  /** O rotulo continua acessivel (label ligado ao campo), so some visualmente (mesmo padrao de AreaTexto.rotuloOculto). */
+  rotuloOculto?: boolean;
   ajuda?: string;
   erro?: string;
   /** Ja formatado ("20/60") por quem chama. */
@@ -14,7 +17,7 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
   prefixo?: string;
 };
 
-export function Campo({ rotulo, ajuda, erro, contador, prefixo, className, ...props }: Props) {
+export function Campo({ rotulo, rotuloOculto = false, ajuda, erro, contador, prefixo, className, ...props }: Props) {
   const id = useId();
   const idAjuda = ajuda ? `${id}-ajuda` : undefined;
   const idErro = erro ? `${id}-erro` : undefined;
@@ -34,7 +37,7 @@ export function Campo({ rotulo, ajuda, erro, contador, prefixo, className, ...pr
   return (
     <div className={styles.grupo}>
       <span className={styles.linhaRotulo}>
-        <label className={styles.rotulo} htmlFor={id}>
+        <label className={[styles.rotulo, rotuloOculto ? styles.rotuloOculto : ""].filter(Boolean).join(" ")} htmlFor={id}>
           {rotulo}
         </label>
         {contador ? <span className={styles.contador}>{contador}</span> : null}
@@ -56,6 +59,7 @@ export function Campo({ rotulo, ajuda, erro, contador, prefixo, className, ...pr
       )}
       {erro ? (
         <span className={styles.erro} id={idErro} role="alert">
+          <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
           {erro}
         </span>
       ) : null}

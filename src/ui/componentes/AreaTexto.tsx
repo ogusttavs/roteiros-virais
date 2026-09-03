@@ -1,11 +1,14 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useId, type TextareaHTMLAttributes } from "react";
 
 import styles from "./AreaTexto.module.css";
 
 type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "rows"> & {
   rotulo: string;
+  /** O rotulo continua acessivel (label ligado ao campo), so some visualmente: uso quando outro texto na tela (o enunciado da pergunta) ja serve de rotulo visivel (BriefingTela.dc.html). */
+  rotuloOculto?: boolean;
   ajuda?: string;
   erro?: string;
   /** Ja formatado ("128 caracteres") por quem chama. */
@@ -15,7 +18,16 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "rows"> & {
 };
 
 /** Igual a Campo, mas cresce com o texto (`field-sizing: content`, entrega/README.md). */
-export function AreaTexto({ rotulo, ajuda, erro, contador, linhasMin = 3, className, ...props }: Props) {
+export function AreaTexto({
+  rotulo,
+  rotuloOculto = false,
+  ajuda,
+  erro,
+  contador,
+  linhasMin = 3,
+  className,
+  ...props
+}: Props) {
   const id = useId();
   const idAjuda = ajuda ? `${id}-ajuda` : undefined;
   const idErro = erro ? `${id}-erro` : undefined;
@@ -23,7 +35,7 @@ export function AreaTexto({ rotulo, ajuda, erro, contador, linhasMin = 3, classN
   return (
     <div className={styles.grupo}>
       <span className={styles.linhaRotulo}>
-        <label className={styles.rotulo} htmlFor={id}>
+        <label className={[styles.rotulo, rotuloOculto ? styles.rotuloOculto : ""].filter(Boolean).join(" ")} htmlFor={id}>
           {rotulo}
         </label>
         {contador ? <span className={styles.contador}>{contador}</span> : null}
@@ -43,6 +55,7 @@ export function AreaTexto({ rotulo, ajuda, erro, contador, linhasMin = 3, classN
       />
       {erro ? (
         <span className={styles.erro} id={idErro} role="alert">
+          <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
           {erro}
         </span>
       ) : null}

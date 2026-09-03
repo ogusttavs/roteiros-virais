@@ -1,17 +1,18 @@
 .pagina {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-6);
-  max-width: 40rem;
+}
+
+.corpo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-9);
+  max-width: var(--largura-leitura);
 }
 
 .introducao {
-  color: var(--cor-texto-suave);
-}
-
-.avisoNota {
   margin: 0;
-  color: var(--cor-texto);
+  color: var(--cor-texto-suave);
 }
 
 .bloco {
@@ -20,34 +21,44 @@
 }
 
 .blocoTitulo {
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--cor-texto-suave);
-  margin-bottom: var(--espaco-2);
+  font-size: var(--tamanho-titulo-sm);
+  margin: 0 0 var(--espaco-2);
+}
+
+.cartaoPerfil {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
 }
 
 .perfilTitulo {
-  font-size: 15px;
+  margin: 0;
+  font-size: var(--tamanho-secundario);
 }
 
 .perfilFatos {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-3);
-  margin: var(--espaco-4) 0 0;
+  margin: var(--espaco-2) 0 0;
 }
 
 .perfilFatos dt {
   font-family: var(--fonte-mono);
-  font-size: 11px;
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--cor-texto-suave);
 }
 
 .perfilFatos dd {
-  margin: 2px 0 0;
-  font-size: 14px;
+  margin: var(--espaco-1) 0 0;
+  font-size: var(--tamanho-secundario);
   color: var(--cor-texto);
+}
+
+.perfilRodape {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
 }

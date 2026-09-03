@@ -1,56 +1,48 @@
 .pagina {
   min-height: 100vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--espaco-6);
-  padding: var(--espaco-6);
+  padding: var(--espaco-10) var(--margem-celular);
 }
 
-.cartao {
+.envoltorio {
   width: 100%;
   max-width: 24rem;
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-5);
 }
 
 .titulo {
-  margin: 0;
-  text-align: center;
+  margin: var(--espaco-8) 0 0;
 }
 
 .forma {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-4);
+  gap: var(--espaco-5);
+  margin-top: var(--espaco-8);
 }
 
-.erro {
-  color: var(--cor-erro);
-  font-size: 14px;
-  text-align: center;
-}
-
-.separador {
-  text-align: center;
-  color: var(--cor-texto-suave);
-  font-size: 14px;
-}
-
-.linkSemSenha {
+.linkAcao {
+  align-self: flex-start;
+  margin-top: var(--espaco-5);
+  padding: var(--espaco-2) 0;
+  min-height: var(--altura-toque);
   background: none;
   border: none;
   color: var(--cor-acao);
   font-family: var(--fonte-texto);
-  font-size: 14px;
-  cursor: pointer;
+  font-size: var(--tamanho-secundario);
   text-decoration: underline;
-  padding: var(--espaco-2);
-  min-height: 44px;
+  cursor: pointer;
 }
 
 .confirmacao {
-  text-align: center;
+  margin-top: var(--espaco-6);
+  text-wrap: pretty;
+}
+
+.confirmacao + .linkAcao {
+  margin-top: var(--espaco-4);
 }
