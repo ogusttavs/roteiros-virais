@@ -235,6 +235,14 @@ export const contas = pgTable(
     vigiada: boolean("vigiada").notNull().default(false),
     /** Mediana de views dos videos coletados da conta (base do fora-da-curva) */
     medianaViews: numeric("mediana_views", { precision: 14, scale: 2 }),
+    /**
+     * Menos de 5 videos nos ultimos 90 dias (etapa 7): a mediana normal fica
+     * pouco confiavel, entao `medianaViews` vira o substituto por seguidor
+     * (ver `src/jobs/pontuar.ts`) e esta coluna avisa quem le o dado.
+     */
+    baseFraca: boolean("base_fraca").notNull().default(false),
+    /** Mediana da velocidade (views/hora) dos videos de 2 a 30 dias da conta (etapa 7) */
+    medianaVelocidade: numeric("mediana_velocidade", { precision: 14, scale: 3 }),
     /** Fracao dos videos da conta que ficaram fora da curva (ranking da vigilancia) */
     taxaForaDaCurva: numeric("taxa_fora_da_curva", { precision: 6, scale: 4 }),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
@@ -316,6 +324,10 @@ export const videos = pgTable(
     index("videos_nicho_publicado").on(t.nichoId, t.publicadoEm),
     index("videos_nicho_fora_da_curva").on(t.nichoId, t.foraDaCurva),
     index("videos_busca_idx").using("gin", t.busca),
+    /** Janela de 90 dias por conta, usada pelo job `pontuar` (etapa 7). */
+    index("videos_conta_publicado").on(t.contaId, t.publicadoEm),
+    /** Consulta "subindo hoje" (etapa 7, src/servicos/pesquisa.ts). */
+    index("videos_nicho_velocidade_relativa").on(t.nichoId, t.velocidadeRelativa),
   ],
 );
 

@@ -11,11 +11,15 @@ import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
 import { FILAS } from "./fila";
+import { rodarPontuar } from "./pontuar";
+import { rodarVigilancia } from "./vigilancia";
 
 const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.coletaYoutube]: rodarColetaYoutube,
   [FILAS.coletaApify]: rodarColetaApify,
   [FILAS.coletaNoticias]: rodarColetaNoticias,
+  [FILAS.pontuar]: rodarPontuar,
+  [FILAS.vigilancia]: rodarVigilancia,
 };
 
 async function main(): Promise<void> {

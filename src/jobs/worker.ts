@@ -12,6 +12,8 @@ import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { executarComRegistro } from "./execucoes";
 import { boss, FILAS, garantirFilas } from "./fila";
+import { rodarPontuar } from "./pontuar";
+import { rodarVigilancia } from "./vigilancia";
 
 async function main(): Promise<void> {
   await boss().start();
@@ -26,6 +28,12 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.coletaNoticias, async () => {
     await executarComRegistro(FILAS.coletaNoticias, rodarColetaNoticias);
+  });
+  await boss().work(FILAS.pontuar, async () => {
+    await executarComRegistro(FILAS.pontuar, rodarPontuar);
+  });
+  await boss().work(FILAS.vigilancia, async () => {
+    await executarComRegistro(FILAS.vigilancia, rodarVigilancia);
   });
 
   console.log("worker no ar.");
