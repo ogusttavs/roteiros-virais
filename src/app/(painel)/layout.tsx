@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
+import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
@@ -10,10 +11,6 @@ import { Logo } from "@/ui/Logo";
 
 import { CabecalhoCelular } from "./_casca/CabecalhoCelular";
 import styles from "./layout.module.css";
-
-function iniciaisDe(nome: string): string {
-  return (nome.trim()[0] ?? "?").toUpperCase();
-}
 
 /**
  * Casca do cliente (CascaCelular.dc.html, CascaDesktop.dc.html): cabecalho

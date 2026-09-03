@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 
-import * as avaliarRespostaIA from "./prompts/avaliarResposta";
 import { construirSaidaMock } from "./mock";
+import * as avaliarRespostaIA from "./prompts/avaliarResposta";
 
 describe("mock de avaliarResposta", () => {
   const entrada = avaliarRespostaIA.montarEntrada({
