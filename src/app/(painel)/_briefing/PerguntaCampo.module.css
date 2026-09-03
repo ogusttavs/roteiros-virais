@@ -33,3 +33,65 @@
   color: var(--cor-texto-suave);
   min-height: 16px;
 }
+
+.linhaVivo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5) 0;
+  border-top: 1px solid var(--cor-borda);
+}
+
+.colunaVivo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  min-width: 0;
+  flex: 1;
+}
+
+.resposta {
+  margin: 0;
+  color: var(--cor-texto);
+}
+
+.respostaTruncada {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.respostaEsmaecida {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.acoesVivo {
+  display: flex;
+  gap: var(--espaco-4);
+}
+
+.erroInline {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
+.detalhesAnalise summary {
+  cursor: pointer;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  text-decoration: underline;
+  min-height: var(--altura-toque);
+  display: flex;
+  align-items: center;
+}
+
+.detalhesAnalise[open] summary {
+  margin-bottom: var(--espaco-3);
+}

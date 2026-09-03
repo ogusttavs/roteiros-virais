@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { PerguntaBriefing } from "@/config/briefing";
@@ -11,6 +12,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Nota } from "@/ui/componentes/Nota";
 import { faixaDeNota } from "@/ui/componentes/notaFaixa";
 import { Progresso } from "@/ui/componentes/Progresso";
+import { Skeleton } from "@/ui/componentes/Skeleton";
 
 import styles from "./PerguntaCampo.module.css";
 
@@ -28,6 +30,14 @@ type Props = {
   onSalvarRascunho: (perguntaId: string, resposta: string) => Promise<void>;
   onAvaliar: (perguntaId: string, resposta: string) => Promise<ResultadoAcaoBriefing>;
   onAtualizado: (perguntaId: string, resposta: string, resultado: ResultadoAcaoBriefing) => void;
+  /**
+   * wizard (/comecar, BriefingTela.dc.html): fechado mostra nota, analise
+   * inteira e "ajustar resposta". vivo (/briefing, BriefingVivoTela.dc.html):
+   * linha com resposta truncada em 3 linhas, nota ao lado, analise atras de
+   * um <details> "ver a analise", e "cancelar" para sair da edicao sem
+   * salvar (o wizard nao tem esse botao: toda pergunta comeca aberta).
+   */
+  variante?: "wizard" | "vivo";
 };
 
 const t = textosBriefing.pergunta;
@@ -45,6 +55,7 @@ export function PerguntaCampo({
   onSalvarRascunho,
   onAvaliar,
   onAtualizado,
+  variante = "wizard",
 }: Props) {
   const [texto, setTexto] = useState(resposta);
   const [textoAvaliado, setTextoAvaliado] = useState<string | null>(avaliacao ? resposta : null);
@@ -53,6 +64,7 @@ export function PerguntaCampo({
   const [erro, setErro] = useState<string | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState(true);
   const [rascunhoComErro, setRascunhoComErro] = useState(false);
+  const [expandido, setExpandido] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(
@@ -109,6 +121,100 @@ export function PerguntaCampo({
   function aoSairDoCampo() {
     if (texto.trim().length === 0 || texto === textoAvaliado) return;
     void avaliar();
+  }
+
+  function cancelarEdicao() {
+    setTexto(textoAvaliado ?? resposta);
+    setErro(null);
+    setEditando(false);
+  }
+
+  if (variante === "vivo" && avaliacao) {
+    const legenda = textosBriefing.notaFaixa[faixaDeNota(avaliacao.nota)];
+
+    if (editando) {
+      return (
+        <div className={styles.linhaVivo}>
+          <div className={styles.colunaVivo}>
+            <p className={styles.enunciado}>{pergunta.enunciado}</p>
+            <AreaTexto
+              rotulo={pergunta.enunciado}
+              rotuloOculto
+              value={texto}
+              onChange={(evento) => aoMudarTexto(evento.target.value)}
+              linhasMin={5}
+              erro={erro ?? undefined}
+            />
+            <div className={styles.acoesVivo}>
+              <Botao variante="secundario" onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
+                {t.botaoAvaliarDeNovo}
+              </Botao>
+              <Botao variante="ghost" onClick={cancelarEdicao}>
+                {t.botaoCancelar}
+              </Botao>
+            </div>
+          </div>
+          <Nota valor={avaliacao.nota} legenda={legenda} tamanho="lista" />
+        </div>
+      );
+    }
+
+    if (avaliando) {
+      return (
+        <div className={styles.linhaVivo}>
+          <div className={styles.colunaVivo}>
+            <p className={styles.enunciado}>{pergunta.enunciado}</p>
+            <p className={styles.respostaEsmaecida}>{texto}</p>
+            <Progresso mensagem={t.avaliando} />
+          </div>
+          <Skeleton variante="numero" largura="72px" />
+        </div>
+      );
+    }
+
+    if (erro) {
+      return (
+        <div className={styles.linhaVivo}>
+          <div className={styles.colunaVivo}>
+            <p className={styles.enunciado}>{pergunta.enunciado}</p>
+            <p className={styles.respostaEsmaecida}>{texto}</p>
+            <p className={styles.erroInline} role="alert">
+              <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+              {erro}
+            </p>
+            <Botao variante="secundario" onClick={() => void avaliar()}>
+              {t.botaoTentarDeNovo}
+            </Botao>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.linhaVivo}>
+        <div className={styles.colunaVivo}>
+          <p className={styles.enunciado}>{pergunta.enunciado}</p>
+          <p className={[styles.resposta, expandido ? "" : styles.respostaTruncada].filter(Boolean).join(" ")}>
+            {textoAvaliado ?? resposta}
+          </p>
+          <div className={styles.acoesVivo}>
+            {!expandido ? (
+              <Botao variante="ghost" onClick={() => setExpandido(true)}>
+                {t.botaoVerTudo}
+              </Botao>
+            ) : null}
+            <Botao variante="ghost" onClick={() => setEditando(true)}>
+              {t.botaoEditar}
+            </Botao>
+          </div>
+          <details className={styles.detalhesAnalise}>
+            <summary>{t.botaoVerAnalise}</summary>
+            <AnaliseQuatroPartes avaliacao={avaliacao} rotulos={textosBriefing.analiseRotulos} />
+          </details>
+        </div>
+        <Nota valor={avaliacao.nota} legenda={legenda} tamanho="lista" />
+      </div>
+    );
   }
 
   if (!editando && avaliacao) {

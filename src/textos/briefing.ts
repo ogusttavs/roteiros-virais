@@ -46,6 +46,11 @@ export const textosBriefing = {
     botaoTentarDeNovo: "tentar de novo",
     rascunhoSalvo: "salvo",
     rascunhoComErro: "não conseguimos salvar; o texto ainda está só nesta tela",
+    botaoVerTudo: "ver tudo",
+    botaoEditar: "editar",
+    botaoVerAnalise: "ver a análise",
+    botaoAvaliarDeNovo: "avaliar de novo",
+    botaoCancelar: "cancelar",
   },
   navegacaoBlocos: {
     botaoVoltar: "voltar",
@@ -83,5 +88,6 @@ export const textosBriefing = {
     perfilOQueVende: "o que você vende",
     perfilClienteIdeal: "o seu cliente ideal",
     perfilProibicoes: "o que nunca aparece nos seus vídeos",
+    perfilSeErrado: "se algo aqui estiver errado, edite a resposta correspondente",
   },
 };
