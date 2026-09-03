@@ -2,12 +2,19 @@
  * Tokens visuais. Nenhuma cor, fonte, raio, sombra ou espaco e escrito direto em
  * componente: tudo vem daqui (brief-frontend.md, secao 4).
  *
- * PROVISORIO: o agente de design ainda nao entregou a identidade propria. Os
- * valores abaixo sao os "tokens provisorios" da secao 4 do brief-frontend.md.
- * Quando a identidade chegar, so este arquivo, o Logo e as fontes mudam.
+ * Entrega do Claude Design integrada na etapa D, parte 1 (02/09/2026). Tema por
+ * atributo `data-tema` no `<html>` ("claro" ou "escuro"); "do sistema" e a
+ * ausencia do atributo, resolvida pelo bloco `@media (prefers-color-scheme: dark)`
+ * abaixo (a entrega nao trouxe esse bloco; foi acrescentado aqui com os mesmos
+ * valores do tema escuro, REVISAO-FABLE.md). O tema cinza ([data-tema="cinza"])
+ * e so para teste em desenvolvimento, nunca oferecido ao cliente.
+ *
+ * A identidade propria troca em tres passos (entrega/README.md): os valores
+ * deste arquivo, o SVG do Logo, e as tres variaveis de fonte abaixo.
  */
 
-:root {
+:root,
+[data-tema="claro"] {
   --cor-fundo: #f7f3ea;
   --cor-superficie: #fcfaf4;
   --cor-superficie-recuada: #ede3d3;
@@ -23,39 +30,17 @@
   --cor-atencao: #c49a3a;
   --cor-erro: #a8503f;
 
-  --fonte-texto:
-    var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --fonte-titulo:
-    var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
-  --fonte-mono: var(--fonte-space-mono, "Space Mono"), ui-monospace, "SFMono-Regular", monospace;
-
-  --raio-sm: 6px;
-  --raio-md: 10px;
-  --raio-lg: 16px;
-  --raio-pill: 999px;
+  --cor-texto-dica: #7e6b59;
+  --cor-acao-hover: #3b2820;
+  --cor-acao-pressionada: #2e1f18;
+  --cor-superficie-hover: rgba(74, 51, 40, 0.06);
+  --cor-superficie-pressionada: rgba(74, 51, 40, 0.1);
+  --cor-erro-suave: rgba(168, 80, 63, 0.08);
+  --cor-skeleton-brilho: rgba(252, 250, 244, 0.6);
 
   --sombra-sm: 0 1px 2px rgba(34, 25, 18, 0.08);
   --sombra-md: 0 4px 12px rgba(34, 25, 18, 0.12);
-
-  --espaco-1: 4px;
-  --espaco-2: 8px;
-  --espaco-3: 12px;
-  --espaco-4: 16px;
-  --espaco-5: 20px;
-  --espaco-6: 24px;
-  --espaco-7: 32px;
-  --espaco-8: 40px;
-  --espaco-9: 48px;
-  --espaco-10: 64px;
-  --espaco-11: 80px;
-  --espaco-12: 96px;
-
-  --duracao-rapida: 120ms;
-  --duracao-base: 200ms;
-  --duracao-lenta: 320ms;
-  --curva-saida: cubic-bezier(0.16, 1, 0.3, 1);
-
-  --app-name: "seu painel";
+  --sombra-foco: 0 0 0 3px rgba(74, 51, 40, 0.22);
 }
 
 [data-tema="escuro"] {
@@ -73,4 +58,155 @@
   --cor-positivo: #7fa885;
   --cor-atencao: #d3a663;
   --cor-erro: #d16d5c;
+
+  --cor-texto-dica: #a08e7a;
+  --cor-acao-hover: #d6b98c;
+  --cor-acao-pressionada: #b8965f;
+  --cor-superficie-hover: rgba(243, 237, 225, 0.06);
+  --cor-superficie-pressionada: rgba(243, 237, 225, 0.1);
+  --cor-erro-suave: rgba(209, 109, 92, 0.12);
+  --cor-skeleton-brilho: rgba(243, 237, 225, 0.08);
+
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --sombra-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --sombra-foco: 0 0 0 3px rgba(201, 168, 118, 0.35);
+}
+
+/**
+ * "Do sistema": sem `data-tema` no html, o SO prefere escuro. Mesmos valores
+ * do bloco `[data-tema="escuro"]" acima; a entrega nao trouxe este bloco
+ * (decisao do Fable, PROXIMO.md, etapa D parte 1, item 2).
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="claro"]) {
+    --cor-fundo: #1c1610;
+    --cor-superficie: #241c15;
+    --cor-superficie-recuada: #2e2318;
+    --cor-titulo: #f7f1e6;
+    --cor-texto: #ded1bf;
+    --cor-texto-suave: #c4b3a0;
+    --cor-acao: #c9a876;
+    --cor-acao-texto: #1c1610;
+    --cor-destaque: #e8c66a;
+    --cor-borda: rgba(243, 237, 225, 0.12);
+    --cor-borda-forte: rgba(243, 237, 225, 0.2);
+    --cor-positivo: #7fa885;
+    --cor-atencao: #d3a663;
+    --cor-erro: #d16d5c;
+
+    --cor-texto-dica: #a08e7a;
+    --cor-acao-hover: #d6b98c;
+    --cor-acao-pressionada: #b8965f;
+    --cor-superficie-hover: rgba(243, 237, 225, 0.06);
+    --cor-superficie-pressionada: rgba(243, 237, 225, 0.1);
+    --cor-erro-suave: rgba(209, 109, 92, 0.12);
+    --cor-skeleton-brilho: rgba(243, 237, 225, 0.08);
+
+    --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --sombra-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+    --sombra-foco: 0 0 0 3px rgba(201, 168, 118, 0.35);
+  }
+}
+
+/** Teste do cinza: mesma luminosidade, nenhuma cor. So em desenvolvimento. */
+[data-tema="cinza"] {
+  --cor-fundo: #f1f1f1;
+  --cor-superficie: #fafafa;
+  --cor-superficie-recuada: #e2e2e2;
+  --cor-titulo: #1a1a1a;
+  --cor-texto: #303030;
+  --cor-texto-suave: #626262;
+  --cor-acao: #3a3a3a;
+  --cor-acao-texto: #fafafa;
+  --cor-destaque: #bebebe;
+  --cor-borda: rgba(0, 0, 0, 0.12);
+  --cor-borda-forte: rgba(0, 0, 0, 0.2);
+  --cor-positivo: #6a6a6a;
+  --cor-atencao: #6a6a6a;
+  --cor-erro: #6a6a6a;
+
+  --cor-texto-dica: #707070;
+  --cor-acao-hover: #2c2c2c;
+  --cor-acao-pressionada: #202020;
+  --cor-superficie-hover: rgba(0, 0, 0, 0.06);
+  --cor-superficie-pressionada: rgba(0, 0, 0, 0.1);
+  --cor-erro-suave: rgba(0, 0, 0, 0.06);
+  --cor-skeleton-brilho: rgba(255, 255, 255, 0.6);
+
+  --sombra-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --sombra-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --sombra-foco: 0 0 0 3px rgba(0, 0, 0, 0.22);
+}
+
+:root {
+  --fonte-texto: var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-titulo: var(--fonte-hanken, "Hanken Grotesk"), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fonte-mono: var(--fonte-space-mono, "Space Mono"), ui-monospace, "SFMono-Regular", monospace;
+
+  --tamanho-rotulo: 11px;
+  --tamanho-legenda: 13px;
+  --tamanho-secundario: 15px;
+  --tamanho-corpo: 17px;
+  --tamanho-leitura: 20px;
+  --tamanho-titulo-sm: 24px;
+  --tamanho-titulo: 31px;
+  --tamanho-titulo-lg: 40px;
+  --tamanho-nota: 52px;
+
+  --peso-titulo: 600;
+  --peso-corpo: 400;
+  --peso-rotulo: 400;
+  --altura-titulo: 1.15;
+  --altura-corpo: 1.55;
+  --espacamento-titulo: -0.015em;
+  --espacamento-rotulo: 0.12em;
+
+  --raio-sm: 6px;
+  --raio-md: 10px;
+  --raio-lg: 16px;
+  --raio-pill: 999px;
+
+  --espaco-1: 4px;
+  --espaco-2: 8px;
+  --espaco-3: 12px;
+  --espaco-4: 16px;
+  --espaco-5: 20px;
+  --espaco-6: 24px;
+  --espaco-7: 32px;
+  --espaco-8: 40px;
+  --espaco-9: 48px;
+  --espaco-10: 64px;
+  --espaco-11: 80px;
+  --espaco-12: 96px;
+
+  --largura-leitura: 40rem;
+  --margem-celular: 20px;
+  --altura-toque: 44px;
+  --altura-toque-lg: 52px;
+  --traco-icone: 1.5;
+
+  /** Opacidade do estado desabilitado (Botao, Campo, AreaTexto, Chips). A entrega
+   * documenta este token em REVISAO.md mas nao o define em tokens.css; os
+   * .dc.html usam .4 direto. Acrescentado aqui para nao sobrar valor solto. */
+  --opacidade-desabilitado: 0.4;
+
+  --duracao-rapida: 120ms;
+  --duracao-base: 200ms;
+  --duracao-lenta: 320ms;
+  --duracao-skeleton: 1600ms;
+  --curva-saida: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duracao-rapida: 0ms;
+    --duracao-base: 0ms;
+    --duracao-lenta: 0ms;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

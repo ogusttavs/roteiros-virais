@@ -1,0 +1,114 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-8);
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--espaco-6) var(--margem-celular) var(--espaco-10);
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.cabecalho {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--altura-toque);
+  background: var(--cor-fundo);
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.identidade {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.secao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  padding-top: var(--espaco-6);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.tituloSecao {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  font-weight: var(--peso-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-4);
+}
+
+.coluna {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.grade2 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--espaco-8);
+}
+
+.grade3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--espaco-4);
+}
+
+.grade6 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--espaco-5) var(--espaco-2);
+  color: var(--cor-titulo);
+}
+
+.icone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.legendaIcone {
+  font-family: var(--fonte-mono);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  color: var(--cor-texto-dica);
+  text-align: center;
+}
+
+.demoToast {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+@media (min-width: 640px) {
+  .grade2 {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .grade3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .grade6 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}

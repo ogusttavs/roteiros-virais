@@ -62,7 +62,9 @@ export async function upsertVideo(
         views: video.views,
         likes: video.likes,
         comentarios: video.comentarios,
-        audio,
+        // Uma recoleta cujo ator nao devolveu audio nao pode apagar o audio
+        // ja gravado numa coleta anterior (revisao da etapa 6, parte 2).
+        audio: sql`coalesce(${sql.param(audio, videos.audio)}, ${videos.audio})`,
         atualizadoEm: new Date(),
       },
     })

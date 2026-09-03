@@ -58,8 +58,11 @@ export const textosBriefing = {
   },
   barraNotaGeral: {
     rotuloNotaAtual: "nota atual",
-    rotuloMeta: "meta",
+    rotuloMeta: (meta: number) => `meta ${meta}`,
     dica: (perguntaId: string) => `a ${perguntaId.toUpperCase()} é a que mais ajuda agora`,
+    semNota: "sem nota",
+    tituloFolha: "as doze notas",
+    rotuloPergunta: (perguntaId: string) => perguntaId.toUpperCase(),
   },
   liberacao: {
     titulo: "Seu painel está aberto.",

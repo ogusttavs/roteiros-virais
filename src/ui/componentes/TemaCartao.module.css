@@ -1,0 +1,100 @@
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  padding: var(--espaco-6) 0;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.cartao.primario {
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.tema {
+  margin: 0;
+  font-size: var(--tamanho-leitura);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cor-titulo);
+}
+
+.porque {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
+.rodape {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+  margin-top: var(--espaco-2);
+}
+
+.evidencia {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.botao {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-5);
+  border-radius: var(--raio-pill);
+  border: 1px solid transparent;
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  cursor: pointer;
+  transition: background var(--duracao-rapida) var(--curva-saida);
+}
+
+.botaoPrimario {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-weight: 600;
+}
+
+.botaoPrimario:hover {
+  background: var(--cor-acao-hover);
+}
+
+.botaoSecundario {
+  background: transparent;
+  border-color: var(--cor-borda-forte);
+  color: var(--cor-titulo);
+  font-weight: 500;
+}
+
+.botaoSecundario:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.cartao.primario .rodape {
+  margin-top: var(--espaco-2);
+}
+
+.cartao.primario .botao {
+  width: 100%;
+}

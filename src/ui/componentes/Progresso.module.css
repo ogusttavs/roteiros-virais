@@ -1,50 +1,59 @@
 .passos {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-2);
-}
-
-.trilha {
-  height: 4px;
-  border-radius: var(--raio-pill);
-  background: var(--cor-superficie-recuada);
-  overflow: hidden;
-}
-
-.preenchido {
-  height: 100%;
-  background: var(--cor-acao);
-  border-radius: var(--raio-pill);
-  transition: width var(--duracao-base) var(--curva-saida);
+  gap: var(--espaco-3);
 }
 
 .rotuloPassos {
   font-family: var(--fonte-mono);
-  font-size: 12px;
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
   color: var(--cor-texto-suave);
+}
+
+.trilha {
+  display: flex;
+  gap: var(--espaco-1);
+  max-width: 200px;
+}
+
+.segmentoCheio,
+.segmentoVazio {
+  flex: 1;
+  height: 2px;
+  border-radius: 1px;
+}
+
+.segmentoCheio {
+  background: var(--cor-titulo);
+}
+
+.segmentoVazio {
+  background: var(--cor-borda-forte);
 }
 
 .espera {
   display: flex;
   align-items: center;
-  gap: var(--espaco-2);
-  font-size: 13px;
+  gap: var(--espaco-3);
+  font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
 }
 
 .pulso {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--cor-acao);
-  animation: pulsar 1s ease-in-out infinite;
-  flex-shrink: 0;
+  background: var(--cor-titulo);
+  animation: pulso var(--duracao-skeleton) ease-in-out infinite;
 }
 
-@keyframes pulsar {
+@keyframes pulso {
   0%,
   100% {
-    opacity: 0.3;
+    opacity: 0.25;
   }
   50% {
     opacity: 1;
@@ -54,5 +63,6 @@
 @media (prefers-reduced-motion: reduce) {
   .pulso {
     animation: none;
+    opacity: 0.7;
   }
 }

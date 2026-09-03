@@ -5,38 +5,101 @@
   text-align: left;
 }
 
+.linhaRotulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
 .rotulo {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
   color: var(--cor-titulo);
 }
 
+.contador {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  color: var(--cor-texto-dica);
+}
+
 .ajuda {
-  font-size: 13px;
+  font-size: var(--tamanho-legenda);
   color: var(--cor-texto-suave);
 }
 
 .entrada {
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
   border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-sm);
+  border-radius: var(--raio-md);
   background: var(--cor-superficie);
-  color: var(--cor-texto);
+  color: var(--cor-titulo);
   font-family: var(--fonte-texto);
-  font-size: 16px;
-  padding: var(--espaco-3) var(--espaco-4);
-  min-height: 44px;
+  font-size: var(--tamanho-corpo);
+  outline: none;
+  transition: box-shadow var(--duracao-rapida) var(--curva-saida);
 }
 
 .entrada:focus-visible {
-  outline: 2px solid var(--cor-acao);
-  outline-offset: 1px;
+  box-shadow: var(--sombra-foco);
+}
+
+.entrada::placeholder {
+  color: var(--cor-texto-dica);
+}
+
+.entrada:disabled {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  border-color: var(--cor-borda);
 }
 
 .comErro {
   border-color: var(--cor-erro);
 }
 
+.envoltorioPrefixo {
+  display: flex;
+  align-items: center;
+  height: var(--altura-toque);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  overflow: hidden;
+}
+
+.envoltorioPrefixo:has(.entrada:focus-visible) {
+  box-shadow: var(--sombra-foco);
+}
+
+.prefixo {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 var(--espaco-3);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  border-right: 1px solid var(--cor-borda);
+  background: var(--cor-superficie-recuada);
+}
+
+.comPrefixo {
+  flex: 1;
+  height: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.comPrefixo:focus-visible {
+  box-shadow: none;
+}
+
 .erro {
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-legenda);
   color: var(--cor-erro);
 }

@@ -1,15 +1,20 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { sessaoAtual } from "@/lib/sessao";
 import { textosAdmin } from "@/textos/admin";
+import { Logo } from "@/ui/Logo";
 
+import { AbasAdmin } from "./_casca/AbasAdmin";
 import styles from "./layout.module.css";
 
 const t = textosAdmin.navegacao;
 
-/** Area da equipe, sem a barra do cliente (brief-frontend.md, 6.10). */
+function iniciaisDe(nome: string): string {
+  return (nome.trim()[0] ?? "?").toUpperCase();
+}
+
+/** Casca do admin: abas, largura total, sem a navegacao do cliente (CascaAdmin.dc.html). */
 export default async function LayoutAdmin({ children }: { children: ReactNode }) {
   const sessao = await sessaoAtual();
   if (!sessao) {
@@ -21,12 +26,18 @@ export default async function LayoutAdmin({ children }: { children: ReactNode })
 
   return (
     <div className={styles.pagina}>
-      <nav className={styles.nav}>
-        <Link href="/admin/clientes">{t.clientes}</Link>
-        <Link href="/admin/nichos">{t.nichos}</Link>
-        <Link href="/admin/jobs">{t.jobs}</Link>
-      </nav>
-      {children}
+      <header className={styles.cabecalho}>
+        <div className={styles.identidade}>
+          <Logo tamanho={24} />
+          <span className={styles.equipe}>{t.equipe}</span>
+        </div>
+        <AbasAdmin rotulos={{ clientes: t.clientes, nichos: t.nichos, jobs: t.jobs }} />
+        <div className={styles.conta}>
+          <span className={styles.nomeConta}>{sessao.user.name}</span>
+          <span className={styles.avatar}>{iniciaisDe(sessao.user.name)}</span>
+        </div>
+      </header>
+      <main className={styles.corpo}>{children}</main>
     </div>
   );
 }

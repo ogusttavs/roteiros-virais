@@ -1,0 +1,52 @@
+.grupo {
+  display: inline-flex;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.chip {
+  flex: none;
+  height: 36px;
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: 1px solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background var(--duracao-rapida) var(--curva-saida),
+    color var(--duracao-rapida) var(--curva-saida),
+    border-color var(--duracao-rapida) var(--curva-saida);
+}
+
+.chip:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.ativo {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  border-color: var(--cor-acao);
+}
+
+.ativo:hover {
+  background: var(--cor-acao-hover);
+}
+
+.separador {
+  flex: none;
+  width: 1px;
+  height: 24px;
+  align-self: center;
+  background: var(--cor-borda-forte);
+  margin: 0 var(--espaco-1);
+}

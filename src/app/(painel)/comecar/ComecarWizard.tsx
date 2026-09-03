@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
+import { PERGUNTAS_BRIEFING, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { perguntaQueMaisAjuda } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
@@ -96,8 +96,14 @@ export function ComecarWizard({
         notaAtual={notaGeral}
         meta={meta}
         rotuloNotaAtual={textosBriefing.barraNotaGeral.rotuloNotaAtual}
-        rotuloMeta={textosBriefing.barraNotaGeral.rotuloMeta}
+        rotuloMeta={textosBriefing.barraNotaGeral.rotuloMeta(meta)}
         dica={notaGeral < meta && dica ? textosBriefing.barraNotaGeral.dica(dica.id) : undefined}
+        semNota={textosBriefing.barraNotaGeral.semNota}
+        tituloFolha={textosBriefing.barraNotaGeral.tituloFolha}
+        notas={PERGUNTAS_BRIEFING.map((p) => ({
+          rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id),
+          nota: avaliacoes[p.id]?.nota ?? null,
+        }))}
       />
       <div className={styles.corpo}>
         <h1>{textosBriefing.comecar.titulo}</h1>

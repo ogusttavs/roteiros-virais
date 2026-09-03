@@ -1,0 +1,58 @@
+.constancia {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+}
+
+.numeros {
+  display: flex;
+  gap: var(--espaco-8);
+  flex-wrap: wrap;
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.valor {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-titulo);
+  line-height: 1;
+  color: var(--cor-titulo);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.linha {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espaco-1);
+  max-width: var(--largura-leitura);
+}
+
+.dia {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  background: transparent;
+  border: 1px solid var(--cor-titulo);
+}
+
+.gravou {
+  background: var(--cor-titulo);
+}
+
+.hoje {
+  box-shadow:
+    0 0 0 2px var(--cor-fundo),
+    0 0 0 3px var(--cor-titulo);
+}

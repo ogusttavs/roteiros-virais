@@ -1,0 +1,60 @@
+.cabecalho {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 var(--margem-celular);
+  margin-top: env(safe-area-inset-top);
+  background: var(--cor-fundo);
+  transition: transform var(--duracao-base) var(--curva-saida);
+}
+
+.identidade {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.nome {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.contaBotao {
+  width: 44px;
+  height: 44px;
+  margin-right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.contaBotao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-titulo);
+}
+
+@media (min-width: 768px) {
+  .cabecalho {
+    display: none;
+  }
+}

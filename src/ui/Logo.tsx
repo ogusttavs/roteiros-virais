@@ -1,8 +1,9 @@
 import { config } from "@/lib/config";
 
 /**
- * Espaco reservado do logo (brief-frontend.md, secao 4.3). Hoje e um simbolo
- * geometrico neutro. Trocar o SVG aqui troca o logo em todo o painel.
+ * Espaco reservado do logo (entrega/README.md): circulo em linha, 24 px.
+ * Troca pelo SVG da marca quando ela existir; nenhuma tela referencia isso
+ * direto (brief-frontend.md, secao 4.3).
  */
 export function Logo({ tamanho = 24 }: { tamanho?: number }) {
   return (
@@ -14,8 +15,7 @@ export function Logo({ tamanho = 24 }: { tamanho?: number }) {
       role="img"
       aria-label={`ícone de ${config.appName}`}
     >
-      <rect x="2" y="2" width="20" height="20" rx="6" stroke="var(--cor-acao)" strokeWidth="2" />
-      <circle cx="12" cy="12" r="4" fill="var(--cor-destaque)" />
+      <circle cx="12" cy="12" r="11.25" stroke="var(--cor-titulo)" strokeWidth="1.5" />
     </svg>
   );
 }

@@ -39,7 +39,7 @@ export default async function Conta() {
         </div>
       </Cartao>
 
-      <Cartao variante="recuada">
+      <Cartao variante="recuado">
         <div className={styles.linha}>
           <span className={styles.rotulo}>{textosConta.lembreteTitulo}</span>
           <span className={styles.valor}>{textosConta.lembreteDescricao}</span>

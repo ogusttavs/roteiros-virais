@@ -1,0 +1,48 @@
+.roteiro {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-7);
+  max-width: 34ch;
+}
+
+.bloco {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.gancho {
+  margin: 0;
+  font-size: var(--tamanho-titulo-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--cor-titulo);
+}
+
+.paragrafo {
+  margin: 0;
+  font-size: var(--tamanho-leitura);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto);
+}
+
+.gravacao {
+  gap: var(--espaco-8);
+  max-width: 26ch;
+}
+
+.gravacao .paragrafo,
+.gravacao .gancho {
+  font-size: var(--tamanho-titulo-sm);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--cor-titulo);
+}
