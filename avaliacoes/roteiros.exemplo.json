@@ -1,0 +1,103 @@
+[
+  {
+    "tema": "o antes e depois de clareamento que faz o paciente marcar consulta",
+    "objetivo": "conversao",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "duas evidencias fortes com antes e depois; ver se o roteiro usa o consultorio de verdade e nao vira busto falante na parede branca"
+  },
+  {
+    "tema": "o erro que faz a mancha de vinho no sofá espalhar em vez de sair",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já tentou um produto que estragou o tecido do sofá. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Cenas filmáveis: cozinha, sala com o sofá, bancada com os produtos.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o erro comum, mostrar o jeito certo, resultado final. Fechamentos comuns: mostrar o resultado sem falar por dois segundos. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 101,
+        "assunto": "o produto que tira qualquer mancha do estofado",
+        "gancho": "esse produto tira qualquer mancha do estofado",
+        "estrutura": "mostra o produto agindo na mancha antes de explicar",
+        "fechamento": "estofado limpo, sem falar por dois segundos",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 6.2
+      }
+    ],
+    "roteirosRecentes": [
+      { "tema": "como tirar cheiro de gordura da cozinha sem produto forte", "objetivo": "alcance", "status": "postado" }
+    ],
+    "pontoPrincipal": "uma evidencia so; ver se o roteiro nao repete o angulo do roteiro recente de cozinha e usa a tese (pessoa de verdade, nao produto sozinho na bancada)"
+  },
+  {
+    "tema": "mito ou verdade: aparelho dentário atrasa o crescimento do dente",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende avaliação de ortodontia gratuita. Cliente ideal é pai ou mãe de criança de 8 a 14 anos. Medo do cliente: ouviu um mito de alguém e não sabe se é verdade. Frase que fala: aqui a gente explica com calma antes de indicar qualquer coisa.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: aparelho, mito ou verdade, dor de dente. Ganchos que funcionam: pergunta direta seguida da resposta (média frequência). Estruturas comuns: pergunta, resposta curta, explicação. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta sua duvida aqui embaixo.",
+    "evidencias": [],
+    "roteirosRecentes": [
+      { "tema": "ortodontia invisivel funciona mesmo?", "objetivo": "conversao", "status": "gravado" },
+      { "tema": "mito ou verdade sobre tratamento de canal", "objetivo": "engajamento", "status": "postado" }
+    ],
+    "pontoPrincipal": "sem nenhuma evidencia do banco; a regra dura diz para dizer isso e nao inventar, e para nao repetir o angulo de mito ou verdade ja usado no roteiro recente"
+  },
+  {
+    "tema": "por que o cheiro do produto forte de mercado não é sinal de limpeza de verdade",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit multiuso por R$ 65. Cliente ideal tem filho pequeno ou animal de estimação e evita produto tóxico. Medo do cliente: pagar mais caro por um produto que não limpa igual ao de mercado. Nunca recomenda produto tóxico perto de criança ou pet.",
+    "camadaExclusiva": "Concorrente citado pelo cliente: marca de limpeza de mercado com cheiro forte.",
+    "modeloNicho": "Duração típica: 25 a 40 segundos. Assuntos quentes: cheiro que dura, produto que faz mal para pet. Ganchos que funcionam: comparação direta entre dois produtos (alta frequência). Estruturas comuns: mostrar o mito, explicar por que é mito, mostrar a prova. Fechamentos comuns: mostrar o resultado lado a lado. Chamadas finais comuns: chama aqui se quiser o que eu uso.",
+    "evidencias": [
+      {
+        "id": 302,
+        "assunto": "erro que todo mundo comete ao limpar",
+        "gancho": "voce ta cometendo esse erro ao limpar a casa",
+        "estrutura": "mostra o erro, explica a causa, mostra o certo",
+        "fechamento": "casa limpa, produto na mao",
+        "chamadaFinal": "chama aqui se quiser o que eu uso",
+        "foraDaCurva": 5.5
+      }
+    ],
+    "roteirosRecentes": [],
+    "anguloParaEvitar": {
+      "gancho": "cheiro forte nao quer dizer limpo de verdade",
+      "corpo": "explicacao direta sobre cheiro forte, com uma cena real do negocio."
+    },
+    "pontoPrincipal": "simula um pedido de outro angulo: o roteiro precisa ter um gancho e um corpo diferentes do angulo anterior sobre o mesmo tema"
+  },
+  {
+    "tema": "a rotina de 10 minutos que faço todo dia depois de fechar o consultório",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Quem grava é só a própria pessoa, sem equipe. Autoridade: doze anos de consultório. Frase que fala: aqui a gente explica tudo antes de fazer.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 30 a 50 segundos. Assuntos quentes: bastidor do consultório, rotina do dia a dia. Ganchos que funcionam: rotina cronometrada (média frequência). Estruturas comuns: passo a passo curto. Fechamentos comuns: resultado final sem falar. Chamadas finais comuns: comenta se voce faz igual.",
+    "evidencias": [],
+    "roteirosRecentes": [
+      { "tema": "ortodontia invisivel funciona mesmo?", "objetivo": "conversao", "status": "postado" }
+    ],
+    "pontoPrincipal": "tema de rotina, sem evidencia de que funciona no nicho; ver se o roteiro reconhece a falta de evidencia em vez de inventar um numero"
+  }
+]
