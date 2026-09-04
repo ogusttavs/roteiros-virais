@@ -67,7 +67,11 @@ export function TemaLivreTela({ notaMinima }: Props) {
 
     return (
       <div className={styles.pagina}>
-        <Nota valor={resultado.nota} legenda={faixaDeNota(resultado.nota)} tamanho="destaque" />
+        <Nota
+          valor={resultado.nota}
+          legenda={textosTemaLivre.notaFaixa[faixaDeNota(resultado.nota)]}
+          tamanho="destaque"
+        />
         {semEvidencia ? <p className={styles.semEvidencia}>{textosTemaLivre.semEvidencia}</p> : null}
 
         <Pilares

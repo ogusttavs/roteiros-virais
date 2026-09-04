@@ -27,7 +27,7 @@ const casoSchema = z.object({
   perfilCompilado: z.string(),
   modeloNicho: z.string(),
   persona: z.enum(["negocio", "criador"]),
-  evidencias: z.array(z.object({ id: z.number(), assunto: z.string(), foraDaCurva: z.number() })),
+  evidencias: z.array(z.object({ id: z.number(), assunto: z.string(), gancho: z.string(), foraDaCurva: z.number() })),
   notaEsperada: z.object({
     viralizar: z.number().min(0).max(10),
     gerarCliente: z.number().min(0).max(10),

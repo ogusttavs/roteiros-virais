@@ -5,6 +5,11 @@
 
 export const textosTemaLivre = {
   titulo: "Sobre o que você quer falar?",
+  notaFaixa: {
+    baixa: "abaixo do esperado",
+    media: "no caminho",
+    alta: "muito boa",
+  },
   placeholder: "por exemplo: como tirar cheiro de gordura da cozinha sem produto forte",
   ajuda: "um assunto, não um título de vídeo",
   campoVazio: "escreva um assunto antes de avaliar",

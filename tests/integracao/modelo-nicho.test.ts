@@ -228,4 +228,27 @@ describe("rodarModeloNicho", () => {
     expect(atual!.modelo.acimaDoLimiar).toBe(3);
     expect(atual!.modelo.baseadoEm).toBe(10);
   });
+
+  it("evidencia forte suficiente (10 ou mais acima do limiar) nao completa com nenhum video abaixo (ajuste da revisao da etapa 9)", async () => {
+    // 11 acima do limiar (limiarForaDaCurva = 3): ja passa do piso de 10, entao nada abaixo entra.
+    for (let i = 0; i < 11; i += 1) {
+      await criarVideo(`acima-${i}`, {
+        foraDaCurva: 9 - i * 0.1,
+        publicadoEm: diasAtras(5),
+        analise: ANALISE_PADRAO,
+      });
+    }
+    await criarVideo("abaixo-nao-deveria-entrar", {
+      foraDaCurva: 2.9,
+      publicadoEm: diasAtras(6),
+      analise: ANALISE_PADRAO,
+    });
+
+    const resumo = await rodarModeloNicho();
+    expect(resumo.modelados).toBe(1);
+
+    const atual = await modeloNichoAtual(nichoId);
+    expect(atual!.modelo.acimaDoLimiar).toBe(11);
+    expect(atual!.modelo.baseadoEm).toBe(11);
+  });
 });

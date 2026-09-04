@@ -79,6 +79,55 @@ describe("avisoLinhaEditorial", () => {
     expect(avisoLinhaEditorial(historico, "negocio")?.totalNaJanela).toBe(15);
     expect(avisoLinhaEditorial(historico, "negocio")?.objetivoEmFalta).toBe("conversao");
   });
+
+  it("com exatamente 5 roteiros (o limiar minimo), ja avisa se a distribuicao pedir", () => {
+    // engajamento ausente dos 5 (zerado): zeradoRecente sozinho basta, sem precisar
+    // estar abaixo da metade da referencia.
+    const historico: Objetivo[] = [...repetir("alcance", 4), "conversao"];
+    expect(historico).toHaveLength(5);
+
+    const aviso = avisoLinhaEditorial(historico, "negocio");
+    expect(aviso).toEqual({
+      objetivoEmFalta: "engajamento",
+      contagemEmFalta: 0,
+      maisComum: "alcance",
+      contagemMaisComum: 4,
+      totalNaJanela: 5,
+    });
+  });
+
+  it("zerado nos ultimos 5 mas com proporcao geral acima da metade da referencia ainda avisa (ramo isolado, sem abaixoDaMetade)", () => {
+    // conversao some dos 5 mais recentes mas tem 5/15 (33%) no total, acima da
+    // metade da referencia de negocio (15%): so o ramo "zeradoRecente" decide aqui.
+    const historico: Objetivo[] = [
+      ...repetir("alcance", 3),
+      ...repetir("engajamento", 2),
+      ...repetir("conversao", 5),
+      ...repetir("alcance", 4),
+      "engajamento",
+    ];
+    expect(historico).toHaveLength(15);
+
+    const aviso = avisoLinhaEditorial(historico, "negocio");
+    expect(aviso?.objetivoEmFalta).toBe("conversao");
+    expect(aviso?.maisComum).toBe("alcance");
+  });
+
+  it("quando o objetivo em falta e tambem o mais comum da janela, nao avisa (guarda de auto-comparacao)", () => {
+    // alcance some dos 5 mais recentes (zeradoRecente), mas e o mais frequente no
+    // total (8 de 15): o objetivo "em falta" seria o proprio mais comum, o que nao
+    // faz sentido recomendar, entao o aviso e descartado.
+    const historico: Objetivo[] = [
+      ...repetir("engajamento", 3),
+      ...repetir("conversao", 2),
+      ...repetir("alcance", 8),
+      "engajamento",
+      "conversao",
+    ];
+    expect(historico).toHaveLength(15);
+
+    expect(avisoLinhaEditorial(historico, "negocio")).toBeNull();
+  });
 });
 
 describe("fraseAvisoLinhaEditorial", () => {

@@ -176,7 +176,7 @@ export function palavrasChave(texto: string): string[] {
   return [...new Set(encontradas)];
 }
 
-export type VideoEvidenciaTema = { id: number; assunto: string; foraDaCurva: number };
+export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number };
 
 /**
  * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
@@ -219,6 +219,7 @@ export async function evidenciaParaTema(nichoId: number, texto: string, limite =
     .map((l) => ({
       id: l.id,
       assunto: l.analise.assunto,
+      gancho: l.analise.gancho,
       foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
     }));
 }

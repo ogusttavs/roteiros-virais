@@ -34,6 +34,10 @@
   font-size: var(--tamanho-secundario);
   line-height: 1.5;
   color: var(--cor-texto-suave);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .rodape {

@@ -236,4 +236,28 @@ describe("rodarAnalisarVisual", () => {
     expect(resumo.analisados).toBe(0);
     expect(baixarVideo480p).not.toHaveBeenCalled();
   });
+
+  it("video com analise antiga, sem o campo pertenceAoNicho, continua entrando como candidato", async () => {
+    const analiseAntiga = {
+      assunto: ANALISE_PADRAO.assunto,
+      gancho: ANALISE_PADRAO.gancho,
+      estrutura: ANALISE_PADRAO.estrutura,
+      fechamento: ANALISE_PADRAO.fechamento,
+      chamadaFinal: ANALISE_PADRAO.chamadaFinal,
+      formato: ANALISE_PADRAO.formato,
+      porQueFuncionou: ANALISE_PADRAO.porQueFuncionou,
+    };
+
+    const v = await criarVideo("analise-antiga", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: analiseAntiga,
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith(v.url);
+  });
 });

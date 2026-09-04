@@ -27,6 +27,20 @@ function diasAtrasISO(dias: number, base = new Date()): string {
   return hojeISO(new Date(base.getTime() - dias * DIA_MS));
 }
 
+/**
+ * Subtrai dias de uma data "AAAA-MM-DD" em espaço de calendario puro (UTC),
+ * sem passar por `Date.now()`: usado por `temasDoDiaOuRecente` para a regra
+ * de estabilidade valer tambem para uma data arbitraria (nao so "agora"),
+ * sem risco de fuso horario deslocar o dia (`diasAtrasISO` acima resolve
+ * pelo relogio real, correto para `constanciaDoCliente`, mas erraria aqui).
+ */
+function diasAtrasIsoDe(dataBase: string, dias: number): string {
+  const [ano, mes, dia] = dataBase.split("-").map(Number);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  data.setUTCDate(data.getUTCDate() - dias);
+  return data.toISOString().slice(0, 10);
+}
+
 async function historicoDeObjetivos(clienteId: number): Promise<Objetivo[]> {
   const linhas = await db()
     .select({ objetivo: roteiros.objetivo, data: roteiros.data })
@@ -77,15 +91,18 @@ export async function constanciaDoCliente(clienteId: number): Promise<Constancia
   return { tipo: "seguidos", dias: seguidos };
 }
 
-async function temasDoDiaOuRecente(nichoId: number): Promise<{ temas: TemaDoDia[]; dataUsada: string } | null> {
+async function temasDoDiaOuRecente(
+  nichoId: number,
+  data: string,
+): Promise<{ temas: TemaDoDia[]; dataUsada: string } | null> {
   const [linha] = await db()
     .select({ data: temasDia.data, temas: temasDia.temas })
     .from(temasDia)
     .where(
       and(
         eq(temasDia.nichoId, nichoId),
-        gte(temasDia.data, diasAtrasISO(DIAS_REGRA_ESTABILIDADE)),
-        lte(temasDia.data, hojeISO()),
+        gte(temasDia.data, diasAtrasIsoDe(data, DIAS_REGRA_ESTABILIDADE)),
+        lte(temasDia.data, data),
       ),
     )
     .orderBy(desc(temasDia.data))
@@ -107,15 +124,18 @@ export type ResultadoTemasHoje =
 
 /**
  * Temas do dia para o cliente ver em `/hoje` (etapa 10, decisões 3 e 4 do
- * `PROXIMO.md`): regra de estabilidade (hoje, ou o mais recente dos
- * últimos 3 dias) e o aviso da linha editorial, que reordena o primeiro
- * tema para o que puxa para o objetivo em falta quando um dos três serve.
+ * `PROXIMO.md`): regra de estabilidade (a data pedida, ou o mais recente
+ * dos últimos 3 dias antes dela) e o aviso da linha editorial, que reordena
+ * o primeiro tema para o que puxa para o objetivo em falta quando um dos
+ * três serve. `data` é opcional (hoje por padrão); existe para permitir ver
+ * o que o cliente veria num dia específico (ex.: o admin auditando), sem
+ * depender do relógio real no caminho comum.
  */
-export async function temasParaCliente(cliente: Cliente): Promise<ResultadoTemasHoje> {
+export async function temasParaCliente(cliente: Cliente, data: string = hojeISO()): Promise<ResultadoTemasHoje> {
   if (!cliente.nichoId) return { status: "sem_tema" };
 
   const [encontrado, historico, constancia] = await Promise.all([
-    temasDoDiaOuRecente(cliente.nichoId),
+    temasDoDiaOuRecente(cliente.nichoId, data),
     historicoDeObjetivos(cliente.id),
     constanciaDoCliente(cliente.id),
   ]);
