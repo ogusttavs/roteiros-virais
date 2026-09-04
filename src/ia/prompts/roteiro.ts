@@ -28,8 +28,17 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * para nao citar nenhum id (antes so dizia "nenhuma evidencia disponivel",
  * vago o bastante para o modelo inventar ids na segunda tentativa, achado
  * rodando com chave real). Versao 1.3.0.
+ *
+ * Ajustes da revisao da etapa 11 (etapa 12): sem evidencia, a entrada tambem
+ * diz para nao afirmar video, numero ou resultado de outra pessoa, so o que
+ * esta no perfil e no modelo do nicho (a lacuna que a revisao do PR #17
+ * fechou era so a citacao de id; a prosa em si podia continuar inventando
+ * fatos sem citar nenhum id, o que o `evidenciasFornecidas` do verificador
+ * nao pega). Sem checagem nova de codigo: os dois roteiros reais ficaram
+ * honestos so com a instrucao, e a fase 3 cria a checagem se o golden set
+ * mostrar o contrario. Versao 1.4.0.
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -151,7 +160,9 @@ export function montarEntrada(dados: {
           )
           .join("\n\n")}`
       : "Não há vídeo fora da curva sobre este tema no banco. Escreva a partir do perfil, do " +
-        "modelo do nicho e da camada exclusiva; não cite nenhum id.";
+        "modelo do nicho e da camada exclusiva; não cite nenhum id. Não afirme que existe " +
+        "vídeo, número ou resultado de outra pessoa; fale só do que está no perfil e no " +
+        "modelo do nicho.";
 
   const listaRecentes =
     dados.roteirosRecentes.length > 0
