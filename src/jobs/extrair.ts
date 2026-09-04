@@ -5,10 +5,10 @@
  * 24h); `extrairColeta` (job separado) e quem busca o resultado quando
  * pronto.
  */
-import { and, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { lotesIa, videos } from "@/db/schema";
+import { lotesIa, nichos, videos } from "@/db/schema";
 import { criarLote, type ItemLote } from "@/ia/lote";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 
@@ -24,8 +24,15 @@ const TAMANHO_MINIMO_TRANSCRICAO = 80;
 
 export async function rodarExtrair(): Promise<Record<string, unknown>> {
   const candidatos = await db()
-    .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao })
+    .select({
+      id: videos.id,
+      titulo: videos.titulo,
+      transcricao: videos.transcricao,
+      nomeNicho: nichos.nome,
+      termosNicho: nichos.termos,
+    })
     .from(videos)
+    .innerJoin(nichos, eq(videos.nichoId, nichos.id))
     .where(and(isNotNull(videos.transcricao), isNull(videos.analise)));
 
   const curtos = candidatos.filter((v) => (v.transcricao ?? "").trim().length < TAMANHO_MINIMO_TRANSCRICAO);
@@ -53,7 +60,12 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
     nivel: extrairVideo.nivel,
     schema: extrairVideo.schema,
     sistemaEstavel: extrairVideo.montarSistemaEstavel(),
-    entrada: extrairVideo.montarEntrada({ titulo: v.titulo ?? "", transcricao: v.transcricao ?? "" }),
+    entrada: extrairVideo.montarEntrada({
+      titulo: v.titulo ?? "",
+      transcricao: v.transcricao ?? "",
+      nomeNicho: v.nomeNicho,
+      termosNicho: v.termosNicho,
+    }),
   }));
 
   const loteIdExterno = await criarLote(itens);

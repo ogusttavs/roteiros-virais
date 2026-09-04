@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "painel",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "dev-mock-etapa7",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "AI_PROVIDER=mock PORT=3247 BETTER_AUTH_URL=http://localhost:3247 APP_URL=http://localhost:3247 npm run dev"],
+      "port": 3247
+    },
+    {
+      "name": "dev-mock-etapa10",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "AI_PROVIDER=mock PORT=3410 BETTER_AUTH_URL=http://localhost:3410 APP_URL=http://localhost:3410 DATABASE_URL=postgres://roteiros:roteiros@localhost:5432/roteiros_teste npm run dev"
+      ],
+      "port": 3410
+    }
+  ]
+}

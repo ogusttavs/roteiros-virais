@@ -42,7 +42,9 @@ export default async function AdminNichoModelo({ params }: { params: Promise<{ s
         <>
           <div className={styles.metaLinha}>
             <span className={styles.mono}>{t.semana(formatarData(atual.semana))}</span>
-            <span className={styles.mono}>{t.baseadoEm(atual.modelo.baseadoEm)}</span>
+            <span className={styles.mono}>
+              {t.baseadoEm(atual.modelo.baseadoEm, atual.modelo.acimaDoLimiar ?? atual.modelo.baseadoEm)}
+            </span>
           </div>
 
           <section className={styles.secao}>

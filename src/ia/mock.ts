@@ -44,6 +44,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockAnalisarVisual();
     case "modeloNicho":
       return mockModeloNicho(entrada);
+    case "filtrarNoticias":
+      return mockFiltrarNoticias(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -124,13 +126,14 @@ function mockAvaliarTema(entrada: string) {
   };
   const nota =
     Object.values(pilares).reduce((soma, p) => soma + p.nota, 0) / Object.values(pilares).length;
+  const notaArredondada = Math.round(nota * 10) / 10;
+  const aprovado = notaArredondada >= 9;
 
   return {
     pilares,
-    nota: Math.round(nota * 10) / 10,
-    recomendacao:
-      evidencias > 0 ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
-    anguloSugerido: evidencias > 0 ? null : "angulo vizinho simulado",
+    nota: notaArredondada,
+    recomendacao: aprovado ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
+    anguloSugerido: aprovado ? null : "angulo vizinho simulado",
     evidencias: extrairIds(entrada),
   };
 }
@@ -174,6 +177,20 @@ function mockVerificarTexto(entrada: string) {
   };
 }
 
+/** As primeiras 8 noticias numeradas da entrada, com um angulo derivado do titulo. */
+function mockFiltrarNoticias(entrada: string) {
+  const blocoNoticias = entrada.split("Noticias:\n")[1] ?? "";
+  const linhas = blocoNoticias.split("\n").filter((l) => /^\d+\./.test(l));
+
+  return {
+    relevantes: linhas.slice(0, 8).map((linha) => {
+      const indice = Number(linha.match(/^(\d+)\./)?.[1] ?? 0);
+      const titulo = linha.replace(/^\d+\.\s*/, "").split(":")[0].trim();
+      return { indice, angulo: `saiu hoje que ${titulo}, explique o que muda para o seu cliente` };
+    }),
+  };
+}
+
 function mockTemasDoDia(entrada: string) {
   const ids = extrairIds(entrada);
   const puxaPara = ["alcance", "engajamento", "conversao"] as const;
@@ -191,6 +208,14 @@ function mockTemasDoDia(entrada: string) {
 
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
+  const nichoLinha = extrairCampo(entrada, "Nicho:");
+  const termos = (nichoLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  const textoBusca = entrada.toLowerCase();
+  const pertenceAoNicho = termos.length === 0 || termos.some((termo) => textoBusca.includes(termo));
+
   return {
     assunto: titulo,
     gancho: `abertura sobre ${titulo}`,
@@ -204,6 +229,10 @@ function mockExtrairVideo(entrada: string) {
       .split(" ")
       .filter((palavra) => palavra.length > 3)
       .slice(0, 4),
+    pertenceAoNicho,
+    motivoNicho: pertenceAoNicho
+      ? "a transcricao cita termo do nicho"
+      : "a transcricao nao cita nenhum termo do nicho",
   };
 }
 

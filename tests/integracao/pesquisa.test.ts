@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
-import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
+import { evidenciaParaTema, foraDaCurvaDoNicho, subindoHoje, subindoHojeComAnalise } from "@/servicos/pesquisa";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -26,9 +26,12 @@ async function criarVideo(
     velocidadeRelativa?: number;
     publicadoEm: Date;
     origem?: "coleta" | "seed";
+    analise?: unknown;
+    titulo?: string;
+    etiquetas?: string[];
   },
 ) {
-  await db()
+  const [v] = await db()
     .insert(videos)
     .values({
       plataforma: "tiktok",
@@ -36,12 +39,17 @@ async function criarVideo(
       url: `https://exemplo.invalido/${idExterno}`,
       contaId,
       nichoId,
+      titulo: opcoes.titulo,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
       origem: opcoes.origem ?? "coleta",
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
       velocidadeRelativa: opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
-    });
+      analise: opcoes.analise as never,
+      etiquetas: opcoes.etiquetas,
+    })
+    .returning();
+  return v;
 }
 
 beforeAll(async () => {
@@ -84,6 +92,24 @@ describe("foraDaCurvaDoNicho", () => {
     expect(resultado).toHaveLength(1);
     expect(resultado[0].foraDaCurva).toBe(9.5);
   });
+
+  it("exclui video marcado como fora do nicho, mas mantem sem analise e com analise antiga sem o campo (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("fc-fora-do-nicho", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(5),
+      analise: { pertenceAoNicho: false },
+    });
+    await criarVideo("fc-analise-antiga", {
+      foraDaCurva: 45,
+      publicadoEm: diasAtras(5),
+      analise: { assunto: "video antigo, sem o campo pertenceAoNicho" },
+    });
+
+    const resultado = await foraDaCurvaDoNicho(nichoId, 90);
+
+    expect(resultado.some((v) => v.foraDaCurva === 50)).toBe(false);
+    expect(resultado.some((v) => v.foraDaCurva === 45)).toBe(true);
+  });
 });
 
 describe("subindoHoje", () => {
@@ -99,5 +125,85 @@ describe("subindoHoje", () => {
     expect(resultado.map((v) => v.velocidadeRelativa)).toEqual([3.1, 1.1]);
     expect(resultado.some((v) => v.velocidadeRelativa === 99)).toBe(false);
     expect(resultado.some((v) => v.velocidadeRelativa === 50)).toBe(false);
+  });
+
+  it("exclui video marcado como fora do nicho, mas mantem sem analise e com analise antiga sem o campo (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("sh-fora-do-nicho", {
+      velocidadeRelativa: 80,
+      publicadoEm: diasAtras(3),
+      analise: { pertenceAoNicho: false },
+    });
+    await criarVideo("sh-analise-antiga", {
+      velocidadeRelativa: 70,
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "video antigo, sem o campo pertenceAoNicho" },
+    });
+
+    const resultado = await subindoHoje(nichoId);
+
+    expect(resultado.some((v) => v.velocidadeRelativa === 80)).toBe(false);
+    expect(resultado.some((v) => v.velocidadeRelativa === 70)).toBe(true);
+  });
+});
+
+describe("subindoHojeComAnalise", () => {
+  it("so traz video com analise, com o assunto e a velocidade relativa", async () => {
+    const comAnalise = await criarVideo("sca-com-analise", {
+      velocidadeRelativa: 5,
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "erro comum ao lavar sofa" },
+    });
+    const semAnalise = await criarVideo("sca-sem-analise", { velocidadeRelativa: 9, publicadoEm: diasAtras(3) });
+
+    const resultado = await subindoHojeComAnalise(nichoId);
+    const ids = resultado.map((v) => v.id);
+
+    expect(ids).toContain(comAnalise.id);
+    expect(ids).not.toContain(semAnalise.id);
+    expect(resultado.find((v) => v.id === comAnalise.id)).toEqual({
+      id: comAnalise.id,
+      assunto: "erro comum ao lavar sofa",
+      velocidadeRelativa: 5,
+    });
+  });
+});
+
+describe("evidenciaParaTema", () => {
+  it("casa por busca textual (titulo) ordenado por fora_da_curva desc", async () => {
+    await criarVideo("ev-titulo", {
+      foraDaCurva: 6,
+      publicadoEm: diasAtras(10),
+      titulo: "como limpar estofado de sofa em casa hoje",
+      analise: { assunto: "limpeza de estofado" },
+    });
+    await criarVideo("ev-sem-relacao", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(10),
+      titulo: "receita de bolo de chocolate",
+      analise: { assunto: "receita" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "limpar sofa estofado hoje");
+
+    expect(resultado.map((v) => v.assunto)).toEqual(["limpeza de estofado"]);
+  });
+
+  it("casa por etiqueta que contenha uma palavra do texto, mesmo sem casar o titulo", async () => {
+    await criarVideo("ev-etiqueta", {
+      foraDaCurva: 4,
+      publicadoEm: diasAtras(10),
+      titulo: "video sem nenhuma palavra em comum",
+      etiquetas: ["mancha", "estofado"],
+      analise: { assunto: "tira mancha do estofado" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "como tirar mancha de vinho do sofa");
+
+    expect(resultado.map((v) => v.assunto)).toContain("tira mancha do estofado");
+  });
+
+  it("sem casamento nenhum, a evidencia vem vazia", async () => {
+    const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
+    expect(resultado).toEqual([]);
   });
 });

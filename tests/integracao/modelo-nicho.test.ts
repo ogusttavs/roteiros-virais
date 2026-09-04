@@ -190,4 +190,65 @@ describe("rodarModeloNicho", () => {
     const atual = await modeloNichoAtual(nichoId);
     expect(atual!.audiosDaSemana).toEqual([]);
   });
+
+  it("video marcado como fora do nicho (pertenceAoNicho false) nao conta como evidencia (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("pertence", { foraDaCurva: 9, publicadoEm: diasAtras(3), analise: ANALISE_PADRAO });
+    await criarVideo("nao-pertence", {
+      foraDaCurva: 10,
+      publicadoEm: diasAtras(3),
+      analise: { ...ANALISE_PADRAO, pertenceAoNicho: false },
+    });
+
+    const resumo = await rodarModeloNicho();
+    expect(resumo.modelados).toBe(1);
+
+    const atual = await modeloNichoAtual(nichoId);
+    expect(atual!.modelo.baseadoEm).toBe(1);
+    expect(atual!.modelo.acimaDoLimiar).toBe(1);
+  });
+
+  it("evidencia forte insuficiente completa com os melhores abaixo do limiar ate o piso (ajuste da revisao da etapa 9)", async () => {
+    await criarVideo("acima-1", { foraDaCurva: 9, publicadoEm: diasAtras(5), analise: ANALISE_PADRAO });
+    await criarVideo("acima-2", { foraDaCurva: 8, publicadoEm: diasAtras(6), analise: ANALISE_PADRAO });
+    await criarVideo("acima-3", { foraDaCurva: 3, publicadoEm: diasAtras(7), analise: ANALISE_PADRAO });
+
+    // 12 abaixo do limiar (limiarForaDaCurva = 3); so os 7 melhores devem entrar, para completar o piso de 10.
+    for (let i = 0; i < 12; i += 1) {
+      await criarVideo(`abaixo-${i}`, {
+        foraDaCurva: 2.9 - i * 0.1,
+        publicadoEm: diasAtras(8),
+        analise: ANALISE_PADRAO,
+      });
+    }
+
+    const resumo = await rodarModeloNicho();
+    expect(resumo.modelados).toBe(1);
+
+    const atual = await modeloNichoAtual(nichoId);
+    expect(atual!.modelo.acimaDoLimiar).toBe(3);
+    expect(atual!.modelo.baseadoEm).toBe(10);
+  });
+
+  it("evidencia forte suficiente (10 ou mais acima do limiar) nao completa com nenhum video abaixo (ajuste da revisao da etapa 9)", async () => {
+    // 11 acima do limiar (limiarForaDaCurva = 3): ja passa do piso de 10, entao nada abaixo entra.
+    for (let i = 0; i < 11; i += 1) {
+      await criarVideo(`acima-${i}`, {
+        foraDaCurva: 9 - i * 0.1,
+        publicadoEm: diasAtras(5),
+        analise: ANALISE_PADRAO,
+      });
+    }
+    await criarVideo("abaixo-nao-deveria-entrar", {
+      foraDaCurva: 2.9,
+      publicadoEm: diasAtras(6),
+      analise: ANALISE_PADRAO,
+    });
+
+    const resumo = await rodarModeloNicho();
+    expect(resumo.modelados).toBe(1);
+
+    const atual = await modeloNichoAtual(nichoId);
+    expect(atual!.modelo.acimaDoLimiar).toBe(11);
+    expect(atual!.modelo.baseadoEm).toBe(11);
+  });
 });

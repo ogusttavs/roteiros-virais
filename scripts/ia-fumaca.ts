@@ -1,5 +1,5 @@
 /**
- * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as nove
+ * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as dez
  * tarefas do plano uma vez cada, com dados ficticios encadeados (o resumo do
  * perfil e do modelo do nicho de uma chamada alimenta o sistema estavel da
  * proxima, como em producao), e imprime o resumo de cada saida com o custo.
@@ -21,6 +21,7 @@ import * as avaliarResposta from "../src/ia/prompts/avaliarResposta";
 import * as avaliarTema from "../src/ia/prompts/avaliarTema";
 import * as compilarPerfil from "../src/ia/prompts/compilarPerfil";
 import * as extrairVideo from "../src/ia/prompts/extrairVideo";
+import * as filtrarNoticias from "../src/ia/prompts/filtrarNoticias";
 import * as modeloNicho from "../src/ia/prompts/modeloNicho";
 import * as roteiro from "../src/ia/prompts/roteiro";
 import * as temasDoDia from "../src/ia/prompts/temasDoDia";
@@ -125,6 +126,8 @@ async function main() {
         titulo: "3 erros que estragam o sofa",
         transcricao:
           "Oi gente, hoje eu vou mostrar os 3 erros que quase todo mundo comete limpando o proprio sofa em casa.",
+        nomeNicho: "Limpeza de estofados",
+        termosNicho: ["sofa", "estofado", "limpeza a seco"],
       }),
     }),
   );
@@ -177,6 +180,27 @@ async function main() {
   );
 
   await chamar(
+    "filtrarNoticias",
+    filtrarNoticias.nivel,
+    (d) => `${d.relevantes.length} noticia(s) relevante(s)`,
+    gerarEstruturado({
+      tarefa: "filtrarNoticias",
+      nivel: filtrarNoticias.nivel,
+      effort: filtrarNoticias.esforco,
+      schema: filtrarNoticias.schema,
+      sistemaEstavel: filtrarNoticias.montarSistemaEstavel(),
+      entrada: filtrarNoticias.montarEntrada({
+        nomeNicho: "Limpeza de estofados",
+        termosNicho: ["sofa", "estofado", "limpeza a seco"],
+        noticias: [
+          { titulo: "Inverno chega mais cedo em SP", resumo: "friagem aumenta o uso de sofa e cobertor" },
+          { titulo: "Time local perde de virada", resumo: "torcida lamenta resultado no campeonato" },
+        ],
+      }),
+    }),
+  );
+
+  await chamar(
     "temasDoDia",
     temasDoDia.nivel,
     (d) => d.temas.map((t) => t.titulo).join(" | "),
@@ -211,7 +235,9 @@ async function main() {
       }),
       entrada: avaliarTema.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
-        evidencias: [{ id: 2, assunto: "mancha de vinho tinto no sofa", foraDaCurva: 4.2 }],
+        evidencias: [
+          { id: 2, assunto: "mancha de vinho tinto no sofa", gancho: extraido.gancho, foraDaCurva: 4.2 },
+        ],
       }),
     }),
   );

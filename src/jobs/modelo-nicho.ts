@@ -8,8 +8,14 @@
  * IA (nunca gerada pelo modelo) e gravada em `modelos_nicho.audios_da_semana`.
  * Grava com `semana` = segunda-feira ISO da data. Sem evidencia (nenhum
  * video com analise no nicho ainda), pula o nicho sem erro.
+ *
+ * Ajustes da revisao da etapa 9 (etapa 10): so entra video com `analise`
+ * marcada `pertenceAoNicho` (nunca `false`), e so conta como evidencia forte
+ * quem tem `fora_da_curva` de verdade (>= `limiarForaDaCurva`); com menos de
+ * `minimoEvidenciaModeloNicho`, completa com os melhores abaixo do limiar em
+ * vez de modelar com pouca evidencia.
  */
-import { and, asc, desc, eq, gte, isNotNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { modelosNicho, nichos, videos, type AnaliseVideo, type AnaliseVisual, type ModeloNicho } from "@/db/schema";
@@ -19,26 +25,50 @@ import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
 import { segundaFeiraIso } from "@/lib/semana";
 import { contarAudiosDaSemana } from "@/servicos/audio-da-semana";
-import { incluirSeed } from "@/servicos/pesquisa";
+import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 const DOZE_SEMANAS_MS = 12 * 7 * 24 * 60 * 60 * 1000;
 
-async function videosComAnalise(nichoId: number) {
-  const condicoes = [
+/**
+ * Evidência do modelo do nicho (etapa 10, ajuste da revisão da etapa 9): só
+ * vídeo de fato fora da curva (`fora_da_curva >= limiarForaDaCurva`) conta
+ * como evidência forte. Se sobrarem menos de `minimoEvidenciaModeloNicho`,
+ * completa com os melhores abaixo do limiar em vez de modelar com pouca
+ * evidência; `acimaDoLimiar` guarda quantos vieram da evidência forte.
+ */
+async function videosComAnalise(
+  nichoId: number,
+): Promise<{ videos: { id: number; analise: AnaliseVideo | null }[]; acimaDoLimiar: number }> {
+  const limiar = String(config.regras.limiarForaDaCurva);
+  const condicoesBase = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, new Date(Date.now() - DOZE_SEMANAS_MS)),
-    isNotNull(videos.foraDaCurva),
     isNotNull(videos.analise),
+    PERTENCE_AO_NICHO,
   ];
-  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  if (!incluirSeed()) condicoesBase.push(ne(videos.origem, "seed"));
 
-  return db()
+  const acima = (await db()
     .select({ id: videos.id, analise: videos.analise })
     .from(videos)
-    .where(and(...condicoes))
+    .where(and(...condicoesBase, gte(videos.foraDaCurva, limiar)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
-    .limit(config.regras.videosParaModeloNicho) as Promise<{ id: number; analise: AnaliseVideo | null }[]>;
+    .limit(config.regras.videosParaModeloNicho)) as { id: number; analise: AnaliseVideo | null }[];
+
+  const faltam = config.regras.minimoEvidenciaModeloNicho - acima.length;
+  if (faltam <= 0) {
+    return { videos: acima, acimaDoLimiar: acima.length };
+  }
+
+  const abaixo = (await db()
+    .select({ id: videos.id, analise: videos.analise })
+    .from(videos)
+    .where(and(...condicoesBase, isNotNull(videos.foraDaCurva), lt(videos.foraDaCurva, limiar)))
+    .orderBy(desc(videos.foraDaCurva), asc(videos.id))
+    .limit(faltam)) as { id: number; analise: AnaliseVideo | null }[];
+
+  return { videos: [...acima, ...abaixo], acimaDoLimiar: acima.length };
 }
 
 async function videosComAnaliseVisual(nichoId: number) {
@@ -46,6 +76,7 @@ async function videosComAnaliseVisual(nichoId: number) {
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, new Date(Date.now() - SETE_DIAS_MS)),
     isNotNull(videos.analiseVisual),
+    PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -70,7 +101,7 @@ async function videosParaAudioDaSemana(nichoId: number) {
 }
 
 async function modelarNicho(nicho: { id: number; slug: string }): Promise<"modelado" | "sem_evidencia"> {
-  const [comAnalise, comAnaliseVisual, paraAudio] = await Promise.all([
+  const [{ videos: comAnalise, acimaDoLimiar }, comAnaliseVisual, paraAudio] = await Promise.all([
     videosComAnalise(nicho.id),
     videosComAnaliseVisual(nicho.id),
     videosParaAudioDaSemana(nicho.id),
@@ -104,7 +135,7 @@ async function modelarNicho(nicho: { id: number; slug: string }): Promise<"model
     }),
   });
 
-  const modelo: ModeloNicho = { ...resultado.dados, baseadoEm: comAnalise.length };
+  const modelo: ModeloNicho = { ...resultado.dados, baseadoEm: comAnalise.length, acimaDoLimiar };
 
   await db().insert(modelosNicho).values({
     nichoId: nicho.id,

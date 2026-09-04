@@ -17,6 +17,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
+import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
@@ -54,6 +55,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.modeloNicho, async () => {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);
+  });
+  await boss().work(FILAS.temasDoDia, async () => {
+    await executarComRegistro(FILAS.temasDoDia, rodarTemasDoDia);
   });
 
   console.log("worker no ar.");

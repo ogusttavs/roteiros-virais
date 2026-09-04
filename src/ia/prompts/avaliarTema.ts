@@ -10,7 +10,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * em evidencia: o sistema busca os videos e entrega a IA, que so pode citar
  * o que recebeu.
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -82,12 +82,12 @@ Escreva em português do Brasil, com acentuação correta.`;
 
 export function montarEntrada(dados: {
   tema: string;
-  evidencias: { id: number; assunto: string; foraDaCurva: number }[];
+  evidencias: { id: number; assunto: string; gancho: string; foraDaCurva: number }[];
 }): string {
   const listaEvidencias =
     dados.evidencias.length > 0
       ? dados.evidencias
-          .map((v) => `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)`)
+          .map((v) => `id ${v.id}: ${v.assunto}, gancho "${v.gancho}" (fora da curva ${v.foraDaCurva.toFixed(1)}x)`)
           .join("\n")
       : "nenhuma evidencia encontrada nos ultimos 90 dias";
 

@@ -14,11 +14,14 @@ import {
   execucoesJob,
   nichos,
   roteiros,
+  temasDia,
   user,
   videos,
   type Nicho,
   type Plataforma,
+  type TemaDoDia,
 } from "@/db/schema";
+import { hojeISO } from "@/lib/config";
 
 export type ContagemPlataforma = Record<Plataforma, number>;
 
@@ -215,6 +218,22 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
     taxaForaDaCurva: l.taxaForaDaCurva === null ? null : Number(l.taxaForaDaCurva),
     medianaViews: l.medianaViews === null ? null : Number(l.medianaViews),
   }));
+}
+
+/**
+ * Os temas de hoje do nicho, exatamente como o job `temasDoDia` gravou
+ * (etapa 10, decisão 8 do `PROXIMO.md`): sem a regra de estabilidade nem a
+ * linha editorial, que são da experiência do cliente, não do diagnóstico
+ * do admin. `null` quando o job de hoje ainda não rodou ou não gerou
+ * evidência para este nicho.
+ */
+export async function temaDoDiaAtual(nichoId: number): Promise<TemaDoDia[] | null> {
+  const [linha] = await db()
+    .select({ temas: temasDia.temas })
+    .from(temasDia)
+    .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
+
+  return linha?.temas ?? null;
 }
 
 export type VideoLinkavel = { id: number; titulo: string | null; url: string };

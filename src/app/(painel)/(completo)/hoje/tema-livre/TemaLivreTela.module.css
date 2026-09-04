@@ -1,0 +1,65 @@
+.pagina {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+  max-width: var(--largura-leitura);
+  padding-bottom: var(--espaco-10);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo);
+}
+
+.semEvidencia {
+  margin: 0;
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+}
+
+.cartaoAngulo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.anguloTitulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.anguloTexto {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto);
+}
+
+.avaliarOutro {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.avaliarOutro:hover {
+  color: var(--cor-titulo);
+}
+
+.avaliarOutro:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

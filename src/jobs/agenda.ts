@@ -5,7 +5,9 @@
  * depois de todas as coletas (03:45); `vigilancia` e semanal, domingo 04:30
  * (etapa 7, decisao 1 e 5 do `PROXIMO.md`). `analisarVisual` e `modeloNicho`
  * sao semanais tambem, domingo 05:00 e 06:00, depois da vigilancia e das
- * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`).
+ * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`). `temasDoDia` e
+ * diario, 05:30, depois de `transcrever` (etapa 10, decisao 2 do
+ * `PROXIMO.md`).
  */
 import { boss, FILAS } from "./fila";
 
@@ -60,6 +62,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.extrair,
     cron: "0 5 * * *",
     descricao: "monta o lote de extracao, todo dia as 05:00, depois de transcrever",
+  },
+  {
+    fila: FILAS.temasDoDia,
+    cron: "30 5 * * *",
+    descricao: "temas do dia por nicho, todo dia as 05:30, depois de transcrever",
   },
   {
     fila: FILAS.extrairColeta,
