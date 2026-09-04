@@ -1,0 +1,89 @@
+# Compose de producao (etapa 13). Copiado para /srv/roteiros/docker-compose.yml
+# pelo deploy/deploy.sh. Segue _compartilhado/INFRA-VPS.md: nomes com prefixo
+# roteiros-, nenhuma porta publicada, rede externa `web` so para o app (o Caddy
+# compartilhado fala com ele pelo nome), rede interna para o banco, restart
+# unless-stopped em tudo, limite de memoria por servico, volumes nomeados
+# proprios. Segredos vem de /srv/roteiros/.env (chmod 600, nunca no git).
+
+name: roteiros
+
+services:
+  roteiros-postgres:
+    image: postgres:16-alpine
+    container_name: roteiros-postgres
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      POSTGRES_USER: roteiros
+      POSTGRES_DB: roteiros
+      # POSTGRES_PASSWORD vem do .env e e a mesma senha da DATABASE_URL
+    volumes:
+      - roteiros_pg:/var/lib/postgresql/data
+    networks:
+      - roteiros-interna
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roteiros -d roteiros"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  roteiros-app:
+    image: ghcr.io/ogusttavs/roteiros-virais/app:${TAG:-latest}
+    container_name: roteiros-app
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      roteiros-postgres:
+        condition: service_healthy
+    networks:
+      - web
+      - roteiros-interna
+    mem_limit: 1500m
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/saude"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  roteiros-worker:
+    image: ghcr.io/ogusttavs/roteiros-virais/worker:${TAG:-latest}
+    container_name: roteiros-worker
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      roteiros-postgres:
+        condition: service_healthy
+    networks:
+      - roteiros-interna
+    mem_limit: 1500m
+    # yt-dlp e ffmpeg escrevem arquivo temporario; nada persiste fora do container
+    tmpfs:
+      - /tmp:size=1g
+
+  roteiros-backup:
+    image: ghcr.io/ogusttavs/roteiros-virais/backup:${TAG:-latest}
+    container_name: roteiros-backup
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      roteiros-postgres:
+        condition: service_healthy
+    networks:
+      - roteiros-interna
+    volumes:
+      - roteiros_backups:/backups
+    mem_limit: 256m
+
+networks:
+  web:
+    external: true
+  roteiros-interna:
+    name: roteiros-interna
+
+volumes:
+  roteiros_pg:
+    name: roteiros_pg
+  roteiros_backups:
+    name: roteiros_backups
