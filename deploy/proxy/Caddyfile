@@ -1,0 +1,18 @@
+# Caddyfile compartilhado (/srv/proxy/Caddyfile). Um bloco por produto, marcado
+# com o nome. Ninguem edita o bloco do outro. Validar antes de recarregar.
+#
+# Enquanto nenhum dominio existir, o Caddy sobe sem site e so responde vazio.
+
+{
+	email {$CADDY_EMAIL:admin@localhost}
+}
+
+# roteiros
+# Descomentar e trocar o dominio quando o registro A existir:
+# app.DOMINIO-PENDENTE {
+# 	encode zstd gzip
+# 	reverse_proxy roteiros-app:3000
+# }
+
+# odontotech
+# (bloco do OdontoTech entra aqui quando o produto fizer o deploy)

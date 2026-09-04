@@ -1,0 +1,9 @@
+# Imagem do backup do banco (etapa 13): pg_dump diario para um volume local
+# com retencao de 30 dias e, quando houver credencial de bucket no .env,
+# copia para o armazenamento externo com rclone. Nada instalado na VPS
+# fora do Docker (regra compartilhada).
+FROM postgres:16-alpine
+RUN apk add --no-cache rclone bash
+COPY deploy/backup/backup.sh /usr/local/bin/backup.sh
+RUN chmod +x /usr/local/bin/backup.sh
+ENTRYPOINT ["/usr/local/bin/backup.sh"]
