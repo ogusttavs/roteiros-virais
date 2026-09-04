@@ -112,7 +112,7 @@ async function temasDoDiaOuRecente(
 }
 
 export type ResultadoTemasHoje =
-  | { status: "sem_tema" }
+  | { status: "sem_tema"; constancia: Constancia }
   | {
       status: "ok";
       temas: TemaDoDia[];
@@ -137,15 +137,16 @@ export type ResultadoTemasHoje =
  * depender do relógio real no caminho comum.
  */
 export async function temasParaCliente(cliente: Cliente, data: string = hojeISO()): Promise<ResultadoTemasHoje> {
-  if (!cliente.nichoId) return { status: "sem_tema" };
+  const constancia = await constanciaDoCliente(cliente.id);
 
-  const [encontrado, historico, constancia] = await Promise.all([
+  if (!cliente.nichoId) return { status: "sem_tema", constancia };
+
+  const [encontrado, historico] = await Promise.all([
     temasDoDiaOuRecente(cliente.nichoId, data),
     historicoDeObjetivos(cliente.id),
-    constanciaDoCliente(cliente.id),
   ]);
 
-  if (!encontrado) return { status: "sem_tema" };
+  if (!encontrado) return { status: "sem_tema", constancia };
 
   const aviso = avisoLinhaEditorial(historico, cliente.persona);
   if (!aviso) {

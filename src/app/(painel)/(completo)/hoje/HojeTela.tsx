@@ -10,6 +10,7 @@ import type { Constancia } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { TemaCartao } from "@/ui/componentes/TemaCartao";
 
+import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
 
 type RoteiroDeHoje = { id: number; objetivo: Objetivo; criadoEm: Date; corpo: ConteudoRoteiro };
@@ -20,24 +21,6 @@ type Props = {
   constancia: Constancia;
   roteiroHoje: RoteiroDeHoje | null;
 };
-
-function fraseConstancia(constancia: Constancia): string {
-  if (constancia.tipo === "primeiro_dia") return textosHoje.constancia.primeiroDia;
-  if (constancia.tipo === "seguidos") return textosHoje.constancia.seguidos(constancia.dias);
-  return textosHoje.constancia.parado(constancia.dias);
-}
-
-const DATA_POR_EXTENSO = new Intl.DateTimeFormat("pt-BR", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  timeZone: "America/Sao_Paulo",
-});
-
-function dataDeHojePorExtenso(): string {
-  const texto = DATA_POR_EXTENSO.format(new Date());
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
 
 function horaDeHoje(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -54,11 +37,7 @@ export function HojeTela({ temas, avisoLinhaEditorial, constancia, roteiroHoje }
 
   return (
     <div className={styles.pagina}>
-      <div className={styles.cabecalho}>
-        <span className={styles.data}>{dataDeHojePorExtenso()}</span>
-        <h1 className={styles.titulo}>{textosHoje.titulo}</h1>
-        <p className={styles.constancia}>{fraseConstancia(constancia)}</p>
-      </div>
+      <HojeCabecalho constancia={constancia} />
 
       {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}
 
