@@ -16,7 +16,7 @@ import { Progresso } from "@/ui/componentes/Progresso";
 import { avaliarTemaAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
 
-type Props = { notaMinima: number };
+type Props = { notaMinima: number; temaInicial?: string };
 
 const ORDEM_PILARES: { chave: keyof SaidaAvaliarTema["pilares"]; indice: number }[] = [
   { chave: "viralizar", indice: 0 },
@@ -27,9 +27,9 @@ const ORDEM_PILARES: { chave: keyof SaidaAvaliarTema["pilares"]; indice: number 
 ];
 
 /** `/hoje/tema-livre` (etapa 10, brief-frontend.md 6.4). */
-export function TemaLivreTela({ notaMinima }: Props) {
+export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
   const router = useRouter();
-  const [texto, setTexto] = useState("");
+  const [texto, setTexto] = useState(temaInicial);
   const [campoVazio, setCampoVazio] = useState(false);
   const [resultado, setResultado] = useState<SaidaAvaliarTema | null>(null);
   const [erro, setErro] = useState(false);

@@ -43,6 +43,7 @@ const PERFIL_PADRAO: PerfilCompilado = {
     perfisAdmirados: [],
   },
   resumo: "lava estofados em domicilio",
+  referencias: [],
 };
 
 let nichoId: number;

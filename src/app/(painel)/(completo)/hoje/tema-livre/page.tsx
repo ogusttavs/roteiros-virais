@@ -5,11 +5,19 @@ import { sessaoAtual } from "@/lib/sessao";
 
 import { TemaLivreTela } from "./TemaLivreTela";
 
-export default async function TemaLivre() {
+type Props = { searchParams: Promise<{ tema?: string }> };
+
+/**
+ * `?tema=<assunto>` vem de `/referencias`, "usar como referência" (etapa 12,
+ * decisão 1 do `PROXIMO.md`): só preenche o campo, o cliente ainda decide
+ * clicar em "avaliar o tema".
+ */
+export default async function TemaLivre({ searchParams }: Props) {
   const sessao = await sessaoAtual();
   if (!sessao) {
     redirect("/entrar");
   }
 
-  return <TemaLivreTela notaMinima={config.regras.notaMinimaTema} />;
+  const { tema } = await searchParams;
+  return <TemaLivreTela notaMinima={config.regras.notaMinimaTema} temaInicial={tema ?? ""} />;
 }

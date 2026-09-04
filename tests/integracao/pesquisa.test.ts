@@ -7,7 +7,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
-import { evidenciaParaTema, foraDaCurvaDoNicho, subindoHoje, subindoHojeComAnalise } from "@/servicos/pesquisa";
+import {
+  evidenciaParaTema,
+  foraDaCurvaDoNicho,
+  referenciasDoNicho,
+  subindoHoje,
+  subindoHojeComAnalise,
+} from "@/servicos/pesquisa";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -219,5 +225,40 @@ describe("evidenciaParaTema", () => {
   it("sem casamento nenhum, a evidencia vem vazia", async () => {
     const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
     expect(resultado).toEqual([]);
+  });
+});
+
+describe("referenciasDoNicho", () => {
+  it("ordena por publicado_em desc (mais recente primeiro, diferenca de foraDaCurvaDoNicho), so com analise", async () => {
+    await criarVideo("ref-antigo", {
+      foraDaCurva: 9,
+      publicadoEm: diasAtras(10),
+      analise: {
+        assunto: "assunto antigo",
+        gancho: "gancho antigo",
+        estrutura: "estrutura antiga",
+        porQueFuncionou: "funcionou por isso",
+        formato: "fala_para_camera",
+      },
+    });
+    await criarVideo("ref-recente", {
+      foraDaCurva: 3,
+      publicadoEm: diasAtras(1),
+      analise: {
+        assunto: "assunto recente",
+        gancho: "gancho recente",
+        estrutura: "estrutura recente",
+        porQueFuncionou: "funcionou por isso tambem",
+        formato: "podcast",
+      },
+    });
+    const semAnalise = await criarVideo("ref-sem-analise", { foraDaCurva: 20, publicadoEm: diasAtras(1) });
+
+    const resultado = await referenciasDoNicho(nichoId, 90);
+    const relevantes = resultado.filter((v) => v.assunto === "assunto recente" || v.assunto === "assunto antigo");
+
+    expect(relevantes.map((v) => v.assunto)).toEqual(["assunto recente", "assunto antigo"]);
+    expect(relevantes.find((v) => v.assunto === "assunto recente")?.formato).toBe("podcast");
+    expect(resultado.some((v) => v.id === semAnalise.id)).toBe(false); // sem analise, nunca entra
   });
 });

@@ -65,6 +65,7 @@ test.describe("roteiro pela tela", () => {
             perfisAdmirados: [],
           },
           resumo: "marca propria de produtos de limpeza",
+          referencias: [],
         },
       });
 

@@ -37,6 +37,7 @@ const PERFIL_PADRAO: PerfilCompilado = {
     perfisAdmirados: [],
   },
   resumo: "lava estofados em domicilio",
+  referencias: [],
 };
 
 const MODELO_PADRAO: ModeloNicho = {

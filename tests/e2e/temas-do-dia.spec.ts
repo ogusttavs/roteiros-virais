@@ -75,6 +75,7 @@ test.describe("temas do dia pela tela", () => {
             perfisAdmirados: [],
           },
           resumo: "clinica odontologica de bairro",
+          referencias: [],
         },
       });
 

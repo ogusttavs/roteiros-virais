@@ -90,6 +90,44 @@ export async function constanciaDoCliente(clienteId: number): Promise<Constancia
   return { tipo: "seguidos", dias: seguidos };
 }
 
+export type ResumoHistorico = {
+  diasSeguidos: number;
+  gravadosNoMes: number;
+  postadosNoMes: number;
+  /** Um por dia, dos últimos 30 (mais antigo primeiro, hoje por último). */
+  ultimos30Dias: boolean[];
+};
+
+const DIAS_JANELA_HISTORICO = 35;
+
+/**
+ * O topo de `/historico` (etapa 12, decisão 3 do `PROXIMO.md`): dias
+ * seguidos reusa `constanciaDoCliente` (0 quando o cliente está parado ou é
+ * o primeiro dia); gravados e postados no mês e a linha de 30 dias vêm de
+ * `gravadoEm`/`postadoEm` (quando aconteceu de verdade), não de `data` (o
+ * dia do tema, que pode ser diferente do dia em que gravou).
+ */
+export async function resumoHistorico(clienteId: number): Promise<ResumoHistorico> {
+  const constancia = await constanciaDoCliente(clienteId);
+  const diasSeguidos = constancia.tipo === "seguidos" ? constancia.dias : 0;
+
+  const linhas = await db()
+    .select({ gravadoEm: roteiros.gravadoEm, postadoEm: roteiros.postadoEm })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.data, diasAtrasISO(DIAS_JANELA_HISTORICO))));
+
+  const mesAtual = hojeISO().slice(0, 7);
+  const gravadosNoMes = linhas.filter((l) => l.gravadoEm && hojeISO(l.gravadoEm).slice(0, 7) === mesAtual).length;
+  const postadosNoMes = linhas.filter((l) => l.postadoEm && hojeISO(l.postadoEm).slice(0, 7) === mesAtual).length;
+
+  const diasGravados = new Set(
+    linhas.filter((l): l is typeof l & { gravadoEm: Date } => l.gravadoEm !== null).map((l) => hojeISO(l.gravadoEm)),
+  );
+  const ultimos30Dias = Array.from({ length: 30 }, (_, i) => diasGravados.has(diasAtrasISO(29 - i)));
+
+  return { diasSeguidos, gravadosNoMes, postadosNoMes, ultimos30Dias };
+}
+
 async function temasDoDiaOuRecente(
   nichoId: number,
   data: string,

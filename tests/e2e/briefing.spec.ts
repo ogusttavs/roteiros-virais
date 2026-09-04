@@ -255,6 +255,7 @@ test.describe("briefing pela tela", () => {
             perfisAdmirados: ["@sorrisodouradooficial"],
           },
           resumo: "Clinica odontologica que atende familias inteiras em Sao Paulo.",
+          referencias: [],
         },
       });
 

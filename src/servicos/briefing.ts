@@ -17,6 +17,7 @@ import { perguntaPorId, PERGUNTAS_BRIEFING } from "../config/briefing";
 
 import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
+import { referenciasParaPerfil } from "./referencias";
 
 export { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial };
 
@@ -266,7 +267,10 @@ async function compilarEGravarPerfil(
     extrairCampos: (d) => ({ resumo: d.resumo }),
   });
 
-  await db().update(briefings).set({ perfil }).where(eq(briefings.id, briefingId));
+  const referencias = await referenciasParaPerfil(clienteId);
+  const perfilCompleto: PerfilCompilado = { ...perfil, referencias };
+
+  await db().update(briefings).set({ perfil: perfilCompleto }).where(eq(briefings.id, briefingId));
 
   const cliente = await clientePorId(clienteId);
   const termos = [cliente?.cidade, cliente?.bairro, perfil.fatos.oQueVende].filter(
@@ -304,6 +308,10 @@ export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
   if (perfil.fatos.proibicoes.length > 0) linhas.push(`Nunca diria ou faria: ${perfil.fatos.proibicoes.join("; ")}`);
   if (perfil.fatos.cenasFilmaveis.length > 0) {
     linhas.push(`Cenas que dá para filmar: ${perfil.fatos.cenasFilmaveis.join("; ")}`);
+  }
+  /** `?? []`: perfil compilado antes da etapa 12 não tem este campo. */
+  if ((perfil.referencias ?? []).length > 0) {
+    linhas.push(`Vídeos que ele guardou como referência: ${perfil.referencias.join("; ")}`);
   }
   return linhas.join("\n");
 }

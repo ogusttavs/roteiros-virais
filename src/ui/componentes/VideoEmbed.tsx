@@ -30,11 +30,36 @@ function idDoYoutube(url: string): string | null {
   }
 }
 
+/** `/p/<codigo>` ou `/reel/<codigo>` viram `/p/<codigo>/embed` (embed oficial, sem SDK). */
+function urlEmbedInstagram(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes("instagram.com")) return null;
+    const caminho = u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`;
+    return `https://www.instagram.com${caminho}embed`;
+  } catch {
+    return null;
+  }
+}
+
+function eUrlDoTiktok(url: string): boolean {
+  try {
+    return new URL(url).hostname.includes("tiktok.com");
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Embed oficial 9:16, carregamento tardio ao entrar na tela (RoteiroTela,
- * ReferenciasTela). So o YouTube tem embed oficial sem SDK externo; TikTok e
- * Instagram usam o link de fallback ate a etapa que integrar os SDKs deles
- * (fora do escopo desta etapa, que so troca visual).
+ * ReferenciasTela). YouTube e Instagram viram iframe só por transformação de
+ * URL; o TikTok não expõe o id do vídeo de forma confiável em toda URL
+ * (link curto de compartilhamento não traz o número), então o carregamento
+ * tardio dispara uma chamada ao oEmbed oficial do TikTok
+ * (`https://www.tiktok.com/oembed?url=`) só para extrair o id do vídeo, sem
+ * injetar o HTML nem o script que a resposta traz: o iframe final
+ * (`/embed/v2/<id>`) é montado à mão, mesma regra das outras duas
+ * plataformas, sem SDK de terceiro no bundle.
  */
 export function VideoEmbed({
   url,
@@ -45,11 +70,16 @@ export function VideoEmbed({
   segundoInicial,
 }: Props) {
   const [visivel, setVisivel] = useState(false);
+  const [idTiktok, setIdTiktok] = useState<string | null>(null);
+  const [falhouTiktok, setFalhouTiktok] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const idYoutube = idDoYoutube(url);
+  const urlInstagram = urlEmbedInstagram(url);
+  const eTiktok = eUrlDoTiktok(url);
+  const embedavel = Boolean(idYoutube) || Boolean(urlInstagram) || eTiktok;
 
   useEffect(() => {
-    if (!ref.current || falhou || !idYoutube) return;
+    if (!ref.current || falhou || !embedavel) return;
     const observer = new IntersectionObserver(
       ([entrada]) => {
         if (entrada.isIntersecting) setVisivel(true);
@@ -58,9 +88,31 @@ export function VideoEmbed({
     );
     observer.observe(ref.current);
     return () => observer.disconnect();
-  }, [falhou, idYoutube]);
+  }, [falhou, embedavel]);
 
-  if (falhou) {
+  useEffect(() => {
+    if (!visivel || !eTiktok || idTiktok || falhouTiktok) return;
+    let cancelado = false;
+    fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`)
+      .then((resposta) => {
+        if (!resposta.ok) throw new Error("oembed do tiktok falhou");
+        return resposta.json() as Promise<{ embed_product_id?: string; html?: string }>;
+      })
+      .then((dados) => {
+        if (cancelado) return;
+        const id = dados.embed_product_id ?? dados.html?.match(/data-video-id="(\d+)"/)?.[1] ?? null;
+        if (id) setIdTiktok(id);
+        else setFalhouTiktok(true);
+      })
+      .catch(() => {
+        if (!cancelado) setFalhouTiktok(true);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [visivel, eTiktok, idTiktok, falhouTiktok, url]);
+
+  if (falhou || falhouTiktok) {
     return (
       <a href={linkExterno.href} className={styles.fallback}>
         {linkExterno.rotulo}
@@ -76,6 +128,30 @@ export function VideoEmbed({
       <iframe
         className={styles.iframe}
         src={src.toString()}
+        title={alt}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+  }
+
+  if (visivel && urlInstagram) {
+    return (
+      <iframe
+        className={styles.iframe}
+        src={urlInstagram}
+        title={alt}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+  }
+
+  if (visivel && eTiktok && idTiktok) {
+    return (
+      <iframe
+        className={styles.iframe}
+        src={`https://www.tiktok.com/embed/v2/${idTiktok}`}
         title={alt}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
