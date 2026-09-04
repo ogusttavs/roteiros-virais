@@ -8,7 +8,9 @@ import { temasParaCliente } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
+import { HojeCabecalho } from "./HojeCabecalho";
 import { HojeTela } from "./HojeTela";
+import styles from "./HojeTela.module.css";
 
 export default async function Hoje() {
   const sessao = await sessaoAtual();
@@ -28,10 +30,13 @@ export default async function Hoje() {
 
   if (resultado.status === "sem_tema") {
     return (
-      <EstadoVazio
-        icone={<Video size={24} strokeWidth={1.5} aria-hidden="true" />}
-        frase={textosHoje.vazio}
-      />
+      <div className={styles.pagina}>
+        <HojeCabecalho constancia={resultado.constancia} />
+        <EstadoVazio
+          icone={<Video size={24} strokeWidth={1.5} aria-hidden="true" />}
+          frase={textosHoje.vazio}
+        />
+      </div>
     );
   }
 

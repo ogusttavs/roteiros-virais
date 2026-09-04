@@ -196,6 +196,13 @@ export type PerfilCompilado = {
     perfisAdmirados: string[];
   };
   resumo: string;
+  /**
+   * Vídeos que o cliente favoritou em `/referencias` (etapa 12, decisão 1 do
+   * `PROXIMO.md`), preenchido por código depois da chamada de IA, mesma
+   * lógica de `clientes.camadaExclusiva`. Ausente em perfil compilado antes
+   * desta etapa; `formatarPerfilCompilado` trata como lista vazia.
+   */
+  referencias: string[];
 };
 
 export const briefings = pgTable("briefings", {

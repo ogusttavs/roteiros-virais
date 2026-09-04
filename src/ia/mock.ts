@@ -111,6 +111,16 @@ function mockCompilarPerfil(entrada: string) {
 
 const PILAR_PADRAO = { nota: 6, justificativa: "avaliacao simulada, sem chamada de IA" };
 
+/**
+ * Gatilho de teste (revisao do PR #17, etapa 12, ajuste 1): o mock sempre
+ * ecoa os ids que recebeu, entao nao ha jeito natural de simular a IA
+ * inventando evidencia (o defeito que o Fable achou rodando com chave
+ * real). Um tema com esta frase faz o mock devolver um id que nunca
+ * existiu na entrada, para o teste de integracao confirmar que
+ * `evidenciasFornecidas` (agora tambem em `avaliarTema`) reprova isso.
+ */
+const MARCADOR_EVIDENCIA_INVENTADA = "invente uma evidencia que nao existe";
+
 function mockAvaliarTema(entrada: string) {
   const evidencias = contarOcorrencias(entrada, /\bid \d+:/g);
   const notaViralizar = evidencias >= 3 ? 9 : evidencias >= 1 ? 7 : 4;
@@ -128,13 +138,15 @@ function mockAvaliarTema(entrada: string) {
     Object.values(pilares).reduce((soma, p) => soma + p.nota, 0) / Object.values(pilares).length;
   const notaArredondada = Math.round(nota * 10) / 10;
   const aprovado = notaArredondada >= 9;
+  const tema = extrairCampo(entrada, "Tema proposto:");
+  const idsCitados = extrairIds(entrada);
 
   return {
     pilares,
     nota: notaArredondada,
     recomendacao: aprovado ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
     anguloSugerido: aprovado ? null : "angulo vizinho simulado",
-    evidencias: extrairIds(entrada),
+    evidencias: tema.includes(MARCADOR_EVIDENCIA_INVENTADA) ? [...idsCitados, 999999] : idsCitados,
   };
 }
 

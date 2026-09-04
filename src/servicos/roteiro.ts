@@ -6,7 +6,7 @@
  * grava. `outroAngulo` gera a versão seguinte com a instrução de diferir
  * da anterior; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -557,4 +557,37 @@ export async function roteiroPorId(
     .from(roteiros)
     .where(and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId)));
   return roteiro ?? null;
+}
+
+export type RoteiroHistoricoLinha = {
+  id: number;
+  data: string;
+  tema: string;
+  status: "gerado" | "gravado" | "postado";
+  gravadoEm: Date | null;
+  postadoEm: Date | null;
+};
+
+/** Só a ponta de cada série (sem versão mais nova apontando `versaoDe` para ela). */
+const SEM_VERSAO_MAIS_NOVA = sql`not exists (select 1 from roteiros mais_novo where mais_novo.versao_de = roteiros.id)`;
+
+/**
+ * A lista de `/historico` (etapa 12, decisão 3 do `PROXIMO.md`): mais
+ * recente primeiro, só a versão atual de cada série ("outro ângulo" nunca
+ * duplica linha no histórico).
+ */
+export async function roteirosDoCliente(clienteId: number, limite = 200): Promise<RoteiroHistoricoLinha[]> {
+  return db()
+    .select({
+      id: roteiros.id,
+      data: roteiros.data,
+      tema: roteiros.tema,
+      status: roteiros.status,
+      gravadoEm: roteiros.gravadoEm,
+      postadoEm: roteiros.postadoEm,
+    })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), SEM_VERSAO_MAIS_NOVA))
+    .orderBy(desc(roteiros.data), desc(roteiros.criadoEm))
+    .limit(limite);
 }

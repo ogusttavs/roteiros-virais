@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { Objetivo } from "@/db/schema";
+import type { AnaliseVideo, Objetivo } from "@/db/schema";
 
 /**
  * Enums Zod usados nos schemas de saida das tarefas, e a traducao do
@@ -43,3 +43,25 @@ export const AJUDA_OBJETIVO: Record<Objetivo, string> = {
 
 /** As três opções de objetivo, na ordem fixa em que a tela mostra (etapa 11). */
 export const OBJETIVOS_EM_ORDEM: Objetivo[] = ["alcance", "engajamento", "conversao"];
+
+/**
+ * Rótulo do formato em `/referencias` (etapa 12, decisão 1 do
+ * `PROXIMO.md`): mesma razão de `NOME_OBJETIVO` estar aqui, fora do
+ * `checar-texto`. Ordem bate com `textosReferencias.formatos`.
+ */
+export const ROTULO_FORMATO: Record<AnaliseVideo["formato"], string> = {
+  fala_para_camera: "fala para câmera",
+  podcast: "podcast",
+  caixinha: "caixinha de pergunta",
+  esquete: "esquete",
+  outro: "outro",
+};
+
+/** Mesma ordem de `ROTULO_FORMATO`, para os chips de filtro. */
+export const FORMATOS_EM_ORDEM: AnaliseVideo["formato"][] = [
+  "fala_para_camera",
+  "podcast",
+  "caixinha",
+  "esquete",
+  "outro",
+];

@@ -20,6 +20,7 @@ import {
   type Objetivo,
   type PerfilCompilado,
 } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
 import { avaliarTema, ErroTemas, temasParaCliente } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -42,6 +43,7 @@ const PERFIL_PADRAO: PerfilCompilado = {
     perfisAdmirados: [],
   },
   resumo: "lava estofados em domicilio",
+  referencias: [],
 };
 
 let nichoId: number;
@@ -268,5 +270,12 @@ describe("avaliarTema", () => {
     const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
 
     await expect(avaliarTema(cliente, "qualquer assunto")).rejects.toThrow(ErroTemas);
+  });
+
+  it("mock cita id que nao foi fornecido: o verificador reprova as duas tentativas e lanca ErroIA", async () => {
+    clienteId = await criarCliente();
+    const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
+
+    await expect(avaliarTema(cliente, "invente uma evidencia que nao existe")).rejects.toThrow(ErroIA);
   });
 });

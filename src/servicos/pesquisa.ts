@@ -326,6 +326,70 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
   return mapearEvidenciaRoteiro(linhas);
 }
 
+export type VideoReferencia = {
+  id: number;
+  plataforma: Plataforma;
+  url: string;
+  contaHandle: string | null;
+  publicadoEm: Date | null;
+  foraDaCurva: number;
+  assunto: string;
+  gancho: string;
+  estrutura: string;
+  porQueFuncionou: string;
+  formato: AnaliseVideo["formato"];
+};
+
+/**
+ * A biblioteca de referências (etapa 12, decisão 1 do `PROXIMO.md`, brief
+ * 6.6): fora da curva do nicho, mais recentes primeiro (não por
+ * `foraDaCurva`, diferença de `foraDaCurvaDoNicho`), com a ficha de análise
+ * inteira para as três linhas do cartão e o filtro de formato. Só vídeo já
+ * analisado entra (sem `analise` não tem o que mostrar).
+ */
+export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60): Promise<VideoReferencia[]> {
+  const condicoes = [
+    eq(videos.nichoId, nichoId),
+    gte(videos.publicadoEm, diasAtras(dias)),
+    isNotNull(videos.foraDaCurva),
+    isNotNull(videos.analise),
+    PERTENCE_AO_NICHO,
+  ];
+  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+
+  const linhas = await db()
+    .select({
+      id: videos.id,
+      plataforma: videos.plataforma,
+      url: videos.url,
+      contaHandle: contas.handle,
+      publicadoEm: videos.publicadoEm,
+      foraDaCurva: videos.foraDaCurva,
+      analise: videos.analise,
+    })
+    .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
+    .where(and(...condicoes))
+    .orderBy(desc(videos.publicadoEm), asc(videos.id))
+    .limit(limite);
+
+  return linhas
+    .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
+    .map((l) => ({
+      id: l.id,
+      plataforma: l.plataforma,
+      url: l.url,
+      contaHandle: l.contaHandle,
+      publicadoEm: l.publicadoEm,
+      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+      assunto: l.analise.assunto,
+      gancho: l.analise.gancho,
+      estrutura: l.analise.estrutura,
+      porQueFuncionou: l.analise.porQueFuncionou,
+      formato: l.analise.formato,
+    }));
+}
+
 export type VideoParaEmbed = { id: number; plataforma: Plataforma; url: string };
 
 /** Plataforma e url de um vídeo, para montar o embed da referência (etapa 11, `RoteiroTela`). */

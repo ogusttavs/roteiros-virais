@@ -7,9 +7,8 @@ import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { db } from "@/db";
 import { avaliacoesTema, roteiros, temasDia, type Cliente, type Objetivo, type TemaDoDia } from "@/db/schema";
-import { gerarEstruturado } from "@/ia/cliente";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
-import { registrarGeracao } from "@/ia/registro";
+import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual } from "@/servicos/pesquisa";
 
@@ -91,6 +90,44 @@ export async function constanciaDoCliente(clienteId: number): Promise<Constancia
   return { tipo: "seguidos", dias: seguidos };
 }
 
+export type ResumoHistorico = {
+  diasSeguidos: number;
+  gravadosNoMes: number;
+  postadosNoMes: number;
+  /** Um por dia, dos últimos 30 (mais antigo primeiro, hoje por último). */
+  ultimos30Dias: boolean[];
+};
+
+const DIAS_JANELA_HISTORICO = 35;
+
+/**
+ * O topo de `/historico` (etapa 12, decisão 3 do `PROXIMO.md`): dias
+ * seguidos reusa `constanciaDoCliente` (0 quando o cliente está parado ou é
+ * o primeiro dia); gravados e postados no mês e a linha de 30 dias vêm de
+ * `gravadoEm`/`postadoEm` (quando aconteceu de verdade), não de `data` (o
+ * dia do tema, que pode ser diferente do dia em que gravou).
+ */
+export async function resumoHistorico(clienteId: number): Promise<ResumoHistorico> {
+  const constancia = await constanciaDoCliente(clienteId);
+  const diasSeguidos = constancia.tipo === "seguidos" ? constancia.dias : 0;
+
+  const linhas = await db()
+    .select({ gravadoEm: roteiros.gravadoEm, postadoEm: roteiros.postadoEm })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.data, diasAtrasISO(DIAS_JANELA_HISTORICO))));
+
+  const mesAtual = hojeISO().slice(0, 7);
+  const gravadosNoMes = linhas.filter((l) => l.gravadoEm && hojeISO(l.gravadoEm).slice(0, 7) === mesAtual).length;
+  const postadosNoMes = linhas.filter((l) => l.postadoEm && hojeISO(l.postadoEm).slice(0, 7) === mesAtual).length;
+
+  const diasGravados = new Set(
+    linhas.filter((l): l is typeof l & { gravadoEm: Date } => l.gravadoEm !== null).map((l) => hojeISO(l.gravadoEm)),
+  );
+  const ultimos30Dias = Array.from({ length: 30 }, (_, i) => diasGravados.has(diasAtrasISO(29 - i)));
+
+  return { diasSeguidos, gravadosNoMes, postadosNoMes, ultimos30Dias };
+}
+
 async function temasDoDiaOuRecente(
   nichoId: number,
   data: string,
@@ -113,7 +150,7 @@ async function temasDoDiaOuRecente(
 }
 
 export type ResultadoTemasHoje =
-  | { status: "sem_tema" }
+  | { status: "sem_tema"; constancia: Constancia }
   | {
       status: "ok";
       temas: TemaDoDia[];
@@ -138,15 +175,16 @@ export type ResultadoTemasHoje =
  * depender do relógio real no caminho comum.
  */
 export async function temasParaCliente(cliente: Cliente, data: string = hojeISO()): Promise<ResultadoTemasHoje> {
-  if (!cliente.nichoId) return { status: "sem_tema" };
+  const constancia = await constanciaDoCliente(cliente.id);
 
-  const [encontrado, historico, constancia] = await Promise.all([
+  if (!cliente.nichoId) return { status: "sem_tema", constancia };
+
+  const [encontrado, historico] = await Promise.all([
     temasDoDiaOuRecente(cliente.nichoId, data),
     historicoDeObjetivos(cliente.id),
-    constanciaDoCliente(cliente.id),
   ]);
 
-  if (!encontrado) return { status: "sem_tema" };
+  if (!encontrado) return { status: "sem_tema", constancia };
 
   const aviso = avisoLinhaEditorial(historico, cliente.persona);
   if (!aviso) {
@@ -175,10 +213,31 @@ export async function temasParaCliente(cliente: Cliente, data: string = hojeISO(
   };
 }
 
+/** Campos de texto livre da avaliação, para o verificador (regra dura da própria tarefa: sem jargão, emoji, travessão). */
+function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record<string, string> {
+  return {
+    recomendacao: dados.recomendacao,
+    anguloSugerido: dados.anguloSugerido ?? "",
+    justificativaViralizar: dados.pilares.viralizar.justificativa,
+    justificativaGerarCliente: dados.pilares.gerarCliente.justificativa,
+    justificativaEncaixe: dados.pilares.encaixe.justificativa,
+    justificativaNovidade: dados.pilares.novidade.justificativa,
+    justificativaFacilidade: dados.pilares.facilidade.justificativa,
+  };
+}
+
 /**
  * Nota em cinco pilares de um tema proposto pelo cliente (etapa 10, decisão
  * 5 do `PROXIMO.md`): evidência do banco, perfil compilado e modelo do
  * nicho no bloco estável, e o resultado gravado em `avaliacoes_tema`.
+ *
+ * Passa por `gerarComVerificacao` desde a revisão do PR #17 (ajuste 1 da
+ * etapa 12): antes chamava `gerarEstruturado` direto, sem nenhuma checagem
+ * local, a mesma classe de lacuna que deixou o roteiro citar evidência
+ * inventada. `evidenciasFornecidas` sempre vai (mesmo vazia): a evidência
+ * nunca é obrigatória aqui (sem evidência é um resultado válido, com nota
+ * baixa no pilar "viralizar"), mas nenhum id fora do que foi fornecido pode
+ * ser citado.
  */
 export async function avaliarTema(cliente: Cliente, texto: string): Promise<avaliarTemaIA.SaidaAvaliarTema> {
   if (!cliente.nichoId) {
@@ -195,10 +254,12 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
     modeloNichoAtual(cliente.nichoId),
   ]);
 
-  const resultado = await gerarEstruturado({
+  const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",
     nivel: avaliarTemaIA.nivel,
     effort: avaliarTemaIA.esforco,
+    versaoPrompt: avaliarTemaIA.versao,
+    clienteId: cliente.id,
     schema: avaliarTemaIA.schema,
     sistemaEstavel: avaliarTemaIA.montarSistemaEstavel({
       perfilCompilado: formatarPerfilCompilado(perfil),
@@ -206,23 +267,11 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
       persona: cliente.persona,
     }),
     entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias }),
-  });
-
-  await registrarGeracao({
-    tarefa: "avaliarTema",
-    versaoPrompt: avaliarTemaIA.versao,
-    modelo: resultado.modelo,
-    nivel: avaliarTemaIA.nivel,
-    clienteId: cliente.id,
-    entradas: { tema: texto, evidencias: evidencias.length },
-    evidencias: resultado.dados.evidencias,
-    saida: resultado.dados,
-    uso: {
-      tokensEntrada: resultado.tokensEntrada,
-      tokensSaida: resultado.tokensSaida,
-      tokensCacheLeitura: resultado.tokensCacheLeitura,
-      tokensCacheEscrita: resultado.tokensCacheEscrita,
-    },
+    proibicoes: perfil.fatos.proibicoes,
+    exigeEvidencia: false,
+    evidenciasFornecidas: evidencias.map((v) => v.id),
+    extrairCampos: extrairCamposAvaliarTema,
+    extrairEvidencias: (d) => d.evidencias,
   });
 
   await db()
@@ -230,12 +279,12 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
     .values({
       clienteId: cliente.id,
       tema: texto,
-      pilares: resultado.dados.pilares,
-      nota: String(resultado.dados.nota),
-      recomendacao: resultado.dados.recomendacao,
-      anguloSugerido: resultado.dados.anguloSugerido,
-      evidencias: resultado.dados.evidencias,
+      pilares: dados.pilares,
+      nota: String(dados.nota),
+      recomendacao: dados.recomendacao,
+      anguloSugerido: dados.anguloSugerido,
+      evidencias: dados.evidencias,
     });
 
-  return resultado.dados;
+  return dados;
 }
