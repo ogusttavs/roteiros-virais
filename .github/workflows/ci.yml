@@ -16,7 +16,9 @@ jobs:
         env:
           POSTGRES_USER: roteiros
           POSTGRES_PASSWORD: roteiros
-          POSTGRES_DB: roteiros
+          # "postgres", nunca "roteiros": resetarSchema recusa o nome exato "roteiros" desde a
+          # etapa 11 (o banco de trabalho local, com dado real que custou credito de API).
+          POSTGRES_DB: postgres
         ports:
           - 5432:5432
         options: >-
@@ -26,7 +28,7 @@ jobs:
           --health-retries 10
 
     env:
-      DATABASE_URL: postgres://roteiros:roteiros@localhost:5432/roteiros
+      DATABASE_URL: postgres://roteiros:roteiros@localhost:5432/postgres
       AI_PROVIDER: mock
       APP_NAME: "seu painel"
       BETTER_AUTH_SECRET: ci-secret-nao-e-producao

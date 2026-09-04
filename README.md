@@ -24,6 +24,15 @@ Abra http://localhost:3000. Sem chave de IA o sistema responde em modo simulado
 desenvolvimento do zero. O seed cria um administrador e um cliente de teste por nicho,
 todos com a senha `ExemploSenha123` (so funciona local, o seed nunca roda em producao).
 
+### Os tres bancos (etapa 11, ajuste 1)
+
+`roteiros_dev` (o padrao do `.env.example`) e o do dia a dia, reset e teste podem apagar a
+vontade. `roteiros_teste` e um segundo banco isolado para rodar teste sem mexer no que voce
+esta explorando manualmente no `roteiros_dev` no momento. O nome `roteiros`, sem sufixo, e
+reservado para um banco de trabalho com dado real (por exemplo, coletado com credito de API de
+verdade); `resetarSchema` recusa esse nome exato no codigo, para reset por engano parar de ser
+possivel mesmo esquecendo a regra.
+
 ## Qualidade
 
 ```bash

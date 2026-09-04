@@ -8,13 +8,15 @@
  * `briefing.spec.ts`): grava `temas_dia` e o briefing direto no banco, e
  * deixa so a avaliacao do tema livre passar pelo navegador, contra o
  * `AI_PROVIDER=mock` do servidor (`playwright.config.ts`).
+ *
+ * Sem `resetarSchema` proprio (etapa 11, ajuste 3 da revisao da etapa 10): o
+ * seed roda uma vez so, no globalSetup; o cliente "e2e-temas" tem id
+ * proprio, entao nao colide com o que outro arquivo de spec cria ou muda.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
-import { resetarSchema } from "../../scripts/resetar-schema";
-import { semear } from "../../scripts/semear";
 import { db } from "../../src/db";
 import { account, briefings, clientes, nichos, temasDia, user, videos, type TemaDoDia } from "../../src/db/schema";
 
@@ -33,9 +35,6 @@ function hojeIso(): string {
 
 test.describe("temas do dia pela tela", () => {
   test.beforeAll(async () => {
-    await resetarSchema(db());
-    await semear(db());
-
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 
     await db().insert(user).values({

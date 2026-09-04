@@ -39,6 +39,23 @@ export function verificarAmbienteSeguro(
       `db:reset so roda contra um banco local (localhost, 127.0.0.1 ou postgres); DATABASE_URL aponta para "${host}".`,
     );
   }
+
+  /**
+   * Etapa 11, ajuste 1 da revisao da etapa 10: tres vezes em dois dias o
+   * banco de trabalho `roteiros` foi apagado por engano, com dado que
+   * custou credito de API para coletar. A regra em documento
+   * (FLUXO.md, "Um Postgres local, varias sessoes") nao bastou; agora e o
+   * codigo que recusa. `roteiros_teste`, `roteiros_dev`, `roteiros_revisao`
+   * e `roteiros_ci` (sufixo do nome) continuam permitidos, e tambem
+   * `postgres` (banco padrao usado pela CI).
+   */
+  const nomeBanco = new URL(env.DATABASE_URL).pathname.replace(/^\//, "");
+  if (nomeBanco === "roteiros") {
+    throw new ResetProibidoError(
+      'db:reset recusa o banco de trabalho "roteiros" (tem dado real que custou credito de API). ' +
+        'Use um banco com sufixo, como "roteiros_teste" ou "roteiros_dev".',
+    );
+  }
 }
 
 export async function resetarSchema(db: Db): Promise<void> {

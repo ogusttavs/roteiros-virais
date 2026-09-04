@@ -180,21 +180,29 @@ export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; 
 
 /**
  * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
- * `PROXIMO.md`): casa pela busca textual (`videos.busca`, gerada com título,
- * descrição, transcrição e assunto) ou por etiqueta que contenha alguma
- * palavra do texto, nos últimos 90 dias, os de maior `fora_da_curva`
- * primeiro. Sem palavra nem casamento textual, a lista vem vazia (o prompt
- * já sabe dizer "sem evidência" para isso).
+ * `PROXIMO.md`; casamento por etiqueta trocado na etapa 11, ajuste 2 da
+ * revisão da etapa 10): casa pela busca textual (`videos.busca`, gerada com
+ * título, descrição, transcrição e assunto) ou por etiqueta que **contenha**
+ * alguma palavra do texto (subcadeia, sem caixa), nos últimos 90 dias, os de
+ * maior `fora_da_curva` primeiro. Etiqueta real costuma ser frase composta
+ * ("clareamento dental"), então igualdade exata (a versão antiga, com o
+ * operador `?|`) quase nunca casava; confirmado numa rodada real. Sem
+ * `unaccent` (extensão que exigiria migração própria, sobrevivendo a
+ * `resetarSchema`; decisão registrada em `TODO.md`), só `lower()`: "não"
+ * buscado não casa "nao" numa etiqueta, e vice versa. Sem palavra nem
+ * casamento textual, a lista vem vazia (o prompt já sabe dizer "sem
+ * evidência" para isso).
  */
 export async function evidenciaParaTema(nichoId: number, texto: string, limite = 8): Promise<VideoEvidenciaTema[]> {
   const palavras = palavrasChave(texto);
-  // "?|" pede um text[] de verdade; um array JS interpolado direto vira uma
-  // lista de parametros separados por virgula, que o Postgres le como um
+  const padroes = palavras.map((p) => `%${p}%`);
+  // "text[]" pede um array de verdade; um array JS interpolado direto vira
+  // uma lista de parametros separados por virgula, que o Postgres le como um
   // record (erro "cannot cast type record to text[]"), nao como array.
-  const palavrasSql =
-    palavras.length > 0
+  const padroesSql =
+    padroes.length > 0
       ? sql`array[${sql.join(
-          palavras.map((p) => sql`${p}`),
+          padroes.map((p) => sql`${p}`),
           sql`, `,
         )}]::text[]`
       : sql`array[]::text[]`;
@@ -203,7 +211,10 @@ export async function evidenciaParaTema(nichoId: number, texto: string, limite =
     gte(videos.publicadoEm, diasAtras(90)),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
-    sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or ${videos.etiquetas} ?| ${palavrasSql})`,
+    sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
+      select 1 from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor)
+      where lower(etiqueta.valor) like any (${padroesSql})
+    ))`,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 

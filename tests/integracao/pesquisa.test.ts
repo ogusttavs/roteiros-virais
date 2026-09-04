@@ -202,6 +202,20 @@ describe("evidenciaParaTema", () => {
     expect(resultado.map((v) => v.assunto)).toContain("tira mancha do estofado");
   });
 
+  it("casa por subcadeia de uma etiqueta composta (ajuste 2 da revisao da etapa 10)", async () => {
+    await criarVideo("ev-etiqueta-composta", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      titulo: "video sem nenhuma palavra em comum com a busca",
+      etiquetas: ["clareamento dental", "consultorio"],
+      analise: { assunto: "resultado do clareamento" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "clareamento vale a pena");
+
+    expect(resultado.map((v) => v.assunto)).toContain("resultado do clareamento");
+  });
+
   it("sem casamento nenhum, a evidencia vem vazia", async () => {
     const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
     expect(resultado).toEqual([]);

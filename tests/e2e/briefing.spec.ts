@@ -6,9 +6,11 @@
  * em /briefing: editar recalcula a geral e mostra o aviso quando a nota cai
  * abaixo da meta (gate de mao unica, revisao da parte 1).
  *
- * playwright.config.ts trava em um worker (workers: 1) porque este arquivo e
- * entrar-e-convidar.spec.ts resetam o schema inteiro no beforeAll; em mais de
- * um worker os dois podiam derrubar o schema um do outro no meio do teste.
+ * playwright.config.ts trava em um worker (workers: 1): mais de um arquivo
+ * de e2e roda no mesmo processo Node e compartilha o pool do Postgres
+ * (globalThis, src/db/index.ts). `resetarSchema` mais `semear` rodam uma
+ * vez so, no `globalSetup` (etapa 11, ajuste 3 da revisao da etapa 10); este
+ * arquivo so cria os proprios dados em cima do que o seed ja deixou.
  *
  * Este arquivo nunca chama `avaliarResposta` (ou qualquer funcao que passe
  * por `src/ia`) direto no corpo do teste: esse codigo roda no processo do
@@ -24,8 +26,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
-import { resetarSchema } from "../../scripts/resetar-schema";
-import { semear } from "../../scripts/semear";
 import { db } from "../../src/db";
 import { account, briefings, clientes, nichos, user, type AvaliacaoResposta } from "../../src/db/schema";
 
@@ -62,13 +62,9 @@ async function responderEAvaliar(page: Page, rotulo: string, texto: string): Pro
 }
 
 test.describe("briefing pela tela", () => {
-  test.beforeAll(async () => {
-    await resetarSchema(db());
-    await semear(db());
-  });
-
-  // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts):
-  // mais de um arquivo de e2e roda no mesmo worker e compartilha o pool.
+  // Seed uma vez so, no globalSetup (etapa 11, ajuste 3); o pool do Postgres fecha uma vez
+  // so, no globalTeardown (playwright.config.ts): mais de um arquivo de e2e roda no mesmo
+  // worker e compartilha o pool.
 
   test("responde bloco a bloco, edita, ve a nota mudar, e liberado e cai em /hoje; recarregar traz o rascunho e o bloco certo", async ({
     page,
