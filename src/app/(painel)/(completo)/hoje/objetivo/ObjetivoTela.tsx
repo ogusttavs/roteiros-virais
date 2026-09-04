@@ -1,6 +1,5 @@
 "use client";
 
-import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -10,6 +9,7 @@ import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosObjetivo } from "@/textos/objetivo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
+import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { Progresso } from "@/ui/componentes/Progresso";
 
 import { gerarRoteiroAction } from "./acoes";
@@ -89,32 +89,17 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
       <h1 className={styles.pergunta}>{textosObjetivo.pergunta}</h1>
 
       <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
-        {OBJETIVOS_EM_ORDEM.map((objetivo) => {
-          const marcada = escolhido === objetivo;
-          const recomendada = objetivoRecomendado === objetivo;
-          return (
-            <button
-              key={objetivo}
-              type="button"
-              role="radio"
-              aria-checked={marcada}
-              onClick={() => setEscolhido(objetivo)}
-              className={[styles.opcao, marcada ? styles.marcada : ""].join(" ")}
-            >
-              <span className={styles.textoOpcao}>
-                {recomendada ? <span className={styles.recomendado}>{textosObjetivo.recomendado}</span> : null}
-                <span className={styles.tituloOpcao}>{primeiraMaiuscula(NOME_OBJETIVO[objetivo])}</span>
-                <span className={styles.ajudaOpcao}>{AJUDA_OBJETIVO[objetivo]}</span>
-              </span>
-              <Check
-                size={24}
-                strokeWidth={1.5}
-                aria-hidden="true"
-                className={[styles.check, marcada ? styles.checkVisivel : ""].join(" ")}
-              />
-            </button>
-          );
-        })}
+        {OBJETIVOS_EM_ORDEM.map((objetivo) => (
+          <OpcaoObjetivo
+            key={objetivo}
+            titulo={primeiraMaiuscula(NOME_OBJETIVO[objetivo])}
+            ajuda={AJUDA_OBJETIVO[objetivo]}
+            marcada={escolhido === objetivo}
+            recomendada={objetivoRecomendado === objetivo}
+            rotuloRecomendado={textosObjetivo.recomendado}
+            onEscolher={() => setEscolhido(objetivo)}
+          />
+        ))}
       </div>
 
       <BarraAcao

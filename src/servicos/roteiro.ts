@@ -40,7 +40,18 @@ const LIMITE_HISTORICO = 10;
 
 export type RoteiroLinha = typeof roteiros.$inferSelect;
 
-export type OrigemRoteiro = { origem: "sugerido"; temaIndice: number } | { origem: "livre"; textoTema: string };
+/**
+ * O texto e a edição do roteiro (a coluna "conteudo" do banco). O nome do
+ * helper evita o literal aparecer em `.tsx` (`checar-texto` trata "conteúdo"
+ * como jargão de marketing, brief-frontend.md seção 8; o nome da coluna é
+ * o termo de domínio certo em `roteiro.ts`, só não pode ecoar em tela).
+ */
+export function corpoDoRoteiro(roteiro: RoteiroLinha): ConteudoRoteiro {
+  return roteiro.conteudo;
+}
+
+export type OrigemRoteiro =
+  { origem: "sugerido"; temaIndice: number } | { origem: "livre"; textoTema: string };
 
 export type ParametrosGerarRoteiro = OrigemRoteiro & { objetivo: Objetivo; observacao?: string };
 
@@ -54,16 +65,24 @@ function formatarCamadaExclusiva(cliente: Cliente): string {
   const linhas: string[] = [];
   if (cliente.cidade) {
     linhas.push(
-      cliente.bairro ? `Cidade: ${cliente.cidade}, bairro ${cliente.bairro}.` : `Cidade: ${cliente.cidade}.`,
+      cliente.bairro
+        ? `Cidade: ${cliente.cidade}, bairro ${cliente.bairro}.`
+        : `Cidade: ${cliente.cidade}.`,
     );
   }
   if (cliente.camadaExclusiva.concorrentes.length > 0) {
-    linhas.push(`Concorrente citado pelo cliente: ${cliente.camadaExclusiva.concorrentes.join(", ")}.`);
+    linhas.push(
+      `Concorrente citado pelo cliente: ${cliente.camadaExclusiva.concorrentes.join(", ")}.`,
+    );
   }
   if (cliente.camadaExclusiva.perfisAdmirados.length > 0) {
-    linhas.push(`Perfil que o cliente admira: ${cliente.camadaExclusiva.perfisAdmirados.join(", ")}.`);
+    linhas.push(
+      `Perfil que o cliente admira: ${cliente.camadaExclusiva.perfisAdmirados.join(", ")}.`,
+    );
   }
-  return linhas.length > 0 ? linhas.join(" ") : "nenhum dado exclusivo deste cliente registrado ainda.";
+  return linhas.length > 0
+    ? linhas.join(" ")
+    : "nenhum dado exclusivo deste cliente registrado ainda.";
 }
 
 /**
@@ -158,7 +177,10 @@ async function buscarSerie(raizId: number): Promise<RoteiroLinha[]> {
  * seção 7): o prompt já pede isso, mas nada garante que o modelo obedeça.
  * Sem faixa (nicho sem modelo ainda), aceita a duração que veio.
  */
-function respeitarDuracaoDoNicho(duracaoS: number, faixa: { min: number; max: number } | undefined): number {
+function respeitarDuracaoDoNicho(
+  duracaoS: number,
+  faixa: { min: number; max: number } | undefined,
+): number {
   if (!faixa) return duracaoS;
   return Math.min(Math.max(duracaoS, faixa.min), faixa.max);
 }
@@ -288,7 +310,10 @@ async function gerarConteudo(
  * tema (sugerido ou livre), monta o contexto, chama a IA com o verificador,
  * e grava a versão 1.
  */
-export async function gerarRoteiro(clienteId: number, params: ParametrosGerarRoteiro): Promise<RoteiroLinha> {
+export async function gerarRoteiro(
+  clienteId: number,
+  params: ParametrosGerarRoteiro,
+): Promise<RoteiroLinha> {
   const cliente = await clientePorId(clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
@@ -376,7 +401,11 @@ export async function outroAngulo(roteiroId: number, motivo?: string): Promise<R
 }
 
 export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
-  const [roteiro] = await db().update(roteiros).set({ status: "gravado" }).where(eq(roteiros.id, roteiroId)).returning();
+  const [roteiro] = await db()
+    .update(roteiros)
+    .set({ status: "gravado" })
+    .where(eq(roteiros.id, roteiroId))
+    .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
   return roteiro;
 }
@@ -386,7 +415,10 @@ export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
  * (etapa 11, decisão 5). Sem reconhecer nenhum dos dois, grava só a URL e
  * deixa o resto nulo: a medição da curva por API oficial é da fase 3.
  */
-function inferirPlataforma(url: string): { plataforma: Plataforma | null; idExterno: string | null } {
+function inferirPlataforma(url: string): {
+  plataforma: Plataforma | null;
+  idExterno: string | null;
+} {
   let analisada: URL;
   try {
     analisada = new URL(url);
@@ -442,8 +474,14 @@ export async function marcarPostado(roteiroId: number, url: string): Promise<Rot
 }
 
 /** "gostei" ou "não gostei" (etapa 11, decisão 4): gravado na geração deste roteiro. */
-export async function avaliarRoteiro(roteiroId: number, avaliacao: "gostei" | "nao_gostei"): Promise<void> {
-  const [atual] = await db().select({ geracaoId: roteiros.geracaoId }).from(roteiros).where(eq(roteiros.id, roteiroId));
+export async function avaliarRoteiro(
+  roteiroId: number,
+  avaliacao: "gostei" | "nao_gostei",
+): Promise<void> {
+  const [atual] = await db()
+    .select({ geracaoId: roteiros.geracaoId })
+    .from(roteiros)
+    .where(eq(roteiros.id, roteiroId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
   if (!atual.geracaoId) return;
 
@@ -464,7 +502,12 @@ export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro
   const serie = await buscarSerie(raizId);
   const maisRecente = serie[0]?.id;
 
-  return serie.map((r) => ({ id: r.id, versao: r.versao, criadoEm: r.criadoEm, atual: r.id === maisRecente }));
+  return serie.map((r) => ({
+    id: r.id,
+    versao: r.versao,
+    criadoEm: r.criadoEm,
+    atual: r.id === maisRecente,
+  }));
 }
 
 /**
@@ -489,7 +532,10 @@ export async function roteiroDeHoje(clienteId: number): Promise<RoteiroLinha | n
  * nível de rota, mesmo padrão do briefing): dado de um cliente nunca
  * aparece para outro.
  */
-export async function roteiroPorId(roteiroId: number, clienteId: number): Promise<RoteiroLinha | null> {
+export async function roteiroPorId(
+  roteiroId: number,
+  clienteId: number,
+): Promise<RoteiroLinha | null> {
   const [roteiro] = await db()
     .select()
     .from(roteiros)

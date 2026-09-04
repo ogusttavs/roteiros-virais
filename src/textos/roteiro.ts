@@ -1,0 +1,50 @@
+/**
+ * Texto de tela de `/roteiros/[id]` (brief-frontend.md, seção 6.5;
+ * `RoteiroTela.dc.html`; `entrega/textos.ts`, bloco `roteiro`).
+ */
+
+export const textosRoteiro = {
+  blocos: {
+    abertura: "Os 3 primeiros segundos",
+    meio: "O meio",
+    fechamento: "O fechamento",
+    chamada: "A chamada final",
+  },
+  ondeGravar: "Onde gravar e o que mostrar",
+  comoEditar: "Como editar",
+  edicao: {
+    texto: "texto na tela",
+    corte: "ritmo de corte",
+    recursos: "recursos",
+    audio: "áudio da semana",
+    semTexto: "sem texto na tela definido para este vídeo",
+    semRecurso: "nenhum recurso extra além do corte",
+    semAudio: "sem indicação de áudio para este vídeo",
+  },
+  referencia: "Referência",
+  carregandoVideo: "vídeo carregando",
+  olhaComo: (t: string) => `olha como ele faz aos ${t}`,
+  irPara: (t: string) => `ir para ${t}`,
+  abrirReferencia: "abrir o vídeo de referência",
+  gravei: "gravei",
+  postei: "postei",
+  gravadoAs: (h: string) => `gravado às ${h}`,
+  postado: "postado",
+  ondePostou: "Onde você postou?",
+  coleLink: "cole o link do vídeo",
+  menu: { angulo: "outro ângulo", copiar: "copiar texto", versoes: "versões" },
+  queDiferente: "o que você quer diferente?",
+  opcional: "(opcional)",
+  outraVersao: "escrever outra versão",
+  textoCopiado: "texto copiado",
+  versao: (a: number, b: number) => `versão ${a} de ${b}`,
+  versaoAntiga: (a: number, b: number) => `versão ${a}; a atual é a ${b}`,
+  verAtual: "ver a atual",
+  escrevendo: "escrevendo do jeito que você fala",
+  erro: "não conseguimos escrever agora",
+  sair: "sair",
+  modoGravacao: "Modo gravação",
+  maisOpcoes: "Mais opções",
+  versoesTitulo: "Versões",
+  atual: "atual",
+};

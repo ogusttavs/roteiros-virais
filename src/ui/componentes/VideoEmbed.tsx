@@ -13,6 +13,8 @@ export type VideoEmbedProps = {
   /** Quando o ator/API nao devolve embed oficial para a plataforma (TikTok e Instagram hoje). */
   falhou?: boolean;
   linkExterno: { rotulo: string; href: string };
+  /** O embed já carrega começando neste segundo (RoteiroTela, "olha como ele faz aos X"). */
+  segundoInicial?: number;
 };
 
 type Props = VideoEmbedProps;
@@ -34,7 +36,14 @@ function idDoYoutube(url: string): string | null {
  * Instagram usam o link de fallback ate a etapa que integrar os SDKs deles
  * (fora do escopo desta etapa, que so troca visual).
  */
-export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, linkExterno }: Props) {
+export function VideoEmbed({
+  url,
+  alt,
+  rotuloCarregamento,
+  falhou = false,
+  linkExterno,
+  segundoInicial,
+}: Props) {
   const [visivel, setVisivel] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const idYoutube = idDoYoutube(url);
@@ -61,10 +70,12 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, linkE
   }
 
   if (visivel && idYoutube) {
+    const src = new URL(`https://www.youtube.com/embed/${idYoutube}`);
+    if (segundoInicial) src.searchParams.set("start", String(Math.trunc(segundoInicial)));
     return (
       <iframe
         className={styles.iframe}
-        src={`https://www.youtube.com/embed/${idYoutube}`}
+        src={src.toString()}
         title={alt}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
