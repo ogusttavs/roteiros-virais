@@ -16,8 +16,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * de reescrito aqui, e NOME_OBJETIVO importado de src/ia/enums.ts: os tres
  * evitam que a palavra proibida apareca como texto literal neste arquivo,
  * que o checar-texto varre.
+ *
+ * Etapa 11, decisao 1 do `PROXIMO.md`: `montarSistemaEstavel` ganha a
+ * camada exclusiva do cliente (cidade, bairro, concorrentes, perfis
+ * admirados), decisao adiada na etapa 10; `montarEntrada` ganha estrutura,
+ * fechamento, chamada final e momento chave de cada evidencia (nao so
+ * assunto e gancho), e os ultimos roteiros do cliente, para nao repetir
+ * angulo. Versao 1.2.0.
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -57,6 +64,7 @@ export type SaidaRoteiro = z.infer<typeof schema>;
 export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
+  camadaExclusiva: string;
 }): string {
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
@@ -71,6 +79,8 @@ gravar com a própria cara no celular. Regras duras:
 4. Sem travessão, sem emoji, sem jargão em nenhum campo de texto.
 5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do
    nicho.
+6. Não repita o ângulo de um roteiro recente do mesmo cliente (lista abaixo); se o tema pedido
+   for muito parecido com um deles, escolha um ângulo diferente para o gancho e a estrutura.
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -89,6 +99,10 @@ visual.
 Perfil do cliente:
 ${dados.perfilCompilado}
 
+O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido
+no gancho ou na chamada final, nunca force):
+${dados.camadaExclusiva}
+
 Modelo do nicho:
 ${dados.modeloNicho}
 
@@ -99,20 +113,55 @@ export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
   observacao?: string;
-  evidencias: { id: number; assunto: string; gancho: string; momentoChave?: string }[];
+  evidencias: {
+    id: number;
+    assunto: string;
+    gancho: string;
+    estrutura: string;
+    fechamento: string;
+    chamadaFinal: string;
+    foraDaCurva: number;
+    momentoChave?: string;
+  }[];
+  roteirosRecentes: { tema: string; objetivo: Objetivo; status: string }[];
+  /**
+   * "Outro ângulo" (etapa 11, decisão 4 do `PROXIMO.md`): o gancho e o
+   * corpo da versão que o cliente já viu e pediu para trocar, para o
+   * modelo saber exatamente o que não repetir, além da regra geral contra
+   * `roteirosRecentes`.
+   */
+  anguloParaEvitar?: { gancho: string; corpo: string };
 }): string {
   const listaEvidencias =
     dados.evidencias.length > 0
       ? dados.evidencias
-          .map((v) => `id ${v.id}: ${v.assunto}. gancho que funcionou: ${v.gancho}`)
-          .join("\n")
+          .map(
+            (v) =>
+              `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)\n` +
+              `  gancho que funcionou: ${v.gancho}\n` +
+              `  estrutura: ${v.estrutura}\n` +
+              `  fechamento: ${v.fechamento}\n` +
+              `  chamada final: ${v.chamadaFinal}` +
+              (v.momentoChave ? `\n  momento chave do vídeo: ${v.momentoChave}` : ""),
+          )
+          .join("\n\n")
       : "nenhuma evidencia disponivel";
+
+  const listaRecentes =
+    dados.roteirosRecentes.length > 0
+      ? dados.roteirosRecentes.map((r) => `"${r.tema}" (${NOME_OBJETIVO[r.objetivo]}, ${r.status})`).join("; ")
+      : "nenhum roteiro anterior";
 
   const partes = [
     `Tema escolhido: ${dados.tema}`,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
+    dados.anguloParaEvitar
+      ? `O cliente já viu esta versão e pediu outro ângulo; não repita o gancho nem a estrutura ` +
+        `dela:\ngancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
+      : null,
     `Evidencia disponivel:\n${listaEvidencias}`,
+    `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

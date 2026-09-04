@@ -57,6 +57,13 @@
       "when": 1788450744690,
       "tag": "0007_modelo_nicho",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788541111423,
+      "tag": "0008_graceful_silver_fox",
+      "breakpoints": true
     }
   ]
 }

@@ -11,10 +11,18 @@
  * (desempate por id), para a mesma consulta não devolver ordens diferentes
  * em execuções iguais.
  */
-import { and, asc, desc, eq, gte, isNotNull, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { contas, modelosNicho, videos, type AnaliseVideo, type ModeloNicho, type Plataforma } from "@/db/schema";
+import {
+  contas,
+  modelosNicho,
+  videos,
+  type AnaliseVideo,
+  type AnaliseVisual,
+  type ModeloNicho,
+  type Plataforma,
+} from "@/db/schema";
 
 export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
@@ -176,24 +184,21 @@ export function palavrasChave(texto: string): string[] {
   return [...new Set(encontradas)];
 }
 
-export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number };
-
 /**
- * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
- * `PROXIMO.md`; casamento por etiqueta trocado na etapa 11, ajuste 2 da
- * revisão da etapa 10): casa pela busca textual (`videos.busca`, gerada com
- * título, descrição, transcrição e assunto) ou por etiqueta que **contenha**
- * alguma palavra do texto (subcadeia, sem caixa), nos últimos 90 dias, os de
- * maior `fora_da_curva` primeiro. Etiqueta real costuma ser frase composta
- * ("clareamento dental"), então igualdade exata (a versão antiga, com o
- * operador `?|`) quase nunca casava; confirmado numa rodada real. Sem
- * `unaccent` (extensão que exigiria migração própria, sobrevivendo a
- * `resetarSchema`; decisão registrada em `TODO.md`), só `lower()`: "não"
- * buscado não casa "nao" numa etiqueta, e vice versa. Sem palavra nem
- * casamento textual, a lista vem vazia (o prompt já sabe dizer "sem
- * evidência" para isso).
+ * As condições de casamento de um texto de tema contra o banco (etapa 10,
+ * decisão 5; casamento por etiqueta trocado na etapa 11, ajuste 2 da
+ * revisão da etapa 10), compartilhadas por `evidenciaParaTema` e
+ * `evidenciaParaRoteiro`: busca textual (`videos.busca`, gerada com título,
+ * descrição, transcrição e assunto) ou etiqueta que **contenha** alguma
+ * palavra do texto (subcadeia, sem caixa), nos últimos 90 dias. Etiqueta
+ * real costuma ser frase composta ("clareamento dental"), então igualdade
+ * exata (a versão antiga, com o operador `?|`) quase nunca casava;
+ * confirmado numa rodada real. Sem `unaccent` (extensão que exigiria
+ * migração própria, sobrevivendo a `resetarSchema`; decisão registrada em
+ * `TODO.md`), só `lower()`: "não" buscado não casa "nao" numa etiqueta, e
+ * vice versa.
  */
-export async function evidenciaParaTema(nichoId: number, texto: string, limite = 8): Promise<VideoEvidenciaTema[]> {
+function condicoesEvidencia(nichoId: number, texto: string) {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
   // "text[]" pede um array de verdade; um array JS interpolado direto vira
@@ -217,11 +222,21 @@ export async function evidenciaParaTema(nichoId: number, texto: string, limite =
     ))`,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  return condicoes;
+}
 
+export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number };
+
+/**
+ * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
+ * `PROXIMO.md`). Sem palavra nem casamento textual, a lista vem vazia (o
+ * prompt já sabe dizer "sem evidência" para isso).
+ */
+export async function evidenciaParaTema(nichoId: number, texto: string, limite = 8): Promise<VideoEvidenciaTema[]> {
   const linhas = await db()
     .select({ id: videos.id, analise: videos.analise, foraDaCurva: videos.foraDaCurva })
     .from(videos)
-    .where(and(...condicoes))
+    .where(and(...condicoesEvidencia(nichoId, texto)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite);
 
@@ -233,6 +248,82 @@ export async function evidenciaParaTema(nichoId: number, texto: string, limite =
       gancho: l.analise.gancho,
       foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
     }));
+}
+
+export type VideoEvidenciaRoteiro = {
+  id: number;
+  assunto: string;
+  gancho: string;
+  estrutura: string;
+  fechamento: string;
+  chamadaFinal: string;
+  foraDaCurva: number;
+  analiseVisual: AnaliseVisual | null;
+};
+
+/**
+ * Evidência para o roteiro (etapa 11, decisão 1 do `PROXIMO.md`): mesmo
+ * casamento de `evidenciaParaTema`, mas com a ficha inteira da extração
+ * (estrutura, fechamento, chamada final) e a análise visual quando houver,
+ * para o roteiro poder imitar o que já funcionou, não só citar o assunto.
+ */
+function mapearEvidenciaRoteiro(
+  linhas: { id: number; analise: AnaliseVideo | null; analiseVisual: AnaliseVisual | null; foraDaCurva: string | null }[],
+): VideoEvidenciaRoteiro[] {
+  return linhas
+    .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
+    .map((l) => ({
+      id: l.id,
+      assunto: l.analise.assunto,
+      gancho: l.analise.gancho,
+      estrutura: l.analise.estrutura,
+      fechamento: l.analise.fechamento,
+      chamadaFinal: l.analise.chamadaFinal,
+      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+      analiseVisual: l.analiseVisual,
+    }));
+}
+
+export async function evidenciaParaRoteiro(
+  nichoId: number,
+  texto: string,
+  limite = 8,
+): Promise<VideoEvidenciaRoteiro[]> {
+  const linhas = await db()
+    .select({
+      id: videos.id,
+      analise: videos.analise,
+      analiseVisual: videos.analiseVisual,
+      foraDaCurva: videos.foraDaCurva,
+    })
+    .from(videos)
+    .where(and(...condicoesEvidencia(nichoId, texto)))
+    .orderBy(desc(videos.foraDaCurva), asc(videos.id))
+    .limit(limite);
+
+  return mapearEvidenciaRoteiro(linhas);
+}
+
+/**
+ * A ficha rica de evidência (mesmos campos de `evidenciaParaRoteiro`) para
+ * ids já conhecidos (etapa 11): usada para os ids que `temasDoDia` já
+ * validou como evidência de um tema sugerido, que podem não bater na busca
+ * textual do próprio título do tema (a busca da evidência do dia usa
+ * `subindoHojeComAnalise`, um caminho diferente).
+ */
+export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRoteiro[]> {
+  if (ids.length === 0) return [];
+  const linhas = await db()
+    .select({
+      id: videos.id,
+      analise: videos.analise,
+      analiseVisual: videos.analiseVisual,
+      foraDaCurva: videos.foraDaCurva,
+    })
+    .from(videos)
+    .where(inArray(videos.id, ids));
+
+  return mapearEvidenciaRoteiro(linhas);
 }
 
 /**
@@ -268,9 +359,31 @@ export function formatarModeloNicho(modelo: ModeloNicho | null): string {
       `Ganchos que funcionam: ${modelo.ganchos.map((g) => `${g.tipo} (${g.frequencia}): ${g.exemplo}`).join("; ")}`,
     );
   }
+  /**
+   * Etapa 11: `duracaoTipicaS`, `estruturas`, `fechamentos` e
+   * `chamadasFinais` existem desde a etapa 9 (`modeloNicho`, decisão 2 do
+   * `PROXIMO.md`) mas não entravam aqui; o roteiro (decisão 1 da etapa 11)
+   * é a primeira tarefa que precisa deles de verdade, para imitar exemplo
+   * literal em vez de regra abstrata (escopo 5.9.5).
+   */
+  linhas.push(`Duração típica: de ${modelo.duracaoTipicaS.min} a ${modelo.duracaoTipicaS.max} segundos.`);
+  if (modelo.estruturas.length > 0) {
+    linhas.push(`Estruturas que funcionam: ${modelo.estruturas.join("; ")}`);
+  }
+  if (modelo.fechamentos.length > 0) {
+    linhas.push(`Fechamentos que funcionam: ${modelo.fechamentos.join("; ")}`);
+  }
+  if (modelo.chamadasFinais.length > 0) {
+    linhas.push(`Chamadas finais que funcionam: ${modelo.chamadasFinais.join("; ")}`);
+  }
   if (modelo.formatos.length > 0) {
     linhas.push(`Formatos: ${modelo.formatos.map((f) => `${f.formato} (${f.participacao})`).join(", ")}`);
   }
+  linhas.push(
+    `Edição: texto na tela ${modelo.edicao.textoNaTela}; ritmo de corte ${modelo.edicao.ritmoDeCorte}` +
+      (modelo.edicao.recursos.length > 0 ? `; recursos ${modelo.edicao.recursos.join(", ")}` : "") +
+      (modelo.edicao.audio ? `; áudio da semana ${modelo.edicao.audio}` : ""),
+  );
   linhas.push(`Baseado em ${modelo.baseadoEm} vídeo(s), ${modelo.acimaDoLimiar} fora da curva de verdade.`);
   return linhas.join("\n");
 }

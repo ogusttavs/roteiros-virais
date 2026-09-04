@@ -21,6 +21,7 @@ import {
   text,
   timestamp,
   uniqueIndex,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
@@ -471,6 +472,8 @@ export type ConteudoRoteiro = {
     audio: string | null;
     referencia: { videoId: number | null; segundo: number | null; oQueOlhar: string } | null;
   };
+  /** Ids de video que sustentam o roteiro (etapa 11): a mesma lista que o verificador conferiu. */
+  evidencias: number[];
 };
 
 export const roteiros = pgTable(
@@ -487,6 +490,19 @@ export const roteiros = pgTable(
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     referenciaVideoId: integer("referencia_video_id").references(() => videos.id),
     versao: integer("versao").notNull().default(1),
+    /**
+     * A versao 1 da mesma serie (etapa 11, decisao 4 do PROXIMO.md,
+     * "outro angulo" mantem as anteriores acessiveis): nulo na propria
+     * versao 1; nas seguintes, aponta para o id da versao 1. Listar a serie
+     * inteira e "id = raiz ou versaoDe = raiz", com raiz = versaoDe ?? id.
+     */
+    versaoDe: integer("versao_de").references((): AnyPgColumn => roteiros.id),
+    /**
+     * A linha de geracoes_ia da tentativa aprovada que gerou esta versao
+     * (etapa 11, decisao 4): onde a avaliacao do cliente (gostei, nao
+     * gostei, ou o motivo de pedir outro angulo) e gravada.
+     */
+    geracaoId: integer("geracao_id").references(() => geracoesIA.id),
     status: text("status").$type<"gerado" | "gravado" | "postado">().notNull().default("gerado"),
     urlPostado: text("url_postado"),
     postadoEm: timestamp("postado_em", { withTimezone: true }),

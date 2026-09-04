@@ -95,6 +95,7 @@ const CONTEUDO_ROTEIRO_MINIMO = {
   cenas: [],
   ondeGravar: "no local do negocio",
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+  evidencias: [],
 };
 
 async function criarRoteiroPostado(clienteId: number, objetivo: Objetivo, diasAtras: number) {

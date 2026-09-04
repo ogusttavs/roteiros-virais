@@ -62,26 +62,39 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   extrairEvidencias?: (dados: T) => number[];
 };
 
+export type ResultadoVerificacao<T> = {
+  dados: T;
+  /**
+   * Id da linha de `geracoes_ia` da tentativa aprovada (etapa 11, decisão 4
+   * do `PROXIMO.md`): quem chama pode gravar a avaliação do cliente
+   * ("gostei", "não gostei", o motivo de pedir outro ângulo) nessa mesma
+   * linha depois, sem precisar buscar de novo por tarefa e cliente.
+   */
+  geracaoId: number;
+};
+
 /**
  * Gera, verifica em duas camadas, e refaz uma vez se reprovar. As duas
  * tentativas (quando houver a segunda) ficam registradas em geracoes_ia.
  */
-export async function gerarComVerificacao<T>(params: ParametrosGeracaoVerificada<T>): Promise<T> {
+export async function gerarComVerificacao<T>(
+  params: ParametrosGeracaoVerificada<T>,
+): Promise<ResultadoVerificacao<T>> {
   const primeira = await tentarGerarEVerificar(params);
-  if (primeira.aprovado) return primeira.dados;
+  if (primeira.aprovado) return { dados: primeira.dados, geracaoId: primeira.geracaoId };
 
   const segunda = await tentarGerarEVerificar({
     ...params,
     entrada: `${params.entrada}\n\nA tentativa anterior foi reprovada. Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`,
   });
-  if (segunda.aprovado) return segunda.dados;
+  if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
 
   throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
 }
 
 async function tentarGerarEVerificar<T>(
   params: ParametrosGeracaoVerificada<T>,
-): Promise<{ aprovado: boolean; dados: T; motivos: string[] }> {
+): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number }> {
   const resultado = await gerarEstruturado(params);
   const campos = params.extrairCampos(resultado.dados);
   const evidencias = params.extrairEvidencias?.(resultado.dados) ?? [];
@@ -128,7 +141,7 @@ async function tentarGerarEVerificar<T>(
     });
   }
 
-  await registrarGeracao({
+  const geracaoId = await registrarGeracao({
     tarefa: params.tarefa,
     versaoPrompt: params.versaoPrompt,
     modelo: resultado.modelo,
@@ -146,5 +159,5 @@ async function tentarGerarEVerificar<T>(
     motivoAvaliacao: motivos.length > 0 ? motivos.join("; ") : undefined,
   });
 
-  return { aprovado, dados: resultado.dados, motivos };
+  return { aprovado, dados: resultado.dados, motivos, geracaoId };
 }

@@ -100,7 +100,7 @@ describe("gerarComVerificacao", () => {
 
     const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
 
-    expect(resultado).toEqual({ corpo: "texto limpo" });
+    expect(resultado).toEqual({ dados: { corpo: "texto limpo" }, geracaoId: 1 });
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
 
     const segundaChamada = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
