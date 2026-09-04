@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import type { SaidaAvaliarTema } from "@/ia/prompts/avaliarTema";
+import { textosComuns } from "@/textos/comuns";
 import { textosTemaLivre } from "@/textos/tema-livre";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
@@ -64,14 +65,11 @@ export function TemaLivreTela({ notaMinima }: Props) {
   if (resultado) {
     const semEvidencia = resultado.evidencias.length === 0;
     const aprovado = resultado.nota >= notaMinima;
+    const irParaObjetivo = () => router.push(`/hoje/objetivo?livre=${encodeURIComponent(texto)}`);
 
     return (
       <div className={styles.pagina}>
-        <Nota
-          valor={resultado.nota}
-          legenda={textosTemaLivre.notaFaixa[faixaDeNota(resultado.nota)]}
-          tamanho="destaque"
-        />
+        <Nota valor={resultado.nota} legenda={textosComuns.faixa[faixaDeNota(resultado.nota)]} tamanho="destaque" />
         {semEvidencia ? <p className={styles.semEvidencia}>{textosTemaLivre.semEvidencia}</p> : null}
 
         <Pilares
@@ -83,21 +81,18 @@ export function TemaLivreTela({ notaMinima }: Props) {
         />
 
         {aprovado ? (
-          <BarraAcao primaria={{ rotulo: textosTemaLivre.escrever, onClick: () => router.push("/hoje/objetivo") }} />
+          <BarraAcao primaria={{ rotulo: textosTemaLivre.escrever, onClick: irParaObjetivo }} />
         ) : resultado.anguloSugerido ? (
           <div className={styles.cartaoAngulo}>
             <h2 className={styles.anguloTitulo}>{textosTemaLivre.anguloTitulo}</h2>
             <p className={styles.anguloTexto}>{resultado.anguloSugerido}</p>
             <BarraAcao
               primaria={{ rotulo: textosTemaLivre.usarAngulo, onClick: () => avaliar(resultado.anguloSugerido!) }}
-              secundaria={{
-                rotulo: textosTemaLivre.seguirMeu,
-                onClick: () => router.push("/hoje/objetivo"),
-              }}
+              secundaria={{ rotulo: textosTemaLivre.seguirMeu, onClick: irParaObjetivo }}
             />
           </div>
         ) : (
-          <BarraAcao secundaria={{ rotulo: textosTemaLivre.seguirMeu, onClick: () => router.push("/hoje/objetivo") }} />
+          <BarraAcao secundaria={{ rotulo: textosTemaLivre.seguirMeu, onClick: irParaObjetivo }} />
         )}
 
         <button type="button" className={styles.avaliarOutro} onClick={() => setResultado(null)}>

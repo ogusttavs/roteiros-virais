@@ -30,3 +30,16 @@ export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
   engajamento: "para lembrarem de você",
   conversao: "para te chamarem",
 };
+
+/**
+ * A frase de ajuda de cada opção em `/hoje/objetivo` (etapa 11,
+ * `ObjetivoFluxo.dc.html`): mesma razão de `NOME_OBJETIVO` estar aqui.
+ */
+export const AJUDA_OBJETIVO: Record<Objetivo, string> = {
+  alcance: "para quem ainda não te viu",
+  engajamento: "para quem já te segue",
+  conversao: "para quem está quase decidindo",
+};
+
+/** As três opções de objetivo, na ordem fixa em que a tela mostra (etapa 11). */
+export const OBJETIVOS_EM_ORDEM: Objetivo[] = ["alcance", "engajamento", "conversao"];

@@ -326,6 +326,17 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
   return mapearEvidenciaRoteiro(linhas);
 }
 
+export type VideoParaEmbed = { id: number; plataforma: Plataforma; url: string };
+
+/** Plataforma e url de um vídeo, para montar o embed da referência (etapa 11, `RoteiroTela`). */
+export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
+  const [linha] = await db()
+    .select({ id: videos.id, plataforma: videos.plataforma, url: videos.url })
+    .from(videos)
+    .where(eq(videos.id, id));
+  return linha ?? null;
+}
+
 /**
  * Modelo do nicho mais recente (etapa 9, decisao 2 do `PROXIMO.md`): so o
  * mais novo e usado por quem le. `null` quando o job semanal ainda nao

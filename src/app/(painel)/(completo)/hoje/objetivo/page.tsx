@@ -1,18 +1,52 @@
-import { Sparkles } from "lucide-react";
+import { redirect } from "next/navigation";
 
-import { textosObjetivoProvisorio } from "@/textos/tema-livre";
-import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
+import { sessaoAtual } from "@/lib/sessao";
+import { clienteDoUsuario } from "@/servicos/clientes";
+import type { OrigemRoteiro } from "@/servicos/roteiro";
+import { temasParaCliente } from "@/servicos/temas";
+
+import { ObjetivoTela } from "./ObjetivoTela";
+
+type Props = { searchParams: Promise<{ tema?: string; livre?: string }> };
 
 /**
- * Provisório (etapa 10, decisão 6 do `PROXIMO.md`): a etapa 11 escreve a
- * pergunta de objetivo e o roteiro de verdade aqui. Por enquanto só existe
- * para os botões de `/hoje` e `/hoje/tema-livre` terem para onde ir.
+ * `/hoje/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`): resolve o tema
+ * escolhido (`?tema=<índice>`, vindo de `/hoje`) ou proposto (`?livre=<texto>`,
+ * vindo de `/hoje/tema-livre`), e o objetivo recomendado hoje, antes de
+ * entregar para a tela de cliente escolher o objetivo e escrever o roteiro.
  */
-export default function ObjetivoProvisorio() {
+export default async function Objetivo({ searchParams }: Props) {
+  const sessao = await sessaoAtual();
+  if (!sessao) {
+    redirect("/entrar");
+  }
+
+  const cliente = await clienteDoUsuario(sessao.user.id);
+  if (!cliente) {
+    redirect("/entrar");
+  }
+
+  const { tema, livre } = await searchParams;
+  const resultado = await temasParaCliente(cliente);
+  const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
+
+  let origem: OrigemRoteiro;
+  let temaEscolhidoTexto: string;
+
+  if (livre) {
+    origem = { origem: "livre", textoTema: livre };
+    temaEscolhidoTexto = livre;
+  } else {
+    const indice = Number(tema);
+    const temaDoDia = resultado.status === "ok" ? resultado.temas[indice] : undefined;
+    if (!temaDoDia) {
+      redirect("/hoje");
+    }
+    origem = { origem: "sugerido", temaIndice: indice };
+    temaEscolhidoTexto = temaDoDia.titulo;
+  }
+
   return (
-    <EstadoVazio
-      icone={<Sparkles size={24} strokeWidth={1.5} aria-hidden="true" />}
-      frase={textosObjetivoProvisorio.frase}
-    />
+    <ObjetivoTela origem={origem} temaEscolhidoTexto={temaEscolhidoTexto} objetivoRecomendado={objetivoRecomendado} />
   );
 }

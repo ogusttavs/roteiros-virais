@@ -119,6 +119,12 @@ export type ResultadoTemasHoje =
       temas: TemaDoDia[];
       dataUsada: string;
       avisoLinhaEditorial: string | null;
+      /**
+       * O objetivo que a linha editorial recomenda hoje (etapa 11,
+       * `ObjetivoFluxo.dc.html`, "Recomendado hoje"), quando há aviso.
+       * `null` sem aviso, mesmo que o tema não tenha sido reordenado.
+       */
+      objetivoRecomendado: Objetivo | null;
       constancia: Constancia;
     };
 
@@ -144,7 +150,14 @@ export async function temasParaCliente(cliente: Cliente, data: string = hojeISO(
 
   const aviso = avisoLinhaEditorial(historico, cliente.persona);
   if (!aviso) {
-    return { status: "ok", temas: encontrado.temas, dataUsada: encontrado.dataUsada, avisoLinhaEditorial: null, constancia };
+    return {
+      status: "ok",
+      temas: encontrado.temas,
+      dataUsada: encontrado.dataUsada,
+      avisoLinhaEditorial: null,
+      objetivoRecomendado: null,
+      constancia,
+    };
   }
 
   const indice = encontrado.temas.findIndex((t) => t.puxaPara === aviso.objetivoEmFalta);
@@ -157,6 +170,7 @@ export async function temasParaCliente(cliente: Cliente, data: string = hojeISO(
     temas,
     dataUsada: encontrado.dataUsada,
     avisoLinhaEditorial: fraseAvisoLinhaEditorial(aviso, existeTemaQuePuxa),
+    objetivoRecomendado: aviso.objetivoEmFalta,
     constancia,
   };
 }

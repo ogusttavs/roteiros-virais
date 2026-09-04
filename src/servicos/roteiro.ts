@@ -6,7 +6,7 @@
  * grava. `outroAngulo` gera a versão seguinte com a instrução de diferir
  * da anterior; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -465,4 +465,34 @@ export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro
   const maisRecente = serie[0]?.id;
 
   return serie.map((r) => ({ id: r.id, versao: r.versao, criadoEm: r.criadoEm, atual: r.id === maisRecente }));
+}
+
+/**
+ * O roteiro mais recente gerado hoje para o cliente (etapa 11, decisão 6:
+ * o cartão de roteiro em `/hoje`, quando já existe). `null` sem nenhum
+ * roteiro de hoje ainda.
+ */
+export async function roteiroDeHoje(clienteId: number): Promise<RoteiroLinha | null> {
+  const linhas = await db()
+    .select()
+    .from(roteiros)
+    .where(eq(roteiros.clienteId, clienteId))
+    .orderBy(desc(roteiros.criadoEm))
+    .limit(1);
+
+  const [roteiro] = linhas;
+  return roteiro && roteiro.data === hojeISO() ? roteiro : null;
+}
+
+/**
+ * Um roteiro pelo id, só se pertencer ao cliente pedido (isolamento no
+ * nível de rota, mesmo padrão do briefing): dado de um cliente nunca
+ * aparece para outro.
+ */
+export async function roteiroPorId(roteiroId: number, clienteId: number): Promise<RoteiroLinha | null> {
+  const [roteiro] = await db()
+    .select()
+    .from(roteiros)
+    .where(and(eq(roteiros.id, roteiroId), eq(roteiros.clienteId, clienteId)));
+  return roteiro ?? null;
 }
