@@ -8,7 +8,10 @@ services:
     environment:
       POSTGRES_USER: roteiros
       POSTGRES_PASSWORD: roteiros
-      POSTGRES_DB: roteiros
+      # "roteiros_dev": o banco do dia a dia, que reset e teste podem apagar. O nome "roteiros"
+      # (sem sufixo) e reservado para dado de trabalho real; resetarSchema recusa ele desde a
+      # etapa 11 (README.md explica os tres bancos).
+      POSTGRES_DB: roteiros_dev
     ports:
       - "5432:5432"
     volumes:

@@ -19,8 +19,26 @@
  * admin preso em /entrar) e passou quando um spec rodou sozinho, com o
  * servidor ja quente. Por isso as outras rotas do fluxo tambem sao
  * aquecidas aqui, nao so /entrar.
+ *
+ * Etapa 11, ajuste 3 da revisao da etapa 10: `resetarSchema` mais `semear`
+ * rodam uma vez so, aqui, antes de qualquer arquivo de teste (globalSetup e
+ * garantido pelo Playwright rodar primeiro, diferente de depender da ordem
+ * alfabetica dos arquivos de spec). Sob carga (duas sessoes na mesma
+ * maquina), a suite completa recebeu `/hoje` onde esperava `/comecar` num
+ * arquivo que resetava o schema no proprio `beforeAll`, provavelmente
+ * porque o servidor de desenvolvimento continuava quente entre um reset e
+ * outro; cada arquivo de spec agora cria os proprios dados, com prefixo de
+ * id proprio, em vez de derrubar o schema de novo. O pool do Postgres
+ * (`db()`, globalThis) e o mesmo do resto da suite (achado rodando de
+ * verdade: fechar aqui derrubava o `globalTeardown`, "called end on pool
+ * more than once"), entao nao fecha o proprio pool aqui; quem fecha e o
+ * `globalTeardown`, como antes.
  */
 import { chromium } from "@playwright/test";
+
+import { resetarSchema } from "../../scripts/resetar-schema";
+import { semear } from "../../scripts/semear";
+import { db } from "../../src/db";
 
 const porta = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const baseURL = `http://localhost:${porta}`;
@@ -28,6 +46,9 @@ const baseURL = `http://localhost:${porta}`;
 const ROTAS = ["/entrar", "/comecar", "/hoje", "/admin/clientes", "/conta"];
 
 export default async function globalSetup() {
+  await resetarSchema(db());
+  await semear(db());
+
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();

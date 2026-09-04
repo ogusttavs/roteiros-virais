@@ -5,30 +5,50 @@
  * `data-tema` do `<html>` bate com o que o servidor le do banco
  * (`src/app/layout.tsx`). "Do sistema" e a ausencia do atributo.
  *
- * O briefing do cliente de seed e inserido direto no banco (nunca chamando
- * codigo de `src/ia` no processo do Playwright, licao da etapa 5, parte 2):
- * so o suficiente para `completo = true` destravar o grupo `(completo)`,
- * onde /conta mora.
+ * O briefing do cliente e inserido direto no banco (nunca chamando codigo de
+ * `src/ia` no processo do Playwright, licao da etapa 5, parte 2): so o
+ * suficiente para `completo = true` destravar o grupo `(completo)`, onde
+ * /conta mora.
+ *
+ * Cliente proprio ("e2e-tema-preferencia"), nao o "seed-cliente-dentistas"
+ * do seed: etapa 11, ajuste 3 da revisao da etapa 10. Sem `resetarSchema`
+ * por arquivo (o seed roda uma vez so, no globalSetup), outro arquivo pode
+ * ja ter mexido no briefing do cliente do seed antes deste rodar (por
+ * exemplo `briefing.spec.ts`, que preenche o briefing dele pela tela); um
+ * cliente com id proprio evita a corrida.
  */
 import { expect, test } from "@playwright/test";
+import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
-import { resetarSchema } from "../../scripts/resetar-schema";
-import { semear } from "../../scripts/semear";
 import { db } from "../../src/db";
-import { briefings, clientes } from "../../src/db/schema";
+import { account, briefings, clientes, nichos, user } from "../../src/db/schema";
 
-const EMAIL_CLIENTE = "seed-cliente-dentistas@exemplo.teste";
-const SENHA_CLIENTE = "ExemploSenha123";
+const SENHA = "ExemploSenha123";
+const EMAIL_CLIENTE = "e2e-tema-preferencia@exemplo.teste";
 
 test.beforeAll(async () => {
-  await resetarSchema(db());
-  await semear(db());
+  const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 
+  await db().insert(user).values({
+    id: "e2e-tema-preferencia",
+    name: "[teste] Preferencia de tema",
+    email: EMAIL_CLIENTE,
+  });
+  await db()
+    .insert(account)
+    .values({
+      id: "e2e-tema-preferencia-credential",
+      issuer: "local:credential",
+      accountId: "e2e-tema-preferencia",
+      providerId: "credential",
+      userId: "e2e-tema-preferencia",
+      password: await hashPassword(SENHA),
+    });
   const [cliente] = await db()
-    .select({ id: clientes.id })
-    .from(clientes)
-    .where(eq(clientes.usuarioId, "seed-cliente-dentistas"));
+    .insert(clientes)
+    .values({ usuarioId: "e2e-tema-preferencia", nome: "[teste] Preferencia de tema", nichoId: nicho.id })
+    .returning();
   await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
 });
 
@@ -39,7 +59,7 @@ test("escolhe escuro, salva, recarrega com data-tema escuro; volta para do siste
 }) => {
   await page.goto("/entrar");
   await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_CLIENTE);
-  await page.getByLabel("senha", { exact: true }).fill(SENHA_CLIENTE);
+  await page.getByLabel("senha", { exact: true }).fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await expect(page).toHaveURL(/\/hoje/);
 

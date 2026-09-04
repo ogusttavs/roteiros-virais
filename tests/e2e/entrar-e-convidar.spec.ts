@@ -12,8 +12,6 @@
 import { expect, test } from "@playwright/test";
 import { desc } from "drizzle-orm";
 
-import { resetarSchema } from "../../scripts/resetar-schema";
-import { semear } from "../../scripts/semear";
 import { db } from "../../src/db";
 import { verification } from "../../src/db/schema";
 
@@ -21,13 +19,10 @@ const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
 const EMAIL_NOVO_CLIENTE = "cliente-e2e@exemplo.teste";
 
-test.beforeAll(async () => {
-  await resetarSchema(db());
-  await semear(db());
-});
-
-// O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts):
-// mais de um arquivo de e2e roda no mesmo worker e compartilha o pool.
+// Seed uma vez so, no globalSetup (etapa 11, ajuste 3 da revisao da etapa 10); o pool do
+// Postgres fecha uma vez so, no globalTeardown (playwright.config.ts): mais de um arquivo de
+// e2e roda no mesmo worker e compartilha o pool. EMAIL_NOVO_CLIENTE ja e um identificador
+// proprio deste arquivo, unico o bastante.
 
 test("admin entra, cria cliente, cliente entra por link magico e cai em /comecar", async ({
   page,

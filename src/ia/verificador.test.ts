@@ -67,6 +67,33 @@ describe("verificarLocalmente", () => {
     expect(r.aprovado).toBe(true);
     expect(r.motivos).toEqual([]);
   });
+
+  it("reprova id de evidencia inventado, fora da lista fornecida (revisao do PR #17)", () => {
+    const r = verificarLocalmente(
+      { corpo: "texto limpo" },
+      { evidencias: [255, 359], evidenciasFornecidas: [65, 80] },
+    );
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.join(" ")).toContain("nao foi fornecida");
+    expect(r.motivos.join(" ")).toContain("255");
+    expect(r.motivos.join(" ")).toContain("359");
+  });
+
+  it("aprova quando todo id citado esta entre os fornecidos", () => {
+    const r = verificarLocalmente(
+      { corpo: "texto limpo" },
+      { evidencias: [65], evidenciasFornecidas: [65, 80] },
+    );
+    expect(r.aprovado).toBe(true);
+  });
+
+  it("aprova lista vazia de evidencias quando fornecidas tambem e vazia e nao exige evidencia", () => {
+    const r = verificarLocalmente(
+      { corpo: "texto limpo" },
+      { evidencias: [], evidenciasFornecidas: [], exigeEvidencia: false },
+    );
+    expect(r.aprovado).toBe(true);
+  });
 });
 
 describe("gerarComVerificacao", () => {
@@ -100,7 +127,7 @@ describe("gerarComVerificacao", () => {
 
     const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
 
-    expect(resultado).toEqual({ corpo: "texto limpo" });
+    expect(resultado).toEqual({ dados: { corpo: "texto limpo" }, geracaoId: 1 });
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
 
     const segundaChamada = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };

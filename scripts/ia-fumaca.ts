@@ -254,11 +254,23 @@ async function main() {
       sistemaEstavel: roteiro.montarSistemaEstavel({
         perfilCompilado: perfil.resumo,
         modeloNicho: nicho.resumo,
+        camadaExclusiva: "Cidade: Sao Paulo, bairro Pinheiros. Nenhum concorrente citado.",
       }),
       entrada: roteiro.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
         objetivo: "conversao",
-        evidencias: [{ id: 2, assunto: extraido.assunto, gancho: extraido.gancho }],
+        evidencias: [
+          {
+            id: 2,
+            assunto: extraido.assunto,
+            gancho: extraido.gancho,
+            estrutura: extraido.estrutura,
+            fechamento: extraido.fechamento,
+            chamadaFinal: extraido.chamadaFinal,
+            foraDaCurva: 5.2,
+          },
+        ],
+        roteirosRecentes: [],
       }),
     }),
   );

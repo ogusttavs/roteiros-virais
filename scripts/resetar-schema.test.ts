@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ResetProibidoError, verificarAmbienteSeguro } from "./resetar-schema";
 
-const BASE = { DATABASE_URL: "postgres://roteiros:roteiros@localhost:5432/roteiros" };
+const BASE = { DATABASE_URL: "postgres://roteiros:roteiros@localhost:5432/roteiros_teste" };
 
 describe("verificarAmbienteSeguro", () => {
   it("permite localhost", () => {
@@ -11,13 +11,13 @@ describe("verificarAmbienteSeguro", () => {
 
   it("permite 127.0.0.1", () => {
     expect(() =>
-      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@127.0.0.1:5432/roteiros" }),
+      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@127.0.0.1:5432/roteiros_teste" }),
     ).not.toThrow();
   });
 
   it("permite o host postgres do compose", () => {
     expect(() =>
-      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@postgres:5432/roteiros" }),
+      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@postgres:5432/roteiros_ci" }),
     ).not.toThrow();
   });
 
@@ -41,5 +41,25 @@ describe("verificarAmbienteSeguro", () => {
     expect(() => verificarAmbienteSeguro({ DATABASE_URL: "nao e uma url" })).toThrow(
       ResetProibidoError,
     );
+  });
+
+  it("recusa o banco de trabalho roteiros, mesmo em host local (etapa 11, ajuste 1)", () => {
+    expect(() =>
+      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@localhost:5432/roteiros" }),
+    ).toThrow(ResetProibidoError);
+  });
+
+  it("permite qualquer nome com sufixo de roteiros_", () => {
+    for (const nome of ["roteiros_teste", "roteiros_dev", "roteiros_revisao", "roteiros_ci"]) {
+      expect(() =>
+        verificarAmbienteSeguro({ DATABASE_URL: `postgres://u:p@localhost:5432/${nome}` }),
+      ).not.toThrow();
+    }
+  });
+
+  it("permite o banco postgres, usado pela CI", () => {
+    expect(() =>
+      verificarAmbienteSeguro({ DATABASE_URL: "postgres://u:p@localhost:5432/postgres" }),
+    ).not.toThrow();
   });
 });

@@ -163,7 +163,7 @@ export async function avaliarResposta(
     avaliacao = avaliacaoGuardada;
     reusada = true;
   } else {
-    avaliacao = await gerarComVerificacao({
+    ({ dados: avaliacao } = await gerarComVerificacao({
       tarefa: "avaliarResposta",
       nivel: avaliarRespostaIA.nivel,
       effort: avaliarRespostaIA.esforco,
@@ -183,7 +183,7 @@ export async function avaliarResposta(
         exemplo: d.exemplo,
         impacto: d.impacto,
       }),
-    });
+    }));
   }
 
   const {
@@ -254,7 +254,7 @@ async function compilarEGravarPerfil(
     respostasPorEnunciado[pergunta.enunciado] = respostas[pergunta.id] ?? "";
   }
 
-  const perfil = await gerarComVerificacao({
+  const { dados: perfil } = await gerarComVerificacao({
     tarefa: "compilarPerfil",
     nivel: compilarPerfilIA.nivel,
     effort: compilarPerfilIA.esforco,

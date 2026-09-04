@@ -5,11 +5,6 @@
 
 export const textosTemaLivre = {
   titulo: "Sobre o que você quer falar?",
-  notaFaixa: {
-    baixa: "abaixo do esperado",
-    media: "no caminho",
-    alta: "muito boa",
-  },
   placeholder: "por exemplo: como tirar cheiro de gordura da cozinha sem produto forte",
   ajuda: "um assunto, não um título de vídeo",
   campoVazio: "escreva um assunto antes de avaliar",
@@ -31,12 +26,4 @@ export const textosTemaLivre = {
     "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. O mais perto que está funcionando é o ângulo abaixo.",
   avaliarOutro: "avaliar outro tema",
   erro: "não conseguimos avaliar agora; o seu tema ficou salvo, tente de novo em um minuto",
-};
-
-/**
- * Provisório (etapa 10): `/hoje/objetivo` é a rota da etapa 11, aqui só
- * existe para o botão de `/hoje/tema-livre` ter para onde ir.
- */
-export const textosObjetivoProvisorio = {
-  frase: "o roteiro entra na próxima etapa",
 };
