@@ -1,0 +1,37 @@
+# Proxy compartilhado da maquina (nao e de um produto so): um Caddy dono das
+# portas 80 e 443, roteando por dominio, TLS automatico, na rede externa `web`.
+# Vive em /srv/proxy na VPS. Esta copia fica no repositorio do Roteiros Virais
+# porque foi este produto que o criou (03/09/2026); a fonte da regra e
+# _compartilhado/INFRA-VPS.md. Cada produto so mexe no proprio bloco do
+# Caddyfile e recarrega com:
+#   docker exec proxy-caddy-1 caddy validate --config /etc/caddy/Caddyfile
+#   docker exec proxy-caddy-1 caddy reload   --config /etc/caddy/Caddyfile
+
+name: proxy
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: proxy-caddy-1
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - proxy_dados:/data
+      - proxy_config:/config
+    networks:
+      - web
+    mem_limit: 256m
+
+networks:
+  web:
+    external: true
+
+volumes:
+  proxy_dados:
+    name: proxy_dados
+  proxy_config:
+    name: proxy_config

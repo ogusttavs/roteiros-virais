@@ -1,0 +1,50 @@
+# Constroi e publica as tres imagens no GHCR a cada merge na main (etapa 13).
+# A VPS nunca faz build: so puxa (regra compartilhada). Tags: latest e o sha
+# curto do commit, para voltar atras com deploy/deploy.sh <sha>.
+name: Imagens
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  imagens:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - nome: app
+            dockerfile: deploy/Dockerfile
+          - nome: worker
+            dockerfile: deploy/Dockerfile.worker
+          - nome: backup
+            dockerfile: deploy/Dockerfile.backup
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: sha
+        run: echo "curto=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/${{ matrix.nome }}:latest
+            ghcr.io/${{ github.repository }}/${{ matrix.nome }}:${{ steps.sha.outputs.curto }}
+          cache-from: type=gha,scope=${{ matrix.nome }}
+          cache-to: type=gha,scope=${{ matrix.nome }},mode=max
