@@ -504,6 +504,7 @@ export const roteiros = pgTable(
      */
     geracaoId: integer("geracao_id").references(() => geracoesIA.id),
     status: text("status").$type<"gerado" | "gravado" | "postado">().notNull().default("gerado"),
+    gravadoEm: timestamp("gravado_em", { withTimezone: true }),
     urlPostado: text("url_postado"),
     postadoEm: timestamp("postado_em", { withTimezone: true }),
     criadoEm: criadoEm(),

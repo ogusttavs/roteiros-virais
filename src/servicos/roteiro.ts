@@ -403,7 +403,7 @@ export async function outroAngulo(roteiroId: number, motivo?: string): Promise<R
 export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
   const [roteiro] = await db()
     .update(roteiros)
-    .set({ status: "gravado" })
+    .set({ status: "gravado", gravadoEm: new Date() })
     .where(eq(roteiros.id, roteiroId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
@@ -466,7 +466,12 @@ export async function marcarPostado(roteiroId: number, url: string): Promise<Rot
 
   const [roteiro] = await db()
     .update(roteiros)
-    .set({ status: "postado", urlPostado: url, postadoEm: new Date() })
+    .set({
+      status: "postado",
+      urlPostado: url,
+      postadoEm: new Date(),
+      gravadoEm: atual.gravadoEm ?? new Date(),
+    })
     .where(eq(roteiros.id, roteiroId))
     .returning();
   if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");

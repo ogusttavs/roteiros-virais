@@ -97,7 +97,7 @@ type Props = {
 export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   const router = useRouter();
 
-  const [gravado, setGravado] = useState(roteiro.status !== "gerado");
+  const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
   const [postado, setPostado] = useState(roteiro.status === "postado");
   const [urlPostado, setUrlPostado] = useState(roteiro.urlPostado ?? "");
   const [painel, setPainel] = useState<Painel>(null);
@@ -118,7 +118,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
     iniciarTransicao(async () => {
       try {
         await marcarGravadoAction(roteiro.id);
-        setGravado(true);
+        setGravadoEm(new Date());
       } catch {
         setErro(true);
       }
@@ -132,7 +132,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
       try {
         await marcarPostadoAction(roteiro.id, urlDigitada.trim());
         setPostado(true);
-        setGravado(true);
+        setGravadoEm((atual) => atual ?? new Date());
         setUrlPostado(urlDigitada.trim());
         setPainel(null);
       } catch {
@@ -273,17 +273,12 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
 
       <div className={styles.acoes}>
         <div className={styles.linhaAcoes}>
-          {!gravado ? (
-            <button
-              type="button"
-              onClick={gravei}
-              disabled={pendente}
-              className={styles.botaoGravei}
-            >
+          {!gravadoEm ? (
+            <button type="button" onClick={gravei} disabled={pendente} className={styles.botaoGravei}>
               {textosRoteiro.gravei}
             </button>
           ) : (
-            <span className={styles.rotuloFeito}>{textosRoteiro.gravei}</span>
+            <span className={styles.rotuloFeito}>{textosRoteiro.gravadoAs(formatarHora(gravadoEm))}</span>
           )}
           {!postado ? (
             <button
