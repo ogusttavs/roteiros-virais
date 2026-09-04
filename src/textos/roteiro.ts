@@ -23,6 +23,9 @@ export const textosRoteiro = {
   },
   referencia: "Referência",
   carregandoVideo: "vídeo carregando",
+  semEvidencia:
+    "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. Este " +
+    "roteiro foi escrito só com o que funciona no seu nicho e com o seu briefing.",
   olhaComo: (t: string) => `olha como ele faz aos ${t}`,
   irPara: (t: string) => `ir para ${t}`,
   abrirReferencia: "abrir o vídeo de referência",

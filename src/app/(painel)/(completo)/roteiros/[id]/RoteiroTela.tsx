@@ -266,6 +266,11 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
               {textosRoteiro.irPara(formatarSegundo(referencia.segundo ?? 0))}
             </button>
           </section>
+        ) : corpo.semEvidencia ? (
+          <section className={styles.referencia}>
+            <h2 className={styles.tituloSecao}>{textosRoteiro.referencia}</h2>
+            <p className={styles.olhaComo}>{textosRoteiro.semEvidencia}</p>
+          </section>
         ) : null}
       </div>
 

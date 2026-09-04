@@ -14,8 +14,8 @@
 export const textosHoje = {
   titulo: "O que gravar hoje",
   constancia: {
-    seguidos: (n: number) => `${n} dias seguidos gravando`,
-    parado: (n: number) => `faz ${n} dias que você não grava`,
+    seguidos: (n: number) => `${n} dia${n === 1 ? "" : "s"} seguido${n === 1 ? "" : "s"} gravando`,
+    parado: (n: number) => `faz ${n} dia${n === 1 ? "" : "s"} que você não grava`,
     primeiroDia: "hoje é o seu primeiro dia",
   },
   evidencia: (n: number) => `${n} vídeo${n === 1 ? "" : "s"} fora da curva esta semana`,

@@ -243,6 +243,8 @@ async function gerarConteudo(
 
   const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA);
   const referenciaEscolhida = escolherReferencia(evidencias);
+  const semEvidencia = evidencias.length === 0;
+  const evidenciasFornecidas = evidencias.map((v) => v.id);
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -276,7 +278,8 @@ async function gerarConteudo(
       anguloParaEvitar: dados.anguloParaEvitar,
     }),
     proibicoes: perfil.fatos.proibicoes,
-    exigeEvidencia: true,
+    exigeEvidencia: !semEvidencia,
+    evidenciasFornecidas,
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,
   });
@@ -299,7 +302,15 @@ async function gerarConteudo(
       audio: saida.edicao.audio,
       referencia: referenciaEscolhida,
     },
-    evidencias: saida.evidencias,
+    /**
+     * Forcado a [] quando semEvidencia, em vez de confiar em saida.evidencias
+     * (revisao do PR #17): o verificador ja reprova qualquer id fora de
+     * evidenciasFornecidas, mas a tese do produto (sem evidencia, nao
+     * inventa) merece a segunda camada de defesa que o projeto sempre usa
+     * para saida de IA.
+     */
+    evidencias: semEvidencia ? [] : saida.evidencias,
+    semEvidencia,
   };
 
   return { conteudo, geracaoId, referenciaVideoId: referenciaEscolhida?.videoId ?? null };

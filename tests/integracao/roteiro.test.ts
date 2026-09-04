@@ -79,8 +79,8 @@ async function criarCliente(): Promise<number> {
   return cliente.id;
 }
 
-async function criarVideoEvidencia(idExterno: string, assunto: string) {
-  await db()
+async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<number> {
+  const [video] = await db()
     .insert(videos)
     .values({
       plataforma: "youtube",
@@ -99,7 +99,9 @@ async function criarVideoEvidencia(idExterno: string, assunto: string) {
         formato: "fala_para_camera",
         porQueFuncionou: "mostra o problema acontecendo de verdade",
       } as never,
-    });
+    })
+    .returning();
+  return video.id;
 }
 
 async function criarModeloNicho() {
@@ -204,6 +206,39 @@ describe("gerarRoteiro", () => {
         objetivo: "alcance",
       }),
     ).rejects.toThrow(ErroIA);
+  });
+
+  it("vídeo de referência aponta a evidência sem análise visual, aos 0s, com o gancho dela (revisão do PR #17)", async () => {
+    const clienteId = await criarCliente();
+    const videoId = await criarVideoEvidencia("ev-referencia", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.edicao.referencia).toEqual({
+      videoId,
+      segundo: 0,
+      oQueOlhar: "olha essa mancha saindo do estofado",
+    });
+  });
+
+  it("tema livre sem nenhuma evidência no banco: roteiro honesto, sem referência e sem citar id (ajuste 2 da revisão do PR #17)", async () => {
+    const clienteId = await criarCliente();
+    // nenhum video criado para este nicho: evidenciaParaRoteiro nao acha nada.
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "assunto sem nenhum video parecido no banco",
+      objetivo: "engajamento",
+    });
+
+    expect(roteiro.conteudo.semEvidencia).toBe(true);
+    expect(roteiro.conteudo.evidencias).toEqual([]);
+    expect(roteiro.conteudo.edicao.referencia).toBeNull();
+    expect(roteiro.geracaoId).not.toBeNull();
   });
 });
 

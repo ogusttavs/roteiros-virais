@@ -474,6 +474,13 @@ export type ConteudoRoteiro = {
   };
   /** Ids de video que sustentam o roteiro (etapa 11): a mesma lista que o verificador conferiu. */
   evidencias: number[];
+  /**
+   * Nao havia video fora da curva sobre o tema no banco (etapa 11, ajuste da
+   * revisao do PR #17): o roteiro foi escrito so a partir do perfil, do
+   * modelo do nicho e da camada exclusiva, sem citar nenhuma evidencia. A
+   * tela troca a secao "Referencia" por um aviso quando isto e verdadeiro.
+   */
+  semEvidencia: boolean;
 };
 
 export const roteiros = pgTable(

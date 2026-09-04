@@ -23,8 +23,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * fechamento, chamada final e momento chave de cada evidencia (nao so
  * assunto e gancho), e os ultimos roteiros do cliente, para nao repetir
  * angulo. Versao 1.2.0.
+ *
+ * Ajuste da revisao do PR #17: sem evidencia, a entrada diz explicitamente
+ * para nao citar nenhum id (antes so dizia "nenhuma evidencia disponivel",
+ * vago o bastante para o modelo inventar ids na segunda tentativa, achado
+ * rodando com chave real). Versao 1.3.0.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -132,9 +137,9 @@ export function montarEntrada(dados: {
    */
   anguloParaEvitar?: { gancho: string; corpo: string };
 }): string {
-  const listaEvidencias =
+  const blocoEvidencia =
     dados.evidencias.length > 0
-      ? dados.evidencias
+      ? `Evidencia disponivel:\n${dados.evidencias
           .map(
             (v) =>
               `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)\n` +
@@ -144,8 +149,9 @@ export function montarEntrada(dados: {
               `  chamada final: ${v.chamadaFinal}` +
               (v.momentoChave ? `\n  momento chave do vídeo: ${v.momentoChave}` : ""),
           )
-          .join("\n\n")
-      : "nenhuma evidencia disponivel";
+          .join("\n\n")}`
+      : "Não há vídeo fora da curva sobre este tema no banco. Escreva a partir do perfil, do " +
+        "modelo do nicho e da camada exclusiva; não cite nenhum id.";
 
   const listaRecentes =
     dados.roteirosRecentes.length > 0
@@ -160,7 +166,7 @@ export function montarEntrada(dados: {
       ? `O cliente já viu esta versão e pediu outro ângulo; não repita o gancho nem a estrutura ` +
         `dela:\ngancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
       : null,
-    `Evidencia disponivel:\n${listaEvidencias}`,
+    blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
   ].filter((parte): parte is string => Boolean(parte));
 
