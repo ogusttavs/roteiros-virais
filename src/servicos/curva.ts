@@ -221,3 +221,32 @@ export async function videoSubindoParaAviso(clienteId: number): Promise<AvisoVid
   }
   return null;
 }
+
+/**
+ * A curva de cada vídeo postado da lista de `roteiroId` de `/historico`,
+ * pelo `roteiroId` (decisão 5 do `PROXIMO.md`). Sem entrada no mapa para um
+ * `roteiroId` que não tem `videos_cliente` (ainda não postado).
+ */
+export async function curvasDoHistorico(
+  clienteId: number,
+  roteiroIds: number[],
+): Promise<Map<number, CurvaDeVideo>> {
+  const resultado = new Map<number, CurvaDeVideo>();
+  if (roteiroIds.length === 0) return resultado;
+
+  const videos = await db()
+    .select({
+      id: videosCliente.id,
+      roteiroId: videosCliente.roteiroId,
+      plataforma: videosCliente.plataforma,
+      idExterno: videosCliente.idExterno,
+    })
+    .from(videosCliente)
+    .where(inArray(videosCliente.roteiroId, roteiroIds));
+
+  for (const video of videos) {
+    if (video.roteiroId === null) continue;
+    resultado.set(video.roteiroId, await curvaDoVideo({ ...video, clienteId }));
+  }
+  return resultado;
+}

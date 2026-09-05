@@ -18,6 +18,7 @@ type RoteiroDeHoje = { id: number; objetivo: Objetivo; criadoEm: Date; corpo: Co
 type Props = {
   temas: TemaDoDia[];
   avisoLinhaEditorial: string | null;
+  avisoVideoSubindo: string | null;
   constancia: Constancia;
   roteiroHoje: RoteiroDeHoje | null;
 };
@@ -31,13 +32,13 @@ function horaDeHoje(data: Date): string {
 }
 
 /** `/hoje` (etapa 10, brief-frontend.md 6.3; o cartão de roteiro é a etapa 11, `HojeCelular.dc.html`). */
-export function HojeTela({ temas, avisoLinhaEditorial, constancia, roteiroHoje }: Props) {
+export function HojeTela({ temas, avisoLinhaEditorial, avisoVideoSubindo, constancia, roteiroHoje }: Props) {
   const router = useRouter();
   const [outrosAbertos, setOutrosAbertos] = useState(false);
 
   return (
     <div className={styles.pagina}>
-      <HojeCabecalho constancia={constancia} />
+      <HojeCabecalho constancia={constancia} avisoVideoSubindo={avisoVideoSubindo} />
 
       {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}
 

@@ -28,6 +28,12 @@
   color: var(--cor-texto-suave);
 }
 
+.avisoVideo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
 .aviso {
   margin: 0;
   padding: var(--espaco-4);

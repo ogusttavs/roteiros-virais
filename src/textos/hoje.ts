@@ -32,4 +32,6 @@ export const textosHoje = {
   verOutros: "ver outros temas de hoje",
   esconderOutros: "esconder os outros temas",
   trocar: "trocar",
+  avisoVideoSubindo: (dia: string, vezes: string) =>
+    `seu vídeo de ${dia} está ${vezes} acima do normal; responda os comentários hoje`,
 };
