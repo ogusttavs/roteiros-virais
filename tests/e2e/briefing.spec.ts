@@ -95,7 +95,11 @@ test.describe("briefing pela tela", () => {
 
     // rascunho da P2 sem avaliar, para testar que sobrevive ao recarregar.
     await page.getByLabel("produto ou serviço que mais vende").fill("rascunho da P2, ainda sem avaliar");
-    await page.waitForTimeout(1000); // debounce de 800ms do rascunho
+    // espera o indicador "salvo" aparecer em vez de um tempo fixo (achado da
+    // revisao da parte 1 de outra etapa: sob carga, o debounce de 800ms
+    // podia nao ter gravado ainda quando o reload disparava, e o campo
+    // voltava vazio).
+    await expect(page.getByText("salvo")).toBeVisible();
 
     await page.reload();
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();

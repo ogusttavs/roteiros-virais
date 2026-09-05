@@ -49,7 +49,7 @@ export function HistoricoTela({ resumo, grupos }: Props) {
       <Constancia
         numeros={numeros}
         dias={resumo.ultimos30Dias}
-        rotuloDias={`Últimos 30 dias: gravou em ${diasGravados} dias`}
+        rotuloDias={textosHistorico.ultimosDias(diasGravados)}
       />
 
       <div className={styles.grupos}>

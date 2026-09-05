@@ -30,6 +30,12 @@ export default defineConfig({
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
   forbidOnly: !!process.env.CI,
+  /**
+   * `retries: 1` em CI esconde corrida de teste (achado da revisão da etapa
+   * 12, parte 1): toda falha que só aparece local, sob carga, e passa na
+   * segunda tentativa é corrida de teste ou corrida de produto de verdade,
+   * nunca "ambiente". Investigar a causa real em vez de confiar no retry.
+   */
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   /**

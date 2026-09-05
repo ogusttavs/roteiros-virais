@@ -28,7 +28,8 @@
     "ia:fumaca": "tsx scripts/ia-fumaca.ts",
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",
-    "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts"
+    "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
+    "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

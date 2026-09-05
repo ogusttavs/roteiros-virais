@@ -18,8 +18,11 @@ type Props = {
   analise: AnaliseLinha[];
   embed: VideoEmbedProps;
   salvo: boolean;
+  /** Enquanto a Server Action de favoritar não responde (achado da revisão da parte 1). */
+  salvando?: boolean;
   rotuloUsar: string;
   rotuloSalvar: string;
+  rotuloSalvando: string;
   onSalvar: () => void;
   onUsar: () => void;
 };
@@ -33,8 +36,10 @@ export function ReferenciaCartao({
   analise,
   embed,
   salvo,
+  salvando = false,
   rotuloUsar,
   rotuloSalvar,
+  rotuloSalvando,
   onSalvar,
   onUsar,
 }: Props) {
@@ -63,7 +68,8 @@ export function ReferenciaCartao({
         <button
           type="button"
           aria-pressed={salvo}
-          aria-label={rotuloSalvar}
+          aria-label={salvando ? rotuloSalvando : rotuloSalvar}
+          disabled={salvando}
           onClick={onSalvar}
           className={styles.salvar}
         >

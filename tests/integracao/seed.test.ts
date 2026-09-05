@@ -2,10 +2,11 @@
  * Migra do zero, roda o seed, confere contagens e a unicidade de
  * (plataforma, id_externo) (etapa 2, criterio de aceite).
  */
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { videos } from "@/db/schema";
+import { briefings, clientes, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { semear } from "../../scripts/semear";
@@ -32,6 +33,20 @@ describe("seed", () => {
     for (const v of todos) {
       expect(v.origem).toBe("seed");
       expect(v.titulo?.startsWith("[exemplo]")).toBe(true);
+    }
+  });
+
+  it("os dois clientes de seed ja tem briefing completo com perfil compilado (etapa 12, ajuste 3)", async () => {
+    const linhas = await db()
+      .select({ perfil: briefings.perfil, completo: briefings.completo })
+      .from(briefings)
+      .innerJoin(clientes, eq(clientes.id, briefings.clienteId));
+
+    expect(linhas).toHaveLength(2);
+    for (const linha of linhas) {
+      expect(linha.completo).toBe(true);
+      expect(linha.perfil?.resumo).toBeTruthy();
+      expect(linha.perfil?.fatos.oQueVende).toBeTruthy();
     }
   });
 

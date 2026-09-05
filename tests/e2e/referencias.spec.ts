@@ -98,7 +98,11 @@ test.describe("favoritar em /referencias", () => {
 
     await cartao.getByRole("button", { name: "salvar nos favoritos" }).click();
     await expect(page.getByText("salvo; entra como referência no seu briefing")).toBeVisible();
+    // espera a Server Action responder de verdade (botao sai de "salvando" e
+    // fica desabilitado ate la, achado da revisao da parte 1): sem isso, o
+    // reload logo abaixo podia abortar o pedido antes de gravar no banco.
     await expect(cartao.getByRole("button", { name: "remover dos favoritos" })).toBeVisible();
+    await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "favoritos", exact: true }).click();
     await expect(cartao).toBeVisible();

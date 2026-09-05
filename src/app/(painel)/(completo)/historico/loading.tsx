@@ -7,7 +7,7 @@ export default function CarregandoHistorico() {
   return (
     <div className={styles.pagina}>
       <Skeleton variante="titulo" largura="40%" />
-      <div style={{ display: "flex", gap: "var(--espaco-8)" }}>
+      <div className={styles.numerosCarregando}>
         <Skeleton variante="numero" largura="48px" />
         <Skeleton variante="numero" largura="48px" />
         <Skeleton variante="numero" largura="48px" />

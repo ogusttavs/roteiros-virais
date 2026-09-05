@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, nichos, roteiros, user } from "../../src/db/schema";
+import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-historico@exemplo.teste";
@@ -84,7 +85,7 @@ test.describe("historico com roteiro gravado", () => {
       .insert(roteiros)
       .values({
         clienteId: cliente.id,
-        data: new Date().toISOString().slice(0, 10),
+        data: hojeISO(),
         tema: "o produto que tira qualquer mancha do e2e",
         origem: "sugerido",
         objetivo: "alcance",

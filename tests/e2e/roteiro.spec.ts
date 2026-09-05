@@ -19,13 +19,10 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, nichos, temasDia, user, videos, type TemaDoDia } from "../../src/db/schema";
+import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-roteiro@exemplo.teste";
-
-function hojeIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 test.describe("roteiro pela tela", () => {
   test.beforeAll(async () => {
@@ -114,7 +111,7 @@ test.describe("roteiro pela tela", () => {
         puxaPara: "alcance",
       },
     ];
-    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeIso(), temas });
+    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).

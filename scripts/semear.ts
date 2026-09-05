@@ -13,6 +13,7 @@ import { hashPassword } from "better-auth/crypto";
 import type { Db } from "../src/db";
 import {
   account,
+  briefings,
   clientes,
   contas,
   nichos,
@@ -20,6 +21,7 @@ import {
   videos,
   type AnaliseVideo,
   type Plataforma,
+  type PerfilCompilado,
 } from "../src/db/schema";
 
 const SENHA_DEV = "ExemploSenha123";
@@ -197,6 +199,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       bairro: string;
       perfil: string;
       quemGrava: "propria_pessoa" | "pessoa_e_equipe";
+      perfilCompilado: PerfilCompilado;
     }
   > = {
     dentistas: {
@@ -206,6 +209,25 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       bairro: "Pinheiros",
       perfil: "exemplo_sorriso_novo",
       quemGrava: "propria_pessoa",
+      perfilCompilado: {
+        fatos: {
+          oQueVende: "consultas e tratamentos odontologicos, clareamento e ortodontia",
+          preco: "consulta a partir de 150 reais, clareamento a partir de 400 reais",
+          clienteIdeal: "familia da regiao, adultos que evitam o dentista por medo ou vergonha do sorriso",
+          medos: ["medo de sentir dor", "vergonha do estado dos dentes", "medo de gastar e nao resolver"],
+          frasesDaFala: [
+            '"aqui a gente explica tudo antes de fazer"',
+            '"voce nao sai daqui sem entender o proprio tratamento"',
+          ],
+          proibicoes: ["nunca prometer resultado antes de examinar o paciente"],
+          cenasFilmaveis: ["consultorio", "cadeira de atendimento", "sorriso do paciente antes e depois"],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo:
+          "Clinica odontologica de bairro, atende familia da regiao, forte em clareamento e ortodontia, fala direto sobre medo e vergonha do sorriso.",
+        referencias: [],
+      },
     },
     "limpeza-e-organizacao-da-casa": {
       usuarioId: "seed-cliente-limpeza",
@@ -214,6 +236,22 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       bairro: "Batel",
       perfil: "exemplo_casa_em_ordem",
       quemGrava: "pessoa_e_equipe",
+      perfilCompilado: {
+        fatos: {
+          oQueVende: "produtos de limpeza multiuso e servico de organizacao de ambientes",
+          preco: "kit de produtos a partir de 80 reais, visita de organizacao a partir de 250 reais",
+          clienteIdeal: "quem mora em apartamento e nao tem tempo para organizar a casa sozinho",
+          medos: ["medo de produto forte fazer mal para criança ou animal", "vergonha da casa bagunçada"],
+          frasesDaFala: ['"a gente resolve sem produto que faz mal para ninguem em casa"'],
+          proibicoes: ["nunca usar produto com cheiro forte demais nas demonstracoes"],
+          cenasFilmaveis: ["cozinha", "sala antes e depois da organizacao", "produto sendo usado de verdade"],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo:
+          "Marca de produtos de limpeza e organizacao para quem mora em apartamento, fala direto sobre praticidade e seguranca para criança e animal.",
+        referencias: [],
+      },
     },
   };
 
@@ -239,17 +277,34 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       email: `${clienteSeed.usuarioId}@exemplo.teste`,
       role: "cliente",
     });
-    await db.insert(clientes).values({
-      usuarioId: clienteSeed.usuarioId,
-      nome: clienteSeed.nome,
-      nichoId: nicho.id,
-      cidade: clienteSeed.cidade,
-      bairro: clienteSeed.bairro,
-      persona: "negocio",
-      perfis: { instagram: `@${clienteSeed.perfil}`, tiktok: null, youtube: null },
-      quemGrava: clienteSeed.quemGrava,
-    });
+    const [clienteCriado] = await db
+      .insert(clientes)
+      .values({
+        usuarioId: clienteSeed.usuarioId,
+        nome: clienteSeed.nome,
+        nichoId: nicho.id,
+        cidade: clienteSeed.cidade,
+        bairro: clienteSeed.bairro,
+        persona: "negocio",
+        perfis: { instagram: `@${clienteSeed.perfil}`, tiktok: null, youtube: null },
+        quemGrava: clienteSeed.quemGrava,
+      })
+      .returning();
     totalClientes += 1;
+
+    /**
+     * Briefing ja compilado e completo (etapa 12, ajuste 3 da revisao da
+     * parte 1): sem isso, `gerarRoteiro` recusa o cliente de seed com "o
+     * briefing deste cliente ainda nao foi compilado", e nem `scripts/
+     * capturas.ts` nem uma sessao testando /roteiros/[id] a mao conseguem
+     * ver a tela sem inserir isso na unha toda vez.
+     */
+    await db.insert(briefings).values({
+      clienteId: clienteCriado.id,
+      completo: true,
+      notaGeral: "8.5",
+      perfil: clienteSeed.perfilCompilado,
+    });
 
     const contasParaVideo = contasCriadas.map((c) => ({
       id: c.id,
