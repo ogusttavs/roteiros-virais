@@ -80,9 +80,9 @@ Editar com redirecionamento no mesmo arquivo (por exemplo `cat /tmp/novo > Caddy
 ssh getorbita-vps 'cd /srv/proxy && diff Caddyfile <(docker exec proxy-caddy-1 cat /etc/caddy/Caddyfile)'
 ```
 
-Se divergir (o caso mais comum: a edicao foi feita antes de o `docker-compose.yml` do proxy
-existir, ou o inode mudou por outro motivo), recriar o container basta e custa poucos
-segundos fora do ar, so deste produto no proxy:
+Se divergir (a causa e sempre uma ferramenta que grava um arquivo novo e renomeia por cima
+do antigo: `sed -i`, e varios editores de texto fazem o mesmo), recriar o container basta e
+custa poucos segundos fora do ar, so deste produto no proxy:
 
 ```bash
 ssh getorbita-vps 'cd /srv/proxy && docker compose up -d --force-recreate'
@@ -102,9 +102,11 @@ ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh agora'
 ssh getorbita-vps 'docker run --rm -v roteiros_backups:/b alpine ls -la /b'
 ```
 
-A senha do primeiro admin fica em `/srv/roteiros/admin-inicial.senha` (`600`), so na
-primeira vez que `scripts/criar-admin.ts` gera uma senha na hora; ler, guardar num
-gerenciador de senhas e apagar o arquivo:
+A senha do primeiro admin foi gerada e gravada a mao pelo Fable, uma vez so, no deploy de
+05/09/2026, em `/srv/roteiros/admin-inicial.senha` (`600`); o Gustavo le, guarda num
+gerenciador de senhas e apaga o arquivo. `scripts/criar-admin.ts` nunca escreve esse
+arquivo: para os proximos admins, quem roda `admin:criar` escolhe a senha em `ADMIN_SENHA`
+e entrega por um canal seguro, nada fica gravado na maquina.
 
 ```bash
 ssh getorbita-vps 'cat /srv/roteiros/admin-inicial.senha'

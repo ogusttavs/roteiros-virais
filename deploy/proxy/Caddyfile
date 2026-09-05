@@ -10,7 +10,7 @@
 # pelo Let's Encrypt e pelo ZeroSSL ("Domain name needs at least one dot").
 
 {
-	email gustavs.silvs@gmail.com
+	email {$CADDY_EMAIL:gustavs.silvs@gmail.com}
 }
 
 # roteiros
