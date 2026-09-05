@@ -60,9 +60,23 @@ function linha(rotulo: string, texto: string): string {
   return `  ${rotulo}: ${texto}`;
 }
 
-async function main() {
+export type ResultadoAvaliarRoteiros = {
+  conjunto: string;
+  ehExemplo: boolean;
+  casos: number;
+  /** So os titulos gerados: o roteiro inteiro e so para leitura humana no terminal. */
+  titulos: string[];
+};
+
+/**
+ * Mesmo raciocinio de `avaliarBriefing` em `avaliar-briefing.ts`, mas sem
+ * diferenca numerica (o julgamento e "o Gustavo leria isso e gravaria?",
+ * comentario no topo do arquivo).
+ */
+export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
   const { caminho, ehExemplo } = caminhoDoConjunto();
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
+  const titulos: string[] = [];
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
@@ -93,6 +107,7 @@ async function main() {
     });
 
     const saida = resultado.dados;
+    titulos.push(saida.titulo);
 
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s\n`);
@@ -122,9 +137,13 @@ async function main() {
     console.log(`\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`);
     console.log(`custo aproximado: ${resultado.modelo}\n`);
   }
+
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos };
 }
 
-main().catch((erro: unknown) => {
-  console.error(erro);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  avaliarRoteiros().catch((erro: unknown) => {
+    console.error(erro);
+    process.exitCode = 1;
+  });
+}

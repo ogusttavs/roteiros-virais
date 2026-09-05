@@ -38,7 +38,22 @@ function caminhoDoConjunto(): { caminho: string; ehExemplo: boolean } {
   };
 }
 
-async function main() {
+export type ResultadoAvaliarBriefing = {
+  conjunto: string;
+  ehExemplo: boolean;
+  casos: number;
+  diferencaMedia: number;
+  acimaDaMeta: boolean;
+};
+
+const META_DIFERENCA = 1.0;
+
+/**
+ * Roda o conjunto inteiro e imprime cada caso (npm run avaliar:briefing) e
+ * devolve o resumo numerico, para `avaliar-tudo.ts` gravar num JSON so
+ * (etapa 18, decisao 4 do `PROXIMO.md`) sem precisar reler o stdout.
+ */
+export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
   const { caminho, ehExemplo } = caminhoDoConjunto();
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
 
@@ -79,13 +94,25 @@ async function main() {
   }
 
   const diferencaMedia = casosAvaliados > 0 ? somaDiferencas / casosAvaliados : 0;
+  const acimaDaMeta = diferencaMedia >= META_DIFERENCA;
   console.log(`\ndiferenca media: ${diferencaMedia.toFixed(2)}`);
-  if (diferencaMedia >= 1.0) {
+  if (acimaDaMeta) {
     console.log("acima da meta de 1,0 (plano de execucao, etapa 5).");
   }
+
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diferencaMedia, acimaDaMeta };
 }
 
-main().catch((erro: unknown) => {
-  console.error(erro);
-  process.exitCode = 1;
-});
+/**
+ * So dispara ao rodar `tsx scripts/avaliar-briefing.ts` direto (`npm run
+ * avaliar:briefing`), nunca quando `avaliar-tudo.ts` importa a funcao: os
+ * dois rodam no mesmo processo CommonJS do tsx, entao `require.main` e o
+ * script que foi chamado na linha de comando, nao este arquivo, quando e
+ * so um import.
+ */
+if (require.main === module) {
+  avaliarBriefing().catch((erro: unknown) => {
+    console.error(erro);
+    process.exitCode = 1;
+  });
+}

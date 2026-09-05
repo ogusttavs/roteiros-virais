@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "checar-texto": "tsx scripts/checar-texto.ts",
     "checar-tokens": "tsx scripts/checar-tokens.ts",
+    "checar-versao-prompt": "tsx scripts/checar-versao-prompt.ts",
     "db:up": "docker compose -f compose.dev.yml up -d",
     "db:down": "docker compose -f compose.dev.yml down",
     "db:generate": "drizzle-kit generate",
@@ -30,6 +31,7 @@
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",
     "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
+    "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts"
   },
   "dependencies": {

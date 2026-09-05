@@ -4,7 +4,7 @@
  * leitura, sem regra de negocio: as telas `/admin/nichos` e `/admin/jobs`
  * chamam direto.
  */
-import { and, count, desc, eq, inArray, max } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, max, sql, sum } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -25,6 +25,11 @@ import {
 } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import { constanciaDoCliente } from "@/servicos/temas";
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+function diasAtras(dias: number): Date {
+  return new Date(Date.now() - dias * DIA_MS);
+}
 
 export type ContagemPlataforma = Record<Plataforma, number>;
 
@@ -319,8 +324,21 @@ export type GeracaoResumo = {
   criadoEm: Date;
 };
 
-/** /admin/geracoes (etapa 12, decisão 8 do `PROXIMO.md`): as ultimas gerações, mais recentes primeiro. So leitura. */
-export async function listarGeracoesRecentes(limite = 50): Promise<GeracaoResumo[]> {
+export type FiltroGeracoes = { tarefa?: string; clienteId?: number };
+
+function condicaoFiltro(filtro?: FiltroGeracoes) {
+  const condicoes = [];
+  if (filtro?.tarefa) condicoes.push(eq(geracoesIA.tarefa, filtro.tarefa));
+  if (filtro?.clienteId) condicoes.push(eq(geracoesIA.clienteId, filtro.clienteId));
+  return condicoes.length > 0 ? and(...condicoes) : undefined;
+}
+
+/**
+ * /admin/geracoes (etapa 12, decisão 8 do `PROXIMO.md`; filtro por tarefa e
+ * cliente na etapa 18, decisão 1 do `PROXIMO.md`): as ultimas gerações, mais
+ * recentes primeiro. So leitura.
+ */
+export async function listarGeracoesRecentes(limite = 50, filtro?: FiltroGeracoes): Promise<GeracaoResumo[]> {
   const linhas = await db()
     .select({
       id: geracoesIA.id,
@@ -333,10 +351,157 @@ export async function listarGeracoesRecentes(limite = 50): Promise<GeracaoResumo
       criadoEm: geracoesIA.criadoEm,
     })
     .from(geracoesIA)
+    .where(condicaoFiltro(filtro))
     .orderBy(desc(geracoesIA.criadoEm))
     .limit(limite);
 
   return linhas.map((l) => ({ ...l, custoUsd: Number(l.custoUsd) }));
+}
+
+/** As tarefas com pelo menos uma geração, para o filtro de `/admin/geracoes`. */
+export async function listarTarefasComGeracao(): Promise<string[]> {
+  const linhas = await db().selectDistinct({ tarefa: geracoesIA.tarefa }).from(geracoesIA).orderBy(geracoesIA.tarefa);
+  return linhas.map((l) => l.tarefa);
+}
+
+/** Os clientes com pelo menos uma geração, para o filtro de `/admin/geracoes`. */
+export async function listarClientesComGeracao(): Promise<{ id: number; nome: string }[]> {
+  const linhas = await db()
+    .selectDistinct({ id: clientes.id, nome: clientes.nome })
+    .from(geracoesIA)
+    .innerJoin(clientes, eq(clientes.id, geracoesIA.clienteId))
+    .orderBy(clientes.nome);
+  return linhas;
+}
+
+export type MotivosPorTarefa = { tarefa: string; motivos: { motivo: string; contagem: number }[] };
+
+export type ResumoGeracoes = {
+  periodoDias: 7 | 30;
+  totalGeracoes: number;
+  custoTotalUsd: number;
+  custoMedioUsd: number;
+  tokensEntrada: number;
+  tokensSaida: number;
+  tokensCache: number;
+  /** tokensCache / (tokensEntrada + tokensCache); null sem nenhum token de entrada. */
+  proporcaoCache: number | null;
+  avaliadas: number;
+  /** As tres taxas somam 1 (100%) sobre `avaliadas`, nunca sobre `totalGeracoes`: a
+   * maioria das tarefas (tema, briefing, modelo do nicho) nunca recebe avaliacao do
+   * cliente, so o roteiro recebe (revisao do Fable: conferir contra o banco). */
+  taxaGostei: number | null;
+  taxaNaoGostei: number | null;
+  taxaOutroAngulo: number | null;
+  /** Os 5 motivos de "outro angulo" mais frequentes, por tarefa (decisao 3 do PROXIMO.md). */
+  motivosOutroAnguloPorTarefa: MotivosPorTarefa[];
+};
+
+const MOTIVOS_POR_TAREFA_LIMITE = 5;
+
+/**
+ * Resumo de `/admin/geracoes` (etapa 18, decisao 1 a 3 do `PROXIMO.md`): custo,
+ * tokens e taxa de avaliacao dos ultimos `dias` dias, com filtro opcional por
+ * tarefa e por cliente. So leitura, sem texto de roteiro de cliente nenhum.
+ */
+export async function resumoGeracoes(opcoes: {
+  dias: 7 | 30;
+  tarefa?: string;
+  clienteId?: number;
+}): Promise<ResumoGeracoes> {
+  const desde = gte(geracoesIA.criadoEm, diasAtras(opcoes.dias));
+  const filtroExtra = condicaoFiltro({ tarefa: opcoes.tarefa, clienteId: opcoes.clienteId });
+  const filtro = filtroExtra ? and(desde, filtroExtra) : desde;
+
+  const [totais] = await db()
+    .select({
+      totalGeracoes: count(),
+      custoTotalUsd: sum(geracoesIA.custoUsd),
+      tokensEntrada: sum(geracoesIA.tokensEntrada),
+      tokensSaida: sum(geracoesIA.tokensSaida),
+      tokensCache: sum(geracoesIA.tokensCache),
+    })
+    .from(geracoesIA)
+    .where(filtro);
+
+  const [avaliacoesLinha] = await db()
+    .select({
+      avaliadas: count(),
+      gostei: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'gostei')`,
+      naoGostei: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'nao_gostei')`,
+      outroAngulo: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'outro_angulo')`,
+    })
+    .from(geracoesIA)
+    .where(and(filtro, isNotNull(geracoesIA.avaliacao)));
+
+  const motivoNormalizado = sql<string>`trim(lower(${geracoesIA.motivoAvaliacao}))`;
+  const linhasMotivos = await db()
+    .select({ tarefa: geracoesIA.tarefa, motivo: motivoNormalizado, contagem: count() })
+    .from(geracoesIA)
+    .where(
+      and(
+        filtro,
+        eq(geracoesIA.avaliacao, "outro_angulo"),
+        isNotNull(geracoesIA.motivoAvaliacao),
+        sql`trim(${geracoesIA.motivoAvaliacao}) <> ''`,
+      ),
+    )
+    .groupBy(geracoesIA.tarefa, motivoNormalizado)
+    .orderBy(desc(count()));
+
+  const motivosPorTarefa = new Map<string, { motivo: string; contagem: number }[]>();
+  for (const linha of linhasMotivos) {
+    const lista = motivosPorTarefa.get(linha.tarefa) ?? [];
+    if (lista.length < MOTIVOS_POR_TAREFA_LIMITE) lista.push({ motivo: linha.motivo, contagem: linha.contagem });
+    motivosPorTarefa.set(linha.tarefa, lista);
+  }
+
+  const totalGeracoes = totais.totalGeracoes;
+  const custoTotalUsd = Number(totais.custoTotalUsd ?? 0);
+  const tokensEntrada = Number(totais.tokensEntrada ?? 0);
+  const tokensSaida = Number(totais.tokensSaida ?? 0);
+  const tokensCache = Number(totais.tokensCache ?? 0);
+  const avaliadas = avaliacoesLinha.avaliadas;
+
+  return {
+    periodoDias: opcoes.dias,
+    totalGeracoes,
+    custoTotalUsd,
+    custoMedioUsd: totalGeracoes > 0 ? custoTotalUsd / totalGeracoes : 0,
+    tokensEntrada,
+    tokensSaida,
+    tokensCache,
+    proporcaoCache: tokensEntrada + tokensCache > 0 ? tokensCache / (tokensEntrada + tokensCache) : null,
+    avaliadas,
+    taxaGostei: avaliadas > 0 ? avaliacoesLinha.gostei / avaliadas : null,
+    taxaNaoGostei: avaliadas > 0 ? avaliacoesLinha.naoGostei / avaliadas : null,
+    taxaOutroAngulo: avaliadas > 0 ? avaliacoesLinha.outroAngulo / avaliadas : null,
+    motivosOutroAnguloPorTarefa: [...motivosPorTarefa.entries()].map(([tarefa, motivos]) => ({ tarefa, motivos })),
+  };
+}
+
+export type CustoClienteMes = { clienteId: number; nomeCliente: string; custoUsd: number; acimaDaMeta: boolean };
+
+/** US$/mes por cliente antes de virar preocupacao (decisao 2 do `PROXIMO.md`). */
+export const META_CUSTO_CLIENTE_USD = 5;
+
+/**
+ * Soma do custo dos ultimos 30 dias por cliente (decisao 2 do `PROXIMO.md`),
+ * quem passou da meta primeiro.
+ */
+export async function custoPorClientePorMes(): Promise<CustoClienteMes[]> {
+  const linhas = await db()
+    .select({ clienteId: clientes.id, nomeCliente: clientes.nome, custoUsd: sum(geracoesIA.custoUsd) })
+    .from(geracoesIA)
+    .innerJoin(clientes, eq(clientes.id, geracoesIA.clienteId))
+    .where(gte(geracoesIA.criadoEm, diasAtras(30)))
+    .groupBy(clientes.id, clientes.nome)
+    .orderBy(desc(sum(geracoesIA.custoUsd)));
+
+  return linhas.map((l) => {
+    const custoUsd = Number(l.custoUsd ?? 0);
+    return { clienteId: l.clienteId, nomeCliente: l.nomeCliente, custoUsd, acimaDaMeta: custoUsd > META_CUSTO_CLIENTE_USD };
+  });
 }
 
 export type GeracaoDetalhe = GeracaoResumo & {

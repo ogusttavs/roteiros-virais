@@ -8,6 +8,10 @@
  * seed (`dentistas`, `produtos-de-limpeza`).
  */
 import { expect, test } from "@playwright/test";
+import { desc } from "drizzle-orm";
+
+import { db } from "../../src/db";
+import { verification } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
@@ -15,7 +19,7 @@ const NOME_NICHO = "[exemplo e2e] Nicho de teste";
 const SLUG_NICHO = "exemplo-e2e-nicho-de-teste";
 const EMAIL_CLIENTE = "cliente-nicho-e2e@exemplo.teste";
 
-test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente", async ({ page }) => {
+test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente", async ({ page, browser }) => {
   // Dois fluxos num teste so (criar nicho, depois criar cliente com ele), varias
   // navegacoes de pagina inteira: o padrao de 30s aperta (briefing.spec.ts tem o
   // mesmo ajuste para o fluxo mais longo daquela suite).
@@ -55,4 +59,25 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await modalConvidar.getByRole("button", { name: "convidar por e-mail" }).click();
 
   await expect(page.getByRole("status")).toContainText(EMAIL_CLIENTE);
+
+  // O cliente novo entra pelo link magico (mesmo caminho de
+  // entrar-e-convidar.spec.ts): o token fica em verification, o mesmo dado que
+  // aparece no link logado.
+  const [linha] = await db()
+    .select({ token: verification.identifier })
+    .from(verification)
+    .orderBy(desc(verification.createdAt))
+    .limit(1);
+  expect(linha?.token).toBeTruthy();
+
+  const contextoCliente = await browser.newContext();
+  const paginaCliente = await contextoCliente.newPage();
+  await paginaCliente.goto(
+    `/api/auth/magic-link/verify?token=${linha.token}&callbackURL=%2Fcomecar`,
+  );
+
+  await expect(paginaCliente).toHaveURL(/\/comecar/);
+  await expect(paginaCliente.getByText("Vamos montar o seu briefing")).toBeVisible();
+
+  await contextoCliente.close();
 });
