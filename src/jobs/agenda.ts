@@ -7,7 +7,9 @@
  * sao semanais tambem, domingo 05:00 e 06:00, depois da vigilancia e das
  * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`). `temasDoDia` e
  * diario, 05:30, depois de `transcrever` (etapa 10, decisao 2 do
- * `PROXIMO.md`).
+ * `PROXIMO.md`). `curvaCliente` e a cada hora cheia, as :05 (decisao 1 da
+ * etapa 15, parte 1), 5 minutos depois de `lembrete` so para nao competir
+ * pelo mesmo minuto exato.
  */
 import { boss, FILAS } from "./fila";
 
@@ -87,6 +89,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.lembrete,
     cron: "0 * * * *",
     descricao: "lembrete por e-mail, a cada hora cheia, para quem ainda nao abriu o painel hoje",
+  },
+  {
+    fila: FILAS.curvaCliente,
+    cron: "5 * * * *",
+    descricao: "curva de viralizacao dos videos postados, a cada hora cheia (as :05)",
   },
 ];
 

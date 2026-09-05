@@ -26,6 +26,7 @@ export const FILAS = {
   modeloNicho: "modelo-nicho",
   temasDoDia: "temas-do-dia",
   lembrete: "lembrete",
+  curvaCliente: "curva-cliente",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

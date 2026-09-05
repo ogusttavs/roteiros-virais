@@ -26,13 +26,24 @@ function dataDeHojePorExtenso(): string {
  * (etapa 12, decisão 4 do `PROXIMO.md`, `HojeCelular.dc.html`: só essa
  * linha, não o componente `Constancia` inteiro). Server Component puro,
  * para o estado vazio de `page.tsx` usar sem precisar de `"use client"`.
+ *
+ * `avisoVideoSubindo` (etapa 15, parte 1, decisão 4): uma linha curta
+ * quando algum vídeo postado está acima do normal da própria conta, em
+ * todo estado tambem, ja formatada por quem chama.
  */
-export function HojeCabecalho({ constancia }: { constancia: Constancia }) {
+export function HojeCabecalho({
+  constancia,
+  avisoVideoSubindo = null,
+}: {
+  constancia: Constancia;
+  avisoVideoSubindo?: string | null;
+}) {
   return (
     <div className={styles.cabecalho}>
       <span className={styles.data}>{dataDeHojePorExtenso()}</span>
       <h1 className={styles.titulo}>{textosHoje.titulo}</h1>
       <p className={styles.constancia}>{fraseConstancia(constancia)}</p>
+      {avisoVideoSubindo ? <p className={styles.avisoVideo}>{avisoVideoSubindo}</p> : null}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteDoUsuario } from "@/servicos/clientes";
+import { curvasDoHistorico } from "@/servicos/curva";
 import { agruparPorSemana } from "@/servicos/historico-regras";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { resumoHistorico } from "@/servicos/temas";
@@ -34,5 +35,9 @@ export default async function Historico() {
     );
   }
 
-  return <HistoricoTela resumo={resumo} grupos={agruparPorSemana(roteiros)} />;
+  const idsPostados = roteiros.filter((r) => r.status === "postado").map((r) => r.id);
+  const curvas = await curvasDoHistorico(cliente.id, idsPostados);
+  const comCurva = roteiros.map((r) => ({ ...r, curva: curvas.get(r.id) ?? null }));
+
+  return <HistoricoTela resumo={resumo} grupos={agruparPorSemana(comCurva)} />;
 }

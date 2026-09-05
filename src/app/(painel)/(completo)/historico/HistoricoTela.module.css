@@ -75,6 +75,12 @@
   text-wrap: pretty;
 }
 
+.itemMedida {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+  text-wrap: pretty;
+}
+
 .itemStatus {
   flex: none;
   font-family: var(--fonte-mono);

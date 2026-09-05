@@ -75,6 +75,10 @@ tests/              integração e e2e; unitários ficam ao lado do arquivo (*.t
   rodam em `AI_PROVIDER=mock`. A suíte e2e sobe o app em modo produção com `MODO_E2E=1` e
   as chaves reais zeradas no `webServer.env`; nunca rode o app em `NODE_ENV=production` com
   o `.env` real fora do Playwright (em 05/09 isso mandou e-mail de verdade pelo Resend).
+  Todo `<select>` que um e2e precisa achar por rótulo leva `aria-label` igual ao texto do
+  rótulo visível; um `<label>` ao redor não basta para o `getByLabel` do Playwright achar o
+  elemento (achado nas etapas 24 e 18, `ModalConvidarCliente.tsx` e `FiltroGeracoes.tsx`,
+  provado nos dois sentidos nas duas telas).
 - **Commits** convencionais em português: `feat(briefing): nota por resposta`,
   `fix(coleta): cota do youtube`. Um PR por etapa, título `etapa N: nome`.
 - **Commit e push a cada bloco que compila**, com prefixo `wip:` enquanto a etapa não
