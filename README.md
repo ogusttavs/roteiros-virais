@@ -40,12 +40,15 @@ npm run lint && npm run typecheck && npm run test && npm run checar-texto && npm
 npm run test:e2e
 ```
 
-`npm run test` usa o Postgres do `db:up` (testes de integracao contra banco real).
+`npm run test` usa o Postgres do `db:up` (testes de integracao contra banco real). `npm run
+test:e2e` builda e sobe o servidor de producao (`next build` mais `next start`) sozinho, sem
+precisar de nada rodando antes. `deploy/ensaio/ensaiar.sh` e o ensaio do Compose de producao
+nesta maquina, antes de qualquer deploy (`deploy/README.md`).
 
 ## Estado
 
-Etapa 2 (02/09/2026): schema completo do MVP migrado, seed com administrador, dois nichos e
-um cliente de teste por nicho. Autenticacao ainda nao tem tela nem middleware (entra na
-etapa 3); as tabelas do better-auth (`user`, `session`, `account`, `verification`) ja
-existem porque `clientes` referencia `user`. As telas de produto, os jobs e os prompts
-entram etapa por etapa, conforme o plano de execucao.
+Etapas 1 a 13 e D completas na `main` (05/09/2026): banco e autenticacao, briefing, coleta e
+transcricao, temas e roteiro, referencias e historico, lembrete, termos e admin, deploy. O
+painel esta em producao na VPS compartilhada com o OdontoTech, endereco provisorio
+`https://app.srv1953618.hstgr.cloud`, ate existir dominio proprio. Proxima etapa: dez dias
+de teste com a Dr.Wash, do Gustavo, nao do codigo. Lista item a item: `../TODO.md`.

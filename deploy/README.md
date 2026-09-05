@@ -22,17 +22,39 @@ com as tags `latest` e o sha curto. A VPS so puxa.
 
 ## Primeiro deploy (uma vez)
 
-1. Dominio com registro A de `app.<dominio>` para `179.199.142.54`.
-2. `/srv/roteiros/.env` na VPS (`chmod 600`), com `APP_URL`, `BETTER_AUTH_URL` e
-   `EMAIL_FROM` ja com o dominio, `EMAIL_CONTATO` (mostrado em `/termos` e `/privacidade`),
-   `POSTGRES_PASSWORD` igual a senha da `DATABASE_URL`, e `SENTRY_DSN` quando a conta
-   existir (etapa 13, decisao 1 e 5 do `PROXIMO.md`). Sem `EMAIL_CONTATO`, o texto mostra
-   "contato@localhost"; sem `SENTRY_DSN`, o Sentry simplesmente nao inicia (nada quebra,
-   nenhum erro vai para lugar nenhum alem do `docker logs`).
-3. Proxy compartilhado no ar (`/srv/proxy`, rede `web`): ver `proxy/`. Descomentar o bloco
-   `roteiros` no `Caddyfile` com o dominio, validar e recarregar.
-4. Imagens publicadas (o workflow roda no merge; conferir em Actions).
-5. `deploy/deploy.sh`.
+Ordem que aconteceu de verdade em 05/09/2026, com o painel indo ao ar em
+`https://app.srv1953618.hstgr.cloud` (`acessos/VPS.md`, "Estado em 05/09/2026").
+
+1. Endereco: dominio proprio com registro A de `app.<dominio>` para `179.199.142.54`, ou o
+   curinga que a propria Hostinger ja da (`app.srv1953618.hstgr.cloud`), sem precisar de
+   DNS proprio. Foi o curinga que este primeiro deploy usou; dominio proprio continua em
+   aberto (`../../TODO.md`).
+2. `/srv/roteiros/.env` na VPS (`chmod 600`), conferido chave a chave contra o
+   `.env.example` atual: `APP_URL` e `BETTER_AUTH_URL` com o endereco escolhido,
+   `EMAIL_CONTATO` (mostrado em `/termos` e `/privacidade`), `POSTGRES_PASSWORD` igual a
+   senha da `DATABASE_URL`, e `SENTRY_DSN` quando a conta existir (etapa 13, decisao 1 e 5
+   do `PROXIMO.md`). Sem dominio proprio verificado na Resend, `EMAIL_FROM` fica
+   `onboarding@resend.dev` (remetente de teste, entrega so no e-mail do dono da conta
+   Resend; a chave e so de envio e nao lista dominios, entao nao precisa trocar so por
+   isso). Sem `EMAIL_CONTATO`, o texto mostra "contato@localhost"; sem `SENTRY_DSN`, o
+   Sentry simplesmente nao inicia (nada quebra, nenhum erro vai para lugar nenhum alem do
+   `docker logs`).
+3. Snapshot da VPS pela API da Hostinger antes de tocar em qualquer coisa fora do proprio
+   diretorio do produto, incluindo o proxy (`acessos/VPS.md`, convencao de convivencia).
+4. Imagens publicadas (o workflow "Imagens" roda no merge; conferir em Actions).
+5. `deploy/deploy.sh <sha>`, com o sha curto do commit que passou na CI, nunca `latest`:
+   fixa exatamente a imagem testada, em vez de depender do que a `main` tiver quando o
+   comando rodar.
+6. Proxy compartilhado no ar (`/srv/proxy`, rede `web`): ver `proxy/`. Bloco `roteiros` do
+   `Caddyfile` ativo com o endereco escolhido, validar e recarregar; ver "Editar o Caddyfile
+   compartilhado" abaixo para a forma segura de editar o arquivo na VPS.
+7. Primeiro admin, ninguem se cadastra sozinho (`scripts/criar-admin.ts`):
+   ```bash
+   ssh getorbita-vps 'cd /srv/roteiros && docker compose run --rm --no-deps \
+     -e ADMIN_EMAIL=... -e ADMIN_NOME=... -e ADMIN_SENHA=... \
+     roteiros-worker npm run -s admin:criar'
+   ```
+   Idempotente: rodar de novo com o mesmo `ADMIN_EMAIL` imprime "ja existe" e sai com 0.
 
 ## Deploys seguintes
 
@@ -40,6 +62,35 @@ com as tags `latest` e o sha curto. A VPS so puxa.
 deploy/deploy.sh            # latest
 deploy/deploy.sh <sha>      # voltar para um commit especifico
 ```
+
+## Editar o Caddyfile compartilhado
+
+`/srv/proxy/Caddyfile` e de dois produtos (`acessos/VPS.md`, convencao de convivencia); cada
+um so mexe no proprio bloco, marcado com o nome.
+
+**Nunca `sed -i`.** O `docker-compose.yml` do proxy monta o arquivo como bind mount de um
+arquivo so (`./Caddyfile:/etc/caddy/Caddyfile:ro`), e `sed -i` cria um arquivo novo e troca o
+inode no lugar do antigo. O container continua com o inode velho aberto: `caddy validate` e
+`caddy reload` rodam sem erro nenhum, mas leem a versao de antes da edicao, silenciosamente.
+
+Editar com redirecionamento no mesmo arquivo (por exemplo `cat /tmp/novo > Caddyfile`, nunca
+`mv`), depois conferir que bateu com o que o container realmente ve:
+
+```bash
+ssh getorbita-vps 'cd /srv/proxy && diff Caddyfile <(docker exec proxy-caddy-1 cat /etc/caddy/Caddyfile)'
+```
+
+Se divergir (o caso mais comum: a edicao foi feita antes de o `docker-compose.yml` do proxy
+existir, ou o inode mudou por outro motivo), recriar o container basta e custa poucos
+segundos fora do ar, so deste produto no proxy:
+
+```bash
+ssh getorbita-vps 'cd /srv/proxy && docker compose up -d --force-recreate'
+```
+
+O e-mail de contato do bloco global (`{$CADDY_EMAIL:...}`) precisa ter um dominio de
+verdade; `admin@localhost` e recusado tanto pelo Let's Encrypt quanto pelo ZeroSSL ("Domain
+name needs at least one dot"), e nenhum certificado sai enquanto isso nao for corrigido.
 
 ## Operacao
 
@@ -49,6 +100,23 @@ ssh getorbita-vps 'docker logs --tail 100 roteiros-app'
 ssh getorbita-vps 'docker logs --tail 100 roteiros-worker'
 ssh getorbita-vps 'docker exec roteiros-backup /usr/local/bin/backup.sh agora'
 ssh getorbita-vps 'docker run --rm -v roteiros_backups:/b alpine ls -la /b'
+```
+
+A senha do primeiro admin fica em `/srv/roteiros/admin-inicial.senha` (`600`), so na
+primeira vez que `scripts/criar-admin.ts` gera uma senha na hora; ler, guardar num
+gerenciador de senhas e apagar o arquivo:
+
+```bash
+ssh getorbita-vps 'cat /srv/roteiros/admin-inicial.senha'
+ssh getorbita-vps 'rm /srv/roteiros/admin-inicial.senha'
+```
+
+Trocar `EMAIL_FROM`, `SENTRY_DSN` ou o bucket do backup (`BACKUP_RCLONE_REMOTE` e
+`RCLONE_CONFIG_*`): editar `/srv/roteiros/.env` na VPS e subir de novo so o servico afetado.
+
+```bash
+ssh getorbita-vps 'cd /srv/roteiros && docker compose up -d roteiros-app roteiros-worker'   # EMAIL_FROM, SENTRY_DSN
+ssh getorbita-vps 'cd /srv/roteiros && docker compose up -d roteiros-backup'                # bucket do backup
 ```
 
 Restaurar um dump num Postgres local (e o teste de restauracao, etapa 13, decisao 2):

@@ -1,18 +1,23 @@
 # Caddyfile compartilhado (/srv/proxy/Caddyfile). Um bloco por produto, marcado
 # com o nome. Ninguem edita o bloco do outro. Validar antes de recarregar.
 #
-# Enquanto nenhum dominio existir, o Caddy sobe sem site e so responde vazio.
+# Editar so por redirecionamento no mesmo arquivo, nunca sed -i: o container
+# monta este arquivo como bind mount unico, e sed -i troca o inode, entao
+# validate/reload continuam lendo a versao antiga sem erro nenhum
+# (deploy/README.md, "Editar o Caddyfile compartilhado").
+#
+# O e-mail abaixo precisa ter dominio de verdade: admin@localhost e recusado
+# pelo Let's Encrypt e pelo ZeroSSL ("Domain name needs at least one dot").
 
 {
-	email {$CADDY_EMAIL:admin@localhost}
+	email gustavs.silvs@gmail.com
 }
 
 # roteiros
-# Descomentar e trocar o dominio quando o registro A existir:
-# app.DOMINIO-PENDENTE {
-# 	encode zstd gzip
-# 	reverse_proxy roteiros-app:3000
-# }
+app.srv1953618.hstgr.cloud {
+	encode zstd gzip
+	reverse_proxy roteiros-app:3000
+}
 
 # odontotech
 # (bloco do OdontoTech entra aqui quando o produto fizer o deploy)
