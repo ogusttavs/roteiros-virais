@@ -1,14 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("./config", () => ({
-  config: { email: { resendKey: "", de: "painel@localhost" } },
+const configMock = vi.hoisted(() => ({
+  email: { resendKey: "", de: "painel@localhost" },
+  modoE2E: false,
 }));
+vi.mock("./config", () => ({ config: configMock }));
 
 import { enviarEmail, ErroEmail } from "./email";
 
 describe("enviarEmail", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
+    configMock.modoE2E = false;
   });
 
   it("fora de producao, cai no log mesmo sem chave", async () => {
@@ -23,5 +26,13 @@ describe("enviarEmail", () => {
     await expect(
       enviarEmail({ para: "a@teste.local", assunto: "oi", html: "<p>oi</p>" }),
     ).rejects.toThrow(ErroEmail);
+  });
+
+  it("em producao com modoE2E, cai no log em vez de mandar de verdade (achado da etapa 13, parte 3)", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    configMock.modoE2E = true;
+    await expect(
+      enviarEmail({ para: "cliente-e2e@exemplo.teste", assunto: "oi", html: "<p>oi</p>" }),
+    ).resolves.toBeUndefined();
   });
 });

@@ -89,13 +89,29 @@ export default defineConfig({
       BETTER_AUTH_SECRET: SEGREDO_E2E,
       JOBS_API_KEY: SEGREDO_E2E,
       /**
-       * Achado ao rodar a suíte contra `next start`: o better-auth liga
-       * sozinho, só em produção, um limite de 3 tentativas a cada 10 s em
-       * `/sign-in*`, e mais de um spec entra pela mesma conta de exemplo em
-       * sequência. Ver o comentário em `src/lib/config.ts`; nunca setar
-       * isso fora deste arquivo.
+       * Desliga o limite de taxa do better-auth (várias telas entram pela
+       * mesma conta de exemplo em sequência) e faz `enviarEmail` cair no
+       * log em vez de mandar de verdade, mesmo com `NODE_ENV=production`
+       * (`next start`). `verificarSegredosDeProducao` (`src/lib/config.ts`)
+       * recusa essa flag fora de `localhost`/`127.0.0.1`; `baseURL` acima é
+       * sempre `localhost`, então a trava nunca dispara aqui. Nunca setar
+       * `MODO_E2E` fora deste arquivo (achado da revisão desta etapa: sem
+       * essa flag existir ainda, a suíte rodando contra produção mandou
+       * e-mail de verdade pelo Resend).
        */
-      DESABILITAR_LIMITE_DE_TAXA: "1",
+      MODO_E2E: "1",
+      /**
+       * Defesa em profundidade: mesmo que o `.env` local tenha chave de
+       * verdade, o `dotenv/config` de `src/lib/config.ts` não sobrescreve
+       * variável já definida no processo, então zerar aqui garante que
+       * nenhuma chave real chega ao servidor do e2e.
+       */
+      RESEND_API_KEY: "",
+      SENTRY_DSN: "",
+      ANTHROPIC_API_KEY: "",
+      GROQ_API_KEY: "",
+      APIFY_TOKEN: "",
+      YOUTUBE_API_KEY: "",
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
