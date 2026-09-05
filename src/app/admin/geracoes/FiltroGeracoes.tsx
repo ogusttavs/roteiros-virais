@@ -14,10 +14,15 @@ type Props = {
 };
 
 /**
- * Tarefa e cliente, os dois opcionais (decisao 1 do PROXIMO.md). `aria-label`
- * direto no `<select>`, sem `<label>` envolvendo: achado da etapa 24
- * (`getByLabel` travava num select dentro de `<label>`; `aria-label` evita o
- * problema na raiz, sem precisar escopar a um dialog que esta tela nao tem.
+ * Tarefa e cliente, os dois opcionais (decisao 1 do PROXIMO.md).
+ * `aria-label` direto no `<select>` mesmo com o `<label>` visivel
+ * envolvendo: achado rodando de verdade nesta propria tela (nao so no
+ * `<dialog>` do ModalConvidarCliente, etapa 24) e confirmado ao contrario
+ * tambem, tirando o aria-label de proposito para testar: sem ele,
+ * `getByLabel` do Playwright nao encontra o `<select>` (timeout, sem erro
+ * de ambiguidade), com ele encontra. `<label>` sozinho ao redor de um
+ * `<select>` nao e o bastante; `tests/e2e/geracoes.spec.ts` prova os dois
+ * lados.
  */
 export function FiltroGeracoes({ tarefas, clientes }: Props) {
   const router = useRouter();
