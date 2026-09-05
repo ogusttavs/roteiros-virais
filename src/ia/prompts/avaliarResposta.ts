@@ -62,3 +62,4 @@ export function montarEntrada(dados: {
     `Resposta do cliente: ${dados.resposta}`,
   ].join("\n");
 }
+// teste temporario: prova que a CI reprova prompt mudado sem versao nova (etapa 18, definicao de pronto)
