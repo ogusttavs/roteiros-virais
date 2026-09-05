@@ -1,8 +1,12 @@
 /**
  * Registro de execucao (etapa 6, decisao do Fable): toda chamada de job
  * grava inicio, fim, estado e resumo em `execucoes_job`, e decide se um
- * erro deve fazer o pg-boss tentar de novo.
+ * erro deve fazer o pg-boss tentar de novo. Todo erro tambem vai para o
+ * Sentry (etapa 13, decisao 1), marcado com o nome do job; sem
+ * `SENTRY_DSN`, `captureException` nao faz nada (Sentry nunca foi
+ * inicializado).
  */
+import * as Sentry from "@sentry/node";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -50,6 +54,7 @@ export async function executarComRegistro(
     return { status: "ok", resumo };
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : String(erro);
+    Sentry.captureException(erro, { tags: { job: nome } });
     await db()
       .update(execucoesJob)
       .set({ status: "erro", erro: mensagem, terminadoEm: new Date() })

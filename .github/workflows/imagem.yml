@@ -43,6 +43,8 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            GIT_SHA=${{ steps.sha.outputs.curto }}
           tags: |
             ghcr.io/${{ github.repository }}/${{ matrix.nome }}:latest
             ghcr.io/${{ github.repository }}/${{ matrix.nome }}:${{ steps.sha.outputs.curto }}

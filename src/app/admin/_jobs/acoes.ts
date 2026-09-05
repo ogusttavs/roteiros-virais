@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 
 import { config } from "@/lib/config";
@@ -30,6 +31,7 @@ export async function dispararJobAction(nome: string): Promise<{ ok: boolean; me
     }
     return { ok: true, mensagem: "" };
   } catch (erro) {
+    Sentry.captureException(erro, { tags: { job: nome } });
     return { ok: false, mensagem: erro instanceof Error ? erro.message : String(erro) };
   }
 }

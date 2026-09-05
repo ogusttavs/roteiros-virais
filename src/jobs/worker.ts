@@ -2,7 +2,16 @@
  * Processo do worker (etapa 6): `npm run worker`. Sobe o pg-boss, garante as
  * filas, registra os agendamentos e fica processando. Um job que falha
  * registra em `execucoes_job` e nao derruba o processo (`executarComRegistro`
- * cuida disso; so relanca quando o pg-boss deve mesmo tentar de novo).
+ * cuida disso; so relanca quando o pg-boss deve mesmo tentar de novo, e
+ * chama `Sentry.captureException`, etapa 13, decisao 1).
+ *
+ * `SIGTERM` (etapa 13, decisao 3, criterio de aceite da etapa 13: "derrubar
+ * o container do worker, o Compose sobe de novo sozinho e o job seguinte
+ * roda"): o Compose manda SIGTERM antes de matar o processo; sem um
+ * handler, o Node encerra na hora, no meio de uma query, em vez de fechar o
+ * pg-boss de forma limpa. `desligarComGraca` para de aceitar trabalho novo
+ * e espera o job em andamento terminar (ate o limite do pg-boss) antes de
+ * sair, para nunca deixar uma linha de `execucoes_job` presa em "rodando".
  */
 import "dotenv/config";
 
@@ -11,6 +20,7 @@ import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
@@ -23,6 +33,22 @@ import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
 async function main(): Promise<void> {
+  const { deveInicializarSentry, opcoesSentry } = await import("@/lib/sentry");
+  const opcoesDoSentry = opcoesSentry();
+  if (deveInicializarSentry(opcoesDoSentry.dsn)) {
+    const Sentry = await import("@sentry/node");
+    Sentry.init(opcoesDoSentry);
+  }
+
+  process.on("SIGTERM", () => {
+    desligarComGraca(boss(), "SIGTERM")
+      .then(() => process.exit(0))
+      .catch((erro: unknown) => {
+        console.error("worker nao parou com graca:", erro);
+        process.exit(1);
+      });
+  });
+
   await boss().start();
   await garantirFilas();
   await agendarTudo();

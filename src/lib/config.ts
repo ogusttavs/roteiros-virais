@@ -55,6 +55,14 @@ export const config = {
   },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
+  /** Vazio ate o Gustavo criar a conta (etapa 13, decisao 1); sem DSN, o Sentry nao inicia. */
+  sentryDsn: env("SENTRY_DSN"),
+  /**
+   * Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry.
+   * Passado como build-arg pelo workflow "Imagens" para os Dockerfiles do
+   * app e do worker; vazio fora desses containers (dev local, testes).
+   */
+  gitSha: env("GIT_SHA"),
   /** Regras de produto que sao decisao, nao opiniao (CLAUDE.md e briefing-e-rubricas.md) */
   regras: {
     notaMinimaBriefing: 8,
