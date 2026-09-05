@@ -53,14 +53,20 @@ async function main(): Promise<void> {
   await garantirFilas();
   await agendarTudo();
 
-  await boss().work(FILAS.coletaYoutube, async () => {
-    await executarComRegistro(FILAS.coletaYoutube, rodarColetaYoutube);
+  /**
+   * `job[0]?.data?.nichoId` (etapa 24, parte 1): "coletar agora" na tela do
+   * nicho manda esse dado ao enfileirar; o cron e o disparo manual em
+   * `/admin/jobs` nao mandam nada, e `rodarColeta*` sem nichoId roda para
+   * todos os nichos ativos, igual sempre foi.
+   */
+  await boss().work<{ nichoId?: number }>(FILAS.coletaYoutube, async (job) => {
+    await executarComRegistro(FILAS.coletaYoutube, () => rodarColetaYoutube(job[0]?.data?.nichoId));
   });
-  await boss().work(FILAS.coletaApify, async () => {
-    await executarComRegistro(FILAS.coletaApify, rodarColetaApify);
+  await boss().work<{ nichoId?: number }>(FILAS.coletaApify, async (job) => {
+    await executarComRegistro(FILAS.coletaApify, () => rodarColetaApify(job[0]?.data?.nichoId));
   });
-  await boss().work(FILAS.coletaNoticias, async () => {
-    await executarComRegistro(FILAS.coletaNoticias, rodarColetaNoticias);
+  await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
+    await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);

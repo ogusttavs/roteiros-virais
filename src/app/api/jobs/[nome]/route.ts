@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
 const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
@@ -16,6 +16,23 @@ function chaveValida(recebida: string): boolean {
   const dada = Buffer.from(recebida);
   if (esperada.length !== dada.length) return false;
   return timingSafeEqual(esperada, dada);
+}
+
+/**
+ * Corpo opcional (etapa 24, parte 1): "coletar agora" manda `{ nichoId }`
+ * para escopar a coleta a um nicho; todo outro disparo (cron, `/admin/jobs`)
+ * continua sem corpo nenhum. Corpo ausente ou malformado vale como vazio,
+ * em vez de reprovar a requisicao por um detalhe que nao muda o disparo.
+ */
+async function corpoOpcional(request: Request): Promise<{ nichoId?: number }> {
+  const texto = await request.text();
+  if (!texto) return {};
+  try {
+    const dados = JSON.parse(texto) as { nichoId?: unknown };
+    return typeof dados.nichoId === "number" ? { nichoId: dados.nichoId } : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -41,6 +58,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
     return NextResponse.json({ erro: `job desconhecido: ${nome}` }, { status: 404 });
   }
 
+  const { nichoId } = await corpoOpcional(request);
+
   try {
     await garantirBossPronto();
   } catch (erro) {
@@ -50,6 +69,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
     );
   }
 
-  const id = await boss().send(nome);
-  return NextResponse.json({ ok: true, job: nome, enfileirado: id }, { status: 202 });
+  if (nichoId && (await existeJobPendente(nome, nichoId))) {
+    return NextResponse.json({ ok: true, job: nome, enfileirado: null, duplicado: true }, { status: 202 });
+  }
+
+  const id = await boss().send(nome, nichoId ? { nichoId } : undefined);
+  return NextResponse.json({ ok: true, job: nome, enfileirado: id, duplicado: false }, { status: 202 });
 }

@@ -266,6 +266,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
       vigiada: i === 0,
       medianaViews: String(500 * (i + 1) ** 2),
       taxaForaDaCurva: String((0.1 + i * 0.08).toFixed(4)),
+      origem: "seed" as const,
     }));
     const contasCriadas = await db.insert(contas).values(contasSeed).returning();
     totalContas += contasCriadas.length;

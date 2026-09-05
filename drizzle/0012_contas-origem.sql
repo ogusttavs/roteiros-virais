@@ -1,0 +1,1 @@
+ALTER TABLE "contas" ADD COLUMN "origem" text DEFAULT 'coleta' NOT NULL;

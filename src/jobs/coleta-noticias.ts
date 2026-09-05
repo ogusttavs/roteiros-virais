@@ -3,7 +3,7 @@
  * portugues do Brasil. Relevancia e angulo por IA ficam para a etapa 10;
  * aqui so grava o que veio. Idempotente por `noticias.url`, que e unica.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import Parser from "rss-parser";
 
 import { db } from "@/db";
@@ -18,8 +18,10 @@ function urlGoogleNews(termo: string): string {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(termo)}&hl=pt-BR&gl=BR&ceid=BR:pt-419`;
 }
 
-export async function rodarColetaNoticias(): Promise<Record<string, unknown>> {
-  const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
+/** `nichoId` (etapa 24, parte 1): mesmo raciocinio de `rodarColetaYoutube`. */
+export async function rodarColetaNoticias(nichoId?: number): Promise<Record<string, unknown>> {
+  const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
+  const nichosAtivos = await db().select().from(nichos).where(condicao);
 
   let termosBuscados = 0;
   let noticiasProcessadas = 0;
