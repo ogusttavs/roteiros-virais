@@ -22,6 +22,119 @@
   color: var(--cor-texto-suave);
 }
 
+.linhaFiltros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-4);
+  margin-top: var(--espaco-6);
+}
+
+.filtroCampo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.filtroCampo select {
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-md);
+  border: 1px solid var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+}
+
+.resumo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  margin-top: var(--espaco-6);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+}
+
+.resumo h2 {
+  margin: 0;
+}
+
+.cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--espaco-4);
+}
+
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+}
+
+.cartaoRotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.cartaoValor {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.secaoResumo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.secaoResumo h3 {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.motivosLista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.motivoTarefa {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.motivoItem {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+}
+
+.metaTexto {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.acimaDaMeta {
+  color: var(--cor-erro);
+}
+
 .tabelaEnvoltorio {
   margin-top: var(--espaco-6);
   overflow-x: auto;
