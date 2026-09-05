@@ -50,12 +50,18 @@ jobs:
 
       - run: npm run test
 
+      # e2e roda contra o build de producao (next start), nao o next dev
+      # (etapa 13, parte 3, decisao 2 do PROXIMO.md): builda aqui, uma vez,
+      # e PLAYWRIGHT_SEM_BUILD faz o webServer do playwright.config.ts so
+      # iniciar o servidor com o que ja foi construido, sem buildar de novo.
+      - run: npm run build
+
       - run: npx playwright install --with-deps chromium
 
       - run: npm run test:e2e
+        env:
+          PLAYWRIGHT_SEM_BUILD: "1"
 
       - run: npm run checar-texto
 
       - run: npm run checar-tokens
-
-      - run: npm run build

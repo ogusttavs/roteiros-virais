@@ -29,6 +29,21 @@ export const config = {
   auth: {
     secret: env("BETTER_AUTH_SECRET", "troque-em-producao"),
     url: env("BETTER_AUTH_URL", "http://localhost:3000"),
+    /**
+     * Achado da etapa 13, parte 3: o better-auth liga sozinho, só quando
+     * `NODE_ENV=production`, uma regra de limite de taxa embutida em
+     * `/sign-in*` (3 tentativas a cada 10 s, não configurável por fora,
+     * `getDefaultSpecialRules` do pacote). A suíte e2e passou a rodar
+     * contra `next start` (decisão 2 desta parte) e várias telas entram
+     * pela mesma conta de exemplo em sequência, o que basta para estourar
+     * esse limite e trocar o login por "e-mail ou senha não conferem"
+     * (todo erro de `signIn` vira essa mensagem genérica em
+     * `FormularioEntrar.tsx`, incluindo um 429). `DESABILITAR_LIMITE_DE_TAXA`
+     * só é setada pelo `webServer.env` do `playwright.config.ts`; nunca no
+     * `.env` de produção, onde o limite continua ativo pelo padrão do
+     * pacote.
+     */
+    desabilitarLimiteDeTaxa: env("DESABILITAR_LIMITE_DE_TAXA") === "1",
   },
   ia: {
     provedor: provedorIA(),

@@ -23,6 +23,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  /**
+   * `enabled: undefined` preserva o padrão do pacote (ligado só em
+   * produção); `false` só quando `config.auth.desabilitarLimiteDeTaxa` for
+   * setada, e só a suíte e2e faz isso (ver o comentário em `config.ts`).
+   */
+  rateLimit: {
+    enabled: config.auth.desabilitarLimiteDeTaxa ? false : undefined,
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 30,
   },
