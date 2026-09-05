@@ -20,6 +20,7 @@ import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarCurvaCliente } from "./curva-cliente";
 import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
@@ -94,6 +95,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.lembrete, async () => {
     await executarComRegistro(FILAS.lembrete, rodarLembrete);
+  });
+  await boss().work(FILAS.curvaCliente, async () => {
+    await executarComRegistro(FILAS.curvaCliente, rodarCurvaCliente);
   });
 
   console.log("worker no ar.");

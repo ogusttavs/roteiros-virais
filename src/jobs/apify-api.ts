@@ -79,6 +79,19 @@ export async function buscarTiktok(
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
 }
 
+/**
+ * Um video especifico por URL (etapa 15, parte 1: curva do cliente, o link
+ * que ele colou em "postei"). `postURLs` e o campo do `clockworks/
+ * tiktok-scraper` para um alvo ja conhecido, ao lado de `hashtags` e
+ * `profiles`; nao confirmado ainda com chave real (registrar em decisoes
+ * pendentes se o ator devolver vazio de verdade).
+ */
+export async function buscarTiktokPorUrl(urls: string[]): Promise<TiktokItemBruto[]> {
+  if (urls.length === 0) return [];
+  const input = { postURLs: urls, resultsPerPage: urls.length };
+  return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, urls.length);
+}
+
 /** Item bruto do Instagram (apify/instagram-scraper), so os campos que a normalizacao usa. */
 export type InstagramItemBruto = {
   id: string;
@@ -117,4 +130,17 @@ export async function buscarInstagram(
 
   const input = { directUrls, resultsType: "reels", resultsLimit: maxItens };
   return rodarAtor<InstagramItemBruto>(config.coleta.atorInstagram, input, maxItens);
+}
+
+/**
+ * Um post ou reel especifico por URL (etapa 15, parte 1: curva do
+ * cliente). `directUrls` ja e o jeito documentado de scrapar um alvo
+ * conhecido (comentario de `buscarInstagram` acima); um link de post
+ * especifico e o mesmo mecanismo, so que a URL aponta para o proprio
+ * video em vez do perfil ou da hashtag.
+ */
+export async function buscarInstagramPorUrl(urls: string[]): Promise<InstagramItemBruto[]> {
+  if (urls.length === 0) return [];
+  const input = { directUrls: urls, resultsType: "reels", resultsLimit: urls.length };
+  return rodarAtor<InstagramItemBruto>(config.coleta.atorInstagram, input, urls.length);
 }

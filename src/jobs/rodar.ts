@@ -10,6 +10,7 @@ import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarCurvaCliente } from "./curva-cliente";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
@@ -34,6 +35,7 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.modeloNicho]: rodarModeloNicho,
   [FILAS.temasDoDia]: rodarTemasDoDia,
   [FILAS.lembrete]: rodarLembrete,
+  [FILAS.curvaCliente]: rodarCurvaCliente,
 };
 
 async function main(): Promise<void> {
