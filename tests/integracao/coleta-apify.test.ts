@@ -189,4 +189,16 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
     expect(buscarTiktok).toHaveBeenCalledTimes(1);
     expect(buscarTiktok).toHaveBeenCalledWith(expect.anything(), expect.anything(), 1);
   });
+
+  it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
+    await db().insert(nichos).values({ slug: "coleta-apify-teste-2", nome: "Coleta Apify teste 2", termos: ["dentista"] });
+
+    vi.mocked(buscarTiktok).mockResolvedValue([]);
+    vi.mocked(buscarInstagram).mockResolvedValue([]);
+
+    const resumo = await rodarColetaApify(nichoId);
+    expect(resumo.nichos).toBe(1);
+    expect(buscarTiktok).toHaveBeenCalledTimes(1);
+    expect(buscarInstagram).toHaveBeenCalledTimes(1);
+  });
 });

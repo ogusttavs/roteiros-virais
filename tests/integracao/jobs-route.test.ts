@@ -42,8 +42,12 @@ afterAll(async () => {
   await getPool().end();
 });
 
-function requisicao(headers: Record<string, string> = {}): Request {
-  return new Request("http://localhost/api/jobs/coleta-noticias", { method: "POST", headers });
+function requisicao(headers: Record<string, string> = {}, corpo?: unknown): Request {
+  return new Request("http://localhost/api/jobs/coleta-noticias", {
+    method: "POST",
+    headers,
+    body: corpo === undefined ? undefined : JSON.stringify(corpo),
+  });
 }
 
 describe("POST /api/jobs/[nome]", () => {
@@ -107,5 +111,57 @@ describe("POST /api/jobs/[nome]", () => {
     const job = await boss().getJobById("coleta-noticias", corpo.enfileirado);
     expect(job).not.toBeNull();
     expect(job?.name).toBe("coleta-noticias");
+  });
+
+  /**
+   * "Coletar agora" (etapa 24, parte 1, decisao 4 do PROXIMO.md): o corpo
+   * `{ nichoId }` escopa o disparo e o job enfileirado carrega esse dado.
+   */
+  it("com nichoId no corpo, o job enfileirado carrega o nichoId nos dados", async () => {
+    const { POST } = await import("@/app/api/jobs/[nome]/route");
+    const { boss } = await import("@/jobs/fila");
+
+    const resposta = await POST(
+      requisicao({ "x-jobs-key": config.jobsApiKey, "content-type": "application/json" }, { nichoId: 501 }),
+      { params: Promise.resolve({ nome: "coleta-noticias" }) },
+    );
+    const corpo = (await resposta.json()) as { enfileirado: string; duplicado: boolean };
+    expect(resposta.status).toBe(202);
+    expect(corpo.duplicado).toBe(false);
+
+    const job = await boss().getJobById<{ nichoId: number }>("coleta-noticias", corpo.enfileirado);
+    expect(job?.data.nichoId).toBe(501);
+  });
+
+  /**
+   * "Se a fila ja tiver o mesmo job para o mesmo nicho pendente, nao
+   * duplica" (decisao 4). O segundo disparo para o mesmo nichoId nao cria
+   * um job novo; um nichoId diferente nao e bloqueado pelo primeiro.
+   */
+  it("com um job pendente do mesmo nicho, nao duplica; de outro nicho, enfileira normalmente", async () => {
+    const { POST } = await import("@/app/api/jobs/[nome]/route");
+
+    const primeira = await POST(
+      requisicao({ "x-jobs-key": config.jobsApiKey, "content-type": "application/json" }, { nichoId: 777 }),
+      { params: Promise.resolve({ nome: "coleta-noticias" }) },
+    );
+    const corpoPrimeira = (await primeira.json()) as { duplicado: boolean };
+    expect(corpoPrimeira.duplicado).toBe(false);
+
+    const segunda = await POST(
+      requisicao({ "x-jobs-key": config.jobsApiKey, "content-type": "application/json" }, { nichoId: 777 }),
+      { params: Promise.resolve({ nome: "coleta-noticias" }) },
+    );
+    const corpoSegunda = (await segunda.json()) as { ok: boolean; enfileirado: string | null; duplicado: boolean };
+    expect(corpoSegunda.ok).toBe(true);
+    expect(corpoSegunda.duplicado).toBe(true);
+    expect(corpoSegunda.enfileirado).toBeNull();
+
+    const outroNicho = await POST(
+      requisicao({ "x-jobs-key": config.jobsApiKey, "content-type": "application/json" }, { nichoId: 778 }),
+      { params: Promise.resolve({ nome: "coleta-noticias" }) },
+    );
+    const corpoOutroNicho = (await outroNicho.json()) as { duplicado: boolean };
+    expect(corpoOutroNicho.duplicado).toBe(false);
   });
 });

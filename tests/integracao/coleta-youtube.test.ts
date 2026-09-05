@@ -78,8 +78,8 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-  await db().delete(videos).where(eq(videos.nichoId, nichoId));
-  await db().delete(contas).where(eq(contas.nichoId, nichoId));
+  await db().delete(videos);
+  await db().delete(contas);
   await db().delete(consumoApi);
 });
 
@@ -158,5 +158,28 @@ describe("rodarColetaYoutube (rede mockada, banco real)", () => {
       .where(and(eq(consumoApi.fonte, "youtube"), eq(consumoApi.data, hojeISO())));
     // A busca falhou, mas a cota (100, search.list) ja tinha sido contada antes da chamada.
     expect(linha.unidades).toBe(100);
+  });
+
+  it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
+    const [outroNicho] = await db()
+      .insert(nichos)
+      .values({ slug: "coleta-youtube-outro", nome: "Coleta YouTube outro nicho", termos: ["esteticista"] })
+      .returning();
+
+    try {
+      mockarBuscaEVideo("exVidEscopado", 42);
+
+      const resumo = await rodarColetaYoutube(nichoId);
+      expect(resumo.nichos).toBe(1);
+
+      const chamadasDeBusca = mockFetch.mock.calls.filter((chamada) =>
+        String(chamada[0]).includes("/search"),
+      );
+      // So o termo do nicho pedido ("dentista"), nunca o do outro ("esteticista").
+      expect(chamadasDeBusca).toHaveLength(1);
+      expect(String(chamadasDeBusca[0][0])).toContain("dentista");
+    } finally {
+      await db().delete(nichos).where(eq(nichos.id, outroNicho.id));
+    }
   });
 });
