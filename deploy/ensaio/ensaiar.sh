@@ -22,6 +22,12 @@ BASE_URL="http://127.0.0.1:$PORTA"
 MANTER=0
 [ "${1:-}" = "--manter" ] && MANTER=1
 
+# Marca se este script foi quem criou deploy/.env, para o limpar() so
+# apagar o que ele mesmo criou (ajuste da revisao desta etapa: o script
+# apagava deploy/.env no fim sem conferir se ja existia antes, o que
+# derrubaria um segredo de verdade que por acaso estivesse la).
+CRIOU_ENV_TEMP=0
+
 cd "$RAIZ"
 
 INICIO_TOTAL=$(date +%s)
@@ -51,7 +57,7 @@ imprimir_resumo() {
 }
 
 limpar() {
-  rm -f "$ENV_TEMP"
+  [ "$CRIOU_ENV_TEMP" = "1" ] && rm -f "$ENV_TEMP"
   if [ "$MANTER" = "0" ]; then
     "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
   fi
@@ -72,6 +78,13 @@ conferir_env() {
   done
 }
 
+conferir_deploy_env_nao_existe() {
+  if [ -f "$ENV_TEMP" ]; then
+    echo "ja existe $ENV_TEMP; o ensaio nao sobrescreve arquivo de segredo, apague ou mova antes." >&2
+    return 1
+  fi
+}
+
 buildar_imagens() {
   docker build -f deploy/Dockerfile -t roteiros-app:ensaio --build-arg GIT_SHA=ensaio . || return 1
   docker build -f deploy/Dockerfile.worker -t roteiros-worker:ensaio --build-arg GIT_SHA=ensaio . || return 1
@@ -84,6 +97,7 @@ garantir_rede_web() {
 
 subir_postgres() {
   cp "$ENV_ENSAIO" "$ENV_TEMP"
+  CRIOU_ENV_TEMP=1
   "${COMPOSE[@]}" up -d roteiros-postgres
   for _ in $(seq 1 30); do
     estado=$("${COMPOSE[@]}" ps --format '{{.Health}}' roteiros-postgres)
@@ -241,6 +255,7 @@ fazer_backup() {
 }
 
 passo "confere .env.ensaio (segredos de 32+ caracteres)" conferir_env
+passo "confere que deploy/.env nao existe (nunca sobrescrever segredo)" conferir_deploy_env_nao_existe
 passo "builda as tres imagens (roteiros-app, roteiros-worker, roteiros-backup :ensaio)" buildar_imagens
 passo "garante a rede externa 'web'" garantir_rede_web
 passo "sobe o postgres e espera ficar saudavel" subir_postgres
