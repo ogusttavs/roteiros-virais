@@ -91,6 +91,53 @@ docker run --rm --network plataforma_default -v "$(pwd)/dump:/backups" \
 Testado nesta etapa: dump do `roteiros_dev` semeado, restaurado em `roteiros_restaurado`,
 app subindo na porta 3413 e `/hoje` abrindo com o cliente de seed. Anotado no PR.
 
+## Ensaio local antes do deploy (etapa 13, parte 3)
+
+`deploy/ensaio/` sobe o Compose de produção inteiro nesta máquina, com as imagens
+construídas da árvore atual (nunca as do GHCR) e publicadas só em `127.0.0.1:3500`, para
+provar antes de subir na VPS os dois critérios de aceite da etapa 13 que só tinham sido
+provados em unidade ou por documento: o worker volta sozinho depois de cair, e o job
+seguinte roda.
+
+```bash
+cp deploy/ensaio/.env.ensaio.exemplo deploy/ensaio/.env.ensaio   # so segredo de teste
+deploy/ensaio/ensaiar.sh              # builda, sobe, migra, semeia, testa, derruba tudo
+deploy/ensaio/ensaiar.sh --manter     # mesma coisa, mas deixa o Compose no ar no fim
+```
+
+Builda as três imagens, garante a rede `web`, sobe o Postgres, migra pelo container do
+worker (do jeito que `deploy.sh` faz), sobe o resto, confere `/api/saude`, semeia, loga
+como o admin de exemplo e confere `/admin/clientes`, dispara `coleta-noticias` de verdade
+três vezes (a segunda depois de um `stop`/`start` gracioso do worker, a terceira depois de
+um `kill` abrupto), tira um backup e confere o dump. Para no primeiro erro; imprime um
+resumo de uma linha por passo, com o tempo de cada um.
+
+**Achados desta rodada, corrigidos no próprio Dockerfile/Compose (não só no ensaio):**
+- `container_name: roteiros-postgres` (e os outros três) do `compose.prod.yml` colidiam
+  com os containers de `compose.dev.yml`, que usam os mesmos nomes literais e costumam
+  estar rodando. `deploy/ensaio/compose.ensaio.yml` dá um sufixo `-ensaio` aos quatro, só
+  para o ensaio; `compose.prod.yml` continua como está, correto para a VPS.
+- `Dockerfile.worker` rodava `CMD ["npm", "run", "worker"]`; o `npm run` passa por um
+  `sh -c` no meio que não repassa `SIGTERM` para o processo Node de verdade (o log só
+  mostrava `npm error signal SIGTERM`, nunca o "parando com graça" de
+  `src/jobs/desligamento.ts`). Isso valia para todo `docker compose stop`, ou seja, todo
+  deploy: o worker nunca tinha a chance de terminar o job em andamento antes do Docker
+  matar o processo. Corrigido para rodar o binário do `tsx` direto
+  (`node_modules/.bin/tsx`), sem `npm`/`sh` no meio; confirmado com o log mostrando a
+  frase certa depois de um `docker compose stop`.
+
+**Limite conhecido desta máquina (Docker Desktop para Mac, kernel `linuxkit`), não um bug
+do produto:** `restart: unless-stopped` (e `always`) não reaplicam depois de um
+`docker kill`, confirmado num container `alpine` mínimo, sem Compose nem nada deste
+projeto, três vezes, esperando até 30 s sem o container voltar. No Linux nativo da VPS
+isso funciona (é o comportamento documentado do Docker); `ensaiar.sh` detecta a falha,
+sobe o worker de volta à mão só para os passos seguintes poderem continuar, e marca o
+passo como `[limite do ambiente, não comprovado aqui]` no resumo, sem travar o resto do
+ensaio. Rode com `ENSAIO_DOCKER_DESKTOP=1 deploy/ensaio/ensaiar.sh` para esse
+comportamento; sem a variável, uma falha aqui para o ensaio (o padrão certo numa máquina
+Linux de verdade, onde a falha seria um achado real). Este critério específico só fica
+provado de fato no primeiro deploy real na VPS.
+
 ## O que nunca fazer
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no

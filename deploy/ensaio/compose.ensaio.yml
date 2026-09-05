@@ -1,0 +1,43 @@
+# Override do compose.prod.yml para o ensaio local (etapa 13, parte 3 do
+# PROXIMO.md). Roda com:
+#   docker compose -f deploy/compose.prod.yml -f deploy/ensaio/compose.ensaio.yml \
+#     --env-file deploy/ensaio/.env.ensaio up -d
+# a partir da raiz do repositorio (plataforma/), nunca sozinho: o
+# compose.prod.yml de baixo e quem define os servicos, a rede interna e os
+# volumes.
+#
+# Tres diferencas do que sobe na VPS:
+# - imagem: tag local (roteiros-*:ensaio), construida da arvore atual pelo
+#   ensaiar.sh, nunca puxada do GHCR.
+# - roteiros-app publica 127.0.0.1:3500 (producao nunca publica porta; o
+#   Caddy compartilhado fala com o app pelo nome, mas nao ha Caddy aqui).
+# - container_name com sufixo -ensaio: o nome do compose.prod.yml
+#   (roteiros-postgres) colide com o Postgres de compose.dev.yml, que usa o
+#   mesmo nome literal e costuma estar rodando (achado rodando o ensaio pela
+#   primeira vez, "Conflict. The container name /roteiros-postgres is
+#   already in use"). Sem esse sufixo, ninguem consegue ensaiar com o
+#   ambiente de desenvolvimento normal no ar.
+#
+# env_file continua ".env" (herdado do compose.prod.yml, resolvido relativo
+# a este diretorio, deploy/): Compose funde a lista de env_file de varios
+# `-f` em vez de trocar (achado escrevendo este arquivo, `docker compose
+# config` recusou com um `env_file` extra apontando para um caminho que
+# nao existia). O ensaiar.sh copia deploy/ensaio/.env.ensaio (segredos so
+# de teste) para deploy/.env antes do `up`, e apaga depois.
+services:
+  roteiros-postgres:
+    container_name: roteiros-postgres-ensaio
+
+  roteiros-app:
+    image: roteiros-app:ensaio
+    container_name: roteiros-app-ensaio
+    ports:
+      - "127.0.0.1:3500:3000"
+
+  roteiros-worker:
+    image: roteiros-worker:ensaio
+    container_name: roteiros-worker-ensaio
+
+  roteiros-backup:
+    image: roteiros-backup:ensaio
+    container_name: roteiros-backup-ensaio
