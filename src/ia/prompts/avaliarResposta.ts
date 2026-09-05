@@ -6,7 +6,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Nota e analise de uma resposta do briefing (briefing-e-rubricas.md, secao
  * 3, texto literal, nao parafrasear).
  */
-export const versao = "1.2.1";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -62,4 +62,3 @@ export function montarEntrada(dados: {
     `Resposta do cliente: ${dados.resposta}`,
   ].join("\n");
 }
-// teste temporario: prova que a CI reprova prompt mudado sem versao nova (etapa 18, definicao de pronto)
