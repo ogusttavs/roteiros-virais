@@ -6,7 +6,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Nota e analise de uma resposta do briefing (briefing-e-rubricas.md, secao
  * 3, texto literal, nao parafrasear).
  */
-export const versao = "1.2.0";
+export const versao = "1.2.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
