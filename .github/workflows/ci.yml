@@ -35,7 +35,12 @@ jobs:
       JOBS_API_KEY: ci-secret-nao-e-producao
 
     steps:
+      # fetch-depth: 0 (historico inteiro, nao so o commit do evento): checar-versao-prompt
+      # (etapa 18, decisao 5) precisa de origin/main para comparar, e o clone raso padrao
+      # nao traz esse ref.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -65,3 +70,5 @@ jobs:
       - run: npm run checar-texto
 
       - run: npm run checar-tokens
+
+      - run: npm run checar-versao-prompt

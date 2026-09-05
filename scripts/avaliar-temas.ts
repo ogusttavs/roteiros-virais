@@ -51,7 +51,18 @@ function caminhoDoConjunto(): { caminho: string; ehExemplo: boolean } {
   };
 }
 
-async function main() {
+export type ResultadoAvaliarTemas = {
+  conjunto: string;
+  ehExemplo: boolean;
+  casos: number;
+  diferencaMediaPorPilar: number;
+  acimaDaMeta: boolean;
+};
+
+const META_DIFERENCA = 1.5;
+
+/** Mesmo raciocinio de `avaliarBriefing` em `avaliar-briefing.ts`. */
+export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
   const { caminho, ehExemplo } = caminhoDoConjunto();
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
 
@@ -87,14 +98,19 @@ async function main() {
     console.log();
   }
 
-  const diferencaMedia = comparacoes > 0 ? somaDiferencas / comparacoes : 0;
-  console.log(`diferenca media por pilar: ${diferencaMedia.toFixed(2)}`);
-  if (diferencaMedia >= 1.5) {
+  const diferencaMediaPorPilar = comparacoes > 0 ? somaDiferencas / comparacoes : 0;
+  const acimaDaMeta = diferencaMediaPorPilar >= META_DIFERENCA;
+  console.log(`diferenca media por pilar: ${diferencaMediaPorPilar.toFixed(2)}`);
+  if (acimaDaMeta) {
     console.log("acima da meta de 1,5 (PROXIMO.md, decisao 7 da etapa 10).");
   }
+
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diferencaMediaPorPilar, acimaDaMeta };
 }
 
-main().catch((erro: unknown) => {
-  console.error(erro);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  avaliarTemas().catch((erro: unknown) => {
+    console.error(erro);
+    process.exitCode = 1;
+  });
+}
