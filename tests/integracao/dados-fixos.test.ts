@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, nichos, user } from "@/db/schema";
-import { listarNichosAtivos, salvarDadosFixos, salvarTema } from "@/servicos/clientes";
+import { aceitarTermos, listarNichosAtivos, salvarDadosFixos, salvarPerfilConta, salvarTema } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -133,5 +133,56 @@ describe("salvarTema", () => {
     await salvarTema(clienteId, "claro");
     const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
     expect(outroCliente?.tema).toBe("sistema");
+  });
+});
+
+describe("salvarPerfilConta", () => {
+  it("comeca em 08:00 por padrao", async () => {
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(cliente?.horaLembrete).toBe("08:00");
+  });
+
+  it("grava nome, perfis e a hora do lembrete", async () => {
+    const cliente = await salvarPerfilConta(clienteId, {
+      nome: "Sorriso Novo",
+      perfis: { instagram: "@sorrisonovo" },
+      horaLembrete: "11:00",
+    });
+
+    expect(cliente.nome).toBe("Sorriso Novo");
+    expect(cliente.perfis).toEqual({ instagram: "@sorrisonovo", tiktok: null, youtube: null });
+    expect(cliente.horaLembrete).toBe("11:00");
+  });
+
+  it("recusa uma hora que nao seja cheia (etapa 12: o job lembrete so roda de hora em hora)", async () => {
+    await expect(
+      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "11:30" }),
+    ).rejects.toThrow();
+  });
+
+  it("salvar a conta de um cliente nao muda a hora de lembrete de outro", async () => {
+    await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "09:00" });
+    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(outroCliente?.horaLembrete).toBe("08:00");
+  });
+});
+
+describe("aceitarTermos", () => {
+  it("comeca nulo, ninguem aceitou por padrao", async () => {
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(cliente?.aceitouTermosEm).toBeNull();
+  });
+
+  it("grava a data do aceite", async () => {
+    const antes = new Date();
+    const cliente = await aceitarTermos(clienteId);
+    expect(cliente.aceitouTermosEm).not.toBeNull();
+    expect(cliente.aceitouTermosEm!.getTime()).toBeGreaterThanOrEqual(antes.getTime());
+  });
+
+  it("aceitar por um cliente nao muda o aceite de outro (o layout do painel trava so quem nao aceitou)", async () => {
+    await aceitarTermos(clienteId);
+    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(outroCliente?.aceitouTermosEm).toBeNull();
   });
 });

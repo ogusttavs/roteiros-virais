@@ -21,13 +21,20 @@ import {
   type PerfilCompilado,
 } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import { hojeISO } from "@/lib/config";
 import { avaliarTema, ErroTemas, temasParaCliente } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
+/**
+ * Data local do Brasil, nao UTC (achado rodando perto da meia-noite UTC,
+ * que ja e o dia seguinte em Brasilia): `temasParaCliente` e `constanciaDoCliente`
+ * usam `hojeISO()` (Brasil) para decidir "hoje"; um fixture de teste em UTC
+ * puro descasava bem nesse horario e quebrava o teste sem nenhum bug real.
+ */
 function dataIso(diasAtras: number): string {
-  return new Date(Date.now() - diasAtras * DIA_MS).toISOString().slice(0, 10);
+  return hojeISO(new Date(Date.now() - diasAtras * DIA_MS));
 }
 
 const PERFIL_PADRAO: PerfilCompilado = {

@@ -273,6 +273,7 @@ export default function Fundacao() {
             salvo={false}
             rotuloUsar="usar como referência"
             rotuloSalvar="salvar nos favoritos"
+            rotuloSalvando="salvando"
             onSalvar={() => undefined}
             onUsar={() => undefined}
           />

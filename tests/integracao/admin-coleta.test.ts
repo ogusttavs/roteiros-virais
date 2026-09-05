@@ -7,8 +7,15 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { contas, execucoesJob, nichos, videos } from "@/db/schema";
-import { listarExecucoesRecentes, listarNichosComContagem, ultimaExecucaoPorJob } from "@/servicos/admin-coleta";
+import { clientes, contas, execucoesJob, nichos, roteiros, user, videos } from "@/db/schema";
+import { hojeISO } from "@/lib/config";
+import {
+  listarClientesAdmin,
+  listarExecucoesRecentes,
+  listarNichosComContagem,
+  ultimaExecucaoPorJob,
+} from "@/servicos/admin-coleta";
+import { constanciaDoCliente } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -133,5 +140,95 @@ describe("ultimaExecucaoPorJob", () => {
     expect(resultado["coleta-youtube"]?.status).toBe("erro");
     expect(resultado["coleta-noticias"]?.status).toBe("ok");
     expect(resultado["coleta-apify"]).toBeNull();
+  });
+});
+
+/**
+ * "dias sem gravar" (etapa 12, decisão 6 do `PROXIMO.md`): vem de
+ * `constanciaDoCliente` (`gravadoEm`/`postadoEm`, não `criadoEm`), não da
+ * aproximação antiga.
+ */
+describe("listarClientesAdmin, dias sem gravar", () => {
+  const DIA_MS = 24 * 60 * 60 * 1000;
+  function dataIso(diasAtras: number): string {
+    return hojeISO(new Date(Date.now() - diasAtras * DIA_MS));
+  }
+
+  const CONTEUDO_MINIMO = {
+    titulo: "titulo",
+    duracaoS: 40,
+    gancho: "gancho",
+    corpo: "corpo",
+    fechamento: "fechamento",
+    chamadaFinal: "chamada final",
+    cenas: [],
+    ondeGravar: "no local do negocio",
+    edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+    evidencias: [],
+    semEvidencia: false,
+  };
+
+  let clienteNuncaGravouId: number;
+  let clienteEmDiaId: number;
+  let clienteParadoId: number;
+
+  async function criarCliente(usuarioId: string, nome: string): Promise<number> {
+    await db()
+      .insert(user)
+      .values({ id: usuarioId, name: nome, email: `${usuarioId}@admin-coleta.teste` });
+    const [cliente] = await db().insert(clientes).values({ usuarioId, nome, nichoId }).returning();
+    return cliente.id;
+  }
+
+  beforeAll(async () => {
+    clienteNuncaGravouId = await criarCliente("admin-coleta-nunca-gravou", "[teste] Nunca gravou");
+    clienteEmDiaId = await criarCliente("admin-coleta-em-dia", "[teste] Em dia");
+    clienteParadoId = await criarCliente("admin-coleta-parado", "[teste] Parado");
+
+    await db()
+      .insert(roteiros)
+      .values({
+        clienteId: clienteEmDiaId,
+        data: dataIso(0),
+        tema: "tema de hoje",
+        origem: "sugerido",
+        objetivo: "alcance",
+        conteudo: CONTEUDO_MINIMO,
+        status: "gravado",
+        gravadoEm: new Date(),
+      });
+
+    await db()
+      .insert(roteiros)
+      .values({
+        clienteId: clienteParadoId,
+        data: dataIso(6),
+        tema: "tema de 6 dias atras",
+        origem: "sugerido",
+        objetivo: "alcance",
+        conteudo: CONTEUDO_MINIMO,
+        status: "gravado",
+        gravadoEm: new Date(Date.now() - 6 * DIA_MS),
+      });
+  });
+
+  it("nulo para quem nunca gravou nem postou nada", async () => {
+    const lista = await listarClientesAdmin();
+    expect(lista.find((c) => c.id === clienteNuncaGravouId)?.diasSemGravar).toBeNull();
+  });
+
+  it("zero para quem esta gravando em dia (hoje ou ontem, em sequencia)", async () => {
+    const lista = await listarClientesAdmin();
+    expect(lista.find((c) => c.id === clienteEmDiaId)?.diasSemGravar).toBe(0);
+  });
+
+  it("os dias corridos para quem parou, iguais aos de constanciaDoCliente (nao um numero fixo: o calculo real depende da hora exata do teste)", async () => {
+    const [constancia, lista] = await Promise.all([
+      constanciaDoCliente(clienteParadoId),
+      listarClientesAdmin(),
+    ]);
+    expect(constancia.tipo).toBe("parado");
+    const diasEsperados = constancia.tipo === "parado" ? constancia.dias : null;
+    expect(lista.find((c) => c.id === clienteParadoId)?.diasSemGravar).toBe(diasEsperados);
   });
 });

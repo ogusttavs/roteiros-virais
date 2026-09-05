@@ -82,3 +82,21 @@
 .textoAtencao {
   color: var(--cor-atencao);
 }
+
+.botaoAbrir {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-pill);
+  border: 1px solid var(--cor-borda-forte);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.botaoAbrir:hover {
+  background: var(--cor-superficie-hover);
+}

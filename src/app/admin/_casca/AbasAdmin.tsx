@@ -9,10 +9,11 @@ const ABAS = [
   { href: "/admin/clientes", rotuloChave: "clientes" as const },
   { href: "/admin/nichos", rotuloChave: "nichos" as const },
   { href: "/admin/jobs", rotuloChave: "jobs" as const },
+  { href: "/admin/geracoes", rotuloChave: "geracoes" as const },
 ];
 
 /** Abas do admin com o traco embaixo da ativa (CascaAdmin.dc.html). */
-export function AbasAdmin({ rotulos }: { rotulos: Record<"clientes" | "nichos" | "jobs", string> }) {
+export function AbasAdmin({ rotulos }: { rotulos: Record<"clientes" | "nichos" | "jobs" | "geracoes", string> }) {
   const pathname = usePathname();
 
   return (

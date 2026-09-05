@@ -19,6 +19,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, nichos, temasDia, user, videos, type TemaDoDia } from "../../src/db/schema";
+import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 
@@ -27,10 +28,6 @@ async function entrar(page: Page, email: string) {
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
-}
-
-function hojeIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 test.describe("temas do dia pela tela", () => {
@@ -54,7 +51,12 @@ test.describe("temas do dia pela tela", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-temas", nome: "[teste] Temas do dia", nichoId: nicho.id })
+      .values({
+        usuarioId: "e2e-temas",
+        nome: "[teste] Temas do dia",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
 
     await db()
@@ -123,7 +125,7 @@ test.describe("temas do dia pela tela", () => {
         puxaPara: "conversao",
       },
     ];
-    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeIso(), temas });
+    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).

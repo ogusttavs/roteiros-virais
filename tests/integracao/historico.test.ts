@@ -7,14 +7,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, nichos, roteiros, user } from "@/db/schema";
+import { hojeISO } from "@/lib/config";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { resumoHistorico } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
+/**
+ * Data local do Brasil, nao UTC (achado rodando perto da meia-noite UTC,
+ * que ja e o dia seguinte em Brasilia): `constanciaDoCliente` usa
+ * `hojeISO()` (Brasil) para decidir "hoje"; um fixture de teste em UTC
+ * puro descasava bem nesse horario e quebrava o teste sem nenhum bug real.
+ */
 function dataIso(diasAtras: number): string {
-  return new Date(Date.now() - diasAtras * DIA_MS).toISOString().slice(0, 10);
+  return hojeISO(new Date(Date.now() - diasAtras * DIA_MS));
 }
 function dataHora(diasAtras: number): Date {
   return new Date(Date.now() - diasAtras * DIA_MS);

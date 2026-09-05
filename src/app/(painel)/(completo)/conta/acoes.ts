@@ -11,10 +11,11 @@ export async function salvarContaAction(dados: {
   nome: string;
   perfis: { instagram?: string; tiktok?: string; youtube?: string };
   tema: string;
+  horaLembrete: string;
 }) {
   const cliente = await clienteDaSessaoAtual();
   const [clienteAtualizado] = await Promise.all([
-    salvarPerfilConta(cliente.id, { nome: dados.nome, perfis: dados.perfis }),
+    salvarPerfilConta(cliente.id, { nome: dados.nome, perfis: dados.perfis, horaLembrete: dados.horaLembrete }),
     salvarTema(cliente.id, dados.tema),
   ]);
   return { ...clienteAtualizado, tema: dados.tema };

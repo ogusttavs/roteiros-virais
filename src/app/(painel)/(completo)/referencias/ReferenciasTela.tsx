@@ -41,6 +41,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIniciais));
   const [toastAberto, setToastAberto] = useState(false);
   const [jaMostrouToast, setJaMostrouToast] = useState(false);
+  const [idPendente, setIdPendente] = useState<number | null>(null);
   const [, iniciarTransicao] = useTransition();
 
   const filtrados = useMemo(() => {
@@ -57,7 +58,12 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
     });
   }, [videos, plataforma, periodo, formato, soFavoritos, favoritos]);
 
-  /** Otimista: o marcador muda na hora; se a gravação falhar, desfaz. */
+  /**
+   * Otimista: o marcador muda na hora; se a gravação falhar, desfaz. O botão
+   * fica desabilitado enquanto a Server Action não responde (achado da
+   * revisão da parte 1: sem isso, navegar ou recarregar antes da resposta
+   * podia abortar o pedido e o favorito sumia mesmo tendo "marcado" na tela).
+   */
   function alternarFavorito(videoId: number) {
     const jaSalvo = favoritos.has(videoId);
     const primeiraVez = !jaSalvo && !jaMostrouToast;
@@ -73,6 +79,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
       setJaMostrouToast(true);
     }
 
+    setIdPendente(videoId);
     iniciarTransicao(async () => {
       try {
         if (jaSalvo) await desfavoritarAction(videoId);
@@ -84,6 +91,8 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
           else proximo.delete(videoId);
           return proximo;
         });
+      } finally {
+        setIdPendente((atual) => (atual === videoId ? null : atual));
       }
     });
   }
@@ -97,21 +106,21 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
 
       <div className={styles.filtros}>
         <Chips
-          rotuloGrupo="Plataforma"
+          rotuloGrupo={textosReferencias.grupoPlataforma}
           opcoes={textosReferencias.plataformas}
           selecionado={plataforma}
           onChange={setPlataforma}
         />
         <SeparadorChips />
         <Chips
-          rotuloGrupo="Período"
+          rotuloGrupo={textosReferencias.grupoPeriodo}
           opcoes={textosReferencias.periodos}
           selecionado={periodo}
           onChange={setPeriodo}
         />
         <SeparadorChips />
         <Chips
-          rotuloGrupo="Formato"
+          rotuloGrupo={textosReferencias.grupoFormato}
           opcoes={textosReferencias.formatos}
           selecionado={formato}
           onChange={setFormato}
@@ -141,7 +150,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
               key={v.id}
               vezes={formatarVezes(v.foraDaCurva)}
               rotuloVezes={textosReferencias.acimaDoNormal}
-              conta={v.contaHandle ?? "conta não identificada"}
+              conta={v.contaHandle ?? textosReferencias.contaNaoIdentificada}
               data={v.publicadoEm ? FORMATAR_DATA.format(v.publicadoEm) : ""}
               analise={[
                 { rotulo: textosReferencias.analise.comecou, texto: v.gancho },
@@ -150,13 +159,15 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
               ]}
               embed={{
                 url: v.url,
-                alt: `vídeo de ${v.contaHandle ?? "referência"}, 9 por 16, carrega ao entrar na tela`,
-                rotuloCarregamento: "vídeo embedado 9:16 · carrega ao entrar na tela",
+                alt: textosReferencias.embedAlt(v.contaHandle ?? textosReferencias.contaNaoIdentificada),
+                rotuloCarregamento: textosReferencias.embedCarregando,
                 linkExterno: { rotulo: textosReferencias.abrirVideo, href: v.url },
               }}
               salvo={favoritos.has(v.id)}
+              salvando={idPendente === v.id}
               rotuloUsar={textosReferencias.usar}
               rotuloSalvar={favoritos.has(v.id) ? textosReferencias.remover : textosReferencias.salvar}
+              rotuloSalvando={textosReferencias.salvando}
               onSalvar={() => alternarFavorito(v.id)}
               onUsar={() => router.push(`/hoje/tema-livre?tema=${encodeURIComponent(v.assunto)}`)}
             />

@@ -161,6 +161,15 @@ export const clientes = pgTable("clientes", {
     .notNull()
     .default({ concorrentes: [], termos: [], perfisAdmirados: [] }),
   ativo: boolean("ativo").notNull().default(true),
+  /** "HH:00", hora cheia de Brasilia (etapa 12, decisao 5 do PROXIMO.md: job lembrete). */
+  horaLembrete: text("hora_lembrete").notNull().default("08:00"),
+  /**
+   * Atualizado pelo layout do painel uma vez por dia (etapa 12, decisao 5):
+   * o job `lembrete` nao manda e-mail para quem ja abriu o painel hoje.
+   */
+  ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
+  /** Nulo ate aceitar; quem nao aceitou nao passa do layout (completo) (etapa 12, decisao 7). */
+  aceitouTermosEm: timestamp("aceitou_termos_em", { withTimezone: true }),
   criadoEm: criadoEm(),
 });
 

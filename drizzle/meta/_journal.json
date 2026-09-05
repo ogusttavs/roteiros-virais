@@ -71,6 +71,13 @@
       "when": 1788543823812,
       "tag": "0009_public_stark_industries",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788569482212,
+      "tag": "0010_lembrete",
+      "breakpoints": true
     }
   ]
 }

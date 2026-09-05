@@ -2,6 +2,7 @@
 export const textosHistorico = {
   titulo: "Histórico",
   numeros: { seguidos: "dias seguidos", gravados: "gravados este mês", postados: "postados este mês" },
+  ultimosDias: (n: number) => `últimos 30 dias: gravou em ${n} dia${n === 1 ? "" : "s"}`,
   grupos: { estaSemana: "Esta semana", semanaPassada: "Semana passada" },
   status: { gerado: "escrito", gravado: "gravado", postado: "postado" },
   comparacao: (x: string, h: number) => `${x} o seu normal em ${h} horas`,

@@ -1,0 +1,111 @@
+.pagina {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--cor-fundo);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--cor-titulo) 30%, transparent);
+  animation: surgir var(--duracao-base) var(--curva-saida);
+}
+
+.folha {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  padding: var(--espaco-6) var(--margem-celular) var(--espaco-9);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--sombra-md);
+  animation: subir var(--duracao-lenta) var(--curva-saida);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-sm);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--cor-titulo);
+}
+
+.lista {
+  margin: 0;
+  padding: 0 0 0 var(--espaco-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: var(--altura-toque);
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--cor-borda-forte);
+}
+
+.erro {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
+.botao {
+  width: 100%;
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes subir {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .folha {
+    animation: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .folha {
+    left: 50%;
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    width: 420px;
+    border-radius: var(--raio-lg);
+    animation: surgir var(--duracao-base) var(--curva-saida);
+  }
+}

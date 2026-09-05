@@ -9,8 +9,14 @@ import { NextResponse, type NextRequest } from "next/server";
  * src/app/(painel)/(completo)/layout.tsx), que rodam no runtime Node e podem
  * consultar de verdade.
  */
-/** /api/saude e publica de proposito (etapa 13): healthcheck do Compose, deploy e monitor externo batem nela sem sessao; nao devolve dado. */
-const ROTAS_PUBLICAS = ["/entrar", "/api/saude"];
+/**
+ * /api/saude e publica de proposito (etapa 13): healthcheck do Compose,
+ * deploy e monitor externo batem nela sem sessao; nao devolve dado.
+ * /termos e /privacidade sao publicas (etapa 12, decisao 7): quem ainda nao
+ * assina precisa conseguir ler antes de entrar, e a folha de aceite linka
+ * para elas de dentro do painel tambem.
+ */
+const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade"];
 
 /**
  * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho

@@ -19,6 +19,7 @@ type Props = {
   tiktokInicial: string;
   youtubeInicial: string;
   temaInicial: TemaPreferido;
+  horaLembreteInicial: string;
 };
 
 const OPCOES_TEMA = textosConta.temas;
@@ -43,12 +44,14 @@ export function FormularioConta({
   tiktokInicial,
   youtubeInicial,
   temaInicial,
+  horaLembreteInicial,
 }: Props) {
   const [nome, setNome] = useState(nomeInicial);
   const [instagram, setInstagram] = useState(instagramInicial);
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
   const [tema, setTema] = useState<TemaPreferido>(temaInicial);
+  const [horaLembrete, setHoraLembrete] = useState(horaLembreteInicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [toastAberto, setToastAberto] = useState(false);
@@ -60,7 +63,7 @@ export function FormularioConta({
     setErro(null);
     setSalvando(true);
     try {
-      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema });
+      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete });
       aplicarTema(tema);
       setToastAberto(true);
     } catch {
@@ -88,7 +91,13 @@ export function FormularioConta({
           <Campo rotulo="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
         </div>
 
-        <Campo type="time" rotulo={textosConta.lembrete} value="08:00" disabled />
+        <Campo
+          type="time"
+          step={3600}
+          rotulo={textosConta.lembrete}
+          value={horaLembrete}
+          onChange={(e) => setHoraLembrete(e.target.value)}
+        />
 
         <div className={styles.grupo}>
           <span className={styles.rotuloGrupo}>{textosConta.tema}</span>

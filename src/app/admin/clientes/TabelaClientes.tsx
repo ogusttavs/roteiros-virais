@@ -1,6 +1,7 @@
 "use client";
 
 import { Users } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import type { ClienteAdmin } from "@/servicos/admin-coleta";
@@ -75,6 +76,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                 <th>{t.colunaNota}</th>
                 <th>{t.colunaUltimoRoteiro}</th>
                 <th>{t.colunaDiasSemGravar}</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -99,6 +101,11 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                       : cliente.diasSemGravar >= LIMIAR_ATENCAO
                         ? t.diasAtencao(cliente.diasSemGravar)
                         : cliente.diasSemGravar}
+                  </td>
+                  <td>
+                    <Link href={`/admin/clientes/${cliente.id}`} className={styles.botaoAbrir}>
+                      {t.botaoAbrir}
+                    </Link>
                   </td>
                 </tr>
               ))}

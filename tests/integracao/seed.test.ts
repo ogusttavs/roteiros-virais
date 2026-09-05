@@ -2,10 +2,11 @@
  * Migra do zero, roda o seed, confere contagens e a unicidade de
  * (plataforma, id_externo) (etapa 2, criterio de aceite).
  */
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { videos } from "@/db/schema";
+import { briefings, clientes, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { semear } from "../../scripts/semear";
@@ -33,6 +34,21 @@ describe("seed", () => {
       expect(v.origem).toBe("seed");
       expect(v.titulo?.startsWith("[exemplo]")).toBe(true);
     }
+  });
+
+  it("o cliente de seed de limpeza ja tem briefing completo com perfil compilado (etapa 12, ajuste 3)", async () => {
+    const linhas = await db()
+      .select({ usuarioId: clientes.usuarioId, perfil: briefings.perfil, completo: briefings.completo })
+      .from(briefings)
+      .innerJoin(clientes, eq(clientes.id, briefings.clienteId));
+
+    // so o cliente de limpeza: o de dentistas fica sem briefing completo de
+    // proposito, para briefing.spec.ts exercitar o fluxo de onboarding.
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].usuarioId).toBe("seed-cliente-limpeza");
+    expect(linhas[0].completo).toBe(true);
+    expect(linhas[0].perfil?.resumo).toBeTruthy();
+    expect(linhas[0].perfil?.fatos.oQueVende).toBeTruthy();
   });
 
   it("reprova video duplicado na mesma plataforma e id_externo", async () => {

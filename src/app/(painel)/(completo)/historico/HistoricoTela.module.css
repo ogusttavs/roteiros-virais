@@ -5,6 +5,11 @@
   max-width: var(--largura-leitura);
 }
 
+.numerosCarregando {
+  display: flex;
+  gap: var(--espaco-8);
+}
+
 .titulo {
   margin: 0;
   font-size: var(--tamanho-titulo);

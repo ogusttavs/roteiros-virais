@@ -13,6 +13,7 @@ import {
   type TemaPreferido,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { hojeISO } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -229,15 +230,19 @@ const perfilContaSchema = z.object({
     tiktok: z.string().trim().optional(),
     youtube: z.string().trim().optional(),
   }),
+  /** Hora cheia de Brasilia, "HH:00" (etapa 12, decisao 5): o job `lembrete` so roda a cada hora cheia. */
+  horaLembrete: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):00$/, "escolha uma hora cheia"),
 });
 
 /**
- * /conta (etapa D, parte 2): so nome e perfis, gravados numa unica UPDATE.
- * Diferente de salvarDadosFixos (/comecar), que exige cidade e persona:
- * a tela de conta nao mostra esses campos, entao usar salvarDadosFixos
- * aqui exigiria ler o cliente primeiro para preservar o resto (uma
- * leitura-depois-escrita sem necessidade, no mesmo tipo de corrida de
- * dado ja corrigido em src/servicos/briefing.ts).
+ * /conta (etapa D, parte 2; hora do lembrete na etapa 12): nome, perfis e a
+ * hora do lembrete, gravados numa unica UPDATE. Diferente de salvarDadosFixos
+ * (/comecar), que exige cidade e persona: a tela de conta nao mostra esses
+ * campos, entao usar salvarDadosFixos aqui exigiria ler o cliente primeiro
+ * para preservar o resto (uma leitura-depois-escrita sem necessidade, no
+ * mesmo tipo de corrida de dado ja corrigido em src/servicos/briefing.ts).
  */
 export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
   const dados = perfilContaSchema.parse(dadosBrutos);
@@ -250,7 +255,7 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
 
   const [cliente] = await db()
     .update(clientes)
-    .set({ nome: dados.nome, perfis })
+    .set({ nome: dados.nome, perfis, horaLembrete: dados.horaLembrete })
     .where(eq(clientes.id, clienteId))
     .returning();
 
@@ -277,5 +282,39 @@ export async function salvarTema(clienteId: number, tema: string): Promise<Clien
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar o tema; cliente nao encontrado.");
+  return cliente;
+}
+
+/**
+ * Mesmo "hoje" usado pelo job `lembrete` (etapa 12, decisao 5) para decidir
+ * quem ja abriu o painel: comparado em data local do Brasil, nao UTC, mesmo
+ * raciocinio de `hojeISO`. Compartilhada aqui para o layout do painel (que
+ * grava `ultimo_acesso_em`) e o job (que le) nunca divergirem.
+ */
+export function acessouHoje(ultimoAcessoEm: Date | null, agora = new Date()): boolean {
+  return ultimoAcessoEm !== null && hojeISO(ultimoAcessoEm) === hojeISO(agora);
+}
+
+/**
+ * O layout do painel chama isto no maximo uma vez por dia por cliente
+ * (etapa 12, decisao 5): confere com `acessouHoje` antes de chamar, para nao
+ * gravar a cada navegacao.
+ */
+export async function registrarAcessoHoje(clienteId: number): Promise<void> {
+  await db().update(clientes).set({ ultimoAcessoEm: new Date() }).where(eq(clientes.id, clienteId));
+}
+
+/**
+ * Aceite dos termos no primeiro acesso (etapa 12, decisao 7): quem nao
+ * aceitou nao passa do layout `(completo)`.
+ */
+export async function aceitarTermos(clienteId: number): Promise<Cliente> {
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ aceitouTermosEm: new Date() })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel registrar o aceite; cliente nao encontrado.");
   return cliente;
 }

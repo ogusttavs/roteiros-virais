@@ -6,6 +6,8 @@ export const textosComuns = {
   exemplo: "exemplo",
   voltar: "voltar",
   tentarDeNovo: "tentar de novo",
+  /** Repetido em mais de uma lista do admin ate a etapa 12 (limpeza da decisao 9). */
+  erroCarregarLista: "não conseguimos carregar a lista agora; tente de novo em um minuto",
   salvar: "salvar",
   salvo: "salvo",
   cancelar: "cancelar",
