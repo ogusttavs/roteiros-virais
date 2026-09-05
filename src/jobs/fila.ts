@@ -8,7 +8,10 @@
  * e os `.d.ts` em `node_modules/pg-boss/dist/`.
  */
 import "dotenv/config";
+import { sql } from "drizzle-orm";
 import { PgBoss } from "pg-boss";
+
+import { db } from "@/db";
 
 export const FILAS = {
   coletaYoutube: "coleta-youtube",
@@ -80,4 +83,23 @@ export function garantirBossPronto(): Promise<void> {
     });
   }
   return prontoPromise;
+}
+
+/**
+ * Ja existe um job pendente (nao terminado) desta fila para este nicho
+ * (etapa 24, parte 1, decisao 4 do PROXIMO.md: "coletar agora" nao duplica
+ * job pendente do mesmo nicho). Le a tabela do proprio pg-boss em vez de um
+ * mecanismo de deduplicacao da lib (singletonKey), para o criterio ficar
+ * explicito e facil de testar.
+ */
+export async function existeJobPendente(nome: string, nichoId: number): Promise<boolean> {
+  const resultado = await db().execute(sql`
+    select 1
+    from pgboss.job
+    where name = ${nome}
+      and (data ->> 'nichoId')::int = ${nichoId}
+      and state in ('created', 'retry', 'active')
+    limit 1
+  `);
+  return resultado.rows.length > 0;
 }

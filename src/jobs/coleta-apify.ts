@@ -41,8 +41,10 @@ async function registrarConsumo(unidades: number): Promise<void> {
     });
 }
 
-export async function rodarColetaApify(): Promise<Record<string, unknown>> {
-  const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
+/** `nichoId` (etapa 24, parte 1): mesmo raciocinio de `rodarColetaYoutube`. */
+export async function rodarColetaApify(nichoId?: number): Promise<Record<string, unknown>> {
+  const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
+  const nichosAtivos = await db().select().from(nichos).where(condicao);
 
   const teto = config.coleta.apifyMaxResultadosDia;
   const maxPorChamada = config.coleta.apifyMaxItems;

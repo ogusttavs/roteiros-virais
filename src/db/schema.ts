@@ -267,6 +267,12 @@ export const contas = pgTable(
     medianaVelocidade: numeric("mediana_velocidade", { precision: 14, scale: 3 }),
     /** Fracao dos videos da conta que ficaram fora da curva (ranking da vigilancia) */
     taxaForaDaCurva: numeric("taxa_fora_da_curva", { precision: 6, scale: 4 }),
+    /**
+     * "coleta" veio do motor (upsertConta durante uma coleta), "seed" e
+     * exemplo de desenvolvimento, "curadoria" foi acrescentada pelo admin
+     * como conta semente (etapa 24, parte 1). Mesma forma de videos.origem.
+     */
+    origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],

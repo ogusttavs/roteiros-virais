@@ -117,4 +117,25 @@ describe("rodarColetaNoticias (RSS mockado, banco real)", () => {
     await db().delete(noticias).where(eq(noticias.nichoId, outroNicho.id));
     await db().delete(nichos).where(eq(nichos.id, outroNicho.id));
   });
+
+  it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
+    const [outroNicho] = await db()
+      .insert(nichos)
+      .values({ slug: "coleta-noticias-outro", nome: "Coleta noticias outro nicho", termos: ["esteticista"] })
+      .returning();
+
+    try {
+      parseURL.mockResolvedValue({
+        items: [itemFeed("[exemplo] noticia escopada", "https://exemplo.invalid/escopada")],
+      });
+
+      const resumo = await rodarColetaNoticias(nichoId);
+      expect(resumo.nichos).toBe(1);
+      expect(parseURL).toHaveBeenCalledTimes(1);
+      expect(decodeURIComponent(String(parseURL.mock.calls[0][0]))).toContain("dentista");
+    } finally {
+      await db().delete(noticias).where(eq(noticias.nichoId, outroNicho.id));
+      await db().delete(nichos).where(eq(nichos.id, outroNicho.id));
+    }
+  });
 });

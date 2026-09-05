@@ -45,8 +45,15 @@ async function registrarConsumo(unidades: number): Promise<void> {
     });
 }
 
-export async function rodarColetaYoutube(): Promise<Record<string, unknown>> {
-  const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
+/**
+ * `nichoId` (etapa 24, parte 1): escopa a coleta a um nicho so, para o
+ * botao "coletar agora" da tela do nicho. Sem ele, roda para todos os
+ * nichos ativos, o comportamento de sempre (cron e disparo manual em
+ * `/admin/jobs`).
+ */
+export async function rodarColetaYoutube(nichoId?: number): Promise<Record<string, unknown>> {
+  const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
+  const nichosAtivos = await db().select().from(nichos).where(condicao);
   const publicadoApos = new Date(Date.now() - JANELA_DIAS * 24 * 60 * 60 * 1000);
 
   let unidadesUsadas = await consumoDeHoje();

@@ -85,6 +85,13 @@
       "when": 1788574655390,
       "tag": "0011_lembrete-ultimo-envio",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788632267222,
+      "tag": "0012_contas-origem",
+      "breakpoints": true
     }
   ]
 }

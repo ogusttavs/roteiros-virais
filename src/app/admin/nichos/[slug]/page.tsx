@@ -3,12 +3,20 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
-import { listarContasVigiadas, nichoPorSlug, temaDoDiaAtual, videosPorId } from "@/servicos/admin-coleta";
+import { FILAS } from "@/jobs/fila";
+import {
+  listarContasVigiadas,
+  nichoPorSlug,
+  temaDoDiaAtual,
+  ultimaExecucaoPorJob,
+  videosPorId,
+} from "@/servicos/admin-coleta";
 import { foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import styles from "./page.module.css";
+import { PainelNicho } from "./PainelNicho";
 
 const t = textosAdmin.nichoDetalhe;
 
@@ -55,16 +63,22 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje] = await Promise.all([
+  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
     listarContasVigiadas(nicho.id),
     temaDoDiaAtual(nicho.id),
+    ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
   const evidencias = await videosPorId(idsEvidencia);
   const videoPorId = new Map(evidencias.map((v) => [v.id, v]));
+
+  const jobsColeta = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias].map((nome) => ({
+    nome,
+    execucao: ultimasExecucoes[nome],
+  }));
 
   return (
     <div className={styles.pagina}>
@@ -75,6 +89,8 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         <h1>{nicho.nome}</h1>
         <Link href={`/admin/nichos/${slug}/modelo`}>{t.verModelo}</Link>
       </div>
+
+      <PainelNicho nicho={nicho} jobsColeta={jobsColeta} />
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>
