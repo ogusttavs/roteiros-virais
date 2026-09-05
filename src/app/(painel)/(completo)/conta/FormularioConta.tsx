@@ -32,6 +32,18 @@ const OPCOES_TEMA = textosConta.temas;
 const HORA_LEMBRETE_MINIMA = "06:00";
 const HORA_LEMBRETE_MAXIMA = "22:00";
 
+/**
+ * Mesmo arredondamento de `salvarPerfilConta` (etapa 13, ajuste 4): a faixa
+ * acima precisa comparar contra a hora que vai ser gravada de verdade, não
+ * contra o valor bruto do campo. Achado da revisão adversarial desta etapa:
+ * sem isso, "22:30" (que o servidor aceita, arredondando para "22:00") caía
+ * na recusa do cliente antes mesmo de chamar a Server Action.
+ */
+function arredondarParaHoraCheia(horaMinuto: string): string {
+  const [hora] = horaMinuto.split(":");
+  return `${hora}:00`;
+}
+
 function aplicarTema(tema: TemaPreferido) {
   if (tema === "claro" || tema === "escuro") {
     document.documentElement.setAttribute("data-tema", tema);
@@ -69,13 +81,14 @@ export function FormularioConta({
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
-    if (horaLembrete < HORA_LEMBRETE_MINIMA || horaLembrete > HORA_LEMBRETE_MAXIMA) {
+    const horaArredondada = arredondarParaHoraCheia(horaLembrete);
+    if (horaArredondada < HORA_LEMBRETE_MINIMA || horaArredondada > HORA_LEMBRETE_MAXIMA) {
       setErro(textosConta.erroHoraForaDaFaixa);
       return;
     }
     setSalvando(true);
     try {
-      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete });
+      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete: horaArredondada });
       aplicarTema(tema);
       setToastAberto(true);
     } catch {

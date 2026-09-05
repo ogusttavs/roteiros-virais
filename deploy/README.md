@@ -61,7 +61,8 @@ scp getorbita-vps:/var/lib/docker/volumes/roteiros_backups/_data/<arquivo>.sql.g
 docker exec roteiros-postgres createdb -U roteiros roteiros_restaurado
 
 # 3. restaurar (recusa se o banco de destino ja tiver a tabela "clientes";
-#    --forcar derruba e recria o banco antes de restaurar por cima)
+#    --forcar=<nome-do-banco> derruba e recria o banco antes de restaurar
+#    por cima, exigindo o nome exato como confirmacao)
 deploy/backup/restaurar.sh <arquivo>.sql.gz \
   postgres://roteiros:roteiros@localhost:5432/roteiros_restaurado
 

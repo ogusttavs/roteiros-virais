@@ -9,11 +9,6 @@
 # de verdade, "/usr/bin/env: python3: No such file or directory").
 FROM node:24-slim
 
-# Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry.
-# Passado pelo workflow "Imagens"; vazio fora dele (build local).
-ARG GIT_SHA=""
-ENV GIT_SHA=$GIT_SHA
-
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl \
   && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
@@ -26,6 +21,15 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+
+# Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry, so
+# usado em runtime (nunca num RUN de build). Fica depois das duas camadas
+# caras (apt-get e npm ci) de proposito: um ARG/ENV muda a cada commit
+# (achado da revisao adversarial desta etapa) e, se viesse antes, invalidava
+# o cache dessas camadas em toda build, mesmo com cache-from/cache-to do
+# workflow "Imagens".
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 
 # tsx roda os jobs direto do TypeScript, sem passo de build separado (mesmo
 # padrao ja usado em desenvolvimento, npm run worker).

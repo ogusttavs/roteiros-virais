@@ -12,6 +12,15 @@
  * enviar, pulando quem já recebeu hoje (mesma comparação de `acessouHoje`).
  * Isso cobre tanto uma execução manual (`npm run job -- lembrete`) quanto
  * uma repetição do pg-boss no mesmo dia.
+ *
+ * Grava `ultimo_lembrete_em` **antes** de chamar `enviarEmail`, não depois
+ * (achado da revisão adversarial desta etapa): mandar o e-mail e só then
+ * gravar deixa uma janela onde o processo pode cair (ou o job ser repetido)
+ * depois do e-mail sair mas antes da marca gravar, mandando de novo. Gravar
+ * primeiro fecha essa janela; se o envio falhar depois, a marca é desfeita
+ * no catch, para não perder o lembrete do cliente naquele dia por causa de
+ * uma falha comum do provedor de e-mail (mais provável que o processo cair
+ * no meio).
  */
 import { and, eq } from "drizzle-orm";
 
@@ -64,13 +73,21 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
     }
 
     try {
-      await enviarEmail({
-        para: candidato.email,
-        assunto: textosEmail.assuntoLembrete,
-        html: textosEmail.corpoLembrete(),
-      });
       await db().update(clientes).set({ ultimoLembreteEm: agora }).where(eq(clientes.id, candidato.clienteId));
-      enviados += 1;
+      try {
+        await enviarEmail({
+          para: candidato.email,
+          assunto: textosEmail.assuntoLembrete,
+          html: textosEmail.corpoLembrete(),
+        });
+        enviados += 1;
+      } catch (erroDeEnvio) {
+        await db()
+          .update(clientes)
+          .set({ ultimoLembreteEm: candidato.ultimoLembreteEm })
+          .where(eq(clientes.id, candidato.clienteId));
+        throw erroDeEnvio;
+      }
     } catch (erro) {
       erros.push(`cliente ${candidato.clienteId}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }

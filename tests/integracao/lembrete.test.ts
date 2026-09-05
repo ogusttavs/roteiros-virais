@@ -8,11 +8,14 @@
  * chamada de rede de verdade.
  */
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/email", () => ({ enviarEmail: vi.fn().mockResolvedValue(undefined) }));
 
 import { db, getPool } from "@/db";
 import { clientes, nichos, temasDia, user } from "@/db/schema";
 import { rodarLembrete } from "@/jobs/lembrete";
+import { enviarEmail } from "@/lib/email";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -173,5 +176,17 @@ describe("rodarLembrete", () => {
 
     const resumo = await rodarLembrete(AGORA);
     expect(resumo.candidatos).toBe(0);
+  });
+
+  it("se o envio falhar, desfaz a marca de ultimo_lembrete_em (nao perde o lembrete do dia por uma falha do provedor)", async () => {
+    const cliente = await criarCliente({ horaLembrete: "11:00", nichoId: nichoComTemaId });
+    vi.mocked(enviarEmail).mockRejectedValueOnce(new Error("falha simulada do provedor"));
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(0);
+    expect(resumo.erros).toBeDefined();
+
+    const [linha] = await db().select().from(clientes).where(eq(clientes.id, cliente.id));
+    expect(linha.ultimoLembreteEm).toBeNull();
   });
 });

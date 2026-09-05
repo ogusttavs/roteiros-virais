@@ -10,6 +10,6 @@ describe("desligarComGraca", () => {
 
     await desligarComGraca(bossFalso, "SIGTERM");
 
-    expect(stop).toHaveBeenCalledWith({ graceful: true });
+    expect(stop).toHaveBeenCalledWith({ graceful: true, timeout: 30_000 });
   });
 });
