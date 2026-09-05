@@ -126,17 +126,19 @@ resumo de uma linha por passo, com o tempo de cada um.
   (`node_modules/.bin/tsx`), sem `npm`/`sh` no meio; confirmado com o log mostrando a
   frase certa depois de um `docker compose stop`.
 
-**Limite conhecido desta máquina (Docker Desktop para Mac, kernel `linuxkit`), não um bug
-do produto:** `restart: unless-stopped` (e `always`) não reaplicam depois de um
-`docker kill`, confirmado num container `alpine` mínimo, sem Compose nem nada deste
-projeto, três vezes, esperando até 30 s sem o container voltar. No Linux nativo da VPS
-isso funciona (é o comportamento documentado do Docker); `ensaiar.sh` detecta a falha,
-sobe o worker de volta à mão só para os passos seguintes poderem continuar, e marca o
-passo como `[limite do ambiente, não comprovado aqui]` no resumo, sem travar o resto do
-ensaio. Rode com `ENSAIO_DOCKER_DESKTOP=1 deploy/ensaio/ensaiar.sh` para esse
-comportamento; sem a variável, uma falha aqui para o ensaio (o padrão certo numa máquina
-Linux de verdade, onde a falha seria um achado real). Este critério específico só fica
-provado de fato no primeiro deploy real na VPS.
+**Por que o ensaio mata o processo, não o container.** `docker kill` (e `docker compose
+stop`/`kill`) são parada manual pela API do Docker; a política de `restart` é ignorada
+depois de uma parada manual, em qualquer plataforma, até o daemon reiniciar ou o
+container ser reiniciado à mão de novo (documentação do Docker,
+[restart policies](https://docs.docker.com/engine/containers/start-containers-automatically/)).
+Uma primeira versão deste ensaio matava o container pela API e via ele nunca voltar,
+achado que a revisão corrigiu: o critério certo é uma queda de verdade do **processo**, de
+dentro do container, sem passar pela API. `ensaiar.sh` acha o processo Node que o `tsx`
+sobe para rodar o worker (PID 1 é o próprio `tsx`; o worker de verdade é um filho dele,
+achado por `PPid` em `/proc/<pid>/status`, nunca por nome de processo: a imagem não tem
+`ps`, e o `comm` do Node é "MainThread") e manda `kill -9` nele. O Docker vê o processo
+sair sozinho e reinicia o container de verdade: o critério é `RestartCount` subindo (0
+para 1 ou mais) e o log mostrando "worker no ar" de novo.
 
 ## O que nunca fazer
 
