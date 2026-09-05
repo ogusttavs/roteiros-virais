@@ -27,6 +27,7 @@ export default async function Conta() {
         tiktokInicial={perfis?.tiktok ?? ""}
         youtubeInicial={perfis?.youtube ?? ""}
         temaInicial={cliente?.tema ?? "sistema"}
+        horaLembreteInicial={cliente?.horaLembrete ?? "08:00"}
       />
       <BotaoSair />
     </div>

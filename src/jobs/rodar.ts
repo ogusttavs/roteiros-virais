@@ -14,6 +14,7 @@ import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { FILAS } from "./fila";
+import { rodarLembrete } from "./lembrete";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -32,6 +33,7 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.analisarVisual]: rodarAnalisarVisual,
   [FILAS.modeloNicho]: rodarModeloNicho,
   [FILAS.temasDoDia]: rodarTemasDoDia,
+  [FILAS.lembrete]: rodarLembrete,
 };
 
 async function main(): Promise<void> {

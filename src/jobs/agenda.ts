@@ -83,6 +83,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "0 6 * * 0",
     descricao: "modelo do nicho semanal, todo domingo as 06:00, depois da analise visual",
   },
+  {
+    fila: FILAS.lembrete,
+    cron: "0 * * * *",
+    descricao: "lembrete por e-mail, a cada hora cheia, para quem ainda nao abriu o painel hoje",
+  },
 ];
 
 export async function agendarTudo(): Promise<void> {

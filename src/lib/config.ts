@@ -53,6 +53,8 @@ export const config = {
     resendKey: env("RESEND_API_KEY"),
     de: env("EMAIL_FROM", "painel@localhost"),
   },
+  /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
+  emailContato: env("EMAIL_CONTATO", "contato@localhost"),
   /** Regras de produto que sao decisao, nao opiniao (CLAUDE.md e briefing-e-rubricas.md) */
   regras: {
     notaMinimaBriefing: 8,
@@ -114,4 +116,18 @@ export function hojeISO(d = new Date()): string {
     day: "2-digit",
   });
   return fmt.format(d);
+}
+
+/**
+ * "HH:00" na hora local do Brasil (etapa 12, decisão 5 do `PROXIMO.md`: o
+ * job `lembrete` roda de hora em hora e compara com `clientes.hora_lembrete`,
+ * que também é "HH:00").
+ */
+export function horaAtualISO(d = new Date()): string {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    hour12: false,
+  });
+  return `${fmt.format(d)}:00`;
 }
