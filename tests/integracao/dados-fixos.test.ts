@@ -154,9 +154,28 @@ describe("salvarPerfilConta", () => {
     expect(cliente.horaLembrete).toBe("11:00");
   });
 
-  it("recusa uma hora que nao seja cheia (etapa 12: o job lembrete so roda de hora em hora)", async () => {
+  it("arredonda para a hora cheia anterior (etapa 13: o navegador nao obriga o step de hora cheia)", async () => {
+    const cliente = await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "11:45" });
+    expect(cliente.horaLembrete).toBe("11:00");
+  });
+
+  it("aceita a hora cheia no limite da faixa (22:00)", async () => {
+    const cliente = await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "22:30" });
+    expect(cliente.horaLembrete).toBe("22:00");
+  });
+
+  it("recusa fora da faixa de 06:00 a 22:00, mesmo depois de arredondar (etapa 13, ajuste 3)", async () => {
     await expect(
-      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "11:30" }),
+      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "05:45" }),
+    ).rejects.toThrow();
+    await expect(
+      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "23:00" }),
+    ).rejects.toThrow();
+  });
+
+  it("recusa uma hora mal formada", async () => {
+    await expect(
+      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "25:99" }),
     ).rejects.toThrow();
   });
 

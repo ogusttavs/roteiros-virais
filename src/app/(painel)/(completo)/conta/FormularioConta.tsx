@@ -23,6 +23,14 @@ type Props = {
 };
 
 const OPCOES_TEMA = textosConta.temas;
+/**
+ * Mesma faixa de `salvarPerfilConta` (etapa 13, ajuste 3): o tema do dia
+ * nasce as 05:30. Checada aqui tambem porque o navegador nao bloqueia um
+ * valor fora do `min`/`max` do campo quando o envio passa pelo `onSubmit`
+ * em vez da validacao nativa do formulario (ajuste 4).
+ */
+const HORA_LEMBRETE_MINIMA = "06:00";
+const HORA_LEMBRETE_MAXIMA = "22:00";
 
 function aplicarTema(tema: TemaPreferido) {
   if (tema === "claro" || tema === "escuro") {
@@ -61,6 +69,10 @@ export function FormularioConta({
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
+    if (horaLembrete < HORA_LEMBRETE_MINIMA || horaLembrete > HORA_LEMBRETE_MAXIMA) {
+      setErro(textosConta.erroHoraForaDaFaixa);
+      return;
+    }
     setSalvando(true);
     try {
       await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete });
@@ -94,6 +106,8 @@ export function FormularioConta({
         <Campo
           type="time"
           step={3600}
+          min={HORA_LEMBRETE_MINIMA}
+          max={HORA_LEMBRETE_MAXIMA}
           rotulo={textosConta.lembrete}
           value={horaLembrete}
           onChange={(e) => setHoraLembrete(e.target.value)}

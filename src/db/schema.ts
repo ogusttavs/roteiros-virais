@@ -170,6 +170,11 @@ export const clientes = pgTable("clientes", {
   ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
   /** Nulo ate aceitar; quem nao aceitou nao passa do layout (completo) (etapa 12, decisao 7). */
   aceitouTermosEm: timestamp("aceitou_termos_em", { withTimezone: true }),
+  /**
+   * Gravado pelo job `lembrete` ao mandar o e-mail (etapa 13, ajuste 3): evita
+   * mandar duas vezes no mesmo dia (execucao manual ou repeticao do pg-boss).
+   */
+  ultimoLembreteEm: timestamp("ultimo_lembrete_em", { withTimezone: true }),
   criadoEm: criadoEm(),
 });
 
