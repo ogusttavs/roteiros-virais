@@ -22,14 +22,6 @@ BASE_URL="http://127.0.0.1:$PORTA"
 MANTER=0
 [ "${1:-}" = "--manter" ] && MANTER=1
 
-# ENSAIO_DOCKER_DESKTOP=1: Docker Desktop para Mac (kernel linuxkit) nao
-# reaplica "restart: unless-stopped"/"always" depois de um "docker kill"
-# (achado desta etapa, confirmado com um container alpine minimo, sem
-# Compose nem nada deste projeto). No Linux nativo da VPS isso funciona;
-# so existe para nao travar o ensaio inteiro numa maquina com essa
-# limitacao conhecida, sem esconder o resultado real do passo.
-DOCKER_DESKTOP="${ENSAIO_DOCKER_DESKTOP:-0}"
-
 cd "$RAIZ"
 
 INICIO_TOTAL=$(date +%s)
@@ -43,28 +35,6 @@ passo() {
   if "$@"; then
     local fim=$(date +%s)
     RESUMO+=("[ok] $nome ($((fim - inicio))s)")
-  else
-    local fim=$(date +%s)
-    RESUMO+=("[falhou] $nome ($((fim - inicio))s)")
-    imprimir_resumo
-    exit 1
-  fi
-}
-
-# Variante que nao para o ensaio quando ENSAIO_DOCKER_DESKTOP=1 e o passo
-# falhar: usada so no criterio do kill abrupto do worker (ver comentario de
-# DOCKER_DESKTOP acima). Fora desse caso, falha do jeito normal (para).
-passo_ou_limite_conhecido() {
-  local nome="$1"
-  local inicio=$(date +%s)
-  echo ">> $nome"
-  shift
-  if "$@"; then
-    local fim=$(date +%s)
-    RESUMO+=("[ok] $nome ($((fim - inicio))s)")
-  elif [ "$DOCKER_DESKTOP" = "1" ]; then
-    local fim=$(date +%s)
-    RESUMO+=("[limite do ambiente, nao comprovado aqui] $nome ($((fim - inicio))s)")
   else
     local fim=$(date +%s)
     RESUMO+=("[falhou] $nome ($((fim - inicio))s)")
@@ -208,28 +178,54 @@ worker_desligou_com_graca() {
   "${COMPOSE[@]}" start roteiros-worker
 }
 
+# Mata o processo Node que o tsx sobe para rodar o worker de verdade, de
+# dentro do container, sem passar pela API do Docker (ajuste da revisao
+# desta etapa: "docker kill" e "docker compose stop/kill" contam como
+# parada manual, e a politica de restart e ignorada depois de uma parada
+# manual em qualquer plataforma, nao so no Docker Desktop, ate o daemon
+# reiniciar ou o container ser reiniciado a mao; documentacao do Docker,
+# restart policies). O PID 1 do container e o proprio tsx
+# (node node_modules/.bin/tsx src/jobs/worker.ts); ele sobe o worker de
+# verdade num processo Node filho (PPid 1) e ainda tem um neto esbuild. A
+# imagem e node:24-slim, sem "ps", e o "comm" do processo Node e
+# "MainThread", nao "node": o alvo certo e achado por /proc/<pid>/status
+# (PPid igual a 1) e /proc/<pid>/cmdline (comeca com /usr/local/bin/node).
+matar_processo_do_tsx() {
+  "${COMPOSE[@]}" exec -T roteiros-worker sh -c '
+    for entrada in /proc/[0-9]*; do
+      pid=${entrada#/proc/}
+      [ -r "/proc/$pid/status" ] || continue
+      linha=$(grep "^PPid:" "/proc/$pid/status" 2>/dev/null)
+      ppid=$(echo ${linha#PPid:})
+      if [ "$ppid" = "1" ]; then
+        cmd=$(tr "\0" " " < "/proc/$pid/cmdline" 2>/dev/null)
+        case "$cmd" in
+          /usr/local/bin/node*) kill -9 "$pid" ;;
+        esac
+      fi
+    done
+  '
+}
+
 worker_volta_sozinho_apos_kill() {
-  local id_antes id_depois
-  id_antes=$("${COMPOSE[@]}" ps -q roteiros-worker)
-  docker kill roteiros-worker-ensaio >/dev/null
+  local antes depois
+  antes=$(docker inspect -f '{{.RestartCount}}' roteiros-worker-ensaio)
+  echo "RestartCount antes: $antes"
+  matar_processo_do_tsx
   for _ in $(seq 1 30); do
-    id_depois=$("${COMPOSE[@]}" ps -q roteiros-worker 2>/dev/null || true)
+    depois=$(docker inspect -f '{{.RestartCount}}' roteiros-worker-ensaio 2>/dev/null || echo "$antes")
     rodando=$(docker inspect -f '{{.State.Running}}' roteiros-worker-ensaio 2>/dev/null || echo false)
-    if [ -n "$id_depois" ] && [ "$id_depois" = "$id_antes" ] && [ "$rodando" = "true" ]; then
+    if [ "$depois" -gt "$antes" ] && [ "$rodando" = "true" ]; then
+      echo "RestartCount depois: $depois (State.Running=true)"
+      "${COMPOSE[@]}" logs roteiros-worker 2>/dev/null | grep -q "worker no ar" || {
+        echo "RestartCount subiu, mas o log nao mostrou 'worker no ar' de novo" >&2
+        return 1
+      }
       return 0
     fi
     sleep 2
   done
-  echo "o worker nao voltou sozinho depois do kill (restart: unless-stopped)." >&2
-  echo "achado desta etapa: em Docker Desktop para Mac (kernel linuxkit), 'restart: unless-stopped' e 'always' nao reaplicam apos 'docker kill', confirmado com um container alpine minimo, sem Compose nem nada deste projeto, tres vezes, esperando ate 30s. Nao acontece assim no Linux nativo da VPS (docker.com/manuals, restart policies); registrado no TODO.md como limite conhecido deste ambiente, nao um bug do Compose ou do Dockerfile." >&2
-  if [ "$DOCKER_DESKTOP" = "1" ]; then
-    echo "ENSAIO_DOCKER_DESKTOP=1: subindo o worker manualmente para os passos seguintes continuarem (isso nao prova o restart automatico, so segue o ensaio)." >&2
-    "${COMPOSE[@]}" up -d roteiros-worker >/dev/null 2>&1 || true
-    for _ in $(seq 1 15); do
-      [ "$(docker inspect -f '{{.State.Running}}' roteiros-worker-ensaio 2>/dev/null || echo false)" = "true" ] && break
-      sleep 2
-    done
-  fi
+  echo "o worker nao reiniciou sozinho em 60s (RestartCount ficou em $antes)" >&2
   return 1
 }
 
@@ -256,7 +252,7 @@ passo "login do admin de seed e GET /admin/clientes com o cookie" conferir_login
 passo "dispara coleta-noticias e espera terminar ok (1a vez)" disparar_e_esperar_job
 passo "para o worker (SIGTERM), confere 'parando com graca', e inicia de novo" worker_desligou_com_graca
 passo "dispara coleta-noticias e espera terminar ok (2a vez, depois do stop/start)" disparar_e_esperar_job
-passo_ou_limite_conhecido "mata o worker de forma abrupta e confere que o Compose sobe sozinho" worker_volta_sozinho_apos_kill
+passo "mata o processo do worker de dentro do container e confere que o Compose sobe sozinho" worker_volta_sozinho_apos_kill
 passo "dispara coleta-noticias e espera terminar ok (3a vez, depois do kill)" disparar_e_esperar_job
 passo "roda o backup.sh e confere o dump no volume" fazer_backup
 
