@@ -6,12 +6,13 @@
  * clientes.ts`); comparado em data local do Brasil, não UTC, mesmo
  * raciocínio de `hojeISO`.
  *
- * Duas guardas novas, para nunca prometer o que não pode cumprir e nunca
- * mandar duas vezes: só envia se existir `temas_dia` do nicho do cliente
- * para hoje (`temaDeHojeExisteParaNicho`), e grava `ultimo_lembrete_em` ao
- * enviar, pulando quem já recebeu hoje (mesma comparação de `acessouHoje`).
- * Isso cobre tanto uma execução manual (`npm run job -- lembrete`) quanto
- * uma repetição do pg-boss no mesmo dia.
+ * Duas guardas, para nunca prometer o que não pode cumprir e nunca mandar
+ * duas vezes: só envia se `/hoje` teria tema para mostrar (`temasDoDiaOuRecente`,
+ * a mesma regra de estabilidade da tela: o mais recente dos últimos 3 dias,
+ * não só hoje; ajuste da revisão da etapa 13, parte 2), e grava
+ * `ultimo_lembrete_em` ao enviar, pulando quem já recebeu hoje (mesma
+ * comparação de `acessouHoje`). Isso cobre tanto uma execução manual
+ * (`npm run job -- lembrete`) quanto uma repetição do pg-boss no mesmo dia.
  *
  * Grava `ultimo_lembrete_em` **antes** de chamar `enviarEmail`, não depois
  * (achado da revisão adversarial desta etapa): mandar o e-mail e só then
@@ -26,10 +27,10 @@ import { and, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clientes, user } from "@/db/schema";
-import { horaAtualISO } from "@/lib/config";
+import { hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { acessouHoje } from "@/servicos/clientes";
-import { temaDeHojeExisteParaNicho } from "@/servicos/temas";
+import { temasDoDiaOuRecente } from "@/servicos/temas";
 import { textosEmail } from "@/textos/email";
 
 /**
@@ -67,7 +68,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       jaReceberam += 1;
       continue;
     }
-    if (!candidato.nichoId || !(await temaDeHojeExisteParaNicho(candidato.nichoId, agora))) {
+    if (!candidato.nichoId || !(await temasDoDiaOuRecente(candidato.nichoId, hojeISO(agora)))) {
       semTema += 1;
       continue;
     }
