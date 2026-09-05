@@ -221,25 +221,38 @@ matar_processo_do_tsx() {
   '
 }
 
+# Conta quantas vezes "worker no ar" aparece no log do worker ate agora.
+# grep -c sai com status 1 quando a contagem e zero (inclusive com entrada
+# vazia); o "|| true" evita que set -e derrube o script por isso, e a
+# contagem impressa continua correta (0).
+contar_worker_no_ar() {
+  "${COMPOSE[@]}" logs roteiros-worker 2>/dev/null | grep -c "worker no ar" || true
+}
+
 worker_volta_sozinho_apos_kill() {
-  local antes depois
+  local antes antes_log depois depois_log rodando
   antes=$(docker inspect -f '{{.RestartCount}}' roteiros-worker-ensaio)
-  echo "RestartCount antes: $antes"
+  antes_log=$(contar_worker_no_ar)
+  echo "RestartCount antes: $antes, 'worker no ar' no log antes: $antes_log"
   matar_processo_do_tsx
+  # As tres condicoes (RestartCount subiu, State.Running=true, e a
+  # contagem de "worker no ar" subiu) precisam valer ao mesmo tempo, dentro
+  # do mesmo laco de espera: uma tentativa unica no instante do reinicio
+  # (achado da revisao desta rodada) pode cair no meio do reinicio, antes
+  # do processo novo imprimir a linha; e so conferir a linha existir, sem
+  # comparar com a contagem de antes, aceitaria o log do primeiro arranque
+  # do container, que nunca prova o reinicio de verdade.
   for _ in $(seq 1 30); do
     depois=$(docker inspect -f '{{.RestartCount}}' roteiros-worker-ensaio 2>/dev/null || echo "$antes")
     rodando=$(docker inspect -f '{{.State.Running}}' roteiros-worker-ensaio 2>/dev/null || echo false)
-    if [ "$depois" -gt "$antes" ] && [ "$rodando" = "true" ]; then
-      echo "RestartCount depois: $depois (State.Running=true)"
-      "${COMPOSE[@]}" logs roteiros-worker 2>/dev/null | grep -q "worker no ar" || {
-        echo "RestartCount subiu, mas o log nao mostrou 'worker no ar' de novo" >&2
-        return 1
-      }
+    depois_log=$(contar_worker_no_ar)
+    if [ "$depois" -gt "$antes" ] && [ "$rodando" = "true" ] && [ "$depois_log" -gt "$antes_log" ]; then
+      echo "RestartCount depois: $depois, 'worker no ar' no log depois: $depois_log (State.Running=true)"
       return 0
     fi
     sleep 2
   done
-  echo "o worker nao reiniciou sozinho em 60s (RestartCount ficou em $antes)" >&2
+  echo "o worker nao provou reiniciar sozinho em 60s: RestartCount ficou $depois (esperava mais que $antes), State.Running=$rodando (esperava true), 'worker no ar' no log ficou $depois_log (esperava mais que $antes_log)" >&2
   return 1
 }
 
