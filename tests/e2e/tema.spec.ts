@@ -47,7 +47,12 @@ test.beforeAll(async () => {
     });
   const [cliente] = await db()
     .insert(clientes)
-    .values({ usuarioId: "e2e-tema-preferencia", nome: "[teste] Preferencia de tema", nichoId: nicho.id })
+    .values({
+      usuarioId: "e2e-tema-preferencia",
+      nome: "[teste] Preferencia de tema",
+      nichoId: nicho.id,
+      aceitouTermosEm: new Date(),
+    })
     .returning();
   await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
 });

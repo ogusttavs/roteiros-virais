@@ -56,7 +56,12 @@ test.describe("historico com roteiro gravado", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-historico", nome: "[teste] Historico", nichoId: nicho.id })
+      .values({
+        usuarioId: "e2e-historico",
+        nome: "[teste] Historico",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
 
     await db()

@@ -22,24 +22,8 @@
   color: var(--cor-texto-suave);
 }
 
-.acoes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--espaco-3);
-}
-
-.buscaCampo {
-  width: 220px;
-}
-
-.semResultado {
-  margin-top: var(--espaco-8);
-  color: var(--cor-texto-suave);
-}
-
 .tabelaEnvoltorio {
-  margin-top: var(--espaco-8);
+  margin-top: var(--espaco-6);
   overflow-x: auto;
 }
 
@@ -79,24 +63,6 @@
   color: var(--cor-titulo);
 }
 
-.textoAtencao {
-  color: var(--cor-atencao);
-}
-
-.botaoAbrir {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 36px;
-  padding: 0 var(--espaco-3);
-  border-radius: var(--raio-pill);
-  border: 1px solid var(--cor-borda-forte);
-  color: var(--cor-titulo);
-  font-size: var(--tamanho-legenda);
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.botaoAbrir:hover {
-  background: var(--cor-superficie-hover);
+.semAvaliacao {
+  color: var(--cor-texto-suave);
 }

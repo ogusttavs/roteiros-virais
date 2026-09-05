@@ -51,7 +51,12 @@ test.describe("temas do dia pela tela", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-temas", nome: "[teste] Temas do dia", nichoId: nicho.id })
+      .values({
+        usuarioId: "e2e-temas",
+        nome: "[teste] Temas do dia",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
 
     await db()

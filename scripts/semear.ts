@@ -288,23 +288,36 @@ export async function semear(db: Db): Promise<ResumoSeed> {
         persona: "negocio",
         perfis: { instagram: `@${clienteSeed.perfil}`, tiktok: null, youtube: null },
         quemGrava: clienteSeed.quemGrava,
+        /**
+         * Os dois clientes de seed ja aceitaram os termos (etapa 12,
+         * decisao 7): so o briefing de dentistas fica de proposito
+         * incompleto (comentario abaixo), o aceite dos termos e uma
+         * checagem separada, depois do briefing, e nao faz parte do que
+         * `briefing.spec.ts` testa.
+         */
+        aceitouTermosEm: new Date(),
       })
       .returning();
     totalClientes += 1;
 
     /**
-     * Briefing ja compilado e completo (etapa 12, ajuste 3 da revisao da
-     * parte 1): sem isso, `gerarRoteiro` recusa o cliente de seed com "o
-     * briefing deste cliente ainda nao foi compilado", e nem `scripts/
-     * capturas.ts` nem uma sessao testando /roteiros/[id] a mao conseguem
-     * ver a tela sem inserir isso na unha toda vez.
+     * So o cliente de limpeza ganha briefing ja compilado e completo (etapa
+     * 12, ajuste 3 da revisao da parte 1): sem isso, `gerarRoteiro` recusa
+     * o cliente com "o briefing deste cliente ainda nao foi compilado", e
+     * nem `scripts/capturas.ts` nem uma sessao testando /roteiros/[id] a
+     * mao conseguem ver a tela sem inserir isso na unha toda vez.
+     * "seed-cliente-dentistas" fica de fora de proposito: `briefing.spec.ts`
+     * precisa dele com dados fixos preenchidos mas SEM briefing completo,
+     * para cair em `/comecar` e exercitar o fluxo de onboarding inteiro.
      */
-    await db.insert(briefings).values({
-      clienteId: clienteCriado.id,
-      completo: true,
-      notaGeral: "8.5",
-      perfil: clienteSeed.perfilCompilado,
-    });
+    if (nicho.slug !== "dentistas") {
+      await db.insert(briefings).values({
+        clienteId: clienteCriado.id,
+        completo: true,
+        notaGeral: "8.5",
+        perfil: clienteSeed.perfilCompilado,
+      });
+    }
 
     const contasParaVideo = contasCriadas.map((c) => ({
       id: c.id,

@@ -41,7 +41,7 @@ test.describe("roteiro pela tela", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-roteiro", nome: "[teste] Roteiro", nichoId: nicho.id })
+      .values({ usuarioId: "e2e-roteiro", nome: "[teste] Roteiro", nichoId: nicho.id, aceitouTermosEm: new Date() })
       .returning();
 
     await db()

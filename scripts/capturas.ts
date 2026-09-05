@@ -3,8 +3,11 @@
  * parte 1): as ferramentas de navegador das sessoes de agente nao gravam
  * arquivo, entao um pedido de captura nunca sai de verdade. Este script
  * sobe o Playwright direto, fora da suite de testes, entra com o cliente
- * de exemplo de dentistas e grava um PNG de cada tela pedida, claro e
- * escuro, a 390 (celular) e 1280 (desktop).
+ * de exemplo de limpeza e grava um PNG de cada tela pedida, claro e
+ * escuro, a 390 (celular) e 1280 (desktop). Usa o cliente de limpeza, nao
+ * o de dentistas, porque `scripts/semear.ts` deixa o de dentistas de
+ * proposito sem briefing completo, para `briefing.spec.ts` exercitar o
+ * fluxo de onboarding inteiro.
  *
  * Pre-requisitos, antes de rodar:
  * 1. `DATABASE_URL` do `.env` apontando para `roteiros_dev` (nunca
@@ -30,7 +33,7 @@ import { clienteDoUsuario, salvarTema } from "../src/servicos/clientes";
 import { gerarRoteiro, roteiroDeHoje } from "../src/servicos/roteiro";
 
 const SENHA_SEED = "ExemploSenha123";
-const USUARIO_SEED = "seed-cliente-dentistas";
+const USUARIO_SEED = "seed-cliente-limpeza";
 const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
 
 const TAMANHOS = [
@@ -54,7 +57,7 @@ async function garantirRoteiro(clienteId: number): Promise<number> {
 
   const roteiro = await gerarRoteiro(clienteId, {
     origem: "livre",
-    textoTema: "como clarear os dentes em casa sem gastar muito",
+    textoTema: "como organizar o guarda roupa em uma tarde sem gastar muito",
     objetivo: "conversao",
   });
   return roteiro.id;

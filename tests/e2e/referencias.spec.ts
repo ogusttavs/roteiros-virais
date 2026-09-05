@@ -40,7 +40,12 @@ test.describe("favoritar em /referencias", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-referencias", nome: "[teste] Referencias", nichoId: nicho.id })
+      .values({
+        usuarioId: "e2e-referencias",
+        nome: "[teste] Referencias",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
 
     await db()

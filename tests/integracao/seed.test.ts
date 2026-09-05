@@ -36,18 +36,19 @@ describe("seed", () => {
     }
   });
 
-  it("os dois clientes de seed ja tem briefing completo com perfil compilado (etapa 12, ajuste 3)", async () => {
+  it("o cliente de seed de limpeza ja tem briefing completo com perfil compilado (etapa 12, ajuste 3)", async () => {
     const linhas = await db()
-      .select({ perfil: briefings.perfil, completo: briefings.completo })
+      .select({ usuarioId: clientes.usuarioId, perfil: briefings.perfil, completo: briefings.completo })
       .from(briefings)
       .innerJoin(clientes, eq(clientes.id, briefings.clienteId));
 
-    expect(linhas).toHaveLength(2);
-    for (const linha of linhas) {
-      expect(linha.completo).toBe(true);
-      expect(linha.perfil?.resumo).toBeTruthy();
-      expect(linha.perfil?.fatos.oQueVende).toBeTruthy();
-    }
+    // so o cliente de limpeza: o de dentistas fica sem briefing completo de
+    // proposito, para briefing.spec.ts exercitar o fluxo de onboarding.
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0].usuarioId).toBe("seed-cliente-limpeza");
+    expect(linhas[0].completo).toBe(true);
+    expect(linhas[0].perfil?.resumo).toBeTruthy();
+    expect(linhas[0].perfil?.fatos.oQueVende).toBeTruthy();
   });
 
   it("reprova video duplicado na mesma plataforma e id_externo", async () => {

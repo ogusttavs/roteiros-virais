@@ -94,12 +94,18 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByText("ABAIXO DO ESPERADO").first()).toBeVisible();
 
     // rascunho da P2 sem avaliar, para testar que sobrevive ao recarregar.
-    await page.getByLabel("produto ou serviço que mais vende").fill("rascunho da P2, ainda sem avaliar");
-    // espera o indicador "salvo" aparecer em vez de um tempo fixo (achado da
-    // revisao da parte 1 de outra etapa: sob carga, o debounce de 800ms
-    // podia nao ter gravado ainda quando o reload disparava, e o campo
-    // voltava vazio).
-    await expect(page.getByText("salvo")).toBeVisible();
+    const campoP2 = page.getByLabel("produto ou serviço que mais vende");
+    await campoP2.fill("rascunho da P2, ainda sem avaliar");
+    // espera o indicador "salvo" DESTA pergunta (nao de outra ja aberta e
+    // intocada, que mostra "salvo" por padrao) aparecer, em vez de um tempo
+    // fixo: achado da revisao da parte 1 de outra etapa (sob carga, o
+    // debounce de 800ms podia nao ter gravado ainda quando o reload
+    // disparava, e o campo voltava vazio), mais um segundo achado ao
+    // aplicar o primeiro (`page.getByText("salvo")` sem escopo casava com
+    // o indicador de outra pergunta aberta que nunca foi editada, que
+    // comeca em "salvo" por padrao, e nao esperava nada de verdade).
+    const blocoP2 = campoP2.locator("xpath=ancestor::div[contains(@class, 'aberto')][1]");
+    await expect(blocoP2.getByText("salvo")).toBeVisible();
 
     await page.reload();
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();
@@ -221,7 +227,12 @@ test.describe("briefing pela tela", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-briefing-vivo", nome: "[teste] Briefing Vivo", nichoId: nicho.id })
+      .values({
+        usuarioId: "e2e-briefing-vivo",
+        nome: "[teste] Briefing Vivo",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
 
     const avaliacaoNota9 = (id: string): AvaliacaoResposta => ({

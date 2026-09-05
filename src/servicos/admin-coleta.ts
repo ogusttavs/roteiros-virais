@@ -12,16 +12,19 @@ import {
   clientes,
   contas,
   execucoesJob,
+  geracoesIA,
   nichos,
   roteiros,
   temasDia,
   user,
   videos,
+  type AvaliacaoGeracao,
   type Nicho,
   type Plataforma,
   type TemaDoDia,
 } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
+import { constanciaDoCliente } from "@/servicos/temas";
 
 export type ContagemPlataforma = Record<Plataforma, number>;
 
@@ -91,10 +94,13 @@ export type ClienteAdmin = {
 };
 
 /**
- * Lista para /admin/clientes (AdminTela.dc.html): junta nota do briefing e a
- * data do roteiro mais recente. "dias sem gravar" usa criadoEm do roteiro
- * como aproximacao (nao ha um campo "gravado em" separado no schema; a
- * etapa 11, que ainda nao existe, e quem decide se precisa de um).
+ * Lista para /admin/clientes (AdminTela.dc.html): junta nota do briefing, a
+ * data do roteiro mais recente (qualquer status, so para mostrar a coluna
+ * "ultimo roteiro") e "dias sem gravar" (etapa 12, decisao 6), que vem de
+ * `constanciaDoCliente` (baseada em `gravadoEm`/`postadoEm`, nao em
+ * `criadoEm`): nulo quando o cliente nunca gravou nem postou nada, 0 quando
+ * esta gravando hoje ou ontem (em sequencia), e os dias corridos quando
+ * parou.
  */
 export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
   const [linhas, notas, ultimosRoteiros] = await Promise.all([
@@ -117,14 +123,18 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
       .groupBy(roteiros.clienteId),
   ]);
 
-  const agora = Date.now();
+  const constancias = await Promise.all(
+    linhas.map((linha) => constanciaDoCliente(linha.id).then((constancia) => [linha.id, constancia] as const)),
+  );
+  const constanciaPorCliente = new Map(constancias);
+
   return linhas.map((linha) => {
     const notaGeral = notas.find((n) => n.clienteId === linha.id)?.notaGeral ?? null;
     const ultimaTexto = ultimosRoteiros.find((r) => r.clienteId === linha.id)?.ultima ?? null;
     const ultimoRoteiro = ultimaTexto ? new Date(ultimaTexto) : null;
-    const diasSemGravar = ultimoRoteiro
-      ? Math.floor((agora - ultimoRoteiro.getTime()) / (1000 * 60 * 60 * 24))
-      : null;
+    const constancia = constanciaPorCliente.get(linha.id);
+    const diasSemGravar =
+      constancia?.tipo === "parado" ? constancia.dias : constancia?.tipo === "seguidos" ? 0 : null;
     return {
       ...linha,
       notaBriefing: notaGeral ? Number(notaGeral) : null,
@@ -245,4 +255,120 @@ export async function videosPorId(ids: number[]): Promise<VideoLinkavel[]> {
     .select({ id: videos.id, titulo: videos.titulo, url: videos.url })
     .from(videos)
     .where(inArray(videos.id, ids));
+}
+
+export type ClienteDetalheAdmin = {
+  id: number;
+  nome: string;
+  email: string;
+  nichoNome: string | null;
+  ativo: boolean;
+  criadoEm: Date;
+  briefing: { completo: boolean; notaGeral: number | null; resumo: string | null } | null;
+  diasSemGravar: number | null;
+};
+
+/** /admin/clientes/[id] (etapa 12, decisão 9 do `PROXIMO.md`): briefing, saúde da conta. Só leitura. */
+export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDetalheAdmin | null> {
+  const [linha] = await db()
+    .select({
+      id: clientes.id,
+      nome: clientes.nome,
+      email: user.email,
+      nichoNome: nichos.nome,
+      ativo: clientes.ativo,
+      criadoEm: clientes.criadoEm,
+    })
+    .from(clientes)
+    .innerJoin(user, eq(user.id, clientes.usuarioId))
+    .leftJoin(nichos, eq(nichos.id, clientes.nichoId))
+    .where(eq(clientes.id, clienteId));
+
+  if (!linha) return null;
+
+  const [briefingLinha] = await db()
+    .select({ completo: briefings.completo, notaGeral: briefings.notaGeral, perfil: briefings.perfil })
+    .from(briefings)
+    .where(eq(briefings.clienteId, clienteId));
+
+  const constancia = await constanciaDoCliente(clienteId);
+  const diasSemGravar =
+    constancia.tipo === "parado" ? constancia.dias : constancia.tipo === "seguidos" ? 0 : null;
+
+  return {
+    ...linha,
+    briefing: briefingLinha
+      ? {
+          completo: briefingLinha.completo,
+          notaGeral: briefingLinha.notaGeral ? Number(briefingLinha.notaGeral) : null,
+          resumo: briefingLinha.perfil?.resumo ?? null,
+        }
+      : null,
+    diasSemGravar,
+  };
+}
+
+export type GeracaoResumo = {
+  id: number;
+  tarefa: string;
+  modelo: string;
+  versaoPrompt: string;
+  custoUsd: number;
+  avaliacao: AvaliacaoGeracao | null;
+  motivoAvaliacao: string | null;
+  criadoEm: Date;
+};
+
+/** /admin/geracoes (etapa 12, decisão 8 do `PROXIMO.md`): as ultimas gerações, mais recentes primeiro. So leitura. */
+export async function listarGeracoesRecentes(limite = 50): Promise<GeracaoResumo[]> {
+  const linhas = await db()
+    .select({
+      id: geracoesIA.id,
+      tarefa: geracoesIA.tarefa,
+      modelo: geracoesIA.modelo,
+      versaoPrompt: geracoesIA.versaoPrompt,
+      custoUsd: geracoesIA.custoUsd,
+      avaliacao: geracoesIA.avaliacao,
+      motivoAvaliacao: geracoesIA.motivoAvaliacao,
+      criadoEm: geracoesIA.criadoEm,
+    })
+    .from(geracoesIA)
+    .orderBy(desc(geracoesIA.criadoEm))
+    .limit(limite);
+
+  return linhas.map((l) => ({ ...l, custoUsd: Number(l.custoUsd) }));
+}
+
+export type GeracaoDetalhe = GeracaoResumo & {
+  clienteId: number | null;
+  entradas: Record<string, unknown>;
+  evidencias: number[];
+  saida: Record<string, unknown> | null;
+  tokensEntrada: number;
+  tokensSaida: number;
+  tokensCache: number;
+};
+
+/** /admin/geracoes/[id] (etapa 12, decisão 8): entrada e saída de uma geração. So leitura. */
+export async function geracaoPorId(id: number): Promise<GeracaoDetalhe | null> {
+  const [linha] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, id));
+  if (!linha) return null;
+
+  return {
+    id: linha.id,
+    clienteId: linha.clienteId,
+    tarefa: linha.tarefa,
+    modelo: linha.modelo,
+    versaoPrompt: linha.versaoPrompt,
+    custoUsd: Number(linha.custoUsd),
+    avaliacao: linha.avaliacao,
+    motivoAvaliacao: linha.motivoAvaliacao,
+    criadoEm: linha.criadoEm,
+    entradas: linha.entradas,
+    evidencias: linha.evidencias,
+    saida: linha.saida,
+    tokensEntrada: linha.tokensEntrada,
+    tokensSaida: linha.tokensSaida,
+    tokensCache: linha.tokensCache,
+  };
 }
