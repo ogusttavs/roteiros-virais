@@ -12,11 +12,25 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, roteiros, user } from "../../src/db/schema";
+import {
+  account,
+  briefings,
+  clientes,
+  metricasVideoCliente,
+  nichos,
+  roteiros,
+  user,
+  videosCliente,
+} from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-historico@exemplo.teste";
+
+/** Fixo, nao relativo a "agora": a conta exata de horas no texto da curva precisa ser estavel entre rodadas. */
+const POSTADO_COM_CURVA_EM = new Date("2026-09-01T12:00:00Z");
+const COLETADO_EM = new Date("2026-09-01T14:00:00Z");
+const POSTADO_SEM_LINK_EM = new Date("2026-09-01T10:00:00Z");
 
 const CONTEUDO_MINIMO = {
   titulo: "titulo do e2e",
@@ -98,6 +112,69 @@ test.describe("historico com roteiro gravado", () => {
         status: "gravado",
         gravadoEm: new Date(),
       });
+
+    // Postado com curva (etapa 15, parte 1, decisão 5 do `PROXIMO.md`): um ponto medido.
+    const [roteiroComCurva] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId: cliente.id,
+        data: hojeISO(),
+        tema: "o video que subiu no e2e",
+        origem: "sugerido",
+        objetivo: "alcance",
+        conteudo: CONTEUDO_MINIMO,
+        status: "postado",
+        gravadoEm: POSTADO_COM_CURVA_EM,
+        postadoEm: POSTADO_COM_CURVA_EM,
+        urlPostado: "https://youtu.be/e2ecurva1",
+      })
+      .returning();
+
+    const [videoComCurva] = await db()
+      .insert(videosCliente)
+      .values({
+        clienteId: cliente.id,
+        roteiroId: roteiroComCurva.id,
+        plataforma: "youtube",
+        url: "https://youtu.be/e2ecurva1",
+        idExterno: "e2ecurva1",
+        postadoEm: POSTADO_COM_CURVA_EM,
+      })
+      .returning();
+
+    await db().insert(metricasVideoCliente).values({
+      videoClienteId: videoComCurva.id,
+      coletadoEm: COLETADO_EM,
+      views: 1234,
+      likes: 10,
+      comentarios: 2,
+    });
+
+    // Postado sem link reconhecido (decisão 6 do `PROXIMO.md`): "sem acompanhamento".
+    const [roteiroSemLink] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId: cliente.id,
+        data: hojeISO(),
+        tema: "o video sem link valido do e2e",
+        origem: "sugerido",
+        objetivo: "alcance",
+        conteudo: CONTEUDO_MINIMO,
+        status: "postado",
+        gravadoEm: POSTADO_SEM_LINK_EM,
+        postadoEm: POSTADO_SEM_LINK_EM,
+        urlPostado: "https://naoreconhecido.teste/x",
+      })
+      .returning();
+
+    await db().insert(videosCliente).values({
+      clienteId: cliente.id,
+      roteiroId: roteiroSemLink.id,
+      plataforma: null,
+      url: "https://naoreconhecido.teste/x",
+      idExterno: null,
+      postadoEm: POSTADO_SEM_LINK_EM,
+    });
   });
 
   test("mostra a constancia e o roteiro gravado, e o toque abre o roteiro", async ({ page }) => {
@@ -117,5 +194,21 @@ test.describe("historico com roteiro gravado", () => {
     await item.click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  });
+
+  /** Etapa 15, parte 1, decisões 5 e 6 do `PROXIMO.md`. */
+  test("mostra a curva de um video postado e 'sem acompanhamento' de outro", async ({ page }) => {
+    await entrar(page, EMAIL);
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto("/historico");
+
+    const itemComCurva = page.getByRole("link", { name: /o video que subiu no e2e/ });
+    await expect(itemComCurva).toBeVisible();
+    await expect(itemComCurva.getByText("1.234 views em 2h")).toBeVisible();
+
+    const itemSemLink = page.getByRole("link", { name: /o video sem link valido do e2e/ });
+    await expect(itemSemLink).toBeVisible();
+    await expect(itemSemLink.getByText("sem acompanhamento")).toBeVisible();
   });
 });
