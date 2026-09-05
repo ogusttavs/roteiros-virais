@@ -83,8 +83,8 @@ export async function buscarTiktok(
  * Um video especifico por URL (etapa 15, parte 1: curva do cliente, o link
  * que ele colou em "postei"). `postURLs` e o campo do `clockworks/
  * tiktok-scraper` para um alvo ja conhecido, ao lado de `hashtags` e
- * `profiles`; nao confirmado ainda com chave real (registrar em decisoes
- * pendentes se o ator devolver vazio de verdade).
+ * `profiles`; confirmado rodando com chave real em 05/09/2026 (pegou um
+ * post de @tiktok pelo perfil e devolveu o mesmo post so com a URL dele).
  */
 export async function buscarTiktokPorUrl(urls: string[]): Promise<TiktokItemBruto[]> {
   if (urls.length === 0) return [];
@@ -137,7 +137,10 @@ export async function buscarInstagram(
  * cliente). `directUrls` ja e o jeito documentado de scrapar um alvo
  * conhecido (comentario de `buscarInstagram` acima); um link de post
  * especifico e o mesmo mecanismo, so que a URL aponta para o proprio
- * video em vez do perfil ou da hashtag.
+ * video em vez do perfil ou da hashtag. Confirmado rodando com chave real
+ * em 05/09/2026, inclusive que `/reel/{codigo}/` e `/p/{codigo}/` resolvem
+ * o mesmo post (o job sempre reconstroi como `/reel/`, `medirInstagram` em
+ * `curva-cliente.ts`).
  */
 export async function buscarInstagramPorUrl(urls: string[]): Promise<InstagramItemBruto[]> {
   if (urls.length === 0) return [];

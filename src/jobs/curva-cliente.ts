@@ -3,10 +3,13 @@
  * comentarios dos videos que os clientes postaram, na cadencia de
  * `src/servicos/curva.ts` (1h nas primeiras 24h, 6h ate 72h, 24h ate 30
  * dias). YouTube pela Data API (`videos.list`, sem OAuth, estatistica
- * publica); TikTok e Instagram pelo Apify por URL do video especifico,
+ * publica); TikTok e Instagram pelo Apify por URL do video especifico
+ * (confirmado rodando com chave real em 05/09/2026, ver `apify-api.ts`),
  * dentro do teto diario que a coleta ja usa (mesma fonte "apify" em
  * `consumo_api`, decisao do PROXIMO.md: "Apify por cliente" soma no mesmo
- * teto do "Apify por nicho").
+ * teto do "Apify por nicho"). Post do Instagram sem video (foto ou carrossel)
+ * volta `videoViewCount` nulo; `medirInstagram` grava `views: 0` nesse caso,
+ * curtidas e comentarios continuam corretos (achado da mesma verificacao).
  */
 import { and, eq, sql } from "drizzle-orm";
 
