@@ -23,6 +23,14 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  /**
+   * `enabled: undefined` preserva o padrão do pacote (ligado só em
+   * produção); `false` só em `config.modoE2E`, e só a suíte e2e liga essa
+   * flag (ver o comentário em `config.ts`).
+   */
+  rateLimit: {
+    enabled: config.modoE2E ? false : undefined,
+  },
   session: {
     expiresIn: 60 * 60 * 24 * 30,
   },

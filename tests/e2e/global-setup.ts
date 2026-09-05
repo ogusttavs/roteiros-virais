@@ -1,62 +1,34 @@
 /**
- * Visita /entrar uma vez antes da suite (achado da revisao da etapa 7, task
- * separada de investigacao): a primeira visita de toda a suite a uma rota
- * nova, contra o `next dev` ainda frio, podia colidir com a hidratacao. O
- * clique do Playwright chegava antes de o React anexar o onSubmit do
- * formulario, o navegador caia no submit nativo do <form> e vazava e-mail e
- * senha na query string (`/entrar?email=...&senha=...`) em vez de navegar
- * para /comecar ou /hoje.
+ * Reset e semeadura do banco, uma vez so, antes de qualquer arquivo de
+ * teste (globalSetup e garantido pelo Playwright rodar primeiro, diferente
+ * de depender da ordem alfabetica dos arquivos de spec). Etapa 11, ajuste 3
+ * da revisao da etapa 10.
  *
- * Depois que uma rota ja foi compilada uma vez, o resto da suite passa
- * normalmente (o webpack do `next dev` cacheia o bundle compilado); e o que
- * ja acontecia manualmente sempre que alguem testava a tela no navegador
- * antes do e2e. Este arquivo faz isso sozinho, forcando a compilacao e
- * esperando a rede ficar quieta (o que cobre a compilacao sob demanda do
- * bundle cliente) antes do primeiro teste de verdade tocar em /entrar.
+ * Sob carga (duas sessoes na mesma maquina), a suite completa recebeu
+ * `/hoje` onde esperava `/comecar` num arquivo que resetava o schema no
+ * proprio `beforeAll`, provavelmente porque o servidor de desenvolvimento
+ * continuava quente entre um reset e outro; cada arquivo de spec agora cria
+ * os proprios dados, com prefixo de id proprio, em vez de derrubar o schema
+ * de novo. O pool do Postgres (`db()`, globalThis) e o mesmo do resto da
+ * suite (achado rodando de verdade: fechar aqui derrubava o
+ * `globalTeardown`, "called end on pool more than once"), entao nao fecha o
+ * proprio pool aqui; quem fecha e o `globalTeardown`, como antes.
  *
- * Mesma familia de achado, revisao da etapa 8: a suite completa falhou duas
- * vezes nos dois primeiros testes (login caindo em /hoje em vez de /comecar;
- * admin preso em /entrar) e passou quando um spec rodou sozinho, com o
- * servidor ja quente. Por isso as outras rotas do fluxo tambem sao
- * aquecidas aqui, nao so /entrar.
- *
- * Etapa 11, ajuste 3 da revisao da etapa 10: `resetarSchema` mais `semear`
- * rodam uma vez so, aqui, antes de qualquer arquivo de teste (globalSetup e
- * garantido pelo Playwright rodar primeiro, diferente de depender da ordem
- * alfabetica dos arquivos de spec). Sob carga (duas sessoes na mesma
- * maquina), a suite completa recebeu `/hoje` onde esperava `/comecar` num
- * arquivo que resetava o schema no proprio `beforeAll`, provavelmente
- * porque o servidor de desenvolvimento continuava quente entre um reset e
- * outro; cada arquivo de spec agora cria os proprios dados, com prefixo de
- * id proprio, em vez de derrubar o schema de novo. O pool do Postgres
- * (`db()`, globalThis) e o mesmo do resto da suite (achado rodando de
- * verdade: fechar aqui derrubava o `globalTeardown`, "called end on pool
- * more than once"), entao nao fecha o proprio pool aqui; quem fecha e o
- * `globalTeardown`, como antes.
+ * Ate a etapa 13, parte 3, este arquivo tambem visitava um punhado de rotas
+ * antes da suite comecar, para forcar a compilacao sob demanda do `next dev`
+ * (achados das revisoes das etapas 7 e 8: o clique do Playwright podia
+ * chegar antes de o React anexar o onSubmit do formulario ainda
+ * compilando, e o navegador caia no submit nativo do <form>, vazando
+ * e-mail e senha na query string). O aquecimento saiu porque a suite passou
+ * a rodar contra `next start` (build de producao pronto, sem compilacao sob
+ * demanda nenhuma); se a suite voltar a rodar contra `next dev`, o
+ * aquecimento provavelmente volta a fazer falta.
  */
-import { chromium } from "@playwright/test";
-
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { semear } from "../../scripts/semear";
 import { db } from "../../src/db";
 
-const porta = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
-const baseURL = `http://localhost:${porta}`;
-
-const ROTAS = ["/entrar", "/comecar", "/hoje", "/admin/clientes", "/conta"];
-
 export default async function globalSetup() {
   await resetarSchema(db());
   await semear(db());
-
-  const browser = await chromium.launch();
-  try {
-    const page = await browser.newPage();
-    for (const rota of ROTAS) {
-      await page.goto(`${baseURL}${rota}`);
-      await page.waitForLoadState("networkidle");
-    }
-  } finally {
-    await browser.close();
-  }
 }

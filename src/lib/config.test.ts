@@ -71,4 +71,57 @@ describe("verificarSegredosDeProducao", () => {
       }),
     ).not.toThrow();
   });
+
+  it("MODO_E2E=1 com APP_URL e BETTER_AUTH_URL em localhost: passa", () => {
+    expect(() =>
+      verificarSegredosDeProducao({
+        NODE_ENV: "production",
+        ...segredosDeVerdade,
+        MODO_E2E: "1",
+        APP_URL: "http://localhost:3100",
+        BETTER_AUTH_URL: "http://localhost:3100",
+      }),
+    ).not.toThrow();
+  });
+
+  it("MODO_E2E=1 com 127.0.0.1: passa", () => {
+    expect(() =>
+      verificarSegredosDeProducao({
+        NODE_ENV: "production",
+        ...segredosDeVerdade,
+        MODO_E2E: "1",
+        APP_URL: "http://127.0.0.1:3100",
+        BETTER_AUTH_URL: "http://127.0.0.1:3100",
+      }),
+    ).not.toThrow();
+  });
+
+  it("MODO_E2E=1 com APP_URL fora de localhost: recusa (a flag nunca pode valer na VPS)", () => {
+    expect(() =>
+      verificarSegredosDeProducao({
+        NODE_ENV: "production",
+        ...segredosDeVerdade,
+        MODO_E2E: "1",
+        APP_URL: "https://app.srv1953618.hstgr.cloud",
+        BETTER_AUTH_URL: "http://localhost:3100",
+      }),
+    ).toThrow(ErroConfiguracao);
+  });
+
+  it("MODO_E2E=1 sem APP_URL nenhuma: recusa", () => {
+    expect(() =>
+      verificarSegredosDeProducao({ NODE_ENV: "production", ...segredosDeVerdade, MODO_E2E: "1" }),
+    ).toThrow(ErroConfiguracao);
+  });
+
+  it("sem MODO_E2E, APP_URL fora de localhost passa normalmente (e a producao de verdade)", () => {
+    expect(() =>
+      verificarSegredosDeProducao({
+        NODE_ENV: "production",
+        ...segredosDeVerdade,
+        APP_URL: "https://app.srv1953618.hstgr.cloud",
+        BETTER_AUTH_URL: "https://app.srv1953618.hstgr.cloud",
+      }),
+    ).not.toThrow();
+  });
 });

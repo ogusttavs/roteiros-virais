@@ -1,11 +1,13 @@
 /**
- * `rodarLembrete` (etapa 12, decisão 5; guardas da etapa 13, ajuste 3 do
- * `PROXIMO.md`): cliente que já abriu o painel hoje não recebe; cliente que
- * já recebeu o lembrete hoje não recebe de novo (uma repetição do pg-boss ou
- * uma execução manual no mesmo dia); cliente sem tema hoje no nicho (ou sem
- * nicho) não recebe; cliente na hora certa, sem nada disso, recebe.
- * `enviarEmail` sai no log fora de produção (`NODE_ENV` de teste), sem
- * chamada de rede de verdade.
+ * `rodarLembrete` (etapa 12, decisão 5; guardas da etapa 13, ajuste 1 da
+ * revisão da parte 2 do `PROXIMO.md`): cliente que já abriu o painel hoje
+ * não recebe; cliente que já recebeu o lembrete hoje não recebe de novo
+ * (uma repetição do pg-boss ou uma execução manual no mesmo dia); cliente
+ * sem tema no nicho, nem hoje nem nos últimos 3 dias (a mesma regra de
+ * estabilidade de `/hoje`, `temasDoDiaOuRecente`), ou sem nicho, não
+ * recebe; cliente na hora certa, sem nada disso, recebe, mesmo quando o
+ * tema mostrado é o de ontem. `enviarEmail` sai no log fora de produção
+ * (`NODE_ENV` de teste), sem chamada de rede de verdade.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -52,6 +54,12 @@ const AGORA = new Date("2026-09-03T14:00:00Z");
 
 let nichoComTemaId: number;
 let nichoSemTemaId: number;
+let nichoTemaOntemId: number;
+let nichoTemaForaDaJanelaId: number;
+
+function temaExemplo(titulo: string) {
+  return [{ titulo, descricao: "descricao", porQue: "por que", evidencias: [], puxaPara: "alcance" as const }];
+}
 
 beforeAll(async () => {
   await resetarSchema(db());
@@ -63,19 +71,33 @@ beforeAll(async () => {
   nichoComTemaId = comTema.id;
   await db()
     .insert(temasDia)
-    .values({
-      nichoId: nichoComTemaId,
-      data: "2026-09-03",
-      temas: [
-        { titulo: "tema 1", descricao: "descricao", porQue: "por que", evidencias: [], puxaPara: "alcance" },
-      ],
-    });
+    .values({ nichoId: nichoComTemaId, data: "2026-09-03", temas: temaExemplo("tema 1") });
 
   const [semTema] = await db()
     .insert(nichos)
     .values({ slug: "lembrete-teste-sem-tema", nome: "Lembrete teste sem tema", termos: [] })
     .returning();
   nichoSemTemaId = semTema.id;
+
+  // AGORA e 2026-09-03; "ontem" (2026-09-02) entra na janela de estabilidade de 3 dias.
+  const [temaOntem] = await db()
+    .insert(nichos)
+    .values({ slug: "lembrete-teste-tema-ontem", nome: "Lembrete teste tema ontem", termos: [] })
+    .returning();
+  nichoTemaOntemId = temaOntem.id;
+  await db()
+    .insert(temasDia)
+    .values({ nichoId: nichoTemaOntemId, data: "2026-09-02", temas: temaExemplo("tema de ontem") });
+
+  // 5 dias atras, fora da janela de estabilidade de 3 dias: conta como sem tema.
+  const [foraDaJanela] = await db()
+    .insert(nichos)
+    .values({ slug: "lembrete-teste-fora-da-janela", nome: "Lembrete teste fora da janela", termos: [] })
+    .returning();
+  nichoTemaForaDaJanelaId = foraDaJanela.id;
+  await db()
+    .insert(temasDia)
+    .values({ nichoId: nichoTemaForaDaJanelaId, data: "2026-08-29", temas: temaExemplo("tema antigo demais") });
 }, 30_000);
 
 afterAll(async () => {
@@ -147,8 +169,24 @@ describe("rodarLembrete", () => {
     expect(resumo.jaAbriram).toBe(0);
   });
 
-  it("nicho sem tema hoje nao recebe, conta em semTema", async () => {
+  it("nicho sem nenhum tema gravado nao recebe, conta em semTema", async () => {
     await criarCliente({ horaLembrete: "11:00", nichoId: nichoSemTemaId });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(0);
+    expect(resumo.semTema).toBe(1);
+  });
+
+  it("nicho so com tema de ontem (regra de estabilidade de /hoje) recebe, nao conta em semTema", async () => {
+    await criarCliente({ horaLembrete: "11:00", nichoId: nichoTemaOntemId });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    expect(resumo.semTema).toBe(0);
+  });
+
+  it("nicho so com tema de mais de 3 dias atras (fora da janela de estabilidade) nao recebe, conta em semTema", async () => {
+    await criarCliente({ horaLembrete: "11:00", nichoId: nichoTemaForaDaJanelaId });
 
     const resumo = await rodarLembrete(AGORA);
     expect(resumo.enviados).toBe(0);

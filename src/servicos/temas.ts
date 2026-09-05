@@ -128,7 +128,16 @@ export async function resumoHistorico(clienteId: number): Promise<ResumoHistoric
   return { diasSeguidos, gravadosNoMes, postadosNoMes, ultimos30Dias };
 }
 
-async function temasDoDiaOuRecente(
+/**
+ * Exportada para `lembrete.ts` usar a mesma regra de estabilidade de
+ * `/hoje` (etapa 13, ajuste 1 da revisão da parte 2 do `PROXIMO.md`): o
+ * lembrete não pode ficar mais estrito que a tela para a qual ele manda a
+ * pessoa. Antes disso o job usava uma checagem estrita, só de hoje
+ * (`temaDeHojeExisteParaNicho`, removida), e um nicho cuja coleta de hoje
+ * falhasse deixava de mandar o lembrete mesmo com o tema de ontem ainda
+ * valendo em `/hoje`.
+ */
+export async function temasDoDiaOuRecente(
   nichoId: number,
   data: string,
 ): Promise<{ temas: TemaDoDia[]; dataUsada: string } | null> {
@@ -147,21 +156,6 @@ async function temasDoDiaOuRecente(
 
   if (!linha) return null;
   return { temas: linha.temas, dataUsada: linha.data };
-}
-
-/**
- * Existência estrita de `temas_dia` para hoje (etapa 13, ajuste 3 do
- * `PROXIMO.md`): diferente de `temasDoDiaOuRecente`, que aceita um dos
- * últimos dias por causa da regra de estabilidade. O job `lembrete` usa
- * isto para nunca prometer um tema que ainda não existe. `agora` injetável
- * como o resto do job, para o teste de integração escolher a data certa.
- */
-export async function temaDeHojeExisteParaNicho(nichoId: number, agora = new Date()): Promise<boolean> {
-  const [linha] = await db()
-    .select({ data: temasDia.data })
-    .from(temasDia)
-    .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO(agora))));
-  return Boolean(linha);
 }
 
 export type ResultadoTemasHoje =

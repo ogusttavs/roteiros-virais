@@ -30,6 +30,27 @@ export const config = {
     secret: env("BETTER_AUTH_SECRET", "troque-em-producao"),
     url: env("BETTER_AUTH_URL", "http://localhost:3000"),
   },
+  /**
+   * Modo da suíte e2e (etapa 13, parte 3, ajuste da revisão): `next start`
+   * sempre roda com `NODE_ENV=production`, mas a suíte não pode se
+   * comportar como produção de verdade em dois pontos.
+   *
+   * (1) O better-auth liga sozinho, só em produção, um limite de taxa
+   * embutido em `/sign-in*` (3 tentativas a cada 10 s, não configurável por
+   * fora, `getDefaultSpecialRules` do pacote); várias telas da suíte entram
+   * pela mesma conta de exemplo em sequência, o que basta para estourar
+   * esse limite (`src/lib/auth.ts`).
+   *
+   * (2) `enviarEmail` só simula fora de produção; a suíte rodando contra
+   * `next start` mandou e-mail de verdade pelo Resend para
+   * `cliente-e2e@exemplo.teste` (domínio inexistente, bounce), porque o
+   * `.env` local tinha a chave real (achado da revisão desta etapa).
+   *
+   * `verificarSegredosDeProducao`, abaixo, recusa `MODO_E2E=1` fora de
+   * `localhost`/`127.0.0.1`: essa flag só existe para o `webServer.env` do
+   * `playwright.config.ts` e nunca pode valer na VPS de verdade.
+   */
+  modoE2E: env("MODO_E2E") === "1",
   ia: {
     provedor: provedorIA(),
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),
@@ -95,8 +116,26 @@ export class ErroConfiguracao extends Error {}
  * esse passo de build do servidor rodando de verdade (etapa 4, achado ao
  * rodar `npm run build` local com o .env.example ainda no .env).
  */
+/** `null` sem host valido (URL ausente ou malformada): tratado como reprovado por MODO_E2E. */
+function hostDeUrl(valor: string | undefined): string | null {
+  if (!valor) return null;
+  try {
+    return new URL(valor).hostname;
+  } catch {
+    return null;
+  }
+}
+
 export function verificarSegredosDeProducao(
-  env: { NODE_ENV?: string; NEXT_PHASE?: string; BETTER_AUTH_SECRET?: string; JOBS_API_KEY?: string } = process.env,
+  env: {
+    NODE_ENV?: string;
+    NEXT_PHASE?: string;
+    BETTER_AUTH_SECRET?: string;
+    JOBS_API_KEY?: string;
+    MODO_E2E?: string;
+    APP_URL?: string;
+    BETTER_AUTH_URL?: string;
+  } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
   if (env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) return;
@@ -110,6 +149,30 @@ export function verificarSegredosDeProducao(
     throw new ErroConfiguracao(
       "JOBS_API_KEY ainda e o valor de exemplo do .env.example; gere uma chave de verdade antes de subir em producao.",
     );
+  }
+
+  /**
+   * MODO_E2E desliga o limite de taxa do better-auth e o envio de e-mail de
+   * verdade (config.modoE2E, src/lib/auth.ts, src/lib/email.ts); sem essa
+   * trava, a mesma flag num `.env` de producao de verdade abriria as duas
+   * brechas na VPS. So vale com APP_URL e BETTER_AUTH_URL em localhost ou
+   * 127.0.0.1, o unico jeito de rodar de verdade `next start` para a suite
+   * e2e (etapa 13, parte 3, ajuste da revisao: e-mail real saiu pelo Resend
+   * numa rodada da suite antes desta trava existir).
+   */
+  if (env.MODO_E2E === "1") {
+    const HOSTS_PERMITIDOS = new Set(["localhost", "127.0.0.1"]);
+    for (const [nome, valor] of [
+      ["APP_URL", env.APP_URL],
+      ["BETTER_AUTH_URL", env.BETTER_AUTH_URL],
+    ] as const) {
+      const host = hostDeUrl(valor);
+      if (!host || !HOSTS_PERMITIDOS.has(host)) {
+        throw new ErroConfiguracao(
+          `MODO_E2E=1 exige ${nome} em localhost ou 127.0.0.1; recebido "${valor}". Essa flag nunca pode valer fora do e2e.`,
+        );
+      }
+    }
   }
 }
 

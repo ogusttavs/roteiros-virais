@@ -9,6 +9,15 @@ import { defineConfig, devices } from "@playwright/test";
 const porta = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 const baseURL = `http://localhost:${porta}`;
 
+/**
+ * Segredos de teste com 32 caracteres ou mais (etapa 13, parte 3, decisão 2
+ * do `PROXIMO.md`): `next start` sempre roda com `NODE_ENV=production`
+ * (diferente de `next dev`), e `verificarSegredosDeProducao`
+ * (`src/lib/config.ts`) recusa iniciar em produção com o valor de exemplo
+ * do `.env.example`. Só de teste, nunca os segredos reais.
+ */
+const SEGREDO_E2E = "e2e-teste-nao-e-producao-".padEnd(32, "0");
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: true,
@@ -49,13 +58,22 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   webServer: {
-    command: "npm run dev",
+    /**
+     * e2e contra build de producao (etapa 13, parte 3, decisao 2 do
+     * `PROXIMO.md`): `next dev` recompila pagina sob demanda, a fonte de
+     * toda oscilacao que este projeto ja viu; `next start` serve o build
+     * pronto, igual ao Dockerfile de producao. Em CI, o build ja roda como
+     * passo proprio antes deste arquivo (`PLAYWRIGHT_SEM_BUILD=1`), entao o
+     * comando so inicia; localmente, builda e inicia toda vez que nao ha
+     * servidor ja rodando na porta (reuseExistingServer abaixo).
+     */
+    command: process.env.PLAYWRIGHT_SEM_BUILD === "1" ? "npm run start" : "npm run build && npm run start",
     url: baseURL,
     reuseExistingServer: !process.env.CI,
-    timeout: 60_000,
+    timeout: 180_000,
     /**
      * plataforma/CLAUDE.md: todo teste roda em mock. So vale para um
-     * servidor novo, que este comando sobe; um `npm run dev` ja rodando na
+     * servidor novo, que este comando sobe; um servidor ja rodando na
      * porta e reusado do jeito que esta (reuseExistingServer acima), com o
      * provedor que ele ja tinha.
      *
@@ -68,6 +86,32 @@ export default defineConfig({
       PORT: String(porta),
       BETTER_AUTH_URL: baseURL,
       APP_URL: baseURL,
+      BETTER_AUTH_SECRET: SEGREDO_E2E,
+      JOBS_API_KEY: SEGREDO_E2E,
+      /**
+       * Desliga o limite de taxa do better-auth (várias telas entram pela
+       * mesma conta de exemplo em sequência) e faz `enviarEmail` cair no
+       * log em vez de mandar de verdade, mesmo com `NODE_ENV=production`
+       * (`next start`). `verificarSegredosDeProducao` (`src/lib/config.ts`)
+       * recusa essa flag fora de `localhost`/`127.0.0.1`; `baseURL` acima é
+       * sempre `localhost`, então a trava nunca dispara aqui. Nunca setar
+       * `MODO_E2E` fora deste arquivo (achado da revisão desta etapa: sem
+       * essa flag existir ainda, a suíte rodando contra produção mandou
+       * e-mail de verdade pelo Resend).
+       */
+      MODO_E2E: "1",
+      /**
+       * Defesa em profundidade: mesmo que o `.env` local tenha chave de
+       * verdade, o `dotenv/config` de `src/lib/config.ts` não sobrescreve
+       * variável já definida no processo, então zerar aqui garante que
+       * nenhuma chave real chega ao servidor do e2e.
+       */
+      RESEND_API_KEY: "",
+      SENTRY_DSN: "",
+      ANTHROPIC_API_KEY: "",
+      GROQ_API_KEY: "",
+      APIFY_TOKEN: "",
+      YOUTUBE_API_KEY: "",
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

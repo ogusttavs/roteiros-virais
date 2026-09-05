@@ -18,6 +18,14 @@ export class ErroEmail extends Error {}
  * `.env` local. Em producao sem chave, lanca ErroEmail em vez de cair no
  * log em silencio: link magico que some sem aviso e o tipo de falha que
  * ninguem percebe (revisao da etapa 3, PROXIMO.md).
+ *
+ * `config.modoE2E` tambem cai no log, mesmo com `NODE_ENV=production`
+ * (etapa 13, parte 3, ajuste da revisao): a suite e2e passou a rodar contra
+ * `next start`, que forca producao, e a rodada de 05/09 mandou convite de
+ * verdade pelo Resend para `cliente-e2e@exemplo.teste` (dominio inexistente,
+ * bounce) porque o `.env` local tinha a chave real. `verificarSegredosDeProducao`
+ * (`config.ts`) trava essa flag em localhost, entao ela nunca some essa
+ * checagem na VPS de verdade.
  */
 export async function enviarEmail(opcoes: {
   para: string;
@@ -26,7 +34,7 @@ export async function enviarEmail(opcoes: {
 }): Promise<void> {
   const producao = process.env.NODE_ENV === "production";
 
-  if (!producao) {
+  if (!producao || config.modoE2E) {
     console.log(`[e-mail simulado] para ${opcoes.para}, assunto "${opcoes.assunto}"`);
     console.log(opcoes.html);
     return;

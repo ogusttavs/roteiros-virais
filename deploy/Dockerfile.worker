@@ -33,4 +33,15 @@ ENV GIT_SHA=$GIT_SHA
 
 # tsx roda os jobs direto do TypeScript, sem passo de build separado (mesmo
 # padrao ja usado em desenvolvimento, npm run worker).
-CMD ["npm", "run", "worker"]
+#
+# Direto no binario do tsx, nao "npm run worker" (achado do ensaio local,
+# etapa 13 parte 3): "npm run <script>" passa por um "sh -c" no meio, que
+# nao repassa o SIGTERM do Docker para o processo Node de verdade (o log
+# so mostra "npm error signal SIGTERM", nunca o "worker recebeu SIGTERM,
+# parando com graca" de src/jobs/desligamento.ts). Sem isso, todo
+# `docker compose stop` (todo deploy) matava o worker no meio de um job em
+# vez de deixar o pg-boss terminar sozinho, do jeito que stop_grace_period
+# deste servico e TIMEOUT_DESLIGAMENTO_MS existem para permitir. Rodando o
+# binario direto (exec, sem shell no meio), o processo do tsx vira o PID 1
+# do container e recebe o sinal direto.
+CMD ["node_modules/.bin/tsx", "src/jobs/worker.ts"]
