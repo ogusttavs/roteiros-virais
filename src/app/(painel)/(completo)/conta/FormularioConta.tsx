@@ -23,6 +23,26 @@ type Props = {
 };
 
 const OPCOES_TEMA = textosConta.temas;
+/**
+ * Mesma faixa de `salvarPerfilConta` (etapa 13, ajuste 3): o tema do dia
+ * nasce as 05:30. Checada aqui tambem porque o navegador nao bloqueia um
+ * valor fora do `min`/`max` do campo quando o envio passa pelo `onSubmit`
+ * em vez da validacao nativa do formulario (ajuste 4).
+ */
+const HORA_LEMBRETE_MINIMA = "06:00";
+const HORA_LEMBRETE_MAXIMA = "22:00";
+
+/**
+ * Mesmo arredondamento de `salvarPerfilConta` (etapa 13, ajuste 4): a faixa
+ * acima precisa comparar contra a hora que vai ser gravada de verdade, não
+ * contra o valor bruto do campo. Achado da revisão adversarial desta etapa:
+ * sem isso, "22:30" (que o servidor aceita, arredondando para "22:00") caía
+ * na recusa do cliente antes mesmo de chamar a Server Action.
+ */
+function arredondarParaHoraCheia(horaMinuto: string): string {
+  const [hora] = horaMinuto.split(":");
+  return `${hora}:00`;
+}
 
 function aplicarTema(tema: TemaPreferido) {
   if (tema === "claro" || tema === "escuro") {
@@ -61,9 +81,14 @@ export function FormularioConta({
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
+    const horaArredondada = arredondarParaHoraCheia(horaLembrete);
+    if (horaArredondada < HORA_LEMBRETE_MINIMA || horaArredondada > HORA_LEMBRETE_MAXIMA) {
+      setErro(textosConta.erroHoraForaDaFaixa);
+      return;
+    }
     setSalvando(true);
     try {
-      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete });
+      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete: horaArredondada });
       aplicarTema(tema);
       setToastAberto(true);
     } catch {
@@ -94,6 +119,8 @@ export function FormularioConta({
         <Campo
           type="time"
           step={3600}
+          min={HORA_LEMBRETE_MINIMA}
+          max={HORA_LEMBRETE_MAXIMA}
           rotulo={textosConta.lembrete}
           value={horaLembrete}
           onChange={(e) => setHoraLembrete(e.target.value)}

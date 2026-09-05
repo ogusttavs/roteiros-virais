@@ -58,6 +58,11 @@ services:
     networks:
       - roteiros-interna
     mem_limit: 1500m
+    # SIGTERM chama desligarComGraca (src/jobs/desligamento.ts), que espera o
+    # pg-boss fechar (graceful: true, teto de 30s da propria lib). O padrao
+    # do Docker (10s) mata o processo antes disso; 35s da folga pro pg-boss
+    # terminar sozinho na maioria dos casos (etapa 13, decisao 3).
+    stop_grace_period: 35s
     # yt-dlp e ffmpeg escrevem arquivo temporario; nada persiste fora do container
     tmpfs:
       - /tmp:size=1g

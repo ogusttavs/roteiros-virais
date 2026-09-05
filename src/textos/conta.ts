@@ -5,6 +5,7 @@ export const textosConta = {
   soLeitura: "(só leitura)",
   redes: "perfis nas redes",
   lembrete: "a que horas você quer o lembrete de gravar?",
+  erroHoraForaDaFaixa: "escolha uma hora entre 6h e 22h",
   tema: "tema",
   temas: [
     { valor: "claro", rotulo: "claro" },

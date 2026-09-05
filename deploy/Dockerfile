@@ -25,6 +25,10 @@ RUN mkdir -p public && npm run build
 
 FROM node:24-slim AS runner
 WORKDIR /app
+# Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry.
+# Passado pelo workflow "Imagens"; vazio fora dele (build local).
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0

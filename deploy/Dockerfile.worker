@@ -22,6 +22,15 @@ RUN npm ci
 
 COPY . .
 
+# Sha curto do commit (etapa 13, decisao 1): vira `release` no Sentry, so
+# usado em runtime (nunca num RUN de build). Fica depois das duas camadas
+# caras (apt-get e npm ci) de proposito: um ARG/ENV muda a cada commit
+# (achado da revisao adversarial desta etapa) e, se viesse antes, invalidava
+# o cache dessas camadas em toda build, mesmo com cache-from/cache-to do
+# workflow "Imagens".
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
+
 # tsx roda os jobs direto do TypeScript, sem passo de build separado (mesmo
 # padrao ja usado em desenvolvimento, npm run worker).
 CMD ["npm", "run", "worker"]

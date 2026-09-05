@@ -149,6 +149,21 @@ async function temasDoDiaOuRecente(
   return { temas: linha.temas, dataUsada: linha.data };
 }
 
+/**
+ * Existência estrita de `temas_dia` para hoje (etapa 13, ajuste 3 do
+ * `PROXIMO.md`): diferente de `temasDoDiaOuRecente`, que aceita um dos
+ * últimos dias por causa da regra de estabilidade. O job `lembrete` usa
+ * isto para nunca prometer um tema que ainda não existe. `agora` injetável
+ * como o resto do job, para o teste de integração escolher a data certa.
+ */
+export async function temaDeHojeExisteParaNicho(nichoId: number, agora = new Date()): Promise<boolean> {
+  const [linha] = await db()
+    .select({ data: temasDia.data })
+    .from(temasDia)
+    .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO(agora))));
+  return Boolean(linha);
+}
+
 export type ResultadoTemasHoje =
   | { status: "sem_tema"; constancia: Constancia }
   | {

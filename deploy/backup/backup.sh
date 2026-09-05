@@ -8,12 +8,14 @@
 #
 # Variaveis (do .env do Compose): DATABASE_URL, BACKUP_HORA_UTC (padrao 06,
 # que e 03:00 em Brasilia), BACKUP_RETENCAO_DIAS (padrao 30),
-# BACKUP_RCLONE_REMOTE (opcional) e as RCLONE_CONFIG_* do remoto.
+# BACKUP_RCLONE_REMOTE (opcional), as RCLONE_CONFIG_* do remoto, e
+# BACKUP_DESTINO (padrao /backups, o volume do Compose; sobrescrito no
+# teste local da etapa 13, decisao 2, rodando o script fora do container).
 set -euo pipefail
 
 HORA="${BACKUP_HORA_UTC:-06}"
 RETENCAO="${BACKUP_RETENCAO_DIAS:-30}"
-DESTINO=/backups
+DESTINO="${BACKUP_DESTINO:-/backups}"
 mkdir -p "$DESTINO"
 
 fazer_backup() {

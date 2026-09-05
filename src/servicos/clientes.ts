@@ -230,22 +230,42 @@ const perfilContaSchema = z.object({
     tiktok: z.string().trim().optional(),
     youtube: z.string().trim().optional(),
   }),
-  /** Hora cheia de Brasilia, "HH:00" (etapa 12, decisao 5): o job `lembrete` so roda a cada hora cheia. */
-  horaLembrete: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):00$/, "escolha uma hora cheia"),
+  /**
+   * "HH:MM" (etapa 13, ajuste 4: o navegador nao obriga o `step` de hora
+   * cheia do campo, entao chega qualquer minuto). Arredondada para a hora
+   * cheia anterior antes de gravar; a faixa permitida (etapa 13, ajuste 3)
+   * e conferida depois do arredondamento.
+   */
+  horaLembrete: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "hora invalida"),
 });
 
+/** O tema do dia nasce as 05:30; o lembrete nao faz sentido antes disso nem tarde da noite. */
+const HORA_LEMBRETE_MINIMA = "06:00";
+const HORA_LEMBRETE_MAXIMA = "22:00";
+
+function arredondarParaHoraCheia(horaMinuto: string): string {
+  const [hora] = horaMinuto.split(":");
+  return `${hora}:00`;
+}
+
 /**
- * /conta (etapa D, parte 2; hora do lembrete na etapa 12): nome, perfis e a
- * hora do lembrete, gravados numa unica UPDATE. Diferente de salvarDadosFixos
- * (/comecar), que exige cidade e persona: a tela de conta nao mostra esses
- * campos, entao usar salvarDadosFixos aqui exigiria ler o cliente primeiro
- * para preservar o resto (uma leitura-depois-escrita sem necessidade, no
- * mesmo tipo de corrida de dado ja corrigido em src/servicos/briefing.ts).
+ * /conta (etapa D, parte 2; hora do lembrete na etapa 12, faixa e
+ * arredondamento na etapa 13): nome, perfis e a hora do lembrete, gravados
+ * numa unica UPDATE. Diferente de salvarDadosFixos (/comecar), que exige
+ * cidade e persona: a tela de conta nao mostra esses campos, entao usar
+ * salvarDadosFixos aqui exigiria ler o cliente primeiro para preservar o
+ * resto (uma leitura-depois-escrita sem necessidade, no mesmo tipo de
+ * corrida de dado ja corrigido em src/servicos/briefing.ts).
  */
 export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
   const dados = perfilContaSchema.parse(dadosBrutos);
+
+  const horaLembrete = arredondarParaHoraCheia(dados.horaLembrete);
+  if (horaLembrete < HORA_LEMBRETE_MINIMA || horaLembrete > HORA_LEMBRETE_MAXIMA) {
+    throw new ErroCliente(
+      `hora do lembrete fora da faixa permitida (${HORA_LEMBRETE_MINIMA} a ${HORA_LEMBRETE_MAXIMA}): ${horaLembrete}`,
+    );
+  }
 
   const perfis: PerfisCliente = {
     instagram: dados.perfis.instagram?.trim() || null,
@@ -255,7 +275,7 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
 
   const [cliente] = await db()
     .update(clientes)
-    .set({ nome: dados.nome, perfis, horaLembrete: dados.horaLembrete })
+    .set({ nome: dados.nome, perfis, horaLembrete })
     .where(eq(clientes.id, clienteId))
     .returning();
 

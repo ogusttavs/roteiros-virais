@@ -41,7 +41,7 @@ export const textosTermos = {
       {
         titulo: "4. Cancelamento",
         paragrafos: [
-          "Você cancela quando quiser, em Conta. O acesso continua até o fim do período já pago, sem multa.",
+          "Você cancela quando quiser, escrevendo para o contato abaixo; o acesso continua até o fim do período já pago, sem multa.",
         ],
       },
       {
@@ -96,7 +96,7 @@ export const textosTermos = {
     itens: [
       "Os roteiros são sugestões; quem grava e publica é você.",
       "As suas respostas servem só para escrever os seus roteiros.",
-      "Você cancela quando quiser, em Conta.",
+      "Você cancela quando quiser, sem multa.",
     ],
     lerTermos: "ler os termos",
     aceitar: "li e aceito",
