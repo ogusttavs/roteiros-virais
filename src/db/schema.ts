@@ -450,6 +450,12 @@ export type TemaDoDia = {
   porQue: string;
   /** ids de videos que sustentam o tema (evidencia) */
   evidencias: number[];
+  /**
+   * ids de noticias que sustentam o tema (correcao do dia 1 da etapa 14,
+   * `PROXIMO.md`): opcional porque nao ha linha em `temas_dia` de producao
+   * com este campo; le como `[]` quando ausente.
+   */
+  evidenciasNoticias?: number[];
   /** objetivo que o tema puxa mais: alcance, engajamento ou conversao (taxonomia interna, escopo 4.3) */
   puxaPara: "alcance" | "engajamento" | "conversao";
 };

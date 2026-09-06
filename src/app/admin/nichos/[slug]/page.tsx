@@ -7,6 +7,7 @@ import { FILAS } from "@/jobs/fila";
 import {
   listarContasVigiadas,
   nichoPorSlug,
+  noticiasPorId,
   temaDoDiaAtual,
   ultimaExecucaoPorJob,
   videosPorId,
@@ -72,8 +73,15 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
-  const evidencias = await videosPorId(idsEvidencia);
+  const idsEvidenciaNoticias = [
+    ...new Set((temasHoje ?? []).flatMap((tema) => tema.evidenciasNoticias ?? [])),
+  ];
+  const [evidencias, evidenciasNoticias] = await Promise.all([
+    videosPorId(idsEvidencia),
+    noticiasPorId(idsEvidenciaNoticias),
+  ]);
   const videoPorId = new Map(evidencias.map((v) => [v.id, v]));
+  const noticiaPorId = new Map(evidenciasNoticias.map((n) => [n.id, n]));
 
   const jobsColeta = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias].map((nome) => ({
     nome,
@@ -113,6 +121,14 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                     return (
                       <Link key={id} href={video?.url ?? "#"} target="_blank" rel="noopener noreferrer" className={styles.mono}>
                         {video?.titulo ?? `#${id}`}
+                      </Link>
+                    );
+                  })}
+                  {(tema.evidenciasNoticias ?? []).map((id) => {
+                    const noticia = noticiaPorId.get(id);
+                    return (
+                      <Link key={`noticia-${id}`} href={noticia?.url ?? "#"} target="_blank" rel="noopener noreferrer" className={styles.mono}>
+                        {noticia?.titulo ?? `#${id}`}
                       </Link>
                     );
                   })}

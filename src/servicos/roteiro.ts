@@ -185,8 +185,12 @@ function respeitarDuracaoDoNicho(
   return Math.min(Math.max(duracaoS, faixa.min), faixa.max);
 }
 
-/** Campos de texto do roteiro que passam pelo verificador (regra dura 4: sem jargão, emoji, travessão). */
-function extrairCamposRoteiro(dados: roteiroIA.SaidaRoteiro): Record<string, string> {
+/**
+ * Campos de texto do roteiro que passam pelo verificador (regra dura 4: sem
+ * jargão, emoji, travessão). Exportada para `scripts/avaliar-roteiros.ts`
+ * rodar a mesma checagem que a produção usa (dia 1 da etapa 14, item 5).
+ */
+export function extrairCamposRoteiro(dados: roteiroIA.SaidaRoteiro): Record<string, string> {
   const campos: Record<string, string> = {
     titulo: dados.titulo,
     gancho: dados.gancho,
@@ -280,6 +284,7 @@ async function gerarConteudo(
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
+    generoTexto: "roteiro",
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,
   });

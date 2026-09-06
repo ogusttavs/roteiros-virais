@@ -18,7 +18,16 @@ export const textosHoje = {
     parado: (n: number) => `faz ${n} dia${n === 1 ? "" : "s"} que você não grava`,
     primeiroDia: "hoje é o seu primeiro dia",
   },
-  evidencia: (n: number) => `${n} vídeo${n === 1 ? "" : "s"} fora da curva esta semana`,
+  /**
+   * Conta vídeos e notícias juntos (correção do dia 1 da etapa 14,
+   * `PROXIMO.md`, item 1): antes só contava vídeo, e um tema sustentado só
+   * por notícia aparecia como "0 vídeos fora da curva esta semana".
+   */
+  evidencia: (videos: number, noticias: number) => {
+    if (noticias === 0) return `${videos} vídeo${videos === 1 ? "" : "s"} fora da curva esta semana`;
+    if (videos === 0) return `${noticias} notícia${noticias === 1 ? "" : "s"} do setor esta semana`;
+    return `${videos} vídeo${videos === 1 ? "" : "s"} e ${noticias} notícia${noticias === 1 ? "" : "s"} esta semana`;
+  },
   queroEsse: "quero esse",
   outraCoisa: "quero falar de outra coisa",
   carregando: "lendo os vídeos que funcionaram esta semana",

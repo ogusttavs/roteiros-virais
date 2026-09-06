@@ -23,22 +23,29 @@
   gap: var(--espaco-4);
 }
 
+/**
+ * Duas linhas, momento em cima (ajuste do dia 1 da etapa 14, `PROXIMO.md`,
+ * item 6): a entrega do design supunha o momento curto ("0 a 3 s") numa
+ * grade de 64px, mas a IA escreve frases mais longas ("0 a 3 segundos, o
+ * gancho"), que atravessavam o texto da cena ao lado. Sem grade fixa, cada
+ * cena cresce livre e nunca sobrepõe.
+ */
 .item {
-  display: grid;
-  grid-template-columns: 64px 1fr;
-  gap: var(--espaco-3);
-  align-items: baseline;
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
 }
 
 .momento {
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-legenda);
   color: var(--cor-titulo);
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .oQueFazer {
   font-size: var(--tamanho-corpo);
   line-height: 1.45;
   color: var(--cor-texto);
+  text-wrap: pretty;
 }

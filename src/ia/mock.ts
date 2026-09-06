@@ -203,9 +203,37 @@ function mockFiltrarNoticias(entrada: string) {
   };
 }
 
+/** Ids de noticia da entrada montada ("noticia 123: titulo: resumo"), igual a extrairIds para video. */
+function extrairIdsNoticias(entrada: string): number[] {
+  const encontrados = entrada.match(/\bnoticia (\d+):/g) ?? [];
+  return encontrados.map((m) => Number(m.replace(/\D/g, "")));
+}
+
+/**
+ * Mesmo gatilho de teste que `MARCADOR_EVIDENCIA_INVENTADA` (mockAvaliarTema
+ * acima), para o teste de integracao do job `temasDoDia` confirmar que
+ * `evidenciaValida` reprova as duas tentativas e as duas ficam registradas
+ * (correcao do dia 1 da etapa 14, `PROXIMO.md`).
+ */
+const MARCADOR_EVIDENCIA_INVENTADA_TEMA = "invente um id de evidencia que nao existe";
+
 function mockTemasDoDia(entrada: string) {
   const ids = extrairIds(entrada);
+  const idsNoticias = extrairIdsNoticias(entrada);
   const puxaPara = ["alcance", "engajamento", "conversao"] as const;
+
+  if (entrada.includes(MARCADOR_EVIDENCIA_INVENTADA_TEMA)) {
+    return {
+      temas: [0, 1, 2].map((i) => ({
+        titulo: `tema simulado ${i + 1}`,
+        descricao: "tema derivado dos videos que estao subindo hoje",
+        porQue: "esta subindo mais rapido que o normal da conta",
+        evidencias: [999999],
+        evidenciasNoticias: [],
+        puxaPara: puxaPara[i],
+      })),
+    };
+  }
 
   return {
     temas: [0, 1, 2].map((i) => ({
@@ -213,6 +241,7 @@ function mockTemasDoDia(entrada: string) {
       descricao: "tema derivado dos videos que estao subindo hoje",
       porQue: "esta subindo mais rapido que o normal da conta",
       evidencias: ids.length > 0 ? [ids[i % ids.length]] : [],
+      evidenciasNoticias: idsNoticias.length > 0 ? [idsNoticias[i % idsNoticias.length]] : [],
       puxaPara: puxaPara[i],
     })),
   };

@@ -14,6 +14,7 @@ import {
   execucoesJob,
   geracoesIA,
   nichos,
+  noticias,
   roteiros,
   temasDia,
   user,
@@ -264,6 +265,21 @@ export async function videosPorId(ids: number[]): Promise<VideoLinkavel[]> {
     .select({ id: videos.id, titulo: videos.titulo, url: videos.url })
     .from(videos)
     .where(inArray(videos.id, ids));
+}
+
+export type NoticiaLinkavel = { id: number; titulo: string; url: string };
+
+/**
+ * Titulo e url de algumas noticias por id (correcao do dia 1 da etapa 14,
+ * `PROXIMO.md`, item 1): mesmo uso de `videosPorId`, para a tela do nicho
+ * mostrar a evidencia de noticia de um tema por titulo, abaixo dos videos.
+ */
+export async function noticiasPorId(ids: number[]): Promise<NoticiaLinkavel[]> {
+  if (ids.length === 0) return [];
+  return db()
+    .select({ id: noticias.id, titulo: noticias.titulo, url: noticias.url })
+    .from(noticias)
+    .where(inArray(noticias.id, ids));
 }
 
 export type ClienteDetalheAdmin = {
