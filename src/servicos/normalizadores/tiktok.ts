@@ -43,7 +43,18 @@ function normalizarAudio(item: TiktokItemBruto): VideoAudio | null {
   };
 }
 
-export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNormalizados {
+/**
+ * `null` quando o item veio sem o nome do autor (rodada de acabamento de
+ * 06/09, item 3): achado real, "Cannot read properties of undefined" ao
+ * tentar ler `authorMeta.name`, porque o item nem tinha `authorMeta`. Sem
+ * handle nao da para gravar a conta (`contas.handle` e obrigatorio), entao
+ * o item e pulado; quem chama registra um aviso no resumo em vez de
+ * deixar o erro estourar e derrubar o lote inteiro.
+ */
+export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNormalizados | null {
+  const nomeAutor = item.authorMeta?.name;
+  if (!nomeAutor) return null;
+
   return {
     video: {
       plataforma: "tiktok",
@@ -59,9 +70,9 @@ export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNo
     },
     conta: {
       plataforma: "tiktok",
-      handle: item.authorMeta.name,
-      nome: item.authorMeta.nickName || item.authorMeta.name || null,
-      url: `https://www.tiktok.com/@${item.authorMeta.name}`,
+      handle: nomeAutor,
+      nome: item.authorMeta?.nickName || nomeAutor,
+      url: `https://www.tiktok.com/@${nomeAutor}`,
     },
     audio: normalizarAudio(item),
   };

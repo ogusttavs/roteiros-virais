@@ -49,13 +49,21 @@ function paraHashtag(termo: string): string {
   return termo.replace(/\s+/g, "");
 }
 
-/** Item bruto do TikTok (clockworks/tiktok-scraper), so os campos que a normalizacao usa. */
+/**
+ * Item bruto do TikTok (clockworks/tiktok-scraper), so os campos que a
+ * normalizacao usa. `authorMeta` e `authorMeta.name` marcados opcionais
+ * (rodada de acabamento de 06/09, item 3): a documentacao do ator promete
+ * os dois sempre presentes, mas um item real veio sem `authorMeta`
+ * nenhum ("Cannot read properties of undefined"). `id` continua obrigatorio
+ * na tipagem (e o que a doc promete de mais estavel), mas o normalizador
+ * trata mesmo esse como podendo faltar, pelo mesmo motivo.
+ */
 export type TiktokItemBruto = {
   id: string;
   text?: string;
   webVideoUrl: string;
   createTimeISO?: string;
-  authorMeta: { name: string; nickName?: string };
+  authorMeta?: { name?: string; nickName?: string };
   videoMeta?: { duration?: number };
   musicMeta?: { musicId?: string; musicName?: string; musicAuthor?: string; musicOriginal?: boolean };
   playCount?: number;
