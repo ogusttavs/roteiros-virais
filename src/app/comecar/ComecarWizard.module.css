@@ -32,6 +32,18 @@
   box-sizing: border-box;
 }
 
+/**
+ * Envolve a barra de nota geral e o formulario (ajuste de 06/09/2026,
+ * brief-frontend.md 6.2): no celular so uma coluna (a barra e a folha, nao
+ * o cartao); no desktop, cartao lateral ao lado do formulario, para o
+ * cartao nunca empurrar nem cobrir o conteudo ao rolar.
+ */
+.corpoComNota {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
 .corpoIntro {
   padding-top: var(--espaco-8);
 }
@@ -75,5 +87,11 @@
   .corpoLiberado {
     padding: var(--espaco-10);
     margin: 0;
+  }
+
+  .corpoComNota {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--espaco-8);
   }
 }

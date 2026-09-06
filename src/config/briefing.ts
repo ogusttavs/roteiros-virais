@@ -42,6 +42,12 @@ export type PerguntaBriefing = {
   enunciado: string;
   ajuda: string;
   oQueAIAProcura: string;
+  /**
+   * Rótulo curto para a lista de notas (brief-frontend.md 6.2, "Ajuste de
+   * 06/09/2026", achado do Gustavo usando de verdade: a lista só dizia
+   * "P2 · 9,5"). Texto exato do brief, um por pergunta.
+   */
+  rotuloCurto: string;
 };
 
 const AJUDA_PADRAO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
@@ -49,6 +55,7 @@ const AJUDA_PADRAO = "Escreva como se fosse para alguém que nunca ouviu falar d
 export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   {
     id: "p1",
+    rotuloCurto: "o que você faz",
     bloco: 1,
     blocoNome: "Sobre o negócio",
     peso: 2,
@@ -60,6 +67,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p2",
+    rotuloCurto: "o que mais vende",
     bloco: 1,
     blocoNome: "Sobre o negócio",
     peso: 1,
@@ -70,6 +78,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p3",
+    rotuloCurto: "o que faz diferente",
     bloco: 1,
     blocoNome: "Sobre o negócio",
     peso: 1,
@@ -81,6 +90,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p4",
+    rotuloCurto: "sua cliente",
     bloco: 2,
     blocoNome: "Sobre quem você atende",
     peso: 1,
@@ -91,6 +101,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p5",
+    rotuloCurto: "o medo dela",
     bloco: 2,
     blocoNome: "Sobre quem você atende",
     peso: 2,
@@ -102,6 +113,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p6",
+    rotuloCurto: "perguntas repetidas",
     bloco: 2,
     blocoNome: "Sobre quem você atende",
     peso: 1,
@@ -112,6 +124,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p7",
+    rotuloCurto: "o que quer que aconteça",
     bloco: 3,
     blocoNome: "Sobre o que você quer que aconteça",
     peso: 1,
@@ -123,6 +136,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p8",
+    rotuloCurto: "onde posta hoje",
     bloco: 3,
     blocoNome: "Sobre o que você quer que aconteça",
     peso: 1,
@@ -134,6 +148,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p9",
+    rotuloCurto: "suas frases",
     bloco: 4,
     blocoNome: "Sobre a sua fala",
     peso: 2,
@@ -145,6 +160,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p10",
+    rotuloCurto: "o que nunca diria",
     bloco: 4,
     blocoNome: "Sobre a sua fala",
     peso: 1,
@@ -155,6 +171,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p11",
+    rotuloCurto: "o que dá para mostrar",
     bloco: 5,
     blocoNome: "O que dá para mostrar, referências e concorrentes",
     peso: 2,
@@ -166,6 +183,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
   },
   {
     id: "p12",
+    rotuloCurto: "referências e concorrentes",
     bloco: 5,
     blocoNome: "O que dá para mostrar, referências e concorrentes",
     peso: 1,

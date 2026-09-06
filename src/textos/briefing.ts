@@ -73,7 +73,7 @@ export const textosBriefing = {
     dica: (perguntaId: string) => `a ${perguntaId.toUpperCase()} é a que mais ajuda agora`,
     semNota: "sem nota",
     tituloFolha: "as doze notas",
-    rotuloPergunta: (perguntaId: string) => perguntaId.toUpperCase(),
+    rotuloPergunta: (perguntaId: string, rotuloCurto: string) => `${perguntaId.toUpperCase()} · ${rotuloCurto}`,
   },
   liberacao: {
     titulo: "Seu painel está aberto.",

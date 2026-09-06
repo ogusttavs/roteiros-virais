@@ -296,4 +296,77 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
     await expect(page.getByText(/a sua nota caiu para/).last()).toBeVisible();
   });
+
+  /** brief-frontend.md 6.2, "Ajuste de 06/09/2026": tocar numa linha da lista de notas rola ate a pergunta. */
+  test("no cartao de notas, tocar numa linha de outro bloco leva a pergunta certa", async ({ page }) => {
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+    await db().insert(user).values({
+      id: "e2e-cartao-notas",
+      name: "[teste] Cartao de Notas",
+      email: "e2e-cartao-notas@exemplo.teste",
+    });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-cartao-notas-credential",
+        issuer: "local:credential",
+        accountId: "e2e-cartao-notas",
+        providerId: "credential",
+        userId: "e2e-cartao-notas",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "e2e-cartao-notas",
+        nome: "[teste] Cartao de Notas",
+        cidade: "Sao Paulo",
+        nichoId: nicho.id,
+      })
+      .returning();
+
+    // O bloco 1 inteiro avaliado (p1, p2, p3): blocoInicial pula direto para o bloco 2
+    // (so avanca quando NENHUMA pergunta do bloco atual ainda esta pendente).
+    const avaliacaoP1: AvaliacaoResposta = {
+      nota: 9,
+      bom: "Resposta com exemplo concreto.",
+      melhorar: "Falta dizer para quem e o serviço, com um número real da clínica.",
+      como: "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.",
+      impacto: "Uma resposta mais concreta gera um roteiro mais parecido com você.",
+    };
+    const avaliacaoGenerica: AvaliacaoResposta = {
+      nota: 8,
+      bom: "Resposta clara.",
+      melhorar: "Falta um exemplo real.",
+      como: "Acrescente um caso real.",
+      impacto: "O roteiro fica mais especifico.",
+    };
+    await db()
+      .insert(briefings)
+      .values({
+        clienteId: cliente.id,
+        respostas: {
+          p1: "Somos uma clinica odontologica em Sao Paulo.",
+          p2: "O que mais vende e a limpeza dental completa.",
+          p3: "Atendo do inicio ao fim, sem trocar de dentista no meio do tratamento.",
+        },
+        avaliacoes: { p1: avaliacaoP1, p2: avaliacaoGenerica, p3: avaliacaoGenerica },
+        notaGeral: "4.25",
+        completo: false,
+      });
+
+    await entrar(page, "e2e-cartao-notas@exemplo.teste");
+    await expect(page).toHaveURL(/\/comecar/);
+    await expect(page.getByText("bloco 2 de 5")).toBeVisible();
+
+    // a primeira frase de "o que pode melhorar" da P1 aparece na lista (corte na primeira pontuação final).
+    await expect(page.getByText("Falta dizer para quem e o serviço, com um número real da clínica.").last()).toBeVisible();
+
+    // P8 e do bloco 3 ("Sobre o que você quer que aconteça"); tocar a linha troca o bloco e rola ate a pergunta.
+    await page.getByRole("button", { name: /P8 · onde posta hoje/ }).last().click();
+    await expect(page.getByText("bloco 3 de 5")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sobre o que você quer que aconteça" })).toBeVisible();
+    await expect(page.getByLabel("Onde você posta hoje")).toBeInViewport();
+  });
 });

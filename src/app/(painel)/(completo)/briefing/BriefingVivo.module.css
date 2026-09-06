@@ -3,11 +3,31 @@
   flex-direction: column;
 }
 
+/**
+ * Envolve a barra de nota geral e o corpo (ajuste de 06/09/2026,
+ * brief-frontend.md 6.2): no celular so uma coluna; no desktop, cartao
+ * lateral ao lado do formulario, para nunca empurrar nem cobrir o
+ * conteudo ao rolar.
+ */
+.corpoComNota {
+  display: flex;
+  flex-direction: column;
+}
+
+@media (min-width: 768px) {
+  .corpoComNota {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--espaco-8);
+  }
+}
+
 .corpo {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-9);
   max-width: var(--largura-leitura);
+  flex: 1;
 }
 
 .introducao {

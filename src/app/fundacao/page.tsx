@@ -181,9 +181,9 @@ export default function Fundacao() {
             semNota="sem nota"
             tituloFolha="as doze notas"
             notas={[
-              { rotulo: "P1", nota: 6.5 },
-              { rotulo: "P2", nota: 9.2 },
-              { rotulo: "P3", nota: null },
+              { id: "p1", rotulo: "P1 · o que você faz", nota: 6.5, melhorarResumo: "Falta dizer para quem." },
+              { id: "p2", rotulo: "P2 · o que mais vende", nota: 9.2 },
+              { id: "p3", rotulo: "P3 · o que faz diferente", nota: null },
             ]}
           />
         </div>

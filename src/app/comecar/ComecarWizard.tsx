@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
-import { PERGUNTAS_BRIEFING, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
+import { PERGUNTAS_BRIEFING, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { config } from "@/lib/config";
-import { perguntaQueMaisAjuda } from "@/servicos/briefing-regras";
+import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -62,6 +62,22 @@ export function ComecarWizard({
   const [respostas, setRespostas] = useState(respostasIniciais);
   const [avaliacoes, setAvaliacoes] = useState(avaliacoesIniciais);
   const [notaGeral, setNotaGeral] = useState(notaGeralInicial);
+  const [perguntaParaRolar, setPerguntaParaRolar] = useState<string | null>(null);
+
+  /**
+   * Tocar numa linha da lista de notas rola ate a pergunta (brief-frontend.md
+   * 6.2, "Ajuste de 06/09/2026"); se a pergunta e de outro bloco,
+   * `aoSelecionarPergunta` troca o bloco primeiro. O efeito reroda quando
+   * `bloco` muda, entao a segunda vez ja acha o elemento no DOM.
+   */
+  useEffect(() => {
+    if (!perguntaParaRolar) return;
+    const elemento = document.getElementById(`pergunta-${perguntaParaRolar}`);
+    if (elemento) {
+      elemento.scrollIntoView({ behavior: "smooth", block: "center" });
+      setPerguntaParaRolar(null);
+    }
+  }, [perguntaParaRolar, bloco]);
 
   function aoAtualizarPergunta(perguntaId: string, resposta: string, resultado: ResultadoAcaoBriefing) {
     setRespostas((atual) => ({ ...atual, [perguntaId]: resposta }));
@@ -126,54 +142,67 @@ export function ComecarWizard({
   const perguntas = perguntasDoBloco(bloco);
   const dica = perguntaQueMaisAjuda(avaliacoes);
 
+  function aoSelecionarPergunta(perguntaId: string) {
+    const pergunta = perguntaPorId(perguntaId);
+    if (!pergunta) return;
+    if (pergunta.bloco !== bloco) setBloco(pergunta.bloco);
+    setPerguntaParaRolar(perguntaId);
+  }
+
   return (
     <div className={styles.pagina}>
-      <BarraNotaGeral
-        notaAtual={notaGeral}
-        meta={meta}
-        rotuloNotaAtual={textosBriefing.barraNotaGeral.rotuloNotaAtual}
-        rotuloMeta={textosBriefing.barraNotaGeral.rotuloMeta(meta)}
-        dica={notaGeral < meta && dica ? textosBriefing.barraNotaGeral.dica(dica.id) : undefined}
-        semNota={textosBriefing.barraNotaGeral.semNota}
-        tituloFolha={textosBriefing.barraNotaGeral.tituloFolha}
-        notas={PERGUNTAS_BRIEFING.map((p) => ({
-          rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id),
-          nota: avaliacoes[p.id]?.nota ?? null,
-        }))}
-      />
-      <div className={styles.corpo}>
-        <Progresso
-          rotulo={textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}
-          atual={bloco}
-          total={TOTAL_BLOCOS}
+      <div className={styles.corpoComNota}>
+        <BarraNotaGeral
+          notaAtual={notaGeral}
+          meta={meta}
+          rotuloNotaAtual={textosBriefing.barraNotaGeral.rotuloNotaAtual}
+          rotuloMeta={textosBriefing.barraNotaGeral.rotuloMeta(meta)}
+          dica={notaGeral < meta && dica ? textosBriefing.barraNotaGeral.dica(dica.id) : undefined}
+          semNota={textosBriefing.barraNotaGeral.semNota}
+          tituloFolha={textosBriefing.barraNotaGeral.tituloFolha}
+          aoTocarItem={aoSelecionarPergunta}
+          notas={PERGUNTAS_BRIEFING.map((p) => ({
+            id: p.id,
+            rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id, p.rotuloCurto),
+            nota: avaliacoes[p.id]?.nota ?? null,
+            melhorarResumo: avaliacoes[p.id] ? resumirMelhorar(avaliacoes[p.id].melhorar) : null,
+          }))}
         />
-        <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
-        {perguntas.map((pergunta) => (
-          <PerguntaCampo
-            key={pergunta.id}
-            pergunta={pergunta}
-            resposta={respostas[pergunta.id] ?? ""}
-            avaliacao={avaliacoes[pergunta.id] ?? null}
-            onSalvarRascunho={salvarRascunhoAction}
-            onAvaliar={avaliarRespostaAction}
-            onAtualizado={aoAtualizarPergunta}
+        <div className={styles.corpo}>
+          <Progresso
+            rotulo={textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}
+            atual={bloco}
+            total={TOTAL_BLOCOS}
           />
-        ))}
+          <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
+          {perguntas.map((pergunta) => (
+            <div key={pergunta.id} id={`pergunta-${pergunta.id}`}>
+              <PerguntaCampo
+                pergunta={pergunta}
+                resposta={respostas[pergunta.id] ?? ""}
+                avaliacao={avaliacoes[pergunta.id] ?? null}
+                onSalvarRascunho={salvarRascunhoAction}
+                onAvaliar={avaliarRespostaAction}
+                onAtualizado={aoAtualizarPergunta}
+              />
+            </div>
+          ))}
+          <BarraAcao
+            secundaria={{
+              rotulo: textosBriefing.navegacaoBlocos.botaoVoltar,
+              onClick: () => (bloco > 1 ? setBloco((atual) => atual - 1) : setEtapa("dadosFixos")),
+            }}
+            primaria={
+              bloco < TOTAL_BLOCOS
+                ? {
+                    rotulo: textosBriefing.navegacaoBlocos.botaoProximoBloco,
+                    onClick: () => setBloco((atual) => atual + 1),
+                  }
+                : undefined
+            }
+          />
+        </div>
       </div>
-      <BarraAcao
-        secundaria={{
-          rotulo: textosBriefing.navegacaoBlocos.botaoVoltar,
-          onClick: () => (bloco > 1 ? setBloco((atual) => atual - 1) : setEtapa("dadosFixos")),
-        }}
-        primaria={
-          bloco < TOTAL_BLOCOS
-            ? {
-                rotulo: textosBriefing.navegacaoBlocos.botaoProximoBloco,
-                onClick: () => setBloco((atual) => atual + 1),
-              }
-            : undefined
-        }
-      />
     </div>
   );
 }

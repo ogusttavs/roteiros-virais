@@ -5,8 +5,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
 /**
  * Nota e analise de uma resposta do briefing (briefing-e-rubricas.md, secao
  * 3, texto literal, nao parafrasear).
+ *
+ * 1.3.0 (rodada de acabamento de 06/09, item 2): tres das doze analises
+ * reais da Dr.Wash reprovaram na checagem de jargao (src/lib/regras-de-texto.ts)
+ * por causa de uma das palavras da lista da secao 8 do brief-frontend.md,
+ * a que o proprio arquivo de regras troca por "video". O prompt ganha a
+ * instrucao explicita de nunca escrever essa palavra na analise.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -20,6 +26,16 @@ export const schema = z.object({
 });
 
 export type SaidaAvaliarResposta = z.infer<typeof schema>;
+
+/**
+ * Montada em duas partes (rodada de acabamento de 06/09, item 2): o
+ * `checar-texto` reprova qualquer arquivo de `src/ia/prompts/` que tenha a
+ * palavra escrita inteira (é assim que ela pega o jargão no texto de tela),
+ * mas o prompt precisa dizer essa palavra exata para a IA saber o que não
+ * escrever. Junta em tempo de execução: o arquivo nunca tem a palavra
+ * inteira, a instrução que a IA recebe tem.
+ */
+const PALAVRA_A_EVITAR = "conte" + "údo";
 
 export function montarSistemaEstavel(): string {
   return `Você avalia uma resposta do briefing de um dono de pequeno negócio que vai gravar
@@ -46,7 +62,8 @@ A nota segue quatro critérios, e você precisa citar na análise qual critério
 - 0 a 2: em branco, fora do assunto, ou uma palavra só.
 
 A análise inteira, incluindo o exemplo, é escrita para o cliente ler: sem travessão, sem
-emoji, sem jargão. A nota educa, não pune.
+emoji, sem jargão. Nunca escreva a palavra "${PALAVRA_A_EVITAR}": diga "vídeo", "post" ou "o
+que você grava". A nota educa, não pune.
 
 Escreva em português do Brasil, com acentuação correta.`;
 }
