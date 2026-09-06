@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { estaAcimaDoNormal, estaNaHoraDeMedir, intervaloDeMedicaoH } from "./curva";
+import { estaAcimaDoNormal, estaNaHoraDeMedir, intervaloDeMedicaoH, normalizarHandle } from "./curva";
 
 const HORA_MS = 60 * 60 * 1000;
 const DIA_MS = 24 * HORA_MS;
@@ -94,5 +94,28 @@ describe("estaAcimaDoNormal", () => {
 
   it("mediana zero nao divide por zero", () => {
     expect(estaAcimaDoNormal(10, 0)).toBe(false);
+  });
+});
+
+/** Rodada de acabamento de 06/09, item 4: o cliente digita o perfil como quiser no briefing. */
+describe("normalizarHandle", () => {
+  it("youtube: sempre com @, mesmo se o cliente nao digitou", () => {
+    expect(normalizarHandle("ninadobre", "youtube")).toBe("@ninadobre");
+    expect(normalizarHandle("@ninadobre", "youtube")).toBe("@ninadobre");
+  });
+
+  it("tiktok: sempre sem @, mesmo se o cliente digitou com @", () => {
+    expect(normalizarHandle("@ninadobre", "tiktok")).toBe("ninadobre");
+    expect(normalizarHandle("ninadobre", "tiktok")).toBe("ninadobre");
+  });
+
+  it("instagram: sempre sem @, mesmo se o cliente digitou com @", () => {
+    expect(normalizarHandle("@ninadobre", "instagram")).toBe("ninadobre");
+    expect(normalizarHandle("ninadobre", "instagram")).toBe("ninadobre");
+  });
+
+  it("tira espaco em volta e no meio, de qualquer plataforma", () => {
+    expect(normalizarHandle("  @ nina dobre  ", "tiktok")).toBe("ninadobre");
+    expect(normalizarHandle(" nina dobre ", "youtube")).toBe("@ninadobre");
   });
 });
