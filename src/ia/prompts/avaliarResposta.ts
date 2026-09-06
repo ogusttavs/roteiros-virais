@@ -1,18 +1,21 @@
 import { z } from "zod";
 
+import { JARGAO } from "@/lib/regras-de-texto";
+
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
  * Nota e analise de uma resposta do briefing (briefing-e-rubricas.md, secao
  * 3, texto literal, nao parafrasear).
  *
- * 1.3.0 (rodada de acabamento de 06/09, item 2): tres das doze analises
- * reais da Dr.Wash reprovaram na checagem de jargao (src/lib/regras-de-texto.ts)
- * por causa de uma das palavras da lista da secao 8 do brief-frontend.md,
- * a que o proprio arquivo de regras troca por "video". O prompt ganha a
- * instrucao explicita de nunca escrever essa palavra na analise.
+ * 1.4.0 (revisao do PR #27, item 3): a 1.3.0 so proibia uma palavra fixa da
+ * lista `JARGAO` (src/lib/regras-de-texto.ts); na rodada seguinte com chave
+ * real uma pergunta reprovou por causa de outra palavra da mesma lista.
+ * Agora a instrucao vem da lista inteira, montada em tempo de execucao (ver
+ * `montarSistemaEstavel`), entao uma palavra nova na lista de regras ja
+ * entra no prompt sem precisar mexer aqui.
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -28,14 +31,17 @@ export const schema = z.object({
 export type SaidaAvaliarResposta = z.infer<typeof schema>;
 
 /**
- * Montada em duas partes (rodada de acabamento de 06/09, item 2): o
- * `checar-texto` reprova qualquer arquivo de `src/ia/prompts/` que tenha a
- * palavra escrita inteira (é assim que ela pega o jargão no texto de tela),
- * mas o prompt precisa dizer essa palavra exata para a IA saber o que não
- * escrever. Junta em tempo de execução: o arquivo nunca tem a palavra
- * inteira, a instrução que a IA recebe tem.
+ * Uma linha por entrada de `JARGAO` (ajuste de 06/09/2026, revisão do PR
+ * #27, item 3): "nunca escreva X, diga Y", com a mesma troca que
+ * `src/lib/regras-de-texto.ts` já usa para reprovar o texto de tela. Monta
+ * em tempo de execução porque o `checar-texto` reprova qualquer arquivo de
+ * `src/ia/prompts/` que tenha a palavra escrita inteira (é assim que ele
+ * pega o jargão no texto de tela); este arquivo só referencia `item.palavra`
+ * e `item.usar`, nunca a palavra em si.
  */
-const PALAVRA_A_EVITAR = "conte" + "údo";
+function montarInstrucaoJargao(): string {
+  return JARGAO.map((item) => `Nunca escreva "${item.palavra}", diga "${item.usar}".`).join("\n");
+}
 
 export function montarSistemaEstavel(): string {
   return `Você avalia uma resposta do briefing de um dono de pequeno negócio que vai gravar
@@ -62,8 +68,9 @@ A nota segue quatro critérios, e você precisa citar na análise qual critério
 - 0 a 2: em branco, fora do assunto, ou uma palavra só.
 
 A análise inteira, incluindo o exemplo, é escrita para o cliente ler: sem travessão, sem
-emoji, sem jargão. Nunca escreva a palavra "${PALAVRA_A_EVITAR}": diga "vídeo", "post" ou "o
-que você grava". A nota educa, não pune.
+emoji, sem jargão. Nunca escreva estas palavras, use a troca do lado:
+${montarInstrucaoJargao()}
+A nota educa, não pune.
 
 Escreva em português do Brasil, com acentuação correta.`;
 }

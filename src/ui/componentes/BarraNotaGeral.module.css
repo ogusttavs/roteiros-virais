@@ -66,6 +66,12 @@
   padding: var(--espaco-5) var(--margem-celular) var(--espaco-9);
   max-height: 80%;
   overflow-y: auto;
+  /**
+   * Ajuste de 06/09/2026 (revisao do PR #27, item 1): sem isto, rolar a
+   * lista ate o fim encadeia o scroll para o documento, e o `scroll` da
+   * window (useEffect acima) fecha a folha com o cliente ainda lendo.
+   */
+  overscroll-behavior: contain;
 }
 
 .cabecalhoFolha {
@@ -174,6 +180,14 @@
   }
 
   .cartaoDesktop {
+    /**
+     * Ajuste de 06/09/2026 (revisao do PR #27, item 2): o DOM continua com
+     * este cartao antes do formulario (e o que mantem a barra fina do
+     * celular no topo), mas visualmente ele fica a direita, como no design
+     * (BriefingTela.dc.html, colunas "minmax(0, var(--largura-leitura))
+     * 320px"). So o CSS troca a ordem; a marcacao continua a mesma.
+     */
+    order: 1;
     position: sticky;
     top: var(--espaco-8);
     flex: none;

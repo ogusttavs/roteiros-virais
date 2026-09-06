@@ -9,20 +9,34 @@
 export const TRAVESSAO = /\u2014/;
 export const EMOJI = /\p{Extended_Pictographic}/u;
 
-export const JARGAO: { proibido: RegExp; usar: string }[] = [
+/**
+ * `palavra` e a forma escrita normal (com acento), usada para montar a
+ * instrucao que a IA le (ajuste de 06/09/2026, revisao do PR #27, item 3):
+ * `avaliarResposta.montarSistemaEstavel` monta "nunca escreva X; diga Y" a
+ * partir desta lista inteira, em vez de uma unica palavra fixa no prompt.
+ * Este arquivo nao entra em `PADROES` de `scripts/checar-texto-regras.ts`
+ * (so `.tsx`, `src/textos/**` e `src/ia/prompts/**`), entao escrever a
+ * palavra por extenso aqui, a fonte da lista, nao reprova a si mesmo.
+ */
+export const JARGAO: { proibido: RegExp; usar: string; palavra: string }[] = [
   {
     proibido: /\bengajamento\b/i,
     usar: "as pessoas lembrarem de voce, comentarios e salvamentos",
+    palavra: "engajamento",
   },
-  { proibido: /\bconvers(a|ã)o\b/i, usar: "gente te chamar para comprar" },
-  { proibido: /\balcance\b/i, usar: "mais gente te conhecer" },
-  { proibido: /\bcta\b/i, usar: "chamada final" },
-  { proibido: /\bhook\b/i, usar: "os 3 primeiros segundos" },
-  { proibido: /\bm(é|e)tricas?\b/i, usar: "quantas pessoas viram, o seu painel" },
-  { proibido: /\bdashboard\b/i, usar: "o seu painel" },
-  { proibido: /\bviral\b/i, usar: "fora da curva, muito acima do normal" },
-  { proibido: /\bconte(ú|u)do\b/i, usar: "video" },
-  { proibido: /\bonboarding\b/i, usar: "comecar, o seu briefing" },
+  { proibido: /\bconvers(a|ã)o\b/i, usar: "gente te chamar para comprar", palavra: "conversão" },
+  { proibido: /\balcance\b/i, usar: "mais gente te conhecer", palavra: "alcance" },
+  { proibido: /\bcta\b/i, usar: "chamada final", palavra: "CTA" },
+  { proibido: /\bhook\b/i, usar: "os 3 primeiros segundos", palavra: "hook" },
+  {
+    proibido: /\bm(é|e)tricas?\b/i,
+    usar: "quantas pessoas viram, o seu painel",
+    palavra: "métricas",
+  },
+  { proibido: /\bdashboard\b/i, usar: "o seu painel", palavra: "dashboard" },
+  { proibido: /\bviral\b/i, usar: "fora da curva, muito acima do normal", palavra: "viral" },
+  { proibido: /\bconte(ú|u)do\b/i, usar: "video", palavra: "conteúdo" },
+  { proibido: /\bonboarding\b/i, usar: "comecar, o seu briefing", palavra: "onboarding" },
 ];
 
 /** Motivos de reprovacao encontrados num texto (uma linha ou um bloco inteiro). */

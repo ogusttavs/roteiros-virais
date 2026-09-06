@@ -124,4 +124,18 @@ describe("resumirMelhorar", () => {
     expect(resultado).toBe(`${"a".repeat(89)}.`);
     expect(resultado.length).toBe(90);
   });
+
+  it("ponto de numero nao conta como fim de frase (revisao do PR #27, item 4)", () => {
+    expect(resumirMelhorar("Diga quanto rende: 1.200 ml por frasco. O resto está bom.")).toBe(
+      "Diga quanto rende: 1.200 ml por frasco.",
+    );
+  });
+
+  it("ponto de numero no fim do texto tambem nao corta, devolve o texto inteiro", () => {
+    expect(resumirMelhorar("Custa R$ 1.200.")).toBe("Custa R$ 1.200.");
+  });
+
+  it("ponto de abreviacao (sem espaço depois) nao conta como fim de frase", () => {
+    expect(resumirMelhorar("Ex.: um caso real. Outro.")).toBe("Ex.: um caso real.");
+  });
 });

@@ -69,13 +69,15 @@ const MAX_RESUMO_MELHORAR = 90;
  * (brief-frontend.md 6.2, "Ajuste de 06/09/2026"): corta na primeira
  * pontuação final (. ! ?), no máximo 90 caracteres, com reticência quando
  * corta antes de uma pontuação final (sem uma, ou ela vem depois do
- * limite).
+ * limite). Pontuação final só conta seguida de espaço ou fim do texto
+ * (revisão do PR #27, item 4): sem isso, um número como "1.200" ou uma
+ * abreviação como "Ex.:" cortava a frase no meio.
  */
 export function resumirMelhorar(melhorar: string): string {
   const texto = melhorar.trim();
   if (!texto) return "";
 
-  const indicePontuacao = texto.search(/[.!?]/);
+  const indicePontuacao = texto.search(/[.!?](?=\s|$)/);
   if (indicePontuacao !== -1 && indicePontuacao < MAX_RESUMO_MELHORAR) {
     return texto.slice(0, indicePontuacao + 1);
   }

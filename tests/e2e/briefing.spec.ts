@@ -22,7 +22,7 @@
  * (respostas, avaliacoes, notaGeral, completo, perfil) e deixa so a interacao
  * que o teste quer verificar de verdade passar pelo navegador.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { devices, expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
@@ -368,5 +368,111 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByText("bloco 3 de 5")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sobre o que você quer que aconteça" })).toBeVisible();
     await expect(page.getByLabel("Onde você posta hoje")).toBeInViewport();
+  });
+
+  /**
+   * brief-frontend.md 6.2, "Ajuste de 06/09/2026" (revisao do PR #27, item
+   * 1): no celular a folha (BarraNotaGeral.module.css, `.folha`) tem altura
+   * menor que a lista das doze notas, entao a lista rola por dentro. Sem
+   * `overscroll-behavior: contain`, rolar a lista ate o fim encadeava o
+   * scroll para o documento, e o `scroll` da window fechava a folha com o
+   * cliente ainda lendo. Viewport de celular so neste bloco (`test.use`),
+   * as outras tres tests deste arquivo continuam no viewport padrao.
+   */
+  test.describe("na folha do celular", () => {
+    // So o viewport de celular, sem `defaultBrowserType` (o resto de
+    // `devices["iPhone 13"]`): o Playwright recusa esse campo num
+    // `test.use` dentro de um describe (forcaria outro worker/browser), e o
+    // projeto unico deste repositorio e Chromium (playwright.config.ts).
+    test.use({
+      userAgent: devices["iPhone 13"].userAgent,
+      viewport: devices["iPhone 13"].viewport,
+      deviceScaleFactor: devices["iPhone 13"].deviceScaleFactor,
+      isMobile: devices["iPhone 13"].isMobile,
+      hasTouch: devices["iPhone 13"].hasTouch,
+    });
+
+    test("rolar a lista por dentro ate o fim nao fecha a folha; rolar o véu fecha", async ({ page }) => {
+      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+      await db().insert(user).values({
+        id: "e2e-folha-celular",
+        name: "[teste] Folha Celular",
+        email: "e2e-folha-celular@exemplo.teste",
+      });
+      await db()
+        .insert(account)
+        .values({
+          id: "e2e-folha-celular-credential",
+          issuer: "local:credential",
+          accountId: "e2e-folha-celular",
+          providerId: "credential",
+          userId: "e2e-folha-celular",
+          password: await hashPassword(SENHA),
+        });
+      const [cliente] = await db()
+        .insert(clientes)
+        .values({
+          usuarioId: "e2e-folha-celular",
+          nome: "[teste] Folha Celular",
+          nichoId: nicho.id,
+          aceitouTermosEm: new Date(),
+        })
+        .returning();
+
+      // Doze respostas avaliadas, cada uma com "melhorar" grande o bastante
+      // para gerar uma linha de resumo (mesmo formato do teste "cartao de
+      // notas" acima): e o que deixa a lista mais alta que a folha no celular.
+      const avaliacao = (id: string): AvaliacaoResposta => ({
+        nota: 9,
+        bom: `A resposta de ${id} tem exemplo concreto.`,
+        melhorar: `Poderia trazer mais um numero ou exemplo real do negocio na resposta de ${id}, para ficar ainda mais forte.`,
+        como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
+        impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+      });
+      const respostas: Record<string, string> = {};
+      const avaliacoes: Record<string, AvaliacaoResposta> = {};
+      for (let i = 1; i <= 12; i++) {
+        const id = `p${i}`;
+        respostas[id] = `Resposta concreta para ${id}, com o numero 42 na frase e o bairro de Pinheiros.`;
+        avaliacoes[id] = avaliacao(id);
+      }
+
+      await db().insert(briefings).values({
+        clienteId: cliente.id,
+        respostas,
+        avaliacoes,
+        notaGeral: "9.00",
+        completo: true,
+      });
+
+      await entrar(page, "e2e-folha-celular@exemplo.teste");
+      await expect(page).toHaveURL(/\/hoje/);
+
+      await page.goto("/briefing");
+      await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
+
+      // barra fina fixa no topo (barraCelular): abre a folha ao tocar.
+      await page.getByRole("button", { name: "as doze notas" }).click();
+      const folha = page.getByRole("dialog", { name: "as doze notas" });
+      await expect(folha).toBeVisible();
+
+      const caixa = await folha.boundingBox();
+      if (!caixa) throw new Error("folha sem caixa delimitadora");
+      const centroFolha = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
+
+      // rola a lista por dentro, varias vezes, ate passar do fim.
+      await page.mouse.move(centroFolha.x, centroFolha.y);
+      for (let i = 0; i < 15; i++) {
+        await page.mouse.wheel(0, 800);
+      }
+      await expect(folha).toBeVisible();
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+
+      // agora rola em cima do véu, fora da folha (topo da tela, acima dela).
+      await page.mouse.move(centroFolha.x, 10);
+      await page.mouse.wheel(0, 400);
+      await expect(folha).toBeHidden();
+    });
   });
 });
