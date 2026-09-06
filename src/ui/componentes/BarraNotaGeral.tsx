@@ -1,10 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import styles from "./BarraNotaGeral.module.css";
 
-export type NotaListada = { rotulo: string; nota: number | null };
+export type NotaListada = {
+  id: string;
+  rotulo: string;
+  nota: number | null;
+  /** Primeira frase de "o que pode melhorar", ja cortada (ajuste de 06/09/2026); ausente sem avaliacao ainda. */
+  melhorarResumo?: string | null;
+};
 
 type Props = {
   notaAtual: number;
@@ -18,6 +24,8 @@ type Props = {
   semNota: string;
   /** aria-label do dialogo no celular (ex.: "As doze notas"). */
   tituloFolha: string;
+  /** Tocar numa linha da lista (ajuste de 06/09/2026): rola ate a pergunta. */
+  aoTocarItem?: (id: string) => void;
 };
 
 function formatarNota(valor: number): string {
@@ -39,16 +47,42 @@ export function BarraNotaGeral({
   notas,
   semNota,
   tituloFolha,
+  aoTocarItem,
 }: Props) {
   const [aberto, setAberto] = useState(false);
   const atingiu = notaAtual >= meta;
 
+  /**
+   * Fecha ao rolar a pagina de tras (brief-frontend.md 6.2, "Ajuste de
+   * 06/09/2026"): so ouve o scroll do documento, nunca o scroll interno da
+   * propria folha (`.folha` tem overflow-y proprio, que nao borbulha como
+   * evento de scroll da window).
+   */
+  useEffect(() => {
+    if (!aberto) return;
+    function fechar() {
+      setAberto(false);
+    }
+    window.addEventListener("scroll", fechar, { passive: true });
+    return () => window.removeEventListener("scroll", fechar);
+  }, [aberto]);
+
+  function tocarItem(id: string) {
+    setAberto(false);
+    aoTocarItem?.(id);
+  }
+
   const lista = (
     <ul className={styles.lista}>
       {notas.map((item) => (
-        <li key={item.rotulo} className={styles.itemLista}>
-          <span className={styles.rotuloItem}>{item.rotulo}</span>
-          <span className={styles.notaItem}>{item.nota === null ? semNota : formatarNota(item.nota)}</span>
+        <li key={item.id} className={styles.itemLista}>
+          <button type="button" className={styles.botaoItem} onClick={() => tocarItem(item.id)}>
+            <span className={styles.linhaPrincipal}>
+              <span className={styles.rotuloItem}>{item.rotulo}</span>
+              <span className={styles.notaItem}>{item.nota === null ? semNota : formatarNota(item.nota)}</span>
+            </span>
+            {item.melhorarResumo ? <span className={styles.melhorarResumo}>{item.melhorarResumo}</span> : null}
+          </button>
         </li>
       ))}
     </ul>

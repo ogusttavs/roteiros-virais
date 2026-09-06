@@ -61,3 +61,25 @@ export function blocoInicial(avaliacoes: Record<string, AvaliacaoResposta>): num
   }
   return TOTAL_BLOCOS;
 }
+
+const MAX_RESUMO_MELHORAR = 90;
+
+/**
+ * Primeira frase de "o que pode melhorar", para a lista de notas
+ * (brief-frontend.md 6.2, "Ajuste de 06/09/2026"): corta na primeira
+ * pontuação final (. ! ?), no máximo 90 caracteres, com reticência quando
+ * corta antes de uma pontuação final (sem uma, ou ela vem depois do
+ * limite).
+ */
+export function resumirMelhorar(melhorar: string): string {
+  const texto = melhorar.trim();
+  if (!texto) return "";
+
+  const indicePontuacao = texto.search(/[.!?]/);
+  if (indicePontuacao !== -1 && indicePontuacao < MAX_RESUMO_MELHORAR) {
+    return texto.slice(0, indicePontuacao + 1);
+  }
+
+  if (texto.length <= MAX_RESUMO_MELHORAR) return texto;
+  return `${texto.slice(0, MAX_RESUMO_MELHORAR).trimEnd()}…`;
+}

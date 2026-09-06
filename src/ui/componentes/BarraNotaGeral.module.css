@@ -95,12 +95,40 @@
 }
 
 .itemLista {
+  border-bottom: 1px solid var(--cor-borda);
+  font-size: var(--tamanho-secundario);
+}
+
+.botaoItem {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--espaco-2) 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+.botaoItem:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoItem:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.linhaPrincipal {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 44px;
-  border-bottom: 1px solid var(--cor-borda);
-  font-size: var(--tamanho-secundario);
+  width: 100%;
 }
 
 .rotuloItem {
@@ -108,8 +136,16 @@
 }
 
 .notaItem {
+  flex: none;
   font-family: var(--fonte-mono);
   color: var(--cor-titulo);
+}
+
+.melhorarResumo {
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  text-wrap: pretty;
 }
 
 .cartaoDesktop {
@@ -139,8 +175,10 @@
 
   .cartaoDesktop {
     position: sticky;
-    top: 0;
+    top: var(--espaco-8);
+    flex: none;
     width: 320px;
+    max-height: calc(100vh - var(--espaco-8) * 2);
     background: var(--cor-superficie);
     border: 1px solid var(--cor-borda);
     border-radius: var(--raio-lg);
@@ -150,12 +188,24 @@
     gap: var(--espaco-4);
   }
 
+  /**
+   * So a lista rola por dentro (brief-frontend.md 6.2, "Ajuste de
+   * 06/09/2026"): o cabecalho (nota, meta, dica) fica sempre visivel, e o
+   * cartao nunca cresce alem de max-height nem empurra o formulario ao
+   * lado.
+   */
   .cartaoDesktop .lista {
+    flex: 1;
+    min-height: 0;
     margin-top: var(--espaco-2);
+    overflow-y: auto;
   }
 
   .cartaoDesktop .itemLista {
-    height: 36px;
     font-size: var(--tamanho-legenda);
+  }
+
+  .cartaoDesktop .botaoItem {
+    min-height: 36px;
   }
 }

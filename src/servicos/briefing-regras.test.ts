@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AvaliacaoResposta } from "@/db/schema";
 
-import { blocoInicial, calcularNotaGeral, perguntaQueMaisAjuda } from "./briefing-regras";
+import { blocoInicial, calcularNotaGeral, perguntaQueMaisAjuda, resumirMelhorar } from "./briefing-regras";
 
 function avaliacao(nota: number): AvaliacaoResposta {
   return { nota, bom: "", melhorar: "", como: "", impacto: "" };
@@ -81,5 +81,47 @@ describe("blocoInicial", () => {
     const avaliacoes: Record<string, AvaliacaoResposta> = {};
     for (let i = 1; i <= 12; i++) avaliacoes[`p${i}`] = avaliacao(9);
     expect(blocoInicial(avaliacoes)).toBe(5);
+  });
+});
+
+describe("resumirMelhorar", () => {
+  it("texto vazio devolve vazio", () => {
+    expect(resumirMelhorar("")).toBe("");
+    expect(resumirMelhorar("   ")).toBe("");
+  });
+
+  it("corta na primeira pontuacao final, incluindo ela, sem reticencia", () => {
+    expect(resumirMelhorar("Falta o publico. O resto esta otimo, com numero e exemplo reais.")).toBe(
+      "Falta o publico.",
+    );
+  });
+
+  it("aceita ! e ? como pontuacao final, nao so ponto final", () => {
+    expect(resumirMelhorar("Rende quanto? Isso falta na resposta.")).toBe("Rende quanto?");
+    expect(resumirMelhorar("Faltou o numero! Volte e complete.")).toBe("Faltou o numero!");
+  });
+
+  it("texto curto sem pontuacao final devolve o texto inteiro, sem reticencia", () => {
+    expect(resumirMelhorar("falta o numero")).toBe("falta o numero");
+  });
+
+  it("sem pontuacao final e maior que 90 caracteres, corta em 90 com reticencia", () => {
+    const texto = "a".repeat(120);
+    const resultado = resumirMelhorar(texto);
+    expect(resultado).toBe(`${"a".repeat(90)}…`);
+    expect(resultado.length).toBe(91);
+  });
+
+  it("primeira pontuacao final depois de 90 caracteres, corta em 90 com reticencia", () => {
+    const texto = `${"a".repeat(95)}. resto da frase.`;
+    const resultado = resumirMelhorar(texto);
+    expect(resultado).toBe(`${"a".repeat(90)}…`);
+  });
+
+  it("pontuacao final exatamente na posicao 90 (indice 89), inclui ela, sem reticencia", () => {
+    const texto = `${"a".repeat(89)}. resto da frase`;
+    const resultado = resumirMelhorar(texto);
+    expect(resultado).toBe(`${"a".repeat(89)}.`);
+    expect(resultado.length).toBe(90);
   });
 });
