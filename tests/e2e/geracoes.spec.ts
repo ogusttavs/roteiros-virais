@@ -26,10 +26,16 @@ test("periodo (chips) e filtro por tarefa mudam a URL e a tela", async ({ page }
   await expect(chip7).toHaveAttribute("aria-current", "true");
   await expect(chip30).not.toHaveAttribute("aria-current", "true");
 
+  // O contador do topo segue o mesmo período dos chips (rodada de acabamento
+  // de 06/09, item 5), nunca a lista de recentes: sem contagem exata (o
+  // banco e compartilhado com outros arquivos de e2e), so o período no texto.
+  await expect(page.getByText(/gerações? em 7 dias/)).toBeVisible();
+
   await chip30.click();
   await expect(page).toHaveURL(/periodo=30/);
   await expect(chip30).toHaveAttribute("aria-current", "true");
   await expect(chip7).not.toHaveAttribute("aria-current", "true");
+  await expect(page.getByText(/gerações? em 30 dias/)).toBeVisible();
 
   const filtroTarefa = page.getByLabel("tarefa", { exact: true });
   await expect(filtroTarefa).toBeVisible();

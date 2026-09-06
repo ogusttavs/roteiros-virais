@@ -77,7 +77,7 @@ export default async function AdminGeracoes({ searchParams }: { searchParams: Pr
       <div className={styles.cabecalhoLista}>
         <div>
           <h1>{t.titulo}</h1>
-          <p className={styles.subtitulo}>{t.subtitulo(geracoes.length)}</p>
+          <p className={styles.subtitulo}>{t.subtitulo(resumo.totalGeracoes, dias)}</p>
         </div>
       </div>
 
