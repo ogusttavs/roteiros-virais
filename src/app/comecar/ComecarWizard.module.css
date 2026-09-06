@@ -89,9 +89,21 @@
     margin: 0;
   }
 
+  /**
+   * Ajuste de 06/09/2026 (revisao do PR #27, item 2): o recuo da pagina
+   * passa da .corpo para a linha inteira, senao o cartao (primeiro filho no
+   * DOM) encostava na borda da janela. A .corpo continua com o proprio
+   * max-width; so perde o padding proprio aqui dentro, para nao dobrar o
+   * recuo.
+   */
   .corpoComNota {
     flex-direction: row;
     align-items: flex-start;
     gap: var(--espaco-8);
+    padding: var(--espaco-10);
+  }
+
+  .corpoComNota .corpo {
+    padding: 0;
   }
 }
