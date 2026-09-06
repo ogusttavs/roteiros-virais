@@ -79,60 +79,69 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
       continue;
     }
 
-    const resultado = await gerarEstruturado({
-      tarefa: "avaliarResposta",
-      nivel: avaliarRespostaIA.nivel,
-      effort: avaliarRespostaIA.esforco,
-      schema: avaliarRespostaIA.schema,
-      sistemaEstavel: avaliarRespostaIA.montarSistemaEstavel(),
-      entrada: avaliarRespostaIA.montarEntrada({
-        pergunta: pergunta.enunciado,
-        oQueAIAProcura: pergunta.oQueAIAProcura,
-        resposta: caso.resposta,
-      }),
-    });
-
-    const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
-    somaDiferencas += diferenca;
-    casosAvaliados += 1;
-
     /**
-     * O mesmo verificador de producao (checagem local mais verificarTexto,
-     * `generoTexto: "analise"`), rodado aqui so para saber se aprovaria,
-     * sem repetir nem gravar em geracoes_ia (rodada de acabamento de 06/09,
-     * item 1): antes deste ajuste o script so media a nota, nunca conferia
-     * se a analise passaria no verificador de verdade.
+     * Um caso que falha (erro transitorio de rede, resposta truncada) nao
+     * pode derrubar o resto do conjunto: sem isso, um golden set de doze
+     * casos perdia todos os que vinham depois do primeiro erro.
      */
-    const campos = {
-      bom: resultado.dados.bom,
-      melhorar: resultado.dados.melhorar,
-      como: resultado.dados.como,
-      exemplo: resultado.dados.exemplo,
-      impacto: resultado.dados.impacto,
-    };
-    const local = verificarLocalmente(campos);
-    let verificacao = local;
-    if (local.aprovado) {
-      const saida = await gerarEstruturado({
-        tarefa: "verificarTexto",
-        nivel: verificarTextoIA.nivel,
-        effort: verificarTextoIA.esforco,
-        schema: verificarTextoIA.schema,
-        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("analise"),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
+    try {
+      const resultado = await gerarEstruturado({
+        tarefa: "avaliarResposta",
+        nivel: avaliarRespostaIA.nivel,
+        effort: avaliarRespostaIA.esforco,
+        schema: avaliarRespostaIA.schema,
+        sistemaEstavel: avaliarRespostaIA.montarSistemaEstavel(),
+        entrada: avaliarRespostaIA.montarEntrada({
+          pergunta: pergunta.enunciado,
+          oQueAIAProcura: pergunta.oQueAIAProcura,
+          resposta: caso.resposta,
+        }),
       });
-      verificacao = {
-        aprovado: saida.dados.aprovado,
-        motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"],
-      };
-    }
-    if (!verificacao.aprovado) reprovadosNoVerificador += 1;
 
-    console.log(
-      `${caso.perguntaId}: IA deu ${resultado.dados.nota}, esperado ${caso.notaEsperada} ` +
-        `(diferenca ${diferenca.toFixed(1)}) - ${caso.pontoPrincipal}` +
-        (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`),
-    );
+      const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
+      somaDiferencas += diferenca;
+      casosAvaliados += 1;
+
+      /**
+       * O mesmo verificador de producao (checagem local mais verificarTexto,
+       * `generoTexto: "analise"`), rodado aqui so para saber se aprovaria,
+       * sem repetir nem gravar em geracoes_ia (rodada de acabamento de
+       * 06/09, item 1): antes deste ajuste o script so media a nota, nunca
+       * conferia se a analise passaria no verificador de verdade.
+       */
+      const campos = {
+        bom: resultado.dados.bom,
+        melhorar: resultado.dados.melhorar,
+        como: resultado.dados.como,
+        exemplo: resultado.dados.exemplo,
+        impacto: resultado.dados.impacto,
+      };
+      const local = verificarLocalmente(campos);
+      let verificacao = local;
+      if (local.aprovado) {
+        const saida = await gerarEstruturado({
+          tarefa: "verificarTexto",
+          nivel: verificarTextoIA.nivel,
+          effort: verificarTextoIA.esforco,
+          schema: verificarTextoIA.schema,
+          sistemaEstavel: verificarTextoIA.montarSistemaEstavel("analise"),
+          entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
+        });
+        verificacao = {
+          aprovado: saida.dados.aprovado,
+          motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"],
+        };
+      }
+      if (!verificacao.aprovado) reprovadosNoVerificador += 1;
+
+      console.log(
+        `${caso.perguntaId}: IA deu ${resultado.dados.nota}, esperado ${caso.notaEsperada} ` +
+          `(diferenca ${diferenca.toFixed(1)}) - ${caso.pontoPrincipal}` +
+          (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`),
+      );
+    } catch (erro) {
+      console.log(`${caso.perguntaId}: erro ao avaliar, pulando (${erro instanceof Error ? erro.message : String(erro)})`);
+    }
   }
 
   const diferencaMedia = casosAvaliados > 0 ? somaDiferencas / casosAvaliados : 0;
