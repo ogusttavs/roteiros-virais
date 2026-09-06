@@ -67,6 +67,20 @@
   color: var(--cor-titulo);
 }
 
+.sair {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  cursor: pointer;
+}
+
+.sair:hover {
+  color: var(--cor-titulo);
+}
+
 .corpo {
   flex: 1;
   min-height: 0;

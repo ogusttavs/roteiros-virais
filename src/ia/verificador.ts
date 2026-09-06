@@ -10,6 +10,7 @@ import { encontrarProblemas } from "@/lib/regras-de-texto";
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
 import * as verificarTexto from "./prompts/verificarTexto";
+import type { GeneroTexto } from "./prompts/verificarTexto";
 import { registrarGeracao } from "./registro";
 
 export type ResultadoVerificacaoLocal = {
@@ -84,6 +85,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   exigeEvidencia?: boolean;
   /** Os ids que entraram na entrada, para o verificador reprovar qualquer id citado fora daqui. */
   evidenciasFornecidas?: number[];
+  /**
+   * "padrao" (default) ou "analise" (rodada de acabamento de 06/09, item
+   * 1): qual criterio de tom a tarefa verificarTexto usa. Ver
+   * `prompts/verificarTexto.ts`.
+   */
+  generoTexto?: GeneroTexto;
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
 };
@@ -142,7 +149,7 @@ async function tentarGerarEVerificar<T>(
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
-      sistemaEstavel: verificarTexto.montarSistemaEstavel(),
+      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto),
       entrada: verificarTexto.montarEntrada({
         texto: textoJunto,
         proibicoes: params.proibicoes ?? [],

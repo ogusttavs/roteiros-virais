@@ -5,6 +5,8 @@ export const textosAdmin = {
     nichos: "Nichos",
     jobs: "Jobs",
     geracoes: "Gerações",
+    sair: "sair",
+    saindo: "saindo",
   },
   clientes: {
     titulo: "Clientes",
@@ -67,6 +69,7 @@ export const textosAdmin = {
     colunaVelocidadeRelativa: "velocidade relativa",
     colunaTaxa: "taxa fora da curva",
     colunaMediana: "mediana de views",
+    colunaAviso: "aviso",
     verVideo: "ver vídeo",
     semDado: "sem dado ainda",
     vazioForaDaCurva: "nenhum vídeo fora da curva ainda; o job pontuar roda todo dia, depois das coletas.",
@@ -172,7 +175,9 @@ export const textosAdmin = {
   },
   geracoes: {
     titulo: "Gerações",
-    subtitulo: (n: number) => (n === 1 ? "1 geração" : `${n} gerações`),
+    /** Segue o mesmo período e filtro do resumo (rodada de acabamento de 06/09, item 5). */
+    subtitulo: (n: number, dias: number) =>
+      n === 1 ? `1 geração em ${dias} dias` : `${n} gerações em ${dias} dias`,
     colunaData: "data",
     colunaTarefa: "tarefa",
     colunaModelo: "modelo",

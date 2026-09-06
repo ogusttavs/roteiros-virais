@@ -87,12 +87,24 @@ export async function videosParaMedir(agora: Date): Promise<VideoParaMedir[]> {
 export type MedianaConta = { mediana: number | null; aprendendo: boolean };
 
 /**
+ * A coleta grava `contas.handle` sem "@" no TikTok e no Instagram, e com
+ * "@" no YouTube (`src/servicos/nichos.ts`, `analisarUrlPerfil`); o
+ * cliente digita o perfil dele no briefing do jeito que quiser. Sem
+ * normalizar os dois lados da mesma forma, a comparação nunca batia
+ * (rodada de acabamento de 06/09, item 4).
+ */
+export function normalizarHandle(handle: string, plataforma: Plataforma): string {
+  const limpo = handle.replace(/\s+/g, "").replace(/^@+/, "");
+  return plataforma === "youtube" ? `@${limpo}` : limpo;
+}
+
+/**
  * "Normal da conta" (decisão 3 do `PROXIMO.md`). Quando a conta do cliente
  * já existe em `contas` (mesma plataforma, o handle que ele informou no
- * briefing) com `mediana_views`, usa essa, fonte maior e mais estável.
- * Senão, mediana das views finais (última medição) dos vídeos anteriores
- * do próprio cliente em `videos_cliente`, a partir do quinto; antes disso
- * `aprendendo: true`, sem número.
+ * briefing, normalizado) com `mediana_views`, usa essa, fonte maior e mais
+ * estável. Senão, mediana das views finais (última medição) dos vídeos
+ * anteriores do próprio cliente em `videos_cliente`, a partir do quinto;
+ * antes disso `aprendendo: true`, sem número.
  */
 export async function medianaDaConta(
   clienteId: number,
@@ -100,7 +112,8 @@ export async function medianaDaConta(
   excluirVideoClienteId: number,
 ): Promise<MedianaConta> {
   const [cliente] = await db().select({ perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
-  const handle = cliente?.perfis?.[plataforma];
+  const handleBruto = cliente?.perfis?.[plataforma];
+  const handle = handleBruto?.trim() ? normalizarHandle(handleBruto, plataforma) : null;
 
   if (handle) {
     const [contaDoCliente] = await db()

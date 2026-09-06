@@ -273,6 +273,15 @@ export const contas = pgTable(
      * como conta semente (etapa 24, parte 1). Mesma forma de videos.origem.
      */
     origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
+    /**
+     * Coleta por perfil falhou de um jeito conhecido e nao vale gastar cota
+     * tentando de novo na mesma hora (rodada de acabamento de 06/09, item 2:
+     * `@ninadobre` com 404 na playlist de uploads). A tela do nicho mostra
+     * este texto ao lado da conta; `avisoColetaEm` e o que garante no maximo
+     * uma tentativa por dia (limpo assim que uma coleta volta a funcionar).
+     */
+    avisoColeta: text("aviso_coleta"),
+    avisoColetaEm: timestamp("aviso_coleta_em", { withTimezone: true }),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],

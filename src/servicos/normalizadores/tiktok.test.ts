@@ -12,11 +12,18 @@ function carregarFixture(): TiktokItemBruto[] {
   return JSON.parse(readFileSync(caminho, "utf8")) as TiktokItemBruto[];
 }
 
+/** Falha o teste com uma mensagem clara em vez de um "possibly null" do TS, quando o item deveria normalizar. */
+function normalizarOuFalhar(item: TiktokItemBruto) {
+  const resultado = normalizarVideoTiktok(item);
+  if (!resultado) throw new Error("esperava normalizar o item, recebeu null");
+  return resultado;
+}
+
 describe("normalizarVideoTiktok", () => {
   const itens = carregarFixture();
 
   it("normaliza o primeiro item, com audio e todas as estatisticas", () => {
-    const { video, conta, audio } = normalizarVideoTiktok(itens[0]);
+    const { video, conta, audio } = normalizarOuFalhar(itens[0]);
 
     expect(video).toEqual({
       plataforma: "tiktok",
@@ -45,11 +52,20 @@ describe("normalizarVideoTiktok", () => {
   });
 
   it("sem musicMeta, o audio vem nulo e as estatisticas ausentes viram zero", () => {
-    const { video, audio } = normalizarVideoTiktok(itens[1]);
+    const { video, audio } = normalizarOuFalhar(itens[1]);
 
     expect(audio).toBeNull();
     expect(video.likes).toBe(0);
     expect(video.comentarios).toBe(0);
     expect(video.views).toBe(58210);
+  });
+
+  /** Rodada de acabamento de 06/09, item 3: achado real, "Cannot read properties of undefined". */
+  it("sem authorMeta nenhum, devolve null em vez de estourar", () => {
+    expect(normalizarVideoTiktok(itens[2])).toBeNull();
+  });
+
+  it("com authorMeta mas sem name, tambem devolve null", () => {
+    expect(normalizarVideoTiktok(itens[3])).toBeNull();
   });
 });

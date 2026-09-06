@@ -84,7 +84,15 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
         await registrarConsumo(itens.length);
         for (const item of itens) {
           try {
-            const { video, conta, audio } = normalizarVideoTiktok(item);
+            const normalizado = normalizarVideoTiktok(item);
+            if (!normalizado) {
+              // Sem authorMeta.name nao da para gravar a conta (rodada de
+              // acabamento de 06/09, item 3): pula o item com um aviso em
+              // vez de deixar o erro estourar e derrubar o resto do lote.
+              erros.push(`tiktok / nicho "${nicho.slug}" / item "${item.id ?? "sem id"}": sem nome do autor, pulado`);
+              continue;
+            }
+            const { video, conta, audio } = normalizado;
             const contaId = await upsertConta(conta, nicho.id);
             const resultado = await upsertVideo(video, contaId, nicho.id, audio);
             if (resultado === "novo") videosNovos += 1;
@@ -93,7 +101,7 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
             // Um item malformado nao pode derrubar o resto do lote (achado
             // rodando com chave real: um item do apify sem dado essencial).
             erros.push(
-              `tiktok / nicho "${nicho.slug}" / item "${item.id}": ${erroItem instanceof Error ? erroItem.message : String(erroItem)}`,
+              `tiktok / nicho "${nicho.slug}" / item "${item.id ?? "sem id"}": ${erroItem instanceof Error ? erroItem.message : String(erroItem)}`,
             );
           }
         }

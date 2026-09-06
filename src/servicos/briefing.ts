@@ -177,6 +177,7 @@ export async function avaliarResposta(
         oQueAIAProcura: pergunta.oQueAIAProcura,
         resposta,
       }),
+      generoTexto: "analise",
       extrairCampos: (d) => ({
         bom: d.bom,
         melhorar: d.melhorar,

@@ -152,6 +152,9 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
     expect(resumo.videosNovos).toBe(1);
     expect(erros).toHaveLength(1);
     expect(erros?.[0]).toMatch(/item-quebrado/);
+    // Pula com um aviso claro, nao com a mensagem crua do "Cannot read
+    // properties of undefined" (rodada de acabamento de 06/09, item 3).
+    expect(erros?.[0]).toMatch(/sem nome do autor, pulado/);
 
     const [videoBom] = await db()
       .select()

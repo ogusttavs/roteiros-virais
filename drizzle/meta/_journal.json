@@ -92,6 +92,13 @@
       "when": 1788632267222,
       "tag": "0012_contas-origem",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788653979334,
+      "tag": "0013_contas-aviso-coleta",
+      "breakpoints": true
     }
   ]
 }

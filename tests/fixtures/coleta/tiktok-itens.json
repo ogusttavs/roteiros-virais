@@ -30,5 +30,16 @@
     },
     "videoMeta": { "duration": 21 },
     "playCount": 58210
+  },
+  {
+    "id": "7345678901234567892",
+    "webVideoUrl": "https://www.tiktok.com/@x/video/7345678901234567892",
+    "playCount": 100
+  },
+  {
+    "id": "7345678901234567893",
+    "webVideoUrl": "https://www.tiktok.com/@x/video/7345678901234567893",
+    "authorMeta": { "nickName": "[exemplo] sem nome de usuario" },
+    "playCount": 50
   }
 ]
