@@ -210,6 +210,8 @@ export type ContaVigiada = {
   handle: string;
   taxaForaDaCurva: number | null;
   medianaViews: number | null;
+  /** Coleta por perfil falhou de um jeito conhecido (rodada de acabamento de 06/09, item 2). */
+  avisoColeta: string | null;
 };
 
 /** A lista de vigilância de um nicho (escopo 5.3): quem está `vigiada`, por taxa. */
@@ -221,6 +223,7 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
       handle: contas.handle,
       taxaForaDaCurva: contas.taxaForaDaCurva,
       medianaViews: contas.medianaViews,
+      avisoColeta: contas.avisoColeta,
     })
     .from(contas)
     .where(and(eq(contas.nichoId, nichoId), eq(contas.vigiada, true)))
@@ -232,6 +235,7 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
     handle: l.handle,
     taxaForaDaCurva: l.taxaForaDaCurva === null ? null : Number(l.taxaForaDaCurva),
     medianaViews: l.medianaViews === null ? null : Number(l.medianaViews),
+    avisoColeta: l.avisoColeta,
   }));
 }
 

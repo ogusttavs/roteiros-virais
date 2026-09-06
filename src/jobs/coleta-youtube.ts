@@ -21,6 +21,7 @@ import {
   buscarVideosPorId,
   CUSTO_LISTA,
   CUSTO_SEARCH,
+  ErroYoutubeApi,
 } from "./youtube-api";
 
 const LIMITE_DIARIO_UNIDADES = 9000;
@@ -62,6 +63,7 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
   let videosNovos = 0;
   let videosAtualizados = 0;
   const erros: string[] = [];
+  const avisos: string[] = [];
 
   const cabe = (custo: number) => unidadesUsadas + custo <= LIMITE_DIARIO_UNIDADES;
   async function gastar(custo: number): Promise<void> {
@@ -98,6 +100,19 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
       .where(and(eq(contas.plataforma, "youtube"), eq(contas.nichoId, nicho.id), eq(contas.vigiada, true)));
 
     for (const conta of contasVigiadas) {
+      /**
+       * Coleta por perfil ja tinha falhado hoje de um jeito conhecido
+       * (rodada de acabamento de 06/09, item 2: `@ninadobre`, 404 na
+       * playlist de uploads): nao gasta cota tentando nao a mesma coisa de
+       * novo, no maximo uma tentativa por dia por conta. O "coletar agora"
+       * do admin pode ser clicado varias vezes no mesmo dia; sem isso, cada
+       * clique repetia a mesma chamada fadada a falhar.
+       */
+      if (conta.avisoColeta && conta.avisoColetaEm && hojeISO(conta.avisoColetaEm) === hojeISO()) {
+        avisos.push(`canal "${conta.handle}": ${conta.avisoColeta} (ja tentou hoje, pulando)`);
+        continue;
+      }
+
       if (!cabe(CUSTO_LISTA * 2)) break;
       canaisChecados += 1;
       try {
@@ -112,9 +127,28 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
         if (!canal) continue;
 
         await gastar(CUSTO_LISTA);
-        const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
-        for (const item of uploadsResp.items ?? []) {
-          idsCandidatos.add(item.snippet.resourceId.videoId);
+        try {
+          const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
+          for (const item of uploadsResp.items ?? []) {
+            idsCandidatos.add(item.snippet.resourceId.videoId);
+          }
+          if (conta.avisoColeta) {
+            await db()
+              .update(contas)
+              .set({ avisoColeta: null, avisoColetaEm: null })
+              .where(eq(contas.id, conta.id));
+          }
+        } catch (erroUploads) {
+          if (erroUploads instanceof ErroYoutubeApi && erroUploads.status === 404) {
+            const aviso = "canal sem uploads acessiveis (playlist de uploads deu 404)";
+            await db()
+              .update(contas)
+              .set({ avisoColeta: aviso, avisoColetaEm: new Date() })
+              .where(eq(contas.id, conta.id));
+            avisos.push(`canal "${conta.handle}": ${aviso}`);
+          } else {
+            throw erroUploads;
+          }
         }
       } catch (erro) {
         erros.push(`canal "${conta.handle}": ${erro instanceof Error ? erro.message : String(erro)}`);
@@ -156,5 +190,6 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
     videosAtualizados,
     unidadesConsumidasHoje: unidadesUsadas,
     erros: erros.length > 0 ? erros : undefined,
+    avisos: avisos.length > 0 ? avisos : undefined,
   };
 }

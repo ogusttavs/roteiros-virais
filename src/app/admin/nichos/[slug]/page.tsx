@@ -164,6 +164,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                   <th>{t.colunaConta}</th>
                   <th>{t.colunaTaxa}</th>
                   <th>{t.colunaMediana}</th>
+                  <th>{t.colunaAviso}</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,6 +174,9 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                     <td>{conta.handle}</td>
                     <td className={styles.mono}>{formatarNumero(conta.taxaForaDaCurva, 2)}</td>
                     <td className={styles.mono}>{formatarNumero(conta.medianaViews, 0)}</td>
+                    <td className={conta.avisoColeta ? styles.aviso : undefined}>
+                      {conta.avisoColeta ?? t.semDado}
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -58,6 +58,10 @@
   color: var(--cor-titulo);
 }
 
+.aviso {
+  color: var(--cor-atencao);
+}
+
 .tituloComContagem {
   display: flex;
   align-items: baseline;

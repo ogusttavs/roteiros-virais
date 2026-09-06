@@ -67,6 +67,7 @@ export const textosAdmin = {
     colunaVelocidadeRelativa: "velocidade relativa",
     colunaTaxa: "taxa fora da curva",
     colunaMediana: "mediana de views",
+    colunaAviso: "aviso",
     verVideo: "ver vídeo",
     semDado: "sem dado ainda",
     vazioForaDaCurva: "nenhum vídeo fora da curva ainda; o job pontuar roda todo dia, depois das coletas.",

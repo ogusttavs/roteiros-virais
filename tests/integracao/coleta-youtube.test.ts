@@ -182,4 +182,102 @@ describe("rodarColetaYoutube (rede mockada, banco real)", () => {
       await db().delete(nichos).where(eq(nichos.id, outroNicho.id));
     }
   });
+
+  /** Rodada de acabamento de 06/09, item 2: `@ninadobre` com 404 na playlist de uploads. */
+  describe("canal vigiado com 404 na playlist de uploads", () => {
+    function mockarCanalComPlaylistQuebrada() {
+      mockFetch.mockImplementation(async (url: URL) => {
+        const texto = url.toString();
+        if (texto.includes("/search")) return respostaJson({ items: [] });
+        if (texto.includes("/channels")) {
+          return respostaJson({
+            items: [
+              {
+                id: "UCcanalquebrado",
+                snippet: { title: "[exemplo] canal quebrado" },
+                contentDetails: { relatedPlaylists: { uploads: "UUcanalquebrado" } },
+              },
+            ],
+          });
+        }
+        if (texto.includes("/playlistItems")) {
+          return new Response("playlist nao encontrada", { status: 404 });
+        }
+        throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+      });
+    }
+
+    it("marca a conta com o aviso, registra no resumo e nao derruba o job", async () => {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: "@canalquebrado", nichoId, vigiada: true })
+        .returning();
+
+      mockarCanalComPlaylistQuebrada();
+
+      const resumo = await rodarColetaYoutube(nichoId);
+
+      expect((resumo.avisos as string[] | undefined)?.some((a) => a.includes("@canalquebrado") && a.includes("404"))).toBe(true);
+      expect(resumo.erros).toBeUndefined();
+
+      const [contaAtualizada] = await db().select().from(contas).where(eq(contas.id, conta.id));
+      expect(contaAtualizada.avisoColeta).toContain("404");
+      expect(contaAtualizada.avisoColetaEm).not.toBeNull();
+    });
+
+    it("no mesmo dia, nao tenta de novo (nao gasta cota numa falha ja conhecida)", async () => {
+      await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: "@canalquebrado", nichoId, vigiada: true });
+
+      mockarCanalComPlaylistQuebrada();
+      await rodarColetaYoutube(nichoId);
+
+      mockFetch.mockClear();
+      const resumo = await rodarColetaYoutube(nichoId);
+
+      expect((resumo.avisos as string[] | undefined)?.some((a) => a.includes("ja tentou hoje"))).toBe(true);
+      const chamadasDeCanal = mockFetch.mock.calls.filter((c) => String(c[0]).includes("/channels"));
+      expect(chamadasDeCanal).toHaveLength(0);
+    });
+
+    it("uma coleta anterior (nao hoje) tenta de novo, e o sucesso limpa o aviso", async () => {
+      const [conta] = await db()
+        .insert(contas)
+        .values({
+          plataforma: "youtube",
+          handle: "@canalrecuperado",
+          nichoId,
+          vigiada: true,
+          avisoColeta: "canal sem uploads acessiveis (playlist de uploads deu 404)",
+          avisoColetaEm: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        })
+        .returning();
+
+      mockFetch.mockImplementation(async (url: URL) => {
+        const texto = url.toString();
+        if (texto.includes("/search")) return respostaJson({ items: [] });
+        if (texto.includes("/channels")) {
+          return respostaJson({
+            items: [
+              {
+                id: "UCcanalrecuperado",
+                snippet: { title: "[exemplo] canal recuperado" },
+                contentDetails: { relatedPlaylists: { uploads: "UUcanalrecuperado" } },
+              },
+            ],
+          });
+        }
+        if (texto.includes("/playlistItems")) return respostaJson({ items: [] });
+        throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+      });
+
+      const resumo = await rodarColetaYoutube(nichoId);
+      expect(resumo.avisos).toBeUndefined();
+
+      const [contaAtualizada] = await db().select().from(contas).where(eq(contas.id, conta.id));
+      expect(contaAtualizada.avisoColeta).toBeNull();
+      expect(contaAtualizada.avisoColetaEm).toBeNull();
+    });
+  });
 });
