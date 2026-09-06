@@ -5,11 +5,18 @@
  * depois de todas as coletas (03:45); `vigilancia` e semanal, domingo 04:30
  * (etapa 7, decisao 1 e 5 do `PROXIMO.md`). `analisarVisual` e `modeloNicho`
  * sao semanais tambem, domingo 05:00 e 06:00, depois da vigilancia e das
- * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`). `temasDoDia` e
- * diario, 05:30, depois de `transcrever` (etapa 10, decisao 2 do
- * `PROXIMO.md`). `curvaCliente` e a cada hora cheia, as :05 (decisao 1 da
- * etapa 15, parte 1), 5 minutos depois de `lembrete` so para nao competir
- * pelo mesmo minuto exato.
+ * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`). `curvaCliente` e
+ * a cada hora cheia, as :05 (decisao 1 da etapa 15, parte 1), 5 minutos
+ * depois de `lembrete` so para nao competir pelo mesmo minuto exato.
+ *
+ * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
+ * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
+ * gerou tema porque `extrairColeta` so buscava o resultado do lote de
+ * extracao de 4 em 4 horas, e as 05:30 nenhum video do nicho novo ainda
+ * tinha analise. Agora `extrairColeta` roda de hora em hora, aos 20 (e uma
+ * consulta de estado do lote, barata) e `temasDoDia` vai para as 06:30:
+ * transcrever 04:00, extrair (monta o lote) 05:00, resultado normalmente
+ * ate 06:20, tema 06:30, lembrete padrao 08:00.
  */
 import { boss, FILAS } from "./fila";
 
@@ -67,13 +74,13 @@ export const AGENDAMENTOS: Agendamento[] = [
   },
   {
     fila: FILAS.temasDoDia,
-    cron: "30 5 * * *",
-    descricao: "temas do dia por nicho, todo dia as 05:30, depois de transcrever",
+    cron: "30 6 * * *",
+    descricao: "temas do dia por nicho, todo dia as 06:30, depois do resultado da extracao",
   },
   {
     fila: FILAS.extrairColeta,
-    cron: "0 */4 * * *",
-    descricao: "busca o resultado do lote de extracao quando pronto, a cada 4 horas",
+    cron: "20 * * * *",
+    descricao: "busca o resultado do lote de extracao quando pronto, de hora em hora, aos 20",
   },
   {
     fila: FILAS.analisarVisual,

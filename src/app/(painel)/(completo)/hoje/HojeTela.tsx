@@ -94,7 +94,7 @@ export function HojeTela({ temas, avisoLinhaEditorial, avisoVideoSubindo, consta
                 rotulo={ROTULO_TEMA_CARTAO[tema.puxaPara]}
                 tema={tema.titulo}
                 porque={tema.porQue}
-                evidencia={textosHoje.evidencia(tema.evidencias.length)}
+                evidencia={textosHoje.evidencia(tema.evidencias.length, tema.evidenciasNoticias?.length ?? 0)}
                 primario={indice === 0}
                 rotuloBotao={textosHoje.queroEsse}
                 onEscolher={() => router.push(`/hoje/objetivo?tema=${indice}`)}

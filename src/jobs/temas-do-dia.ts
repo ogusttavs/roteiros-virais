@@ -1,15 +1,23 @@
 /**
- * Job `temasDoDia` (etapa 10, fila `temas-do-dia`, diário 05:30 de
- * Brasília, decisão 2 do `PROXIMO.md`, depois de `transcrever`): por nicho
- * ativo, filtra as notícias das últimas 24h com a tarefa barata
+ * Job `temasDoDia` (etapa 10, fila `temas-do-dia`, diário 06:30 de
+ * Brasília, decisão 2 do `PROXIMO.md`, depois do resultado da extração):
+ * por nicho ativo, filtra as notícias das últimas 24h com a tarefa barata
  * `filtrarNoticias`, junta com o que está subindo hoje (com análise), e
  * chama a tarefa `temasDoDia` (modelo forte, com o modelo do nicho no bloco
  * estável, cache de prompt). Cada tema precisa citar pelo menos um id de
- * evidência que de fato foi enviado; se algum tema não citar, refaz a
- * chamada uma vez, e se falhar de novo o nicho fica sem tema novo (a regra
- * de estabilidade em `src/servicos/temas.ts` usa o de um dos últimos 3
- * dias). Sem `subindoHoje` e sem notícia relevante, o nicho não gera tema
- * (sem chamar a IA), e o resumo diz por quê.
+ * evidência (vídeo ou notícia) que de fato foi enviado; se algum tema não
+ * citar, refaz a chamada uma vez, e se falhar de novo o nicho fica sem tema
+ * novo (a regra de estabilidade em `src/servicos/temas.ts` usa o de um dos
+ * últimos 3 dias). Sem `subindoHoje` e sem notícia relevante, o nicho não
+ * gera tema (sem chamar a IA), e o resumo diz por quê.
+ *
+ * Correção do dia 1 da etapa 14 (`PROXIMO.md`): antes, só vídeo contava como
+ * evidência válida, então um nicho novo com notícia mas sem vídeo com
+ * análise ainda madrugada chamava o modelo forte pedindo evidência de uma
+ * lista de ids vazia, reprovava as duas tentativas por definição, e as duas
+ * gerações ficavam fora do registro de custo (a validação só registrava
+ * depois de aprovar). Agora notícia é evidência válida também, e toda
+ * geração é registrada, aprovada ou não.
  */
 import { and, eq, gte, isNull } from "drizzle-orm";
 
@@ -46,12 +54,13 @@ async function noticiasCandidatas(nichoId: number): Promise<NoticiaCandidata[]> 
 /**
  * Chama `filtrarNoticias`, grava `relevante`/`angulo` em cada notícia (para
  * nunca reprocessar a mesma notícia dia depois de dia) e devolve só as
- * relevantes, no formato que `temasDoDia` espera.
+ * relevantes, com o id delas no banco (correção do dia 1 da etapa 14): é o
+ * id que `temasDoDia` cita como evidência.
  */
 async function filtrarEGravarNoticias(
   nicho: NichoAtivo,
   candidatas: NoticiaCandidata[],
-): Promise<{ titulo: string; resumo: string | null }[]> {
+): Promise<NoticiaCandidata[]> {
   if (candidatas.length === 0) return [];
 
   const resultado = await gerarEstruturado({
@@ -92,14 +101,78 @@ async function filtrarEGravarNoticias(
       .where(eq(noticias.id, candidata.id));
   }
 
-  return candidatas
-    .filter((_, i) => anguloPorIndice.has(i + 1))
-    .map((n) => ({ titulo: n.titulo, resumo: n.resumo }));
+  return candidatas.filter((_, i) => anguloPorIndice.has(i + 1));
 }
 
-/** Todo tema precisa citar ao menos uma evidencia que de fato foi enviada ao modelo. */
-function evidenciaValida(temas: TemaDoDia[], idsValidos: Set<number>): boolean {
-  return temas.every((tema) => tema.evidencias.length > 0 && tema.evidencias.every((id) => idsValidos.has(id)));
+/**
+ * Todo tema precisa citar ao menos uma evidencia (video ou noticia) que de
+ * fato foi enviada ao modelo; nenhum id fora do que foi enviado pode ser
+ * citado, em nenhuma das duas listas. Exportada para teste unitario
+ * (correcao do dia 1 da etapa 14, `PROXIMO.md`).
+ */
+export function evidenciaValida(
+  temas: TemaDoDia[],
+  idsValidos: Set<number>,
+  idsValidosNoticias: Set<number>,
+): boolean {
+  return temas.every((tema) => {
+    const evidenciasNoticias = tema.evidenciasNoticias ?? [];
+    const temEvidencia = tema.evidencias.length > 0 || evidenciasNoticias.length > 0;
+    return (
+      temEvidencia &&
+      tema.evidencias.every((id) => idsValidos.has(id)) &&
+      evidenciasNoticias.every((id) => idsValidosNoticias.has(id))
+    );
+  });
+}
+
+/**
+ * Uma tentativa de gerar os temas: gera, confere a evidencia e registra a
+ * geracao, aprovada ou nao (correcao do dia 1 da etapa 14: antes o registro
+ * so acontecia depois de aprovar, e as tentativas reprovadas sumiam do
+ * painel de custo).
+ */
+async function tentarGerarTemas(dados: {
+  nicho: NichoAtivo;
+  sistemaEstavel: string;
+  entrada: string;
+  idsValidos: Set<number>;
+  idsValidosNoticias: Set<number>;
+  subindoCount: number;
+  noticiasCount: number;
+}): Promise<{ valido: boolean; temas: TemaDoDia[] }> {
+  const resultado = await gerarEstruturado({
+    tarefa: "temasDoDia",
+    nivel: temasDoDiaIA.nivel,
+    effort: temasDoDiaIA.esforco,
+    schema: temasDoDiaIA.schema,
+    sistemaEstavel: dados.sistemaEstavel,
+    entrada: dados.entrada,
+  });
+
+  const valido = evidenciaValida(resultado.dados.temas, dados.idsValidos, dados.idsValidosNoticias);
+
+  await registrarGeracao({
+    tarefa: "temasDoDia",
+    versaoPrompt: temasDoDiaIA.versao,
+    modelo: resultado.modelo,
+    nivel: temasDoDiaIA.nivel,
+    entradas: {
+      nichoId: dados.nicho.id,
+      subindoHoje: dados.subindoCount,
+      noticias: dados.noticiasCount,
+      evidenciaValida: valido,
+    },
+    saida: resultado.dados,
+    uso: {
+      tokensEntrada: resultado.tokensEntrada,
+      tokensSaida: resultado.tokensSaida,
+      tokensCacheLeitura: resultado.tokensCacheLeitura,
+      tokensCacheEscrita: resultado.tokensCacheEscrita,
+    },
+  });
+
+  return { valido, temas: resultado.dados.temas };
 }
 
 async function gerarTemasDoNicho(nicho: NichoAtivo): Promise<"gerado" | "sem_evidencia"> {
@@ -116,53 +189,39 @@ async function gerarTemasDoNicho(nicho: NichoAtivo): Promise<"gerado" | "sem_evi
 
   const modeloNicho = await modeloNichoAtual(nicho.id);
   const idsValidos = new Set(subindo.map((v) => v.id));
+  const idsValidosNoticias = new Set(noticiasRelevantes.map((n) => n.id));
   const sistemaEstavel = temasDoDiaIA.montarSistemaEstavel({
     modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
   });
   const entrada = temasDoDiaIA.montarEntrada({
     subindoHoje: subindo,
-    noticias: noticiasRelevantes.map((n) => ({ titulo: n.titulo, resumo: n.resumo ?? "" })),
+    noticias: noticiasRelevantes.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
   });
 
-  const gerar = () =>
-    gerarEstruturado({
-      tarefa: "temasDoDia",
-      nivel: temasDoDiaIA.nivel,
-      effort: temasDoDiaIA.esforco,
-      schema: temasDoDiaIA.schema,
-      sistemaEstavel,
-      entrada,
-    });
+  const parametrosTentativa = {
+    nicho,
+    sistemaEstavel,
+    entrada,
+    idsValidos,
+    idsValidosNoticias,
+    subindoCount: subindo.length,
+    noticiasCount: noticiasRelevantes.length,
+  };
 
-  let resultado = await gerar();
-  if (!evidenciaValida(resultado.dados.temas, idsValidos)) {
-    resultado = await gerar();
-    if (!evidenciaValida(resultado.dados.temas, idsValidos)) {
+  let tentativa = await tentarGerarTemas(parametrosTentativa);
+  if (!tentativa.valido) {
+    tentativa = await tentarGerarTemas(parametrosTentativa);
+    if (!tentativa.valido) {
       throw new Error("tema sem evidencia valida depois de refazer a chamada uma vez");
     }
   }
 
-  await registrarGeracao({
-    tarefa: "temasDoDia",
-    versaoPrompt: temasDoDiaIA.versao,
-    modelo: resultado.modelo,
-    nivel: temasDoDiaIA.nivel,
-    entradas: { nichoId: nicho.id, subindoHoje: subindo.length, noticias: noticiasRelevantes.length },
-    saida: resultado.dados,
-    uso: {
-      tokensEntrada: resultado.tokensEntrada,
-      tokensSaida: resultado.tokensSaida,
-      tokensCacheLeitura: resultado.tokensCacheLeitura,
-      tokensCacheEscrita: resultado.tokensCacheEscrita,
-    },
-  });
-
   await db()
     .insert(temasDia)
-    .values({ nichoId: nicho.id, data: hojeISO(), temas: resultado.dados.temas })
+    .values({ nichoId: nicho.id, data: hojeISO(), temas: tentativa.temas })
     .onConflictDoUpdate({
       target: [temasDia.nichoId, temasDia.data],
-      set: { temas: resultado.dados.temas },
+      set: { temas: tentativa.temas },
     });
 
   return "gerado";

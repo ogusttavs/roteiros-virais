@@ -19,3 +19,25 @@ describe("textosHoje.constancia", () => {
     expect(textosHoje.constancia.parado(2)).toBe("faz 2 dias que você não grava");
   });
 });
+
+describe("textosHoje.evidencia (correcao do dia 1 da etapa 14, PROXIMO.md)", () => {
+  it("so video, singular", () => {
+    expect(textosHoje.evidencia(1, 0)).toBe("1 vídeo fora da curva esta semana");
+  });
+
+  it("so video, plural", () => {
+    expect(textosHoje.evidencia(3, 0)).toBe("3 vídeos fora da curva esta semana");
+  });
+
+  it("so noticia, singular", () => {
+    expect(textosHoje.evidencia(0, 1)).toBe("1 notícia do setor esta semana");
+  });
+
+  it("so noticia, plural", () => {
+    expect(textosHoje.evidencia(0, 2)).toBe("2 notícias do setor esta semana");
+  });
+
+  it("video e noticia juntos, como no exemplo do PROXIMO.md", () => {
+    expect(textosHoje.evidencia(3, 1)).toBe("3 vídeos e 1 notícia esta semana");
+  });
+});

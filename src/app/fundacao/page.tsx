@@ -235,7 +235,10 @@ export default function Fundacao() {
             <BlocoCenas
               titulo="Onde gravar e o que mostrar"
               cenas={[
-                { momento: "0 a 3 s", oQueFazer: "na sua cozinha, em frente ao fogão, com o pano na mão" },
+                {
+                  momento: "0 a 3 segundos, o gancho",
+                  oQueFazer: "na sua cozinha, em frente ao fogão, com o pano na mão",
+                },
                 { momento: "3 a 25 s", oQueFazer: "câmera apoiada na bancada, mostrando só as mãos e o fogão" },
                 { momento: "25 a 35 s", oQueFazer: "você de volta ao quadro, fogão limpo ao fundo" },
               ]}

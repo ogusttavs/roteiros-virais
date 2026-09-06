@@ -213,7 +213,7 @@ async function main() {
       entrada: temasDoDia.montarEntrada({
         subindoHoje: [{ id: 2, assunto: "mancha de vinho tinto no sofa", velocidadeRelativa: 4.2 }],
         noticias: [
-          { titulo: "Inverno chega mais cedo em SP", resumo: "friagem aumenta o uso de sofa e cobertor" },
+          { id: 1, titulo: "Inverno chega mais cedo em SP", resumo: "friagem aumenta o uso de sofa e cobertor" },
         ],
       }),
     }),

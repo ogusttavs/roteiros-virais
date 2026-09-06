@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { nichos, noticias, temasDia, videos } from "@/db/schema";
+import { geracoesIA, nichos, noticias, temasDia, videos } from "@/db/schema";
 import { rodarTemasDoDia } from "@/jobs/temas-do-dia";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -73,6 +73,7 @@ afterEach(async () => {
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   await db().delete(noticias).where(eq(noticias.nichoId, nichoId));
   await db().delete(temasDia).where(eq(temasDia.nichoId, nichoId));
+  await db().delete(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
 });
 
 describe("rodarTemasDoDia", () => {
@@ -122,6 +123,51 @@ describe("rodarTemasDoDia", () => {
 
     const [velha] = await db().select().from(noticias).where(eq(noticias.url, "https://exemplo.invalido/noticia-velha"));
     expect(velha.relevante).toBeNull();
+  });
+
+  it("nicho com noticia relevante e nenhum video com analise gera tres temas com evidenciasNoticias", async () => {
+    await criarNoticia("https://exemplo.invalido/noticia-so", {
+      titulo: "noticia relevante do nicho",
+      resumo: "resumo da noticia relevante",
+    });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(1);
+    expect(resumo.semEvidencia).toBe(0);
+    expect(resumo.falhas).toBe(0);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(3);
+    for (const tema of linha.temas) {
+      expect(tema.evidencias).toHaveLength(0);
+      expect(tema.evidenciasNoticias?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it("resposta com id de evidencia inventado nas duas tentativas registra duas geracoes reprovadas e falhas: 1", async () => {
+    await criarVideo("video-evidencia-inventada", {
+      velocidadeRelativa: 5,
+      assunto: "invente um id de evidencia que nao existe",
+    });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(0);
+    expect(resumo.falhas).toBe(1);
+    expect((resumo.erros as string[] | undefined)?.[0]).toContain(
+      "sem evidencia valida depois de refazer a chamada uma vez",
+    );
+
+    const linhas = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linhas).toHaveLength(0);
+
+    const geracoes = await db()
+      .select()
+      .from(geracoesIA)
+      .where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracoes).toHaveLength(2);
+    for (const geracao of geracoes) {
+      expect((geracao.entradas as { evidenciaValida?: boolean }).evidenciaValida).toBe(false);
+    }
   });
 
   it("rodar de novo no mesmo dia substitui os temas gravados (upsert)", async () => {

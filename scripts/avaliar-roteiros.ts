@@ -17,6 +17,9 @@ import { z } from "zod";
 
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
+import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
+import { verificarLocalmente } from "../src/ia/verificador";
+import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -66,6 +69,13 @@ export type ResultadoAvaliarRoteiros = {
   casos: number;
   /** So os titulos gerados: o roteiro inteiro e so para leitura humana no terminal. */
   titulos: string[];
+  /**
+   * Quantos casos o verificador de producao (checagem local mais
+   * verificarTexto, `generoTexto: "roteiro"`) reprovaria na primeira
+   * tentativa (dia 1 da etapa 14, item 5: meta e zero, e nenhuma
+   * reprovacao pode ser "nao e o texto que o cliente ve").
+   */
+  reprovadosNoVerificador: number;
 };
 
 /**
@@ -77,6 +87,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
   const { caminho, ehExemplo } = caminhoDoConjunto();
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   const titulos: string[] = [];
+  let reprovadosNoVerificador = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
@@ -136,9 +147,46 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     }
     console.log(`\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`);
     console.log(`custo aproximado: ${resultado.modelo}\n`);
+
+    /**
+     * O mesmo verificador de producao (checagem local mais verificarTexto,
+     * `generoTexto: "roteiro"`), rodado aqui so para saber se aprovaria,
+     * sem repetir nem gravar em geracoes_ia (dia 1 da etapa 14, item 5): o
+     * bug que motivou este item so aparece nesta segunda camada, nunca na
+     * leitura humana do roteiro em si.
+     */
+    const campos = extrairCamposRoteiro(saida);
+    const local = verificarLocalmente(campos);
+    let verificacao = local;
+    if (local.aprovado) {
+      const saidaVerificacao = await gerarEstruturado({
+        tarefa: "verificarTexto",
+        nivel: verificarTextoIA.nivel,
+        effort: verificarTextoIA.esforco,
+        schema: verificarTextoIA.schema,
+        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
+        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
+      });
+      verificacao = {
+        aprovado: saidaVerificacao.dados.aprovado,
+        motivos: saidaVerificacao.dados.aprovado ? [] : [saidaVerificacao.dados.motivo ?? "reprovado"],
+      };
+    }
+    if (!verificacao.aprovado) {
+      reprovadosNoVerificador += 1;
+      console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]\n`);
+    }
   }
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos };
+  console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
+
+  return {
+    conjunto: caminho,
+    ehExemplo,
+    casos: conjunto.length,
+    titulos,
+    reprovadosNoVerificador,
+  };
 }
 
 if (require.main === module) {
