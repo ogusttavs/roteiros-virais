@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
 import { textosAdmin } from "@/textos/admin";
@@ -32,6 +33,7 @@ export default async function LayoutAdmin({ children }: { children: ReactNode })
         <div className={styles.conta}>
           <span className={styles.nomeConta}>{sessao.user.name}</span>
           <span className={styles.avatar}>{iniciaisDe(sessao.user.name)}</span>
+          <BotaoSair className={styles.sair} rotulo={t.sair} rotuloSaindo={t.saindo} />
         </div>
       </header>
       <main className={styles.corpo}>{children}</main>

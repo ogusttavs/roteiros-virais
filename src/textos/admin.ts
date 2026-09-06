@@ -5,6 +5,8 @@ export const textosAdmin = {
     nichos: "Nichos",
     jobs: "Jobs",
     geracoes: "Gerações",
+    sair: "sair",
+    saindo: "saindo",
   },
   clientes: {
     titulo: "Clientes",
