@@ -18,11 +18,24 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, temasDia, user, videos, type TemaDoDia } from "../../src/db/schema";
+import {
+  account,
+  briefings,
+  clientes,
+  nichos,
+  roteiros,
+  temasDia,
+  user,
+  videos,
+  type ConteudoRoteiro,
+  type TemaDoDia,
+} from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-roteiro@exemplo.teste";
+
+let clienteId: number;
 
 test.describe("roteiro pela tela", () => {
   test.beforeAll(async () => {
@@ -43,6 +56,7 @@ test.describe("roteiro pela tela", () => {
       .insert(clientes)
       .values({ usuarioId: "e2e-roteiro", nome: "[teste] Roteiro", nichoId: nicho.id, aceitouTermosEm: new Date() })
       .returning();
+    clienteId = cliente.id;
 
     await db()
       .insert(briefings)
@@ -151,4 +165,61 @@ test.describe("roteiro pela tela", () => {
     await page.getByRole("button", { name: "Já gravei", exact: true }).click();
     await expect(page.getByRole("button", { name: "Postei", exact: true })).toBeVisible();
   });
+
+  /**
+   * `PainelFlutuante` (acabamento do primeiro uso no iPad, item 1): o menu
+   * dos três pontos nasce com `position: relative`, no fim da página, e no
+   * iPad ninguém via. Este teste so confere que ele abre visível e com os
+   * itens certos nas duas larguras, sem repetir o fluxo inteiro de gerar
+   * roteiro; usa um roteiro próprio, gravado direto no banco.
+   */
+  for (const largura of [390, 1024]) {
+    test(`o menu dos três pontos abre visível e fecha, em ${largura}px`, async ({ page }) => {
+      const conteudo: ConteudoRoteiro = {
+        titulo: "teste do menu",
+        duracaoS: 30,
+        gancho: "gancho de teste",
+        corpo: "corpo de teste",
+        fechamento: "fechamento de teste",
+        chamadaFinal: "chamada final de teste",
+        cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
+        ondeGravar: "na cozinha",
+        edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+        evidencias: [],
+        semEvidencia: true,
+      };
+      const [roteiro] = await db()
+        .insert(roteiros)
+        .values({
+          clienteId,
+          data: hojeISO(),
+          tema: conteudo.titulo,
+          origem: "livre",
+          objetivo: "conversao",
+          conteudo,
+        })
+        .returning();
+
+      await page.setViewportSize({ width: largura, height: 900 });
+      await page.goto("/entrar");
+      await page.getByLabel("E-mail").fill(EMAIL);
+      await page.getByLabel("Senha").fill(SENHA);
+      await page.getByRole("button", { name: "entrar", exact: true }).click();
+      await expect(page).toHaveURL(/\/hoje/);
+
+      await page.goto(`/roteiros/${roteiro.id}`);
+      const botaoMenu = page.getByRole("button", { name: "Mais opções" });
+      await botaoMenu.click();
+
+      const menu = page.getByRole("menu", { name: "Mais opções" });
+      await expect(menu).toBeVisible();
+      await expect(menu).toBeInViewport();
+      await expect(page.getByRole("menuitem", { name: "outro ângulo" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "copiar texto" })).toBeVisible();
+
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeHidden();
+      await expect(botaoMenu).toBeFocused();
+    });
+  }
 });

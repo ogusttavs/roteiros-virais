@@ -277,24 +277,14 @@
   box-shadow: var(--sombra-foco);
 }
 
-/* ---------- Painéis (menu, postei, ângulo, versões) ---------- */
+/**
+ * Painéis (menu, postei, ângulo, versões): a posição e o fechar são do
+ * componente compartilhado `PainelFlutuante` (achado do primeiro uso no
+ * iPad, `PROXIMO.md`, item 1: `position: relative` deixava o painel nascer
+ * no fim da página, fora da tela). Aqui só o título de dentro do painel.
+ */
 
-.formularioPainel {
-  /**
-   * Acima da barra de ações fixa (achado rodando o e2e de layout,
-   * `PROXIMO.md` D2 parte 1, item 8): sem isto, o botão de baixo do painel
-   * ficava atrás da barra fixa e o clique não chegava nele.
-   */
-  position: relative;
-  z-index: 26;
-  display: grid;
-  gap: var(--espaco-4);
-  padding: var(--espaco-4) var(--margem-celular) var(--espaco-6);
-  background: var(--cor-superficie);
-  border-top: var(--largura-borda) solid var(--cor-divisor);
-}
-
-.formularioPainel h2 {
+.tituloPainel {
   margin: 0;
   font-size: var(--tamanho-titulo-2);
   font-weight: var(--peso-semibold);

@@ -3,7 +3,7 @@
 import { ArrowLeft, Copy, Ellipsis, Eye, History, Music, Scissors, Type, Video } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import type { ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -16,6 +16,7 @@ import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
+import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
 import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
@@ -96,6 +97,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   const [postado, setPostado] = useState(roteiro.status === "postado");
   const [urlPostado, setUrlPostado] = useState(roteiro.urlPostado ?? "");
   const [painel, setPainel] = useState<Painel>(null);
+  const botaoMenuRef = useRef<HTMLButtonElement>(null);
   const [urlDigitada, setUrlDigitada] = useState("");
   const [motivoAngulo, setMotivoAngulo] = useState("");
   const [toast, setToast] = useState(false);
@@ -104,6 +106,12 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
 
   const versaoAtual = versoes.find((v) => v.id === roteiro.id);
   const idVersaoAtual = versoes.find((v) => v.atual)?.id;
+
+  /** Devolve o foco ao botão que abriu o painel, do jeito que um menu ou uma folha deve fechar. */
+  function fecharPainel() {
+    setPainel(null);
+    botaoMenuRef.current?.focus();
+  }
 
   function gravei() {
     setErro(false);
@@ -126,7 +134,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         setPostado(true);
         setGravadoEm((atual) => atual ?? new Date());
         setUrlPostado(urlDigitada.trim());
-        setPainel(null);
+        fecharPainel();
       } catch {
         setErro(true);
       }
@@ -148,7 +156,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   async function copiarTexto() {
     try {
       await navigator.clipboard.writeText(textoParaCopiar(corpo));
-      setPainel(null);
+      fecharPainel();
       setToast(true);
     } catch {
       setErro(true);
@@ -176,8 +184,10 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
               <span>{textosRoteiro.modoGravacao}</span>
             </Link>
             <button
+              ref={botaoMenuRef}
               type="button"
               aria-label={textosRoteiro.maisOpcoes}
+              aria-haspopup="menu"
               aria-expanded={painel === "menu"}
               onClick={() => setPainel(painel === "menu" ? null : "menu")}
               className={styles.botaoBarra}
@@ -292,82 +302,74 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         )}
       </div>
 
-      {painel === "menu" ? (
-        <div role="menu" className={styles.formularioPainel}>
-          <button type="button" role="menuitem" onClick={() => setPainel("angulo")} className={styles.itemMenu}>
-            <Video size={20} strokeWidth={1.5} aria-hidden="true" />
-            {textosRoteiro.menu.angulo}
+      <PainelFlutuante titulo={textosRoteiro.maisOpcoes} aberto={painel === "menu"} aoFechar={fecharPainel} role="menu">
+        <button type="button" role="menuitem" onClick={() => setPainel("angulo")} className={styles.itemMenu}>
+          <Video size={20} strokeWidth={1.5} aria-hidden="true" />
+          {textosRoteiro.menu.angulo}
+        </button>
+        <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
+          <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
+          {textosRoteiro.menu.copiar}
+        </button>
+        {versoes.length > 1 ? (
+          <button type="button" role="menuitem" onClick={() => setPainel("versoes")} className={styles.itemMenu}>
+            <History size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosRoteiro.menu.versoes}
           </button>
-          <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
-            <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
-            {textosRoteiro.menu.copiar}
-          </button>
-          {versoes.length > 1 ? (
-            <button type="button" role="menuitem" onClick={() => setPainel("versoes")} className={styles.itemMenu}>
-              <History size={20} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.menu.versoes}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+        ) : null}
+      </PainelFlutuante>
 
-      {painel === "postei" ? (
-        <div className={styles.formularioPainel}>
-          <h2>{textosRoteiro.ondePostou}</h2>
-          <label className={styles.campo}>
-            <span>{textosRoteiro.coleLink}</span>
-            <input
-              type="url"
-              value={urlDigitada}
-              onChange={(evento) => setUrlDigitada(evento.target.value)}
-              placeholder="https://"
-              className={styles.input}
-            />
-          </label>
-          <button type="button" onClick={salvarPostado} disabled={pendente} className={styles.btn}>
-            {textosComuns.salvar}
-          </button>
-        </div>
-      ) : null}
+      <PainelFlutuante titulo={textosRoteiro.ondePostou} aberto={painel === "postei"} aoFechar={fecharPainel}>
+        <h2 className={styles.tituloPainel}>{textosRoteiro.ondePostou}</h2>
+        <label className={styles.campo}>
+          <span>{textosRoteiro.coleLink}</span>
+          <input
+            type="url"
+            value={urlDigitada}
+            onChange={(evento) => setUrlDigitada(evento.target.value)}
+            placeholder="https://"
+            className={styles.input}
+          />
+        </label>
+        <button type="button" onClick={salvarPostado} disabled={pendente} className={styles.btn}>
+          {textosComuns.salvar}
+        </button>
+      </PainelFlutuante>
 
-      {painel === "angulo" ? (
-        <div className={styles.formularioPainel}>
-          <h2>{textosRoteiro.menu.angulo}</h2>
-          <label className={styles.campo}>
-            <span>
-              {textosRoteiro.queDiferente} <span className={styles.opcional}>{textosRoteiro.opcional}</span>
-            </span>
-            <textarea
-              value={motivoAngulo}
-              onChange={(evento) => setMotivoAngulo(evento.target.value)}
-              rows={3}
-              className={styles.textarea}
-            />
-          </label>
-          <button type="button" onClick={escreverOutraVersao} disabled={pendente} className={styles.btn}>
-            {textosRoteiro.outraVersao}
-          </button>
-        </div>
-      ) : null}
+      <PainelFlutuante titulo={textosRoteiro.menu.angulo} aberto={painel === "angulo"} aoFechar={fecharPainel}>
+        <h2 className={styles.tituloPainel}>{textosRoteiro.menu.angulo}</h2>
+        <label className={styles.campo}>
+          <span>
+            {textosRoteiro.queDiferente} <span className={styles.opcional}>{textosRoteiro.opcional}</span>
+          </span>
+          <textarea
+            value={motivoAngulo}
+            onChange={(evento) => setMotivoAngulo(evento.target.value)}
+            rows={3}
+            className={styles.textarea}
+          />
+        </label>
+        <button type="button" onClick={escreverOutraVersao} disabled={pendente} className={styles.btn}>
+          {textosRoteiro.outraVersao}
+        </button>
+      </PainelFlutuante>
 
-      {painel === "versoes" ? (
-        <div className={styles.formularioPainel}>
-          <h2>{textosRoteiro.versoesTitulo}</h2>
-          <div className={styles.listaVersoes}>
-            {versoes.map((v) => (
-              <Link key={v.id} href={`/roteiros/${v.id}`} className={styles.itemVersao}>
-                <span className={styles.textoVersao}>
-                  <span>
-                    {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
-                    {v.atual ? `, ${textosRoteiro.atual}` : ""}
-                  </span>
-                  <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
+      <PainelFlutuante titulo={textosRoteiro.versoesTitulo} aberto={painel === "versoes"} aoFechar={fecharPainel}>
+        <h2 className={styles.tituloPainel}>{textosRoteiro.versoesTitulo}</h2>
+        <div className={styles.listaVersoes}>
+          {versoes.map((v) => (
+            <Link key={v.id} href={`/roteiros/${v.id}`} className={styles.itemVersao}>
+              <span className={styles.textoVersao}>
+                <span>
+                  {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
+                  {v.atual ? `, ${textosRoteiro.atual}` : ""}
                 </span>
-              </Link>
-            ))}
-          </div>
+                <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
+              </span>
+            </Link>
+          ))}
         </div>
-      ) : null}
+      </PainelFlutuante>
 
       <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
     </div>

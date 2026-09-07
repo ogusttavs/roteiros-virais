@@ -1,0 +1,68 @@
+/**
+ * Design v2, `base.css`, ".folha-fundo" e ".folha" (a folha que sobe de
+ * baixo); do tablet para cima vira painel ancorado, sem equivalente
+ * desenhado (comportamento descrito no `PROXIMO.md`, acabamento do iPad,
+ * item 1, não numa tela do design v2).
+ */
+
+.veu {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--cor-sobreposicao);
+}
+
+.painel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  display: grid;
+  gap: var(--espaco-4);
+  max-height: 80vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-6) + env(safe-area-inset-bottom, 0px));
+  background: var(--cor-superficie);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--sombra-md);
+  outline: none;
+}
+
+.alca {
+  justify-self: center;
+  width: 2.25rem;
+  height: 0.3125rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda-forte);
+}
+
+@media (min-width: 768px) {
+  .veu {
+    /* Do tablet para cima o painel fecha ao clicar fora (sem fundo escurecido, que é so do celular). */
+    background: transparent;
+  }
+
+  .painel {
+    left: auto;
+    right: var(--espaco-6);
+    bottom: auto;
+    top: calc(56px + env(safe-area-inset-top, 0px) + var(--espaco-2));
+    width: min(20rem, calc(100vw - var(--espaco-8)));
+    max-height: min(28rem, calc(100vh - 6rem));
+    padding: var(--espaco-3);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+  }
+
+  .alca {
+    display: none;
+  }
+}
+
+@media (min-width: 1180px) {
+  .painel {
+    right: var(--espaco-10);
+  }
+}
