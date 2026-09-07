@@ -5,12 +5,6 @@
   text-align: left;
 }
 
-.linhaRotulo {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
 .rotulo {
   font-size: var(--tamanho-secundario);
   font-weight: 500;
@@ -30,13 +24,7 @@
 }
 
 .contador {
-  /**
-   * margin-inline-start:auto em vez de depender so do justify-content do pai
-   * (space-between): com o rotulo oculto (.rotuloOculto e position:absolute,
-   * sai do fluxo), o contador vira o unico item flex, e space-between
-   * sozinho o jogaria para o inicio em vez do fim.
-   */
-  margin-inline-start: auto;
+  align-self: flex-end;
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rotulo);
   color: var(--cor-texto-dica);
@@ -64,6 +52,19 @@
 
 .area:focus-visible {
   box-shadow: var(--sombra-foco);
+}
+
+/** Design v2, `base.css`, ".campo textarea" e ".campo-longo textarea": altura fixa, redimensionavel a mao. */
+.areaAlta {
+  min-height: 9.5rem;
+  resize: vertical;
+  field-sizing: initial;
+}
+
+.areaLonga {
+  min-height: 13rem;
+  resize: vertical;
+  field-sizing: initial;
 }
 
 .area::placeholder {

@@ -1,6 +1,46 @@
 .analise {
   display: flex;
   flex-direction: column;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.topo {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.valor {
+  font-family: var(--fonte-mono);
+  font-weight: 600;
+  font-size: var(--tamanho-titulo);
+  line-height: 1;
+  color: var(--cor-nota);
+}
+
+.faixa {
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-texto-suave);
+}
+
+.naMeta .valor,
+.naMeta .faixa {
+  color: var(--cor-acao);
+}
+
+.baixa .valor,
+.baixa .faixa {
+  color: var(--cor-atencao);
+}
+
+.partes {
+  display: flex;
+  flex-direction: column;
   gap: var(--espaco-5);
   margin: 0;
 }
@@ -28,7 +68,12 @@
 
 .exemplo {
   margin: 0;
-  background: var(--cor-superficie-recuada);
+  /**
+   * O cartao em volta ja usa cor-superficie-recuada (design v2, ".analise");
+   * este bloco precisa de cor-superficie para continuar se destacando dele.
+   */
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
   border-radius: var(--raio-md);
   padding: var(--espaco-4);
 }
