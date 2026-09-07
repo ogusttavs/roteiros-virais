@@ -70,6 +70,12 @@
   @media (max-width: 1099px) {
     .colunaDesktop {
       width: var(--largura-barra-recolhida);
+      /**
+       * Menos padding de lado (achado rodando o e2e de layout,
+       * `PROXIMO.md` D2 parte 1, item 8): com o padding cheio, sobrava
+       * menos que 44px para os alvos de toque dentro da coluna estreita.
+       */
+      padding-inline: var(--espaco-2);
     }
 
     .identidadeDesktop {
@@ -83,8 +89,10 @@
     }
 
     .contaDesktop {
+      width: var(--altura-toque);
       justify-content: center;
       padding: 0;
+      margin-inline: auto;
     }
   }
 
@@ -137,6 +145,7 @@
    */
   html[data-barra-lateral="recolhida"] .colunaDesktop {
     width: var(--largura-barra-recolhida);
+    padding-inline: var(--espaco-2);
   }
 
   html[data-barra-lateral="recolhida"] .identidadeDesktop {
@@ -150,12 +159,15 @@
   }
 
   html[data-barra-lateral="recolhida"] .contaDesktop {
+    width: var(--altura-toque);
     justify-content: center;
     padding: 0;
+    margin-inline: auto;
   }
 
   html[data-barra-lateral="aberta"] .colunaDesktop {
     width: var(--largura-barra-lateral);
+    padding-inline: var(--espaco-4);
   }
 
   html[data-barra-lateral="aberta"] .identidadeDesktop {
@@ -169,8 +181,10 @@
   }
 
   html[data-barra-lateral="aberta"] .contaDesktop {
+    width: auto;
     justify-content: flex-start;
     padding: 0 var(--espaco-3);
+    margin-inline: 0;
   }
 
   .contaDesktop:hover {

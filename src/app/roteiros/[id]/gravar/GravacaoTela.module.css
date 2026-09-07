@@ -3,12 +3,14 @@
  * D2 parte 1, item 7). Tela de primeira classe: uma saída, sem barra
  * lateral, sem barra de abas.
  */
-body {
-  overflow: hidden;
-}
-
+/**
+ * `height` (não `min-height`) trava a página em uma tela só: só `.palco`
+ * rola por dentro. Evitado mexer em `body` direto (seletor global, ficaria
+ * ligado para as outras rotas depois de uma navegação do lado do cliente).
+ */
 .gravacao {
-  min-height: 100dvh;
+  height: 100dvh;
+  overflow: hidden;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--cor-fundo);

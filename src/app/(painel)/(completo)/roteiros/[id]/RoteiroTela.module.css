@@ -278,6 +278,13 @@
 /* ---------- Painéis (menu, postei, ângulo, versões) ---------- */
 
 .formularioPainel {
+  /**
+   * Acima da barra de ações fixa (achado rodando o e2e de layout,
+   * `PROXIMO.md` D2 parte 1, item 8): sem isto, o botão de baixo do painel
+   * ficava atrás da barra fixa e o clique não chegava nele.
+   */
+  position: relative;
+  z-index: 26;
   display: grid;
   gap: var(--espaco-4);
   padding: var(--espaco-4) var(--margem-celular) var(--espaco-6);

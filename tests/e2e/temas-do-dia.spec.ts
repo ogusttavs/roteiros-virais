@@ -138,7 +138,7 @@ test.describe("temas do dia pela tela", () => {
     await expect(page.getByRole("heading", { name: "tema de teste 2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 3" })).toBeVisible();
 
-    await page.getByRole("button", { name: "quero falar de outra coisa" }).click();
+    await page.getByRole("button", { name: "escrever o meu assunto" }).click();
     await expect(page).toHaveURL(/\/hoje\/tema-livre/);
 
     await page.getByLabel("Sobre o que você quer falar?").fill("clarear os dentes em casa");

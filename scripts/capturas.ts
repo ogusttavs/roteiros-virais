@@ -1,13 +1,16 @@
 /**
  * Capturas do painel para revisao visual (etapa 12, ajuste 3 da revisao da
- * parte 1): as ferramentas de navegador das sessoes de agente nao gravam
- * arquivo, entao um pedido de captura nunca sai de verdade. Este script
- * sobe o Playwright direto, fora da suite de testes, entra com o cliente
- * de exemplo de limpeza e grava um PNG de cada tela pedida, claro e
- * escuro, a 390 (celular) e 1280 (desktop). Usa o cliente de limpeza, nao
- * o de dentistas, porque `scripts/semear.ts` deixa o de dentistas de
- * proposito sem briefing completo, para `briefing.spec.ts` exercitar o
- * fluxo de onboarding inteiro.
+ * parte 1; nomes no padrao do design v2 desde a D2 parte 1, item 9 do
+ * `PROXIMO.md`: `Tela.Estado.Largura.Modo`, como
+ * `entregaveis/design-v2/entrega/telas/README.md`): as ferramentas de
+ * navegador das sessoes de agente nao gravam arquivo, entao um pedido de
+ * captura nunca sai de verdade. Este script sobe o Playwright direto, fora
+ * da suite de testes, entra com o cliente de exemplo de limpeza e grava um
+ * PNG de cada tela pedida, claro e escuro, a 390 (celular), 1024 (tablet) e
+ * 1280 (desktop). Usa o cliente de limpeza, nao o de dentistas, porque
+ * `scripts/semear.ts` deixa o de dentistas de proposito sem briefing
+ * completo, para `briefing.spec.ts` exercitar o fluxo de onboarding
+ * inteiro.
  *
  * Pre-requisitos, antes de rodar:
  * 1. `DATABASE_URL` do `.env` apontando para `roteiros_dev` (nunca
@@ -41,7 +44,10 @@ const TAMANHOS = [
   { rotulo: "1024", largura: 1024, altura: 768 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
-const TEMAS = ["claro", "escuro"] as const;
+const MODOS = [
+  { rotulo: "Claro", colorScheme: "light" as const },
+  { rotulo: "Escuro", colorScheme: "dark" as const },
+];
 
 async function entrar(page: Page, baseUrl: string): Promise<void> {
   await page.goto(`${baseUrl}/entrar`);
@@ -85,34 +91,35 @@ async function main(): Promise<void> {
 
   const roteiroId = await garantirRoteiro(cliente.id);
 
-  const rotas = [
-    { slug: "hoje", caminho: "/hoje" },
-    { slug: "referencias", caminho: "/referencias" },
-    { slug: "historico", caminho: "/historico" },
-    { slug: "roteiro", caminho: `/roteiros/${roteiroId}` },
-    { slug: "briefing", caminho: "/briefing" },
-    { slug: "conta", caminho: "/conta" },
+  const telas = [
+    { tela: "Hoje", estado: "Normal", caminho: "/hoje" },
+    { tela: "Roteiro", estado: "Normal", caminho: `/roteiros/${roteiroId}` },
+    { tela: "Gravacao", estado: "Normal", caminho: `/roteiros/${roteiroId}/gravar` },
+    { tela: "Referencias", estado: "Normal", caminho: "/referencias" },
+    { tela: "Historico", estado: "Normal", caminho: "/historico" },
+    { tela: "Briefing", estado: "Normal", caminho: "/briefing" },
+    { tela: "Conta", estado: "Normal", caminho: "/conta" },
   ];
 
   const arquivosGravados: string[] = [];
   const browser = await chromium.launch();
 
   try {
-    for (const tema of TEMAS) {
-      await salvarTema(cliente.id, tema);
+    for (const modo of MODOS) {
+      await salvarTema(cliente.id, modo.colorScheme === "dark" ? "escuro" : "claro");
 
       for (const tamanho of TAMANHOS) {
         const contexto = await browser.newContext({
           viewport: { width: tamanho.largura, height: tamanho.altura },
-          colorScheme: tema === "escuro" ? "dark" : "light",
+          colorScheme: modo.colorScheme,
         });
         const page = await contexto.newPage();
         await entrar(page, baseUrl);
 
-        for (const rota of rotas) {
-          await page.goto(`${baseUrl}${rota.caminho}`);
+        for (const tela of telas) {
+          await page.goto(`${baseUrl}${tela.caminho}`);
           await page.waitForLoadState("networkidle");
-          const nomeArquivo = `${rota.slug}-${tamanho.rotulo}-${tema}.png`;
+          const nomeArquivo = `${tela.tela}.${tela.estado}.${tamanho.rotulo}.${modo.rotulo}.png`;
           const caminhoArquivo = path.join(pastaDestino, nomeArquivo);
           await page.screenshot({ path: caminhoArquivo, fullPage: true });
           arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), caminhoArquivo));

@@ -12,6 +12,7 @@ import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosRoteiro } from "@/textos/roteiro";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
@@ -224,6 +225,8 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             ]}
           />
         </article>
+
+        <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
 
         <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
 

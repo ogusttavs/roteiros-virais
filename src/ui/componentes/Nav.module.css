@@ -91,9 +91,17 @@
  * regras abaixo a afeta.
  */
 @media (min-width: 768px) and (max-width: 1099px) {
+  /**
+   * Alvo de 44px de verdade (achado rodando o e2e de layout, `PROXIMO.md`
+   * D2 parte 1, item 8): sem largura própria, o item encolhia para o
+   * tamanho do ícone (39px), porque a coluna recolhida (4,5rem) menos o
+   * padding de `.colunaDesktop` sobrava menos que isso.
+   */
   .compactavel .item {
+    width: var(--altura-toque);
     justify-content: center;
     padding: 0;
+    margin-inline: auto;
   }
 
   .compactavel .rotulo {
@@ -102,8 +110,10 @@
 }
 
 html[data-barra-lateral="recolhida"] .compactavel .item {
+  width: var(--altura-toque);
   justify-content: center;
   padding: 0;
+  margin-inline: auto;
 }
 
 html[data-barra-lateral="recolhida"] .compactavel .rotulo {
@@ -111,8 +121,10 @@ html[data-barra-lateral="recolhida"] .compactavel .rotulo {
 }
 
 html[data-barra-lateral="aberta"] .compactavel .item {
+  width: auto;
   justify-content: flex-start;
   padding: 0 var(--espaco-3);
+  margin-inline: 0;
 }
 
 html[data-barra-lateral="aberta"] .compactavel .rotulo {
