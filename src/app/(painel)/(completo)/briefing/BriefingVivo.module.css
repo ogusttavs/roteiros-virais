@@ -14,7 +14,12 @@
   flex-direction: column;
 }
 
-@media (min-width: 768px) {
+/**
+ * 1100px, nao 768 (revisao do PR #28, medido no iPad em 800px: o cartao de
+ * 320px espremia o formulario a 312px). Entre 768 e 1099 vale o
+ * comportamento do celular, mesmo ponto de corte de BarraNotaGeral.
+ */
+@media (min-width: 1100px) {
   .corpoComNota {
     flex-direction: row;
     align-items: flex-start;
