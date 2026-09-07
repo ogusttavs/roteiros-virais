@@ -29,22 +29,6 @@
   color: var(--cor-positivo);
 }
 
-/**
- * Faixa por meta (design v2, `base.css`, ".nota-linha"): petróleo na meta,
- * neutra abaixo, âmbar abaixo de 6, nunca vermelha (`notaFaixaMeta.ts`).
- */
-.naMeta {
-  color: var(--cor-acao);
-}
-
-.neutra {
-  color: var(--cor-nota);
-}
-
-.baixaMeta {
-  color: var(--cor-atencao);
-}
-
 .linha {
   display: flex;
   align-items: baseline;
@@ -74,4 +58,22 @@
 
 .blocoLista .legenda {
   font-size: var(--tamanho-legenda);
+}
+
+/**
+ * Faixa por meta (design v2, `base.css`, ".nota-linha"): petróleo na meta,
+ * neutra abaixo, âmbar abaixo de 6, nunca vermelha (`notaFaixaMeta.ts`).
+ * Por ultimo no arquivo, de proposito: precisa vencer tanto
+ * `.numeroDestaque` quanto `.numeroLista`, que tambem definem `color`.
+ */
+.naMeta {
+  color: var(--cor-acao);
+}
+
+.neutra {
+  color: var(--cor-nota);
+}
+
+.baixaMeta {
+  color: var(--cor-atencao);
 }

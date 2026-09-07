@@ -56,7 +56,7 @@ test("admin entra, cria cliente, cliente entra por link magico e cai em /comecar
   );
 
   await expect(paginaCliente).toHaveURL(/\/comecar/);
-  await expect(paginaCliente.getByText("Vamos montar o seu briefing")).toBeVisible();
+  await expect(paginaCliente.getByText("Antes de escrever, a gente precisa te conhecer")).toBeVisible();
 
   await contextoCliente.close();
 });

@@ -234,7 +234,11 @@
     font-size: var(--tamanho-legenda);
   }
 
-  .cartaoDesktop .botaoItem {
-    min-height: 36px;
-  }
+  /**
+   * Sem override de min-height aqui (era 36px antes desta rodada): o
+   * desenho pede 44px "em toda largura e todo estado"
+   * (`entrega/telas/README.md`, "As regras que este desenho segue", item 2),
+   * sem excecao para a lista compacta do desktop. Achado ao cobrir esta
+   * tela com o e2e de layout pela primeira vez (D2 parte 2, item 5).
+   */
 }

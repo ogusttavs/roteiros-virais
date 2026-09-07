@@ -16,8 +16,6 @@ import { Skeleton } from "@/ui/componentes/Skeleton";
 
 import styles from "./PerguntaCampo.module.css";
 
-const CLASSE_FAIXA_RESPOSTA = { naMeta: styles.respostaNaMeta, neutra: "", baixa: styles.respostaBaixa };
-
 export type ResultadoAcaoBriefing = {
   avaliacao: AvaliacaoResposta;
   notaGeral: number;
@@ -194,14 +192,9 @@ export function PerguntaCampo({
       );
     }
 
-    const faixa = faixaMeta(avaliacao.nota, meta);
-    const legenda = textosBriefing.faixaMeta[faixa];
+    const legenda = textosBriefing.faixaMeta[faixaMeta(avaliacao.nota, meta)];
     return (
-      <button
-        type="button"
-        className={[styles.resposta, CLASSE_FAIXA_RESPOSTA[faixa]].filter(Boolean).join(" ")}
-        onClick={() => setEditando(true)}
-      >
+      <button type="button" className={styles.resposta} onClick={() => setEditando(true)}>
         <span className={styles.pergunta}>{pergunta.enunciado}</span>
         <Nota valor={avaliacao.nota} tamanho="lista" meta={meta} />
         <span className={styles.textoResposta}>{textoAvaliado ?? resposta}</span>

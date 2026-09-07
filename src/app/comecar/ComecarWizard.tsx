@@ -186,6 +186,7 @@ export function ComecarWizard({
 
   return (
     <div className={styles.pagina}>
+      <CabecalhoSimples />
       <div className={styles.corpoComNota}>
         <BarraNotaGeral
           notaAtual={notaGeral}
