@@ -110,7 +110,7 @@ export function HojeTela({
         }
       />
 
-      <div className={styles.conteudo}>
+      <div className={styles.miolo}>
         <HojeCabecalho constancia={constancia} avisoVideoSubindo={avisoVideoSubindo} estado="normal" />
 
         {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}

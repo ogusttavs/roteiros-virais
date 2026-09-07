@@ -12,7 +12,7 @@ export default function CarregandoHoje() {
   return (
     <div className={styles.pagina}>
       <BarraTopo titulo={textosHoje.titulo} />
-      <div className={styles.conteudo}>
+      <div className={styles.miolo}>
         <HojeCabecalho constancia={{ tipo: "primeiro_dia" }} estado="carregando" />
         <div className={styles.duasColunas}>
           <div className={styles.temasTres}>

@@ -445,15 +445,46 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
     }));
 }
 
-export type VideoParaEmbed = { id: number; plataforma: Plataforma; url: string };
+export type VideoParaEmbed = {
+  id: number;
+  plataforma: Plataforma;
+  url: string;
+  contaNome: string | null;
+  contaHandle: string | null;
+  foraDaCurva: number;
+  porQueFuncionou: string | null;
+};
 
-/** Plataforma e url de um vídeo, para montar o embed da referência (etapa 11, `RoteiroTela`). */
+/**
+ * Plataforma, url e a ficha da conta, para montar o embed e o cartão "de
+ * onde veio" da referência (etapa 11, `RoteiroTela`; design v2, `PROXIMO.md`,
+ * D2 parte 1, item 6: cartão "de onde veio" com conta e múltiplo reais).
+ */
 export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
   const [linha] = await db()
-    .select({ id: videos.id, plataforma: videos.plataforma, url: videos.url })
+    .select({
+      id: videos.id,
+      plataforma: videos.plataforma,
+      url: videos.url,
+      contaNome: contas.nome,
+      contaHandle: contas.handle,
+      foraDaCurva: videos.foraDaCurva,
+      analise: videos.analise,
+    })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(eq(videos.id, id));
-  return linha ?? null;
+
+  if (!linha) return null;
+  return {
+    id: linha.id,
+    plataforma: linha.plataforma,
+    url: linha.url,
+    contaNome: linha.contaNome,
+    contaHandle: linha.contaHandle,
+    foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
+    porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
+  };
 }
 
 /**

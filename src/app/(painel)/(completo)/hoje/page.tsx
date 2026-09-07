@@ -90,7 +90,7 @@ export default async function Hoje() {
     return (
       <div className={styles.pagina}>
         <BarraTopo titulo={textosHoje.titulo} />
-        <div className={styles.conteudo}>
+        <div className={styles.miolo}>
           <HojeCabecalho constancia={resultado.constancia} avisoVideoSubindo={avisoVideoSubindo} estado="vazio" />
           <div className={styles.estadoCartao}>
             <h3>{textosHoje.vazioTitulo}</h3>

@@ -24,7 +24,7 @@ export default function ErroHoje({ error, reset }: { error: Error & { digest?: s
   return (
     <div className={styles.pagina}>
       <BarraTopo titulo={textosHoje.titulo} />
-      <div className={styles.conteudo}>
+      <div className={styles.miolo}>
         <HojeCabecalho constancia={{ tipo: "primeiro_dia" }} estado="erro" />
         <div className={styles.estadoCartao}>
           <span className={styles.estadoAviso}>

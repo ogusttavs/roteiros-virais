@@ -1,12 +1,13 @@
 .linha {
   display: flex;
   justify-content: flex-end;
-  height: 32px;
+  height: var(--altura-toque);
 }
 
 .botao {
-  width: 32px;
-  height: 32px;
+  /** Alvo minimo de 44px em toda largura (design v2, `entrega/telas/README.md`, regra 2). */
+  width: var(--altura-toque);
+  height: var(--altura-toque);
   flex: none;
   display: flex;
   align-items: center;

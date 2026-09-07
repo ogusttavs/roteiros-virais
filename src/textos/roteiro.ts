@@ -4,6 +4,12 @@
  */
 
 export const textosRoteiro = {
+  tituloTela: "Roteiro",
+  acimaDoNormalDessaConta: "acima do normal dessa conta.",
+  trechoComeca: (t: string) => `o trecho que interessa começa em ${t}`,
+  outrasVersoes: "Outras versões deste tema",
+  outrasVersoesEmBreve:
+    "Em breve você vai poder comparar até três versões com nota antes de escolher qual gravar.",
   blocos: {
     abertura: "Os 3 primeiros segundos",
     meio: "O meio",

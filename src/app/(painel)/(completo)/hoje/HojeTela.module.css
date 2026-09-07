@@ -3,7 +3,7 @@
  * item 5). `.pagina` cancela o padding de `(painel)/layout.module.css`
  * (`.corpo`), porque esta tela tem a própria `BarraTopo` colada no topo,
  * sem o cabeçalho genérico do celular por baixo (`CascaCabecalhoCelular`); e
- * o próprio `.conteudo` abaixo devolve o espaçamento do design.
+ * o próprio `.miolo` abaixo devolve o espaçamento do design.
  */
 .pagina {
   margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
@@ -45,21 +45,21 @@
 
 /* ---------- Conteúdo ---------- */
 
-.conteudo {
+.miolo {
   padding: var(--espaco-5) var(--margem-celular) calc(64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
   display: grid;
   gap: var(--espaco-6);
 }
 
 @media (min-width: 768px) {
-  .conteudo {
+  .miolo {
     padding: var(--espaco-8) var(--espaco-6) var(--espaco-12);
     gap: var(--espaco-8);
   }
 }
 
 @media (min-width: 1100px) {
-  .conteudo {
+  .miolo {
     padding-inline: var(--espaco-10);
   }
 }

@@ -1,0 +1,83 @@
+/** design v2, `entrega/telas/Roteiro.dc.html`, `.referencia`, `.miniatura`, `.ref-linha` (`PROXIMO.md`, D2 parte 1, item 6). */
+.secao {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.linha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-4);
+  align-items: start;
+}
+
+.miniatura {
+  aspect-ratio: 9 / 16;
+  max-width: 9rem;
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  border: var(--largura-borda) solid var(--cor-borda);
+  display: grid;
+  place-items: center;
+  color: var(--cor-texto-dica);
+  overflow: hidden;
+}
+
+.corpo {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.conta {
+  display: block;
+  font-family: var(--fonte-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.texto b {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.segundo {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  font-family: var(--fonte-mono);
+}
+
+.botao {
+  justify-self: start;
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.botao:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

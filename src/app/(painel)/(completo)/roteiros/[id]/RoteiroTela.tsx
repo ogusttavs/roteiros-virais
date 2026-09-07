@@ -1,20 +1,9 @@
 "use client";
 
-import {
-  ArrowLeft,
-  Copy,
-  Ellipsis,
-  Eye,
-  History,
-  Music,
-  Play,
-  Scissors,
-  Type,
-  Video,
-} from "lucide-react";
+import { ArrowLeft, Copy, Ellipsis, Eye, History, Music, Scissors, Type, Video } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import type { ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -22,8 +11,9 @@ import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosRoteiro } from "@/textos/roteiro";
-import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
+import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
+import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
 import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
@@ -93,10 +83,13 @@ type Props = {
   versoes: VersaoRoteiro[];
 };
 
-/** `/roteiros/[id]` (etapa 11, brief-frontend.md 6.5; `RoteiroTela.dc.html`). */
+/**
+ * `/roteiros/[id]` (design v2, `entrega/telas/Roteiro.dc.html`; `PROXIMO.md`,
+ * D2 parte 1, item 6). Modo gravação virou rota própria
+ * (`/roteiros/[id]/gravar`, item 7): o botão daqui só navega.
+ */
 export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   const router = useRouter();
-
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
   const [postado, setPostado] = useState(roteiro.status === "postado");
   const [urlPostado, setUrlPostado] = useState(roteiro.urlPostado ?? "");
@@ -104,13 +97,10 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   const [urlDigitada, setUrlDigitada] = useState("");
   const [motivoAngulo, setMotivoAngulo] = useState("");
   const [toast, setToast] = useState(false);
-  const [modoGravacao, setModoGravacao] = useState(false);
   const [erro, setErro] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
-  const referenciaRef = useRef<HTMLDivElement>(null);
 
   const versaoAtual = versoes.find((v) => v.id === roteiro.id);
-  const eVersaoAntiga = versaoAtual ? !versaoAtual.atual : false;
   const idVersaoAtual = versoes.find((v) => v.atual)?.id;
 
   function gravei() {
@@ -167,272 +157,211 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
 
   return (
     <div className={styles.pagina}>
-      <div className={styles.cabecalho}>
-        <Link href="/hoje" aria-label={textosComuns.voltar} className={styles.voltar}>
-          <ArrowLeft size={24} strokeWidth={1.5} aria-hidden="true" />
-        </Link>
-        <button
-          type="button"
-          aria-label={textosRoteiro.modoGravacao}
-          onClick={() => setModoGravacao(true)}
-          className={styles.botaoGravacao}
-        >
-          <Video size={24} strokeWidth={1.5} aria-hidden="true" />
-        </button>
-      </div>
-
-      {eVersaoAntiga && versaoAtual ? (
-        <div className={styles.avisoVersao}>
-          <span>
-            {textosRoteiro.versaoAntiga(
-              versaoAtual.versao,
-              versoes.find((v) => v.atual)?.versao ?? versaoAtual.versao,
-            )}
-          </span>
-          {idVersaoAtual ? (
-            <Link href={`/roteiros/${idVersaoAtual}`} className={styles.linkVersaoAtual}>
-              {textosRoteiro.verAtual}
+      <BarraTopo
+        titulo={textosRoteiro.tituloTela}
+        esquerda={
+          <Link href="/hoje" aria-label={textosComuns.voltar} className={styles.botaoBarra}>
+            <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
+          </Link>
+        }
+        direita={
+          <>
+            <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.botaoBarra}>
+              <Video size={18} strokeWidth={1.75} aria-hidden="true" />
+              <span>{textosRoteiro.modoGravacao}</span>
             </Link>
-          ) : null}
-        </div>
-      ) : null}
+            <button
+              type="button"
+              aria-label={textosRoteiro.maisOpcoes}
+              aria-expanded={painel === "menu"}
+              onClick={() => setPainel(painel === "menu" ? null : "menu")}
+              className={styles.botaoBarra}
+            >
+              <Ellipsis size={20} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          </>
+        }
+      />
 
-      <div className={styles.principal}>
-        <h1 className={styles.titulo}>{corpo.titulo}</h1>
-        <div className={styles.meta}>
-          <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
-          <span aria-hidden="true">·</span>
-          <span className={styles.mono}>{corpo.duracaoS} s</span>
-          <span aria-hidden="true">·</span>
-          <span className={styles.mono}>{formatarData(roteiro.data)}</span>
-          {versoes.length > 1 ? (
-            <>
-              <span aria-hidden="true">·</span>
-              <button
-                type="button"
-                className={styles.linkVersoes}
-                onClick={() => setPainel("versoes")}
-              >
+      <div className={styles.miolo}>
+        {versaoAtual && !versaoAtual.atual ? (
+          <div className={styles.avisoVersao}>
+            <span>
+              {textosRoteiro.versaoAntiga(
+                versaoAtual.versao,
+                versoes.find((v) => v.atual)?.versao ?? versaoAtual.versao,
+              )}
+            </span>
+            {idVersaoAtual ? (
+              <Link href={`/roteiros/${idVersaoAtual}`} className={styles.linkVersaoAtual}>
+                {textosRoteiro.verAtual}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className={styles.cabecalhoTela}>
+          <h1>{corpo.titulo}</h1>
+          <p className={styles.metaRoteiro}>
+            <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
+            <span className={styles.num}>{corpo.duracaoS} s</span>
+            <span className={styles.num}>{formatarData(roteiro.data)}</span>
+            {versoes.length > 1 ? (
+              <button type="button" className={styles.linkVersoes} onClick={() => setPainel("versoes")}>
                 {textosRoteiro.versao(roteiro.versao, Math.max(...versoes.map((v) => v.versao)))}
               </button>
-            </>
-          ) : null}
+            ) : null}
+          </p>
         </div>
 
-        <RoteiroTexto
-          modoGravacao={false}
-          blocos={[
-            { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-            { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-            {
-              rotulo: textosRoteiro.blocos.fechamento,
-              paragrafos: splitParagrafos(corpo.fechamento),
-            },
-            { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
-          ]}
-        />
-
-        <div className={styles.cenas}>
-          <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
-        </div>
+        <article className={styles.blocos}>
+          <RoteiroTexto
+            blocos={[
+              { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
+              { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
+              { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
+              { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
+            ]}
+          />
+        </article>
 
         <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
 
         {referencia && video ? (
-          <section ref={referenciaRef} className={styles.referencia}>
-            <h2 className={styles.tituloSecao}>{textosRoteiro.referencia}</h2>
-            <VideoEmbed
-              url={video.url}
-              alt={textosRoteiro.olhaComo(formatarSegundo(referencia.segundo ?? 0))}
-              rotuloCarregamento={textosRoteiro.carregandoVideo}
-              falhou={video.plataforma !== "youtube"}
-              segundoInicial={referencia.segundo ?? undefined}
-              linkExterno={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
-            />
-            <p className={styles.olhaComo}>
-              {textosRoteiro.olhaComo(formatarSegundo(referencia.segundo ?? 0))}
-            </p>
-            {referencia.oQueOlhar ? (
-              <p className={styles.oQueOlhar}>{referencia.oQueOlhar}</p>
-            ) : null}
-            <button
-              type="button"
-              onClick={() =>
-                referenciaRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
-              }
-              className={styles.botaoIrPara}
-            >
-              <Play size={18} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.irPara(formatarSegundo(referencia.segundo ?? 0))}
-            </button>
-          </section>
+          <CartaoDeOndeVeio
+            titulo={textosRoteiro.referencia}
+            conta={video.contaNome ?? video.contaHandle}
+            multiplo={`${video.foraDaCurva.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`}
+            texto={`${textosRoteiro.acimaDoNormalDessaConta} ${video.porQueFuncionou ?? ""}`.trim()}
+            segundoFormatado={
+              referencia.segundo !== null ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo)) : null
+            }
+            miniatura={
+              <VideoEmbed
+                url={video.url}
+                alt={textosRoteiro.olhaComo(formatarSegundo(referencia.segundo ?? 0))}
+                rotuloCarregamento={textosRoteiro.carregandoVideo}
+                falhou={video.plataforma !== "youtube"}
+                segundoInicial={referencia.segundo ?? undefined}
+                linkExterno={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
+              />
+            }
+            botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
+          />
         ) : corpo.semEvidencia ? (
-          <section className={styles.referencia}>
-            <h2 className={styles.tituloSecao}>{textosRoteiro.referencia}</h2>
-            <p className={styles.olhaComo}>{textosRoteiro.semEvidencia}</p>
+          <section className={styles.referenciaVazia}>
+            <h2>{textosRoteiro.referencia}</h2>
+            <p>{textosRoteiro.semEvidencia}</p>
           </section>
         ) : null}
+
+        {/* Outras versões deste tema (design v2): a comparação com nota é a E26, ainda não construída.
+            Só a marcação, no estado vazio (PROXIMO.md, D2 parte 1, item 6). */}
+        <section className={styles.versoesVazio}>
+          <h2>{textosRoteiro.outrasVersoes}</h2>
+          <p>{textosRoteiro.outrasVersoesEmBreve}</p>
+        </section>
       </div>
 
       {erro ? <p className={styles.fraseErro}>{textosRoteiro.erro}</p> : null}
 
-      <div className={styles.acoes}>
-        <div className={styles.linhaAcoes}>
-          {!gravadoEm ? (
-            <button type="button" onClick={gravei} disabled={pendente} className={styles.botaoGravei}>
-              {textosRoteiro.gravei}
-            </button>
-          ) : (
-            <span className={styles.rotuloFeito}>{textosRoteiro.gravadoAs(formatarHora(gravadoEm))}</span>
-          )}
-          {!postado ? (
-            <button
-              type="button"
-              onClick={() => setPainel("postei")}
-              className={styles.botaoPostei}
-            >
-              {textosRoteiro.postei}
-            </button>
-          ) : (
-            <a href={urlPostado} target="_blank" rel="noreferrer" className={styles.linkPostado}>
-              {textosRoteiro.postado}
-            </a>
-          )}
-          <button
-            type="button"
-            aria-label={textosRoteiro.maisOpcoes}
-            aria-expanded={painel === "menu"}
-            onClick={() => setPainel(painel === "menu" ? null : "menu")}
-            className={styles.botaoMenu}
-          >
-            <Ellipsis size={24} strokeWidth={1.5} aria-hidden="true" />
+      <div className={styles.barraAcoes}>
+        {!gravadoEm ? (
+          <button type="button" onClick={gravei} disabled={pendente} className={styles.btn}>
+            {textosRoteiro.gravei}
           </button>
-        </div>
-
-        {painel === "menu" ? (
-          <div role="menu" className={styles.menu}>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => setPainel("angulo")}
-              className={styles.itemMenu}
-            >
-              <Video size={20} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.menu.angulo}
-            </button>
-            <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
-              <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.menu.copiar}
-            </button>
-            {versoes.length > 1 ? (
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => setPainel("versoes")}
-                className={styles.itemMenu}
-              >
-                <History size={20} strokeWidth={1.5} aria-hidden="true" />
-                {textosRoteiro.menu.versoes}
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        {painel === "postei" ? (
-          <div className={styles.formularioPainel}>
-            <h2 className={styles.tituloPainel}>{textosRoteiro.ondePostou}</h2>
-            <label className={styles.campo}>
-              <span>{textosRoteiro.coleLink}</span>
-              <input
-                type="url"
-                value={urlDigitada}
-                onChange={(evento) => setUrlDigitada(evento.target.value)}
-                placeholder="https://"
-                className={styles.input}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={salvarPostado}
-              disabled={pendente}
-              className={styles.botaoSalvar}
-            >
-              {textosComuns.salvar}
-            </button>
-          </div>
-        ) : null}
-
-        {painel === "angulo" ? (
-          <div className={styles.formularioPainel}>
-            <h2 className={styles.tituloPainel}>{textosRoteiro.menu.angulo}</h2>
-            <label className={styles.campo}>
-              <span>
-                {textosRoteiro.queDiferente}{" "}
-                <span className={styles.opcional}>{textosRoteiro.opcional}</span>
-              </span>
-              <textarea
-                value={motivoAngulo}
-                onChange={(evento) => setMotivoAngulo(evento.target.value)}
-                rows={3}
-                className={styles.textarea}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={escreverOutraVersao}
-              disabled={pendente}
-              className={styles.botaoSalvar}
-            >
-              {textosRoteiro.outraVersao}
-            </button>
-          </div>
-        ) : null}
-
-        {painel === "versoes" ? (
-          <div className={styles.formularioPainel}>
-            <h2 className={styles.tituloPainel}>{textosRoteiro.versoesTitulo}</h2>
-            <div className={styles.listaVersoes}>
-              {versoes.map((v) => (
-                <Link key={v.id} href={`/roteiros/${v.id}`} className={styles.itemVersao}>
-                  <span className={styles.textoVersao}>
-                    <span>
-                      {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
-                      {v.atual ? `, ${textosRoteiro.atual}` : ""}
-                    </span>
-                    <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        ) : null}
+        ) : (
+          <span className={styles.rotuloFeito}>{textosRoteiro.gravadoAs(formatarHora(gravadoEm))}</span>
+        )}
+        {!postado ? (
+          <button type="button" onClick={() => setPainel("postei")} className={styles.btnVazio}>
+            {textosRoteiro.postei}
+          </button>
+        ) : (
+          <a href={urlPostado} target="_blank" rel="noreferrer" className={styles.btnVazio}>
+            {textosRoteiro.postado}
+          </a>
+        )}
       </div>
 
-      <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
+      {painel === "menu" ? (
+        <div role="menu" className={styles.formularioPainel}>
+          <button type="button" role="menuitem" onClick={() => setPainel("angulo")} className={styles.itemMenu}>
+            <Video size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosRoteiro.menu.angulo}
+          </button>
+          <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
+            <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosRoteiro.menu.copiar}
+          </button>
+          {versoes.length > 1 ? (
+            <button type="button" role="menuitem" onClick={() => setPainel("versoes")} className={styles.itemMenu}>
+              <History size={20} strokeWidth={1.5} aria-hidden="true" />
+              {textosRoteiro.menu.versoes}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
-      {modoGravacao ? (
-        <div className={styles.modoGravacao}>
-          <RoteiroTexto
-            modoGravacao
-            blocos={[
-              { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-              { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-              {
-                rotulo: textosRoteiro.blocos.fechamento,
-                paragrafos: splitParagrafos(corpo.fechamento),
-              },
-              { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
-            ]}
-          />
-          <button
-            type="button"
-            onClick={() => setModoGravacao(false)}
-            className={styles.sairGravacao}
-          >
-            {textosRoteiro.sair}
+      {painel === "postei" ? (
+        <div className={styles.formularioPainel}>
+          <h2>{textosRoteiro.ondePostou}</h2>
+          <label className={styles.campo}>
+            <span>{textosRoteiro.coleLink}</span>
+            <input
+              type="url"
+              value={urlDigitada}
+              onChange={(evento) => setUrlDigitada(evento.target.value)}
+              placeholder="https://"
+              className={styles.input}
+            />
+          </label>
+          <button type="button" onClick={salvarPostado} disabled={pendente} className={styles.btn}>
+            {textosComuns.salvar}
           </button>
         </div>
       ) : null}
+
+      {painel === "angulo" ? (
+        <div className={styles.formularioPainel}>
+          <h2>{textosRoteiro.menu.angulo}</h2>
+          <label className={styles.campo}>
+            <span>
+              {textosRoteiro.queDiferente} <span className={styles.opcional}>{textosRoteiro.opcional}</span>
+            </span>
+            <textarea
+              value={motivoAngulo}
+              onChange={(evento) => setMotivoAngulo(evento.target.value)}
+              rows={3}
+              className={styles.textarea}
+            />
+          </label>
+          <button type="button" onClick={escreverOutraVersao} disabled={pendente} className={styles.btn}>
+            {textosRoteiro.outraVersao}
+          </button>
+        </div>
+      ) : null}
+
+      {painel === "versoes" ? (
+        <div className={styles.formularioPainel}>
+          <h2>{textosRoteiro.versoesTitulo}</h2>
+          <div className={styles.listaVersoes}>
+            {versoes.map((v) => (
+              <Link key={v.id} href={`/roteiros/${v.id}`} className={styles.itemVersao}>
+                <span className={styles.textoVersao}>
+                  <span>
+                    {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
+                    {v.atual ? `, ${textosRoteiro.atual}` : ""}
+                  </span>
+                  <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
     </div>
   );
 }
