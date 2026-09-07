@@ -9,7 +9,6 @@ export const textosReferencias = {
   periodos: ["esta semana", "30 dias", "90 dias"],
   formatos: ["fala para câmera", "podcast", "caixinha de pergunta", "esquete", "outro"],
   favoritos: "favoritos",
-  acimaDoNormal: "acima do normal da conta",
   analise: { comecou: "Como começou", construiu: "Como construiu", funcionou: "Por que funcionou" },
   usar: "usar como referência",
   salvar: "salvar nos favoritos",

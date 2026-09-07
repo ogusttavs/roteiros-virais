@@ -394,17 +394,27 @@ export type VideoReferencia = {
 };
 
 /**
+ * O limiar de "fora da curva" (`formatarNumero.ts`, `classificarMultiplo`):
+ * abaixo disso o vídeo está na média ou abaixo da conta, não é referência.
+ */
+const LIMIAR_FORA_DA_CURVA = "1.5";
+
+/**
  * A biblioteca de referências (etapa 12, decisão 1 do `PROXIMO.md`, brief
  * 6.6): fora da curva do nicho, mais recentes primeiro (não por
  * `foraDaCurva`, diferença de `foraDaCurvaDoNicho`), com a ficha de análise
  * inteira para as três linhas do cartão e o filtro de formato. Só vídeo já
  * analisado entra (sem `analise` não tem o que mostrar).
+ *
+ * Filtra por `foraDaCurva >= 1,5` (achado do primeiro uso no iPad, item 4):
+ * a consulta antiga só exigia `foraDaCurva` não nulo, e um vídeo na média
+ * da conta (0,7x, 1,0x) aparecia como se fosse referência.
  */
 export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60): Promise<VideoReferencia[]> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
-    isNotNull(videos.foraDaCurva),
+    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
   ];
