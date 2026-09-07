@@ -47,7 +47,12 @@
       }
     ],
     "roteirosRecentes": [
-      { "tema": "como tirar cheiro de gordura da cozinha sem produto forte", "objetivo": "alcance", "status": "postado" }
+      {
+        "tema": "como tirar cheiro de gordura da cozinha sem produto forte",
+        "objetivo": "alcance",
+        "status": "postado",
+        "gancho": "voce ja sentiu vergonha do cheiro de gordura na sua cozinha"
+      }
     ],
     "pontoPrincipal": "uma evidencia so; ver se o roteiro nao repete o angulo do roteiro recente de cozinha e usa a tese (pessoa de verdade, nao produto sozinho na bancada)"
   },
@@ -59,8 +64,18 @@
     "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: aparelho, mito ou verdade, dor de dente. Ganchos que funcionam: pergunta direta seguida da resposta (média frequência). Estruturas comuns: pergunta, resposta curta, explicação. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta sua duvida aqui embaixo.",
     "evidencias": [],
     "roteirosRecentes": [
-      { "tema": "ortodontia invisivel funciona mesmo?", "objetivo": "conversao", "status": "gravado" },
-      { "tema": "mito ou verdade sobre tratamento de canal", "objetivo": "engajamento", "status": "postado" }
+      {
+        "tema": "ortodontia invisivel funciona mesmo?",
+        "objetivo": "conversao",
+        "status": "gravado",
+        "gancho": "voce ja ouviu falar em ortodontia invisivel e ficou com duvida se funciona"
+      },
+      {
+        "tema": "mito ou verdade sobre tratamento de canal",
+        "objetivo": "engajamento",
+        "status": "postado",
+        "gancho": "sera que tratamento de canal doi mesmo, como todo mundo fala"
+      }
     ],
     "pontoPrincipal": "sem nenhuma evidencia do banco; a regra dura diz para dizer isso e nao inventar, e para nao repetir o angulo de mito ou verdade ja usado no roteiro recente"
   },
@@ -96,7 +111,12 @@
     "modeloNicho": "Duração típica: 30 a 50 segundos. Assuntos quentes: bastidor do consultório, rotina do dia a dia. Ganchos que funcionam: rotina cronometrada (média frequência). Estruturas comuns: passo a passo curto. Fechamentos comuns: resultado final sem falar. Chamadas finais comuns: comenta se voce faz igual.",
     "evidencias": [],
     "roteirosRecentes": [
-      { "tema": "ortodontia invisivel funciona mesmo?", "objetivo": "conversao", "status": "postado" }
+      {
+        "tema": "ortodontia invisivel funciona mesmo?",
+        "objetivo": "conversao",
+        "status": "postado",
+        "gancho": "voce ja ouviu falar em ortodontia invisivel e ficou com duvida se funciona"
+      }
     ],
     "pontoPrincipal": "tema de rotina, sem evidencia de que funciona no nicho; ver se o roteiro reconhece a falta de evidencia em vez de inventar um numero"
   }

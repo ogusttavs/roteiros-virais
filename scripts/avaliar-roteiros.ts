@@ -41,7 +41,14 @@ const casoSchema = z.object({
   camadaExclusiva: z.string(),
   modeloNicho: z.string(),
   evidencias: z.array(evidenciaSchema),
-  roteirosRecentes: z.array(z.object({ tema: z.string(), objetivo: objetivoSchema, status: z.string() })),
+  roteirosRecentes: z.array(
+    z.object({
+      tema: z.string(),
+      objetivo: objetivoSchema,
+      status: z.string(),
+      gancho: z.string(),
+    }),
+  ),
   anguloParaEvitar: z.object({ gancho: z.string(), corpo: z.string() }).optional(),
   pontoPrincipal: z.string(),
 });
@@ -143,9 +150,16 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     console.log(linha("recursos", saida.edicao.recursos.join("; ") || "nenhum"));
     console.log(linha("audio", saida.edicao.audio ?? "nenhum"));
     if (saida.edicao.referencia) {
-      console.log(linha("referencia", `video ${saida.edicao.referencia.videoId}, ${saida.edicao.referencia.oQueOlhar}`));
+      console.log(
+        linha(
+          "referencia",
+          `video ${saida.edicao.referencia.videoId}, ${saida.edicao.referencia.oQueOlhar}`,
+        ),
+      );
     }
-    console.log(`\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`);
+    console.log(
+      `\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`,
+    );
     console.log(`custo aproximado: ${resultado.modelo}\n`);
 
     /**
@@ -156,7 +170,9 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
      * leitura humana do roteiro em si.
      */
     const campos = extrairCamposRoteiro(saida);
-    const local = verificarLocalmente(campos);
+    const local = verificarLocalmente(campos, {
+      ganchosRecentes: caso.roteirosRecentes.map((r) => r.gancho),
+    });
     let verificacao = local;
     if (local.aprovado) {
       const saidaVerificacao = await gerarEstruturado({
@@ -165,11 +181,16 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         effort: verificarTextoIA.esforco,
         schema: verificarTextoIA.schema,
         sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
+        entrada: verificarTextoIA.montarEntrada({
+          texto: Object.values(campos).join("\n"),
+          proibicoes: [],
+        }),
       });
       verificacao = {
         aprovado: saidaVerificacao.dados.aprovado,
-        motivos: saidaVerificacao.dados.aprovado ? [] : [saidaVerificacao.dados.motivo ?? "reprovado"],
+        motivos: saidaVerificacao.dados.aprovado
+          ? []
+          : [saidaVerificacao.dados.motivo ?? "reprovado"],
       };
     }
     if (!verificacao.aprovado) {
