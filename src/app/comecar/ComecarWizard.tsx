@@ -1,8 +1,10 @@
 "use client";
 
+import { CircleCheck, Clock, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
 import { PERGUNTAS_BRIEFING, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
@@ -11,6 +13,7 @@ import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regra
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
+import { Botao } from "@/ui/componentes/Botao";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Logo } from "@/ui/Logo";
 
@@ -31,18 +34,23 @@ type Props = {
 
 type Etapa = "intro" | "dadosFixos" | "blocos" | "liberado";
 
+const ICONES_PROMESSA = [Clock, CircleCheck, Pencil];
+
 function CabecalhoSimples() {
   return (
-    <div className={styles.cabecalho}>
+    <header className={styles.cabecalho}>
       <Logo tamanho={24} />
       <span className={styles.nomeProduto}>{config.appName}</span>
-    </div>
+      <BotaoSair className={styles.botaoSair} />
+    </header>
   );
 }
 
 /**
- * As tres partes de /comecar (BriefingTela.dc.html): introducao, dados
- * fixos, depois os cinco blocos do briefing. Sem a Nav principal do app
+ * As sete estados de /comecar (design v2, `Comecar.dc.html`): introducao,
+ * dados fixos, os cinco blocos do briefing (cada um com o estado de pergunta,
+ * avaliando e erro, dentro de `PerguntaCampo`, mais a folha das doze notas,
+ * dentro de `BarraNotaGeral`), e liberado. Sem a Nav principal do app
  * (proposital: isto acontece antes do painel abrir), por isso esta rota
  * mora fora do grupo (painel), sem a casca compartilhada.
  */
@@ -98,9 +106,23 @@ export function ComecarWizard({
       <div className={styles.pagina}>
         <CabecalhoSimples />
         <div className={styles.corpoIntro}>
-          <h1>{textosBriefing.comecar.titulo}</h1>
+          <div className={styles.cabecalhoTela}>
+            <span className={styles.data}>{textosBriefing.comecar.passoUm}</span>
+            <h1>{textosBriefing.comecar.titulo}</h1>
+          </div>
           <p className={styles.introducao}>{textosBriefing.comecar.introducao}</p>
-          <p className={styles.introducaoSecundaria}>{textosBriefing.comecar.introNota}</p>
+          <div className={styles.promessas}>
+            {textosBriefing.comecar.promessas.map((promessa, indice) => {
+              const Icone = ICONES_PROMESSA[indice];
+              return (
+                <div key={promessa.titulo} className={styles.promessa}>
+                  <Icone size={20} strokeWidth={1.5} aria-hidden="true" className={styles.iconePromessa} />
+                  <strong>{promessa.titulo}</strong>
+                  <p>{promessa.texto}</p>
+                </div>
+              );
+            })}
+          </div>
         </div>
         <BarraAcao primaria={{ rotulo: textosBriefing.comecar.botaoComecar, onClick: () => setEtapa("dadosFixos") }} />
       </div>
@@ -112,8 +134,11 @@ export function ComecarWizard({
       <div className={styles.pagina}>
         <CabecalhoSimples />
         <div className={styles.corpo}>
-          <h1 className={styles.tituloSecao}>{textosBriefing.dadosFixos.titulo}</h1>
-          <p className={styles.introducao}>{textosBriefing.dadosFixos.introducao}</p>
+          <div className={styles.cabecalhoTela}>
+            <span className={styles.data}>{textosBriefing.dadosFixos.passoUm}</span>
+            <h1 className={styles.tituloSecao}>{textosBriefing.dadosFixos.titulo}</h1>
+            <p className={styles.introducao}>{textosBriefing.dadosFixos.introducao}</p>
+          </div>
           <DadosFixosForm
             nichos={nichos}
             inicial={dadosFixosIniciais}
@@ -130,11 +155,21 @@ export function ComecarWizard({
       <div className={styles.pagina}>
         <CabecalhoSimples />
         <div className={styles.corpoLiberado}>
-          <h1>{textosBriefing.liberacao.titulo}</h1>
+          <span className={styles.selo} aria-hidden="true">
+            <CircleCheck size={28} strokeWidth={1.5} />
+          </span>
+          <div className={styles.cabecalhoTela}>
+            <span className={styles.data}>{`nota ${notaGeral.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}, meta ${meta}`}</span>
+            <h1>{textosBriefing.liberacao.titulo}</h1>
+          </div>
+          <p className={styles.introducao}>{textosBriefing.liberacao.introducao}</p>
+          <div className={styles.acoesLiberado}>
+            <Botao onClick={() => router.push("/hoje")}>{textosBriefing.liberacao.botao}</Botao>
+            <Botao variante="secundario" onClick={() => router.push("/briefing")}>
+              {textosBriefing.liberacao.botaoRevisar}
+            </Botao>
+          </div>
         </div>
-        <BarraAcao
-          primaria={{ rotulo: textosBriefing.liberacao.botao, onClick: () => router.push("/hoje") }}
-        />
       </div>
     );
   }
@@ -151,6 +186,7 @@ export function ComecarWizard({
 
   return (
     <div className={styles.pagina}>
+      <CabecalhoSimples />
       <div className={styles.corpoComNota}>
         <BarraNotaGeral
           notaAtual={notaGeral}
@@ -169,12 +205,15 @@ export function ComecarWizard({
           }))}
         />
         <div className={styles.corpo}>
-          <Progresso
-            rotulo={textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}
-            atual={bloco}
-            total={TOTAL_BLOCOS}
-          />
-          <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
+          <div className={styles.cabecalhoTela}>
+            <span className={styles.data}>{textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}</span>
+            <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
+            <Progresso
+              rotulo={textosBriefing.progresso.respondidas(Object.keys(avaliacoes).length, PERGUNTAS_BRIEFING.length)}
+              atual={Object.keys(avaliacoes).length}
+              total={PERGUNTAS_BRIEFING.length}
+            />
+          </div>
           {perguntas.map((pergunta) => (
             <div key={pergunta.id} id={`pergunta-${pergunta.id}`}>
               <PerguntaCampo
@@ -184,6 +223,7 @@ export function ComecarWizard({
                 onSalvarRascunho={salvarRascunhoAction}
                 onAvaliar={avaliarRespostaAction}
                 onAtualizado={aoAtualizarPergunta}
+                meta={meta}
               />
             </div>
           ))}

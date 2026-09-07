@@ -20,6 +20,7 @@ import {
   temasDia,
   user,
   videos,
+  type AvaliacaoResposta,
   type ConteudoRoteiro,
   type TemaDoDia,
 } from "../../src/db/schema";
@@ -27,14 +28,35 @@ import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-layout@exemplo.teste";
+const EMAIL_COMECAR = "e2e-layout-comecar@exemplo.teste";
+const EMAIL_BRIEFING = "e2e-layout-briefing@exemplo.teste";
 const LARGURAS = [
   { rotulo: "390", largura: 390, altura: 844 },
   { rotulo: "1024", largura: 1024, altura: 768 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
+/** A folha (BarraNotaGeral) so existe abaixo de 1180px; acima disso vira cartao lateral fixo. */
+const LARGURAS_COM_FOLHA = LARGURAS.filter((l) => l.largura < 1180);
 const ALTURA_TOQUE_MINIMA = 44;
 
 let roteiroId: number;
+
+function avaliacaoExemplo(nota: number): AvaliacaoResposta {
+  return {
+    nota,
+    bom: "Resposta com exemplo concreto.",
+    melhorar: "Falta um numero ou um caso real.",
+    como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo.",
+    impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+  };
+}
+
+async function entrarComo(page: Page, email: string) {
+  await page.goto("/entrar");
+  await page.getByLabel("E-mail").fill(email);
+  await page.getByLabel("Senha").fill(SENHA);
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
+}
 
 async function entrar(page: Page) {
   await page.goto("/entrar");
@@ -215,6 +237,109 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       })
       .returning();
     roteiroId = roteiro.id;
+
+    /**
+     * Cliente proprio para Comecar (estados "perguntas" e "folha", item 5 do
+     * PROXIMO.md): dados fixos preenchidos (cai direto no bloco 1) e o
+     * bloco 1 com uma nota em cada faixa (na meta, neutra, baixa), para a
+     * folha das doze notas ter conteudo de verdade, nao so "sem nota".
+     */
+    await db().insert(user).values({ id: "e2e-layout-comecar", name: "[teste] Layout Comecar", email: EMAIL_COMECAR });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-layout-comecar-credential",
+        issuer: "local:credential",
+        accountId: "e2e-layout-comecar",
+        providerId: "credential",
+        userId: "e2e-layout-comecar",
+        password: await hashPassword(SENHA),
+      });
+    const [clienteComecar] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "e2e-layout-comecar",
+        nome: "[teste] Layout Comecar",
+        cidade: "Sao Paulo",
+        nichoId: nicho.id,
+      })
+      .returning();
+    await db()
+      .insert(briefings)
+      .values({
+        clienteId: clienteComecar.id,
+        /**
+         * P3 fica sem avaliacao de proposito: `blocoInicial` (briefing-regras.ts)
+         * so avanca de bloco quando NENHUMA pergunta do bloco atual esta
+         * pendente, entao com as tres respondidas o teste cairia direto no
+         * bloco 2. Duas fechadas (na meta e neutra) mais uma aberta cobre os
+         * dois estados do cartao na mesma tela.
+         */
+        respostas: {
+          p1: "Somos uma clinica de estetica que atende mulheres de 30 a 50 anos, com procedimentos faciais.",
+          p2: "O produto que mais vende e o peeling facial.",
+        },
+        avaliacoes: { p1: avaliacaoExemplo(8.6), p2: avaliacaoExemplo(7.1) },
+        notaGeral: "6.83",
+        completo: false,
+      });
+
+    /**
+     * Cliente proprio para Briefing (item 5 do PROXIMO.md): briefing completo
+     * com respostas e avaliacoes de verdade, para as linhas ".resposta"
+     * (Briefing.dc.html) terem texto e nota para medir.
+     */
+    await db().insert(user).values({ id: "e2e-layout-briefing", name: "[teste] Layout Briefing", email: EMAIL_BRIEFING });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-layout-briefing-credential",
+        issuer: "local:credential",
+        accountId: "e2e-layout-briefing",
+        providerId: "credential",
+        userId: "e2e-layout-briefing",
+        password: await hashPassword(SENHA),
+      });
+    const [clienteBriefing] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "e2e-layout-briefing",
+        nome: "[teste] Layout Briefing",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
+      .returning();
+    const respostasBriefing: Record<string, string> = {};
+    const avaliacoesBriefing: Record<string, AvaliacaoResposta> = {};
+    for (let i = 1; i <= 12; i++) {
+      const id = `p${i}`;
+      respostasBriefing[id] = `Resposta concreta para ${id}, com o numero 42 na frase e o bairro de Pinheiros.`;
+      avaliacoesBriefing[id] = avaliacaoExemplo(i === 3 ? 4.8 : i === 2 ? 7.1 : 8.6);
+    }
+    await db()
+      .insert(briefings)
+      .values({
+        clienteId: clienteBriefing.id,
+        respostas: respostasBriefing,
+        avaliacoes: avaliacoesBriefing,
+        notaGeral: "8.20",
+        completo: true,
+        perfil: {
+          fatos: {
+            oQueVende: "kit tira-mancha para estofados",
+            preco: "kit a partir de 89 reais",
+            clienteIdeal: "mora em apartamento",
+            medos: ["medo de estragar o tecido"],
+            frasesDaFala: [],
+            proibicoes: [],
+            cenasFilmaveis: ["sala com o sofa"],
+            concorrentes: [],
+            perfisAdmirados: [],
+          },
+          resumo: "marca propria de produtos de limpeza",
+          referencias: [],
+        },
+      });
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
@@ -241,6 +366,35 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await entrar(page);
       await page.goto(`/roteiros/${roteiroId}/gravar`);
       await expect(page.getByText("1 de 4")).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Começar, estado perguntas, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarComo(page, EMAIL_COMECAR);
+      await expect(page).toHaveURL(/\/comecar/);
+      await expect(page.getByRole("heading", { name: "Sobre o negócio" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Briefing em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarComo(page, EMAIL_BRIEFING);
+      // Espera o login terminar (mesmo achado de `entrar`, acima) antes do goto seguinte.
+      await expect(page).toHaveURL(/\/hoje/);
+      await page.goto("/briefing");
+      await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
+      await conferirLayout(page);
+    });
+  }
+
+  for (const { rotulo, largura, altura } of LARGURAS_COM_FOLHA) {
+    test(`Começar, estado folha, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarComo(page, EMAIL_COMECAR);
+      await expect(page).toHaveURL(/\/comecar/);
+      await page.getByRole("button", { name: "as doze notas" }).click();
+      await expect(page.getByRole("dialog", { name: "as doze notas" })).toBeVisible();
       await conferirLayout(page);
     });
   }

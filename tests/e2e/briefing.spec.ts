@@ -50,8 +50,8 @@ const TITULO_LIBERACAO = "Seu painel está aberto.";
  */
 async function responderEAvaliar(page: Page, rotulo: string, texto: string): Promise<boolean> {
   await page.getByLabel(rotulo).fill(texto);
-  // "avaliar" no wizard (/comecar), "avaliar de novo" no vivo (/briefing, editando).
-  await page.getByRole("button", { name: /^avaliar/ }).first().click();
+  // "Avaliar esta resposta" no wizard (/comecar), "Avaliar de novo" no vivo (/briefing, editando).
+  await page.getByRole("button", { name: /^avaliar/i }).first().click();
   const liberado = page.getByRole("heading", { name: TITULO_LIBERACAO });
   const campoFechado = page.getByLabel(rotulo);
   await Promise.race([
@@ -86,12 +86,12 @@ test.describe("briefing pela tela", () => {
       "o que o seu negócio faz hoje",
       'Somos uma clinica odontologica em Sao Paulo que atende familias inteiras. Fazemos 42 procedimentos por semana, e uma cliente disse "finalmente perdi o medo de sorrir".',
     );
-    await expect(page.getByText("MUITO BOA").first()).toBeVisible();
+    await expect(page.getByText("Na meta").first()).toBeVisible();
 
     // edita a P1: a nota muda, e o texto novo fica.
     await page.getByRole("button", { name: "ajustar resposta" }).first().click();
     await responderEAvaliar(page, "o que o seu negócio faz hoje", "atendimento bom");
-    await expect(page.getByText("ABAIXO DO ESPERADO").first()).toBeVisible();
+    await expect(page.getByText("Dá para melhorar").first()).toBeVisible();
 
     // rascunho da P2 sem avaliar, para testar que sobrevive ao recarregar.
     const campoP2 = page.getByLabel("produto ou serviço que mais vende");
@@ -104,12 +104,20 @@ test.describe("briefing pela tela", () => {
     // aplicar o primeiro (`page.getByText("salvo")` sem escopo casava com
     // o indicador de outra pergunta aberta que nunca foi editada, que
     // comeca em "salvo" por padrao, e nao esperava nada de verdade).
-    const blocoP2 = campoP2.locator("xpath=ancestor::div[contains(@class, 'aberto')][1]");
-    await expect(blocoP2.getByText("salvo")).toBeVisible();
+    //
+    // Terceiro achado (D2 parte 2): o proprio campo tocado tambem comeca
+    // com "salvo" por padrao (antes de qualquer edicao), entao o primeiro
+    // poll do `toBeVisible` podia pegar esse "salvo" antigo, de antes do
+    // React processar o `fill`, sem nunca confirmar o rascunho de verdade.
+    // Espera primeiro "ainda não salvo" (prova que o React ja registrou a
+    // edicao e o debounce comecou) para so depois esperar "salvo" de novo.
+    const blocoP2 = campoP2.locator("xpath=ancestor::div[contains(@class, 'cartaoAberto')][1]");
+    await expect(blocoP2.getByText("ainda não salvo")).toBeVisible();
+    await expect(blocoP2.getByText("salvo", { exact: true })).toBeVisible();
 
     await page.reload();
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();
-    await expect(page.getByText("ABAIXO DO ESPERADO").first()).toBeVisible(); // a edicao da P1 sobreviveu
+    await expect(page.getByText("Dá para melhorar").first()).toBeVisible(); // a edicao da P1 sobreviveu
     await expect(page.getByLabel("produto ou serviço que mais vende")).toHaveValue(
       "rascunho da P2, ainda sem avaliar",
     );
@@ -288,13 +296,13 @@ test.describe("briefing pela tela", () => {
     // BarraNotaGeral renderiza a mesma dica duas vezes (folha do celular +
     // aside do desktop, so o CSS decide qual aparece); .last() pega a do
     // desktop, que e o viewport padrao do Playwright aqui.
-    await expect(page.getByText(/a sua nota caiu para/).last()).toBeVisible();
+    await expect(page.getByText(/a sua nota caiu para/i).last()).toBeVisible();
     await expect(page.getByText(/reforçar a p1/i).last()).toBeVisible();
 
     // o gate e de mao unica: o painel continua acessivel mesmo com a nota abaixo da meta.
     await page.reload();
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
-    await expect(page.getByText(/a sua nota caiu para/).last()).toBeVisible();
+    await expect(page.getByText(/a sua nota caiu para/i).last()).toBeVisible();
   });
 
   /** brief-frontend.md 6.2, "Ajuste de 06/09/2026": tocar numa linha da lista de notas rola ate a pergunta. */

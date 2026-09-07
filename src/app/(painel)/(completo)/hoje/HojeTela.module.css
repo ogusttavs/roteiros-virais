@@ -56,10 +56,11 @@
   display: grid;
   place-items: center;
   border-radius: var(--raio-pill);
-  background: var(--cor-superficie-recuada);
-  color: var(--cor-titulo);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
   text-decoration: none;
 }
 

@@ -24,6 +24,21 @@ type Props = {
 
 const BLOCOS = Array.from({ length: TOTAL_BLOCOS }, (_, i) => i + 1);
 
+/**
+ * Os itens do perfil compilado que o cartao "como o sistema te entende"
+ * mostra (design v2, `Briefing.dc.html`, ".perfil"), so quando o campo tem
+ * dado de fato (item 3 do PROXIMO.md: "campo sem dado não aparece").
+ */
+function itensDoPerfil(perfil: PerfilCompilado) {
+  return [
+    { titulo: textosBriefing.briefing.perfilOQueVende, texto: perfil.fatos.oQueVende },
+    { titulo: textosBriefing.briefing.perfilClienteIdeal, texto: perfil.fatos.clienteIdeal },
+    { titulo: textosBriefing.briefing.perfilMedos, texto: perfil.fatos.medos.join(" ") },
+    { titulo: textosBriefing.briefing.perfilProibicoes, texto: perfil.fatos.proibicoes.join(", ") },
+    { titulo: textosBriefing.briefing.perfilCenas, texto: perfil.fatos.cenasFilmaveis.join(", ") },
+  ].filter((item) => item.texto.trim().length > 0);
+}
+
 /** O briefing vivo (brief-frontend.md, 6.8): as doze respostas com nota, editaveis, e o perfil compilado. */
 export function BriefingVivo({
   respostasIniciais,
@@ -43,6 +58,7 @@ export function BriefingVivo({
   }
 
   const dica = perguntaQueMaisAjuda(avaliacoes);
+  const itensPerfil = perfil ? itensDoPerfil(perfil) : [];
 
   function aoSelecionarPergunta(perguntaId: string) {
     document.getElementById(`pergunta-${perguntaId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -71,26 +87,18 @@ export function BriefingVivo({
           <h1>{textosBriefing.briefing.titulo}</h1>
           <p className={styles.introducao}>{textosBriefing.briefing.introducao}</p>
 
-          {perfil ? (
+          {itensPerfil.length > 0 ? (
             <Cartao variante="recuado" className={styles.cartaoPerfil}>
               <h2 className={styles.perfilTitulo}>{textosBriefing.briefing.perfilTitulo}</h2>
               <dl className={styles.perfilFatos}>
-                <div>
-                  <dt>{textosBriefing.briefing.perfilOQueVende}</dt>
-                  <dd>{perfil.fatos.oQueVende}</dd>
-                </div>
-                <div>
-                  <dt>{textosBriefing.briefing.perfilClienteIdeal}</dt>
-                  <dd>{perfil.fatos.clienteIdeal}</dd>
-                </div>
-                {perfil.fatos.proibicoes.length > 0 ? (
-                  <div>
-                    <dt>{textosBriefing.briefing.perfilProibicoes}</dt>
-                    <dd>{perfil.fatos.proibicoes.join(", ")}</dd>
+                {itensPerfil.map((item) => (
+                  <div key={item.titulo}>
+                    <dt>{item.titulo}</dt>
+                    <dd>{item.texto}</dd>
                   </div>
-                ) : null}
+                ))}
               </dl>
-              <p className={styles.perfilRodape}>{textosBriefing.briefing.perfilSeErrado}</p>
+              <p className={styles.perfilRodape}>{textosBriefing.briefing.perfilRodape}</p>
             </Cartao>
           ) : null}
 
@@ -108,6 +116,7 @@ export function BriefingVivo({
                       onSalvarRascunho={salvarRascunhoAction}
                       onAvaliar={avaliarRespostaAction}
                       onAtualizado={aoAtualizarPergunta}
+                      meta={meta}
                       variante="vivo"
                     />
                   </div>

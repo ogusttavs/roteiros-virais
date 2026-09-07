@@ -77,7 +77,7 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   );
 
   await expect(paginaCliente).toHaveURL(/\/comecar/);
-  await expect(paginaCliente.getByText("Vamos montar o seu briefing")).toBeVisible();
+  await expect(paginaCliente.getByText("Antes de escrever, a gente precisa te conhecer")).toBeVisible();
 
   await contextoCliente.close();
 });

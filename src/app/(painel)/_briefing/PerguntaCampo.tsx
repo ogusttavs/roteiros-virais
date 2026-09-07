@@ -10,7 +10,7 @@ import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Nota } from "@/ui/componentes/Nota";
-import { faixaDeNota } from "@/ui/componentes/notaFaixa";
+import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 
@@ -30,17 +30,27 @@ type Props = {
   onSalvarRascunho: (perguntaId: string, resposta: string) => Promise<void>;
   onAvaliar: (perguntaId: string, resposta: string) => Promise<ResultadoAcaoBriefing>;
   onAtualizado: (perguntaId: string, resposta: string, resultado: ResultadoAcaoBriefing) => void;
+  /** Meta da nota geral (design v2, `base.css`, ".analise"): pinta a analise e a linha do briefing vivo. */
+  meta: number;
   /**
-   * wizard (/comecar, BriefingTela.dc.html): fechado mostra nota, analise
-   * inteira e "ajustar resposta". vivo (/briefing, BriefingVivoTela.dc.html):
-   * linha com resposta truncada em 3 linhas, nota ao lado, analise atras de
-   * um <details> "ver a analise", e "cancelar" para sair da edicao sem
-   * salvar (o wizard nao tem esse botao: toda pergunta comeca aberta).
+   * wizard (/comecar, Comecar.dc.html): fechado mostra a nota e a analise
+   * inteira, com "ajustar resposta". vivo (/briefing, Briefing.dc.html):
+   * linha com pergunta, nota e texto, que abre para editar ao tocar.
    */
   variante?: "wizard" | "vivo";
 };
 
 const t = textosBriefing.pergunta;
+
+function Chip({ pergunta }: { pergunta: PerguntaBriefing }) {
+  return (
+    <p className={styles.campoPergunta}>
+      {pergunta.enunciado}
+      {/* So o numero da pergunta, sem o peso (PROXIMO.md, D2 parte 2, item 2). */}
+      <span className={styles.peso}>{pergunta.id.toUpperCase()}</span>
+    </p>
+  );
+}
 
 /**
  * Uma pergunta do briefing, com os dois estados que /comecar (6.2) e
@@ -55,6 +65,7 @@ export function PerguntaCampo({
   onSalvarRascunho,
   onAvaliar,
   onAtualizado,
+  meta,
   variante = "wizard",
 }: Props) {
   const [texto, setTexto] = useState(resposta);
@@ -64,8 +75,8 @@ export function PerguntaCampo({
   const [erro, setErro] = useState<string | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState(true);
   const [rascunhoComErro, setRascunhoComErro] = useState(false);
-  const [expandido, setExpandido] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const caixaAlta = pergunta.peso === 2 ? "longa" : "padrao";
 
   useEffect(
     () => () => {
@@ -112,7 +123,7 @@ export function PerguntaCampo({
       setEditando(false);
       onAtualizado(pergunta.id, texto, resultado);
     } catch {
-      setErro(t.erroAvaliacao);
+      setErro(t.erroAviso);
     } finally {
       setAvaliando(false);
     }
@@ -130,31 +141,26 @@ export function PerguntaCampo({
   }
 
   if (variante === "vivo" && avaliacao) {
-    const legenda = textosBriefing.notaFaixa[faixaDeNota(avaliacao.nota)];
-
     if (editando) {
       return (
         <div className={styles.linhaVivo}>
-          <div className={styles.colunaVivo}>
-            <p className={styles.enunciado}>{pergunta.enunciado}</p>
-            <AreaTexto
-              rotulo={pergunta.enunciado}
-              rotuloOculto
-              value={texto}
-              onChange={(evento) => aoMudarTexto(evento.target.value)}
-              linhasMin={5}
-              erro={erro ?? undefined}
-            />
-            <div className={styles.acoesVivo}>
-              <Botao variante="secundario" onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
-                {t.botaoAvaliarDeNovo}
-              </Botao>
-              <Botao variante="ghost" onClick={cancelarEdicao}>
-                {t.botaoCancelar}
-              </Botao>
-            </div>
+          <p className={styles.enunciado}>{pergunta.enunciado}</p>
+          <AreaTexto
+            rotulo={pergunta.enunciado}
+            rotuloOculto
+            value={texto}
+            onChange={(evento) => aoMudarTexto(evento.target.value)}
+            caixaAlta={caixaAlta}
+            erro={erro ?? undefined}
+          />
+          <div className={styles.acoesVivo}>
+            <Botao variante="secundario" onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
+              {t.botaoAvaliarDeNovo}
+            </Botao>
+            <Botao variante="ghost" onClick={cancelarEdicao}>
+              {t.botaoCancelar}
+            </Botao>
           </div>
-          <Nota valor={avaliacao.nota} legenda={legenda} tamanho="lista" />
         </div>
       );
     }
@@ -162,11 +168,9 @@ export function PerguntaCampo({
     if (avaliando) {
       return (
         <div className={styles.linhaVivo}>
-          <div className={styles.colunaVivo}>
-            <p className={styles.enunciado}>{pergunta.enunciado}</p>
-            <p className={styles.respostaEsmaecida}>{texto}</p>
-            <Progresso mensagem={t.avaliando} />
-          </div>
+          <p className={styles.enunciado}>{pergunta.enunciado}</p>
+          <p className={styles.respostaEsmaecida}>{texto}</p>
+          <Progresso mensagem={t.avaliando} />
           <Skeleton variante="numero" largura="72px" />
         </div>
       );
@@ -175,55 +179,43 @@ export function PerguntaCampo({
     if (erro) {
       return (
         <div className={styles.linhaVivo}>
-          <div className={styles.colunaVivo}>
-            <p className={styles.enunciado}>{pergunta.enunciado}</p>
-            <p className={styles.respostaEsmaecida}>{texto}</p>
-            <p className={styles.erroInline} role="alert">
-              <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
-              {erro}
-            </p>
-            <Botao variante="secundario" onClick={() => void avaliar()}>
-              {t.botaoTentarDeNovo}
-            </Botao>
-          </div>
+          <p className={styles.enunciado}>{pergunta.enunciado}</p>
+          <p className={styles.respostaEsmaecida}>{texto}</p>
+          <p className={styles.erroInline} role="alert">
+            <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+            {erro}
+          </p>
+          <Botao variante="secundario" onClick={() => void avaliar()}>
+            {t.botaoTentarDeNovo}
+          </Botao>
         </div>
       );
     }
 
+    const legenda = textosBriefing.faixaMeta[faixaMeta(avaliacao.nota, meta)];
     return (
-      <div className={styles.linhaVivo}>
-        <div className={styles.colunaVivo}>
-          <p className={styles.enunciado}>{pergunta.enunciado}</p>
-          <p className={[styles.resposta, expandido ? "" : styles.respostaTruncada].filter(Boolean).join(" ")}>
-            {textoAvaliado ?? resposta}
-          </p>
-          <div className={styles.acoesVivo}>
-            {!expandido ? (
-              <Botao variante="ghost" onClick={() => setExpandido(true)}>
-                {t.botaoVerTudo}
-              </Botao>
-            ) : null}
-            <Botao variante="ghost" onClick={() => setEditando(true)}>
-              {t.botaoEditar}
-            </Botao>
-          </div>
-          <details className={styles.detalhesAnalise}>
-            <summary>{t.botaoVerAnalise}</summary>
-            <AnaliseQuatroPartes avaliacao={avaliacao} rotulos={textosBriefing.analiseRotulos} />
-          </details>
-        </div>
-        <Nota valor={avaliacao.nota} legenda={legenda} tamanho="lista" />
-      </div>
+      <button type="button" className={styles.resposta} onClick={() => setEditando(true)}>
+        <span className={styles.pergunta}>{pergunta.enunciado}</span>
+        <Nota valor={avaliacao.nota} tamanho="lista" meta={meta} />
+        <span className={styles.textoResposta}>{textoAvaliado ?? resposta}</span>
+        <span className={styles.faixaVivo}>
+          {legenda}
+          <span className={styles.editarAfordancia}>{t.botaoEditar}</span>
+        </span>
+      </button>
     );
   }
 
   if (!editando && avaliacao) {
-    const legenda = textosBriefing.notaFaixa[faixaDeNota(avaliacao.nota)];
     return (
-      <div className={styles.fechado}>
-        <p className={styles.enunciado}>{pergunta.enunciado}</p>
-        <Nota valor={avaliacao.nota} legenda={legenda} />
-        <AnaliseQuatroPartes avaliacao={avaliacao} rotulos={textosBriefing.analiseRotulos} />
+      <div className={styles.cartaoFechado}>
+        <Chip pergunta={pergunta} />
+        <AnaliseQuatroPartes
+          avaliacao={avaliacao}
+          rotulos={textosBriefing.analiseRotulos}
+          meta={meta}
+          rotulosFaixa={textosBriefing.faixaMeta}
+        />
         <p className={styles.fraseAjuste}>{t.fraseAjuste}</p>
         <Botao variante="ghost" onClick={() => setEditando(true)}>
           {t.botaoAjustarResposta}
@@ -233,28 +225,39 @@ export function PerguntaCampo({
   }
 
   return (
-    <div className={styles.aberto}>
+    <div className={styles.cartaoAberto}>
+      <Chip pergunta={pergunta} />
+      {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
       <AreaTexto
         rotulo={pergunta.enunciado}
-        ajuda={pergunta.ajuda}
+        rotuloOculto
         value={texto}
         onChange={(evento) => aoMudarTexto(evento.target.value)}
         onBlur={aoSairDoCampo}
-        contador={t.contador(texto.length)}
-        erro={erro ?? undefined}
+        caixaAlta={caixaAlta}
         disabled={avaliando}
       />
+      <div className={styles.rodapeAberto}>
+        <span className={rascunhoComErro ? styles.rascunhoComErro : styles.indicadorSalvo}>
+          {rascunhoComErro ? t.rascunhoComErro : rascunhoSalvo ? t.rascunhoSalvo : t.rascunhoAindaNao}
+        </span>
+        <span className={styles.contador}>{t.contador(texto.length)}</span>
+      </div>
       {avaliando ? (
         <Progresso mensagem={t.avaliando} />
-      ) : (
-        <div className={styles.rodapeAberto}>
-          <span className={styles.indicadorSalvo}>
-            {rascunhoComErro ? t.rascunhoComErro : rascunhoSalvo ? t.rascunhoSalvo : ""}
-          </span>
-          <Botao variante="secundario" onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
-            {erro ? t.botaoTentarDeNovo : t.botaoAvaliar}
-          </Botao>
+      ) : erro ? (
+        <div className={styles.blocoErro}>
+          <p className={styles.erroInline} role="alert">
+            <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+            {erro}
+          </p>
+          <p className={styles.erroExplicacao}>{t.erroExplicacao}</p>
+          <Botao onClick={() => void avaliar()}>{t.botaoTentarDeNovo}</Botao>
         </div>
+      ) : (
+        <Botao onClick={() => void avaliar()} disabled={texto.trim().length === 0}>
+          {t.botaoAvaliar}
+        </Botao>
       )}
     </div>
   );

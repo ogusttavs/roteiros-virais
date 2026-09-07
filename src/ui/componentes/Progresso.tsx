@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 
 import styles from "./Progresso.module.css";
-import { segmentosPreenchidos } from "./progressoSegmentos";
 
 type Props = {
   /** "bloco 2 de 5", ja formatado por quem chama. */
@@ -43,14 +42,12 @@ export function Progresso({ rotulo, atual, total, mensagem, frases, intervaloMs 
   }
 
   if (rotulo && atual !== undefined && total !== undefined && total > 0) {
-    const segmentos = segmentosPreenchidos(atual, total);
+    const percentual = Math.min(100, Math.max(0, (atual / total) * 100));
     return (
       <div className={styles.passos}>
         <span className={styles.rotuloPassos}>{rotulo}</span>
         <div className={styles.trilha} role="progressbar" aria-valuenow={atual} aria-valuemin={0} aria-valuemax={total}>
-          {segmentos.map((preenchido, i) => (
-            <span key={i} className={preenchido ? styles.segmentoCheio : styles.segmentoVazio} />
-          ))}
+          <span className={styles.trilhaPreenchida} style={{ width: `${percentual}%` }} />
         </div>
       </div>
     );

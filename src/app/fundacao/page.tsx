@@ -165,6 +165,8 @@ export default function Fundacao() {
               impacto: "Os roteiros conseguem citar o seu produto e o seu bairro em vez de falar de limpeza em geral.",
             }}
             rotulos={{ bom: "o que está bom", melhorar: "o que pode melhorar", como: "como melhorar", impacto: "impacto no seu resultado" }}
+            meta={8}
+            rotulosFaixa={{ naMeta: "na meta", neutra: "quase na meta", baixa: "dá para melhorar" }}
           />
         </div>
       </section>

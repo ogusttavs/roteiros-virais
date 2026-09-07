@@ -28,6 +28,7 @@
 
 .numeroResumo {
   font-weight: 400;
+  color: var(--cor-nota);
 }
 
 .metaResumo {
@@ -84,11 +85,12 @@
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-titulo);
   line-height: 1;
-  color: var(--cor-titulo);
+  color: var(--cor-nota);
 }
 
-.numeroFolha.atingiu {
-  color: var(--cor-positivo);
+/** Petroleo na meta, nunca vermelha (design v2, ".nota-geral-barra.na-meta .valor"). */
+.atingiu {
+  color: var(--cor-acao);
 }
 
 .lista {
@@ -144,7 +146,15 @@
 .notaItem {
   flex: none;
   font-family: var(--fonte-mono);
-  color: var(--cor-titulo);
+  color: var(--cor-nota);
+}
+
+.itemNaMeta {
+  color: var(--cor-acao);
+}
+
+.itemBaixa {
+  color: var(--cor-atencao);
 }
 
 .melhorarResumo {
@@ -224,7 +234,11 @@
     font-size: var(--tamanho-legenda);
   }
 
-  .cartaoDesktop .botaoItem {
-    min-height: 36px;
-  }
+  /**
+   * Sem override de min-height aqui (era 36px antes desta rodada): o
+   * desenho pede 44px "em toda largura e todo estado"
+   * (`entrega/telas/README.md`, "As regras que este desenho segue", item 2),
+   * sem excecao para a lista compacta do desktop. Achado ao cobrir esta
+   * tela com o e2e de layout pela primeira vez (D2 parte 2, item 5).
+   */
 }

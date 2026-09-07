@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 
 import styles from "./BarraNotaGeral.module.css";
+import { faixaMeta } from "./notaFaixaMeta";
+
+const CLASSE_FAIXA_ITEM = { naMeta: styles.itemNaMeta, neutra: "", baixa: styles.itemBaixa };
 
 export type NotaListada = {
   id: string;
@@ -79,7 +82,13 @@ export function BarraNotaGeral({
           <button type="button" className={styles.botaoItem} onClick={() => tocarItem(item.id)}>
             <span className={styles.linhaPrincipal}>
               <span className={styles.rotuloItem}>{item.rotulo}</span>
-              <span className={styles.notaItem}>{item.nota === null ? semNota : formatarNota(item.nota)}</span>
+              <span
+                className={[styles.notaItem, item.nota === null ? "" : CLASSE_FAIXA_ITEM[faixaMeta(item.nota, meta)]]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {item.nota === null ? semNota : formatarNota(item.nota)}
+              </span>
             </span>
             {item.melhorarResumo ? <span className={styles.melhorarResumo}>{item.melhorarResumo}</span> : null}
           </button>
@@ -99,7 +108,10 @@ export function BarraNotaGeral({
       >
         <span className={styles.resumo}>
           <span>
-            {rotuloNotaAtual} <strong className={styles.numeroResumo}>{formatarNota(notaAtual)}</strong>
+            {rotuloNotaAtual}{" "}
+            <strong className={[styles.numeroResumo, atingiu ? styles.atingiu : ""].filter(Boolean).join(" ")}>
+              {formatarNota(notaAtual)}
+            </strong>
           </span>
           <span className={styles.metaResumo}>{rotuloMeta}</span>
         </span>

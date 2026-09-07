@@ -1,17 +1,49 @@
-.fechado,
-.aberto {
-  display: flex;
-  flex-direction: column;
+/**
+ * Design v2, `entrega/telas/base.css` (blocos "Campo de resposta" e
+ * "Análise em quatro partes") e `Briefing.dc.html` (`.resposta`).
+ */
+
+.cartaoFechado,
+.cartaoAberto {
+  display: grid;
   gap: var(--espaco-3);
-  padding: var(--espaco-5) 0;
-  border-bottom: 1px solid var(--cor-borda);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
 }
 
-.enunciado {
+.cartaoFechado + .cartaoFechado,
+.cartaoFechado + .cartaoAberto,
+.cartaoAberto + .cartaoFechado,
+.cartaoAberto + .cartaoAberto {
+  margin-top: var(--espaco-4);
+}
+
+.campoPergunta {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--cor-texto);
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+  font-weight: 500;
+}
+
+/** So o numero da pergunta, sem o peso (PROXIMO.md, D2 parte 2, item 2). */
+.peso {
+  margin-left: var(--espaco-2);
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-dica);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.campoDica {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
 }
 
 .fraseAjuste {
@@ -25,42 +57,61 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--espaco-3);
+  flex-wrap: wrap;
+  font-size: var(--tamanho-legenda);
 }
 
 .indicadorSalvo {
   font-family: var(--fonte-mono);
-  font-size: 12px;
-  color: var(--cor-texto-suave);
+  color: var(--cor-positivo);
   min-height: 16px;
 }
 
-.linhaVivo {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--espaco-4);
-  padding: var(--espaco-5) 0;
-  border-top: 1px solid var(--cor-borda);
+.rascunhoComErro {
+  font-family: var(--fonte-mono);
+  color: var(--cor-erro);
+  min-height: 16px;
 }
 
-.colunaVivo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-2);
-  min-width: 0;
-  flex: 1;
+.contador {
+  margin-left: auto;
+  font-family: var(--fonte-mono);
+  color: var(--cor-texto-dica);
 }
 
-.resposta {
+.blocoErro {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.erroExplicacao {
   margin: 0;
-  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
 }
 
-.respostaTruncada {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+/* ---------- Briefing vivo: linha aberta (editando) ---------- */
+
+.linhaVivo {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.linhaVivo + .linhaVivo,
+.linhaVivo + .resposta,
+.resposta + .linhaVivo {
+  margin-top: var(--espaco-4);
+}
+
+.enunciado {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  color: var(--cor-titulo);
 }
 
 .respostaEsmaecida {
@@ -82,16 +133,59 @@
   color: var(--cor-erro);
 }
 
-.detalhesAnalise summary {
+/* ---------- Briefing vivo: linha fechada (Briefing.dc.html, ".resposta") ---------- */
+
+.resposta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-2) var(--espaco-4);
+  align-items: start;
+  width: 100%;
+  padding: var(--espaco-5);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  text-align: left;
+  color: inherit;
   cursor: pointer;
-  color: var(--cor-acao);
-  font-size: var(--tamanho-secundario);
-  text-decoration: underline;
-  min-height: var(--altura-toque);
-  display: flex;
-  align-items: center;
 }
 
-.detalhesAnalise[open] summary {
-  margin-bottom: var(--espaco-3);
+.resposta:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.resposta:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.resposta + .resposta {
+  margin-top: var(--espaco-4);
+}
+
+.pergunta {
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  color: var(--cor-titulo);
+}
+
+.textoResposta {
+  grid-column: 1;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.faixaVivo {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.editarAfordancia {
+  color: var(--cor-acao);
+  font-weight: 500;
 }

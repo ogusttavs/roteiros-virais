@@ -36,12 +36,9 @@ export function Campo({ rotulo, rotuloOculto = false, ajuda, erro, contador, pre
 
   return (
     <div className={styles.grupo}>
-      <span className={styles.linhaRotulo}>
-        <label className={[styles.rotulo, rotuloOculto ? styles.rotuloOculto : ""].filter(Boolean).join(" ")} htmlFor={id}>
-          {rotulo}
-        </label>
-        {contador ? <span className={styles.contador}>{contador}</span> : null}
-      </span>
+      <label className={[styles.rotulo, rotuloOculto ? styles.rotuloOculto : ""].filter(Boolean).join(" ")} htmlFor={id}>
+        {rotulo}
+      </label>
       {ajuda ? (
         <span className={styles.ajuda} id={idAjuda}>
           {ajuda}
@@ -57,6 +54,8 @@ export function Campo({ rotulo, rotuloOculto = false, ajuda, erro, contador, pre
       ) : (
         entrada
       )}
+      {/* Abaixo do campo, a direita (design v2, "O que o Briefing resolve", item 1). */}
+      {contador ? <span className={styles.contador}>{contador}</span> : null}
       {erro ? (
         <span className={styles.erro} id={idErro} role="alert">
           <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
