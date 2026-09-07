@@ -23,6 +23,7 @@ import {
   type ModeloNicho,
   type Plataforma,
 } from "@/db/schema";
+import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 
 export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
@@ -394,10 +395,13 @@ export type VideoReferencia = {
 };
 
 /**
- * O limiar de "fora da curva" (`formatarNumero.ts`, `classificarMultiplo`):
- * abaixo disso o vídeo está na média ou abaixo da conta, não é referência.
+ * A régua de "fora da curva" mora em `formatarNumero.ts` (`classificarMultiplo`),
+ * como número; aqui vira string porque a coluna é `numeric` no Postgres e o
+ * Drizzle representa esse tipo como string (leitura prévia do Fable,
+ * acabamento do iPad, item 4: as duas réguas escritas em separado podiam
+ * divergir sem ninguém notar).
  */
-const LIMIAR_FORA_DA_CURVA = "1.5";
+const LIMIAR_FORA_DA_CURVA_CONSULTA = String(LIMIAR_FORA_DA_CURVA);
 
 /**
  * A biblioteca de referências (etapa 12, decisão 1 do `PROXIMO.md`, brief
@@ -414,7 +418,7 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
-    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA),
+    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
   ];
