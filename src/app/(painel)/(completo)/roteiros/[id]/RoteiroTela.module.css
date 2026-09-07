@@ -109,7 +109,18 @@
 
 .principal > :global(article) {
   margin-top: var(--espaco-8);
+  /**
+   * 34ch (o desenho de RoteiroTela.dc.html) so no celular: no iPad essa
+   * coluna ficava feia, ajuste do Gustavo em 06/09/2026 (`brief-frontend.md`
+   * 6.5). A partir do tablet o corpo usa a largura de leitura normal.
+   */
   max-width: 34ch;
+}
+
+@media (min-width: 768px) {
+  .principal > :global(article) {
+    max-width: var(--largura-leitura);
+  }
 }
 
 .principal > .cenas + section {

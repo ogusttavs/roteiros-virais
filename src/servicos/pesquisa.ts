@@ -331,6 +331,13 @@ export type VideoReferencia = {
   plataforma: Plataforma;
   url: string;
   contaHandle: string | null;
+  /**
+   * O YouTube grava o id do canal em `contas.handle` (nunca um @handle
+   * legível); mostrar isso ao cliente era o bug relatado no iPad
+   * (06/09/2026). O cartão prefere `contaNome`, que a coleta preenche com
+   * `channelTitle`/`nickName`/`ownerFullName`.
+   */
+  contaNome: string | null;
   publicadoEm: Date | null;
   foraDaCurva: number;
   assunto: string;
@@ -363,6 +370,7 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
       plataforma: videos.plataforma,
       url: videos.url,
       contaHandle: contas.handle,
+      contaNome: contas.nome,
       publicadoEm: videos.publicadoEm,
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
@@ -380,6 +388,7 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
       plataforma: l.plataforma,
       url: l.url,
       contaHandle: l.contaHandle,
+      contaNome: l.contaNome,
       publicadoEm: l.publicadoEm,
       foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
       assunto: l.analise.assunto,

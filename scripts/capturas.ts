@@ -38,6 +38,7 @@ const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
 
 const TAMANHOS = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "1024", largura: 1024, altura: 768 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
 const TEMAS = ["claro", "escuro"] as const;
@@ -89,6 +90,7 @@ async function main(): Promise<void> {
     { slug: "referencias", caminho: "/referencias" },
     { slug: "historico", caminho: "/historico" },
     { slug: "roteiro", caminho: `/roteiros/${roteiroId}` },
+    { slug: "briefing", caminho: "/briefing" },
     { slug: "conta", caminho: "/conta" },
   ];
 

@@ -47,6 +47,17 @@
     display: flex;
     flex-direction: column;
     padding: var(--espaco-6) var(--espaco-4);
+    /**
+     * Fixa ao rolar (achado do Gustavo no iPad, 06/09/2026: a barra sumia e
+     * a coluna ficava vazia): `position: sticky` com a altura da janela
+     * inteira, e rolagem propria se a lista de itens crescer. `top: 0`
+     * porque nao ha cabecalho acima dela no desktop.
+     */
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    transition: width var(--duracao-rapida) var(--curva-saida);
   }
 
   .identidadeDesktop {
@@ -60,6 +71,7 @@
   .nomeDesktop {
     font-size: var(--tamanho-secundario);
     color: var(--cor-texto-suave);
+    white-space: nowrap;
   }
 
   .colunaDesktop > :global(nav) {
@@ -79,6 +91,38 @@
     font-weight: 500;
     text-decoration: none;
     transition: background var(--duracao-rapida) var(--curva-saida);
+  }
+
+  .nomeConta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /**
+   * Recolhida (botao em BarraLateralToggle, atributo lido antes da
+   * primeira pintura em src/app/layout.tsx): so a coluna de 220 px vira 68,
+   * o nome do produto e da conta somem, e a identidade/conta centralizam
+   * com o icone. A casca do celular nao tem `.colunaDesktop`, entao o
+   * atributo global em `<html>` nunca a afeta.
+   */
+  html[data-barra-lateral="recolhida"] .colunaDesktop {
+    width: 68px;
+  }
+
+  html[data-barra-lateral="recolhida"] .identidadeDesktop {
+    justify-content: center;
+    padding: 0;
+  }
+
+  html[data-barra-lateral="recolhida"] .nomeDesktop,
+  html[data-barra-lateral="recolhida"] .nomeConta {
+    display: none;
+  }
+
+  html[data-barra-lateral="recolhida"] .contaDesktop {
+    justify-content: center;
+    padding: 0;
   }
 
   .contaDesktop:hover {
