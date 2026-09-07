@@ -58,6 +58,8 @@ export const textosBriefing = {
   },
   progresso: {
     bloco: (atual: number, total: number) => `bloco ${atual} de ${total}`,
+    /** Trilha continua do rodape do cabecalho (design v2, ".blocos-progresso"): total de respostas, nao de blocos. */
+    respondidas: (atual: number, total: number) => `${atual} de ${total} respondidas`,
   },
   pergunta: {
     contador: (n: number) => `${n} caracteres`,

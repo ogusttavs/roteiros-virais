@@ -18,6 +18,23 @@
   font-size: var(--tamanho-secundario);
 }
 
+.botaoSair {
+  margin-left: auto;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.botaoSair:hover {
+  background: var(--cor-superficie-hover);
+}
+
 .corpo,
 .corpoIntro,
 .corpoLiberado {
@@ -50,8 +67,23 @@
 
 .corpoLiberado {
   justify-content: center;
+  align-items: flex-start;
   min-height: 480px;
   animation: chegar 360ms var(--curva-saida) both;
+}
+
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.data {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cor-texto-dica);
 }
 
 .tituloSecao {
@@ -62,8 +94,54 @@
   color: var(--cor-texto);
 }
 
-.introducaoSecundaria {
+/* ---------- Intro ---------- */
+
+.promessas {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.promessa {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.iconePromessa {
+  color: var(--cor-acao);
+  margin-top: 0.15rem;
+}
+
+.promessa strong {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+}
+
+.promessa p {
+  grid-column: 2;
+  margin: 0;
   color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+/* ---------- Liberado ---------- */
+
+.selo {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  border: 1px solid var(--cor-selecao-borda);
+  color: var(--cor-destaque);
+}
+
+.acoesLiberado {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+  max-width: 22rem;
 }
 
 @keyframes chegar {
@@ -78,10 +156,12 @@
 }
 
 @media (min-width: 768px) {
-  .cabecalho {
-    display: none;
-  }
-
+  /**
+   * Diferente de Hoje e Roteiro (que tem barra lateral com o link de sair),
+   * /comecar nao tem casca: a barra do topo e a unica forma de sair em
+   * qualquer largura, entao ela fica visivel sempre (design v2,
+   * `Comecar.dc.html`, sem media query escondendo a `.barra-topo`).
+   */
   .corpo,
   .corpoIntro,
   .corpoLiberado {

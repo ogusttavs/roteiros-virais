@@ -1,11 +1,22 @@
 .forma {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-6);
+  gap: var(--espaco-5);
   max-width: var(--largura-leitura);
 }
 
-.rotulo {
+.dois {
+  display: grid;
+  gap: var(--espaco-5);
+}
+
+@media (min-width: 600px) {
+  .dois {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.campoSelect {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-2);
@@ -31,17 +42,26 @@
   min-height: var(--altura-toque);
 }
 
-.grupo,
-.grupoOpcoes {
+.grupo {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-3);
+  gap: var(--espaco-5);
 }
 
-.rotuloGrupo {
+.tituloGrupo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-sm);
+}
+
+.ajudaGrupo {
+  margin: var(--espaco-2) 0 0;
+  color: var(--cor-texto-suave);
   font-size: var(--tamanho-secundario);
-  font-weight: 500;
-  color: var(--cor-titulo);
+}
+
+.opcoes {
+  display: grid;
+  gap: var(--espaco-3);
 }
 
 .erro {
