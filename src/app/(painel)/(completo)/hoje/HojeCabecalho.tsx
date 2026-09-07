@@ -1,13 +1,9 @@
+import { Check } from "lucide-react";
+
 import type { Constancia } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 
 import styles from "./HojeTela.module.css";
-
-function fraseConstancia(constancia: Constancia): string {
-  if (constancia.tipo === "primeiro_dia") return textosHoje.constancia.primeiroDia;
-  if (constancia.tipo === "seguidos") return textosHoje.constancia.seguidos(constancia.dias);
-  return textosHoje.constancia.parado(constancia.dias);
-}
 
 const DATA_POR_EXTENSO = new Intl.DateTimeFormat("pt-BR", {
   weekday: "long",
@@ -21,29 +17,55 @@ function dataDeHojePorExtenso(): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
+type Estado = "normal" | "carregando" | "vazio" | "erro";
+
 /**
- * Data e constância no topo de `/hoje`, em todo estado, inclusive o vazio
- * (etapa 12, decisão 4 do `PROXIMO.md`, `HojeCelular.dc.html`: só essa
- * linha, não o componente `Constancia` inteiro). Server Component puro,
- * para o estado vazio de `page.tsx` usar sem precisar de `"use client"`.
+ * Data, título e uma linha de estado no topo de `/hoje`, em todo estado
+ * (design v2, `entrega/telas/Hoje.dc.html`, `.cabecalho-tela`). "normal"
+ * cobre também o roteiro já gerado (mesma linha no design, `data-passo="normal
+ * gerado"`); os outros estados mostram uma frase curta própria em vez da
+ * constância. Server Component puro, para `page.tsx`, `loading.tsx` e
+ * `error.tsx` usarem sem precisar de `"use client"`.
+ *
+ * `diasGravados` (revisão do PR #31, item 2): "você gravou N dos últimos 7
+ * dias", com N vindo de `resumoHistorico().ultimos30Dias` (a mesma conta de
+ * "sua semana"). No primeiro dia da conta, a frase de primeiro dia
+ * (`constancia.tipo === "primeiro_dia"`) tem prioridade.
  *
  * `avisoVideoSubindo` (etapa 15, parte 1, decisão 4): uma linha curta
- * quando algum vídeo postado está acima do normal da própria conta, em
- * todo estado tambem, ja formatada por quem chama.
+ * quando algum vídeo postado está acima do normal da própria conta, só no
+ * estado normal, já formatada por quem chama.
  */
 export function HojeCabecalho({
   constancia,
+  diasGravados = 0,
   avisoVideoSubindo = null,
+  estado = "normal",
 }: {
   constancia: Constancia;
+  diasGravados?: number;
   avisoVideoSubindo?: string | null;
+  estado?: Estado;
 }) {
   return (
-    <div className={styles.cabecalho}>
+    <div className={styles.cabecalhoTela}>
       <span className={styles.data}>{dataDeHojePorExtenso()}</span>
-      <h1 className={styles.titulo}>{textosHoje.titulo}</h1>
-      <p className={styles.constancia}>{fraseConstancia(constancia)}</p>
-      {avisoVideoSubindo ? <p className={styles.avisoVideo}>{avisoVideoSubindo}</p> : null}
+      <h1>{textosHoje.titulo}</h1>
+      {estado === "normal" ? (
+        <p className={styles.linhaConstancia}>
+          <Check size={18} strokeWidth={1.75} className={styles.iconePositivo} aria-hidden="true" />
+          <span>
+            {constancia.tipo === "primeiro_dia" ? textosHoje.constancia.primeiroDia : textosHoje.constanciaSemana(diasGravados)}
+          </span>
+        </p>
+      ) : estado === "carregando" ? (
+        <p className={styles.fraseEstado}>{textosHoje.carregando}</p>
+      ) : estado === "vazio" ? (
+        <p className={styles.fraseEstado}>{textosHoje.vazioTitulo}</p>
+      ) : (
+        <p className={styles.fraseEstado}>{textosHoje.erroAviso}</p>
+      )}
+      {estado === "normal" && avisoVideoSubindo ? <p className={styles.avisoVideo}>{avisoVideoSubindo}</p> : null}
     </div>
   );
 }

@@ -1,7 +1,9 @@
 /**
- * Texto de tela de `/hoje` (brief-frontend.md, seção 6.3;
- * `entrega/textos.ts`, bloco `hoje`), incluindo o cartão de roteiro do dia
- * (etapa 11, `HojeCelular.dc.html`, quadro "roteiro").
+ * Texto de tela de `/hoje` (brief-frontend.md, seção 6.3; design v2,
+ * `entregaveis/design-v2/entrega/telas/Hoje.dc.html`), incluindo o cartão de
+ * roteiro do dia (etapa 11) e o bloco de evidência (design v2, `PROXIMO.md`,
+ * D2 parte 1, item 5). Primeira letra maiúscula em toda frase (`BRIEF.md`,
+ * revisão do lote 6; `PROXIMO.md`, revisão do PR #31, item 3).
  *
  * O rótulo por objetivo do `TemaCartao` ("para te conhecerem") fica em
  * `src/ia/enums.ts`, não aqui: a chave do objeto seria um dos três nomes
@@ -13,10 +15,18 @@
 
 export const textosHoje = {
   titulo: "O que gravar hoje",
+  /**
+   * Linha de constância de Hoje (design v2; revisão do PR #31, item 2): o
+   * número vem de `resumoHistorico().ultimos30Dias`, os últimos 7, a mesma que
+   * monta "sua semana". A `Constancia` (sequência) continua valendo em
+   * outras telas (Histórico); aqui é só esta linha que muda.
+   */
+  constanciaSemana: (diasGravados: number) =>
+    diasGravados === 0
+      ? "Você ainda não gravou nesta semana. Gravar hoje começa o ritmo."
+      : `Você gravou ${diasGravados} dos últimos 7 dias. Gravar hoje mantém o ritmo.`,
   constancia: {
-    seguidos: (n: number) => `${n} dia${n === 1 ? "" : "s"} seguido${n === 1 ? "" : "s"} gravando`,
-    parado: (n: number) => `faz ${n} dia${n === 1 ? "" : "s"} que você não grava`,
-    primeiroDia: "hoje é o seu primeiro dia",
+    primeiroDia: "Hoje é o seu primeiro dia",
   },
   /**
    * Conta vídeos e notícias juntos (correção do dia 1 da etapa 14,
@@ -28,19 +38,54 @@ export const textosHoje = {
     if (videos === 0) return `${noticias} notícia${noticias === 1 ? "" : "s"} do setor esta semana`;
     return `${videos} vídeo${videos === 1 ? "" : "s"} e ${noticias} notícia${noticias === 1 ? "" : "s"} esta semana`;
   },
-  queroEsse: "quero esse",
-  outraCoisa: "quero falar de outra coisa",
-  carregando: "lendo os vídeos que funcionaram esta semana",
+  /**
+   * Bloco de evidência (design v2, três linhas: conta, múltiplo, parecidos).
+   * Sem dado, o bloco some (`BRIEF.md`). O múltiplo ("4,1x") vem em negrito
+   * à parte na tela; esta função só devolve o resto da frase. `rotulo` já
+   * vem calculado por `rotuloMultiploConta` (revisão do PR #31, item 4: o
+   * rótulo acompanha o número, nunca fixo em "acima"); `quando` por
+   * `fraseDiasAtras` (nunca "em 0 dias").
+   */
+  evidenciaMultiplo: (rotulo: string, views: string, quando: string) =>
+    `${rotulo}, ${views} visualizaç${views === "1" ? "ão" : "ões"} ${quando}`,
+  evidenciaParecidos: (n: number) => `Mais ${n} vídeo${n === 1 ? "" : "s"} parecido${n === 1 ? "" : "s"} nos últimos 7 dias`,
+  maisIndicadoParaHoje: "Mais indicado para hoje",
+  queroEsse: "Quero esse",
+  escreverMeuAssunto: "Escrever o meu assunto",
+  preferAssuntoSeu: "Prefere um assunto seu?",
+  preferAssuntoSeuTexto: "Escreva o que você quer gravar e a gente diz se vale a pena hoje, com nota e com o que mudar.",
+  carregando: "Lendo os vídeos que funcionaram esta semana",
+  carregandoAviso: "Isso leva menos de um minuto. Pode deixar aberto.",
+  vazioTitulo: "Os temas de hoje saem até as 6h30",
   vazio:
-    "Ainda estamos lendo o que funciona no seu setor. Os temas de hoje aparecem aqui amanhã cedo.",
-  erro: "não conseguimos buscar os temas agora; tente de novo em um minuto",
-  tentarDeNovo: "tentar de novo",
+    "A busca do que está funcionando no seu setor roda de madrugada. Se você chegou antes, ainda dá para escrever o seu assunto.",
+  erroAviso: "A busca de hoje falhou",
+  erroTitulo: "Ainda dá para gravar",
+  erro:
+    "Não conseguimos falar com uma das fontes agora. O que já estava guardado continua valendo, e você pode escrever o seu assunto.",
+  tentarDeNovo: "Tentar de novo",
   roteiroDeHoje: "Roteiro de hoje",
-  escritoAs: (h: string) => `escrito às ${h}`,
-  abrirRoteiro: "abrir roteiro",
-  verOutros: "ver outros temas de hoje",
-  esconderOutros: "esconder os outros temas",
-  trocar: "trocar",
+  roteiroDeHojePronto: "Seu roteiro de hoje está pronto",
+  escritoAs: (h: string) => `Escrito às ${h}`,
+  abrirRoteiro: "Abrir o roteiro",
+  modoGravacao: "Modo gravação",
+  verOutros: "Ver os outros temas de hoje",
+  esconderOutros: "Esconder os outros temas",
+  contagemTemas: (n: number) => `${n} tema${n === 1 ? "" : "s"}`,
+  trocarTemaAviso: "Trocar de tema escreve um roteiro novo. O de agora continua guardado no histórico.",
+  trocar: "Trocar",
   avisoVideoSubindo: (dia: string, vezes: string) =>
-    `seu vídeo de ${dia} está ${vezes} acima do normal; responda os comentários hoje`,
+    `Seu vídeo de ${dia} está ${vezes} acima do normal; responda os comentários hoje`,
+  suaSemana: "Sua semana",
+  seuUltimoVideo: "Seu último vídeo",
+  visualizacoesEmHoras: (views: string, horas: number) => `${views} visualizações em ${horas} hora${horas === 1 ? "" : "s"}`,
+  acimaDoSeuNormal: (vezes: string) => `${vezes} acima do seu normal`,
+  doNormalDaSuaConta: (vezes: string) => `${vezes} do normal da sua conta`,
+  verComoFoi: "Ver como foi",
+  atualizar: "Atualizar",
+  conta: "Conta",
+  roteiroGeradoDescricao: (duracaoS: number) =>
+    `Quatro blocos, ${duracaoS} segundos, com a edição junto. Escrito com o que funcionou no seu setor esta semana.`,
+  hoje: "hoje",
+  semVideoAinda: "Assim que você postar um vídeo, o acompanhamento aparece aqui",
 };

@@ -19,10 +19,10 @@
   right: 0;
   bottom: 0;
   z-index: 6;
-  background: color-mix(in srgb, var(--cor-superficie) 85%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--cor-borda);
+  background: var(--cor-material-barra);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border-top: 1px solid var(--cor-divisor);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -41,9 +41,9 @@
 
   .colunaDesktop {
     flex: none;
-    width: 220px;
+    width: var(--largura-barra-lateral);
     box-sizing: border-box;
-    border-right: 1px solid var(--cor-borda);
+    border-right: 1px solid var(--cor-divisor);
     display: flex;
     flex-direction: column;
     padding: var(--espaco-6) var(--espaco-4);
@@ -58,6 +58,42 @@
     height: 100dvh;
     overflow-y: auto;
     transition: width var(--duracao-rapida) var(--curva-saida);
+  }
+
+  /**
+   * Sem escolha salva, o iPad (768 a 1179px) nasce recolhida (design v2,
+   * `PROXIMO.md`, D2 parte 1, item 3: "recolhida por padrão no iPad,
+   * aberta no desktop"). A escolha explicita do cliente
+   * (`html[data-barra-lateral]`, mais abaixo) vence isto em qualquer
+   * largura.
+   */
+  @media (max-width: 1179px) {
+    .colunaDesktop {
+      width: var(--largura-barra-recolhida);
+      /**
+       * Menos padding de lado (achado rodando o e2e de layout,
+       * `PROXIMO.md` D2 parte 1, item 8): com o padding cheio, sobrava
+       * menos que 44px para os alvos de toque dentro da coluna estreita.
+       */
+      padding-inline: var(--espaco-2);
+    }
+
+    .identidadeDesktop {
+      justify-content: center;
+      padding: 0;
+    }
+
+    .nomeDesktop,
+    .nomeConta {
+      display: none;
+    }
+
+    .contaDesktop {
+      width: var(--altura-toque);
+      justify-content: center;
+      padding: 0;
+      margin-inline: auto;
+    }
   }
 
   .identidadeDesktop {
@@ -100,14 +136,16 @@
   }
 
   /**
-   * Recolhida (botao em BarraLateralToggle, atributo lido antes da
-   * primeira pintura em src/app/layout.tsx): so a coluna de 220 px vira 68,
-   * o nome do produto e da conta somem, e a identidade/conta centralizam
-   * com o icone. A casca do celular nao tem `.colunaDesktop`, entao o
-   * atributo global em `<html>` nunca a afeta.
+   * Escolha explicita do cliente (botao em BarraLateralToggle, atributo
+   * lido antes da primeira pintura em src/app/layout.tsx) vence o padrão
+   * automático acima em qualquer largura: recolhida força os 4,5rem mesmo
+   * no desktop; aberta força os 16rem mesmo no iPad. A casca do celular
+   * nao tem `.colunaDesktop`, entao o atributo global em `<html>` nunca a
+   * afeta.
    */
   html[data-barra-lateral="recolhida"] .colunaDesktop {
-    width: 68px;
+    width: var(--largura-barra-recolhida);
+    padding-inline: var(--espaco-2);
   }
 
   html[data-barra-lateral="recolhida"] .identidadeDesktop {
@@ -121,8 +159,32 @@
   }
 
   html[data-barra-lateral="recolhida"] .contaDesktop {
+    width: var(--altura-toque);
     justify-content: center;
     padding: 0;
+    margin-inline: auto;
+  }
+
+  html[data-barra-lateral="aberta"] .colunaDesktop {
+    width: var(--largura-barra-lateral);
+    padding-inline: var(--espaco-4);
+  }
+
+  html[data-barra-lateral="aberta"] .identidadeDesktop {
+    justify-content: flex-start;
+    padding: 0 var(--espaco-3);
+  }
+
+  html[data-barra-lateral="aberta"] .nomeDesktop,
+  html[data-barra-lateral="aberta"] .nomeConta {
+    display: inline;
+  }
+
+  html[data-barra-lateral="aberta"] .contaDesktop {
+    width: auto;
+    justify-content: flex-start;
+    padding: 0 var(--espaco-3);
+    margin-inline: 0;
   }
 
   .contaDesktop:hover {

@@ -8,30 +8,42 @@
 .bloco {
   display: flex;
   flex-direction: column;
-  gap: var(--espaco-3);
+  gap: var(--espaco-2);
 }
 
+/**
+ * O rótulo virou um chip, como o "chip de tempo do bloco" do design v2
+ * (design não tem duração por bloco no dado real; o chip mostra o nome do
+ * bloco em vez de um intervalo de segundos inventado, `PROXIMO.md`, D2
+ * parte 1, item 6, decisão registrada em `TODO.md`).
+ */
 .rotulo {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
-  letter-spacing: var(--espacamento-rotulo);
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-sm);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  font: var(--peso-semibold) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
   text-transform: uppercase;
-  color: var(--cor-texto-suave);
+  color: var(--cor-destaque);
 }
 
 .gancho {
   margin: 0;
-  font-size: var(--tamanho-titulo-sm);
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-medio);
+  line-height: var(--altura-titulo);
   color: var(--cor-titulo);
 }
 
 .paragrafo {
   margin: 0;
-  font-size: var(--tamanho-leitura);
+  font-size: var(--tamanho-corpo);
   line-height: var(--altura-corpo);
-  color: var(--cor-texto);
+  color: var(--cor-titulo);
 }
 
 .gravacao {
@@ -41,8 +53,8 @@
 
 .gravacao .paragrafo,
 .gravacao .gancho {
-  font-size: var(--tamanho-titulo-sm);
-  font-weight: 600;
-  line-height: 1.45;
+  font-size: var(--tamanho-gravacao);
+  font-weight: var(--peso-medio);
+  line-height: var(--altura-gravacao);
   color: var(--cor-titulo);
 }

@@ -127,7 +127,7 @@ test.describe("roteiro pela tela", () => {
       name: "o erro que faz a mancha de vinho no sofa espalhar em vez de sair",
     });
     await expect(cartaoDoTema).toBeVisible();
-    await cartaoDoTema.locator("..").getByRole("button", { name: "quero esse" }).click();
+    await cartaoDoTema.locator("../..").getByRole("button", { name: "quero esse" }).click();
 
     await expect(page).toHaveURL(/\/hoje\/objetivo/);
     await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
@@ -148,7 +148,7 @@ test.describe("roteiro pela tela", () => {
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("versão 2 de 2")).toBeVisible();
 
-    await page.getByRole("button", { name: "gravei", exact: true }).click();
-    await expect(page.getByText(/gravado às/)).toBeVisible();
+    await page.getByRole("button", { name: "Já gravei", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Postei", exact: true })).toBeVisible();
   });
 });

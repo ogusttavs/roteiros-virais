@@ -1,12 +1,13 @@
 .linha {
   display: flex;
   justify-content: flex-end;
-  height: 32px;
+  height: var(--altura-toque);
 }
 
 .botao {
-  width: 32px;
-  height: 32px;
+  /** Alvo minimo de 44px em toda largura (design v2, `entrega/telas/README.md`, regra 2). */
+  width: var(--altura-toque);
+  height: var(--altura-toque);
   flex: none;
   display: flex;
   align-items: center;
@@ -32,6 +33,26 @@
   display: none;
 }
 
+/**
+ * Sem escolha salva (nenhum atributo em `<html>`), o iPad (768 a 1179px)
+ * nasce recolhido: mostra "abrir o menu"; o desktop (1180px+) nasce aberto.
+ * Design v2, `PROXIMO.md`, D2 parte 1, item 3.
+ */
+@media (min-width: 768px) and (max-width: 1179px) {
+  .linha {
+    justify-content: center;
+  }
+
+  .recolher {
+    display: none;
+  }
+
+  .abrir {
+    display: flex;
+  }
+}
+
+/** Escolha explicita do cliente (BarraLateralToggle.tsx) vence o padrão automático em qualquer largura. */
 html[data-barra-lateral="recolhida"] .linha {
   justify-content: center;
 }
@@ -42,4 +63,16 @@ html[data-barra-lateral="recolhida"] .recolher {
 
 html[data-barra-lateral="recolhida"] .abrir {
   display: flex;
+}
+
+html[data-barra-lateral="aberta"] .linha {
+  justify-content: flex-end;
+}
+
+html[data-barra-lateral="aberta"] .recolher {
+  display: flex;
+}
+
+html[data-barra-lateral="aberta"] .abrir {
+  display: none;
 }

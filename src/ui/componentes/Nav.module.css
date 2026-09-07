@@ -1,7 +1,14 @@
+/**
+ * Barra de abas do celular e barra lateral do tablet/desktop (base.css,
+ * blocos `.abas`/`.aba` e `.lateral`/`.item-lateral`; design v2, `PROXIMO.md`,
+ * D2 parte 1, item 3). O item ativo muda de cor no celular (nunca bolha por
+ * cima do icone) e ganha um fundo de seleção suave no tablet/desktop, na
+ * mesma cor que o resto do painel usa para "isto está selecionado".
+ */
 .nav {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  height: 64px;
+  height: var(--altura-toque-lg);
 }
 
 .item {
@@ -23,7 +30,8 @@
 }
 
 .ativo {
-  color: var(--cor-titulo);
+  color: var(--cor-acao);
+  font-weight: var(--peso-semibold);
 }
 
 .traco {
@@ -33,7 +41,7 @@
 .rotulo {
   font-size: var(--tamanho-rotulo);
   line-height: 1;
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   letter-spacing: 0.01em;
 }
 
@@ -50,7 +58,7 @@
     justify-content: flex-start;
     align-items: center;
     gap: var(--espaco-3);
-    height: 40px;
+    min-height: var(--altura-toque);
     padding: 0 var(--espaco-3);
   }
 
@@ -58,42 +66,67 @@
     background: var(--cor-superficie-hover);
   }
 
-  .traco {
-    display: block;
-    position: absolute;
-    left: -16px;
-    top: 10px;
-    bottom: 10px;
-    width: 2px;
-    border-radius: 1px;
-    background: var(--cor-titulo);
-    opacity: 0;
-    transition: opacity var(--duracao-rapida) var(--curva-saida);
-  }
-
-  .ativo .traco {
-    opacity: 1;
+  .ativo {
+    background: var(--cor-selecao-suave);
+    color: var(--cor-destaque);
   }
 
   .rotulo {
     font-size: var(--tamanho-secundario);
-    font-weight: 500;
+    font-weight: var(--peso-medio);
     letter-spacing: normal;
+  }
+
+  .ativo .rotulo {
+    font-weight: var(--peso-semibold);
   }
 }
 
 /**
- * Barra lateral recolhida (etapa "acabamento visual 2"): só o rótulo some,
- * o ícone fica centralizado e o `title` do link (Nav.tsx) vira a dica ao
- * pairar o mouse. `.compactavel` só existe na instância de dentro de
- * `.colunaDesktop` (layout.tsx); a barra inferior do celular nunca recebe
- * esta classe, então o atributo global em `<html>` não a afeta.
+ * Barra lateral recolhida (auto no iPad ou escolha explicita, veja
+ * `BarraLateralToggle`): só o rótulo some, o ícone fica centralizado e o
+ * `title` do link (Nav.tsx) vira a dica ao pairar o mouse. `.compactavel`
+ * só existe na instância de dentro de `.colunaDesktop` (layout.tsx); a
+ * barra inferior do celular nunca recebe esta classe, então nenhuma das
+ * regras abaixo a afeta.
  */
+@media (min-width: 768px) and (max-width: 1179px) {
+  /**
+   * Alvo de 44px de verdade (achado rodando o e2e de layout, `PROXIMO.md`
+   * D2 parte 1, item 8): sem largura própria, o item encolhia para o
+   * tamanho do ícone (39px), porque a coluna recolhida (4,5rem) menos o
+   * padding de `.colunaDesktop` sobrava menos que isso.
+   */
+  .compactavel .item {
+    width: var(--altura-toque);
+    justify-content: center;
+    padding: 0;
+    margin-inline: auto;
+  }
+
+  .compactavel .rotulo {
+    display: none;
+  }
+}
+
 html[data-barra-lateral="recolhida"] .compactavel .item {
+  width: var(--altura-toque);
   justify-content: center;
   padding: 0;
+  margin-inline: auto;
 }
 
 html[data-barra-lateral="recolhida"] .compactavel .rotulo {
   display: none;
+}
+
+html[data-barra-lateral="aberta"] .compactavel .item {
+  width: auto;
+  justify-content: flex-start;
+  padding: 0 var(--espaco-3);
+  margin-inline: 0;
+}
+
+html[data-barra-lateral="aberta"] .compactavel .rotulo {
+  display: inline;
 }

@@ -1,70 +1,110 @@
+/**
+ * design v2, `entrega/telas/Hoje.dc.html` (`.cartao.tema`, `.tema-titulo-area`,
+ * `.evidencia`, `.marca-recomendado`, `.acao`). Os três cartões (recomendado
+ * e os outros dois) têm a mesma caixa; só o preenchimento do botão muda
+ * (`PROXIMO.md`, D2 parte 1, item 5).
+ */
 .cartao {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-2);
-  padding: var(--espaco-6) 0;
-  border-bottom: 1px solid var(--cor-borda);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-5);
+  display: grid;
+  gap: var(--espaco-4);
+  align-content: start;
+  min-width: 0;
+  height: 100%;
 }
 
-.cartao.primario {
-  padding: var(--espaco-5);
-  border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-lg);
-  background: var(--cor-superficie);
+.marcaRecomendado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  align-self: start;
+  justify-self: start;
+  padding: var(--espaco-1) var(--espaco-3);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+}
+
+.tituloArea {
+  display: grid;
+  gap: var(--espaco-2);
 }
 
 .rotulo {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
-  letter-spacing: var(--espacamento-rotulo);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
   text-transform: uppercase;
-  color: var(--cor-texto-suave);
+  color: var(--cor-texto-dica);
 }
 
 .tema {
   margin: 0;
-  font-size: var(--tamanho-leitura);
-  font-weight: 600;
-  line-height: 1.3;
+  font-size: var(--tamanho-titulo-2);
+  line-height: var(--altura-titulo);
   color: var(--cor-titulo);
 }
 
 .porque {
   margin: 0;
   font-size: var(--tamanho-secundario);
-  line-height: 1.5;
+  line-height: var(--altura-corpo);
   color: var(--cor-texto-suave);
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
-  overflow: hidden;
-}
-
-.rodape {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-4);
-  margin-top: var(--espaco-2);
 }
 
 .evidencia {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.evidenciaLinha {
+  display: block;
+  min-width: 0;
+}
+
+.evidenciaLinha b {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-texto-dica);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.conta {
+  display: block;
+  font-family: var(--fonte-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.rodape {
+  margin-top: auto;
 }
 
 .botao {
-  flex: none;
+  min-height: var(--altura-toque-lg);
+  width: 100%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: var(--altura-toque);
-  padding: 0 var(--espaco-5);
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
+  border: var(--largura-borda) solid transparent;
   border-radius: var(--raio-pill);
-  border: 1px solid transparent;
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-corpo);
   font-family: var(--fonte-texto);
-  font-size: var(--tamanho-secundario);
   cursor: pointer;
   transition: background var(--duracao-rapida) var(--curva-saida);
 }
@@ -72,7 +112,6 @@
 .botaoPrimario {
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
-  font-weight: 600;
 }
 
 .botaoPrimario:hover {
@@ -83,7 +122,7 @@
   background: transparent;
   border-color: var(--cor-borda-forte);
   color: var(--cor-titulo);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
 }
 
 .botaoSecundario:hover {
@@ -95,56 +134,9 @@
   box-shadow: var(--sombra-foco);
 }
 
-.cartao.primario .rodape {
-  flex-direction: column;
-  align-items: stretch;
-  gap: var(--espaco-3);
-  margin-top: var(--espaco-2);
-}
-
-.cartao.primario .botao {
-  width: 100%;
-}
-
-/**
- * Desktop, mesmo corte das outras telas do acabamento visual 2 (revisao do
- * PR #30, ajuste 2, item 8 do plano): os tres cartoes iguais, como em
- * HojeDesktop.dc.html. Sem caixa nem borda (nem no recomendado); o porque
- * inteiro, sem cortar; a evidencia numa linha propria, com o botao embaixo
- * a esquerda, do tamanho do texto. So o preenchimento do botao muda entre
- * o recomendado e os outros (`.botaoPrimario`/`.botaoSecundario`, ja
- * existiam). No celular e no tablet (ate 1099px) continua como estava.
- */
-@media (min-width: 1100px) {
-  .cartao,
-  .cartao.primario {
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: none;
-  }
-
-  .porque {
-    display: block;
-    overflow: visible;
-  }
-
-  .rodape,
-  .cartao.primario .rodape {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--espaco-1);
-    margin-top: var(--espaco-2);
-  }
-
-  .evidencia {
-    margin-top: var(--espaco-2);
-  }
-
-  .botao,
-  .cartao.primario .botao {
-    align-self: flex-start;
+@media (min-width: 768px) {
+  .botao {
     width: auto;
-    margin-top: var(--espaco-3);
+    justify-self: start;
   }
 }

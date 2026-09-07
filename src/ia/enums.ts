@@ -25,10 +25,15 @@ export const NOME_OBJETIVO: Record<Objetivo, string> = {
  * Rótulo curto do `TemaCartao` em `/hoje` (etapa 10, brief-frontend.md
  * 6.3): mesma razão de `NOME_OBJETIVO` estar aqui, fora do `checar-texto`.
  */
+/**
+ * Frase completa do design v2 (`entrega/telas/Hoje.dc.html`, `.rotulo`; `PROXIMO.md`, revisão
+ * do PR #31, item 3), com a primeira letra maiúscula como o resto do produto (`BRIEF.md`,
+ * seção 3, revisão do lote 6).
+ */
 export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
-  alcance: "para te conhecerem",
-  engajamento: "para lembrarem de você",
-  conversao: "para te chamarem",
+  alcance: "Para mais gente te conhecer",
+  engajamento: "Para lembrarem de você",
+  conversao: "Para te chamarem para comprar",
 };
 
 /**

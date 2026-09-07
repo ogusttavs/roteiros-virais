@@ -1,35 +1,137 @@
+/**
+ * `/hoje` (design v2, `entrega/telas/Hoje.dc.html`; `PROXIMO.md`, D2 parte 1,
+ * item 5). `.pagina` cancela o padding de `(painel)/layout.module.css`
+ * (`.corpo`), porque esta tela tem a própria `BarraTopo` colada no topo,
+ * sem o cabeçalho genérico do celular por baixo (`CascaCabecalhoCelular`); e
+ * o próprio `.miolo` abaixo devolve o espaçamento do design.
+ */
 .pagina {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-6);
-  max-width: var(--largura-leitura);
+  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
-.cabecalho {
-  display: flex;
-  flex-direction: column;
+@media (min-width: 768px) {
+  .pagina {
+    margin: calc(-1 * var(--espaco-10));
+  }
+}
+
+.botaoBarra {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botaoBarra:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoBarra:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/**
+ * Avatar de `/conta` na barra do topo, só no celular (revisão do PR #31,
+ * item 8, decisão do Fable em `BRIEF.md`): no celular, Hoje não tem barra
+ * lateral, e a barra do topo é a única porta para a conta. No tablet e no
+ * desktop a barra lateral já tem o link, então este some.
+ */
+.avatarBarra {
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .avatarBarra {
+    display: none;
+  }
+}
+
+/* ---------- Conteúdo ---------- */
+
+.miolo {
+  padding: var(--espaco-5) var(--margem-celular) calc(64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (min-width: 768px) {
+  .miolo {
+    padding: var(--espaco-8) var(--espaco-6) var(--espaco-12);
+    gap: var(--espaco-8);
+  }
+}
+
+@media (min-width: 1180px) {
+  .miolo {
+    padding-inline: var(--espaco-10);
+  }
+}
+
+/* ---------- Cabeçalho da tela (HojeCabecalho) ---------- */
+
+.cabecalhoTela {
+  display: grid;
   gap: var(--espaco-1);
 }
 
 .data {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
   color: var(--cor-texto-dica);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
 }
 
-.titulo {
-  margin: 0;
-  font-size: var(--tamanho-titulo);
-}
-
-.constancia {
-  margin: 0;
+.linhaConstancia {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin-top: var(--espaco-2);
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
 }
 
-.avisoVideo {
+.iconePositivo {
+  color: var(--cor-positivo);
+  margin-top: 0.15rem;
+}
+
+.linhaConstancia b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.fraseEstado {
   margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.avisoVideo {
+  margin: var(--espaco-1) 0 0;
   font-size: var(--tamanho-secundario);
   color: var(--cor-titulo);
 }
@@ -44,100 +146,227 @@
   line-height: var(--altura-corpo);
 }
 
-.grade {
-  display: flex;
-  flex-direction: column;
+/* ---------- Duas colunas ---------- */
+
+.duasColunas {
+  display: grid;
+  gap: var(--espaco-6);
 }
 
+.colunaPrincipal {
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (min-width: 768px) {
+  .duasColunas {
+    grid-template-columns: minmax(0, 1.55fr) minmax(17rem, 0.85fr);
+    align-items: start;
+  }
+}
+
+@media (min-width: 1180px) {
+  .duasColunas {
+    grid-template-columns: minmax(0, 1.7fr) minmax(19rem, 0.8fr);
+    gap: var(--espaco-8);
+  }
+}
+
+/**
+ * Sempre uma coluna, os cartões empilhados (design v2, `Hoje.Normal.1280.Claro.png`; revisão
+ * do PR #31, item 1): a entrega tem um `.temas-tres` de três colunas em `base.css`, mas o PNG
+ * de referência em 1280px mostra os três cartões empilhados na coluna principal, ao lado do
+ * aparte "sua semana"; três colunas dentro da coluna principal (que já divide a largura com o
+ * aparte) ficavam estreitas demais. Nome da classe mantido para não mexer no JSX.
+ */
+.temasTres {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espaco-4);
+}
+
+/* ---------- Cartão do roteiro de hoje ---------- */
+
 .cartaoRoteiro {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-3);
+  display: grid;
+  gap: var(--espaco-4);
   padding: var(--espaco-5);
   background: var(--cor-superficie);
-  border: 1px solid var(--cor-borda-forte);
+  border: var(--largura-borda) solid var(--cor-borda);
   border-radius: var(--raio-lg);
 }
 
-.rotuloRoteiro {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
-  letter-spacing: var(--espacamento-rotulo);
-  text-transform: uppercase;
-  color: var(--cor-texto-suave);
+.marcaRecomendado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  align-self: start;
+  padding: var(--espaco-1) var(--espaco-3);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
 }
 
-.tituloRoteiro {
+.tituloArea {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.rotulo {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.temaTitulo {
   margin: 0;
-  font-size: var(--tamanho-corpo);
-  font-weight: 500;
-  line-height: 1.4;
+  font-size: var(--tamanho-titulo-2);
+  line-height: var(--altura-titulo);
   color: var(--cor-titulo);
 }
 
-.ganchoRoteiro {
+.porque {
   margin: 0;
-  font-size: var(--tamanho-leitura);
-  line-height: 1.45;
-  color: var(--cor-texto);
-}
-
-.escritoAs {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
 }
 
-.botaoAbrir {
-  margin-top: var(--espaco-2);
-  display: flex;
+.evidencia {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.evidenciaLinha {
+  display: block;
+  min-width: 0;
+}
+
+.evidenciaLinha b {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.conta {
+  display: block;
+  font-family: var(--fonte-mono);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.acoes {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+@media (min-width: 768px) {
+  .acoes {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+.botaoPrimario,
+.botaoSecundario {
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: var(--altura-toque);
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
   border-radius: var(--raio-pill);
-  border: 1px solid transparent;
-  background: var(--cor-acao);
-  color: var(--cor-acao-texto);
+  border: var(--largura-borda) solid transparent;
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-corpo);
   font-family: var(--fonte-texto);
-  font-size: var(--tamanho-secundario);
-  font-weight: 600;
   text-decoration: none;
+  text-align: center;
   cursor: pointer;
 }
 
-.botaoAbrir:hover {
+.botaoPrimario {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
+.botaoPrimario:hover {
   background: var(--cor-acao-hover);
 }
 
-.botaoAbrir:focus-visible {
+.botaoSecundario {
+  background: transparent;
+  color: var(--cor-titulo);
+  border-color: var(--cor-borda-forte);
+  font-weight: var(--peso-medio);
+}
+
+.botaoSecundario:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoPrimario:focus-visible,
+.botaoSecundario:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-.alternarOutros {
-  align-self: flex-start;
-  margin-top: var(--espaco-2);
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: var(--tamanho-secundario);
-  font-weight: 500;
+/* ---------- Recolhidos: os outros temas ---------- */
+
+.recolhidos {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.abrirTemas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-3) var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
   color: var(--cor-titulo);
-  text-decoration: underline;
-  text-underline-offset: 4px;
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-corpo);
+  font-family: var(--fonte-texto);
+  text-align: left;
   cursor: pointer;
 }
 
-.alternarOutros:focus-visible {
+.abrirTemas:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
+.contaTemas {
+  color: var(--cor-acao);
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-secundario);
+}
+
+.avisoTrocarTema {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
 .listaOutros {
-  display: flex;
-  flex-direction: column;
-  margin-top: var(--espaco-2);
+  display: grid;
 }
 
 .linhaOutro {
@@ -146,27 +375,25 @@
   justify-content: space-between;
   gap: var(--espaco-4);
   padding: var(--espaco-4) 0;
-  border-top: 1px solid var(--cor-borda);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
 }
 
 .blocoOutro {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: var(--espaco-1);
   min-width: 0;
 }
 
 .rotuloOutro {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
-  letter-spacing: var(--espacamento-rotulo);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
   text-transform: uppercase;
-  color: var(--cor-texto-suave);
+  color: var(--cor-texto-dica);
 }
 
 .temaOutro {
   font-size: var(--tamanho-secundario);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   color: var(--cor-titulo);
 }
 
@@ -176,7 +403,7 @@
   border: none;
   padding: 0;
   font-size: var(--tamanho-secundario);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   color: var(--cor-titulo);
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -188,35 +415,188 @@
   box-shadow: var(--sombra-foco);
 }
 
-.outraCoisa {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-  text-decoration: underline;
-  cursor: pointer;
+/* ---------- Prefere um assunto seu ---------- */
+
+.proprio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+  padding: var(--espaco-5);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
 }
 
-.outraCoisa:hover {
+.proprio p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+/* ---------- Aparte: sua semana e seu último vídeo ---------- */
+
+.aparte {
+  display: grid;
+  gap: var(--espaco-6);
+  padding: var(--espaco-5);
+  background: var(--cor-superficie-recuada);
+  border-radius: var(--raio-lg);
+}
+
+.aparte h4 {
+  margin: 0 0 var(--espaco-3);
+  color: var(--cor-texto-dica);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  font-weight: var(--peso-medio);
+}
+
+.semana {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.dia {
+  flex: 1;
+  display: grid;
+  gap: var(--espaco-2);
+  justify-items: center;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.dia i {
+  display: block;
+  width: 100%;
+  height: 2rem;
+  border-radius: var(--raio-sm);
+  border: var(--largura-borda) solid var(--cor-borda);
+  background: var(--cor-superficie);
+}
+
+.diaGravou i {
+  background: var(--cor-acao);
+  border-color: var(--cor-acao);
+}
+
+.diaHoje i {
+  border: 2px solid var(--cor-acao);
+  background: var(--cor-selecao-suave);
+}
+
+.diaHoje.diaGravou i {
+  background: var(--cor-acao);
+}
+
+.curva {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.curvaValor {
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
   color: var(--cor-titulo);
 }
 
-.outraCoisa:focus-visible {
+.curvaLegenda {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.curvaAcima {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-positivo);
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-secundario);
+}
+
+.curvaVazia {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.verComoFoi {
+  justify-self: start;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.verComoFoi:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-/**
- * 1100px, mesmo corte das outras telas do acabamento visual 2 (revisao do
- * PR #30, ajuste 2): abaixo disso os cartoes empilham em uma coluna so,
- * como no celular (TemaCartao.module.css cuida do resto do ajuste).
- */
-@media (min-width: 1100px) {
-  .grade {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--espaco-8);
+/* ---------- Estados vazio e erro (design v2, `.vazio`/`.erro` de base.css) ---------- */
+
+.estadoCartao {
+  display: grid;
+  gap: var(--espaco-4);
+  justify-items: start;
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  max-width: var(--largura-leitura);
+}
+
+.estadoCartao h3 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+}
+
+.estadoCartao p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.estadoAviso {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-erro);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-secundario);
+}
+
+.estadoAcoes {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .estadoAcoes {
+    grid-auto-flow: column;
+    justify-content: start;
+    width: auto;
   }
+}
+
+/* ---------- Carregando ---------- */
+
+.temaCarregando {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.esperando {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
 }

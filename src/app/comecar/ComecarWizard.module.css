@@ -91,12 +91,12 @@
 }
 
 /**
- * 1100px, nao 768 (revisao do PR #28, medido no iPad em 800px: o cartao de
- * 320px espremia o formulario a 312px). Entre 768 e 1099 vale o
+ * 1180px, nao 768 (revisao do PR #28, medido no iPad em 800px: o cartao de
+ * 320px espremia o formulario a 312px). Entre 768 e 1179 vale o
  * comportamento do celular (a barra fina de BarraNotaGeral, que so vira
  * cartao lateral no mesmo ponto de corte); so o recuo acima muda em 768.
  */
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   /**
    * Ajuste de 06/09/2026 (revisao do PR #27, item 2): o recuo da pagina
    * passa da .corpo para a linha inteira, senao o cartao (primeiro filho no

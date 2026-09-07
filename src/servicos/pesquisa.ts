@@ -326,6 +326,52 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
   return mapearEvidenciaRoteiro(linhas);
 }
 
+export type EvidenciaResumo = {
+  contaNome: string | null;
+  contaHandle: string | null;
+  multiplicador: number;
+  views: number;
+  publicadoEm: Date | null;
+  /** Quantos outros vídeos da lista, além do citado acima (design v2, Hoje.Normal e Hoje.Gerado). */
+  quantidadeParecidos: number;
+};
+
+/**
+ * O bloco de evidência de um tema ou do roteiro do dia em `/hoje` (design
+ * v2, `PROXIMO.md`, D2 parte 1, item 5): conta, quantas vezes acima do
+ * normal e views do vídeo mais fora da curva da lista, mais quantos outros
+ * vídeos parecidos sustentam o mesmo tema. `null` sem nenhum vídeo (a tela
+ * não mostra o bloco, nunca um número inventado, `BRIEF.md` seção 4).
+ */
+export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaResumo | null> {
+  if (ids.length === 0) return null;
+
+  const linhas = await db()
+    .select({
+      contaNome: contas.nome,
+      contaHandle: contas.handle,
+      foraDaCurva: videos.foraDaCurva,
+      views: videos.views,
+      publicadoEm: videos.publicadoEm,
+    })
+    .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
+    .where(inArray(videos.id, ids))
+    .orderBy(desc(videos.foraDaCurva), asc(videos.id));
+
+  if (linhas.length === 0) return null;
+
+  const [principal] = linhas;
+  return {
+    contaNome: principal.contaNome,
+    contaHandle: principal.contaHandle,
+    multiplicador: principal.foraDaCurva === null ? 0 : Number(principal.foraDaCurva),
+    views: principal.views,
+    publicadoEm: principal.publicadoEm,
+    quantidadeParecidos: linhas.length - 1,
+  };
+}
+
 export type VideoReferencia = {
   id: number;
   plataforma: Plataforma;
@@ -399,15 +445,46 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
     }));
 }
 
-export type VideoParaEmbed = { id: number; plataforma: Plataforma; url: string };
+export type VideoParaEmbed = {
+  id: number;
+  plataforma: Plataforma;
+  url: string;
+  contaNome: string | null;
+  contaHandle: string | null;
+  foraDaCurva: number;
+  porQueFuncionou: string | null;
+};
 
-/** Plataforma e url de um vídeo, para montar o embed da referência (etapa 11, `RoteiroTela`). */
+/**
+ * Plataforma, url e a ficha da conta, para montar o embed e o cartão "de
+ * onde veio" da referência (etapa 11, `RoteiroTela`; design v2, `PROXIMO.md`,
+ * D2 parte 1, item 6: cartão "de onde veio" com conta e múltiplo reais).
+ */
 export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
   const [linha] = await db()
-    .select({ id: videos.id, plataforma: videos.plataforma, url: videos.url })
+    .select({
+      id: videos.id,
+      plataforma: videos.plataforma,
+      url: videos.url,
+      contaNome: contas.nome,
+      contaHandle: contas.handle,
+      foraDaCurva: videos.foraDaCurva,
+      analise: videos.analise,
+    })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(eq(videos.id, id));
-  return linha ?? null;
+
+  if (!linha) return null;
+  return {
+    id: linha.id,
+    plataforma: linha.plataforma,
+    url: linha.url,
+    contaNome: linha.contaNome,
+    contaHandle: linha.contaHandle,
+    foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
+    porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
+  };
 }
 
 /**

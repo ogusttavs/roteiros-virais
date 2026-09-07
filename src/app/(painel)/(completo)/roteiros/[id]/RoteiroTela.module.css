@@ -1,40 +1,68 @@
+/**
+ * `/roteiros/[id]` (design v2, `entrega/telas/Roteiro.dc.html`; `PROXIMO.md`,
+ * D2 parte 1, item 6). Mesmo truque de `.pagina` de `HojeTela.module.css`:
+ * cancela o padding de `(painel)/layout.module.css` porque esta tela tem a
+ * própria `BarraTopo`.
+ */
 .pagina {
-  display: flex;
-  flex-direction: column;
-  padding-bottom: calc(var(--altura-toque-lg) + var(--espaco-9));
+  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
-.cabecalho {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: calc(var(--espaco-3) * -1) calc(var(--espaco-3) * -1) var(--espaco-4);
+@media (min-width: 768px) {
+  .pagina {
+    margin: calc(-1 * var(--espaco-10));
+  }
 }
 
-.voltar,
-.botaoGravacao {
-  width: 44px;
-  height: 44px;
-  display: flex;
+.botaoBarra {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-3);
   border: 0;
+  border-radius: var(--raio-pill);
   background: transparent;
-  color: var(--cor-titulo);
-  cursor: pointer;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  font-family: var(--fonte-texto);
   text-decoration: none;
+  cursor: pointer;
 }
 
-.voltar:hover,
-.botaoGravacao:hover {
+.botaoBarra:hover {
   background: var(--cor-superficie-hover);
 }
 
-.voltar:focus-visible,
-.botaoGravacao:focus-visible {
+.botaoBarra:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+/* ---------- Conteúdo ---------- */
+
+.miolo {
+  padding: var(--espaco-5) var(--margem-celular)
+    calc(var(--altura-toque-lg) + var(--espaco-9) + 64px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: var(--espaco-8);
+  max-width: var(--largura-leitura);
+}
+
+@media (min-width: 768px) {
+  .miolo {
+    padding: var(--espaco-8) var(--espaco-6) calc(var(--altura-toque-lg) + var(--espaco-9));
+  }
+}
+
+@media (min-width: 1180px) {
+  .miolo {
+    padding-inline: var(--espaco-10);
+  }
 }
 
 .avisoVersao {
@@ -42,52 +70,40 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--espaco-3);
-  height: 40px;
-  padding: 0 var(--espaco-3);
-  margin: 0 calc(var(--espaco-3) * -1) var(--espaco-5);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) var(--espaco-4);
+  border-radius: var(--raio-md);
   background: var(--cor-superficie-recuada);
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-size: var(--tamanho-rodape);
   color: var(--cor-texto);
 }
 
 .linkVersaoAtual {
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-secundario);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   color: var(--cor-titulo);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.principal {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  max-width: var(--largura-leitura);
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-1);
 }
 
-.titulo {
-  margin: 0;
-  font-family: var(--fonte-titulo);
-  font-size: var(--tamanho-titulo-sm);
-  font-weight: var(--peso-titulo);
-  line-height: 1.2;
-  color: var(--cor-titulo);
-}
-
-.meta {
+.metaRoteiro {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--espaco-2) var(--espaco-3);
-  margin-top: var(--espaco-3);
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  gap: var(--espaco-2) var(--espaco-4);
+  margin-top: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
 }
 
-.mono {
+.num {
   font-family: var(--fonte-mono);
 }
 
@@ -95,203 +111,201 @@
   border: 0;
   background: transparent;
   padding: 0;
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-size: var(--tamanho-secundario);
   color: var(--cor-titulo);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
 }
 
-.cenas {
-  margin-top: var(--espaco-9);
-}
-
-.principal > :global(article) {
-  margin-top: var(--espaco-8);
-  /**
-   * 34ch (o desenho de RoteiroTela.dc.html) so no celular: no iPad essa
-   * coluna ficava feia, ajuste do Gustavo em 06/09/2026 (`brief-frontend.md`
-   * 6.5). A partir do tablet o corpo usa a largura de leitura normal.
-   */
+.blocos {
   max-width: 34ch;
 }
 
 @media (min-width: 768px) {
-  .principal > :global(article) {
+  .blocos {
     max-width: var(--largura-leitura);
   }
 }
 
-.principal > .cenas + section {
-  margin-top: var(--espaco-9);
+.referenciaVazia {
+  display: grid;
+  gap: var(--espaco-3);
 }
 
-.referencia {
-  margin-top: var(--espaco-9);
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-4);
-}
-
-.tituloSecao {
+.referenciaVazia h2 {
   margin: 0;
   font-size: var(--tamanho-corpo);
-  font-weight: 600;
+  font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
 
-.olhaComo {
+.referenciaVazia p {
   margin: 0;
   font-size: var(--tamanho-corpo);
   color: var(--cor-texto);
 }
 
-.oQueOlhar {
+.versoesVazio {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+}
+
+.versoesVazio h2 {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.versoesVazio p {
   margin: 0;
   font-size: var(--tamanho-secundario);
-  line-height: 1.5;
   color: var(--cor-texto-suave);
 }
 
-.botaoIrPara {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  height: var(--altura-toque);
-  padding: 0 var(--espaco-5);
-  border-radius: var(--raio-pill);
-  border: 1px solid var(--cor-borda-forte);
-  background: transparent;
-  color: var(--cor-titulo);
-  font-family: var(--fonte-texto);
-  font-size: var(--tamanho-secundario);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.botaoIrPara:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.botaoIrPara:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
 .fraseErro {
-  margin: var(--espaco-6) 0 0;
+  margin: 0 var(--margem-celular) var(--espaco-4);
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto);
 }
 
-.acoes {
+/* ---------- Barra de ações, fixa embaixo ---------- */
+
+.barraAcoes {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  z-index: 4;
-  background: color-mix(in srgb, var(--cor-superficie) 92%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--cor-borda);
-}
-
-.linhaAcoes {
+  bottom: 64px;
+  z-index: 25;
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  padding: var(--espaco-3) var(--margem-celular);
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--cor-material-barra);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
 }
 
-.botaoGravei,
-.botaoPostei,
-.rotuloFeito,
-.linkPostado {
-  flex: 1;
-  display: flex;
+@media (min-width: 768px) {
+  .barraAcoes {
+    left: var(--largura-barra-recolhida);
+    bottom: 0;
+    padding-inline: var(--espaco-6);
+    justify-content: flex-start;
+  }
+}
+
+@media (min-width: 1180px) {
+  .barraAcoes {
+    left: var(--largura-barra-lateral);
+    padding-inline: var(--espaco-10);
+  }
+}
+
+.btn,
+.btnVazio {
+  flex: 1 1 auto;
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: var(--altura-toque-lg);
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
   border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid transparent;
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-corpo);
   text-decoration: none;
+  text-align: center;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.botaoGravei {
-  border: 1px solid transparent;
+@media (min-width: 768px) {
+  .btn,
+  .btnVazio {
+    flex: 0 0 auto;
+    min-width: 11rem;
+  }
+}
+
+/** Modo gravação some da barra do topo no celular, fica no tablet e no desktop (item 7). */
+.somenteTablet {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .somenteTablet {
+    display: inline-flex;
+  }
+}
+
+.btn {
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
-  font-weight: 600;
+  font-weight: var(--peso-semibold);
 }
 
-.botaoGravei:hover {
+.btn:hover {
   background: var(--cor-acao-hover);
 }
 
-.botaoGravei:disabled {
+.btn:disabled {
   opacity: var(--opacidade-desabilitado);
   cursor: not-allowed;
 }
 
-.botaoPostei {
-  border: 1px solid var(--cor-borda-forte);
+.btnVazio {
   background: transparent;
+  border-color: var(--cor-borda-forte);
   color: var(--cor-titulo);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
 }
 
-.botaoPostei:hover {
+.btnVazio:hover {
   background: var(--cor-superficie-hover);
 }
 
-.rotuloFeito,
-.linkPostado {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-texto-suave);
-  justify-content: flex-start;
-}
-
-.botaoMenu {
-  flex: none;
-  width: var(--altura-toque);
-  height: var(--altura-toque);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  background: transparent;
-  border-radius: 50%;
-  color: var(--cor-titulo);
-  cursor: pointer;
-}
-
-.botaoMenu:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.botaoGravei:focus-visible,
-.botaoPostei:focus-visible,
-.botaoMenu:focus-visible {
+.btn:focus-visible,
+.btnVazio:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-.menu {
-  display: flex;
-  flex-direction: column;
-  padding: 0 var(--margem-celular) var(--espaco-4);
+/* ---------- Painéis (menu, postei, ângulo, versões) ---------- */
+
+.formularioPainel {
+  /**
+   * Acima da barra de ações fixa (achado rodando o e2e de layout,
+   * `PROXIMO.md` D2 parte 1, item 8): sem isto, o botão de baixo do painel
+   * ficava atrás da barra fixa e o clique não chegava nele.
+   */
+  position: relative;
+  z-index: 26;
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) var(--margem-celular) var(--espaco-6);
+  background: var(--cor-superficie);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.formularioPainel h2 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
 }
 
 .itemMenu {
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  height: var(--altura-toque-lg);
+  min-height: var(--altura-toque-lg);
   padding: 0 var(--espaco-2);
   border: 0;
   background: transparent;
@@ -312,32 +326,16 @@
   box-shadow: var(--sombra-foco);
 }
 
-.formularioPainel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-4);
-  padding: 0 var(--margem-celular) var(--espaco-6);
-}
-
-.tituloPainel {
-  margin: 0;
-  font-size: var(--tamanho-titulo-sm);
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--cor-titulo);
-}
-
 .campo {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: var(--espaco-2);
   font-size: var(--tamanho-secundario);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   color: var(--cor-titulo);
 }
 
 .opcional {
-  font-weight: 400;
+  font-weight: var(--peso-regular);
   color: var(--cor-texto-suave);
 }
 
@@ -345,7 +343,7 @@
 .textarea {
   padding: 0 var(--espaco-3);
   border-radius: var(--raio-md);
-  border: 1px solid var(--cor-borda-forte);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
   background: var(--cor-superficie);
   color: var(--cor-titulo);
   font-family: var(--fonte-texto);
@@ -368,39 +366,8 @@
   box-shadow: var(--sombra-foco);
 }
 
-.botaoSalvar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: var(--altura-toque-lg);
-  border-radius: var(--raio-pill);
-  border: 1px solid transparent;
-  background: var(--cor-acao);
-  color: var(--cor-acao-texto);
-  font-family: var(--fonte-texto);
-  font-size: var(--tamanho-corpo);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.botaoSalvar:hover {
-  background: var(--cor-acao-hover);
-}
-
-.botaoSalvar:disabled {
-  opacity: var(--opacidade-desabilitado);
-  cursor: not-allowed;
-}
-
-.botaoSalvar:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
 .listaVersoes {
-  display: flex;
-  flex-direction: column;
+  display: grid;
 }
 
 .itemVersao {
@@ -409,7 +376,7 @@
   align-items: center;
   min-height: var(--altura-toque-lg);
   padding: var(--espaco-3) 0;
-  border-bottom: 1px solid var(--cor-borda);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
   text-decoration: none;
   color: var(--cor-titulo);
 }
@@ -419,79 +386,14 @@
 }
 
 .textoVersao {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 2px;
-  font-weight: 500;
+  font-weight: var(--peso-medio);
 }
 
 .horaVersao {
   font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
+  font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
-  font-weight: 400;
-}
-
-.modoGravacao {
-  position: fixed;
-  inset: 0;
-  z-index: 8;
-  background: var(--cor-fundo);
-  overflow-y: auto;
-  padding: var(--espaco-10) var(--margem-celular) var(--espaco-12);
-  box-sizing: border-box;
-}
-
-.sairGravacao {
-  position: sticky;
-  bottom: var(--espaco-9);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: var(--espaco-8) auto 0;
-  height: var(--altura-toque-lg);
-  padding: 0 var(--espaco-7);
-  border-radius: var(--raio-pill);
-  border: 1px solid var(--cor-borda-forte);
-  background: var(--cor-superficie);
-  color: var(--cor-titulo);
-  font-family: var(--fonte-texto);
-  font-size: var(--tamanho-corpo);
-  font-weight: 500;
-  cursor: pointer;
-  box-shadow: var(--sombra-md);
-}
-
-.sairGravacao:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-@media (min-width: 768px) {
-  .pagina {
-    padding-bottom: 0;
-  }
-
-  .cabecalho {
-    display: none;
-  }
-
-  .acoes {
-    position: static;
-    max-width: var(--largura-leitura);
-    margin-top: var(--espaco-9);
-    background: none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    border-top: 1px solid var(--cor-borda);
-  }
-
-  .linhaAcoes {
-    padding: var(--espaco-6) 0 0;
-  }
-
-  .menu,
-  .formularioPainel {
-    padding: 0 0 var(--espaco-4);
-  }
+  font-weight: var(--peso-regular);
 }

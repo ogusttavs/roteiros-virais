@@ -1,8 +1,9 @@
+/** base.css, bloco `.esqueleto` (design v2, `PROXIMO.md`, D2 parte 1, item 4). */
 .skeleton {
   border-radius: var(--raio-sm);
-  background: linear-gradient(90deg, var(--cor-superficie-recuada) 25%, var(--cor-skeleton-brilho) 50%, var(--cor-superficie-recuada) 75%);
+  background: linear-gradient(90deg, var(--cor-esqueleto-base), var(--cor-esqueleto-luz), var(--cor-esqueleto-base));
   background-size: 200% 100%;
-  animation: brilho var(--duracao-skeleton) ease-in-out infinite;
+  animation: brilho var(--duracao-skeleton) linear infinite;
 }
 
 .titulo {
@@ -27,9 +28,6 @@
 }
 
 @keyframes brilho {
-  from {
-    background-position: 200% 0;
-  }
   to {
     background-position: -200% 0;
   }
@@ -38,6 +36,6 @@
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
     animation: none;
-    background: var(--cor-superficie-recuada);
+    background: var(--cor-esqueleto-base);
   }
 }

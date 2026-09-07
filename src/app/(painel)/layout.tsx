@@ -10,7 +10,7 @@ import { Nav } from "@/ui/componentes/Nav";
 import { Logo } from "@/ui/Logo";
 
 import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
-import { CabecalhoCelular } from "./_casca/CabecalhoCelular";
+import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
 import styles from "./layout.module.css";
 
 /**
@@ -31,7 +31,7 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
 
   return (
     <div className={styles.pagina}>
-      <CabecalhoCelular nomeProduto={config.appName} iniciais={iniciais} rotuloConta={textosNav.conta} />
+      <CascaCabecalhoCelular nomeProduto={config.appName} iniciais={iniciais} rotuloConta={textosNav.conta} />
 
       <aside className={styles.colunaDesktop}>
         <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
