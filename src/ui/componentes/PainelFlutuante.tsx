@@ -22,7 +22,7 @@ type Props = {
  * direito, perto do botão "Mais ações" que os quatro reaproveitam como
  * ponto de abertura. Fecha ao clicar fora, com Esc, ou ao rolar a página de
  * trás (mesma regra de `BarraNotaGeral`, para o painel nunca ficar aberto
- * sobre conteúdo que já rolou para outro lugar).
+ * sobre o que já rolou para outro lugar).
  */
 export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", children }: Props) {
   const painelRef = useRef<HTMLDivElement>(null);

@@ -19,7 +19,6 @@ import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
-import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
 
 import { marcarGravadoAction, marcarPostadoAction, outroAnguloAction } from "./acoes";
 import styles from "./RoteiroTela.module.css";
@@ -75,6 +74,11 @@ function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
 
 function textoParaCopiar(corpo: ConteudoRoteiro): string {
   return [corpo.gancho, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\n\n");
+}
+
+/** "O que funcionou ali:" mais a análise, que vem de um campo com maiúscula (design v2, achado do iPad, item 2). */
+function comInicialMinuscula(texto: string): string {
+  return texto.length > 0 ? texto[0].toLowerCase() + texto.slice(1) : texto;
 }
 
 type Painel = "menu" | "postei" | "angulo" | "versoes" | null;
@@ -249,19 +253,11 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             titulo={textosRoteiro.referencia}
             conta={video.contaNome ?? video.contaHandle}
             multiplo={formatarMultiplo(video.foraDaCurva)}
-            texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva))}. ${textosRoteiro.oQueFuncionouAli} ${video.porQueFuncionou ?? ""}`.trim()}
+            texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva))}. ${textosRoteiro.oQueFuncionouAli} ${comInicialMinuscula(video.porQueFuncionou ?? "")}`.trim()}
             segundoFormatado={
-              referencia.segundo !== null ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo)) : null
-            }
-            miniatura={
-              <VideoEmbed
-                url={video.url}
-                alt={textosRoteiro.olhaComo(formatarSegundo(referencia.segundo ?? 0))}
-                rotuloCarregamento={textosRoteiro.carregandoVideo}
-                falhou={video.plataforma !== "youtube"}
-                segundoInicial={referencia.segundo ?? undefined}
-                linkExterno={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
-              />
+              referencia.segundo !== null && referencia.segundo > 0
+                ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo))
+                : null
             }
             botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
           />
