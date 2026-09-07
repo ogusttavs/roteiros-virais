@@ -5,7 +5,8 @@
  * própria `BarraTopo`.
  */
 .pagina {
-  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6)))
+    calc(-1 * var(--margem-celular))
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
@@ -184,7 +185,8 @@
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
+  padding: var(--espaco-3) var(--margem-celular)
+    calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
   background: var(--cor-material-barra);
   backdrop-filter: var(--desfoque-barra);
   -webkit-backdrop-filter: var(--desfoque-barra);
@@ -243,6 +245,14 @@
   .somenteTablet {
     display: inline-flex;
   }
+}
+
+/** Baixar em PDF na barra de ações: só o ícone, quadrado, do tablet para cima (item 5). */
+.btnIcone {
+  flex: 0 0 auto;
+  min-width: var(--altura-toque-lg);
+  width: var(--altura-toque-lg);
+  padding: 0;
 }
 
 .btn {

@@ -13,6 +13,8 @@
  * nao "dentistas": `temas_dia` tem uma unica linha por nicho e dia, e
  * `temas-do-dia.spec.ts` ja grava a linha de hoje para "dentistas".
  */
+import { stat } from "node:fs/promises";
+
 import { expect, test } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
@@ -39,7 +41,10 @@ let clienteId: number;
 
 test.describe("roteiro pela tela", () => {
   test.beforeAll(async () => {
-    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+    const [nicho] = await db()
+      .select()
+      .from(nichos)
+      .where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
 
     await db().insert(user).values({ id: "e2e-roteiro", name: "[teste] Roteiro", email: EMAIL });
     await db()
@@ -54,7 +59,12 @@ test.describe("roteiro pela tela", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-roteiro", nome: "[teste] Roteiro", nichoId: nicho.id, aceitouTermosEm: new Date() })
+      .values({
+        usuarioId: "e2e-roteiro",
+        nome: "[teste] Roteiro",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
       .returning();
     clienteId = cliente.id;
 
@@ -130,7 +140,9 @@ test.describe("roteiro pela tela", () => {
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
-  test("escolhe tema, escolhe objetivo, ve o roteiro, pede outro angulo, marca gravei", async ({ page }) => {
+  test("escolhe tema, escolhe objetivo, ve o roteiro, pede outro angulo, marca gravei", async ({
+    page,
+  }) => {
     await page.goto("/entrar");
     await page.getByLabel("E-mail").fill(EMAIL);
     await page.getByLabel("Senha").fill(SENHA);
@@ -184,7 +196,13 @@ test.describe("roteiro pela tela", () => {
         chamadaFinal: "chamada final de teste",
         cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
         ondeGravar: "na cozinha",
-        edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+        edicao: {
+          textoNaTela: [],
+          ritmoDeCorte: "moderado",
+          recursos: [],
+          audio: null,
+          referencia: null,
+        },
         evidencias: [],
         semEvidencia: true,
       };
@@ -217,9 +235,74 @@ test.describe("roteiro pela tela", () => {
       await expect(page.getByRole("menuitem", { name: "outro ângulo" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "copiar texto" })).toBeVisible();
 
+      // leitura prévia do Fable (achado do iPad, item 1): o mousedown do clique no
+      // botão contava como "fora" e fechava, e o click do mesmo gesto reabria.
+      await botaoMenu.click();
+      await expect(menu).toBeHidden();
+      await botaoMenu.click();
+      await expect(menu).toBeVisible();
+
       await page.keyboard.press("Escape");
       await expect(menu).toBeHidden();
       await expect(botaoMenu).toBeFocused();
     });
   }
+
+  /**
+   * PDF (acabamento do iPad, item 5): baixa pelo menu dos três pontos e
+   * confere que o arquivo existe e não está vazio. O conteúdo em si (título,
+   * gancho, cenas, edição) é o mesmo `page.tsx` de `/imprimir` monta a
+   * partir do banco; aqui só a ponta a ponta pelo navegador importa.
+   */
+  test("baixa o roteiro em PDF pelo menu, e o arquivo nao esta vazio", async ({ page }) => {
+    const conteudo: ConteudoRoteiro = {
+      titulo: "teste do pdf",
+      duracaoS: 30,
+      gancho: "gancho de teste",
+      corpo: "corpo de teste",
+      fechamento: "fechamento de teste",
+      chamadaFinal: "chamada final de teste",
+      cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
+      ondeGravar: "na cozinha",
+      edicao: {
+        textoNaTela: [],
+        ritmoDeCorte: "moderado",
+        recursos: [],
+        audio: null,
+        referencia: null,
+      },
+      evidencias: [],
+      semEvidencia: true,
+    };
+    const [roteiro] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId,
+        data: hojeISO(),
+        tema: conteudo.titulo,
+        origem: "livre",
+        objetivo: "conversao",
+        conteudo,
+      })
+      .returning();
+
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(EMAIL);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto(`/roteiros/${roteiro.id}`);
+    await page.getByRole("button", { name: "Mais opções" }).click();
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("menuitem", { name: "Baixar em PDF" }).click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toBe(`roteiro-${hojeISO()}.pdf`);
+    const caminho = await download.path();
+    expect(caminho).toBeTruthy();
+    const info = await stat(caminho!);
+    expect(info.size).toBeGreaterThan(0);
+  });
 });

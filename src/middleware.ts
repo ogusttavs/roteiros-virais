@@ -28,12 +28,26 @@ const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade"];
  */
 const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs"];
 
+/**
+ * `/roteiros/[id]/imprimir` (roteiro em PDF, `PROXIMO.md`, acabamento do
+ * iPad, item 5): quem abre essa pagina e o Playwright de dentro da propria
+ * rota `/api/roteiros/[id]/pdf`, sem cookie de sessao nenhum; a pagina se
+ * autentica sozinha com o token de `tokenImpressao.ts`. Sem esta excecao, o
+ * middleware redirecionava para `/entrar` antes da pagina rodar, e o PDF
+ * saia com a tela de login em vez do roteiro (achado gerando a primeira
+ * captura de verdade, nao no e2e, que so confere o arquivo nao vazio).
+ */
+function ehImpressaoDeRoteiro(pathname: string): boolean {
+  return pathname.startsWith("/roteiros/") && pathname.endsWith("/imprimir");
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
     ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota)) ||
-    ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota))
+    ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota)) ||
+    ehImpressaoDeRoteiro(pathname)
   ) {
     return NextResponse.next();
   }

@@ -46,7 +46,14 @@ export const textosRoteiro = {
   postado: "Postado",
   ondePostou: "Onde você postou?",
   coleLink: "Cole o link do vídeo",
-  menu: { angulo: "Outro ângulo", copiar: "Copiar texto", versoes: "Versões" },
+  menu: {
+    angulo: "Outro ângulo",
+    copiar: "Copiar texto",
+    versoes: "Versões",
+    baixarPdf: "Baixar em PDF",
+  },
+  /** aria-label do botão só de ícone na barra de ações do desktop (achado do primeiro uso no iPad, item 5). */
+  baixarPdf: "Baixar em PDF",
   queDiferente: "O que você quer diferente?",
   opcional: "(opcional)",
   outraVersao: "Escrever outra versão",

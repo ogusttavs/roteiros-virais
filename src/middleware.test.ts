@@ -45,4 +45,25 @@ describe("middleware", () => {
     vi.mocked(getSessionCookie).mockReturnValue("algum-token-de-sessao");
     expect(foiRedirecionada(middleware(requisicao("/admin/nichos")))).toBe(false);
   });
+
+  describe("/roteiros/[id]/imprimir (roteiro em PDF, achado do primeiro uso no iPad, item 5)", () => {
+    it("passa sem cookie de sessao (autenticacao propria pelo token de impressao)", () => {
+      vi.mocked(getSessionCookie).mockReturnValue(null);
+      expect(foiRedirecionada(middleware(requisicao("/roteiros/42/imprimir")))).toBe(false);
+    });
+
+    it("/roteiros/[id] (a tela de verdade) continua exigindo cookie de sessao", () => {
+      vi.mocked(getSessionCookie).mockReturnValue(null);
+      const resposta = middleware(requisicao("/roteiros/42"));
+      expect(resposta.status).toBe(307);
+      expect(new URL(resposta.headers.get("location")!).pathname).toBe("/entrar");
+    });
+
+    it("/roteiros/[id]/gravar continua exigindo cookie de sessao", () => {
+      vi.mocked(getSessionCookie).mockReturnValue(null);
+      const resposta = middleware(requisicao("/roteiros/42/gravar"));
+      expect(resposta.status).toBe(307);
+      expect(new URL(resposta.headers.get("location")!).pathname).toBe("/entrar");
+    });
+  });
 });

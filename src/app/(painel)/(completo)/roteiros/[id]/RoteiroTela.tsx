@@ -1,6 +1,17 @@
 "use client";
 
-import { ArrowLeft, Copy, Ellipsis, Eye, History, Music, Scissors, Type, Video } from "lucide-react";
+import {
+  ArrowLeft,
+  Copy,
+  Download,
+  Ellipsis,
+  Eye,
+  History,
+  Music,
+  Scissors,
+  Type,
+  Video,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -183,7 +194,10 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             {/* Some no celular, fica no tablet e no desktop (design v2, Roteiro.dc.html mostra
                 nos dois lugares; PROXIMO.md, revisão do PR #31, item 7: "sai da barra do topo
                 no celular"). O rodapé sempre tem o botão, em toda largura. */}
-            <Link href={`/roteiros/${roteiro.id}/gravar`} className={`${styles.botaoBarra} ${styles.somenteTablet}`}>
+            <Link
+              href={`/roteiros/${roteiro.id}/gravar`}
+              className={`${styles.botaoBarra} ${styles.somenteTablet}`}
+            >
               <Video size={18} strokeWidth={1.75} aria-hidden="true" />
               <span>{textosRoteiro.modoGravacao}</span>
             </Link>
@@ -226,7 +240,11 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             <span className={styles.num}>{corpo.duracaoS} s</span>
             <span className={styles.num}>{formatarData(roteiro.data)}</span>
             {versoes.length > 1 ? (
-              <button type="button" className={styles.linkVersoes} onClick={() => setPainel("versoes")}>
+              <button
+                type="button"
+                className={styles.linkVersoes}
+                onClick={() => setPainel("versoes")}
+              >
                 {textosRoteiro.versao(roteiro.versao, Math.max(...versoes.map((v) => v.versao)))}
               </button>
             ) : null}
@@ -238,7 +256,10 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             blocos={[
               { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
               { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-              { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
+              {
+                rotulo: textosRoteiro.blocos.fechamento,
+                paragrafos: splitParagrafos(corpo.fechamento),
+              },
               { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
             ]}
           />
@@ -296,10 +317,28 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             {textosRoteiro.postado}
           </a>
         )}
+        <a
+          href={`/api/roteiros/${roteiro.id}/pdf`}
+          aria-label={textosRoteiro.baixarPdf}
+          className={`${styles.btnVazio} ${styles.btnIcone} ${styles.somenteTablet}`}
+        >
+          <Download size={18} strokeWidth={1.75} aria-hidden="true" />
+        </a>
       </div>
 
-      <PainelFlutuante titulo={textosRoteiro.maisOpcoes} aberto={painel === "menu"} aoFechar={fecharPainel} role="menu">
-        <button type="button" role="menuitem" onClick={() => setPainel("angulo")} className={styles.itemMenu}>
+      <PainelFlutuante
+        titulo={textosRoteiro.maisOpcoes}
+        aberto={painel === "menu"}
+        aoFechar={fecharPainel}
+        role="menu"
+        ignorar={botaoMenuRef}
+      >
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => setPainel("angulo")}
+          className={styles.itemMenu}
+        >
           <Video size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosRoteiro.menu.angulo}
         </button>
@@ -307,15 +346,28 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
           <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosRoteiro.menu.copiar}
         </button>
+        <a href={`/api/roteiros/${roteiro.id}/pdf`} role="menuitem" className={styles.itemMenu}>
+          <Download size={20} strokeWidth={1.5} aria-hidden="true" />
+          {textosRoteiro.menu.baixarPdf}
+        </a>
         {versoes.length > 1 ? (
-          <button type="button" role="menuitem" onClick={() => setPainel("versoes")} className={styles.itemMenu}>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => setPainel("versoes")}
+            className={styles.itemMenu}
+          >
             <History size={20} strokeWidth={1.5} aria-hidden="true" />
             {textosRoteiro.menu.versoes}
           </button>
         ) : null}
       </PainelFlutuante>
 
-      <PainelFlutuante titulo={textosRoteiro.ondePostou} aberto={painel === "postei"} aoFechar={fecharPainel}>
+      <PainelFlutuante
+        titulo={textosRoteiro.ondePostou}
+        aberto={painel === "postei"}
+        aoFechar={fecharPainel}
+      >
         <h2 className={styles.tituloPainel}>{textosRoteiro.ondePostou}</h2>
         <label className={styles.campo}>
           <span>{textosRoteiro.coleLink}</span>
@@ -332,11 +384,16 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         </button>
       </PainelFlutuante>
 
-      <PainelFlutuante titulo={textosRoteiro.menu.angulo} aberto={painel === "angulo"} aoFechar={fecharPainel}>
+      <PainelFlutuante
+        titulo={textosRoteiro.menu.angulo}
+        aberto={painel === "angulo"}
+        aoFechar={fecharPainel}
+      >
         <h2 className={styles.tituloPainel}>{textosRoteiro.menu.angulo}</h2>
         <label className={styles.campo}>
           <span>
-            {textosRoteiro.queDiferente} <span className={styles.opcional}>{textosRoteiro.opcional}</span>
+            {textosRoteiro.queDiferente}{" "}
+            <span className={styles.opcional}>{textosRoteiro.opcional}</span>
           </span>
           <textarea
             value={motivoAngulo}
@@ -345,12 +402,21 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             className={styles.textarea}
           />
         </label>
-        <button type="button" onClick={escreverOutraVersao} disabled={pendente} className={styles.btn}>
+        <button
+          type="button"
+          onClick={escreverOutraVersao}
+          disabled={pendente}
+          className={styles.btn}
+        >
           {textosRoteiro.outraVersao}
         </button>
       </PainelFlutuante>
 
-      <PainelFlutuante titulo={textosRoteiro.versoesTitulo} aberto={painel === "versoes"} aoFechar={fecharPainel}>
+      <PainelFlutuante
+        titulo={textosRoteiro.versoesTitulo}
+        aberto={painel === "versoes"}
+        aoFechar={fecharPainel}
+      >
         <h2 className={styles.tituloPainel}>{textosRoteiro.versoesTitulo}</h2>
         <div className={styles.listaVersoes}>
           {versoes.map((v) => (

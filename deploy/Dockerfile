@@ -40,6 +40,24 @@ RUN apt-get update \
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
+# O rastreamento do standalone so copia o que o import estatico usa
+# (chromium de "playwright"), sem o cli.js nem playwright-core inteiro que o
+# instalador do Chromium precisa; por isso os dois entram por cima, prontos,
+# em vez de reinstalar via npx (achado buildando a imagem: o node_modules/
+# playwright incompleto do standalone fazia o npx errar "playwright: not
+# found" em vez de cair para a versao de verdade).
+COPY --from=build /app/node_modules/playwright ./node_modules/playwright
+COPY --from=build /app/node_modules/playwright-core ./node_modules/playwright-core
+# Chromium do Playwright, so para a rota /api/roteiros/[id]/pdf (roteiro em
+# PDF, PROXIMO.md, acabamento do iPad, item 5, decisao registrada no
+# TODO.md): fica fora de node_modules (o instalador guarda o binario do
+# navegador à parte), num caminho fixo que o processo em runtime acha pela
+# variavel de ambiente. --with-deps instala tambem as bibliotecas de sistema
+# que faltam nesta imagem slim; roda antes do USER app porque precisa de
+# root para o apt-get.
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+RUN node node_modules/playwright/cli.js install --with-deps chromium \
+  && chown -R app:app /app/.playwright
 USER app
 EXPOSE 3000
 CMD ["node", "server.js"]
