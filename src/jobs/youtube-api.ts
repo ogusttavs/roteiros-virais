@@ -123,6 +123,21 @@ export async function buscarCanal(idOuHandle: string): Promise<YoutubeChannelsRe
   });
 }
 
+/**
+ * channels.list em lote (ate 50 ids por chamada, 1 unidade no total): usado
+ * so por `scripts/preencher-nome-contas.ts` para buscar o nome de canais ja
+ * coletados antes de a coleta gravar `contas.nome` (etapa "acabamento
+ * visual 2"). `buscarCanal` (acima) resolve um so, por id ou @handle, para
+ * a coleta descobrir a playlist de uploads.
+ */
+export async function buscarCanaisPorId(ids: string[]): Promise<YoutubeChannelsResponse> {
+  if (ids.length === 0) return { items: [] };
+  return chamar<YoutubeChannelsResponse>("channels", {
+    part: "snippet",
+    id: ids.slice(0, 50).join(","),
+  });
+}
+
 export type YoutubePlaylistItem = {
   snippet: {
     resourceId: { videoId: string };

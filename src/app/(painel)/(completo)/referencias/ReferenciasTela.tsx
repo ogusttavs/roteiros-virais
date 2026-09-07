@@ -150,7 +150,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
               key={v.id}
               vezes={formatarVezes(v.foraDaCurva)}
               rotuloVezes={textosReferencias.acimaDoNormal}
-              conta={v.contaHandle ?? textosReferencias.contaNaoIdentificada}
+              conta={v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada}
               data={v.publicadoEm ? FORMATAR_DATA.format(v.publicadoEm) : ""}
               analise={[
                 { rotulo: textosReferencias.analise.comecou, texto: v.gancho },
@@ -159,7 +159,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
               ]}
               embed={{
                 url: v.url,
-                alt: textosReferencias.embedAlt(v.contaHandle ?? textosReferencias.contaNaoIdentificada),
+                alt: textosReferencias.embedAlt(v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada),
                 rotuloCarregamento: textosReferencias.embedCarregando,
                 linkExterno: { rotulo: textosReferencias.abrirVideo, href: v.url },
               }}
