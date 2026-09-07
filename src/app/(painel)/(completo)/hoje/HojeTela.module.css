@@ -208,10 +208,15 @@
   box-shadow: var(--sombra-foco);
 }
 
-@media (min-width: 768px) {
+/**
+ * 1100px, mesmo corte das outras telas do acabamento visual 2 (revisao do
+ * PR #30, ajuste 2): abaixo disso os cartoes empilham em uma coluna so,
+ * como no celular (TemaCartao.module.css cuida do resto do ajuste).
+ */
+@media (min-width: 1100px) {
   .grade {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: var(--espaco-5);
+    gap: var(--espaco-8);
   }
 }
