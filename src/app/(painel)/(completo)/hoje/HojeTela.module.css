@@ -43,6 +43,32 @@
   box-shadow: var(--sombra-foco);
 }
 
+/**
+ * Avatar de `/conta` na barra do topo, só no celular (revisão do PR #31,
+ * item 8, decisão do Fable em `BRIEF.md`): no celular, Hoje não tem barra
+ * lateral, e a barra do topo é a única porta para a conta. No tablet e no
+ * desktop a barra lateral já tem o link, então este some.
+ */
+.avatarBarra {
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-decoration: none;
+}
+
+@media (min-width: 768px) {
+  .avatarBarra {
+    display: none;
+  }
+}
+
 /* ---------- Conteúdo ---------- */
 
 .miolo {
@@ -58,7 +84,7 @@
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .miolo {
     padding-inline: var(--espaco-10);
   }
@@ -139,23 +165,24 @@
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .duasColunas {
     grid-template-columns: minmax(0, 1.7fr) minmax(19rem, 0.8fr);
     gap: var(--espaco-8);
   }
 }
 
+/**
+ * Sempre uma coluna, os cartões empilhados (design v2, `Hoje.Normal.1280.Claro.png`; revisão
+ * do PR #31, item 1): a entrega tem um `.temas-tres` de três colunas em `base.css`, mas o PNG
+ * de referência em 1280px mostra os três cartões empilhados na coluna principal, ao lado do
+ * aparte "sua semana"; três colunas dentro da coluna principal (que já divide a largura com o
+ * aparte) ficavam estreitas demais. Nome da classe mantido para não mexer no JSX.
+ */
 .temasTres {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: var(--espaco-4);
-}
-
-@media (min-width: 1100px) {
-  .temasTres {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* ---------- Cartão do roteiro de hoje ---------- */

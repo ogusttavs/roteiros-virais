@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { diasDesde, formatarMultiplo, formatarViewsCompacto, formatarViewsExato } from "./formatarNumero";
+import {
+  classificarMultiplo,
+  diasDesde,
+  formatarMultiplo,
+  formatarViewsCompacto,
+  formatarViewsExato,
+  fraseDiasAtras,
+  rotuloMultiploConta,
+} from "./formatarNumero";
 
 describe("formatarViewsCompacto", () => {
   it("arredonda para mil e milhão em português", () => {
@@ -34,5 +42,32 @@ describe("diasDesde", () => {
   it("conta dias corridos de calendario", () => {
     const hoje = new Date(2026, 8, 7, 8, 0);
     expect(diasDesde(new Date(2026, 8, 5, 20, 0), hoje)).toBe(2);
+  });
+});
+
+describe("fraseDiasAtras", () => {
+  it("nunca em 0 dias", () => {
+    expect(fraseDiasAtras(0)).toBe("hoje");
+    expect(fraseDiasAtras(1)).toBe("ontem");
+    expect(fraseDiasAtras(3)).toBe("em 3 dias");
+  });
+});
+
+describe("classificarMultiplo e rotuloMultiploConta", () => {
+  it("acima a partir de 1,5x", () => {
+    expect(classificarMultiplo(1.5)).toBe("acima");
+    expect(classificarMultiplo(4.1)).toBe("acima");
+    expect(rotuloMultiploConta("acima")).toBe("acima do normal dessa conta");
+  });
+
+  it("na media entre 0,8 e 1,5", () => {
+    expect(classificarMultiplo(0.8)).toBe("media");
+    expect(classificarMultiplo(1.2)).toBe("media");
+    expect(rotuloMultiploConta("media")).toBe("na média dessa conta");
+  });
+
+  it("abaixo do normal abaixo de 0,8", () => {
+    expect(classificarMultiplo(0.3)).toBe("abaixo");
+    expect(rotuloMultiploConta("abaixo")).toBe("abaixo do normal dessa conta");
   });
 });

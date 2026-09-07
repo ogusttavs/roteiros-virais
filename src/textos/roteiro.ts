@@ -1,12 +1,14 @@
 /**
- * Texto de tela de `/roteiros/[id]` (brief-frontend.md, seção 6.5;
- * `RoteiroTela.dc.html`; `entrega/textos.ts`, bloco `roteiro`).
+ * Texto de tela de `/roteiros/[id]` (brief-frontend.md, seção 6.5; design v2,
+ * `entrega/telas/Roteiro.dc.html`). Primeira letra maiúscula em toda frase
+ * (`BRIEF.md`, revisão do lote 6; `PROXIMO.md`, revisão do PR #31, item 3).
  */
 
 export const textosRoteiro = {
   tituloTela: "Roteiro",
-  acimaDoNormalDessaConta: "acima do normal dessa conta.",
-  trechoComeca: (t: string) => `o trecho que interessa começa em ${t}`,
+  /** "conta real, rotulo real. O que funcionou ali foi X" (`rotuloMultiploConta` decide o rótulo). */
+  oQueFuncionouAli: "O que funcionou ali foi",
+  trechoComeca: (t: string) => `O trecho que interessa começa em ${t}`,
   outrasVersoes: "Outras versões deste tema",
   outrasVersoesEmBreve:
     "Em breve você vai poder comparar até três versões com nota antes de escolher qual gravar.",
@@ -19,41 +21,41 @@ export const textosRoteiro = {
   ondeGravar: "Onde gravar e o que mostrar",
   comoEditar: "Como editar",
   edicao: {
-    texto: "texto na tela",
-    corte: "ritmo de corte",
-    recursos: "recursos",
-    audio: "áudio da semana",
-    semTexto: "sem texto na tela definido para este vídeo",
-    semRecurso: "nenhum recurso extra além do corte",
-    semAudio: "sem indicação de áudio para este vídeo",
+    texto: "Texto na tela",
+    corte: "Ritmo de corte",
+    recursos: "Recursos",
+    audio: "Áudio da semana",
+    semTexto: "Sem texto na tela definido para este vídeo",
+    semRecurso: "Nenhum recurso extra além do corte",
+    semAudio: "Sem indicação de áudio para este vídeo",
   },
   referencia: "Referência",
-  carregandoVideo: "vídeo carregando",
+  carregandoVideo: "Vídeo carregando",
   semEvidencia:
     "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. Este " +
     "roteiro foi escrito só com o que funciona no seu nicho e com o seu briefing.",
-  olhaComo: (t: string) => `olha como ele faz aos ${t}`,
-  irPara: (t: string) => `ir para ${t}`,
-  abrirReferencia: "abrir o vídeo de referência",
-  gravei: "gravei",
-  postei: "postei",
-  gravadoAs: (h: string) => `gravado às ${h}`,
-  postado: "postado",
+  olhaComo: (t: string) => `Olha como ele faz aos ${t}`,
+  irPara: (t: string) => `Ir para ${t}`,
+  abrirReferencia: "Abrir o vídeo de referência",
+  /** Rodapé como no design (revisão do PR #31, item 7): preenchido enquanto não gravou. */
+  jaGravei: "Já gravei",
+  postei: "Postei",
+  postado: "Postado",
   ondePostou: "Onde você postou?",
-  coleLink: "cole o link do vídeo",
-  menu: { angulo: "outro ângulo", copiar: "copiar texto", versoes: "versões" },
-  queDiferente: "o que você quer diferente?",
+  coleLink: "Cole o link do vídeo",
+  menu: { angulo: "Outro ângulo", copiar: "Copiar texto", versoes: "Versões" },
+  queDiferente: "O que você quer diferente?",
   opcional: "(opcional)",
-  outraVersao: "escrever outra versão",
-  textoCopiado: "texto copiado",
-  versao: (a: number, b: number) => `versão ${a} de ${b}`,
-  versaoAntiga: (a: number, b: number) => `versão ${a}; a atual é a ${b}`,
-  verAtual: "ver a atual",
-  escrevendo: "escrevendo do jeito que você fala",
-  erro: "não conseguimos escrever agora",
-  sair: "sair",
+  outraVersao: "Escrever outra versão",
+  textoCopiado: "Texto copiado",
+  versao: (a: number, b: number) => `Versão ${a} de ${b}`,
+  versaoAntiga: (a: number, b: number) => `Versão ${a}; a atual é a ${b}`,
+  verAtual: "Ver a atual",
+  escrevendo: "Escrevendo do jeito que você fala",
+  erro: "Não conseguimos escrever agora",
+  sair: "Sair",
   modoGravacao: "Modo gravação",
   maisOpcoes: "Mais opções",
   versoesTitulo: "Versões",
-  atual: "atual",
+  atual: "Atual",
 };

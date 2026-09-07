@@ -36,6 +36,8 @@ type Props = {
   evidenciaRoteiroHoje: EvidenciaTema | null;
   semana: SemanaDia[];
   ultimoVideo: UltimoVideoAparte | null;
+  /** Para o avatar de `/conta` na barra do topo, só no celular (revisão do PR #31, item 8). */
+  iniciais: string;
 };
 
 function AparteSemanaCurva({ semana, ultimoVideo }: { semana: SemanaDia[]; ultimoVideo: UltimoVideoAparte | null }) {
@@ -94,24 +96,36 @@ export function HojeTela({
   evidenciaRoteiroHoje,
   semana,
   ultimoVideo,
+  iniciais,
 }: Props) {
   const router = useRouter();
   const [outrosAbertos, setOutrosAbertos] = useState(false);
+  const diasGravados = semana.filter((dia) => dia.gravou).length;
 
   return (
     <div className={styles.pagina}>
       <BarraTopo
         titulo={textosHoje.titulo}
         direita={
-          <button type="button" className={styles.botaoBarra} onClick={() => router.refresh()}>
-            <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
-            <span>{textosHoje.atualizar}</span>
-          </button>
+          <>
+            <Link href="/conta" aria-label={textosHoje.conta} className={styles.avatarBarra}>
+              <span aria-hidden="true">{iniciais}</span>
+            </Link>
+            <button type="button" className={styles.botaoBarra} onClick={() => router.refresh()}>
+              <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
+              <span>{textosHoje.atualizar}</span>
+            </button>
+          </>
         }
       />
 
       <div className={styles.miolo}>
-        <HojeCabecalho constancia={constancia} avisoVideoSubindo={avisoVideoSubindo} estado="normal" />
+        <HojeCabecalho
+          constancia={constancia}
+          diasGravados={diasGravados}
+          avisoVideoSubindo={avisoVideoSubindo}
+          estado="normal"
+        />
 
         {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}
 
@@ -137,7 +151,7 @@ export function HojeTela({
                     ) : null}
                     <span className={styles.evidenciaLinha}>
                       <b>{evidenciaRoteiroHoje.multiplo}</b>{" "}
-                      {textosHoje.evidenciaMultiplo(evidenciaRoteiroHoje.views, evidenciaRoteiroHoje.dias)}
+                      {textosHoje.evidenciaMultiplo(evidenciaRoteiroHoje.rotulo, evidenciaRoteiroHoje.views, evidenciaRoteiroHoje.quando)}
                     </span>
                   </div>
                 ) : null}
@@ -152,38 +166,40 @@ export function HojeTela({
                 </div>
               </article>
 
-              <div className={styles.recolhidos}>
-                <button
-                  type="button"
-                  aria-expanded={outrosAbertos}
-                  className={styles.abrirTemas}
-                  onClick={() => setOutrosAbertos((a) => !a)}
-                >
-                  <span>{outrosAbertos ? textosHoje.esconderOutros : textosHoje.verOutros}</span>
-                  <span className={styles.contaTemas}>{textosHoje.contagemTemas(temas.length)}</span>
-                </button>
-                <p className={styles.avisoTrocarTema}>{textosHoje.trocarTemaAviso}</p>
+              {temas.length > 0 ? (
+                <div className={styles.recolhidos}>
+                  <button
+                    type="button"
+                    aria-expanded={outrosAbertos}
+                    className={styles.abrirTemas}
+                    onClick={() => setOutrosAbertos((a) => !a)}
+                  >
+                    <span>{outrosAbertos ? textosHoje.esconderOutros : textosHoje.verOutros}</span>
+                    <span className={styles.contaTemas}>{textosHoje.contagemTemas(temas.length)}</span>
+                  </button>
+                  <p className={styles.avisoTrocarTema}>{textosHoje.trocarTemaAviso}</p>
 
-                {outrosAbertos ? (
-                  <div className={styles.listaOutros}>
-                    {temas.map((tema, indice) => (
-                      <div key={`${tema.titulo}-${indice}`} className={styles.linhaOutro}>
-                        <span className={styles.blocoOutro}>
-                          <span className={styles.rotuloOutro}>{ROTULO_TEMA_CARTAO[tema.puxaPara]}</span>
-                          <span className={styles.temaOutro}>{tema.titulo}</span>
-                        </span>
-                        <button
-                          type="button"
-                          className={styles.trocar}
-                          onClick={() => router.push(`/hoje/objetivo?tema=${indice}`)}
-                        >
-                          {textosHoje.trocar}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
+                  {outrosAbertos ? (
+                    <div className={styles.listaOutros}>
+                      {temas.map((tema, indice) => (
+                        <div key={`${tema.titulo}-${indice}`} className={styles.linhaOutro}>
+                          <span className={styles.blocoOutro}>
+                            <span className={styles.rotuloOutro}>{ROTULO_TEMA_CARTAO[tema.puxaPara]}</span>
+                            <span className={styles.temaOutro}>{tema.titulo}</span>
+                          </span>
+                          <button
+                            type="button"
+                            className={styles.trocar}
+                            onClick={() => router.push(`/hoje/objetivo?tema=${indice}`)}
+                          >
+                            {textosHoje.trocar}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <AparteSemanaCurva semana={semana} ultimoVideo={ultimoVideo} />

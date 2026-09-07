@@ -34,11 +34,11 @@
 }
 
 /**
- * Sem escolha salva (nenhum atributo em `<html>`), o iPad (768 a 1099px)
- * nasce recolhido: mostra "abrir o menu"; o desktop (1100px+) nasce aberto.
+ * Sem escolha salva (nenhum atributo em `<html>`), o iPad (768 a 1179px)
+ * nasce recolhido: mostra "abrir o menu"; o desktop (1180px+) nasce aberto.
  * Design v2, `PROXIMO.md`, D2 parte 1, item 3.
  */
-@media (min-width: 768px) and (max-width: 1099px) {
+@media (min-width: 768px) and (max-width: 1179px) {
   .linha {
     justify-content: center;
   }

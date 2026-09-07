@@ -12,11 +12,17 @@
  * completo, para `briefing.spec.ts` exercitar o fluxo de onboarding
  * inteiro.
  *
+ * Revisao do PR #31 (item 11): a captura "depois" do PR mostrava Hoje no
+ * estado vazio, porque o seed nao grava `temas_dia` de hoje para o cliente
+ * de exemplo, e isso invalidou a conferencia visual contra o design. Agora
+ * o script garante uma linha de hoje (tres temas, evidencia apontando para
+ * um video real do seed) antes de capturar, e tira Hoje duas vezes: sem
+ * roteiro do dia (`Hoje.Normal`) e com (`Hoje.Gerado`).
+ *
  * Pre-requisitos, antes de rodar:
  * 1. `DATABASE_URL` do `.env` apontando para `roteiros_dev` (nunca
  *    `roteiros`, o banco de trabalho: `FLUXO.md`, "Um Postgres local,
- *    varias sessoes"; `resetarSchema` ja recusa esse nome, mas este script
- *    nao reseta nada, so le e grava um roteiro se faltar).
+ *    varias sessoes"; `resetarSchema` ja recusa esse nome).
  * 2. `npm run db:seed` rodado uma vez contra esse banco.
  * 3. `npm run dev` rodando, na mesma porta que `CAPTURAS_URL` aponta
  *    (padrao `http://localhost:3000`).
@@ -30,8 +36,11 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { chromium, type Page } from "@playwright/test";
+import { and, desc, eq } from "drizzle-orm";
 
-import { getPool } from "../src/db";
+import { db, getPool } from "../src/db";
+import { temasDia, videos, type TemaDoDia } from "../src/db/schema";
+import { hojeISO } from "../src/lib/config";
 import { clienteDoUsuario, salvarTema } from "../src/servicos/clientes";
 import { gerarRoteiro, roteiroDeHoje } from "../src/servicos/roteiro";
 
@@ -70,6 +79,52 @@ async function garantirRoteiro(clienteId: number): Promise<number> {
   return roteiro.id;
 }
 
+/**
+ * Garante os temas de hoje do nicho do cliente, com evidência real
+ * (revisão do PR #31, item 11): sem isso, Hoje cai no estado vazio e a
+ * captura não mostra o que o design desenha.
+ */
+async function garantirTemasDeHoje(nichoId: number): Promise<void> {
+  const [existente] = await db()
+    .select({ data: temasDia.data })
+    .from(temasDia)
+    .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
+  if (existente) return;
+
+  const videosDoNicho = await db()
+    .select({ id: videos.id })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId))
+    .orderBy(desc(videos.foraDaCurva))
+    .limit(3);
+  const evidenciaPrincipal = videosDoNicho.map((v) => v.id).slice(0, 2);
+
+  const temas: TemaDoDia[] = [
+    {
+      titulo: "[exemplo] o erro que faz a mancha voltar depois da limpeza",
+      descricao: "descrição do tema de exemplo",
+      porQue: "está subindo mais rápido que o normal da conta",
+      evidencias: evidenciaPrincipal,
+      puxaPara: "conversao",
+    },
+    {
+      titulo: "[exemplo] o que fazer antes de aplicar o produto",
+      descricao: "descrição do tema de exemplo",
+      porQue: "uma dúvida que aparece toda semana nos comentários",
+      evidencias: videosDoNicho[2] ? [videosDoNicho[2].id] : [],
+      puxaPara: "engajamento",
+    },
+    {
+      titulo: "[exemplo] quanto custa limpar errado duas vezes",
+      descricao: "descrição do tema de exemplo",
+      porQue: "assunto de custo está subindo no setor",
+      evidencias: [],
+      puxaPara: "alcance",
+    },
+  ];
+  await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
+}
+
 async function main(): Promise<void> {
   const nomeEtapa = process.argv[2];
   if (!nomeEtapa) {
@@ -88,26 +143,20 @@ async function main(): Promise<void> {
       `cliente de seed "${USUARIO_SEED}" nao encontrado; rode "npm run db:seed" contra o banco desta sessao (roteiros_dev, nunca roteiros).`,
     );
   }
+  if (!cliente.nichoId) {
+    throw new Error(`cliente de seed "${USUARIO_SEED}" sem nicho; confira o seed.`);
+  }
 
-  const roteiroId = await garantirRoteiro(cliente.id);
-
-  const telas = [
-    { tela: "Hoje", estado: "Normal", caminho: "/hoje" },
-    { tela: "Roteiro", estado: "Normal", caminho: `/roteiros/${roteiroId}` },
-    { tela: "Gravacao", estado: "Normal", caminho: `/roteiros/${roteiroId}/gravar` },
-    { tela: "Referencias", estado: "Normal", caminho: "/referencias" },
-    { tela: "Historico", estado: "Normal", caminho: "/historico" },
-    { tela: "Briefing", estado: "Normal", caminho: "/briefing" },
-    { tela: "Conta", estado: "Normal", caminho: "/conta" },
-  ];
+  await garantirTemasDeHoje(cliente.nichoId);
 
   const arquivosGravados: string[] = [];
   const browser = await chromium.launch();
 
-  try {
+  async function paraCadaTela(
+    acao: (page: Page, tamanho: (typeof TAMANHOS)[number], modo: (typeof MODOS)[number]) => Promise<void>,
+  ): Promise<void> {
     for (const modo of MODOS) {
-      await salvarTema(cliente.id, modo.colorScheme === "dark" ? "escuro" : "claro");
-
+      await salvarTema(cliente!.id, modo.colorScheme === "dark" ? "escuro" : "claro");
       for (const tamanho of TAMANHOS) {
         const contexto = await browser.newContext({
           viewport: { width: tamanho.largura, height: tamanho.altura },
@@ -115,19 +164,38 @@ async function main(): Promise<void> {
         });
         const page = await contexto.newPage();
         await entrar(page, baseUrl);
-
-        for (const tela of telas) {
-          await page.goto(`${baseUrl}${tela.caminho}`);
-          await page.waitForLoadState("networkidle");
-          const nomeArquivo = `${tela.tela}.${tela.estado}.${tamanho.rotulo}.${modo.rotulo}.png`;
-          const caminhoArquivo = path.join(pastaDestino, nomeArquivo);
-          await page.screenshot({ path: caminhoArquivo, fullPage: true });
-          arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), caminhoArquivo));
-        }
-
+        await acao(page, tamanho, modo);
         await contexto.close();
       }
     }
+  }
+
+  async function capturar(page: Page, caminho: string, tela: string, estado: string, rotulo: string, modo: string): Promise<void> {
+    await page.goto(`${baseUrl}${caminho}`);
+    await page.waitForLoadState("networkidle");
+    const nomeArquivo = `${tela}.${estado}.${rotulo}.${modo}.png`;
+    const caminhoArquivo = path.join(pastaDestino, nomeArquivo);
+    await page.screenshot({ path: caminhoArquivo, fullPage: true });
+    arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), caminhoArquivo));
+  }
+
+  try {
+    // Passo 1: Hoje.Normal, sem roteiro do dia, em todas as larguras e nos dois modos.
+    await paraCadaTela(async (page, tamanho, modo) => {
+      await capturar(page, "/hoje", "Hoje", "Normal", tamanho.rotulo, modo.rotulo);
+    });
+
+    // Passo 2: o roteiro do dia passa a existir; o resto das telas, com Hoje.Gerado.
+    const roteiroId = await garantirRoteiro(cliente.id);
+    await paraCadaTela(async (page, tamanho, modo) => {
+      await capturar(page, "/hoje", "Hoje", "Gerado", tamanho.rotulo, modo.rotulo);
+      await capturar(page, `/roteiros/${roteiroId}`, "Roteiro", "Normal", tamanho.rotulo, modo.rotulo);
+      await capturar(page, `/roteiros/${roteiroId}/gravar`, "Gravacao", "Normal", tamanho.rotulo, modo.rotulo);
+      await capturar(page, "/referencias", "Referencias", "Normal", tamanho.rotulo, modo.rotulo);
+      await capturar(page, "/historico", "Historico", "Normal", tamanho.rotulo, modo.rotulo);
+      await capturar(page, "/briefing", "Briefing", "Normal", tamanho.rotulo, modo.rotulo);
+      await capturar(page, "/conta", "Conta", "Normal", tamanho.rotulo, modo.rotulo);
+    });
   } finally {
     await browser.close();
     await salvarTema(cliente.id, "sistema");

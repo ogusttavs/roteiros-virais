@@ -9,8 +9,11 @@ import styles from "./TemaCartao.module.css";
 export type EvidenciaTema = {
   conta: string | null;
   multiplo: string;
+  /** "acima do normal dessa conta" / "na média dessa conta" / "abaixo do normal dessa conta" (`rotuloMultiploConta`). */
+  rotulo: string;
   views: string;
-  dias: number;
+  /** "hoje" / "ontem" / "em N dias" (`fraseDiasAtras`); nunca "em 0 dias". */
+  quando: string;
   parecidos: number;
 };
 
@@ -50,7 +53,7 @@ export function TemaCartao({ rotulo, tema, porque, evidencia, primario = false, 
             </span>
           ) : null}
           <span className={styles.evidenciaLinha}>
-            <b>{evidencia.multiplo}</b> {textosHoje.evidenciaMultiplo(evidencia.views, evidencia.dias)}
+            <b>{evidencia.multiplo}</b> {textosHoje.evidenciaMultiplo(evidencia.rotulo, evidencia.views, evidencia.quando)}
           </span>
           {evidencia.parecidos > 0 ? (
             <span className={styles.evidenciaLinha}>{textosHoje.evidenciaParecidos(evidencia.parecidos)}</span>

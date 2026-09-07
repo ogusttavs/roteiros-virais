@@ -61,13 +61,13 @@
   }
 
   /**
-   * Sem escolha salva, o iPad (768 a 1099px) nasce recolhida (design v2,
+   * Sem escolha salva, o iPad (768 a 1179px) nasce recolhida (design v2,
    * `PROXIMO.md`, D2 parte 1, item 3: "recolhida por padrão no iPad,
    * aberta no desktop"). A escolha explicita do cliente
    * (`html[data-barra-lateral]`, mais abaixo) vence isto em qualquer
    * largura.
    */
-  @media (max-width: 1099px) {
+  @media (max-width: 1179px) {
     .colunaDesktop {
       width: var(--largura-barra-recolhida);
       /**

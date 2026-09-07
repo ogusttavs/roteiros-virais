@@ -51,6 +51,7 @@ export default async function Gravar({ params }: Props) {
     <GravacaoTela
       roteiroId={roteiro.id}
       titulo={corpo.titulo}
+      jaGravado={roteiro.gravadoEm !== null}
       blocos={[
         { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
         { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },

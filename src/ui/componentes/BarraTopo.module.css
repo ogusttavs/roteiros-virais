@@ -35,7 +35,7 @@
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .barra {
     padding-inline: var(--espaco-10);
   }

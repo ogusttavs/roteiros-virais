@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
 import { textosGravacao } from "@/textos/gravacao";
+import { Toast } from "@/ui/componentes/Toast";
 
 import styles from "./GravacaoTela.module.css";
 
@@ -15,6 +16,8 @@ type Props = {
   roteiroId: number;
   titulo: string;
   blocos: Bloco[];
+  /** Se o roteiro já estava marcado como gravado ao entrar (revisão do PR #31, item 6). */
+  jaGravado: boolean;
 };
 
 /**
@@ -22,28 +25,50 @@ type Props = {
  * `entrega/telas/Gravacao.dc.html`; `PROXIMO.md`, D2 parte 1, item 7):
  * substitui o modo gravação que era um estado sobreposto de `/roteiros/[id]`.
  */
-export function GravacaoTela({ roteiroId, titulo, blocos }: Props) {
+export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado }: Props) {
   const router = useRouter();
   const [passo, setPasso] = useState(0);
   const [temWakeLock, setTemWakeLock] = useState(false);
+  const [gravado, setGravado] = useState(jaGravado);
+  const [marcando, setMarcando] = useState(false);
+  const [erroToast, setErroToast] = useState(false);
 
+  /**
+   * O navegador solta o wake lock sozinho quando a aba fica escondida (a
+   * pessoa troca para a câmera para gravar); pedir de novo ao voltar
+   * visível, e esconder o aviso enquanto não tiver (revisão do PR #31,
+   * item 5: nunca mentir que a tela vai ficar acesa).
+   */
   useEffect(() => {
     if (!("wakeLock" in navigator)) return;
     let sentinela: WakeLockSentinel | null = null;
     let cancelado = false;
-    navigator.wakeLock
-      .request("screen")
-      .then((s) => {
+
+    async function pedir() {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const s = await navigator.wakeLock.request("screen");
         if (cancelado) {
           s.release();
           return;
         }
         sentinela = s;
         setTemWakeLock(true);
-      })
-      .catch(() => setTemWakeLock(false));
+        s.addEventListener("release", () => setTemWakeLock(false));
+      } catch {
+        setTemWakeLock(false);
+      }
+    }
+
+    function aoMudarVisibilidade() {
+      if (document.visibilityState === "visible") pedir();
+    }
+
+    pedir();
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
     return () => {
       cancelado = true;
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
       sentinela?.release();
     };
   }, []);
@@ -53,7 +78,12 @@ export function GravacaoTela({ roteiroId, titulo, blocos }: Props) {
   const primeiroParagrafoProximo = proximo?.paragrafos[0] ?? null;
 
   function marcarGravado() {
-    marcarGravadoAction(roteiroId).catch(() => undefined);
+    if (gravado || marcando) return;
+    setMarcando(true);
+    marcarGravadoAction(roteiroId)
+      .then(() => setGravado(true))
+      .catch(() => setErroToast(true))
+      .finally(() => setMarcando(false));
   }
 
   return (
@@ -123,13 +153,17 @@ export function GravacaoTela({ roteiroId, titulo, blocos }: Props) {
         </button>
         <button
           type="button"
-          aria-label={textosGravacao.marcarGravei}
-          className={styles.redondo}
+          aria-label={gravado ? textosGravacao.gravado : textosGravacao.marcarGravei}
+          aria-pressed={gravado}
+          className={`${styles.redondo} ${gravado ? styles.redondoFeito : ""}`}
+          disabled={marcando}
           onClick={marcarGravado}
         >
           <Check size={24} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
+
+      <Toast texto={textosGravacao.erroMarcar} aberto={erroToast} onFechar={() => setErroToast(false)} />
     </div>
   );
 }

@@ -172,6 +172,14 @@
   cursor: not-allowed;
 }
 
+/** Estado feito depois de marcar que gravou (revisão do PR #31, item 6): preenchido, resposta na tela. */
+.redondoFeito,
+.redondoFeito:disabled {
+  background: var(--cor-acao);
+  border-color: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
 .redondo:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);

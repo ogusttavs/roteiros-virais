@@ -59,7 +59,7 @@
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .miolo {
     padding-inline: var(--espaco-10);
   }
@@ -200,7 +200,7 @@
   }
 }
 
-@media (min-width: 1100px) {
+@media (min-width: 1180px) {
   .barraAcoes {
     left: var(--largura-barra-lateral);
     padding-inline: var(--espaco-10);
@@ -208,8 +208,7 @@
 }
 
 .btn,
-.btnVazio,
-.rotuloFeito {
+.btnVazio {
   flex: 1 1 auto;
   min-height: var(--altura-toque-lg);
   display: inline-flex;
@@ -229,10 +228,20 @@
 
 @media (min-width: 768px) {
   .btn,
-  .btnVazio,
-  .rotuloFeito {
+  .btnVazio {
     flex: 0 0 auto;
     min-width: 11rem;
+  }
+}
+
+/** Modo gravação some da barra do topo no celular, fica no tablet e no desktop (item 7). */
+.somenteTablet {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .somenteTablet {
+    display: inline-flex;
   }
 }
 
@@ -260,13 +269,6 @@
 
 .btnVazio:hover {
   background: var(--cor-superficie-hover);
-}
-
-.rotuloFeito {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-suave);
-  justify-content: flex-start;
 }
 
 .btn:focus-visible,

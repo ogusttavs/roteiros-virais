@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 
 import type { ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
@@ -167,7 +168,10 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         }
         direita={
           <>
-            <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.botaoBarra}>
+            {/* Some no celular, fica no tablet e no desktop (design v2, Roteiro.dc.html mostra
+                nos dois lugares; PROXIMO.md, revisão do PR #31, item 7: "sai da barra do topo
+                no celular"). O rodapé sempre tem o botão, em toda largura. */}
+            <Link href={`/roteiros/${roteiro.id}/gravar`} className={`${styles.botaoBarra} ${styles.somenteTablet}`}>
               <Video size={18} strokeWidth={1.75} aria-hidden="true" />
               <span>{textosRoteiro.modoGravacao}</span>
             </Link>
@@ -234,8 +238,8 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
           <CartaoDeOndeVeio
             titulo={textosRoteiro.referencia}
             conta={video.contaNome ?? video.contaHandle}
-            multiplo={`${video.foraDaCurva.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`}
-            texto={`${textosRoteiro.acimaDoNormalDessaConta} ${video.porQueFuncionou ?? ""}`.trim()}
+            multiplo={formatarMultiplo(video.foraDaCurva)}
+            texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva))}. ${textosRoteiro.oQueFuncionouAli} ${video.porQueFuncionou ?? ""}`.trim()}
             segundoFormatado={
               referencia.segundo !== null ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo)) : null
             }
@@ -269,14 +273,15 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
       {erro ? <p className={styles.fraseErro}>{textosRoteiro.erro}</p> : null}
 
       <div className={styles.barraAcoes}>
+        <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.btn}>
+          <Video size={18} strokeWidth={1.75} aria-hidden="true" />
+          {textosRoteiro.modoGravacao}
+        </Link>
         {!gravadoEm ? (
-          <button type="button" onClick={gravei} disabled={pendente} className={styles.btn}>
-            {textosRoteiro.gravei}
+          <button type="button" onClick={gravei} disabled={pendente} className={styles.btnVazio}>
+            {textosRoteiro.jaGravei}
           </button>
-        ) : (
-          <span className={styles.rotuloFeito}>{textosRoteiro.gravadoAs(formatarHora(gravadoEm))}</span>
-        )}
-        {!postado ? (
+        ) : !postado ? (
           <button type="button" onClick={() => setPainel("postei")} className={styles.btnVazio}>
             {textosRoteiro.postei}
           </button>

@@ -148,7 +148,7 @@ test.describe("roteiro pela tela", () => {
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("versão 2 de 2")).toBeVisible();
 
-    await page.getByRole("button", { name: "gravei", exact: true }).click();
-    await expect(page.getByText(/gravado às/)).toBeVisible();
+    await page.getByRole("button", { name: "Já gravei", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Postei", exact: true })).toBeVisible();
   });
 });

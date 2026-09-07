@@ -52,7 +52,7 @@ const SCRIPT_TEMA = `(function(){try{if(document.documentElement.hasAttribute("d
  * Etapa D2, parte 1 (design v2, item 3 do `PROXIMO.md`): a barra passou a
  * ter um terceiro estado, "sem escolha do cliente" (nem "aberta" nem
  * "recolhida" salvos), em que o CSS decide sozinho pela largura da tela
- * (recolhida no iPad, 768 a 1099px; aberta a partir de 1100px,
+ * (recolhida no iPad, 768 a 1179px; aberta a partir de 1180px,
  * `layout.module.css`). Só grava o atributo quando ha uma escolha
  * explicita salva; sem ela, o atributo fica ausente e o `@media` cuida do
  * resto (`o estado guardado continua valendo`, `PROXIMO.md`).

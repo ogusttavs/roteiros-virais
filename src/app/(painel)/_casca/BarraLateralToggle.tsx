@@ -6,12 +6,12 @@ import styles from "./BarraLateralToggle.module.css";
 
 const CHAVE_ARMAZENAMENTO = "barra-lateral";
 const ATRIBUTO = "data-barra-lateral";
-/** Mesmo corte de 1100px do resto do painel (TemaCartao, HojeTela). */
-const CONSULTA_AUTO_RECOLHIDA = "(max-width: 1099px)";
+/** Mesmo corte de 1180px do resto do painel (TemaCartao, HojeTela). */
+const CONSULTA_AUTO_RECOLHIDA = "(max-width: 1179px)";
 
 /**
  * Sem escolha salva, a barra decide sozinha pela largura: recolhida no
- * iPad (768 a 1099px), aberta a partir de 1100px (design v2, `PROXIMO.md`,
+ * iPad (768 a 1179px), aberta a partir de 1180px (design v2, `PROXIMO.md`,
  * D2 parte 1, item 3). `layout.module.css` tem o mesmo corte em CSS puro
  * para o primeiro paint; esta função só precisa saber o estado atual para
  * decidir para que lado alternar.

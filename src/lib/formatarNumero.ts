@@ -35,3 +35,30 @@ export function diasDesde(data: Date, agora: Date = new Date()): number {
   const inicioAgora = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
   return Math.max(0, Math.round((inicioAgora - inicioData) / DIA_MS));
 }
+
+/** "hoje", "ontem" ou "há N dias": nunca "em 0 dias" (revisão do PR #31, item 4). */
+export function fraseDiasAtras(dias: number): string {
+  if (dias === 0) return "hoje";
+  if (dias === 1) return "ontem";
+  return `em ${dias} dias`;
+}
+
+export type FaixaMultiplo = "acima" | "media" | "abaixo";
+
+/**
+ * A partir de 1,5x é "acima do normal"; entre 0,8 e 1,5 é "na média"; abaixo
+ * é "abaixo do normal" (`BRIEF.md`, revisão de Referências; revisão do PR
+ * #31, item 4: o rótulo do múltiplo sempre acompanha o número).
+ */
+export function classificarMultiplo(vezes: number): FaixaMultiplo {
+  if (vezes >= 1.5) return "acima";
+  if (vezes >= 0.8) return "media";
+  return "abaixo";
+}
+
+/** "acima do normal dessa conta" / "na média dessa conta" / "abaixo do normal dessa conta". */
+export function rotuloMultiploConta(faixa: FaixaMultiplo): string {
+  if (faixa === "acima") return "acima do normal dessa conta";
+  if (faixa === "media") return "na média dessa conta";
+  return "abaixo do normal dessa conta";
+}

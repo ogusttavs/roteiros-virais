@@ -90,7 +90,7 @@
  * barra inferior do celular nunca recebe esta classe, então nenhuma das
  * regras abaixo a afeta.
  */
-@media (min-width: 768px) and (max-width: 1099px) {
+@media (min-width: 768px) and (max-width: 1179px) {
   /**
    * Alvo de 44px de verdade (achado rodando o e2e de layout, `PROXIMO.md`
    * D2 parte 1, item 8): sem largura própria, o item encolhia para o
