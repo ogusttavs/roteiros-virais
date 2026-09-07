@@ -61,17 +61,21 @@ afterEach(async () => {
 });
 
 describe("rodarExtrairColeta, checagem de idioma", () => {
-  it("reprovada nas duas tentativas: o video fica sem analise e o resumo conta", async () => {
+  it("reprovada nas duas tentativas: grava a melhor das duas mesmo assim, nunca fica sem analise", async () => {
     await criarVideo("video-em-ingles", "how to clean a couch fast without buying anything");
 
     await rodarExtrair();
     const resumo = await rodarExtrairColeta();
 
-    expect(resumo.videosAtualizados).toBe(0);
+    // revisao do PR #30: analise nenhuma e pior que uma com um campo em ingles.
+    expect(resumo.videosAtualizados).toBe(1);
     expect(resumo.reprovadosPorIdioma).toBe(1);
 
     const [video] = await db().select().from(videos).where(eq(videos.idExterno, "video-em-ingles"));
-    expect(video.analise).toBeNull();
+    expect(video.analise).not.toBeNull();
+    // mock e deterministico a partir do titulo: a retentativa repete o mesmo gancho em ingles,
+    // empate na contagem de campos em portugues, entao fica com a analise original.
+    expect(video.analise!.gancho).toBe("abertura sobre how to clean a couch fast without buying anything");
 
     // uma chamada de retentativa so, alem da do lote (que nao passa por gerarEstruturado).
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(1);

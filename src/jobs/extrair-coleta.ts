@@ -6,8 +6,10 @@
  * Idioma (acabamento visual 2, achado do Gustavo no iPad): a analise que
  * nao passa na checagem barata de `src/lib/idioma.ts` ganha uma segunda
  * tentativa, sincrona (fora do lote, so para este video), com a instrucao
- * de traducao reforcada. Reprovou de nova, o video fica sem analise e o
- * resumo do job conta.
+ * de traducao reforcada. Reprovou de novo, grava a melhor das duas mesmo
+ * assim (revisao do PR #30: analise nenhuma e pior que uma com um campo em
+ * ingles) e conta no resumo do job; nunca deixa o video sem analise por
+ * causa disto.
  */
 import { eq } from "drizzle-orm";
 
@@ -31,6 +33,10 @@ function camposParaChecarIdioma(dados: extrairVideo.SaidaExtrairVideo): string[]
 
 function pareceEmPortugues(dados: extrairVideo.SaidaExtrairVideo): boolean {
   return camposParaChecarIdioma(dados).every(pareceTextoEmPortugues);
+}
+
+function contarCamposEmPortugues(dados: extrairVideo.SaidaExtrairVideo): number {
+  return camposParaChecarIdioma(dados).filter(pareceTextoEmPortugues).length;
 }
 
 async function buscarDadosParaRetentativa(
@@ -111,13 +117,19 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
 
       let dados = resultado.dados;
       if (!pareceEmPortugues(dados)) {
-        dados = (await retentarEmPortugues(videoId)) ?? dados;
-      }
-
-      if (!pareceEmPortugues(dados)) {
-        reprovadosPorIdioma += 1;
-        erros.push(`video ${videoId}: analise reprovada na checagem de idioma depois de refazer`);
-        continue;
+        const retentativa = await retentarEmPortugues(videoId);
+        if (retentativa && pareceEmPortugues(retentativa)) {
+          dados = retentativa;
+        } else {
+          // As duas reprovaram (ou a retentativa nao rodou, sem transcricao
+          // para reconstruir a entrada): fica com a que passa em mais
+          // campos, nunca descarta a analise (revisao do PR #30).
+          reprovadosPorIdioma += 1;
+          erros.push(`video ${videoId}: analise reprovada na checagem de idioma depois de refazer`);
+          if (retentativa && contarCamposEmPortugues(retentativa) > contarCamposEmPortugues(dados)) {
+            dados = retentativa;
+          }
+        }
       }
 
       const { etiquetas, ...analise } = dados;

@@ -1,32 +1,53 @@
 /**
  * Checagem barata de idioma (acabamento visual 2, achado do Gustavo no
  * iPad: duas análises de vídeo saíram em inglês ou misturadas, apesar de o
- * prompt pedir português). Sem chamar IA: conta a proporção de palavras
- * funcionais do português numa lista fixa. `extrair-coleta.ts` usa isto
+ * prompt pedir português). Sem chamar IA. `extrair-coleta.ts` usa isto
  * campo a campo (o vídeo pode ter só um trecho copiado no idioma original,
  * como o gancho, com o resto da análise certo).
  *
- * O limiar e o tamanho mínimo são uma hipótese (os dois casos reais de
- * 06/09 não sobreviveram fora de `avaliacoes-privadas/`, que esta sessão
- * não acessa): abaixo de 6 palavras o texto não dá sinal confiável e passa
- * direto: PROXIMO.md pediu um limiar "conferido nos dois casos reais",
- * decisão pendente registrada em TODO.md para o Fable confirmar contra o
- * diário real quando houver um novo caso.
+ * Duas listas fixas, não uma proporção (revisão do PR #30, Fable): a
+ * primeira versão (proporção de oito palavras funcionais do português)
+ * reprovava 37 dos 135 campos das 27 análises reais de produção, e uns 18
+ * eram português correto. Comparando a contagem de palavras de cada lista
+ * nos mesmos 135 campos, esta versão reprova 20, todos de fato em inglês,
+ * zero falso positivo (números e as duas listas vieram do comentário de
+ * revisão do PR #30).
  */
-const PALAVRAS_FUNCIONAIS_PT = ["de", "que", "nao", "com", "para", "uma", "voce", "mais"];
+const PALAVRAS_PT = [
+  "o", "a", "os", "as", "e", "de", "do", "da", "dos", "das", "no", "na", "nos", "nas", "em",
+  "um", "uma", "por", "se", "ao", "à", "é", "são", "como", "mais", "seu", "sua", "ele", "ela",
+  "isso", "este", "esta", "esse", "essa", "para", "pra", "com", "não", "que", "mas", "ou", "já",
+  "até", "também", "você", "depois", "antes", "sem", "quando", "onde", "muito", "bem", "tudo",
+  "vai", "foi", "ser", "ter", "fazer", "mostra", "mostrando", "vídeo",
+];
 
-const PALAVRAS_MINIMAS = 6;
-const LIMIAR_PROPORCAO = 0.06;
+const PALAVRAS_EN = [
+  "the", "and", "you", "your", "this", "that", "what", "with", "will", "it", "is", "are", "to",
+  "of", "in", "on", "like", "just", "when", "how", "why", "not", "never", "it's", "you'll",
+  "i'd", "me", "my", "we", "again", "wait", "because", "until", "into", "from", "but", "or",
+  "so", "if", "can", "all", "one", "these", "up", "out", "about",
+];
 
-/** Sem acento, para "você"/"nao" baterem com texto que escreve sem acento (mock, digitação rápida). */
+const PALAVRAS_MINIMAS = 4;
+
+/** Sem acento, para "você"/"não" baterem com texto que escreve sem acento (mock, digitação rápida). */
 function semAcento(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
+const CONJUNTO_PT = new Set(PALAVRAS_PT.map(semAcento));
+const CONJUNTO_EN = new Set(PALAVRAS_EN);
+
+/** Reprova só quando a contagem de palavras da lista em inglês é maior que a da lista em português. Empate passa. */
 export function pareceTextoEmPortugues(texto: string): boolean {
-  const palavras = semAcento(texto.toLowerCase()).match(/\p{L}+/gu) ?? [];
+  const palavras = semAcento(texto.toLowerCase()).match(/[\p{L}']+/gu) ?? [];
   if (palavras.length < PALAVRAS_MINIMAS) return true;
 
-  const funcionais = palavras.filter((palavra) => PALAVRAS_FUNCIONAIS_PT.includes(palavra)).length;
-  return funcionais / palavras.length >= LIMIAR_PROPORCAO;
+  let pt = 0;
+  let en = 0;
+  for (const palavra of palavras) {
+    if (CONJUNTO_PT.has(palavra)) pt += 1;
+    if (CONJUNTO_EN.has(palavra)) en += 1;
+  }
+  return en <= pt;
 }
