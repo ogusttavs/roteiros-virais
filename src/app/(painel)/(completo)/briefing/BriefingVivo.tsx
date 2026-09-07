@@ -80,7 +80,12 @@ export function BriefingVivo({
             id: p.id,
             rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id, p.rotuloCurto),
             nota: avaliacoes[p.id]?.nota ?? null,
-            melhorarResumo: avaliacoes[p.id] ? resumirMelhorar(avaliacoes[p.id].melhorar) : null,
+            /** Na meta, a lista mostra a palavra, nao o resumo (design v2, "Briefing.dc.html", ".lista-notas"; item 0 do PROXIMO.md). */
+            melhorarResumo: !avaliacoes[p.id]
+              ? null
+              : avaliacoes[p.id].nota >= meta
+                ? `${textosBriefing.faixaMeta.naMeta}.`
+                : resumirMelhorar(avaliacoes[p.id].melhorar),
           }))}
         />
         <div className={styles.corpo}>
