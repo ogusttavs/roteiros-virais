@@ -32,6 +32,26 @@
   display: none;
 }
 
+/**
+ * Sem escolha salva (nenhum atributo em `<html>`), o iPad (768 a 1099px)
+ * nasce recolhido: mostra "abrir o menu"; o desktop (1100px+) nasce aberto.
+ * Design v2, `PROXIMO.md`, D2 parte 1, item 3.
+ */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .linha {
+    justify-content: center;
+  }
+
+  .recolher {
+    display: none;
+  }
+
+  .abrir {
+    display: flex;
+  }
+}
+
+/** Escolha explicita do cliente (BarraLateralToggle.tsx) vence o padrão automático em qualquer largura. */
 html[data-barra-lateral="recolhida"] .linha {
   justify-content: center;
 }
@@ -42,4 +62,16 @@ html[data-barra-lateral="recolhida"] .recolher {
 
 html[data-barra-lateral="recolhida"] .abrir {
   display: flex;
+}
+
+html[data-barra-lateral="aberta"] .linha {
+  justify-content: flex-end;
+}
+
+html[data-barra-lateral="aberta"] .recolher {
+  display: flex;
+}
+
+html[data-barra-lateral="aberta"] .abrir {
+  display: none;
 }
