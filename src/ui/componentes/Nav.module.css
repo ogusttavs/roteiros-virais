@@ -81,3 +81,19 @@
     letter-spacing: normal;
   }
 }
+
+/**
+ * Barra lateral recolhida (etapa "acabamento visual 2"): só o rótulo some,
+ * o ícone fica centralizado e o `title` do link (Nav.tsx) vira a dica ao
+ * pairar o mouse. `.compactavel` só existe na instância de dentro de
+ * `.colunaDesktop` (layout.tsx); a barra inferior do celular nunca recebe
+ * esta classe, então o atributo global em `<html>` não a afeta.
+ */
+html[data-barra-lateral="recolhida"] .compactavel .item {
+  justify-content: center;
+  padding: 0;
+}
+
+html[data-barra-lateral="recolhida"] .compactavel .rotulo {
+  display: none;
+}

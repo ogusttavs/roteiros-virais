@@ -22,11 +22,24 @@ const ITENS: { href: string; rotulo: string; Icone: ComponentType<{ size?: numbe
   { href: "/briefing", rotulo: textosNav.briefing, Icone: List },
 ];
 
-export function Nav() {
+type Props = {
+  /**
+   * Só a barra lateral do desktop passa isto (etapa "acabamento visual 2"):
+   * marca o `<nav>` para o CSS poder esconder o rótulo quando a barra está
+   * recolhida (`html[data-barra-lateral="recolhida"]`), sem afetar a barra
+   * inferior do celular, que usa o mesmo componente sem a prop.
+   */
+  compactavel?: boolean;
+};
+
+export function Nav({ compactavel = false }: Props) {
   const pathname = usePathname();
 
   return (
-    <nav className={styles.nav} aria-label={textosNav.navegacaoPrincipal}>
+    <nav
+      className={compactavel ? `${styles.nav} ${styles.compactavel}` : styles.nav}
+      aria-label={textosNav.navegacaoPrincipal}
+    >
       {ITENS.map(({ href, rotulo, Icone }) => {
         const ativo = ehRotaAtiva(pathname, href);
         return (
@@ -35,6 +48,7 @@ export function Nav() {
             href={href}
             className={ativo ? `${styles.item} ${styles.ativo}` : styles.item}
             aria-current={ativo ? "page" : undefined}
+            title={compactavel ? rotulo : undefined}
           >
             <span className={styles.traco} aria-hidden="true" />
             <Icone size={22} strokeWidth={1.5} />

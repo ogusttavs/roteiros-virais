@@ -31,15 +31,30 @@ export const metadata: Metadata = {
  */
 const SCRIPT_TEMA = `(function(){try{if(document.documentElement.hasAttribute("data-tema"))return;var t=localStorage.getItem("tema");if(t==="claro"||t==="escuro"){document.documentElement.setAttribute("data-tema",t);}}catch(e){}})();`;
 
+/**
+ * Le o estado da barra lateral do painel antes da primeira pintura, mesma
+ * ideia do SCRIPT_TEMA acima (etapa "acabamento visual 2", achado do
+ * Gustavo usando o painel no iPad): sem isto, a barra nasceria sempre
+ * aberta e recolheria de repente depois da hidratacao. Inocuo fora do
+ * painel (nenhuma tela fora dele tem `.colunaDesktop`).
+ */
+const SCRIPT_BARRA_LATERAL = `(function(){try{if(localStorage.getItem("barra-lateral")==="recolhida"){document.documentElement.setAttribute("data-barra-lateral","recolhida");}}catch(e){}})();`;
+
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const sessao = await sessaoAtual();
   const cliente = sessao ? await clienteDoUsuario(sessao.user.id) : null;
   const tema = cliente?.tema === "claro" || cliente?.tema === "escuro" ? cliente.tema : undefined;
 
   return (
-    <html lang="pt-BR" data-tema={tema} className={`${hanken.variable} ${spaceMono.variable}`}>
+    <html
+      lang="pt-BR"
+      data-tema={tema}
+      className={`${hanken.variable} ${spaceMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_BARRA_LATERAL }} />
       </head>
       <body>{children}</body>
     </html>

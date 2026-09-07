@@ -5,4 +5,6 @@ export const textosNav = {
   briefing: "Briefing",
   conta: "Conta",
   navegacaoPrincipal: "Navegação principal",
+  recolherMenu: "recolher o menu",
+  abrirMenu: "abrir o menu",
 };

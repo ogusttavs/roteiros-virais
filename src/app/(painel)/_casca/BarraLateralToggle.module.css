@@ -1,0 +1,45 @@
+.linha {
+  display: flex;
+  justify-content: flex-end;
+  height: 32px;
+}
+
+.botao {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+  transition: background var(--duracao-rapida) var(--curva-saida);
+}
+
+.botao:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.abrir {
+  display: none;
+}
+
+html[data-barra-lateral="recolhida"] .linha {
+  justify-content: center;
+}
+
+html[data-barra-lateral="recolhida"] .recolher {
+  display: none;
+}
+
+html[data-barra-lateral="recolhida"] .abrir {
+  display: flex;
+}
