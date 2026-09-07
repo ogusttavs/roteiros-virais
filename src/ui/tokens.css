@@ -254,6 +254,7 @@
   --raio-md: 0.75rem;
   --raio-lg: 1rem;
   --raio-pill: 999px;
+  --largura-borda: 1px;
 
   /** Grade de 4 px (entrega/tokens.css); 7 a 12 mudam de valor nesta integracao (D2 parte 1). */
   --espaco-1: 0.25rem;

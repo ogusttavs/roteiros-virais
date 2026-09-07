@@ -326,6 +326,52 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
   return mapearEvidenciaRoteiro(linhas);
 }
 
+export type EvidenciaResumo = {
+  contaNome: string | null;
+  contaHandle: string | null;
+  multiplicador: number;
+  views: number;
+  publicadoEm: Date | null;
+  /** Quantos outros vídeos da lista, além do citado acima (design v2, Hoje.Normal e Hoje.Gerado). */
+  quantidadeParecidos: number;
+};
+
+/**
+ * O bloco de evidência de um tema ou do roteiro do dia em `/hoje` (design
+ * v2, `PROXIMO.md`, D2 parte 1, item 5): conta, quantas vezes acima do
+ * normal e views do vídeo mais fora da curva da lista, mais quantos outros
+ * vídeos parecidos sustentam o mesmo tema. `null` sem nenhum vídeo (a tela
+ * não mostra o bloco, nunca um número inventado, `BRIEF.md` seção 4).
+ */
+export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaResumo | null> {
+  if (ids.length === 0) return null;
+
+  const linhas = await db()
+    .select({
+      contaNome: contas.nome,
+      contaHandle: contas.handle,
+      foraDaCurva: videos.foraDaCurva,
+      views: videos.views,
+      publicadoEm: videos.publicadoEm,
+    })
+    .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
+    .where(inArray(videos.id, ids))
+    .orderBy(desc(videos.foraDaCurva), asc(videos.id));
+
+  if (linhas.length === 0) return null;
+
+  const [principal] = linhas;
+  return {
+    contaNome: principal.contaNome,
+    contaHandle: principal.contaHandle,
+    multiplicador: principal.foraDaCurva === null ? 0 : Number(principal.foraDaCurva),
+    views: principal.views,
+    publicadoEm: principal.publicadoEm,
+    quantidadeParecidos: linhas.length - 1,
+  };
+}
+
 export type VideoReferencia = {
   id: number;
   plataforma: Plataforma;

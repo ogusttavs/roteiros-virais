@@ -235,6 +235,49 @@ export async function videoSubindoParaAviso(clienteId: number): Promise<AvisoVid
   return null;
 }
 
+export type UltimoVideoAparte = {
+  views: number;
+  horasDesdePostado: number;
+  multiplicador: number;
+  acimaDoNormal: boolean;
+};
+
+/**
+ * O último vídeo postado do cliente com curva já medida, para o cartão
+ * "seu último vídeo" de `/hoje` (design v2, `PROXIMO.md`, D2 parte 1, item
+ * 5). `null` sem vídeo postado ainda ou sem medição (a "aprender" a
+ * mediana da conta, por exemplo): a tela mostra o estado vazio desenhado
+ * em vez de um número inventado.
+ */
+export async function ultimoVideoParaAparte(clienteId: number): Promise<UltimoVideoAparte | null> {
+  const [ultimo] = await db()
+    .select({
+      id: videosCliente.id,
+      plataforma: videosCliente.plataforma,
+      idExterno: videosCliente.idExterno,
+      postadoEm: videosCliente.postadoEm,
+    })
+    .from(videosCliente)
+    .where(
+      and(eq(videosCliente.clienteId, clienteId), isNotNull(videosCliente.plataforma), isNotNull(videosCliente.idExterno)),
+    )
+    .orderBy(desc(videosCliente.postadoEm))
+    .limit(1);
+
+  if (!ultimo) return null;
+
+  const curva = await curvaDoVideo({ ...ultimo, clienteId });
+  if (curva.status !== "medido") return null;
+
+  const ultimaMedicao = curva.pontos[curva.pontos.length - 1];
+  return {
+    views: ultimaMedicao.views,
+    horasDesdePostado: Math.max(1, Math.round((ultimaMedicao.coletadoEm.getTime() - ultimo.postadoEm.getTime()) / HORA_MS)),
+    multiplicador: curva.multiplicador,
+    acimaDoNormal: curva.acimaDoNormal,
+  };
+}
+
 /**
  * A curva de cada vídeo postado da lista de `roteiroId` de `/historico`,
  * pelo `roteiroId` (decisão 5 do `PROXIMO.md`). Sem entrada no mapa para um

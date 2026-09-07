@@ -211,7 +211,7 @@ export default function Fundacao() {
             rotulo="para te chamarem"
             tema="o erro que quase todo mundo comete ao limpar o fogão"
             porque="Mostrar o erro e o jeito certo no mesmo take está segurando a atenção até o fim."
-            evidencia="5 vídeos fora da curva esta semana"
+            evidencia={{ conta: "@exemplo_limpeza", multiplo: "3,2x", views: "5 mil", dias: 2, parecidos: 2 }}
             primario
             rotuloBotao="quero esse"
             onEscolher={() => undefined}

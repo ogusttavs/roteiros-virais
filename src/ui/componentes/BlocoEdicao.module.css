@@ -7,7 +7,7 @@
 .titulo {
   margin: 0;
   font-size: var(--tamanho-corpo);
-  font-weight: 600;
+  font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
 
@@ -40,7 +40,7 @@
 
 .rotulo {
   font-size: var(--tamanho-secundario);
-  font-weight: 600;
+  font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
 

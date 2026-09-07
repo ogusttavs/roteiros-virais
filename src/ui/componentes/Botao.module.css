@@ -1,3 +1,4 @@
+/** base.css, bloco `.btn` (design v2, `PROXIMO.md`, D2 parte 1, item 4). */
 .botao {
   position: relative;
   display: inline-flex;
@@ -7,7 +8,7 @@
   border: 1px solid transparent;
   border-radius: var(--raio-pill);
   font-family: var(--fonte-texto);
-  font-weight: 600;
+  font-weight: var(--peso-semibold);
   cursor: pointer;
   transition:
     background var(--duracao-rapida) var(--curva-saida),
@@ -50,7 +51,7 @@
   background: transparent;
   color: var(--cor-titulo);
   border-color: var(--cor-borda-forte);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
 }
 
 .secundario:not(:disabled):hover {
@@ -64,7 +65,7 @@
 .ghost {
   background: transparent;
   color: var(--cor-titulo);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
   padding-left: var(--espaco-3);
   padding-right: var(--espaco-3);
 }
@@ -81,7 +82,7 @@
   background: transparent;
   color: var(--cor-erro);
   border-color: var(--cor-borda-forte);
-  font-weight: 500;
+  font-weight: var(--peso-medio);
 }
 
 .perigo:not(:disabled):hover,

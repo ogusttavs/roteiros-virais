@@ -1,0 +1,42 @@
+/** base.css, bloco `.barra-topo` (design v2, `PROXIMO.md`, D2 parte 1, item 3). */
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: 3rem;
+  padding: var(--espaco-2) var(--margem-celular);
+  padding-top: calc(var(--espaco-2) + env(safe-area-inset-top, 0px));
+  background: var(--cor-material-barra);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.titulo {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-cabecalho);
+}
+
+.direita {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .barra {
+    padding-inline: var(--espaco-6);
+  }
+}
+
+@media (min-width: 1100px) {
+  .barra {
+    padding-inline: var(--espaco-10);
+  }
+}

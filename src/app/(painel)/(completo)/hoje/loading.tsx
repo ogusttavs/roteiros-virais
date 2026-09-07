@@ -1,19 +1,37 @@
+import { RefreshCw } from "lucide-react";
+
 import { textosHoje } from "@/textos/hoje";
-import { Progresso } from "@/ui/componentes/Progresso";
+import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 
+import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
 
-/** Skeleton mais a frase de espera (etapa 10, brief-frontend.md 6.3, estado "carregando"). */
+/** Esqueleto dos três cartões mais a frase de espera (design v2, Hoje.Carregando). */
 export default function CarregandoHoje() {
   return (
     <div className={styles.pagina}>
-      <Skeleton variante="titulo" largura="50%" />
-      <Progresso mensagem={textosHoje.carregando} />
-      <div className={styles.grade}>
-        <Skeleton variante="video" />
-        <Skeleton variante="video" />
-        <Skeleton variante="video" />
+      <BarraTopo titulo={textosHoje.titulo} />
+      <div className={styles.conteudo}>
+        <HojeCabecalho constancia={{ tipo: "primeiro_dia" }} estado="carregando" />
+        <div className={styles.duasColunas}>
+          <div className={styles.temasTres}>
+            {[0, 1, 2].map((indice) => (
+              <div key={indice} className={styles.temaCarregando} aria-busy="true">
+                <Skeleton variante="corpo" largura="9rem" />
+                <Skeleton variante="titulo" />
+                <Skeleton variante="corpo" />
+                <Skeleton variante="corpo" largura="80%" />
+              </div>
+            ))}
+          </div>
+          <div className={styles.aparte}>
+            <p className={styles.esperando}>
+              <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
+              {textosHoje.carregandoAviso}
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

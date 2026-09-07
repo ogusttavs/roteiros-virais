@@ -1,29 +1,63 @@
 "use client";
 
+import { Check } from "lucide-react";
+
+import { textosHoje } from "@/textos/hoje";
+
 import styles from "./TemaCartao.module.css";
+
+export type EvidenciaTema = {
+  conta: string | null;
+  multiplo: string;
+  views: string;
+  dias: number;
+  parecidos: number;
+};
 
 type Props = {
   /** Ex.: "para te chamarem". */
   rotulo: string;
   tema: string;
   porque: string;
-  /** Ja formatado ("5 vídeos fora da curva esta semana"). */
-  evidencia: string;
-  /** O tema recomendado do dia: botao preenchido em vez de linha. */
+  /** `null` quando não há vídeo de evidência: o bloco não aparece (`BRIEF.md`, sem número inventado). */
+  evidencia: EvidenciaTema | null;
+  /** O tema recomendado do dia: marca e botão preenchido em vez de linha (design v2, Hoje.Normal). */
   primario?: boolean;
   rotuloBotao: string;
   onEscolher: () => void;
 };
 
-/** Um tema do dia, com evidencia e o rotulo de objetivo (entrega/README.md, HojeCelular). */
+/** Um tema do dia, com evidência e o rótulo de objetivo (design v2, `entrega/telas/Hoje.dc.html`, `.tema`). */
 export function TemaCartao({ rotulo, tema, porque, evidencia, primario = false, rotuloBotao, onEscolher }: Props) {
   return (
     <article className={[styles.cartao, primario ? styles.primario : ""].filter(Boolean).join(" ")}>
-      <span className={styles.rotulo}>{rotulo}</span>
-      <h2 className={styles.tema}>{tema}</h2>
+      {primario ? (
+        <span className={styles.marcaRecomendado}>
+          <Check size={14} strokeWidth={1.75} aria-hidden="true" />
+          {textosHoje.maisIndicadoParaHoje}
+        </span>
+      ) : null}
+      <div className={styles.tituloArea}>
+        <span className={styles.rotulo}>{rotulo}</span>
+        <h3 className={styles.tema}>{tema}</h3>
+      </div>
       <p className={styles.porque}>{porque}</p>
+      {evidencia ? (
+        <div className={styles.evidencia}>
+          {evidencia.conta ? (
+            <span className={styles.evidenciaLinha}>
+              <span className={styles.conta}>{evidencia.conta}</span>
+            </span>
+          ) : null}
+          <span className={styles.evidenciaLinha}>
+            <b>{evidencia.multiplo}</b> {textosHoje.evidenciaMultiplo(evidencia.views, evidencia.dias)}
+          </span>
+          {evidencia.parecidos > 0 ? (
+            <span className={styles.evidenciaLinha}>{textosHoje.evidenciaParecidos(evidencia.parecidos)}</span>
+          ) : null}
+        </div>
+      ) : null}
       <div className={styles.rodape}>
-        <span className={styles.evidencia}>{evidencia}</span>
         <button
           type="button"
           onClick={onEscolher}
