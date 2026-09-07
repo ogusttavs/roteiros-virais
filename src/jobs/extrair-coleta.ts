@@ -2,14 +2,87 @@
  * Job `extrairColeta` (etapa 8, roda a parte, a cada poucas horas): busca os
  * lotes `em_andamento` de `lotes_ia`, confere se cada um terminou, e quando
  * terminou grava `analise` mais `etiquetas` nos videos do lote.
+ *
+ * Idioma (acabamento visual 2, achado do Gustavo no iPad): a analise que
+ * nao passa na checagem barata de `src/lib/idioma.ts` ganha uma segunda
+ * tentativa, sincrona (fora do lote, so para este video), com a instrucao
+ * de traducao reforcada. Reprovou de nova, o video fica sem analise e o
+ * resumo do job conta.
  */
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { lotesIa, videos, type AnaliseVideo } from "@/db/schema";
+import { lotesIa, nichos, videos, type AnaliseVideo } from "@/db/schema";
+import { gerarEstruturado } from "@/ia/cliente";
 import { coletarResultadosLote, statusLote } from "@/ia/lote";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 import { registrarGeracao } from "@/ia/registro";
+import { pareceTextoEmPortugues } from "@/lib/idioma";
+
+/**
+ * So os campos que o cliente le (o gancho pode vir sozinho no idioma
+ * original quando o resto da analise saiu certo, achado de 06/09):
+ * `assunto`, `etiquetas` e `motivoNicho` ficam fora, porque um deles e
+ * curto demais para dar sinal e os outros dois sao uso interno.
+ */
+function camposParaChecarIdioma(dados: extrairVideo.SaidaExtrairVideo): string[] {
+  return [dados.gancho, dados.estrutura, dados.fechamento, dados.chamadaFinal, dados.porQueFuncionou];
+}
+
+function pareceEmPortugues(dados: extrairVideo.SaidaExtrairVideo): boolean {
+  return camposParaChecarIdioma(dados).every(pareceTextoEmPortugues);
+}
+
+async function buscarDadosParaRetentativa(
+  videoId: number,
+): Promise<{ titulo: string; transcricao: string; nomeNicho: string; termosNicho: string[] } | null> {
+  const [linha] = await db()
+    .select({
+      titulo: videos.titulo,
+      transcricao: videos.transcricao,
+      nomeNicho: nichos.nome,
+      termosNicho: nichos.termos,
+    })
+    .from(videos)
+    .innerJoin(nichos, eq(videos.nichoId, nichos.id))
+    .where(eq(videos.id, videoId));
+
+  if (!linha || !linha.transcricao) return null;
+  return { titulo: linha.titulo ?? "", transcricao: linha.transcricao, nomeNicho: linha.nomeNicho, termosNicho: linha.termosNicho };
+}
+
+async function retentarEmPortugues(videoId: number): Promise<extrairVideo.SaidaExtrairVideo | null> {
+  const dadosVideo = await buscarDadosParaRetentativa(videoId);
+  if (!dadosVideo) return null;
+
+  const entrada = `${extrairVideo.montarEntrada(dadosVideo)}\n\nA tentativa anterior saiu em outro idioma ou so parte dela. Traduza tudo para o português do Brasil, inclusive o gancho.`;
+
+  const resultado = await gerarEstruturado({
+    tarefa: "extrairVideo",
+    nivel: extrairVideo.nivel,
+    effort: extrairVideo.esforco,
+    schema: extrairVideo.schema,
+    sistemaEstavel: extrairVideo.montarSistemaEstavel(),
+    entrada,
+  });
+
+  await registrarGeracao({
+    tarefa: "extrairVideo",
+    versaoPrompt: extrairVideo.versao,
+    modelo: resultado.modelo,
+    nivel: extrairVideo.nivel,
+    entradas: { videoId, retentativaDeIdioma: true },
+    saida: resultado.dados,
+    uso: {
+      tokensEntrada: resultado.tokensEntrada,
+      tokensSaida: resultado.tokensSaida,
+      tokensCacheLeitura: resultado.tokensCacheLeitura,
+      tokensCacheEscrita: resultado.tokensCacheEscrita,
+    },
+  });
+
+  return resultado.dados;
+}
 
 export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
   const lotesPendentes = await db().select().from(lotesIa).where(eq(lotesIa.status, "em_andamento"));
@@ -17,6 +90,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
   let lotesConcluidos = 0;
   let videosAtualizados = 0;
   let videosComErro = 0;
+  let reprovadosPorIdioma = 0;
   const erros: string[] = [];
 
   for (const lote of lotesPendentes) {
@@ -35,7 +109,18 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
         continue;
       }
 
-      const { etiquetas, ...analise } = resultado.dados;
+      let dados = resultado.dados;
+      if (!pareceEmPortugues(dados)) {
+        dados = (await retentarEmPortugues(videoId)) ?? dados;
+      }
+
+      if (!pareceEmPortugues(dados)) {
+        reprovadosPorIdioma += 1;
+        erros.push(`video ${videoId}: analise reprovada na checagem de idioma depois de refazer`);
+        continue;
+      }
+
+      const { etiquetas, ...analise } = dados;
       const analiseVideo: AnaliseVideo = analise;
 
       await db().update(videos).set({ analise: analiseVideo, etiquetas }).where(eq(videos.id, videoId));
@@ -70,6 +155,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
     lotesConcluidos,
     videosAtualizados,
     videosComErro,
+    reprovadosPorIdioma,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

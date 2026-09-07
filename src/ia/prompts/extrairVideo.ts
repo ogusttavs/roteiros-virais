@@ -13,8 +13,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * um anuncio de escova em ingles ou um video de carro so porque veio da
  * mesma conta vigiada. `montarEntrada` passa o nome e os termos do nicho
  * para o modelo decidir se o video de fato fala do assunto do nicho.
+ *
+ * Traducao (1.3.0, acabamento visual 2): a base tem conta de fora do
+ * Brasil, e duas analises reais saem em ingles ou so com o gancho no
+ * idioma original (achado do Gustavo no iPad, 06/09). `extrair-coleta.ts`
+ * reprova com uma checagem barata de idioma (`src/lib/idioma.ts`) e refaz
+ * uma vez com a instrucao de traducao reforcada.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -35,10 +41,13 @@ export type SaidaExtrairVideo = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(): string {
   return `Você lê a transcrição de um vídeo curto que ficou fora da curva numa conta vigiada de
-um nicho de dono de pequeno negócio, e extrai uma ficha fixa:
+um nicho de dono de pequeno negócio, e extrai uma ficha fixa. A transcrição pode estar em
+outra língua; a ficha inteira, incluindo o gancho, sai sempre em português do Brasil. Nunca
+copie nem deixe uma frase no idioma original, nem o gancho: traduza mantendo o sentido
+literal e o tom.
 
 - assunto: o tema do vídeo em poucas palavras.
-- gancho: a frase ou cena literal dos primeiros segundos, exatamente como apareceu.
+- gancho: a frase ou cena dos primeiros segundos, o mais próxima possível do que apareceu.
 - estrutura: como o vídeo se desenrola, em uma frase.
 - fechamento: como o vídeo termina.
 - chamadaFinal: o que o vídeo pede para quem assiste fazer no final, se pedir algo.
@@ -51,7 +60,9 @@ um nicho de dono de pequeno negócio, e extrai uma ficha fixa:
   abaixo; false quando não fala.
 - motivoNicho: uma frase curta explicando a decisão de pertenceAoNicho.
 
-Copie o gancho literalmente da transcrição, nunca parafraseie. Sem travessão, sem emoji.
+Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
+Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem
+parafrasear nem resumir. Sem travessão, sem emoji.
 
 Escreva em português do Brasil, com acentuação correta.`;
 }
