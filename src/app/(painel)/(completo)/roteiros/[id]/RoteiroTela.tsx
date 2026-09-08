@@ -326,13 +326,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         </a>
       </div>
 
-      <PainelFlutuante
-        titulo={textosRoteiro.maisOpcoes}
-        aberto={painel === "menu"}
-        aoFechar={fecharPainel}
-        role="menu"
-        ignorar={botaoMenuRef}
-      >
+      <PainelFlutuante titulo={textosRoteiro.maisOpcoes} aberto={painel === "menu"} aoFechar={fecharPainel} role="menu">
         <button
           type="button"
           role="menuitem"

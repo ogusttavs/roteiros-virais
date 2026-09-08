@@ -6,19 +6,16 @@
  */
 
 /**
- * `pointer-events: none` (achado do iPad, item 1, correção 1 da leitura prévia
- * do Fable): o véu cobre a tela inteira, inclusive o botão que abriu o painel;
- * sem isso, um segundo clique no botão nunca chegava a ele, batia no véu. O
- * fechar ao clicar fora continua funcionando porque o `mousedown` bate no que
- * está por baixo (o próprio conteúdo da página) e ainda borbulha até o
- * `document`, onde `PainelFlutuante` já ouve.
+ * O véu recebe o clique e fecha (ajuste da revisão do PR #33, item 1): sem
+ * isso, o toque no celular passava para o que está por baixo do fundo
+ * escurecido (um toque perto de "Já gravei" fechava a folha e marcava como
+ * gravado ao mesmo tempo). `PainelFlutuante.tsx` explica o porquê inteiro.
  */
 .veu {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: var(--cor-sobreposicao);
-  pointer-events: none;
 }
 
 .painel {

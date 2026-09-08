@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import styles from "./PainelFlutuante.module.css";
 
@@ -13,15 +13,6 @@ type Props = {
   aoFechar: () => void;
   /** "menu" para uma lista de acoes (role="menuitem" nos filhos); "dialog" para formulario ou lista. */
   role?: "menu" | "dialog";
-  /**
-   * O botao que abre este painel, quando ele alterna aberto/fechado sozinho
-   * (leitura previa do Fable no acabamento do iPad, item 1): sem isso, o
-   * `mousedown` do clique nesse botao conta como "fora" e fecha o painel, e o
-   * `click` do mesmo gesto reabre (o handler do botao ainda ve o estado
-   * antigo). O clique dentro de `ignorar` nao fecha por clique fora; o
-   * proprio botao continua decidindo abrir ou fechar.
-   */
-  ignorar?: RefObject<HTMLElement | null>;
   children: ReactNode;
 };
 
@@ -31,7 +22,19 @@ type Props = {
  * folha que sobe de baixo, fixa acima da barra de ações, com fundo
  * escurecido; do tablet para cima, painel ancorado no canto superior
  * direito, perto do botão "Mais ações" que os quatro reaproveitam como
- * ponto de abertura. Fecha ao clicar fora ou com Esc sempre.
+ * ponto de abertura.
+ *
+ * O véu cobre a tela inteira e recebe o clique (ajuste da revisão do PR
+ * #33, item 1): a primeira versão deixava o clique passar por baixo dele
+ * (`pointer-events: none`) para o botão que abriu o painel conseguir
+ * alternar; o efeito colateral era o toque atrás do véu escurecido, no
+ * celular, chegar ao que está por baixo (um toque perto de "Já gravei"
+ * fechava a folha e marcava como gravado ao mesmo tempo). Com o véu de
+ * volta cobrindo o toque, um clique no botão que abriu o painel cai no véu
+ * (que está por cima) e só fecha; não precisa mais de um caso especial para
+ * esse botão, e o `document` não precisa ouvir clique fora, porque não
+ * sobra nenhum lugar clicável fora do véu ou do próprio painel enquanto ele
+ * está aberto.
  *
  * Fechar ao rolar a página de trás (mesma regra de `BarraNotaGeral`) só vale
  * do tablet para cima, e só para o menu: no celular a folha é modal (achado
@@ -40,24 +43,12 @@ type Props = {
  * digitação; um formulário ancorado (tablet para cima) tem o mesmo problema
  * e também não fecha ao rolar.
  */
-export function PainelFlutuante({
-  titulo,
-  aberto,
-  aoFechar,
-  role = "dialog",
-  ignorar,
-  children,
-}: Props) {
+export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", children }: Props) {
   const painelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!aberto) return;
 
-    function aoClicarFora(evento: MouseEvent) {
-      const alvo = evento.target as Node;
-      if (ignorar?.current && ignorar.current.contains(alvo)) return;
-      if (painelRef.current && !painelRef.current.contains(alvo)) aoFechar();
-    }
     function aoTeclar(evento: KeyboardEvent) {
       if (evento.key === "Escape") aoFechar();
     }
@@ -67,23 +58,21 @@ export function PainelFlutuante({
       aoFechar();
     }
 
-    document.addEventListener("mousedown", aoClicarFora);
     document.addEventListener("keydown", aoTeclar);
     window.addEventListener("scroll", aoRolar, { passive: true });
     painelRef.current?.focus();
 
     return () => {
-      document.removeEventListener("mousedown", aoClicarFora);
       document.removeEventListener("keydown", aoTeclar);
       window.removeEventListener("scroll", aoRolar);
     };
-  }, [aberto, aoFechar, ignorar, role]);
+  }, [aberto, aoFechar, role]);
 
   if (!aberto) return null;
 
   return (
     <>
-      <div className={styles.veu} aria-hidden="true" />
+      <div className={styles.veu} onClick={aoFechar} aria-hidden="true" />
       <div
         ref={painelRef}
         role={role}

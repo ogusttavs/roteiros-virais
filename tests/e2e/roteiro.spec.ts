@@ -235,10 +235,20 @@ test.describe("roteiro pela tela", () => {
       await expect(page.getByRole("menuitem", { name: "outro ângulo" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "copiar texto" })).toBeVisible();
 
-      // leitura prévia do Fable (achado do iPad, item 1): o mousedown do clique no
-      // botão contava como "fora" e fechava, e o click do mesmo gesto reabria.
-      await botaoMenu.click();
+      /**
+       * Ajuste da revisão do PR #33, item 1: o véu cobre a tela inteira e
+       * recebe o clique, inclusive no ponto onde o botão está; um clique ali
+       * cai no véu (que está por cima) e só fecha, não alterna pelo próprio
+       * botão. `locator.click()` recusaria isso (o alvo do clique não seria
+       * o botão), então o teste clica na coordenada de verdade com
+       * `page.mouse.click`, do jeito que um toque de verdade faria.
+       */
+      const caixaBotao = await botaoMenu.boundingBox();
+      if (!caixaBotao) throw new Error("botao 'Mais opções' sem caixa (nao deveria acontecer)");
+      await page.mouse.click(caixaBotao.x + caixaBotao.width / 2, caixaBotao.y + caixaBotao.height / 2);
       await expect(menu).toBeHidden();
+
+      // Com o menu fechado, o botão volta a ser o topo da pilha: reabre normalmente.
       await botaoMenu.click();
       await expect(menu).toBeVisible();
 
@@ -247,6 +257,70 @@ test.describe("roteiro pela tela", () => {
       await expect(botaoMenu).toBeFocused();
     });
   }
+
+  /**
+   * Ajuste da revisão do PR #33, item 1: o toque atrás do véu escurecido não
+   * pode chegar ao que está por baixo. Antes, com o véu deixando o toque
+   * passar (`pointer-events: none`), um toque na área escurecida chegava ao
+   * que está por trás dela.
+   *
+   * Hipótese registrada (achado medindo as caixas de verdade a 390px, antes
+   * de escrever este teste): o pedido original citava um toque "perto de
+   * Já gravei", mas a folha (menu ou "Postei") tem ~240px de altura e cobre
+   * a barra de ações inteira com o próprio conteúdo (um item de menu, ou o
+   * campo de link); um toque ali cairia num item da folha, não no véu, e não
+   * reproduz o achado. O ponto que fica só atrás do véu, em qualquer folha
+   * aberta, é a barra do topo (`Voltar`), acima da folha inteira: o mesmo
+   * bug, e mais fácil de ver o efeito colateral (navegar para "/hoje" sem
+   * querer, em vez de marcar como gravado).
+   */
+  test("um toque atrás do véu não aciona o que está por baixo (não navega para Hoje)", async ({ page }) => {
+    const conteudo: ConteudoRoteiro = {
+      titulo: "teste do veu",
+      duracaoS: 30,
+      gancho: "gancho de teste",
+      corpo: "corpo de teste",
+      fechamento: "fechamento de teste",
+      chamadaFinal: "chamada final de teste",
+      cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
+      ondeGravar: "na cozinha",
+      edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+      evidencias: [],
+      semEvidencia: true,
+    };
+    const [roteiro] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId,
+        data: hojeISO(),
+        tema: conteudo.titulo,
+        origem: "livre",
+        objetivo: "conversao",
+        conteudo,
+      })
+      .returning();
+
+    await page.setViewportSize({ width: 390, height: 900 });
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(EMAIL);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto(`/roteiros/${roteiro.id}`);
+    const linkVoltar = page.getByRole("link", { name: "Voltar" });
+    const caixa = await linkVoltar.boundingBox();
+    if (!caixa) throw new Error("link 'Voltar' sem caixa (nao deveria acontecer)");
+
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    const menu = page.getByRole("menu", { name: "Mais opções" });
+    await expect(menu).toBeVisible();
+
+    await page.mouse.click(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
+
+    await expect(menu).toBeHidden();
+    await expect(page).toHaveURL(`/roteiros/${roteiro.id}`);
+  });
 
   /**
    * PDF (acabamento do iPad, item 5): baixa pelo menu dos três pontos e
