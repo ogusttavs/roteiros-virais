@@ -18,6 +18,7 @@ import { z } from "zod";
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
+import { calcularCustoUsd } from "../src/ia/registro";
 import { verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
@@ -83,6 +84,8 @@ export type ResultadoAvaliarRoteiros = {
    * reprovacao pode ser "nao e o texto que o cliente ve").
    */
   reprovadosNoVerificador: number;
+  /** Soma do custo de todas as chamadas (roteiro e verificarTexto), em dolares. */
+  custoTotalUsd: number;
 };
 
 /**
@@ -95,6 +98,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   const titulos: string[] = [];
   let reprovadosNoVerificador = 0;
+  let custoTotalUsd = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
@@ -126,6 +130,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
 
     const saida = resultado.dados;
     titulos.push(saida.titulo);
+    let custoDoCasoUsd = calcularCustoUsd(roteiroIA.nivel, resultado);
 
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s\n`);
@@ -160,7 +165,6 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     console.log(
       `\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`,
     );
-    console.log(`custo aproximado: ${resultado.modelo}\n`);
 
     /**
      * O mesmo verificador de producao (checagem local mais verificarTexto,
@@ -186,6 +190,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
           proibicoes: [],
         }),
       });
+      custoDoCasoUsd += calcularCustoUsd(verificarTextoIA.nivel, saidaVerificacao);
       verificacao = {
         aprovado: saidaVerificacao.dados.aprovado,
         motivos: saidaVerificacao.dados.aprovado
@@ -197,9 +202,13 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
       reprovadosNoVerificador += 1;
       console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]\n`);
     }
+
+    custoTotalUsd += custoDoCasoUsd;
+    console.log(`custo deste caso: US$ ${custoDoCasoUsd.toFixed(4)} (${resultado.modelo})\n`);
   }
 
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
+  console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
   return {
     conjunto: caminho,
@@ -207,6 +216,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     casos: conjunto.length,
     titulos,
     reprovadosNoVerificador,
+    custoTotalUsd,
   };
 }
 
