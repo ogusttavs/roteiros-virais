@@ -13,7 +13,7 @@
  * nao "dentistas": `temas_dia` tem uma unica linha por nicho e dia, e
  * `temas-do-dia.spec.ts` ja grava a linha de hoje para "dentistas".
  */
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 
 import { expect, test } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -38,6 +38,18 @@ const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-roteiro@exemplo.teste";
 
 let clienteId: number;
+
+/**
+ * Conta as páginas de um PDF pelo próprio formato, sem biblioteca nova
+ * (ajuste da revisão do PR #33, item 2): cada objeto de página tem
+ * `/Type /Page`; o nó pai da árvore tem `/Type /Pages` (plural), por isso o
+ * `(?!s)` exclui esse caso. Os dicionários do PDF ficam fora dos streams
+ * comprimidos, então a contagem funciona direto nos bytes crus.
+ */
+function contarPaginasPdf(bytes: Buffer): number {
+  const texto = bytes.toString("latin1");
+  return (texto.match(/\/Type\s*\/Page(?!s)/g) ?? []).length;
+}
 
 test.describe("roteiro pela tela", () => {
   test.beforeAll(async () => {
@@ -378,5 +390,9 @@ test.describe("roteiro pela tela", () => {
     expect(caminho).toBeTruthy();
     const info = await stat(caminho!);
     expect(info.size).toBeGreaterThan(0);
+
+    // Ajuste da revisão do PR #33, item 2: o roteiro de exemplo cabe numa página, nunca duas.
+    const bytes = await readFile(caminho!);
+    expect(contarPaginasPdf(bytes)).toBe(1);
   });
 });

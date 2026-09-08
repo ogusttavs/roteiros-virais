@@ -4,6 +4,13 @@
  * raiz), só sem a barra lateral, sem a barra de ações e sem os painéis
  * flutuantes. `@page` cabe numa folha A4; a margem real do PDF vem de
  * `page.pdf()` no Playwright (rota `/api/roteiros/[id]/pdf`), não daqui.
+ *
+ * Sem `padding` aqui (ajuste da revisão do PR #33, item 2): a margem já vem
+ * do `page.pdf()`; somar as duas empurrava o roteiro de exemplo para uma
+ * segunda página quase em branco (só um resquício do fundo do `.pagina`).
+ * Largura da folha inteira, não `--largura-leitura` (a coluna de leitura do
+ * painel é estreita de propósito para a tela; no papel só encurta as linhas
+ * e alonga a página à toa), e `gap` menor (`--espaco-6`).
  */
 @page {
   size: A4;
@@ -11,10 +18,7 @@
 
 .pagina {
   display: grid;
-  gap: var(--espaco-8);
-  max-width: var(--largura-leitura);
-  margin: 0 auto;
-  padding: var(--espaco-6);
+  gap: var(--espaco-6);
   background: var(--cor-superficie);
   color: var(--cor-texto);
   font-family: var(--fonte-texto);
