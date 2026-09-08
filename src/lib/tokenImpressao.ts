@@ -4,8 +4,11 @@
  * sem sessão (a rota `/api/roteiros/[id]/pdf` abre essa página com o
  * Playwright, dentro do próprio servidor), então ela não pode exigir o
  * cookie de sessão do better-auth. O token, assinado com o mesmo segredo da
- * sessão e valido por 1 minuto, é criado e consumido na mesma requisição:
- * tempo de sobra para o Playwright navegar e nunca reaproveitável depois.
+ * sessão, válido por 1 minuto, só para o próprio servidor: tempo de sobra
+ * para o Playwright navegar, sem nascer numa requisição do navegador do
+ * cliente (ajuste da revisão do PR #33, item 5: o texto antigo dizia "uso
+ * único" e "nunca reaproveitável", mas não há registro de consumo, então o
+ * mesmo token vale para mais de uma navegação dentro do minuto).
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
 
