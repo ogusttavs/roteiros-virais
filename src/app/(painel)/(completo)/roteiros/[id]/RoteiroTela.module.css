@@ -301,6 +301,11 @@
   color: var(--cor-titulo);
 }
 
+/**
+ * "Baixar em PDF" é um `<a>`, os outros itens são `<button>` (ajuste da
+ * revisão do PR #33, item 3): sem `text-decoration` e `color: inherit`, o
+ * link nascia sublinhado e azul, do jeito padrão do navegador.
+ */
 .itemMenu {
   display: flex;
   align-items: center;
@@ -310,10 +315,11 @@
   border: 0;
   background: transparent;
   border-radius: var(--raio-md);
-  color: var(--cor-titulo);
+  color: inherit;
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-corpo);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 
