@@ -29,6 +29,11 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/entrar")))).toBe(false);
   });
 
+  it("/dados passa sem cookie de sessao (rota publica, exclusao de dados da Meta, E6 parte 3, item 8)", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/dados")))).toBe(false);
+  });
+
   it("/api/jobs/[nome] passa sem cookie de sessao (autenticacao propria por x-jobs-key)", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/api/jobs/coleta-noticias")))).toBe(false);
