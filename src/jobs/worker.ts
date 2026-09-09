@@ -22,6 +22,7 @@ import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
+import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
@@ -80,6 +81,9 @@ async function main(): Promise<void> {
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
     await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId));
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.descobertaInstagram, async (job) => {
+    await executarComRegistro(FILAS.descobertaInstagram, () => rodarDescobertaInstagram(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);

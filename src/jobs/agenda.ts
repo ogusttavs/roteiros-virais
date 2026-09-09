@@ -17,11 +17,14 @@
  * coleta do Apify (03:30) e o `contasBase` (03:40): a Business Discovery
  * refaz a leitura das contas vigiadas do Instagram (a fonte da vigilancia
  * passa a ser ela, nao mais o Apify), a tempo de `contasBase` e `pontuar`
- * contarem com dado fresco. `metaHashtags` (item 3) e semanal, segunda as
- * 05:00 (o Apify de descoberta do item 4 fica para os domingos, antes
- * dela). As duas so agendam com `config.coleta.metaAtivo` (`agendarTudo`,
- * abaixo): sem `META_IG_ID`/`META_TOKEN`, o cron nem inscreve, e o Apify
- * continua sozinho como hoje.
+ * contarem com dado fresco. `descobertaInstagram` (item 4) e semanal,
+ * domingo as 04:15, entre `contasBase`/`pontuar` (03:40/03:45) e a
+ * `vigilancia` (04:30): o Apify do Instagram vira so isto, achar handle de
+ * conta ainda desconhecida por hashtag, 30 resultados por termo.
+ * `metaHashtags` (item 3) tambem e semanal, segunda as 05:00, depois da
+ * descoberta de domingo. As tres so agendam com `config.coleta.metaAtivo`
+ * (`agendarTudo`, abaixo): sem `META_IG_ID`/`META_TOKEN`, o cron nem
+ * inscreve, e o Apify continua sozinho como hoje.
  *
  * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
  * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
@@ -80,6 +83,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.contasBase,
     cron: "40 3 * * *",
     descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 03:40, depois das coletas",
+  },
+  {
+    fila: FILAS.descobertaInstagram,
+    cron: "15 4 * * 0",
+    descricao: "apify do instagram, so descoberta de conta nova por hashtag, todo domingo as 04:15",
+    condicao: () => config.coleta.metaAtivo,
   },
   {
     fila: FILAS.metaHashtags,

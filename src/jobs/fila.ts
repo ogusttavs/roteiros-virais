@@ -22,6 +22,8 @@ export const FILAS = {
   metaContas: "meta-contas",
   /** Hashtag Search da Meta, semanal (E6 parte 3, segunda rodada, item 3); so agenda com config.coleta.metaAtivo. */
   metaHashtags: "meta-hashtags",
+  /** Apify do Instagram, so descoberta de conta nova, semanal (E6 parte 3, segunda rodada, item 4); so agenda com config.coleta.metaAtivo. */
+  descobertaInstagram: "descoberta-instagram",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",
