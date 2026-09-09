@@ -295,6 +295,14 @@ export const contas = pgTable(
      */
     avisoColeta: text("aviso_coleta"),
     avisoColetaEm: timestamp("aviso_coleta_em", { withTimezone: true }),
+    /**
+     * Job `contas-base` (E6 parte 3, item 5) ja tentou trazer o catch-up de
+     * ate 10 videos recentes desta conta. Nulo faz a conta candidata a
+     * selecao do job; marcado uma vez, nunca mais e selecionada de novo,
+     * mesmo que continue com menos de 5 videos (a plataforma pode nao ter
+     * mais que isso para ela).
+     */
+    baseCompletaEm: timestamp("base_completa_em", { withTimezone: true }),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],

@@ -9,6 +9,10 @@
  * a cada hora cheia, as :05 (decisao 1 da etapa 15, parte 1), 5 minutos
  * depois de `lembrete` so para nao competir pelo mesmo minuto exato.
  *
+ * `contasBase` (E6 parte 3, item 5) roda as 03:40, depois das duas coletas
+ * (03:00 e 03:30) e antes de `pontuar` (03:45): o catch-up de ate 10 videos
+ * por conta precisa estar gravado antes da mediana do dia ser calculada.
+ *
  * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
  * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
  * gerou tema porque `extrairColeta` so buscava o resultado do lote de
@@ -53,9 +57,14 @@ export const AGENDAMENTOS: Agendamento[] = [
     chave: "tarde",
   },
   {
+    fila: FILAS.contasBase,
+    cron: "40 3 * * *",
+    descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 03:40, depois das coletas",
+  },
+  {
     fila: FILAS.pontuar,
     cron: "45 3 * * *",
-    descricao: "pontuacao (fora-da-curva, velocidade), todo dia as 03:45, depois das coletas",
+    descricao: "pontuacao (fora-da-curva, velocidade), todo dia as 03:45, depois das coletas e do contas-base",
   },
   {
     fila: FILAS.vigilancia,

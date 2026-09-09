@@ -1,0 +1,1 @@
+ALTER TABLE "contas" ADD COLUMN "base_completa_em" timestamp with time zone;

@@ -16,6 +16,11 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.temasDoDia)).toBe("30 6 * * *");
   });
 
+  it("contasBase roda as 03:40, antes de pontuar as 03:45 (E6 parte 3, item 5: catch-up antes da mediana do dia)", () => {
+    expect(cronDe(FILAS.contasBase)).toBe("40 3 * * *");
+    expect(cronDe(FILAS.pontuar)).toBe("45 3 * * *");
+  });
+
   it("cada fila e chave aparecem no maximo uma vez", () => {
     const chaves = AGENDAMENTOS.map((a) => `${a.fila}::${a.chave ?? ""}`);
     expect(new Set(chaves).size).toBe(chaves.length);

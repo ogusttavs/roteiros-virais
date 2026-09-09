@@ -38,7 +38,8 @@ import { config } from "@/lib/config";
  */
 const FATOR_SUBSTITUTO_BASE_FRACA = 100;
 
-const MINIMO_VIDEOS_MEDIANA = 5;
+/** Tambem usado por `contas-base.ts` (E6 parte 3, item 5): mesmo corte de "ainda sem base". */
+export const MINIMO_VIDEOS_MEDIANA = 5;
 const MINIMO_VIDEOS_MEDIANA_VELOCIDADE = 3;
 
 /**

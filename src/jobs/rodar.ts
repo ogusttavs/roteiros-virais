@@ -10,6 +10,7 @@ import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
@@ -26,6 +27,7 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.coletaYoutube]: rodarColetaYoutube,
   [FILAS.coletaApify]: rodarColetaApify,
   [FILAS.coletaNoticias]: rodarColetaNoticias,
+  [FILAS.contasBase]: rodarContasBase,
   [FILAS.pontuar]: rodarPontuar,
   [FILAS.vigilancia]: rodarVigilancia,
   [FILAS.transcrever]: rodarTranscrever,

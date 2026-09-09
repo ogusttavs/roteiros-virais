@@ -17,6 +17,7 @@ export const FILAS = {
   coletaYoutube: "coleta-youtube",
   coletaApify: "coleta-apify",
   coletaNoticias: "coleta-noticias",
+  contasBase: "contas-base",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",
