@@ -113,6 +113,27 @@
       "when": 1788916484044,
       "tag": "0015_contas-base-completa",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788957155540,
+      "tag": "0016_chamadas-meta-api",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788957654370,
+      "tag": "0017_meta-business-discovery",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788958861450,
+      "tag": "0018_hashtag-search-sem-dono",
+      "breakpoints": true
     }
   ]
 }

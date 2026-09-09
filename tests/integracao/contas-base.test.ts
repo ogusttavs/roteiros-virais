@@ -12,6 +12,7 @@ import { db, getPool } from "@/db";
 import { consumoApi, contas, nichos, videos } from "@/db/schema";
 import type { TiktokItemBruto } from "@/jobs/apify-api";
 import { rodarContasBase } from "@/jobs/contas-base";
+import { buscarBusinessDiscovery, ErroMetaApi } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -21,7 +22,12 @@ vi.mock("@/jobs/apify-api", async (importarOriginal) => {
   return { ...original, buscarTiktok: vi.fn(), buscarInstagram: vi.fn() };
 });
 
-// eslint-disable-next-line import/order -- vi.mock acima e hoisted; este import precisa vir depois para pegar o mock.
+vi.mock("@/jobs/meta-api", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/jobs/meta-api")>();
+  return { ...original, buscarBusinessDiscovery: vi.fn() };
+});
+
+// eslint-disable-next-line import/order -- vi.mock acima e hoisted; os imports abaixo precisam vir depois para pegar o mock.
 import { buscarInstagram, buscarTiktok } from "@/jobs/apify-api";
 
 const mockFetch = vi.fn();
@@ -48,11 +54,17 @@ async function criarContaComVideo(
   plataforma: "tiktok" | "instagram" | "youtube",
   handle: string,
   views: number,
-  opts?: { baseCompletaEm?: Date; semVideo?: boolean },
+  opts?: { baseCompletaEm?: Date; semVideo?: boolean; apiIndisponivelEm?: Date },
 ): Promise<number> {
   const [c] = await db()
     .insert(contas)
-    .values({ plataforma, handle, nichoId, baseCompletaEm: opts?.baseCompletaEm ?? null })
+    .values({
+      plataforma,
+      handle,
+      nichoId,
+      baseCompletaEm: opts?.baseCompletaEm ?? null,
+      apiIndisponivelEm: opts?.apiIndisponivelEm ?? null,
+    })
     .returning({ id: contas.id });
   if (!opts?.semVideo) {
     await db()
@@ -86,6 +98,7 @@ afterAll(async () => {
 beforeEach(() => {
   vi.mocked(buscarTiktok).mockReset();
   vi.mocked(buscarInstagram).mockReset();
+  vi.mocked(buscarBusinessDiscovery).mockReset();
   mockFetch.mockReset();
 });
 
@@ -93,11 +106,13 @@ afterEach(async () => {
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   await db().delete(contas).where(eq(contas.nichoId, nichoId));
   await db().delete(consumoApi);
+  config.coleta.metaAtivo = false;
 });
 
 describe("rodarContasBase", () => {
-  it("prioriza por views e respeita o teto: a conta com mais views e atendida primeiro, a outra fica para amanha", async () => {
+  it("prioriza por views e respeita o teto: tiktok depois do teto fica para amanha, mas o youtube entre eles ainda e atendido (revisao do PR #34, item 0b)", async () => {
     const contaBaixa = await criarContaComVideo("tiktok", "conta-baixa-views", 100);
+    const contaYoutube = await criarContaComVideo("youtube", "UCentreostiktok0000001", 50000);
     const contaAlta = await criarContaComVideo("tiktok", "conta-alta-views", 99999);
 
     const teto = config.coleta.apifyMaxResultadosDia;
@@ -107,18 +122,58 @@ describe("rodarContasBase", () => {
       const handle = perfis[0];
       return { itens: [itemTiktok(handle, `${handle}-novo`)], devolvidos: 1 };
     });
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = url.toString();
+      if (texto.includes("/channels")) {
+        return respostaJson({
+          items: [
+            {
+              id: "UCentreostiktok0000001",
+              snippet: { title: "[exemplo] canal entre os dois tiktoks" },
+              contentDetails: { relatedPlaylists: { uploads: "UUentreostiktok0000001" } },
+            },
+          ],
+        });
+      }
+      if (texto.includes("/playlistItems")) return respostaJson({ items: [] });
+      throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+    });
 
     const resumo = await rodarContasBase();
 
+    // Ordem por views: alta (99999) > youtube (50000) > baixa (100). O teto so
+    // cabe mais 1 resultado do apify: a alta usa esse espaco; a do meio e
+    // youtube, sem trava de apify, e atendida mesmo com o teto ja batido; a
+    // baixa (tiktok, depois do teto) fica para amanha.
     expect(resumo.tetoAtingido).toBe(true);
-    expect(resumo.contasProcessadas).toBe(1);
+    expect(resumo.contasProcessadas).toBe(2);
     expect(buscarTiktok).toHaveBeenCalledTimes(1);
     expect(buscarTiktok).toHaveBeenCalledWith([], ["conta-alta-views"], 10);
 
     const [linhaAlta] = await db().select().from(contas).where(eq(contas.id, contaAlta));
+    const [linhaYoutube] = await db().select().from(contas).where(eq(contas.id, contaYoutube));
     const [linhaBaixa] = await db().select().from(contas).where(eq(contas.id, contaBaixa));
     expect(linhaAlta.baseCompletaEm).not.toBeNull();
+    expect(linhaYoutube.baseCompletaEm).not.toBeNull();
     expect(linhaBaixa.baseCompletaEm).toBeNull();
+  });
+
+  it("registra em consumo_api os resultados consumidos (itens.length), nao os devolvidos brutos (revisao do PR #34, item 0c)", async () => {
+    await criarContaComVideo("tiktok", "conta-devolvidos-vs-usados", 500);
+
+    vi.mocked(buscarTiktok).mockResolvedValue({
+      itens: [itemTiktok("conta-devolvidos-vs-usados", "video-1")],
+      devolvidos: 7,
+    });
+
+    const resumo = await rodarContasBase();
+    expect(resumo.resultadosApifyDevolvidos).toBe(7);
+
+    const [linha] = await db()
+      .select()
+      .from(consumoApi)
+      .where(eq(consumoApi.fonte, "apify"));
+    expect(linha.unidades).toBe(1);
   });
 
   it("youtube: busca a playlist de uploads e videos.list, grava o video novo e marca a conta", async () => {
@@ -213,5 +268,133 @@ describe("rodarContasBase", () => {
 
     expect(resumo.contasProcessadas).toBe(0);
     expect(buscarTiktok).not.toHaveBeenCalled();
+  });
+
+  describe("instagram pela api da meta (E6 parte 3, segunda rodada, item 2)", () => {
+    it("com meta ativo, usa a business discovery em vez do apify, grava os videos com origem meta e marca a leitura", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-base", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({
+        username: "conta-meta-base",
+        followers_count: 5000,
+        media: {
+          data: [
+            {
+              id: "1",
+              media_type: "VIDEO",
+              timestamp: "2026-08-20T10:00:00.000Z",
+              view_count: 900,
+              like_count: 50,
+              comments_count: 3,
+              permalink: "https://www.instagram.com/p/ExemploMeta01/",
+              caption: "[exemplo] video pego pela meta",
+            },
+          ],
+        },
+      });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.videosNovos).toBe(1);
+      expect(buscarInstagram).not.toHaveBeenCalled();
+
+      const [linhaConta] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linhaConta.baseCompletaEm).not.toBeNull();
+      expect(linhaConta.ultimaLeituraMetaEm).not.toBeNull();
+      expect(linhaConta.seguidores).toBe(5000);
+
+      const [video] = await db().select().from(videos).where(eq(videos.idExterno, "ExemploMeta01"));
+      expect(video).toBeDefined();
+      expect(video.origem).toBe("meta");
+      expect(video.views).toBe(900);
+    });
+
+    it("erro da meta (conta pessoal/restrita) marca api_indisponivel_em e cai para o apify na mesma tentativa", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-indisponivel", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("conta pessoal", 100, 33));
+      vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(1);
+      expect(buscarInstagram).toHaveBeenCalledTimes(1);
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.apiIndisponivelEm).not.toBeNull();
+    });
+
+    it("com o teto do apify ja no limite, erro da meta (conta) nao cai para o apify: marca indisponivel e fica para amanha (correcao 4 da leitura previa)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-teto-batido", 100);
+
+      const teto = config.coleta.apifyMaxResultadosDia;
+      await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+      vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("conta pessoal", 100, 33));
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.tetoAtingido).toBe(true);
+      expect(resumo.contasProcessadas).toBe(0);
+      expect(buscarInstagram).not.toHaveBeenCalled();
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.apiIndisponivelEm).not.toBeNull();
+      expect(linha.baseCompletaEm).toBeNull();
+    });
+
+    it("token vencido ou limite de taxa da meta para o job na hora, sem marcar nenhuma conta (correcao 1 da leitura previa)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-token-vencido", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("token vencido", 190));
+
+      await expect(rodarContasBase()).rejects.toMatchObject({ retentavel: true });
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.apiIndisponivelEm).toBeNull();
+      expect(buscarInstagram).not.toHaveBeenCalled();
+    });
+
+    it("conta ja marcada api_indisponivel_em nunca tenta a meta de novo, vai direto pro apify", async () => {
+      config.coleta.metaAtivo = true;
+      await criarContaComVideo("instagram", "conta-ja-indisponivel", 100, { apiIndisponivelEm: new Date() });
+
+      vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
+
+      await rodarContasBase();
+
+      expect(buscarBusinessDiscovery).not.toHaveBeenCalled();
+      expect(buscarInstagram).toHaveBeenCalledTimes(1);
+    });
+
+    it("sem meta ativo, continua usando o apify como antes", async () => {
+      await criarContaComVideo("instagram", "conta-sem-meta-ativo", 100);
+      vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
+
+      await rodarContasBase();
+
+      expect(buscarBusinessDiscovery).not.toHaveBeenCalled();
+      expect(buscarInstagram).toHaveBeenCalledTimes(1);
+    });
+
+    it("com meta ativo, o teto diario do apify nao trava uma candidata do instagram (ela nao usa apify)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaInstagram = await criarContaComVideo("instagram", "conta-meta-sem-teto", 100);
+
+      const teto = config.coleta.apifyMaxResultadosDia;
+      await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({ username: "conta-meta-sem-teto" });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.tetoAtingido).toBe(false);
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaInstagram));
+      expect(linha.baseCompletaEm).not.toBeNull();
+    });
   });
 });

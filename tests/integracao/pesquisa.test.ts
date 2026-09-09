@@ -11,6 +11,7 @@ import {
   evidenciaParaTema,
   foraDaCurvaDoNicho,
   referenciasDoNicho,
+  semDonoComAnalise,
   subindoHoje,
   subindoHojeComAnalise,
 } from "@/servicos/pesquisa";
@@ -35,24 +36,26 @@ async function criarVideo(
     analise?: unknown;
     titulo?: string;
     etiquetas?: string[];
+    semDono?: boolean;
   },
 ) {
   const [v] = await db()
     .insert(videos)
     .values({
-      plataforma: "tiktok",
+      plataforma: opcoes.semDono ? "instagram" : "tiktok",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
-      contaId,
+      contaId: opcoes.semDono ? null : contaId,
       nichoId,
       titulo: opcoes.titulo,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
-      origem: opcoes.origem ?? "coleta",
+      origem: opcoes.origem ?? (opcoes.semDono ? "meta" : "coleta"),
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
       velocidadeRelativa: opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
       analise: opcoes.analise as never,
       etiquetas: opcoes.etiquetas,
+      semDono: opcoes.semDono ?? false,
     })
     .returning();
   return v;
@@ -170,6 +173,38 @@ describe("subindoHojeComAnalise", () => {
       id: comAnalise.id,
       assunto: "erro comum ao lavar sofa",
       velocidadeRelativa: 5,
+    });
+  });
+});
+
+describe("semDonoComAnalise", () => {
+  it("so traz video sem_dono com analise, dos ultimos 7 dias", async () => {
+    const comAnalise = await criarVideo("sd-com-analise", {
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "assunto em alta na hashtag" },
+      semDono: true,
+    });
+    const semAnalise = await criarVideo("sd-sem-analise", { publicadoEm: diasAtras(3), semDono: true });
+    const foraDaJanela = await criarVideo("sd-fora-da-janela", {
+      publicadoEm: diasAtras(10),
+      analise: { assunto: "assunto antigo demais" },
+      semDono: true,
+    });
+    const comDono = await criarVideo("sd-com-dono", {
+      publicadoEm: diasAtras(3),
+      analise: { assunto: "assunto de video com conta" },
+    });
+
+    const resultado = await semDonoComAnalise(nichoId);
+    const ids = resultado.map((v) => v.id);
+
+    expect(ids).toContain(comAnalise.id);
+    expect(ids).not.toContain(semAnalise.id);
+    expect(ids).not.toContain(foraDaJanela.id);
+    expect(ids).not.toContain(comDono.id);
+    expect(resultado.find((v) => v.id === comAnalise.id)).toEqual({
+      id: comAnalise.id,
+      assunto: "assunto em alta na hashtag",
     });
   });
 });

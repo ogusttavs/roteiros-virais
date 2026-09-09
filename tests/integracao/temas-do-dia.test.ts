@@ -44,6 +44,31 @@ async function criarVideo(idExterno: string, opcoes: { velocidadeRelativa: numbe
     });
 }
 
+async function criarVideoSemDono(idExterno: string, opcoes: { assunto: string; publicadoEm?: Date }) {
+  await db()
+    .insert(videos)
+    .values({
+      plataforma: "instagram",
+      idExterno,
+      url: `https://exemplo.invalido/${idExterno}`,
+      nichoId,
+      semDono: true,
+      origem: "meta",
+      titulo: `[exemplo] ${idExterno}`,
+      views: 0,
+      publicadoEm: opcoes.publicadoEm ?? diasAtras(3),
+      analise: {
+        assunto: opcoes.assunto,
+        gancho: "x",
+        estrutura: "x",
+        fechamento: "x",
+        chamadaFinal: "x",
+        formato: "fala_para_camera",
+        porQueFuncionou: "x",
+      } as never,
+    });
+}
+
 async function criarNoticia(url: string, opcoes: { titulo: string; resumo?: string; coletadoEm?: Date }) {
   await db()
     .insert(noticias)
@@ -90,6 +115,19 @@ describe("rodarTemasDoDia", () => {
     for (const tema of linha.temas) {
       expect(tema.evidencias.length).toBeGreaterThan(0);
     }
+  });
+
+  it("video sem dono (hashtag search da meta) com analise aparece entre as evidencias do tema (achado da leitura previa, correcao 3)", async () => {
+    await criarVideoSemDono("video-sem-dono-1", { assunto: "assunto em alta na hashtag" });
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(1);
+    expect(resumo.semEvidencia).toBe(0);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    const [videoSemDono] = await db().select().from(videos).where(eq(videos.idExterno, "video-sem-dono-1"));
+    const todasEvidencias = linha.temas.flatMap((tema) => tema.evidencias);
+    expect(todasEvidencias).toContain(videoSemDono.id);
   });
 
   it("sem video subindo e sem noticia, nao gera tema e o resumo diz sem evidencia", async () => {

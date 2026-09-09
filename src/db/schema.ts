@@ -303,6 +303,15 @@ export const contas = pgTable(
      * mais que isso para ela).
      */
     baseCompletaEm: timestamp("base_completa_em", { withTimezone: true }),
+    /**
+     * A conta e pessoal ou tem restricao de idade: a Business Discovery da
+     * Meta devolve erro para ela (E6 parte 3, segunda rodada, item 2).
+     * Marcada uma vez, o job de Instagram pela API nunca mais tenta essa
+     * conta, e ela volta a ser coberta pelo Apify.
+     */
+    apiIndisponivelEm: timestamp("api_indisponivel_em", { withTimezone: true }),
+    /** Ultima vez que esta conta foi lida pela Business Discovery da Meta (admin, item 5). */
+    ultimaLeituraMetaEm: timestamp("ultima_leitura_meta_em", { withTimezone: true }),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],
@@ -386,8 +395,21 @@ export const videos = pgTable(
     busca: tsvector("busca").generatedAlwaysAs(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
     ),
-    /** "coleta" veio do motor, "seed" e exemplo de desenvolvimento, "curadoria" foi posto pela equipe */
-    origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
+    /**
+     * "coleta" veio do Apify ou da YouTube Data API, "seed" e exemplo de
+     * desenvolvimento, "curadoria" foi posto pela equipe, "meta" veio da
+     * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
+     * rodada, item 2).
+     */
+    origem: text("origem").$type<"coleta" | "seed" | "curadoria" | "meta">().notNull().default("coleta"),
+    /**
+     * Video da Hashtag Search da Meta (E6 parte 3, segunda rodada, item 3):
+     * `contaId` fica nulo (a Hashtag Search nunca devolve a conta dona).
+     * Nunca recebe mediana nem multiplo (nao ha conta para comparar); so
+     * serve de sinal de assunto para o tema do dia, via a transcricao e a
+     * extracao, como qualquer outro video.
+     */
+    semDono: boolean("sem_dono").notNull().default(false),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -671,6 +693,40 @@ export const consumoApi = pgTable(
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("consumo_api_fonte_data").on(t.fonte, t.data)],
+);
+
+/**
+ * Uma linha por chamada da Graph API da Meta (E6 parte 3, segunda rodada,
+ * item 1): o limite e 200 por hora, janela corrida, nao por dia calendario
+ * como `consumo_api`; por isso uma tabela a parte, so com o instante da
+ * chamada, em vez de um contador por data.
+ */
+export const chamadasMetaApi = pgTable(
+  "chamadas_meta_api",
+  {
+    id: id(),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chamadas_meta_api_criado_em").on(t.criadoEm)],
+);
+
+/**
+ * Uma linha por termo ja resolvido em hashtag pela Meta (E6 parte 3,
+ * segunda rodada, item 3): o limite de 30 hashtags unicas por semana e da
+ * Meta (`ig_hashtag_search`, nao do `top_media`), entao guardar o
+ * `hashtagId` aqui evita resolver de novo (e gastar mais uma das 30) um
+ * termo que ja foi visto nos ultimos 7 dias, mesmo que dois nichos usem o
+ * mesmo termo. `ultimoUsoEm` e o que conta como "usada esta semana".
+ */
+export const hashtagsMetaUsadas = pgTable(
+  "hashtags_meta_usadas",
+  {
+    id: id(),
+    termo: text("termo").notNull(),
+    hashtagId: text("hashtag_id").notNull(),
+    ultimoUsoEm: timestamp("ultimo_uso_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("hashtags_meta_usadas_termo").on(t.termo)],
 );
 
 /** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */

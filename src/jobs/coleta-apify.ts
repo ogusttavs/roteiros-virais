@@ -119,6 +119,17 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
 
     if (!cabe()) continue;
 
+    /**
+     * Com a Meta ativa (E6 parte 3, segunda rodada), a vigilancia do
+     * Instagram vem da Business Discovery (`meta-contas.ts`, item 2) e a
+     * descoberta de conta nova por hashtag e semanal, so pelo Apify
+     * (`descoberta-instagram.ts`, item 4). O Instagram fica fora deste job
+     * diario quando `metaAtivo`, para nao coletar (e pagar) duas vezes a
+     * mesma coisa; sem a Meta, o Instagram continua inteiro aqui, todo dia,
+     * como sempre foi.
+     */
+    if (config.coleta.metaAtivo) continue;
+
     const vigiadasInstagram = await db()
       .select()
       .from(contas)

@@ -12,8 +12,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * com id próprio, igual a vídeo. Antes, com vídeo zero e notícia relevante,
  * o job chamava o modelo pedindo evidência de uma lista de ids vazia, que
  * sempre reprova.
+ *
+ * 1.3.0 (achado da leitura previa do Fable, 09/09/2026, correcao 3 do
+ * `PROXIMO.md`): video sem conta dona (Hashtag Search da Meta) entra na
+ * mesma lista "subindo hoje", mas sem numero de velocidade, so com o texto
+ * "assunto em alta na hashtag": nao ha conta para comparar, entao pesa "na
+ * media", nunca como se fosse mais fora da curva que os demais.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -52,14 +58,13 @@ Escreva em português do Brasil, com acentuação correta.`;
 
 export function montarEntrada(dados: {
   subindoHoje: { id: number; assunto: string; velocidadeRelativa: number }[];
+  /** Sem conta dona (Hashtag Search da Meta): sem numero de velocidade, so o assunto. */
+  semDono?: { id: number; assunto: string }[];
   noticias: { id: number; titulo: string; resumo: string }[];
 }): string {
-  const listaVideos =
-    dados.subindoHoje.length > 0
-      ? dados.subindoHoje
-          .map((v) => `id ${v.id}: ${v.assunto} (velocidade ${v.velocidadeRelativa.toFixed(1)}x)`)
-          .join("\n")
-      : "nenhum video subindo hoje";
+  const linhasSubindo = dados.subindoHoje.map((v) => `id ${v.id}: ${v.assunto} (velocidade ${v.velocidadeRelativa.toFixed(1)}x)`);
+  const linhasSemDono = (dados.semDono ?? []).map((v) => `id ${v.id}: ${v.assunto} (assunto em alta na hashtag)`);
+  const listaVideos = [...linhasSubindo, ...linhasSemDono].join("\n") || "nenhum video subindo hoje";
 
   const listaNoticias =
     dados.noticias.length > 0

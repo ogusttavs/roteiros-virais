@@ -13,15 +13,35 @@
  * (03:00 e 03:30) e antes de `pontuar` (03:45): o catch-up de ate 10 videos
  * por conta precisa estar gravado antes da mediana do dia ser calculada.
  *
+ * `metaContas` (E6 parte 3, segunda rodada, item 2) roda as 03:35, entre a
+ * coleta do Apify (03:30) e o `contasBase` (03:40): a Business Discovery
+ * refaz a leitura das contas vigiadas do Instagram (a fonte da vigilancia
+ * passa a ser ela, nao mais o Apify), a tempo de `contasBase` e `pontuar`
+ * contarem com dado fresco. `descobertaInstagram` (item 4) e semanal,
+ * domingo as 04:15, entre `contasBase`/`pontuar` (03:40/03:45) e a
+ * `vigilancia` (04:30): o Apify do Instagram vira so isto, achar handle de
+ * conta ainda desconhecida por hashtag, 30 resultados por termo.
+ * `metaHashtags` (item 3) e diario, as 04:20 (ajuste 2 da revisao do PR
+ * #35: o `recent_media` da hashtag e uma janela de 24h, entao precisa
+ * rodar todo dia para nao perder o que saiu da janela; era semanal,
+ * segunda as 05:00, quando ainda lia `top_media`), depois de `transcrever`
+ * (04:00) e antes de `extrair` (05:00): o video sem_dono que ele grava e
+ * transcreve na hora entra no lote de extracao do mesmo dia. As tres so
+ * agendam com `config.coleta.metaAtivo` (`agendarTudo`, abaixo): sem
+ * `META_IG_ID`/`META_TOKEN`, o cron nem inscreve, e o Apify continua
+ * sozinho como hoje.
+ *
  * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
  * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
  * gerou tema porque `extrairColeta` so buscava o resultado do lote de
  * extracao de 4 em 4 horas, e as 05:30 nenhum video do nicho novo ainda
  * tinha analise. Agora `extrairColeta` roda de hora em hora, aos 20 (e uma
  * consulta de estado do lote, barata) e `temasDoDia` vai para as 06:30:
- * transcrever 04:00, extrair (monta o lote) 05:00, resultado normalmente
- * ate 06:20, tema 06:30, lembrete padrao 08:00.
+ * transcrever 04:00, meta-hashtags 04:20, extrair (monta o lote) 05:00,
+ * resultado normalmente ate 06:20, tema 06:30, lembrete padrao 08:00.
  */
+import { config } from "@/lib/config";
+
 import { boss, FILAS } from "./fila";
 
 const FUSO = "America/Sao_Paulo";
@@ -31,6 +51,8 @@ export type Agendamento = {
   cron: string;
   descricao: string;
   chave?: string;
+  /** So agenda quando isso devolve true (ex: metaContas, so com config.coleta.metaAtivo). Sem isso, sempre agenda. */
+  condicao?: () => boolean;
 };
 
 export const AGENDAMENTOS: Agendamento[] = [
@@ -57,9 +79,27 @@ export const AGENDAMENTOS: Agendamento[] = [
     chave: "tarde",
   },
   {
+    fila: FILAS.metaContas,
+    cron: "35 3 * * *",
+    descricao: "instagram pela api da meta (contas vigiadas), todo dia as 03:35, depois do apify",
+    condicao: () => config.coleta.metaAtivo,
+  },
+  {
     fila: FILAS.contasBase,
     cron: "40 3 * * *",
     descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 03:40, depois das coletas",
+  },
+  {
+    fila: FILAS.descobertaInstagram,
+    cron: "15 4 * * 0",
+    descricao: "apify do instagram, so descoberta de conta nova por hashtag, todo domingo as 04:15",
+    condicao: () => config.coleta.metaAtivo,
+  },
+  {
+    fila: FILAS.metaHashtags,
+    cron: "20 4 * * *",
+    descricao: "hashtag search da meta pelo recent_media (sinal de assunto, sem_dono), todo dia as 04:20, depois de transcrever e antes de extrair",
+    condicao: () => config.coleta.metaAtivo,
   },
   {
     fila: FILAS.pontuar,
@@ -116,6 +156,7 @@ export const AGENDAMENTOS: Agendamento[] = [
 export async function agendarTudo(): Promise<void> {
   const b = boss();
   for (const agendamento of AGENDAMENTOS) {
+    if (agendamento.condicao && !agendamento.condicao()) continue;
     await b.schedule(agendamento.fila, agendamento.cron, null, {
       tz: FUSO,
       key: agendamento.chave,

@@ -22,12 +22,15 @@ import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
+import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
+import { rodarMetaContas } from "./meta-contas";
+import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -72,6 +75,15 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.contasBase, async () => {
     await executarComRegistro(FILAS.contasBase, rodarContasBase);
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.metaContas, async (job) => {
+    await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId));
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
+    await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId));
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.descobertaInstagram, async (job) => {
+    await executarComRegistro(FILAS.descobertaInstagram, () => rodarDescobertaInstagram(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);
