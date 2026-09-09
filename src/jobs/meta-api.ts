@@ -10,7 +10,7 @@
  * de graca, `estrategia/plano-de-execucao.md`, item i) e Hashtag Search
  * (`top_media`, sinal de assunto, sem conta dona nem views).
  */
-import { asc, gte } from "drizzle-orm";
+import { asc, count, gte, lt } from "drizzle-orm";
 
 import { db } from "@/db";
 import { chamadasMetaApi } from "@/db/schema";
@@ -46,15 +46,41 @@ export class ErroMetaApi extends Error {
 type ErroMeta = { message?: string; code?: number; error_subcode?: number };
 
 /**
+ * Codigo 100 (Business Discovery de conta que nao e comercial ou de
+ * criador, confirmado no item 6 desta rodada com uma conta pessoal de
+ * verdade) e erro da CONTA chamada: so essa conta deve virar
+ * `api_indisponivel_em`. Achado da leitura previa do Fable, 09/09/2026,
+ * correcao 1 do `PROXIMO.md`: antes, qualquer `ErroMetaApi` marcava a conta,
+ * e um token vencido ou um limite de taxa (que afetam TODAS as contas, nao
+ * uma so) marcava as 50 contas vigiadas de uma vez e jogava todas de volta
+ * para o Apify pago, sem nunca mais tentar a API.
+ */
+export const CODIGOS_ERRO_DE_CONTA = [100];
+
+/** Token vencido (190) ou limite de taxa (4, 17, 32, 613): afeta a chamada inteira, nao uma conta. */
+export const CODIGOS_TOKEN_OU_LIMITE = [190, 4, 17, 32, 613];
+
+export function erroMetaEhDaConta(erro: ErroMetaApi): boolean {
+  return erro.codigo !== undefined && CODIGOS_ERRO_DE_CONTA.includes(erro.codigo);
+}
+
+export function erroMetaEhTokenOuLimite(erro: ErroMetaApi): boolean {
+  return erro.codigo !== undefined && CODIGOS_TOKEN_OU_LIMITE.includes(erro.codigo);
+}
+
+/**
  * Quantas chamadas ja aconteceram desde `desde` (inclusive). Exportada para
- * o admin mostrar "chamadas usadas na hora" (PROXIMO.md, item 5).
+ * o admin mostrar "chamadas usadas na hora" (PROXIMO.md, item 5). `count()`
+ * no banco em vez de trazer as linhas para contar em memoria (achado da
+ * leitura previa do Fable, correcao 5: `chamadas_meta_api` cresce sem
+ * parar, e `length` sobre todas as linhas piora a cada chamada).
  */
 export async function chamadasDesde(desde: Date): Promise<number> {
-  const linhas = await db()
-    .select({ criadoEm: chamadasMetaApi.criadoEm })
+  const [linha] = await db()
+    .select({ total: count() })
     .from(chamadasMetaApi)
     .where(gte(chamadasMetaApi.criadoEm, desde));
-  return linhas.length;
+  return linha?.total ?? 0;
 }
 
 async function chamadaMaisAntigaDesde(desde: Date): Promise<Date | null> {
@@ -67,7 +93,13 @@ async function chamadaMaisAntigaDesde(desde: Date): Promise<Date | null> {
   return linha?.criadoEm ?? null;
 }
 
+/**
+ * Apaga o que ja saiu da janela antes de inserir a nova (correcao 5): sem
+ * isso a tabela cresce sem parar (nunca ha uma limpeza). Nao muda a conta
+ * de `chamadasDesde` (que ja filtra por `criadoEm`), so evita acumular lixo.
+ */
 async function registrarChamada(): Promise<void> {
+  await db().delete(chamadasMetaApi).where(lt(chamadasMetaApi.criadoEm, new Date(Date.now() - JANELA_MS)));
   await db().insert(chamadasMetaApi).values({});
 }
 
@@ -124,10 +156,27 @@ async function chamar<T>(caminho: string, parametros: Record<string, string>): P
   }
   url.searchParams.set("access_token", config.coleta.metaToken);
 
-  const resposta = await fetch(url);
+  /**
+   * Antes do `fetch`, nao depois (correcao 5): uma chamada que falha na
+   * rede tambem conta para o limite de 200/hora da Meta (a Meta ja recebeu
+   * a requisicao antes de ela falhar do lado de ca).
+   */
   await registrarChamada();
+  const resposta = await fetch(url);
 
-  const corpo = (await resposta.json()) as { error?: ErroMeta } & Record<string, unknown>;
+  let corpo: { error?: ErroMeta } & Record<string, unknown>;
+  try {
+    corpo = (await resposta.json()) as { error?: ErroMeta } & Record<string, unknown>;
+  } catch {
+    /**
+     * Um 5xx com corpo HTML (nao JSON) faria `resposta.json()` lancar um
+     * erro generico sem codigo (correcao 6); embrulhar em `ErroMetaApi` com
+     * o status HTTP deixa o item 1 classificar do mesmo jeito (nenhum dos
+     * codigos conhecidos bate com um status HTTP, entao cai no caminho
+     * "registra e segue sem marcar").
+     */
+    throw new ErroMetaApi(`Meta API respondeu ${resposta.status} sem corpo em JSON`, resposta.status);
+  }
   if (!resposta.ok || corpo.error) {
     const erro = corpo.error ?? {};
     throw new ErroMetaApi(erro.message ?? `Meta API respondeu ${resposta.status}`, erro.code, erro.error_subcode);

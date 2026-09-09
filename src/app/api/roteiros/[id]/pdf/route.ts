@@ -131,7 +131,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
      * Sentry ainda não está ligado em produção (sem DSN é silêncio), então
      * sem isso o erro não deixava rastro nenhum lugar que alguém olhasse.
      */
-    logger.error({ erro, roteiroId: roteiro.id, clienteId: cliente.id }, "nao foi possivel gerar o pdf");
+    logger.error({ err: erro, roteiroId: roteiro.id, clienteId: cliente.id }, "nao foi possivel gerar o pdf");
     Sentry.captureException(erro, {
       tags: { rota: "roteiros-pdf" },
       extra: { roteiroId: roteiro.id, clienteId: cliente.id },

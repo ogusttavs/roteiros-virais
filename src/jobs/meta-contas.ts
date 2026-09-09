@@ -15,7 +15,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contas, nichos } from "@/db/schema";
-import { buscarBusinessDiscovery, ErroMetaApi } from "@/jobs/meta-api";
+import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
 
@@ -76,8 +76,21 @@ export async function rodarMetaContas(nichoId?: number): Promise<Record<string, 
         }
         contasLidas += 1;
       } catch (erro) {
+        /**
+         * Classificacao do erro (achado da leitura previa do Fable,
+         * correcao 1): token vencido ou limite de taxa afeta TODAS as
+         * contas, nao so esta, entao para o job na hora (`ErroColeta`
+         * retentavel) em vez de marcar `apiIndisponivelEm` em todas as
+         * contas vigiadas uma a uma. So um erro da propria conta (pessoal
+         * ou com restricao de idade) marca ela como indisponivel.
+         */
         if (erro instanceof ErroMetaApi) {
-          await db().update(contas).set({ apiIndisponivelEm: new Date() }).where(eq(contas.id, conta.id));
+          if (erroMetaEhTokenOuLimite(erro)) {
+            throw new ErroColeta(`meta api indisponivel (codigo ${erro.codigo}): ${erro.message}`, true);
+          }
+          if (erroMetaEhDaConta(erro)) {
+            await db().update(contas).set({ apiIndisponivelEm: new Date() }).where(eq(contas.id, conta.id));
+          }
         }
         erros.push(`instagram / "${conta.handle}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }

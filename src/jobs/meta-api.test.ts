@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 
-import { calcularEsperaMs, JANELA_MS } from "./meta-api";
+import { calcularEsperaMs, ErroMetaApi, erroMetaEhDaConta, erroMetaEhTokenOuLimite, JANELA_MS } from "./meta-api";
+
+describe("erroMetaEhDaConta", () => {
+  it("codigo 100 (conta pessoal ou de criador) e da conta", () => {
+    expect(erroMetaEhDaConta(new ErroMetaApi("x", 100))).toBe(true);
+  });
+
+  it.each([190, 4, 17, 32, 613, 1, undefined])("codigo %s nao e da conta", (codigo) => {
+    expect(erroMetaEhDaConta(new ErroMetaApi("x", codigo))).toBe(false);
+  });
+});
+
+describe("erroMetaEhTokenOuLimite", () => {
+  it.each([190, 4, 17, 32, 613])("codigo %i (token vencido ou limite de taxa) e token ou limite", (codigo) => {
+    expect(erroMetaEhTokenOuLimite(new ErroMetaApi("x", codigo))).toBe(true);
+  });
+
+  it.each([100, 1, undefined])("codigo %s nao e token ou limite", (codigo) => {
+    expect(erroMetaEhTokenOuLimite(new ErroMetaApi("x", codigo))).toBe(false);
+  });
+});
 
 describe("calcularEsperaMs", () => {
   it("meia janela ja passada, falta a outra metade", () => {

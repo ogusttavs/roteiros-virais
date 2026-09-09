@@ -180,6 +180,42 @@ export async function subindoHojeComAnalise(nichoId: number, limite = 30): Promi
     }));
 }
 
+export type VideoSemDonoComAssunto = { id: number; assunto: string };
+
+const LIMITE_SEM_DONO = 10;
+
+/**
+ * Vídeos sem conta dona (Hashtag Search da Meta, `videos.semDono`) com
+ * análise, dos últimos 7 dias, no máximo `LIMITE_SEM_DONO` por nicho
+ * (achado da leitura prévia do Fable, 09/09/2026, correção 3 do
+ * `PROXIMO.md`): sem conta, o vídeo não tem velocidade nem múltiplo, então
+ * nunca aparecia em `subindoHojeComAnalise`, e a Hashtag Search virava custo
+ * de transcrição sem efeito nenhum no tema do dia. Peso "na média" (sem
+ * multiplicador), citado pelo job como "assunto em alta na hashtag" em vez
+ * de um número, porque não há base de comparação.
+ */
+export async function semDonoComAnalise(nichoId: number): Promise<VideoSemDonoComAssunto[]> {
+  const condicoes = [
+    eq(videos.nichoId, nichoId),
+    eq(videos.semDono, true),
+    gte(videos.publicadoEm, diasAtras(7)),
+    isNotNull(videos.analise),
+    PERTENCE_AO_NICHO,
+  ];
+  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+
+  const linhas = await db()
+    .select({ id: videos.id, analise: videos.analise })
+    .from(videos)
+    .where(and(...condicoes))
+    .orderBy(desc(videos.publicadoEm), asc(videos.id))
+    .limit(LIMITE_SEM_DONO);
+
+  return linhas
+    .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
+    .map((l) => ({ id: l.id, assunto: l.analise.assunto }));
+}
+
 /** Palavras com 4 ou mais letras do texto do tema, sem repetir (etapa 10). */
 export function palavrasChave(texto: string): string[] {
   const encontradas = texto.toLowerCase().match(/\p{L}{4,}/gu) ?? [];

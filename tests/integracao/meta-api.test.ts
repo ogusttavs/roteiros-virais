@@ -137,6 +137,37 @@ describe("erro da Meta (codigo, subcodigo, mensagem)", () => {
     mockFetch.mockResolvedValue(respostaJson({}, 500));
     await expect(buscarBusinessDiscovery("qualquer")).rejects.toBeInstanceOf(ErroMetaApi);
   });
+
+  /** Achado da leitura previa do Fable, correcao 6: um 5xx com HTML derrubava a funcao com um erro sem codigo. */
+  it("corpo que nao e json vira ErroMetaApi com o status http, em vez de derrubar com erro generico", async () => {
+    mockFetch.mockResolvedValue(
+      new Response("<html>gateway timeout</html>", { status: 504, headers: { "content-type": "text/html" } }),
+    );
+    await expect(buscarBusinessDiscovery("qualquer")).rejects.toMatchObject({
+      codigo: 504,
+    });
+  });
+});
+
+describe("registro de chamada (correcao 5 da leitura previa)", () => {
+  it("registra a chamada antes do fetch: mesmo com a rede falhando, ela conta para o limite", async () => {
+    mockFetch.mockRejectedValue(new Error("rede fora do ar"));
+
+    await expect(buscarBusinessDiscovery("qualquer")).rejects.toThrow("rede fora do ar");
+    expect(await chamadasDesde(new Date(0))).toBe(1);
+  });
+
+  it("apaga chamadas com mais de uma hora ao registrar uma nova, sem contar as de fora da janela", async () => {
+    await db()
+      .insert(chamadasMetaApi)
+      .values({ criadoEm: new Date(Date.now() - 2 * 60 * 60 * 1000) });
+    expect(await chamadasDesde(new Date(0))).toBe(1);
+
+    mockFetch.mockResolvedValue(respostaJson({ business_discovery: { username: "x" } }));
+    await buscarBusinessDiscovery("x");
+
+    expect(await chamadasDesde(new Date(0))).toBe(1); // a antiga saiu, so a nova ficou
+  });
 });
 
 describe("hashtag search", () => {

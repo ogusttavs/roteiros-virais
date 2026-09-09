@@ -326,6 +326,39 @@ describe("rodarContasBase", () => {
       expect(linha.apiIndisponivelEm).not.toBeNull();
     });
 
+    it("com o teto do apify ja no limite, erro da meta (conta) nao cai para o apify: marca indisponivel e fica para amanha (correcao 4 da leitura previa)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-teto-batido", 100);
+
+      const teto = config.coleta.apifyMaxResultadosDia;
+      await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+      vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("conta pessoal", 100, 33));
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.tetoAtingido).toBe(true);
+      expect(resumo.contasProcessadas).toBe(0);
+      expect(buscarInstagram).not.toHaveBeenCalled();
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.apiIndisponivelEm).not.toBeNull();
+      expect(linha.baseCompletaEm).toBeNull();
+    });
+
+    it("token vencido ou limite de taxa da meta para o job na hora, sem marcar nenhuma conta (correcao 1 da leitura previa)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-token-vencido", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("token vencido", 190));
+
+      await expect(rodarContasBase()).rejects.toMatchObject({ retentavel: true });
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.apiIndisponivelEm).toBeNull();
+      expect(buscarInstagram).not.toHaveBeenCalled();
+    });
+
     it("conta ja marcada api_indisponivel_em nunca tenta a meta de novo, vai direto pro apify", async () => {
       config.coleta.metaAtivo = true;
       await criarContaComVideo("instagram", "conta-ja-indisponivel", 100, { apiIndisponivelEm: new Date() });

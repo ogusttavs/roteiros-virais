@@ -28,7 +28,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { consumoApi, contas, nichos } from "@/db/schema";
-import { ErroMetaApi, buscarBusinessDiscovery } from "@/jobs/meta-api";
+import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
@@ -121,7 +121,20 @@ async function marcarBaseCompleta(contaId: number): Promise<void> {
  * #34, item 0c: antes este job registrava `devolvidos` como consumo, uma
  * regua diferente da coleta).
  */
-type ResultadoCatchUp = { novos: number; atualizados: number; usadosApify: number; devolvidosApify: number };
+type ResultadoCatchUp = {
+  novos: number;
+  atualizados: number;
+  usadosApify: number;
+  devolvidosApify: number;
+  /**
+   * A Meta falhou para essa conta (marcada indisponivel) e o teto do Apify
+   * ja nao cabe mais nada hoje (correcao 4 da leitura previa): a conta fica
+   * sem base completa, para tentar de novo amanha (a Meta ja marcou
+   * `apiIndisponivelEm`, entao amanha ela vai direto para o caminho do
+   * Apify, sujeito ao mesmo teto).
+   */
+  tetoAtingido?: boolean;
+};
 
 async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
   const { itens, devolvidos } = await buscarTiktok([], [candidata.handle], VIDEOS_POR_CONTA);
@@ -165,16 +178,40 @@ async function catchUpInstagramMeta(nichoId: number, candidata: ContaCandidata):
   return { novos, atualizados, usadosApify: 0, devolvidosApify: 0 };
 }
 
-async function catchUpInstagram(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
+async function catchUpInstagram(
+  nichoId: number,
+  candidata: ContaCandidata,
+  apifyCabe: () => boolean,
+): Promise<ResultadoCatchUp> {
   if (!instagramUsaApify(candidata)) {
     try {
       return await catchUpInstagramMeta(nichoId, candidata);
     } catch (erro) {
       if (!(erro instanceof ErroMetaApi)) throw erro;
-      // Conta pessoal ou com restricao de idade (nao confirmado ainda qual
-      // codigo/subcodigo a Meta devolve nesse caso): marca indisponivel e
-      // cai para o Apify abaixo, na mesma tentativa.
+      /**
+       * Classificacao do erro (achado da leitura previa do Fable, correcao
+       * 1): token vencido ou limite de taxa afeta a chamada inteira, entao
+       * para o job na hora (`ErroColeta` retentavel) em vez de marcar
+       * qualquer conta; erro de outra natureza so registra e segue, sem
+       * marcar nem cair para o Apify (a conta continua tentando a Meta
+       * amanha).
+       */
+      if (erroMetaEhTokenOuLimite(erro)) {
+        throw new ErroColeta(`meta api indisponivel (codigo ${erro.codigo}): ${erro.message}`, true);
+      }
+      if (!erroMetaEhDaConta(erro)) throw erro;
+
+      // Conta pessoal ou com restricao de idade: marca indisponivel e cai
+      // para o Apify abaixo, na mesma tentativa, se ainda couber no teto.
       await db().update(contas).set({ apiIndisponivelEm: new Date() }).where(eq(contas.id, candidata.contaId));
+      /**
+       * Correcao 4 da leitura previa: sem isso, com o teto do Apify em
+       * zero (como esta enquanto o Instagram passa pela Meta), a queda para
+       * o Apify abaixo pagava mesmo assim, ignorando o teto diario.
+       */
+      if (!apifyCabe()) {
+        return { novos: 0, atualizados: 0, usadosApify: 0, devolvidosApify: 0, tetoAtingido: true };
+      }
     }
   }
 
@@ -253,16 +290,26 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
           candidata.plataforma === "tiktok"
             ? await catchUpTiktok(nicho.id, candidata)
             : candidata.plataforma === "instagram"
-              ? await catchUpInstagram(nicho.id, candidata)
+              ? await catchUpInstagram(nicho.id, candidata, apifyCabe)
               : await catchUpYoutube(nicho.id, candidata);
 
         resultadosApifyUsados += resultado.usadosApify;
         resultadosApifyDevolvidos += resultado.devolvidosApify;
         videosNovos += resultado.novos;
         videosAtualizados += resultado.atualizados;
-        await marcarBaseCompleta(candidata.contaId);
-        contasProcessadas += 1;
+        if (resultado.tetoAtingido) {
+          tetoAtingido = true;
+        } else {
+          await marcarBaseCompleta(candidata.contaId);
+          contasProcessadas += 1;
+        }
       } catch (erro) {
+        /**
+         * Token vencido ou limite de taxa da Meta (correcao 1 da leitura
+         * previa): para o job na hora, em vez de engolir e seguir tentando
+         * as outras candidatas, que falhariam do mesmo jeito.
+         */
+        if (erro instanceof ErroColeta) throw erro;
         erros.push(
           `${candidata.plataforma} "${candidata.handle}": ${erro instanceof Error ? erro.message : String(erro)}`,
         );

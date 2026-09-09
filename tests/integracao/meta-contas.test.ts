@@ -109,6 +109,20 @@ describe("rodarMetaContas", () => {
     expect(linha.apiIndisponivelEm).not.toBeNull();
   });
 
+  it("token vencido ou limite de taxa da meta para o job na hora, sem marcar a conta (correcao 1 da leitura previa)", async () => {
+    const [conta] = await db()
+      .insert(contas)
+      .values({ plataforma: "instagram", handle: "conta-meta-token-vencido", nichoId, vigiada: true })
+      .returning();
+
+    vi.mocked(buscarBusinessDiscovery).mockRejectedValue(new ErroMetaApi("token vencido", 190));
+
+    await expect(rodarMetaContas()).rejects.toMatchObject({ retentavel: true });
+
+    const [linha] = await db().select().from(contas).where(eq(contas.id, conta.id));
+    expect(linha.apiIndisponivelEm).toBeNull();
+  });
+
   it("conta ja marcada api_indisponivel_em nunca e tentada de novo", async () => {
     await db()
       .insert(contas)

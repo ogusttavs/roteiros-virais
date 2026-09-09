@@ -2,14 +2,18 @@
  * Job `temasDoDia` (etapa 10, fila `temas-do-dia`, diário 06:30 de
  * Brasília, decisão 2 do `PROXIMO.md`, depois do resultado da extração):
  * por nicho ativo, filtra as notícias das últimas 24h com a tarefa barata
- * `filtrarNoticias`, junta com o que está subindo hoje (com análise), e
+ * `filtrarNoticias`, junta com o que está subindo hoje (com análise) e com
+ * os vídeos sem conta dona da Hashtag Search da Meta (`semDonoComAnalise`,
+ * achado da leitura prévia do Fable, 09/09/2026, correção 3 do
+ * `PROXIMO.md`: sem isso, esses vídeos nunca tinham velocidade nem múltiplo
+ * e a Hashtag Search virava custo de transcrição sem efeito no tema), e
  * chama a tarefa `temasDoDia` (modelo forte, com o modelo do nicho no bloco
  * estável, cache de prompt). Cada tema precisa citar pelo menos um id de
  * evidência (vídeo ou notícia) que de fato foi enviado; se algum tema não
  * citar, refaz a chamada uma vez, e se falhar de novo o nicho fica sem tema
  * novo (a regra de estabilidade em `src/servicos/temas.ts` usa o de um dos
- * últimos 3 dias). Sem `subindoHoje` e sem notícia relevante, o nicho não
- * gera tema (sem chamar a IA), e o resumo diz por quê.
+ * últimos 3 dias). Sem `subindoHoje`, sem vídeo sem dono e sem notícia
+ * relevante, o nicho não gera tema (sem chamar a IA), e o resumo diz por quê.
  *
  * Correção do dia 1 da etapa 14 (`PROXIMO.md`): antes, só vídeo contava como
  * evidência válida, então um nicho novo com notícia mas sem vídeo com
@@ -28,7 +32,7 @@ import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
-import { formatarModeloNicho, modeloNichoAtual, subindoHojeComAnalise } from "@/servicos/pesquisa";
+import { formatarModeloNicho, modeloNichoAtual, semDonoComAnalise, subindoHojeComAnalise } from "@/servicos/pesquisa";
 
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 const LIMITE_NOTICIAS = 60;
@@ -176,25 +180,27 @@ async function tentarGerarTemas(dados: {
 }
 
 async function gerarTemasDoNicho(nicho: NichoAtivo): Promise<"gerado" | "sem_evidencia"> {
-  const [subindo, candidatasNoticias] = await Promise.all([
+  const [subindo, semDono, candidatasNoticias] = await Promise.all([
     subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO),
+    semDonoComAnalise(nicho.id),
     noticiasCandidatas(nicho.id),
   ]);
 
   const noticiasRelevantes = await filtrarEGravarNoticias(nicho, candidatasNoticias);
 
-  if (subindo.length === 0 && noticiasRelevantes.length === 0) {
+  if (subindo.length === 0 && semDono.length === 0 && noticiasRelevantes.length === 0) {
     return "sem_evidencia";
   }
 
   const modeloNicho = await modeloNichoAtual(nicho.id);
-  const idsValidos = new Set(subindo.map((v) => v.id));
+  const idsValidos = new Set([...subindo.map((v) => v.id), ...semDono.map((v) => v.id)]);
   const idsValidosNoticias = new Set(noticiasRelevantes.map((n) => n.id));
   const sistemaEstavel = temasDoDiaIA.montarSistemaEstavel({
     modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
   });
   const entrada = temasDoDiaIA.montarEntrada({
     subindoHoje: subindo,
+    semDono,
     noticias: noticiasRelevantes.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
   });
 
@@ -204,7 +210,7 @@ async function gerarTemasDoNicho(nicho: NichoAtivo): Promise<"gerado" | "sem_evi
     entrada,
     idsValidos,
     idsValidosNoticias,
-    subindoCount: subindo.length,
+    subindoCount: subindo.length + semDono.length,
     noticiasCount: noticiasRelevantes.length,
   };
 
