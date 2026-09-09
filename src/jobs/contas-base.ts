@@ -2,11 +2,17 @@
  * Job `contas-base` (E6 parte 3, item 5): a coleta por termo (hashtag) traz
  * so 1 a 2 vídeos por conta, então a maioria nunca chega aos 5 vídeos que
  * `pontuar.ts` exige para uma mediana de verdade. Este job faz o catch-up:
- * por nicho e por dia, pega as 30 contas que ainda não têm base (menos de
+ * por nicho e por dia, pega as contas que ainda não têm base (menos de
  * `MINIMO_VIDEOS_MEDIANA` vídeos nos últimos 90 dias, com pelo menos 1 vídeo
  * para priorizar por views) e busca até 10 vídeos recentes de cada. Roda
  * antes de `pontuar` na agenda, para a mediana de hoje já contar com o que
  * este job trouxe de manhã.
+ *
+ * Duas vagas por nicho por dia (E6 parte 3, terceira rodada, item 9): as
+ * `CONTAS_POR_NICHO_POR_DIA` (30) compartilhadas por TikTok, YouTube e
+ * Instagram-por-Apify, e as `CONTAS_INSTAGRAM_META_POR_NICHO_POR_DIA` (50)
+ * só de Instagram pela Meta, sempre além das 30 e nunca repetindo conta
+ * (Meta é de graça, processa mais).
  *
  * YouTube por `playlistItems` do canal; TikTok sempre pelo Apify em modo
  * perfil (`buscarTiktokVigilancia` com só um handle, o mesmo mecanismo que
@@ -19,12 +25,14 @@
  * ou quando a Meta está desligada.
  *
  * O teto diário do Apify é a única trava do TikTok e do Instagram-por-Apify
- * (decisão do `PROXIMO.md`): ao bater, o job pula só as candidatas que
- * dependem dele (ajuste da revisão do PR #34, item 0b: antes o job inteiro
- * parava, e as candidatas do YouTube que vinham depois na lista nunca
- * recebiam catch-up nenhum enquanto o Apify estivesse pausado) e continua
- * tentando as do YouTube (e as do Instagram pela Meta), no nicho atual e
- * nos seguintes; `tetoAtingido` no resumo registra que isso aconteceu.
+ * (decisão do `PROXIMO.md`): candidatas que dependem dele ficam de fora da
+ * consulta das 30 vagas assim que o teto está esgotado (item 9b desta
+ * rodada, achado em produção em 09/09: com o filtro só em tempo de
+ * execução, como era antes, as vagas eram gastas e puladas sem substituto,
+ * em vez de sobrar para outra candidata elegível), e o laço ainda pula em
+ * tempo de execução se o teto esgotar no meio da mesma lista (`apifyCabe`
+ * muda a cada candidata processada); `tetoAtingido` no resumo registra que
+ * isso aconteceu.
  */
 import { and, eq, sql } from "drizzle-orm";
 
@@ -43,7 +51,22 @@ import { ErroColeta } from "./execucoes";
 import { MINIMO_VIDEOS_MEDIANA } from "./pontuar";
 import { buscarCanal, buscarUploadsDoCanal, buscarVideosPorId, CUSTO_LISTA } from "./youtube-api";
 
+/**
+ * Vagas compartilhadas por TikTok, YouTube e Instagram-por-Apify, por nicho
+ * por dia (E6 parte 3, item 5; numero mantido na terceira rodada, item 9).
+ * Instagram pela Meta tem vagas proprias, abaixo: a Meta e de graca, TikTok
+ * (teto do Apify) e YouTube (cota) nao.
+ */
 const CONTAS_POR_NICHO_POR_DIA = 30;
+
+/**
+ * Vagas so para Instagram pela Meta, por nicho por dia, alem das 30 acima
+ * (E6 parte 3, terceira rodada, item 9, decisao do Gustavo em 09/09: a Meta
+ * e de graca, entao processa mais por dia; o limite real e as 200 chamadas
+ * por hora da Meta, `meta-api.ts`, bem acima de 50 por nicho).
+ */
+const CONTAS_INSTAGRAM_META_POR_NICHO_POR_DIA = 50;
+
 const VIDEOS_POR_CONTA = 10;
 const FONTE_APIFY = "apify";
 const FONTE_YOUTUBE = "youtube";
@@ -55,7 +78,19 @@ type ContaCandidata = {
   apiIndisponivelEm: Date | null;
 };
 
-async function contasCandidatas(nichoId: number): Promise<ContaCandidata[]> {
+/**
+ * As 30 vagas compartilhadas por TikTok, YouTube e Instagram-por-Apify
+ * (item 5; item 9 desta rodada muda quem entra): Instagram pela Meta nunca
+ * aparece aqui, so na vaga propria dele (`contasCandidatasInstagramMeta`,
+ * abaixo). Quando `apifyDisponivel` e falso, so YouTube entra na selecao
+ * (TikTok e Instagram-por-Apify dependem do Apify): sem isso, as vagas
+ * eram desperdicadas em candidatas que iam ser puladas mesmo assim no laco
+ * de `rodarContasBase` (achado em producao em 09/09: 21 das 30 vagas foram
+ * TikTok pulado, so 9 contas receberam base, e as mesmas 21 voltavam no
+ * dia seguinte, porque a selecao antiga so filtrava depois de escolher as
+ * 30, nunca trocava por outra candidata).
+ */
+async function contasCandidatas(nichoId: number, apifyDisponivel: boolean): Promise<ContaCandidata[]> {
   const linhas = await db().execute<{
     conta_id: number;
     plataforma: "youtube" | "tiktok" | "instagram";
@@ -67,10 +102,64 @@ async function contasCandidatas(nichoId: number): Promise<ContaCandidata[]> {
     JOIN videos v ON v.conta_id = c.id AND v.publicado_em >= now() - interval '90 days'
     WHERE c.nicho_id = ${nichoId}
       AND c.base_completa_em IS NULL
+      AND (
+        c.plataforma = 'youtube'
+        OR (
+          ${apifyDisponivel}
+          AND (
+            c.plataforma = 'tiktok'
+            OR (c.plataforma = 'instagram' AND (NOT ${config.coleta.metaAtivo} OR c.api_indisponivel_em IS NOT NULL))
+          )
+        )
+      )
     GROUP BY c.id, c.plataforma, c.handle, c.api_indisponivel_em
     HAVING count(v.id) < ${MINIMO_VIDEOS_MEDIANA}
     ORDER BY max(v.views) DESC
     LIMIT ${CONTAS_POR_NICHO_POR_DIA}
+  `);
+  return linhas.rows.map((l) => ({
+    contaId: l.conta_id,
+    plataforma: l.plataforma,
+    handle: l.handle,
+    apiIndisponivelEm: l.api_indisponivel_em,
+  }));
+}
+
+/**
+ * As 50 vagas so de Instagram pela Meta (item 9a desta rodada), sempre
+ * alem das candidatas ja escolhidas pelas 30 vagas compartilhadas acima
+ * (`idsJaSelecionados`, para nunca processar a mesma conta duas vezes no
+ * mesmo dia). So chamada com `config.coleta.metaAtivo` (quem chama confere).
+ */
+async function contasCandidatasInstagramMeta(nichoId: number, idsJaSelecionados: number[]): Promise<ContaCandidata[]> {
+  // "int[]" pede um array de verdade; um array JS interpolado direto vira
+  // uma lista de parametros separados por virgula (mesmo achado de
+  // `condicoesEvidencia` em pesquisa.ts, "cannot cast type record to text[]").
+  const idsSql =
+    idsJaSelecionados.length > 0
+      ? sql`array[${sql.join(
+          idsJaSelecionados.map((id) => sql`${id}`),
+          sql`, `,
+        )}]::int[]`
+      : sql`array[]::int[]`;
+  const linhas = await db().execute<{
+    conta_id: number;
+    plataforma: "youtube" | "tiktok" | "instagram";
+    handle: string;
+    api_indisponivel_em: Date | null;
+  }>(sql`
+    SELECT c.id AS conta_id, c.plataforma, c.handle, c.api_indisponivel_em
+    FROM contas c
+    JOIN videos v ON v.conta_id = c.id AND v.publicado_em >= now() - interval '90 days'
+    WHERE c.nicho_id = ${nichoId}
+      AND c.base_completa_em IS NULL
+      AND c.plataforma = 'instagram'
+      AND c.api_indisponivel_em IS NULL
+      AND NOT (c.id = ANY(${idsSql}))
+    GROUP BY c.id, c.plataforma, c.handle, c.api_indisponivel_em
+    HAVING count(v.id) < ${MINIMO_VIDEOS_MEDIANA}
+    ORDER BY max(v.views) DESC
+    LIMIT ${CONTAS_INSTAGRAM_META_POR_NICHO_POR_DIA}
   `);
   return linhas.rows.map((l) => ({
     contaId: l.conta_id,
@@ -283,42 +372,63 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
   let tetoAtingido = false;
   const erros: string[] = [];
 
-  for (const nicho of nichosAtivos) {
-    const candidatas = await contasCandidatas(nicho.id);
-    for (const candidata of candidatas) {
-      if (usaApify(candidata) && !apifyCabe()) {
+  /**
+   * Processa uma candidata (compartilhada com as duas vagas do item 9): o
+   * `if (usaApify(...) && !apifyCabe())` continua aqui, alem do filtro na
+   * consulta, para o caso de uma candidata anterior desta mesma lista ter
+   * esgotado o teto no meio do laco (a consulta so sabe o teto de quando
+   * foi feita).
+   */
+  async function processarCandidata(nichoId: number, candidata: ContaCandidata): Promise<void> {
+    if (usaApify(candidata) && !apifyCabe()) {
+      tetoAtingido = true;
+      return;
+    }
+
+    try {
+      const resultado =
+        candidata.plataforma === "tiktok"
+          ? await catchUpTiktok(nichoId, candidata)
+          : candidata.plataforma === "instagram"
+            ? await catchUpInstagram(nichoId, candidata, apifyCabe)
+            : await catchUpYoutube(nichoId, candidata);
+
+      resultadosApifyUsados += resultado.usadosApify;
+      resultadosApifyDevolvidos += resultado.devolvidosApify;
+      videosNovos += resultado.novos;
+      videosAtualizados += resultado.atualizados;
+      if (resultado.tetoAtingido) {
         tetoAtingido = true;
-        continue;
+      } else {
+        await marcarBaseCompleta(candidata.contaId);
+        contasProcessadas += 1;
       }
+    } catch (erro) {
+      /**
+       * Token vencido ou limite de taxa da Meta (correcao 1 da leitura
+       * previa): para o job na hora, em vez de engolir e seguir tentando
+       * as outras candidatas, que falhariam do mesmo jeito.
+       */
+      if (erro instanceof ErroColeta) throw erro;
+      erros.push(
+        `${candidata.plataforma} "${candidata.handle}": ${erro instanceof Error ? erro.message : String(erro)}`,
+      );
+    }
+  }
 
-      try {
-        const resultado =
-          candidata.plataforma === "tiktok"
-            ? await catchUpTiktok(nicho.id, candidata)
-            : candidata.plataforma === "instagram"
-              ? await catchUpInstagram(nicho.id, candidata, apifyCabe)
-              : await catchUpYoutube(nicho.id, candidata);
+  for (const nicho of nichosAtivos) {
+    const candidatas = await contasCandidatas(nicho.id, apifyCabe());
+    for (const candidata of candidatas) {
+      await processarCandidata(nicho.id, candidata);
+    }
 
-        resultadosApifyUsados += resultado.usadosApify;
-        resultadosApifyDevolvidos += resultado.devolvidosApify;
-        videosNovos += resultado.novos;
-        videosAtualizados += resultado.atualizados;
-        if (resultado.tetoAtingido) {
-          tetoAtingido = true;
-        } else {
-          await marcarBaseCompleta(candidata.contaId);
-          contasProcessadas += 1;
-        }
-      } catch (erro) {
-        /**
-         * Token vencido ou limite de taxa da Meta (correcao 1 da leitura
-         * previa): para o job na hora, em vez de engolir e seguir tentando
-         * as outras candidatas, que falhariam do mesmo jeito.
-         */
-        if (erro instanceof ErroColeta) throw erro;
-        erros.push(
-          `${candidata.plataforma} "${candidata.handle}": ${erro instanceof Error ? erro.message : String(erro)}`,
-        );
+    // Vagas proprias do Instagram pela Meta (item 9a), sempre depois das 30
+    // compartilhadas acima e nunca repetindo as mesmas contas.
+    if (config.coleta.metaAtivo) {
+      const idsJaSelecionados = candidatas.map((c) => c.contaId);
+      const candidatasInstagramMeta = await contasCandidatasInstagramMeta(nicho.id, idsJaSelecionados);
+      for (const candidata of candidatasInstagramMeta) {
+        await processarCandidata(nicho.id, candidata);
       }
     }
   }

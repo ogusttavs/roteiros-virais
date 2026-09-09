@@ -414,4 +414,80 @@ describe("rodarContasBase", () => {
       expect(linha.baseCompletaEm).not.toBeNull();
     });
   });
+
+  describe("item 9 (E6 parte 3, terceira rodada): vagas proprias do instagram pela meta e teto do apify na selecao", () => {
+    it("teto ja atingido com candidatas mistas: tiktok fica de fora da selecao (nao so pulado em tempo de execucao), as vagas vao para instagram (pela meta, vaga propria) e youtube", async () => {
+      config.coleta.metaAtivo = true;
+      const teto = config.coleta.apifyMaxResultadosDia;
+      await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+      // 25 tiktok com views bem mais altas que as outras: se a selecao ainda
+      // escolhesse por rank de views antes de excluir quem depende do
+      // Apify, essas 25 ocupariam a maior parte das 30 vagas compartilhadas
+      // e sobrariam poucas para o youtube (o bug de producao de 09/09).
+      const contasTiktok: number[] = [];
+      for (let i = 0; i < 25; i += 1) {
+        contasTiktok.push(await criarContaComVideo("tiktok", `conta-teto-tiktok-${i}`, 100_000 + i));
+      }
+      const contasYoutube: number[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        contasYoutube.push(await criarContaComVideo("youtube", `conta-teto-youtube-${i}`, 10 + i));
+      }
+      const contasInstagram: number[] = [];
+      for (let i = 0; i < 2; i += 1) {
+        contasInstagram.push(await criarContaComVideo("instagram", `conta-teto-instagram-${i}`, 10 + i));
+      }
+
+      mockFetch.mockImplementation(async (url: URL) => {
+        const texto = url.toString();
+        if (texto.includes("/channels")) {
+          return respostaJson({
+            items: [
+              {
+                id: "UCtetoexemplo00000001",
+                snippet: { title: "[exemplo] canal do teste de teto" },
+                contentDetails: { relatedPlaylists: { uploads: "UUtetoexemplo00000001" } },
+              },
+            ],
+          });
+        }
+        if (texto.includes("/playlistItems")) return respostaJson({ items: [] });
+        throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+      });
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({ username: "conta-teto-instagram" });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(5); // 3 youtube + 2 instagram, nenhum tiktok
+      expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+
+      for (const id of [...contasYoutube, ...contasInstagram]) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        expect(linha.baseCompletaEm).not.toBeNull();
+      }
+      for (const id of contasTiktok) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        expect(linha.baseCompletaEm).toBeNull();
+      }
+    });
+
+    it("60 candidatas do instagram pela meta, so 50 processadas no dia (vaga propria, sem depender das 30 compartilhadas)", async () => {
+      config.coleta.metaAtivo = true;
+      const contasInstagram: number[] = [];
+      for (let i = 0; i < 60; i += 1) {
+        contasInstagram.push(await criarContaComVideo("instagram", `conta-60-instagram-${i}`, 100 + i));
+      }
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({ username: "conta-60-instagram" });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(50);
+      let comBase = 0;
+      for (const id of contasInstagram) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        if (linha.baseCompletaEm !== null) comBase += 1;
+      }
+      expect(comBase).toBe(50);
+    });
+  });
 });
