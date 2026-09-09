@@ -92,19 +92,78 @@ export type TiktokItemBruto = {
 };
 
 /**
- * Busca por hashtag (PROXIMO.md, decisao 2: os termos do nicho viram
- * hashtag) e por perfil vigiado, ambos num so input (o ator aceita os dois
- * campos juntos e cobra por resultado devolvido, nao por chamada).
+ * Resultados por termo na busca por hashtag (E6 parte 3, terceira rodada,
+ * item 1): fixo, nao dividido pelo teto como `limitePorAlvo` fazia antes.
+ * Os 30 mais populares da semana de um termo sao, na pratica, os fora da
+ * curva dele; pedir mais que isso e pagar por vídeo que não ajuda a achar
+ * conta nova.
  */
-export async function buscarTiktok(
-  hashtags: string[],
-  perfis: string[],
+export const RESULTADOS_POR_TERMO_HASHTAG = 30;
+
+/**
+ * Videos por perfil vigiado na vigilancia diaria (E6 parte 3, terceira
+ * rodada, item 3): so os mais recentes, fixo por perfil, nao dividido pelo
+ * teto.
+ */
+export const VIDEOS_POR_PERFIL_VIGILANCIA = 5;
+
+/**
+ * Busca por hashtag (PROXIMO.md, decisao 2: os termos do nicho viram
+ * hashtag), so a semana e so os termos do rodizio do dia (E6 parte 3,
+ * terceira rodada, itens 1 e 2, `termosDaRodada` em `coleta-apify.ts`).
+ *
+ * `oldestPostDateUnified` aceita data relativa ("7 days", confirmado no
+ * schema de entrada do ator em 09/09/2026, via `api.apify.com/v2/acts/
+ * clockworks~tiktok-scraper/builds/<ultimo>`) e nao e descrito como
+ * exclusivo de perfil, apesar de a UI do ator agrupar o campo visualmente
+ * com as opcoes de perfil. `videoSearchSorting`/`videoSearchDateFilter`
+ * (que teriam `MOST_LIKED`/`PAST_WEEK`) ficaram de fora de proposito: a
+ * documentacao do ator e explicita que os dois "so valem com a secao
+ * /video" da busca por termo (`searchQueries` + `searchSection`), que nao e
+ * o que este projeto usa (aqui os termos do nicho viram hashtag, decisao
+ * 2); nao ha um parametro de ordenacao documentado para `hashtags`, so o
+ * filtro de data. Sem prova com chave real (item 7 desta rodada depende do
+ * limite mensal do Apify), fica em `TODO.md` como decisao pendente: se a
+ * pagina de hashtag do TikTok ja devolve em ordem de popularidade por
+ * padrao (e o que o produto conta com), ou se um dia sera preciso pedir
+ * mais que 30 e ordenar no codigo por `diggCount`/`playCount` antes de
+ * cortar.
+ */
+export async function buscarTiktokPorHashtag(
+  termos: string[],
   maxItems: number,
 ): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
-  const numeroDeAlvos = hashtags.length + perfis.length;
-  const input: Record<string, unknown> = { resultsPerPage: limitePorAlvo(maxItems, numeroDeAlvos) };
-  if (hashtags.length > 0) input.hashtags = hashtags.map(paraHashtag);
-  if (perfis.length > 0) input.profiles = perfis;
+  if (termos.length === 0) return { itens: [], devolvidos: 0 };
+  const input: Record<string, unknown> = {
+    hashtags: termos.map(paraHashtag),
+    resultsPerPage: RESULTADOS_POR_TERMO_HASHTAG,
+    oldestPostDateUnified: "7 days",
+  };
+  return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
+}
+
+/**
+ * Vigilancia por perfil: `videosPorPerfil` mais recentes de cada conta.
+ * `coleta-apify.ts` chama com `VIDEOS_POR_PERFIL_VIGILANCIA` (5, todo dia,
+ * E6 parte 3, terceira rodada, item 3); `contas-base.ts` chama com
+ * `VIDEOS_POR_CONTA` (10, so no catch-up de conta sem base, uma vez, mais
+ * historico do que a vigilancia diaria precisa). `profileSorting: "latest"`
+ * e o valor documentado no schema do ator para "mais recentes primeiro" (o
+ * mesmo usado no `exampleRunInput` da documentacao publica do ator; era o
+ * default implicito quando `buscarTiktok` nao mandava o campo, antes desta
+ * rodada).
+ */
+export async function buscarTiktokVigilancia(
+  perfis: string[],
+  videosPorPerfil: number,
+  maxItems: number,
+): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
+  if (perfis.length === 0) return { itens: [], devolvidos: 0 };
+  const input: Record<string, unknown> = {
+    profiles: perfis,
+    resultsPerPage: videosPorPerfil,
+    profileSorting: "latest",
+  };
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
 }
 

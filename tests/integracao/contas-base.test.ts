@@ -19,7 +19,7 @@ import { resetarSchema } from "../../scripts/resetar-schema";
 
 vi.mock("@/jobs/apify-api", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/apify-api")>();
-  return { ...original, buscarTiktok: vi.fn(), buscarInstagram: vi.fn() };
+  return { ...original, buscarTiktokVigilancia: vi.fn(), buscarInstagram: vi.fn() };
 });
 
 vi.mock("@/jobs/meta-api", async (importarOriginal) => {
@@ -28,7 +28,7 @@ vi.mock("@/jobs/meta-api", async (importarOriginal) => {
 });
 
 // eslint-disable-next-line import/order -- vi.mock acima e hoisted; os imports abaixo precisam vir depois para pegar o mock.
-import { buscarInstagram, buscarTiktok } from "@/jobs/apify-api";
+import { buscarInstagram, buscarTiktokVigilancia } from "@/jobs/apify-api";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -96,7 +96,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  vi.mocked(buscarTiktok).mockReset();
+  vi.mocked(buscarTiktokVigilancia).mockReset();
   vi.mocked(buscarInstagram).mockReset();
   vi.mocked(buscarBusinessDiscovery).mockReset();
   mockFetch.mockReset();
@@ -118,7 +118,7 @@ describe("rodarContasBase", () => {
     const teto = config.coleta.apifyMaxResultadosDia;
     await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto - 1 });
 
-    vi.mocked(buscarTiktok).mockImplementation(async (_hashtags, perfis) => {
+    vi.mocked(buscarTiktokVigilancia).mockImplementation(async (perfis) => {
       const handle = perfis[0];
       return { itens: [itemTiktok(handle, `${handle}-novo`)], devolvidos: 1 };
     });
@@ -147,8 +147,8 @@ describe("rodarContasBase", () => {
     // baixa (tiktok, depois do teto) fica para amanha.
     expect(resumo.tetoAtingido).toBe(true);
     expect(resumo.contasProcessadas).toBe(2);
-    expect(buscarTiktok).toHaveBeenCalledTimes(1);
-    expect(buscarTiktok).toHaveBeenCalledWith([], ["conta-alta-views"], 10);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledTimes(1);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-alta-views"], 10, 10);
 
     const [linhaAlta] = await db().select().from(contas).where(eq(contas.id, contaAlta));
     const [linhaYoutube] = await db().select().from(contas).where(eq(contas.id, contaYoutube));
@@ -161,7 +161,7 @@ describe("rodarContasBase", () => {
   it("registra em consumo_api os resultados consumidos (itens.length), nao os devolvidos brutos (revisao do PR #34, item 0c)", async () => {
     await criarContaComVideo("tiktok", "conta-devolvidos-vs-usados", 500);
 
-    vi.mocked(buscarTiktok).mockResolvedValue({
+    vi.mocked(buscarTiktokVigilancia).mockResolvedValue({
       itens: [itemTiktok("conta-devolvidos-vs-usados", "video-1")],
       devolvidos: 7,
     });
@@ -236,7 +236,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   it("conta com 5 videos ou mais ja tem base, nunca e selecionada", async () => {
@@ -258,7 +258,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   it("conta sem nenhum video nunca e selecionada (sem video de mais views para priorizar)", async () => {
@@ -267,7 +267,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   describe("instagram pela api da meta (E6 parte 3, segunda rodada, item 2)", () => {
@@ -308,6 +308,23 @@ describe("rodarContasBase", () => {
       expect(video).toBeDefined();
       expect(video.origem).toBe("meta");
       expect(video.views).toBe(900);
+    });
+
+    it("business discovery sem dado (null) nao marca base completa, registra em erros e tenta de novo no dia seguinte (item 0b da revisao do PR #35)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-sem-dado", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue(null);
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(0);
+      expect((resumo.erros as string[] | undefined)?.[0]).toContain("business discovery sem dado");
+      expect(buscarInstagram).not.toHaveBeenCalled();
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.baseCompletaEm).toBeNull();
+      expect(linha.apiIndisponivelEm).toBeNull();
     });
 
     it("erro da meta (conta pessoal/restrita) marca api_indisponivel_em e cai para o apify na mesma tentativa", async () => {
@@ -395,6 +412,82 @@ describe("rodarContasBase", () => {
       expect(resumo.tetoAtingido).toBe(false);
       const [linha] = await db().select().from(contas).where(eq(contas.id, contaInstagram));
       expect(linha.baseCompletaEm).not.toBeNull();
+    });
+  });
+
+  describe("item 9 (E6 parte 3, terceira rodada): vagas proprias do instagram pela meta e teto do apify na selecao", () => {
+    it("teto ja atingido com candidatas mistas: tiktok fica de fora da selecao (nao so pulado em tempo de execucao), as vagas vao para instagram (pela meta, vaga propria) e youtube", async () => {
+      config.coleta.metaAtivo = true;
+      const teto = config.coleta.apifyMaxResultadosDia;
+      await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+      // 25 tiktok com views bem mais altas que as outras: se a selecao ainda
+      // escolhesse por rank de views antes de excluir quem depende do
+      // Apify, essas 25 ocupariam a maior parte das 30 vagas compartilhadas
+      // e sobrariam poucas para o youtube (o bug de producao de 09/09).
+      const contasTiktok: number[] = [];
+      for (let i = 0; i < 25; i += 1) {
+        contasTiktok.push(await criarContaComVideo("tiktok", `conta-teto-tiktok-${i}`, 100_000 + i));
+      }
+      const contasYoutube: number[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        contasYoutube.push(await criarContaComVideo("youtube", `conta-teto-youtube-${i}`, 10 + i));
+      }
+      const contasInstagram: number[] = [];
+      for (let i = 0; i < 2; i += 1) {
+        contasInstagram.push(await criarContaComVideo("instagram", `conta-teto-instagram-${i}`, 10 + i));
+      }
+
+      mockFetch.mockImplementation(async (url: URL) => {
+        const texto = url.toString();
+        if (texto.includes("/channels")) {
+          return respostaJson({
+            items: [
+              {
+                id: "UCtetoexemplo00000001",
+                snippet: { title: "[exemplo] canal do teste de teto" },
+                contentDetails: { relatedPlaylists: { uploads: "UUtetoexemplo00000001" } },
+              },
+            ],
+          });
+        }
+        if (texto.includes("/playlistItems")) return respostaJson({ items: [] });
+        throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+      });
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({ username: "conta-teto-instagram" });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(5); // 3 youtube + 2 instagram, nenhum tiktok
+      expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+
+      for (const id of [...contasYoutube, ...contasInstagram]) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        expect(linha.baseCompletaEm).not.toBeNull();
+      }
+      for (const id of contasTiktok) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        expect(linha.baseCompletaEm).toBeNull();
+      }
+    });
+
+    it("60 candidatas do instagram pela meta, so 50 processadas no dia (vaga propria, sem depender das 30 compartilhadas)", async () => {
+      config.coleta.metaAtivo = true;
+      const contasInstagram: number[] = [];
+      for (let i = 0; i < 60; i += 1) {
+        contasInstagram.push(await criarContaComVideo("instagram", `conta-60-instagram-${i}`, 100 + i));
+      }
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue({ username: "conta-60-instagram" });
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(50);
+      let comBase = 0;
+      for (const id of contasInstagram) {
+        const [linha] = await db().select().from(contas).where(eq(contas.id, id));
+        if (linha.baseCompletaEm !== null) comBase += 1;
+      }
+      expect(comBase).toBe(50);
     });
   });
 });

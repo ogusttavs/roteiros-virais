@@ -410,6 +410,15 @@ export const videos = pgTable(
      * extracao, como qualquer outro video.
      */
     semDono: boolean("sem_dono").notNull().default(false),
+    /**
+     * Execucao de job que trouxe este video (E6 parte 3, terceira rodada,
+     * item 5): so preenchida na insercao (nunca no ON CONFLICT DO UPDATE de
+     * `upsertVideo`), nula para todo video que ja existia antes desta
+     * coluna. E como o admin de jobs calcula, por execucao de coleta paga,
+     * quantos dos resultados novos viraram fora da curva (a "taxa de
+     * acerto" da rodada).
+     */
+    execucaoId: integer("execucao_id").references(() => execucoesJob.id),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -422,6 +431,8 @@ export const videos = pgTable(
     index("videos_conta_publicado").on(t.contaId, t.publicadoEm),
     /** Consulta "subindo hoje" (etapa 7, src/servicos/pesquisa.ts). */
     index("videos_nicho_velocidade_relativa").on(t.nichoId, t.velocidadeRelativa),
+    /** Taxa de acerto por execucao (E6 parte 3, terceira rodada, item 5). */
+    index("videos_execucao_id").on(t.execucaoId),
   ],
 );
 

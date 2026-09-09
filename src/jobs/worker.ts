@@ -18,6 +18,7 @@ import "dotenv/config";
 import { agendarTudo, listarAgendamentos } from "./agenda";
 import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
+import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarContasBase } from "./contas-base";
@@ -68,7 +69,12 @@ async function main(): Promise<void> {
     await executarComRegistro(FILAS.coletaYoutube, () => rodarColetaYoutube(job[0]?.data?.nichoId));
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaApify, async (job) => {
-    await executarComRegistro(FILAS.coletaApify, () => rodarColetaApify(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.coletaApify, (execucaoId) =>
+      rodarColetaApify(job[0]?.data?.nichoId, execucaoId),
+    );
+  });
+  await boss().work(FILAS.coletaMeioDia, async () => {
+    await executarComRegistro(FILAS.coletaMeioDia, (execucaoId) => rodarColetaMeioDia(execucaoId));
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
     await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId));
@@ -110,10 +116,10 @@ async function main(): Promise<void> {
     await executarComRegistro(FILAS.temasDoDia, rodarTemasDoDia);
   });
   await boss().work(FILAS.lembrete, async () => {
-    await executarComRegistro(FILAS.lembrete, rodarLembrete);
+    await executarComRegistro(FILAS.lembrete, () => rodarLembrete());
   });
   await boss().work(FILAS.curvaCliente, async () => {
-    await executarComRegistro(FILAS.curvaCliente, rodarCurvaCliente);
+    await executarComRegistro(FILAS.curvaCliente, () => rodarCurvaCliente());
   });
 
   console.log("worker no ar.");

@@ -2,7 +2,7 @@ import { List } from "lucide-react";
 import Link from "next/link";
 
 import { FILAS, type NomeFila } from "@/jobs/fila";
-import { listarExecucoesRecentes } from "@/servicos/admin-coleta";
+import { listarExecucoesRecentes, taxaDeAcertoPorExecucao } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -13,6 +13,9 @@ import styles from "./page.module.css";
 
 const t = textosAdmin.jobs;
 const NOMES_DE_JOB = Object.values(FILAS);
+
+/** So essas filas pagam o Apify por resultado; so nelas a taxa de acerto faz sentido (item 5). */
+const FILAS_DE_COLETA_PAGA = new Set<string>([FILAS.coletaApify, FILAS.coletaMeioDia]);
 
 function formatarData(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium" }).format(data);
@@ -28,10 +31,24 @@ function ehNomeDeJob(valor: string | undefined): valor is NomeFila {
   return valor !== undefined && (NOMES_DE_JOB as string[]).includes(valor);
 }
 
+function numeroDoResumo(resumo: Record<string, unknown> | null, chave: string): number | null {
+  const valor = resumo?.[chave];
+  return typeof valor === "number" ? valor : null;
+}
+
+function formatarTaxa(foraDaCurva: number, consumidos: number | null): string {
+  if (!consumidos) return "-";
+  return `${((foraDaCurva / consumidos) * 100).toFixed(0)}%`;
+}
+
 export default async function AdminJobs({ searchParams }: { searchParams: Promise<{ job?: string }> }) {
   const { job } = await searchParams;
   const filtro = ehNomeDeJob(job) ? job : undefined;
   const execucoes = await listarExecucoesRecentes(filtro, 50);
+
+  const idsDeColetaPaga = execucoes.filter((e) => FILAS_DE_COLETA_PAGA.has(e.nome)).map((e) => e.id);
+  const taxas = await taxaDeAcertoPorExecucao(idsDeColetaPaga);
+  const taxaPorExecucao = new Map(taxas.map((t) => [t.execucaoId, t]));
 
   return (
     <div className={styles.pagina}>
@@ -73,34 +90,51 @@ export default async function AdminJobs({ searchParams }: { searchParams: Promis
                 <th>{t.colunaInicio}</th>
                 <th>{t.colunaDuracao}</th>
                 <th>{t.colunaEstado}</th>
+                <th>{t.colunaDevolvidos}</th>
+                <th>{t.colunaConsumidos}</th>
+                <th>{t.colunaNovos}</th>
+                <th>{t.colunaForaDaCurva}</th>
+                <th>{t.colunaTaxaDeAcerto}</th>
                 <th>{t.colunaResumo}</th>
               </tr>
             </thead>
             <tbody>
-              {execucoes.map((execucao) => (
-                <tr key={execucao.id}>
-                  <td className={styles.mono}>{execucao.nome}</td>
-                  <td className={styles.mono}>{formatarData(execucao.iniciadoEm)}</td>
-                  <td className={styles.mono}>{formatarDuracao(execucao.duracaoMs)}</td>
-                  <td>
-                    <span
-                      className={[
-                        styles.ponto,
-                        execucao.status === "ok"
-                          ? styles.pontoPositivo
-                          : execucao.status === "erro"
-                            ? styles.pontoErro
-                            : styles.pontoAtencao,
-                      ].join(" ")}
-                      aria-hidden="true"
-                    />
-                    {execucao.status === "ok" ? t.estadoOk : execucao.status === "erro" ? t.estadoErro : t.estadoRodando}
-                  </td>
-                  <td className={styles.resumo}>
-                    {execucao.erro ?? (execucao.resumo ? JSON.stringify(execucao.resumo) : "-")}
-                  </td>
-                </tr>
-              ))}
+              {execucoes.map((execucao) => {
+                const deColetaPaga = FILAS_DE_COLETA_PAGA.has(execucao.nome);
+                const devolvidos = deColetaPaga ? numeroDoResumo(execucao.resumo, "resultadosDevolvidos") : null;
+                const consumidos = deColetaPaga ? numeroDoResumo(execucao.resumo, "resultadosConsumidos") : null;
+                const novos = deColetaPaga ? numeroDoResumo(execucao.resumo, "videosNovos") : null;
+                const taxa = taxaPorExecucao.get(execucao.id);
+                return (
+                  <tr key={execucao.id}>
+                    <td className={styles.mono}>{execucao.nome}</td>
+                    <td className={styles.mono}>{formatarData(execucao.iniciadoEm)}</td>
+                    <td className={styles.mono}>{formatarDuracao(execucao.duracaoMs)}</td>
+                    <td>
+                      <span
+                        className={[
+                          styles.ponto,
+                          execucao.status === "ok"
+                            ? styles.pontoPositivo
+                            : execucao.status === "erro"
+                              ? styles.pontoErro
+                              : styles.pontoAtencao,
+                        ].join(" ")}
+                        aria-hidden="true"
+                      />
+                      {execucao.status === "ok" ? t.estadoOk : execucao.status === "erro" ? t.estadoErro : t.estadoRodando}
+                    </td>
+                    <td className={styles.mono}>{devolvidos ?? "-"}</td>
+                    <td className={styles.mono}>{consumidos ?? "-"}</td>
+                    <td className={styles.mono}>{novos ?? "-"}</td>
+                    <td className={styles.mono}>{deColetaPaga && taxa ? taxa.foraDaCurva : "-"}</td>
+                    <td className={styles.mono}>{deColetaPaga && taxa ? formatarTaxa(taxa.foraDaCurva, consumidos) : "-"}</td>
+                    <td className={styles.resumo}>
+                      {execucao.erro ?? (execucao.resumo ? JSON.stringify(execucao.resumo) : "-")}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -10,7 +10,7 @@ import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { rodarPontuar } from "../../src/jobs/pontuar";
+import { rodarPontuar, rodarPontuarVelocidade } from "../../src/jobs/pontuar";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -243,4 +243,39 @@ describe("mediana do setor (substituto de terceiro nivel, E6 parte 3, item 2)", 
     expect(cVazia.medianaOrigem).toBeNull();
     expect(cVazia.taxaForaDaCurva).toBeNull();
   }, 30_000);
+});
+
+describe("rodarPontuarVelocidade (E6 parte 3, terceira rodada, item 6: passada leve do meio-dia)", () => {
+  it("recalcula velocidade e velocidade_relativa, mas nao mexe em mediana_views nem fora_da_curva", async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-velocidade-teste", nome: "Pontuar velocidade teste", termos: [] })
+      .returning();
+    const nichoVel = nicho.id;
+
+    const conta = await criarConta("velocidade-so", null, nichoVel);
+    await criarVideo(conta, "velocidade-so-base", 3000, diasAtras(10), nichoVel);
+    await rodarPontuar();
+    const [antes] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(Number(antes.medianaViews)).toBe(3000);
+
+    // Um video novo, dentro da janela de velocidade (2 a 7 dias), como a coleta
+    // do meio-dia traria; nenhum video novo entra na janela de 90 dias que
+    // mudaria a mediana (o de agora ha pouco esta la fora do calculo de
+    // velocidade tambem, so serve para a mediana ja existir).
+    await criarVideo(conta, "velocidade-so-novo", 720, diasAtras(3), nichoVel); // 720/72h = 10 views/h
+
+    const resumo = await rodarPontuarVelocidade();
+    expect(resumo.videosComVelocidade).toBeGreaterThan(0);
+
+    const [novo] = await db().select().from(videos).where(eq(videos.idExterno, "velocidade-so-novo"));
+    expect(Number(novo.velocidade)).toBeCloseTo(10, 3);
+    // fora_da_curva do video novo continua nulo: so o passo 2 (rodarPontuar
+    // inteiro) preenche esse campo, rodarPontuarVelocidade nunca roda os
+    // passos 1, 2 e 5.
+    expect(novo.foraDaCurva).toBeNull();
+
+    const [depois] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(Number(depois.medianaViews)).toBe(3000); // sem mudanca (passo 1 nao rodou)
+  });
 });
