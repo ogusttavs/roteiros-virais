@@ -1,12 +1,13 @@
 /**
- * Cliente fino do Apify (etapa 6, parte 2): tres achados travados aqui.
+ * Cliente fino do Apify (etapa 6, parte 2): achados travados aqui.
  * `maxItems` da chamada ao ator so limita quanto e cobrado, nao quanto o
  * dataset devolve (pediu 20, o dataset trouxe mais), por isso `rodarAtor`
  * corta o resultado mas devolve `devolvidos` (o bruto) ao lado. Hashtag com
  * espaco (um termo composto, "lente de contato dental") nao existe de
- * verdade em nenhuma das duas plataformas. E `resultsPerPage` do TikTok vale
- * por alvo, nao no total (PROXIMO.md, item 1): `limitePorAlvo` divide o teto
- * pelo numero de hashtags e contas vigiadas.
+ * verdade em nenhuma das duas plataformas. `limitePorAlvo` (E6 parte 2)
+ * dividia o teto pelo numero de alvos; a busca por hashtag do TikTok (E6
+ * parte 3, terceira rodada, item 1) nao usa mais essa divisao, passou a
+ * `RESULTADOS_POR_TERMO_HASHTAG` fixo.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -26,7 +27,13 @@ vi.mock("apify-client", () => ({
   }),
 }));
 
-import { buscarInstagram, buscarTiktok, limitePorAlvo, rodarAtor } from "./apify-api";
+import {
+  buscarInstagram,
+  buscarTiktokPorHashtag,
+  buscarTiktokVigilancia,
+  limitePorAlvo,
+  rodarAtor,
+} from "./apify-api";
 
 beforeEach(() => {
   actorCall.mockReset().mockResolvedValue({ defaultDatasetId: "ds1" });
@@ -56,19 +63,54 @@ describe("rodarAtor", () => {
   });
 });
 
-describe("buscarTiktok", () => {
+describe("buscarTiktokPorHashtag", () => {
   it("tira espaco dos termos antes de mandar como hashtag", async () => {
-    await buscarTiktok(["lente de contato dental", "dentista"], [], 10);
+    await buscarTiktokPorHashtag(["lente de contato dental", "dentista"], 60);
     expect(actorCall).toHaveBeenCalledWith(
       expect.objectContaining({ hashtags: ["lentedecontatodental", "dentista"] }),
+      { maxItems: 60 },
+    );
+  });
+
+  it("resultsPerPage e fixo em 30 por termo, nao dividido pelo numero de termos (item 1)", async () => {
+    await buscarTiktokPorHashtag(["dentista", "odontologia", "implante"], 90);
+    expect(actorCall).toHaveBeenCalledWith(expect.objectContaining({ resultsPerPage: 30 }), { maxItems: 90 });
+  });
+
+  it("filtra so a semana (oldestPostDateUnified relativo, item 1)", async () => {
+    await buscarTiktokPorHashtag(["dentista"], 30);
+    expect(actorCall).toHaveBeenCalledWith(expect.objectContaining({ oldestPostDateUnified: "7 days" }), {
+      maxItems: 30,
+    });
+  });
+
+  it("sem termo, nao chama o ator", async () => {
+    const { itens, devolvidos } = await buscarTiktokPorHashtag([], 30);
+    expect(itens).toEqual([]);
+    expect(devolvidos).toBe(0);
+    expect(actorCall).not.toHaveBeenCalled();
+  });
+});
+
+describe("buscarTiktokVigilancia", () => {
+  it("resultsPerPage e o videosPorPerfil pedido, mais recentes primeiro (item 3)", async () => {
+    await buscarTiktokVigilancia(["conta_a", "conta_b"], 5, 10);
+    expect(actorCall).toHaveBeenCalledWith(
+      expect.objectContaining({ profiles: ["conta_a", "conta_b"], resultsPerPage: 5, profileSorting: "latest" }),
       { maxItems: 10 },
     );
   });
 
-  it("resultsPerPage e o teto dividido pelo numero de termos e contas vigiadas, nao o teto inteiro", async () => {
-    await buscarTiktok(["dentista", "odontologia"], ["conta_vigiada"], 30);
-    // 3 alvos (2 hashtags + 1 perfil), teto 30: 10 por alvo.
-    expect(actorCall).toHaveBeenCalledWith(expect.objectContaining({ resultsPerPage: 10 }), { maxItems: 30 });
+  it("catch-up de conta nova pede mais videos por perfil que a vigilancia diaria (contas-base.ts, VIDEOS_POR_CONTA)", async () => {
+    await buscarTiktokVigilancia(["conta_nova"], 10, 10);
+    expect(actorCall).toHaveBeenCalledWith(expect.objectContaining({ resultsPerPage: 10 }), { maxItems: 10 });
+  });
+
+  it("sem perfil vigiado, nao chama o ator", async () => {
+    const { itens, devolvidos } = await buscarTiktokVigilancia([], 5, 10);
+    expect(itens).toEqual([]);
+    expect(devolvidos).toBe(0);
+    expect(actorCall).not.toHaveBeenCalled();
   });
 });
 

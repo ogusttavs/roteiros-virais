@@ -19,7 +19,7 @@ import { resetarSchema } from "../../scripts/resetar-schema";
 
 vi.mock("@/jobs/apify-api", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/apify-api")>();
-  return { ...original, buscarTiktok: vi.fn(), buscarInstagram: vi.fn() };
+  return { ...original, buscarTiktokVigilancia: vi.fn(), buscarInstagram: vi.fn() };
 });
 
 vi.mock("@/jobs/meta-api", async (importarOriginal) => {
@@ -28,7 +28,7 @@ vi.mock("@/jobs/meta-api", async (importarOriginal) => {
 });
 
 // eslint-disable-next-line import/order -- vi.mock acima e hoisted; os imports abaixo precisam vir depois para pegar o mock.
-import { buscarInstagram, buscarTiktok } from "@/jobs/apify-api";
+import { buscarInstagram, buscarTiktokVigilancia } from "@/jobs/apify-api";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -96,7 +96,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  vi.mocked(buscarTiktok).mockReset();
+  vi.mocked(buscarTiktokVigilancia).mockReset();
   vi.mocked(buscarInstagram).mockReset();
   vi.mocked(buscarBusinessDiscovery).mockReset();
   mockFetch.mockReset();
@@ -118,7 +118,7 @@ describe("rodarContasBase", () => {
     const teto = config.coleta.apifyMaxResultadosDia;
     await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto - 1 });
 
-    vi.mocked(buscarTiktok).mockImplementation(async (_hashtags, perfis) => {
+    vi.mocked(buscarTiktokVigilancia).mockImplementation(async (perfis) => {
       const handle = perfis[0];
       return { itens: [itemTiktok(handle, `${handle}-novo`)], devolvidos: 1 };
     });
@@ -147,8 +147,8 @@ describe("rodarContasBase", () => {
     // baixa (tiktok, depois do teto) fica para amanha.
     expect(resumo.tetoAtingido).toBe(true);
     expect(resumo.contasProcessadas).toBe(2);
-    expect(buscarTiktok).toHaveBeenCalledTimes(1);
-    expect(buscarTiktok).toHaveBeenCalledWith([], ["conta-alta-views"], 10);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledTimes(1);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-alta-views"], 10, 10);
 
     const [linhaAlta] = await db().select().from(contas).where(eq(contas.id, contaAlta));
     const [linhaYoutube] = await db().select().from(contas).where(eq(contas.id, contaYoutube));
@@ -161,7 +161,7 @@ describe("rodarContasBase", () => {
   it("registra em consumo_api os resultados consumidos (itens.length), nao os devolvidos brutos (revisao do PR #34, item 0c)", async () => {
     await criarContaComVideo("tiktok", "conta-devolvidos-vs-usados", 500);
 
-    vi.mocked(buscarTiktok).mockResolvedValue({
+    vi.mocked(buscarTiktokVigilancia).mockResolvedValue({
       itens: [itemTiktok("conta-devolvidos-vs-usados", "video-1")],
       devolvidos: 7,
     });
@@ -236,7 +236,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   it("conta com 5 videos ou mais ja tem base, nunca e selecionada", async () => {
@@ -258,7 +258,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   it("conta sem nenhum video nunca e selecionada (sem video de mais views para priorizar)", async () => {
@@ -267,7 +267,7 @@ describe("rodarContasBase", () => {
     const resumo = await rodarContasBase();
 
     expect(resumo.contasProcessadas).toBe(0);
-    expect(buscarTiktok).not.toHaveBeenCalled();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
   });
 
   describe("instagram pela api da meta (E6 parte 3, segunda rodada, item 2)", () => {

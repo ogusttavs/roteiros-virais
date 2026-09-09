@@ -26,9 +26,9 @@ import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
-const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
+const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<string, unknown>>> = {
   [FILAS.coletaYoutube]: rodarColetaYoutube,
-  [FILAS.coletaApify]: rodarColetaApify,
+  [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaNoticias]: rodarColetaNoticias,
   [FILAS.contasBase]: rodarContasBase,
   [FILAS.metaContas]: rodarMetaContas,
@@ -42,8 +42,8 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.analisarVisual]: rodarAnalisarVisual,
   [FILAS.modeloNicho]: rodarModeloNicho,
   [FILAS.temasDoDia]: rodarTemasDoDia,
-  [FILAS.lembrete]: rodarLembrete,
-  [FILAS.curvaCliente]: rodarCurvaCliente,
+  [FILAS.lembrete]: () => rodarLembrete(),
+  [FILAS.curvaCliente]: () => rodarCurvaCliente(),
 };
 
 async function main(): Promise<void> {

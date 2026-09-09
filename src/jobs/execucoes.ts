@@ -38,15 +38,20 @@ export type ResultadoExecucao =
  * erro de dado; quem chama ainda sabe que a execucao falhou olhando o
  * `status` devolvido. Qualquer outro erro relanca (e o pg-boss tenta de
  * novo).
+ *
+ * `tarefa` recebe o id da propria linha de execucao (E6 parte 3, terceira
+ * rodada, item 5): so `rodarColetaApify` usa (`videos.execucao_id`, para a
+ * taxa de acerto por execucao); as demais tarefas continuam com zero
+ * parametro declarado e ignoram o argumento extra, sem mudar nada nelas.
  */
 export async function executarComRegistro(
   nome: string,
-  tarefa: () => Promise<Record<string, unknown>>,
+  tarefa: (execucaoId: number) => Promise<Record<string, unknown>>,
 ): Promise<ResultadoExecucao> {
   const [execucao] = await db().insert(execucoesJob).values({ nome, status: "rodando" }).returning();
 
   try {
-    const resumo = await tarefa();
+    const resumo = await tarefa(execucao.id);
     await db()
       .update(execucoesJob)
       .set({ status: "ok", resumo, terminadoEm: new Date() })

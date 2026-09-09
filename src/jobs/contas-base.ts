@@ -9,8 +9,10 @@
  * este job trouxe de manhã.
  *
  * YouTube por `playlistItems` do canal; TikTok sempre pelo Apify em modo
- * perfil (`buscarTiktok` com só um handle no array de perfis, sem
- * hashtag: o mesmo mecanismo que já busca as contas vigiadas). Instagram
+ * perfil (`buscarTiktokVigilancia` com só um handle, o mesmo mecanismo que
+ * já busca as contas vigiadas todo dia, só que com `VIDEOS_POR_CONTA` em
+ * vez de `VIDEOS_POR_PERFIL_VIGILANCIA`, mais historico para o catch-up de
+ * uma vez só). Instagram
  * pela Business Discovery da Meta quando `config.coleta.metaAtivo` (E6
  * parte 3, segunda rodada, item 2), com o Apify como reserva quando a
  * conta é pessoal ou tem restrição de idade (`contas.api_indisponivel_em`)
@@ -35,7 +37,7 @@ import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
 import { normalizarVideoTiktok } from "@/servicos/normalizadores/tiktok";
 import { normalizarVideoYoutube } from "@/servicos/normalizadores/youtube";
 
-import { buscarInstagram, buscarTiktok } from "./apify-api";
+import { buscarInstagram, buscarTiktokVigilancia } from "./apify-api";
 import { upsertConta, upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
 import { MINIMO_VIDEOS_MEDIANA } from "./pontuar";
@@ -137,7 +139,7 @@ type ResultadoCatchUp = {
 };
 
 async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
-  const { itens, devolvidos } = await buscarTiktok([], [candidata.handle], VIDEOS_POR_CONTA);
+  const { itens, devolvidos } = await buscarTiktokVigilancia([candidata.handle], VIDEOS_POR_CONTA, VIDEOS_POR_CONTA);
   await registrarConsumo(FONTE_APIFY, itens.length);
 
   let novos = 0;

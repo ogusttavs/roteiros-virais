@@ -69,10 +69,17 @@ export async function upsertVideo(
   audio: VideoAudio | null = null,
   /** "meta" para video vindo da Business Discovery/Hashtag Search (E6 parte 3, segunda rodada, item 2). */
   origem: "coleta" | "meta" = "coleta",
+  /**
+   * Execucao de job que trouxe este video (E6 parte 3, terceira rodada,
+   * item 5): so entra em `values` (na insercao), nunca em `set` (no ON
+   * CONFLICT DO UPDATE), para nunca reescrever a execucao de um video que ja
+   * existia antes desta rodada.
+   */
+  execucaoId: number | null = null,
 ): Promise<"novo" | "atualizado"> {
   const [linha] = await db()
     .insert(videos)
-    .values({ ...video, contaId, nichoId, audio, origem, semDono: contaId === null })
+    .values({ ...video, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
     .onConflictDoUpdate({
       target: [videos.plataforma, videos.idExterno],
       set: {
