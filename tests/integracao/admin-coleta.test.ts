@@ -15,6 +15,7 @@ import {
   listarExecucoesRecentes,
   listarNichosComContagem,
   resumoMedianaPorPlataforma,
+  taxaDeAcertoPorExecucao,
   ultimaExecucaoPorJob,
 } from "@/servicos/admin-coleta";
 import { constanciaDoCliente } from "@/servicos/temas";
@@ -132,6 +133,49 @@ describe("listarExecucoesRecentes", () => {
   it("respeita o limite", async () => {
     const execucoes = await listarExecucoesRecentes(undefined, 1);
     expect(execucoes).toHaveLength(1);
+  });
+});
+
+describe("taxaDeAcertoPorExecucao (E6 parte 3, terceira rodada, item 5)", () => {
+  it("conta, por execucao, quantos videos ela trouxe e quantos ja viraram fora da curva (limiar 1,5)", async () => {
+    // Nicho e nome de job proprios (nunca "coleta-apify"): este arquivo compartilha `nichoId` e a
+    // tabela `execucoes_job` inteira entre describes, sem afterEach; usar o nicho ou o nome de job
+    // do `beforeAll` mudaria a contagem de outros testes (resumoMedianaPorPlataforma,
+    // ultimaExecucaoPorJob).
+    const [nichoTaxa] = await db()
+      .insert(nichos)
+      .values({ slug: "admin-coleta-taxa-teste", nome: "Admin coleta taxa teste", termos: [] })
+      .returning();
+    const [execucaoA] = await db().insert(execucoesJob).values({ nome: "coleta-apify-taxa-teste" }).returning();
+    const [execucaoB] = await db().insert(execucoesJob).values({ nome: "coleta-apify-taxa-teste" }).returning();
+    const [contaTaxa] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "taxa-de-acerto", nichoId: nichoTaxa.id })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values([
+        // Execucao A: 3 videos, 2 acima do limiar (1,5), 1 abaixo.
+        { plataforma: "tiktok", idExterno: "taxa-a1", url: "https://x/a1", contaId: contaTaxa.id, nichoId: nichoTaxa.id, foraDaCurva: "2.0", execucaoId: execucaoA.id },
+        { plataforma: "tiktok", idExterno: "taxa-a2", url: "https://x/a2", contaId: contaTaxa.id, nichoId: nichoTaxa.id, foraDaCurva: "1.5", execucaoId: execucaoA.id },
+        { plataforma: "tiktok", idExterno: "taxa-a3", url: "https://x/a3", contaId: contaTaxa.id, nichoId: nichoTaxa.id, foraDaCurva: "1.0", execucaoId: execucaoA.id },
+        // Execucao B: 1 video, ainda sem fora_da_curva (pontuar nao rodou).
+        { plataforma: "tiktok", idExterno: "taxa-b1", url: "https://x/b1", contaId: contaTaxa.id, nichoId: nichoTaxa.id, execucaoId: execucaoB.id },
+        // Video antigo (sem execucao_id, de antes desta coluna existir): nunca entra na conta.
+        { plataforma: "tiktok", idExterno: "taxa-sem-execucao", url: "https://x/sx", contaId: contaTaxa.id, nichoId: nichoTaxa.id, foraDaCurva: "5.0" },
+      ]);
+
+    const resultado = await taxaDeAcertoPorExecucao([execucaoA.id, execucaoB.id]);
+    const linhaA = resultado.find((r) => r.execucaoId === execucaoA.id);
+    const linhaB = resultado.find((r) => r.execucaoId === execucaoB.id);
+
+    expect(linhaA).toEqual({ execucaoId: execucaoA.id, novos: 3, foraDaCurva: 2 });
+    expect(linhaB).toEqual({ execucaoId: execucaoB.id, novos: 1, foraDaCurva: 0 });
+  });
+
+  it("sem ids, devolve vazio sem consultar o banco", async () => {
+    expect(await taxaDeAcertoPorExecucao([])).toEqual([]);
   });
 });
 

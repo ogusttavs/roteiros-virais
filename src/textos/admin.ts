@@ -163,6 +163,12 @@ export const textosAdmin = {
     colunaDuracao: "duração",
     colunaEstado: "estado",
     colunaResumo: "resumo",
+    /** So preenchidas nas execucoes de coleta paga do apify (E6 parte 3, terceira rodada, item 5). */
+    colunaDevolvidos: "devolvidos",
+    colunaConsumidos: "consumidos",
+    colunaNovos: "novos",
+    colunaForaDaCurva: "fora da curva",
+    colunaTaxaDeAcerto: "taxa de acerto",
     estadoRodando: "rodando",
     estadoOk: "ok",
     estadoErro: "erro",

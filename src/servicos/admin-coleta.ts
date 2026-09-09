@@ -646,6 +646,43 @@ export type GeracaoDetalhe = GeracaoResumo & {
   tokensCache: number;
 };
 
+/**
+ * Multiplo minimo (`videos.fora_da_curva`) para um video novo contar como
+ * "acerto" na taxa de acerto por execucao (E6 parte 3, terceira rodada,
+ * item 5). Mais baixo que `config.regras.limiarForaDaCurva` (3, a regua da
+ * vigilancia): aqui a pergunta e mais simples, "valeu a pena pagar por
+ * este resultado", nao "esta conta merece entrar na lista de vigilancia".
+ */
+export const LIMIAR_TAXA_DE_ACERTO = 1.5;
+
+export type TaxaDeAcertoExecucao = { execucaoId: number; novos: number; foraDaCurva: number };
+
+/**
+ * Por execucao de coleta paga (E6 parte 3, terceira rodada, item 5): quantos
+ * videos ela trouxe (todo video com `execucao_id = X` e, por definicao, um
+ * video novo daquela execucao, `coleta-comum.ts` nunca reescreve o campo
+ * numa atualizacao) e quantos deles ja viraram fora da curva depois do
+ * `pontuar` do dia. So leitura, usada por `/admin/jobs`.
+ */
+export async function taxaDeAcertoPorExecucao(execucaoIds: number[]): Promise<TaxaDeAcertoExecucao[]> {
+  if (execucaoIds.length === 0) return [];
+  const linhas = await db()
+    .select({
+      execucaoId: videos.execucaoId,
+      novos: count(),
+      foraDaCurva: sql<number>`count(*) filter (where ${videos.foraDaCurva} >= ${LIMIAR_TAXA_DE_ACERTO})`,
+    })
+    .from(videos)
+    .where(inArray(videos.execucaoId, execucaoIds))
+    .groupBy(videos.execucaoId);
+
+  return linhas.map((l) => ({
+    execucaoId: l.execucaoId as number,
+    novos: l.novos,
+    foraDaCurva: Number(l.foraDaCurva),
+  }));
+}
+
 /** /admin/geracoes/[id] (etapa 12, decisão 8): entrada e saída de uma geração. So leitura. */
 export async function geracaoPorId(id: number): Promise<GeracaoDetalhe | null> {
   const [linha] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, id));
