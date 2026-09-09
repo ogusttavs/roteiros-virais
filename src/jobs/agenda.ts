@@ -13,6 +13,14 @@
  * (03:00 e 03:30) e antes de `pontuar` (03:45): o catch-up de ate 10 videos
  * por conta precisa estar gravado antes da mediana do dia ser calculada.
  *
+ * `metaContas` (E6 parte 3, segunda rodada, item 2) roda as 03:35, entre a
+ * coleta do Apify (03:30) e o `contasBase` (03:40): a Business Discovery
+ * refaz a leitura das contas vigiadas do Instagram (a fonte da vigilancia
+ * passa a ser ela, nao mais o Apify), a tempo de `contasBase` e `pontuar`
+ * contarem com dado fresco. So agenda com `config.coleta.metaAtivo`
+ * (`agendarTudo`, abaixo): sem `META_IG_ID`/`META_TOKEN`, o cron nem
+ * inscreve, e o Apify continua sozinho como hoje.
+ *
  * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
  * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
  * gerou tema porque `extrairColeta` so buscava o resultado do lote de
@@ -22,6 +30,8 @@
  * transcrever 04:00, extrair (monta o lote) 05:00, resultado normalmente
  * ate 06:20, tema 06:30, lembrete padrao 08:00.
  */
+import { config } from "@/lib/config";
+
 import { boss, FILAS } from "./fila";
 
 const FUSO = "America/Sao_Paulo";
@@ -31,6 +41,8 @@ export type Agendamento = {
   cron: string;
   descricao: string;
   chave?: string;
+  /** So agenda quando isso devolve true (ex: metaContas, so com config.coleta.metaAtivo). Sem isso, sempre agenda. */
+  condicao?: () => boolean;
 };
 
 export const AGENDAMENTOS: Agendamento[] = [
@@ -55,6 +67,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "0 14 * * *",
     descricao: "noticias do nicho, todo dia as 14:00",
     chave: "tarde",
+  },
+  {
+    fila: FILAS.metaContas,
+    cron: "35 3 * * *",
+    descricao: "instagram pela api da meta (contas vigiadas), todo dia as 03:35, depois do apify",
+    condicao: () => config.coleta.metaAtivo,
   },
   {
     fila: FILAS.contasBase,
@@ -116,6 +134,7 @@ export const AGENDAMENTOS: Agendamento[] = [
 export async function agendarTudo(): Promise<void> {
   const b = boss();
   for (const agendamento of AGENDAMENTOS) {
+    if (agendamento.condicao && !agendamento.condicao()) continue;
     await b.schedule(agendamento.fila, agendamento.cron, null, {
       tz: FUSO,
       key: agendamento.chave,

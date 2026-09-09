@@ -17,6 +17,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { FILAS } from "./fila";
 import { rodarLembrete } from "./lembrete";
+import { rodarMetaContas } from "./meta-contas";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -28,6 +29,7 @@ const TAREFAS: Record<string, () => Promise<Record<string, unknown>>> = {
   [FILAS.coletaApify]: rodarColetaApify,
   [FILAS.coletaNoticias]: rodarColetaNoticias,
   [FILAS.contasBase]: rodarContasBase,
+  [FILAS.metaContas]: rodarMetaContas,
   [FILAS.pontuar]: rodarPontuar,
   [FILAS.vigilancia]: rodarVigilancia,
   [FILAS.transcrever]: rodarTranscrever,

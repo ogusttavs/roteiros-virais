@@ -209,4 +209,20 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
     expect(buscarTiktok).toHaveBeenCalledTimes(1);
     expect(buscarInstagram).toHaveBeenCalledTimes(1);
   });
+
+  it("com meta ativo, pula o instagram (a vigilancia e a base dele vem da business discovery, meta-contas.ts), mas o tiktok continua", async () => {
+    config.coleta.metaAtivo = true;
+    try {
+      vi.mocked(buscarTiktok).mockResolvedValue({ itens: [tiktokFixture[0]], devolvidos: 1 });
+
+      const resumo = await rodarColetaApify();
+
+      expect(resumo.chamadasTiktok).toBe(1);
+      expect(resumo.chamadasInstagram).toBe(0);
+      expect(buscarInstagram).not.toHaveBeenCalled();
+      expect(buscarTiktok).toHaveBeenCalledTimes(1);
+    } finally {
+      config.coleta.metaAtivo = false;
+    }
+  });
 });

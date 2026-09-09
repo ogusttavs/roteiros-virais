@@ -18,6 +18,8 @@ export const FILAS = {
   coletaApify: "coleta-apify",
   coletaNoticias: "coleta-noticias",
   contasBase: "contas-base",
+  /** Instagram pela API oficial da Meta (E6 parte 3, segunda rodada, item 2); so agenda com config.coleta.metaAtivo. */
+  metaContas: "meta-contas",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",

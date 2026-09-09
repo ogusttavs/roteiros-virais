@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { config } from "@/lib/config";
 
 import { AGENDAMENTOS, listarAgendamentos } from "./agenda";
 import { FILAS } from "./fila";
@@ -24,6 +26,30 @@ describe("AGENDAMENTOS", () => {
   it("cada fila e chave aparecem no maximo uma vez", () => {
     const chaves = AGENDAMENTOS.map((a) => `${a.fila}::${a.chave ?? ""}`);
     expect(new Set(chaves).size).toBe(chaves.length);
+  });
+
+  it("metaContas roda as 03:35, entre a coleta do apify (03:30) e o contas-base (03:40)", () => {
+    expect(cronDe(FILAS.coletaApify)).toBe("30 3 * * *");
+    expect(cronDe(FILAS.metaContas)).toBe("35 3 * * *");
+    expect(cronDe(FILAS.contasBase)).toBe("40 3 * * *");
+  });
+
+  describe("metaContas so agenda com config.coleta.metaAtivo (E6 parte 3, segunda rodada, item 1)", () => {
+    afterEach(() => {
+      config.coleta.metaAtivo = false;
+    });
+
+    it("condicao reflete metaAtivo desligado", () => {
+      config.coleta.metaAtivo = false;
+      const agendamento = AGENDAMENTOS.find((a) => a.fila === FILAS.metaContas);
+      expect(agendamento?.condicao?.()).toBe(false);
+    });
+
+    it("condicao reflete metaAtivo ligado", () => {
+      config.coleta.metaAtivo = true;
+      const agendamento = AGENDAMENTOS.find((a) => a.fila === FILAS.metaContas);
+      expect(agendamento?.condicao?.()).toBe(true);
+    });
   });
 });
 

@@ -8,24 +8,30 @@
  * antes de `pontuar` na agenda, para a mediana de hoje já contar com o que
  * este job trouxe de manhã.
  *
- * YouTube por `playlistItems` do canal (mesmo par de chamadas de
- * `coleta-youtube.ts`); TikTok e Instagram pelo mesmo ator do `apify-api.ts`,
- * em modo perfil (`buscarTiktok`/`buscarInstagram` com só um handle no
- * array de perfis, sem hashtag: o mesmo mecanismo que já busca as contas
- * vigiadas). O teto diário do Apify é a única trava do TikTok e do
- * Instagram (decisão do `PROXIMO.md`): ao bater, o job pula só as
- * candidatas dessas duas plataformas (ajuste da revisão do PR #34, item
- * 0b: antes o job inteiro parava, e as candidatas do YouTube que vinham
- * depois na lista nunca recebiam catch-up nenhum enquanto o Apify
- * estivesse pausado) e continua tentando as do YouTube, no nicho atual e
+ * YouTube por `playlistItems` do canal; TikTok sempre pelo Apify em modo
+ * perfil (`buscarTiktok` com só um handle no array de perfis, sem
+ * hashtag: o mesmo mecanismo que já busca as contas vigiadas). Instagram
+ * pela Business Discovery da Meta quando `config.coleta.metaAtivo` (E6
+ * parte 3, segunda rodada, item 2), com o Apify como reserva quando a
+ * conta é pessoal ou tem restrição de idade (`contas.api_indisponivel_em`)
+ * ou quando a Meta está desligada.
+ *
+ * O teto diário do Apify é a única trava do TikTok e do Instagram-por-Apify
+ * (decisão do `PROXIMO.md`): ao bater, o job pula só as candidatas que
+ * dependem dele (ajuste da revisão do PR #34, item 0b: antes o job inteiro
+ * parava, e as candidatas do YouTube que vinham depois na lista nunca
+ * recebiam catch-up nenhum enquanto o Apify estivesse pausado) e continua
+ * tentando as do YouTube (e as do Instagram pela Meta), no nicho atual e
  * nos seguintes; `tetoAtingido` no resumo registra que isso aconteceu.
  */
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { consumoApi, contas, nichos } from "@/db/schema";
+import { ErroMetaApi, buscarBusinessDiscovery } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
+import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
 import { normalizarVideoTiktok } from "@/servicos/normalizadores/tiktok";
 import { normalizarVideoYoutube } from "@/servicos/normalizadores/youtube";
 
@@ -40,21 +46,48 @@ const VIDEOS_POR_CONTA = 10;
 const FONTE_APIFY = "apify";
 const FONTE_YOUTUBE = "youtube";
 
-type ContaCandidata = { contaId: number; plataforma: "youtube" | "tiktok" | "instagram"; handle: string };
+type ContaCandidata = {
+  contaId: number;
+  plataforma: "youtube" | "tiktok" | "instagram";
+  handle: string;
+  apiIndisponivelEm: Date | null;
+};
 
 async function contasCandidatas(nichoId: number): Promise<ContaCandidata[]> {
-  const linhas = await db().execute<{ conta_id: number; plataforma: "youtube" | "tiktok" | "instagram"; handle: string }>(sql`
-    SELECT c.id AS conta_id, c.plataforma, c.handle
+  const linhas = await db().execute<{
+    conta_id: number;
+    plataforma: "youtube" | "tiktok" | "instagram";
+    handle: string;
+    api_indisponivel_em: Date | null;
+  }>(sql`
+    SELECT c.id AS conta_id, c.plataforma, c.handle, c.api_indisponivel_em
     FROM contas c
     JOIN videos v ON v.conta_id = c.id AND v.publicado_em >= now() - interval '90 days'
     WHERE c.nicho_id = ${nichoId}
       AND c.base_completa_em IS NULL
-    GROUP BY c.id, c.plataforma, c.handle
+    GROUP BY c.id, c.plataforma, c.handle, c.api_indisponivel_em
     HAVING count(v.id) < ${MINIMO_VIDEOS_MEDIANA}
     ORDER BY max(v.views) DESC
     LIMIT ${CONTAS_POR_NICHO_POR_DIA}
   `);
-  return linhas.rows.map((l) => ({ contaId: l.conta_id, plataforma: l.plataforma, handle: l.handle }));
+  return linhas.rows.map((l) => ({
+    contaId: l.conta_id,
+    plataforma: l.plataforma,
+    handle: l.handle,
+    apiIndisponivelEm: l.api_indisponivel_em,
+  }));
+}
+
+/** Instagram usa o Apify so quando a Meta esta desligada, ou essa conta ja foi marcada indisponivel na API. */
+function instagramUsaApify(candidata: ContaCandidata): boolean {
+  return !config.coleta.metaAtivo || candidata.apiIndisponivelEm !== null;
+}
+
+/** TikTok e Instagram-por-Apify contam para o teto diario do Apify; YouTube e Instagram-por-Meta nao. */
+function usaApify(candidata: ContaCandidata): boolean {
+  if (candidata.plataforma === "tiktok") return true;
+  if (candidata.plataforma === "instagram") return instagramUsaApify(candidata);
+  return false;
 }
 
 async function consumoDeHoje(fonte: string): Promise<number> {
@@ -108,7 +141,43 @@ async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promis
   return { novos, atualizados, usadosApify: itens.length, devolvidosApify: devolvidos };
 }
 
+/**
+ * Business Discovery da Meta em vez do Apify (E6 parte 3, segunda rodada,
+ * item 2): uma conta, um perfil e ate 50 posts de uma vez, de graca. Sem
+ * `discovery` (achado nao confirmado ainda com uma conta de verdade sem
+ * dado), so marca a conta sem gravar nada, sem contar como erro.
+ */
+async function catchUpInstagramMeta(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
+  const discovery = await buscarBusinessDiscovery(candidata.handle);
+  if (!discovery) return { novos: 0, atualizados: 0, usadosApify: 0, devolvidosApify: 0 };
+
+  const { conta, videos: videosNormalizados } = normalizarBusinessDiscovery(candidata.handle, discovery);
+  const contaId = await upsertConta(conta, nichoId);
+  await db().update(contas).set({ ultimaLeituraMetaEm: new Date() }).where(eq(contas.id, contaId));
+
+  let novos = 0;
+  let atualizados = 0;
+  for (const video of videosNormalizados) {
+    const resultado = await upsertVideo(video, contaId, nichoId, null, "meta");
+    if (resultado === "novo") novos += 1;
+    else atualizados += 1;
+  }
+  return { novos, atualizados, usadosApify: 0, devolvidosApify: 0 };
+}
+
 async function catchUpInstagram(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
+  if (!instagramUsaApify(candidata)) {
+    try {
+      return await catchUpInstagramMeta(nichoId, candidata);
+    } catch (erro) {
+      if (!(erro instanceof ErroMetaApi)) throw erro;
+      // Conta pessoal ou com restricao de idade (nao confirmado ainda qual
+      // codigo/subcodigo a Meta devolve nesse caso): marca indisponivel e
+      // cai para o Apify abaixo, na mesma tentativa.
+      await db().update(contas).set({ apiIndisponivelEm: new Date() }).where(eq(contas.id, candidata.contaId));
+    }
+  }
+
   const { itens, devolvidos } = await buscarInstagram([], [candidata.handle], VIDEOS_POR_CONTA);
   await registrarConsumo(FONTE_APIFY, itens.length);
 
@@ -174,7 +243,7 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
   for (const nicho of nichosAtivos) {
     const candidatas = await contasCandidatas(nicho.id);
     for (const candidata of candidatas) {
-      if ((candidata.plataforma === "tiktok" || candidata.plataforma === "instagram") && !apifyCabe()) {
+      if (usaApify(candidata) && !apifyCabe()) {
         tetoAtingido = true;
         continue;
       }
