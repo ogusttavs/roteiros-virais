@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { idExternoDoPermalink, normalizarBusinessDiscovery, normalizarHashtagMedia } from "./meta";
+import { ehVideo, idExternoDoPermalink, normalizarBusinessDiscovery, normalizarHashtagMedia } from "./meta";
 
 describe("idExternoDoPermalink", () => {
   it("extrai o codigo de um permalink de post", () => {
@@ -94,13 +94,34 @@ describe("normalizarBusinessDiscovery", () => {
   });
 });
 
+describe("ehVideo", () => {
+  it("media_type VIDEO e video", () => {
+    expect(ehVideo({ media_type: "VIDEO" })).toBe(true);
+  });
+
+  /** Chamada real do Fable, 09/09/2026, revisao do PR #35: os 38 VIDEO do recent_media da hashtag "limpeza" vieram todos com media_product_type REELS. */
+  it("media_product_type REELS e video, mesmo sem media_type", () => {
+    expect(ehVideo({ media_product_type: "REELS" })).toBe(true);
+  });
+
+  it("IMAGE nao e video", () => {
+    expect(ehVideo({ media_type: "IMAGE" })).toBe(false);
+  });
+
+  it("CAROUSEL_ALBUM sem media_product_type REELS nao e video", () => {
+    expect(ehVideo({ media_type: "CAROUSEL_ALBUM" })).toBe(false);
+  });
+});
+
 describe("normalizarHashtagMedia", () => {
-  it("normaliza um item do top_media, sem views (a hashtag search nunca devolve)", () => {
+  it("normaliza um item do recent_media, sem views (a hashtag search nunca devolve)", () => {
     const video = normalizarHashtagMedia(
       {
         id: "1",
         caption: "[exemplo] dica de limpeza para quem mora em São Paulo",
         media_type: "VIDEO",
+        media_product_type: "REELS",
+        media_url: "https://exemplo.invalido/video1.mp4",
         permalink: "https://www.instagram.com/p/ExemploHashtag01/",
         timestamp: "2026-08-19T10:00:00.000Z",
         like_count: 500,
@@ -121,5 +142,23 @@ describe("normalizarHashtagMedia", () => {
       likes: 500,
       comentarios: 10,
     });
+  });
+
+  /** Ajuste 2 (e) da revisao do PR #35: media_url ausente (achado real: 21 dos 38 VIDEO tinham). */
+  it("normaliza mesmo sem media_url (o job decide se transcreve; o normalizador so nao inventa um valor)", () => {
+    const video = normalizarHashtagMedia(
+      {
+        id: "2",
+        caption: "[exemplo] outra dica de limpeza",
+        media_type: "VIDEO",
+        media_product_type: "REELS",
+        permalink: "https://www.instagram.com/p/ExemploHashtag02/",
+        timestamp: "2026-08-19T11:00:00.000Z",
+      },
+      "limpeza",
+    );
+
+    expect(video.idExterno).toBe("ExemploHashtag02");
+    expect(video.titulo).toBe("[exemplo] outra dica de limpeza");
   });
 });

@@ -24,6 +24,7 @@ import {
   aguardarJanela,
   buscarBusinessDiscovery,
   buscarIdDaHashtag,
+  buscarRecentMediaDaHashtag,
   buscarTodasAsPaginas,
   buscarTopMediaDaHashtag,
   chamadasDesde,
@@ -216,6 +217,50 @@ describe("hashtag search", () => {
   it("devolve null quando a hashtag nao existe", async () => {
     mockFetch.mockResolvedValue(respostaJson({ data: [] }));
     expect(await buscarIdDaHashtag("hashtag-que-nao-existe")).toBeNull();
+  });
+
+  /**
+   * Ajuste 2 da revisao do PR #35: chamada real do Fable, 09/09/2026, contra
+   * a hashtag "limpeza" ja resolvida (`17841563347091627`). `top_media`
+   * devolveu 50 itens, nenhum VIDEO (48 IMAGE, 2 CAROUSEL_ALBUM);
+   * `recent_media` devolveu 38 VIDEO (todos REELS) em 50, `media_url`
+   * presente em 21 deles. A fixture aqui e um recorte com um de cada tipo.
+   */
+  it("recent_media traz media_product_type, para distinguir reel de imagem/carrossel", async () => {
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = url.toString();
+      if (texto.includes("recent_media")) {
+        expect(texto).toContain("media_product_type");
+        return respostaJson({
+          data: [
+            {
+              id: "1",
+              caption: "[exemplo] video de limpeza",
+              media_type: "VIDEO",
+              media_product_type: "REELS",
+              media_url: "https://exemplo.invalido/video1.mp4",
+              permalink: "https://www.instagram.com/reel/exemplo3/",
+              timestamp: "2026-09-08T10:00:00Z",
+              like_count: 300,
+              comments_count: 8,
+            },
+            {
+              id: "2",
+              caption: "[exemplo] foto de limpeza",
+              media_type: "IMAGE",
+              permalink: "https://www.instagram.com/p/exemplo4/",
+              timestamp: "2026-09-08T09:00:00Z",
+            },
+          ],
+        });
+      }
+      throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+    });
+
+    const itens = await buscarRecentMediaDaHashtag("17841563347091627");
+    expect(itens).toHaveLength(2);
+    expect(itens[0]).toMatchObject({ media_type: "VIDEO", media_product_type: "REELS" });
+    expect(itens[1]).toMatchObject({ media_type: "IMAGE" });
   });
 });
 

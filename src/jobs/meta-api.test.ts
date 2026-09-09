@@ -7,6 +7,11 @@ describe("erroMetaEhDaConta", () => {
     expect(erroMetaEhDaConta(new ErroMetaApi("x", 100))).toBe(true);
   });
 
+  /** Chamada real do Fable contra um handle inventado, revisao do PR #35: `{ code: 110, error_subcode: 2207013, message: "Invalid user id" }`. */
+  it("codigo 110 (conta que nao existe) e da conta", () => {
+    expect(erroMetaEhDaConta(new ErroMetaApi("Invalid user id", 110, 2207013))).toBe(true);
+  });
+
   it.each([190, 4, 17, 32, 613, 1, undefined])("codigo %s nao e da conta", (codigo) => {
     expect(erroMetaEhDaConta(new ErroMetaApi("x", codigo))).toBe(false);
   });
@@ -17,7 +22,7 @@ describe("erroMetaEhTokenOuLimite", () => {
     expect(erroMetaEhTokenOuLimite(new ErroMetaApi("x", codigo))).toBe(true);
   });
 
-  it.each([100, 1, undefined])("codigo %s nao e token ou limite", (codigo) => {
+  it.each([100, 110, 1, undefined])("codigo %s nao e token ou limite", (codigo) => {
     expect(erroMetaEhTokenOuLimite(new ErroMetaApi("x", codigo))).toBe(false);
   });
 });

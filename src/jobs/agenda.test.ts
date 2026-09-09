@@ -34,6 +34,12 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.contasBase)).toBe("40 3 * * *");
   });
 
+  it("metaHashtags roda todo dia as 04:20, entre transcrever (04:00) e extrair (05:00) (ajuste 2 da revisao do PR #35: recent_media e janela de 24h)", () => {
+    expect(cronDe(FILAS.transcrever)).toBe("0 4 * * *");
+    expect(cronDe(FILAS.metaHashtags)).toBe("20 4 * * *");
+    expect(cronDe(FILAS.extrair)).toBe("0 5 * * *");
+  });
+
   describe("metaContas so agenda com config.coleta.metaAtivo (E6 parte 3, segunda rodada, item 1)", () => {
     afterEach(() => {
       config.coleta.metaAtivo = false;

@@ -1,33 +1,49 @@
 /**
- * Job `meta-hashtags` (E6 parte 3, segunda rodada, item 3): semanal
- * (segunda de manhã), por nicho, resolve até `TERMOS_POR_NICHO` termos com
- * `ig_hashtag_search` e lê `top_media` de cada um. A Hashtag Search e
- * global (achado de 08/09/2026: o primeiro resultado de "limpeza" era de
- * Portugal), entao um item so vira video se a legenda passar no filtro de
+ * Job `meta-hashtags` (E6 parte 3, segunda rodada, item 3, ajuste 2 da
+ * revisao do PR #35): diario, as 04:20 (depois de `transcrever`, antes de
+ * `extrair`), por nicho, resolve até `TERMOS_POR_NICHO` termos com
+ * `ig_hashtag_search` e lê o `recent_media` de cada um. Era `top_media` e
+ * semanal (segunda de manhã) na rodada anterior; a chamada real do Fable
+ * contra a hashtag "limpeza" achou o motivo da troca: `top_media` devolveu
+ * 50 itens, nenhum VIDEO, so IMAGE (48) e CAROUSEL_ALBUM (2), e o mesmo
+ * termo pelo `recent_media` devolveu 38 VIDEO (todos REELS) em 50. Em troca,
+ * `recent_media` e uma janela de 24h, entao o job precisa rodar todo dia
+ * para nao perder o que saiu da janela; a trava de 30 hashtags por semana
+ * continua so na resolucao (abaixo), entao rodar todo dia nao gasta mais
+ * vaga nenhuma depois que o termo ja foi resolvido uma vez.
+ *
+ * So vira video um item com `media_type === "VIDEO"` ou
+ * `media_product_type === "REELS"` (`ehVideo`, compartilhada com o
+ * normalizador da Business Discovery); imagem e carrossel sao pulados e
+ * contados em `itensNaoVideo`. A Hashtag Search e global (achado de
+ * 08/09/2026: o primeiro resultado de "limpeza" era de Portugal), entao um
+ * item so vira video de verdade se a legenda tambem passar no filtro de
  * Brasil (`temIndicioDeBrasil`). Sem conta dona (`videos.contaId = null`,
  * `videos.semDono = true`): nunca recebe mediana nem multiplo, so serve de
  * sinal de assunto (transcricao e extracao), como qualquer outro video.
  *
  * O limite de 30 hashtags unicas por semana e da propria Meta, na
- * resolucao (`ig_hashtag_search`), nao no `top_media`: `hashtags_meta_usadas`
+ * resolucao (`ig_hashtag_search`), nao no `recent_media`: `hashtags_meta_usadas`
  * guarda o `hashtagId` de cada termo ja resolvido, para dois nichos com o
- * mesmo termo (ou o mesmo nicho numa semana seguinte, dentro dos 7 dias)
- * nunca gastarem duas vezes a mesma vaga.
+ * mesmo termo (ou o mesmo nicho num dia seguinte, dentro dos 7 dias) nunca
+ * gastarem duas vezes a mesma vaga.
  *
- * `media_url` da Meta expira (nao documentado por quanto tempo): baixa e
- * transcreve o audio na hora, em vez de deixar para o job `transcrever`
- * de hoje a noite, que de qualquer forma nunca selecionaria estes videos
- * (a selecao dele exige `foraDaCurva`/`velocidadeRelativa`, que um video
- * sem conta nunca tem, `pontuar.ts` nunca calcula para ele).
+ * `media_url` da Meta expira (nao documentado por quanto tempo) e nem todo
+ * item do `recent_media` traz um (achado real: 21 dos 38 VIDEO); baixa e
+ * transcreve o audio na hora, em vez de deixar para o job `transcrever` de
+ * hoje a noite (que de qualquer forma nunca selecionaria estes videos, a
+ * selecao dele exige `foraDaCurva`/`velocidadeRelativa`, que um video sem
+ * conta nunca tem). Sem `media_url` nao e erro: o video entra so com a
+ * legenda como sinal, sem transcricao, contado em `semMediaUrl`.
  */
 import { and, eq, gte } from "drizzle-orm";
 
 import { temIndicioDeBrasil } from "@/config/brasil";
 import { db } from "@/db";
 import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
-import { buscarIdDaHashtag, buscarTopMediaDaHashtag } from "@/jobs/meta-api";
+import { buscarIdDaHashtag, buscarRecentMediaDaHashtag } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
-import { normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
+import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
 
 import { apagarAudio, baixarAudio, ErroAudio } from "./audio";
 import { upsertVideo } from "./coleta-comum";
@@ -74,6 +90,8 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
 
   let videosNovos = 0;
   let videosAtualizados = 0;
+  let itensNaoVideo = 0;
+  let semMediaUrl = 0;
   let transcritos = 0;
   const foraDoLimite: string[] = [];
   const erros: string[] = [];
@@ -110,26 +128,34 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
       }
 
       try {
-        const itens = await buscarTopMediaDaHashtag(hashtagId);
+        const itens = await buscarRecentMediaDaHashtag(hashtagId);
         for (const item of itens) {
+          if (!ehVideo(item)) {
+            itensNaoVideo += 1;
+            continue;
+          }
           if (!temIndicioDeBrasil(item.caption ?? "", nicho.termos)) continue;
 
           const video = normalizarHashtagMedia(item, termo);
           const resultado = await upsertVideo(video, null, nicho.id, null, "meta");
-          if (resultado === "novo") videosNovos += 1;
-          else videosAtualizados += 1;
-
-          if (resultado === "novo") {
-            try {
-              if (await transcreverVideoNovo(video.idExterno, item.media_url)) transcritos += 1;
-            } catch (erroTranscricao) {
-              if (!(erroTranscricao instanceof ErroAudio) && !(erroTranscricao instanceof ErroGroq)) {
-                throw erroTranscricao;
-              }
-              erros.push(
-                `hashtag "${termo}" / video "${video.idExterno}": ${erroTranscricao.message}`,
-              );
+          if (resultado !== "novo") {
+            videosAtualizados += 1;
+            continue;
+          }
+          videosNovos += 1;
+          if (!item.media_url) {
+            semMediaUrl += 1;
+            continue;
+          }
+          try {
+            if (await transcreverVideoNovo(video.idExterno, item.media_url)) transcritos += 1;
+          } catch (erroTranscricao) {
+            if (!(erroTranscricao instanceof ErroAudio) && !(erroTranscricao instanceof ErroGroq)) {
+              throw erroTranscricao;
             }
+            erros.push(
+              `hashtag "${termo}" / video "${video.idExterno}": ${erroTranscricao.message}`,
+            );
           }
         }
       } catch (erro) {
@@ -142,6 +168,8 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
     nichos: nichosAtivos.length,
     videosNovos,
     videosAtualizados,
+    itensNaoVideo,
+    semMediaUrl,
     transcritos,
     hashtagsUsadasNaSemana: usadosNaSemana,
     hashtagsForaDoLimite: foraDoLimite.length > 0 ? foraDoLimite : undefined,

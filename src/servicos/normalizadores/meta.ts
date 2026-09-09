@@ -4,7 +4,7 @@
  * chamada so devolve o perfil da conta MAIS ate 50 posts dela de uma vez,
  * entao a saida e uma conta e uma LISTA de videos.
  */
-import type { BusinessDiscovery, BusinessDiscoveryMedia, HashtagTopMediaItem } from "@/jobs/meta-api";
+import type { BusinessDiscovery, HashtagRecentMediaItem } from "@/jobs/meta-api";
 
 import { tituloDeVideo } from "./titulo";
 
@@ -46,11 +46,13 @@ export function idExternoDoPermalink(permalink: string | undefined, idNumerico: 
 
 /**
  * So video (media_type "VIDEO"), ou reel quando media_product_type vier
- * (a Business Discovery as vezes marca reels so nesse campo, achado
- * documentado, nao confirmado ainda com uma resposta real que traga um
- * reel; decisao registrada aqui: aceitar qualquer um dos dois sinais).
+ * (a Business Discovery e o recent_media da hashtag as vezes marcam reels
+ * so nesse campo; confirmado com uma resposta real do recent_media da
+ * hashtag "limpeza", revisao do PR #35: os 38 VIDEO vieram todos com
+ * `media_product_type = REELS`). Compartilhada entre os dois normalizadores
+ * desta rodada, que usam o mesmo par de campos.
  */
-function ehVideo(item: BusinessDiscoveryMedia): boolean {
+export function ehVideo(item: { media_type?: string; media_product_type?: string }): boolean {
   return item.media_type === "VIDEO" || item.media_product_type === "REELS";
 }
 
@@ -88,14 +90,15 @@ export function normalizarBusinessDiscovery(
 }
 
 /**
- * Hashtag Search (item 3): sem conta dona nem views, so serve de sinal de
- * assunto. `termo` (o texto da hashtag buscada) entra so como identificador
- * no titulo de reserva de `tituloDeVideo`, que na pratica nunca deveria
- * disparar aqui: um item so chega ate este normalizador depois de passar
- * no filtro de Brasil (`temIndicioDeBrasil`), que exige uma legenda com
- * texto de verdade.
+ * Hashtag Search, pelo `recent_media` (item 3, ajuste 2 da revisao do PR
+ * #35): sem conta dona nem views, so serve de sinal de assunto. `termo` (o
+ * texto da hashtag buscada) entra so como identificador no titulo de
+ * reserva de `tituloDeVideo`, que na pratica nunca deveria disparar aqui:
+ * um item so chega ate este normalizador depois de passar no filtro de
+ * video (`ehVideo`) e no filtro de Brasil (`temIndicioDeBrasil`), que exige
+ * uma legenda com texto de verdade.
  */
-export function normalizarHashtagMedia(item: HashtagTopMediaItem, termo: string): VideoNormalizado {
+export function normalizarHashtagMedia(item: HashtagRecentMediaItem, termo: string): VideoNormalizado {
   const descricao = item.caption || null;
   const publicadoEm = item.timestamp ? new Date(item.timestamp) : null;
   return {

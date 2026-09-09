@@ -47,15 +47,19 @@ type ErroMeta = { message?: string; code?: number; error_subcode?: number };
 
 /**
  * Codigo 100 (Business Discovery de conta que nao e comercial ou de
- * criador, confirmado no item 6 desta rodada com uma conta pessoal de
- * verdade) e erro da CONTA chamada: so essa conta deve virar
- * `api_indisponivel_em`. Achado da leitura previa do Fable, 09/09/2026,
- * correcao 1 do `PROXIMO.md`: antes, qualquer `ErroMetaApi` marcava a conta,
- * e um token vencido ou um limite de taxa (que afetam TODAS as contas, nao
- * uma so) marcava as 50 contas vigiadas de uma vez e jogava todas de volta
- * para o Apify pago, sem nunca mais tentar a API.
+ * criador) e codigo 110 (`{"code": 110, "error_subcode": 2207013, "message":
+ * "Invalid user id"}`, chamada real do Fable contra um handle inventado,
+ * revisao do PR #35: conta que nao existe) sao erro da CONTA chamada: so
+ * essa conta deve virar `api_indisponivel_em`. Achado da leitura previa do
+ * Fable, 09/09/2026, correcao 1 do `PROXIMO.md`: antes, qualquer
+ * `ErroMetaApi` marcava a conta, e um token vencido ou um limite de taxa
+ * (que afetam TODAS as contas, nao uma so) marcava as 50 contas vigiadas de
+ * uma vez e jogava todas de volta para o Apify pago, sem nunca mais tentar
+ * a API. Sem o 110, uma conta inexistente (ou, pela mesma familia de erro,
+ * uma conta pessoal) nunca era marcada, era tentada todo dia para sempre e
+ * nunca caia para o Apify: o inverso do problema original.
  */
-export const CODIGOS_ERRO_DE_CONTA = [100];
+export const CODIGOS_ERRO_DE_CONTA = [100, 110];
 
 /** Token vencido (190) ou limite de taxa (4, 17, 32, 613): afeta a chamada inteira, nao uma conta. */
 export const CODIGOS_TOKEN_OU_LIMITE = [190, 4, 17, 32, 613];
@@ -270,10 +274,42 @@ export type HashtagTopMediaItem = {
   comments_count?: number;
 };
 
+/**
+ * `top_media` (deixou de ser usada pelo job `meta-hashtags`, ajuste 2 da
+ * revisao do PR #35: chamada real do Fable contra a hashtag "limpeza"
+ * devolveu 50 itens, nenhum VIDEO, so IMAGE (48) e CAROUSEL_ALBUM (2)).
+ * Fica exportada, sem uso no motor por enquanto.
+ */
 export async function buscarTopMediaDaHashtag(hashtagId: string, limite = 50): Promise<HashtagTopMediaItem[]> {
   const resposta = await chamar<{ data?: HashtagTopMediaItem[] }>(`${hashtagId}/top_media`, {
     user_id: config.coleta.metaIgId,
     fields: "caption,media_type,media_url,permalink,timestamp,like_count,comments_count",
+    limit: String(limite),
+  });
+  return resposta.data ?? [];
+}
+
+/** Mesmos campos do `top_media`, mais `media_product_type` (distingue REELS de VIDEO puro, como a Business Discovery). */
+export type HashtagRecentMediaItem = HashtagTopMediaItem & { media_product_type?: string };
+
+/**
+ * `<hashtagId>/recent_media` (ajuste 2 da revisao do PR #35): a mesma
+ * chamada real, contra `recent_media`, devolveu 38 VIDEO (todos com
+ * `media_product_type = REELS`) em 50 itens, `media_url` presente em 21
+ * deles. Substitui `buscarTopMediaDaHashtag` no job `meta-hashtags`.
+ *
+ * Limite padrao 25, nao 50 (achado da fumaca do ajuste 5, 09/09/2026): a
+ * mesma chamada com `limit=50` devolveu "Please reduce the amount of data
+ * you're asking for, then retry your request"; o `media_url` de um reel e
+ * uma url longa (700+ caracteres, assinada), e 50 delas de uma vez excede
+ * algum limite de tamanho de resposta que o `top_media` (sem essa mesma
+ * combinacao de campos, na chamada de prova do Fable) nao bateu. `limit=25`
+ * confirmado funcionando contra a hashtag "limpeza" de verdade.
+ */
+export async function buscarRecentMediaDaHashtag(hashtagId: string, limite = 25): Promise<HashtagRecentMediaItem[]> {
+  const resposta = await chamar<{ data?: HashtagRecentMediaItem[] }>(`${hashtagId}/recent_media`, {
+    user_id: config.coleta.metaIgId,
+    fields: "caption,media_type,media_product_type,media_url,permalink,timestamp,like_count,comments_count",
     limit: String(limite),
   });
   return resposta.data ?? [];
