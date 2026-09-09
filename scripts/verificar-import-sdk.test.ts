@@ -5,10 +5,19 @@
  * src/ia/cliente.ts.
  */
 import { globSync, readFileSync } from "node:fs";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-const arquivos = globSync("src/**/*.{ts,tsx}").filter((arquivo) => !arquivo.startsWith("src/ia/"));
+/**
+ * `globSync` devolve `\` no Windows (achado provando o ambiente no Dell,
+ * 09/09/2026, item 0d do PROXIMO.md); `startsWith("src/ia/")` nunca batia e
+ * `cliente.ts`/`lote.ts` entravam na lista, cujo conteudo cita
+ * `@anthropic-ai/sdk` de verdade e reprovava o teste.
+ */
+const arquivos = globSync("src/**/*.{ts,tsx}")
+  .map((arquivo) => arquivo.split(path.sep).join("/"))
+  .filter((arquivo) => !arquivo.startsWith("src/ia/"));
 
 describe("nenhum arquivo fora de src/ia/ importa @anthropic-ai/sdk", () => {
   it.each(arquivos)("%s", (arquivo) => {
