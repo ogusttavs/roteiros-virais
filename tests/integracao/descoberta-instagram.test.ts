@@ -69,6 +69,20 @@ describe("rodarDescobertaInstagram", () => {
     await expect(rodarDescobertaInstagram()).rejects.toThrow(ErroColeta);
   });
 
+  it("com o teto do apify zerado (apify desligado), termina ok sem chamar o ator, em vez de lancar (ajuste 4 da revisao do PR #36)", async () => {
+    const tetoOriginal = config.coleta.apifyMaxResultadosDia;
+    config.coleta.apifyMaxResultadosDia = 0;
+    try {
+      const resumo = await rodarDescobertaInstagram();
+      expect(resumo.apifyDesligado).toBe(true);
+      expect(resumo.tetoAtingido).toBe(false);
+      expect(resumo.termosBuscados).toBe(0);
+      expect(buscarInstagram).not.toHaveBeenCalled();
+    } finally {
+      config.coleta.apifyMaxResultadosDia = tetoOriginal;
+    }
+  });
+
   it("busca 30 por termo e cria conta ainda desconhecida com o video que veio junto", async () => {
     vi.mocked(buscarInstagram).mockResolvedValue({ itens: [itemInstagram()], devolvidos: 1 });
 

@@ -98,6 +98,15 @@ export async function rodarColetaApify(nichoId?: number, execucaoId?: number): P
   let resultadosConsumidos = 0;
   const cabe = () => resultadosUsados < teto;
   const idDaExecucao = execucaoId ?? null;
+  const apifyDesligado = teto <= 0;
+  /**
+   * Capturado antes do laço (ajuste 4 da revisão do PR #36): distingue "sem
+   * orçamento desde o início" (teto zero, ou já esgotado por outra execução
+   * hoje) de "o laço gastou tudo no meio". Só o primeiro caso, junto com
+   * `apifyDesligado`, dispensa o `ErroColeta` abaixo: um estado escolhido
+   * (decisão do Gustavo em 09/09, TikTok pelo Apify suspenso), não falha.
+   */
+  const tinhaOrcamentoNoInicio = cabe();
 
   let chamadasTiktok = 0;
   let chamadasInstagram = 0;
@@ -261,9 +270,15 @@ export async function rodarColetaApify(nichoId?: number, execucaoId?: number): P
     }
   }
 
-  if (chamadasTiktok === 0 && chamadasInstagram === 0) {
+  /**
+   * Ajuste 4 da revisão do PR #36: com `apifyDesligado` ou sem orçamento
+   * desde o início, zero chamadas é o estado esperado, não uma falha de
+   * configuração; o `ErroColeta` fica só para quando havia orçamento e
+   * nenhum nicho tinha termo nem conta vigiada mesmo assim.
+   */
+  if (!apifyDesligado && tinhaOrcamentoNoInicio && chamadasTiktok === 0 && chamadasInstagram === 0) {
     throw new ErroColeta(
-      "nenhum termo nem conta vigiada para coletar no apify (sem nichos ativos ou teto diario zerado)",
+      "nenhum termo nem conta vigiada para coletar no apify (nenhum nicho ativo tem termo nem conta vigiada)",
       false,
     );
   }
@@ -280,7 +295,8 @@ export async function rodarColetaApify(nichoId?: number, execucaoId?: number): P
     resultadosDevolvidos,
     resultadosConsumidos,
     resultadosConsumidosHoje: resultadosUsados,
-    tetoAtingido: !cabe(),
+    apifyDesligado,
+    tetoAtingido: !apifyDesligado && !cabe(),
     erros: erros.length > 0 ? erros : undefined,
   };
 }

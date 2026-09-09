@@ -303,6 +303,23 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
     expect(buscarTiktokPorHashtag).toHaveBeenCalledWith(["dentista"], 1);
   });
 
+  it("com o teto zerado (apify desligado), termina ok sem chamar o ator, em vez de lancar (ajuste 4 da revisao do PR #36)", async () => {
+    const tetoOriginal = config.coleta.apifyMaxResultadosDia;
+    config.coleta.apifyMaxResultadosDia = 0;
+    try {
+      const resumo = await rodarColetaApify();
+      expect(resumo.apifyDesligado).toBe(true);
+      expect(resumo.tetoAtingido).toBe(false);
+      expect(resumo.chamadasTiktok).toBe(0);
+      expect(resumo.chamadasInstagram).toBe(0);
+      expect(buscarTiktokPorHashtag).not.toHaveBeenCalled();
+      expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+      expect(buscarInstagram).not.toHaveBeenCalled();
+    } finally {
+      config.coleta.apifyMaxResultadosDia = tetoOriginal;
+    }
+  });
+
   it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
     await db().insert(nichos).values({ slug: "coleta-apify-teste-2", nome: "Coleta Apify teste 2", termos: ["dentista"] });
 

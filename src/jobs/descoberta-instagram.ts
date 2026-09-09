@@ -64,6 +64,9 @@ export async function rodarDescobertaInstagram(nichoId?: number): Promise<Record
   let resultadosUsados = await consumoDeHoje();
   let resultadosDevolvidos = 0;
   const cabe = () => resultadosUsados < teto;
+  const apifyDesligado = teto <= 0;
+  /** Mesmo raciocínio de `coleta-apify.ts` (ajuste 4 da revisão do PR #36). */
+  const tinhaOrcamentoNoInicio = cabe();
 
   let termosBuscados = 0;
   let contasNovas = 0;
@@ -117,9 +120,9 @@ export async function rodarDescobertaInstagram(nichoId?: number): Promise<Record
     }
   }
 
-  if (termosBuscados === 0) {
+  if (!apifyDesligado && tinhaOrcamentoNoInicio && termosBuscados === 0) {
     throw new ErroColeta(
-      "nenhum termo de nicho para descobrir conta nova no instagram (sem nichos ativos com termos, ou teto diario do apify ja zerado)",
+      "nenhum termo de nicho para descobrir conta nova no instagram (sem nichos ativos com termos)",
       false,
     );
   }
@@ -132,7 +135,8 @@ export async function rodarDescobertaInstagram(nichoId?: number): Promise<Record
     videosAtualizados,
     resultadosDevolvidos,
     resultadosConsumidosHoje: resultadosUsados,
-    tetoAtingido: !cabe(),
+    apifyDesligado,
+    tetoAtingido: !apifyDesligado && !cabe(),
     erros: erros.length > 0 ? erros : undefined,
   };
 }
