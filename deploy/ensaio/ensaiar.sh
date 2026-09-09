@@ -257,7 +257,22 @@ worker_volta_sozinho_apos_kill() {
 }
 
 fazer_backup() {
-  "${COMPOSE[@]}" exec -T roteiros-backup /usr/local/bin/backup.sh agora
+  # Barra dupla no caminho (pendencia do Fable, deploy de b7ce20d em
+  # 09/09/2026, terceira tentativa): "//usr/local/bin/backup.sh" em vez de
+  # "/usr/local/bin/backup.sh". No Git Bash do Windows, um argumento que e
+  # so um caminho POSIX de barra unica vira caminho do Windows antes de
+  # chegar no `docker compose exec`, que entao nao acha o script dentro do
+  # container Linux; `MSYS_NO_PATHCONV=1` (tentativa anterior) desligava a
+  # conversao para o comando inteiro, e quebrava os `-f caminho.yml` de
+  # `$COMPOSE`, que PRECISAM virar caminho do Windows (erro "cannot find
+  # compose.prod.yml"). A barra dupla e o truque padrao do MSYS para tirar
+  # so este argumento da conversao (o `//` nao bate no padrao que o MSYS
+  # reconhece como caminho de host a converter); dentro do container Linux,
+  # `//caminho` e o mesmo que `/caminho` (POSIX, barra inicial dobrada nao
+  # muda nada fora de sistemas que dao significado especial a ela, e o
+  # Debian do container nao da). Fora do Git Bash (Linux, macOS, CI) a
+  # barra dupla tambem nunca teve efeito nenhum, comando roda igual.
+  "${COMPOSE[@]}" exec -T roteiros-backup //usr/local/bin/backup.sh agora
   local dump
   dump=$("${COMPOSE[@]}" exec -T roteiros-backup sh -c 'ls -1 /backups/roteiros-*.sql.gz 2>/dev/null | tail -1')
   [ -n "$dump" ] || {
