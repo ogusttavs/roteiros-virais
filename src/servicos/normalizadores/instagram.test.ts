@@ -35,6 +35,7 @@ describe("normalizarVideoInstagram", () => {
       handle: "exemplo.sorrisoemdia",
       nome: "[exemplo] Sorriso em Dia",
       url: "https://www.instagram.com/exemplo.sorrisoemdia",
+      seguidores: 8000,
     });
     expect(audio).toEqual({
       id: "611111111111111",
@@ -45,7 +46,7 @@ describe("normalizarVideoInstagram", () => {
   });
 
   it("sem musicInfo, o audio vem nulo; usa videoViewCount quando nao ha videoPlayCount", () => {
-    const { video, audio } = normalizarVideoInstagram(itens[1]);
+    const { video, conta, audio } = normalizarVideoInstagram(itens[1]);
 
     expect(audio).toBeNull();
     expect(video.likes).toBe(0);
@@ -53,5 +54,7 @@ describe("normalizarVideoInstagram", () => {
     expect(video.duracaoS).toBeNull();
     expect(video.views).toBe(40210);
     expect(video.titulo).toBe("[exemplo] antes e depois de um clareamento");
+    // Sem ownerFollowersCount no item, seguidores fica nulo (E6 parte 3, item 4).
+    expect(conta.seguidores).toBeNull();
   });
 });

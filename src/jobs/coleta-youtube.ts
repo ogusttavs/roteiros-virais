@@ -16,6 +16,7 @@ import { upsertConta, upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
 import {
   buscarCanal,
+  buscarCanaisPorId,
   buscarPorTermo,
   buscarUploadsDoCanal,
   buscarVideosPorId,
@@ -162,9 +163,42 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
       try {
         await gastar(CUSTO_LISTA);
         const resposta = await buscarVideosPorId(lote);
-        for (const item of resposta.items ?? []) {
+        const itens = resposta.items ?? [];
+
+        /**
+         * Seguidores (E6 parte 3, item 4): `videos.list` nao traz
+         * `statistics.subscriberCount` do canal, so `channels.list` traz.
+         * Uma chamada por lote (no maximo 50 canais distintos, o mesmo
+         * tamanho do lote de videos), sem trava se faltar cota: o valor so
+         * fica nulo desta vez, `upsertConta` protege o que ja foi gravado
+         * antes (nunca apaga um seguidores conhecido com um nulo).
+         */
+        const seguidoresPorCanal = new Map<string, number | null>();
+        const canaisDoLote = [...new Set(itens.map((item) => item.snippet.channelId))];
+        if (canaisDoLote.length > 0 && cabe(CUSTO_LISTA)) {
+          try {
+            await gastar(CUSTO_LISTA);
+            const canaisResp = await buscarCanaisPorId(canaisDoLote);
+            for (const canal of canaisResp.items ?? []) {
+              seguidoresPorCanal.set(
+                canal.id,
+                canal.statistics?.subscriberCount ? Number(canal.statistics.subscriberCount) : null,
+              );
+            }
+          } catch (erroCanais) {
+            avisos.push(
+              `channels.list (seguidores, lote a partir de ${i}): ${erroCanais instanceof Error ? erroCanais.message : String(erroCanais)}`,
+            );
+          }
+        }
+
+        for (const item of itens) {
           const { video, conta } = normalizarVideoYoutube(item);
-          const contaId = await upsertConta(conta, nicho.id);
+          const contaComSeguidores = {
+            ...conta,
+            seguidores: seguidoresPorCanal.get(item.snippet.channelId) ?? null,
+          };
+          const contaId = await upsertConta(contaComSeguidores, nicho.id);
           const resultado = await upsertVideo(video, contaId, nicho.id);
           if (resultado === "novo") videosNovos += 1;
           else videosAtualizados += 1;

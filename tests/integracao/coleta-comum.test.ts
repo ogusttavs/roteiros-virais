@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { nichos, videos } from "@/db/schema";
+import { contas, nichos, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { upsertConta, upsertVideo, type VideoParaGravar } from "../../src/jobs/coleta-comum";
@@ -42,7 +42,7 @@ afterAll(async () => {
 describe("upsertVideo", () => {
   it("uma recoleta sem audio nao apaga o audio ja gravado", async () => {
     const contaId = await upsertConta(
-      { plataforma: "tiktok", handle: "exemplo.coletacomum", nome: null, url: null },
+      { plataforma: "tiktok", handle: "exemplo.coletacomum", nome: null, url: null, seguidores: null },
       nichoId,
     );
 
@@ -67,5 +67,38 @@ describe("upsertVideo", () => {
       autor: "exemplo.coletacomum",
       original: true,
     });
+  });
+});
+
+describe("upsertConta", () => {
+  it("grava seguidores no insert e atualiza num recoleta com valor novo", async () => {
+    const contaId = await upsertConta(
+      { plataforma: "tiktok", handle: "exemplo.seguidores-a", nome: null, url: null, seguidores: 1000 },
+      nichoId,
+    );
+    const [linha1] = await db().select().from(contas).where(eq(contas.id, contaId));
+    expect(linha1.seguidores).toBe(1000);
+
+    await upsertConta(
+      { plataforma: "tiktok", handle: "exemplo.seguidores-a", nome: null, url: null, seguidores: 1500 },
+      nichoId,
+    );
+    const [linha2] = await db().select().from(contas).where(eq(contas.id, contaId));
+    expect(linha2.seguidores).toBe(1500);
+  });
+
+  it("uma recoleta sem seguidores (Instagram sem o campo, ou falha do channels.list) nao apaga o valor ja gravado", async () => {
+    const contaId = await upsertConta(
+      { plataforma: "instagram", handle: "exemplo.seguidores-b", nome: null, url: null, seguidores: 2000 },
+      nichoId,
+    );
+
+    await upsertConta(
+      { plataforma: "instagram", handle: "exemplo.seguidores-b", nome: null, url: null, seguidores: null },
+      nichoId,
+    );
+
+    const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+    expect(linha.seguidores).toBe(2000);
   });
 });

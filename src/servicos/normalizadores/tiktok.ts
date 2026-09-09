@@ -13,6 +13,7 @@ export type ContaNormalizada = {
   handle: string;
   nome: string | null;
   url: string | null;
+  seguidores: number | null;
 };
 
 export type VideoNormalizado = {
@@ -78,6 +79,7 @@ export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNo
       handle: nomeAutor,
       nome: item.authorMeta?.nickName || nomeAutor,
       url: `https://www.tiktok.com/@${nomeAutor}`,
+      seguidores: item.authorMeta?.fans ?? null,
     },
     audio: normalizarAudio(item),
   };

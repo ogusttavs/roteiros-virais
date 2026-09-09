@@ -13,6 +13,7 @@ export type ContaNormalizada = {
   handle: string;
   nome: string | null;
   url: string | null;
+  seguidores: number | null;
 };
 
 export type VideoNormalizado = {
@@ -67,6 +68,7 @@ export function normalizarVideoInstagram(item: InstagramItemBruto): VideoContaEA
       handle: item.ownerUsername,
       nome: item.ownerFullName || item.ownerUsername || null,
       url: `https://www.instagram.com/${item.ownerUsername}`,
+      seguidores: item.ownerFollowersCount ?? null,
     },
     audio: normalizarAudio(item),
   };

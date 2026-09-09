@@ -82,7 +82,8 @@ export type TiktokItemBruto = {
   text?: string;
   webVideoUrl: string;
   createTimeISO?: string;
-  authorMeta?: { name?: string; nickName?: string };
+  /** `fans` (E6 parte 3, item 4): contagem de seguidores do autor, quando o ator devolve. */
+  authorMeta?: { name?: string; nickName?: string; fans?: number };
   videoMeta?: { duration?: number };
   musicMeta?: { musicId?: string; musicName?: string; musicAuthor?: string; musicOriginal?: boolean };
   playCount?: number;
@@ -122,7 +123,14 @@ export async function buscarTiktokPorUrl(
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, urls.length);
 }
 
-/** Item bruto do Instagram (apify/instagram-scraper), so os campos que a normalizacao usa. */
+/**
+ * Item bruto do Instagram (apify/instagram-scraper), so os campos que a
+ * normalizacao usa. `ownerFollowersCount` (E6 parte 3, item 4): nome de
+ * campo nao confirmado contra uma resposta real do ator para post/reel
+ * scrapado por `directUrls` (nesta rodada nenhuma chamada real ao Apify e
+ * feita, `PROXIMO.md`); se o nome vier diferente quando a coleta voltar,
+ * ajustar aqui, o resto do normalizador nao muda.
+ */
 export type InstagramItemBruto = {
   id: string;
   shortCode?: string;
@@ -131,6 +139,7 @@ export type InstagramItemBruto = {
   timestamp?: string;
   ownerUsername: string;
   ownerFullName?: string;
+  ownerFollowersCount?: number;
   videoDuration?: number;
   videoPlayCount?: number;
   videoViewCount?: number;

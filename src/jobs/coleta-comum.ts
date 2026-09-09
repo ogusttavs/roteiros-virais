@@ -14,6 +14,7 @@ export type ContaParaGravar = {
   handle: string;
   nome: string | null;
   url: string | null;
+  seguidores: number | null;
 };
 
 export type VideoParaGravar = {
@@ -35,7 +36,16 @@ export async function upsertConta(conta: ContaParaGravar, nichoId: number): Prom
     .values({ ...conta, nichoId })
     .onConflictDoUpdate({
       target: [contas.plataforma, contas.handle],
-      set: { nome: conta.nome, url: conta.url, atualizadoEm: new Date() },
+      set: {
+        nome: conta.nome,
+        url: conta.url,
+        // Uma recoleta cujo normalizador nao devolveu seguidores (Instagram,
+        // ou o YouTube quando a busca em lote de channels.list falhou) nao
+        // pode apagar um valor ja gravado numa coleta anterior (mesmo
+        // raciocinio do audio em upsertVideo).
+        seguidores: sql`coalesce(${sql.param(conta.seguidores, contas.seguidores)}, ${contas.seguidores})`,
+        atualizadoEm: new Date(),
+      },
     })
     .returning({ id: contas.id });
   return linha.id;

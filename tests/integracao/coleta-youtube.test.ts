@@ -58,6 +58,11 @@ function itemVideo(videoId: string, views: number) {
   };
 }
 
+/** `channels.list` com `statistics.subscriberCount` (E6 parte 3, item 4). */
+function itemCanalComSeguidores(channelId: string, subscriberCount: number) {
+  return { id: channelId, snippet: { title: "[exemplo] Canal de teste" }, statistics: { subscriberCount: String(subscriberCount) } };
+}
+
 let nichoId: number;
 
 beforeAll(async () => {
@@ -83,11 +88,14 @@ afterEach(async () => {
   await db().delete(consumoApi);
 });
 
-function mockarBuscaEVideo(videoId: string, views: number) {
+function mockarBuscaEVideo(videoId: string, views: number, seguidores = 5000) {
   mockFetch.mockImplementation(async (url: URL) => {
     const texto = url.toString();
     if (texto.includes("/search")) return respostaJson({ items: [itemBusca(videoId)] });
     if (texto.includes("/videos")) return respostaJson({ items: [itemVideo(videoId, views)] });
+    if (texto.includes("/channels")) {
+      return respostaJson({ items: [itemCanalComSeguidores("UCexemplo00000000009", seguidores)] });
+    }
     throw new Error(`chamada inesperada nesta fixture: ${texto}`);
   });
 }
@@ -113,6 +121,7 @@ describe("rodarColetaYoutube (rede mockada, banco real)", () => {
       .from(contas)
       .where(and(eq(contas.plataforma, "youtube"), eq(contas.handle, "UCexemplo00000000009")));
     expect(contaGravada).toBeDefined();
+    expect(contaGravada.seguidores).toBe(5000);
   });
 
   it("rodar duas vezes para o mesmo video atualiza em vez de duplicar (idempotencia)", async () => {
@@ -140,8 +149,9 @@ describe("rodarColetaYoutube (rede mockada, banco real)", () => {
       .select()
       .from(consumoApi)
       .where(and(eq(consumoApi.fonte, "youtube"), eq(consumoApi.data, hojeISO())));
-    // 1 termo (search.list, 100) + 1 lote de videos.list (1) = 101.
-    expect(linha.unidades).toBe(101);
+    // 1 termo (search.list, 100) + 1 lote de videos.list (1) + 1 channels.list
+    // para seguidores (1) = 102.
+    expect(linha.unidades).toBe(102);
   });
 
   it("uma chamada que falha ainda assim consome a cota (o youtube cobra mesmo em erro)", async () => {

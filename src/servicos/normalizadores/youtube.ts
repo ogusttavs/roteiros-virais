@@ -10,6 +10,13 @@ export type ContaNormalizada = {
   handle: string;
   nome: string | null;
   url: string | null;
+  /**
+   * Sempre nulo aqui: o `videos.list` que alimenta este normalizador nao
+   * traz `statistics.subscriberCount` do canal, so `channels.list` traz
+   * (E6 parte 3, item 4). Quem chama (`coleta-youtube.ts`) busca em lote,
+   * uma chamada por 50 canais, e substitui este campo antes do upsert.
+   */
+  seguidores: number | null;
 };
 
 export type VideoNormalizado = {
@@ -56,6 +63,7 @@ export function normalizarVideoYoutube(item: YoutubeVideoItem): VideoEContaNorma
       handle: item.snippet.channelId,
       nome: item.snippet.channelTitle || null,
       url: `https://www.youtube.com/channel/${item.snippet.channelId}`,
+      seguidores: null,
     },
   };
 }
