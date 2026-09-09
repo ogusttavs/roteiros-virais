@@ -3,12 +3,24 @@ import { describe, expect, it } from "vitest";
 import { mascararSegredos } from "./log";
 
 describe("mascararSegredos", () => {
-  it("mascara uma string que comeca com EAA", () => {
+  it("mascara uma string que e so o token", () => {
     expect(mascararSegredos("EAAsegredoqualquer123")).toBe("***token mascarado***");
   });
 
-  it("nao mexe em string que nao comeca com EAA", () => {
+  it("nao mexe em string sem nenhum EAA", () => {
     expect(mascararSegredos("erro qualquer")).toBe("erro qualquer");
+  });
+
+  /**
+   * Ajuste 3 da revisao do PR #35: o token vai na URL da Graph API
+   * (`access_token=EAA...`), e a mascara antiga (`startsWith`) nunca cobria
+   * um erro que logasse a URL inteira, com texto antes do token.
+   */
+  it("mascara o token no meio de uma url, mantendo o resto", () => {
+    const url = "https://graph.facebook.com/v26.0/123?fields=x&access_token=EAAxyz123ABC&outro=1";
+    expect(mascararSegredos(url)).toBe(
+      "https://graph.facebook.com/v26.0/123?fields=x&access_token=***token mascarado***&outro=1",
+    );
   });
 
   it("mascara em qualquer profundidade de um objeto", () => {
@@ -46,10 +58,10 @@ describe("mascararSegredos", () => {
     expect(resultado.pilha).toContain("Error: falha ao chamar a api");
   });
 
-  it("mascara o token quando a mensagem do erro comeca com EAA", () => {
-    const erro = new Error("EAAtoken-vazou-na-mensagem");
+  it("mascara o token quando ele aparece na mensagem do erro, mantendo o resto do texto (mascara por trecho, ajuste 3 da revisao do PR #35)", () => {
+    const erro = new Error("token invalido: EAAtoken123ABC");
     const resultado = mascararSegredos(erro) as { mensagem: string };
-    expect(resultado.mensagem).toBe("***token mascarado***");
+    expect(resultado.mensagem).toBe("token invalido: ***token mascarado***");
   });
 
   it("Error dentro de um objeto (formato do logger.error({ err: erro })) tambem preserva a mensagem", () => {
