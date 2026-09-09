@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { idExternoDoPermalink, normalizarBusinessDiscovery } from "./meta";
+import { idExternoDoPermalink, normalizarBusinessDiscovery, normalizarHashtagMedia } from "./meta";
 
 describe("idExternoDoPermalink", () => {
   it("extrai o codigo de um permalink de post", () => {
@@ -91,5 +91,35 @@ describe("normalizarBusinessDiscovery", () => {
       media: { data: [{ id: "1", media_type: "VIDEO", timestamp: "2026-09-05T12:00:00.000Z" }] },
     });
     expect(resultado.videos[0].titulo).toBe("vídeo de @conta-sem-legenda, 5 de setembro");
+  });
+});
+
+describe("normalizarHashtagMedia", () => {
+  it("normaliza um item do top_media, sem views (a hashtag search nunca devolve)", () => {
+    const video = normalizarHashtagMedia(
+      {
+        id: "1",
+        caption: "[exemplo] dica de limpeza para quem mora em São Paulo",
+        media_type: "VIDEO",
+        permalink: "https://www.instagram.com/p/ExemploHashtag01/",
+        timestamp: "2026-08-19T10:00:00.000Z",
+        like_count: 500,
+        comments_count: 10,
+      },
+      "limpeza",
+    );
+
+    expect(video).toEqual({
+      plataforma: "instagram",
+      idExterno: "ExemploHashtag01",
+      url: "https://www.instagram.com/p/ExemploHashtag01/",
+      titulo: "[exemplo] dica de limpeza para quem mora em São Paulo",
+      descricao: "[exemplo] dica de limpeza para quem mora em São Paulo",
+      publicadoEm: new Date("2026-08-19T10:00:00.000Z"),
+      duracaoS: null,
+      views: 0,
+      likes: 500,
+      comentarios: 10,
+    });
   });
 });

@@ -59,7 +59,12 @@ export async function upsertConta(conta: ContaParaGravar, nichoId: number): Prom
  */
 export async function upsertVideo(
   video: VideoParaGravar,
-  contaId: number,
+  /**
+   * `null` para video da Hashtag Search da Meta, que nunca traz a conta
+   * dona (E6 parte 3, segunda rodada, item 3): `semDono` sai daqui, nunca
+   * um parametro a parte, para as duas coisas nunca poderem divergir.
+   */
+  contaId: number | null,
   nichoId: number,
   audio: VideoAudio | null = null,
   /** "meta" para video vindo da Business Discovery/Hashtag Search (E6 parte 3, segunda rodada, item 2). */
@@ -67,7 +72,7 @@ export async function upsertVideo(
 ): Promise<"novo" | "atualizado"> {
   const [linha] = await db()
     .insert(videos)
-    .values({ ...video, contaId, nichoId, audio, origem })
+    .values({ ...video, contaId, nichoId, audio, origem, semDono: contaId === null })
     .onConflictDoUpdate({
       target: [videos.plataforma, videos.idExterno],
       set: {

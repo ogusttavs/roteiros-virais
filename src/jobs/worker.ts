@@ -29,6 +29,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
+import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -76,6 +77,9 @@ async function main(): Promise<void> {
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaContas, async (job) => {
     await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId));
+  });
+  await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
+    await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);

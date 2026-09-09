@@ -4,7 +4,7 @@
  * chamada so devolve o perfil da conta MAIS ate 50 posts dela de uma vez,
  * entao a saida e uma conta e uma LISTA de videos.
  */
-import type { BusinessDiscovery, BusinessDiscoveryMedia } from "@/jobs/meta-api";
+import type { BusinessDiscovery, BusinessDiscoveryMedia, HashtagTopMediaItem } from "@/jobs/meta-api";
 
 import { tituloDeVideo } from "./titulo";
 
@@ -85,4 +85,30 @@ export function normalizarBusinessDiscovery(
   });
 
   return { conta, videos };
+}
+
+/**
+ * Hashtag Search (item 3): sem conta dona nem views, so serve de sinal de
+ * assunto. `termo` (o texto da hashtag buscada) entra so como identificador
+ * no titulo de reserva de `tituloDeVideo`, que na pratica nunca deveria
+ * disparar aqui: um item so chega ate este normalizador depois de passar
+ * no filtro de Brasil (`temIndicioDeBrasil`), que exige uma legenda com
+ * texto de verdade.
+ */
+export function normalizarHashtagMedia(item: HashtagTopMediaItem, termo: string): VideoNormalizado {
+  const descricao = item.caption || null;
+  const publicadoEm = item.timestamp ? new Date(item.timestamp) : null;
+  return {
+    plataforma: "instagram",
+    idExterno: idExternoDoPermalink(item.permalink, item.id),
+    url: item.permalink ?? `https://www.instagram.com/p/${item.id}/`,
+    titulo: tituloDeVideo(descricao, termo, publicadoEm),
+    descricao,
+    publicadoEm,
+    // A Hashtag Search nunca devolve duracao nem views (so a Business Discovery devolve views).
+    duracaoS: null,
+    views: 0,
+    likes: item.like_count ?? 0,
+    comentarios: item.comments_count ?? 0,
+  };
 }

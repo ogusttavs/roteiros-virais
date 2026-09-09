@@ -20,6 +20,8 @@ export const FILAS = {
   contasBase: "contas-base",
   /** Instagram pela API oficial da Meta (E6 parte 3, segunda rodada, item 2); so agenda com config.coleta.metaAtivo. */
   metaContas: "meta-contas",
+  /** Hashtag Search da Meta, semanal (E6 parte 3, segunda rodada, item 3); so agenda com config.coleta.metaAtivo. */
+  metaHashtags: "meta-hashtags",
   pontuar: "pontuar",
   vigilancia: "vigilancia",
   transcrever: "transcrever",

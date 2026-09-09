@@ -402,6 +402,14 @@ export const videos = pgTable(
      * rodada, item 2).
      */
     origem: text("origem").$type<"coleta" | "seed" | "curadoria" | "meta">().notNull().default("coleta"),
+    /**
+     * Video da Hashtag Search da Meta (E6 parte 3, segunda rodada, item 3):
+     * `contaId` fica nulo (a Hashtag Search nunca devolve a conta dona).
+     * Nunca recebe mediana nem multiplo (nao ha conta para comparar); so
+     * serve de sinal de assunto para o tema do dia, via a transcricao e a
+     * extracao, como qualquer outro video.
+     */
+    semDono: boolean("sem_dono").notNull().default(false),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -700,6 +708,25 @@ export const chamadasMetaApi = pgTable(
     criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("chamadas_meta_api_criado_em").on(t.criadoEm)],
+);
+
+/**
+ * Uma linha por termo ja resolvido em hashtag pela Meta (E6 parte 3,
+ * segunda rodada, item 3): o limite de 30 hashtags unicas por semana e da
+ * Meta (`ig_hashtag_search`, nao do `top_media`), entao guardar o
+ * `hashtagId` aqui evita resolver de novo (e gastar mais uma das 30) um
+ * termo que ja foi visto nos ultimos 7 dias, mesmo que dois nichos usem o
+ * mesmo termo. `ultimoUsoEm` e o que conta como "usada esta semana".
+ */
+export const hashtagsMetaUsadas = pgTable(
+  "hashtags_meta_usadas",
+  {
+    id: id(),
+    termo: text("termo").notNull(),
+    hashtagId: text("hashtag_id").notNull(),
+    ultimoUsoEm: timestamp("ultimo_uso_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("hashtags_meta_usadas_termo").on(t.termo)],
 );
 
 /** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */
