@@ -6,7 +6,7 @@
  * grava. `outroAngulo` gera a versão seguinte com a instrução de diferir
  * da anterior; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -36,7 +36,12 @@ import { temasParaCliente } from "./temas";
 export class ErroRoteiro extends Error {}
 
 const LIMITE_EVIDENCIA = 8;
-const LIMITE_HISTORICO = 10;
+const DIAS_HISTORICO = 10;
+
+const DIA_MS = 24 * 60 * 60 * 1000;
+function diasAtras(dias: number): Date {
+  return new Date(Date.now() - dias * DIA_MS);
+}
 
 export type RoteiroLinha = typeof roteiros.$inferSelect;
 
@@ -151,16 +156,35 @@ async function resolverTema(
   return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias };
 }
 
+/**
+ * Dos últimos `dias` dias, com o gancho de cada um (achado do primeiro uso no
+ * iPad, item 3: o roteiro do dia 2 começou igual ao do dia 1 porque esta
+ * consulta nunca levava o gancho, só título, objetivo e status, e o modelo
+ * não tinha como saber qual frase de abertura já foi usada). Por dias corridos
+ * em vez de contagem fixa, para o histórico crescer com o cliente sem um
+ * número escolhido a dedo.
+ */
 async function historicoDeRoteiros(
   clienteId: number,
-  limite: number,
-): Promise<{ tema: string; objetivo: Objetivo; status: string }[]> {
-  return db()
-    .select({ tema: roteiros.tema, objetivo: roteiros.objetivo, status: roteiros.status })
+  dias: number,
+): Promise<{ tema: string; objetivo: Objetivo; status: string; gancho: string }[]> {
+  const linhas = await db()
+    .select({
+      tema: roteiros.tema,
+      objetivo: roteiros.objetivo,
+      status: roteiros.status,
+      conteudo: roteiros.conteudo,
+    })
     .from(roteiros)
-    .where(eq(roteiros.clienteId, clienteId))
-    .orderBy(desc(roteiros.criadoEm))
-    .limit(limite);
+    .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.criadoEm, diasAtras(dias))))
+    .orderBy(desc(roteiros.criadoEm));
+
+  return linhas.map((r) => ({
+    tema: r.tema,
+    objetivo: r.objetivo,
+    status: r.status,
+    gancho: r.conteudo.gancho,
+  }));
 }
 
 /** Todas as versões da mesma série (etapa 11, decisão 4): a raiz e quem aponta para ela. */
@@ -242,7 +266,7 @@ async function gerarConteudo(
     evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
     evidenciaPorIds(dados.evidenciasPrevistas),
     modeloNichoAtual(nichoId),
-    historicoDeRoteiros(dados.clienteId, LIMITE_HISTORICO),
+    historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
   ]);
 
   const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA);
@@ -284,6 +308,7 @@ async function gerarConteudo(
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
+    ganchosRecentes: roteirosRecentes.map((r) => r.gancho),
     generoTexto: "roteiro",
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,

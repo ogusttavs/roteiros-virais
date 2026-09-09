@@ -6,8 +6,13 @@
 
 export const textosRoteiro = {
   tituloTela: "Roteiro",
-  /** "conta real, rotulo real. O que funcionou ali foi X" (`rotuloMultiploConta` decide o rótulo). */
-  oQueFuncionouAli: "O que funcionou ali foi",
+  /**
+   * "conta real, rotulo real. O que funcionou ali: x" (`rotuloMultiploConta`
+   * decide o rótulo; a análise entra com inicial minúscula, achado do
+   * primeiro uso no iPad, item 2: ela já vem maiúscula do próprio campo).
+   */
+  oQueFuncionouAli: "O que funcionou ali:",
+  /** Só aparece quando o segundo é maior que zero (achado do primeiro uso no iPad, item 2). */
   trechoComeca: (t: string) => `O trecho que interessa começa em ${t}`,
   outrasVersoes: "Outras versões deste tema",
   outrasVersoesEmBreve:
@@ -30,11 +35,9 @@ export const textosRoteiro = {
     semAudio: "Sem indicação de áudio para este vídeo",
   },
   referencia: "Referência",
-  carregandoVideo: "Vídeo carregando",
   semEvidencia:
     "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. Este " +
     "roteiro foi escrito só com o que funciona no seu nicho e com o seu briefing.",
-  olhaComo: (t: string) => `Olha como ele faz aos ${t}`,
   irPara: (t: string) => `Ir para ${t}`,
   abrirReferencia: "Abrir o vídeo de referência",
   /** Rodapé como no design (revisão do PR #31, item 7): preenchido enquanto não gravou. */
@@ -43,7 +46,14 @@ export const textosRoteiro = {
   postado: "Postado",
   ondePostou: "Onde você postou?",
   coleLink: "Cole o link do vídeo",
-  menu: { angulo: "Outro ângulo", copiar: "Copiar texto", versoes: "Versões" },
+  menu: {
+    angulo: "Outro ângulo",
+    copiar: "Copiar texto",
+    versoes: "Versões",
+    baixarPdf: "Baixar em PDF",
+  },
+  /** aria-label do botão só de ícone na barra de ações do desktop (achado do primeiro uso no iPad, item 5). */
+  baixarPdf: "Baixar em PDF",
   queDiferente: "O que você quer diferente?",
   opcional: "(opcional)",
   outraVersao: "Escrever outra versão",

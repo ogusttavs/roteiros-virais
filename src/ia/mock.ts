@@ -155,15 +155,29 @@ function extrairIds(entrada: string): number[] {
   return encontrados.map((m) => Number(m.replace(/\D/g, "")));
 }
 
+/**
+ * "pediu outro ângulo" só aparece na entrada quando `anguloParaEvitar` está
+ * presente (`prompts/roteiro.ts`, `montarEntrada`): um pedido de verdade de
+ * ângulo diferente, não só "não repita o histórico". Sem isto, o mock
+ * devolvia o mesmo gancho de sempre para o mesmo tema, e o "outro ângulo"
+ * colidia com o próprio verificador local novo (achado do primeiro uso no
+ * iPad, item 3, `verificarLocalmente`, ganchosRecentes): a v2 da série
+ * repetia o gancho da v1, que é um roteiro recente do mesmo cliente.
+ */
 function mockRoteiro(entrada: string) {
   const tema = extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
+  const outroAngulo = entrada.includes("pediu outro ângulo");
   const ids = extrairIds(entrada);
 
   return {
     titulo: tema,
     duracaoS: 40,
-    gancho: `os 3 primeiros segundos sobre ${tema}`,
-    corpo: `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
+    gancho: outroAngulo
+      ? `um jeito diferente de mostrar ${tema}`
+      : `os 3 primeiros segundos sobre ${tema}`,
+    corpo: outroAngulo
+      ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
+      : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
     fechamento: "resumo do que foi mostrado",
     chamadaFinal: "comenta se voce ja passou por isso",
     cenas: [{ momento: "abertura", oQueFazer: "mostrar o local de verdade" }],

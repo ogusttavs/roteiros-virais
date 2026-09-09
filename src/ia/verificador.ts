@@ -40,6 +40,14 @@ export function verificarLocalmente(
      * reprova a geracao.
      */
     evidenciasFornecidas?: number[];
+    /**
+     * O gancho dos roteiros recentes do mesmo cliente (achado do primeiro
+     * uso no iPad, item 3): segunda camada de defesa, por codigo, alem da
+     * instrucao no prompt (mesmo espirito da licao do PR #17, so instrucao
+     * no prompt nao bastava). So reprova quando `campos.gancho` existe;
+     * tarefas sem esse campo ignoram a checagem mesmo se a lista vier.
+     */
+    ganchosRecentes?: string[];
   } = {},
 ): ResultadoVerificacaoLocal {
   const motivos: string[] = [];
@@ -54,6 +62,18 @@ export function verificarLocalmente(
   for (const proibicao of opcoes.proibicoes ?? []) {
     if (proibicao.trim() && textoJunto.includes(normalizar(proibicao))) {
       motivos.push(`fere a proibicao do cliente: "${proibicao}"`);
+    }
+  }
+
+  if (campos.gancho && opcoes.ganchosRecentes && opcoes.ganchosRecentes.length > 0) {
+    const inicioNovo = inicioDoGancho(campos.gancho);
+    const repeteRecente = opcoes.ganchosRecentes.some(
+      (recente) => inicioDoGancho(recente) === inicioNovo,
+    );
+    if (repeteRecente) {
+      motivos.push(
+        "gancho: repete ou parafraseia as primeiras palavras de um gancho recente do mesmo cliente",
+      );
     }
   }
 
@@ -78,6 +98,18 @@ function normalizar(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
+const PALAVRAS_INICIO_GANCHO = 6;
+
+/** Minusculas, sem acento, sem pontuacao: as seis primeiras palavras, para comparar ganchos entre si. */
+function inicioDoGancho(texto: string): string {
+  return normalizar(texto)
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, PALAVRAS_INICIO_GANCHO)
+    .join(" ");
+}
+
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
   clienteId?: number;
@@ -85,6 +117,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   exigeEvidencia?: boolean;
   /** Os ids que entraram na entrada, para o verificador reprovar qualquer id citado fora daqui. */
   evidenciasFornecidas?: number[];
+  /** O gancho dos roteiros recentes do mesmo cliente (ver `verificarLocalmente`). */
+  ganchosRecentes?: string[];
   /**
    * "padrao" (default) ou "analise" (rodada de acabamento de 06/09, item
    * 1): qual criterio de tom a tarefa verificarTexto usa. Ver
@@ -137,6 +171,7 @@ async function tentarGerarEVerificar<T>(
     evidencias,
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,
+    ganchosRecentes: params.ganchosRecentes,
   });
 
   let aprovado = local.aprovado;

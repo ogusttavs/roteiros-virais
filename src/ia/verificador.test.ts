@@ -94,6 +94,49 @@ describe("verificarLocalmente", () => {
     );
     expect(r.aprovado).toBe(true);
   });
+
+  describe("ganchosRecentes (achado do primeiro uso no iPad, item 3)", () => {
+    it("reprova gancho identico a um recente", () => {
+      const r = verificarLocalmente(
+        { gancho: "voce ja tentou tirar mancha de vinho do sofa e nao conseguiu?", corpo: "texto" },
+        { ganchosRecentes: ["voce ja tentou tirar mancha de vinho do sofa e nao conseguiu?"] },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("gancho");
+    });
+
+    it("reprova parafrase: mesmas seis primeiras palavras, sem acento, sem pontuacao e sem ligar para maiuscula", () => {
+      const r = verificarLocalmente(
+        { gancho: "Você já tentou tirar mancha de vinho, sem sucesso?", corpo: "texto" },
+        { ganchosRecentes: ["voce ja tentou tirar mancha de vinho e nao conseguiu"] },
+      );
+      expect(r.aprovado).toBe(false);
+    });
+
+    it("aprova gancho que comeca diferente, mesmo tema", () => {
+      const r = verificarLocalmente(
+        { gancho: "isso aqui muda a forma como voce limpa o estofado", corpo: "texto" },
+        { ganchosRecentes: ["voce ja tentou tirar mancha de vinho e nao conseguiu"] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("aprova quando nao ha campo gancho, mesmo com a lista preenchida", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { ganchosRecentes: ["qualquer gancho recente"] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("aprova quando nao ha gancho recente nenhum", () => {
+      const r = verificarLocalmente(
+        { gancho: "gancho novo", corpo: "texto" },
+        { ganchosRecentes: [] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+  });
 });
 
 describe("gerarComVerificacao", () => {

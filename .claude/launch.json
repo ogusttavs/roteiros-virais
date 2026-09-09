@@ -10,7 +10,10 @@
     {
       "name": "dev-mock-etapa7",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-c", "AI_PROVIDER=mock PORT=3247 BETTER_AUTH_URL=http://localhost:3247 APP_URL=http://localhost:3247 npm run dev"],
+      "runtimeArgs": [
+        "-c",
+        "AI_PROVIDER=mock PORT=3247 BETTER_AUTH_URL=http://localhost:3247 APP_URL=http://localhost:3247 npm run dev"
+      ],
       "port": 3247
     },
     {
@@ -48,6 +51,15 @@
         "AI_PROVIDER=mock PORT=3427 BETTER_AUTH_URL=http://localhost:3427 APP_URL=http://localhost:3427 DATABASE_URL=postgres://roteiros:roteiros@localhost:5432/roteiros_dev npm run dev"
       ],
       "port": 3427
+    },
+    {
+      "name": "dev-mock-d2p1",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "AI_PROVIDER=mock PORT=3421 BETTER_AUTH_URL=http://localhost:3421 APP_URL=http://localhost:3421 DATABASE_URL=postgres://roteiros:roteiros@localhost:5432/roteiros_dev npm run dev"
+      ],
+      "port": 3421
     }
   ]
 }

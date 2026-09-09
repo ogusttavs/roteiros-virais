@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from "react";
 
 import type { Plataforma } from "@/db/schema";
 import { FORMATOS_EM_ORDEM } from "@/ia/enums";
+import { classificarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { VideoReferencia } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
 import { Chips, SeparadorChips } from "@/ui/componentes/Chips";
@@ -149,7 +150,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
             <ReferenciaCartao
               key={v.id}
               vezes={formatarVezes(v.foraDaCurva)}
-              rotuloVezes={textosReferencias.acimaDoNormal}
+              rotuloVezes={rotuloMultiploConta(classificarMultiplo(v.foraDaCurva))}
               conta={v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada}
               data={v.publicadoEm ? FORMATAR_DATA.format(v.publicadoEm) : ""}
               analise={[

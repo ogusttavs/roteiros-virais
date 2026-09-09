@@ -336,8 +336,10 @@ test.describe("briefing pela tela", () => {
 
     // O bloco 1 inteiro avaliado (p1, p2, p3): blocoInicial pula direto para o bloco 2
     // (so avanca quando NENHUMA pergunta do bloco atual ainda esta pendente).
+    // Nota abaixo da meta (8) de proposito (item 0 do PROXIMO.md, resto da D2 parte 2): na
+    // meta, a lista mostra "Na meta.", nao o resumo; este teste verifica o resumo em si.
     const avaliacaoP1: AvaliacaoResposta = {
-      nota: 9,
+      nota: 7,
       bom: "Resposta com exemplo concreto.",
       melhorar: "Falta dizer para quem e o serviço, com um número real da clínica.",
       como: "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.",
@@ -431,8 +433,10 @@ test.describe("briefing pela tela", () => {
       // Doze respostas avaliadas, cada uma com "melhorar" grande o bastante
       // para gerar uma linha de resumo (mesmo formato do teste "cartao de
       // notas" acima): e o que deixa a lista mais alta que a folha no celular.
+      // Nota abaixo da meta (8) de proposito (item 0 do PROXIMO.md): na meta, a lista
+      // mostra "Na meta.", curto o bastante para a lista nao estourar a folha mais.
       const avaliacao = (id: string): AvaliacaoResposta => ({
-        nota: 9,
+        nota: 7,
         bom: `A resposta de ${id} tem exemplo concreto.`,
         melhorar: `Poderia trazer mais um numero ou exemplo real do negocio na resposta de ${id}, para ficar ainda mais forte.`,
         como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",

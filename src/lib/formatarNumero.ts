@@ -5,7 +5,10 @@
  * `src/textos/` porque não é texto fixo, é regra de formatação, testável
  * sem depender de nenhuma tela.
  */
-const FORMATO_COMPACTO = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+const FORMATO_COMPACTO = new Intl.NumberFormat("pt-BR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
 const FORMATO_EXATO = new Intl.NumberFormat("pt-BR");
 
 /**
@@ -46,12 +49,20 @@ export function fraseDiasAtras(dias: number): string {
 export type FaixaMultiplo = "acima" | "media" | "abaixo";
 
 /**
- * A partir de 1,5x é "acima do normal"; entre 0,8 e 1,5 é "na média"; abaixo
- * é "abaixo do normal" (`BRIEF.md`, revisão de Referências; revisão do PR
- * #31, item 4: o rótulo do múltiplo sempre acompanha o número).
+ * A partir daqui é "acima do normal" (fora da curva de verdade). Exportado
+ * como número (leitura prévia do Fable, acabamento do iPad, item 4): antes
+ * `pesquisa.ts` tinha o mesmo 1,5 escrito à mão como string, e a régua da
+ * consulta e a do cartão podiam divergir sem ninguém notar.
+ */
+export const LIMIAR_FORA_DA_CURVA = 1.5;
+
+/**
+ * Entre 0,8 e o limiar acima é "na média"; abaixo é "abaixo do normal"
+ * (`BRIEF.md`, revisão de Referências; revisão do PR #31, item 4: o rótulo
+ * do múltiplo sempre acompanha o número).
  */
 export function classificarMultiplo(vezes: number): FaixaMultiplo {
-  if (vezes >= 1.5) return "acima";
+  if (vezes >= LIMIAR_FORA_DA_CURVA) return "acima";
   if (vezes >= 0.8) return "media";
   return "abaixo";
 }

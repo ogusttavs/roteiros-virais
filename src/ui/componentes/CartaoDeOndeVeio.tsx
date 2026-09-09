@@ -36,7 +36,7 @@ export function CartaoDeOndeVeio({ titulo, conta, multiplo, texto, segundoFormat
           </p>
           {segundoFormatado ? <p className={styles.segundo}>{segundoFormatado}</p> : null}
           {botao ? (
-            <a href={botao.href} className={styles.botao}>
+            <a href={botao.href} target="_blank" rel="noreferrer" className={styles.botao}>
               {botao.rotulo}
             </a>
           ) : null}

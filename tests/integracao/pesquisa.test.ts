@@ -261,4 +261,36 @@ describe("referenciasDoNicho", () => {
     expect(relevantes.find((v) => v.assunto === "assunto recente")?.formato).toBe("podcast");
     expect(resultado.some((v) => v.id === semAnalise.id)).toBe(false); // sem analise, nunca entra
   });
+
+  /** Achado do primeiro uso no iPad, item 4: "1,0x" e "0,7x" apareciam como se fossem referencia. */
+  it("so entra video fora da curva de verdade (>= 1,5x); na media ou abaixo, fica de fora", async () => {
+    const analiseExemplo = {
+      assunto: "assunto do limiar",
+      gancho: "gancho",
+      estrutura: "estrutura",
+      porQueFuncionou: "funcionou por isso",
+      formato: "fala_para_camera",
+    };
+    const naMedia = await criarVideo("ref-na-media", {
+      foraDaCurva: 1.0,
+      publicadoEm: diasAtras(1),
+      analise: { ...analiseExemplo, assunto: "na media" },
+    });
+    const abaixo = await criarVideo("ref-abaixo", {
+      foraDaCurva: 0.7,
+      publicadoEm: diasAtras(1),
+      analise: { ...analiseExemplo, assunto: "abaixo do normal" },
+    });
+    await criarVideo("ref-no-limiar", {
+      foraDaCurva: 1.5,
+      publicadoEm: diasAtras(1),
+      analise: { ...analiseExemplo, assunto: "no limiar" },
+    });
+
+    const resultado = await referenciasDoNicho(nichoId, 90);
+
+    expect(resultado.some((v) => v.id === naMedia.id)).toBe(false);
+    expect(resultado.some((v) => v.id === abaixo.id)).toBe(false);
+    expect(resultado.some((v) => v.assunto === "no limiar")).toBe(true);
+  });
 });

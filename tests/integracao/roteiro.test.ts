@@ -10,6 +10,7 @@ import { db, getPool } from "@/db";
 import {
   briefings,
   clientes,
+  geracoesIA,
   modelosNicho,
   nichos,
   roteiros,
@@ -20,7 +21,13 @@ import {
   type PerfilCompilado,
 } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
-import { ErroRoteiro, gerarRoteiro, marcarGravado, marcarPostado, outroAngulo } from "@/servicos/roteiro";
+import {
+  ErroRoteiro,
+  gerarRoteiro,
+  marcarGravado,
+  marcarPostado,
+  outroAngulo,
+} from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -42,13 +49,20 @@ const PERFIL_PADRAO: PerfilCompilado = {
 
 const MODELO_PADRAO: ModeloNicho = {
   resumo: "videos curtos mostrando o produto agindo",
-  ganchos: [{ tipo: "mostrar o produto agindo", exemplo: "olha essa mancha saindo", frequencia: "alta" }],
+  ganchos: [
+    { tipo: "mostrar o produto agindo", exemplo: "olha essa mancha saindo", frequencia: "alta" },
+  ],
   duracaoTipicaS: { min: 20, max: 30 },
   estruturas: ["gancho, demonstracao, fechamento"],
   fechamentos: ["mostra o resultado sem falar nada"],
   chamadasFinais: ["comenta se voce ja passou por isso"],
   formatos: [{ formato: "fala_para_camera", participacao: "60%" }],
-  edicao: { textoNaTela: "curto, no topo", ritmoDeCorte: "moderado", recursos: ["zoom na mancha"], audio: null },
+  edicao: {
+    textoNaTela: "curto, no topo",
+    ritmoDeCorte: "moderado",
+    recursos: ["zoom na mancha"],
+    audio: null,
+  },
   assuntosQuentes: ["mancha em estofado"],
   baseadoEm: 3,
   acimaDoLimiar: 3,
@@ -62,7 +76,11 @@ async function criarCliente(): Promise<number> {
   const usuarioId = `roteiro-teste-${contadorUsuario}`;
   await db()
     .insert(user)
-    .values({ id: usuarioId, name: `[teste] cliente ${contadorUsuario}`, email: `${usuarioId}@roteiro.teste` });
+    .values({
+      id: usuarioId,
+      name: `[teste] cliente ${contadorUsuario}`,
+      email: `${usuarioId}@roteiro.teste`,
+    });
 
   const [cliente] = await db()
     .insert(clientes)
@@ -75,7 +93,9 @@ async function criarCliente(): Promise<number> {
     })
     .returning();
 
-  await db().insert(briefings).values({ clienteId: cliente.id, completo: true, perfil: PERFIL_PADRAO });
+  await db()
+    .insert(briefings)
+    .values({ clienteId: cliente.id, completo: true, perfil: PERFIL_PADRAO });
 
   return cliente.id;
 }
@@ -182,11 +202,20 @@ describe("gerarRoteiro", () => {
   it("cliente sem briefing compilado: erro nomeado", async () => {
     contadorUsuario += 1;
     const usuarioId = `roteiro-teste-sem-briefing-${contadorUsuario}`;
-    await db().insert(user).values({ id: usuarioId, name: "sem briefing", email: `${usuarioId}@roteiro.teste` });
-    const [cliente] = await db().insert(clientes).values({ usuarioId, nome: "sem briefing", nichoId }).returning();
+    await db()
+      .insert(user)
+      .values({ id: usuarioId, name: "sem briefing", email: `${usuarioId}@roteiro.teste` });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId, nome: "sem briefing", nichoId })
+      .returning();
 
     await expect(
-      gerarRoteiro(cliente.id, { origem: "livre", textoTema: "qualquer assunto", objetivo: "alcance" }),
+      gerarRoteiro(cliente.id, {
+        origem: "livre",
+        textoTema: "qualquer assunto",
+        objetivo: "alcance",
+      }),
     ).rejects.toThrow(ErroRoteiro);
   });
 
@@ -243,6 +272,55 @@ describe("gerarRoteiro", () => {
   });
 });
 
+describe("historico de ganchos entre roteiros do mesmo cliente (achado do primeiro uso no iPad, item 3)", () => {
+  it("o gancho do roteiro anterior entra na entrada da geracao seguinte", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-gancho-1", "mancha de vinho no estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "alcance",
+    });
+
+    await criarVideoEvidencia("ev-gancho-2", "cheiro de bicho de estimacao no sofa");
+    const v2 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de bicho de estimacao no sofa",
+      objetivo: "alcance",
+    });
+
+    const [geracaoV2] = await db()
+      .select()
+      .from(geracoesIA)
+      .where(eq(geracoesIA.id, v2.geracaoId!));
+    const entradaV2 = (geracaoV2.entradas as { entrada: string }).entrada;
+
+    expect(entradaV2).toContain(v1.conteudo.gancho);
+  });
+
+  it("reprova quando o novo gancho repete o de um roteiro recente do mesmo cliente (mock e deterministico no tema)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-gancho-repete", "mancha de vinho no estofado");
+
+    await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "alcance",
+    });
+
+    // mesmo tema, mesmo cliente: o mock devolve o mesmo gancho de novo nas
+    // duas tentativas, e o verificador local reprova as duas.
+    await expect(
+      gerarRoteiro(clienteId, {
+        origem: "livre",
+        textoTema: "mancha de vinho no estofado",
+        objetivo: "alcance",
+      }),
+    ).rejects.toThrow(ErroIA);
+  });
+});
+
 describe("outroAngulo", () => {
   it("cria a versao 2 na mesma serie, mantendo a versao 1 acessivel", async () => {
     const clienteId = await criarCliente();
@@ -292,13 +370,19 @@ describe("marcarGravado e marcarPostado", () => {
       objetivo: "alcance",
     });
 
-    const atualizado = await marcarPostado(roteiro.id, "https://www.tiktok.com/@sofalimpo/video/1234567890");
+    const atualizado = await marcarPostado(
+      roteiro.id,
+      "https://www.tiktok.com/@sofalimpo/video/1234567890",
+    );
 
     expect(atualizado.status).toBe("postado");
     expect(atualizado.urlPostado).toBe("https://www.tiktok.com/@sofalimpo/video/1234567890");
     expect(atualizado.postadoEm).not.toBeNull();
 
-    const [videoCliente] = await db().select().from(videosCliente).where(eq(videosCliente.roteiroId, roteiro.id));
+    const [videoCliente] = await db()
+      .select()
+      .from(videosCliente)
+      .where(eq(videosCliente.roteiroId, roteiro.id));
     expect(videoCliente.clienteId).toBe(clienteId);
     expect(videoCliente.plataforma).toBe("tiktok");
     expect(videoCliente.idExterno).toBe("1234567890");

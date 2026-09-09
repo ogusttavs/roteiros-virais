@@ -5,7 +5,8 @@
  * própria `BarraTopo`.
  */
 .pagina {
-  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6)))
+    calc(-1 * var(--margem-celular))
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
@@ -184,7 +185,8 @@
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
+  padding: var(--espaco-3) var(--margem-celular)
+    calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
   background: var(--cor-material-barra);
   backdrop-filter: var(--desfoque-barra);
   -webkit-backdrop-filter: var(--desfoque-barra);
@@ -245,6 +247,14 @@
   }
 }
 
+/** Baixar em PDF na barra de ações: só o ícone, quadrado, do tablet para cima (item 5). */
+.btnIcone {
+  flex: 0 0 auto;
+  min-width: var(--altura-toque-lg);
+  width: var(--altura-toque-lg);
+  padding: 0;
+}
+
 .btn {
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
@@ -277,30 +287,25 @@
   box-shadow: var(--sombra-foco);
 }
 
-/* ---------- Painéis (menu, postei, ângulo, versões) ---------- */
+/**
+ * Painéis (menu, postei, ângulo, versões): a posição e o fechar são do
+ * componente compartilhado `PainelFlutuante` (achado do primeiro uso no
+ * iPad, `PROXIMO.md`, item 1: `position: relative` deixava o painel nascer
+ * no fim da página, fora da tela). Aqui só o título de dentro do painel.
+ */
 
-.formularioPainel {
-  /**
-   * Acima da barra de ações fixa (achado rodando o e2e de layout,
-   * `PROXIMO.md` D2 parte 1, item 8): sem isto, o botão de baixo do painel
-   * ficava atrás da barra fixa e o clique não chegava nele.
-   */
-  position: relative;
-  z-index: 26;
-  display: grid;
-  gap: var(--espaco-4);
-  padding: var(--espaco-4) var(--margem-celular) var(--espaco-6);
-  background: var(--cor-superficie);
-  border-top: var(--largura-borda) solid var(--cor-divisor);
-}
-
-.formularioPainel h2 {
+.tituloPainel {
   margin: 0;
   font-size: var(--tamanho-titulo-2);
   font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
 
+/**
+ * "Baixar em PDF" é um `<a>`, os outros itens são `<button>` (ajuste da
+ * revisão do PR #33, item 3): sem `text-decoration` e `color: inherit`, o
+ * link nascia sublinhado e azul, do jeito padrão do navegador.
+ */
 .itemMenu {
   display: flex;
   align-items: center;
@@ -310,10 +315,11 @@
   border: 0;
   background: transparent;
   border-radius: var(--raio-md);
-  color: var(--cor-titulo);
+  color: inherit;
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-corpo);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
 }
 

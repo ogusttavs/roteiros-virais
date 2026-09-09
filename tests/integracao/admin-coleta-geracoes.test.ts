@@ -4,7 +4,7 @@
  * Postgres real, com os numeros conferidos por consulta SQL de conferencia
  * (anotada em cada teste). Custo por cliente nos ultimos 30 dias.
  */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, geracoesIA, user } from "@/db/schema";
@@ -66,6 +66,18 @@ async function criarGeracao(dados: {
 }
 
 beforeAll(async () => {
+  /**
+   * `resumoGeracoes` (`admin-coleta.ts`) calcula a janela de dias a partir
+   * de `Date.now()`, não de `AGORA`; sem travar o relógio, as fixtures
+   * gravadas em `hADias(4)` saem da janela de 7 dias assim que o dia real
+   * passa de `AGORA` (achado no PR #24; caiu na definição de pronto do PR
+   * #33, ajuste 7, sem relação com o roteiro em PDF).
+   */
+  /** So `Date`, nunca `setTimeout`: o pool do `pg` e o `resetarSchema` abaixo dependem de
+   * temporizador de verdade para timeout e retry de conexao. */
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(AGORA);
+
   await resetarSchema(db());
 
   clienteAId = await criarCliente("geracoes-teste-cliente-a", "[teste] Cliente A");
@@ -140,6 +152,7 @@ beforeAll(async () => {
 }, 30_000);
 
 afterAll(async () => {
+  vi.useRealTimers();
   await getPool().end();
 });
 

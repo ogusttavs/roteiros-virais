@@ -37,8 +37,19 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * nao pega). Sem checagem nova de codigo: os dois roteiros reais ficaram
  * honestos so com a instrucao, e a fase 3 cria a checagem se o golden set
  * mostrar o contrario. Versao 1.4.0.
+ *
+ * Achado do primeiro uso no iPad, item 3: o roteiro do dia 2 comecou igual
+ * ao do dia 1, porque `roteirosRecentes` so levava titulo, objetivo e
+ * status, nunca o gancho, entao o modelo nao tinha como saber qual frase de
+ * abertura ja foi usada. `roteirosRecentes` ganha o gancho de cada roteiro
+ * (agora dos ultimos 10 dias, nao so os ultimos 10, `servicos/roteiro.ts`),
+ * e a regra dura 6 vira explicita sobre nao repetir nem parafrasear o
+ * gancho. A segunda camada de defesa (comparacao por codigo, nao so
+ * instrucao no prompt) fica no verificador (`verificador.ts`,
+ * `verificarLocalmente`), no mesmo espirito da licao do PR #17. Versao
+ * 1.5.0.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -93,8 +104,10 @@ gravar com a própria cara no celular. Regras duras:
 4. Sem travessão, sem emoji, sem jargão em nenhum campo de texto.
 5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do
    nicho.
-6. Não repita o ângulo de um roteiro recente do mesmo cliente (lista abaixo); se o tema pedido
-   for muito parecido com um deles, escolha um ângulo diferente para o gancho e a estrutura.
+6. Não repita o ângulo de um roteiro recente do mesmo cliente (lista abaixo, com o gancho de
+   cada um); se o tema pedido for muito parecido com um deles, escolha um ângulo diferente
+   para o gancho e a estrutura. O gancho novo não pode repetir nem parafrasear nenhum gancho
+   recente: comece de um jeito diferente, com outra pergunta ou outra cena.
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -137,7 +150,8 @@ export function montarEntrada(dados: {
     foraDaCurva: number;
     momentoChave?: string;
   }[];
-  roteirosRecentes: { tema: string; objetivo: Objetivo; status: string }[];
+  /** Dos ultimos 10 dias (`servicos/roteiro.ts`, `historicoDeRoteiros`), com o gancho de cada um. */
+  roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
   /**
    * "Outro ângulo" (etapa 11, decisão 4 do `PROXIMO.md`): o gancho e o
    * corpo da versão que o cliente já viu e pediu para trocar, para o
@@ -166,7 +180,9 @@ export function montarEntrada(dados: {
 
   const listaRecentes =
     dados.roteirosRecentes.length > 0
-      ? dados.roteirosRecentes.map((r) => `"${r.tema}" (${NOME_OBJETIVO[r.objetivo]}, ${r.status})`).join("; ")
+      ? dados.roteirosRecentes
+          .map((r) => `"${r.tema}" (${NOME_OBJETIVO[r.objetivo]}, ${r.status}), gancho: "${r.gancho}"`)
+          .join("; ")
       : "nenhum roteiro anterior";
 
   const partes = [

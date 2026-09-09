@@ -1,0 +1,50 @@
+/**
+ * O roteiro em PDF (`PROXIMO.md`, acabamento do iPad, item 5): a mesma
+ * fonte e as mesmas cores do painel (tokens.css, importado pelo layout
+ * raiz), só sem a barra lateral, sem a barra de ações e sem os painéis
+ * flutuantes. `@page` cabe numa folha A4; a margem real do PDF vem de
+ * `page.pdf()` no Playwright (rota `/api/roteiros/[id]/pdf`), não daqui.
+ *
+ * Sem `padding` aqui (ajuste da revisão do PR #33, item 2): a margem já vem
+ * do `page.pdf()`; somar as duas empurrava o roteiro de exemplo para uma
+ * segunda página quase em branco (só um resquício do fundo do `.pagina`).
+ * Largura da folha inteira, não `--largura-leitura` (a coluna de leitura do
+ * painel é estreita de propósito para a tela; no papel só encurta as linhas
+ * e alonga a página à toa), e `gap` menor (`--espaco-6`).
+ */
+@page {
+  size: A4;
+}
+
+.pagina {
+  display: grid;
+  gap: var(--espaco-6);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  line-height: 1.5;
+}
+
+.cabecalho {
+  display: grid;
+  gap: var(--espaco-2);
+  padding-bottom: var(--espaco-5);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-1);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-4);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
