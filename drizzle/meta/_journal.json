@@ -113,6 +113,13 @@
       "when": 1788916484044,
       "tag": "0015_contas-base-completa",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788957155540,
+      "tag": "0016_chamadas-meta-api",
+      "breakpoints": true
     }
   ]
 }

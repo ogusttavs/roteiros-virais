@@ -69,6 +69,18 @@ export const config = {
     apifyMaxItems: envNumero("APIFY_MAX_ITEMS", process.env.NODE_ENV === "production" ? 200 : 50),
     /** Teto diario de resultados do Apify (fonte "apify" em consumo_api), somando TikTok e Instagram. */
     apifyMaxResultadosDia: envNumero("APIFY_MAX_RESULTADOS_DIA", 1000),
+    /** Id numerico da conta Instagram que enxerga a Business Discovery e a Hashtag Search (a Velura). */
+    metaIgId: env("META_IG_ID"),
+    /** Token permanente de usuario do sistema do Portfolio empresarial (acessos/meta-app.md). */
+    metaToken: env("META_TOKEN"),
+    /**
+     * E6 parte 3, segunda rodada: so true com META_ATIVO=1 e os dois dados
+     * da conta chamadora preenchidos. Sem isso (ainda faltando o id, o
+     * token, ou a flag desligada), os jobs do Instagram pela API nao
+     * agendam e o Apify continua como hoje (PROXIMO.md, item 1): nunca um
+     * erro de boot, so a rodada anterior seguindo em frente.
+     */
+    metaAtivo: env("META_ATIVO") === "1" && env("META_IG_ID") !== "" && env("META_TOKEN") !== "",
   },
   email: {
     resendKey: env("RESEND_API_KEY"),

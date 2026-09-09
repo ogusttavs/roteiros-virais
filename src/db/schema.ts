@@ -673,6 +673,21 @@ export const consumoApi = pgTable(
   (t) => [uniqueIndex("consumo_api_fonte_data").on(t.fonte, t.data)],
 );
 
+/**
+ * Uma linha por chamada da Graph API da Meta (E6 parte 3, segunda rodada,
+ * item 1): o limite e 200 por hora, janela corrida, nao por dia calendario
+ * como `consumo_api`; por isso uma tabela a parte, so com o instante da
+ * chamada, em vez de um contador por data.
+ */
+export const chamadasMetaApi = pgTable(
+  "chamadas_meta_api",
+  {
+    id: id(),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chamadas_meta_api_criado_em").on(t.criadoEm)],
+);
+
 /** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */
 export type AvaliacaoGeracao = "gostei" | "nao_gostei" | "outro_angulo";
 
