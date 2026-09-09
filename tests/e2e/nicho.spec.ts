@@ -48,6 +48,11 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await expect(page.getByRole("heading", { name: NOME_NICHO })).toBeVisible();
   await expect(page.getByText("termo um")).toBeVisible();
 
+  // Bloco novo (E6 parte 3, item 7): nicho recem criado, sem conta nem video
+  // ainda, mas as tres plataformas aparecem com "0 / 0".
+  await expect(page.getByRole("heading", { name: "estoque por plataforma" })).toBeVisible();
+  await expect(page.getByRole("row").filter({ hasText: "youtube" })).toContainText("0 / 0");
+
   await page.goto("/admin/clientes");
   await page.getByRole("button", { name: "convidar cliente" }).click();
   const modalConvidar = page.getByRole("dialog", { name: "Convidar cliente" });

@@ -4,6 +4,7 @@
  * plataforma, contas vigiadas, e as execucoes de job mais recentes com a
  * mensagem de erro passando intacta.
  */
+import { inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -13,6 +14,7 @@ import {
   listarClientesAdmin,
   listarExecucoesRecentes,
   listarNichosComContagem,
+  resumoMedianaPorPlataforma,
   ultimaExecucaoPorJob,
 } from "@/servicos/admin-coleta";
 import { constanciaDoCliente } from "@/servicos/temas";
@@ -230,5 +232,81 @@ describe("listarClientesAdmin, dias sem gravar", () => {
     expect(constancia.tipo).toBe("parado");
     const diasEsperados = constancia.tipo === "parado" ? constancia.dias : null;
     expect(lista.find((c) => c.id === clienteParadoId)?.diasSemGravar).toBe(diasEsperados);
+  });
+});
+
+describe("resumoMedianaPorPlataforma", () => {
+  it("sempre as tres plataformas, mesmo com zero conta (instagram, neste nicho)", async () => {
+    const resumo = await resumoMedianaPorPlataforma(nichoId);
+    const porPlataforma = new Map(resumo.map((r) => [r.plataforma, r]));
+
+    expect(porPlataforma.get("instagram")).toEqual({
+      plataforma: "instagram",
+      totalContas: 0,
+      contasComMediana: 0,
+      contasPorOrigem: { conta: 0, seguidores: 0, setor: 0 },
+      totalVideos: 0,
+      videosComMultiplo: 0,
+    });
+    // youtube e tiktok do beforeAll: 1 conta cada, sem mediana nem foraDaCurva ainda.
+    expect(porPlataforma.get("youtube")).toMatchObject({ totalContas: 1, contasComMediana: 0, totalVideos: 2 });
+    expect(porPlataforma.get("tiktok")).toMatchObject({ totalContas: 1, contasComMediana: 0, totalVideos: 1 });
+  });
+
+  it("separa contas com mediana por origem, e conta video com multiplo (foraDaCurva nao nulo)", async () => {
+    const [contaOrigemConta] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "youtube",
+        handle: "@origem-conta",
+        nichoId,
+        medianaViews: "3000",
+        medianaOrigem: "conta",
+      })
+      .returning();
+    const [contaOrigemSetor] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "youtube",
+        handle: "@origem-setor",
+        nichoId,
+        medianaViews: "3500",
+        medianaOrigem: "setor",
+      })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values([
+        {
+          plataforma: "youtube",
+          idExterno: "yt-com-multiplo",
+          url: "https://youtube.com/com-multiplo",
+          contaId: contaOrigemConta.id,
+          nichoId,
+          foraDaCurva: "2.5",
+        },
+        {
+          plataforma: "youtube",
+          idExterno: "yt-sem-multiplo",
+          url: "https://youtube.com/sem-multiplo",
+          contaId: contaOrigemSetor.id,
+          nichoId,
+        },
+      ]);
+
+    const resumo = await resumoMedianaPorPlataforma(nichoId);
+    const youtube = resumo.find((r) => r.plataforma === "youtube");
+
+    // 3 contas de youtube agora: a original do beforeAll (sem mediana) mais as duas novas.
+    expect(youtube?.totalContas).toBe(3);
+    expect(youtube?.contasComMediana).toBe(2);
+    expect(youtube?.contasPorOrigem).toEqual({ conta: 1, seguidores: 0, setor: 1 });
+    // 4 videos de youtube agora: os 2 do beforeAll (sem multiplo) mais os 2 novos (1 com, 1 sem).
+    expect(youtube?.totalVideos).toBe(4);
+    expect(youtube?.videosComMultiplo).toBe(1);
+
+    await db().delete(videos).where(inArray(videos.idExterno, ["yt-com-multiplo", "yt-sem-multiplo"]));
+    await db().delete(contas).where(inArray(contas.id, [contaOrigemConta.id, contaOrigemSetor.id]));
   });
 });

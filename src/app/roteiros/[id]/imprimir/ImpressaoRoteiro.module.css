@@ -20,17 +20,18 @@
  * O `body` desta rota herda `--cor-fundo` (o fundo do painel) de `base.css`;
  * onde `.pagina` termina antes do fim da folha impressa, esse fundo aparece
  * como uma faixa cinza no papel (achado da revisão do PR #33, item 0a,
- * visível em `Roteiro.PdfAberto.A4.Claro.png`). `:global` porque `html` e
- * `body` não são deste módulo.
+ * visível em `Roteiro.PdfAberto.A4.Claro.png`). Um seletor `:global(html)`/
+ * `:global(body)` puro (sem nenhuma classe local no mesmo seletor) não
+ * compila: o css-loader do Next exige pelo menos uma classe local por
+ * seletor em todo `.module.css` (achado rodando `npm run build` nesta
+ * rodada, antes disso o build inteiro quebrava). `min-height: 100vh` no
+ * próprio `.pagina` (classe local) cobre a folha inteira sem precisar
+ * pintar `html`/`body`.
  */
-:global(html),
-:global(body) {
-  background: var(--cor-superficie);
-}
-
 .pagina {
   display: grid;
   gap: var(--espaco-6);
+  min-height: 100vh;
   background: var(--cor-superficie);
   color: var(--cor-texto);
   font-family: var(--fonte-texto);

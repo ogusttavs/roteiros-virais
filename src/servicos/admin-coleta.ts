@@ -240,6 +240,69 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
   }));
 }
 
+export type ResumoMedianaPlataforma = {
+  plataforma: Plataforma;
+  totalContas: number;
+  contasComMediana: number;
+  /** As tres origens somam `contasComMediana` (E6 parte 3, item 2, `contas.mediana_origem`). */
+  contasPorOrigem: Record<"conta" | "seguidores" | "setor", number>;
+  totalVideos: number;
+  videosComMultiplo: number;
+};
+
+/**
+ * Uma linha por plataforma, "contas com mediana / total" (por origem) e
+ * "vídeos com múltiplo / total" (E6 parte 3, item 7): para nunca mais
+ * descobrir pela tela do cliente se a coleta de um nicho está entrando no
+ * motor. Sempre as três plataformas, mesmo com zero conta ou vídeo.
+ */
+export async function resumoMedianaPorPlataforma(nichoId: number): Promise<ResumoMedianaPlataforma[]> {
+  const [linhasContas, linhasVideos] = await Promise.all([
+    db()
+      .select({
+        plataforma: contas.plataforma,
+        total: count(),
+        comMediana: sql<number>`count(*) filter (where ${contas.medianaViews} is not null)`,
+        origemConta: sql<number>`count(*) filter (where ${contas.medianaOrigem} = 'conta')`,
+        origemSeguidores: sql<number>`count(*) filter (where ${contas.medianaOrigem} = 'seguidores')`,
+        origemSetor: sql<number>`count(*) filter (where ${contas.medianaOrigem} = 'setor')`,
+      })
+      .from(contas)
+      .where(eq(contas.nichoId, nichoId))
+      .groupBy(contas.plataforma),
+    db()
+      .select({
+        plataforma: videos.plataforma,
+        total: count(),
+        comMultiplo: sql<number>`count(*) filter (where ${videos.foraDaCurva} is not null)`,
+      })
+      .from(videos)
+      .where(eq(videos.nichoId, nichoId))
+      .groupBy(videos.plataforma),
+  ]);
+
+  const PLATAFORMAS: Plataforma[] = ["youtube", "tiktok", "instagram"];
+  return PLATAFORMAS.map((plataforma) => {
+    const c = linhasContas.find((l) => l.plataforma === plataforma);
+    const v = linhasVideos.find((l) => l.plataforma === plataforma);
+    return {
+      plataforma,
+      totalContas: c?.total ?? 0,
+      // `count(*) filter (...)` cru vem como string do driver (bigint do Postgres);
+      // `count()` do Drizzle (acima, `total`) ja converte, este `Number` cobre so
+      // os filtrados.
+      contasComMediana: Number(c?.comMediana ?? 0),
+      contasPorOrigem: {
+        conta: Number(c?.origemConta ?? 0),
+        seguidores: Number(c?.origemSeguidores ?? 0),
+        setor: Number(c?.origemSetor ?? 0),
+      },
+      totalVideos: v?.total ?? 0,
+      videosComMultiplo: Number(v?.comMultiplo ?? 0),
+    };
+  });
+}
+
 /**
  * Os temas de hoje do nicho, exatamente como o job `temasDoDia` gravou
  * (etapa 10, decisão 8 do `PROXIMO.md`): sem a regra de estabilidade nem a
