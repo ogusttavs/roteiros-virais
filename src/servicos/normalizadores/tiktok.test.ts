@@ -29,7 +29,7 @@ describe("normalizarVideoTiktok", () => {
       plataforma: "tiktok",
       idExterno: "7345678901234567890",
       url: "https://www.tiktok.com/@exemplo.sorrisoemdia/video/7345678901234567890",
-      titulo: null,
+      titulo: "[exemplo] 3 erros que estragam o seu sorriso #dentista",
       descricao: "[exemplo] 3 erros que estragam o seu sorriso #dentista",
       publicadoEm: new Date("2026-08-21T10:00:00.000Z"),
       duracaoS: 34,
@@ -58,6 +58,7 @@ describe("normalizarVideoTiktok", () => {
     expect(video.likes).toBe(0);
     expect(video.comentarios).toBe(0);
     expect(video.views).toBe(58210);
+    expect(video.titulo).toBe("[exemplo] antes e depois de um clareamento");
   });
 
   /** Rodada de acabamento de 06/09, item 3: achado real, "Cannot read properties of undefined". */

@@ -6,6 +6,8 @@
 import type { VideoAudio } from "@/db/schema";
 import type { InstagramItemBruto } from "@/jobs/apify-api";
 
+import { tituloDeVideo } from "./titulo";
+
 export type ContaNormalizada = {
   plataforma: "instagram";
   handle: string;
@@ -44,14 +46,17 @@ function normalizarAudio(item: InstagramItemBruto): VideoAudio | null {
 }
 
 export function normalizarVideoInstagram(item: InstagramItemBruto): VideoContaEAudioNormalizados {
+  const descricao = item.caption || null;
+  const publicadoEm = item.timestamp ? new Date(item.timestamp) : null;
+
   return {
     video: {
       plataforma: "instagram",
       idExterno: item.shortCode || item.id,
       url: item.url,
-      titulo: null,
-      descricao: item.caption || null,
-      publicadoEm: item.timestamp ? new Date(item.timestamp) : null,
+      titulo: tituloDeVideo(descricao, item.ownerUsername, publicadoEm),
+      descricao,
+      publicadoEm,
       duracaoS: item.videoDuration ? Math.round(item.videoDuration) : null,
       views: item.videoPlayCount ?? item.videoViewCount ?? 0,
       likes: item.likesCount ?? 0,

@@ -22,7 +22,7 @@ describe("normalizarVideoInstagram", () => {
       plataforma: "instagram",
       idExterno: "Cx1Exemplo01",
       url: "https://www.instagram.com/reel/Cx1Exemplo01/",
-      titulo: null,
+      titulo: "[exemplo] 3 erros que estragam o seu sorriso",
       descricao: "[exemplo] 3 erros que estragam o seu sorriso",
       publicadoEm: new Date("2026-08-21T10:00:00.000Z"),
       duracaoS: 34,
@@ -52,5 +52,6 @@ describe("normalizarVideoInstagram", () => {
     expect(video.comentarios).toBe(0);
     expect(video.duracaoS).toBeNull();
     expect(video.views).toBe(40210);
+    expect(video.titulo).toBe("[exemplo] antes e depois de um clareamento");
   });
 });

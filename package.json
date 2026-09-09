@@ -28,6 +28,7 @@
     "job": "tsx src/jobs/rodar.ts",
     "admin:criar": "tsx scripts/criar-admin.ts",
     "preencher:nome-contas": "tsx scripts/preencher-nome-contas.ts",
+    "corrigir:titulos": "tsx scripts/corrigir-titulos.ts",
     "ia:fumaca": "tsx scripts/ia-fumaca.ts",
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",

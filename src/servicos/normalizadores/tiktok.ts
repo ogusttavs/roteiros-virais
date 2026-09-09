@@ -6,6 +6,8 @@
 import type { VideoAudio } from "@/db/schema";
 import type { TiktokItemBruto } from "@/jobs/apify-api";
 
+import { tituloDeVideo } from "./titulo";
+
 export type ContaNormalizada = {
   plataforma: "tiktok";
   handle: string;
@@ -55,14 +57,17 @@ export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNo
   const nomeAutor = item.authorMeta?.name;
   if (!nomeAutor) return null;
 
+  const descricao = item.text || null;
+  const publicadoEm = item.createTimeISO ? new Date(item.createTimeISO) : null;
+
   return {
     video: {
       plataforma: "tiktok",
       idExterno: item.id,
       url: item.webVideoUrl,
-      titulo: null,
-      descricao: item.text || null,
-      publicadoEm: item.createTimeISO ? new Date(item.createTimeISO) : null,
+      titulo: tituloDeVideo(descricao, nomeAutor, publicadoEm),
+      descricao,
+      publicadoEm,
       duracaoS: item.videoMeta?.duration ?? null,
       views: item.playCount ?? 0,
       likes: item.diggCount ?? 0,
