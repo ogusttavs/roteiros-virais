@@ -12,10 +12,13 @@
  * `coleta-youtube.ts`); TikTok e Instagram pelo mesmo ator do `apify-api.ts`,
  * em modo perfil (`buscarTiktok`/`buscarInstagram` com só um handle no
  * array de perfis, sem hashtag: o mesmo mecanismo que já busca as contas
- * vigiadas). O teto diário do Apify é a única trava (decisão do
- * `PROXIMO.md`): ao bater, o job inteiro para (mesmo em contas do YouTube
- * ainda por vir na lista) e continua no dia seguinte, com as contas que
- * sobraram ainda sem `baseCompletaEm`.
+ * vigiadas). O teto diário do Apify é a única trava do TikTok e do
+ * Instagram (decisão do `PROXIMO.md`): ao bater, o job pula só as
+ * candidatas dessas duas plataformas (ajuste da revisão do PR #34, item
+ * 0b: antes o job inteiro parava, e as candidatas do YouTube que vinham
+ * depois na lista nunca recebiam catch-up nenhum enquanto o Apify
+ * estivesse pausado) e continua tentando as do YouTube, no nicho atual e
+ * nos seguintes; `tetoAtingido` no resumo registra que isso aconteceu.
  */
 import { and, eq, sql } from "drizzle-orm";
 
@@ -77,11 +80,19 @@ async function marcarBaseCompleta(contaId: number): Promise<void> {
   await db().update(contas).set({ baseCompletaEm: new Date() }).where(eq(contas.id, contaId));
 }
 
-type ResultadoCatchUp = { novos: number; atualizados: number; devolvidosApify: number };
+/**
+ * `usadosApify` e o que de fato conta para `consumo_api` e para o teto (o
+ * mesmo `itens.length`, ja cortado, que `coleta-apify.ts` usa: decisao 4
+ * da etapa 6, "o teto e o que processamos"); `devolvidosApify` e so
+ * telemetria, o bruto do Apify antes do corte (ajuste da revisao do PR
+ * #34, item 0c: antes este job registrava `devolvidos` como consumo, uma
+ * regua diferente da coleta).
+ */
+type ResultadoCatchUp = { novos: number; atualizados: number; usadosApify: number; devolvidosApify: number };
 
 async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
   const { itens, devolvidos } = await buscarTiktok([], [candidata.handle], VIDEOS_POR_CONTA);
-  await registrarConsumo(FONTE_APIFY, devolvidos);
+  await registrarConsumo(FONTE_APIFY, itens.length);
 
   let novos = 0;
   let atualizados = 0;
@@ -94,12 +105,12 @@ async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promis
     if (resultado === "novo") novos += 1;
     else atualizados += 1;
   }
-  return { novos, atualizados, devolvidosApify: devolvidos };
+  return { novos, atualizados, usadosApify: itens.length, devolvidosApify: devolvidos };
 }
 
 async function catchUpInstagram(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
   const { itens, devolvidos } = await buscarInstagram([], [candidata.handle], VIDEOS_POR_CONTA);
-  await registrarConsumo(FONTE_APIFY, devolvidos);
+  await registrarConsumo(FONTE_APIFY, itens.length);
 
   let novos = 0;
   let atualizados = 0;
@@ -110,7 +121,7 @@ async function catchUpInstagram(nichoId: number, candidata: ContaCandidata): Pro
     if (resultado === "novo") novos += 1;
     else atualizados += 1;
   }
-  return { novos, atualizados, devolvidosApify: devolvidos };
+  return { novos, atualizados, usadosApify: itens.length, devolvidosApify: devolvidos };
 }
 
 /**
@@ -124,12 +135,12 @@ async function catchUpYoutube(nichoId: number, candidata: ContaCandidata): Promi
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
   const canalResp = await buscarCanal(candidata.handle);
   const canal = canalResp.items?.[0];
-  if (!canal) return { novos: 0, atualizados: 0, devolvidosApify: 0 };
+  if (!canal) return { novos: 0, atualizados: 0, usadosApify: 0, devolvidosApify: 0 };
 
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
   const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
   const ids = (uploadsResp.items ?? []).slice(0, VIDEOS_POR_CONTA).map((item) => item.snippet.resourceId.videoId);
-  if (ids.length === 0) return { novos: 0, atualizados: 0, devolvidosApify: 0 };
+  if (ids.length === 0) return { novos: 0, atualizados: 0, usadosApify: 0, devolvidosApify: 0 };
 
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
   const videosResp = await buscarVideosPorId(ids);
@@ -143,7 +154,7 @@ async function catchUpYoutube(nichoId: number, candidata: ContaCandidata): Promi
     if (resultado === "novo") novos += 1;
     else atualizados += 1;
   }
-  return { novos, atualizados, devolvidosApify: 0 };
+  return { novos, atualizados, usadosApify: 0, devolvidosApify: 0 };
 }
 
 export async function rodarContasBase(): Promise<Record<string, unknown>> {
@@ -151,6 +162,7 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
 
   const teto = config.coleta.apifyMaxResultadosDia;
   let resultadosApifyUsados = await consumoDeHoje(FONTE_APIFY);
+  let resultadosApifyDevolvidos = 0;
   const apifyCabe = () => resultadosApifyUsados < teto;
 
   let contasProcessadas = 0;
@@ -160,13 +172,11 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
-    if (tetoAtingido) break;
-
     const candidatas = await contasCandidatas(nicho.id);
     for (const candidata of candidatas) {
       if ((candidata.plataforma === "tiktok" || candidata.plataforma === "instagram") && !apifyCabe()) {
         tetoAtingido = true;
-        break;
+        continue;
       }
 
       try {
@@ -177,7 +187,8 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
               ? await catchUpInstagram(nicho.id, candidata)
               : await catchUpYoutube(nicho.id, candidata);
 
-        resultadosApifyUsados += resultado.devolvidosApify;
+        resultadosApifyUsados += resultado.usadosApify;
+        resultadosApifyDevolvidos += resultado.devolvidosApify;
         videosNovos += resultado.novos;
         videosAtualizados += resultado.atualizados;
         await marcarBaseCompleta(candidata.contaId);
@@ -199,6 +210,7 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
     contasProcessadas,
     videosNovos,
     videosAtualizados,
+    resultadosApifyDevolvidos,
     tetoAtingido,
     erros: erros.length > 0 ? erros : undefined,
   };

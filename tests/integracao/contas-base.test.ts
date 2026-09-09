@@ -96,8 +96,9 @@ afterEach(async () => {
 });
 
 describe("rodarContasBase", () => {
-  it("prioriza por views e respeita o teto: a conta com mais views e atendida primeiro, a outra fica para amanha", async () => {
+  it("prioriza por views e respeita o teto: tiktok depois do teto fica para amanha, mas o youtube entre eles ainda e atendido (revisao do PR #34, item 0b)", async () => {
     const contaBaixa = await criarContaComVideo("tiktok", "conta-baixa-views", 100);
+    const contaYoutube = await criarContaComVideo("youtube", "UCentreostiktok0000001", 50000);
     const contaAlta = await criarContaComVideo("tiktok", "conta-alta-views", 99999);
 
     const teto = config.coleta.apifyMaxResultadosDia;
@@ -107,18 +108,58 @@ describe("rodarContasBase", () => {
       const handle = perfis[0];
       return { itens: [itemTiktok(handle, `${handle}-novo`)], devolvidos: 1 };
     });
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = url.toString();
+      if (texto.includes("/channels")) {
+        return respostaJson({
+          items: [
+            {
+              id: "UCentreostiktok0000001",
+              snippet: { title: "[exemplo] canal entre os dois tiktoks" },
+              contentDetails: { relatedPlaylists: { uploads: "UUentreostiktok0000001" } },
+            },
+          ],
+        });
+      }
+      if (texto.includes("/playlistItems")) return respostaJson({ items: [] });
+      throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+    });
 
     const resumo = await rodarContasBase();
 
+    // Ordem por views: alta (99999) > youtube (50000) > baixa (100). O teto so
+    // cabe mais 1 resultado do apify: a alta usa esse espaco; a do meio e
+    // youtube, sem trava de apify, e atendida mesmo com o teto ja batido; a
+    // baixa (tiktok, depois do teto) fica para amanha.
     expect(resumo.tetoAtingido).toBe(true);
-    expect(resumo.contasProcessadas).toBe(1);
+    expect(resumo.contasProcessadas).toBe(2);
     expect(buscarTiktok).toHaveBeenCalledTimes(1);
     expect(buscarTiktok).toHaveBeenCalledWith([], ["conta-alta-views"], 10);
 
     const [linhaAlta] = await db().select().from(contas).where(eq(contas.id, contaAlta));
+    const [linhaYoutube] = await db().select().from(contas).where(eq(contas.id, contaYoutube));
     const [linhaBaixa] = await db().select().from(contas).where(eq(contas.id, contaBaixa));
     expect(linhaAlta.baseCompletaEm).not.toBeNull();
+    expect(linhaYoutube.baseCompletaEm).not.toBeNull();
     expect(linhaBaixa.baseCompletaEm).toBeNull();
+  });
+
+  it("registra em consumo_api os resultados consumidos (itens.length), nao os devolvidos brutos (revisao do PR #34, item 0c)", async () => {
+    await criarContaComVideo("tiktok", "conta-devolvidos-vs-usados", 500);
+
+    vi.mocked(buscarTiktok).mockResolvedValue({
+      itens: [itemTiktok("conta-devolvidos-vs-usados", "video-1")],
+      devolvidos: 7,
+    });
+
+    const resumo = await rodarContasBase();
+    expect(resumo.resultadosApifyDevolvidos).toBe(7);
+
+    const [linha] = await db()
+      .select()
+      .from(consumoApi)
+      .where(eq(consumoApi.fonte, "apify"));
+    expect(linha.unidades).toBe(1);
   });
 
   it("youtube: busca a playlist de uploads e videos.list, grava o video novo e marca a conta", async () => {

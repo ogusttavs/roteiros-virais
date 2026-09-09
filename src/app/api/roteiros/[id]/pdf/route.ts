@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/node";
 import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
+import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
 import { clienteDoUsuario } from "@/servicos/clientes";
@@ -126,7 +127,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
      * Sem isso, um PDF que falha (timeout, container sem memória, o que
      * for) some sem deixar rastro (achado da revisão do PR #33, item 0b):
      * o cliente só via "tente de novo", e ninguém saberia que aconteceu.
+     * `logger.error` primeiro (E6 parte 3, segunda rodada, item 0a): o
+     * Sentry ainda não está ligado em produção (sem DSN é silêncio), então
+     * sem isso o erro não deixava rastro nenhum lugar que alguém olhasse.
      */
+    logger.error({ erro, roteiroId: roteiro.id, clienteId: cliente.id }, "nao foi possivel gerar o pdf");
     Sentry.captureException(erro, {
       tags: { rota: "roteiros-pdf" },
       extra: { roteiroId: roteiro.id, clienteId: cliente.id },
