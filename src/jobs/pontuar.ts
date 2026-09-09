@@ -192,3 +192,22 @@ export async function rodarPontuar(): Promise<Record<string, unknown>> {
     contasComTaxa: r5.rowCount ?? 0,
   };
 }
+
+/**
+ * Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6): so os
+ * passos 3 e 4 (velocidade por video, mediana e velocidade relativa por
+ * conta). Sem os passos 1, 2 e 5 (mediana de views, fora_da_curva, taxa por
+ * conta), que sao a conta cara e nao mudam entre a rodada da madrugada e a
+ * do meio-dia: a mediana de views da conta so muda com dado novo do dia
+ * anterior, ja processado as 03:45. `rodarColetaMeioDia` chama isto depois
+ * da coleta leve, para "subiu 3x hoje de manha" aparecer ainda hoje.
+ */
+export async function rodarPontuarVelocidade(): Promise<Record<string, unknown>> {
+  const r3 = await passo3VelocidadePorVideo();
+  const r4 = await passo4VelocidadeRelativa();
+
+  return {
+    videosComVelocidade: r3.rowCount ?? 0,
+    videosComVelocidadeRelativa: r4.rowCount ?? 0,
+  };
+}

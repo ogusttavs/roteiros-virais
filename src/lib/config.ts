@@ -81,6 +81,13 @@ export const config = {
      * erro de boot, so a rodada anterior seguindo em frente.
      */
     metaAtivo: env("META_ATIVO") === "1" && env("META_IG_ID") !== "" && env("META_TOKEN") !== "",
+    /**
+     * Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6):
+     * desligada por padrao (nem no ensaio). Com `COLETA_MEIO_DIA=1`, o job
+     * `coleta-meio-dia` agenda ao meio-dia; sem a variavel, `agendarTudo`
+     * nem inscreve (mesmo mecanismo `condicao` de `metaAtivo`).
+     */
+    coletaMeioDia: env("COLETA_MEIO_DIA") === "1",
   },
   email: {
     resendKey: env("RESEND_API_KEY"),

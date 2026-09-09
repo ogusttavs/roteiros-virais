@@ -40,6 +40,36 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.extrair)).toBe("0 5 * * *");
   });
 
+  it("vigilancia roda todo dia as 04:30 (E6 parte 3, terceira rodada, item 8: nao mais so domingo)", () => {
+    const agendamento = AGENDAMENTOS.find((a) => a.fila === FILAS.vigilancia);
+    expect(agendamento?.cron).toBe("30 4 * * *");
+  });
+
+  it("coletaMeioDia roda as 12:00 (E6 parte 3, terceira rodada, item 6)", () => {
+    expect(cronDe(FILAS.coletaMeioDia)).toBe("0 12 * * *");
+  });
+
+  describe("metaContas aparece duas vezes (E6 parte 3, terceira rodada, item 10)", () => {
+    afterEach(() => {
+      config.coleta.metaAtivo = false;
+      config.coleta.coletaMeioDia = false;
+    });
+
+    it("so com metaAtivo, uma vez (a das 03:35)", () => {
+      config.coleta.metaAtivo = true;
+      const agendamentos = AGENDAMENTOS.filter((a) => a.fila === FILAS.metaContas && (a.condicao?.() ?? true));
+      expect(agendamentos).toHaveLength(1);
+      expect(agendamentos[0].cron).toBe("35 3 * * *");
+    });
+
+    it("com metaAtivo e coletaMeioDia, duas vezes (03:35 e 11:55, antes da passada do meio-dia)", () => {
+      config.coleta.metaAtivo = true;
+      config.coleta.coletaMeioDia = true;
+      const agendamentos = AGENDAMENTOS.filter((a) => a.fila === FILAS.metaContas && (a.condicao?.() ?? true));
+      expect(agendamentos.map((a) => a.cron).sort()).toEqual(["35 3 * * *", "55 11 * * *"]);
+    });
+  });
+
   describe("metaContas so agenda com config.coleta.metaAtivo (E6 parte 3, segunda rodada, item 1)", () => {
     afterEach(() => {
       config.coleta.metaAtivo = false;

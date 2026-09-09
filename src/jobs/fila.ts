@@ -16,6 +16,8 @@ import { db } from "@/db";
 export const FILAS = {
   coletaYoutube: "coleta-youtube",
   coletaApify: "coleta-apify",
+  /** Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6); so agenda com config.coleta.coletaMeioDia. */
+  coletaMeioDia: "coleta-meio-dia",
   coletaNoticias: "coleta-noticias",
   contasBase: "contas-base",
   /** Instagram pela API oficial da Meta (E6 parte 3, segunda rodada, item 2); so agenda com config.coleta.metaAtivo. */

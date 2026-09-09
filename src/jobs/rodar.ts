@@ -8,6 +8,7 @@ import "dotenv/config";
 import { listarAgendamentos } from "./agenda";
 import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
+import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarContasBase } from "./contas-base";
@@ -29,6 +30,7 @@ import { rodarVigilancia } from "./vigilancia";
 const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<string, unknown>>> = {
   [FILAS.coletaYoutube]: rodarColetaYoutube,
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
+  [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
   [FILAS.coletaNoticias]: rodarColetaNoticias,
   [FILAS.contasBase]: rodarContasBase,
   [FILAS.metaContas]: rodarMetaContas,

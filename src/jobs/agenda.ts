@@ -2,12 +2,15 @@
  * Agendamentos em codigo (etapa 6, decisao do Fable): coleta as 03:00,
  * noticias as 06:00 e 14:00, horario de Brasilia. `npm run job -- listar`
  * imprime esta lista sem precisar do worker rodando. `pontuar` entra logo
- * depois de todas as coletas (03:45); `vigilancia` e semanal, domingo 04:30
- * (etapa 7, decisao 1 e 5 do `PROXIMO.md`). `analisarVisual` e `modeloNicho`
- * sao semanais tambem, domingo 05:00 e 06:00, depois da vigilancia e das
- * coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`). `curvaCliente` e
- * a cada hora cheia, as :05 (decisao 1 da etapa 15, parte 1), 5 minutos
- * depois de `lembrete` so para nao competir pelo mesmo minuto exato.
+ * depois de todas as coletas (03:45); `vigilancia` roda todo dia as 04:30
+ * (etapa 7, decisao 1 e 5 do `PROXIMO.md`; virou diaria na E6 parte 3,
+ * terceira rodada, item 8, decisao do Gustavo: uma conta que ganhou base
+ * hoje e vigiada amanha, em vez de esperar o domingo). `analisarVisual` e
+ * `modeloNicho` continuam semanais, domingo 05:00 e 06:00, depois da
+ * vigilancia e das coletas do dia (etapa 9, decisoes 1 e 2 do `PROXIMO.md`).
+ * `curvaCliente` e a cada hora cheia, as :05 (decisao 1 da etapa 15, parte
+ * 1), 5 minutos depois de `lembrete` so para nao competir pelo mesmo minuto
+ * exato.
  *
  * `contasBase` (E6 parte 3, item 5) roda as 03:40, depois das duas coletas
  * (03:00 e 03:30) e antes de `pontuar` (03:45): o catch-up de ate 10 videos
@@ -30,6 +33,13 @@
  * agendam com `config.coleta.metaAtivo` (`agendarTudo`, abaixo): sem
  * `META_IG_ID`/`META_TOKEN`, o cron nem inscreve, e o Apify continua
  * sozinho como hoje.
+ *
+ * `metaContas` roda uma segunda vez as 11:55 (E6 parte 3, terceira rodada,
+ * item 10, decisao do Gustavo: a Meta e de graca, entao roda mais vezes;
+ * chave "meio-dia" para nao colidir com a entrada das 03:35 na checagem de
+ * unicidade), so com `metaAtivo` e `coletaMeioDia` juntos: a leitura fresca
+ * das contas vigiadas do Instagram antes de `coletaMeioDia` (12:00, item 6),
+ * cujo `rodarPontuarVelocidade` interno aproveita o dado do dia.
  *
  * `extrairColeta` e `temasDoDia` (correcao do dia 1 da etapa 14,
  * `PROXIMO.md`): no primeiro dia da Dr.Wash, `temasDoDia` as 05:30 nao
@@ -65,6 +75,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.coletaApify,
     cron: "30 3 * * *",
     descricao: "coleta do TikTok e Instagram (Apify), todo dia as 03:30",
+  },
+  {
+    fila: FILAS.coletaMeioDia,
+    cron: "0 12 * * *",
+    descricao: "passada leve do meio-dia (20 contas do tiktok mais fora da curva, 5 videos cada), todo dia as 12:00",
+    condicao: () => config.coleta.coletaMeioDia,
   },
   {
     fila: FILAS.coletaNoticias,
@@ -108,8 +124,15 @@ export const AGENDAMENTOS: Agendamento[] = [
   },
   {
     fila: FILAS.vigilancia,
-    cron: "30 4 * * 0",
-    descricao: "lista de vigilancia, todo domingo as 04:30",
+    cron: "30 4 * * *",
+    descricao: "lista de vigilancia, todo dia as 04:30",
+  },
+  {
+    fila: FILAS.metaContas,
+    cron: "55 11 * * *",
+    descricao: "instagram pela api da meta (contas vigiadas), segunda vez do dia, as 11:55, antes da passada do meio-dia (12:00)",
+    chave: "meio-dia",
+    condicao: () => config.coleta.metaAtivo && config.coleta.coletaMeioDia,
   },
   {
     fila: FILAS.transcrever,
