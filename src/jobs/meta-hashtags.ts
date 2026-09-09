@@ -35,8 +35,9 @@ import { ErroColeta } from "./execucoes";
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
 const TERMOS_POR_NICHO = 8;
-const LIMITE_HASHTAGS_SEMANA = 30;
-const JANELA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+/** 30 por semana, o limite real da Meta na resolucao. Exportado para o admin mostrar "hashtags usadas na semana" (PROXIMO.md, item 5). */
+export const LIMITE_HASHTAGS_SEMANA = 30;
+export const JANELA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
 
 async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefined): Promise<boolean> {
   if (!config.transcricao.groqKey || !mediaUrl) return false;

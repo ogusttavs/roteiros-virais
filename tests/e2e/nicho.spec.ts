@@ -8,10 +8,10 @@
  * seed (`dentistas`, `produtos-de-limpeza`).
  */
 import { expect, test } from "@playwright/test";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { verification } from "../../src/db/schema";
+import { contas, nichos, verification } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
@@ -52,6 +52,19 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   // ainda, mas as tres plataformas aparecem com "0 / 0".
   await expect(page.getByRole("heading", { name: "estoque por plataforma" })).toBeVisible();
   await expect(page.getByRole("row").filter({ hasText: "youtube" })).toContainText("0 / 0");
+
+  // Bloco novo (E6 parte 3, segunda rodada, item 5): conta vigiada do
+  // instagram ganha coluna de origem; sem META_ATIVO no ambiente de e2e,
+  // toda conta do instagram e "apify".
+  const [nichoCriado] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.slug, SLUG_NICHO));
+  await db()
+    .insert(contas)
+    .values({ plataforma: "instagram", handle: "exemplo-e2e-conta-instagram", nichoId: nichoCriado.id, vigiada: true });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "lista de vigilância" })).toBeVisible();
+  await expect(
+    page.getByRole("row").filter({ hasText: "exemplo-e2e-conta-instagram" }),
+  ).toContainText("apify");
 
   await page.goto("/admin/clientes");
   await page.getByRole("button", { name: "convidar cliente" }).click();

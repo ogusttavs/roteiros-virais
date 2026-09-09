@@ -4,11 +4,13 @@ import { notFound } from "next/navigation";
 
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { FILAS } from "@/jobs/fila";
+import { config } from "@/lib/config";
 import {
   listarContasVigiadas,
   nichoPorSlug,
   noticiasPorId,
   resumoMedianaPorPlataforma,
+  statusMetaApi,
   temaDoDiaAtual,
   ultimaExecucaoPorJob,
   videosPorId,
@@ -25,6 +27,10 @@ const t = textosAdmin.nichoDetalhe;
 function formatarNumero(valor: number | null, casas = 1): string {
   if (valor === null) return t.semDado;
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+}
+
+function formatarData(data: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
 }
 
 function TabelaVideos({ videos, colunaNumero }: { videos: VideoRankeado[]; colunaNumero: "foraDaCurva" | "velocidadeRelativa" }) {
@@ -65,14 +71,16 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma] = await Promise.all([
-    foraDaCurvaDoNicho(nicho.id, 90, 30),
-    subindoHoje(nicho.id, 30),
-    listarContasVigiadas(nicho.id),
-    temaDoDiaAtual(nicho.id),
-    ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
-    resumoMedianaPorPlataforma(nicho.id),
-  ]);
+  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta] =
+    await Promise.all([
+      foraDaCurvaDoNicho(nicho.id, 90, 30),
+      subindoHoje(nicho.id, 30),
+      listarContasVigiadas(nicho.id),
+      temaDoDiaAtual(nicho.id),
+      ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
+      resumoMedianaPorPlataforma(nicho.id),
+      config.coleta.metaAtivo ? statusMetaApi() : null,
+    ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
   const idsEvidenciaNoticias = [
@@ -182,6 +190,8 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                   <th>{t.colunaConta}</th>
                   <th>{t.colunaTaxa}</th>
                   <th>{t.colunaMediana}</th>
+                  <th>{t.colunaOrigem}</th>
+                  <th>{t.colunaUltimaLeituraApi}</th>
                   <th>{t.colunaAviso}</th>
                 </tr>
               </thead>
@@ -192,6 +202,16 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                     <td>{conta.handle}</td>
                     <td className={styles.mono}>{formatarNumero(conta.taxaForaDaCurva, 2)}</td>
                     <td className={styles.mono}>{formatarNumero(conta.medianaViews, 0)}</td>
+                    <td>
+                      {conta.origemInstagram === "api"
+                        ? t.origemApi
+                        : conta.origemInstagram === "apify"
+                          ? t.origemApify
+                          : t.naoAplicavel}
+                    </td>
+                    <td className={styles.mono}>
+                      {conta.ultimaLeituraMetaEm ? formatarData(conta.ultimaLeituraMetaEm) : t.naoAplicavel}
+                    </td>
                     <td className={conta.avisoColeta ? styles.aviso : undefined}>
                       {conta.avisoColeta ?? t.semDado}
                     </td>
@@ -202,6 +222,36 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
           </div>
         )}
       </section>
+
+      {statusMeta ? (
+        <section className={styles.secao}>
+          <h2>{t.metaStatusTitulo}</h2>
+          <div className={styles.tabelaEnvoltorio}>
+            <table className={styles.tabela}>
+              <thead>
+                <tr>
+                  <th>{t.colunaMetaLimite}</th>
+                  <th>{t.colunaMetaUso}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>{t.metaChamadasNaHora}</td>
+                  <td className={styles.mono}>
+                    {statusMeta.chamadasNaHora} / {statusMeta.limiteChamadasHora}
+                  </td>
+                </tr>
+                <tr>
+                  <td>{t.metaHashtagsNaSemana}</td>
+                  <td className={styles.mono}>
+                    {statusMeta.hashtagsNaSemana} / {statusMeta.limiteHashtagsSemana}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className={styles.secao}>
         <h2>{t.estoqueTitulo}</h2>

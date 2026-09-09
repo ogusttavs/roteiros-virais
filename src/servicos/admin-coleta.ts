@@ -13,6 +13,7 @@ import {
   contas,
   execucoesJob,
   geracoesIA,
+  hashtagsMetaUsadas,
   nichos,
   noticias,
   roteiros,
@@ -24,7 +25,9 @@ import {
   type Plataforma,
   type TemaDoDia,
 } from "@/db/schema";
-import { hojeISO } from "@/lib/config";
+import { chamadasDesde, JANELA_MS, LIMITE_CHAMADAS_HORA } from "@/jobs/meta-api";
+import { JANELA_SEMANA_MS, LIMITE_HASHTAGS_SEMANA } from "@/jobs/meta-hashtags";
+import { config, hojeISO } from "@/lib/config";
 import { constanciaDoCliente } from "@/servicos/temas";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -213,6 +216,14 @@ export type ContaVigiada = {
   medianaViews: number | null;
   /** Coleta por perfil falhou de um jeito conhecido (rodada de acabamento de 06/09, item 2). */
   avisoColeta: string | null;
+  /**
+   * So para instagram (E6 parte 3, segunda rodada, item 5); `null` para
+   * youtube/tiktok, que nunca passam pela Meta. "api" quando `metaAtivo` e a
+   * conta nao esta marcada `api_indisponivel_em` (mesma regra de
+   * `instagramUsaApify` em `contas-base.ts`, invertida).
+   */
+  origemInstagram: "api" | "apify" | null;
+  ultimaLeituraMetaEm: Date | null;
 };
 
 /** A lista de vigilância de um nicho (escopo 5.3): quem está `vigiada`, por taxa. */
@@ -225,6 +236,8 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
       taxaForaDaCurva: contas.taxaForaDaCurva,
       medianaViews: contas.medianaViews,
       avisoColeta: contas.avisoColeta,
+      apiIndisponivelEm: contas.apiIndisponivelEm,
+      ultimaLeituraMetaEm: contas.ultimaLeituraMetaEm,
     })
     .from(contas)
     .where(and(eq(contas.nichoId, nichoId), eq(contas.vigiada, true)))
@@ -237,7 +250,43 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
     taxaForaDaCurva: l.taxaForaDaCurva === null ? null : Number(l.taxaForaDaCurva),
     medianaViews: l.medianaViews === null ? null : Number(l.medianaViews),
     avisoColeta: l.avisoColeta,
+    origemInstagram:
+      l.plataforma !== "instagram"
+        ? null
+        : config.coleta.metaAtivo && l.apiIndisponivelEm === null
+          ? "api"
+          : "apify",
+    ultimaLeituraMetaEm: l.ultimaLeituraMetaEm,
   }));
+}
+
+export type StatusMetaApi = {
+  chamadasNaHora: number;
+  limiteChamadasHora: number;
+  hashtagsNaSemana: number;
+  limiteHashtagsSemana: number;
+};
+
+/**
+ * Uso corrente da API da Meta (E6 parte 3, segunda rodada, item 5): uma
+ * conta profissional so, global, nao por nicho; mostrado em toda tela de
+ * detalhe de nicho quando `config.coleta.metaAtivo`.
+ */
+export async function statusMetaApi(): Promise<StatusMetaApi> {
+  const [chamadasNaHora, hashtagsUsadas] = await Promise.all([
+    chamadasDesde(new Date(Date.now() - JANELA_MS)),
+    db()
+      .select({ total: count() })
+      .from(hashtagsMetaUsadas)
+      .where(gte(hashtagsMetaUsadas.ultimoUsoEm, new Date(Date.now() - JANELA_SEMANA_MS))),
+  ]);
+
+  return {
+    chamadasNaHora,
+    limiteChamadasHora: LIMITE_CHAMADAS_HORA,
+    hashtagsNaSemana: hashtagsUsadas[0]?.total ?? 0,
+    limiteHashtagsSemana: LIMITE_HASHTAGS_SEMANA,
+  };
 }
 
 export type ResumoMedianaPlataforma = {
