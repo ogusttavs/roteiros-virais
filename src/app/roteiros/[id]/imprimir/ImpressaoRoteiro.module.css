@@ -16,6 +16,18 @@
   size: A4;
 }
 
+/**
+ * O `body` desta rota herda `--cor-fundo` (o fundo do painel) de `base.css`;
+ * onde `.pagina` termina antes do fim da folha impressa, esse fundo aparece
+ * como uma faixa cinza no papel (achado da revisão do PR #33, item 0a,
+ * visível em `Roteiro.PdfAberto.A4.Claro.png`). `:global` porque `html` e
+ * `body` não são deste módulo.
+ */
+:global(html),
+:global(body) {
+  background: var(--cor-superficie);
+}
+
 .pagina {
   display: grid;
   gap: var(--espaco-6);
