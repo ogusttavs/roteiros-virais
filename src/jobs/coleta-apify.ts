@@ -59,7 +59,11 @@ export function termosDaRodada(termos: string[], data: Date = new Date()): strin
   return termos.filter((_, indice) => indice % 3 === grupo);
 }
 
-async function consumoDeHoje(): Promise<number> {
+/**
+ * Exportada (ajuste 2 da revisão do PR #36) para `coleta-meio-dia.ts`
+ * reaproveitar em vez de copiar: mesma fonte "apify", mesmo teto diário.
+ */
+export async function consumoDeHoje(): Promise<number> {
   const [linha] = await db()
     .select({ unidades: consumoApi.unidades })
     .from(consumoApi)
@@ -67,7 +71,7 @@ async function consumoDeHoje(): Promise<number> {
   return linha?.unidades ?? 0;
 }
 
-async function registrarConsumo(unidades: number): Promise<void> {
+export async function registrarConsumo(unidades: number): Promise<void> {
   if (unidades === 0) return;
   await db()
     .insert(consumoApi)

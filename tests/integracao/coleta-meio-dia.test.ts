@@ -12,7 +12,7 @@ import { db, getPool } from "@/db";
 import { consumoApi, contas, execucoesJob, nichos, videos } from "@/db/schema";
 import type { TiktokItemBruto } from "@/jobs/apify-api";
 import { rodarColetaMeioDia } from "@/jobs/coleta-meio-dia";
-import { hojeISO } from "@/lib/config";
+import { config, hojeISO } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -134,8 +134,55 @@ describe("rodarColetaMeioDia", () => {
     expect(linha.unidades).toBe(1);
   });
 
-  it("sem conta vigiada do tiktok, recusa sem chamar o apify", async () => {
-    await expect(rodarColetaMeioDia()).rejects.toThrow(/nenhuma conta vigiada/);
+  it("teto do apify ja atingido: o ator nao e chamado, mas a velocidade roda (ajuste 2 da revisao do PR #36)", async () => {
+    await db().insert(contas).values({ plataforma: "tiktok", handle: "conta-alta", nichoId, vigiada: true });
+    const teto = config.coleta.apifyMaxResultadosDia;
+    await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto });
+
+    const resumo = await rodarColetaMeioDia();
+
     expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+    expect(resumo.tetoAtingido).toBe(true);
+    expect(resumo.videosComVelocidade).toBeDefined();
+  });
+
+  it("com o teto do apify zerado (apify desligado), nao chama o ator, mas a velocidade roda (ajuste 4 da revisao do PR #36)", async () => {
+    await db().insert(contas).values({ plataforma: "tiktok", handle: "conta-alta", nichoId, vigiada: true });
+    const tetoOriginal = config.coleta.apifyMaxResultadosDia;
+    config.coleta.apifyMaxResultadosDia = 0;
+    try {
+      const resumo = await rodarColetaMeioDia();
+      expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+      expect(resumo.apifyDesligado).toBe(true);
+      expect(resumo.tetoAtingido).toBe(false);
+      expect(resumo.videosComVelocidade).toBeDefined();
+    } finally {
+      config.coleta.apifyMaxResultadosDia = tetoOriginal;
+    }
+  });
+
+  it("teto com espaco para 3: com 2 contas vigiadas, o maxItems da chamada e 3, nao 10 (ajuste 2 da revisao do PR #36)", async () => {
+    await db()
+      .insert(contas)
+      .values([
+        { plataforma: "tiktok", handle: "conta-1", nichoId, vigiada: true, taxaForaDaCurva: "0.9" },
+        { plataforma: "tiktok", handle: "conta-2", nichoId, vigiada: true, taxaForaDaCurva: "0.5" },
+      ]);
+    const teto = config.coleta.apifyMaxResultadosDia;
+    await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto - 3 });
+    vi.mocked(buscarTiktokVigilancia).mockResolvedValue({ itens: [], devolvidos: 0 });
+
+    await rodarColetaMeioDia();
+
+    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-1", "conta-2"], 5, 3);
+  });
+
+  it("sem conta vigiada do tiktok, sem chamada ao apify, sem erro, e a velocidade roda do mesmo jeito (ajuste 2 da revisao do PR #36)", async () => {
+    const resumo = await rodarColetaMeioDia();
+
+    expect(resumo.contas).toBe(0);
+    expect(resumo.erros).toBeUndefined();
+    expect(buscarTiktokVigilancia).not.toHaveBeenCalled();
+    expect(resumo.videosComVelocidade).toBeDefined();
   });
 });
