@@ -8,7 +8,7 @@
  * para sempre).
  *
  * Ordem (decisão 1 do `PROXIMO.md`, cada passo depende do anterior):
- * 1. mediana de views por conta (+ `base_fraca`)
+ * 1. mediana de views por conta (+ `base_fraca` e `mediana_origem`)
  * 2. fora_da_curva por vídeo
  * 3. velocidade por vídeo (só 2 a 7 dias)
  * 4. mediana de velocidade por conta (2 a 30 dias, calculada direto da
@@ -41,6 +41,14 @@ const FATOR_SUBSTITUTO_BASE_FRACA = 100;
 const MINIMO_VIDEOS_MEDIANA = 5;
 const MINIMO_VIDEOS_MEDIANA_VELOCIDADE = 3;
 
+/**
+ * Substituto de terceiro nível, quando a conta não tem mediana própria (menos
+ * de 5 vídeos) nem seguidores cadastrados (decisão de 07/09, 16:20,
+ * `PROXIMO.md` E6 parte 3, item 2): a mediana de views de todo o nicho
+ * naquela plataforma, nos últimos 90 dias, sem olhar de qual conta cada
+ * vídeo veio. É o que faz o estoque parado (conta nova, sem seguidor
+ * gravado) entrar no motor em vez de ficar sem múltiplo para sempre.
+ */
 async function passo1MedianaPorConta() {
   return db().execute(sql`
     UPDATE contas c
@@ -48,12 +56,21 @@ async function passo1MedianaPorConta() {
       base_fraca = COALESCE(a.n, 0) < ${MINIMO_VIDEOS_MEDIANA},
       mediana_views = CASE
         WHEN COALESCE(a.n, 0) >= ${MINIMO_VIDEOS_MEDIANA} THEN a.mediana_views
-        WHEN COALESCE(a.n, 0) > 0 THEN a.mediana_substituta
+        WHEN a.mediana_substituta IS NOT NULL THEN a.mediana_substituta
+        WHEN s.mediana_setor IS NOT NULL THEN s.mediana_setor
+        ELSE NULL
+      END,
+      mediana_origem = CASE
+        WHEN COALESCE(a.n, 0) >= ${MINIMO_VIDEOS_MEDIANA} THEN 'conta'
+        WHEN a.mediana_substituta IS NOT NULL THEN 'seguidores'
+        WHEN s.mediana_setor IS NOT NULL THEN 'setor'
         ELSE NULL
       END
     FROM (
       SELECT
         c2.id AS conta_id,
+        c2.nicho_id,
+        c2.plataforma,
         count(v.id) AS n,
         percentile_cont(0.5) WITHIN GROUP (ORDER BY v.views) AS mediana_views,
         percentile_cont(0.5) WITHIN GROUP (
@@ -63,6 +80,15 @@ async function passo1MedianaPorConta() {
       LEFT JOIN videos v ON v.conta_id = c2.id AND v.publicado_em >= now() - interval '90 days'
       GROUP BY c2.id
     ) a
+    LEFT JOIN (
+      SELECT
+        nicho_id,
+        plataforma,
+        percentile_cont(0.5) WITHIN GROUP (ORDER BY views) AS mediana_setor
+      FROM videos
+      WHERE publicado_em >= now() - interval '90 days'
+      GROUP BY nicho_id, plataforma
+    ) s ON s.nicho_id = a.nicho_id AND s.plataforma = a.plataforma
     WHERE c.id = a.conta_id
   `);
 }

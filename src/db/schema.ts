@@ -243,6 +243,17 @@ export const briefings = pgTable("briefings", {
 
 export type Plataforma = "youtube" | "tiktok" | "instagram";
 
+/**
+ * De onde `medianaViews` veio (PROXIMO.md, E6 parte 3, item 2): "conta" e a
+ * mediana de verdade (5 ou mais videos nos ultimos 90 dias); sem isso,
+ * "seguidores" e o substituto por seguidor (`FATOR_SUBSTITUTO_BASE_FRACA`
+ * em `pontuar.ts`); sem seguidores nem, "setor" e a mediana de views do
+ * nicho inteiro naquela plataforma. Assim que a conta ganha uma mediana de
+ * nivel melhor, a origem muda e o multiplo de todo video da conta e
+ * recalculado no `pontuar` seguinte.
+ */
+export type MedianaOrigem = "conta" | "seguidores" | "setor";
+
 export const contas = pgTable(
   "contas",
   {
@@ -257,6 +268,8 @@ export const contas = pgTable(
     vigiada: boolean("vigiada").notNull().default(false),
     /** Mediana de views dos videos coletados da conta (base do fora-da-curva) */
     medianaViews: numeric("mediana_views", { precision: 14, scale: 2 }),
+    /** Nivel de `medianaViews` (nulo quando a conta nao tem nenhuma mediana ainda) */
+    medianaOrigem: text("mediana_origem").$type<MedianaOrigem>(),
     /**
      * Menos de 5 videos nos ultimos 90 dias (etapa 7): a mediana normal fica
      * pouco confiavel, entao `medianaViews` vira o substituto por seguidor

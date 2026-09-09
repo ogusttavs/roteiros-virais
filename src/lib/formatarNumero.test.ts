@@ -70,4 +70,16 @@ describe("classificarMultiplo e rotuloMultiploConta", () => {
     expect(classificarMultiplo(0.3)).toBe("abaixo");
     expect(rotuloMultiploConta("abaixo")).toBe("abaixo do normal dessa conta");
   });
+
+  it("origem conta ou seguidores usam o mesmo texto de \"dessa conta\" (sem origem propria)", () => {
+    expect(rotuloMultiploConta("acima", "conta")).toBe("acima do normal dessa conta");
+    expect(rotuloMultiploConta("acima", "seguidores")).toBe("acima do normal dessa conta");
+    expect(rotuloMultiploConta("acima", null)).toBe("acima do normal dessa conta");
+  });
+
+  it("origem setor troca para \"do seu setor\" nas tres faixas", () => {
+    expect(rotuloMultiploConta("acima", "setor")).toBe("acima da média do seu setor");
+    expect(rotuloMultiploConta("media", "setor")).toBe("na média do seu setor");
+    expect(rotuloMultiploConta("abaixo", "setor")).toBe("abaixo da média do seu setor");
+  });
 });
