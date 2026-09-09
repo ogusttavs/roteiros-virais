@@ -310,6 +310,23 @@ describe("rodarContasBase", () => {
       expect(video.views).toBe(900);
     });
 
+    it("business discovery sem dado (null) nao marca base completa, registra em erros e tenta de novo no dia seguinte (item 0b da revisao do PR #35)", async () => {
+      config.coleta.metaAtivo = true;
+      const contaId = await criarContaComVideo("instagram", "conta-meta-sem-dado", 100);
+
+      vi.mocked(buscarBusinessDiscovery).mockResolvedValue(null);
+
+      const resumo = await rodarContasBase();
+
+      expect(resumo.contasProcessadas).toBe(0);
+      expect((resumo.erros as string[] | undefined)?.[0]).toContain("business discovery sem dado");
+      expect(buscarInstagram).not.toHaveBeenCalled();
+
+      const [linha] = await db().select().from(contas).where(eq(contas.id, contaId));
+      expect(linha.baseCompletaEm).toBeNull();
+      expect(linha.apiIndisponivelEm).toBeNull();
+    });
+
     it("erro da meta (conta pessoal/restrita) marca api_indisponivel_em e cai para o apify na mesma tentativa", async () => {
       config.coleta.metaAtivo = true;
       const contaId = await criarContaComVideo("instagram", "conta-meta-indisponivel", 100);

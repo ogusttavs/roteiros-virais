@@ -157,12 +157,16 @@ async function catchUpTiktok(nichoId: number, candidata: ContaCandidata): Promis
 /**
  * Business Discovery da Meta em vez do Apify (E6 parte 3, segunda rodada,
  * item 2): uma conta, um perfil e ate 50 posts de uma vez, de graca. Sem
- * `discovery` (achado nao confirmado ainda com uma conta de verdade sem
- * dado), so marca a conta sem gravar nada, sem contar como erro.
+ * `discovery`, lanca (item 0b da revisao do PR #35): o chamador
+ * (`catchUpInstagram`) nao e um `ErroMetaApi`, entao sobe direto para
+ * `rodarContasBase`, que registra em `erros` e NAO marca a conta como base
+ * completa, para ela ser tentada de novo no dia seguinte. Antes disto, a
+ * funcao devolvia um resultado vazio "de sucesso", e a conta era marcada
+ * completa sem nunca ter recebido nenhum dado.
  */
 async function catchUpInstagramMeta(nichoId: number, candidata: ContaCandidata): Promise<ResultadoCatchUp> {
   const discovery = await buscarBusinessDiscovery(candidata.handle);
-  if (!discovery) return { novos: 0, atualizados: 0, usadosApify: 0, devolvidosApify: 0 };
+  if (!discovery) throw new Error("business discovery sem dado");
 
   const { conta, videos: videosNormalizados } = normalizarBusinessDiscovery(candidata.handle, discovery);
   const contaId = await upsertConta(conta, nichoId);
