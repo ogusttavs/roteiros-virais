@@ -3,10 +3,13 @@
  * nicho (hashtag, PROXIMO.md decisao 2) e por conta vigiada (perfil). Mesmo
  * padrao de idempotencia das outras coletas (ON CONFLICT em
  * plataforma+id_externo, `src/jobs/coleta-comum.ts`). Credito contado em
- * `consumo_api` com fonte "apify", em resultados devolvidos (nao em dolar,
- * decisao 4), TikTok e Instagram somados num teto diario so. Ao chegar no
- * teto, o job para (nao tenta mais nichos) e registra `tetoAtingido` no
- * resumo.
+ * `consumo_api` com fonte "apify", em resultados consumidos, o que sobra
+ * depois do corte de `rodarAtor` (nao em dolar, decisao 4), TikTok e
+ * Instagram somados num teto diario so. O resumo tambem registra
+ * `resultadosDevolvidos`, o que o ator de fato cobrou antes do corte
+ * (PROXIMO.md, item 1): os dois divergem quando `resultsPerPage` pede mais
+ * por alvo do que o teto desta chamada permite guardar. Ao chegar no teto,
+ * o job para (nao tenta mais nichos) e registra `tetoAtingido` no resumo.
  */
 import { and, eq, sql } from "drizzle-orm";
 
@@ -49,6 +52,7 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
   const teto = config.coleta.apifyMaxResultadosDia;
   const maxPorChamada = config.coleta.apifyMaxItems;
   let resultadosUsados = await consumoDeHoje();
+  let resultadosDevolvidos = 0;
   const cabe = () => resultadosUsados < teto;
 
   let chamadasTiktok = 0;
@@ -75,12 +79,13 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
       chamadasTiktok += 1;
       try {
         const maxItens = Math.min(maxPorChamada, teto - resultadosUsados);
-        const itens = await buscarTiktok(
+        const { itens, devolvidos } = await buscarTiktok(
           nicho.termos,
           vigiadasTiktok.map((c) => c.handle),
           maxItens,
         );
         resultadosUsados += itens.length;
+        resultadosDevolvidos += devolvidos;
         await registrarConsumo(itens.length);
         for (const item of itens) {
           try {
@@ -129,12 +134,13 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
       chamadasInstagram += 1;
       try {
         const maxItens = Math.min(maxPorChamada, teto - resultadosUsados);
-        const itens = await buscarInstagram(
+        const { itens, devolvidos } = await buscarInstagram(
           nicho.termos,
           vigiadasInstagram.map((c) => c.handle),
           maxItens,
         );
         resultadosUsados += itens.length;
+        resultadosDevolvidos += devolvidos;
         await registrarConsumo(itens.length);
         for (const item of itens) {
           try {
@@ -173,6 +179,7 @@ export async function rodarColetaApify(nichoId?: number): Promise<Record<string,
     chamadasInstagram,
     videosNovos,
     videosAtualizados,
+    resultadosDevolvidos,
     resultadosConsumidosHoje: resultadosUsados,
     tetoAtingido: !cabe(),
     erros: erros.length > 0 ? erros : undefined,

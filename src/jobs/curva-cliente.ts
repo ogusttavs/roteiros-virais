@@ -101,7 +101,9 @@ async function medirTiktok(videos: VideoParaMedir[], agora: Date, erros: string[
       continue;
     }
     try {
-      const [item] = await buscarTiktokPorUrl([`https://www.tiktok.com/@x/video/${video.idExterno}`]);
+      const {
+        itens: [item],
+      } = await buscarTiktokPorUrl([`https://www.tiktok.com/@x/video/${video.idExterno}`]);
       usados += 1;
       await registrarConsumo(FONTE_APIFY, 1);
       if (!item) {
@@ -133,7 +135,9 @@ async function medirInstagram(videos: VideoParaMedir[], agora: Date, erros: stri
     }
     try {
       const url = `https://www.instagram.com/reel/${video.idExterno}/`;
-      const [item] = await buscarInstagramPorUrl([url]);
+      const {
+        itens: [item],
+      } = await buscarInstagramPorUrl([url]);
       usados += 1;
       await registrarConsumo(FONTE_APIFY, 1);
       if (!item) {

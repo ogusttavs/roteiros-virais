@@ -1,10 +1,12 @@
 /**
- * Cliente fino do Apify (etapa 6, parte 2): dois achados rodando com chave
- * real travados aqui. `maxItems` da chamada ao ator so limita quanto e
- * cobrado, nao quanto o dataset devolve (pediu 20, o dataset trouxe mais),
- * por isso `rodarAtor` corta o resultado. E hashtag com espaco (um termo
- * composto, "lente de contato dental") nao existe de verdade em nenhuma das
- * duas plataformas.
+ * Cliente fino do Apify (etapa 6, parte 2): tres achados travados aqui.
+ * `maxItems` da chamada ao ator so limita quanto e cobrado, nao quanto o
+ * dataset devolve (pediu 20, o dataset trouxe mais), por isso `rodarAtor`
+ * corta o resultado mas devolve `devolvidos` (o bruto) ao lado. Hashtag com
+ * espaco (um termo composto, "lente de contato dental") nao existe de
+ * verdade em nenhuma das duas plataformas. E `resultsPerPage` do TikTok vale
+ * por alvo, nao no total (PROXIMO.md, item 1): `limitePorAlvo` divide o teto
+ * pelo numero de hashtags e contas vigiadas.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -24,18 +26,33 @@ vi.mock("apify-client", () => ({
   }),
 }));
 
-import { buscarInstagram, buscarTiktok, rodarAtor } from "./apify-api";
+import { buscarInstagram, buscarTiktok, limitePorAlvo, rodarAtor } from "./apify-api";
 
 beforeEach(() => {
   actorCall.mockReset().mockResolvedValue({ defaultDatasetId: "ds1" });
   datasetListItems.mockReset().mockResolvedValue({ items: [] });
 });
 
+describe("limitePorAlvo", () => {
+  it("divide o teto pelo numero de alvos, arredondando para cima (8 termos, teto 400, 50 por termo)", () => {
+    expect(limitePorAlvo(400, 8)).toBe(50);
+  });
+
+  it("arredonda para cima quando a divisao nao e exata (3 termos, teto 100, 34 por termo)", () => {
+    expect(limitePorAlvo(100, 3)).toBe(34);
+  });
+
+  it("sem alvo, devolve o teto inteiro (nada para dividir)", () => {
+    expect(limitePorAlvo(400, 0)).toBe(400);
+  });
+});
+
 describe("rodarAtor", () => {
-  it("corta o dataset em maxItems, mesmo se o ator devolver mais", async () => {
+  it("corta o dataset em maxItems, mesmo se o ator devolver mais, e devolve o bruto em devolvidos", async () => {
     datasetListItems.mockResolvedValue({ items: [1, 2, 3, 4, 5] });
-    const itens = await rodarAtor("algum/ator", {}, 3);
+    const { itens, devolvidos } = await rodarAtor("algum/ator", {}, 3);
     expect(itens).toEqual([1, 2, 3]);
+    expect(devolvidos).toBe(5);
   });
 });
 
@@ -46,6 +63,12 @@ describe("buscarTiktok", () => {
       expect.objectContaining({ hashtags: ["lentedecontatodental", "dentista"] }),
       { maxItems: 10 },
     );
+  });
+
+  it("resultsPerPage e o teto dividido pelo numero de termos e contas vigiadas, nao o teto inteiro", async () => {
+    await buscarTiktok(["dentista", "odontologia"], ["conta_vigiada"], 30);
+    // 3 alvos (2 hashtags + 1 perfil), teto 30: 10 por alvo.
+    expect(actorCall).toHaveBeenCalledWith(expect.objectContaining({ resultsPerPage: 10 }), { maxItems: 30 });
   });
 });
 
@@ -59,8 +82,9 @@ describe("buscarInstagram", () => {
   });
 
   it("sem hashtag nem perfil, nao chama o ator", async () => {
-    const itens = await buscarInstagram([], [], 10);
+    const { itens, devolvidos } = await buscarInstagram([], [], 10);
     expect(itens).toEqual([]);
+    expect(devolvidos).toBe(0);
     expect(actorCall).not.toHaveBeenCalled();
   });
 });
