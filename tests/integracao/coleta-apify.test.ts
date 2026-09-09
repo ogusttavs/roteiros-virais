@@ -64,12 +64,13 @@ afterEach(async () => {
 
 describe("rodarColetaApify (apify mockado, banco real)", () => {
   it("busca, normaliza e grava video, conta e audio do tiktok e do instagram", async () => {
-    vi.mocked(buscarTiktok).mockResolvedValue([tiktokFixture[0]]);
-    vi.mocked(buscarInstagram).mockResolvedValue([instagramFixture[0]]);
+    vi.mocked(buscarTiktok).mockResolvedValue({ itens: [tiktokFixture[0]], devolvidos: 1 });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [instagramFixture[0]], devolvidos: 1 });
 
     const resumo = await rodarColetaApify();
     expect(resumo.videosNovos).toBe(2);
     expect(resumo.videosAtualizados).toBe(0);
+    expect(resumo.resultadosDevolvidos).toBe(2);
 
     const [videoTiktok] = await db()
       .select()
@@ -108,11 +109,14 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
   });
 
   it("rodar duas vezes para o mesmo video atualiza em vez de duplicar (idempotencia)", async () => {
-    vi.mocked(buscarTiktok).mockResolvedValue([tiktokFixture[1]]);
-    vi.mocked(buscarInstagram).mockResolvedValue([]);
+    vi.mocked(buscarTiktok).mockResolvedValue({ itens: [tiktokFixture[1]], devolvidos: 1 });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
     await rodarColetaApify();
 
-    vi.mocked(buscarTiktok).mockResolvedValue([{ ...tiktokFixture[1], playCount: 99999 }]);
+    vi.mocked(buscarTiktok).mockResolvedValue({
+      itens: [{ ...tiktokFixture[1], playCount: 99999 }],
+      devolvidos: 1,
+    });
     const resumo = await rodarColetaApify();
     expect(resumo.videosNovos).toBe(0);
     expect(resumo.videosAtualizados).toBe(1);
@@ -126,8 +130,8 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
   });
 
   it("registra o consumo combinado (tiktok + instagram) em consumo_api com fonte apify", async () => {
-    vi.mocked(buscarTiktok).mockResolvedValue([tiktokFixture[0], tiktokFixture[1]]);
-    vi.mocked(buscarInstagram).mockResolvedValue([instagramFixture[0]]);
+    vi.mocked(buscarTiktok).mockResolvedValue({ itens: [tiktokFixture[0], tiktokFixture[1]], devolvidos: 2 });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [instagramFixture[0]], devolvidos: 1 });
 
     await rodarColetaApify();
 
@@ -144,8 +148,8 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
       id: "item-quebrado",
       authorMeta: undefined,
     } as unknown as TiktokItemBruto;
-    vi.mocked(buscarTiktok).mockResolvedValue([itemQuebrado, tiktokFixture[1]]);
-    vi.mocked(buscarInstagram).mockResolvedValue([]);
+    vi.mocked(buscarTiktok).mockResolvedValue({ itens: [itemQuebrado, tiktokFixture[1]], devolvidos: 2 });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
 
     const resumo = await rodarColetaApify();
     const erros = resumo.erros as string[] | undefined;
@@ -178,10 +182,11 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
       .insert(nichos)
       .values({ slug: "coleta-apify-teste-2", nome: "Coleta Apify teste 2", termos: ["dentista"] });
 
-    vi.mocked(buscarTiktok).mockImplementation(async (_hashtags, _perfis, maxItens) =>
-      [tiktokFixture[1]].slice(0, maxItens),
-    );
-    vi.mocked(buscarInstagram).mockResolvedValue([]);
+    vi.mocked(buscarTiktok).mockImplementation(async (_hashtags, _perfis, maxItens) => {
+      const itens = [tiktokFixture[1]].slice(0, maxItens);
+      return { itens, devolvidos: itens.length };
+    });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
 
     const resumo = await rodarColetaApify();
     // So ha espaco para 1 resultado (teto - 1 ja consumido); um unico nicho
@@ -196,8 +201,8 @@ describe("rodarColetaApify (apify mockado, banco real)", () => {
   it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
     await db().insert(nichos).values({ slug: "coleta-apify-teste-2", nome: "Coleta Apify teste 2", termos: ["dentista"] });
 
-    vi.mocked(buscarTiktok).mockResolvedValue([]);
-    vi.mocked(buscarInstagram).mockResolvedValue([]);
+    vi.mocked(buscarTiktok).mockResolvedValue({ itens: [], devolvidos: 0 });
+    vi.mocked(buscarInstagram).mockResolvedValue({ itens: [], devolvidos: 0 });
 
     const resumo = await rodarColetaApify(nichoId);
     expect(resumo.nichos).toBe(1);

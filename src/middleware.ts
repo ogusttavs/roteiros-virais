@@ -14,9 +14,11 @@ import { NextResponse, type NextRequest } from "next/server";
  * deploy e monitor externo batem nela sem sessao; nao devolve dado.
  * /termos e /privacidade sao publicas (etapa 12, decisao 7): quem ainda nao
  * assina precisa conseguir ler antes de entrar, e a folha de aceite linka
- * para elas de dentro do painel tambem.
+ * para elas de dentro do painel tambem. /dados e publica pelo mesmo motivo
+ * (E6 parte 3, item 8): a configuracao do app da Meta pede uma URL de
+ * instrucoes de exclusao de dados que qualquer um consiga abrir, sem sessao.
  */
-const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade"];
+const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade", "/dados"];
 
 /**
  * Rotas com autenticacao propria, sem cookie de sessao (etapa 6): o cabecalho

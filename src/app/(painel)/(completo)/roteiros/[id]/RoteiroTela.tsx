@@ -274,7 +274,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             titulo={textosRoteiro.referencia}
             conta={video.contaNome ?? video.contaHandle}
             multiplo={formatarMultiplo(video.foraDaCurva)}
-            texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva))}. ${textosRoteiro.oQueFuncionouAli} ${comInicialMinuscula(video.porQueFuncionou ?? "")}`.trim()}
+            texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva), video.contaMedianaOrigem)}. ${textosRoteiro.oQueFuncionouAli} ${comInicialMinuscula(video.porQueFuncionou ?? "")}`.trim()}
             segundoFormatado={
               referencia.segundo !== null && referencia.segundo > 0
                 ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo))

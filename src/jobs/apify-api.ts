@@ -26,16 +26,35 @@ export class ErroApify extends Error {}
 
 /**
  * Roda um ator ate terminar e devolve os itens do dataset padrao da
- * execucao, cortados em `maxItems`. O `maxItems` da chamada ao ator so
- * limita quanto e cobrado, nao quanto o ator devolve no dataset (achado
- * rodando com chave real: pediu 20, o dataset trouxe mais); cortar aqui e o
- * que faz o teto diario em `consumo_api` bater com o que de fato
- * processamos.
+ * execucao, cortados em `maxItems`, junto com `devolvidos`, quantos o
+ * dataset trouxe antes do corte. O `maxItems` da chamada ao ator so limita
+ * quanto e cobrado, nao quanto o ator devolve no dataset (achado rodando
+ * com chave real: pediu 20, o dataset trouxe mais); cortar aqui e o que faz
+ * o teto diario em `consumo_api` bater com o que de fato processamos.
+ * `devolvidos` e o que de fato foi cobrado (PROXIMO.md, item 1: a rodada de
+ * 07/09 pagou 1.602 resultados e consumiu 400, porque `resultsPerPage`
+ * multiplicava por alvo em vez de dividir o teto entre eles).
  */
-export async function rodarAtor<T>(ator: string, input: Record<string, unknown>, maxItems: number): Promise<T[]> {
+export async function rodarAtor<T>(
+  ator: string,
+  input: Record<string, unknown>,
+  maxItems: number,
+): Promise<{ itens: T[]; devolvidos: number }> {
   const execucao = await cliente().actor(ator).call(input, { maxItems });
   const { items } = await cliente().dataset(execucao.defaultDatasetId).listItems();
-  return (items as T[]).slice(0, maxItems);
+  return { itens: (items as T[]).slice(0, maxItems), devolvidos: items.length };
+}
+
+/**
+ * `resultsPerPage`/`resultsLimit` valem por alvo (hashtag ou perfil), nao no
+ * total (achado de 07/09, PROXIMO.md item 1): pedir o teto inteiro por alvo
+ * multiplica o que e cobrado pelo numero de alvos. O limite por chamada
+ * passa a ser o teto dividido pelo numero de alvos, arredondado para cima
+ * (sobra de arredondamento e melhor que faltar resultado).
+ */
+export function limitePorAlvo(teto: number, numeroDeAlvos: number): number {
+  if (numeroDeAlvos <= 0) return teto;
+  return Math.ceil(teto / numeroDeAlvos);
 }
 
 /**
@@ -63,7 +82,8 @@ export type TiktokItemBruto = {
   text?: string;
   webVideoUrl: string;
   createTimeISO?: string;
-  authorMeta?: { name?: string; nickName?: string };
+  /** `fans` (E6 parte 3, item 4): contagem de seguidores do autor, quando o ator devolve. */
+  authorMeta?: { name?: string; nickName?: string; fans?: number };
   videoMeta?: { duration?: number };
   musicMeta?: { musicId?: string; musicName?: string; musicAuthor?: string; musicOriginal?: boolean };
   playCount?: number;
@@ -80,8 +100,9 @@ export async function buscarTiktok(
   hashtags: string[],
   perfis: string[],
   maxItems: number,
-): Promise<TiktokItemBruto[]> {
-  const input: Record<string, unknown> = { resultsPerPage: maxItems };
+): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
+  const numeroDeAlvos = hashtags.length + perfis.length;
+  const input: Record<string, unknown> = { resultsPerPage: limitePorAlvo(maxItems, numeroDeAlvos) };
   if (hashtags.length > 0) input.hashtags = hashtags.map(paraHashtag);
   if (perfis.length > 0) input.profiles = perfis;
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
@@ -94,13 +115,22 @@ export async function buscarTiktok(
  * `profiles`; confirmado rodando com chave real em 05/09/2026 (pegou um
  * post de @tiktok pelo perfil e devolveu o mesmo post so com a URL dele).
  */
-export async function buscarTiktokPorUrl(urls: string[]): Promise<TiktokItemBruto[]> {
-  if (urls.length === 0) return [];
+export async function buscarTiktokPorUrl(
+  urls: string[],
+): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
+  if (urls.length === 0) return { itens: [], devolvidos: 0 };
   const input = { postURLs: urls, resultsPerPage: urls.length };
   return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, urls.length);
 }
 
-/** Item bruto do Instagram (apify/instagram-scraper), so os campos que a normalizacao usa. */
+/**
+ * Item bruto do Instagram (apify/instagram-scraper), so os campos que a
+ * normalizacao usa. `ownerFollowersCount` (E6 parte 3, item 4): nome de
+ * campo nao confirmado contra uma resposta real do ator para post/reel
+ * scrapado por `directUrls` (nesta rodada nenhuma chamada real ao Apify e
+ * feita, `PROXIMO.md`); se o nome vier diferente quando a coleta voltar,
+ * ajustar aqui, o resto do normalizador nao muda.
+ */
 export type InstagramItemBruto = {
   id: string;
   shortCode?: string;
@@ -109,6 +139,7 @@ export type InstagramItemBruto = {
   timestamp?: string;
   ownerUsername: string;
   ownerFullName?: string;
+  ownerFollowersCount?: number;
   videoDuration?: number;
   videoPlayCount?: number;
   videoViewCount?: number;
@@ -129,12 +160,12 @@ export async function buscarInstagram(
   hashtags: string[],
   perfis: string[],
   maxItens: number,
-): Promise<InstagramItemBruto[]> {
+): Promise<{ itens: InstagramItemBruto[]; devolvidos: number }> {
   const directUrls = [
     ...hashtags.map((h) => `https://www.instagram.com/explore/tags/${encodeURIComponent(paraHashtag(h))}/`),
     ...perfis.map((p) => `https://www.instagram.com/${encodeURIComponent(p)}/`),
   ];
-  if (directUrls.length === 0) return [];
+  if (directUrls.length === 0) return { itens: [], devolvidos: 0 };
 
   const input = { directUrls, resultsType: "reels", resultsLimit: maxItens };
   return rodarAtor<InstagramItemBruto>(config.coleta.atorInstagram, input, maxItens);
@@ -150,8 +181,10 @@ export async function buscarInstagram(
  * o mesmo post (o job sempre reconstroi como `/reel/`, `medirInstagram` em
  * `curva-cliente.ts`).
  */
-export async function buscarInstagramPorUrl(urls: string[]): Promise<InstagramItemBruto[]> {
-  if (urls.length === 0) return [];
+export async function buscarInstagramPorUrl(
+  urls: string[],
+): Promise<{ itens: InstagramItemBruto[]; devolvidos: number }> {
+  if (urls.length === 0) return { itens: [], devolvidos: 0 };
   const input = { directUrls: urls, resultsType: "reels", resultsLimit: urls.length };
   return rodarAtor<InstagramItemBruto>(config.coleta.atorInstagram, input, urls.length);
 }

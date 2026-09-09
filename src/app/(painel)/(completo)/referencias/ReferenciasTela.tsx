@@ -150,7 +150,7 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
             <ReferenciaCartao
               key={v.id}
               vezes={formatarVezes(v.foraDaCurva)}
-              rotuloVezes={rotuloMultiploConta(classificarMultiplo(v.foraDaCurva))}
+              rotuloVezes={rotuloMultiploConta(classificarMultiplo(v.foraDaCurva), v.contaMedianaOrigem)}
               conta={v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada}
               data={v.publicadoEm ? FORMATAR_DATA.format(v.publicadoEm) : ""}
               analise={[

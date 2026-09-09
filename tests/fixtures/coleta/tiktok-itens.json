@@ -6,7 +6,8 @@
     "createTimeISO": "2026-08-21T10:00:00.000Z",
     "authorMeta": {
       "name": "exemplo.sorrisoemdia",
-      "nickName": "[exemplo] Sorriso em Dia"
+      "nickName": "[exemplo] Sorriso em Dia",
+      "fans": 12000
     },
     "videoMeta": { "duration": 34 },
     "musicMeta": {

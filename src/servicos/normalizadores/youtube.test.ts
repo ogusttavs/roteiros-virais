@@ -54,6 +54,8 @@ describe("normalizarVideoYoutube", () => {
       handle: "UCexemplo00000000001",
       nome: "[exemplo] Sorriso em Dia",
       url: "https://www.youtube.com/channel/UCexemplo00000000001",
+      // `videos.list` nunca traz subscriberCount; quem preenche e coleta-youtube.ts (item 4).
+      seguidores: null,
     });
   });
 

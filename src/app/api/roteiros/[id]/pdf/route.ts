@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
@@ -120,7 +121,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         "Cache-Control": "private, no-store",
       },
     });
-  } catch {
+  } catch (erro) {
+    /**
+     * Sem isso, um PDF que falha (timeout, container sem memória, o que
+     * for) some sem deixar rastro (achado da revisão do PR #33, item 0b):
+     * o cliente só via "tente de novo", e ninguém saberia que aconteceu.
+     */
+    Sentry.captureException(erro, {
+      tags: { rota: "roteiros-pdf" },
+      extra: { roteiroId: roteiro.id, clienteId: cliente.id },
+    });
     return NextResponse.json({ erro: "nao foi possivel gerar o pdf agora, tente de novo" }, { status: 504 });
   }
 }

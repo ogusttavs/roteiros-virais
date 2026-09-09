@@ -91,6 +91,34 @@ export const textosTermos = {
     ],
   },
 
+  dados: {
+    titulo: "Exclusão de dados",
+    secoes: [
+      {
+        titulo: "1. Como pedir a exclusão",
+        paragrafos: [
+          `Escreva para ${config.emailContato}, do mesmo e-mail que você usa para entrar na plataforma, pedindo a exclusão dos seus dados.`,
+        ],
+      },
+      {
+        titulo: "2. O que é apagado",
+        paragrafos: [
+          "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, os perfis informados em Conta (Instagram, TikTok, YouTube) e os links dos vídeos que você marcou como postado.",
+        ],
+      },
+      {
+        titulo: "3. Em quanto tempo",
+        paragrafos: [
+          "Em até 30 dias corridos depois do pedido. Você recebe uma confirmação por e-mail quando a exclusão terminar.",
+        ],
+      },
+      {
+        titulo: "4. Contato",
+        paragrafos: [`Dúvida sobre a exclusão dos seus dados, escreva para ${config.emailContato}.`],
+      },
+    ],
+  },
+
   aceite: {
     titulo: "Antes de entrar",
     itens: [

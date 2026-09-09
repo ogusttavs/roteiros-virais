@@ -8,6 +8,7 @@ import {
   listarContasVigiadas,
   nichoPorSlug,
   noticiasPorId,
+  resumoMedianaPorPlataforma,
   temaDoDiaAtual,
   ultimaExecucaoPorJob,
   videosPorId,
@@ -64,12 +65,13 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes] = await Promise.all([
+  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
     listarContasVigiadas(nicho.id),
     temaDoDiaAtual(nicho.id),
     ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
+    resumoMedianaPorPlataforma(nicho.id),
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -199,6 +201,38 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
             </table>
           </div>
         )}
+      </section>
+
+      <section className={styles.secao}>
+        <h2>{t.estoqueTitulo}</h2>
+        <div className={styles.tabelaEnvoltorio}>
+          <table className={styles.tabela}>
+            <thead>
+              <tr>
+                <th>{t.colunaPlataforma}</th>
+                <th>{t.colunaContasComMediana}</th>
+                <th>{t.colunaOrigemMediana}</th>
+                <th>{t.colunaVideosComMultiplo}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estoquePorPlataforma.map((linha) => (
+                <tr key={linha.plataforma}>
+                  <td>{linha.plataforma}</td>
+                  <td className={styles.mono}>
+                    {linha.contasComMediana} / {linha.totalContas}
+                  </td>
+                  <td className={styles.mono}>
+                    {linha.contasPorOrigem.conta} / {linha.contasPorOrigem.seguidores} / {linha.contasPorOrigem.setor}
+                  </td>
+                  <td className={styles.mono}>
+                    {linha.videosComMultiplo} / {linha.totalVideos}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

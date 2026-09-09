@@ -108,6 +108,10 @@ export const textosAdmin = {
     erroColetar: (mensagem: string) => `não conseguimos enfileirar a coleta: ${mensagem}`,
     ultimaExecucaoJob: (nome: string, quando: string) => `${nome}: ${quando}`,
     semExecucao: "ainda não rodou",
+    estoqueTitulo: "estoque por plataforma",
+    colunaContasComMediana: "contas com mediana",
+    colunaOrigemMediana: "conta / seguidores / setor",
+    colunaVideosComMultiplo: "vídeos com múltiplo",
   },
   nichoModelo: {
     voltar: "nicho",

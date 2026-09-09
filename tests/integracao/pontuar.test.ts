@@ -20,15 +20,21 @@ function diasAtras(dias: number): Date {
 
 let nichoId: number;
 
-async function criarConta(handle: string, seguidores: number | null = null): Promise<number> {
+async function criarConta(handle: string, seguidores: number | null = null, nicho: number = nichoId): Promise<number> {
   const [c] = await db()
     .insert(contas)
-    .values({ plataforma: "tiktok", handle, nichoId, seguidores: seguidores ?? undefined })
+    .values({ plataforma: "tiktok", handle, nichoId: nicho, seguidores: seguidores ?? undefined })
     .returning({ id: contas.id });
   return c.id;
 }
 
-async function criarVideo(contaId: number, idExterno: string, views: number, publicadoEm: Date) {
+async function criarVideo(
+  contaId: number,
+  idExterno: string,
+  views: number,
+  publicadoEm: Date,
+  nicho: number = nichoId,
+) {
   await db()
     .insert(videos)
     .values({
@@ -36,7 +42,7 @@ async function criarVideo(contaId: number, idExterno: string, views: number, pub
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       contaId,
-      nichoId,
+      nichoId: nicho,
       views,
       publicadoEm,
     });
@@ -71,21 +77,6 @@ describe("rodarPontuar", () => {
     const fracaComSeguidores = await criarConta("fraca-com-seguidores", 1000);
     await criarVideo(fracaComSeguidores, "fraca-a", 50, diasAtras(10));
     await criarVideo(fracaComSeguidores, "fraca-b", 150, diasAtras(10));
-
-    // Conta "fraca-sem-seguidores": tambem so 2 videos, sem seguidores cadastrado =>
-    // mediana fica nula (sem substituto possivel) e os videos nao recebem fora_da_curva.
-    const fracaSemSeguidores = await criarConta("fraca-sem-seguidores", null);
-    await criarVideo(fracaSemSeguidores, "fsem-a", 80, diasAtras(10));
-    await criarVideo(fracaSemSeguidores, "fsem-b", 120, diasAtras(10));
-
-    // Conta "vazia": nenhum video na janela de 90 dias, mas com um valor antigo
-    // gravado manualmente, para confirmar que o job reseta o que saiu da janela
-    // (sem isso, o valor de uma rodada anterior ficaria preso para sempre).
-    const vazia = await criarConta("vazia");
-    await db()
-      .update(contas)
-      .set({ medianaViews: "999.99", baseFraca: false, taxaForaDaCurva: "0.5", medianaVelocidade: "42" })
-      .where(eq(contas.id, vazia));
 
     // O exemplo do escopo 5.1, vira teste: video de 300 mil numa conta de mediana 5
     // mil fica acima de um de 3 milhoes numa conta de mediana 2 milhoes. Os videos
@@ -142,6 +133,7 @@ describe("rodarPontuar", () => {
     const cForte = await linhaConta(forte);
     expect(cForte.baseFraca).toBe(false);
     expect(Number(cForte.medianaViews)).toBe(3000);
+    expect(cForte.medianaOrigem).toBe("conta");
     const vForte = await linhaVideo("forte-4"); // views=5000
     expect(Number(vForte.foraDaCurva)).toBeCloseTo(5000 / 3000, 3);
 
@@ -149,27 +141,11 @@ describe("rodarPontuar", () => {
     const cFraca = await linhaConta(fracaComSeguidores);
     expect(cFraca.baseFraca).toBe(true);
     expect(Number(cFraca.medianaViews)).toBeCloseTo(10, 2);
+    expect(cFraca.medianaOrigem).toBe("seguidores");
     const vFracaA = await linhaVideo("fraca-a"); // views=50
     expect(Number(vFracaA.foraDaCurva)).toBeCloseTo(5, 3);
     const vFracaB = await linhaVideo("fraca-b"); // views=150
     expect(Number(vFracaB.foraDaCurva)).toBeCloseTo(15, 3);
-
-    // Conta fraca sem seguidores: mediana nula, videos sem fora_da_curva, e a taxa
-    // tambem fica nula (nao zero: sem fora_da_curva calculado em nenhum video, nao ha
-    // dado para dizer "zero fora da curva", revisao da etapa 7 no PROXIMO.md da etapa 8).
-    const cFracaSem = await linhaConta(fracaSemSeguidores);
-    expect(cFracaSem.baseFraca).toBe(true);
-    expect(cFracaSem.medianaViews).toBeNull();
-    expect(cFracaSem.taxaForaDaCurva).toBeNull();
-    const vFracaSemA = await linhaVideo("fsem-a");
-    expect(vFracaSemA.foraDaCurva).toBeNull();
-
-    // Conta vazia: reset de valores antigos que saíram da janela
-    const cVazia = await linhaConta(vazia);
-    expect(cVazia.baseFraca).toBe(true);
-    expect(cVazia.medianaViews).toBeNull();
-    expect(cVazia.medianaVelocidade).toBeNull();
-    expect(cVazia.taxaForaDaCurva).toBeNull();
 
     // O exemplo do escopo 5.1
     const vEspecialA = await linhaVideo("escopo-a-especial");
@@ -200,5 +176,71 @@ describe("rodarPontuar", () => {
     expect(Number(vVeloz4d.velocidadeRelativa)).toBeCloseTo(2, 3);
     expect(vVeloz10d.velocidadeRelativa).toBeNull(); // sem velocidade, sem relativa
     expect(vVeloz1d.velocidadeRelativa).toBeNull();
+  }, 30_000);
+});
+
+describe("mediana do setor (substituto de terceiro nivel, E6 parte 3, item 2)", () => {
+  it("conta sem mediana propria e sem seguidores recebe a mediana do setor; ao ganhar seguidores, a origem muda", async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-setor-teste", nome: "Pontuar setor teste", termos: [] })
+      .returning();
+    const nichoSetor = nicho.id;
+
+    // Conta com mediana propria (5 videos, mediana 3000), que tambem alimenta o
+    // calculo do setor (a mediana do setor olha todo video do nicho+plataforma,
+    // sem distinguir de qual conta ele veio).
+    const fonte = await criarConta("setor-fonte", null, nichoSetor);
+    for (const [i, v] of [1000, 2000, 3000, 4000, 5000].entries()) {
+      await criarVideo(fonte, `setor-fonte-${i}`, v, diasAtras(10), nichoSetor);
+    }
+
+    // Conta sob teste: 1 video, sem seguidores. Sem mediana propria (n < 5) e
+    // sem substituto por seguidor (nulo), cai no setor: mediana de
+    // [1000,2000,3000,4000,5000,6000] (o proprio video entra no calculo do
+    // setor) = 3500 (interpolacao entre 3000 e 4000, n par).
+    const semSeguidores = await criarConta("setor-sem-seguidores", null, nichoSetor);
+    await criarVideo(semSeguidores, "setor-alvo", 6000, diasAtras(10), nichoSetor);
+
+    await rodarPontuar();
+
+    const [cAntes] = await db().select().from(contas).where(eq(contas.id, semSeguidores));
+    expect(cAntes.medianaOrigem).toBe("setor");
+    expect(Number(cAntes.medianaViews)).toBeCloseTo(3500, 2);
+    const [vAntes] = await db().select().from(videos).where(eq(videos.idExterno, "setor-alvo"));
+    expect(Number(vAntes.foraDaCurva)).toBeCloseTo(6000 / 3500, 3);
+
+    // Ganha seguidores: substituto por seguidor passa a existir (so 1 video,
+    // mediana = 6000/1000*100 = 600) e vence o setor no proximo pontuar.
+    await db().update(contas).set({ seguidores: 1000 }).where(eq(contas.id, semSeguidores));
+    await rodarPontuar();
+
+    const [cDepois] = await db().select().from(contas).where(eq(contas.id, semSeguidores));
+    expect(cDepois.medianaOrigem).toBe("seguidores");
+    expect(Number(cDepois.medianaViews)).toBeCloseTo(600, 2);
+    const [vDepois] = await db().select().from(videos).where(eq(videos.idExterno, "setor-alvo"));
+    expect(Number(vDepois.foraDaCurva)).toBeCloseTo(10, 3);
+  }, 30_000);
+
+  it("nicho sem nenhum video: sem setor para usar, a mediana continua nula (nunca um valor antigo preso)", async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-vazio-teste", nome: "Pontuar vazio teste", termos: [] })
+      .returning();
+    const nichoVazio = nicho.id;
+
+    const vazia = await criarConta("vazia", null, nichoVazio);
+    await db()
+      .update(contas)
+      .set({ medianaViews: "999.99", medianaOrigem: "setor", baseFraca: false, taxaForaDaCurva: "0.5" })
+      .where(eq(contas.id, vazia));
+
+    await rodarPontuar();
+
+    const [cVazia] = await db().select().from(contas).where(eq(contas.id, vazia));
+    expect(cVazia.baseFraca).toBe(true);
+    expect(cVazia.medianaViews).toBeNull();
+    expect(cVazia.medianaOrigem).toBeNull();
+    expect(cVazia.taxaForaDaCurva).toBeNull();
   }, 30_000);
 });

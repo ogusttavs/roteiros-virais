@@ -10,6 +10,7 @@ import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+import { rodarPontuar } from "../../src/jobs/pontuar";
 import { rodarVigilancia } from "../../src/jobs/vigilancia";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -99,5 +100,64 @@ describe("rodarVigilancia", () => {
     expect(await vigiada(poucosVideos)).toBe(false);
     expect(await vigiada(contaSeed)).toBe(false);
     expect(await vigiada(caiuDoRanking)).toBe(false);
+  }, 30_000);
+
+  /**
+   * E6 parte 3, item 6: a regra de selecao nao muda (o teste acima ja cobre
+   * a query em si, com taxa manual); o que faltava provar e que, quando
+   * `pontuar` de verdade calcula a mediana e a taxa fora da curva de varias
+   * contas (nao so uma, achado do Gustavo em 07/09: "hoje so uma conta e
+   * vigiada em todo o banco"), a vigilancia seleciona todas que qualificam,
+   * nao trava numa so.
+   */
+  it("com pontuar de verdade calculando a taxa, a vigilancia seleciona varias contas, nao so uma", async () => {
+    const [nichoPontuar] = await db()
+      .insert(nichos)
+      .values({ slug: "vigilancia-pontuar-teste", nome: "Vigilancia com pontuar teste", termos: [] })
+      .returning();
+
+    const idsComBase: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: `vigilancia-base-${i}`, nichoId: nichoPontuar.id })
+        .returning({ id: contas.id });
+      for (let v = 0; v < 8; v += 1) {
+        await db()
+          .insert(videos)
+          .values({
+            plataforma: "tiktok",
+            idExterno: `vigilancia-base-${i}-v${v}`,
+            url: `https://exemplo.invalido/vigilancia-base-${i}-v${v}`,
+            contaId: conta.id,
+            nichoId: nichoPontuar.id,
+            views: 1000 + v * 500 + i * 3000,
+            publicadoEm: diasAtras(10),
+          });
+      }
+      idsComBase.push(conta.id);
+    }
+
+    await rodarPontuar();
+    await rodarVigilancia();
+
+    let vigiadas = 0;
+    for (const id of idsComBase) {
+      const [c] = await db()
+        .select({ vigiada: contas.vigiada, taxaForaDaCurva: contas.taxaForaDaCurva })
+        .from(contas)
+        .where(eq(contas.id, id));
+      // Cada conta tem mediana propria (8 videos >= MINIMO_VIDEOS_MEDIANA) e,
+      // com isso, taxa_fora_da_curva deixa de ser nula.
+      expect(c.taxaForaDaCurva).not.toBeNull();
+      if (c.vigiada) vigiadas += 1;
+    }
+    // O achado de producao era "so uma conta vigiada em todo o banco"; aqui,
+    // as quatro qualificam (8 videos cada, bem dentro do limite de 50 por nicho).
+    expect(vigiadas).toBe(4);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoPontuar.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoPontuar.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoPontuar.id));
   }, 30_000);
 });

@@ -5,6 +5,8 @@
  * `src/textos/` porque não é texto fixo, é regra de formatação, testável
  * sem depender de nenhuma tela.
  */
+import type { MedianaOrigem } from "@/db/schema";
+
 const FORMATO_COMPACTO = new Intl.NumberFormat("pt-BR", {
   notation: "compact",
   maximumFractionDigits: 1,
@@ -67,8 +69,20 @@ export function classificarMultiplo(vezes: number): FaixaMultiplo {
   return "abaixo";
 }
 
-/** "acima do normal dessa conta" / "na média dessa conta" / "abaixo do normal dessa conta". */
-export function rotuloMultiploConta(faixa: FaixaMultiplo): string {
+/**
+ * "acima do normal dessa conta" / "na média dessa conta" / "abaixo do normal
+ * dessa conta"; com `origem` "setor" (mediana substituta de terceiro nível,
+ * `pontuar.ts`, `PROXIMO.md` E6 parte 3, item 2), "acima da média do seu
+ * setor" / "na média do seu setor" / "abaixo da média do seu setor". Origem
+ * "seguidores" e `null` (conta sem `mediana_origem` ainda) usam o mesmo texto
+ * de "conta": o cliente não distingue as duas, só "setor" muda o que ele lê.
+ */
+export function rotuloMultiploConta(faixa: FaixaMultiplo, origem: MedianaOrigem | null = "conta"): string {
+  if (origem === "setor") {
+    if (faixa === "acima") return "acima da média do seu setor";
+    if (faixa === "media") return "na média do seu setor";
+    return "abaixo da média do seu setor";
+  }
   if (faixa === "acima") return "acima do normal dessa conta";
   if (faixa === "media") return "na média dessa conta";
   return "abaixo do normal dessa conta";

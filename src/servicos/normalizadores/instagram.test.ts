@@ -22,7 +22,7 @@ describe("normalizarVideoInstagram", () => {
       plataforma: "instagram",
       idExterno: "Cx1Exemplo01",
       url: "https://www.instagram.com/reel/Cx1Exemplo01/",
-      titulo: null,
+      titulo: "[exemplo] 3 erros que estragam o seu sorriso",
       descricao: "[exemplo] 3 erros que estragam o seu sorriso",
       publicadoEm: new Date("2026-08-21T10:00:00.000Z"),
       duracaoS: 34,
@@ -35,6 +35,7 @@ describe("normalizarVideoInstagram", () => {
       handle: "exemplo.sorrisoemdia",
       nome: "[exemplo] Sorriso em Dia",
       url: "https://www.instagram.com/exemplo.sorrisoemdia",
+      seguidores: 8000,
     });
     expect(audio).toEqual({
       id: "611111111111111",
@@ -45,12 +46,15 @@ describe("normalizarVideoInstagram", () => {
   });
 
   it("sem musicInfo, o audio vem nulo; usa videoViewCount quando nao ha videoPlayCount", () => {
-    const { video, audio } = normalizarVideoInstagram(itens[1]);
+    const { video, conta, audio } = normalizarVideoInstagram(itens[1]);
 
     expect(audio).toBeNull();
     expect(video.likes).toBe(0);
     expect(video.comentarios).toBe(0);
     expect(video.duracaoS).toBeNull();
     expect(video.views).toBe(40210);
+    expect(video.titulo).toBe("[exemplo] antes e depois de um clareamento");
+    // Sem ownerFollowersCount no item, seguidores fica nulo (E6 parte 3, item 4).
+    expect(conta.seguidores).toBeNull();
   });
 });

@@ -41,7 +41,7 @@ function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null
   return {
     conta: resumo.contaNome ?? resumo.contaHandle,
     multiplo: formatarMultiplo(resumo.multiplicador),
-    rotulo: rotuloMultiploConta(faixa),
+    rotulo: rotuloMultiploConta(faixa, resumo.contaMedianaOrigem),
     views: formatarViewsCompacto(resumo.views),
     quando: resumo.publicadoEm ? fraseDiasAtras(diasDesde(resumo.publicadoEm)) : fraseDiasAtras(0),
     parecidos: resumo.quantidadeParecidos,

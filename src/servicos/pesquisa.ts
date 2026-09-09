@@ -20,6 +20,7 @@ import {
   videos,
   type AnaliseVideo,
   type AnaliseVisual,
+  type MedianaOrigem,
   type ModeloNicho,
   type Plataforma,
 } from "@/db/schema";
@@ -330,6 +331,8 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
 export type EvidenciaResumo = {
   contaNome: string | null;
   contaHandle: string | null;
+  /** De onde veio a mediana da conta, para `rotuloMultiploConta` trocar o texto quando é "setor". */
+  contaMedianaOrigem: MedianaOrigem | null;
   multiplicador: number;
   views: number;
   publicadoEm: Date | null;
@@ -351,6 +354,7 @@ export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaRes
     .select({
       contaNome: contas.nome,
       contaHandle: contas.handle,
+      contaMedianaOrigem: contas.medianaOrigem,
       foraDaCurva: videos.foraDaCurva,
       views: videos.views,
       publicadoEm: videos.publicadoEm,
@@ -366,6 +370,7 @@ export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaRes
   return {
     contaNome: principal.contaNome,
     contaHandle: principal.contaHandle,
+    contaMedianaOrigem: principal.contaMedianaOrigem,
     multiplicador: principal.foraDaCurva === null ? 0 : Number(principal.foraDaCurva),
     views: principal.views,
     publicadoEm: principal.publicadoEm,
@@ -385,6 +390,8 @@ export type VideoReferencia = {
    * `channelTitle`/`nickName`/`ownerFullName`.
    */
   contaNome: string | null;
+  /** De onde veio a mediana da conta, para `rotuloMultiploConta` trocar o texto quando é "setor". */
+  contaMedianaOrigem: MedianaOrigem | null;
   publicadoEm: Date | null;
   foraDaCurva: number;
   assunto: string;
@@ -431,6 +438,7 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
       url: videos.url,
       contaHandle: contas.handle,
       contaNome: contas.nome,
+      contaMedianaOrigem: contas.medianaOrigem,
       publicadoEm: videos.publicadoEm,
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
@@ -449,6 +457,7 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
       url: l.url,
       contaHandle: l.contaHandle,
       contaNome: l.contaNome,
+      contaMedianaOrigem: l.contaMedianaOrigem,
       publicadoEm: l.publicadoEm,
       foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
       assunto: l.analise.assunto,
@@ -465,6 +474,8 @@ export type VideoParaEmbed = {
   url: string;
   contaNome: string | null;
   contaHandle: string | null;
+  /** De onde veio a mediana da conta, para `rotuloMultiploConta` trocar o texto quando é "setor". */
+  contaMedianaOrigem: MedianaOrigem | null;
   foraDaCurva: number;
   porQueFuncionou: string | null;
 };
@@ -482,6 +493,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
       url: videos.url,
       contaNome: contas.nome,
       contaHandle: contas.handle,
+      contaMedianaOrigem: contas.medianaOrigem,
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
     })
@@ -496,6 +508,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     url: linha.url,
     contaNome: linha.contaNome,
     contaHandle: linha.contaHandle,
+    contaMedianaOrigem: linha.contaMedianaOrigem,
     foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
     porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
   };

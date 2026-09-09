@@ -1,0 +1,1 @@
+ALTER TABLE "contas" ADD COLUMN "mediana_origem" text;

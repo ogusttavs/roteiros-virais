@@ -20,6 +20,7 @@ import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { desligarComGraca } from "./desligamento";
 import { executarComRegistro } from "./execucoes";
@@ -68,6 +69,9 @@ async function main(): Promise<void> {
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
     await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId));
+  });
+  await boss().work(FILAS.contasBase, async () => {
+    await executarComRegistro(FILAS.contasBase, rodarContasBase);
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);
