@@ -27,23 +27,35 @@ import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
-const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<string, unknown>>> = {
-  [FILAS.coletaYoutube]: rodarColetaYoutube,
+/**
+ * Toda entrada embrulhada numa arrow function, mesmo as que ignoram o
+ * argumento (ajuste 1 da revisão do PR #36): `executarComRegistro` chama
+ * `tarefa(execucao.id)`, e uma referência direta a uma função com
+ * `nichoId?: number` como primeiro parâmetro (`rodarColetaYoutube`,
+ * `rodarColetaNoticias`, `rodarMetaContas`, `rodarMetaHashtags`,
+ * `rodarDescobertaInstagram`) recebia o id da execução ali, filtrava por um
+ * nicho que não existe e terminava "ok" sem processar nada; o `typecheck`
+ * não pega porque uma função com menos parâmetros é atribuível a um tipo
+ * com mais. Só `rodarColetaApify` e `rodarColetaMeioDia` de fato usam o id.
+ * Exportada para o teste (`rodar.test.ts`) chamar cada entrada direto.
+ */
+export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<string, unknown>>> = {
+  [FILAS.coletaYoutube]: () => rodarColetaYoutube(),
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
-  [FILAS.coletaNoticias]: rodarColetaNoticias,
-  [FILAS.contasBase]: rodarContasBase,
-  [FILAS.metaContas]: rodarMetaContas,
-  [FILAS.metaHashtags]: rodarMetaHashtags,
-  [FILAS.descobertaInstagram]: rodarDescobertaInstagram,
-  [FILAS.pontuar]: rodarPontuar,
-  [FILAS.vigilancia]: rodarVigilancia,
-  [FILAS.transcrever]: rodarTranscrever,
-  [FILAS.extrair]: rodarExtrair,
-  [FILAS.extrairColeta]: rodarExtrairColeta,
-  [FILAS.analisarVisual]: rodarAnalisarVisual,
-  [FILAS.modeloNicho]: rodarModeloNicho,
-  [FILAS.temasDoDia]: rodarTemasDoDia,
+  [FILAS.coletaNoticias]: () => rodarColetaNoticias(),
+  [FILAS.contasBase]: () => rodarContasBase(),
+  [FILAS.metaContas]: () => rodarMetaContas(),
+  [FILAS.metaHashtags]: () => rodarMetaHashtags(),
+  [FILAS.descobertaInstagram]: () => rodarDescobertaInstagram(),
+  [FILAS.pontuar]: () => rodarPontuar(),
+  [FILAS.vigilancia]: () => rodarVigilancia(),
+  [FILAS.transcrever]: () => rodarTranscrever(),
+  [FILAS.extrair]: () => rodarExtrair(),
+  [FILAS.extrairColeta]: () => rodarExtrairColeta(),
+  [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
+  [FILAS.modeloNicho]: () => rodarModeloNicho(),
+  [FILAS.temasDoDia]: () => rodarTemasDoDia(),
   [FILAS.lembrete]: () => rodarLembrete(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
 };
@@ -72,7 +84,15 @@ async function main(): Promise<void> {
   console.log(`${nome} rodou:`, JSON.stringify(resultado.resumo, null, 2));
 }
 
-main().catch((erro) => {
-  console.error(erro);
-  process.exitCode = 1;
-});
+/**
+ * So dispara ao rodar `tsx src/jobs/rodar.ts` direto (`npm run job`), nunca
+ * quando `rodar.test.ts` importa `TAREFAS` (mesmo raciocinio de
+ * `scripts/avaliar-briefing.ts`, "require.main e o script que foi chamado
+ * na linha de comando").
+ */
+if (require.main === module) {
+  main().catch((erro) => {
+    console.error(erro);
+    process.exitCode = 1;
+  });
+}
