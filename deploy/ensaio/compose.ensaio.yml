@@ -38,6 +38,9 @@ services:
     image: roteiros-worker:ensaio
     container_name: roteiros-worker-ensaio
 
+  roteiros-pot:
+    container_name: roteiros-pot-ensaio
+
   roteiros-backup:
     image: roteiros-backup:ensaio
     container_name: roteiros-backup-ensaio

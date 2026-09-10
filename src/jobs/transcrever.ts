@@ -20,6 +20,7 @@ import { db } from "@/db";
 import { nichos, videos } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
+import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
@@ -178,6 +179,13 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
         falhas += 1;
         erros.push(`video ${videoId} / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }
+
+      // Espaça as chamadas ao YouTube (item 2 desta rodada), depois de
+      // processar o vídeo (qualquer resultado), antes do próximo. Pela URL
+      // de verdade, não por `plataforma` (mesmo raciocínio de `video.ts`/
+      // `audio.ts`, `ehUrlDoYoutube`): é a URL que decide se o yt-dlp
+      // chamou o YouTube, não o rótulo da coluna.
+      if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
     }
   }
 

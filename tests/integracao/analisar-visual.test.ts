@@ -18,10 +18,11 @@ vi.mock("@/jobs/video", () => ({
   baixarVideo480p: vi.fn(),
   apagarVideo: vi.fn(),
   extrairQuadros: vi.fn(),
+  duracaoDoArquivoS: vi.fn(),
 }));
 
 import { rodarAnalisarVisual } from "@/jobs/analisar-visual";
-import { apagarVideo, baixarVideo480p, extrairQuadros } from "@/jobs/video";
+import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from "@/jobs/video";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -94,6 +95,7 @@ beforeEach(() => {
   vi.mocked(baixarVideo480p).mockReset().mockResolvedValue("/tmp/video-fake.mp4");
   vi.mocked(apagarVideo).mockReset().mockResolvedValue(undefined);
   vi.mocked(extrairQuadros).mockReset().mockResolvedValue(QUADROS_FALSOS);
+  vi.mocked(duracaoDoArquivoS).mockReset();
 });
 
 afterEach(async () => {
@@ -188,18 +190,39 @@ describe("rodarAnalisarVisual", () => {
     expect(linhaBoa.id).toBe(bom.id);
   });
 
-  it("video sem duracao conhecida falha de forma isolada (nao da para escolher os quadros)", async () => {
-    await criarVideo("sem-duracao", {
+  it("video sem duracao conhecida (Meta nao devolve isso, transcricao do YouTube rodada 2 item 3b): baixa, le a duracao com ffprobe e grava na coluna", async () => {
+    const video = await criarVideo("sem-duracao", {
       foraDaCurva: 5,
       publicadoEm: diasAtras(2),
       transcricao: "transcricao qualquer",
       analise: ANALISE_PADRAO,
     });
+    vi.mocked(duracaoDoArquivoS).mockResolvedValue(37);
+
+    const resumo = await rodarAnalisarVisual();
+
+    expect(resumo.analisados).toBe(1);
+    expect(resumo.falhas).toBe(0);
+    expect(baixarVideo480p).toHaveBeenCalledWith(video.url);
+    expect(duracaoDoArquivoS).toHaveBeenCalledWith("/tmp/video-fake.mp4");
+
+    const [linha] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(linha.duracaoS).toBe(37);
+    expect(linha.analiseVisual).not.toBeNull();
+  });
+
+  it("ffprobe falhando em ler a duracao falha de forma isolada (nao da para escolher os quadros)", async () => {
+    await criarVideo("sem-duracao-ffprobe-falha", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      analise: ANALISE_PADRAO,
+    });
+    vi.mocked(duracaoDoArquivoS).mockRejectedValue(new Error("ffprobe nao devolveu uma duracao valida"));
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(0);
     expect(resumo.falhas).toBe(1);
-    expect(baixarVideo480p).not.toHaveBeenCalled();
   });
 
   it("respeita o limite de visuaisPorSemana, os de maior fora_da_curva primeiro", async () => {

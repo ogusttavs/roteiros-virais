@@ -18,10 +18,22 @@
 # pagina "EJS", conferida em 09/09/2026, minimo 2.3.0; esta imagem usa uma
 # bem mais nova). Binario oficial da Deno Land, baixado por versao fixa e
 # conferido pelo sha256sum publicado junto do release, antes de instalar.
+#
+# Plugin do provedor de PO Token (transcricao do YouTube, rodada 2, item 1,
+# github.com/Brainicism/bgutil-ytdlp-pot-provider, versao fixa como o resto):
+# o yt-dlp deste Dockerfile e o zipapp oficial, nao instalado por pip, entao
+# o plugin entra pelo metodo "Executable location" do proprio README do
+# yt-dlp ("Installing Plugins"): uma pasta `yt-dlp-plugins` do lado do
+# binario (`/usr/local/bin/yt-dlp-plugins/`). O `.zip` do release tem
+# `yt_dlp_plugins/` na propria raiz (conferido em 10/09/2026, `unzip -l` no
+# zip baixado), que e a forma que o README do yt-dlp descreve como aceita
+# direto, sem descompactar. O servidor do provedor (a outra metade) roda a
+# parte, como o servico `roteiros-pot` do Compose.
 FROM node:24-slim
 
 ARG YT_DLP_VERSION=2026.08.19
 ARG DENO_VERSION=2.9.6
+ARG BGUTIL_POT_VERSION=2.0.0
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl unzip \
@@ -33,6 +45,8 @@ RUN apt-get update \
   && unzip -q /tmp/deno-x86_64-unknown-linux-gnu.zip -d /usr/local/bin \
   && chmod a+rx /usr/local/bin/deno \
   && rm -f /tmp/deno-x86_64-unknown-linux-gnu.zip /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
+  && mkdir -p /usr/local/bin/yt-dlp-plugins \
+  && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o /usr/local/bin/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

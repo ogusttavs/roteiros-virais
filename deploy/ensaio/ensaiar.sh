@@ -148,6 +148,29 @@ semear() {
   "${COMPOSE[@]}" exec -T roteiros-worker npm run -s db:seed
 }
 
+# Transcricao do YouTube, rodada 2, item 1: confere que o worker acha o
+# servidor do provedor de PO Token pela rede interna (`roteiros-pot`, o
+# servico novo deste Compose) e que o plugin foi instalado direito na
+# imagem. `--simulate` nunca baixa nada (so extrai metadado); a linha "PO
+# Token Providers" com "bgutil" na saida verbosa e o mesmo jeito que o
+# proprio README do provedor descreve para confirmar a instalacao, e
+# aparece cedo na extracao, antes de qualquer bloqueio de IP mais adiante
+# (por isso o `|| true`: o comando pode terminar com erro pelo bloqueio, o
+# passo confere so se a linha do provedor apareceu).
+worker_fala_com_provedor_pot() {
+  local saida
+  saida=$("${COMPOSE[@]}" exec -T roteiros-worker yt-dlp -v --simulate \
+    --extractor-args "youtube:player_client=mweb" \
+    --extractor-args "youtubepot-bgutilhttp:base_url=http://roteiros-pot:4416" \
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ" 2>&1) || true
+  if ! printf '%s' "$saida" | grep -q "PO Token Providers:.*bgutil"; then
+    echo "yt-dlp -v nao mostrou o provedor bgutil na lista de PO Token Providers" >&2
+    printf '%s\n' "$saida" >&2
+    return 1
+  fi
+  printf '%s\n' "$saida" | grep "PO Token Providers:"
+}
+
 conferir_login_admin() {
   local resposta cookie codigo
   resposta=$(curl -s -i -X POST "$BASE_URL/api/auth/sign-in/email" \
@@ -308,6 +331,7 @@ passo "sobe o postgres e espera ficar saudavel" subir_postgres
 passo "migra o banco pelo container do worker" migrar
 passo "sobe o app, o worker e o backup" subir_resto
 passo "confere /api/saude em $BASE_URL" conferir_saude
+passo "worker fala com o provedor de PO Token" worker_fala_com_provedor_pot
 passo "semeia o banco pelo container do worker" semear
 passo "login do admin de seed e GET /admin/clientes com o cookie" conferir_login_admin
 passo "dispara coleta-noticias e espera terminar ok (1a vez)" disparar_e_esperar_job
