@@ -8,6 +8,7 @@ import {
   Eye,
   History,
   Music,
+  RotateCcw,
   Scissors,
   Type,
   Video,
@@ -16,22 +17,25 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
+import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import type { ConteudoRoteiro } from "@/db/schema";
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { ROTULO_OBJETIVO_TRAVADO, ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosRoteiro } from "@/textos/roteiro";
+import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
+import chipStyles from "@/ui/componentes/Chips.module.css";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
 
-import { marcarGravadoAction, marcarPostadoAction, outroAnguloAction } from "./acoes";
+import { marcarGravadoAction, marcarPostadoAction, reprovarERescreverAction } from "./acoes";
 import styles from "./RoteiroTela.module.css";
 
 function splitParagrafos(texto: string): string[] {
@@ -63,6 +67,21 @@ function formatarSegundo(segundo: number): string {
   return `${minutos}:${String(restante).padStart(2, "0")}`;
 }
 
+/** "7 de setembro" (E27, parte 1, bloco de versões: "você reprovou por... em D de mês"). */
+function formatarDataPorExtenso(data: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    day: "numeric",
+    month: "long",
+    timeZone: "America/Sao_Paulo",
+  }).format(data);
+}
+
+/** "X e Y" com dois itens, "X, Y e Z" com três ou mais (E27, parte 1, motivos da reprovação). */
+function listaComE(itens: string[]): string {
+  if (itens.length <= 1) return itens[0] ?? "";
+  return `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`;
+}
+
 function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
   const textoNaTela =
     edicao.textoNaTela.length > 0
@@ -92,7 +111,7 @@ function comInicialMinuscula(texto: string): string {
   return texto.length > 0 ? texto[0].toLowerCase() + texto.slice(1) : texto;
 }
 
-type Painel = "menu" | "postei" | "angulo" | "versoes" | null;
+type Painel = "menu" | "postei" | "reprovar" | "versoes" | null;
 
 type Props = {
   roteiro: RoteiroLinha;
@@ -114,7 +133,9 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
   const [painel, setPainel] = useState<Painel>(null);
   const botaoMenuRef = useRef<HTMLButtonElement>(null);
   const [urlDigitada, setUrlDigitada] = useState("");
-  const [motivoAngulo, setMotivoAngulo] = useState("");
+  const [motivosSelecionados, setMotivosSelecionados] = useState<Set<IdMotivoReprovacao>>(new Set());
+  const [motivoTexto, setMotivoTexto] = useState("");
+  const [erroReprovar, setErroReprovar] = useState(false);
   const [toast, setToast] = useState(false);
   const [erro, setErro] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
@@ -156,14 +177,28 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
     });
   }
 
-  function escreverOutraVersao() {
-    setErro(false);
+  function alternarMotivo(id: IdMotivoReprovacao) {
+    setMotivosSelecionados((atual) => {
+      const proximo = new Set(atual);
+      if (proximo.has(id)) proximo.delete(id);
+      else proximo.add(id);
+      return proximo;
+    });
+  }
+
+  function reprovarRoteiro() {
+    if (motivosSelecionados.size === 0) return;
+    setErroReprovar(false);
     iniciarTransicao(async () => {
       try {
-        const { id } = await outroAnguloAction(roteiro.id, motivoAngulo.trim() || undefined);
+        const { id } = await reprovarERescreverAction(
+          roteiro.id,
+          [...motivosSelecionados],
+          motivoTexto.trim() || undefined,
+        );
         router.push(`/roteiros/${id}`);
       } catch {
-        setErro(true);
+        setErroReprovar(true);
       }
     });
   }
@@ -263,6 +298,17 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
               { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
             ]}
           />
+          {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
+          <p className={styles.julgar}>
+            {textosRoteiro.reprovar.naoFicouBom}{" "}
+            <button
+              type="button"
+              onClick={() => setPainel("reprovar")}
+              className={styles.linkReprovar}
+            >
+              {textosRoteiro.menu.reprovar}
+            </button>
+          </p>
         </article>
 
         <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
@@ -317,6 +363,14 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
             {textosRoteiro.postado}
           </a>
         )}
+        {/* "Reprovar" só do tablet para cima; no celular é a linha .julgar no fim do cartão (design v2). */}
+        <button
+          type="button"
+          onClick={() => setPainel("reprovar")}
+          className={`${styles.btnVazio} ${styles.somenteTablet}`}
+        >
+          {textosRoteiro.menu.reprovar}
+        </button>
         <a
           href={`/api/roteiros/${roteiro.id}/pdf`}
           aria-label={textosRoteiro.baixarPdf}
@@ -330,11 +384,11 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         <button
           type="button"
           role="menuitem"
-          onClick={() => setPainel("angulo")}
+          onClick={() => setPainel("reprovar")}
           className={styles.itemMenu}
         >
-          <Video size={20} strokeWidth={1.5} aria-hidden="true" />
-          {textosRoteiro.menu.angulo}
+          <RotateCcw size={20} strokeWidth={1.5} aria-hidden="true" />
+          {textosRoteiro.menu.reprovar}
         </button>
         <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
           <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
@@ -379,30 +433,54 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
       </PainelFlutuante>
 
       <PainelFlutuante
-        titulo={textosRoteiro.menu.angulo}
-        aberto={painel === "angulo"}
+        titulo={textosRoteiro.reprovar.tituloFolha}
+        aberto={painel === "reprovar"}
         aoFechar={fecharPainel}
       >
-        <h2 className={styles.tituloPainel}>{textosRoteiro.menu.angulo}</h2>
-        <label className={styles.campo}>
-          <span>
-            {textosRoteiro.queDiferente}{" "}
-            <span className={styles.opcional}>{textosRoteiro.opcional}</span>
-          </span>
-          <textarea
-            value={motivoAngulo}
-            onChange={(evento) => setMotivoAngulo(evento.target.value)}
-            rows={3}
-            className={styles.textarea}
-          />
-        </label>
+        <h2 className={styles.tituloPainel}>{textosRoteiro.reprovar.tituloFolha}</h2>
+        <p className={styles.ajudaReprovar}>{textosRoteiro.reprovar.ajudaMotivos}</p>
+        <div role="group" aria-label={textosRoteiro.reprovar.rotuloMotivos} className={chipStyles.grupo}>
+          {MOTIVOS_REPROVACAO.map((motivo) => {
+            const ativo = motivosSelecionados.has(motivo.id);
+            return (
+              <button
+                key={motivo.id}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => alternarMotivo(motivo.id)}
+                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""].filter(Boolean).join(" ")}
+              >
+                {motivo.rotulo}
+              </button>
+            );
+          })}
+        </div>
+        <AreaTexto
+          rotulo={textosRoteiro.reprovar.rotuloTextoLivre}
+          value={motivoTexto}
+          onChange={(evento) => setMotivoTexto(evento.target.value)}
+          placeholder={textosRoteiro.reprovar.textoLivrePlaceholder}
+          linhasMin={3}
+        />
+        <p className={styles.objetivoTravado}>
+          {textosRoteiro.reprovar.objetivoContinua(ROTULO_OBJETIVO_TRAVADO[roteiro.objetivo])}
+        </p>
+        {erroReprovar ? <p className={styles.fraseErroPainel}>{textosRoteiro.reprovar.erro}</p> : null}
         <button
           type="button"
-          onClick={escreverOutraVersao}
-          disabled={pendente}
+          onClick={reprovarRoteiro}
+          disabled={pendente || motivosSelecionados.size === 0}
           className={styles.btn}
         >
-          {textosRoteiro.outraVersao}
+          {pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.reescrever}
+        </button>
+        <p className={styles.avisoTempoReprovar}>
+          {motivosSelecionados.size === 0
+            ? textosRoteiro.reprovar.semMotivoMarcado
+            : textosRoteiro.reprovar.tempoEstimado}
+        </p>
+        <button type="button" onClick={fecharPainel} className={styles.btnTextoCancelar}>
+          {textosRoteiro.reprovar.cancelar}
         </button>
       </PainelFlutuante>
 
@@ -419,8 +497,20 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
                 <span>
                   {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
                   {v.atual ? `, ${textosRoteiro.atual}` : ""}
+                  {v.reprovadoEm ? (
+                    <span className={styles.etiquetaReprovada}>{textosRoteiro.reprovar.etiqueta}</span>
+                  ) : null}
                 </span>
-                <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
+                {v.reprovadoEm && v.motivos ? (
+                  <span className={styles.motivosVersao}>
+                    {textosRoteiro.reprovar.motivosLinha(
+                      listaComE(v.motivos),
+                      formatarDataPorExtenso(v.reprovadoEm),
+                    )}
+                  </span>
+                ) : (
+                  <span className={styles.horaVersao}>{formatarHora(v.criadoEm)}</span>
+                )}
               </span>
             </Link>
           ))}

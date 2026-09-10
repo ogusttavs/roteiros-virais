@@ -40,12 +40,19 @@ function formatarPercentual(valor: number | null): string {
   return `${(valor * 100).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}%`;
 }
 
+const ROTULO_AVALIACAO: Record<"gostei" | "nao_gostei" | "outro_angulo" | "reprovado", string> = {
+  gostei: "gostei",
+  nao_gostei: "não gostei",
+  outro_angulo: "pediu outro ângulo",
+  reprovado: "reprovou",
+};
+
 function formatarAvaliacao(
-  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | null,
+  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | "reprovado" | null,
   motivo: string | null,
 ): string {
   if (!avaliacao) return t.semAvaliacao;
-  const rotulo = avaliacao === "gostei" ? "gostei" : avaliacao === "nao_gostei" ? "não gostei" : "pediu outro ângulo";
+  const rotulo = ROTULO_AVALIACAO[avaliacao];
   return motivo ? `${rotulo}: ${motivo}` : rotulo;
 }
 
@@ -157,20 +164,27 @@ export default async function AdminGeracoes({ searchParams }: { searchParams: Pr
                     <span className={styles.cartaoValor}>{formatarPercentual(resumo.taxaNaoGostei)}</span>
                   </div>
                   <div className={styles.cartao}>
-                    <span className={styles.cartaoRotulo}>{t.taxaOutroAngulo}</span>
-                    <span className={styles.cartaoValor}>{formatarPercentual(resumo.taxaOutroAngulo)}</span>
+                    <span className={styles.cartaoRotulo}>{t.taxaReprovado}</span>
+                    <span className={styles.cartaoValor}>{formatarPercentual(resumo.taxaReprovado)}</span>
                   </div>
+                  {/* Fluxo antigo (etapa 11), antes da E27: só aparece enquanto houver linha antiga no período. */}
+                  {resumo.taxaOutroAngulo !== null && resumo.taxaOutroAngulo > 0 ? (
+                    <div className={styles.cartao}>
+                      <span className={styles.cartaoRotulo}>{t.taxaOutroAngulo}</span>
+                      <span className={styles.cartaoValor}>{formatarPercentual(resumo.taxaOutroAngulo)}</span>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>
 
             <div className={styles.secaoResumo}>
-              <h3>{t.motivosTitulo}</h3>
-              {resumo.motivosOutroAnguloPorTarefa.length === 0 ? (
+              <h3>{t.motivosReprovadoTitulo}</h3>
+              {resumo.motivosReprovadoPorTarefa.length === 0 ? (
                 <p>{t.semMotivos}</p>
               ) : (
                 <ul className={styles.motivosLista}>
-                  {resumo.motivosOutroAnguloPorTarefa.map((grupo) => (
+                  {resumo.motivosReprovadoPorTarefa.map((grupo) => (
                     <li key={grupo.tarefa}>
                       <span className={styles.motivoTarefa}>{grupo.tarefa}</span>
                       {grupo.motivos.map((m) => (
@@ -184,6 +198,26 @@ export default async function AdminGeracoes({ searchParams }: { searchParams: Pr
                 </ul>
               )}
             </div>
+
+            {/* Fluxo antigo (etapa 11), antes da E27: só aparece enquanto houver linha antiga no período. */}
+            {resumo.motivosOutroAnguloPorTarefa.length > 0 ? (
+              <div className={styles.secaoResumo}>
+                <h3>{t.motivosTitulo}</h3>
+                <ul className={styles.motivosLista}>
+                  {resumo.motivosOutroAnguloPorTarefa.map((grupo) => (
+                    <li key={grupo.tarefa}>
+                      <span className={styles.motivoTarefa}>{grupo.tarefa}</span>
+                      {grupo.motivos.map((m) => (
+                        <div key={m.motivo} className={styles.motivoItem}>
+                          <span>{m.motivo}</span>
+                          <span className={styles.mono}>{m.contagem}</span>
+                        </div>
+                      ))}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </>
         )}
       </section>

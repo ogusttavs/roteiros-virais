@@ -1,7 +1,7 @@
 /**
- * `gerarRoteiro`, `outroAngulo` e `marcarPostado` (etapa 11): ciclo
- * completo contra o Postgres real, em mock (`AI_PROVIDER=mock`,
- * `vitest.config.mts`).
+ * `gerarRoteiro`, `reprovarERescrever` (E27, parte 1; antes `outroAngulo`)
+ * e `marcarPostado` (etapa 11): ciclo completo contra o Postgres real, em
+ * mock (`AI_PROVIDER=mock`, `vitest.config.mts`).
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
@@ -26,7 +26,7 @@ import {
   gerarRoteiro,
   marcarGravado,
   marcarPostado,
-  outroAngulo,
+  reprovarERescrever,
 } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -321,8 +321,8 @@ describe("historico de ganchos entre roteiros do mesmo cliente (achado do primei
   });
 });
 
-describe("outroAngulo", () => {
-  it("cria a versao 2 na mesma serie, mantendo a versao 1 acessivel", async () => {
+describe("reprovarERescrever", () => {
+  it("com dois motivos e um texto, cria a versao 2 com o mesmo objetivo; a versao 1 fica marcada reprovada, com os motivos na geracao dela", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-3", "erro comum ao limpar estofado");
 
@@ -332,16 +332,39 @@ describe("outroAngulo", () => {
       objetivo: "engajamento",
     });
 
-    const v2 = await outroAngulo(v1.id, "mais curto");
+    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco", "muito_longo"], "comeca devagar demais");
 
     expect(v2.versao).toBe(2);
     expect(v2.versaoDe).toBe(v1.id);
     expect(v2.clienteId).toBe(clienteId);
     expect(v2.tema).toBe(v1.tema);
+    expect(v2.objetivo).toBe(v1.objetivo);
 
     const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(v1Recarregado.versao).toBe(1);
     expect(v1Recarregado.conteudo).toBeTruthy();
+    expect(v1Recarregado.reprovadoEm).not.toBeNull();
+
+    const [geracaoV1] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, v1.geracaoId!));
+    expect(geracaoV1.avaliacao).toBe("reprovado");
+    expect(geracaoV1.motivosAvaliacao).toEqual(["gancho_fraco", "muito_longo"]);
+    expect(geracaoV1.motivoAvaliacao).toBe("comeca devagar demais");
+  });
+
+  it("sem motivo nenhum, erro nomeado, sem gerar versao nova", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-sem-motivo", "erro comum ao limpar estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+
+    await expect(reprovarERescrever(v1.id, [])).rejects.toThrow(ErroRoteiro);
+
+    const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
+    expect(v1Recarregado.reprovadoEm).toBeNull();
   });
 });
 

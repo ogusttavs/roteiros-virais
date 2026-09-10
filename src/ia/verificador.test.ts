@@ -137,6 +137,38 @@ describe("verificarLocalmente", () => {
       expect(r.aprovado).toBe(true);
     });
   });
+
+  describe("duracaoParaMuitoLongo (E27, parte 1, item 4)", () => {
+    it("reprova quando a nova versao nao ficou mais curta que a reprovada", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { duracaoParaMuitoLongo: { anteriorS: 40, novaS: 40 } },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("duracao");
+    });
+
+    it("reprova quando a nova versao ficou mais longa ainda", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { duracaoParaMuitoLongo: { anteriorS: 40, novaS: 55 } },
+      );
+      expect(r.aprovado).toBe(false);
+    });
+
+    it("aprova quando a nova versao ficou mais curta", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { duracaoParaMuitoLongo: { anteriorS: 40, novaS: 28 } },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("sem duracaoParaMuitoLongo, nao reprova por duracao nenhuma", () => {
+      const r = verificarLocalmente({ corpo: "texto limpo" });
+      expect(r.aprovado).toBe(true);
+    });
+  });
 });
 
 describe("gerarComVerificacao", () => {

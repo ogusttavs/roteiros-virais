@@ -99,9 +99,10 @@
     "roteirosRecentes": [],
     "anguloParaEvitar": {
       "gancho": "cheiro forte nao quer dizer limpo de verdade",
-      "corpo": "explicacao direta sobre cheiro forte, com uma cena real do negocio."
+      "corpo": "explicacao direta sobre cheiro forte, com uma cena real do negocio.",
+      "motivos": ["Já falei disso"]
     },
-    "pontoPrincipal": "simula um pedido de outro angulo: o roteiro precisa ter um gancho e um corpo diferentes do angulo anterior sobre o mesmo tema"
+    "pontoPrincipal": "simula uma reprovacao por 'ja falei disso': o roteiro precisa ter um gancho e um corpo diferentes do angulo anterior sobre o mesmo tema, sem repetir o que ja foi dito"
   },
   {
     "tema": "a rotina de 10 minutos que faço todo dia depois de fechar o consultório",
@@ -119,5 +120,62 @@
       }
     ],
     "pontoPrincipal": "tema de rotina, sem evidencia de que funciona no nicho; ver se o roteiro reconhece a falta de evidencia em vez de inventar um numero"
+  },
+  {
+    "tema": "por que o mofo volta no rejunte do banheiro mesmo depois de limpar",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o removedor de mofo por R$ 45. Cliente ideal mora em apartamento com pouca ventilação no banheiro. Medo do cliente: já usou água sanitária e o mofo voltou em uma semana. Frase que fala: o problema não é o produto, é nao selar depois.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: mofo no rejunte, banheiro sem ventilação. Ganchos que funcionam: mostrar o problema voltando (alta frequência). Estruturas comuns: mostrar o erro, explicar a causa, mostrar o certo. Fechamentos comuns: rejunte limpo, sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 501,
+        "assunto": "mofo que volta no rejunte",
+        "gancho": "o mofo do seu banheiro sempre volta depois de uma semana",
+        "estrutura": "mostra o mofo, explica a causa, mostra o produto selando",
+        "fechamento": "rejunte limpo, sem falar por dois segundos",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 5.1
+      }
+    ],
+    "roteirosRecentes": [],
+    "anguloParaEvitar": {
+      "gancho": "voce ja limpou o mofo do rejunte umas dez vezes e ele sempre volta, ne? deixa eu te explicar direitinho por que isso acontece e o que voce precisa fazer diferente da proxima vez que for limpar o banheiro inteiro",
+      "corpo": "explicacao longa sobre ventilacao, tipos de rejunte, produtos errados que as pessoas usam, historia de um cliente que reclamou, e so depois o produto certo, com varias cenas diferentes do banheiro em momentos diferentes do dia.",
+      "motivos": ["Muito longo"],
+      "duracaoAnteriorS": 58
+    },
+    "pontoPrincipal": "reprovado por 'muito longo': a nova versao precisa caber em menos de 58s (o modelo do nicho ja pede 20 a 35s) sem cortar o exemplo concreto do rejunte"
+  },
+  {
+    "tema": "o erro no aparelho que faz o tratamento demorar mais que o combinado",
+    "objetivo": "conversao",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende manutenção de aparelho ortodôntico a partir de R$ 120 por mês. Cliente ideal é adolescente ou adulto já em tratamento. Medo do cliente: o tratamento atrasar e custar mais do que o combinado. Frase que fala: aqui a gente conta o prazo real, nao o prazo de propaganda.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: aparelho, prazo de tratamento, manutenção. Ganchos que funcionam: mostrar o resultado primeiro (alta frequência). Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: chama aqui para marcar a manutenção.",
+    "evidencias": [],
+    "roteirosRecentes": [],
+    "anguloParaEvitar": {
+      "gancho": "voce sabia que um erro simples pode atrasar todo o seu tratamento com aparelho",
+      "corpo": "explicacao sobre faltar na manutencao, com uma cena real do consultorio.",
+      "motivos": ["Gancho fraco"]
+    },
+    "pontoPrincipal": "reprovado por 'gancho fraco': o gancho novo precisa comecar pelo resultado ou pela cena, nunca por uma pergunta retorica como 'voce sabia que'"
+  },
+  {
+    "tema": "a pergunta que todo paciente novo faz antes de marcar a primeira consulta",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Quem grava é só a própria pessoa, sem equipe. Cliente ideal é família da região que nunca foi à clínica. Frase que fala: relaxa, aqui ninguem vai fazer nada sem te explicar antes; frase que fala: eu falo igual eu falo com meus amigos, sem enrolacao.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: primeira consulta, medo de dentista. Ganchos que funcionam: pergunta direta seguida da resposta (média frequência). Estruturas comuns: pergunta, resposta curta, explicação. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta sua duvida aqui embaixo.",
+    "evidencias": [],
+    "roteirosRecentes": [],
+    "anguloParaEvitar": {
+      "gancho": "prezados pacientes, e fundamental esclarecer que a primeira consulta consiste em uma avaliacao detalhada",
+      "corpo": "explicacao formal e tecnica sobre o procedimento da primeira consulta, em tom de comunicado.",
+      "motivos": ["Não é assim que eu falo"],
+      "motivoTexto": "eu nunca falo assim, cheio de formalidade; eu falo igual eu falo com meus amigos, sem enrolacao"
+    },
+    "pontoPrincipal": "reprovado por 'nao e assim que eu falo': a nova versao precisa soar como o perfil do cliente (direto, sem formalidade), nunca em tom de comunicado"
   }
 ]

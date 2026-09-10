@@ -608,6 +608,15 @@ export const roteiros = pgTable(
     geracaoId: integer("geracao_id").references(() => geracoesIA.id),
     status: text("status").$type<"gerado" | "gravado" | "postado">().notNull().default("gerado"),
     gravadoEm: timestamp("gravado_em", { withTimezone: true }),
+    /**
+     * Quando esta versao foi reprovada (E27, parte 1, item 1): nulo na
+     * versao em uso; marcado na versao anterior no momento em que
+     * `reprovarERescrever` gera a proxima. Junto com a geracao dela
+     * (`geracaoId`, `motivosAvaliacao`, `motivoAvaliacao`), e o que a tela
+     * usa para mostrar "voce reprovou por: X e Y, em D de mes" no bloco de
+     * versoes.
+     */
+    reprovadoEm: timestamp("reprovado_em", { withTimezone: true }),
     urlPostado: text("url_postado"),
     postadoEm: timestamp("postado_em", { withTimezone: true }),
     criadoEm: criadoEm(),
@@ -740,8 +749,13 @@ export const hashtagsMetaUsadas = pgTable(
   (t) => [uniqueIndex("hashtags_meta_usadas_termo").on(t.termo)],
 );
 
-/** Como o cliente avaliou a geracao ("outro_angulo" registra o motivo). */
-export type AvaliacaoGeracao = "gostei" | "nao_gostei" | "outro_angulo";
+/**
+ * Como o cliente avaliou a geracao. "outro_angulo" e o nome antigo do fluxo
+ * de reprovar (etapa 11); linhas gravadas antes da E27 continuam com esse
+ * valor, nunca reescritas. "reprovado" e o fluxo novo (E27, parte 1),
+ * sempre com `motivosAvaliacao` preenchido.
+ */
+export type AvaliacaoGeracao = "gostei" | "nao_gostei" | "outro_angulo" | "reprovado";
 
 /** Registro de toda chamada de IA (escopo 5.9): entrada, saida, custo e nota. */
 export const geracoesIA = pgTable("geracoes_ia", {
@@ -762,6 +776,13 @@ export const geracoesIA = pgTable("geracoes_ia", {
   custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
   avaliacao: text("avaliacao").$type<AvaliacaoGeracao>(),
   motivoAvaliacao: text("motivo_avaliacao"),
+  /**
+   * Ids de `MOTIVOS_REPROVACAO` (E27, parte 1): so preenchido quando
+   * `avaliacao = "reprovado"`; nulo nas linhas antigas de "outro_angulo" e
+   * em toda avaliacao que nao e reprovacao. `motivoAvaliacao` continua com
+   * o texto livre, dos dois fluxos.
+   */
+  motivosAvaliacao: jsonb("motivos_avaliacao").$type<string[]>(),
   criadoEm: criadoEm(),
 });
 

@@ -46,6 +46,17 @@ export const AJUDA_OBJETIVO: Record<Objetivo, string> = {
   conversao: "para quem está quase decidindo",
 };
 
+/**
+ * "O objetivo continua: X" na folha de reprovar (E27, parte 1;
+ * `entrega/telas/Roteiro.dc.html`): mesma razão de `NOME_OBJETIVO` estar
+ * aqui, sem o "Para" de `ROTULO_TEMA_CARTAO`.
+ */
+export const ROTULO_OBJETIVO_TRAVADO: Record<Objetivo, string> = {
+  alcance: "mais gente te conhecer",
+  engajamento: "lembrarem de você",
+  conversao: "te chamarem para comprar",
+};
+
 /** As três opções de objetivo, na ordem fixa em que a tela mostra (etapa 11). */
 export const OBJETIVOS_EM_ORDEM: Objetivo[] = ["alcance", "engajamento", "conversao"];
 

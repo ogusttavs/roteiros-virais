@@ -231,9 +231,14 @@ export const textosAdmin = {
     taxasTitulo: "o que os clientes acharam",
     taxaGostaram: "gostaram",
     taxaNaoGostaram: "não gostaram",
-    taxaOutroAngulo: "pediram outro ângulo",
+    taxaReprovado: "reprovaram",
+    /** Fluxo antigo (etapa 11), antes da E27; só aparece enquanto houver linha antiga no período. */
+    taxaOutroAngulo: "pediram outro ângulo (antes da E27)",
     semAvaliacaoAinda: "nenhuma geração avaliada ainda neste período.",
-    motivosTitulo: "por que pediram outro ângulo",
+    /** E27, parte 1, item 6: motivo estruturado, no lugar do texto livre de "outro ângulo". */
+    motivosReprovadoTitulo: "por que reprovaram",
+    /** Fluxo antigo (etapa 11), antes da E27; só aparece enquanto houver linha antiga no período. */
+    motivosTitulo: "por que pediram outro ângulo (antes da E27)",
     semMotivos: "nenhum motivo registrado ainda.",
     custoPorClienteTitulo: "por cliente, últimos 30 dias",
     custoPorClienteVazio: "nenhum cliente com geração nos últimos 30 dias.",
