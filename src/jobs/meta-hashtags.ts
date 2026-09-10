@@ -35,6 +35,13 @@
  * selecao dele exige `foraDaCurva`/`velocidadeRelativa`, que um video sem
  * conta nunca tem). Sem `media_url` nao e erro: o video entra so com a
  * legenda como sinal, sem transcricao, contado em `semMediaUrl`.
+ *
+ * Achado do dia 1 da conferencia de producao (10/09/2026): os termos do
+ * nicho tem espaco ("limpeza a seco"), e `ig_hashtag_search` respondia
+ * "The requested resource does not exist" para a maioria; `normalizarHashtag`
+ * (compartilhada com `apify-api.ts`) tira espaco, acento e o que mais nao e
+ * letra, numero ou underscore antes de resolver. `hashtags_meta_usadas.termo`
+ * continua com o termo original do nicho.
  */
 import { and, eq, gte } from "drizzle-orm";
 
@@ -43,6 +50,7 @@ import { db } from "@/db";
 import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
 import { buscarIdDaHashtag, buscarRecentMediaDaHashtag } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
+import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
 
 import { apagarAudio, baixarAudio, ErroAudio } from "./audio";
@@ -106,7 +114,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
           continue;
         }
         try {
-          const idEncontrado = await buscarIdDaHashtag(termo);
+          const idEncontrado = await buscarIdDaHashtag(normalizarHashtag(termo));
           if (!idEncontrado) {
             erros.push(`hashtag "${termo}": nao encontrada na meta`);
             continue;

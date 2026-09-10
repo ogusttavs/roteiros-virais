@@ -226,6 +226,23 @@ describe("rodarMetaHashtags", () => {
     expect(baixarAudio).not.toHaveBeenCalled();
   });
 
+  it("normaliza o termo (espaco e acento) antes de resolver a hashtag na meta (achado do dia 1 da conferencia, 10/09/2026)", async () => {
+    await db().update(nichos).set({ termos: ["mancha no sofá"] }).where(eq(nichos.id, nichoId));
+    vi.mocked(buscarIdDaHashtag).mockResolvedValue("hashtag-mancha");
+    vi.mocked(buscarRecentMediaDaHashtag).mockResolvedValue([]);
+
+    try {
+      await rodarMetaHashtags(nichoId);
+      expect(buscarIdDaHashtag).toHaveBeenCalledWith("manchanosofa");
+
+      const [linha] = await db().select().from(hashtagsMetaUsadas).where(eq(hashtagsMetaUsadas.termo, "mancha no sofá"));
+      expect(linha.termo).toBe("mancha no sofá");
+      expect(linha.hashtagId).toBe("hashtag-mancha");
+    } finally {
+      await db().update(nichos).set({ termos: ["limpeza"] }).where(eq(nichos.id, nichoId));
+    }
+  });
+
   it("com nichoId, roda so para aquele nicho e so ate 8 termos", async () => {
     await db()
       .update(nichos)
