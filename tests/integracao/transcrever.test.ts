@@ -179,6 +179,43 @@ describe("rodarTranscrever", () => {
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
   });
 
+  it("video do youtube que falha com a mensagem do bot marca proxima tentativa para daqui a 3 dias, e falhasYoutubeBot conta a parte (achado da conferencia de producao, 09/09/2026)", async () => {
+    await criarVideo("yt-bloqueado-bot", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockRejectedValue(
+      new ErroAudio(
+        "nao foi possivel baixar o audio: ERROR: [youtube] abc123: Sign in to confirm you're not a bot. " +
+          "Use --cookies-from-browser or --cookies for the authentication.",
+      ),
+    );
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasYoutubeBot).toBe(1);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-bloqueado-bot"));
+    expect(linha.transcricao).toBeNull();
+    expect(linha.proximaTentativaTranscricao).not.toBeNull();
+    const emTresDias = Date.now() + 2 * DIA_MS;
+    const emQuatroDias = Date.now() + 4 * DIA_MS;
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emTresDias);
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeLessThan(emQuatroDias);
+  });
+
+  it("video que falha ao baixar audio com uma mensagem generica (nao a do bot) continua com 7 dias, mesmo sendo do youtube", async () => {
+    await criarVideo("yt-falha-generica", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video privado ou removido"));
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasYoutubeBot).toBe(0);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-falha-generica"));
+    const emSeteDias = Date.now() + 6 * DIA_MS;
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
+  });
+
   it("video ja com transcricao nao e selecionado de novo", async () => {
     await criarVideo("ja-transcrito", {
       velocidadeRelativa: 3,
