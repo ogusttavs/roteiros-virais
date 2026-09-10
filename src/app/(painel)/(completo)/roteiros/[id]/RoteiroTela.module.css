@@ -194,6 +194,9 @@
 }
 
 .linkReprovar {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
   border: 0;
   background: transparent;
   padding: 0;
@@ -405,6 +408,20 @@
 
 /* ---------- Painel de reprovar (E27, parte 1) ---------- */
 
+/**
+ * `Chips.module.css` tem `height: 36px`, 8px abaixo do alvo de toque de
+ * 44px (`--altura-toque`), achado rodando o e2e de layout com a folha
+ * aberta pela primeira vez: nenhuma outra tela testada por
+ * `layout.spec.ts` usa chip, entao o problema ficava latente. `min-height`
+ * so aqui, na folha de reprovar, em vez de mexer no componente
+ * compartilhado (usado em filtros de `/geracoes` e `/referencias`, fora do
+ * escopo desta etapa): `min-height` vence a `height` menor da classe
+ * compartilhada sem precisar de guerra de especificidade.
+ */
+.chipToqueGrande {
+  min-height: var(--altura-toque);
+}
+
 .ajudaReprovar {
   margin: 0;
   font-size: var(--tamanho-secundario);
@@ -432,6 +449,7 @@
 
 .btnTextoCancelar {
   justify-self: center;
+  min-height: var(--altura-toque);
   border: 0;
   background: transparent;
   padding: var(--espaco-2) var(--espaco-4);

@@ -1,7 +1,7 @@
 /**
  * O fluxo inteiro pela tela (etapa 11, criterio de aceite do plano de
- * execucao): escolher tema, escolher objetivo, ver o roteiro, pedir outro
- * angulo, marcar gravei.
+ * execucao; E27 parte 1 trocou "pedir outro angulo" por "reprovar"): escolher
+ * tema, escolher objetivo, ver o roteiro, reprovar com motivo, marcar gravei.
  *
  * Mesma licao de `temas-do-dia.spec.ts` e `briefing.spec.ts`: grava
  * briefing, video e tema do dia direto no banco (nunca chamando codigo de
@@ -152,7 +152,7 @@ test.describe("roteiro pela tela", () => {
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
-  test("escolhe tema, escolhe objetivo, ve o roteiro, pede outro angulo, marca gravei", async ({
+  test("escolhe tema, escolhe objetivo, ve o roteiro, reprovar com dois motivos e um texto, marca gravei", async ({
     page,
   }) => {
     await page.goto("/entrar");
@@ -175,16 +175,37 @@ test.describe("roteiro pela tela", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByText("Onde gravar e o que mostrar")).toBeVisible();
     await expect(page.getByText("Como editar")).toBeVisible();
+    await expect(page.getByText("Para te chamarem para comprar")).toBeVisible();
 
     const urlDaV1 = page.url();
 
     await page.getByRole("button", { name: "Mais opções" }).click();
-    await page.getByRole("menuitem", { name: "outro ângulo" }).click();
-    await page.getByRole("button", { name: "escrever outra versão" }).click();
+    await page.getByRole("menuitem", { name: "Reprovar" }).click();
+
+    const folhaReprovar = page.getByRole("dialog", { name: "O que não ficou bom?" });
+    await expect(folhaReprovar).toBeVisible();
+    await expect(folhaReprovar.getByText("O objetivo continua: te chamarem para comprar")).toBeVisible();
+    await folhaReprovar.getByRole("button", { name: "Gancho fraco", exact: true }).click();
+    await folhaReprovar.getByRole("button", { name: "Já falei disso", exact: true }).click();
+    await folhaReprovar
+      .getByLabel("Se quiser, diga com as suas palavras")
+      .fill("o gancho comecava com pergunta e o angulo ja tinha aparecido antes");
+    await folhaReprovar.getByRole("button", { name: "Reescrever com isso em mente" }).click();
 
     await expect(page).not.toHaveURL(urlDaV1, { timeout: 15_000 });
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("versão 2 de 2")).toBeVisible();
+    await expect(page.getByText("Para te chamarem para comprar")).toBeVisible();
+
+    await page.getByText("versão 2 de 2").click();
+    const folhaVersoes = page.getByRole("dialog", { name: "Versões" });
+    await expect(folhaVersoes).toBeVisible();
+    await expect(folhaVersoes.getByText("reprovada")).toBeVisible();
+    await expect(
+      folhaVersoes.getByText(/Você reprovou por: Gancho fraco e Já falei disso, em \d+ de \w+/),
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(folhaVersoes).toBeHidden();
 
     await page.getByRole("button", { name: "Já gravei", exact: true }).click();
     await expect(page.getByRole("button", { name: "Postei", exact: true })).toBeVisible();
@@ -238,13 +259,26 @@ test.describe("roteiro pela tela", () => {
       await expect(page).toHaveURL(/\/hoje/);
 
       await page.goto(`/roteiros/${roteiro.id}`);
+
+      /**
+       * E27, parte 1, item 5: "Reprovar" só entra na barra de ações do
+       * tablet para cima (o celular continua só com "Modo gravação" e "Já
+       * gravei", e usa a linha ".julgar" no fim do cartão para reprovar).
+       */
+      const barraAcoes = page.locator('[class*="barraAcoes"]');
+      if (largura < 768) {
+        await expect(barraAcoes.getByRole("button", { name: "Reprovar", exact: true })).toHaveCount(0);
+      } else {
+        await expect(barraAcoes.getByRole("button", { name: "Reprovar", exact: true })).toBeVisible();
+      }
+
       const botaoMenu = page.getByRole("button", { name: "Mais opções" });
       await botaoMenu.click();
 
       const menu = page.getByRole("menu", { name: "Mais opções" });
       await expect(menu).toBeVisible();
       await expect(menu).toBeInViewport();
-      await expect(page.getByRole("menuitem", { name: "outro ângulo" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Reprovar" })).toBeVisible();
       await expect(page.getByRole("menuitem", { name: "copiar texto" })).toBeVisible();
 
       /**

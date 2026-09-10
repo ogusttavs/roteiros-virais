@@ -433,11 +433,13 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
       </PainelFlutuante>
 
       <PainelFlutuante
-        titulo={textosRoteiro.reprovar.tituloFolha}
+        titulo={pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
         aberto={painel === "reprovar"}
         aoFechar={fecharPainel}
       >
-        <h2 className={styles.tituloPainel}>{textosRoteiro.reprovar.tituloFolha}</h2>
+        <h2 className={styles.tituloPainel}>
+          {pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
+        </h2>
         <p className={styles.ajudaReprovar}>{textosRoteiro.reprovar.ajudaMotivos}</p>
         <div role="group" aria-label={textosRoteiro.reprovar.rotuloMotivos} className={chipStyles.grupo}>
           {MOTIVOS_REPROVACAO.map((motivo) => {
@@ -448,7 +450,9 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => alternarMotivo(motivo.id)}
-                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""].filter(Boolean).join(" ")}
+                className={[chipStyles.chip, ativo ? chipStyles.ativo : "", styles.chipToqueGrande]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {motivo.rotulo}
               </button>
