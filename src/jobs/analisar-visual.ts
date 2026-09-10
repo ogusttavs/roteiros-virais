@@ -18,7 +18,8 @@ import { config } from "@/lib/config";
 import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
 import { temposDeQuadro } from "@/servicos/quadros";
 
-import { apagarVideo, baixarVideo480p, extrairQuadros } from "./video";
+import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from "./video";
+import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -57,14 +58,24 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
 }
 
 async function analisarUm(video: CandidatoVisual): Promise<void> {
-  if (video.duracaoS === null) {
-    throw new Error("video sem duracao conhecida, nao da para escolher os quadros");
-  }
-
   let caminhoVideo: string | null = null;
   try {
     caminhoVideo = await baixarVideo480p(video.url);
-    const quadros = await extrairQuadros(caminhoVideo, temposDeQuadro(video.duracaoS));
+
+    /**
+     * Video vindo da Meta (Business Discovery/Hashtag Search, E6 parte 3,
+     * segunda rodada) nunca grava `duracao_s`: a API dela nao devolve isso
+     * (transcricao do YouTube, rodada 2, item 3b). Antes, isso derrubava a
+     * analise sem nem tentar o download; agora le do proprio arquivo
+     * baixado com `ffprobe` e grava, para as proximas leituras do mesmo
+     * video nao precisarem disso de novo.
+     */
+    const duracaoS = video.duracaoS ?? (await duracaoDoArquivoS(caminhoVideo));
+    if (video.duracaoS === null) {
+      await db().update(videos).set({ duracaoS }).where(eq(videos.id, video.id));
+    }
+
+    const quadros = await extrairQuadros(caminhoVideo, temposDeQuadro(duracaoS));
 
     const resultado = await gerarEstruturado({
       tarefa: "analisarVisual",
@@ -74,7 +85,7 @@ async function analisarUm(video: CandidatoVisual): Promise<void> {
       sistemaEstavel: analisarVisualIA.montarSistemaEstavel(),
       entrada: analisarVisualIA.montarEntrada({
         titulo: video.titulo ?? "",
-        duracaoS: video.duracaoS,
+        duracaoS,
         transcricao: video.transcricao ?? "",
       }),
       imagens: quadros.map((quadro) => ({ base64: quadro.base64, mediaType: "image/jpeg" as const })),
@@ -120,6 +131,9 @@ export async function rodarAnalisarVisual(): Promise<Record<string, unknown>> {
         falhas += 1;
         erros.push(`video ${video.id} / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }
+
+      // Espaça as chamadas ao YouTube (transcricao do YouTube, rodada 2, item 2), mesmo raciocinio de transcrever.ts.
+      if (ehUrlDoYoutube(video.url)) await pausaEntreVideosYoutube();
     }
   }
 
