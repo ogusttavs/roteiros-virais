@@ -12,6 +12,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { argumentosYoutube } from "./youtube-cliente";
+
 const execFileAsync = promisify(execFile);
 
 const ENTIDADES_HTML: Record<string, string> = {
@@ -76,6 +78,7 @@ export async function baixarLegendaYoutube(url: string, idioma = "pt"): Promise<
       "--skip-download",
       "--sub-format",
       "vtt",
+      ...argumentosYoutube(),
       "-o",
       join(pasta, `${prefixo}.%(ext)s`),
       url,
