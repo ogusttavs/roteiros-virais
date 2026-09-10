@@ -12,6 +12,7 @@
 import { ApifyClient } from "apify-client";
 
 import { config } from "@/lib/config";
+import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 
 let instancia: ApifyClient | null = null;
 
@@ -55,17 +56,6 @@ export async function rodarAtor<T>(
 export function limitePorAlvo(teto: number, numeroDeAlvos: number): number {
   if (numeroDeAlvos <= 0) return teto;
   return Math.ceil(teto / numeroDeAlvos);
-}
-
-/**
- * Hashtag valida nao tem espaco (achado rodando com chave real: um termo
- * como "lente de contato dental" virou uma URL de hashtag do Instagram com
- * espaco codificado, que nao existe, e voltou sem resultado). O TikTok
- * aceita e normaliza sozinho; aqui normalizamos para os dois, para nao
- * depender de comportamento nao documentado de cada ator.
- */
-function paraHashtag(termo: string): string {
-  return termo.replace(/\s+/g, "");
 }
 
 /**
@@ -135,7 +125,7 @@ export async function buscarTiktokPorHashtag(
 ): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
   if (termos.length === 0) return { itens: [], devolvidos: 0 };
   const input: Record<string, unknown> = {
-    hashtags: termos.map(paraHashtag),
+    hashtags: termos.map(normalizarHashtag),
     resultsPerPage: RESULTADOS_POR_TERMO_HASHTAG,
     oldestPostDateUnified: "7 days",
   };
@@ -221,7 +211,7 @@ export async function buscarInstagram(
   maxItens: number,
 ): Promise<{ itens: InstagramItemBruto[]; devolvidos: number }> {
   const directUrls = [
-    ...hashtags.map((h) => `https://www.instagram.com/explore/tags/${encodeURIComponent(paraHashtag(h))}/`),
+    ...hashtags.map((h) => `https://www.instagram.com/explore/tags/${encodeURIComponent(normalizarHashtag(h))}/`),
     ...perfis.map((p) => `https://www.instagram.com/${encodeURIComponent(p)}/`),
   ];
   if (directUrls.length === 0) return { itens: [], devolvidos: 0 };
