@@ -41,7 +41,9 @@
  * "The requested resource does not exist" para a maioria; `normalizarHashtag`
  * (compartilhada com `apify-api.ts`) tira espaco, acento e o que mais nao e
  * letra, numero ou underscore antes de resolver. `hashtags_meta_usadas.termo`
- * continua com o termo original do nicho.
+ * continua com o termo original do nicho. Hashtag que nao existe de verdade
+ * (a Meta devolve vazio, nao erro) e contada em `hashtagsInexistentes`, fora
+ * de `erros`: e um termo sem hashtag, nao uma falha do job.
  */
 import { and, eq, gte } from "drizzle-orm";
 
@@ -102,6 +104,13 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
   let semMediaUrl = 0;
   let transcritos = 0;
   const foraDoLimite: string[] = [];
+  /**
+   * Termo sem hashtag na Meta (achado do dia 1 da conferência, 10/09/2026):
+   * não é falha do job, é um termo do nicho que não vira hashtag de
+   * verdade lá. Contado à parte de `erros`, para a conferência distinguir
+   * "termo sem hashtag" de "a Meta falhou".
+   */
+  const hashtagsInexistentes: string[] = [];
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
@@ -116,7 +125,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
         try {
           const idEncontrado = await buscarIdDaHashtag(normalizarHashtag(termo));
           if (!idEncontrado) {
-            erros.push(`hashtag "${termo}": nao encontrada na meta`);
+            hashtagsInexistentes.push(termo);
             continue;
           }
           hashtagId = idEncontrado;
@@ -181,6 +190,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
     transcritos,
     hashtagsUsadasNaSemana: usadosNaSemana,
     hashtagsForaDoLimite: foraDoLimite.length > 0 ? foraDoLimite : undefined,
+    hashtagsInexistentes: hashtagsInexistentes.length > 0 ? hashtagsInexistentes : undefined,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

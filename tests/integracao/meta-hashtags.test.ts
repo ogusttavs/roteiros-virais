@@ -243,6 +243,19 @@ describe("rodarMetaHashtags", () => {
     }
   });
 
+  it("hashtag que nao existe na meta conta em hashtagsInexistentes, nao em erros (achado do dia 1 da conferencia, 10/09/2026)", async () => {
+    vi.mocked(buscarIdDaHashtag).mockResolvedValue(null);
+
+    const resumo = await rodarMetaHashtags();
+
+    expect(resumo.hashtagsInexistentes).toEqual(["limpeza"]);
+    expect(resumo.erros).toBeUndefined();
+    expect(buscarRecentMediaDaHashtag).not.toHaveBeenCalled();
+
+    const linhas = await db().select().from(hashtagsMetaUsadas).where(eq(hashtagsMetaUsadas.termo, "limpeza"));
+    expect(linhas).toHaveLength(0);
+  });
+
   it("com nichoId, roda so para aquele nicho e so ate 8 termos", async () => {
     await db()
       .update(nichos)
