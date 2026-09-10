@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { calcularEsperaMs, ErroMetaApi, erroMetaEhDaConta, erroMetaEhTokenOuLimite, JANELA_MS } from "./meta-api";
+import {
+  calcularEsperaMs,
+  ErroMetaApi,
+  erroMetaEhDaConta,
+  erroMetaEhHashtagInexistente,
+  erroMetaEhTokenOuLimite,
+  JANELA_MS,
+} from "./meta-api";
 
 describe("erroMetaEhDaConta", () => {
   it("codigo 100 (conta pessoal ou de criador) e da conta", () => {
@@ -24,6 +31,26 @@ describe("erroMetaEhTokenOuLimite", () => {
 
   it.each([100, 110, 1, undefined])("codigo %s nao e token ou limite", (codigo) => {
     expect(erroMetaEhTokenOuLimite(new ErroMetaApi("x", codigo))).toBe(false);
+  });
+});
+
+describe("erroMetaEhHashtagInexistente", () => {
+  /** Corpo real da chamada de leitura direta contra "limpezadepaineldecarro", prova do PR #38, 10/09/2026. */
+  it("code 24 com error_subcode 2207024 (o corpo real da prova) e hashtag inexistente", () => {
+    expect(
+      erroMetaEhHashtagInexistente(
+        new ErroMetaApi("The requested resource does not exist", 24, 2207024),
+      ),
+    ).toBe(true);
+  });
+
+  it("code 24 sem o subcode 2207024 nao e hashtag inexistente (24 tambem e generico de outros recursos)", () => {
+    expect(erroMetaEhHashtagInexistente(new ErroMetaApi("x", 24, 999))).toBe(false);
+    expect(erroMetaEhHashtagInexistente(new ErroMetaApi("x", 24))).toBe(false);
+  });
+
+  it.each([100, 110, 190, 1, undefined])("codigo %s nao e hashtag inexistente", (codigo) => {
+    expect(erroMetaEhHashtagInexistente(new ErroMetaApi("x", codigo, 2207024))).toBe(false);
   });
 });
 
