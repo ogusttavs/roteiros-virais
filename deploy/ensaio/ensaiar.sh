@@ -95,6 +95,23 @@ garantir_rede_web() {
   docker network inspect web >/dev/null 2>&1 || docker network create web
 }
 
+# Achado da conferencia de producao, 09/09/2026: confere que a imagem do
+# worker tem os dois binarios que a transcricao do YouTube depende (o
+# runtime de JavaScript resolve o desafio de assinatura da pagina; sem ele
+# o yt-dlp nem tenta), sem subir nada, so `docker run` pontual.
+worker_tem_ytdlp_e_deno() {
+  local versao_ytdlp versao_deno
+  versao_ytdlp=$(docker run --rm roteiros-worker:ensaio yt-dlp --version) || {
+    echo "yt-dlp --version falhou na imagem do worker" >&2
+    return 1
+  }
+  versao_deno=$(docker run --rm roteiros-worker:ensaio deno --version | head -1) || {
+    echo "deno --version falhou na imagem do worker" >&2
+    return 1
+  }
+  echo "yt-dlp $versao_ytdlp, $versao_deno"
+}
+
 subir_postgres() {
   cp "$ENV_ENSAIO" "$ENV_TEMP"
   CRIOU_ENV_TEMP=1
@@ -285,6 +302,7 @@ fazer_backup() {
 passo "confere .env.ensaio (segredos de 32+ caracteres)" conferir_env
 passo "confere que deploy/.env nao existe (nunca sobrescrever segredo)" conferir_deploy_env_nao_existe
 passo "builda as tres imagens (roteiros-app, roteiros-worker, roteiros-backup :ensaio)" buildar_imagens
+passo "worker tem yt-dlp e deno" worker_tem_ytdlp_e_deno
 passo "garante a rede externa 'web'" garantir_rede_web
 passo "sobe o postgres e espera ficar saudavel" subir_postgres
 passo "migra o banco pelo container do worker" migrar

@@ -10,6 +10,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
+
 const execFileAsync = promisify(execFile);
 
 const LARGURA_QUADRO = 640;
@@ -26,6 +28,8 @@ export async function baixarVideo480p(url: string): Promise<string> {
       "bv*[height<=480]+ba/b[height<=480]",
       "--merge-output-format",
       "mp4",
+      // So o YouTube precisa do cliente sem PO Token (TikTok e Instagram nao passam por aqui).
+      ...(ehUrlDoYoutube(url) ? argumentosYoutube() : []),
       "-o",
       caminho,
       url,

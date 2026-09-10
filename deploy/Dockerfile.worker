@@ -7,12 +7,32 @@
 # distribuido no release oficial, que precisa de python3 no PATH (achado
 # buildando esta imagem: o binario sem sufixo do release nao e standalone
 # de verdade, "/usr/bin/env: python3: No such file or directory").
+#
+# yt-dlp em versao fixa (achado da conferencia de producao, 09/09/2026, nao
+# "latest"): o build fica reproduzivel, a mesma imagem sempre traz a mesma
+# versao, em vez de mudar sozinha a cada rebuild sem passar por revisao.
+#
+# Deno (mesmo achado, `src/jobs/youtube-cliente.ts`): o yt-dlp exige um
+# runtime de JavaScript para resolver o desafio de assinatura do YouTube, e
+# o habilita sozinho, sem flag, quando acha o binario no PATH (yt-dlp wiki,
+# pagina "EJS", conferida em 09/09/2026, minimo 2.3.0; esta imagem usa uma
+# bem mais nova). Binario oficial da Deno Land, baixado por versao fixa e
+# conferido pelo sha256sum publicado junto do release, antes de instalar.
 FROM node:24-slim
 
+ARG YT_DLP_VERSION=2026.08.19
+ARG DENO_VERSION=2.9.6
+
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl \
-  && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+  && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl unzip \
+  && curl -fL "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" -o /usr/local/bin/yt-dlp \
   && chmod a+rx /usr/local/bin/yt-dlp \
+  && curl -fL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" -o /tmp/deno-x86_64-unknown-linux-gnu.zip \
+  && curl -fL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip.sha256sum" -o /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
+  && (cd /tmp && sha256sum -c deno-x86_64-unknown-linux-gnu.zip.sha256sum) \
+  && unzip -q /tmp/deno-x86_64-unknown-linux-gnu.zip -d /usr/local/bin \
+  && chmod a+rx /usr/local/bin/deno \
+  && rm -f /tmp/deno-x86_64-unknown-linux-gnu.zip /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -6,6 +6,12 @@
  * transcreve na Groq. Sem `GROQ_API_KEY`, so a legenda do YouTube roda
  * (`.env.example`); nenhum video de outra plataforma e sequer tentado, e
  * isso nao conta como falha (nao marca `proximaTentativaTranscricao`).
+ *
+ * Achado da conferencia de producao, 09/09/2026: o bloqueio do YouTube por
+ * IP de datacenter ("Sign in to confirm you're not a bot") ganha uma nova
+ * tentativa mais curta (3 dias, `TRES_DIAS_MS`) que a falha generica (7
+ * dias), e conta a parte em `falhasYoutubeBot` no resumo, para a
+ * conferencia ler sem abrir cada linha de erro.
  */
 import { eq, inArray } from "drizzle-orm";
 
@@ -21,6 +27,17 @@ import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Achado da conferência de produção, 09/09/2026: o YouTube bloqueia o
+ * download com "Sign in to confirm you're not a bot" quando o servidor não
+ * tem runtime de JavaScript nem cliente de player sem PO Token (corrigido
+ * nesta rodada, `youtube-cliente.ts`); a mensagem continua podendo
+ * aparecer (o bloqueio pode ter outra causa, ou voltar). Uma tentativa
+ * nova em 3 dias, mais curta que os 7 dias genéricos, porque este caso
+ * específico tem chance real de já estar resolvido nesse prazo.
+ */
+const TRES_DIAS_MS = 3 * 24 * 60 * 60 * 1000;
+const MENSAGEM_BOT_YOUTUBE = /sign in to confirm you.{0,3}re not a bot/i;
 
 async function candidatosDoNicho(nichoId: number, limite: number) {
   const [prioritarios, estruturais] = await Promise.all([
@@ -69,7 +86,8 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
 type ResultadoVideo =
   | { tipo: "legenda" | "pulado" }
   | { tipo: "groq"; duracaoS: number | null }
-  | { tipo: "falhou"; motivo: string };
+  | { tipo: "falhou"; motivo: string }
+  | { tipo: "falhouYoutubeBot"; motivo: string };
 
 /**
  * Legenda automatica curta demais ("E ai", ou uma legenda confusa que virou
@@ -105,11 +123,16 @@ async function transcreverUm(
     return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {
+      const ehBotDoYoutube = plataforma === "youtube" && MENSAGEM_BOT_YOUTUBE.test(erro.message);
       await db()
         .update(videos)
-        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+        .set({
+          proximaTentativaTranscricao: new Date(Date.now() + (ehBotDoYoutube ? TRES_DIAS_MS : SETE_DIAS_MS)),
+        })
         .where(eq(videos.id, videoId));
-      return { tipo: "falhou", motivo: erro.message };
+      return ehBotDoYoutube
+        ? { tipo: "falhouYoutubeBot", motivo: erro.message }
+        : { tipo: "falhou", motivo: erro.message };
     }
     throw erro;
   } finally {
@@ -124,6 +147,8 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
   let porGroq = 0;
   let pulados = 0;
   let falhas = 0;
+  /** Falhas com a mensagem do bot do YouTube, contadas à parte (também somam em `falhas`), para a conferência ler de longe. */
+  let falhasYoutubeBot = 0;
   let segundosAudioGroq = 0;
   const erros: string[] = [];
 
@@ -144,6 +169,10 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
         else if (resultado.tipo === "falhou") {
           falhas += 1;
           erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+        } else if (resultado.tipo === "falhouYoutubeBot") {
+          falhas += 1;
+          falhasYoutubeBot += 1;
+          erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
         }
       } catch (erro) {
         falhas += 1;
@@ -158,6 +187,7 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
     transcritosPorGroq: porGroq,
     puladosSemChaveGroq: pulados,
     falhas,
+    falhasYoutubeBot,
     segundosAudioGroq,
     custoEstimadoGroqUsd: Number(((segundosAudioGroq / 3600) * PRECO_GROQ_USD_POR_HORA).toFixed(4)),
     erros: erros.length > 0 ? erros : undefined,

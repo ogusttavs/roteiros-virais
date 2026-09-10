@@ -11,6 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import { argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
+
 const execFileAsync = promisify(execFile);
 
 export class ErroAudio extends Error {}
@@ -28,6 +30,8 @@ export async function baixarAudio(url: string): Promise<string> {
       "mp3",
       "--postprocessor-args",
       "ffmpeg:-b:a 64k",
+      // So o YouTube precisa do cliente sem PO Token (TikTok e Instagram nao passam por aqui).
+      ...(ehUrlDoYoutube(url) ? argumentosYoutube() : []),
       "-o",
       join(pasta, `${prefixo}.%(ext)s`),
       url,
