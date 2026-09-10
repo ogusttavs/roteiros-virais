@@ -55,6 +55,8 @@ services:
     depends_on:
       roteiros-postgres:
         condition: service_healthy
+      roteiros-pot:
+        condition: service_started
     networks:
       - roteiros-interna
     mem_limit: 1500m
@@ -66,6 +68,21 @@ services:
     # yt-dlp e ffmpeg escrevem arquivo temporario; nada persiste fora do container
     tmpfs:
       - /tmp:size=1g
+
+  # Provedor de PO Token do YouTube (transcricao do YouTube, rodada 2, item
+  # 1): so na rede interna, sem porta publicada (o worker fala com ele por
+  # nome de servico, `config.transcricao.potBaseUrl`, `http://roteiros-pot:
+  # 4416`). Imagem oficial do projeto (github.com/Brainicism/
+  # bgutil-ytdlp-pot-provider), versao fixa como o resto das dependencias
+  # externas deste Compose (achado da rodada 1: versao "latest" muda sozinha
+  # a cada rebuild sem passar por revisao).
+  roteiros-pot:
+    image: brainicism/bgutil-ytdlp-pot-provider:2.0.0
+    container_name: roteiros-pot
+    restart: unless-stopped
+    networks:
+      - roteiros-interna
+    mem_limit: 256m
 
   roteiros-backup:
     image: ghcr.io/ogusttavs/roteiros-virais/backup:${TAG:-latest}

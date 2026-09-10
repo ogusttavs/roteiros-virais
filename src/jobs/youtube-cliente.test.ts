@@ -1,15 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
+import { config } from "@/lib/config";
+
+import { argumentosYoutube, ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
 describe("argumentosYoutube", () => {
-  it("monta o cliente sem po token e um sleep pequeno, sem chamar a rede", () => {
+  it("monta o cliente mweb com o provedor de po token e sleep-requests 2, sem chamar a rede (rodada 2)", () => {
     expect(argumentosYoutube()).toEqual([
       "--extractor-args",
-      "youtube:player_client=web_embedded",
+      "youtube:player_client=mweb",
+      "--extractor-args",
+      `youtubepot-bgutilhttp:base_url=${config.transcricao.potBaseUrl}`,
       "--sleep-requests",
-      "1",
+      "2",
     ]);
+  });
+});
+
+describe("pausaEntreVideosYoutube", () => {
+  afterEach(() => {
+    config.transcricao.youtubePausaS = 20;
+  });
+
+  it("espera config.transcricao.youtubePausaS segundos, em ms, via o esperar injetado", async () => {
+    const esperar = vi.fn().mockResolvedValue(undefined);
+    await pausaEntreVideosYoutube(esperar);
+    expect(esperar).toHaveBeenCalledWith(20_000);
+  });
+
+  it("respeita YOUTUBE_PAUSA_S customizado", async () => {
+    config.transcricao.youtubePausaS = 5;
+    const esperar = vi.fn().mockResolvedValue(undefined);
+    await pausaEntreVideosYoutube(esperar);
+    expect(esperar).toHaveBeenCalledWith(5_000);
   });
 });
 

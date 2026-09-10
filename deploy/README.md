@@ -20,6 +20,12 @@ As imagens sao construidas pelo GitHub Actions (`.github/workflows/imagem.yml`) 
 merge na `main` e publicadas em `ghcr.io/ogusttavs/roteiros-virais/{app,worker,backup}`
 com as tags `latest` e o sha curto. A VPS so puxa.
 
+`roteiros-pot` (transcricao do YouTube, rodada 2): servico do `compose.prod.yml`, imagem de
+terceiro (`brainicism/bgutil-ytdlp-pot-provider:2.0.0`, nao publicada por este projeto), so
+na rede interna, sem porta publicada. O provedor de PO Token que o `yt-dlp` do worker usa
+para baixar video/audio do YouTube com o cliente `mweb` (`src/jobs/youtube-cliente.ts`);
+sem ele, o YouTube volta a bloquear com "Sign in to confirm you're not a bot".
+
 ## Primeiro deploy (uma vez)
 
 Ordem que aconteceu de verdade em 05/09/2026, com o painel indo ao ar em
@@ -176,11 +182,13 @@ deploy/ensaio/ensaiar.sh --manter     # mesma coisa, mas deixa o Compose no ar n
 ```
 
 Builda as três imagens, garante a rede `web`, sobe o Postgres, migra pelo container do
-worker (do jeito que `deploy.sh` faz), sobe o resto, confere `/api/saude`, semeia, loga
-como o admin de exemplo e confere `/admin/clientes`, dispara `coleta-noticias` de verdade
-três vezes (a segunda depois de um `stop`/`start` gracioso do worker, a terceira depois de
-um `kill` abrupto), tira um backup e confere o dump. Para no primeiro erro; imprime um
-resumo de uma linha por passo, com o tempo de cada um.
+worker (do jeito que `deploy.sh` faz), sobe o resto (inclusive `roteiros-pot`, o provedor de
+PO Token), confere `/api/saude`, confere que o worker acha o `roteiros-pot` pela rede
+interna (`yt-dlp -v --simulate` mostrando o provedor na lista, transcrição do YouTube,
+rodada 2), semeia, loga como o admin de exemplo e confere `/admin/clientes`, dispara
+`coleta-noticias` de verdade três vezes (a segunda depois de um `stop`/`start` gracioso do
+worker, a terceira depois de um `kill` abrupto), tira um backup e confere o dump. Para no
+primeiro erro; imprime um resumo de uma linha por passo, com o tempo de cada um.
 
 **Achados desta rodada, corrigidos no próprio Dockerfile/Compose (não só no ensaio):**
 - `container_name: roteiros-postgres` (e os outros três) do `compose.prod.yml` colidiam

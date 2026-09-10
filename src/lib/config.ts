@@ -59,6 +59,17 @@ export const config = {
   transcricao: {
     groqKey: env("GROQ_API_KEY"),
     groqModel: env("GROQ_MODEL", "whisper-large-v3-turbo"),
+    /**
+     * Servidor do provedor de PO Token do YouTube (transcricao do YouTube,
+     * rodada 2, item 1): `roteiros-pot` e o nome do servico no Compose
+     * (`compose.prod.yml`), sem porta publicada, so na rede interna. Vazio
+     * fora do Docker (desenvolvimento local sem o servico) faz o yt-dlp
+     * usar o padrao do proprio plugin (localhost:4416), que so funciona se
+     * o provedor estiver rodando na maquina.
+     */
+    potBaseUrl: env("YOUTUBE_POT_BASE_URL", "http://roteiros-pot:4416"),
+    /** Pausa entre um video do YouTube e o seguinte, em segundos (item 2: espacar as chamadas). */
+    youtubePausaS: envNumero("YOUTUBE_PAUSA_S", 20),
   },
   coleta: {
     youtubeKey: env("YOUTUBE_API_KEY"),
