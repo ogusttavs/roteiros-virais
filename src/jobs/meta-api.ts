@@ -64,12 +64,29 @@ export const CODIGOS_ERRO_DE_CONTA = [100, 110];
 /** Token vencido (190) ou limite de taxa (4, 17, 32, 613): afeta a chamada inteira, nao uma conta. */
 export const CODIGOS_TOKEN_OU_LIMITE = [190, 4, 17, 32, 613];
 
+/**
+ * Hashtag que nao existe na Meta (achado da prova do PR #38, 10/09/2026): a
+ * hipotese de que `ig_hashtag_search` devolveria vazio estava errada.
+ * Chamada real contra "limpezadepaineldecarro" devolveu `code 24`,
+ * `error_subcode 2207024`, `type OAuthException`, "The requested resource
+ * does not exist" (`error_user_title` "Nao foi possivel encontrar uma
+ * hashtag correspondente"). So os dois juntos, nao so o `code`: 24 sozinho e
+ * o codigo generico "resource does not exist" da Graph API, usado para
+ * varios recursos alem de hashtag.
+ */
+export const CODIGO_HASHTAG_INEXISTENTE = 24;
+export const SUBCODIGO_HASHTAG_INEXISTENTE = 2207024;
+
 export function erroMetaEhDaConta(erro: ErroMetaApi): boolean {
   return erro.codigo !== undefined && CODIGOS_ERRO_DE_CONTA.includes(erro.codigo);
 }
 
 export function erroMetaEhTokenOuLimite(erro: ErroMetaApi): boolean {
   return erro.codigo !== undefined && CODIGOS_TOKEN_OU_LIMITE.includes(erro.codigo);
+}
+
+export function erroMetaEhHashtagInexistente(erro: ErroMetaApi): boolean {
+  return erro.codigo === CODIGO_HASHTAG_INEXISTENTE && erro.subcodigo === SUBCODIGO_HASHTAG_INEXISTENTE;
 }
 
 /**
@@ -253,13 +270,23 @@ export async function buscarBusinessDiscovery(handle: string, limite = 50): Prom
   return resposta.business_discovery ?? null;
 }
 
-/** `null` quando a hashtag nao existe na Meta (achado possivel, nunca testado ainda). */
+/**
+ * `null` quando a hashtag nao existe na Meta: tanto por resposta vazia
+ * (nunca visto ainda) quanto pelo `code 24`/`error_subcode 2207024` que a
+ * prova do PR #38 achou (`erroMetaEhHashtagInexistente`). Qualquer outro
+ * erro continua subindo para `meta-hashtags.ts` tratar como falha.
+ */
 export async function buscarIdDaHashtag(termo: string): Promise<string | null> {
-  const resposta = await chamar<{ data?: { id: string }[] }>("ig_hashtag_search", {
-    user_id: config.coleta.metaIgId,
-    q: termo,
-  });
-  return resposta.data?.[0]?.id ?? null;
+  try {
+    const resposta = await chamar<{ data?: { id: string }[] }>("ig_hashtag_search", {
+      user_id: config.coleta.metaIgId,
+      q: termo,
+    });
+    return resposta.data?.[0]?.id ?? null;
+  } catch (erro) {
+    if (erro instanceof ErroMetaApi && erroMetaEhHashtagInexistente(erro)) return null;
+    throw erro;
+  }
 }
 
 /** So os campos que a normalizacao usa; nunca traz a conta dona nem views (item i do plano). */

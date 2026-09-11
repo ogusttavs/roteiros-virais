@@ -38,7 +38,7 @@ import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
 import { apagarAudio, baixarAudio } from "@/jobs/audio";
 import { ErroColeta } from "@/jobs/execucoes";
 import { transcreverAudio } from "@/jobs/groq-api";
-import { buscarIdDaHashtag, buscarRecentMediaDaHashtag } from "@/jobs/meta-api";
+import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, ErroMetaApi } from "@/jobs/meta-api";
 import { rodarMetaHashtags } from "@/jobs/meta-hashtags";
 import { config } from "@/lib/config";
 
@@ -245,6 +245,26 @@ describe("rodarMetaHashtags", () => {
 
   it("hashtag que nao existe na meta conta em hashtagsInexistentes, nao em erros (achado do dia 1 da conferencia, 10/09/2026)", async () => {
     vi.mocked(buscarIdDaHashtag).mockResolvedValue(null);
+
+    const resumo = await rodarMetaHashtags();
+
+    expect(resumo.hashtagsInexistentes).toEqual(["limpeza"]);
+    expect(resumo.erros).toBeUndefined();
+    expect(buscarRecentMediaDaHashtag).not.toHaveBeenCalled();
+
+    const linhas = await db().select().from(hashtagsMetaUsadas).where(eq(hashtagsMetaUsadas.termo, "limpeza"));
+    expect(linhas).toHaveLength(0);
+  });
+
+  /**
+   * Achado da prova do PR #38, 10/09/2026: a hashtag inexistente nao volta
+   * vazia da Meta, ela lanca `code 24`/`error_subcode 2207024`. Corpo real
+   * da chamada de leitura direta contra "limpezadepaineldecarro".
+   */
+  it("code 24 da meta (hashtag inexistente pelo erro cru) tambem conta em hashtagsInexistentes, nao em erros", async () => {
+    vi.mocked(buscarIdDaHashtag).mockRejectedValue(
+      new ErroMetaApi("The requested resource does not exist", 24, 2207024),
+    );
 
     const resumo = await rodarMetaHashtags();
 
