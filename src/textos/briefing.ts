@@ -14,6 +14,13 @@ function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
+/** "6 de setembro" (E27 parte 2, item 4, Briefing.dc.html: dia mais mes por extenso, sem ano). */
+function formatarDiaMesPorExtenso(data: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(
+    data,
+  );
+}
+
 export const textosBriefing = {
   comecar: {
     passoUm: "Primeiro passo",
@@ -127,5 +134,21 @@ export const textosBriefing = {
     perfilMedos: "O medo dela, nas palavras dela",
     perfilProibicoes: "O que nunca entra no seu vídeo",
     perfilCenas: "Cenas que dá para gravar",
+  },
+  /** "O que a gente aprendeu com você" (E27 parte 2, item 4, Briefing.dc.html). */
+  aprendizado: {
+    titulo: "O que a gente aprendeu com você",
+    subtitulo:
+      "Cada vez que você reprova um roteiro dizendo por quê, isso vira uma regra sua. Se alguma estiver errada, é só desligar.",
+    naoEBemAssim: "Não é bem assim",
+    desfazer: "Desfazer",
+    desativada: "desativada",
+    naoEntraMaisNosSeusRoteiros: "Não entra mais nos seus roteiros.",
+    deOnde: (contagem: number, ultimaEm: Date) =>
+      contagem === 1
+        ? `De 1 roteiro que você reprovou, em ${formatarDiaMesPorExtenso(ultimaEm)}.`
+        : `De ${contagem} roteiros que você reprovou, o último em ${formatarDiaMesPorExtenso(ultimaEm)}.`,
+    vazio:
+      "Ainda nada. Quando você reprovar um roteiro dizendo por quê, o que a gente aprender aparece aqui, e você pode desligar o que não fizer sentido.",
   },
 };

@@ -1,5 +1,6 @@
 "use server";
 
+import { desativarRegra, reativarRegra } from "@/servicos/aprendizado";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 
@@ -16,4 +17,15 @@ export async function salvarRascunhoAction(perguntaId: string, resposta: string)
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {
   const cliente = await clienteDaSessaoAtual();
   return avaliarResposta(cliente.id, perguntaId, resposta);
+}
+
+/** "O que a gente aprendeu com você" (E27 parte 2, item 4): "Não é bem assim" e "Desfazer". */
+export async function desativarRegraAction(regraId: number): Promise<void> {
+  const cliente = await clienteDaSessaoAtual();
+  await desativarRegra(cliente.id, regraId);
+}
+
+export async function reativarRegraAction(regraId: number): Promise<void> {
+  const cliente = await clienteDaSessaoAtual();
+  await reativarRegra(cliente.id, regraId);
 }

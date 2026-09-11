@@ -1,0 +1,87 @@
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.subtitulo {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.vazio {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.regras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.regra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.oque {
+  flex: 1 1 100%;
+  color: var(--cor-texto);
+}
+
+.deOnde {
+  flex: 1 1 100%;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+/**
+ * Alvo de 44px de verdade (`--altura-toque`, mesmo achado de `Nav.module.css`
+ * e `RoteiroTela.module.css`, e2e de layout): o texto continua pequeno,
+ * so a area clicavel cresce, com `inline-flex` para centralizar o texto
+ * dentro da altura minima em vez de esticar a fonte.
+ */
+.acao {
+  appearance: none;
+  border: none;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-acao);
+  cursor: pointer;
+}
+
+.acao:hover {
+  text-decoration: underline;
+}
+
+.acao:disabled {
+  color: var(--cor-texto-desabilitado);
+  cursor: default;
+  text-decoration: none;
+}
+
+.desfazer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
