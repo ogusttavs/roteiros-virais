@@ -9,8 +9,19 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * literal) mais as regras duras da secao 7 e a persona da secao 5. Ancorada
  * em evidencia: o sistema busca os videos e entrega a IA, que so pode citar
  * o que recebeu.
+ *
+ * E27, parte 2, item 3: `montarSistemaEstavel` ganha `regrasCliente`, a
+ * memoria do cliente (`servicos/aprendizado.ts`). E este prompt, nao
+ * `temasDoDia.ts`, que recebe a memoria "do tema": `temasDoDia` sugere os
+ * tres temas do dia uma vez por nicho, compartilhado entre todos os
+ * clientes dele (escopo 5.6, "modelo hibrido"), e colocar a regra de um
+ * cliente ali vazaria a preferencia dele para os outros do mesmo nicho
+ * (regra de ouro do produto, "circula padrao, nunca conteudo") e
+ * multiplicaria o custo por cliente. `avaliarTema` ja e por cliente (recebe
+ * `perfilCompilado` e `persona`), entao a regra entra aqui, sem esse
+ * problema. Versao 1.3.0.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -42,7 +53,16 @@ export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
   persona: Persona;
+  /** A memória do cliente (E27, parte 2): `regrasAtivasDoCliente`, ordenada por contagem. Vazia sem nenhuma regra ainda. */
+  regrasCliente: { regra: string; contagem: number }[];
 }): string {
+  const blocoRegrasCliente =
+    dados.regrasCliente.length > 0
+      ? `\n\nO que este cliente já reprovou em roteiros (não sugira ângulo que caia numa dessas, cada uma vale como uma proibição dele):\n${dados.regrasCliente
+          .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
+          .join("\n")}`
+      : "";
+
   return `Você avalia um tema de vídeo proposto por um dono de pequeno negócio, em cinco
 pilares de 0 a 10, cada um com uma frase de justificativa. A nota final é a média simples
 dos cinco. Abaixo de 9,0 recomende ajustar e sugira o ângulo mais próximo que tem evidência
@@ -59,7 +79,9 @@ Os cinco pilares:
   a parceria paga: o vídeo que constrói o interesse de uma marca do nicho vale 9 a 10, o que
   só entretém sem construir esse interesse vale 6 ou menos.
 - Encaixe com você: usa a autoridade dele, fala com o cliente dele e cabe no tom dele. Fere
-  uma proibição do briefing vale 3 ou menos.
+  uma proibição do briefing vale 3 ou menos; cai numa regra firme da lista "o que este
+  cliente já reprovou" (abaixo, quando houver) vale 4 ou menos, e diga isso na
+  justificativa.
 - Novidade: o mesmo ângulo já apareceu três vezes ou mais na evidência vale 5 ou menos.
   Ângulo novo sobre assunto quente vale 9 a 10.
 - Facilidade de gravar: dá para gravar sozinho, no celular, hoje, no lugar dele vale 9 a
@@ -72,7 +94,7 @@ travessão, sem emoji, sem jargão na justificativa nem na recomendação.
 ${textoPersona(dados.persona)}
 
 Perfil do cliente:
-${dados.perfilCompilado}
+${dados.perfilCompilado}${blocoRegrasCliente}
 
 Modelo do nicho:
 ${dados.modeloNicho}

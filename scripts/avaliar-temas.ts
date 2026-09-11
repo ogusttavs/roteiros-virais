@@ -28,6 +28,8 @@ const casoSchema = z.object({
   modeloNicho: z.string(),
   persona: z.enum(["negocio", "criador"]),
   evidencias: z.array(z.object({ id: z.number(), assunto: z.string(), gancho: z.string(), foraDaCurva: z.number() })),
+  /** A memória do cliente (E27, parte 2, item 7): casos com regras ativas de rodadas anteriores. */
+  regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
   notaEsperada: z.object({
     viralizar: z.number().min(0).max(10),
     gerarCliente: z.number().min(0).max(10),
@@ -82,11 +84,18 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
         perfilCompilado: caso.perfilCompilado,
         modeloNicho: caso.modeloNicho,
         persona: caso.persona,
+        regrasCliente: caso.regrasCliente,
       }),
       entrada: avaliarTemaIA.montarEntrada({ tema: caso.tema, evidencias: caso.evidencias }),
     });
 
     console.log(`"${caso.tema}" (${caso.pontoPrincipal})`);
+    if (caso.regrasCliente.length > 0) {
+      console.log("regras deste cliente (memória de reprovações anteriores):");
+      for (const regra of caso.regrasCliente) {
+        console.log(`  ${regra.contagem >= 2 ? "firme" : "fraca"}: ${regra.regra}`);
+      }
+    }
     for (const pilar of PILARES) {
       const notaIA = resultado.dados.pilares[pilar].nota;
       const notaEsperada = caso.notaEsperada[pilar];
