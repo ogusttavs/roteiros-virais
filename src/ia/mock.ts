@@ -46,6 +46,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockModeloNicho(entrada);
     case "filtrarNoticias":
       return mockFiltrarNoticias(entrada);
+    case "aprenderCliente":
+      return mockAprenderCliente(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -330,4 +332,43 @@ function mockModeloNicho(entrada: string) {
     },
     assuntosQuentes: ["assunto simulado"],
   };
+}
+
+const IDS_MOTIVO_VALIDOS = new Set([
+  "nao_e_assim_que_eu_falo",
+  "nao_da_para_gravar_hoje",
+  "ja_falei_disso",
+  "nao_e_o_meu_cliente",
+  "muito_longo",
+  "nao_combina_com_o_objetivo",
+  "gancho_fraco",
+  "outro_motivo",
+]);
+
+/**
+ * Uma regra por motivo estruturado distinto que aparece nas reprovações
+ * (E27, parte 2, item 2): o teste de integração do job confere que duas
+ * reprovações com o mesmo motivo consolidam numa regra só (a contagem quem
+ * soma é o código, não o mock). Uma reprovação só com texto livre (sem
+ * motivo estruturado) vira uma regra a mais, com `motivoOrigem` nulo.
+ */
+function mockAprenderCliente(entrada: string) {
+  const blocoReprovacoes = entrada.split("\n\nRegras já ativas hoje")[0] ?? entrada;
+  const motivosEncontrados = new Set<string>();
+  for (const match of blocoReprovacoes.matchAll(/motivo\(s\) ([^\n;]+)/g)) {
+    for (const token of match[1].split(",").map((s) => s.trim())) {
+      if (IDS_MOTIVO_VALIDOS.has(token)) motivosEncontrados.add(token);
+    }
+  }
+  const temTextoLivreSemMotivo = /nenhum motivo estruturado[^\n]*; o que o cliente escreveu/.test(blocoReprovacoes);
+
+  const regras: { regra: string; motivoOrigem: string | null }[] = [...motivosEncontrados].map((motivo) => ({
+    regra: `[exemplo] regra derivada do motivo ${motivo}`,
+    motivoOrigem: motivo,
+  }));
+  if (temTextoLivreSemMotivo) {
+    regras.push({ regra: "[exemplo] regra derivada do texto livre", motivoOrigem: null });
+  }
+
+  return { regras: regras.slice(0, 10) };
 }
