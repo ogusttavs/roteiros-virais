@@ -64,6 +64,8 @@ const casoSchema = z.object({
       duracaoAnteriorS: z.number().optional(),
     })
     .optional(),
+  /** A memória do cliente (E27, parte 2, item 7): casos com regras ativas de rodadas anteriores. */
+  regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
   pontoPrincipal: z.string(),
 });
 const conjuntoSchema = z.array(casoSchema);
@@ -131,6 +133,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         perfilCompilado: caso.perfilCompilado,
         camadaExclusiva: caso.camadaExclusiva,
         modeloNicho: caso.modeloNicho,
+        regrasCliente: caso.regrasCliente,
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,
@@ -157,6 +160,20 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
       }
       console.log(`gancho reprovado: ${caso.anguloParaEvitar.gancho}`);
       console.log(`gancho novo:      ${saida.gancho}\n`);
+    }
+
+    /**
+     * A memória do cliente (E27, parte 2, item 7): imprime a regra ao lado
+     * do roteiro gerado, para o Fable conferir na leitura se a saída de
+     * fato a respeitou (o julgamento continua humano, mesmo raciocínio do
+     * resto deste script).
+     */
+    if (caso.regrasCliente.length > 0) {
+      console.log("regras deste cliente (memória de reprovações anteriores):");
+      for (const regra of caso.regrasCliente) {
+        console.log(`  ${regra.contagem >= 2 ? "firme" : "fraca"}: ${regra.regra}`);
+      }
+      console.log();
     }
 
     console.log(`titulo: ${saida.titulo}`);

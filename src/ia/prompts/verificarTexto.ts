@@ -30,12 +30,23 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * para um editor, não como o texto que o cliente lê e segue sozinho. O
  * genero "roteiro" descreve isso com todas as letras, para nunca mais
  * reprovar por não reconhecer o gênero.
+ *
+ * `regra` (E27 parte 2, item 7, achado da medição de custo com chave real):
+ * a saída de `aprenderCliente` é uma lista de regras curtas e diretas ("não
+ * começar com pergunta: comece mostrando"), do mesmo jeito que uma regra de
+ * negócio soa, nunca uma frase de conversa. Sem esse gênero, a tentativa com
+ * chave real reprovou duas vezes seguidas dizendo que o texto "parece ser
+ * instruções internas... não um texto para a tela do dono de negócio", a
+ * mesma classe de erro que motivou o gênero "analise": o modelo barato
+ * confunde instrução direta e correta com instrução interna. A regra
+ * aparece no Briefing do próprio cliente (`AprendizadoCard.tsx`), então é
+ * texto de tela sim, só que no formato de regra, não de conversa.
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
-export type GeneroTexto = "padrao" | "analise" | "roteiro";
+export type GeneroTexto = "padrao" | "analise" | "roteiro" | "regra";
 
 export const schema = z.object({
   aprovado: z.boolean(),
@@ -51,9 +62,14 @@ const CRITERIO_TOM: Record<GeneroTexto, string> = {
     "como melhorar é esperado e correto, não reprove só por isso; reprove apenas se soar como " +
     "propaganda de venda ou usar uma palavra fora do lugar;",
   roteiro: "o texto soa como uma pessoa falando com outra pessoa, não como propaganda;",
+  regra:
+    "o texto é uma regra curta e direta sobre o que os próximos roteiros deste cliente devem " +
+    "seguir ou evitar: frase imperativa, do tipo não fazer X e sim Y, é o formato esperado e " +
+    "correto, não reprove só por isso; reprove apenas se soar como propaganda de venda ou usar " +
+    "jargão de marketing ou de tecnologia;",
 };
 
-/** Só o genero "roteiro" precisa desta explicação extra; os outros não mudam de comportamento. */
+/** Só os generos "roteiro" e "regra" precisam desta explicação extra; os outros não mudam de comportamento. */
 const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
   roteiro:
     "\nO texto é um roteiro que o próprio dono do negócio vai gravar sozinho no celular: gancho, " +
@@ -61,6 +77,12 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "corte para ele seguir. Essas instruções de edição são parte do texto que ele lê e segue, " +
     "escritas para ele, não para um editor profissional; nunca reprove achando que não é o " +
     "texto que o cliente vê, isso não é um erro de gênero.\n",
+  regra:
+    "\nO texto é uma regra que resume o que o cliente já reprovou antes, para lembrar os próximos " +
+    "roteiros dele do que evitar. Ela aparece numa lista curta na tela do próprio cliente, no " +
+    "briefing, ao lado de outras regras assim. Frase curta e imperativa é o formato certo deste " +
+    "gênero, não instrução interna de equipe; nunca reprove achando que parece um manual de " +
+    "produção ou uma nota técnica, isso não é um erro de gênero.\n",
 };
 
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao"): string {

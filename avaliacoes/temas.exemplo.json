@@ -111,5 +111,19 @@
     ],
     "notaEsperada": { "viralizar": 7, "gerarCliente": 6, "encaixe": 8, "novidade": 6, "facilidade": 7 },
     "pontoPrincipal": "evidencia sobre organizacao de outros comodos, nao do guarda roupa exato, projeto longo pesa um pouco na facilidade"
+  },
+  {
+    "tema": "por que eu cobro mais caro que a faxina expressa da vizinha",
+    "perfilCompilado": "Serviço de organização e limpeza residencial. Vende faxina completa por R$ 220. Cliente ideal trabalha fora o dia todo e não tem tempo de organizar a casa.",
+    "modeloNicho": "Assuntos quentes: faxina rápida, organização de armário, cheiro que dura. Ganchos: comparação antes e depois.",
+    "persona": "negocio",
+    "evidencias": [
+      { "id": 306, "assunto": "por que cobro mais caro que a faxina da vizinha", "gancho": "e por isso que eu cobro mais caro", "foraDaCurva": 5.4 }
+    ],
+    "regrasCliente": [
+      { "regra": "Não gosta de comparar preço com concorrente, fica sem graça e não é assim que ele fala.", "contagem": 3 }
+    ],
+    "notaEsperada": { "viralizar": 6, "gerarCliente": 5, "encaixe": 4, "novidade": 6, "facilidade": 9 },
+    "pontoPrincipal": "tema com bom encaixe em outras dimensoes, mas o angulo de comparar preco com concorrente cai numa regra firme deste cliente, entao encaixe fica 4 ou menos"
   }
 ]

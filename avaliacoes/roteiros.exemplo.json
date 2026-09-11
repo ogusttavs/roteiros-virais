@@ -177,5 +177,29 @@
       "motivoTexto": "eu nunca falo assim, cheio de formalidade; eu falo igual eu falo com meus amigos, sem enrolacao"
     },
     "pontoPrincipal": "reprovado por 'nao e assim que eu falo': a nova versao precisa soar como o perfil do cliente (direto, sem formalidade), nunca em tom de comunicado"
+  },
+  {
+    "tema": "o jeito certo de guardar produto de limpeza para nao perder a validade",
+    "objetivo": "alcance",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit multiuso por R$ 65. Cliente ideal mora em apartamento pequeno e reclama de espaço no armário. Medo do cliente: comprar em quantidade e o produto perder a validade antes de usar.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: organização do armário de limpeza, validade de produto. Ganchos que funcionam: mostrar o armário organizado (média frequência). Estruturas comuns: mostrar o problema, mostrar a solução, resultado. Fechamentos comuns: armário pronto, sem falar. Chamadas finais comuns: comenta se voce faz igual.",
+    "evidencias": [
+      {
+        "id": 601,
+        "assunto": "armario de limpeza organizado por validade",
+        "gancho": "esse armario de limpeza organizado assim nunca mais perde produto vencido",
+        "estrutura": "mostra o armario bagunçado antes de organizar",
+        "fechamento": "armario pronto, sem falar por dois segundos",
+        "chamadaFinal": "comenta se voce faz igual",
+        "foraDaCurva": 3.8
+      }
+    ],
+    "roteirosRecentes": [],
+    "regrasCliente": [
+      { "regra": "Não começar com pergunta: você começa mostrando.", "contagem": 2 },
+      { "regra": "Nada mais longo que 45 segundos.", "contagem": 1 }
+    ],
+    "pontoPrincipal": "a memoria do cliente (E27, parte 2): duas regras ativas de reprovacoes anteriores, uma firme (contagem 2) e uma fraca (contagem 1); conferir se o gancho nao comeca com pergunta e se a duracao fica em 45s ou menos, mesmo sem nenhum motivo de reprovacao nesta rodada"
   }
 ]

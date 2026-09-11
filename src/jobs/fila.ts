@@ -36,6 +36,8 @@ export const FILAS = {
   temasDoDia: "temas-do-dia",
   lembrete: "lembrete",
   curvaCliente: "curva-cliente",
+  /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
+  aprenderCliente: "aprender-cliente",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

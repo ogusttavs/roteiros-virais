@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { PERGUNTAS_BRIEFING, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta, PerfilCompilado } from "@/db/schema";
+import type { RegraCliente } from "@/servicos/aprendizado";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -12,6 +13,7 @@ import { Cartao } from "@/ui/componentes/Cartao";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "../../_briefing/PerguntaCampo";
 
 import { avaliarRespostaAction, salvarRascunhoAction } from "./acoes";
+import { AprendizadoCard } from "./AprendizadoCard";
 import styles from "./BriefingVivo.module.css";
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
   avaliacoesIniciais: Record<string, AvaliacaoResposta>;
   notaGeralInicial: number;
   perfil: PerfilCompilado | null;
+  regrasIniciais: RegraCliente[];
   meta: number;
 };
 
@@ -45,6 +48,7 @@ export function BriefingVivo({
   avaliacoesIniciais,
   notaGeralInicial,
   perfil,
+  regrasIniciais,
   meta,
 }: Props) {
   const [respostas, setRespostas] = useState(respostasIniciais);
@@ -106,6 +110,8 @@ export function BriefingVivo({
               <p className={styles.perfilRodape}>{textosBriefing.briefing.perfilRodape}</p>
             </Cartao>
           ) : null}
+
+          <AprendizadoCard regrasIniciais={regrasIniciais} />
 
           {BLOCOS.map((bloco) => {
             const perguntas = perguntasDoBloco(bloco);

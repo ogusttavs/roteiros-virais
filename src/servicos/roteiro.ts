@@ -22,8 +22,10 @@ import {
 } from "@/db/schema";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
+import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 
+import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import {
@@ -276,11 +278,12 @@ async function gerarConteudo(
     throw new ErroRoteiro("o briefing deste cliente ainda nao foi compilado.");
   }
 
-  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes] = await Promise.all([
+  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente] = await Promise.all([
     evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
     evidenciaPorIds(dados.evidenciasPrevistas),
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
+    regrasAtivasDoCliente(dados.clienteId),
   ]);
 
   const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA);
@@ -299,6 +302,7 @@ async function gerarConteudo(
       perfilCompilado: formatarPerfilCompilado(perfil),
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
+      regrasCliente,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
@@ -450,6 +454,15 @@ export async function reprovarERescrever(
       .where(eq(geracoesIA.id, atual.geracaoId));
   }
   await db().update(roteiros).set({ reprovadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
+
+  /**
+   * A memória do cliente (E27, parte 2, item 2): por evento, não bloqueia a
+   * tela (`boss().send`, não `await` da execução do job). O cliente vê a
+   * nova versão do roteiro na hora; a regra aprendida aparece no Briefing
+   * pouco depois, quando o worker processar a fila.
+   */
+  await garantirBossPronto();
+  await boss().send(FILAS.aprenderCliente, { clienteId: atual.clienteId });
 
   const cliente = await clientePorId(atual.clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");

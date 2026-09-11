@@ -12,6 +12,7 @@ import { hashPassword } from "better-auth/crypto";
 import { db } from "../../src/db";
 import {
   account,
+  aprendizadoCliente,
   briefings,
   clientes,
   contas,
@@ -340,6 +341,26 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
           referencias: [],
         },
       });
+
+    /**
+     * Regras do cliente (E27 parte 2, item 4): uma ativa e uma desativada,
+     * para o cartao "o que a gente aprendeu com voce" ter os dois botoes
+     * ("Não é bem assim" e "Desfazer") de verdade na medicao de alvo de
+     * toque, nao so o estado vazio.
+     */
+    await db()
+      .insert(aprendizadoCliente)
+      .values([
+        { clienteId: clienteBriefing.id, regra: "Não começar com pergunta.", motivoOrigem: "gancho_fraco", contagem: 2 },
+        {
+          clienteId: clienteBriefing.id,
+          regra: "Nada mais longo que 45 segundos.",
+          motivoOrigem: "muito_longo",
+          contagem: 1,
+          ativa: false,
+          desativadaEm: new Date(),
+        },
+      ]);
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).

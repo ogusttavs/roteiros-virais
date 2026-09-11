@@ -7,6 +7,7 @@ import "dotenv/config";
 
 import { listarAgendamentos } from "./agenda";
 import { rodarAnalisarVisual } from "./analisar-visual";
+import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
@@ -58,6 +59,18 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.temasDoDia]: () => rodarTemasDoDia(),
   [FILAS.lembrete]: () => rodarLembrete(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
+  /**
+   * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
+   * item 2): sem um "todos os clientes" que faca sentido, o disparo manual
+   * pede o id na linha de comando, `npm run job -- aprender-cliente <id>`.
+   */
+  [FILAS.aprenderCliente]: () => {
+    const clienteId = Number(process.argv[3]);
+    if (!Number.isFinite(clienteId)) {
+      throw new Error("uso: npm run job -- aprender-cliente <clienteId>");
+    }
+    return rodarAprenderCliente(clienteId);
+  },
 };
 
 async function main(): Promise<void> {

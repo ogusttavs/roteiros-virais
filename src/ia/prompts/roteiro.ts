@@ -58,8 +58,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * presente, cacheada): a entrada so precisa dizer QUAL motivo, o modelo ja
  * sabe O QUE fazer com cada um, sem repetir a instrucao inteira a cada
  * chamada. Versao 1.6.0.
+ *
+ * E27, parte 2, item 3: `montarSistemaEstavel` ganha `regrasCliente`, a
+ * memoria do cliente (`servicos/aprendizado.ts`, `regrasAtivasDoCliente`):
+ * o que ele ja reprovou em rodadas anteriores, nao so na versao que esta
+ * sendo reescrita agora. Cacheavel junto do resto do bloco estavel; muda
+ * so quando o job `aprender-cliente` roda, nao a cada roteiro. Sem
+ * regra nenhuma, o bloco nao aparece (teste unitario). Versao 1.7.0.
  */
-export const versao = "1.6.0";
+export const versao = "1.7.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -100,7 +107,15 @@ export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
   camadaExclusiva: string;
+  /** A memória do cliente (E27, parte 2): `regrasAtivasDoCliente`, ordenada por contagem. Vazia sem nenhuma regra ainda. */
+  regrasCliente: { regra: string; contagem: number }[];
 }): string {
+  const blocoRegrasCliente =
+    dados.regrasCliente.length > 0
+      ? `\n\nO que este cliente já reprovou (não repita, cada uma vale como uma proibição dele):\n${dados.regrasCliente
+          .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
+          .join("\n")}`
+      : "";
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
 
@@ -134,6 +149,10 @@ gravar com a própria cara no celular. Regras duras:
    Gancho fraco: gancho novo que comece pelo resultado ou pela cena, nunca por pergunta
    retórica.
    Outro motivo: siga o que o cliente escreveu com as próprias palavras dele.
+8. Quando a lista "o que este cliente já reprovou" aparecer abaixo, siga cada regra dela à
+   risca; a marcada "firme" (duas reprovações ou mais) vale tanto quanto uma proibição do
+   perfil, a marcada "fraca" (uma reprovação só) ainda deve ser evitada, mas cede se
+   conflitar de verdade com o tema pedido.
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -150,7 +169,7 @@ Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na te
 visual.
 
 Perfil do cliente:
-${dados.perfilCompilado}
+${dados.perfilCompilado}${blocoRegrasCliente}
 
 O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido
 no gancho ou na chamada final, nunca force):

@@ -786,6 +786,41 @@ export const geracoesIA = pgTable("geracoes_ia", {
   criadoEm: criadoEm(),
 });
 
+/**
+ * A memória do cliente (E27, parte 2): o que ele reprovou vira regra dele.
+ * Um job barato (`src/jobs/aprender-cliente.ts`) lê as reprovações dos
+ * últimos 90 dias e substitui o conjunto de regras ativas de origem
+ * "reprovacao" a cada rodada; "manual" fica reservado, nada grava ainda.
+ * Sem chave estrangeira para a geração que originou a regra: a regra é um
+ * resumo consolidado, não um vínculo com uma reprovação específica.
+ */
+export type OrigemAprendizado = "reprovacao" | "manual";
+
+export const aprendizadoCliente = pgTable(
+  "aprendizado_cliente",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    /** Uma frase, em português de gente (tarefa `aprenderCliente`). */
+    regra: text("regra").notNull(),
+    /** Id de `MOTIVOS_REPROVACAO`; nulo quando a regra veio só do texto livre da reprovação. */
+    motivoOrigem: text("motivo_origem"),
+    /** Reprovações que sustentam esta regra nos últimos 90 dias; >= 2 é regra firme. */
+    contagem: integer("contagem").notNull().default(1),
+    primeiraEm: timestamp("primeira_em", { withTimezone: true }).notNull().defaultNow(),
+    ultimaEm: timestamp("ultima_em", { withTimezone: true }).notNull().defaultNow(),
+    /** Uma vez desativada (`"Não é bem assim"`), nunca volta sozinha, mesmo que o modelo a proponha de novo. */
+    ativa: boolean("ativa").notNull().default(true),
+    desativadaEm: timestamp("desativada_em", { withTimezone: true }),
+    origem: text("origem").$type<OrigemAprendizado>().notNull().default("reprovacao"),
+    criadoEm: criadoEm(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("aprendizado_cliente_cliente_id").on(t.clienteId)],
+);
+
 export type Nicho = typeof nichos.$inferSelect;
 export type Cliente = typeof clientes.$inferSelect;
 export type Briefing = typeof briefings.$inferSelect;
@@ -797,3 +832,4 @@ export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;
 export type ConsumoApi = typeof consumoApi.$inferSelect;
+export type AprendizadoCliente = typeof aprendizadoCliente.$inferSelect;
