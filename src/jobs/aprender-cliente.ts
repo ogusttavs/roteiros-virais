@@ -109,6 +109,7 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
     clienteId,
     schema: aprenderClienteIA.schema,
     sistemaEstavel: aprenderClienteIA.montarSistemaEstavel(),
+    generoTexto: "regra",
     entrada: aprenderClienteIA.montarEntrada({
       reprovacoes,
       regrasAtivas: ativasExistentes.map((r) => ({ regra: r.regra, motivoOrigem: r.motivoOrigem })),
