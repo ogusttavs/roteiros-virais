@@ -17,12 +17,19 @@ function formatarCusto(valor: number): string {
   return `US$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
 }
 
+const ROTULO_AVALIACAO: Record<"gostei" | "nao_gostei" | "outro_angulo" | "reprovado", string> = {
+  gostei: "gostei",
+  nao_gostei: "não gostei",
+  outro_angulo: "pediu outro ângulo",
+  reprovado: "reprovou",
+};
+
 function formatarAvaliacao(
-  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | null,
+  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | "reprovado" | null,
   motivo: string | null,
 ): string {
   if (!avaliacao) return t.semAvaliacao;
-  const rotulo = avaliacao === "gostei" ? "gostei" : avaliacao === "nao_gostei" ? "não gostei" : "pediu outro ângulo";
+  const rotulo = ROTULO_AVALIACAO[avaliacao];
   return motivo ? `${rotulo}: ${motivo}` : rotulo;
 }
 

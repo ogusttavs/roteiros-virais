@@ -141,6 +141,13 @@
       "when": 1788986088970,
       "tag": "0019_videos-execucao-id",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788998459191,
+      "tag": "0020_reprovar-roteiro",
+      "breakpoints": true
     }
   ]
 }

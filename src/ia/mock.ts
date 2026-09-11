@@ -156,26 +156,34 @@ function extrairIds(entrada: string): number[] {
 }
 
 /**
- * "pediu outro ângulo" só aparece na entrada quando `anguloParaEvitar` está
- * presente (`prompts/roteiro.ts`, `montarEntrada`): um pedido de verdade de
+ * "reprovou a versão anterior" só aparece na entrada quando
+ * `anguloParaEvitar` está presente (`prompts/roteiro.ts`, `montarEntrada`,
+ * E27 parte 1, item 3; antes "pediu outro ângulo"): um pedido de verdade de
  * ângulo diferente, não só "não repita o histórico". Sem isto, o mock
- * devolvia o mesmo gancho de sempre para o mesmo tema, e o "outro ângulo"
+ * devolvia o mesmo gancho de sempre para o mesmo tema, e a reescrita
  * colidia com o próprio verificador local novo (achado do primeiro uso no
  * iPad, item 3, `verificarLocalmente`, ganchosRecentes): a v2 da série
  * repetia o gancho da v1, que é um roteiro recente do mesmo cliente.
  */
+/**
+ * "Muito longo" só aparece na entrada quando é um dos motivos da
+ * reprovação (E27, parte 1, item 4): o mock devolve uma duração menor que
+ * o padrão de 40s, para o roteiro reescrito conseguir passar na checagem
+ * do verificador (a nova versão tem de ficar mais curta que a reprovada).
+ */
 function mockRoteiro(entrada: string) {
   const tema = extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
-  const outroAngulo = entrada.includes("pediu outro ângulo");
+  const reprovado = entrada.includes("reprovou a versão anterior");
+  const reprovadoMuitoLongo = entrada.includes("Muito longo");
   const ids = extrairIds(entrada);
 
   return {
     titulo: tema,
-    duracaoS: 40,
-    gancho: outroAngulo
+    duracaoS: reprovadoMuitoLongo ? 25 : 40,
+    gancho: reprovado
       ? `um jeito diferente de mostrar ${tema}`
       : `os 3 primeiros segundos sobre ${tema}`,
-    corpo: outroAngulo
+    corpo: reprovado
       ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
       : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
     fechamento: "resumo do que foi mostrado",

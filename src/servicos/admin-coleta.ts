@@ -6,6 +6,7 @@
  */
 import { and, count, desc, eq, gte, inArray, isNotNull, max, sql, sum } from "drizzle-orm";
 
+import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
   briefings,
@@ -524,9 +525,14 @@ export type ResumoGeracoes = {
    * cliente, so o roteiro recebe (revisao do Fable: conferir contra o banco). */
   taxaGostei: number | null;
   taxaNaoGostei: number | null;
+  /** Fluxo antigo (etapa 11), antes da E27; zero para gerações novas, que gravam "reprovado". */
   taxaOutroAngulo: number | null;
-  /** Os 5 motivos de "outro angulo" mais frequentes, por tarefa (decisao 3 do PROXIMO.md). */
+  /** E27, parte 1: fluxo novo de reprovar, com motivo estruturado. */
+  taxaReprovado: number | null;
+  /** Os 5 motivos de "outro angulo" mais frequentes, por tarefa (decisao 3 do PROXIMO.md; fluxo antigo). */
   motivosOutroAnguloPorTarefa: MotivosPorTarefa[];
+  /** Os 5 motivos estruturados de reprovação mais frequentes, por tarefa (E27, parte 1, item 6). */
+  motivosReprovadoPorTarefa: MotivosPorTarefa[];
 };
 
 const MOTIVOS_POR_TAREFA_LIMITE = 5;
@@ -562,6 +568,7 @@ export async function resumoGeracoes(opcoes: {
       gostei: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'gostei')`,
       naoGostei: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'nao_gostei')`,
       outroAngulo: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'outro_angulo')`,
+      reprovado: sql<number>`count(*) filter (where ${geracoesIA.avaliacao} = 'reprovado')`,
     })
     .from(geracoesIA)
     .where(and(filtro, isNotNull(geracoesIA.avaliacao)));
@@ -588,6 +595,36 @@ export async function resumoGeracoes(opcoes: {
     motivosPorTarefa.set(linha.tarefa, lista);
   }
 
+  /**
+   * Motivos estruturados da reprovação (E27, parte 1, item 6): cada geração
+   * reprovada guarda uma lista de ids em `motivosAvaliacao` (jsonb); a
+   * contagem por id, por tarefa, é feita aqui em vez de em SQL (nenhum
+   * unnest de jsonb pelo query builder do Drizzle), volume baixo o
+   * bastante (admin, 7 ou 30 dias) para não pesar.
+   */
+  const linhasReprovado = await db()
+    .select({ tarefa: geracoesIA.tarefa, motivos: geracoesIA.motivosAvaliacao })
+    .from(geracoesIA)
+    .where(and(filtro, eq(geracoesIA.avaliacao, "reprovado"), isNotNull(geracoesIA.motivosAvaliacao)));
+
+  const contagemReprovadoPorTarefa = new Map<string, Map<string, number>>();
+  for (const linha of linhasReprovado) {
+    const porMotivo = contagemReprovadoPorTarefa.get(linha.tarefa) ?? new Map<string, number>();
+    for (const motivoId of linha.motivos ?? []) {
+      porMotivo.set(motivoId, (porMotivo.get(motivoId) ?? 0) + 1);
+    }
+    contagemReprovadoPorTarefa.set(linha.tarefa, porMotivo);
+  }
+  const motivosReprovadoPorTarefa: MotivosPorTarefa[] = [...contagemReprovadoPorTarefa.entries()].map(
+    ([tarefa, porMotivo]) => ({
+      tarefa,
+      motivos: [...porMotivo.entries()]
+        .map(([motivoId, contagem]) => ({ motivo: rotuloDoMotivo(motivoId), contagem }))
+        .sort((a, b) => b.contagem - a.contagem)
+        .slice(0, MOTIVOS_POR_TAREFA_LIMITE),
+    }),
+  );
+
   const totalGeracoes = totais.totalGeracoes;
   const custoTotalUsd = Number(totais.custoTotalUsd ?? 0);
   const tokensEntrada = Number(totais.tokensEntrada ?? 0);
@@ -608,7 +645,9 @@ export async function resumoGeracoes(opcoes: {
     taxaGostei: avaliadas > 0 ? avaliacoesLinha.gostei / avaliadas : null,
     taxaNaoGostei: avaliadas > 0 ? avaliacoesLinha.naoGostei / avaliadas : null,
     taxaOutroAngulo: avaliadas > 0 ? avaliacoesLinha.outroAngulo / avaliadas : null,
+    taxaReprovado: avaliadas > 0 ? avaliacoesLinha.reprovado / avaliadas : null,
     motivosOutroAnguloPorTarefa: [...motivosPorTarefa.entries()].map(([tarefa, motivos]) => ({ tarefa, motivos })),
+    motivosReprovadoPorTarefa,
   };
 }
 

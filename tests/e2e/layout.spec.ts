@@ -361,6 +361,17 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await conferirLayout(page);
     });
 
+    /** E27, parte 1, definição de pronto: a folha "reprovar" (chips, campo livre) não pode estourar nem trazer alvo pequeno em nenhuma largura. */
+    test(`Roteiro, folha reprovar aberta, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await page.getByRole("button", { name: "Mais opções" }).click();
+      await page.getByRole("menuitem", { name: "Reprovar" }).click();
+      await expect(page.getByRole("dialog", { name: "O que não ficou bom?" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
     test(`Gravação em ${rotulo}px`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
       await entrar(page);

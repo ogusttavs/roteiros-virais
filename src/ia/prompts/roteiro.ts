@@ -48,8 +48,18 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * instrucao no prompt) fica no verificador (`verificador.ts`,
  * `verificarLocalmente`), no mesmo espirito da licao do PR #17. Versao
  * 1.5.0.
+ *
+ * E27, parte 1, item 3: "outro angulo" vira "reprovar com motivo"
+ * (`servicos/roteiro.ts`, `reprovarERescrever`). `anguloParaEvitar` ganha
+ * `motivos` (os rotulos de `config/motivos-reprovacao.ts`, nao os ids) e
+ * `motivoTexto`; a entrada passa a nomear os motivos escolhidos, em vez da
+ * frase generica "pediu outro angulo". A instrucao concreta de cada um dos
+ * oito motivos possiveis fica no sistema estavel (regra dura 7, sempre
+ * presente, cacheada): a entrada so precisa dizer QUAL motivo, o modelo ja
+ * sabe O QUE fazer com cada um, sem repetir a instrucao inteira a cada
+ * chamada. Versao 1.6.0.
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -108,6 +118,22 @@ gravar com a própria cara no celular. Regras duras:
    cada um); se o tema pedido for muito parecido com um deles, escolha um ângulo diferente
    para o gancho e a estrutura. O gancho novo não pode repetir nem parafrasear nenhum gancho
    recente: comece de um jeito diferente, com outra pergunta ou outra cena.
+7. Quando o cliente reprovou a versão anterior, a entrada diz por qual motivo (um ou mais,
+   desta lista fixa) e o que fazer em cada caso:
+   Não é assim que eu falo: use só as palavras e o tom do perfil do cliente, nada de frase
+   feita ou genérica.
+   Não dá para gravar isso hoje: só cena que dá para gravar sozinho, no lugar de trabalho,
+   sem preparação nem equipamento especial.
+   Já falei disso: outro ângulo do mesmo tema, ou outro exemplo, sem repetir o que os
+   roteiros recentes já disseram.
+   Não é o meu cliente: fale com quem realmente compra, a pessoa que o perfil descreve.
+   Muito longo: corte para caber em menos tempo que a versão anterior, sem tirar o exemplo
+   concreto.
+   Não combina com o objetivo: reescreva o fechamento e a chamada final para o objetivo
+   travado.
+   Gancho fraco: gancho novo que comece pelo resultado ou pela cena, nunca por pergunta
+   retórica.
+   Outro motivo: siga o que o cliente escreveu com as próprias palavras dele.
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -153,12 +179,13 @@ export function montarEntrada(dados: {
   /** Dos ultimos 10 dias (`servicos/roteiro.ts`, `historicoDeRoteiros`), com o gancho de cada um. */
   roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
   /**
-   * "Outro ângulo" (etapa 11, decisão 4 do `PROXIMO.md`): o gancho e o
-   * corpo da versão que o cliente já viu e pediu para trocar, para o
-   * modelo saber exatamente o que não repetir, além da regra geral contra
-   * `roteirosRecentes`.
+   * A versão que o cliente reprovou (E27, parte 1, item 3; antes "outro
+   * ângulo", etapa 11, decisão 4): o gancho e o corpo dela, para o modelo
+   * saber exatamente o que não repetir, além da regra geral contra
+   * `roteirosRecentes`. `motivos` são os rótulos de `MOTIVOS_REPROVACAO`
+   * (não os ids); sempre pelo menos um, `reprovarERescrever` exige.
    */
-  anguloParaEvitar?: { gancho: string; corpo: string };
+  anguloParaEvitar?: { gancho: string; corpo: string; motivos: string[]; motivoTexto?: string };
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -190,8 +217,13 @@ export function montarEntrada(dados: {
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
-      ? `O cliente já viu esta versão e pediu outro ângulo; não repita o gancho nem a estrutura ` +
-        `dela:\ngancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
+      ? `O cliente reprovou a versão anterior por: ${dados.anguloParaEvitar.motivos.join(", ")}.` +
+        (dados.anguloParaEvitar.motivoTexto
+          ? ` O que ele escreveu: ${dados.anguloParaEvitar.motivoTexto}.`
+          : "") +
+        ` A nova versão precisa resolver isso sem mudar o objetivo (continua: ` +
+        `${NOME_OBJETIVO[dados.objetivo]}). Não repita o gancho nem a estrutura dela:\n` +
+        `gancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
       : null,
     blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,

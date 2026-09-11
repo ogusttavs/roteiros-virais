@@ -48,6 +48,13 @@ export function verificarLocalmente(
      * tarefas sem esse campo ignoram a checagem mesmo se a lista vier.
      */
     ganchosRecentes?: string[];
+    /**
+     * E27, parte 1, item 4: quando o cliente reprovou por "muito longo", a
+     * nova versão precisa ficar mais curta que a reprovada. `campos` só tem
+     * texto; duração é numérica, por isso entra à parte, já calculada por
+     * quem chama.
+     */
+    duracaoParaMuitoLongo?: { anteriorS: number; novaS: number };
   } = {},
 ): ResultadoVerificacaoLocal {
   const motivos: string[] = [];
@@ -81,6 +88,16 @@ export function verificarLocalmente(
 
   if (opcoes.exigeEvidencia && evidenciasCitadas.length === 0) {
     motivos.push("sem ids de evidencia, e a tarefa exige evidencia");
+  }
+
+  if (
+    opcoes.duracaoParaMuitoLongo &&
+    opcoes.duracaoParaMuitoLongo.novaS >= opcoes.duracaoParaMuitoLongo.anteriorS
+  ) {
+    motivos.push(
+      `duracao: reprovado por "muito longo" (${opcoes.duracaoParaMuitoLongo.anteriorS}s), mas a nova ` +
+        `versao ficou com ${opcoes.duracaoParaMuitoLongo.novaS}s, nao mais curta`,
+    );
   }
 
   if (opcoes.evidenciasFornecidas) {
@@ -119,6 +136,14 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   evidenciasFornecidas?: number[];
   /** O gancho dos roteiros recentes do mesmo cliente (ver `verificarLocalmente`). */
   ganchosRecentes?: string[];
+  /**
+   * Duração da versão reprovada, em segundos (E27, parte 1, item 4): só
+   * informada quando o cliente reprovou por "muito longo", junto com
+   * `extrairDuracaoS` (a tarefa é genérica em `T`, não sabe de antemão se a
+   * saída tem duração). A nova versão precisa ficar mais curta que esta.
+   */
+  duracaoReprovadaS?: number;
+  extrairDuracaoS?: (dados: T) => number;
   /**
    * "padrao" (default) ou "analise" (rodada de acabamento de 06/09, item
    * 1): qual criterio de tom a tarefa verificarTexto usa. Ver
@@ -172,6 +197,10 @@ async function tentarGerarEVerificar<T>(
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,
     ganchosRecentes: params.ganchosRecentes,
+    duracaoParaMuitoLongo:
+      params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
+        ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }
+        : undefined,
   });
 
   let aprovado = local.aprovado;

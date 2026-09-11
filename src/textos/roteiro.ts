@@ -47,16 +47,13 @@ export const textosRoteiro = {
   ondePostou: "Onde você postou?",
   coleLink: "Cole o link do vídeo",
   menu: {
-    angulo: "Outro ângulo",
+    reprovar: "Reprovar",
     copiar: "Copiar texto",
     versoes: "Versões",
     baixarPdf: "Baixar em PDF",
   },
   /** aria-label do botão só de ícone na barra de ações do desktop (achado do primeiro uso no iPad, item 5). */
   baixarPdf: "Baixar em PDF",
-  queDiferente: "O que você quer diferente?",
-  opcional: "(opcional)",
-  outraVersao: "Escrever outra versão",
   textoCopiado: "Texto copiado",
   versao: (a: number, b: number) => `Versão ${a} de ${b}`,
   versaoAntiga: (a: number, b: number) => `Versão ${a}; a atual é a ${b}`,
@@ -68,4 +65,23 @@ export const textosRoteiro = {
   maisOpcoes: "Mais opções",
   versoesTitulo: "Versões",
   atual: "Atual",
+  /** E27, parte 1: reprovar substitui outro ângulo (`entrega/telas/Roteiro.dc.html`, folha "reprovar"). */
+  reprovar: {
+    naoFicouBom: "Não ficou bom?",
+    tituloFolha: "O que não ficou bom?",
+    ajudaMotivos:
+      "Marque tudo que valer. Isso ensina o sistema sobre você, e os próximos roteiros já saem sem isso.",
+    rotuloMotivos: "Motivos",
+    rotuloTextoLivre: "Se quiser, diga com as suas palavras",
+    textoLivrePlaceholder: "Opcional",
+    objetivoContinua: (objetivo: string) => `O objetivo continua: ${objetivo}`,
+    reescrever: "Reescrever com isso em mente",
+    reescrevendo: "Reescrevendo o roteiro",
+    semMotivoMarcado: "Marque pelo menos um motivo para reescrever",
+    tempoEstimado: "Leva de 30 segundos a 3 minutos. O tema e o objetivo continuam os mesmos.",
+    erro: "Não deu para reescrever agora. A falha foi nossa; o que você marcou continua aqui.",
+    cancelar: "Cancelar",
+    etiqueta: "reprovada",
+    motivosLinha: (motivos: string, data: string) => `Você reprovou por: ${motivos}, em ${data}`,
+  },
 };

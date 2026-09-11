@@ -174,6 +174,40 @@
   color: var(--cor-texto);
 }
 
+/**
+ * "Não ficou bom? Reprovar", no fim do cartão do roteiro (design v2,
+ * `.julgar`): só no celular, porque do tablet para cima "Reprovar" já está
+ * na barra de ações (E27, parte 1).
+ */
+.julgar {
+  margin-top: var(--espaco-5);
+  padding-top: var(--espaco-5);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+@media (min-width: 768px) {
+  .julgar {
+    display: none;
+  }
+}
+
+.linkReprovar {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 /* ---------- Barra de ações, fixa embaixo ---------- */
 
 .barraAcoes {
@@ -372,6 +406,60 @@
   box-shadow: var(--sombra-foco);
 }
 
+/* ---------- Painel de reprovar (E27, parte 1) ---------- */
+
+/**
+ * `Chips.module.css` tem `height: 36px`, 8px abaixo do alvo de toque de
+ * 44px (`--altura-toque`), achado rodando o e2e de layout com a folha
+ * aberta pela primeira vez: nenhuma outra tela testada por
+ * `layout.spec.ts` usa chip, entao o problema ficava latente. `min-height`
+ * so aqui, na folha de reprovar, em vez de mexer no componente
+ * compartilhado (usado em filtros de `/geracoes` e `/referencias`, fora do
+ * escopo desta etapa): `min-height` vence a `height` menor da classe
+ * compartilhada sem precisar de guerra de especificidade.
+ */
+.chipToqueGrande {
+  min-height: var(--altura-toque);
+}
+
+.ajudaReprovar {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.objetivoTravado {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.fraseErroPainel {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
+.avisoTempoReprovar {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  text-align: center;
+}
+
+.btnTextoCancelar {
+  justify-self: center;
+  min-height: var(--altura-toque);
+  border: 0;
+  background: transparent;
+  padding: var(--espaco-2) var(--espaco-4);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
 .listaVersoes {
   display: grid;
 }
@@ -399,6 +487,25 @@
 
 .horaVersao {
   font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+  font-weight: var(--peso-regular);
+}
+
+/** Etiqueta neutra da versão reprovada (E27, parte 1: "sem tom de fracasso", design v2). */
+.etiquetaReprovada {
+  margin-left: var(--espaco-2);
+  padding: 2px var(--espaco-2);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-regular);
+  color: var(--cor-texto-suave);
+  text-transform: none;
+}
+
+.motivosVersao {
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
   font-weight: var(--peso-regular);

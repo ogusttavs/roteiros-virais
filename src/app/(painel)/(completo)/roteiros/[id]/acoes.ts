@@ -2,12 +2,13 @@
 
 import { redirect } from "next/navigation";
 
+import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import {
   avaliarRoteiro,
   marcarGravado,
   marcarPostado,
-  outroAngulo,
+  reprovarERescrever,
   roteiroPorId,
 } from "@/servicos/roteiro";
 
@@ -32,12 +33,13 @@ export async function marcarPostadoAction(roteiroId: number, url: string): Promi
   await marcarPostado(roteiroId, url);
 }
 
-export async function outroAnguloAction(
+export async function reprovarERescreverAction(
   roteiroId: number,
-  motivo?: string,
+  motivosIds: IdMotivoReprovacao[],
+  motivoTexto?: string,
 ): Promise<{ id: number }> {
   await roteiroDoClienteOuFalha(roteiroId);
-  const novaVersao = await outroAngulo(roteiroId, motivo);
+  const novaVersao = await reprovarERescrever(roteiroId, motivosIds, motivoTexto);
   return { id: novaVersao.id };
 }
 

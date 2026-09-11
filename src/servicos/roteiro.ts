@@ -3,11 +3,13 @@
  * do tema e do objetivo, monta a entrada com o perfil compilado, o modelo
  * do nicho, a camada exclusiva do cliente e a evidência do banco, chama a
  * tarefa `roteiro` com o verificador, escolhe o vídeo de referência e
- * grava. `outroAngulo` gera a versão seguinte com a instrução de diferir
- * da anterior; `marcarGravado` e `marcarPostado` avançam o status.
+ * grava. `reprovarERescrever` (E27, parte 1; antes `outroAngulo`) gera a
+ * versão seguinte com a instrução de resolver o motivo da reprovação sem
+ * mudar o objetivo; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, gte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 
+import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
   geracoesIA,
@@ -245,7 +247,19 @@ type MontarERoteiroDados = {
   objetivo: Objetivo;
   observacao?: string;
   evidenciasPrevistas: number[];
-  anguloParaEvitar?: { gancho: string; corpo: string };
+  /**
+   * A versão reprovada (E27, parte 1): `motivosIds` são os ids de
+   * `MOTIVOS_REPROVACAO` (fonte da verdade para a lógica de código, como o
+   * verificador de duração); `montarEntrada` recebe os rótulos deles, nunca
+   * os ids. `duracaoAnteriorS` só importa com o motivo "muito_longo".
+   */
+  anguloParaEvitar?: {
+    gancho: string;
+    corpo: string;
+    motivosIds: IdMotivoReprovacao[];
+    motivoTexto?: string;
+    duracaoAnteriorS: number;
+  };
 };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
@@ -303,12 +317,34 @@ async function gerarConteudo(
           : undefined,
       })),
       roteirosRecentes,
-      anguloParaEvitar: dados.anguloParaEvitar,
+      anguloParaEvitar: dados.anguloParaEvitar
+        ? {
+            gancho: dados.anguloParaEvitar.gancho,
+            corpo: dados.anguloParaEvitar.corpo,
+            motivos: dados.anguloParaEvitar.motivosIds.map(rotuloDoMotivo),
+            motivoTexto: dados.anguloParaEvitar.motivoTexto,
+          }
+        : undefined,
     }),
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
-    ganchosRecentes: roteirosRecentes.map((r) => r.gancho),
+    /**
+     * O gancho da versão reprovada entra aqui também (E27, parte 1, item 4:
+     * "com gancho_fraco, o gancho novo tem de ser diferente do reprovado, a
+     * regra dos ganchos recentes já existe"), não só quando o motivo é
+     * "gancho fraco": nunca repetir o gancho que acabou de ser reprovado é
+     * uma defesa boa para qualquer motivo, e `historicoDeRoteiros` já traria
+     * essa versão de qualquer jeito enquanto ela estiver nos últimos
+     * `DIAS_HISTORICO` dias; aqui fica garantido mesmo fora dessa janela.
+     */
+    ganchosRecentes: dados.anguloParaEvitar
+      ? [...roteirosRecentes.map((r) => r.gancho), dados.anguloParaEvitar.gancho]
+      : roteirosRecentes.map((r) => r.gancho),
+    duracaoReprovadaS: dados.anguloParaEvitar?.motivosIds.includes("muito_longo")
+      ? dados.anguloParaEvitar.duracaoAnteriorS
+      : undefined,
+    extrairDuracaoS: (d) => d.duracaoS,
     generoTexto: "roteiro",
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,
@@ -388,21 +424,32 @@ export async function gerarRoteiro(
 }
 
 /**
- * Outro ângulo (etapa 11, decisão 4 do `PROXIMO.md`): gera a versão
- * seguinte da mesma série, com a instrução explícita de diferir do gancho
- * e da estrutura da versão atual, e grava a avaliação "outro ângulo" (com
- * o motivo, se o cliente deu um) na geração da versão anterior.
+ * Reprovar e reescrever (E27, parte 1; antes "outro ângulo", etapa 11,
+ * decisão 4): marca a versão atual como reprovada, com o motivo
+ * estruturado (um ou mais, obrigatório) e o texto livre opcional, e gera a
+ * versão seguinte da mesma série, com o mesmo objetivo, com a instrução
+ * explícita de resolver o motivo sem repetir o gancho nem a estrutura da
+ * versão reprovada.
  */
-export async function outroAngulo(roteiroId: number, motivo?: string): Promise<RoteiroLinha> {
+export async function reprovarERescrever(
+  roteiroId: number,
+  motivosIds: IdMotivoReprovacao[],
+  motivoTexto?: string,
+): Promise<RoteiroLinha> {
+  if (motivosIds.length === 0) {
+    throw new ErroRoteiro("selecione pelo menos um motivo para reprovar o roteiro.");
+  }
+
   const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   if (atual.geracaoId) {
     await db()
       .update(geracoesIA)
-      .set({ avaliacao: "outro_angulo", motivoAvaliacao: motivo })
+      .set({ avaliacao: "reprovado", motivosAvaliacao: motivosIds, motivoAvaliacao: motivoTexto })
       .where(eq(geracoesIA.id, atual.geracaoId));
   }
+  await db().update(roteiros).set({ reprovadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
 
   const cliente = await clientePorId(atual.clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
@@ -416,9 +463,14 @@ export async function outroAngulo(roteiroId: number, motivo?: string): Promise<R
     cliente,
     tema: atual.tema,
     objetivo: atual.objetivo,
-    observacao: motivo,
     evidenciasPrevistas: atual.conteudo.evidencias,
-    anguloParaEvitar: { gancho: atual.conteudo.gancho, corpo: atual.conteudo.corpo },
+    anguloParaEvitar: {
+      gancho: atual.conteudo.gancho,
+      corpo: atual.conteudo.corpo,
+      motivosIds,
+      motivoTexto,
+      duracaoAnteriorS: atual.conteudo.duracaoS,
+    },
   });
 
   const [novaVersao] = await db()
@@ -534,9 +586,24 @@ export async function avaliarRoteiro(
   await db().update(geracoesIA).set({ avaliacao }).where(eq(geracoesIA.id, atual.geracaoId));
 }
 
-export type VersaoRoteiro = { id: number; versao: number; criadoEm: Date; atual: boolean };
+export type VersaoRoteiro = {
+  id: number;
+  versao: number;
+  criadoEm: Date;
+  atual: boolean;
+  /** Nula na versão em uso; marcada na versão que o cliente reprovou (E27, parte 1). */
+  reprovadoEm: Date | null;
+  /** Rótulos de tela, já traduzidos de `MOTIVOS_REPROVACAO`; nulo sem reprovação. */
+  motivos: string[] | null;
+  motivoTexto: string | null;
+};
 
-/** As versões da mesma série, mais recente primeiro (etapa 11, tela "Versões"). */
+/**
+ * As versões da mesma série, mais recente primeiro (etapa 11, tela
+ * "Versões"). A versão reprovada (E27, parte 1) traz os motivos, buscados
+ * na geração dela (`geracoesIA`), para o bloco de versões mostrar "você
+ * reprovou por: X e Y".
+ */
 export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro[]> {
   const [atual] = await db()
     .select({ id: roteiros.id, versaoDe: roteiros.versaoDe })
@@ -548,12 +615,34 @@ export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro
   const serie = await buscarSerie(raizId);
   const maisRecente = serie[0]?.id;
 
-  return serie.map((r) => ({
-    id: r.id,
-    versao: r.versao,
-    criadoEm: r.criadoEm,
-    atual: r.id === maisRecente,
-  }));
+  const idsGeracaoReprovada = serie
+    .filter((r) => r.reprovadoEm !== null && r.geracaoId !== null)
+    .map((r) => r.geracaoId as number);
+  const geracoes =
+    idsGeracaoReprovada.length > 0
+      ? await db()
+          .select({
+            id: geracoesIA.id,
+            motivosAvaliacao: geracoesIA.motivosAvaliacao,
+            motivoAvaliacao: geracoesIA.motivoAvaliacao,
+          })
+          .from(geracoesIA)
+          .where(inArray(geracoesIA.id, idsGeracaoReprovada))
+      : [];
+  const geracaoPorId = new Map(geracoes.map((g) => [g.id, g]));
+
+  return serie.map((r) => {
+    const geracao = r.geracaoId !== null ? geracaoPorId.get(r.geracaoId) : undefined;
+    return {
+      id: r.id,
+      versao: r.versao,
+      criadoEm: r.criadoEm,
+      atual: r.id === maisRecente,
+      reprovadoEm: r.reprovadoEm,
+      motivos: geracao?.motivosAvaliacao?.map(rotuloDoMotivo) ?? null,
+      motivoTexto: geracao?.motivoAvaliacao ?? null,
+    };
+  });
 }
 
 /**

@@ -50,7 +50,20 @@ const casoSchema = z.object({
       gancho: z.string(),
     }),
   ),
-  anguloParaEvitar: z.object({ gancho: z.string(), corpo: z.string() }).optional(),
+  /**
+   * A versão reprovada (E27, parte 1): `motivos` são os rótulos de
+   * `MOTIVOS_REPROVACAO`, não os ids (mesma convenção de `montarEntrada`).
+   */
+  anguloParaEvitar: z
+    .object({
+      gancho: z.string(),
+      corpo: z.string(),
+      motivos: z.array(z.string()),
+      motivoTexto: z.string().optional(),
+      /** Só quando um dos motivos é "Muito longo": a duração da versão reprovada, em segundos. */
+      duracaoAnteriorS: z.number().optional(),
+    })
+    .optional(),
   pontoPrincipal: z.string(),
 });
 const conjuntoSchema = z.array(casoSchema);
@@ -132,6 +145,20 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     titulos.push(saida.titulo);
     let custoDoCasoUsd = calcularCustoUsd(roteiroIA.nivel, resultado);
 
+    /**
+     * O gancho reprovado e o novo lado a lado (E27, parte 1, item 7): para
+     * o Fable ver, sem reler o roteiro inteiro, se o motivo de fato mudou a
+     * saida.
+     */
+    if (caso.anguloParaEvitar) {
+      console.log(`reprovado por: ${caso.anguloParaEvitar.motivos.join(", ")}`);
+      if (caso.anguloParaEvitar.motivoTexto) {
+        console.log(`texto do cliente: ${caso.anguloParaEvitar.motivoTexto}`);
+      }
+      console.log(`gancho reprovado: ${caso.anguloParaEvitar.gancho}`);
+      console.log(`gancho novo:      ${saida.gancho}\n`);
+    }
+
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s\n`);
     console.log("OS 3 PRIMEIROS SEGUNDOS");
@@ -175,7 +202,15 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
      */
     const campos = extrairCamposRoteiro(saida);
     const local = verificarLocalmente(campos, {
-      ganchosRecentes: caso.roteirosRecentes.map((r) => r.gancho),
+      // O gancho reprovado entra junto (mesmo raciocinio de `servicos/roteiro.ts`,
+      // `gerarConteudo`): nunca repetir o gancho que acabou de ser reprovado.
+      ganchosRecentes: caso.anguloParaEvitar
+        ? [...caso.roteirosRecentes.map((r) => r.gancho), caso.anguloParaEvitar.gancho]
+        : caso.roteirosRecentes.map((r) => r.gancho),
+      duracaoParaMuitoLongo:
+        caso.anguloParaEvitar?.duracaoAnteriorS !== undefined
+          ? { anteriorS: caso.anguloParaEvitar.duracaoAnteriorS, novaS: saida.duracaoS }
+          : undefined,
     });
     let verificacao = local;
     if (local.aprovado) {
