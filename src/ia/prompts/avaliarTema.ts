@@ -16,7 +16,8 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * tres temas do dia uma vez por nicho, compartilhado entre todos os
  * clientes dele (escopo 5.6, "modelo hibrido"), e colocar a regra de um
  * cliente ali vazaria a preferencia dele para os outros do mesmo nicho
- * (regra de ouro do produto, "circula padrao, nunca conteudo") e
+ * (regra de ouro do produto: o roteiro ou o tema de um cliente nunca
+ * aparece para outro, so o padrao aprendido pode circular) e
  * multiplicaria o custo por cliente. `avaliarTema` ja e por cliente (recebe
  * `perfilCompilado` e `persona`), entao a regra entra aqui, sem esse
  * problema. Versao 1.3.0.
