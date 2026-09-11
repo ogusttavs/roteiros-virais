@@ -50,7 +50,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { temIndicioDeBrasil } from "@/config/brasil";
 import { db } from "@/db";
 import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
-import { buscarIdDaHashtag, buscarRecentMediaDaHashtag } from "@/jobs/meta-api";
+import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, ErroMetaApi, erroMetaEhHashtagInexistente } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
@@ -139,6 +139,16 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
           mapaResolvidos.set(termo, hashtagId);
           usadosNaSemana += 1;
         } catch (erro) {
+          /**
+           * `buscarIdDaHashtag` ja devolve `null` para o `code 24` (achado
+           * da prova do PR #38, 10/09/2026); esta checagem e so defesa a
+           * mais, para o erro cru da Meta nunca virar `erros` se algum dia
+           * chegar ate aqui sem passar por aquele tratamento.
+           */
+          if (erro instanceof ErroMetaApi && erroMetaEhHashtagInexistente(erro)) {
+            hashtagsInexistentes.push(termo);
+            continue;
+          }
           erros.push(`hashtag "${termo}": ${erro instanceof Error ? erro.message : String(erro)}`);
           continue;
         }
