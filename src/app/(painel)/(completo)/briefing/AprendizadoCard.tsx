@@ -49,51 +49,61 @@ export function AprendizadoCard({ regrasIniciais }: Props) {
     });
   }
 
+  const passo = regras.length === 0 ? "semAprendizado" : regras.some((r) => !r.ativa) ? "regraDesativada" : "normal";
+
   return (
     <section
       className={[cartaoStyles.cartao, cartaoStyles.recuado, styles.cartao].join(" ")}
       aria-label={t.titulo}
+      data-passo={passo}
     >
-      <div>
-        <h2 className={styles.titulo}>{t.titulo}</h2>
-        <p className={styles.subtitulo}>{t.subtitulo}</p>
-      </div>
-
       {regras.length === 0 ? (
-        <p className={styles.vazio}>{t.vazio}</p>
+        <>
+          <h2 className={styles.titulo}>{t.titulo}</h2>
+          <p className={styles.vazio}>{t.vazio}</p>
+        </>
       ) : (
-        <div className={styles.regras}>
-          {regras.map((regra) => (
-            <div key={regra.id} className={styles.regra}>
-              <span className={styles.oque}>{regra.regra}</span>
-              {regra.ativa ? (
-                <button
-                  type="button"
-                  className={styles.acao}
-                  disabled={idPendente === regra.id}
-                  onClick={() => alternar(regra.id, false)}
-                >
-                  {t.naoEBemAssim}
-                </button>
-              ) : (
-                <span className={styles.desfazer}>
-                  {t.desativada}
+        <>
+          <div>
+            <h2 className={styles.titulo}>{t.titulo}</h2>
+            <p className={styles.subtitulo}>{t.subtitulo}</p>
+          </div>
+          <div className={styles.regras}>
+            {regras.map((regra) => (
+              <div
+                key={regra.id}
+                className={[styles.regra, !regra.ativa ? styles.desativada : ""].filter(Boolean).join(" ")}
+              >
+                <span className={styles.oque}>{regra.regra}</span>
+                {regra.ativa ? (
                   <button
                     type="button"
                     className={styles.acao}
                     disabled={idPendente === regra.id}
-                    onClick={() => alternar(regra.id, true)}
+                    onClick={() => alternar(regra.id, false)}
                   >
-                    {t.desfazer}
+                    {t.naoEBemAssim}
                   </button>
+                ) : (
+                  <span className={styles.desfazer}>
+                    {t.desativada}
+                    <button
+                      type="button"
+                      className={styles.acao}
+                      disabled={idPendente === regra.id}
+                      onClick={() => alternar(regra.id, true)}
+                    >
+                      {t.desfazer}
+                    </button>
+                  </span>
+                )}
+                <span className={styles.deOnde}>
+                  {regra.ativa ? t.deOnde(regra.contagem, regra.ultimaEm) : t.naoEntraMaisNosSeusRoteiros}
                 </span>
-              )}
-              <span className={styles.deOnde}>
-                {regra.ativa ? t.deOnde(regra.contagem, regra.ultimaEm) : t.naoEntraMaisNosSeusRoteiros}
-              </span>
-            </div>
-          ))}
-        </div>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </section>
   );

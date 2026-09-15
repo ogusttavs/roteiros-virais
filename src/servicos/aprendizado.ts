@@ -5,7 +5,7 @@
  * consolidação (o que soma contagem, o que nunca ressuscita) mora no job,
  * porque só ele decide o conjunto inteiro de uma vez.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { aprendizadoCliente, type AprendizadoCliente } from "@/db/schema";
@@ -37,16 +37,19 @@ function paraRegraCliente(linha: AprendizadoCliente): RegraCliente {
 }
 
 /**
- * Todas as regras do cliente, ativas e desativadas, mais recente primeiro
- * (Briefing e admin do cliente). Nunca mistura cliente (isolamento no nível
- * da consulta, mesmo padrão de `roteiroPorId`).
+ * Todas as regras do cliente, ativas e desativadas, por `primeiraEm`
+ * crescente, `id` como desempate (Briefing e admin do cliente, segunda
+ * rodada do PR #42, item 1). Nunca por `ativa`: assim a regra não muda de
+ * lugar na lista quando o cliente clica "Não é bem assim", só troca de
+ * estado onde já estava. Nunca mistura cliente (isolamento no nível da
+ * consulta, mesmo padrão de `roteiroPorId`).
  */
 export async function regrasDoCliente(clienteId: number): Promise<RegraCliente[]> {
   const linhas = await db()
     .select()
     .from(aprendizadoCliente)
     .where(eq(aprendizadoCliente.clienteId, clienteId))
-    .orderBy(desc(aprendizadoCliente.ativa), desc(aprendizadoCliente.ultimaEm));
+    .orderBy(asc(aprendizadoCliente.primeiraEm), asc(aprendizadoCliente.id));
   return linhas.map(paraRegraCliente);
 }
 

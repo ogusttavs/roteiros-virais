@@ -57,15 +57,19 @@ afterEach(async () => {
 });
 
 describe("regrasDoCliente", () => {
-  it("devolve ativas e desativadas juntas, ativas primeiro (Briefing e admin do cliente)", async () => {
+  it("ordena por primeiraEm crescente, id como desempate, nao muda de lugar quando desativada (segunda rodada do PR #42, item 1)", async () => {
     const clienteId = await criarCliente();
-    await criarRegra(clienteId, "regra ativa");
-    await criarRegra(clienteId, "regra desativada", { ativa: false });
+    const idPrimeira = await criarRegra(clienteId, "primeira regra");
+    await criarRegra(clienteId, "segunda regra");
 
-    const regras = await regrasDoCliente(clienteId);
-    expect(regras).toHaveLength(2);
-    expect(regras[0]).toMatchObject({ regra: "regra ativa", ativa: true });
-    expect(regras[1]).toMatchObject({ regra: "regra desativada", ativa: false });
+    const antes = await regrasDoCliente(clienteId);
+    expect(antes.map((r) => r.regra)).toEqual(["primeira regra", "segunda regra"]);
+
+    await desativarRegra(clienteId, idPrimeira);
+
+    const depois = await regrasDoCliente(clienteId);
+    expect(depois.map((r) => r.regra)).toEqual(["primeira regra", "segunda regra"]);
+    expect(depois[0]).toMatchObject({ regra: "primeira regra", ativa: false });
   });
 
   it("nunca mistura cliente (item 6: circula padrão, nunca conteúdo)", async () => {
