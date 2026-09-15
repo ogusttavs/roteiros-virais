@@ -73,6 +73,22 @@ describe("POST /api/jobs/[nome]", () => {
     expect(resposta.status).toBe(404);
   });
 
+  /**
+   * Segunda rodada do PR #42, item 2: `aprender-cliente` so roda com um
+   * `clienteId`, que so `reprovarERescrever` sabe qual e; disparado por
+   * evento, nunca pelo admin.
+   */
+  it("job por evento (aprender-cliente) devolve 400, mesmo com a chave certa", async () => {
+    const { POST } = await import("@/app/api/jobs/[nome]/route");
+    const { FILAS } = await import("@/jobs/fila");
+    const resposta = await POST(requisicao({ "x-jobs-key": config.jobsApiKey }), {
+      params: Promise.resolve({ nome: FILAS.aprenderCliente }),
+    });
+    const corpo = (await resposta.json()) as { erro: string };
+    expect(resposta.status).toBe(400);
+    expect(corpo.erro).toMatch(/por evento/);
+  });
+
   it("com o pg-boss fora do ar, devolve 503 com mensagem legivel", async () => {
     vi.resetModules();
     vi.doMock("@/jobs/fila", async (importarOriginal) => {

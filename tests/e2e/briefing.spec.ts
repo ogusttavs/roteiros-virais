@@ -27,7 +27,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, user, type AvaliacaoResposta } from "../../src/db/schema";
+import { account, aprendizadoCliente, briefings, clientes, nichos, user, type AvaliacaoResposta } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 
@@ -303,6 +303,98 @@ test.describe("briefing pela tela", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
     await expect(page.getByText(/a sua nota caiu para/i).last()).toBeVisible();
+  });
+
+  /** E27 parte 2, item 4: "O que a gente aprendeu com você" (`Briefing.dc.html`). */
+  test("no cartao 'o que a gente aprendeu com voce', desativar uma regra mostra 'Desfazer', que reativa de novo", async ({
+    page,
+  }) => {
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+    await db().insert(user).values({
+      id: "e2e-briefing-aprendizado",
+      name: "[teste] Briefing Aprendizado",
+      email: "e2e-briefing-aprendizado@exemplo.teste",
+    });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-briefing-aprendizado-credential",
+        issuer: "local:credential",
+        accountId: "e2e-briefing-aprendizado",
+        providerId: "credential",
+        userId: "e2e-briefing-aprendizado",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "e2e-briefing-aprendizado",
+        nome: "[teste] Briefing Aprendizado",
+        nichoId: nicho.id,
+        aceitouTermosEm: new Date(),
+      })
+      .returning();
+
+    const avaliacaoNota9 = (id: string): AvaliacaoResposta => ({
+      nota: 9,
+      bom: `A resposta de ${id} tem exemplo concreto.`,
+      melhorar: "Poderia trazer mais um numero ou exemplo.",
+      como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
+      impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+    });
+    const respostas: Record<string, string> = {};
+    const avaliacoes: Record<string, AvaliacaoResposta> = {};
+    for (const id of ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12"]) {
+      respostas[id] = `Resposta concreta para ${id}, com o numero 42 na frase, a fala real "isso resolveu o meu problema", e o bairro de Pinheiros.`;
+      avaliacoes[id] = avaliacaoNota9(id);
+    }
+    await db().insert(briefings).values({ clienteId: cliente.id, respostas, avaliacoes, notaGeral: "9.00", completo: true });
+
+    await db()
+      .insert(aprendizadoCliente)
+      .values([
+        {
+          clienteId: cliente.id,
+          regra: "Não começar com pergunta: você começa mostrando.",
+          motivoOrigem: "gancho_fraco",
+          contagem: 2,
+        },
+        {
+          clienteId: cliente.id,
+          regra: "Nada mais longo que 45 segundos.",
+          motivoOrigem: "muito_longo",
+          contagem: 1,
+        },
+      ]);
+
+    await entrar(page, "e2e-briefing-aprendizado@exemplo.teste");
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto("/briefing");
+    const cartao = page.getByRole("region", { name: "O que a gente aprendeu com você" });
+    await expect(cartao).toBeVisible();
+    await expect(cartao.getByText("Não começar com pergunta: você começa mostrando.")).toBeVisible();
+    await expect(cartao.getByText("Nada mais longo que 45 segundos.")).toBeVisible();
+    await expect(cartao.getByText("De 2 roteiros que você reprovou")).toBeVisible();
+    await expect(cartao.getByText("De 1 roteiro que você reprovou")).toBeVisible();
+
+    const linhaDesativar = cartao.getByText("Nada mais longo que 45 segundos.").locator("xpath=ancestor::div[1]");
+    await linhaDesativar.getByRole("button", { name: "Não é bem assim" }).click();
+
+    await expect(cartao.getByText("desativada")).toBeVisible();
+    await expect(cartao.getByText("Não entra mais nos seus roteiros.")).toBeVisible();
+    const botaoDesfazer = cartao.getByRole("button", { name: "Desfazer" });
+    await expect(botaoDesfazer).toBeVisible();
+
+    await botaoDesfazer.click();
+    await expect(cartao.getByText("desativada")).toBeHidden();
+    await expect(cartao.getByText("De 1 roteiro que você reprovou")).toBeVisible();
+
+    // recarregar confirma que a acao gravou de verdade no banco, nao so no estado otimista da tela.
+    await page.reload();
+    await expect(cartao.getByText("Nada mais longo que 45 segundos.")).toBeVisible();
+    await expect(cartao.getByText("desativada")).toBeHidden();
   });
 
   /** brief-frontend.md 6.2, "Ajuste de 06/09/2026": tocar numa linha da lista de notas rola ate a pergunta. */

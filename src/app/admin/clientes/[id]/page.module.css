@@ -109,3 +109,69 @@
 .tabela tbody tr:hover {
   background: var(--cor-superficie-hover);
 }
+
+.cabecalhoAprendizado {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+}
+
+.quantos {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.regras {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.regra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-1) var(--espaco-3);
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.regraDesativada {
+  opacity: 0.65;
+}
+
+.oque {
+  flex: 1 1 100%;
+  color: var(--cor-texto);
+}
+
+.deOnde {
+  flex: 1 1 100%;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-legenda);
+  background: var(--cor-superficie-hover);
+  color: var(--cor-texto-suave);
+}
+
+.etiquetaAtiva {
+  color: var(--cor-positivo);
+}
+
+.rodape {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}

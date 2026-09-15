@@ -232,6 +232,7 @@ async function main() {
         perfilCompilado: perfil.resumo,
         modeloNicho: nicho.resumo,
         persona: "negocio",
+        regrasCliente: [],
       }),
       entrada: avaliarTema.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
@@ -255,6 +256,7 @@ async function main() {
         perfilCompilado: perfil.resumo,
         modeloNicho: nicho.resumo,
         camadaExclusiva: "Cidade: Sao Paulo, bairro Pinheiros. Nenhum concorrente citado.",
+        regrasCliente: [],
       }),
       entrada: roteiro.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",

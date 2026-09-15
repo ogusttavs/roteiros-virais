@@ -12,6 +12,7 @@ import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual } from "@/servicos/pesquisa";
 
+import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 
@@ -258,9 +259,10 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
     throw new ErroTemas("o briefing deste cliente ainda nao foi compilado.");
   }
 
-  const [evidencias, modeloNicho] = await Promise.all([
+  const [evidencias, modeloNicho, regrasCliente] = await Promise.all([
     evidenciaParaTema(cliente.nichoId, texto),
     modeloNichoAtual(cliente.nichoId),
+    regrasAtivasDoCliente(cliente.id),
   ]);
 
   const { dados } = await gerarComVerificacao({
@@ -274,6 +276,7 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
       perfilCompilado: formatarPerfilCompilado(perfil),
       modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
       persona: cliente.persona,
+      regrasCliente,
     }),
     entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias }),
     proibicoes: perfil.fatos.proibicoes,

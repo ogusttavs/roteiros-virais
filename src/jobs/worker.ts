@@ -17,6 +17,7 @@ import "dotenv/config";
 
 import { agendarTudo, listarAgendamentos } from "./agenda";
 import { rodarAnalisarVisual } from "./analisar-visual";
+import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
@@ -120,6 +121,10 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.curvaCliente, async () => {
     await executarComRegistro(FILAS.curvaCliente, () => rodarCurvaCliente());
+  });
+  /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
+  await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {
+    await executarComRegistro(FILAS.aprenderCliente, () => rodarAprenderCliente(job[0].data.clienteId));
   });
 
   console.log("worker no ar.");

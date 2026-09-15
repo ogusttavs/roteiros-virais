@@ -13,7 +13,8 @@ export type TarefaIA =
   | "temasDoDia"
   | "avaliarTema"
   | "roteiro"
-  | "verificarTexto";
+  | "verificarTexto"
+  | "aprenderCliente";
 
 export type ImagemEntrada = {
   base64: string;

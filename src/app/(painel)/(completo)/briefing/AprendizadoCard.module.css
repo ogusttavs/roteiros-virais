@@ -1,0 +1,100 @@
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.subtitulo {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.vazio {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+/**
+ * Lista de linhas, igual ao design (`Briefing.dc.html`, `base.css` linhas
+ * 958 a 976): cada regra e uma linha com divisor embaixo, nunca um
+ * sub-cartao com fundo proprio (segunda rodada do PR #42, item 1).
+ */
+.regras {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.regra {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-1) var(--espaco-4);
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-3) 0;
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.regra:last-child {
+  border-bottom: 0;
+}
+
+.oque {
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+}
+
+.deOnde {
+  grid-column: 1;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.regra.desativada .oque {
+  text-decoration: line-through;
+  color: var(--cor-texto-dica);
+}
+
+.desfazer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  white-space: nowrap;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+/**
+ * Alvo de 44px de verdade (`--altura-toque`, mesmo achado de `Nav.module.css`
+ * e `RoteiroTela.module.css`, e2e de layout): a linha ja tem `min-height`,
+ * o botao continua com o proprio alvo por cima.
+ */
+.acao {
+  appearance: none;
+  border: none;
+  background: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-acao);
+  cursor: pointer;
+}
+
+.acao:hover {
+  text-decoration: underline;
+}
+
+.acao:disabled {
+  color: var(--cor-texto-desabilitado);
+  cursor: default;
+  text-decoration: none;
+}

@@ -36,9 +36,19 @@ export const FILAS = {
   temasDoDia: "temas-do-dia",
   lembrete: "lembrete",
   curvaCliente: "curva-cliente",
+  /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
+  aprenderCliente: "aprender-cliente",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
+
+/**
+ * Filas por evento, nunca por "rodar agora" do admin nem pelo cron
+ * (segunda rodada do PR #42, item 2): `aprender-cliente` só roda com um
+ * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
+ * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
+ */
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente]);
 
 let instancia: PgBoss | null = null;
 

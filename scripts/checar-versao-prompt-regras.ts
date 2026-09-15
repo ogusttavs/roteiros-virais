@@ -23,11 +23,16 @@ export type ArquivoPrompt = {
 /**
  * Arquivo novo (sem `antigo`) ou apagado (sem `novo`) nunca e problema: so
  * importa quando o MESMO arquivo existia nos dois lados e o conteudo mudou
- * sem a versao mudar junto.
+ * sem a versao mudar junto. `*.test.ts` tambem nunca e problema (achado do
+ * E27 parte 2, item 3): o teste ao lado do prompt nunca tem `export const
+ * versao`, so o proprio prompt tem; sem essa exclusao, mudar so o teste
+ * (sem mudar o prompt, ou mudando os dois juntos) sempre reprovava aqui,
+ * mesmo com a versao do prompt certa.
  */
 export function verificarVersoesDePrompt(arquivos: ArquivoPrompt[]): string[] {
   const problemas: string[] = [];
   for (const arquivo of arquivos) {
+    if (arquivo.caminho.endsWith(".test.ts")) continue;
     if (arquivo.antigo === null || arquivo.novo === null) continue;
     if (arquivo.antigo === arquivo.novo) continue;
 

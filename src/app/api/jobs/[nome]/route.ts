@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { boss, existeJobPendente, FILAS, FILAS_POR_EVENTO, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
 const NOMES_VALIDOS = new Set<string>(Object.values(FILAS));
@@ -56,6 +56,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
   const { nome } = await params;
   if (!NOMES_VALIDOS.has(nome)) {
     return NextResponse.json({ erro: `job desconhecido: ${nome}` }, { status: 404 });
+  }
+  if (FILAS_POR_EVENTO.has(nome)) {
+    return NextResponse.json({ erro: "job por evento, não roda pelo admin" }, { status: 400 });
   }
 
   const { nichoId } = await corpoOpcional(request);

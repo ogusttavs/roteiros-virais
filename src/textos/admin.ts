@@ -1,3 +1,15 @@
+/**
+ * "6 set" (E27 parte 2, item 5, AdminCliente.dc.html: dia mais mes abreviado,
+ * sem ano). O Intl do Node devolve "6 de set.", com "de" e ponto; o design
+ * nao tem nenhum dos dois.
+ */
+function formatarDiaMesAbreviado(data: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "short", timeZone: "America/Sao_Paulo" })
+    .format(data)
+    .replace(" de ", " ")
+    .replace(".", "");
+}
+
 export const textosAdmin = {
   navegacao: {
     equipe: "Equipe",
@@ -192,6 +204,24 @@ export const textosAdmin = {
     colunaTema: "tema",
     colunaStatus: "estado",
     vazioRoteiros: "nenhum roteiro ainda",
+    /** E27 parte 2, item 5: "O que ele já reprovou", AdminCliente.dc.html. So leitura. */
+    aprendizadoTitulo: "o que ele já reprovou",
+    aprendizadoQuantos: (reprovacoes: number, ativas: number) =>
+      `${reprovacoes === 1 ? "1 reprovação" : `${reprovacoes} reprovações`}, ${ativas === 1 ? "1 regra ativa" : `${ativas} regras ativas`}`,
+    aprendizadoDeOnde: (contagem: number, ultimaEm: Date, motivo: string | null) => {
+      const base =
+        contagem === 1
+          ? `1 reprovação, em ${formatarDiaMesAbreviado(ultimaEm)}`
+          : `${contagem} reprovações, a última em ${formatarDiaMesAbreviado(ultimaEm)}`;
+      return motivo ? `${base}. Motivo: ${motivo}.` : `${base}.`;
+    },
+    aprendizadoEtiquetaAtiva: "ativa",
+    aprendizadoEtiquetaDesativada: "desativada",
+    aprendizadoDesativadaEm: (desativadaEm: Date) =>
+      `Desligada por ele em ${formatarDiaMesAbreviado(desativadaEm)}. Não entra mais no prompt.`,
+    aprendizadoRodape:
+      "As regras ativas entram no prompt do roteiro e do tema deste cliente. Nunca saem daqui: não entram no modelo do nicho.",
+    aprendizadoVazio: "ainda nenhuma reprovação",
   },
   geracoes: {
     titulo: "Gerações",

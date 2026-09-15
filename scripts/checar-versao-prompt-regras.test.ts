@@ -54,6 +54,14 @@ describe("verificarVersoesDePrompt", () => {
     expect(problemas[0]).toContain("nenhuma versao encontrada");
   });
 
+  it("arquivo .test.ts mudado, sem export const versao nenhum: nunca e problema (E27 parte 2, item 3)", () => {
+    const semVersao = 'import { describe } from "vitest";\n';
+    const problemas = verificarVersoesDePrompt([
+      { caminho: "src/ia/prompts/roteiro.test.ts", antigo: semVersao, novo: 'import { it } from "vitest";\n' },
+    ]);
+    expect(problemas).toEqual([]);
+  });
+
   it("varios arquivos: so lista os que tem problema", () => {
     const problemas = verificarVersoesDePrompt([
       { caminho: "a.ts", antigo: ANTIGO, novo: 'export const versao = "2.0.0";\n' },
