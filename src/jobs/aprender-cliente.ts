@@ -45,13 +45,22 @@ type ReprovacaoBruta = {
   motivoTexto: string | null;
   gancho: string;
   corpo: string;
+  reprovadoEm: Date;
 };
 
+/**
+ * A janela de 90 dias filtra por `roteiros.reprovadoEm` (segunda rodada do
+ * PR #42, item 5: "datas de verdade"), não por `geracoesIA.criadoEm`: uma
+ * reprovação de hoje num roteiro antigo tem de contar, e o que importa para
+ * "quando o cliente reprovou" é a data da reprovação, não a hora em que a
+ * versão original foi gerada.
+ */
 async function reprovacoesDoCliente(clienteId: number): Promise<ReprovacaoBruta[]> {
   const desde = new Date(Date.now() - JANELA_DIAS * DIA_MS);
   const linhas = await db()
     .select({
       conteudo: roteiros.conteudo,
+      reprovadoEm: roteiros.reprovadoEm,
       motivosAvaliacao: geracoesIA.motivosAvaliacao,
       motivoAvaliacao: geracoesIA.motivoAvaliacao,
     })
@@ -62,7 +71,7 @@ async function reprovacoesDoCliente(clienteId: number): Promise<ReprovacaoBruta[
         eq(roteiros.clienteId, clienteId),
         isNotNull(roteiros.reprovadoEm),
         eq(geracoesIA.avaliacao, "reprovado"),
-        gte(geracoesIA.criadoEm, desde),
+        gte(roteiros.reprovadoEm, desde),
       ),
     );
 
@@ -71,6 +80,8 @@ async function reprovacoesDoCliente(clienteId: number): Promise<ReprovacaoBruta[
     motivoTexto: l.motivoAvaliacao,
     gancho: l.conteudo.gancho,
     corpo: l.conteudo.corpo,
+    // isNotNull(roteiros.reprovadoEm) na consulta garante o nao nulo aqui.
+    reprovadoEm: l.reprovadoEm!,
   }));
 }
 
@@ -85,6 +96,18 @@ async function reprovacoesDoCliente(clienteId: number): Promise<ReprovacaoBruta[
 function contarPorMotivo(reprovacoes: ReprovacaoBruta[], motivoOrigem: string | null): number {
   if (motivoOrigem === null) return 1;
   return reprovacoes.filter((r) => r.motivos.includes(motivoOrigem)).length || 1;
+}
+
+/**
+ * `primeiraEm`/`ultimaEm` da regra (item 5): o menor e o maior
+ * `reprovadoEm` das reprovações que a sustentam, mesmo filtro por motivo de
+ * `contarPorMotivo` (as que citam o motivo; sem motivo, todas da janela).
+ */
+function datasPorMotivo(reprovacoes: ReprovacaoBruta[], motivoOrigem: string | null): { primeiraEm: Date; ultimaEm: Date } {
+  const relevantes = motivoOrigem === null ? reprovacoes : reprovacoes.filter((r) => r.motivos.includes(motivoOrigem));
+  const base = relevantes.length > 0 ? relevantes : reprovacoes;
+  const tempos = base.map((r) => r.reprovadoEm.getTime());
+  return { primeiraEm: new Date(Math.min(...tempos)), ultimaEm: new Date(Math.max(...tempos)) };
 }
 
 export async function rodarAprenderCliente(clienteId: number): Promise<Record<string, unknown>> {
@@ -150,6 +173,7 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
   for (const proposta of propostas) {
     const chave = chaveRegra(proposta.regra, proposta.motivoOrigem);
     const contagem = contarPorMotivo(reprovacoes, proposta.motivoOrigem);
+    const { primeiraEm, ultimaEm } = datasPorMotivo(reprovacoes, proposta.motivoOrigem);
     const existente = chaveParaExistente.get(chave);
 
     if (existente) {
@@ -157,13 +181,13 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
       regrasMantidas += 1;
       await db()
         .update(aprendizadoCliente)
-        .set({ contagem, ultimaEm: new Date(), atualizadoEm: new Date() })
+        .set({ contagem, ultimaEm, atualizadoEm: new Date() })
         .where(eq(aprendizadoCliente.id, existente.id));
     } else {
       regrasNovas += 1;
       await db()
         .insert(aprendizadoCliente)
-        .values({ clienteId, regra: proposta.regra, motivoOrigem: proposta.motivoOrigem, contagem, origem: "reprovacao" });
+        .values({ clienteId, regra: proposta.regra, motivoOrigem: proposta.motivoOrigem, contagem, primeiraEm, ultimaEm, origem: "reprovacao" });
     }
   }
 

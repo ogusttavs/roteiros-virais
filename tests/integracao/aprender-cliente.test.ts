@@ -291,4 +291,23 @@ describe("rodarAprenderCliente", () => {
     const verificarTextoDepois = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "verificarTexto"));
     expect(verificarTextoDepois).toHaveLength(verificarTextoAntes.length);
   });
+
+  it("primeiraEm e ultimaEm vem da data da reprovacao, nao da hora do job (segunda rodada do PR #42, item 5)", async () => {
+    const clienteId = await criarCliente();
+    const antiga = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+    const recente = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+
+    const r1 = await gerarEReprovar(clienteId, "mancha de vinho no estofado", ["gancho_fraco"]);
+    await db().update(roteiros).set({ reprovadoEm: antiga }).where(eq(roteiros.id, r1.id));
+
+    const r2 = await gerarEReprovar(clienteId, "cheiro de bicho de estimacao no sofa", ["gancho_fraco"]);
+    await db().update(roteiros).set({ reprovadoEm: recente }).where(eq(roteiros.id, r2.id));
+
+    const resumo = await rodarAprenderCliente(clienteId);
+    expect(resumo).toMatchObject({ regrasNovas: 1 });
+
+    const [regra] = await db().select().from(aprendizadoCliente).where(eq(aprendizadoCliente.clienteId, clienteId));
+    expect(regra.primeiraEm.getTime()).toBe(antiga.getTime());
+    expect(regra.ultimaEm.getTime()).toBe(recente.getTime());
+  });
 });
