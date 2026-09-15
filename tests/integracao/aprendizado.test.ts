@@ -1,22 +1,25 @@
 /**
- * `src/servicos/aprendizado.ts` (E27, parte 2, itens 4 e 5, mais o item 3 da
- * segunda rodada do PR #42): consulta e as duas ações do cliente ("Não é
- * bem assim" e "Desfazer"), contra o Postgres real. `rodarAprenderCliente`
- * (o job que escreve as regras a partir das reprovações) já tem o próprio
- * teste, `tests/integracao/aprender-cliente.test.ts`; este arquivo cobre o
- * resto do serviço: `regrasDoCliente` (ativas e desativadas juntas, Briefing
- * e admin), `reativarRegra`, e `contarReprovacoes`.
+ * `src/servicos/aprendizado.ts` (E27, parte 2, itens 4 e 5, mais os itens 3
+ * e 8a da segunda rodada do PR #42): consulta e as duas ações do cliente
+ * ("Não é bem assim" e "Desfazer"), contra o Postgres real. `rodarAprender
+ * Cliente` (o job que escreve as regras a partir das reprovações) já tem o
+ * próprio teste, `tests/integracao/aprender-cliente.test.ts`; este arquivo
+ * cobre o resto do serviço: `regrasDoCliente` (ativas e desativadas juntas,
+ * Briefing e admin), `reativarRegra`, `contarReprovacoes`, e o isolamento
+ * entre clientes chegando até o texto do prompt do roteiro.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { aprendizadoCliente, clientes, geracoesIA, nichos, roteiros, user } from "@/db/schema";
+import { montarSistemaEstavel } from "@/ia/prompts/roteiro";
 import {
   contarReprovacoes,
   desativarRegra,
   ErroAprendizado,
   reativarRegra,
+  regrasAtivasDoCliente,
   regrasDoCliente,
 } from "@/servicos/aprendizado";
 import { textosAdmin } from "@/textos/admin";
@@ -199,5 +202,35 @@ describe("contarReprovacoes (segunda rodada do PR #42, item 3)", () => {
 
     expect(await contarReprovacoes(clienteA)).toBe(1);
     expect(await contarReprovacoes(clienteB)).toBe(0);
+  });
+});
+
+describe("isolamento entre clientes ate o texto do prompt do roteiro (segunda rodada do PR #42, item 8a)", () => {
+  it("montarSistemaEstavel com regrasAtivasDoCliente(a) nao contem a regra do cliente b, e o inverso", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    await criarRegra(clienteA, "regra exclusiva do cliente a");
+    await criarRegra(clienteB, "regra exclusiva do cliente b");
+
+    const regrasA = await regrasAtivasDoCliente(clienteA);
+    const regrasB = await regrasAtivasDoCliente(clienteB);
+
+    const sistemaA = montarSistemaEstavel({
+      perfilCompilado: "perfil",
+      modeloNicho: "modelo",
+      camadaExclusiva: "camada",
+      regrasCliente: regrasA,
+    });
+    const sistemaB = montarSistemaEstavel({
+      perfilCompilado: "perfil",
+      modeloNicho: "modelo",
+      camadaExclusiva: "camada",
+      regrasCliente: regrasB,
+    });
+
+    expect(sistemaA).toContain("regra exclusiva do cliente a");
+    expect(sistemaA).not.toContain("regra exclusiva do cliente b");
+    expect(sistemaB).toContain("regra exclusiva do cliente b");
+    expect(sistemaB).not.toContain("regra exclusiva do cliente a");
   });
 });
