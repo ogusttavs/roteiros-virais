@@ -15,6 +15,7 @@ import {
   aprendizadoCliente,
   briefings,
   clientes,
+  geracoesIA,
   modelosNicho,
   nichos,
   roteiros,
@@ -259,5 +260,35 @@ describe("rodarAprenderCliente", () => {
 
     const linhasBDepois = await db().select().from(aprendizadoCliente).where(eq(aprendizadoCliente.clienteId, clienteB));
     expect(linhasBDepois).toEqual(linhasB);
+  });
+
+  it("saida vazia do modelo (regra dura 2) nao apaga as regras ativas nem chama o verificarTexto (segunda rodada do PR #42, item 4)", async () => {
+    const clienteId = await criarCliente();
+    await db()
+      .insert(aprendizadoCliente)
+      .values([
+        { clienteId, regra: "regra ativa 1", contagem: 1 },
+        { clienteId, regra: "regra ativa 2", contagem: 1 },
+      ]);
+
+    await criarVideoEvidencia("ev-saida-vazia", "tema sem padrao claro nas reprovacoes");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "tema sem padrao claro nas reprovacoes",
+      objetivo: "engajamento",
+    });
+    await reprovarERescrever(roteiro.id, ["outro_motivo"], "[exemplo] sem regra aqui, nada de especifico");
+
+    const verificarTextoAntes = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "verificarTexto"));
+
+    const resumo = await rodarAprenderCliente(clienteId);
+    expect(resumo).toMatchObject({ regrasPropostas: 0, saidaVazia: true });
+
+    const regras = await db().select().from(aprendizadoCliente).where(eq(aprendizadoCliente.clienteId, clienteId));
+    expect(regras).toHaveLength(2);
+    expect(regras.every((r) => r.ativa)).toBe(true);
+
+    const verificarTextoDepois = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "verificarTexto"));
+    expect(verificarTextoDepois).toHaveLength(verificarTextoAntes.length);
   });
 });

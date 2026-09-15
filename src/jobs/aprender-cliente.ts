@@ -118,6 +118,25 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
     extrairCampos: (d) => Object.fromEntries(d.regras.map((r, i) => [`regra${i}`, r.regra])),
   });
 
+  /**
+   * Lista vazia (segunda rodada do PR #42, item 4): a regra dura 2 do
+   * prompt manda devolver isso quando as reprovações não sustentam nada de
+   * específico. Termina ok, sem mexer em nenhuma regra ativa: o conjunto só
+   * é substituído quando o modelo propõe algo, uma resposta vazia nunca é
+   * motivo para apagar o que o cliente já tem.
+   */
+  if (dados.regras.length === 0) {
+    return {
+      reprovacoesConsideradas: reprovacoes.length,
+      regrasPropostas: 0,
+      regrasNovas: 0,
+      regrasMantidas: 0,
+      regrasRemovidas: 0,
+      regrasDesativadasIgnoradas: 0,
+      saidaVazia: true,
+    };
+  }
+
   const propostas = dados.regras
     .slice(0, LIMITE_REGRAS)
     .filter((p) => !chavesDesativadas.has(chaveRegra(p.regra, p.motivoOrigem)));

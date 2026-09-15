@@ -354,6 +354,18 @@ const IDS_MOTIVO_VALIDOS = new Set([
  */
 function mockAprenderCliente(entrada: string) {
   const blocoReprovacoes = entrada.split("\n\nRegras já ativas hoje")[0] ?? entrada;
+
+  /**
+   * Saída vazia (segunda rodada do PR #42, item 4): qualquer texto livre
+   * marcado com "[exemplo] sem regra" simula a regra dura 2 do prompt
+   * ("reprovações não sustentam nada de específico, devolva lista vazia"),
+   * sem precisar de uma chave real para testar o job não quebrando nem
+   * apagando regra nenhuma.
+   */
+  if (blocoReprovacoes.includes("[exemplo] sem regra")) {
+    return { regras: [] };
+  }
+
   const motivosEncontrados = new Set<string>();
   for (const match of blocoReprovacoes.matchAll(/motivo\(s\) ([^\n;]+)/g)) {
     for (const token of match[1].split(",").map((s) => s.trim())) {

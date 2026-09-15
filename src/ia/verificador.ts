@@ -206,7 +206,15 @@ async function tentarGerarEVerificar<T>(
   let aprovado = local.aprovado;
   let motivos = local.motivos;
 
-  if (aprovado) {
+  /**
+   * Sem nenhum campo (segunda rodada do PR #42, item 4: a saída vazia do
+   * `aprenderCliente`, regra dura 2 do prompt, "sem padrão real, devolva
+   * lista vazia"), não há texto nenhum para conferir tom ou proibição: o
+   * aprovado local já basta, e chamar `verificarTexto` com uma string vazia
+   * só gastaria uma chamada de IA para nada, registrando uma linha de
+   * verificação sem sentido em `geracoes_ia`.
+   */
+  if (aprovado && Object.keys(campos).length > 0) {
     const textoJunto = Object.values(campos).join("\n");
     const verificacao = await gerarEstruturado({
       tarefa: "verificarTexto",
