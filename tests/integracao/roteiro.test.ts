@@ -6,6 +6,11 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+vi.mock("@/ia/cliente", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/ia/cliente")>();
+  return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
+});
+
 import { db, getPool } from "@/db";
 import {
   briefings,
@@ -20,6 +25,7 @@ import {
   type ModeloNicho,
   type PerfilCompilado,
 } from "@/db/schema";
+import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { boss, FILAS } from "@/jobs/fila";
 import {
@@ -31,6 +37,8 @@ import {
 } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+
+const gerarEstruturadoMock = vi.mocked(gerarEstruturado);
 
 const PERFIL_PADRAO: PerfilCompilado = {
   fatos: {
@@ -366,6 +374,52 @@ describe("reprovarERescrever", () => {
 
     const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(v1Recarregado.reprovadoEm).toBeNull();
+  });
+
+  /**
+   * Item 1 do acabamento da E27 (revisão do PR #41): antes a v1 era
+   * marcada reprovada ANTES de gerar a v2; se a IA falhasse, a v1 ficava
+   * reprovada sem substituta. Agora gera primeiro; com a IA falhando, nada
+   * e escrito.
+   */
+  it("com a IA falhando na segunda geracao, a v1 continua sem reprovadoEm e sem avaliacao, e nenhuma v2 e criada", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-ia-falha", "erro comum ao limpar estofado");
+    // pgboss.job nunca e limpo entre execucoes (mesmo achado do teste do item 5, acima):
+    // um clienteId numerico pode se repetir entre rodadas locais desta suite.
+    await db().execute(sql`
+      delete from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+    `);
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+    const [geracaoV1Antes] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, v1.geracaoId!));
+
+    gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: IA fora do ar"));
+    await expect(reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco")).rejects.toThrow(ErroIA);
+
+    const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
+    expect(v1Recarregado.reprovadoEm).toBeNull();
+
+    const [geracaoV1Depois] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, v1.geracaoId!));
+    expect(geracaoV1Depois.avaliacao).toBe(geracaoV1Antes.avaliacao);
+    expect(geracaoV1Depois.motivosAvaliacao).toBeNull();
+
+    const serie = await db().select().from(roteiros).where(eq(roteiros.clienteId, clienteId));
+    expect(serie).toHaveLength(1);
+
+    const jobs = await db().execute(sql`
+      select 1 from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+      limit 1
+    `);
+    expect(jobs.rows.length).toBe(0);
   });
 
   /** Segunda rodada do PR #42, item 6: "a fila nunca derruba a reescrita". */

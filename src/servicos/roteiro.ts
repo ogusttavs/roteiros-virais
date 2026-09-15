@@ -430,11 +430,17 @@ export async function gerarRoteiro(
 
 /**
  * Reprovar e reescrever (E27, parte 1; antes "outro ângulo", etapa 11,
- * decisão 4): marca a versão atual como reprovada, com o motivo
- * estruturado (um ou mais, obrigatório) e o texto livre opcional, e gera a
- * versão seguinte da mesma série, com o mesmo objetivo, com a instrução
- * explícita de resolver o motivo sem repetir o gancho nem a estrutura da
- * versão reprovada.
+ * decisão 4): gera primeiro a versão seguinte da mesma série, com o mesmo
+ * objetivo, com a instrução explícita de resolver o motivo sem repetir o
+ * gancho nem a estrutura da versão reprovada; só depois que ela existe,
+ * marca a versão atual como reprovada, com o motivo estruturado (um ou
+ * mais, obrigatório) e o texto livre opcional.
+ *
+ * Item 1 do acabamento da E27 (revisão do PR #41): antes a marcação vinha
+ * primeiro. Se `gerarConteudo` falhasse (erro de IA ou de rede), a v1
+ * ficava marcada como reprovada, sem nenhuma v2 no lugar, e o cliente
+ * perdia o próprio roteiro. Gerando primeiro, um erro não escreve nada: a
+ * v1 continua exatamente como estava.
  */
 export async function reprovarERescrever(
   roteiroId: number,
@@ -447,42 +453,6 @@ export async function reprovarERescrever(
 
   const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
-
-  if (atual.geracaoId) {
-    await db()
-      .update(geracoesIA)
-      .set({ avaliacao: "reprovado", motivosAvaliacao: motivosIds, motivoAvaliacao: motivoTexto })
-      .where(eq(geracoesIA.id, atual.geracaoId));
-  }
-  await db().update(roteiros).set({ reprovadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
-
-  /**
-   * A memória do cliente (E27, parte 2, item 2): por evento, não bloqueia a
-   * tela (`boss().send`, não `await` da execução do job). O cliente vê a
-   * nova versão do roteiro na hora; a regra aprendida aparece no Briefing
-   * pouco depois, quando o worker processar a fila.
-   *
-   * A fila nunca derruba a reescrita (segunda rodada do PR #42, item 6): a
-   * memória é o bônus, a reescrita é o que o cliente está esperando na
-   * tela. Se o pg-boss estiver fora do ar, o erro fica só no log; o cliente
-   * simplesmente não ganha uma regra aprendida nesta rodada.
-   *
-   * `singletonKey` por cliente com janela de 60s (item 5 do acabamento da
-   * E27, observação do PR #42, "duas reprovações seguidas, uma rodada só"):
-   * a segunda reprovação do mesmo cliente a poucos segundos da primeira nao
-   * enfileira um segundo job, o pg-boss descarta o envio duplicado (send
-   * resolve para null, sem lançar).
-   */
-  try {
-    await garantirBossPronto();
-    await boss().send(
-      FILAS.aprenderCliente,
-      { clienteId: atual.clienteId },
-      { singletonKey: String(atual.clienteId), singletonSeconds: 60 },
-    );
-  } catch (erro) {
-    logger.error({ err: erro, clienteId: atual.clienteId, roteiroId }, "nao foi possivel enfileirar aprender-cliente");
-  }
 
   const cliente = await clientePorId(atual.clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
@@ -522,6 +492,42 @@ export async function reprovarERescrever(
       status: "gerado",
     })
     .returning();
+
+  if (atual.geracaoId) {
+    await db()
+      .update(geracoesIA)
+      .set({ avaliacao: "reprovado", motivosAvaliacao: motivosIds, motivoAvaliacao: motivoTexto })
+      .where(eq(geracoesIA.id, atual.geracaoId));
+  }
+  await db().update(roteiros).set({ reprovadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
+
+  /**
+   * A memória do cliente (E27, parte 2, item 2): por evento, não bloqueia a
+   * tela (`boss().send`, não `await` da execução do job). O cliente vê a
+   * nova versão do roteiro na hora; a regra aprendida aparece no Briefing
+   * pouco depois, quando o worker processar a fila.
+   *
+   * A fila nunca derruba a reescrita (segunda rodada do PR #42, item 6): a
+   * memória é o bônus, a reescrita é o que o cliente está esperando na
+   * tela. Se o pg-boss estiver fora do ar, o erro fica só no log; o cliente
+   * simplesmente não ganha uma regra aprendida nesta rodada.
+   *
+   * `singletonKey` por cliente com janela de 60s (item 5 do acabamento da
+   * E27, observação do PR #42, "duas reprovações seguidas, uma rodada só"):
+   * a segunda reprovação do mesmo cliente a poucos segundos da primeira nao
+   * enfileira um segundo job, o pg-boss descarta o envio duplicado (send
+   * resolve para null, sem lançar).
+   */
+  try {
+    await garantirBossPronto();
+    await boss().send(
+      FILAS.aprenderCliente,
+      { clienteId: atual.clienteId },
+      { singletonKey: String(atual.clienteId), singletonSeconds: 60 },
+    );
+  } catch (erro) {
+    logger.error({ err: erro, clienteId: atual.clienteId, roteiroId }, "nao foi possivel enfileirar aprender-cliente");
+  }
 
   return novaVersao;
 }
