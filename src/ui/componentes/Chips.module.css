@@ -4,9 +4,18 @@
   flex-wrap: wrap;
 }
 
+/**
+ * Alvo de 44px de verdade (`--altura-toque`, achado do e2e de layout com a
+ * folha de reprovar aberta, item 3 do acabamento da E27): `display: inline-flex`
+ * mais `min-height` sobe a altura sem mudar `font-size` nem `padding`, mesmo
+ * truque de `.acao` em `AprendizadoCard.module.css`.
+ */
 .chip {
   flex: none;
-  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
   padding: 0 var(--espaco-4);
   border-radius: var(--raio-pill);
   border: 1px solid var(--cor-borda-forte);
