@@ -40,6 +40,42 @@ function chaveRegra(regra: string, motivoOrigem: string | null): string {
   return `${normalizarFrase(regra)}|${motivoOrigem ?? ""}`;
 }
 
+type RegraComMotivo = { regra: string; motivoOrigem: string | null };
+
+/** Palavras com 4 letras ou mais da frase normalizada (item 4 do acabamento da E27: raizes curtas como "com" ou "nao" nao contam para a semelhanca). */
+function palavrasRelevantes(frase: string): Set<string> {
+  return new Set(normalizarFrase(frase).split(" ").filter((palavra) => palavra.length >= 4));
+}
+
+/** Indice de Jaccard sobre dois conjuntos de palavras; 0 quando a uniao e vazia, nunca NaN. */
+function jaccard(a: Set<string>, b: Set<string>): number {
+  const uniao = new Set([...a, ...b]);
+  if (uniao.size === 0) return 0;
+  let intersecao = 0;
+  for (const palavra of a) {
+    if (b.has(palavra)) intersecao += 1;
+  }
+  return intersecao / uniao.size;
+}
+
+/**
+ * Uma regra desativada nunca volta com outra redação (observacao do PR #42): a comparacao por
+ * `chaveRegra` so pegava frase identica; o modelo podia propor "abra com a cena, nao com
+ * pergunta" e a regra que o cliente desligou ("nao comecar com pergunta") voltava, porque a
+ * frase normalizada era diferente. Bloqueia a proposta quando, para alguma regra desativada:
+ * com `motivoOrigem` definido, o motivo bate E as palavras relevantes compartilham metade ou
+ * mais (Jaccard >= 0,5); com `motivoOrigem` nulo, so a frase conta, mesmo limiar, sem exigir
+ * motivo igual (a proposta pode nao ter motivo estruturado nenhum para citar).
+ */
+export function pareceRegraDesativada(proposta: RegraComMotivo, desativadas: RegraComMotivo[]): boolean {
+  const palavrasProposta = palavrasRelevantes(proposta.regra);
+  for (const desativada of desativadas) {
+    if (proposta.motivoOrigem !== null && desativada.motivoOrigem !== proposta.motivoOrigem) continue;
+    if (jaccard(palavrasProposta, palavrasRelevantes(desativada.regra)) >= 0.5) return true;
+  }
+  return false;
+}
+
 type ReprovacaoBruta = {
   motivos: string[];
   motivoTexto: string | null;
@@ -122,7 +158,6 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
     .where(eq(aprendizadoCliente.clienteId, clienteId));
   const ativasExistentes = existentes.filter((r) => r.ativa && r.origem === "reprovacao");
   const desativadas = existentes.filter((r) => !r.ativa);
-  const chavesDesativadas = new Set(desativadas.map((r) => chaveRegra(r.regra, r.motivoOrigem)));
 
   const { dados } = await gerarComVerificacao({
     tarefa: "aprenderCliente",
@@ -162,7 +197,7 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
 
   const propostas = dados.regras
     .slice(0, LIMITE_REGRAS)
-    .filter((p) => !chavesDesativadas.has(chaveRegra(p.regra, p.motivoOrigem)));
+    .filter((p) => !pareceRegraDesativada(p, desativadas));
 
   const chaveParaExistente = new Map(ativasExistentes.map((r) => [chaveRegra(r.regra, r.motivoOrigem), r]));
   const chavesMantidas = new Set<string>();
