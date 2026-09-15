@@ -1,7 +1,7 @@
 import { List } from "lucide-react";
 import Link from "next/link";
 
-import { FILAS, type NomeFila } from "@/jobs/fila";
+import { FILAS, FILAS_POR_EVENTO, type NomeFila } from "@/jobs/fila";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import chipStyles from "@/ui/componentes/Chips.module.css";
@@ -12,7 +12,8 @@ import { BotaoRodarJob } from "../_jobs/BotaoRodarJob";
 import styles from "./page.module.css";
 
 const t = textosAdmin.jobs;
-const NOMES_DE_JOB = Object.values(FILAS);
+/** Sem as filas por evento (item 2): elas nunca rodam pelo admin, só quando o proprio evento acontece. */
+const NOMES_DE_JOB = Object.values(FILAS).filter((nome) => !FILAS_POR_EVENTO.has(nome));
 
 /** So essas filas pagam o Apify por resultado; so nelas a taxa de acerto faz sentido (item 5). */
 const FILAS_DE_COLETA_PAGA = new Set<string>([FILAS.coletaApify, FILAS.coletaMeioDia]);
