@@ -28,7 +28,7 @@ describe("montarSistemaEstavel", () => {
       ],
     });
 
-    expect(sistema).toContain("já reprovou em roteiros");
+    expect(sistema).toContain("já reprovou em roteiros (a firme vale como proibição dele, encaixe 4 ou menos; a fraca pesa contra)");
     expect(sistema).toContain("- nao comparar preco com concorrente (firme)");
     expect(sistema).toContain("- nao mostrar rosto de cliente (fraca)");
   });

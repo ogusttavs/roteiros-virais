@@ -21,8 +21,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * multiplicaria o custo por cliente. `avaliarTema` ja e por cliente (recebe
  * `perfilCompilado` e `persona`), entao a regra entra aqui, sem esse
  * problema. Versao 1.3.0.
+ *
+ * Segunda rodada do PR #42, item 7: o cabecalho do bloco igualava toda
+ * regra a proibicao, enquanto o pilar "encaixe" (mais abaixo) ja dizia
+ * "regra firme vale 4 ou menos", tratando a fraca diferente. So o texto do
+ * cabecalho muda, para bater com a rubrica que ja estava certa. Versao
+ * 1.3.1.
  */
-export const versao = "1.3.0";
+export const versao = "1.3.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -59,7 +65,7 @@ export function montarSistemaEstavel(dados: {
 }): string {
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
-      ? `\n\nO que este cliente já reprovou em roteiros (não sugira ângulo que caia numa dessas, cada uma vale como uma proibição dele):\n${dados.regrasCliente
+      ? `\n\nO que este cliente já reprovou em roteiros (a firme vale como proibição dele, encaixe 4 ou menos; a fraca pesa contra):\n${dados.regrasCliente
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";

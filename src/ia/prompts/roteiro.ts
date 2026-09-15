@@ -65,8 +65,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * sendo reescrita agora. Cacheavel junto do resto do bloco estavel; muda
  * so quando o job `aprender-cliente` roda, nao a cada roteiro. Sem
  * regra nenhuma, o bloco nao aparece (teste unitario). Versao 1.7.0.
+ *
+ * Segunda rodada do PR #42, item 7: o cabecalho do bloco dizia "cada uma
+ * vale como uma proibicao dele", contradizendo a propria regra dura 8
+ * (a fraca cede, so a firme vale como proibicao). So o texto do cabecalho
+ * muda, a instrucao de verdade ja estava certa na regra 8. Versao 1.7.1.
  */
-export const versao = "1.7.0";
+export const versao = "1.7.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -112,7 +117,7 @@ export function montarSistemaEstavel(dados: {
 }): string {
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
-      ? `\n\nO que este cliente já reprovou (não repita, cada uma vale como uma proibição dele):\n${dados.regrasCliente
+      ? `\n\nO que este cliente já reprovou (siga a regra 8: a firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";

@@ -64,7 +64,7 @@ describe("montarSistemaEstavel", () => {
 
   it("sem regrasCliente, nao monta o bloco da memoria", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [] });
-    expect(sistema).not.toContain("não repita, cada uma vale como uma proibição dele");
+    expect(sistema).not.toContain("siga a regra 8");
   });
 
   it("com regrasCliente, lista cada regra com firme (contagem >= 2) ou fraca (contagem 1)", () => {
@@ -76,7 +76,7 @@ describe("montarSistemaEstavel", () => {
       ],
     });
 
-    expect(sistema).toContain("não repita, cada uma vale como uma proibição dele");
+    expect(sistema).toContain("siga a regra 8: a firme vale como proibição, a fraca deve ser evitada");
     expect(sistema).toContain("- nao comecar com pergunta (firme)");
     expect(sistema).toContain("- nao citar concorrente (fraca)");
   });
