@@ -5,10 +5,11 @@
  * consolidação (o que soma contagem, o que nunca ressuscita) mora no job,
  * porque só ele decide o conjunto inteiro de uma vez.
  */
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { aprendizadoCliente, type AprendizadoCliente } from "@/db/schema";
+import { aprendizadoCliente, roteiros, type AprendizadoCliente } from "@/db/schema";
+import { DIA_MS, JANELA_DIAS } from "@/jobs/aprender-cliente";
 
 export class ErroAprendizado extends Error {}
 
@@ -51,6 +52,22 @@ export async function regrasDoCliente(clienteId: number): Promise<RegraCliente[]
     .where(eq(aprendizadoCliente.clienteId, clienteId))
     .orderBy(asc(aprendizadoCliente.primeiraEm), asc(aprendizadoCliente.id));
   return linhas.map(paraRegraCliente);
+}
+
+/**
+ * Quantas vezes o cliente reprovou um roteiro nos últimos 90 dias (Briefing
+ * e admin do cliente, segunda rodada do PR #42, item 3): conta linhas de
+ * `roteiros` com `reprovadoEm` preenchido, não a soma de `contagem` das
+ * regras, que soma cada motivo por separado e contava a mesma reprovação
+ * de dois motivos duas vezes. Mesma janela do job `aprender-cliente`.
+ */
+export async function contarReprovacoes(clienteId: number): Promise<number> {
+  const desde = new Date(Date.now() - JANELA_DIAS * DIA_MS);
+  const [linha] = await db()
+    .select({ total: count() })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), isNotNull(roteiros.reprovadoEm), gte(roteiros.reprovadoEm, desde)));
+  return linha?.total ?? 0;
 }
 
 /**

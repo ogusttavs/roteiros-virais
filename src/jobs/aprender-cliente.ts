@@ -20,8 +20,8 @@ import { gerarComVerificacao } from "@/ia/verificador";
 
 import { ErroColeta } from "./execucoes";
 
-const DIA_MS = 24 * 60 * 60 * 1000;
-const JANELA_DIAS = 90;
+export const DIA_MS = 24 * 60 * 60 * 1000;
+export const JANELA_DIAS = 90;
 const LIMITE_REGRAS = 10;
 
 /** Minusculas, sem acento, sem pontuacao (mesmo raciocinio de `verificador.ts`, `normalizar`). */

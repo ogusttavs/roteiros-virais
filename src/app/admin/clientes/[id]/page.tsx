@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
-import { regrasDoCliente } from "@/servicos/aprendizado";
+import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { textosAdmin } from "@/textos/admin";
 import { textosHistorico } from "@/textos/historico";
@@ -36,7 +36,7 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
 
   const roteiros = await roteirosDoCliente(cliente.id, 50);
   const regras = await regrasDoCliente(cliente.id);
-  const totalReprovacoes = regras.reduce((soma, regra) => soma + regra.contagem, 0);
+  const totalReprovacoes = await contarReprovacoes(cliente.id);
   const regrasAtivas = regras.filter((regra) => regra.ativa).length;
 
   return (

@@ -1,23 +1,25 @@
 /**
- * `src/servicos/aprendizado.ts` (E27, parte 2, itens 4 e 5): consulta e as
- * duas ações do cliente ("Não é bem assim" e "Desfazer"), contra o Postgres
- * real. `rodarAprenderCliente` (o job que escreve as regras a partir das
- * reprovações) já tem o próprio teste, `tests/integracao/
- * aprender-cliente.test.ts`; este arquivo cobre o resto do serviço:
- * `regrasDoCliente` (ativas e desativadas juntas, Briefing e admin) e
- * `reativarRegra`.
+ * `src/servicos/aprendizado.ts` (E27, parte 2, itens 4 e 5, mais o item 3 da
+ * segunda rodada do PR #42): consulta e as duas ações do cliente ("Não é
+ * bem assim" e "Desfazer"), contra o Postgres real. `rodarAprenderCliente`
+ * (o job que escreve as regras a partir das reprovações) já tem o próprio
+ * teste, `tests/integracao/aprender-cliente.test.ts`; este arquivo cobre o
+ * resto do serviço: `regrasDoCliente` (ativas e desativadas juntas, Briefing
+ * e admin), `reativarRegra`, e `contarReprovacoes`.
  */
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { aprendizadoCliente, clientes, nichos, user } from "@/db/schema";
+import { aprendizadoCliente, clientes, geracoesIA, nichos, roteiros, user } from "@/db/schema";
 import {
+  contarReprovacoes,
   desativarRegra,
   ErroAprendizado,
   reativarRegra,
   regrasDoCliente,
 } from "@/servicos/aprendizado";
+import { textosAdmin } from "@/textos/admin";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -42,6 +44,44 @@ async function criarRegra(clienteId: number, regra: string, opcoes?: { ativa?: b
   return linha.id;
 }
 
+/** Uma reprovação de verdade (geracoesIA + roteiros), para `contarReprovacoes` e a janela de datas. */
+async function criarReprovacao(clienteId: number, motivos: string[], reprovadoEm: Date = new Date()): Promise<void> {
+  const [geracao] = await db()
+    .insert(geracoesIA)
+    .values({
+      tarefa: "roteiro",
+      versaoPrompt: "1.7.1",
+      modelo: "teste-fixture",
+      clienteId,
+      entradas: {},
+      saida: {},
+      avaliacao: "reprovado",
+      motivosAvaliacao: motivos,
+    })
+    .returning();
+  await db()
+    .insert(roteiros)
+    .values({
+      clienteId,
+      data: reprovadoEm.toISOString().slice(0, 10),
+      tema: "tema de teste",
+      origem: "livre",
+      objetivo: "engajamento",
+      conteudo: {
+        titulo: "titulo",
+        gancho: "gancho de teste",
+        corpo: "corpo de teste",
+        fechamento: "fechamento",
+        chamadaFinal: "chamada",
+        duracaoS: 30,
+        ondeGravar: "onde",
+        comoEditar: { textoNaTela: [], ritmoDeCorte: "", recursos: [], audio: "", referencia: "" },
+      } as never,
+      geracaoId: geracao.id,
+      reprovadoEm,
+    });
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db().insert(nichos).values({ slug: "aprendizado-teste", nome: "Aprendizado teste", termos: [] }).returning();
@@ -53,6 +93,8 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
+  await db().delete(roteiros);
+  await db().delete(geracoesIA);
   await db().delete(aprendizadoCliente);
 });
 
@@ -125,5 +167,37 @@ describe("isolamento entre clientes nas ações (\"Não é bem assim\" e \"Desfa
 
     const [linha] = await db().select().from(aprendizadoCliente).where(eq(aprendizadoCliente.id, regraDoA));
     expect(linha.ativa).toBe(false); // continua desativada
+  });
+});
+
+describe("contarReprovacoes (segunda rodada do PR #42, item 3)", () => {
+  it("conta reprovacoes, nao a soma de contagem das regras: uma reprovacao com dois motivos conta 1, nao 2", async () => {
+    const clienteId = await criarCliente();
+    await criarReprovacao(clienteId, ["gancho_fraco", "muito_longo"]);
+    await criarRegra(clienteId, "regra a");
+    await criarRegra(clienteId, "regra b");
+
+    const total = await contarReprovacoes(clienteId);
+    expect(total).toBe(1);
+
+    const regrasAtivas = (await regrasDoCliente(clienteId)).filter((r) => r.ativa).length;
+    expect(textosAdmin.clienteDetalhe.aprendizadoQuantos(total, regrasAtivas)).toBe("1 reprovação, 2 regras ativas");
+  });
+
+  it("duas reprovacoes distintas contam duas, mesmo que uma regra so some contagem 1", async () => {
+    const clienteId = await criarCliente();
+    await criarReprovacao(clienteId, ["ja_falei_disso"]);
+    await criarReprovacao(clienteId, []);
+
+    expect(await contarReprovacoes(clienteId)).toBe(2);
+  });
+
+  it("nunca mistura cliente", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    await criarReprovacao(clienteA, ["gancho_fraco"]);
+
+    expect(await contarReprovacoes(clienteA)).toBe(1);
+    expect(await contarReprovacoes(clienteB)).toBe(0);
   });
 });
