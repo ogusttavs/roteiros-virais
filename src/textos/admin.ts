@@ -1,3 +1,5 @@
+import type { AvaliacaoGeracao } from "@/db/schema";
+
 /**
  * "6 set" (E27 parte 2, item 5, AdminCliente.dc.html: dia mais mes abreviado,
  * sem ano). O Intl do Node devolve "6 de set.", com "de" e ponto; o design
@@ -235,6 +237,13 @@ export const textosAdmin = {
     colunaPrompt: "prompt",
     colunaAvaliacao: "avaliação",
     semAvaliacao: "sem avaliação",
+    /** Um lugar so (revisao do PR #41, duplicado nas duas paginas do admin de geracoes). */
+    rotuloAvaliacao: {
+      gostei: "gostei",
+      nao_gostei: "não gostei",
+      outro_angulo: "pediu outro ângulo",
+      reprovado: "reprovou",
+    } satisfies Record<AvaliacaoGeracao, string>,
     vazio: "Nenhuma geração ainda; toda chamada de IA fica registrada aqui.",
     voltar: "gerações",
     naoEncontrada: "geração não encontrada",

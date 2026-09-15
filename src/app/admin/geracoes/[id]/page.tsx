@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import type { AvaliacaoGeracao } from "@/db/schema";
 import { geracaoPorId } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 
@@ -17,19 +18,9 @@ function formatarCusto(valor: number): string {
   return `US$ ${valor.toLocaleString("pt-BR", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}`;
 }
 
-const ROTULO_AVALIACAO: Record<"gostei" | "nao_gostei" | "outro_angulo" | "reprovado", string> = {
-  gostei: "gostei",
-  nao_gostei: "não gostei",
-  outro_angulo: "pediu outro ângulo",
-  reprovado: "reprovou",
-};
-
-function formatarAvaliacao(
-  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | "reprovado" | null,
-  motivo: string | null,
-): string {
+function formatarAvaliacao(avaliacao: AvaliacaoGeracao | null, motivo: string | null): string {
   if (!avaliacao) return t.semAvaliacao;
-  const rotulo = ROTULO_AVALIACAO[avaliacao];
+  const rotulo = t.rotuloAvaliacao[avaliacao];
   return motivo ? `${rotulo}: ${motivo}` : rotulo;
 }
 
