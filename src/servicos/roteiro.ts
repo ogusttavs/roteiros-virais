@@ -466,10 +466,20 @@ export async function reprovarERescrever(
    * memória é o bônus, a reescrita é o que o cliente está esperando na
    * tela. Se o pg-boss estiver fora do ar, o erro fica só no log; o cliente
    * simplesmente não ganha uma regra aprendida nesta rodada.
+   *
+   * `singletonKey` por cliente com janela de 60s (item 5 do acabamento da
+   * E27, observação do PR #42, "duas reprovações seguidas, uma rodada só"):
+   * a segunda reprovação do mesmo cliente a poucos segundos da primeira nao
+   * enfileira um segundo job, o pg-boss descarta o envio duplicado (send
+   * resolve para null, sem lançar).
    */
   try {
     await garantirBossPronto();
-    await boss().send(FILAS.aprenderCliente, { clienteId: atual.clienteId });
+    await boss().send(
+      FILAS.aprenderCliente,
+      { clienteId: atual.clienteId },
+      { singletonKey: String(atual.clienteId), singletonSeconds: 60 },
+    );
   } catch (erro) {
     logger.error({ err: erro, clienteId: atual.clienteId, roteiroId }, "nao foi possivel enfileirar aprender-cliente");
   }

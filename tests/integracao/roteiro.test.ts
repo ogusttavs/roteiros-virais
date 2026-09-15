@@ -389,6 +389,57 @@ describe("reprovarERescrever", () => {
     expect(jobs.rows.length).toBe(1);
   });
 
+  /**
+   * Item 5 do acabamento da E27: `singletonKey` por cliente evita duas
+   * rodadas do job por duas reprovacoes seguidas. Duas series diferentes
+   * (nao a mesma reprovada duas vezes): o mock devolve sempre o mesmo
+   * gancho "um jeito diferente de mostrar X" para toda reprovacao do mesmo
+   * tema, entao reprovar a mesma serie duas vezes colide com o proprio
+   * verificador local (gancho recente repetido); duas series distintas do
+   * mesmo cliente evita esse falso positivo e ainda prova o que o item 5
+   * pede, que e por cliente, nao por serie.
+   *
+   * `pgboss.job` nunca e limpo entre execucoes da suite (nao e tocado por
+   * `resetarSchema`, so o schema do Drizzle) e um `clienteId` numerico pode
+   * se repetir entre rodadas, porque a sequencia volta a contar do 1 a
+   * cada reset: uma linha antiga de uma rodada anterior com o mesmo
+   * `clienteId`, no mesmo minuto do relogio, ocupa o mesmo slot do
+   * `singletonKey` e faz este teste flacar (achado rodando esta rodada mais
+   * de uma vez na mesma sessao local). Apaga qualquer job antigo com este
+   * `clienteId` antes de reprovar, para a contagem valer so para esta
+   * execucao.
+   */
+  it("duas reprovacoes seguidas do mesmo cliente deixam um job so na fila aprender-cliente", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-duas-reprovacoes-1", "erro comum ao limpar estofado");
+    await criarVideoEvidencia("ev-duas-reprovacoes-2", "cheiro de bicho de estimacao no sofa");
+    await db().execute(sql`
+      delete from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+    `);
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+    const v3 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de bicho de estimacao no sofa",
+      objetivo: "engajamento",
+    });
+    await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+    await reprovarERescrever(v3.id, ["muito_longo"], "ficou longo");
+
+    const jobs = await db().execute(sql`
+      select count(*)::int as total from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+    `);
+    expect(jobs.rows[0].total).toBe(1);
+  });
+
   it("com boss().send lancando, a nova versao e gerada mesmo assim (a memoria e bonus, a reescrita nao pode falhar por causa dela)", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-boss-falha", "erro comum ao limpar estofado");
