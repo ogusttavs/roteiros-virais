@@ -24,6 +24,7 @@ import * as roteiroIA from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
@@ -460,9 +461,18 @@ export async function reprovarERescrever(
    * tela (`boss().send`, não `await` da execução do job). O cliente vê a
    * nova versão do roteiro na hora; a regra aprendida aparece no Briefing
    * pouco depois, quando o worker processar a fila.
+   *
+   * A fila nunca derruba a reescrita (segunda rodada do PR #42, item 6): a
+   * memória é o bônus, a reescrita é o que o cliente está esperando na
+   * tela. Se o pg-boss estiver fora do ar, o erro fica só no log; o cliente
+   * simplesmente não ganha uma regra aprendida nesta rodada.
    */
-  await garantirBossPronto();
-  await boss().send(FILAS.aprenderCliente, { clienteId: atual.clienteId });
+  try {
+    await garantirBossPronto();
+    await boss().send(FILAS.aprenderCliente, { clienteId: atual.clienteId });
+  } catch (erro) {
+    logger.error({ err: erro, clienteId: atual.clienteId, roteiroId }, "nao foi possivel enfileirar aprender-cliente");
+  }
 
   const cliente = await clientePorId(atual.clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");

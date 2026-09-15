@@ -3,8 +3,8 @@
  * e `marcarPostado` (etapa 11): ciclo completo contra o Postgres real, em
  * mock (`AI_PROVIDER=mock`, `vitest.config.mts`).
  */
-import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
 import {
@@ -21,6 +21,7 @@ import {
   type PerfilCompilado,
 } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import { boss, FILAS } from "@/jobs/fila";
 import {
   ErroRoteiro,
   gerarRoteiro,
@@ -365,6 +366,45 @@ describe("reprovarERescrever", () => {
 
     const [v1Recarregado] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
     expect(v1Recarregado.reprovadoEm).toBeNull();
+  });
+
+  /** Segunda rodada do PR #42, item 6: "a fila nunca derruba a reescrita". */
+  it("reprovar enfileira o job aprender-cliente com o clienteId certo", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-enfileira", "erro comum ao limpar estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+    await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+
+    const jobs = await db().execute(sql`
+      select 1 from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+      limit 1
+    `);
+    expect(jobs.rows.length).toBe(1);
+  });
+
+  it("com boss().send lancando, a nova versao e gerada mesmo assim (a memoria e bonus, a reescrita nao pode falhar por causa dela)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-boss-falha", "erro comum ao limpar estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+
+    const envioEspiao = vi.spyOn(boss(), "send").mockRejectedValueOnce(new Error("ECONNREFUSED simulado"));
+    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+    envioEspiao.mockRestore();
+
+    expect(v2.versao).toBe(2);
+    expect(v2.versaoDe).toBe(v1.id);
   });
 });
 
