@@ -1,6 +1,7 @@
 import { List } from "lucide-react";
 import Link from "next/link";
 
+import type { AvaliacaoGeracao } from "@/db/schema";
 import {
   custoPorClientePorMes,
   listarClientesComGeracao,
@@ -40,19 +41,9 @@ function formatarPercentual(valor: number | null): string {
   return `${(valor * 100).toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}%`;
 }
 
-const ROTULO_AVALIACAO: Record<"gostei" | "nao_gostei" | "outro_angulo" | "reprovado", string> = {
-  gostei: "gostei",
-  nao_gostei: "não gostei",
-  outro_angulo: "pediu outro ângulo",
-  reprovado: "reprovou",
-};
-
-function formatarAvaliacao(
-  avaliacao: "gostei" | "nao_gostei" | "outro_angulo" | "reprovado" | null,
-  motivo: string | null,
-): string {
+function formatarAvaliacao(avaliacao: AvaliacaoGeracao | null, motivo: string | null): string {
   if (!avaliacao) return t.semAvaliacao;
-  const rotulo = ROTULO_AVALIACAO[avaliacao];
+  const rotulo = t.rotuloAvaliacao[avaliacao];
   return motivo ? `${rotulo}: ${motivo}` : rotulo;
 }
 

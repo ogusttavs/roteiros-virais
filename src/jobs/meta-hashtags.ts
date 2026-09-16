@@ -60,7 +60,14 @@ import { upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
-const TERMOS_POR_NICHO = 8;
+/**
+ * De 8 para 10 (decisao do Fable em 15/09, achado da conferencia de 10/09): dois termos fora
+ * do corte de 8 existem como hashtag na Meta ("antesedepoislimpeza" e
+ * "produtodelimpezaquefunciona") e ficavam descartados todo dia. A trava de verdade continua
+ * sendo LIMITE_HASHTAGS_SEMANA (30 hashtags unicas por semana por conta profissional); 10 por
+ * nicho cabem em ate tres nichos por semana sem estourar esse limite.
+ */
+const TERMOS_POR_NICHO = 10;
 /** 30 por semana, o limite real da Meta na resolucao. Exportado para o admin mostrar "hashtags usadas na semana" (PROXIMO.md, item 5). */
 export const LIMITE_HASHTAGS_SEMANA = 30;
 export const JANELA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;

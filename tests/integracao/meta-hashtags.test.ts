@@ -276,10 +276,10 @@ describe("rodarMetaHashtags", () => {
     expect(linhas).toHaveLength(0);
   });
 
-  it("com nichoId, roda so para aquele nicho e so ate 8 termos", async () => {
+  it("com nichoId, roda so para aquele nicho e so ate 10 termos", async () => {
     await db()
       .update(nichos)
-      .set({ termos: Array.from({ length: 10 }, (_, i) => `termo-${i}`) })
+      .set({ termos: Array.from({ length: 12 }, (_, i) => `termo-${i}`) })
       .where(eq(nichos.id, nichoId));
 
     vi.mocked(buscarIdDaHashtag).mockResolvedValue("hashtag-x");
@@ -287,7 +287,7 @@ describe("rodarMetaHashtags", () => {
 
     await rodarMetaHashtags(nichoId);
 
-    expect(buscarIdDaHashtag).toHaveBeenCalledTimes(8);
+    expect(buscarIdDaHashtag).toHaveBeenCalledTimes(10);
 
     await db().update(nichos).set({ termos: ["limpeza"] }).where(eq(nichos.id, nichoId));
   });

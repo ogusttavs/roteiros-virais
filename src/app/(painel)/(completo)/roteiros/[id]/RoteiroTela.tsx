@@ -450,9 +450,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => alternarMotivo(motivo.id)}
-                className={[chipStyles.chip, ativo ? chipStyles.ativo : "", styles.chipToqueGrande]
-                  .filter(Boolean)
-                  .join(" ")}
+                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""].filter(Boolean).join(" ")}
               >
                 {motivo.rotulo}
               </button>
