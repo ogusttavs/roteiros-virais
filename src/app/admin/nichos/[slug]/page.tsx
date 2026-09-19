@@ -212,8 +212,10 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
                     <td className={styles.mono}>
                       {conta.ultimaLeituraMetaEm ? formatarData(conta.ultimaLeituraMetaEm) : t.naoAplicavel}
                     </td>
-                    <td className={conta.avisoColeta ? styles.aviso : undefined}>
-                      {conta.avisoColeta ?? t.semDado}
+                    <td className={conta.avisoColeta || conta.contaIndisponivelNaMeta ? styles.aviso : undefined}>
+                      {conta.contaIndisponivelNaMeta
+                        ? t.avisoContaIndisponivelNaMeta
+                        : (conta.avisoColeta ?? t.semDado)}
                     </td>
                   </tr>
                 ))}

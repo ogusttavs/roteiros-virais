@@ -94,6 +94,27 @@ describe("listarContasVigiadas", () => {
       await db().delete(contas).where(eq(contas.nichoId, nichoId));
     }
   });
+
+  /** Preparação da viagem, item 4: painel avisa quando a Meta não lê a conta. */
+  it("contaIndisponivelNaMeta e true so para instagram com api_indisponivel_em gravado", async () => {
+    await db()
+      .insert(contas)
+      .values([
+        { plataforma: "instagram", handle: "ig-indisponivel-item4", nichoId, vigiada: true, apiIndisponivelEm: new Date() },
+        { plataforma: "instagram", handle: "ig-disponivel-item4", nichoId, vigiada: true },
+        { plataforma: "youtube", handle: "yt-item4", nichoId, vigiada: true },
+      ]);
+    try {
+      const resultado = await listarContasVigiadas(nichoId);
+      const porHandle = new Map(resultado.map((c) => [c.handle, c]));
+
+      expect(porHandle.get("ig-indisponivel-item4")?.contaIndisponivelNaMeta).toBe(true);
+      expect(porHandle.get("ig-disponivel-item4")?.contaIndisponivelNaMeta).toBe(false);
+      expect(porHandle.get("yt-item4")?.contaIndisponivelNaMeta).toBe(false);
+    } finally {
+      await db().delete(contas).where(eq(contas.nichoId, nichoId));
+    }
+  });
 });
 
 describe("statusMetaApi", () => {
