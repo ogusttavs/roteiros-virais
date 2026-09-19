@@ -50,18 +50,24 @@ let nichoId: number;
 async function criarVideo(
   idExterno: string,
   opcoes: {
+    plataforma?: "youtube" | "tiktok" | "instagram";
     foraDaCurva?: number;
     publicadoEm: Date;
     transcricao?: string;
     duracaoS?: number;
     analise?: unknown;
     analiseVisual?: unknown;
+    /** V2a, item 3: endereco de midia direto da Meta, e quando foi lido. */
+    midiaUrl?: string;
+    midiaUrlEm?: Date;
+    /** Ajuste 1 da revisao do PR #45: `atualizadoEm` antigo, para provar que a analise visual nao o move (e da coleta). */
+    atualizadoEm?: Date;
   },
 ) {
   const [v] = await db()
     .insert(videos)
     .values({
-      plataforma: "youtube",
+      plataforma: opcoes.plataforma ?? "youtube",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
@@ -73,6 +79,9 @@ async function criarVideo(
       duracaoS: opcoes.duracaoS,
       analise: opcoes.analise as never,
       analiseVisual: opcoes.analiseVisual as never,
+      midiaUrl: opcoes.midiaUrl,
+      midiaUrlEm: opcoes.midiaUrlEm,
+      atualizadoEm: opcoes.atualizadoEm,
     })
     .returning();
   return v;
@@ -104,12 +113,14 @@ afterEach(async () => {
 
 describe("rodarAnalisarVisual", () => {
   it("analisa o video candidato e grava analise_visual", async () => {
+    const atualizadoAntes = diasAtras(5);
     const v = await criarVideo("candidato-ok", {
       foraDaCurva: 5,
       publicadoEm: diasAtras(2),
       transcricao: "falou sobre o produto principal",
       duracaoS: 40,
       analise: ANALISE_PADRAO,
+      atualizadoEm: atualizadoAntes,
     });
 
     const resumo = await rodarAnalisarVisual();
@@ -121,6 +132,10 @@ describe("rodarAnalisarVisual", () => {
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "candidato-ok"));
     expect(linha.analiseVisual).not.toBeNull();
     expect(linha.analiseVisual!.ritmoDeCorte).toBeTruthy();
+    // Ajuste 1 da revisao do PR #45: o momento da leitura vai em `analiseVisualEm`; `atualizadoEm` e da coleta.
+    expect(linha.analiseVisualEm).not.toBeNull();
+    expect(Date.now() - linha.analiseVisualEm!.getTime()).toBeLessThan(60_000);
+    expect(linha.atualizadoEm.getTime()).toBe(atualizadoAntes.getTime());
   });
 
   it("video sem transcricao ou que ja tem analise visual nao entra no candidato", async () => {
@@ -187,7 +202,12 @@ describe("rodarAnalisarVisual", () => {
 
     const [linhaBoa] = await db().select().from(videos).where(eq(videos.idExterno, "ok-depois-da-falha"));
     expect(linhaBoa.analiseVisual).not.toBeNull();
+    expect(linhaBoa.analiseVisualEm).not.toBeNull();
     expect(linhaBoa.id).toBe(bom.id);
+
+    const [linhaFalha] = await db().select().from(videos).where(eq(videos.idExterno, "falha-download"));
+    expect(linhaFalha.analiseVisual).toBeNull();
+    expect(linhaFalha.analiseVisualEm).toBeNull();
   });
 
   it("video sem duracao conhecida (Meta nao devolve isso, transcricao do YouTube rodada 2 item 3b): baixa, le a duracao com ffprobe e grava na coluna", async () => {
@@ -282,5 +302,47 @@ describe("rodarAnalisarVisual", () => {
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
     expect(baixarVideo480p).toHaveBeenCalledWith(v.url);
+  });
+});
+
+/** V2a, item 3: Instagram com endereco de midia fresco baixa direto, sem a url da pagina. */
+describe("rodarAnalisarVisual, V2a item 3: instagram pela media direta", () => {
+  const HORA_MS = 60 * 60 * 1000;
+
+  it("com midiaUrl lida ha menos de 20h, baixa pelo endereco de midia, nao pela url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-fresco.mp4";
+    await criarVideo("visual-insta-fresco", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 1 * HORA_MS),
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith(midiaUrl);
+  });
+
+  it("com midiaUrl lida ha mais de 20h (vencida), ignora e usa a url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-vencido.mp4";
+    await criarVideo("visual-insta-vencido", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 21 * HORA_MS),
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith("https://exemplo.invalido/visual-insta-vencido");
+    expect(baixarVideo480p).not.toHaveBeenCalledWith(midiaUrl);
   });
 });

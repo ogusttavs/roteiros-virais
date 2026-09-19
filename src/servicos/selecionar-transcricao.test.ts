@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { selecionarParaTranscrever, type VideoParaSelecionar } from "./selecionar-transcricao";
+import { limitarPorConta, selecionarParaTranscrever, type VideoParaSelecionar } from "./selecionar-transcricao";
 
 const AGORA = new Date("2026-09-03T12:00:00Z");
 
 function candidato(id: number, opcoes: Partial<VideoParaSelecionar> = {}): VideoParaSelecionar {
-  return { id, temTranscricao: false, proximaTentativaTranscricao: null, ...opcoes };
+  return { id, contaId: null, temTranscricao: false, proximaTentativaTranscricao: null, ...opcoes };
 }
 
 describe("selecionarParaTranscrever", () => {
@@ -52,5 +52,62 @@ describe("selecionarParaTranscrever", () => {
 
   it("sem candidato nenhum, devolve lista vazia", () => {
     expect(selecionarParaTranscrever([], [], [], 10, AGORA)).toEqual([]);
+  });
+
+  /** V2a, item 2: nunca mais de 2 vídeos da mesma conta na fila final. */
+  it("no maximo 2 videos da mesma conta, os de maior prioridade ficam", () => {
+    const candidatos = [
+      candidato(1, { contaId: 100 }),
+      candidato(2, { contaId: 100 }),
+      candidato(3, { contaId: 100 }),
+      candidato(4, { contaId: 200 }),
+    ];
+    const selecionados = selecionarParaTranscrever([1, 2, 3, 4], [], candidatos, 10, AGORA);
+    expect(selecionados).toEqual([1, 2, 4]);
+  });
+
+  it("video sem dono (contaId nulo) nunca entra no teto por conta, mesmo em quantidade", () => {
+    const candidatos = [
+      candidato(1, { contaId: null }),
+      candidato(2, { contaId: null }),
+      candidato(3, { contaId: null }),
+    ];
+    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA);
+    expect(selecionados).toEqual([1, 2, 3]);
+  });
+});
+
+describe("limitarPorConta", () => {
+  it("corta na terceira aparicao da mesma conta, mantendo as duas primeiras", () => {
+    const contaPorId = new Map([
+      [1, 10],
+      [2, 10],
+      [3, 10],
+      [4, 20],
+    ]);
+    expect(limitarPorConta([1, 2, 3, 4], contaPorId, 2)).toEqual([1, 2, 4]);
+  });
+
+  it("video sem dono (contaId nulo no mapa, ou ausente) nunca e cortado", () => {
+    const contaPorId = new Map<number, number | null>([[1, null]]);
+    expect(limitarPorConta([1, 2, 3], contaPorId, 1)).toEqual([1, 2, 3]);
+  });
+
+  it("respeita a ordem de prioridade da lista de entrada, nao reordena", () => {
+    const contaPorId = new Map([
+      [5, 10],
+      [1, 10],
+      [3, 10],
+    ]);
+    expect(limitarPorConta([5, 1, 3], contaPorId, 2)).toEqual([5, 1]);
+  });
+
+  it("maxPorConta zero nunca deixa passar conta nenhuma com dono", () => {
+    const contaPorId = new Map([[1, 10]]);
+    expect(limitarPorConta([1], contaPorId, 0)).toEqual([]);
+  });
+
+  it("lista vazia devolve lista vazia", () => {
+    expect(limitarPorConta([], new Map(), 2)).toEqual([]);
   });
 });
