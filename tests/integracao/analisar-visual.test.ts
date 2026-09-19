@@ -60,6 +60,8 @@ async function criarVideo(
     /** V2a, item 3: endereco de midia direto da Meta, e quando foi lido. */
     midiaUrl?: string;
     midiaUrlEm?: Date;
+    /** Ajuste 1 da revisao do PR #45: `atualizadoEm` antigo, para provar que a analise visual nao o move (e da coleta). */
+    atualizadoEm?: Date;
   },
 ) {
   const [v] = await db()
@@ -79,6 +81,7 @@ async function criarVideo(
       analiseVisual: opcoes.analiseVisual as never,
       midiaUrl: opcoes.midiaUrl,
       midiaUrlEm: opcoes.midiaUrlEm,
+      atualizadoEm: opcoes.atualizadoEm,
     })
     .returning();
   return v;
@@ -110,12 +113,14 @@ afterEach(async () => {
 
 describe("rodarAnalisarVisual", () => {
   it("analisa o video candidato e grava analise_visual", async () => {
+    const atualizadoAntes = diasAtras(5);
     const v = await criarVideo("candidato-ok", {
       foraDaCurva: 5,
       publicadoEm: diasAtras(2),
       transcricao: "falou sobre o produto principal",
       duracaoS: 40,
       analise: ANALISE_PADRAO,
+      atualizadoEm: atualizadoAntes,
     });
 
     const resumo = await rodarAnalisarVisual();
@@ -127,6 +132,10 @@ describe("rodarAnalisarVisual", () => {
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "candidato-ok"));
     expect(linha.analiseVisual).not.toBeNull();
     expect(linha.analiseVisual!.ritmoDeCorte).toBeTruthy();
+    // Ajuste 1 da revisao do PR #45: o momento da leitura vai em `analiseVisualEm`; `atualizadoEm` e da coleta.
+    expect(linha.analiseVisualEm).not.toBeNull();
+    expect(Date.now() - linha.analiseVisualEm!.getTime()).toBeLessThan(60_000);
+    expect(linha.atualizadoEm.getTime()).toBe(atualizadoAntes.getTime());
   });
 
   it("video sem transcricao ou que ja tem analise visual nao entra no candidato", async () => {
@@ -193,7 +202,12 @@ describe("rodarAnalisarVisual", () => {
 
     const [linhaBoa] = await db().select().from(videos).where(eq(videos.idExterno, "ok-depois-da-falha"));
     expect(linhaBoa.analiseVisual).not.toBeNull();
+    expect(linhaBoa.analiseVisualEm).not.toBeNull();
     expect(linhaBoa.id).toBe(bom.id);
+
+    const [linhaFalha] = await db().select().from(videos).where(eq(videos.idExterno, "falha-download"));
+    expect(linhaFalha.analiseVisual).toBeNull();
+    expect(linhaFalha.analiseVisualEm).toBeNull();
   });
 
   it("video sem duracao conhecida (Meta nao devolve isso, transcricao do YouTube rodada 2 item 3b): baixa, le a duracao com ffprobe e grava na coluna", async () => {

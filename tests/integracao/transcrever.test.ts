@@ -64,6 +64,8 @@ async function criarVideo(
     /** V2a, item 3: endereco de midia direto da Meta, e quando foi lido. */
     midiaUrl?: string;
     midiaUrlEm?: Date;
+    /** Ajuste 1 da revisao do PR #45: `atualizadoEm` antigo, para provar que a transcricao nao o move (e da coleta). */
+    atualizadoEm?: Date;
   },
 ) {
   const [v] = await db()
@@ -84,6 +86,7 @@ async function criarVideo(
       duracaoS: opcoes.duracaoS,
       midiaUrl: opcoes.midiaUrl,
       midiaUrlEm: opcoes.midiaUrlEm,
+      atualizadoEm: opcoes.atualizadoEm,
     })
     .returning();
   return v;
@@ -126,7 +129,12 @@ afterEach(async () => {
 
 describe("rodarTranscrever", () => {
   it("video do YouTube com legenda disponivel grava a legenda, sem chamar audio nem Groq", async () => {
-    await criarVideo("yt-com-legenda", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    const atualizadoAntes = diasAtras(5);
+    await criarVideo("yt-com-legenda", {
+      velocidadeRelativa: 3,
+      publicadoEm: diasAtras(3),
+      atualizadoEm: atualizadoAntes,
+    });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
 
     const resumo = await rodarTranscrever();
@@ -136,10 +144,20 @@ describe("rodarTranscrever", () => {
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-com-legenda"));
     expect(linha.transcricao).toBe(LEGENDA_LONGA);
+    // Ajuste 1 da revisao do PR #45: o momento da leitura vai em `transcritoEm`; `atualizadoEm` e da coleta.
+    expect(linha.transcritoEm).not.toBeNull();
+    expect(Date.now() - linha.transcritoEm!.getTime()).toBeLessThan(60_000);
+    expect(linha.atualizadoEm.getTime()).toBe(atualizadoAntes.getTime());
   });
 
   it("video do YouTube sem legenda cai para audio mais Groq, e o resumo acumula o custo", async () => {
-    await criarVideo("yt-sem-legenda", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), duracaoS: 600 });
+    const atualizadoAntes = diasAtras(5);
+    await criarVideo("yt-sem-legenda", {
+      velocidadeRelativa: 3,
+      publicadoEm: diasAtras(3),
+      duracaoS: 600,
+      atualizadoEm: atualizadoAntes,
+    });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
     vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
@@ -152,6 +170,9 @@ describe("rodarTranscrever", () => {
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-legenda"));
     expect(linha.transcricao).toBe("texto transcrito pela groq");
+    expect(linha.transcritoEm).not.toBeNull();
+    expect(Date.now() - linha.transcritoEm!.getTime()).toBeLessThan(60_000);
+    expect(linha.atualizadoEm.getTime()).toBe(atualizadoAntes.getTime());
   });
 
   it("legenda curta demais e tratada como sem legenda e cai para audio mais Groq", async () => {
@@ -183,6 +204,7 @@ describe("rodarTranscrever", () => {
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-falha"));
     expect(linha.transcricao).toBeNull();
+    expect(linha.transcritoEm).toBeNull();
     expect(linha.proximaTentativaTranscricao).not.toBeNull();
     const emSeteDias = Date.now() + 6 * DIA_MS;
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);

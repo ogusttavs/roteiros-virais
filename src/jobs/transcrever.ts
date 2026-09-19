@@ -29,10 +29,13 @@
  * (`urlParaBaixar`, em `candidatosDoNicho`); a pausa entre chamadas do
  * YouTube continua olhando a `url` de verdade, nunca `urlParaBaixar`.
  *
- * V2a, item 5: os dois updates de sucesso passam a gravar `atualizadoEm`
- * junto com `transcricao` (antes só a coleta tocava essa coluna, em
- * `upsertVideo`); é o sinal que `resumoLeituraPorPlataforma`
- * (`admin-coleta.ts`) usa para "lidos hoje" em `/admin/nichos/[slug]`.
+ * V2a, item 5 (corrigido no ajuste 1 da revisão do PR #45): os dois updates
+ * de sucesso gravam `transcritoEm` junto com `transcricao`; é o sinal que
+ * `resumoLeituraPorPlataforma` (`admin-coleta.ts`) usa para "lidos hoje" em
+ * `/admin/nichos/[slug]`. Primeiro foi `atualizadoEm`, mas `upsertVideo`
+ * grava essa coluna em toda recoleta, e a linha do admin acabava medindo a
+ * coleta, não a leitura (77 "transcritos hoje" contra 8 de verdade).
+ * `atualizadoEm` volta a ser só da coleta.
  */
 import { eq, inArray } from "drizzle-orm";
 
@@ -185,7 +188,7 @@ async function transcreverUm(
   if (plataforma === "youtube") {
     const legenda = await baixarLegendaYoutube(url);
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
-      await db().update(videos).set({ transcricao: legenda, atualizadoEm: new Date() }).where(eq(videos.id, videoId));
+      await db().update(videos).set({ transcricao: legenda, transcritoEm: new Date() }).where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
   }
@@ -198,7 +201,7 @@ async function transcreverUm(
   try {
     caminhoAudio = await baixarAudio(url);
     const texto = await transcreverAudio(caminhoAudio);
-    await db().update(videos).set({ transcricao: texto, atualizadoEm: new Date() }).where(eq(videos.id, videoId));
+    await db().update(videos).set({ transcricao: texto, transcritoEm: new Date() }).where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {

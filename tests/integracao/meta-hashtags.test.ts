@@ -135,6 +135,8 @@ describe("rodarMetaHashtags", () => {
     expect(videoBrasil.semDono).toBe(true);
     expect(videoBrasil.origem).toBe("meta");
     expect(videoBrasil.transcricao).toBe("[exemplo] transcricao fake");
+    // Ajuste 1 da revisao do PR #45: transcricao de verdade tambem marca o momento da leitura.
+    expect(videoBrasil.transcritoEm).not.toBeNull();
 
     const videoIngles = await db().select().from(videos).where(eq(videos.idExterno, "ExemploIngles01"));
     expect(videoIngles).toHaveLength(0);

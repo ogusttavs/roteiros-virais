@@ -373,12 +373,16 @@ export type ResumoLeituraPlataforma = {
 /**
  * "lidos hoje" / "últimos 7 dias" por plataforma, para `/admin/nichos/[slug]`
  * (V2a, item 5: a conferência enxerga). "Transcrito" e "analisado" contam
- * pela coluna já preenchida (`transcricao`, `analiseVisual`) mais
- * `atualizadoEm` recente, que os dois jobs agora gravam junto com o
- * resultado (`transcrever.ts`, `analisar-visual.ts`); sem isso não havia
- * como saber quando a leitura aconteceu, só que aconteceu. "Hoje" e "7
- * dias" são janelas corridas (últimas 24h, últimos 7×24h), mesmo padrão de
- * `diasAtras` usado no resto deste arquivo. Sempre as três plataformas,
+ * pelas colunas que registram o momento da leitura (`transcritoEm`,
+ * `analiseVisualEm`), gravadas só por quem lê de verdade (`transcrever.ts`,
+ * `meta-hashtags.ts`, `analisar-visual.ts`). Ajuste 1 da revisão do PR #45:
+ * antes contava por `atualizadoEm`, que `upsertVideo` grava em toda
+ * recoleta, e a linha medía a coleta (77 "transcritos hoje" contra 8
+ * transcrições de verdade, medido em produção em 19/09). O que já existia
+ * antes da migração 0023 fica com as colunas nulas e nunca entra aqui: não
+ * há como saber quando foi lido, a linha conta a partir do deploy. "Hoje" e
+ * "7 dias" são janelas corridas (últimas 24h, últimos 7×24h), mesmo padrão
+ * de `diasAtras` usado no resto deste arquivo. Sempre as três plataformas,
  * mesmo com zero vídeo.
  */
 export async function resumoLeituraPorPlataforma(nichoId: number): Promise<ResumoLeituraPlataforma[]> {
@@ -388,10 +392,10 @@ export async function resumoLeituraPorPlataforma(nichoId: number): Promise<Resum
   const linhas = await db()
     .select({
       plataforma: videos.plataforma,
-      transcritosHoje: sql<number>`count(*) filter (where ${videos.transcricao} is not null and ${videos.atualizadoEm} >= ${desde1Dia})`,
-      analisadosHoje: sql<number>`count(*) filter (where ${videos.analiseVisual} is not null and ${videos.atualizadoEm} >= ${desde1Dia})`,
-      transcritosUltimos7Dias: sql<number>`count(*) filter (where ${videos.transcricao} is not null and ${videos.atualizadoEm} >= ${desde7Dias})`,
-      analisadosUltimos7Dias: sql<number>`count(*) filter (where ${videos.analiseVisual} is not null and ${videos.atualizadoEm} >= ${desde7Dias})`,
+      transcritosHoje: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde1Dia})`,
+      analisadosHoje: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde1Dia})`,
+      transcritosUltimos7Dias: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde7Dias})`,
+      analisadosUltimos7Dias: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde7Dias})`,
     })
     .from(videos)
     .where(eq(videos.nichoId, nichoId))

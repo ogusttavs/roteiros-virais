@@ -429,6 +429,18 @@ export const videos = pgTable(
      */
     midiaUrl: text("midia_url"),
     midiaUrlEm: timestamp("midia_url_em", { withTimezone: true }),
+    /**
+     * Quando a leitura de verdade aconteceu (ajuste 1 da revisão do PR #45,
+     * V2a): `transcrever` (e o `meta-hashtags`, que transcreve na hora) grava
+     * `transcritoEm` no sucesso, `analisar-visual` grava `analiseVisualEm`.
+     * `atualizadoEm` não serve para isso: `upsertVideo` grava em toda
+     * recoleta, e a coleta recolhe mais de mil vídeos por dia (medido em
+     * produção em 19/09: 77 "transcritos hoje" contra 8 transcrições de
+     * verdade). `upsertVideo` nunca toca nestas duas. Nulas para tudo que
+     * já existia antes da migração 0023: não há como saber quando foi lido.
+     */
+    transcritoEm: timestamp("transcrito_em", { withTimezone: true }),
+    analiseVisualEm: timestamp("analise_visual_em", { withTimezone: true }),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
