@@ -160,4 +160,32 @@ describe("rodarVigilancia", () => {
     await db().delete(contas).where(eq(contas.nichoId, nichoPontuar.id));
     await db().delete(nichos).where(eq(nichos.id, nichoPontuar.id));
   }, 30_000);
+
+  /**
+   * Preparação da viagem, item 2: sem o Apify, a semente é a única entrada
+   * de conta do Instagram num nicho novo; antes desta correção, uma
+   * semente recém colada (zero vídeo) perdia o `vigiada` na primeira
+   * rodada de `rodarVigilancia` e nunca mais era lida.
+   */
+  it("semente (origem curadoria) sem nenhum video continua vigiada; conta comum sem 8 videos continua perdendo", async () => {
+    const [semente] = await db()
+      .insert(contas)
+      .values({ plataforma: "instagram", handle: "semente-sem-video", nichoId, vigiada: true, origem: "curadoria" })
+      .returning({ id: contas.id });
+
+    const comumPoucosVideos = await criarConta("comum-poucos-videos-item2", 0.9);
+    await criarVideos(comumPoucosVideos, 3);
+    await db().update(contas).set({ vigiada: true }).where(eq(contas.id, comumPoucosVideos));
+
+    await rodarVigilancia();
+
+    const [contaSemente] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, semente.id));
+    expect(contaSemente.vigiada).toBe(true);
+
+    const [contaComum] = await db()
+      .select({ vigiada: contas.vigiada })
+      .from(contas)
+      .where(eq(contas.id, comumPoucosVideos));
+    expect(contaComum.vigiada).toBe(false);
+  });
 });

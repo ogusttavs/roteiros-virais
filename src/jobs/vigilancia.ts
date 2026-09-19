@@ -12,6 +12,12 @@
  * desenvolvimento"), aqui a exclusão de conta de seed vale mesmo em
  * desenvolvimento: marcar uma conta fictícia como vigiada faria os jobs de
  * coleta tentarem raspar um perfil que não existe de verdade.
+ *
+ * Conta semente (`origem = 'curadoria'`, preparação da viagem, item 2) é
+ * diferente de conta de seed: é real, só entrou pelo admin em vez de
+ * descoberta pelo motor. Fica sempre `vigiada = true`, nunca disputa o
+ * ranking nem o teto de `vigilanciaPorNicho`: é escolha de gente, não
+ * mérito por taxa fora da curva.
  */
 import { sql } from "drizzle-orm";
 
@@ -21,7 +27,17 @@ import { config } from "@/lib/config";
 const MINIMO_VIDEOS_VIGILANCIA = 8;
 
 export async function rodarVigilancia(): Promise<Record<string, unknown>> {
-  const reset = await db().execute(sql`UPDATE contas SET vigiada = false`);
+  /**
+   * Conta semente (`origem = 'curadoria'`) fica sempre vigiada, nunca
+   * resetada nem competindo pelo teto do ranking (preparação da viagem,
+   * item 2): sem o Apify, a semente é a única entrada de conta do
+   * Instagram num nicho novo, e uma semente recém colada (zero vídeo) ou
+   * de conta que posta pouco perdia o `vigiada` na madrugada seguinte e
+   * nunca mais era lida. O reset e o ranking abaixo valem só para as
+   * outras contas.
+   */
+  const reset = await db().execute(sql`UPDATE contas SET vigiada = false WHERE origem <> 'curadoria'`);
+  await db().execute(sql`UPDATE contas SET vigiada = true WHERE origem = 'curadoria'`);
 
   const marcadas = await db().execute(sql`
     WITH candidatas AS (
@@ -40,6 +56,8 @@ export async function rodarVigilancia(): Promise<Record<string, unknown>> {
         ) AS posicao
       FROM contas c
       JOIN candidatas cd ON cd.conta_id = c.id
+      -- Semente nunca conta no teto de 50 por nicho e plataforma (item 2): e escolha de gente, o ranking e da maquina.
+      WHERE c.origem <> 'curadoria'
     )
     UPDATE contas c
     SET vigiada = true
