@@ -29,9 +29,12 @@ sem ele, o YouTube volta a bloquear com "Sign in to confirm you're not a bot".
 `yt-dlp` no worker (V2a, item 4, 19/09/2026): instalado por `pip install "yt-dlp[default,curl-cffi]==<versao>"`,
 nao mais o zipapp baixado do release. So por pip o yt-dlp consegue fazer impersonation de
 navegador (extra `curl-cffi`), que o TikTok exige; o zipapp Unix nunca teve esse extra
-disponivel, versao nenhuma (README do yt-dlp). O pip instala o script em
-`/usr/local/bin/yt-dlp`, o mesmo caminho de antes, entao o plugin do provedor de PO Token
-(pasta `yt-dlp-plugins` do lado do executavel) continua igual.
+disponivel, versao nenhuma (README do yt-dlp). Isso muda onde o plugin do provedor de PO
+Token precisa ficar: o yt-dlp acha a pasta `yt-dlp-plugins` pelo diretorio do pacote Python
+(`get_executable_path()`, achado do ensaio desta rodada: o primeiro build passou mas o
+provedor sumiu da lista "PO Token Providers"), nao mais pelo diretorio do script em
+`/usr/local/bin`; `Dockerfile.worker` calcula o caminho certo chamando essa mesma funcao em
+build, em vez de supor o caminho fixo.
 
 ## Primeiro deploy (uma vez)
 

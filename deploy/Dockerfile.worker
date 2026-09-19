@@ -33,15 +33,22 @@
 # Plugin do provedor de PO Token (transcricao do YouTube, rodada 2, item 1,
 # github.com/Brainicism/bgutil-ytdlp-pot-provider, versao fixa como o resto):
 # entra pelo metodo "Executable location" do proprio README do yt-dlp
-# ("Installing Plugins"), uma pasta `yt-dlp-plugins` do lado do executavel.
-# Continua valendo com yt-dlp por pip (conferido buildando esta imagem,
-# 19/09/2026): o pip instala o script em `/usr/local/bin/yt-dlp`, o mesmo
-# caminho de antes, entao `/usr/local/bin/yt-dlp-plugins/` e o "executable
-# location" certo sem mudar nada nessa parte. O `.zip` do release tem
-# `yt_dlp_plugins/` na propria raiz (conferido em 10/09/2026, `unzip -l` no
-# zip baixado), que e a forma que o README do yt-dlp descreve como aceita
-# direto, sem descompactar. O servidor do provedor (a outra metade) roda a
-# parte, como o servico `roteiros-pot` do Compose.
+# ("Installing Plugins"), uma pasta `yt-dlp-plugins` do lado da "localizacao
+# do executavel". Isso MUDOU de lugar com yt-dlp por pip (achado do ensaio
+# desta rodada, 19/09/2026: o primeiro build passou, mas o provedor sumiu
+# da lista "PO Token Providers"): o `get_executable_path()` do proprio
+# yt-dlp (`yt_dlp/plugins.py`, `yt_dlp/utils/_utils.py`), que decide onde
+# procurar plugins, olha o diretorio do pacote Python (`dist-packages`),
+# nao o script wrapper que o pip cria em `/usr/local/bin/yt-dlp`; o zipapp
+# antigo nao tinha essa distincao, o binario e o "pacote" eram a mesma
+# coisa. A pasta correta agora e calculada em build, chamando a mesma
+# funcao que o yt-dlp usa em runtime, em vez de supor o caminho (evita
+# quebrar nesta mesma armadilha nunca mais, mesmo que a versao do Python
+# do node:24-slim mude). O `.zip` do release tem `yt_dlp_plugins/` na
+# propria raiz (conferido em 10/09/2026, `unzip -l` no zip baixado), que e
+# a forma que o README do yt-dlp descreve como aceita direto, sem
+# descompactar. O servidor do provedor (a outra metade) roda a parte, como
+# o servico `roteiros-pot` do Compose.
 FROM node:24-slim
 
 ARG YT_DLP_VERSION=2026.08.19
@@ -57,8 +64,9 @@ RUN apt-get update \
   && unzip -q /tmp/deno-x86_64-unknown-linux-gnu.zip -d /usr/local/bin \
   && chmod a+rx /usr/local/bin/deno \
   && rm -f /tmp/deno-x86_64-unknown-linux-gnu.zip /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
-  && mkdir -p /usr/local/bin/yt-dlp-plugins \
-  && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o /usr/local/bin/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
+  && PLUGIN_ROOT=$(python3 -c "from yt_dlp.utils import get_executable_path; print(get_executable_path())") \
+  && mkdir -p "$PLUGIN_ROOT/yt-dlp-plugins" \
+  && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o "$PLUGIN_ROOT/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip" \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
