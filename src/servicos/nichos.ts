@@ -7,6 +7,9 @@ import { and, count, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contas, nichos, type Conta, type Nicho, type Plataforma } from "@/db/schema";
+import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 /** Nome com mensagem para a tela (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroNicho extends Error {}
@@ -161,7 +164,8 @@ export function analisarUrlPerfil(bruta: string): { plataforma: Plataforma; hand
  * todas antes de gravar qualquer uma (nada gravado pela metade); numa
  * transacao pelo mesmo motivo. Conta que ja existe (mesma plataforma e
  * handle, de uma coleta anterior) so passa a `vigiada = true`, sem
- * duplicar linha.
+ * duplicar linha. Depois de gravar, enfileira a leitura do mesmo dia
+ * (item 3, `enfileirarLeituraDoDia`).
  */
 export async function adicionarContasSemente(nichoId: number, urlsBruto: string): Promise<Conta[]> {
   const linhas = [...new Set(urlsBruto.split("\n").map((l) => l.trim()).filter(Boolean))];
@@ -185,8 +189,8 @@ export async function adicionarContasSemente(nichoId: number, urlsBruto: string)
     );
   }
 
-  return db().transaction(async (tx) => {
-    const contasCriadas: Conta[] = [];
+  const contasCriadas = await db().transaction(async (tx) => {
+    const criadas: Conta[] = [];
     for (const { resultado } of analisadas) {
       const { plataforma, handle } = resultado!;
       const [conta] = await tx
@@ -197,8 +201,39 @@ export async function adicionarContasSemente(nichoId: number, urlsBruto: string)
           set: { vigiada: true, atualizadoEm: new Date() },
         })
         .returning();
-      contasCriadas.push(conta);
+      criadas.push(conta);
     }
-    return contasCriadas;
+    return criadas;
   });
+
+  await enfileirarLeituraDoDia(nichoId, contasCriadas);
+
+  return contasCriadas;
+}
+
+/**
+ * A semente é lida no mesmo dia (preparação da viagem, item 3): sem isso,
+ * o cliente só veria vídeo da conta que acabou de colar na coleta de
+ * madrugada do dia seguinte. Só enfileira o job que a fila ainda não tem
+ * pendente para este nicho (`existeJobPendente`, a mesma checagem da rota
+ * `POST /api/jobs/[nome]`); a fila fora do ar nunca derruba a ação de
+ * adicionar conta semente, só fica registrado no log (mesmo raciocínio do
+ * item 6 do acabamento da E27).
+ */
+async function enfileirarLeituraDoDia(nichoId: number, contasCriadas: Conta[]): Promise<void> {
+  const plataformas = new Set(contasCriadas.map((c) => c.plataforma));
+  const filas: string[] = [];
+  if (plataformas.has("instagram") && config.coleta.metaAtivo) filas.push(FILAS.metaContas);
+  if (plataformas.has("youtube")) filas.push(FILAS.coletaYoutube);
+  if (filas.length === 0) return;
+
+  try {
+    await garantirBossPronto();
+    for (const fila of filas) {
+      if (await existeJobPendente(fila, nichoId)) continue;
+      await boss().send(fila, { nichoId });
+    }
+  } catch (erro) {
+    logger.error({ err: erro, nichoId }, "nao foi possivel enfileirar a leitura do mesmo dia das contas semente");
+  }
 }

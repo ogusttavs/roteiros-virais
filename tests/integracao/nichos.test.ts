@@ -4,11 +4,13 @@
  * criterio de aceite: "teste de integracao de criar, editar, desativar e da
  * conta semente virar vigiada").
  */
-import { and, eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { and, eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos } from "@/db/schema";
+import { FILAS } from "@/jobs/fila";
+import { config } from "@/lib/config";
 import {
   adicionarContasSemente,
   alternarAtivoNicho,
@@ -188,5 +190,65 @@ describe("adicionarContasSemente", () => {
   it("recusa sem nenhuma URL", async () => {
     const nicho = await criarNicho({ nome: "Nicho sem url", termosBruto: TERMOS_VALIDOS });
     await expect(adicionarContasSemente(nicho.id, "   \n  ")).rejects.toThrow(ErroNicho);
+  });
+});
+
+/** Preparação da viagem, item 3: "a semente é lida no mesmo dia". */
+describe("adicionarContasSemente: leitura do mesmo dia", () => {
+  const metaAtivoOriginal = config.coleta.metaAtivo;
+
+  afterEach(() => {
+    config.coleta.metaAtivo = metaAtivoOriginal;
+  });
+
+  async function jobPendente(nome: string, nichoId: number): Promise<number> {
+    const resultado = await db().execute(sql`
+      select id from pgboss.job where name = ${nome} and (data ->> 'nichoId')::int = ${nichoId}
+    `);
+    return resultado.rows.length;
+  }
+
+  it("com metaAtivo, enfileira meta-contas (instagram) e coleta-youtube (youtube), escopados ao nicho", async () => {
+    config.coleta.metaAtivo = true;
+    const nicho = await criarNicho({ nome: "Nicho leitura mesmo dia", termosBruto: TERMOS_VALIDOS });
+
+    await adicionarContasSemente(
+      nicho.id,
+      "https://www.youtube.com/@leituramesmodia\nhttps://www.instagram.com/leituramesmodia/",
+    );
+
+    expect(await jobPendente(FILAS.coletaYoutube, nicho.id)).toBe(1);
+    expect(await jobPendente(FILAS.metaContas, nicho.id)).toBe(1);
+  });
+
+  it("sem metaAtivo, so enfileira coleta-youtube; nunca meta-contas (o Instagram continua pelo Apify)", async () => {
+    config.coleta.metaAtivo = false;
+    const nicho = await criarNicho({ nome: "Nicho sem meta ativo", termosBruto: TERMOS_VALIDOS });
+
+    await adicionarContasSemente(
+      nicho.id,
+      "https://www.youtube.com/@semmetaativo\nhttps://www.instagram.com/semmetaativo/",
+    );
+
+    expect(await jobPendente(FILAS.coletaYoutube, nicho.id)).toBe(1);
+    expect(await jobPendente(FILAS.metaContas, nicho.id)).toBe(0);
+  });
+
+  it("nao duplica: duas chamadas seguidas deixam so um job pendente por fila e nicho (existeJobPendente)", async () => {
+    const nicho = await criarNicho({ nome: "Nicho nao duplica leitura", termosBruto: TERMOS_VALIDOS });
+
+    await adicionarContasSemente(nicho.id, "https://www.youtube.com/@primeiracolada");
+    await adicionarContasSemente(nicho.id, "https://www.youtube.com/@segundacolada");
+
+    expect(await jobPendente(FILAS.coletaYoutube, nicho.id)).toBe(1);
+  });
+
+  it("so tiktok: nenhuma fila de leitura do mesmo dia enfileirada (o Apify esta suspenso, sem job proprio aqui)", async () => {
+    const nicho = await criarNicho({ nome: "Nicho so tiktok", termosBruto: TERMOS_VALIDOS });
+
+    await adicionarContasSemente(nicho.id, "https://www.tiktok.com/@sotiktok");
+
+    expect(await jobPendente(FILAS.coletaYoutube, nicho.id)).toBe(0);
+    expect(await jobPendente(FILAS.metaContas, nicho.id)).toBe(0);
   });
 });
