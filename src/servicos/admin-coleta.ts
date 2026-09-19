@@ -225,6 +225,14 @@ export type ContaVigiada = {
    */
   origemInstagram: "api" | "apify" | null;
   ultimaLeituraMetaEm: Date | null;
+  /**
+   * A Business Discovery da Meta devolveu erro da propria conta (codigo
+   * 100 ou 110, `contas.api_indisponivel_em` gravado, preparacao da
+   * viagem, item 4): conta pessoal, restrita ou que nao existe mais. Vale
+   * so para instagram; `false` para youtube/tiktok, que nunca passam pela
+   * Meta.
+   */
+  contaIndisponivelNaMeta: boolean;
 };
 
 /** A lista de vigilância de um nicho (escopo 5.3): quem está `vigiada`, por taxa. */
@@ -258,6 +266,7 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
           ? "api"
           : "apify",
     ultimaLeituraMetaEm: l.ultimaLeituraMetaEm,
+    contaIndisponivelNaMeta: l.plataforma === "instagram" && l.apiIndisponivelEm !== null,
   }));
 }
 

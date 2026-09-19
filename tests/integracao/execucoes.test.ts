@@ -75,4 +75,24 @@ describe("executarComRegistro", () => {
     expect(execucao.status).toBe("erro");
     expect(execucao.erro).toBe("algo quebrou");
   });
+
+  /**
+   * Preparacao da viagem, item 0: a mensagem de erro do yt-dlp pode citar a
+   * url do proxy com usuario e senha; execucoes_job.erro nunca pode gravar
+   * isso em texto puro.
+   */
+  it("mascara credencial de proxy na mensagem gravada em execucoes_job.erro", async () => {
+    await expect(
+      executarComRegistro("teste-erro-proxy", async () => {
+        throw new Error(
+          "yt-dlp falhou: nao foi possivel conectar a http://usuario123:senhaSecreta456@proxy.dataimpulse.com:823",
+        );
+      }),
+    ).rejects.toThrow();
+
+    const execucao = await ultimaExecucao("teste-erro-proxy");
+    expect(execucao.erro).toBe(
+      "yt-dlp falhou: nao foi possivel conectar a http://***token mascarado***@proxy.dataimpulse.com:823",
+    );
+  });
 });

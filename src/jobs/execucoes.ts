@@ -11,6 +11,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { execucoesJob } from "@/db/schema";
+import { mascararSegredos } from "@/lib/log";
 
 /**
  * Erro nomeado de uma coleta, com uma decisao explicita: `retentavel: true`
@@ -58,7 +59,15 @@ export async function executarComRegistro(
       .where(eq(execucoesJob.id, execucao.id));
     return { status: "ok", resumo };
   } catch (erro) {
-    const mensagem = erro instanceof Error ? erro.message : String(erro);
+    /**
+     * mascararSegredos (preparacao da viagem, item 0): a mensagem de um
+     * erro de yt-dlp pode citar a url do proxy, com usuario e senha
+     * embutidos; sem isso, `execucoes_job.erro` gravava a credencial em
+     * texto puro, visivel para qualquer admin que abrisse a tela de jobs.
+     */
+    const mensagem = mascararSegredos(
+      erro instanceof Error ? erro.message : String(erro),
+    ) as string;
     Sentry.captureException(erro, { tags: { job: nome } });
     await db()
       .update(execucoesJob)

@@ -70,6 +70,16 @@ export const config = {
     potBaseUrl: env("YOUTUBE_POT_BASE_URL", "http://roteiros-pot:4416"),
     /** Pausa entre um video do YouTube e o seguinte, em segundos (item 2: espacar as chamadas). */
     youtubePausaS: envNumero("YOUTUBE_PAUSA_S", 20),
+    /**
+     * Proxy do yt-dlp (preparacao da viagem, item 0, decisao do Gustavo em
+     * 19/09/2026: resolver o bloqueio de IP de datacenter do YouTube ja, em
+     * vez de esperar). Vazia por padrao (sem proxy, o comportamento de hoje
+     * nao muda). Formato esperado: "http://usuario:senha@host:porta", o
+     * mesmo que `argumentosYoutube()` passa direto para `--proxy`. O
+     * provedor escolhido e o DataImpulse (residencial rotativo, conta do
+     * Gustavo); TikTok usa o mesmo proxy, o Instagram nunca usa.
+     */
+    ytdlpProxy: env("YTDLP_PROXY"),
   },
   coleta: {
     youtubeKey: env("YOUTUBE_API_KEY"),

@@ -40,6 +40,11 @@ import { config } from "@/lib/config";
  * de formatos, manifestos), para além da pausa entre vídeos inteiros que
  * `pausaEntreVideosYoutube` (abaixo) cuida em `transcrever.ts` e
  * `analisar-visual.ts`.
+ *
+ * `--proxy` (preparação da viagem, item 0): só quando `YTDLP_PROXY`
+ * estiver preenchida (`config.transcricao.ytdlpProxy`), para resolver o
+ * bloqueio de IP de datacenter na raiz, com um proxy residencial. Vazia
+ * (padrão), o comportamento de hoje não muda.
  */
 export function argumentosYoutube(): string[] {
   return [
@@ -49,7 +54,19 @@ export function argumentosYoutube(): string[] {
     `youtubepot-bgutilhttp:base_url=${config.transcricao.potBaseUrl}`,
     "--sleep-requests",
     "2",
+    ...argumentosProxy(),
   ];
+}
+
+/**
+ * `--proxy <url>` quando `YTDLP_PROXY` estiver preenchida, vazio senão
+ * (preparação da viagem, item 0). Compartilhada com o TikTok em `audio.ts`
+ * e `video.ts`: os dois passam pelo mesmo bloqueio de IP de datacenter que
+ * motivou o proxy; o Instagram nunca usa (o endereço de mídia da Meta
+ * baixa direto, e proxy se paga por gigabyte).
+ */
+export function argumentosProxy(): string[] {
+  return config.transcricao.ytdlpProxy ? ["--proxy", config.transcricao.ytdlpProxy] : [];
 }
 
 /**

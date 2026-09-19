@@ -109,7 +109,7 @@ export const textosAdmin = {
     ativar: "ativar nicho",
     desativar: "desativar nicho",
     contasSementeTitulo: "acrescentar conta semente",
-    contasSementeAjuda: "cole até 10 links de perfil, um por linha (YouTube, TikTok ou Instagram)",
+    contasSementeAjuda: "cole até 40 links de perfil, um por linha (YouTube, TikTok ou Instagram)",
     campoContasSemente: "links de perfil",
     botaoAdicionarContas: "adicionar",
     adicionandoContas: "adicionando",
@@ -131,6 +131,8 @@ export const textosAdmin = {
     origemApi: "api",
     origemApify: "apify",
     naoAplicavel: "não se aplica",
+    /** Preparação da viagem, item 4: Business Discovery devolveu erro da própria conta (código 100 ou 110). */
+    avisoContaIndisponivelNaMeta: "a Meta não lê esta conta (pessoal, restrita ou inexistente)",
     metaStatusTitulo: "status da api da meta",
     colunaMetaLimite: "limite",
     colunaMetaUso: "uso",
