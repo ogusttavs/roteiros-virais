@@ -419,6 +419,16 @@ export const videos = pgTable(
      * acerto" da rodada).
      */
     execucaoId: integer("execucao_id").references(() => execucoesJob.id),
+    /**
+     * Endereço de mídia direto (CDN) que a Business Discovery da Meta
+     * devolve, quando devolve (V2a, item 3): `transcrever` e
+     * `analisar-visual` baixam por ele em vez do `yt-dlp` contra a página
+     * do Instagram, sem precisar do extrator específico da plataforma.
+     * Expira (a Meta não documenta em quanto tempo); `midiaUrlEm` é quando
+     * foi lida, para só usar a url enquanto ainda está fresca.
+     */
+    midiaUrl: text("midia_url"),
+    midiaUrlEm: timestamp("midia_url_em", { withTimezone: true }),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },

@@ -61,8 +61,27 @@ describe("normalizarBusinessDiscovery", () => {
         views: 679098,
         likes: 12000,
         comentarios: 300,
+        midiaUrl: null,
       },
     ]);
+  });
+
+  /** V2a, item 3: media_url entra no normalizado, para transcrever/analisar-visual baixarem direto. */
+  it("normaliza media_url quando a Business Discovery devolve", () => {
+    const resultado = normalizarBusinessDiscovery("natgeo", {
+      username: "natgeo",
+      media: {
+        data: [
+          {
+            id: "222",
+            media_type: "VIDEO",
+            timestamp: "2026-08-20T10:00:00.000Z",
+            media_url: "https://scontent.cdninstagram.com/video222.mp4",
+          },
+        ],
+      },
+    });
+    expect(resultado.videos[0].midiaUrl).toBe("https://scontent.cdninstagram.com/video222.mp4");
   });
 
   it("filtra fora um item que nao e video nem reel (ex: foto ou carrossel)", () => {
@@ -141,6 +160,7 @@ describe("normalizarHashtagMedia", () => {
       views: 0,
       likes: 500,
       comentarios: 10,
+      midiaUrl: "https://exemplo.invalido/video1.mp4",
     });
   });
 
@@ -160,5 +180,6 @@ describe("normalizarHashtagMedia", () => {
 
     expect(video.idExterno).toBe("ExemploHashtag02");
     expect(video.titulo).toBe("[exemplo] outra dica de limpeza");
+    expect(video.midiaUrl).toBeNull();
   });
 });

@@ -61,6 +61,9 @@ async function criarVideo(
     duracaoS?: number;
     /** V2a, item 2: sem dono nunca conta no teto de 2 por conta; usado nos testes do item 1 para nao interferir. */
     semDono?: boolean;
+    /** V2a, item 3: endereco de midia direto da Meta, e quando foi lido. */
+    midiaUrl?: string;
+    midiaUrlEm?: Date;
   },
 ) {
   const [v] = await db()
@@ -79,6 +82,8 @@ async function criarVideo(
       transcricao: opcoes.transcricao,
       proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
       duracaoS: opcoes.duracaoS,
+      midiaUrl: opcoes.midiaUrl,
+      midiaUrlEm: opcoes.midiaUrlEm,
     })
     .returning();
   return v;
@@ -319,5 +324,52 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(3);
     expect(resumo.falhas).toBe(0);
+  });
+});
+
+/** V2a, item 3: Instagram com endereco de midia fresco baixa direto, sem a url da pagina. */
+describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
+  const HORA_MS = 60 * 60 * 1000;
+
+  it("com midiaUrl lida ha menos de 20h, baixa pelo endereco de midia, nao pela url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-fresco.mp4";
+    await criarVideo("insta-fresco", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 1 * HORA_MS),
+    });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+
+    await rodarTranscrever();
+    expect(baixarAudio).toHaveBeenCalledWith(midiaUrl);
+  });
+
+  it("com midiaUrl lida ha mais de 20h (vencida), ignora e usa a url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-vencido.mp4";
+    await criarVideo("insta-vencido", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 21 * HORA_MS),
+    });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+
+    await rodarTranscrever();
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-vencido");
+    expect(baixarAudio).not.toHaveBeenCalledWith(midiaUrl);
+  });
+
+  it("sem midiaUrl nenhuma, usa a url da pagina normalmente", async () => {
+    await criarVideo("insta-sem-midia", { plataforma: "instagram", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+
+    await rodarTranscrever();
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia");
   });
 });

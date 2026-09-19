@@ -22,6 +22,12 @@
  * consome a fila até fechar `transcricoesPorDia` sucessos de verdade ou a
  * fila acabar, e para de tentar uma plataforma inteira depois de
  * `MAX_FALHAS_SEGUIDAS_FREIO` falhas seguidas nela.
+ *
+ * V2a, item 3: vídeo do Instagram com `videos.midiaUrl` lida há menos de
+ * 20h (`midiaUrlFresca`, `coleta-comum.ts`) baixa direto pelo endereço de
+ * mídia da Meta, sem cair no yt-dlp contra a página do Instagram
+ * (`urlParaBaixar`, em `candidatosDoNicho`); a pausa entre chamadas do
+ * YouTube continua olhando a `url` de verdade, nunca `urlParaBaixar`.
  */
 import { eq, inArray } from "drizzle-orm";
 
@@ -35,6 +41,7 @@ import { config } from "@/lib/config";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
+import { midiaUrlFresca } from "./coleta-comum";
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -61,6 +68,30 @@ const MENSAGEM_BOT_YOUTUBE = /sign in to confirm you.{0,3}re not a bot/i;
  */
 const FATOR_FILA = 4;
 
+/**
+ * Desempate por mídia fresca (V2a, item 3): entre dois vídeos de mesma
+ * prioridade (mesmo `score`), o do Instagram com `midiaUrl` fresca vem
+ * primeiro, porque baixa direto pelo endereço de mídia, sem yt-dlp contra
+ * a página. A ordem entre scores diferentes nunca muda; só o desempate.
+ */
+function comMidiaFrescaComoDesempate<T extends { id: number }>(
+  lista: T[],
+  score: (item: T) => number | null,
+  idsComMidiaFresca: Set<number>,
+): T[] {
+  return [...lista].sort((a, b) => {
+    const scoreA = score(a) ?? Number.NEGATIVE_INFINITY;
+    const scoreB = score(b) ?? Number.NEGATIVE_INFINITY;
+    if (scoreA !== scoreB) return scoreB - scoreA;
+
+    const frescaA = idsComMidiaFresca.has(a.id) ? 0 : 1;
+    const frescaB = idsComMidiaFresca.has(b.id) ? 0 : 1;
+    if (frescaA !== frescaB) return frescaA - frescaB;
+
+    return a.id - b.id;
+  });
+}
+
 async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   const tamanhoFila = tetoDiario * FATOR_FILA;
   const [prioritarios, estruturais] = await Promise.all([
@@ -72,7 +103,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   if (idsUnicos.length === 0) {
     return {
       selecionados: [] as number[],
-      porId: new Map<number, { url: string; plataforma: string; duracaoS: number | null }>(),
+      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: string; duracaoS: number | null }>(),
     };
   }
 
@@ -85,6 +116,8 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
       duracaoS: videos.duracaoS,
       transcricao: videos.transcricao,
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
+      midiaUrl: videos.midiaUrl,
+      midiaUrlEm: videos.midiaUrlEm,
     })
     .from(videos)
     .where(inArray(videos.id, idsUnicos));
@@ -96,15 +129,30 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     proximaTentativaTranscricao: l.proximaTentativaTranscricao,
   }));
 
-  const selecionados = selecionarParaTranscrever(
-    prioritarios.map((v) => v.id),
-    estruturais.map((v) => v.id),
-    candidatos,
-    tamanhoFila,
-    new Date(),
+  const agora = new Date();
+  const idsComMidiaFresca = new Set(
+    linhas.filter((l) => l.plataforma === "instagram" && l.midiaUrl && midiaUrlFresca(l.midiaUrlEm, agora)).map((l) => l.id),
   );
 
-  const porId = new Map(linhas.map((l) => [l.id, { url: l.url, plataforma: l.plataforma, duracaoS: l.duracaoS }]));
+  const selecionados = selecionarParaTranscrever(
+    comMidiaFrescaComoDesempate(prioritarios, (v) => v.velocidadeRelativa, idsComMidiaFresca).map((v) => v.id),
+    comMidiaFrescaComoDesempate(estruturais, (v) => v.foraDaCurva, idsComMidiaFresca).map((v) => v.id),
+    candidatos,
+    tamanhoFila,
+    agora,
+  );
+
+  const porId = new Map(
+    linhas.map((l) => [
+      l.id,
+      {
+        url: l.url,
+        urlParaBaixar: idsComMidiaFresca.has(l.id) ? l.midiaUrl! : l.url,
+        plataforma: l.plataforma,
+        duracaoS: l.duracaoS,
+      },
+    ]),
+  );
   return { selecionados, porId };
 }
 
@@ -214,7 +262,7 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
       tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
 
       try {
-        const resultado = await transcreverUm(videoId, info.url, info.plataforma, info.duracaoS);
+        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS);
         if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
           sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
           sucessosNoNicho += 1;

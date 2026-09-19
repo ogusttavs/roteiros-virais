@@ -28,7 +28,24 @@ export type VideoParaGravar = {
   views: number;
   likes: number;
   comentarios: number;
+  /** So o normalizador da Meta preenche (V2a, item 3); as outras plataformas nunca passam isso. */
+  midiaUrl?: string | null;
 };
+
+/**
+ * Janela em que a url de mídia da Meta ainda vale a pena tentar (V2a, item
+ * 3): a Meta não documenta por quanto tempo o link do CDN é válido. 20h dá
+ * folga segura entre a leitura de `meta-contas` (03:35) e o uso de
+ * `transcrever`/`analisar-visual` (04:00 em diante), mesmo numa execução
+ * atrasada, sem arriscar link já vencido.
+ */
+export const JANELA_MIDIA_URL_MS = 20 * 60 * 60 * 1000;
+
+/** Função pura, para testar sem banco nem relógio de verdade. */
+export function midiaUrlFresca(midiaUrlEm: Date | null, agora: Date = new Date()): boolean {
+  if (!midiaUrlEm) return false;
+  return agora.getTime() - midiaUrlEm.getTime() < JANELA_MIDIA_URL_MS;
+}
 
 export async function upsertConta(conta: ContaParaGravar, nichoId: number): Promise<number> {
   const [linha] = await db()
@@ -77,9 +94,13 @@ export async function upsertVideo(
    */
   execucaoId: number | null = null,
 ): Promise<"novo" | "atualizado"> {
+  const midiaUrl = video.midiaUrl ?? null;
+  /** So marca a hora da leitura quando ha url de verdade (V2a, item 3); sem ela, nao ha nada fresco para marcar. */
+  const midiaUrlEm = midiaUrl ? new Date() : null;
+
   const [linha] = await db()
     .insert(videos)
-    .values({ ...video, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
+    .values({ ...video, midiaUrl, midiaUrlEm, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
     .onConflictDoUpdate({
       target: [videos.plataforma, videos.idExterno],
       set: {
@@ -89,6 +110,11 @@ export async function upsertVideo(
         // Uma recoleta cujo ator nao devolveu audio nao pode apagar o audio
         // ja gravado numa coleta anterior (revisao da etapa 6, parte 2).
         audio: sql`coalesce(${sql.param(audio, videos.audio)}, ${videos.audio})`,
+        // Mesmo raciocinio do audio (V2a, item 3): uma leitura sem media_url
+        // (a maioria) nao pode apagar a url fresca de uma leitura anterior;
+        // midiaUrlEm segue midiaUrl, nunca atualiza sozinha.
+        midiaUrl: sql`coalesce(${sql.param(midiaUrl, videos.midiaUrl)}, ${videos.midiaUrl})`,
+        midiaUrlEm: midiaUrl ? sql`${sql.param(midiaUrlEm, videos.midiaUrlEm)}` : sql`${videos.midiaUrlEm}`,
         atualizadoEm: new Date(),
       },
     })

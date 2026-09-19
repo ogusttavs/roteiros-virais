@@ -27,6 +27,12 @@ export type VideoNormalizado = {
   views: number;
   likes: number;
   comentarios: number;
+  /**
+   * Endereço de mídia direto (CDN) da Business Discovery (V2a, item 3):
+   * `null` quando a Meta não devolveu (a maioria; achado real, 21 dos 38
+   * VIDEO). `upsertVideo` grava a hora da leitura junto.
+   */
+  midiaUrl: string | null;
 };
 
 /**
@@ -83,6 +89,7 @@ export function normalizarBusinessDiscovery(
       views: item.view_count ?? 0,
       likes: item.like_count ?? 0,
       comentarios: item.comments_count ?? 0,
+      midiaUrl: item.media_url ?? null,
     };
   });
 
@@ -113,5 +120,6 @@ export function normalizarHashtagMedia(item: HashtagRecentMediaItem, termo: stri
     views: 0,
     likes: item.like_count ?? 0,
     comentarios: item.comments_count ?? 0,
+    midiaUrl: item.media_url ?? null,
   };
 }

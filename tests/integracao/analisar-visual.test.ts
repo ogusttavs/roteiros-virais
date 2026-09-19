@@ -50,18 +50,22 @@ let nichoId: number;
 async function criarVideo(
   idExterno: string,
   opcoes: {
+    plataforma?: "youtube" | "tiktok" | "instagram";
     foraDaCurva?: number;
     publicadoEm: Date;
     transcricao?: string;
     duracaoS?: number;
     analise?: unknown;
     analiseVisual?: unknown;
+    /** V2a, item 3: endereco de midia direto da Meta, e quando foi lido. */
+    midiaUrl?: string;
+    midiaUrlEm?: Date;
   },
 ) {
   const [v] = await db()
     .insert(videos)
     .values({
-      plataforma: "youtube",
+      plataforma: opcoes.plataforma ?? "youtube",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
@@ -73,6 +77,8 @@ async function criarVideo(
       duracaoS: opcoes.duracaoS,
       analise: opcoes.analise as never,
       analiseVisual: opcoes.analiseVisual as never,
+      midiaUrl: opcoes.midiaUrl,
+      midiaUrlEm: opcoes.midiaUrlEm,
     })
     .returning();
   return v;
@@ -282,5 +288,47 @@ describe("rodarAnalisarVisual", () => {
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
     expect(baixarVideo480p).toHaveBeenCalledWith(v.url);
+  });
+});
+
+/** V2a, item 3: Instagram com endereco de midia fresco baixa direto, sem a url da pagina. */
+describe("rodarAnalisarVisual, V2a item 3: instagram pela media direta", () => {
+  const HORA_MS = 60 * 60 * 1000;
+
+  it("com midiaUrl lida ha menos de 20h, baixa pelo endereco de midia, nao pela url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-fresco.mp4";
+    await criarVideo("visual-insta-fresco", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 1 * HORA_MS),
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith(midiaUrl);
+  });
+
+  it("com midiaUrl lida ha mais de 20h (vencida), ignora e usa a url da pagina", async () => {
+    const midiaUrl = "https://scontent.cdninstagram.com/video-vencido.mp4";
+    await criarVideo("visual-insta-vencido", {
+      plataforma: "instagram",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      midiaUrl,
+      midiaUrlEm: new Date(Date.now() - 21 * HORA_MS),
+    });
+
+    const resumo = await rodarAnalisarVisual();
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith("https://exemplo.invalido/visual-insta-vencido");
+    expect(baixarVideo480p).not.toHaveBeenCalledWith(midiaUrl);
   });
 });
