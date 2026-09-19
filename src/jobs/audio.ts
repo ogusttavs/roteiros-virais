@@ -11,7 +11,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
+import { ehUrlDoInstagram } from "./video";
+import { argumentosProxy, argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
 
 const execFileAsync = promisify(execFile);
 
@@ -31,7 +32,8 @@ export async function baixarAudio(url: string): Promise<string> {
       "--postprocessor-args",
       "ffmpeg:-b:a 64k",
       // So o YouTube precisa do cliente sem PO Token (TikTok e Instagram nao passam por aqui).
-      ...(ehUrlDoYoutube(url) ? argumentosYoutube() : []),
+      // O proxy (item 0 da preparacao da viagem) vale para YouTube e TikTok, nunca Instagram.
+      ...(ehUrlDoYoutube(url) ? argumentosYoutube() : ehUrlDoInstagram(url) ? [] : argumentosProxy()),
       "-o",
       join(pasta, `${prefixo}.%(ext)s`),
       url,

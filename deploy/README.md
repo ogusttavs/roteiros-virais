@@ -119,11 +119,11 @@ ssh getorbita-vps 'cat /srv/roteiros/admin-inicial.senha'
 ssh getorbita-vps 'rm /srv/roteiros/admin-inicial.senha'
 ```
 
-Trocar `EMAIL_FROM`, `SENTRY_DSN` ou o bucket do backup (`BACKUP_RCLONE_REMOTE` e
+Trocar `EMAIL_FROM`, `SENTRY_DSN`, `YTDLP_PROXY` ou o bucket do backup (`BACKUP_RCLONE_REMOTE` e
 `RCLONE_CONFIG_*`): editar `/srv/roteiros/.env` na VPS e subir de novo so o servico afetado.
 
 ```bash
-ssh getorbita-vps 'cd /srv/roteiros && docker compose up -d roteiros-app roteiros-worker'   # EMAIL_FROM, SENTRY_DSN
+ssh getorbita-vps 'cd /srv/roteiros && docker compose up -d roteiros-app roteiros-worker'   # EMAIL_FROM, SENTRY_DSN, YTDLP_PROXY
 ssh getorbita-vps 'cd /srv/roteiros && docker compose up -d roteiros-backup'                # bucket do backup
 ```
 

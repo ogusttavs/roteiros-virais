@@ -51,6 +51,9 @@ services:
     image: ghcr.io/ogusttavs/roteiros-virais/worker:${TAG:-latest}
     container_name: roteiros-worker
     restart: unless-stopped
+    # env_file ja basta para YTDLP_PROXY (preparacao da viagem, item 0)
+    # chegar ao worker: toda variavel do .env passa, sem precisar listar em
+    # "environment:".
     env_file: .env
     depends_on:
       roteiros-postgres:

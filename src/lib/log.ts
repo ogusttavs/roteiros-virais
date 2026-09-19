@@ -23,15 +23,21 @@
  * que so comeca com "EAA" quando o token e o valor inteiro nunca cobria um
  * erro que logasse a URL inteira. `/EAA[A-Za-z0-9]+/g` troca a ocorrencia
  * onde ela estiver na string, mantendo o resto.
+ *
+ * Credencial de proxy na url (preparacao da viagem, item 0): o formato do
+ * `YTDLP_PROXY` e "http://usuario:senha@host:porta"; `PADRAO_CREDENCIAL_PROXY`
+ * troca so o trecho "usuario:senha", mantendo o resto da url legivel no
+ * log (o host ajuda a depurar, a senha nunca pode aparecer).
  */
 import pino from "pino";
 
 const PADRAO_TOKEN_META = /EAA[A-Za-z0-9]+/g;
+const PADRAO_CREDENCIAL_PROXY = /(:\/\/)[^/\s@]+:[^/\s@]+@/g;
 const MASCARA = "***token mascarado***";
 
 export function mascararSegredos(valor: unknown): unknown {
   if (typeof valor === "string") {
-    return valor.replace(PADRAO_TOKEN_META, MASCARA);
+    return valor.replace(PADRAO_TOKEN_META, MASCARA).replace(PADRAO_CREDENCIAL_PROXY, `$1${MASCARA}@`);
   }
   if (Array.isArray(valor)) return valor.map(mascararSegredos);
   if (valor instanceof Error) {

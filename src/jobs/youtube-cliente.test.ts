@@ -2,9 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { config } from "@/lib/config";
 
-import { argumentosYoutube, ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
+import { argumentosProxy, argumentosYoutube, ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
 describe("argumentosYoutube", () => {
+  afterEach(() => {
+    config.transcricao.ytdlpProxy = "";
+  });
+
   it("monta o cliente mweb com o provedor de po token e sleep-requests 2, sem chamar a rede (rodada 2)", () => {
     expect(argumentosYoutube()).toEqual([
       "--extractor-args",
@@ -14,6 +18,36 @@ describe("argumentosYoutube", () => {
       "--sleep-requests",
       "2",
     ]);
+  });
+
+  /** Preparacao da viagem, item 0: com YTDLP_PROXY preenchida, acrescenta --proxy no fim. */
+  it("com YTDLP_PROXY preenchida, acrescenta --proxy <url> no fim", () => {
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
+    expect(argumentosYoutube()).toEqual([
+      "--extractor-args",
+      "youtube:player_client=mweb",
+      "--extractor-args",
+      `youtubepot-bgutilhttp:base_url=${config.transcricao.potBaseUrl}`,
+      "--sleep-requests",
+      "2",
+      "--proxy",
+      "http://usuario:senha@proxy.dataimpulse.com:823",
+    ]);
+  });
+});
+
+describe("argumentosProxy", () => {
+  afterEach(() => {
+    config.transcricao.ytdlpProxy = "";
+  });
+
+  it("vazia por padrao, sem YTDLP_PROXY", () => {
+    expect(argumentosProxy()).toEqual([]);
+  });
+
+  it("com YTDLP_PROXY preenchida, devolve --proxy <url>", () => {
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
+    expect(argumentosProxy()).toEqual(["--proxy", "http://usuario:senha@proxy.dataimpulse.com:823"]);
   });
 });
 

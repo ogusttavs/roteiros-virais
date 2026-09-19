@@ -68,4 +68,24 @@ describe("mascararSegredos", () => {
     const resultado = mascararSegredos({ err: new Error("erro interno") }) as { err: { mensagem: string } };
     expect(resultado.err.mensagem).toBe("erro interno");
   });
+
+  /** Preparacao da viagem, item 0: YTDLP_PROXY tem usuario e senha na propria url. */
+  it("mascara usuario e senha de uma url de proxy, mantendo o host visivel", () => {
+    const url = "http://usuario123:senhaSecreta456@proxy.dataimpulse.com:823";
+    expect(mascararSegredos(url)).toBe("http://***token mascarado***@proxy.dataimpulse.com:823");
+  });
+
+  it("mascara a credencial de proxy no meio de uma mensagem de erro maior", () => {
+    const erro = new Error(
+      "yt-dlp falhou: nao foi possivel conectar a http://usuario123:senhaSecreta456@proxy.dataimpulse.com:823",
+    );
+    const resultado = mascararSegredos(erro) as { mensagem: string };
+    expect(resultado.mensagem).toBe(
+      "yt-dlp falhou: nao foi possivel conectar a http://***token mascarado***@proxy.dataimpulse.com:823",
+    );
+  });
+
+  it("nao mexe numa url sem credencial nenhuma", () => {
+    expect(mascararSegredos("http://proxy.dataimpulse.com:823")).toBe("http://proxy.dataimpulse.com:823");
+  });
 });
