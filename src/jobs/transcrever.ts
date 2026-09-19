@@ -79,6 +79,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   const linhas = await db()
     .select({
       id: videos.id,
+      contaId: videos.contaId,
       url: videos.url,
       plataforma: videos.plataforma,
       duracaoS: videos.duracaoS,
@@ -90,6 +91,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
 
   const candidatos: VideoParaSelecionar[] = linhas.map((l) => ({
     id: l.id,
+    contaId: l.contaId,
     temTranscricao: Boolean(l.transcricao),
     proximaTentativaTranscricao: l.proximaTentativaTranscricao,
   }));

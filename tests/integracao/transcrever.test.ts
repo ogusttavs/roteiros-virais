@@ -59,7 +59,7 @@ async function criarVideo(
     transcricao?: string;
     proximaTentativaTranscricao?: Date;
     duracaoS?: number;
-    /** Vídeo sem conta dona (Hashtag Search da Meta); usado nos testes de item 1 para isolar a fila de outras variáveis. */
+    /** V2a, item 2: sem dono nunca conta no teto de 2 por conta; usado nos testes do item 1 para nao interferir. */
     semDono?: boolean;
   },
 ) {
