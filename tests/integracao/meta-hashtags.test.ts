@@ -146,7 +146,7 @@ describe("rodarMetaHashtags", () => {
     const carrossel = await db().select().from(videos).where(eq(videos.idExterno, "ExemploCarrossel01"));
     expect(carrossel).toHaveLength(0);
 
-    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/video1.mp4");
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/video1.mp4", "instagram");
     expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-fake.mp3");
   });
 
@@ -173,6 +173,7 @@ describe("rodarMetaHashtags", () => {
 
     const [video] = await db().select().from(videos).where(eq(videos.idExterno, "ExemploSemUrl01"));
     expect(video.transcricao).toBeNull();
+    expect(video.transcritoEm).toBeNull();
     expect(baixarAudio).not.toHaveBeenCalled();
   });
 

@@ -184,7 +184,8 @@ describe("rodarTranscrever", () => {
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(0);
     expect(resumo.transcritosPorGroq).toBe(1);
-    expect(baixarAudio).toHaveBeenCalled();
+    // Ajuste 2 da revisao do PR #45: a plataforma da linha e o segundo argumento (decide seletor e proxy).
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/yt-legenda-curta", "youtube");
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-curta"));
     expect(linha.transcricao).toBe("texto transcrito pela groq");
@@ -201,6 +202,7 @@ describe("rodarTranscrever", () => {
     const resumo = await rodarTranscrever();
     expect(resumo.falhas).toBe(1);
     expect(apagarAudio).not.toHaveBeenCalled();
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/tiktok-falha", "tiktok");
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-falha"));
     expect(linha.transcricao).toBeNull();
@@ -366,7 +368,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
     vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
 
     await rodarTranscrever();
-    expect(baixarAudio).toHaveBeenCalledWith(midiaUrl);
+    expect(baixarAudio).toHaveBeenCalledWith(midiaUrl, "instagram");
   });
 
   it("com midiaUrl lida ha mais de 20h (vencida), ignora e usa a url da pagina", async () => {
@@ -382,8 +384,8 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
     vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
 
     await rodarTranscrever();
-    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-vencido");
-    expect(baixarAudio).not.toHaveBeenCalledWith(midiaUrl);
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-vencido", "instagram");
+    expect(baixarAudio).not.toHaveBeenCalledWith(midiaUrl, expect.anything());
   });
 
   it("sem midiaUrl nenhuma, usa a url da pagina normalmente", async () => {
@@ -392,6 +394,6 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
     vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
 
     await rodarTranscrever();
-    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia");
+    expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia", "instagram");
   });
 });

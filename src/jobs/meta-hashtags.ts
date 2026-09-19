@@ -77,7 +77,7 @@ async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefi
 
   let caminhoAudio: string | null = null;
   try {
-    caminhoAudio = await baixarAudio(mediaUrl);
+    caminhoAudio = await baixarAudio(mediaUrl, "instagram");
     const texto = await transcreverAudio(caminhoAudio);
     // `transcritoEm` (ajuste 1 da revisão do PR #45): é uma transcrição de verdade, entra em "lidos hoje".
     await db()

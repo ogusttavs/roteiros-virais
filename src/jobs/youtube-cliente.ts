@@ -1,3 +1,4 @@
+import type { Plataforma } from "@/db/schema";
 import { config } from "@/lib/config";
 
 /**
@@ -60,13 +61,29 @@ export function argumentosYoutube(): string[] {
 
 /**
  * `--proxy <url>` quando `YTDLP_PROXY` estiver preenchida, vazio senão
- * (preparação da viagem, item 0). Compartilhada com o TikTok em `audio.ts`
- * e `video.ts`: os dois passam pelo mesmo bloqueio de IP de datacenter que
- * motivou o proxy; o Instagram nunca usa (o endereço de mídia da Meta
- * baixa direto, e proxy se paga por gigabyte).
+ * (preparação da viagem, item 0). O TikTok e o YouTube passam pelo mesmo
+ * bloqueio de IP de datacenter que motivou o proxy; o Instagram nunca usa
+ * (o endereço de mídia da Meta baixa direto, e proxy se paga por
+ * gigabyte). Quem escolhe é `argumentosPorPlataforma`, logo abaixo.
  */
 export function argumentosProxy(): string[] {
   return config.transcricao.ytdlpProxy ? ["--proxy", config.transcricao.ytdlpProxy] : [];
+}
+
+/**
+ * Argumentos do yt-dlp que dependem de onde o vídeo está, decididos pela
+ * plataforma da linha (`videos.plataforma`), nunca pelo host da url (ajuste
+ * 2 da revisão do PR #45, V2a): o endereço direto de mídia da Meta
+ * (`scontent....cdninstagram.com/....mp4`) não parece Instagram pelo host, e
+ * com o palpite antigo caía no proxy e no seletor de formato do TikTok.
+ * Instagram nunca usa proxy (se paga por gigabyte, e o endereço da Meta
+ * baixa direto); o YouTube ganha o cliente com PO Token; o resto (TikTok), o
+ * proxy. `audio.ts` e `video.ts` chamam esta função em vez de repetir a
+ * escolha.
+ */
+export function argumentosPorPlataforma(plataforma: Plataforma): string[] {
+  if (plataforma === "instagram") return [];
+  return plataforma === "youtube" ? argumentosYoutube() : argumentosProxy();
 }
 
 /**
@@ -86,7 +103,11 @@ export async function pausaEntreVideosYoutube(
 
 const HOSTS_YOUTUBE = ["youtube.com", "youtu.be"];
 
-/** `audio.ts` baixa das três plataformas com a mesma função; só o YouTube ganha `argumentosYoutube()`. */
+/**
+ * Só decide a pausa entre vídeos do YouTube (`transcrever.ts`,
+ * `analisar-visual.ts`), sobre a `url` da página. Argumentos e seletor do
+ * download vêm da plataforma da linha, em `argumentosPorPlataforma`.
+ */
 export function ehUrlDoYoutube(url: string): boolean {
   try {
     const host = new URL(url).hostname.replace(/^www\./, "");

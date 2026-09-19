@@ -14,15 +14,22 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { db, getPool } from "@/db";
 import { nichos, videos } from "@/db/schema";
 
-vi.mock("@/jobs/video", () => ({
-  baixarVideo480p: vi.fn(),
-  apagarVideo: vi.fn(),
-  extrairQuadros: vi.fn(),
-  duracaoDoArquivoS: vi.fn(),
-}));
+vi.mock("@/jobs/video", async (importarOriginal) => {
+  // So o que abre processo e falso; `argumentosDeVideo480p` (pura) fica real, para o teste do
+  // ajuste 2 da revisao do PR #45 conferir o seletor que a plataforma passada resulta.
+  const original = await importarOriginal<typeof import("@/jobs/video")>();
+  return {
+    ...original,
+    baixarVideo480p: vi.fn(),
+    apagarVideo: vi.fn(),
+    extrairQuadros: vi.fn(),
+    duracaoDoArquivoS: vi.fn(),
+  };
+});
 
 import { rodarAnalisarVisual } from "@/jobs/analisar-visual";
-import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from "@/jobs/video";
+import { apagarVideo, argumentosDeVideo480p, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from "@/jobs/video";
+import { config } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -126,7 +133,7 @@ describe("rodarAnalisarVisual", () => {
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
     expect(resumo.falhas).toBe(0);
-    expect(baixarVideo480p).toHaveBeenCalledWith(v.url);
+    expect(baixarVideo480p).toHaveBeenCalledWith(v.url, "youtube");
     expect(apagarVideo).toHaveBeenCalledWith("/tmp/video-fake.mp4");
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "candidato-ok"));
@@ -223,7 +230,7 @@ describe("rodarAnalisarVisual", () => {
 
     expect(resumo.analisados).toBe(1);
     expect(resumo.falhas).toBe(0);
-    expect(baixarVideo480p).toHaveBeenCalledWith(video.url);
+    expect(baixarVideo480p).toHaveBeenCalledWith(video.url, "youtube");
     expect(duracaoDoArquivoS).toHaveBeenCalledWith("/tmp/video-fake.mp4");
 
     const [linha] = await db().select().from(videos).where(eq(videos.id, video.id));
@@ -301,7 +308,7 @@ describe("rodarAnalisarVisual", () => {
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
-    expect(baixarVideo480p).toHaveBeenCalledWith(v.url);
+    expect(baixarVideo480p).toHaveBeenCalledWith(v.url, "youtube");
   });
 });
 
@@ -324,7 +331,21 @@ describe("rodarAnalisarVisual, V2a item 3: instagram pela media direta", () => {
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
-    expect(baixarVideo480p).toHaveBeenCalledWith(midiaUrl);
+    expect(baixarVideo480p).toHaveBeenCalledWith(midiaUrl, "instagram");
+
+    // Ajuste 2 da revisao do PR #45: o host da url direta (scontent.cdninstagram.com) nao parece
+    // Instagram; com o que o job passou (url direta mais a plataforma), o seletor tem de ser o
+    // progressivo, nunca o do YouTube/TikTok (que falha num arquivo direto), e sem proxy (com
+    // YTDLP_PROXY preenchida, senao "sem --proxy" passaria com o defeito antigo tambem).
+    const [urlChamada, plataformaChamada] = vi.mocked(baixarVideo480p).mock.calls[0];
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.exemplo.invalido:823";
+    try {
+      const args = argumentosDeVideo480p(urlChamada, plataformaChamada, "/tmp/video-fake.mp4");
+      expect(args[args.indexOf("-f") + 1]).toBe("b[height<=480]/b");
+      expect(args).not.toContain("--proxy");
+    } finally {
+      config.transcricao.ytdlpProxy = "";
+    }
   });
 
   it("com midiaUrl lida ha mais de 20h (vencida), ignora e usa a url da pagina", async () => {
@@ -342,7 +363,7 @@ describe("rodarAnalisarVisual, V2a item 3: instagram pela media direta", () => {
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(1);
-    expect(baixarVideo480p).toHaveBeenCalledWith("https://exemplo.invalido/visual-insta-vencido");
-    expect(baixarVideo480p).not.toHaveBeenCalledWith(midiaUrl);
+    expect(baixarVideo480p).toHaveBeenCalledWith("https://exemplo.invalido/visual-insta-vencido", "instagram");
+    expect(baixarVideo480p).not.toHaveBeenCalledWith(midiaUrl, expect.anything());
   });
 });

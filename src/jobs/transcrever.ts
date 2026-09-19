@@ -41,7 +41,7 @@ import { eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
-import { nichos, videos } from "@/db/schema";
+import { nichos, videos, type Plataforma } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
@@ -111,7 +111,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   if (idsUnicos.length === 0) {
     return {
       selecionados: [] as number[],
-      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: string; duracaoS: number | null }>(),
+      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null }>(),
     };
   }
 
@@ -182,7 +182,7 @@ const TAMANHO_MINIMO_LEGENDA = 200;
 async function transcreverUm(
   videoId: number,
   url: string,
-  plataforma: string,
+  plataforma: Plataforma,
   duracaoS: number | null,
 ): Promise<ResultadoVideo> {
   if (plataforma === "youtube") {
@@ -199,7 +199,7 @@ async function transcreverUm(
 
   let caminhoAudio: string | null = null;
   try {
-    caminhoAudio = await baixarAudio(url);
+    caminhoAudio = await baixarAudio(url, plataforma);
     const texto = await transcreverAudio(caminhoAudio);
     await db().update(videos).set({ transcricao: texto, transcritoEm: new Date() }).where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
@@ -304,10 +304,12 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
       }
 
       // Espaça as chamadas ao YouTube (item 2 desta rodada), depois de
-      // processar o vídeo (qualquer resultado), antes do próximo. Pela URL
-      // de verdade, não por `plataforma` (mesmo raciocínio de `video.ts`/
-      // `audio.ts`, `ehUrlDoYoutube`): é a URL que decide se o yt-dlp
-      // chamou o YouTube, não o rótulo da coluna.
+      // processar o vídeo (qualquer resultado), antes do próximo. Olha a
+      // `url` da página (nunca `urlParaBaixar`): é ela que diz se o yt-dlp
+      // falou com o YouTube, e o endereço direto de mídia da Meta nunca é.
+      // O download em si decide por plataforma (`argumentosPorPlataforma`,
+      // `audio.ts` e `video.ts`), não por host; `ehUrlDoYoutube` ficou só
+      // para esta pausa.
       if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
     }
 

@@ -415,6 +415,7 @@ describe("resumoLeituraPorPlataforma", () => {
           nichoId: nichoLeituraId,
           transcricao: "transcricao de 10 dias atras",
           transcritoEm: new Date(Date.now() - 10 * DIA_MS),
+          analiseVisualEm: new Date(Date.now() - 10 * DIA_MS),
           atualizadoEm: new Date(Date.now() - 10 * DIA_MS),
         },
         // Atualizado hoje (recoleta) mas sem leitura nenhuma: nao conta em nenhuma coluna.
@@ -465,7 +466,7 @@ describe("resumoLeituraPorPlataforma", () => {
     // A recoleta mexeu em atualizadoEm (agora), mas nunca nas colunas de leitura.
     expect(Date.now() - linha.atualizadoEm.getTime()).toBeLessThan(60_000);
     expect(Date.now() - linha.transcritoEm!.getTime()).toBeGreaterThan(9 * DIA_MS);
-    expect(linha.analiseVisualEm).toBeNull();
+    expect(Date.now() - linha.analiseVisualEm!.getTime()).toBeGreaterThan(9 * DIA_MS);
 
     expect(await resumoLeituraPorPlataforma(nichoLeituraId)).toEqual(antes);
   });

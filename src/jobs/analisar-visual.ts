@@ -21,7 +21,7 @@
 import { and, asc, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos, type AnaliseVisual } from "@/db/schema";
+import { nichos, videos, type AnaliseVisual, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
@@ -38,7 +38,7 @@ const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 type CandidatoVisual = {
   id: number;
   url: string;
-  plataforma: string;
+  plataforma: Plataforma;
   midiaUrl: string | null;
   midiaUrlEm: Date | null;
   titulo: string | null;
@@ -89,7 +89,8 @@ function urlParaBaixar(video: CandidatoVisual): string {
 async function analisarUm(video: CandidatoVisual): Promise<void> {
   let caminhoVideo: string | null = null;
   try {
-    caminhoVideo = await baixarVideo480p(urlParaBaixar(video));
+    // A plataforma da linha decide seletor e proxy (ajuste 2 da revisao do PR #45): a url direta da Meta nao parece Instagram.
+    caminhoVideo = await baixarVideo480p(urlParaBaixar(video), video.plataforma);
 
     /**
      * Video vindo da Meta (Business Discovery/Hashtag Search, E6 parte 3,
