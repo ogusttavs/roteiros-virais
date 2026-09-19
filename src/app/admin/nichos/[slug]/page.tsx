@@ -9,6 +9,7 @@ import {
   listarContasVigiadas,
   nichoPorSlug,
   noticiasPorId,
+  resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   statusMetaApi,
   temaDoDiaAtual,
@@ -71,7 +72,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta] =
+  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta, resumoLeitura] =
     await Promise.all([
       foraDaCurvaDoNicho(nicho.id, 90, 30),
       subindoHoje(nicho.id, 30),
@@ -80,6 +81,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
       ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
       resumoMedianaPorPlataforma(nicho.id),
       config.coleta.metaAtivo ? statusMetaApi() : null,
+      resumoLeituraPorPlataforma(nicho.id),
     ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -108,7 +110,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         <Link href={`/admin/nichos/${slug}/modelo`}>{t.verModelo}</Link>
       </div>
 
-      <PainelNicho nicho={nicho} jobsColeta={jobsColeta} />
+      <PainelNicho nicho={nicho} jobsColeta={jobsColeta} resumoLeitura={resumoLeitura} />
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>

@@ -14,6 +14,7 @@ import {
   listarClientesAdmin,
   listarExecucoesRecentes,
   listarNichosComContagem,
+  resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   taxaDeAcertoPorExecucao,
   ultimaExecucaoPorJob,
@@ -352,5 +353,103 @@ describe("resumoMedianaPorPlataforma", () => {
 
     await db().delete(videos).where(inArray(videos.idExterno, ["yt-com-multiplo", "yt-sem-multiplo"]));
     await db().delete(contas).where(inArray(contas.id, [contaOrigemConta.id, contaOrigemSetor.id]));
+  });
+});
+
+/** V2a, item 5: a conferência enxerga, "lidos hoje" e "últimos 7 dias" por plataforma. */
+describe("resumoLeituraPorPlataforma", () => {
+  const DIA_MS = 24 * 60 * 60 * 1000;
+  let nichoLeituraId: number;
+
+  beforeAll(async () => {
+    const [nichoLeitura] = await db()
+      .insert(nichos)
+      .values({ slug: "admin-coleta-leitura-teste", nome: "Admin coleta leitura teste", termos: [] })
+      .returning();
+    nichoLeituraId = nichoLeitura.id;
+
+    const [conta] = await db()
+      .insert(contas)
+      .values({ plataforma: "youtube", handle: "@leitura-teste", nichoId: nichoLeituraId })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values([
+        // Transcrito e analisado ha 1 hora: conta em "hoje" e em "ultimos 7 dias".
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-hoje",
+          url: "https://x/leitura-hoje",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de hoje",
+          analiseVisual: { falaParaCamera: true, textoNaTela: [], cenario: "x", ritmoDeCorte: "x", recursos: [], momentoChave: null },
+          atualizadoEm: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        },
+        // Transcrito ha 3 dias, sem analise visual: conta so em "ultimos 7 dias", so transcrito.
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-3-dias",
+          url: "https://x/leitura-3-dias",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de 3 dias atras",
+          atualizadoEm: new Date(Date.now() - 3 * DIA_MS),
+        },
+        // Transcrito ha 10 dias: fora da janela de 7 dias, nao conta em nenhuma coluna.
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-10-dias",
+          url: "https://x/leitura-10-dias",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de 10 dias atras",
+          atualizadoEm: new Date(Date.now() - 10 * DIA_MS),
+        },
+        // Atualizado hoje mas sem transcricao nem analise: nao conta em nenhuma coluna
+        // (achado que motivou usar a coluna preenchida, nao so a data).
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-sem-leitura",
+          url: "https://x/leitura-sem-leitura",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          atualizadoEm: new Date(),
+        },
+      ]);
+  });
+
+  it("conta transcritos e analisados hoje e nos ultimos 7 dias, por plataforma", async () => {
+    const resumo = await resumoLeituraPorPlataforma(nichoLeituraId);
+    const youtube = resumo.find((r) => r.plataforma === "youtube");
+
+    expect(youtube).toEqual({
+      plataforma: "youtube",
+      transcritosHoje: 1,
+      analisadosHoje: 1,
+      transcritosUltimos7Dias: 2,
+      analisadosUltimos7Dias: 1,
+    });
+  });
+
+  it("sempre as tres plataformas, mesmo com zero video (tiktok e instagram, neste nicho)", async () => {
+    const resumo = await resumoLeituraPorPlataforma(nichoLeituraId);
+    const porPlataforma = new Map(resumo.map((r) => [r.plataforma, r]));
+
+    expect(porPlataforma.get("tiktok")).toEqual({
+      plataforma: "tiktok",
+      transcritosHoje: 0,
+      analisadosHoje: 0,
+      transcritosUltimos7Dias: 0,
+      analisadosUltimos7Dias: 0,
+    });
+    expect(porPlataforma.get("instagram")).toEqual({
+      plataforma: "instagram",
+      transcritosHoje: 0,
+      analisadosHoje: 0,
+      transcritosUltimos7Dias: 0,
+      analisadosUltimos7Dias: 0,
+    });
   });
 });

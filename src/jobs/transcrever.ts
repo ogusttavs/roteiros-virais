@@ -28,6 +28,11 @@
  * mídia da Meta, sem cair no yt-dlp contra a página do Instagram
  * (`urlParaBaixar`, em `candidatosDoNicho`); a pausa entre chamadas do
  * YouTube continua olhando a `url` de verdade, nunca `urlParaBaixar`.
+ *
+ * V2a, item 5: os dois updates de sucesso passam a gravar `atualizadoEm`
+ * junto com `transcricao` (antes só a coleta tocava essa coluna, em
+ * `upsertVideo`); é o sinal que `resumoLeituraPorPlataforma`
+ * (`admin-coleta.ts`) usa para "lidos hoje" em `/admin/nichos/[slug]`.
  */
 import { eq, inArray } from "drizzle-orm";
 
@@ -180,7 +185,7 @@ async function transcreverUm(
   if (plataforma === "youtube") {
     const legenda = await baixarLegendaYoutube(url);
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
-      await db().update(videos).set({ transcricao: legenda }).where(eq(videos.id, videoId));
+      await db().update(videos).set({ transcricao: legenda, atualizadoEm: new Date() }).where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
   }
@@ -193,7 +198,7 @@ async function transcreverUm(
   try {
     caminhoAudio = await baixarAudio(url);
     const texto = await transcreverAudio(caminhoAudio);
-    await db().update(videos).set({ transcricao: texto }).where(eq(videos.id, videoId));
+    await db().update(videos).set({ transcricao: texto, atualizadoEm: new Date() }).where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {

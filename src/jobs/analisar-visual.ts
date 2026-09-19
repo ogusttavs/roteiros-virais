@@ -11,6 +11,11 @@
  * 20h baixa direto pelo endereço de mídia da Meta (`urlParaBaixar`), sem
  * cair no yt-dlp contra a página do Instagram; mesmo raciocínio de
  * `transcrever.ts`.
+ *
+ * V2a, item 5: o update de sucesso grava `atualizadoEm` junto com
+ * `analiseVisual`, mesmo raciocínio de `transcrever.ts`; é o sinal que
+ * `resumoLeituraPorPlataforma` (`admin-coleta.ts`) usa para "analisados
+ * hoje" em `/admin/nichos/[slug]`.
  */
 import { and, asc, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 
@@ -115,7 +120,7 @@ async function analisarUm(video: CandidatoVisual): Promise<void> {
     });
 
     const analiseVisual: AnaliseVisual = resultado.dados;
-    await db().update(videos).set({ analiseVisual }).where(eq(videos.id, video.id));
+    await db().update(videos).set({ analiseVisual, atualizadoEm: new Date() }).where(eq(videos.id, video.id));
 
     await registrarGeracao({
       tarefa: "analisarVisual",

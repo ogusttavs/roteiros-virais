@@ -362,6 +362,54 @@ export async function resumoMedianaPorPlataforma(nichoId: number): Promise<Resum
   });
 }
 
+export type ResumoLeituraPlataforma = {
+  plataforma: Plataforma;
+  transcritosHoje: number;
+  analisadosHoje: number;
+  transcritosUltimos7Dias: number;
+  analisadosUltimos7Dias: number;
+};
+
+/**
+ * "lidos hoje" / "últimos 7 dias" por plataforma, para `/admin/nichos/[slug]`
+ * (V2a, item 5: a conferência enxerga). "Transcrito" e "analisado" contam
+ * pela coluna já preenchida (`transcricao`, `analiseVisual`) mais
+ * `atualizadoEm` recente, que os dois jobs agora gravam junto com o
+ * resultado (`transcrever.ts`, `analisar-visual.ts`); sem isso não havia
+ * como saber quando a leitura aconteceu, só que aconteceu. "Hoje" e "7
+ * dias" são janelas corridas (últimas 24h, últimos 7×24h), mesmo padrão de
+ * `diasAtras` usado no resto deste arquivo. Sempre as três plataformas,
+ * mesmo com zero vídeo.
+ */
+export async function resumoLeituraPorPlataforma(nichoId: number): Promise<ResumoLeituraPlataforma[]> {
+  const desde1Dia = diasAtras(1);
+  const desde7Dias = diasAtras(7);
+
+  const linhas = await db()
+    .select({
+      plataforma: videos.plataforma,
+      transcritosHoje: sql<number>`count(*) filter (where ${videos.transcricao} is not null and ${videos.atualizadoEm} >= ${desde1Dia})`,
+      analisadosHoje: sql<number>`count(*) filter (where ${videos.analiseVisual} is not null and ${videos.atualizadoEm} >= ${desde1Dia})`,
+      transcritosUltimos7Dias: sql<number>`count(*) filter (where ${videos.transcricao} is not null and ${videos.atualizadoEm} >= ${desde7Dias})`,
+      analisadosUltimos7Dias: sql<number>`count(*) filter (where ${videos.analiseVisual} is not null and ${videos.atualizadoEm} >= ${desde7Dias})`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId))
+    .groupBy(videos.plataforma);
+
+  const PLATAFORMAS: Plataforma[] = ["youtube", "tiktok", "instagram"];
+  return PLATAFORMAS.map((plataforma) => {
+    const l = linhas.find((x) => x.plataforma === plataforma);
+    return {
+      plataforma,
+      transcritosHoje: Number(l?.transcritosHoje ?? 0),
+      analisadosHoje: Number(l?.analisadosHoje ?? 0),
+      transcritosUltimos7Dias: Number(l?.transcritosUltimos7Dias ?? 0),
+      analisadosUltimos7Dias: Number(l?.analisadosUltimos7Dias ?? 0),
+    };
+  });
+}
+
 /**
  * Os temas de hoje do nicho, exatamente como o job `temasDoDia` gravou
  * (etapa 10, decisão 8 do `PROXIMO.md`): sem a regra de estabilidade nem a
