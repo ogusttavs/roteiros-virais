@@ -12,6 +12,16 @@
  * tentativa mais curta (3 dias, `TRES_DIAS_MS`) que a falha generica (7
  * dias), e conta a parte em `falhasYoutubeBot` no resumo, para a
  * conferencia ler sem abrir cada linha de erro.
+ *
+ * V2a, item 1 (força-tarefa da viagem, medido em produção em 19/09: 155 de
+ * 12.293 vídeos com análise, 4 a 8 transcrições fechando o dia): o job
+ * pegava uma lista fixa de até `transcricoesPorDia` candidatos e a
+ * percorria uma vez, gastando a vaga em cada falha de download (18 a 22
+ * por dia só no bloqueio do YouTube). `candidatosDoNicho` agora devolve
+ * uma fila `FATOR_FILA` vezes maior, na mesma ordem de prioridade; o laço
+ * consome a fila até fechar `transcricoesPorDia` sucessos de verdade ou a
+ * fila acabar, e para de tentar uma plataforma inteira depois de
+ * `MAX_FALHAS_SEGUIDAS_FREIO` falhas seguidas nela.
  */
 import { eq, inArray } from "drizzle-orm";
 
@@ -40,10 +50,22 @@ const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 const TRES_DIAS_MS = 3 * 24 * 60 * 60 * 1000;
 const MENSAGEM_BOT_YOUTUBE = /sign in to confirm you.{0,3}re not a bot/i;
 
-async function candidatosDoNicho(nichoId: number, limite: number) {
+/**
+ * A fila fica maior que o teto diário (V2a, item 1: "vaga perdida não
+ * conta"). Antes, `candidatosDoNicho` já devolvia no máximo `limite`
+ * vídeos, e cada falha de download gastava uma vaga sem substituto; o job
+ * fechava o dia com bem menos que `transcricoesPorDia` transcrições de
+ * verdade. Com 4 vezes o teto na mesma ordem de prioridade, sobra fila
+ * para `rodarTranscrever` continuar puxando candidato depois de uma falha,
+ * até fechar o teto em sucessos ou a fila acabar.
+ */
+const FATOR_FILA = 4;
+
+async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
+  const tamanhoFila = tetoDiario * FATOR_FILA;
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, limite),
-    foraDaCurvaDoNicho(nichoId, 90, limite),
+    subindoHoje(nichoId, tamanhoFila),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
@@ -76,7 +98,7 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
     prioritarios.map((v) => v.id),
     estruturais.map((v) => v.id),
     candidatos,
-    limite,
+    tamanhoFila,
     new Date(),
   );
 
@@ -85,7 +107,8 @@ async function candidatosDoNicho(nichoId: number, limite: number) {
 }
 
 type ResultadoVideo =
-  | { tipo: "legenda" | "pulado" }
+  | { tipo: "legenda" }
+  | { tipo: "pulado" }
   | { tipo: "groq"; duracaoS: number | null }
   | { tipo: "falhou"; motivo: string }
   | { tipo: "falhouYoutubeBot"; motivo: string };
@@ -141,6 +164,16 @@ async function transcreverUm(
   }
 }
 
+/**
+ * Freio por plataforma (V2a, item 1): depois de `MAX_FALHAS_SEGUIDAS_FREIO`
+ * falhas seguidas, o job para de tentar aquela plataforma naquele nicho
+ * naquela rodada, e segue só com as outras. Cada nicho começa com o
+ * contador zerado; um sucesso na plataforma zera de novo. Para o YouTube,
+ * só a falha com a mensagem do bot conta (é o padrão específico que
+ * motivou o freio); para o TikTok, qualquer falha conta.
+ */
+const MAX_FALHAS_SEGUIDAS_FREIO = 10;
+
 export async function rodarTranscrever(): Promise<Record<string, unknown>> {
   const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
 
@@ -153,27 +186,59 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
   let segundosAudioGroq = 0;
   const erros: string[] = [];
 
+  const tentativas: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
+  const sucessos: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
+  let youtubePausado = false;
+  let tiktokPausado = false;
+
   for (const nicho of nichosAtivos) {
-    const { selecionados, porId } = await candidatosDoNicho(nicho.id, config.regras.transcricoesPorDia);
+    const tetoDiario = config.regras.transcricoesPorDia;
+    const { selecionados, porId } = await candidatosDoNicho(nicho.id, tetoDiario);
+
+    let sucessosNoNicho = 0;
+    let falhasSeguidasBotYoutube = 0;
+    let falhasSeguidasTiktok = 0;
+    let youtubePausadoNoNicho = false;
+    let tiktokPausadoNoNicho = false;
 
     for (const videoId of selecionados) {
+      if (sucessosNoNicho >= tetoDiario) break;
+
       const info = porId.get(videoId);
       if (!info) continue;
+      if (info.plataforma === "youtube" && youtubePausadoNoNicho) continue;
+      if (info.plataforma === "tiktok" && tiktokPausadoNoNicho) continue;
+
+      tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
 
       try {
         const resultado = await transcreverUm(videoId, info.url, info.plataforma, info.duracaoS);
-        if (resultado.tipo === "legenda") porLegenda += 1;
-        else if (resultado.tipo === "groq") {
-          porGroq += 1;
-          segundosAudioGroq += resultado.duracaoS ?? 0;
-        } else if (resultado.tipo === "pulado") pulados += 1;
-        else if (resultado.tipo === "falhou") {
+        if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
+          sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
+          sucessosNoNicho += 1;
+          if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
+          if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
+
+          if (resultado.tipo === "legenda") porLegenda += 1;
+          else {
+            porGroq += 1;
+            segundosAudioGroq += resultado.duracaoS ?? 0;
+          }
+        } else if (resultado.tipo === "pulado") {
+          pulados += 1;
+        } else if (resultado.tipo === "falhou") {
           falhas += 1;
           erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+          if (info.plataforma === "tiktok") {
+            falhasSeguidasTiktok += 1;
+            if (falhasSeguidasTiktok >= MAX_FALHAS_SEGUIDAS_FREIO) tiktokPausadoNoNicho = true;
+          }
         } else if (resultado.tipo === "falhouYoutubeBot") {
           falhas += 1;
           falhasYoutubeBot += 1;
           erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+          falhasSeguidasBotYoutube += 1;
+          if (falhasSeguidasBotYoutube >= MAX_FALHAS_SEGUIDAS_FREIO) youtubePausadoNoNicho = true;
         }
       } catch (erro) {
         falhas += 1;
@@ -187,6 +252,9 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
       // chamou o YouTube, não o rótulo da coluna.
       if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
     }
+
+    if (youtubePausadoNoNicho) youtubePausado = true;
+    if (tiktokPausadoNoNicho) tiktokPausado = true;
   }
 
   return {
@@ -198,6 +266,10 @@ export async function rodarTranscrever(): Promise<Record<string, unknown>> {
     falhasYoutubeBot,
     segundosAudioGroq,
     custoEstimadoGroqUsd: Number(((segundosAudioGroq / 3600) * PRECO_GROQ_USD_POR_HORA).toFixed(4)),
+    tentativas,
+    sucessos,
+    youtubePausado,
+    tiktokPausado,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

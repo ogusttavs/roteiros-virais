@@ -37,6 +37,7 @@ import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { transcreverAudio } from "@/jobs/groq-api";
 import { rodarTranscrever } from "@/jobs/transcrever";
+import { config } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -58,6 +59,8 @@ async function criarVideo(
     transcricao?: string;
     proximaTentativaTranscricao?: Date;
     duracaoS?: number;
+    /** Vídeo sem conta dona (Hashtag Search da Meta); usado nos testes de item 1 para isolar a fila de outras variáveis. */
+    semDono?: boolean;
   },
 ) {
   const [v] = await db()
@@ -66,7 +69,7 @@ async function criarVideo(
       plataforma: opcoes.plataforma ?? "youtube",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
-      contaId,
+      contaId: opcoes.semDono ? null : contaId,
       nichoId,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
@@ -113,6 +116,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
+  config.regras.transcricoesPorDia = 2;
 });
 
 describe("rodarTranscrever", () => {
@@ -246,5 +250,74 @@ describe("rodarTranscrever", () => {
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(2);
+  });
+});
+
+/**
+ * V2a, item 1 (força-tarefa da viagem): "vaga perdida não conta". Os
+ * vídeos destes testes usam `semDono: true` (contaId nulo) para o teto de
+ * 2 por conta do item 2 não interferir na contagem.
+ */
+describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
+  it("40 sucessos com 15 falhas no meio: a fila maior (4x o teto) cobre as vagas perdidas pelas falhas", async () => {
+    config.regras.transcricoesPorDia = 40;
+
+    const INDICES_DE_FALHA = new Set([2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 32, 35, 38, 41, 44]);
+    const TOTAL = 55;
+    for (let i = 0; i < TOTAL; i += 1) {
+      const idExterno = INDICES_DE_FALHA.has(i) ? `falha-${i}` : `ok-${i}`;
+      await criarVideo(idExterno, { velocidadeRelativa: TOTAL - i, publicadoEm: diasAtras(3), semDono: true });
+    }
+
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async (url: string) =>
+      url.includes("/falha-") ? null : LEGENDA_LONGA,
+    );
+    vi.mocked(baixarAudio).mockImplementation(async (url: string) => {
+      if (url.includes("/falha-")) throw new ErroAudio("falha simulada no download");
+      return "/tmp/audio-fake.mp3";
+    });
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.transcritosPorLegenda).toBe(40);
+    expect(resumo.falhas).toBe(15);
+    expect((resumo.sucessos as Record<string, number>).youtube).toBe(40);
+    expect((resumo.tentativas as Record<string, number>).youtube).toBe(TOTAL);
+    expect(resumo.youtubePausado).toBe(false);
+  });
+
+  it("freio do YouTube: para de tentar depois de 10 falhas seguidas com a mensagem do bot, registra youtubePausado", async () => {
+    config.regras.transcricoesPorDia = 40;
+
+    const MENSAGEM_BOT =
+      "nao foi possivel baixar o audio: ERROR: [youtube] abc: Sign in to confirm you're not a bot. " +
+      "Use --cookies-from-browser or --cookies for the authentication.";
+    const TOTAL = 12;
+    for (let i = 0; i < TOTAL; i += 1) {
+      await criarVideo(`bot-${i}`, { velocidadeRelativa: TOTAL - i, publicadoEm: diasAtras(3), semDono: true });
+    }
+
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio(MENSAGEM_BOT));
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.youtubePausado).toBe(true);
+    expect(resumo.falhasYoutubeBot).toBe(10);
+    expect(resumo.falhas).toBe(10);
+    // As duas ultimas (as de menor prioridade) nunca foram tentadas: o freio parou o laco antes.
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(10);
+  });
+
+  it("a fila acabando antes do teto: menos candidatos elegiveis que o teto, sem erro, so o que tinha", async () => {
+    config.regras.transcricoesPorDia = 40;
+
+    await criarVideo("poucos-1", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), semDono: true });
+    await criarVideo("poucos-2", { velocidadeRelativa: 2, publicadoEm: diasAtras(3), semDono: true });
+    await criarVideo("poucos-3", { velocidadeRelativa: 1, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.transcritosPorLegenda).toBe(3);
+    expect(resumo.falhas).toBe(0);
   });
 });
