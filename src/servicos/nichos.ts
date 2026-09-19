@@ -13,7 +13,13 @@ export class ErroNicho extends Error {}
 
 const TERMOS_MIN = 5;
 const TERMOS_MAX = 20;
-const CONTAS_SEMENTE_MAX = 10;
+/**
+ * De 10 para 40 (preparacao da viagem, item 1): sem o Apify (suspenso), a
+ * conta semente do admin e a unica porta de entrada de conta do Instagram
+ * num nicho novo, e o Bruno e o Uli vao montar dois nichos novos (Overtake,
+ * Velura) de fora, sem o motor de descoberta por termo ajudando.
+ */
+const CONTAS_SEMENTE_MAX = 40;
 
 /** Minusculo, sem acento, hifens; nunca sufixo automatico em colisao (decisao 1 do PROXIMO.md). */
 export function gerarSlug(nome: string): string {
@@ -150,10 +156,12 @@ export function analisarUrlPerfil(bruta: string): { plataforma: Plataforma; hand
 }
 
 /**
- * Ate 10 URLs por linha (decisao 2 do PROXIMO.md). Valida a forma de todas
- * antes de gravar qualquer uma (nada gravado pela metade); numa transacao
- * pelo mesmo motivo. Conta que ja existe (mesma plataforma e handle, de uma
- * coleta anterior) so passa a `vigiada = true`, sem duplicar linha.
+ * Ate `CONTAS_SEMENTE_MAX` URLs por linha (decisao 2 do PROXIMO.md; teto
+ * subiu de 10 para 40 na preparacao da viagem, item 1). Valida a forma de
+ * todas antes de gravar qualquer uma (nada gravado pela metade); numa
+ * transacao pelo mesmo motivo. Conta que ja existe (mesma plataforma e
+ * handle, de uma coleta anterior) so passa a `vigiada = true`, sem
+ * duplicar linha.
  */
 export async function adicionarContasSemente(nichoId: number, urlsBruto: string): Promise<Conta[]> {
   const linhas = [...new Set(urlsBruto.split("\n").map((l) => l.trim()).filter(Boolean))];

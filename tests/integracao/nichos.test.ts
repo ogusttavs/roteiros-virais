@@ -169,11 +169,20 @@ describe("adicionarContasSemente", () => {
     expect(linhas[0].origem).toBe("coleta");
   });
 
-  it("recusa passar de 10 contas semente no nicho", async () => {
-    const nicho = await criarNicho({ nome: "Nicho limite de contas", termosBruto: TERMOS_VALIDOS });
-    const onze = Array.from({ length: 11 }, (_, i) => `https://www.tiktok.com/@conta${i}`).join("\n");
+  /** Preparacao da viagem, item 1: teto de 10 para 40 (sem o Apify, a semente e a unica entrada de conta nova). */
+  it("40 contas semente entram; a 41a e recusada sem gravar nada (item 1, teto novo)", async () => {
+    const nicho = await criarNicho({ nome: "Nicho limite de contas quarenta", termosBruto: TERMOS_VALIDOS });
+    const quarenta = Array.from({ length: 40 }, (_, i) => `https://www.tiktok.com/@quarenta${i}`).join("\n");
 
-    await expect(adicionarContasSemente(nicho.id, onze)).rejects.toThrow(ErroNicho);
+    const criadas = await adicionarContasSemente(nicho.id, quarenta);
+    expect(criadas).toHaveLength(40);
+
+    await expect(
+      adicionarContasSemente(nicho.id, "https://www.tiktok.com/@quadragesimaprimeira"),
+    ).rejects.toThrow(/no maximo 40 contas semente/);
+
+    const linhas = await db().select().from(contas).where(eq(contas.nichoId, nicho.id));
+    expect(linhas).toHaveLength(40);
   });
 
   it("recusa sem nenhuma URL", async () => {
