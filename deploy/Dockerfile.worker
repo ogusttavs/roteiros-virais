@@ -3,14 +3,25 @@
 # agora so para existir e buildar sem erro (criterio de aceite desta etapa).
 #
 # yt-dlp e ffmpeg sao dependencia de sistema (nao pacote npm, ver
-# HISTORICO.md), instalados aqui: ffmpeg via apt; yt-dlp e o zipapp
-# distribuido no release oficial, que precisa de python3 no PATH (achado
-# buildando esta imagem: o binario sem sufixo do release nao e standalone
-# de verdade, "/usr/bin/env: python3: No such file or directory").
+# HISTORICO.md), instalados aqui: ffmpeg via apt.
+#
+# yt-dlp por pip, com o extra `curl-cffi` (V2a, item 4, README do yt-dlp
+# conferido na data, nao de memoria): o zipapp standalone que este
+# Dockerfile baixava antes nunca consegue fazer impersonation de
+# navegador, mesmo com curl_cffi instalado no sistema, porque o README
+# lista esse binario Unix como excecao explicita ("Currently included in
+# most builds except yt-dlp (Unix zipimport binary)..."). Sem
+# impersonation, o TikTok falha sempre com "The extractor is attempting
+# impersonation, but no impersonate target is available" (achado em
+# producao, 19/09/2026). `pip install --break-system-packages` porque a
+# imagem base e Debian bookworm (PEP 668, confirmado rodando node:24-slim);
+# nao ha risco de "quebrar" um Python de sistema que so existe para o
+# yt-dlp dentro deste container.
 #
 # yt-dlp em versao fixa (achado da conferencia de producao, 09/09/2026, nao
 # "latest"): o build fica reproduzivel, a mesma imagem sempre traz a mesma
 # versao, em vez de mudar sozinha a cada rebuild sem passar por revisao.
+# Por pip isso e `pacote==versao`, mesmo ARG de antes.
 #
 # Deno (mesmo achado, `src/jobs/youtube-cliente.ts`): o yt-dlp exige um
 # runtime de JavaScript para resolver o desafio de assinatura do YouTube, e
@@ -21,14 +32,23 @@
 #
 # Plugin do provedor de PO Token (transcricao do YouTube, rodada 2, item 1,
 # github.com/Brainicism/bgutil-ytdlp-pot-provider, versao fixa como o resto):
-# o yt-dlp deste Dockerfile e o zipapp oficial, nao instalado por pip, entao
-# o plugin entra pelo metodo "Executable location" do proprio README do
-# yt-dlp ("Installing Plugins"): uma pasta `yt-dlp-plugins` do lado do
-# binario (`/usr/local/bin/yt-dlp-plugins/`). O `.zip` do release tem
-# `yt_dlp_plugins/` na propria raiz (conferido em 10/09/2026, `unzip -l` no
-# zip baixado), que e a forma que o README do yt-dlp descreve como aceita
-# direto, sem descompactar. O servidor do provedor (a outra metade) roda a
-# parte, como o servico `roteiros-pot` do Compose.
+# entra pelo metodo "Executable location" do proprio README do yt-dlp
+# ("Installing Plugins"), uma pasta `yt-dlp-plugins` do lado da "localizacao
+# do executavel". Isso MUDOU de lugar com yt-dlp por pip (achado do ensaio
+# desta rodada, 19/09/2026: o primeiro build passou, mas o provedor sumiu
+# da lista "PO Token Providers"): o `get_executable_path()` do proprio
+# yt-dlp (`yt_dlp/plugins.py`, `yt_dlp/utils/_utils.py`), que decide onde
+# procurar plugins, olha o diretorio do pacote Python (`dist-packages`),
+# nao o script wrapper que o pip cria em `/usr/local/bin/yt-dlp`; o zipapp
+# antigo nao tinha essa distincao, o binario e o "pacote" eram a mesma
+# coisa. A pasta correta agora e calculada em build, chamando a mesma
+# funcao que o yt-dlp usa em runtime, em vez de supor o caminho (evita
+# quebrar nesta mesma armadilha nunca mais, mesmo que a versao do Python
+# do node:24-slim mude). O `.zip` do release tem `yt_dlp_plugins/` na
+# propria raiz (conferido em 10/09/2026, `unzip -l` no zip baixado), que e
+# a forma que o README do yt-dlp descreve como aceita direto, sem
+# descompactar. O servidor do provedor (a outra metade) roda a parte, como
+# o servico `roteiros-pot` do Compose.
 FROM node:24-slim
 
 ARG YT_DLP_VERSION=2026.08.19
@@ -36,17 +56,17 @@ ARG DENO_VERSION=2.9.6
 ARG BGUTIL_POT_VERSION=2.0.0
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg python3 ca-certificates curl unzip \
-  && curl -fL "https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp" -o /usr/local/bin/yt-dlp \
-  && chmod a+rx /usr/local/bin/yt-dlp \
+  && apt-get install -y --no-install-recommends ffmpeg python3 python3-pip ca-certificates curl unzip \
+  && pip install --break-system-packages --no-cache-dir "yt-dlp[default,curl-cffi]==${YT_DLP_VERSION}" \
   && curl -fL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip" -o /tmp/deno-x86_64-unknown-linux-gnu.zip \
   && curl -fL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-x86_64-unknown-linux-gnu.zip.sha256sum" -o /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
   && (cd /tmp && sha256sum -c deno-x86_64-unknown-linux-gnu.zip.sha256sum) \
   && unzip -q /tmp/deno-x86_64-unknown-linux-gnu.zip -d /usr/local/bin \
   && chmod a+rx /usr/local/bin/deno \
   && rm -f /tmp/deno-x86_64-unknown-linux-gnu.zip /tmp/deno-x86_64-unknown-linux-gnu.zip.sha256sum \
-  && mkdir -p /usr/local/bin/yt-dlp-plugins \
-  && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o /usr/local/bin/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip \
+  && PLUGIN_ROOT=$(python3 -c "from yt_dlp.utils import get_executable_path; print(get_executable_path())") \
+  && mkdir -p "$PLUGIN_ROOT/yt-dlp-plugins" \
+  && curl -fL "https://github.com/Brainicism/bgutil-ytdlp-pot-provider/releases/download/${BGUTIL_POT_VERSION}/bgutil-ytdlp-pot-provider.zip" -o "$PLUGIN_ROOT/yt-dlp-plugins/bgutil-ytdlp-pot-provider.zip" \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

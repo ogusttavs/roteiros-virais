@@ -362,6 +362,58 @@ export async function resumoMedianaPorPlataforma(nichoId: number): Promise<Resum
   });
 }
 
+export type ResumoLeituraPlataforma = {
+  plataforma: Plataforma;
+  transcritosHoje: number;
+  analisadosHoje: number;
+  transcritosUltimos7Dias: number;
+  analisadosUltimos7Dias: number;
+};
+
+/**
+ * "lidos hoje" / "últimos 7 dias" por plataforma, para `/admin/nichos/[slug]`
+ * (V2a, item 5: a conferência enxerga). "Transcrito" e "analisado" contam
+ * pelas colunas que registram o momento da leitura (`transcritoEm`,
+ * `analiseVisualEm`), gravadas só por quem lê de verdade (`transcrever.ts`,
+ * `meta-hashtags.ts`, `analisar-visual.ts`). Ajuste 1 da revisão do PR #45:
+ * antes contava por `atualizadoEm`, que `upsertVideo` grava em toda
+ * recoleta, e a linha medía a coleta (77 "transcritos hoje" contra 8
+ * transcrições de verdade, medido em produção em 19/09). O que já existia
+ * antes da migração 0023 fica com as colunas nulas e nunca entra aqui: não
+ * há como saber quando foi lido, a linha conta a partir do deploy. "Hoje" e
+ * "7 dias" são janelas corridas (últimas 24h, últimos 7×24h), mesmo padrão
+ * de `diasAtras` usado no resto deste arquivo. Sempre as três plataformas,
+ * mesmo com zero vídeo.
+ */
+export async function resumoLeituraPorPlataforma(nichoId: number): Promise<ResumoLeituraPlataforma[]> {
+  const desde1Dia = diasAtras(1);
+  const desde7Dias = diasAtras(7);
+
+  const linhas = await db()
+    .select({
+      plataforma: videos.plataforma,
+      transcritosHoje: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde1Dia})`,
+      analisadosHoje: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde1Dia})`,
+      transcritosUltimos7Dias: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde7Dias})`,
+      analisadosUltimos7Dias: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde7Dias})`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId))
+    .groupBy(videos.plataforma);
+
+  const PLATAFORMAS: Plataforma[] = ["youtube", "tiktok", "instagram"];
+  return PLATAFORMAS.map((plataforma) => {
+    const l = linhas.find((x) => x.plataforma === plataforma);
+    return {
+      plataforma,
+      transcritosHoje: Number(l?.transcritosHoje ?? 0),
+      analisadosHoje: Number(l?.analisadosHoje ?? 0),
+      transcritosUltimos7Dias: Number(l?.transcritosUltimos7Dias ?? 0),
+      analisadosUltimos7Dias: Number(l?.analisadosUltimos7Dias ?? 0),
+    };
+  });
+}
+
 /**
  * Os temas de hoje do nicho, exatamente como o job `temasDoDia` gravou
  * (etapa 10, decisão 8 do `PROXIMO.md`): sem a regra de estabilidade nem a

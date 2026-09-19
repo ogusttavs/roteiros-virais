@@ -10,22 +10,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
-import { argumentosProxy, argumentosYoutube, ehUrlDoYoutube } from "./youtube-cliente";
+import type { Plataforma } from "@/db/schema";
+
+import { argumentosPorPlataforma } from "./youtube-cliente";
 
 const execFileAsync = promisify(execFile);
 
 const LARGURA_QUADRO = 640;
 
 export class ErroVideo extends Error {}
-
-export function ehUrlDoInstagram(url: string): boolean {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, "");
-    return host === "instagram.com" || host.endsWith(".instagram.com");
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Seletor de formato do yt-dlp (transcricao do YouTube, rodada 2, item 3a):
@@ -40,28 +33,50 @@ export function ehUrlDoInstagram(url: string): boolean {
  * menos. `b[height<=480]/b` tenta o progressivo mais proximo de 480p e,
  * sem nenhum, cai pro melhor progressivo disponivel, nunca fica sem
  * formato.
+ *
+ * Ajuste 2 da revisao do PR #45 (V2a): decidido pela plataforma da linha,
+ * nao pelo host da url. O endereco direto de midia da Meta
+ * (`scontent....cdninstagram.com/....mp4`, item 3 da V2a) nao parece
+ * Instagram pelo host, caia no seletor do YouTube/TikTok e falhava com
+ * "Requested format is not available" (o extrator generico do yt-dlp, num
+ * arquivo direto, so enxerga um formato, sem `bv*`/`ba` nem altura). Todo
+ * video do Instagram, pagina ou url direta, e progressivo.
  */
-export function seletorDeFormato(url: string): string {
-  return ehUrlDoInstagram(url) ? "b[height<=480]/b" : "bv*[height<=480]+ba/b[height<=480]";
+export function seletorDeFormato(plataforma: Plataforma): string {
+  return plataforma === "instagram" ? "b[height<=480]/b" : "bv*[height<=480]+ba/b[height<=480]";
 }
 
-/** Baixa o video em ate 480p (video mais audio); devolve o caminho temporario. */
-export async function baixarVideo480p(url: string): Promise<string> {
+/**
+ * Os argumentos do yt-dlp para baixar o video em ate 480p (video mais
+ * audio). Pura, para testar sem abrir processo: o teste confere o seletor e
+ * o proxy que cada plataforma recebe.
+ */
+export function argumentosDeVideo480p(url: string, plataforma: Plataforma, caminho: string): string[] {
+  return [
+    "-f",
+    seletorDeFormato(plataforma),
+    "--merge-output-format",
+    "mp4",
+    // So o YouTube precisa do cliente sem PO Token, e o proxy (item 0 da preparacao da viagem)
+    // vale para YouTube e TikTok, nunca Instagram: `argumentosPorPlataforma` decide.
+    ...argumentosPorPlataforma(plataforma),
+    "-o",
+    caminho,
+    url,
+  ];
+}
+
+/**
+ * Baixa o video em ate 480p (video mais audio); devolve o caminho
+ * temporario. `plataforma` e obrigatoria (ajuste 2 da revisao do PR #45):
+ * quem chama sabe de que plataforma e a linha, mesmo quando a url e o
+ * endereco direto de midia, que nao tem cara de nenhuma plataforma.
+ */
+export async function baixarVideo480p(url: string, plataforma: Plataforma): Promise<string> {
   const caminho = join(tmpdir(), `video-${randomUUID()}.mp4`);
 
   try {
-    await execFileAsync("yt-dlp", [
-      "-f",
-      seletorDeFormato(url),
-      "--merge-output-format",
-      "mp4",
-      // So o YouTube precisa do cliente sem PO Token (TikTok e Instagram nao passam por aqui).
-      // O proxy (item 0 da preparacao da viagem) vale para YouTube e TikTok, nunca Instagram.
-      ...(ehUrlDoYoutube(url) ? argumentosYoutube() : ehUrlDoInstagram(url) ? [] : argumentosProxy()),
-      "-o",
-      caminho,
-      url,
-    ]);
+    await execFileAsync("yt-dlp", argumentosDeVideo480p(url, plataforma, caminho));
   } catch (erro) {
     throw new ErroVideo(`nao foi possivel baixar o video de ${url}: ${String(erro)}`);
   }

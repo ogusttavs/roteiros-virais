@@ -2,7 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { config } from "@/lib/config";
 
-import { argumentosProxy, argumentosYoutube, ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
+import {
+  argumentosPorPlataforma,
+  argumentosProxy,
+  argumentosYoutube,
+  ehUrlDoYoutube,
+  pausaEntreVideosYoutube,
+} from "./youtube-cliente";
 
 describe("argumentosYoutube", () => {
   afterEach(() => {
@@ -48,6 +54,29 @@ describe("argumentosProxy", () => {
   it("com YTDLP_PROXY preenchida, devolve --proxy <url>", () => {
     config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
     expect(argumentosProxy()).toEqual(["--proxy", "http://usuario:senha@proxy.dataimpulse.com:823"]);
+  });
+});
+
+/** Ajuste 2 da revisao do PR #45 (V2a): a plataforma da linha decide, nunca o host da url. */
+describe("argumentosPorPlataforma", () => {
+  afterEach(() => {
+    config.transcricao.ytdlpProxy = "";
+  });
+
+  it("instagram: nunca nada, mesmo com YTDLP_PROXY preenchida (proxy se paga por gigabyte)", () => {
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
+    expect(argumentosPorPlataforma("instagram")).toEqual([]);
+  });
+
+  it("tiktok: so o proxy, quando preenchido", () => {
+    expect(argumentosPorPlataforma("tiktok")).toEqual([]);
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
+    expect(argumentosPorPlataforma("tiktok")).toEqual(["--proxy", "http://usuario:senha@proxy.dataimpulse.com:823"]);
+  });
+
+  it("youtube: o cliente mweb com o provedor de po token (o proxy vai junto, dentro de argumentosYoutube)", () => {
+    config.transcricao.ytdlpProxy = "http://usuario:senha@proxy.dataimpulse.com:823";
+    expect(argumentosPorPlataforma("youtube")).toEqual(argumentosYoutube());
   });
 });
 

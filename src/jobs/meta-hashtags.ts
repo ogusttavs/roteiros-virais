@@ -77,11 +77,12 @@ async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefi
 
   let caminhoAudio: string | null = null;
   try {
-    caminhoAudio = await baixarAudio(mediaUrl);
+    caminhoAudio = await baixarAudio(mediaUrl, "instagram");
     const texto = await transcreverAudio(caminhoAudio);
+    // `transcritoEm` (ajuste 1 da revisão do PR #45): é uma transcrição de verdade, entra em "lidos hoje".
     await db()
       .update(videos)
-      .set({ transcricao: texto })
+      .set({ transcricao: texto, transcritoEm: new Date() })
       .where(and(eq(videos.plataforma, "instagram"), eq(videos.idExterno, idExterno)));
     return true;
   } finally {

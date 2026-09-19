@@ -112,6 +112,28 @@ worker_tem_ytdlp_e_deno() {
   echo "yt-dlp $versao_ytdlp, $versao_deno"
 }
 
+# V2a, item 4: confere que o yt-dlp desta imagem consegue impersonation de
+# navegador (extra `curl-cffi`, instalado por pip no Dockerfile.worker).
+# Sem isso o TikTok falha sempre com "The extractor is attempting
+# impersonation, but no impersonate target is available" (achado em
+# producao, 19/09/2026). So confere a lista de alvos, sem rede: o download
+# de um TikTok de verdade e provado a parte, pela rede do Gustavo (a rede
+# deste ensaio, dentro do Compose, nao tem o proxy residencial que o
+# YouTube e o TikTok exigem fora daqui).
+worker_tem_alvo_impersonacao() {
+  local saida
+  saida=$(docker run --rm roteiros-worker:ensaio yt-dlp --list-impersonate-targets) || {
+    echo "yt-dlp --list-impersonate-targets falhou na imagem do worker" >&2
+    return 1
+  }
+  if ! printf '%s' "$saida" | grep -q "curl_cffi"; then
+    echo "yt-dlp --list-impersonate-targets nao trouxe nenhum alvo curl_cffi" >&2
+    printf '%s\n' "$saida" >&2
+    return 1
+  fi
+  echo "$(printf '%s' "$saida" | grep -c curl_cffi) alvos de impersonacao disponiveis"
+}
+
 subir_postgres() {
   cp "$ENV_ENSAIO" "$ENV_TEMP"
   CRIOU_ENV_TEMP=1
@@ -326,6 +348,7 @@ passo "confere .env.ensaio (segredos de 32+ caracteres)" conferir_env
 passo "confere que deploy/.env nao existe (nunca sobrescrever segredo)" conferir_deploy_env_nao_existe
 passo "builda as tres imagens (roteiros-app, roteiros-worker, roteiros-backup :ensaio)" buildar_imagens
 passo "worker tem yt-dlp e deno" worker_tem_ytdlp_e_deno
+passo "yt-dlp tem alvo de impersonação" worker_tem_alvo_impersonacao
 passo "garante a rede externa 'web'" garantir_rede_web
 passo "sobe o postgres e espera ficar saudavel" subir_postgres
 passo "migra o banco pelo container do worker" migrar

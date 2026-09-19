@@ -122,6 +122,15 @@ export const textosAdmin = {
     erroColetar: (mensagem: string) => `não conseguimos enfileirar a coleta: ${mensagem}`,
     ultimaExecucaoJob: (nome: string, quando: string) => `${nome}: ${quando}`,
     semExecucao: "ainda não rodou",
+    /** V2a, item 5: a conferência enxerga, uma linha por plataforma em `/admin/nichos/[slug]`. */
+    resumoLeitura: (
+      plataforma: string,
+      transcritosHoje: number,
+      analisadosHoje: number,
+      transcritosUltimos7Dias: number,
+      analisadosUltimos7Dias: number,
+    ) =>
+      `${plataforma}, lidos hoje: ${transcritosHoje} transcritos, ${analisadosHoje} analisados; nos últimos 7 dias: ${transcritosUltimos7Dias} e ${analisadosUltimos7Dias}`,
     estoqueTitulo: "estoque por plataforma",
     colunaContasComMediana: "contas com mediana",
     colunaOrigemMediana: "conta / seguidores / setor",

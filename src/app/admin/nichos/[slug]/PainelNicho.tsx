@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import type { Nicho } from "@/db/schema";
-import type { ExecucaoResumo } from "@/servicos/admin-coleta";
+import type { ExecucaoResumo, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -22,6 +22,8 @@ type Props = {
   nicho: Nicho;
   /** Um por job de coleta, na ordem YouTube, Apify, noticias (decisao 4 do PROXIMO.md). */
   jobsColeta: { nome: string; execucao: ExecucaoResumo | null }[];
+  /** Um por plataforma, sempre as tres (V2a, item 5: a conferencia enxerga). */
+  resumoLeitura: ResumoLeituraPlataforma[];
 };
 
 function formatarQuando(data: Date | undefined): string {
@@ -29,7 +31,7 @@ function formatarQuando(data: Date | undefined): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
 }
 
-export function PainelNicho({ nicho, jobsColeta }: Props) {
+export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
   const router = useRouter();
 
   const [editando, setEditando] = useState(false);
@@ -206,6 +208,17 @@ export function PainelNicho({ nicho, jobsColeta }: Props) {
         <ul className={styles.execucoesLista}>
           {jobsColeta.map((job) => (
             <li key={job.nome}>{t.ultimaExecucaoJob(job.nome, formatarQuando(job.execucao?.iniciadoEm))}</li>
+          ))}
+          {resumoLeitura.map((linha) => (
+            <li key={linha.plataforma}>
+              {t.resumoLeitura(
+                linha.plataforma,
+                linha.transcritosHoje,
+                linha.analisadosHoje,
+                linha.transcritosUltimos7Dias,
+                linha.analisadosUltimos7Dias,
+              )}
+            </li>
           ))}
         </ul>
         <div className={styles.botoes}>

@@ -6,11 +6,22 @@
  * (modelo forte, com imagem). Video que falha no download ou na extracao
  * de quadros nao derruba os outros (mesmo padrao de erro por item das
  * etapas 6 e 8), e fica registrado no resumo.
+ *
+ * V2a, item 3: vídeo do Instagram com `videos.midiaUrl` lida há menos de
+ * 20h baixa direto pelo endereço de mídia da Meta (`urlParaBaixar`), sem
+ * cair no yt-dlp contra a página do Instagram; mesmo raciocínio de
+ * `transcrever.ts`.
+ *
+ * V2a, item 5 (corrigido no ajuste 1 da revisão do PR #45): o update de
+ * sucesso grava `analiseVisualEm` junto com `analiseVisual`, mesmo
+ * raciocínio de `transcrever.ts` (`atualizadoEm` é da coleta, não da
+ * leitura); é o sinal que `resumoLeituraPorPlataforma` (`admin-coleta.ts`)
+ * usa para "analisados hoje" em `/admin/nichos/[slug]`.
  */
 import { and, asc, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos, type AnaliseVisual } from "@/db/schema";
+import { nichos, videos, type AnaliseVisual, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
@@ -18,6 +29,7 @@ import { config } from "@/lib/config";
 import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
 import { temposDeQuadro } from "@/servicos/quadros";
 
+import { midiaUrlFresca } from "./coleta-comum";
 import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from "./video";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
@@ -26,6 +38,9 @@ const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 type CandidatoVisual = {
   id: number;
   url: string;
+  plataforma: Plataforma;
+  midiaUrl: string | null;
+  midiaUrlEm: Date | null;
   titulo: string | null;
   transcricao: string | null;
   duracaoS: number | null;
@@ -47,6 +62,9 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     .select({
       id: videos.id,
       url: videos.url,
+      plataforma: videos.plataforma,
+      midiaUrl: videos.midiaUrl,
+      midiaUrlEm: videos.midiaUrlEm,
       titulo: videos.titulo,
       transcricao: videos.transcricao,
       duracaoS: videos.duracaoS,
@@ -57,10 +75,22 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     .limit(config.regras.visuaisPorSemana);
 }
 
+/**
+ * Endereço de mídia direto quando fresco (V2a, item 3), a URL de verdade
+ * senão; mesmo raciocínio de `urlParaBaixar` em `transcrever.ts`.
+ */
+function urlParaBaixar(video: CandidatoVisual): string {
+  if (video.plataforma === "instagram" && video.midiaUrl && midiaUrlFresca(video.midiaUrlEm)) {
+    return video.midiaUrl;
+  }
+  return video.url;
+}
+
 async function analisarUm(video: CandidatoVisual): Promise<void> {
   let caminhoVideo: string | null = null;
   try {
-    caminhoVideo = await baixarVideo480p(video.url);
+    // A plataforma da linha decide seletor e proxy (ajuste 2 da revisao do PR #45): a url direta da Meta nao parece Instagram.
+    caminhoVideo = await baixarVideo480p(urlParaBaixar(video), video.plataforma);
 
     /**
      * Video vindo da Meta (Business Discovery/Hashtag Search, E6 parte 3,
@@ -92,7 +122,7 @@ async function analisarUm(video: CandidatoVisual): Promise<void> {
     });
 
     const analiseVisual: AnaliseVisual = resultado.dados;
-    await db().update(videos).set({ analiseVisual }).where(eq(videos.id, video.id));
+    await db().update(videos).set({ analiseVisual, analiseVisualEm: new Date() }).where(eq(videos.id, video.id));
 
     await registrarGeracao({
       tarefa: "analisarVisual",

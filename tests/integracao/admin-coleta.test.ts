@@ -4,16 +4,18 @@
  * plataforma, contas vigiadas, e as execucoes de job mais recentes com a
  * mensagem de erro passando intacta.
  */
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, contas, execucoesJob, nichos, roteiros, user, videos } from "@/db/schema";
+import { upsertVideo } from "@/jobs/coleta-comum";
 import { hojeISO } from "@/lib/config";
 import {
   listarClientesAdmin,
   listarExecucoesRecentes,
   listarNichosComContagem,
+  resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   taxaDeAcertoPorExecucao,
   ultimaExecucaoPorJob,
@@ -352,5 +354,153 @@ describe("resumoMedianaPorPlataforma", () => {
 
     await db().delete(videos).where(inArray(videos.idExterno, ["yt-com-multiplo", "yt-sem-multiplo"]));
     await db().delete(contas).where(inArray(contas.id, [contaOrigemConta.id, contaOrigemSetor.id]));
+  });
+});
+
+/**
+ * V2a, item 5: a conferência enxerga, "lidos hoje" e "últimos 7 dias" por
+ * plataforma. Ajuste 1 da revisão do PR #45: conta pelas colunas
+ * `transcritoEm`/`analiseVisualEm` (o momento da leitura), nunca por
+ * `atualizadoEm`, que `upsertVideo` grava em toda recoleta.
+ */
+describe("resumoLeituraPorPlataforma", () => {
+  const DIA_MS = 24 * 60 * 60 * 1000;
+  let nichoLeituraId: number;
+  let contaLeituraId: number;
+
+  beforeAll(async () => {
+    const [nichoLeitura] = await db()
+      .insert(nichos)
+      .values({ slug: "admin-coleta-leitura-teste", nome: "Admin coleta leitura teste", termos: [] })
+      .returning();
+    nichoLeituraId = nichoLeitura.id;
+
+    const [conta] = await db()
+      .insert(contas)
+      .values({ plataforma: "youtube", handle: "@leitura-teste", nichoId: nichoLeituraId })
+      .returning();
+    contaLeituraId = conta.id;
+
+    await db()
+      .insert(videos)
+      .values([
+        // Transcrito e analisado ha 1 hora: conta em "hoje" e em "ultimos 7 dias".
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-hoje",
+          url: "https://x/leitura-hoje",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de hoje",
+          analiseVisual: { falaParaCamera: true, textoNaTela: [], cenario: "x", ritmoDeCorte: "x", recursos: [], momentoChave: null },
+          transcritoEm: new Date(Date.now() - 1 * 60 * 60 * 1000),
+          analiseVisualEm: new Date(Date.now() - 1 * 60 * 60 * 1000),
+        },
+        // Transcrito ha 3 dias, sem analise visual: conta so em "ultimos 7 dias", so transcrito.
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-3-dias",
+          url: "https://x/leitura-3-dias",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de 3 dias atras",
+          transcritoEm: new Date(Date.now() - 3 * DIA_MS),
+        },
+        // Transcrito ha 10 dias: fora da janela de 7 dias, nao conta em nenhuma coluna.
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-10-dias",
+          url: "https://x/leitura-10-dias",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de 10 dias atras",
+          transcritoEm: new Date(Date.now() - 10 * DIA_MS),
+          analiseVisualEm: new Date(Date.now() - 10 * DIA_MS),
+          atualizadoEm: new Date(Date.now() - 10 * DIA_MS),
+        },
+        // Atualizado hoje (recoleta) mas sem leitura nenhuma: nao conta em nenhuma coluna.
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-sem-leitura",
+          url: "https://x/leitura-sem-leitura",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          atualizadoEm: new Date(),
+        },
+        // Ja tinha transcricao antes da migracao 0023 (colunas de leitura nulas) e foi recoletado
+        // hoje: nao ha como saber quando foi lido, entao nao entra em "hoje" nem em "7 dias".
+        {
+          plataforma: "youtube",
+          idExterno: "leitura-anterior-a-migracao",
+          url: "https://x/leitura-anterior-a-migracao",
+          contaId: conta.id,
+          nichoId: nichoLeituraId,
+          transcricao: "transcricao de antes da migracao",
+          atualizadoEm: new Date(),
+        },
+      ]);
+  });
+
+  it("um video transcrito ha 10 dias e recoletado hoje (upsertVideo) nao entra em 'lidos hoje': recoletar nao e ler (ajuste 1 da revisao do PR #45)", async () => {
+    const antes = await resumoLeituraPorPlataforma(nichoLeituraId);
+
+    const resultado = await upsertVideo(
+      {
+        plataforma: "youtube",
+        idExterno: "leitura-10-dias",
+        url: "https://x/leitura-10-dias",
+        titulo: "[exemplo] recoletado hoje",
+        descricao: null,
+        publicadoEm: new Date(Date.now() - 12 * DIA_MS),
+        duracaoS: 30,
+        views: 999,
+        likes: 10,
+        comentarios: 1,
+      },
+      contaLeituraId,
+      nichoLeituraId,
+    );
+    expect(resultado).toBe("atualizado");
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "leitura-10-dias"));
+    // A recoleta mexeu em atualizadoEm (agora), mas nunca nas colunas de leitura.
+    expect(Date.now() - linha.atualizadoEm.getTime()).toBeLessThan(60_000);
+    expect(Date.now() - linha.transcritoEm!.getTime()).toBeGreaterThan(9 * DIA_MS);
+    expect(Date.now() - linha.analiseVisualEm!.getTime()).toBeGreaterThan(9 * DIA_MS);
+
+    expect(await resumoLeituraPorPlataforma(nichoLeituraId)).toEqual(antes);
+  });
+
+  it("conta transcritos e analisados hoje e nos ultimos 7 dias, por plataforma", async () => {
+    const resumo = await resumoLeituraPorPlataforma(nichoLeituraId);
+    const youtube = resumo.find((r) => r.plataforma === "youtube");
+
+    expect(youtube).toEqual({
+      plataforma: "youtube",
+      transcritosHoje: 1,
+      analisadosHoje: 1,
+      transcritosUltimos7Dias: 2,
+      analisadosUltimos7Dias: 1,
+    });
+  });
+
+  it("sempre as tres plataformas, mesmo com zero video (tiktok e instagram, neste nicho)", async () => {
+    const resumo = await resumoLeituraPorPlataforma(nichoLeituraId);
+    const porPlataforma = new Map(resumo.map((r) => [r.plataforma, r]));
+
+    expect(porPlataforma.get("tiktok")).toEqual({
+      plataforma: "tiktok",
+      transcritosHoje: 0,
+      analisadosHoje: 0,
+      transcritosUltimos7Dias: 0,
+      analisadosUltimos7Dias: 0,
+    });
+    expect(porPlataforma.get("instagram")).toEqual({
+      plataforma: "instagram",
+      transcritosHoje: 0,
+      analisadosHoje: 0,
+      transcritosUltimos7Dias: 0,
+      analisadosUltimos7Dias: 0,
+    });
   });
 });
