@@ -26,6 +26,13 @@ na rede interna, sem porta publicada. O provedor de PO Token que o `yt-dlp` do w
 para baixar video/audio do YouTube com o cliente `mweb` (`src/jobs/youtube-cliente.ts`);
 sem ele, o YouTube volta a bloquear com "Sign in to confirm you're not a bot".
 
+`yt-dlp` no worker (V2a, item 4, 19/09/2026): instalado por `pip install "yt-dlp[default,curl-cffi]==<versao>"`,
+nao mais o zipapp baixado do release. So por pip o yt-dlp consegue fazer impersonation de
+navegador (extra `curl-cffi`), que o TikTok exige; o zipapp Unix nunca teve esse extra
+disponivel, versao nenhuma (README do yt-dlp). O pip instala o script em
+`/usr/local/bin/yt-dlp`, o mesmo caminho de antes, entao o plugin do provedor de PO Token
+(pasta `yt-dlp-plugins` do lado do executavel) continua igual.
+
 ## Primeiro deploy (uma vez)
 
 Ordem que aconteceu de verdade em 05/09/2026, com o painel indo ao ar em
@@ -185,7 +192,10 @@ Builda as três imagens, garante a rede `web`, sobe o Postgres, migra pelo conta
 worker (do jeito que `deploy.sh` faz), sobe o resto (inclusive `roteiros-pot`, o provedor de
 PO Token), confere `/api/saude`, confere que o worker acha o `roteiros-pot` pela rede
 interna (`yt-dlp -v --simulate` mostrando o provedor na lista, transcrição do YouTube,
-rodada 2), semeia, loga como o admin de exemplo e confere `/admin/clientes`, dispara
+rodada 2), confere que o `yt-dlp` da imagem tem alvo de impersonação disponível
+(`yt-dlp --list-impersonate-targets`, V2a item 4; sem rede, só confere que o extra
+`curl-cffi` foi instalado certo, o download de um TikTok de verdade é provado à parte, pela
+rede do Gustavo), semeia, loga como o admin de exemplo e confere `/admin/clientes`, dispara
 `coleta-noticias` de verdade três vezes (a segunda depois de um `stop`/`start` gracioso do
 worker, a terceira depois de um `kill` abrupto), tira um backup e confere o dump. Para no
 primeiro erro; imprime um resumo de uma linha por passo, com o tempo de cada um.
