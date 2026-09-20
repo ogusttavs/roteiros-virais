@@ -66,6 +66,8 @@ async function criarVideo(
     midiaUrlEm?: Date;
     /** Ajuste 1 da revisao do PR #45: `atualizadoEm` antigo, para provar que a transcricao nao o move (e da coleta). */
     atualizadoEm?: Date;
+    /** V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela. */
+    idioma?: string | null;
   },
 ) {
   const [v] = await db()
@@ -87,6 +89,7 @@ async function criarVideo(
       midiaUrl: opcoes.midiaUrl,
       midiaUrlEm: opcoes.midiaUrlEm,
       atualizadoEm: opcoes.atualizadoEm,
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
     })
     .returning();
   return v;
@@ -352,6 +355,78 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
 });
 
 /** V2a, item 3: Instagram com endereco de midia fresco baixa direto, sem a url da pagina. */
+/** V2b, item 6: a proporcao 70/30 corta o excesso de internacional da fila, mesmo com prioridade maior. */
+describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
+  it("video internacional em excesso nunca entra na fila, mesmo com prioridade maior que o brasileiro que entrou", async () => {
+    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 4 => tamanhoFila = 16,
+    // maxInternacional = floor(16*0.3) = 4. Cinco "en" com prioridade maior
+    // (foraDaCurva mais alto) que os dois "pt": so os 4 primeiros "en" cabem na
+    // fila, o quinto ("en-5", o de menor prioridade entre eles) fica de fora,
+    // mesmo tendo prioridade maior que qualquer "pt".
+    config.regras.transcricoesPorDia = 4;
+
+    const urlsEn: string[] = [];
+    for (let i = 1; i <= 5; i += 1) {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: `proporcao-en-${i}`, nichoId })
+        .returning();
+      const [video] = await db()
+        .insert(videos)
+        .values({
+          plataforma: "youtube",
+          idExterno: `proporcao-en-${i}`,
+          url: `https://exemplo.invalido/proporcao-en-${i}`,
+          contaId: conta.id,
+          nichoId,
+          views: 100,
+          publicadoEm: diasAtras(10),
+          foraDaCurva: String(20 - i), // en-1 (19) maior prioridade, en-5 (15) menor
+          idioma: "en",
+        })
+        .returning();
+      urlsEn.push(video.url);
+    }
+
+    const urlsPt: string[] = [];
+    for (let i = 1; i <= 2; i += 1) {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: `proporcao-pt-${i}`, nichoId })
+        .returning();
+      const [video] = await db()
+        .insert(videos)
+        .values({
+          plataforma: "youtube",
+          idExterno: `proporcao-pt-${i}`,
+          url: `https://exemplo.invalido/proporcao-pt-${i}`,
+          contaId: conta.id,
+          nichoId,
+          views: 100,
+          publicadoEm: diasAtras(10),
+          foraDaCurva: String(5 - i), // bem menor prioridade que qualquer "en"
+          idioma: "pt",
+        })
+        .returning();
+      urlsPt.push(video.url);
+    }
+
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    await rodarTranscrever();
+
+    const chamadas = vi.mocked(baixarLegendaYoutube).mock.calls.map(([url]) => url);
+    // Os quatro "en" de maior prioridade entraram (cabem no teto de 4 internacionais).
+    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 4)));
+    // O quinto "en" (menor prioridade entre eles) nunca entrou na fila, mesmo
+    // tendo prioridade maior que qualquer "pt": a proporcao cortou antes dele.
+    expect(chamadas).not.toContain(urlsEn[4]);
+    // Nenhum "pt" chegou a ser tentado: o teto diario (4 sucessos) ja fechou
+    // com os quatro "en" que entraram na fila, antes de chegar aos "pt".
+    expect(chamadas).not.toEqual(expect.arrayContaining(urlsPt));
+  });
+});
+
 describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
   const HORA_MS = 60 * 60 * 1000;
 

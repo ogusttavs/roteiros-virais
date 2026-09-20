@@ -138,6 +138,8 @@ export const config = {
     minimoEvidenciaModeloNicho: 10,
     janelaLinhaEditorial: 15,
     minimoParaAvisoLinhaEditorial: 5,
+    /** V2b, item 6, escopo 5.11: no minimo 70% brasileiro em tudo que escolhe video (`aplicarProporcaoBrasil`). */
+    proporcaoBrasil: 0.7,
   },
 };
 

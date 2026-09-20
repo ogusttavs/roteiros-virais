@@ -41,12 +41,13 @@ import { eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
-import { nichos, videos, type Plataforma } from "@/db/schema";
+import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
+import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
@@ -126,8 +127,12 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
       midiaUrl: videos.midiaUrl,
       midiaUrlEm: videos.midiaUrlEm,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(inArray(videos.id, idsUnicos));
 
   const candidatos: VideoParaSelecionar[] = linhas.map((l) => ({
@@ -135,6 +140,8 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     contaId: l.contaId,
     temTranscricao: Boolean(l.transcricao),
     proximaTentativaTranscricao: l.proximaTentativaTranscricao,
+    idioma: l.idioma,
+    contaBrasileira: contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal),
   }));
 
   const agora = new Date();
@@ -148,6 +155,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     candidatos,
     tamanhoFila,
     agora,
+    config.regras.proporcaoBrasil,
   );
 
   const porId = new Map(

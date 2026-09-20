@@ -10,13 +10,22 @@
  * `MAX_POR_CONTA` vídeos da mesma conta na fila final, para a base de
  * transcrição (e as Referências, que puxam do que já foi analisado) não
  * saírem quase todas de uma conta só.
+ *
+ * V2b, item 6: depois do teto por conta, `aplicarProporcaoBrasil` corta a
+ * fila para no máximo 30% internacional (o resto de `proporcaoBrasil`),
+ * no lugar do corte simples por tamanho que havia antes.
  */
+import { aplicarProporcaoBrasil, classificarBrasil } from "./proporcao-brasil";
+
 export type VideoParaSelecionar = {
   id: number;
   /** Nulo para video sem dono (Hashtag Search da Meta): nunca conta no teto por conta (item 2 desta rodada). */
   contaId: number | null;
   temTranscricao: boolean;
   proximaTentativaTranscricao: Date | null;
+  /** V2b, item 6: idioma do vídeo e se a conta dona é brasileira, para a proporção 70/30. */
+  idioma: string | null;
+  contaBrasileira: boolean;
 };
 
 /**
@@ -57,6 +66,7 @@ export function selecionarParaTranscrever(
   candidatos: VideoParaSelecionar[],
   limite: number,
   agora: Date,
+  proporcaoBrasil: number,
 ): number[] {
   const porId = new Map(candidatos.map((c) => [c.id, c]));
 
@@ -81,5 +91,12 @@ export function selecionarParaTranscrever(
   const contaPorId = new Map(candidatos.map((c) => [c.id, c.contaId]));
   const limitadosPorConta = limitarPorConta(elegiveis, contaPorId, MAX_POR_CONTA);
 
-  return limitadosPorConta.slice(0, limite);
+  const comProporcao = aplicarProporcaoBrasil(
+    limitadosPorConta.map((id) => porId.get(id)!),
+    limite,
+    (v) => classificarBrasil(v.idioma, v.contaBrasileira),
+    proporcaoBrasil,
+  );
+
+  return comProporcao.map((v) => v.id);
 }
