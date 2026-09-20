@@ -109,7 +109,11 @@ async function criarCliente(): Promise<number> {
   return cliente.id;
 }
 
-async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<number> {
+async function criarVideoEvidencia(
+  idExterno: string,
+  assunto: string,
+  opcoes: { idioma?: string | null; foraDaCurva?: number } = {},
+): Promise<number> {
   const [video] = await db()
     .insert(videos)
     .values({
@@ -118,8 +122,10 @@ async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
       titulo: assunto,
-      foraDaCurva: "6",
+      foraDaCurva: String(opcoes.foraDaCurva ?? 6),
       publicadoEm: new Date(),
+      // V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela.
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
       analise: {
         assunto,
         gancho: "olha essa mancha saindo do estofado",
@@ -262,6 +268,55 @@ describe("gerarRoteiro", () => {
       segundo: 0,
       oQueOlhar: "olha essa mancha saindo do estofado",
     });
+  });
+
+  /** V2b, item 6: a proporcao 70/30 corta o excesso de evidencia internacional. */
+  it("evidencia internacional em excesso fica de fora, mesmo com prioridade maior; brasileira entra sempre", async () => {
+    const clienteId = await criarCliente();
+    const idsEn: number[] = [];
+    for (let i = 1; i <= 4; i += 1) {
+      idsEn.push(
+        await criarVideoEvidencia(`prop-en-${i}`, "vazamento de agua no telhado", {
+          idioma: "en",
+          foraDaCurva: 20 - i, // prioridade maior que o "pt" abaixo
+        }),
+      );
+    }
+    const idPt = await criarVideoEvidencia("prop-pt", "vazamento de agua no telhado", {
+      idioma: "pt",
+      foraDaCurva: 1,
+    });
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "vazamento de agua no telhado",
+      objetivo: "conversao",
+    });
+
+    // Revisao do PR #46: so 1 brasileiro disponivel => maxInternacional = max(1, floor(1*0,3/0,7)) = 1.
+    const evidenciasEn = roteiro.conteudo.evidencias.filter((id) => idsEn.includes(id));
+    expect(evidenciasEn.length).toBeLessThanOrEqual(1);
+    expect(roteiro.conteudo.evidencias).toContain(idPt);
+  });
+
+  /** Revisao do PR #46: sem nenhum brasileiro na base, a evidencia vem vazia, nunca so internacional. */
+  it("sem nenhum brasileiro disponivel, evidencia do roteiro vem vazia mesmo com internacional de sobra", async () => {
+    const clienteId = await criarCliente();
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideoEvidencia(`prop-sem-brasil-en-${i}`, "vazamento no telhado do galpao", {
+        idioma: "en",
+        foraDaCurva: 20 - i,
+      });
+    }
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "vazamento no telhado do galpao",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.evidencias).toEqual([]);
+    expect(roteiro.conteudo.semEvidencia).toBe(true);
   });
 
   it("tema livre sem nenhuma evidência no banco: roteiro honesto, sem referência e sem citar id (ajuste 2 da revisão do PR #17)", async () => {

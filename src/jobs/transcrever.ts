@@ -41,13 +41,14 @@ import { eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
-import { nichos, videos, type Plataforma } from "@/db/schema";
+import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
-import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
+import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
 import { ErroGroq, transcreverAudio } from "./groq-api";
@@ -102,9 +103,16 @@ function comMidiaFrescaComoDesempate<T extends { id: number }>(
 
 async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   const tamanhoFila = tetoDiario * FATOR_FILA;
+  // V2b, item 10: o teto por conta entra aqui, na consulta, antes do LIMIT
+  // (`maxPorConta`), não só depois em `limitarPorConta`; sem isso, quando as
+  // notas mais altas se concentram em poucas contas, o corte por tamanho da
+  // consulta já esgota a fila com poucas contas repetidas, e `limitarPorConta`
+  // encolhe o que sobrou para bem menos que `tetoDiario` (achado da prova em
+  // produção, 19/09 à noite: 187 vídeos fora da curva do Instagram, com mídia
+  // fresca, nunca chegavam a ser tentados).
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, tamanhoFila),
-    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila),
+    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
@@ -126,8 +134,12 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
       midiaUrl: videos.midiaUrl,
       midiaUrlEm: videos.midiaUrlEm,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(inArray(videos.id, idsUnicos));
 
   const candidatos: VideoParaSelecionar[] = linhas.map((l) => ({
@@ -135,6 +147,8 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     contaId: l.contaId,
     temTranscricao: Boolean(l.transcricao),
     proximaTentativaTranscricao: l.proximaTentativaTranscricao,
+    idioma: l.idioma,
+    contaBrasileira: contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal),
   }));
 
   const agora = new Date();
@@ -148,6 +162,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     candidatos,
     tamanhoFila,
     agora,
+    config.regras.proporcaoBrasil,
   );
 
   const porId = new Map(

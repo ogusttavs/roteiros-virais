@@ -132,10 +132,13 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
         }
       }
 
-      const { etiquetas, ...analise } = dados;
+      const { etiquetas, idioma, ...analise } = dados;
       const analiseVideo: AnaliseVideo = analise;
 
-      await db().update(videos).set({ analise: analiseVideo, etiquetas }).where(eq(videos.id, videoId));
+      // Idioma da fala (V2b, item 3): sobrescreve a deteccao por titulo de
+      // `upsertVideo`, porque a extracao le a transcricao inteira, mais
+      // confiavel que titulo/descricao.
+      await db().update(videos).set({ analise: analiseVideo, etiquetas, idioma }).where(eq(videos.id, videoId));
       videosAtualizados += 1;
 
       await registrarGeracao({

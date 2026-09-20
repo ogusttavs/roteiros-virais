@@ -481,6 +481,8 @@ describe("resumoLeituraPorPlataforma", () => {
       analisadosHoje: 1,
       transcritosUltimos7Dias: 2,
       analisadosUltimos7Dias: 1,
+      // V2b, item 9: o video "leitura-hoje" nao tem idioma nem a conta e brasileira.
+      transcritosHojeBrasileiros: 0,
     });
   });
 
@@ -494,6 +496,7 @@ describe("resumoLeituraPorPlataforma", () => {
       analisadosHoje: 0,
       transcritosUltimos7Dias: 0,
       analisadosUltimos7Dias: 0,
+      transcritosHojeBrasileiros: 0,
     });
     expect(porPlataforma.get("instagram")).toEqual({
       plataforma: "instagram",
@@ -501,6 +504,76 @@ describe("resumoLeituraPorPlataforma", () => {
       analisadosHoje: 0,
       transcritosUltimos7Dias: 0,
       analisadosUltimos7Dias: 0,
+      transcritosHojeBrasileiros: 0,
     });
+  });
+
+  /** V2b, item 9: a conferência enxerga a parte brasileira. */
+  it("transcritosHojeBrasileiros conta idioma pt/pt-BR e idioma nulo so quando a conta e brasileira", async () => {
+    const [nichoBrasil] = await db()
+      .insert(nichos)
+      .values({ slug: "admin-coleta-brasil-teste", nome: "Admin coleta brasil teste", termos: [] })
+      .returning();
+    const [contaBrasileira] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "brasil-teste-conta-br", nichoId: nichoBrasil.id, pais: "BR" })
+      .returning();
+    const [contaInternacional] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "brasil-teste-conta-en", nichoId: nichoBrasil.id, idiomaPrincipal: "en" })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values([
+        // idioma "pt", conta internacional: ainda conta como brasileiro (idioma manda).
+        {
+          plataforma: "tiktok",
+          idExterno: "brasil-pt",
+          url: "https://x/brasil-pt",
+          contaId: contaInternacional.id,
+          nichoId: nichoBrasil.id,
+          idioma: "pt",
+          transcritoEm: new Date(),
+        },
+        // idioma nulo, conta brasileira (pais BR): conta como brasileiro.
+        {
+          plataforma: "tiktok",
+          idExterno: "brasil-nulo-conta-br",
+          url: "https://x/brasil-nulo-conta-br",
+          contaId: contaBrasileira.id,
+          nichoId: nichoBrasil.id,
+          transcritoEm: new Date(),
+        },
+        // idioma "en": internacional, nunca conta.
+        {
+          plataforma: "tiktok",
+          idExterno: "brasil-en",
+          url: "https://x/brasil-en",
+          contaId: contaBrasileira.id,
+          nichoId: nichoBrasil.id,
+          idioma: "en",
+          transcritoEm: new Date(),
+        },
+        // idioma nulo, conta internacional: nunca conta.
+        {
+          plataforma: "tiktok",
+          idExterno: "brasil-nulo-conta-en",
+          url: "https://x/brasil-nulo-conta-en",
+          contaId: contaInternacional.id,
+          nichoId: nichoBrasil.id,
+          transcritoEm: new Date(),
+        },
+      ]);
+
+    const resumo = await resumoLeituraPorPlataforma(nichoBrasil.id);
+    const tiktok = resumo.find((r) => r.plataforma === "tiktok");
+
+    expect(tiktok?.transcritosHoje).toBe(4);
+    expect(tiktok?.transcritosHojeBrasileiros).toBe(2);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoBrasil.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoBrasil.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoBrasil.id));
   });
 });

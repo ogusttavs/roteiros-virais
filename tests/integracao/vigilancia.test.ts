@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
+import { config } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { rodarPontuar } from "../../src/jobs/pontuar";
@@ -20,10 +21,21 @@ function diasAtras(dias: number): Date {
 
 let nichoId: number;
 
-async function criarConta(handle: string, taxa: number | null): Promise<number> {
+async function criarConta(
+  handle: string,
+  taxa: number | null,
+  opcoes: { pais?: string | null; idiomaPrincipal?: string | null } = {},
+): Promise<number> {
   const [c] = await db()
     .insert(contas)
-    .values({ plataforma: "tiktok", handle, nichoId, taxaForaDaCurva: taxa === null ? undefined : String(taxa) })
+    .values({
+      plataforma: "tiktok",
+      handle,
+      nichoId,
+      taxaForaDaCurva: taxa === null ? undefined : String(taxa),
+      pais: opcoes.pais,
+      idiomaPrincipal: opcoes.idiomaPrincipal,
+    })
     .returning({ id: contas.id });
   return c.id;
 }
@@ -187,5 +199,96 @@ describe("rodarVigilancia", () => {
       .from(contas)
       .where(eq(contas.id, comumPoucosVideos));
     expect(contaComum.vigiada).toBe(false);
+  });
+
+  /**
+   * V2b, item 7: o ranking prefere conta brasileira antes de olhar a taxa
+   * fora da curva. Teto reduzido a 2 (mutacao direta de `config.regras`,
+   * mesmo padrao ja usado em `transcrever.test.ts`) para o corte por
+   * posicao no ranking ficar observavel: com o teto de producao (50) as
+   * tres contas caberiam de qualquer forma, e o teste nao provaria a ordem.
+   */
+  it("conta brasileira vem antes de conta com taxa maior mas nao brasileira", async () => {
+    const [nichoBrasil] = await db()
+      .insert(nichos)
+      .values({ slug: "vigilancia-brasil-teste", nome: "Vigilancia brasil teste", termos: [] })
+      .returning();
+
+    async function contaNoNicho(handle: string, taxa: string, extra: { pais?: string; idiomaPrincipal?: string }) {
+      const [c] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle, nichoId: nichoBrasil.id, taxaForaDaCurva: taxa, ...extra })
+        .returning({ id: contas.id });
+      for (let v = 0; v < 8; v += 1) {
+        await db()
+          .insert(videos)
+          .values({
+            plataforma: "tiktok",
+            idExterno: `${handle}-v${v}`,
+            url: `https://exemplo.invalido/${handle}-v${v}`,
+            contaId: c.id,
+            nichoId: nichoBrasil.id,
+            publicadoEm: diasAtras(10),
+          });
+      }
+      return c.id;
+    }
+
+    // Taxa mais alta, mas internacional: perde para as duas brasileiras de taxa mais baixa.
+    const contaInternacional = await contaNoNicho("vigilancia-en-taxa-alta", "0.95", { idiomaPrincipal: "en" });
+    const contaBrasileiraPorPais = await contaNoNicho("vigilancia-br-taxa-baixa", "0.2", { pais: "BR" });
+    const contaBrasileiraPorIdioma = await contaNoNicho("vigilancia-pt-taxa-baixa", "0.1", { idiomaPrincipal: "pt-BR" });
+
+    config.regras.vigilanciaPorNicho = 2;
+    try {
+      await rodarVigilancia();
+    } finally {
+      config.regras.vigilanciaPorNicho = 50;
+    }
+
+    async function vigiada(id: number): Promise<boolean> {
+      const [c] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, id));
+      return c.vigiada;
+    }
+
+    expect(await vigiada(contaBrasileiraPorPais)).toBe(true);
+    expect(await vigiada(contaBrasileiraPorIdioma)).toBe(true);
+    // Fica de fora apesar da taxa mais alta: o teto de 2 ja fechou com as duas brasileiras.
+    expect(await vigiada(contaInternacional)).toBe(false);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoBrasil.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoBrasil.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoBrasil.id));
+  }, 30_000);
+
+  /** V2b, item 7: conta de idioma principal "outro" nunca e vigiada, mesmo com taxa alta. */
+  it("conta com idioma principal outro nunca e vigiada, mesmo com taxa alta", async () => {
+    const contaOutro = await criarConta("vigilancia-idioma-outro", 0.99, { idiomaPrincipal: "outro" });
+    await criarVideos(contaOutro, 8);
+
+    await rodarVigilancia();
+
+    const [c] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, contaOutro));
+    expect(c.vigiada).toBe(false);
+  });
+
+  /** V2b, item 7: a semente continua sempre vigiada, mesmo com idioma "outro" (e escolha de gente). */
+  it("semente com idioma outro continua sempre vigiada", async () => {
+    const [semente] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "instagram",
+        handle: "semente-idioma-outro",
+        nichoId,
+        vigiada: true,
+        origem: "curadoria",
+        idiomaPrincipal: "outro",
+      })
+      .returning({ id: contas.id });
+
+    await rodarVigilancia();
+
+    const [c] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, semente.id));
+    expect(c.vigiada).toBe(true);
   });
 });

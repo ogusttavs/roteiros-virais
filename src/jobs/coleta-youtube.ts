@@ -166,14 +166,16 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
         const itens = resposta.items ?? [];
 
         /**
-         * Seguidores (E6 parte 3, item 4): `videos.list` nao traz
-         * `statistics.subscriberCount` do canal, so `channels.list` traz.
-         * Uma chamada por lote (no maximo 50 canais distintos, o mesmo
-         * tamanho do lote de videos), sem trava se faltar cota: o valor so
-         * fica nulo desta vez, `upsertConta` protege o que ja foi gravado
-         * antes (nunca apaga um seguidores conhecido com um nulo).
+         * Seguidores e pais do canal (E6 parte 3, item 4; pais no V2b, item
+         * 2): `videos.list` nao traz `statistics.subscriberCount` nem
+         * `snippet.country`, so `channels.list` traz. Uma chamada por lote
+         * (no maximo 50 canais distintos, o mesmo tamanho do lote de
+         * videos), sem trava se faltar cota: os valores so ficam nulos
+         * desta vez, `upsertConta` protege o que ja foi gravado antes
+         * (nunca apaga um valor conhecido com um nulo).
          */
         const seguidoresPorCanal = new Map<string, number | null>();
+        const paisPorCanal = new Map<string, string | null>();
         const canaisDoLote = [...new Set(itens.map((item) => item.snippet.channelId))];
         if (canaisDoLote.length > 0 && cabe(CUSTO_LISTA)) {
           try {
@@ -184,6 +186,7 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
                 canal.id,
                 canal.statistics?.subscriberCount ? Number(canal.statistics.subscriberCount) : null,
               );
+              paisPorCanal.set(canal.id, canal.snippet.country ?? null);
             }
           } catch (erroCanais) {
             avisos.push(
@@ -197,6 +200,7 @@ export async function rodarColetaYoutube(nichoId?: number): Promise<Record<strin
           const contaComSeguidores = {
             ...conta,
             seguidores: seguidoresPorCanal.get(item.snippet.channelId) ?? null,
+            pais: paisPorCanal.get(item.snippet.channelId) ?? null,
           };
           const contaId = await upsertConta(contaComSeguidores, nicho.id);
           const resultado = await upsertVideo(video, contaId, nicho.id);

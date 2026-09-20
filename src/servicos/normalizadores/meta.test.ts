@@ -62,6 +62,10 @@ describe("normalizarBusinessDiscovery", () => {
         likes: 12000,
         comentarios: 300,
         midiaUrl: null,
+        // Revisao do PR #46 (ajuste 2): "do" entrou na lista de palavras do
+        // portugues, e a legenda de exemplo ("legenda do post") passa a ter
+        // sinal de verdade, correto, ja que o texto e mesmo portugues.
+        idioma: "pt",
       },
     ]);
   });
@@ -161,6 +165,7 @@ describe("normalizarHashtagMedia", () => {
       likes: 500,
       comentarios: 10,
       midiaUrl: "https://exemplo.invalido/video1.mp4",
+      idioma: "pt",
     });
   });
 

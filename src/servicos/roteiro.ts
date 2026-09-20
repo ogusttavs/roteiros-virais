@@ -23,7 +23,7 @@ import {
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
-import { hojeISO } from "@/lib/config";
+import { config, hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -36,6 +36,7 @@ import {
   modeloNichoAtual,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
+import { aplicarProporcaoBrasil, classificarBrasil } from "./proporcao-brasil";
 import { temasParaCliente } from "./temas";
 
 export class ErroRoteiro extends Error {}
@@ -119,21 +120,29 @@ function escolherReferencia(
   return { videoId: maiorForaDaCurva.id, segundo: 0, oQueOlhar: maiorForaDaCurva.gancho };
 }
 
-/** Os ids já vetados pelo tema do dia entram primeiro; completa até o limite com a busca. */
+/**
+ * Os ids já vetados pelo tema do dia entram primeiro; junta com a busca sem
+ * duplicar, e a proporção 70/30 (V2b, item 6) faz o corte final para o
+ * `limite` de verdade, no lugar do corte simples por tamanho que havia
+ * antes. O loop não para mais em `limite` (achado ao implementar a
+ * proporção): parar cedo tiraria candidato brasileiro da busca que a
+ * proporção poderia ter preferido no lugar de um internacional que "chegou
+ * primeiro" na lista prevista.
+ */
 function combinarEvidencias(
   prevista: VideoEvidenciaRoteiro[],
   daBusca: VideoEvidenciaRoteiro[],
   limite: number,
+  proporcaoBrasil: number,
 ): VideoEvidenciaRoteiro[] {
   const combinado = [...prevista];
   const idsJaIncluidos = new Set(prevista.map((v) => v.id));
   for (const video of daBusca) {
-    if (combinado.length >= limite) break;
     if (idsJaIncluidos.has(video.id)) continue;
     combinado.push(video);
     idsJaIncluidos.add(video.id);
   }
-  return combinado.slice(0, limite);
+  return aplicarProporcaoBrasil(combinado, limite, (v) => classificarBrasil(v.idioma, v.contaBrasileira), proporcaoBrasil);
 }
 
 /**
@@ -287,7 +296,7 @@ async function gerarConteudo(
     regrasAtivasDoCliente(dados.clienteId),
   ]);
 
-  const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA);
+  const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil);
   const referenciaEscolhida = escolherReferencia(evidencias);
   const semEvidencia = evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);

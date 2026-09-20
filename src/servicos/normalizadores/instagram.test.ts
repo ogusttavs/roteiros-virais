@@ -29,6 +29,7 @@ describe("normalizarVideoInstagram", () => {
       views: 132045,
       likes: 9210,
       comentarios: 187,
+      idioma: "pt",
     });
     expect(conta).toEqual({
       plataforma: "instagram",

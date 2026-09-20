@@ -3,6 +3,7 @@
  * a regra de nunca aparecer vídeo de seed fora de desenvolvimento (o Vitest
  * roda com NODE_ENV distinto de "development", então a regra vale aqui).
  */
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -37,6 +38,10 @@ async function criarVideo(
     titulo?: string;
     etiquetas?: string[];
     semDono?: boolean;
+    /** V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela. */
+    idioma?: string | null;
+    contaId?: number;
+    nichoId?: number;
   },
 ) {
   const [v] = await db()
@@ -45,8 +50,8 @@ async function criarVideo(
       plataforma: opcoes.semDono ? "instagram" : "tiktok",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
-      contaId: opcoes.semDono ? null : contaId,
-      nichoId,
+      contaId: opcoes.semDono ? null : (opcoes.contaId ?? contaId),
+      nichoId: opcoes.nichoId ?? nichoId,
       titulo: opcoes.titulo,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
@@ -56,6 +61,7 @@ async function criarVideo(
       analise: opcoes.analise as never,
       etiquetas: opcoes.etiquetas,
       semDono: opcoes.semDono ?? false,
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
     })
     .returning();
   return v;
@@ -119,6 +125,64 @@ describe("foraDaCurvaDoNicho", () => {
     expect(resultado.some((v) => v.foraDaCurva === 50)).toBe(false);
     expect(resultado.some((v) => v.foraDaCurva === 45)).toBe(true);
   });
+
+  /**
+   * V2b, item 10 (achado da prova em produção, 19/09 à noite): sem
+   * `maxPorConta`, o LIMIT corta pelos maiores valores globais antes de
+   * `limitarPorConta` poder agir; se as notas mais altas se concentram
+   * numa conta só (o cenário medido em produção), a fila final encolhe
+   * bem abaixo do teto. Trinta contas com 10 vídeos cada, todas as notas
+   * da conta A maiores que as da B e assim por diante: sem `maxPorConta`,
+   * um `limite` de 60 traria só os vídeos da conta A e da B (as duas com
+   * as notas mais altas); com `maxPorConta=2`, a fila tem que ter as 30
+   * contas representadas, 60 candidatos no total.
+   */
+  it("maxPorConta: o teto por conta entra na consulta, antes do limite, preservando contas diferentes", async () => {
+    const [nichoTeto] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-teto-conta-teste", nome: "Pesquisa teto conta teste", termos: [] })
+      .returning();
+
+    for (let conta = 0; conta < 30; conta += 1) {
+      const [c] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: `teto-conta-${conta}`, nichoId: nichoTeto.id })
+        .returning({ id: contas.id });
+      for (let video = 0; video < 10; video += 1) {
+        await db()
+          .insert(videos)
+          .values({
+            plataforma: "tiktok",
+            idExterno: `teto-conta-${conta}-video-${video}`,
+            url: `https://exemplo.invalido/teto-conta-${conta}-video-${video}`,
+            contaId: c.id,
+            nichoId: nichoTeto.id,
+            publicadoEm: diasAtras(10),
+            // Nota decrescente por conta: a conta 0 tem as 10 maiores notas de
+            // todo o nicho, a conta 1 as 10 seguintes, e assim por diante.
+            foraDaCurva: String(1000 - conta * 10 - video),
+          });
+      }
+    }
+
+    const semTeto = await foraDaCurvaDoNicho(nichoTeto.id, 90, 60);
+    const contasSemTeto = new Set(semTeto.map((v) => v.contaHandle));
+    // Sem maxPorConta, os 60 primeiros por nota vem so das contas 0 a 5 (10 videos cada).
+    expect(contasSemTeto.size).toBeLessThan(30);
+
+    const comTeto = await foraDaCurvaDoNicho(nichoTeto.id, 90, 60, 2);
+    expect(comTeto).toHaveLength(60);
+    const contasComTeto = new Set(comTeto.map((v) => v.contaHandle));
+    expect(contasComTeto.size).toBe(30);
+    // No maximo 2 videos por conta, mesmo antes do corte de tamanho.
+    for (const handle of contasComTeto) {
+      expect(comTeto.filter((v) => v.contaHandle === handle)).toHaveLength(2);
+    }
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoTeto.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoTeto.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoTeto.id));
+  }, 30_000);
 });
 
 describe("subindoHoje", () => {
@@ -261,6 +325,59 @@ describe("evidenciaParaTema", () => {
     const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
     expect(resultado).toEqual([]);
   });
+
+  /**
+   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
+   * internacional com base em quantos brasileiros de fato entraram, nao no
+   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
+   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
+   * maior competindo e um limite bem maior que 2.
+   */
+  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
+    const idsEn: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      await criarVideo(`ev-prop-en-${i}`, {
+        foraDaCurva: 50 - i, // prioridade bem maior que o "pt" abaixo
+        publicadoEm: diasAtras(10),
+        titulo: "assunto exclusivo da proporcao internacional",
+        idioma: "en",
+        analise: { assunto: `en-${i}` },
+      });
+      idsEn.push(`en-${i}`);
+    }
+    await criarVideo("ev-prop-pt", {
+      foraDaCurva: 1,
+      publicadoEm: diasAtras(10),
+      titulo: "assunto exclusivo da proporcao internacional",
+      idioma: "pt",
+      analise: { assunto: "pt-0" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da proporcao internacional", 10);
+
+    expect(resultado).toHaveLength(2);
+    expect(resultado.map((v) => v.assunto)).toContain("pt-0");
+    // So o "en" de maior prioridade (en-0) entra; en-1, en-2 e en-3 ficam de fora.
+    expect(resultado.map((v) => v.assunto)).toContain("en-0");
+    expect(resultado.map((v) => v.assunto)).not.toContain("en-1");
+  });
+
+  /** A nova regra: sem nenhum brasileiro na evidencia disponivel, o resultado e vazio. */
+  it("sem nenhum brasileiro disponivel, a evidencia vem vazia mesmo com internacional de sobra", async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await criarVideo(`ev-sem-brasil-en-${i}`, {
+        foraDaCurva: 50 - i,
+        publicadoEm: diasAtras(10),
+        titulo: "assunto so internacional",
+        idioma: "en",
+        analise: { assunto: `sem-brasil-en-${i}` },
+      });
+    }
+
+    const resultado = await evidenciaParaTema(nichoId, "assunto so internacional", 10);
+
+    expect(resultado).toEqual([]);
+  });
 });
 
 describe("referenciasDoNicho", () => {
@@ -327,5 +444,104 @@ describe("referenciasDoNicho", () => {
     expect(resultado.some((v) => v.id === naMedia.id)).toBe(false);
     expect(resultado.some((v) => v.id === abaixo.id)).toBe(false);
     expect(resultado.some((v) => v.assunto === "no limiar")).toBe(true);
+  });
+
+  /**
+   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
+   * internacional com base em quantos brasileiros de fato entraram, nao no
+   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
+   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
+   * maior (mais recentes) competindo e um limite bem maior que 2.
+   */
+  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
+    // Nicho proprio, isolado dos videos que os describes acima ja gravaram
+    // no nicho compartilhado (referenciasDoNicho nao filtra por assunto,
+    // so por nicho): sem isso o corte de proporcao competiria com dado de
+    // outro teste, nao so com o cenario desta rodada.
+    const [nichoProporcao] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-proporcao-teste", nome: "Pesquisa proporcao teste", termos: [] })
+      .returning();
+    const [contaProporcao] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-proporcao", nichoId: nichoProporcao.id })
+      .returning();
+
+    const analiseExemplo = {
+      gancho: "gancho",
+      estrutura: "estrutura",
+      porQueFuncionou: "funcionou por isso",
+      formato: "fala_para_camera",
+    };
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideo(`ref-prop-en-${i}`, {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(i), // mais recente que o "pt" abaixo: prioridade maior
+        idioma: "en",
+        contaId: contaProporcao.id,
+        nichoId: nichoProporcao.id,
+        analise: { ...analiseExemplo, assunto: `ref-en-${i}` },
+      });
+    }
+    await criarVideo("ref-prop-pt", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      idioma: "pt",
+      contaId: contaProporcao.id,
+      nichoId: nichoProporcao.id,
+      analise: { ...analiseExemplo, assunto: "ref-pt-0" },
+    });
+
+    const resultado = await referenciasDoNicho(nichoProporcao.id, 90, 10);
+
+    expect(resultado).toHaveLength(2);
+    const assuntos = resultado.map((v) => v.assunto);
+    expect(assuntos).toContain("ref-pt-0");
+    // So o "en" de maior prioridade (mais recente, ref-en-1) entra.
+    expect(assuntos).toContain("ref-en-1");
+    expect(assuntos).not.toContain("ref-en-2");
+    expect(assuntos).not.toContain("ref-en-3");
+    expect(assuntos).not.toContain("ref-en-4");
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoProporcao.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoProporcao.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoProporcao.id));
+  });
+
+  /** A nova regra: sem nenhum brasileiro na base disponivel, o resultado e vazio. */
+  it("sem nenhum brasileiro disponivel, referencias vem vazia mesmo com internacional de sobra", async () => {
+    const [nichoSemBrasil] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-sem-brasil-teste", nome: "Pesquisa sem brasil teste", termos: [] })
+      .returning();
+    const [contaSemBrasil] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-sem-brasil", nichoId: nichoSemBrasil.id })
+      .returning();
+
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideo(`ref-sem-brasil-en-${i}`, {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(i),
+        idioma: "en",
+        contaId: contaSemBrasil.id,
+        nichoId: nichoSemBrasil.id,
+        analise: {
+          gancho: "gancho",
+          estrutura: "estrutura",
+          porQueFuncionou: "funcionou por isso",
+          formato: "fala_para_camera",
+          assunto: `ref-sem-brasil-en-${i}`,
+        },
+      });
+    }
+
+    const resultado = await referenciasDoNicho(nichoSemBrasil.id, 90, 10);
+
+    expect(resultado).toEqual([]);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoSemBrasil.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoSemBrasil.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoSemBrasil.id));
   });
 });

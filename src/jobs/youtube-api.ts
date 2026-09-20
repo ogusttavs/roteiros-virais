@@ -90,6 +90,13 @@ export type YoutubeVideoItem = {
     title: string;
     description: string;
     publishedAt: string;
+    /**
+     * Idioma do audio/dos metadados do video, formato BCP-47 (ex.: "pt-BR",
+     * "en-US"), quando o canal preencheu (V2b, item 2: o Brasil primeiro).
+     * Ja vem de graca dentro de `snippet`, sem custo de cota a mais.
+     */
+    defaultAudioLanguage?: string;
+    defaultLanguage?: string;
   };
   contentDetails: { duration: string };
   statistics: { viewCount?: string; likeCount?: string; commentCount?: string };
@@ -108,7 +115,12 @@ export async function buscarVideosPorId(ids: string[]): Promise<YoutubeVideosRes
 
 export type YoutubeChannelItem = {
   id: string;
-  snippet: { title: string; customUrl?: string };
+  /**
+   * `country`, formato ISO 3166-1 alpha-2 (ex.: "BR"), quando o canal
+   * preencheu (V2b, item 2: o Brasil primeiro). Ja vem de graca dentro de
+   * `snippet`, sem custo de cota a mais.
+   */
+  snippet: { title: string; customUrl?: string; country?: string };
   contentDetails: { relatedPlaylists: { uploads: string } };
   /** So vem quando `part` inclui "statistics" (`buscarCanaisPorId`, E6 parte 3, item 4). */
   statistics?: { subscriberCount?: string };

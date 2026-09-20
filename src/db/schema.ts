@@ -312,6 +312,19 @@ export const contas = pgTable(
     apiIndisponivelEm: timestamp("api_indisponivel_em", { withTimezone: true }),
     /** Ultima vez que esta conta foi lida pela Business Discovery da Meta (admin, item 5). */
     ultimaLeituraMetaEm: timestamp("ultima_leitura_meta_em", { withTimezone: true }),
+    /**
+     * Pais da conta, duas letras (V2b, item 1, escopo 5.11: o Brasil
+     * primeiro), nulo quando nao da para saber. Hoje so "BR" e gravado (pelo
+     * indicio de Brasil da Meta ou pelo pais do canal do YouTube); a
+     * vigilancia (`vigilancia.ts`) usa para preferir conta brasileira.
+     */
+    pais: text("pais"),
+    /**
+     * Idioma predominante da conta (V2b, item 4): a moda do `videos.idioma`
+     * dos videos da conta nos ultimos 90 dias, calculada pelo `pontuar`
+     * quando ha pelo menos 3 videos com idioma conhecido; nulo ate la.
+     */
+    idiomaPrincipal: text("idioma_principal"),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],
@@ -441,6 +454,15 @@ export const videos = pgTable(
      */
     transcritoEm: timestamp("transcrito_em", { withTimezone: true }),
     analiseVisualEm: timestamp("analise_visual_em", { withTimezone: true }),
+    /**
+     * Idioma do video (V2b, item 1, escopo 5.11: o Brasil primeiro), nulo
+     * quando nao da para saber. Detectado por codigo na coleta a partir do
+     * titulo e da descricao (`detectarIdioma`, `src/config/idioma.ts`) e
+     * sobrescrito pela extracao em lote, que le a transcricao inteira
+     * (item 3, mais confiavel que titulo/descricao). Valores: "pt", "en",
+     * "es", "outro" (alfabeto nao latino ou idioma nao reconhecido).
+     */
+    idioma: text("idioma"),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -455,6 +477,8 @@ export const videos = pgTable(
     index("videos_nicho_velocidade_relativa").on(t.nichoId, t.velocidadeRelativa),
     /** Taxa de acerto por execucao (E6 parte 3, terceira rodada, item 5). */
     index("videos_execucao_id").on(t.execucaoId),
+    /** Proporcao 70/30 por nicho (V2b, item 6): filtra por idioma dentro do nicho. */
+    index("videos_nicho_idioma").on(t.nichoId, t.idioma),
   ],
 );
 

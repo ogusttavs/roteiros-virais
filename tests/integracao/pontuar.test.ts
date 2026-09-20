@@ -12,6 +12,8 @@ import { contas, nichos, videos } from "@/db/schema";
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { rodarPontuar, rodarPontuarVelocidade } from "../../src/jobs/pontuar";
 
+type OpcoesVideo = { idioma?: string | null; titulo?: string | null; descricao?: string | null };
+
 const DIA_MS = 24 * 60 * 60 * 1000;
 
 function diasAtras(dias: number): Date {
@@ -34,6 +36,7 @@ async function criarVideo(
   views: number,
   publicadoEm: Date,
   nicho: number = nichoId,
+  opcoes: OpcoesVideo = {},
 ) {
   await db()
     .insert(videos)
@@ -45,6 +48,9 @@ async function criarVideo(
       nichoId: nicho,
       views,
       publicadoEm,
+      idioma: opcoes.idioma ?? null,
+      titulo: opcoes.titulo ?? null,
+      descricao: opcoes.descricao ?? null,
     });
 }
 
@@ -277,5 +283,100 @@ describe("rodarPontuarVelocidade (E6 parte 3, terceira rodada, item 6: passada l
 
     const [depois] = await db().select().from(contas).where(eq(contas.id, conta));
     expect(Number(depois.medianaViews)).toBe(3000); // sem mudanca (passo 1 nao rodou)
+  });
+});
+
+/** V2b, item 4: idioma_principal (moda do idioma dos videos) e pais por conta. */
+describe("rodarPontuar, idioma principal e pais da conta", () => {
+  it("moda do idioma com pelo menos 3 videos com idioma conhecido", async () => {
+    const conta = await criarConta("idioma-moda");
+    await criarVideo(conta, "idioma-moda-1", 100, diasAtras(10), nichoId, { idioma: "pt" });
+    await criarVideo(conta, "idioma-moda-2", 100, diasAtras(10), nichoId, { idioma: "pt" });
+    await criarVideo(conta, "idioma-moda-3", 100, diasAtras(10), nichoId, { idioma: "en" });
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBe("pt");
+  });
+
+  it("menos de 3 videos com idioma conhecido: idioma_principal fica nulo", async () => {
+    const conta = await criarConta("idioma-poucos");
+    await criarVideo(conta, "idioma-poucos-1", 100, diasAtras(10), nichoId, { idioma: "pt" });
+    await criarVideo(conta, "idioma-poucos-2", 100, diasAtras(10), nichoId, { idioma: "pt" });
+    // Um terceiro video sem idioma conhecido nao conta para o minimo.
+    await criarVideo(conta, "idioma-poucos-3", 100, diasAtras(10));
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBeNull();
+  });
+
+  it("idioma_principal pt-BR confirma Brasil sozinho, sem precisar de indicio no texto", async () => {
+    const conta = await criarConta("idioma-pt-br");
+    for (let i = 0; i < 3; i += 1) {
+      await criarVideo(conta, `idioma-pt-br-${i}`, 100, diasAtras(10), nichoId, {
+        idioma: "pt-BR",
+        titulo: "titulo generico sem nenhum sinal de pais",
+      });
+    }
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBe("pt-BR");
+    expect(c.pais).toBe("BR");
+  });
+
+  it("idioma_principal pt generico so vira BR com indicio de Brasil de verdade em algum video", async () => {
+    const conta = await criarConta("idioma-pt-com-indicio");
+    await criarVideo(conta, "idioma-pt-indicio-1", 100, diasAtras(10), nichoId, {
+      idioma: "pt",
+      titulo: "dica de limpeza para o dia a dia",
+    });
+    await criarVideo(conta, "idioma-pt-indicio-2", 100, diasAtras(10), nichoId, {
+      idioma: "pt",
+      titulo: "outro video qualquer",
+    });
+    await criarVideo(conta, "idioma-pt-indicio-3", 100, diasAtras(10), nichoId, {
+      idioma: "pt",
+      titulo: "aceita pix e cobra em reais, direto de sao paulo",
+    });
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBe("pt");
+    expect(c.pais).toBe("BR");
+  });
+
+  it("idioma_principal pt sem nenhum indicio de Brasil: pais continua nulo", async () => {
+    const conta = await criarConta("idioma-pt-sem-indicio");
+    for (let i = 0; i < 3; i += 1) {
+      await criarVideo(conta, `idioma-pt-sem-indicio-${i}`, 100, diasAtras(10), nichoId, {
+        idioma: "pt",
+        titulo: "video generico sem nenhum sinal de pais especifico",
+      });
+    }
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBe("pt");
+    expect(c.pais).toBeNull();
+  });
+
+  it("pais ja conhecido (ex.: country do canal do YouTube) nunca e sobrescrito", async () => {
+    const conta = await criarConta("idioma-pais-ja-sabido");
+    await db().update(contas).set({ pais: "US" }).where(eq(contas.id, conta));
+    for (let i = 0; i < 3; i += 1) {
+      await criarVideo(conta, `idioma-pais-ja-sabido-${i}`, 100, diasAtras(10), nichoId, { idioma: "pt-BR" });
+    }
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.pais).toBe("US");
   });
 });

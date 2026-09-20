@@ -17,16 +17,22 @@
  * raciocínio de `transcrever.ts` (`atualizadoEm` é da coleta, não da
  * leitura); é o sinal que `resumoLeituraPorPlataforma` (`admin-coleta.ts`)
  * usa para "analisados hoje" em `/admin/nichos/[slug]`.
+ *
+ * V2b, item 6: a proporção 70/30 corta os dez escolhidos, no lugar do
+ * corte simples por tamanho que havia antes; a consulta busca um pool
+ * maior (mesmo raciocínio de `pesquisa.ts`) para sobrar brasileiro
+ * suficiente.
  */
 import { and, asc, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos, type AnaliseVisual, type Plataforma } from "@/db/schema";
+import { contas, nichos, videos, type AnaliseVisual, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
 import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
+import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { temposDeQuadro } from "@/servicos/quadros";
 
 import { midiaUrlFresca } from "./coleta-comum";
@@ -34,6 +40,8 @@ import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from 
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
+/** V2b, item 6: mesmo raciocínio do `FATOR_POOL_BRASIL` de `pesquisa.ts`. */
+const FATOR_POOL_BRASIL = 4;
 
 type CandidatoVisual = {
   id: number;
@@ -44,6 +52,9 @@ type CandidatoVisual = {
   titulo: string | null;
   transcricao: string | null;
   duracaoS: number | null;
+  idioma: string | null;
+  contaPais: string | null;
+  contaIdiomaPrincipal: string | null;
 };
 
 async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
@@ -58,7 +69,7 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
-  return db()
+  const linhas = await db()
     .select({
       id: videos.id,
       url: videos.url,
@@ -68,11 +79,22 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
       titulo: videos.titulo,
       transcricao: videos.transcricao,
       duracaoS: videos.duracaoS,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
-    .limit(config.regras.visuaisPorSemana);
+    .limit(config.regras.visuaisPorSemana * FATOR_POOL_BRASIL);
+
+  return aplicarProporcaoBrasil(
+    linhas,
+    config.regras.visuaisPorSemana,
+    (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
+    config.regras.proporcaoBrasil,
+  );
 }
 
 /**

@@ -3,6 +3,7 @@
  * saida `{ video, conta }` no formato que o banco espera. Sem chamada de
  * rede nem de banco aqui, para testar so com fixtures.
  */
+import { detectarIdioma, idiomaDoCodigoIso, type Idioma } from "@/config/idioma";
 import type { YoutubeVideoItem } from "@/jobs/youtube-api";
 
 export type ContaNormalizada = {
@@ -30,6 +31,7 @@ export type VideoNormalizado = {
   views: number;
   likes: number;
   comentarios: number;
+  idioma: Idioma;
 };
 
 export type VideoEContaNormalizados = { video: VideoNormalizado; conta: ContaNormalizada };
@@ -42,6 +44,18 @@ export function parseDuracaoIso8601(duracao: string): number | null {
   const minutos = Number(encontrado[2] ?? 0);
   const segundos = Number(encontrado[3] ?? 0);
   return horas * 3600 + minutos * 60 + segundos;
+}
+
+/**
+ * Idioma do video (V2b, item 2): `defaultAudioLanguage` (o audio de
+ * verdade) manda quando o canal preencheu, senao `defaultLanguage`
+ * (metadados); sem nenhum dos dois, cai na deteccao por codigo a partir do
+ * titulo mais a descricao.
+ */
+function idiomaDoVideoYoutube(item: YoutubeVideoItem): Idioma {
+  const porCodigo = idiomaDoCodigoIso(item.snippet.defaultAudioLanguage) ?? idiomaDoCodigoIso(item.snippet.defaultLanguage);
+  if (porCodigo) return porCodigo;
+  return detectarIdioma(`${item.snippet.title} ${item.snippet.description}`);
 }
 
 export function normalizarVideoYoutube(item: YoutubeVideoItem): VideoEContaNormalizados {
@@ -57,6 +71,7 @@ export function normalizarVideoYoutube(item: YoutubeVideoItem): VideoEContaNorma
       views: Number(item.statistics.viewCount ?? 0),
       likes: Number(item.statistics.likeCount ?? 0),
       comentarios: Number(item.statistics.commentCount ?? 0),
+      idioma: idiomaDoVideoYoutube(item),
     },
     conta: {
       plataforma: "youtube",
