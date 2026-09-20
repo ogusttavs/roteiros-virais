@@ -214,6 +214,7 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
               {t.resumoLeitura(
                 linha.plataforma,
                 linha.transcritosHoje,
+                linha.transcritosHojeBrasileiros,
                 linha.analisadosHoje,
                 linha.transcritosUltimos7Dias,
                 linha.analisadosUltimos7Dias,

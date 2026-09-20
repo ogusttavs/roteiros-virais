@@ -368,7 +368,22 @@ export type ResumoLeituraPlataforma = {
   analisadosHoje: number;
   transcritosUltimos7Dias: number;
   analisadosUltimos7Dias: number;
+  /** V2b, item 9: dos `transcritosHoje`, quantos são brasileiros (mesma regra de `classificarBrasil`). */
+  transcritosHojeBrasileiros: number;
 };
+
+/**
+ * Mesma regra de `classificarBrasil`/`contaEhBrasileira`
+ * (`src/servicos/proporcao-brasil.ts`), em SQL: "pt"/"pt-BR" é brasileiro;
+ * idioma nulo conta como brasileiro só quando a conta é brasileira (país
+ * "BR" ou idioma principal português). Reescrita em SQL (não a função JS)
+ * porque esta consulta já é agregada por plataforma; buscar linha a linha
+ * só para classificar em JS pesaria mais que o resto da consulta.
+ */
+const EH_BRASILEIRO_SQL = sql`(
+  ${videos.idioma} in ('pt', 'pt-BR')
+  or (${videos.idioma} is null and (${contas.pais} = 'BR' or ${contas.idiomaPrincipal} in ('pt', 'pt-BR')))
+)`;
 
 /**
  * "lidos hoje" / "últimos 7 dias" por plataforma, para `/admin/nichos/[slug]`
@@ -384,6 +399,10 @@ export type ResumoLeituraPlataforma = {
  * "7 dias" são janelas corridas (últimas 24h, últimos 7×24h), mesmo padrão
  * de `diasAtras` usado no resto deste arquivo. Sempre as três plataformas,
  * mesmo com zero vídeo.
+ *
+ * V2b, item 9: `transcritosHojeBrasileiros` acrescenta a parte brasileira
+ * ("N transcritos, X% brasileiros" em `src/textos/admin.ts`); só de hoje,
+ * não dos últimos 7 dias (a linha já tem números o bastante).
  */
 export async function resumoLeituraPorPlataforma(nichoId: number): Promise<ResumoLeituraPlataforma[]> {
   const desde1Dia = diasAtras(1);
@@ -396,8 +415,10 @@ export async function resumoLeituraPorPlataforma(nichoId: number): Promise<Resum
       analisadosHoje: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde1Dia})`,
       transcritosUltimos7Dias: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde7Dias})`,
       analisadosUltimos7Dias: sql<number>`count(*) filter (where ${videos.analiseVisualEm} >= ${desde7Dias})`,
+      transcritosHojeBrasileiros: sql<number>`count(*) filter (where ${videos.transcritoEm} >= ${desde1Dia} and ${EH_BRASILEIRO_SQL})`,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(eq(videos.nichoId, nichoId))
     .groupBy(videos.plataforma);
 
@@ -410,6 +431,7 @@ export async function resumoLeituraPorPlataforma(nichoId: number): Promise<Resum
       analisadosHoje: Number(l?.analisadosHoje ?? 0),
       transcritosUltimos7Dias: Number(l?.transcritosUltimos7Dias ?? 0),
       analisadosUltimos7Dias: Number(l?.analisadosUltimos7Dias ?? 0),
+      transcritosHojeBrasileiros: Number(l?.transcritosHojeBrasileiros ?? 0),
     };
   });
 }

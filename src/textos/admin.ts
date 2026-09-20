@@ -122,15 +122,25 @@ export const textosAdmin = {
     erroColetar: (mensagem: string) => `não conseguimos enfileirar a coleta: ${mensagem}`,
     ultimaExecucaoJob: (nome: string, quando: string) => `${nome}: ${quando}`,
     semExecucao: "ainda não rodou",
-    /** V2a, item 5: a conferência enxerga, uma linha por plataforma em `/admin/nichos/[slug]`. */
+    /**
+     * V2a, item 5: a conferência enxerga, uma linha por plataforma em
+     * `/admin/nichos/[slug]`. V2b, item 9: acrescenta a parte brasileira
+     * ("X% brasileiros"), calculada aqui a partir da contagem bruta para o
+     * arredondamento ficar num lugar só; sem transcrito nenhum hoje, a
+     * porcentagem some da frase (não faz sentido "0% de zero").
+     */
     resumoLeitura: (
       plataforma: string,
       transcritosHoje: number,
+      transcritosHojeBrasileiros: number,
       analisadosHoje: number,
       transcritosUltimos7Dias: number,
       analisadosUltimos7Dias: number,
-    ) =>
-      `${plataforma}, lidos hoje: ${transcritosHoje} transcritos, ${analisadosHoje} analisados; nos últimos 7 dias: ${transcritosUltimos7Dias} e ${analisadosUltimos7Dias}`,
+    ) => {
+      const percentualBrasileiros =
+        transcritosHoje > 0 ? `, ${Math.round((transcritosHojeBrasileiros / transcritosHoje) * 100)}% brasileiros` : "";
+      return `${plataforma}, lidos hoje: ${transcritosHoje} transcritos${percentualBrasileiros}, ${analisadosHoje} analisados; nos últimos 7 dias: ${transcritosUltimos7Dias} e ${analisadosUltimos7Dias}`;
+    },
     estoqueTitulo: "estoque por plataforma",
     colunaContasComMediana: "contas com mediana",
     colunaOrigemMediana: "conta / seguidores / setor",
