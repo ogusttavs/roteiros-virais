@@ -119,9 +119,14 @@ export function HojeTela({
         direita={
           <>
             <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
-            <button type="button" className={styles.botaoBarra} onClick={() => router.refresh()}>
+            <button
+              type="button"
+              className={styles.botaoBarra}
+              aria-label={textosHoje.atualizar}
+              onClick={() => router.refresh()}
+            >
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
-              <span>{textosHoje.atualizar}</span>
+              {marcas.length <= 1 ? <span>{textosHoje.atualizar}</span> : null}
             </button>
           </>
         }

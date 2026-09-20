@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronRight, User } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { iniciaisDe } from "@/lib/iniciais";
 import { textosNav } from "@/textos/nav";
@@ -70,66 +71,72 @@ export function SeletorMarcaCelular({ marcaAtiva, marcas, nomePessoa }: Props) {
         </span>
       </button>
 
-      {aberto ? (
-        <>
-          <div className={styles.folhaFundo} aria-hidden="true" onClick={() => setAberto(false)} />
-          <div ref={folhaRef} role="dialog" aria-modal="true" aria-label={textosNav.suasMarcas} tabIndex={-1} className={styles.folha}>
-            <div className={styles.folhaTopo}>
-              <span className={styles.folhaAlca} aria-hidden="true" />
-              <h3 className={styles.folhaTitulo}>{textosNav.suasMarcas}</h3>
-            </div>
-            <div className={styles.folhaCorpo}>
-              <div className={styles.marcaDestaque}>
-                <span className={`${styles.avatar} ${styles.grande}`} aria-hidden="true">
-                  {iniciaisDe(marcaAtiva.nome)}
-                </span>
-                <span className={styles.nome}>{marcaAtiva.nome}</span>
-                <span className={styles.agora}>{textosNav.estaMarcaAgora}</span>
-              </div>
-              <div className={styles.cabecaLista}>
-                <span className={styles.rotulo}>{textosNav.trocarPara}</span>
-              </div>
-              <div className={styles.listaMarcas}>
-                {outrasMarcas.map((marca) => (
-                  <button
-                    key={marca.id}
-                    type="button"
-                    className={styles.itemMarca}
-                    disabled={trocando}
-                    onClick={() => {
-                      setAberto(false);
-                      trocar(marca.id, marca.nome);
-                    }}
-                  >
-                    <span className={`${styles.avatar} ${styles.neutro}`} aria-hidden="true">
-                      {iniciaisDe(marca.nome)}
+      {aberto
+        ? createPortal(
+            <>
+              <div className={styles.folhaFundo} aria-hidden="true" onClick={() => setAberto(false)} />
+              <div
+                ref={folhaRef}
+                role="dialog"
+                aria-modal="true"
+                aria-label={textosNav.suasMarcas}
+                tabIndex={-1}
+                className={styles.folha}
+              >
+                <div className={styles.folhaTopo}>
+                  <span className={styles.folhaAlca} aria-hidden="true" />
+                  <h3 className={styles.folhaTitulo}>{textosNav.suasMarcas}</h3>
+                </div>
+                <div className={styles.folhaCorpo}>
+                  <div className={styles.marcaDestaque}>
+                    <span className={`${styles.avatar} ${styles.grande}`} aria-hidden="true">
+                      {iniciaisDe(marcaAtiva.nome)}
                     </span>
-                    <span className={styles.nome}>{marca.nome}</span>
-                  </button>
-                ))}
+                    <span className={`${styles.nome} ${styles.nomeDestaque}`}>{marcaAtiva.nome}</span>
+                    <span className={styles.agora}>{textosNav.estaMarcaAgora}</span>
+                  </div>
+                  <div className={styles.cabecaLista}>
+                    <span className={styles.rotulo}>{textosNav.trocarPara}</span>
+                  </div>
+                  <div className={styles.listaMarcas}>
+                    {outrasMarcas.map((marca) => (
+                      <button
+                        key={marca.id}
+                        type="button"
+                        className={styles.itemMarca}
+                        disabled={trocando}
+                        onClick={() => {
+                          setAberto(false);
+                          trocar(marca.id, marca.nome);
+                        }}
+                      >
+                        <span className={`${styles.avatar} ${styles.neutro}`} aria-hidden="true">
+                          {iniciaisDe(marca.nome)}
+                        </span>
+                        <span className={styles.nome}>{marca.nome}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className={styles.folhaPe}>
+                  <Link href="/conta" className={styles.itemMarca}>
+                    <span className={styles.circuloPessoa} aria-hidden="true">
+                      <User size={16} />
+                    </span>
+                    <span className={styles.nome}>
+                      {textosNav.conta}
+                      <small>{nomePessoa}</small>
+                    </span>
+                    <ChevronRight size={16} className={styles.seta} aria-hidden="true" />
+                  </Link>
+                </div>
               </div>
-            </div>
-            <div className={styles.folhaPe}>
-              <Link href="/conta" className={styles.itemMarca}>
-                <span className={styles.circuloPessoa} aria-hidden="true">
-                  <User size={16} />
-                </span>
-                <span className={styles.nome}>
-                  {textosNav.conta}
-                  <small>{nomePessoa}</small>
-                </span>
-                <ChevronRight size={16} className={styles.seta} aria-hidden="true" />
-              </Link>
-            </div>
-          </div>
-        </>
-      ) : null}
+            </>,
+            document.body,
+          )
+        : null}
 
-      {erro ? (
-        <p role="alert" className={styles.erro}>
-          {erro}
-        </p>
-      ) : null}
+      {erro ? createPortal(<p role="alert" className={styles.erro}>{erro}</p>, document.body) : null}
     </>
   );
 }

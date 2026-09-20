@@ -33,6 +33,7 @@ const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-layout@exemplo.teste";
 const EMAIL_COMECAR = "e2e-layout-comecar@exemplo.teste";
 const EMAIL_BRIEFING = "e2e-layout-briefing@exemplo.teste";
+const EMAIL_MARCAS = "e2e-layout-marcas@exemplo.teste";
 const LARGURAS = [
   { rotulo: "390", largura: 390, altura: 844 },
   { rotulo: "1024", largura: 1024, altura: 768 },
@@ -373,6 +374,52 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
           desativadaEm: new Date(),
         },
       ]);
+
+    /**
+     * Pessoa com duas marcas (V3, item 3): so para a folha "Suas marcas"
+     * ter conteudo de verdade nas tres larguras. Duas marcas bastam, o
+     * conteudo de /hoje em si nao importa aqui (isso e `marcas.spec.ts`).
+     */
+    await db().insert(user).values({ id: "e2e-layout-marcas", name: "[teste] Layout Marcas", email: EMAIL_MARCAS });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-layout-marcas-credential",
+        issuer: "local:credential",
+        accountId: "e2e-layout-marcas",
+        providerId: "credential",
+        userId: "e2e-layout-marcas",
+        password: await hashPassword(SENHA),
+      });
+    for (const nomeMarca of ["[teste] Layout Marca Um", "[teste] Layout Marca Dois"]) {
+      const [marca] = await db()
+        .insert(clientes)
+        .values({ usuarioId: "e2e-layout-marcas", nome: nomeMarca, nichoId: nicho.id })
+        .returning();
+      await db().insert(membrosMarca).values({ usuarioId: "e2e-layout-marcas", clienteId: marca.id, papel: "dono" });
+      await db()
+        .insert(briefings)
+        .values({
+          clienteId: marca.id,
+          completo: true,
+          perfil: {
+            fatos: {
+              oQueVende: "kit tira-mancha para estofados",
+              preco: "kit a partir de 89 reais",
+              clienteIdeal: "mora em apartamento",
+              medos: [],
+              frasesDaFala: [],
+              proibicoes: [],
+              cenasFilmaveis: [],
+              concorrentes: [],
+              perfisAdmirados: [],
+            },
+            resumo: "marca propria de produtos de limpeza",
+            referencias: [],
+          },
+        });
+    }
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-layout-marcas", aceitouTermosEm: new Date() });
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
@@ -428,6 +475,26 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await expect(page).toHaveURL(/\/hoje/);
       await page.goto("/briefing");
       await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    /**
+     * V3, item 3: abaixo de 768px quem mostra a folha "Suas marcas" e a
+     * pilula do celular (role="dialog"); a partir de 768 e o pe da barra
+     * lateral (role="menu"), mesmo recolhida no iPad (so o circulo, o
+     * aria-label continua).
+     */
+    test(`Hoje, folha "Suas marcas" aberta, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarComo(page, EMAIL_MARCAS);
+      await expect(page).toHaveURL(/\/hoje/);
+
+      await page.getByRole("button", { name: /^Trocar de marca/ }).click();
+      const suasMarcas =
+        largura < 768
+          ? page.getByRole("dialog", { name: "Suas marcas" })
+          : page.getByRole("menu", { name: "Suas marcas" });
+      await expect(suasMarcas).toBeVisible();
       await conferirLayout(page);
     });
   }

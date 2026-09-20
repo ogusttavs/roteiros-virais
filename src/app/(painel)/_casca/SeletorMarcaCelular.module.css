@@ -29,6 +29,15 @@
 }
 
 .pilulaMarca {
+  /**
+   * min-width:0 (achado corrigindo o e2e de layout): sem isto, um item flex
+   * sem overflow proprio nunca encolhe abaixo do tamanho maximo do
+   * conteudo, mesmo o `.nome` mais fundo ja tendo overflow:hidden. Na
+   * BarraTopo de Hoje (titulo mais a pilula mais "Atualizar" disputando o
+   * mesmo espaco), sem isto a pilula ficava no tamanho cheio e o botao
+   * "Atualizar" estourava a tela para fora da viewport.
+   */
+  min-width: 0;
   min-height: var(--altura-toque);
   display: flex;
   align-items: center;
@@ -39,6 +48,7 @@
   align-items: center;
   gap: var(--espaco-2);
   height: 2.25rem;
+  min-width: 0;
   padding: 0 var(--espaco-2) 0 0.25rem;
   border-radius: var(--raio-pill);
   background: var(--cor-superficie-recuada);
@@ -145,8 +155,13 @@
   text-align: center;
 }
 
-.marcaDestaque .nome {
-  max-width: none;
+.nomeDestaque {
+  /**
+   * Substitui o `max-width: 8.5rem` da pilula (achado corrigindo o e2e de
+   * layout: sem limite nenhum, um nome comprido estourava a folha na
+   * horizontal, e `.nome` de base ja garante nowrap/ellipsis por cima disto).
+   */
+  max-width: 100%;
   font-size: 1.0625rem;
   font-weight: 600;
 }

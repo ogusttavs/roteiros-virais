@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
-import { marcasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
 import { Logo } from "@/ui/Logo";
@@ -29,10 +29,17 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
     redirect("/entrar");
   }
 
-  const marcas = await marcasDoUsuario(sessao.user.id);
+  // clienteAtivoDoUsuario resolve pelo cookie marca_ativa (V3, item 2), nao pela
+  // primeira da lista (que marcasDoUsuario devolve em ordem alfabetica): sem isto,
+  // o rodape da barra lateral e o cabecalho generico mostrariam uma marca diferente
+  // da que as telas com BarraTopo propria (Hoje, Roteiro) resolvem para o mesmo usuario.
+  const [marcaAtivaResolvida, marcas] = await Promise.all([
+    clienteAtivoDoUsuario(sessao.user.id),
+    marcasDoUsuario(sessao.user.id),
+  ]);
   // Sem marca nenhuma, o layout (completo) redireciona para /comecar ou /entrar;
   // aqui so evita quebrar a casca com uma lista vazia enquanto isso acontece.
-  const marcaAtiva = marcas[0] ?? { id: 0, nome: "" };
+  const marcaAtiva = marcaAtivaResolvida ?? marcas[0] ?? { id: 0, nome: "" };
 
   return (
     <div className={styles.pagina}>
