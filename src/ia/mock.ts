@@ -260,11 +260,15 @@ function mockTemasDoDia(entrada: string) {
   }
 
   return {
+    // V2b, item 8: cada tema cita todos os ids de video disponiveis (nao so
+    // um por rodizio), para o mock simular uma prova de verdade quando o
+    // teste cria video suficiente (3+ de 2+ contas); sem isso, nenhum tema
+    // simulado passaria na checagem de prova por codigo.
     temas: [0, 1, 2].map((i) => ({
       titulo: `tema simulado ${i + 1}`,
       descricao: "tema derivado dos videos que estao subindo hoje",
       porQue: "esta subindo mais rapido que o normal da conta",
-      evidencias: ids.length > 0 ? [ids[i % ids.length]] : [],
+      evidencias: ids,
       evidenciasNoticias: idsNoticias.length > 0 ? [idsNoticias[i % idsNoticias.length]] : [],
       puxaPara: puxaPara[i],
     })),
