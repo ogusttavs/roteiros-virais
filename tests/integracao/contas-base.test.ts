@@ -115,8 +115,10 @@ describe("rodarContasBase", () => {
     const contaYoutube = await criarContaComVideo("youtube", "UCentreostiktok0000001", 50000);
     const contaAlta = await criarContaComVideo("tiktok", "conta-alta-views", 99999);
 
-    const teto = config.coleta.apifyMaxResultadosDia;
-    await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: teto - 1 });
+    // Revisao do PR #46, ajuste 3: o contas-base gasta no maximo metade do
+    // teto diario, entao o teto que vale aqui e a metade, nao o teto inteiro.
+    const tetoContasBase = Math.floor(config.coleta.apifyMaxResultadosDia / 2);
+    await db().insert(consumoApi).values({ fonte: "apify", data: hojeISO(), unidades: tetoContasBase - 1 });
 
     vi.mocked(buscarTiktokVigilancia).mockImplementation(async (perfis) => {
       const handle = perfis[0];
@@ -156,6 +158,44 @@ describe("rodarContasBase", () => {
     expect(linhaAlta.baseCompletaEm).not.toBeNull();
     expect(linhaYoutube.baseCompletaEm).not.toBeNull();
     expect(linhaBaixa.baseCompletaEm).toBeNull();
+  });
+
+  /**
+   * Ajuste 3 da revisão do PR #46 (achado da madrugada de 20/09): com o teto
+   * diário em 300, o `contas-base` das 03:40 consumia os 300 inteiros pelo
+   * TikTok, e a `descoberta-instagram` das 04:15 de domingo, que só roda
+   * uma vez por semana, fechava com `tetoAtingido: true` e zero termo
+   * buscado. Com candidatas de sobra do TikTok, o job para na metade do
+   * teto (150), mesmo tendo espaço no teto cheio para continuar.
+   */
+  it("nao consome o teto inteiro do apify: com candidatas de sobra do tiktok, para na metade (revisao do PR #46, ajuste 3)", async () => {
+    const tetoOriginal = config.coleta.apifyMaxResultadosDia;
+    config.coleta.apifyMaxResultadosDia = 300;
+    try {
+      for (let i = 0; i < 20; i += 1) {
+        await criarContaComVideo("tiktok", `conta-metade-teto-${i}`, 100_000 - i);
+      }
+
+      vi.mocked(buscarTiktokVigilancia).mockImplementation(async (perfis) => {
+        const handle = perfis[0];
+        return {
+          itens: Array.from({ length: 10 }, (_, i) => itemTiktok(handle, `${handle}-video-${i}`)),
+          devolvidos: 10,
+        };
+      });
+
+      const resumo = await rodarContasBase();
+
+      // Teto 300, metade 150; cada conta consome 10 (VIDEOS_POR_CONTA): 15
+      // contas cabem (15*10=150), a 16a em diante fica para amanha.
+      expect(resumo.tetoAtingido).toBe(true);
+      expect(resumo.contasProcessadas).toBe(15);
+
+      const [linhaConsumo] = await db().select().from(consumoApi).where(eq(consumoApi.fonte, "apify"));
+      expect(linhaConsumo.unidades).toBe(150);
+    } finally {
+      config.coleta.apifyMaxResultadosDia = tetoOriginal;
+    }
   });
 
   it("registra em consumo_api os resultados consumidos (itens.length), nao os devolvidos brutos (revisao do PR #34, item 0c)", async () => {

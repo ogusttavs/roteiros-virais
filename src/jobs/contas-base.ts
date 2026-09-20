@@ -361,10 +361,19 @@ async function catchUpYoutube(nichoId: number, candidata: ContaCandidata): Promi
 export async function rodarContasBase(): Promise<Record<string, unknown>> {
   const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
 
+  /**
+   * Revisão do PR #46, ajuste 3 (achado da madrugada de 20/09): com o teto
+   * diário em 300, o `contas-base` das 03:40 consumiu os 300 pelo TikTok, e
+   * a `descoberta-instagram` das 04:15 de domingo, que só roda uma vez por
+   * semana, fechou com `tetoAtingido: true` e zero termo buscado. O
+   * `contas-base` passa a gastar no máximo metade do teto diário do Apify;
+   * a outra metade fica para a coleta do dia e para a descoberta.
+   */
   const teto = config.coleta.apifyMaxResultadosDia;
+  const tetoContasBase = Math.floor(teto / 2);
   let resultadosApifyUsados = await consumoDeHoje(FONTE_APIFY);
   let resultadosApifyDevolvidos = 0;
-  const apifyCabe = () => resultadosApifyUsados < teto;
+  const apifyCabe = () => resultadosApifyUsados < tetoContasBase;
 
   let contasProcessadas = 0;
   let videosNovos = 0;
