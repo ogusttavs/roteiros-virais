@@ -355,18 +355,23 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
 });
 
 /** V2a, item 3: Instagram com endereco de midia fresco baixa direto, sem a url da pagina. */
-/** V2b, item 6: a proporcao 70/30 corta o excesso de internacional da fila, mesmo com prioridade maior. */
+/**
+ * V2b, item 6 (revisão do PR #46): a proporção 70/30 corta o excesso de
+ * internacional da fila com base em quantos brasileiros de fato entraram,
+ * não no tamanho da fila.
+ */
 describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
   it("video internacional em excesso nunca entra na fila, mesmo com prioridade maior que o brasileiro que entrou", async () => {
-    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 4 => tamanhoFila = 16,
-    // maxInternacional = floor(16*0.3) = 4. Cinco "en" com prioridade maior
-    // (foraDaCurva mais alto) que os dois "pt": so os 4 primeiros "en" cabem na
-    // fila, o quinto ("en-5", o de menor prioridade entre eles) fica de fora,
-    // mesmo tendo prioridade maior que qualquer "pt".
-    config.regras.transcricoesPorDia = 4;
+    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 5 => tamanhoFila = 20.
+    // Cinco "pt" disponiveis => brasileirosAceitos = 5; maxInternacional =
+    // floor(5*0,3/0,7) = 2 (nao mais um calculo sobre a fila de 20). Dez "en"
+    // com prioridade maior (foraDaCurva mais alto) que os cinco "pt": so os
+    // 2 primeiros "en" cabem na fila, os outros oito ficam de fora, mesmo
+    // tendo prioridade maior que qualquer "pt".
+    config.regras.transcricoesPorDia = 5;
 
     const urlsEn: string[] = [];
-    for (let i = 1; i <= 5; i += 1) {
+    for (let i = 1; i <= 10; i += 1) {
       const [conta] = await db()
         .insert(contas)
         .values({ plataforma: "youtube", handle: `proporcao-en-${i}`, nichoId })
@@ -381,7 +386,7 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
           nichoId,
           views: 100,
           publicadoEm: diasAtras(10),
-          foraDaCurva: String(20 - i), // en-1 (19) maior prioridade, en-5 (15) menor
+          foraDaCurva: String(30 - i), // en-1 (29) maior prioridade, en-10 (20) menor
           idioma: "en",
         })
         .returning();
@@ -389,7 +394,7 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
     }
 
     const urlsPt: string[] = [];
-    for (let i = 1; i <= 2; i += 1) {
+    for (let i = 1; i <= 5; i += 1) {
       const [conta] = await db()
         .insert(contas)
         .values({ plataforma: "youtube", handle: `proporcao-pt-${i}`, nichoId })
@@ -416,14 +421,47 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
     await rodarTranscrever();
 
     const chamadas = vi.mocked(baixarLegendaYoutube).mock.calls.map(([url]) => url);
-    // Os quatro "en" de maior prioridade entraram (cabem no teto de 4 internacionais).
-    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 4)));
-    // O quinto "en" (menor prioridade entre eles) nunca entrou na fila, mesmo
-    // tendo prioridade maior que qualquer "pt": a proporcao cortou antes dele.
-    expect(chamadas).not.toContain(urlsEn[4]);
-    // Nenhum "pt" chegou a ser tentado: o teto diario (4 sucessos) ja fechou
-    // com os quatro "en" que entraram na fila, antes de chegar aos "pt".
-    expect(chamadas).not.toEqual(expect.arrayContaining(urlsPt));
+    // Os dois "en" de maior prioridade entraram (cabem no teto de 2 internacionais).
+    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 2)));
+    // Do terceiro "en" em diante, nenhum entrou na fila, mesmo com prioridade
+    // maior que qualquer "pt": a proporcao cortou antes deles.
+    for (const url of urlsEn.slice(2)) {
+      expect(chamadas).not.toContain(url);
+    }
+    // Os "pt" completam o teto de 5 sucessos (2 en + 3 pt primeiros).
+    expect(chamadas).toEqual(expect.arrayContaining(urlsPt.slice(0, 3)));
+  });
+
+  /** A nova regra: sem nenhum brasileiro disponivel, a fila fica vazia, nunca so internacional. */
+  it("sem nenhum brasileiro disponivel, a fila fica vazia: nenhum internacional e tentado", async () => {
+    config.regras.transcricoesPorDia = 5;
+
+    for (let i = 1; i <= 5; i += 1) {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: `sem-brasil-en-${i}`, nichoId })
+        .returning();
+      await db()
+        .insert(videos)
+        .values({
+          plataforma: "youtube",
+          idExterno: `sem-brasil-en-${i}`,
+          url: `https://exemplo.invalido/sem-brasil-en-${i}`,
+          contaId: conta.id,
+          nichoId,
+          views: 100,
+          publicadoEm: diasAtras(10),
+          foraDaCurva: String(10 - i),
+          idioma: "en",
+        });
+    }
+
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
+    expect((resumo.tentativas as Record<string, number>).youtube).toBe(0);
   });
 });
 

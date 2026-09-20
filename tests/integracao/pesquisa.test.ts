@@ -326,16 +326,24 @@ describe("evidenciaParaTema", () => {
     expect(resultado).toEqual([]);
   });
 
-  /** V2b, item 6: a proporcao 70/30 corta o excesso internacional, mesmo com prioridade maior. */
-  it("com limite pequeno, so o brasileiro entra (nenhuma vaga internacional sobra)", async () => {
+  /**
+   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
+   * internacional com base em quantos brasileiros de fato entraram, nao no
+   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
+   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
+   * maior competindo e um limite bem maior que 2.
+   */
+  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
+    const idsEn: string[] = [];
     for (let i = 0; i < 4; i += 1) {
-      await criarVideo(`ev-prop-en-${i}`, {
-        foraDaCurva: 50 - i, // prioridade bem maior que os "pt" abaixo
+      const video = await criarVideo(`ev-prop-en-${i}`, {
+        foraDaCurva: 50 - i, // prioridade bem maior que o "pt" abaixo
         publicadoEm: diasAtras(10),
         titulo: "assunto exclusivo da proporcao internacional",
         idioma: "en",
         analise: { assunto: `en-${i}` },
       });
+      idsEn.push(`en-${i}`);
     }
     await criarVideo("ev-prop-pt", {
       foraDaCurva: 1,
@@ -345,10 +353,30 @@ describe("evidenciaParaTema", () => {
       analise: { assunto: "pt-0" },
     });
 
-    // limite 3, proporcaoBrasil 0.7 => maxInternacional = floor(3*0.3) = 0.
-    const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da proporcao internacional", 3);
+    const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da proporcao internacional", 10);
 
-    expect(resultado.map((v) => v.assunto)).toEqual(["pt-0"]);
+    expect(resultado).toHaveLength(2);
+    expect(resultado.map((v) => v.assunto)).toContain("pt-0");
+    // So o "en" de maior prioridade (en-0) entra; en-1, en-2 e en-3 ficam de fora.
+    expect(resultado.map((v) => v.assunto)).toContain("en-0");
+    expect(resultado.map((v) => v.assunto)).not.toContain("en-1");
+  });
+
+  /** A nova regra: sem nenhum brasileiro na evidencia disponivel, o resultado e vazio. */
+  it("sem nenhum brasileiro disponivel, a evidencia vem vazia mesmo com internacional de sobra", async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await criarVideo(`ev-sem-brasil-en-${i}`, {
+        foraDaCurva: 50 - i,
+        publicadoEm: diasAtras(10),
+        titulo: "assunto so internacional",
+        idioma: "en",
+        analise: { assunto: `sem-brasil-en-${i}` },
+      });
+    }
+
+    const resultado = await evidenciaParaTema(nichoId, "assunto so internacional", 10);
+
+    expect(resultado).toEqual([]);
   });
 });
 
@@ -418,8 +446,14 @@ describe("referenciasDoNicho", () => {
     expect(resultado.some((v) => v.assunto === "no limiar")).toBe(true);
   });
 
-  /** V2b, item 6: a proporcao 70/30 corta o excesso internacional, mesmo com prioridade maior (mais recente). */
-  it("com limite pequeno, so o brasileiro entra (nenhuma vaga internacional sobra)", async () => {
+  /**
+   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
+   * internacional com base em quantos brasileiros de fato entraram, nao no
+   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
+   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
+   * maior (mais recentes) competindo e um limite bem maior que 2.
+   */
+  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
     // Nicho proprio, isolado dos videos que os describes acima ja gravaram
     // no nicho compartilhado (referenciasDoNicho nao filtra por assunto,
     // so por nicho): sem isso o corte de proporcao competiria com dado de
@@ -458,9 +492,56 @@ describe("referenciasDoNicho", () => {
       analise: { ...analiseExemplo, assunto: "ref-pt-0" },
     });
 
-    // limite 3, proporcaoBrasil 0.7 => maxInternacional = floor(3*0.3) = 0.
-    const resultado = await referenciasDoNicho(nichoProporcao.id, 90, 3);
+    const resultado = await referenciasDoNicho(nichoProporcao.id, 90, 10);
 
-    expect(resultado.map((v) => v.assunto)).toEqual(["ref-pt-0"]);
+    expect(resultado).toHaveLength(2);
+    const assuntos = resultado.map((v) => v.assunto);
+    expect(assuntos).toContain("ref-pt-0");
+    // So o "en" de maior prioridade (mais recente, ref-en-1) entra.
+    expect(assuntos).toContain("ref-en-1");
+    expect(assuntos).not.toContain("ref-en-2");
+    expect(assuntos).not.toContain("ref-en-3");
+    expect(assuntos).not.toContain("ref-en-4");
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoProporcao.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoProporcao.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoProporcao.id));
+  });
+
+  /** A nova regra: sem nenhum brasileiro na base disponivel, o resultado e vazio. */
+  it("sem nenhum brasileiro disponivel, referencias vem vazia mesmo com internacional de sobra", async () => {
+    const [nichoSemBrasil] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-sem-brasil-teste", nome: "Pesquisa sem brasil teste", termos: [] })
+      .returning();
+    const [contaSemBrasil] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-sem-brasil", nichoId: nichoSemBrasil.id })
+      .returning();
+
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideo(`ref-sem-brasil-en-${i}`, {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(i),
+        idioma: "en",
+        contaId: contaSemBrasil.id,
+        nichoId: nichoSemBrasil.id,
+        analise: {
+          gancho: "gancho",
+          estrutura: "estrutura",
+          porQueFuncionou: "funcionou por isso",
+          formato: "fala_para_camera",
+          assunto: `ref-sem-brasil-en-${i}`,
+        },
+      });
+    }
+
+    const resultado = await referenciasDoNicho(nichoSemBrasil.id, 90, 10);
+
+    expect(resultado).toEqual([]);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoSemBrasil.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoSemBrasil.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoSemBrasil.id));
   });
 });

@@ -1,11 +1,12 @@
 /**
  * A proporção 70/30, num lugar só (V2b, item 6, escopo 5.11: o Brasil
  * primeiro). Recebe uma lista já ordenada por prioridade e devolve até
- * `limite` itens com no máximo 30% de internacional (o resto de
- * `proporcaoBrasil`), nunca "outro", e nunca completa com internacional
- * quando falta brasileiro (a lista final fica menor que `limite`). Usada
- * em cinco lugares: a fila do `transcrever`, a evidência do tema do dia e
- * do roteiro, as Referências e os dez da análise visual; cada um passa a
+ * `limite` itens com no máximo 30% de internacional **do que de fato sai**
+ * (não de `limite`, achado da revisão do PR #46), nunca "outro", e nunca
+ * completa com internacional quando falta brasileiro (a lista final fica
+ * menor que `limite`; sem nenhum brasileiro, fica vazia). Usada em cinco
+ * lugares: a fila do `transcrever`, a evidência do tema do dia e do
+ * roteiro, as Referências e os dez da análise visual; cada um passa a
  * própria função `classificar`, porque cada um tem um tipo de item
  * diferente (vídeo de pesquisa, evidência de tema, referência...).
  */
@@ -39,9 +40,21 @@ export function contaEhBrasileira(pais: string | null, idiomaPrincipal: string |
 }
 
 /**
- * `maxInternacional` é calculado sobre `limite` (o alvo), não sobre o
- * tamanho da lista devolvida: é o que faz a lista final ficar menor em vez
- * de completar com mais internacional quando falta brasileiro.
+ * V2b, item 6, revisão do PR #46 (achado do Fable, medição em 600 vídeos
+ * reais): a versão anterior calculava o teto de internacional sobre
+ * `limite` (o alvo), não sobre o que de fato sai. Com 5 brasileiros e
+ * `limite` 40, isso deixava passar `floor(40*0,3)=12` internacionais,
+ * resultando em 5+12=17 itens finais, 71% deles internacionais, o oposto
+ * da intenção ("no mínimo 70% do que sai é brasileiro"). Duas passadas
+ * agora: primeiro quantos brasileiros cabem até `limite`, depois quantos
+ * internacionais **esse número** permite
+ * (`floor(brasileirosAceitos × (1 − proporcaoBrasil) / proporcaoBrasil)`),
+ * com uma exceção: com pelo menos 1 brasileiro aceito, cabe pelo menos 1
+ * internacional (para nicho pobre de conteúdo brasileiro não ficar mudo
+ * de conteúdo internacional relevante). Sem nenhum brasileiro na lista, o
+ * resultado é vazio, nunca só internacional. A ordem de prioridade
+ * original é preservada na montagem final (um item não "pula a fila" por
+ * ser de uma classe ou outra).
  */
 export function aplicarProporcaoBrasil<T>(
   itens: T[],
@@ -49,8 +62,17 @@ export function aplicarProporcaoBrasil<T>(
   classificar: (item: T) => ClassificacaoBrasil,
   proporcaoBrasil: number,
 ): T[] {
-  const maxInternacional = Math.floor(limite * (1 - proporcaoBrasil));
+  const brasileirosDisponiveis = itens.filter((item) => classificar(item) === "brasileiro").length;
+  const brasileirosAceitos = Math.min(brasileirosDisponiveis, limite);
+
+  let maxInternacional = 0;
+  if (brasileirosAceitos > 0) {
+    const proporcional = Math.floor((brasileirosAceitos * (1 - proporcaoBrasil)) / proporcaoBrasil);
+    maxInternacional = Math.min(Math.max(1, proporcional), limite - brasileirosAceitos);
+  }
+
   const resultado: T[] = [];
+  let brasileirosIncluidos = 0;
   let internacionaisIncluidos = 0;
 
   for (const item of itens) {
@@ -58,7 +80,10 @@ export function aplicarProporcaoBrasil<T>(
 
     const classe = classificar(item);
     if (classe === "outro") continue;
-    if (classe === "internacional") {
+    if (classe === "brasileiro") {
+      if (brasileirosIncluidos >= brasileirosAceitos) continue;
+      brasileirosIncluidos += 1;
+    } else {
       if (internacionaisIncluidos >= maxInternacional) continue;
       internacionaisIncluidos += 1;
     }

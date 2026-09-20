@@ -60,7 +60,8 @@ describe("aplicarProporcaoBrasil", () => {
     expect(resultado.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it("nada brasileiro: a lista fica menor que o limite, nunca completa com mais internacional", () => {
+  /** Achado da revisão do PR #46: sem nenhum brasileiro, o resultado é vazio, nunca só internacional. */
+  it("nada brasileiro: resultado vazio", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "en" },
       { id: 2, idioma: "es" },
@@ -68,12 +69,28 @@ describe("aplicarProporcaoBrasil", () => {
       { id: 4, idioma: "es" },
       { id: 5, idioma: "en" },
     ];
-    // limite 10, proporcaoBrasil 0.7 => no maximo 3 internacionais (floor(10*0.3)).
     const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
-    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3]);
+    expect(resultado).toEqual([]);
   });
 
-  it("limite pequeno: limite 1 nao abre vaga nenhuma para internacional (floor(1*0.3) = 0)", () => {
+  /**
+   * Exemplo exato da revisão do PR #46: com 5 brasileiros e limite 40, o
+   * teto de internacional é sobre os 5 aceitos (floor(5*0,3/0,7)=2), não
+   * sobre o limite (que daria 12, o bug corrigido nesta rodada).
+   */
+  it("5 brasileiros e 20 internacionais, limite 40: devolve 5 mais 2, nao 5 mais 12", () => {
+    const brasileiros: ItemTeste[] = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, idioma: "pt" }));
+    const internacionais: ItemTeste[] = Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, idioma: "en" }));
+    const itens = [...brasileiros, ...internacionais];
+
+    const resultado = aplicarProporcaoBrasil(itens, 40, classificar, 0.7);
+
+    expect(resultado).toHaveLength(7);
+    expect(resultado.filter((i) => i.id < 100)).toHaveLength(5);
+    expect(resultado.filter((i) => i.id >= 100)).toHaveLength(2);
+  });
+
+  it("limite pequeno: limite 1 nao abre vaga nenhuma para internacional alem do proprio brasileiro", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "en" },
       { id: 2, idioma: "pt" },
@@ -82,34 +99,41 @@ describe("aplicarProporcaoBrasil", () => {
     expect(resultado.map((i) => i.id)).toEqual([2]);
   });
 
+  /** A exceção: com pelo menos 1 brasileiro aceito, cabe pelo menos 1 internacional, mesmo quando floor() daria 0. */
+  it("excecao: 1 brasileiro aceito ja abre 1 vaga internacional, mesmo com floor(1*0,3/0,7) = 0", () => {
+    const itens: ItemTeste[] = [
+      { id: 1, idioma: "pt" },
+      { id: 2, idioma: "en" },
+      { id: 3, idioma: "en" }, // excedente: so 1 internacional cabe
+    ];
+    const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2]);
+  });
+
   it("outro no topo da prioridade e sempre pulado, mesmo em primeiro lugar", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "outro" },
       { id: 2, idioma: "pt" },
       { id: 3, idioma: "en" },
     ];
-    // limite 10 (nao 3): com limite pequeno o teto de internacional some (caso
-    // ja coberto pelo teste "limite pequeno" acima); aqui o que se testa e so
-    // que "outro" nunca entra, em qualquer posicao.
     const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
     expect(resultado.map((i) => i.id)).toEqual([2, 3]);
   });
 
   it("mistura respeitando a ordem de prioridade, cortando so o internacional excedente", () => {
-    // limite 10, max internacional = 3. Cinco internacionais na fila, so os tres
-    // primeiros (por prioridade) entram; os brasileiros entram todos.
+    // 3 brasileiros disponiveis (ids 2, 4, 7) => maxInternacional = floor(3*0,3/0,7) = 1.
     const itens: ItemTeste[] = [
       { id: 1, idioma: "en" },
       { id: 2, idioma: "pt" },
-      { id: 3, idioma: "en" },
+      { id: 3, idioma: "en" }, // excedente: ja bateu o teto de 1 internacional
       { id: 4, idioma: "pt" },
-      { id: 5, idioma: "en" },
-      { id: 6, idioma: "en" }, // excedente: ja bateu o teto de 3 internacionais
+      { id: 5, idioma: "en" }, // excedente tambem
+      { id: 6, idioma: "en" }, // excedente tambem
       { id: 7, idioma: "pt" },
       { id: 8, idioma: "en" }, // excedente tambem
     ];
     const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
-    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3, 4, 5, 7]);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2, 4, 7]);
   });
 
   it("idioma nulo com conta brasileira conta como brasileiro, sem conta internacional", () => {

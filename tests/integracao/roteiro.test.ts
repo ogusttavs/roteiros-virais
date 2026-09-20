@@ -293,10 +293,30 @@ describe("gerarRoteiro", () => {
       objetivo: "conversao",
     });
 
-    // LIMITE_EVIDENCIA = 8, proporcaoBrasil 0.7 => maxInternacional = floor(8*0.3) = 2.
+    // Revisao do PR #46: so 1 brasileiro disponivel => maxInternacional = max(1, floor(1*0,3/0,7)) = 1.
     const evidenciasEn = roteiro.conteudo.evidencias.filter((id) => idsEn.includes(id));
-    expect(evidenciasEn.length).toBeLessThanOrEqual(2);
+    expect(evidenciasEn.length).toBeLessThanOrEqual(1);
     expect(roteiro.conteudo.evidencias).toContain(idPt);
+  });
+
+  /** Revisao do PR #46: sem nenhum brasileiro na base, a evidencia vem vazia, nunca so internacional. */
+  it("sem nenhum brasileiro disponivel, evidencia do roteiro vem vazia mesmo com internacional de sobra", async () => {
+    const clienteId = await criarCliente();
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideoEvidencia(`prop-sem-brasil-en-${i}`, "vazamento no telhado do galpao", {
+        idioma: "en",
+        foraDaCurva: 20 - i,
+      });
+    }
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "vazamento no telhado do galpao",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.evidencias).toEqual([]);
+    expect(roteiro.conteudo.semEvidencia).toBe(true);
   });
 
   it("tema livre sem nenhuma evidência no banco: roteiro honesto, sem referência e sem citar id (ajuste 2 da revisão do PR #17)", async () => {
