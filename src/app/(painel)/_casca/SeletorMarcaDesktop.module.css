@@ -1,0 +1,256 @@
+/**
+ * Design v2, `Casca.dc.html`/`casca.js` (`seletorMarca()`) e `base.css`
+ * (`.seletor-marca`, `.menu-marcas`): V3, item 3. So existe do tablet para
+ * cima (768px); no celular quem mostra a marca e SeletorMarcaCelular. As
+ * regras de largura recolhida/aberta espelham `.contaDesktop` de
+ * `layout.module.css`, que este componente substitui.
+ */
+
+.wrapper {
+  margin-top: auto;
+  position: relative;
+}
+
+.seletorMarca {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  text-decoration: none;
+  text-align: left;
+  transition: background var(--duracao-rapida) var(--curva-saida);
+}
+
+.seletorMarca:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.seletorMarca:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.seletorMarca[aria-expanded="true"] {
+  background: var(--cor-selecao-suave);
+}
+
+.avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+}
+
+.avatar.neutro {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+}
+
+.quem {
+  display: grid;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.nomeMarca {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oQueFaz {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trocar {
+  flex: none;
+  margin-left: auto;
+  color: var(--cor-texto-suave);
+}
+
+/* iPad, 768 a 1179px: coluna recolhida por padrao, so o circulo. */
+@media (min-width: 768px) and (max-width: 1179px) {
+  .seletorMarca {
+    width: var(--altura-toque);
+    min-height: var(--altura-toque);
+    justify-content: center;
+    padding: 0;
+    border-radius: var(--raio-pill);
+    margin-inline: auto;
+  }
+
+  .quem,
+  .trocar {
+    display: none;
+  }
+}
+
+html[data-barra-lateral="recolhida"] .seletorMarca {
+  width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--raio-pill);
+  margin-inline: auto;
+}
+
+html[data-barra-lateral="recolhida"] .quem,
+html[data-barra-lateral="recolhida"] .trocar {
+  display: none;
+}
+
+html[data-barra-lateral="aberta"] .seletorMarca {
+  width: auto;
+  min-height: var(--altura-toque-lg);
+  justify-content: flex-start;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-md);
+  margin-inline: 0;
+}
+
+html[data-barra-lateral="aberta"] .quem,
+html[data-barra-lateral="aberta"] .trocar {
+  display: grid;
+}
+
+html[data-barra-lateral="aberta"] .trocar {
+  display: block;
+}
+
+.veu {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: transparent;
+}
+
+.menu {
+  position: fixed;
+  z-index: 51;
+  left: var(--espaco-3);
+  bottom: calc(var(--espaco-4) + var(--altura-toque-lg) + var(--espaco-2));
+  width: 18rem;
+  max-height: min(28rem, calc(100vh - 6rem));
+  overflow-y: auto;
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-md);
+  outline: none;
+}
+
+@media (min-width: 768px) and (max-width: 1179px) {
+  .menu {
+    left: calc(var(--largura-barra-recolhida) + var(--espaco-2));
+    bottom: var(--espaco-4);
+  }
+}
+
+.cabecaLista {
+  padding: 0 var(--espaco-2);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--cor-texto-suave);
+}
+
+.listaMarcas {
+  display: grid;
+}
+
+.itemMarca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2);
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-titulo);
+  text-align: left;
+  text-decoration: none;
+}
+
+.itemMarca:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.nome {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamanho-secundario);
+}
+
+.nome small {
+  display: block;
+  font-size: var(--tamanho-legenda);
+  font-weight: 400;
+  color: var(--cor-texto-dica);
+}
+
+.visto {
+  flex: none;
+  color: var(--cor-acao);
+}
+
+.peMenu {
+  border-top: 1px solid var(--cor-divisor);
+  padding-top: var(--espaco-2);
+}
+
+.circuloPessoa {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1px dashed var(--cor-borda-forte);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cor-texto-suave);
+}
+
+.seta {
+  flex: none;
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  position: fixed;
+  left: var(--espaco-4);
+  bottom: var(--espaco-4);
+  z-index: 52;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra-md);
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

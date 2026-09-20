@@ -24,7 +24,9 @@ import {
   account,
   briefings,
   clientes,
+  membrosMarca,
   nichos,
+  preferenciasUsuario,
   roteiros,
   temasDia,
   user,
@@ -75,10 +77,11 @@ test.describe("roteiro pela tela", () => {
         usuarioId: "e2e-roteiro",
         nome: "[teste] Roteiro",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
     clienteId = cliente.id;
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-roteiro", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-roteiro", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)

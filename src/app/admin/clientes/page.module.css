@@ -79,6 +79,13 @@
   color: var(--cor-titulo);
 }
 
+/** Coluna "Pessoas" (V3, item 5, Casca AdminClientes.dc.html): fonte mono, alinhada a direita. */
+.num {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+  text-align: right;
+}
+
 .textoAtencao {
   color: var(--cor-atencao);
 }

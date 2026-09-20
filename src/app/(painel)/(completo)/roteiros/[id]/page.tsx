@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
 import { corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
@@ -19,7 +19,7 @@ export default async function Roteiro({ params }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
     redirect("/entrar");
   }
@@ -44,6 +44,9 @@ export default async function Roteiro({ params }: Props) {
       corpo={corpoDoRoteiro(roteiro)}
       video={video}
       versoes={versoes}
+      marcaAtiva={cliente}
+      marcas={marcas}
+      nomePessoa={sessao.user.name}
     />
   );
 }

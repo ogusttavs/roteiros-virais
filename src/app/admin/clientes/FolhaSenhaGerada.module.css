@@ -1,0 +1,77 @@
+/** Design v2, `AdminCliente.dc.html`, folha "Convite mandado" (`.senha-gerada`, `.aviso-uma-vez`): V3, item 5. */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--espaco-4);
+  background: var(--cor-sobreposicao);
+}
+
+.folha {
+  width: 100%;
+  max-width: 26rem;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-6);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-md);
+}
+
+.titulo {
+  margin: 0;
+}
+
+.texto {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+/* Bloco que precisa gritar que a senha so aparece uma vez (comentario do design). */
+.senhaGerada {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--cor-texto-suave);
+}
+
+.valor {
+  font-family: var(--fonte-mono);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--cor-titulo);
+  word-break: break-all;
+}
+
+.acoes {
+  display: flex;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+}
+
+.aviso {
+  margin: 0;
+  display: flex;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-atencao);
+}
+
+.botaoFechar {
+  width: 100%;
+}

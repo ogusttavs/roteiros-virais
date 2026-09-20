@@ -16,8 +16,10 @@ import {
   account,
   briefings,
   clientes,
+  membrosMarca,
   metricasVideoCliente,
   nichos,
+  preferenciasUsuario,
   roteiros,
   user,
   videosCliente,
@@ -74,9 +76,10 @@ test.describe("historico com roteiro gravado", () => {
         usuarioId: "e2e-historico",
         nome: "[teste] Historico",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-historico", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-historico", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)

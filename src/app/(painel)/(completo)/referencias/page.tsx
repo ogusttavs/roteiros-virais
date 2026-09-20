@@ -2,7 +2,7 @@ import { Bookmark } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { referenciasDoNicho } from "@/servicos/pesquisa";
 import { favoritosDoCliente } from "@/servicos/referencias";
 import { textosReferencias } from "@/textos/referencias";
@@ -16,7 +16,7 @@ export default async function Referencias() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

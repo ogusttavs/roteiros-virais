@@ -4,7 +4,7 @@ import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 
 import { BriefingVivo } from "./BriefingVivo";
 
@@ -14,7 +14,7 @@ export default async function Briefing() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

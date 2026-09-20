@@ -26,6 +26,53 @@
   border-bottom: var(--largura-borda) solid var(--cor-divisor);
 }
 
+/**
+ * So com mais de uma marca (Gravacao.dc.html, estado `variasMarcas`; V3,
+ * item 3): a marca ganha a primeira linha inteira, como o "prompt" de uma
+ * barra de navegacao do iOS, e o resto desce para a segunda.
+ */
+.topo.comMarca {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+}
+
+.marcaGravando {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-legenda);
+}
+
+.marcaGravando .avatar {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+}
+
+.topo.comMarca .botaoSair {
+  grid-row: 2;
+}
+
+.topo.comMarca .passos {
+  grid-row: 2;
+}
+
+.topo.comMarca .contagem {
+  grid-row: 2;
+}
+
 .passos {
   display: flex;
   gap: var(--espaco-2);

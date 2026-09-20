@@ -11,7 +11,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, user, videos } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, user, videos } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-referencias@exemplo.teste";
@@ -44,9 +44,10 @@ test.describe("favoritar em /referencias", () => {
         usuarioId: "e2e-referencias",
         nome: "[teste] Referencias",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-referencias", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-referencias", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)

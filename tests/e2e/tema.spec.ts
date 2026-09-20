@@ -22,7 +22,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, user } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 const EMAIL_CLIENTE = "e2e-tema-preferencia@exemplo.teste";
@@ -51,9 +51,10 @@ test.beforeAll(async () => {
       usuarioId: "e2e-tema-preferencia",
       nome: "[teste] Preferencia de tema",
       nichoId: nicho.id,
-      aceitouTermosEm: new Date(),
     })
     .returning();
+  await db().insert(membrosMarca).values({ usuarioId: "e2e-tema-preferencia", clienteId: cliente.id, papel: "dono" });
+  await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-tema-preferencia", aceitouTermosEm: new Date() });
   await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
 });
 

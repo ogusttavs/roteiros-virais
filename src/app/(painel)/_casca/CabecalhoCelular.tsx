@@ -1,26 +1,33 @@
 "use client";
 
-import Link from "next/link";
+import { RotateCw } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { textosNav } from "@/textos/nav";
 import { Logo } from "@/ui/Logo";
 
 import styles from "./CabecalhoCelular.module.css";
+import { SeletorMarcaCelular, type MarcaResumo } from "./SeletorMarcaCelular";
 
 type Props = {
   nomeProduto: string;
-  iniciais: string;
-  rotuloConta: string;
+  marcaAtiva: MarcaResumo;
+  marcas: MarcaResumo[];
+  nomePessoa: string;
 };
 
 /**
  * Cabecalho fixo do celular: some ao rolar para baixo, volta ao rolar para
  * cima (CascaCelular.dc.html, decisao do Fable no PROXIMO.md). So visivel
- * abaixo de 768px (CabecalhoCelular.module.css).
+ * abaixo de 768px (CabecalhoCelular.module.css). A pilula de marca e o
+ * botao "Atualizar" (V3, item 3, Casca.dc.html) ficam do lado direito,
+ * depois da identidade do produto.
  */
-export function CabecalhoCelular({ nomeProduto, iniciais, rotuloConta }: Props) {
+export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }: Props) {
   const [escondido, setEscondido] = useState(false);
   const ultimoRef = useRef(0);
+  const router = useRouter();
 
   useEffect(() => {
     function aoRolar() {
@@ -37,14 +44,26 @@ export function CabecalhoCelular({ nomeProduto, iniciais, rotuloConta }: Props) 
   }, []);
 
   return (
-    <header className={styles.cabecalho} style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}>
+    <header
+      className={marcas.length > 1 ? `${styles.cabecalho} ${styles.comMarca}` : styles.cabecalho}
+      style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}
+    >
       <div className={styles.identidade}>
         <Logo tamanho={24} />
         <span className={styles.nome}>{nomeProduto}</span>
       </div>
-      <Link href="/conta" aria-label={rotuloConta} className={styles.contaBotao}>
-        <span className={styles.avatar}>{iniciais}</span>
-      </Link>
+      <div className={styles.direita}>
+        <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+        <button
+          type="button"
+          className={styles.botaoBarra}
+          aria-label={textosNav.atualizar}
+          onClick={() => router.refresh()}
+        >
+          <RotateCw size={18} aria-hidden="true" />
+          <span className={styles.cede}>{textosNav.atualizar}</span>
+        </button>
+      </div>
     </header>
   );
 }

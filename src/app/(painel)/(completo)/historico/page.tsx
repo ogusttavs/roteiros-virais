@@ -2,7 +2,7 @@ import { History } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { curvasDoHistorico } from "@/servicos/curva";
 import { agruparPorSemana } from "@/servicos/historico-regras";
 import { roteirosDoCliente } from "@/servicos/roteiro";
@@ -18,7 +18,7 @@ export default async function Historico() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

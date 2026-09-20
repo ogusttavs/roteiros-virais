@@ -83,16 +83,8 @@
       padding: 0;
     }
 
-    .nomeDesktop,
-    .nomeConta {
+    .nomeDesktop {
       display: none;
-    }
-
-    .contaDesktop {
-      width: var(--altura-toque);
-      justify-content: center;
-      padding: 0;
-      margin-inline: auto;
     }
   }
 
@@ -114,27 +106,6 @@
     margin-top: var(--espaco-8);
   }
 
-  .contaDesktop {
-    margin-top: auto;
-    display: flex;
-    align-items: center;
-    gap: var(--espaco-3);
-    height: var(--altura-toque);
-    padding: 0 var(--espaco-3);
-    border-radius: var(--raio-md);
-    color: var(--cor-titulo);
-    font-size: var(--tamanho-secundario);
-    font-weight: 500;
-    text-decoration: none;
-    transition: background var(--duracao-rapida) var(--curva-saida);
-  }
-
-  .nomeConta {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   /**
    * Escolha explicita do cliente (botao em BarraLateralToggle, atributo
    * lido antes da primeira pintura em src/app/layout.tsx) vence o padrão
@@ -153,16 +124,8 @@
     padding: 0;
   }
 
-  html[data-barra-lateral="recolhida"] .nomeDesktop,
-  html[data-barra-lateral="recolhida"] .nomeConta {
+  html[data-barra-lateral="recolhida"] .nomeDesktop {
     display: none;
-  }
-
-  html[data-barra-lateral="recolhida"] .contaDesktop {
-    width: var(--altura-toque);
-    justify-content: center;
-    padding: 0;
-    margin-inline: auto;
   }
 
   html[data-barra-lateral="aberta"] .colunaDesktop {
@@ -175,38 +138,8 @@
     padding: 0 var(--espaco-3);
   }
 
-  html[data-barra-lateral="aberta"] .nomeDesktop,
-  html[data-barra-lateral="aberta"] .nomeConta {
+  html[data-barra-lateral="aberta"] .nomeDesktop {
     display: inline;
-  }
-
-  html[data-barra-lateral="aberta"] .contaDesktop {
-    width: auto;
-    justify-content: flex-start;
-    padding: 0 var(--espaco-3);
-    margin-inline: 0;
-  }
-
-  .contaDesktop:hover {
-    background: var(--cor-superficie-hover);
-  }
-
-  .contaDesktop:focus-visible {
-    outline: none;
-    box-shadow: var(--sombra-foco);
-  }
-
-  .avatarDesktop {
-    flex: none;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--cor-superficie-recuada);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--fonte-mono);
-    font-size: var(--tamanho-legenda);
   }
 
   .barraInferior {

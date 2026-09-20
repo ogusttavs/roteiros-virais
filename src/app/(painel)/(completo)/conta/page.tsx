@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
 import { FormularioConta } from "./FormularioConta";
 import styles from "./page.module.css";
+import { QuemTemAcesso } from "./QuemTemAcesso";
 
 export default async function Conta() {
   const sessao = await sessaoAtual();
@@ -14,8 +15,12 @@ export default async function Conta() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const [cliente, preferencias] = await Promise.all([
+    clienteAtivoDoUsuario(sessao.user.id),
+    preferenciasDoUsuario(sessao.user.id),
+  ]);
   const perfis = cliente?.perfis;
+  const membros = cliente ? await membrosDaMarca(cliente.id) : [];
 
   return (
     <div className={styles.pagina}>
@@ -27,8 +32,12 @@ export default async function Conta() {
         tiktokInicial={perfis?.tiktok ?? ""}
         youtubeInicial={perfis?.youtube ?? ""}
         temaInicial={cliente?.tema ?? "sistema"}
-        horaLembreteInicial={cliente?.horaLembrete ?? "08:00"}
+        horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
+        nomeMarca={cliente?.nome ?? ""}
       />
+      {cliente ? (
+        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
+      ) : null}
       <BotaoSair />
     </div>
   );

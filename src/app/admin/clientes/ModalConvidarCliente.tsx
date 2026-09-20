@@ -9,6 +9,7 @@ import { Campo } from "@/ui/componentes/Campo";
 import { Toast } from "@/ui/componentes/Toast";
 
 import { criarClienteAction } from "./acoes";
+import { FolhaSenhaGerada } from "./FolhaSenhaGerada";
 import styles from "./ModalConvidarCliente.module.css";
 
 const t = textosAdmin.clientes;
@@ -27,17 +28,23 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
   const [convidando, setConvidando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [toastTexto, setToastTexto] = useState<string | null>(null);
+  /** V3, item 5: e-mail novo mostra a senha gerada antes de fechar de vez. */
+  const [senhaGerada, setSenhaGerada] = useState<{ email: string; senha: string } | null>(null);
 
   async function convidar(evento: FormEvent) {
     evento.preventDefault();
     setConvidando(true);
     setErro(null);
     try {
-      await criarClienteAction({ nome, email, nichoId });
-      setToastTexto(t.sucesso(email));
+      const resultado = await criarClienteAction({ nome, email, nichoId });
       setNome("");
-      setEmail("");
       onFechar();
+      if (resultado.tipo === "convite") {
+        setSenhaGerada({ email, senha: resultado.senha });
+      } else {
+        setToastTexto(t.sucessoJaTinhaLogin(email));
+      }
+      setEmail("");
       router.refresh();
     } catch {
       setErro(t.erroConvite);
@@ -66,6 +73,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                ajuda={t.ajudaEmailJaExiste}
               />
               <label className={styles.rotuloSelect}>
                 {t.campoNicho}
@@ -92,6 +100,13 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
             </form>
           </div>
         </div>
+      ) : null}
+      {senhaGerada ? (
+        <FolhaSenhaGerada
+          email={senhaGerada.email}
+          senha={senhaGerada.senha}
+          onFechar={() => setSenhaGerada(null)}
+        />
       ) : null}
       <Toast texto={toastTexto ?? ""} aberto={Boolean(toastTexto)} onFechar={() => setToastTexto(null)} />
     </>

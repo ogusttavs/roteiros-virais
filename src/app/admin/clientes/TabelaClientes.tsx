@@ -76,6 +76,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                 <th>{t.colunaNota}</th>
                 <th>{t.colunaUltimoRoteiro}</th>
                 <th>{t.colunaDiasSemGravar}</th>
+                <th className={styles.num}>{t.colunaPessoas}</th>
                 <th></th>
               </tr>
             </thead>
@@ -102,6 +103,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                         ? t.diasAtencao(cliente.diasSemGravar)
                         : cliente.diasSemGravar}
                   </td>
+                  <td className={styles.num}>{cliente.pessoas}</td>
                   <td>
                     <Link href={`/admin/clientes/${cliente.id}`} className={styles.botaoAbrir}>
                       {t.botaoAbrir}

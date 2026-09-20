@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
+import { iniciaisDe } from "@/lib/iniciais";
 import { textosGravacao } from "@/textos/gravacao";
 import { Toast } from "@/ui/componentes/Toast";
 
@@ -18,6 +19,12 @@ type Props = {
   blocos: Bloco[];
   /** Se o roteiro já estava marcado como gravado ao entrar (revisão do PR #31, item 6). */
   jaGravado: boolean;
+  /**
+   * Nome da marca ativa, só com mais de uma marca (V3, item 3,
+   * Gravacao.dc.html): em linha pequena no topo, sem ação, só para
+   * confirmar para qual marca se está gravando.
+   */
+  nomeMarca?: string;
 };
 
 /**
@@ -25,7 +32,7 @@ type Props = {
  * `entrega/telas/Gravacao.dc.html`; `PROXIMO.md`, D2 parte 1, item 7):
  * substitui o modo gravação que era um estado sobreposto de `/roteiros/[id]`.
  */
-export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado }: Props) {
+export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }: Props) {
   const router = useRouter();
   const [passo, setPasso] = useState(0);
   const [temWakeLock, setTemWakeLock] = useState(false);
@@ -88,7 +95,15 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado }: Props) {
 
   return (
     <div className={styles.gravacao}>
-      <header className={styles.topo}>
+      <header className={nomeMarca ? `${styles.topo} ${styles.comMarca}` : styles.topo}>
+        {nomeMarca ? (
+          <p className={styles.marcaGravando}>
+            <span className={styles.avatar} aria-hidden="true">
+              {iniciaisDe(nomeMarca)}
+            </span>
+            <span>{nomeMarca}</span>
+          </p>
+        ) : null}
         <button
           type="button"
           aria-label={textosGravacao.sair}

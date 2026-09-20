@@ -5,11 +5,13 @@ import { notFound } from "next/navigation";
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
+import { membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { textosAdmin } from "@/textos/admin";
 import { textosHistorico } from "@/textos/historico";
 
 import styles from "./page.module.css";
+import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
 
 const t = textosAdmin.clienteDetalhe;
 const LIMIAR_ATENCAO = 5;
@@ -38,6 +40,10 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
   const regras = await regrasDoCliente(cliente.id);
   const totalReprovacoes = await contarReprovacoes(cliente.id);
   const regrasAtivas = regras.filter((regra) => regra.ativa).length;
+  const membrosBrutos = await membrosDaMarca(cliente.id);
+  // Server Component: NOME_SEM_NOME_AINDA mora num arquivo que importa next/headers,
+  // que so pode ser importado aqui (o client component recebe so o booleano ja calculado).
+  const membros = membrosBrutos.map((membro) => ({ ...membro, semNome: membro.nome === NOME_SEM_NOME_AINDA }));
 
   return (
     <div className={styles.pagina}>
@@ -47,9 +53,11 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
         </Link>
         <h1>{cliente.nome}</h1>
         <p className={styles.subtitulo}>
-          {cliente.email} · {cliente.nichoNome ?? textosAdmin.clientes.semNicho}
+          {cliente.nichoNome ?? textosAdmin.clientes.semNicho} · {textosAdmin.acessos.quantos(membros.length)}
         </p>
       </div>
+
+      <QuemTemAcessoAdmin clienteId={cliente.id} nomeMarca={cliente.nome} membros={membros} />
 
       <section className={styles.secao}>
         <h2>{t.briefingTitulo}</h2>

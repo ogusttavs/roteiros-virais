@@ -90,6 +90,48 @@ describe("aplicarProporcaoBrasil", () => {
     expect(resultado.filter((i) => i.id >= 100)).toHaveLength(2);
   });
 
+  /**
+   * V3, item 0 (resto da revisão do PR #46): com muito brasileiro
+   * disponível, o que funciona lá fora ainda passa, na parte que sobra do
+   * 30%, sem esperar sobrar vaga proporcional ao brasileiro aceito. Com 5
+   * internacionais de maior prioridade e 100 brasileiros atrás, os 5 cabem
+   * inteiros no teto de 12 (`floor(40*0,3)`) da primeira passada, e o
+   * resultado final (35 brasileiro, 5 internacional) sustenta 5 dentro do
+   * seu próprio teto de conferência.
+   */
+  it("100 brasileiros e 5 internacionais no topo da prioridade, limite 40: devolve os 5", () => {
+    const internacionais: ItemTeste[] = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, idioma: "en" }));
+    const brasileiros: ItemTeste[] = Array.from({ length: 100 }, (_, i) => ({ id: 100 + i, idioma: "pt" }));
+    const itens = [...internacionais, ...brasileiros];
+
+    const resultado = aplicarProporcaoBrasil(itens, 40, classificar, 0.7);
+
+    expect(resultado).toHaveLength(40);
+    expect(resultado.filter((i) => i.id < 100)).toHaveLength(5);
+    expect(resultado.filter((i) => i.id >= 100)).toHaveLength(35);
+  });
+
+  /**
+   * V3, item 0: com 30 internacionais de maior prioridade que 100
+   * brasileiros, a primeira passada aceita só 12 (`floor(40*0,3)`, o teto
+   * fixo desta passada), preenche o resto com brasileiro até o limite (28),
+   * e a conferência final aceita os 12, porque 28 brasileiros sustentam
+   * exatamente 12 (`floor(28*0,3/0,7)`).
+   */
+  it("100 brasileiros e 30 internacionais no topo, limite 40: devolve 12 internacionais e 28 brasileiros", () => {
+    const internacionais: ItemTeste[] = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, idioma: "en" }));
+    const brasileiros: ItemTeste[] = Array.from({ length: 100 }, (_, i) => ({ id: 100 + i, idioma: "pt" }));
+    const itens = [...internacionais, ...brasileiros];
+
+    const resultado = aplicarProporcaoBrasil(itens, 40, classificar, 0.7);
+
+    expect(resultado).toHaveLength(40);
+    expect(resultado.filter((i) => i.id < 100)).toHaveLength(12);
+    expect(resultado.filter((i) => i.id >= 100)).toHaveLength(28);
+    // As doze que entram sao as de maior prioridade (as primeiras da lista).
+    expect(resultado.filter((i) => i.id < 100).map((i) => i.id)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
   it("limite pequeno: limite 1 nao abre vaga nenhuma para internacional alem do proprio brasileiro", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "en" },

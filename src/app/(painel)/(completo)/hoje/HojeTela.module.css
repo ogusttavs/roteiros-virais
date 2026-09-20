@@ -43,33 +43,6 @@
   box-shadow: var(--sombra-foco);
 }
 
-/**
- * Avatar de `/conta` na barra do topo, só no celular (revisão do PR #31,
- * item 8, decisão do Fable em `BRIEF.md`): no celular, Hoje não tem barra
- * lateral, e a barra do topo é a única porta para a conta. No tablet e no
- * desktop a barra lateral já tem o link, então este some.
- */
-.avatarBarra {
-  width: var(--altura-toque);
-  height: var(--altura-toque);
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--raio-pill);
-  background: var(--cor-acao);
-  color: var(--cor-acao-texto);
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rodape);
-  font-weight: var(--peso-semibold);
-  text-decoration: none;
-}
-
-@media (min-width: 768px) {
-  .avatarBarra {
-    display: none;
-  }
-}
-
 /* ---------- Conteúdo ---------- */
 
 .miolo {

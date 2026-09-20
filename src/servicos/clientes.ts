@@ -1,20 +1,35 @@
-import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { randomUUID } from "node:crypto";
+
+import { hashPassword } from "better-auth/crypto";
+import { and, eq } from "drizzle-orm";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { db } from "@/db";
 import {
+  account,
   briefings,
   clientes,
+  membrosMarca,
   nichos,
+  preferenciasUsuario,
   user,
   type Cliente,
+  type PapelMarca,
   type PerfisCliente,
   type TemaPreferido,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hojeISO } from "@/lib/config";
+import {
+  lerClienteIdDoCookie,
+  NOME_COOKIE_MARCA_ATIVA,
+  OPCOES_COOKIE_MARCA_ATIVA,
+  valorCookieMarcaAtiva,
+} from "@/lib/marca-ativa";
+import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
+import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroAcessoNegado extends Error {}
@@ -34,11 +49,6 @@ export function garantirSessaoAdmin(sessao: { user: { role?: string | null } } |
   }
 }
 
-export async function clienteDoUsuario(usuarioId: string): Promise<Cliente | null> {
-  const [cliente] = await db().select().from(clientes).where(eq(clientes.usuarioId, usuarioId));
-  return cliente ?? null;
-}
-
 export async function clientePorId(clienteId: number): Promise<Cliente | null> {
   const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
   return cliente ?? null;
@@ -53,37 +63,155 @@ export async function briefingCompleto(clienteId: number): Promise<boolean> {
 }
 
 /**
- * Confere que o cliente pedido e o mesmo da sessao. Dado de um cliente nunca
- * aparece para outro (plataforma/CLAUDE.md).
+ * Todas as marcas de que o usuario e membro (V3, item 1, escopo 4.13),
+ * ordenadas por nome: a lista "Suas marcas" da casca e da folha de troca.
  */
-export async function garantirClientePermitido(
-  clienteIdPedido: number,
-  usuarioId: string,
-): Promise<Cliente> {
-  const cliente = await clienteDoUsuario(usuarioId);
-  if (!cliente || cliente.id !== clienteIdPedido) {
-    throw new ErroAcessoNegado("Este recurso pertence a outro cliente.");
-  }
-  return cliente;
+export async function marcasDoUsuario(usuarioId: string): Promise<Cliente[]> {
+  const linhas = await db()
+    .select({ cliente: clientes })
+    .from(membrosMarca)
+    .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
+    .where(eq(membrosMarca.usuarioId, usuarioId))
+    .orderBy(clientes.nome);
+  return linhas.map((l) => l.cliente);
+}
+
+/** A marca de acesso mais recente entre as que o usuario pertence, para quando o cookie nao serve. */
+function marcaPadrao(marcas: Cliente[]): Cliente {
+  return [...marcas].sort((a, b) => {
+    const acessoA = a.ultimoAcessoEm?.getTime() ?? 0;
+    const acessoB = b.ultimoAcessoEm?.getTime() ?? 0;
+    if (acessoA !== acessoB) return acessoB - acessoA;
+    return b.criadoEm.getTime() - a.criadoEm.getTime();
+  })[0];
 }
 
 /**
- * O cliente da sessao atual, direto, sem receber nenhum id de fora. Usada
- * pelas Server Actions do painel (/comecar, /briefing): como o clienteId
- * nunca vem do cliente da requisicao, nao existe caminho para uma sessao
- * ler ou gravar o briefing de outro cliente por essas rotas (isolamento no
- * nivel de rota, plano de execucao etapa 5).
+ * Resolve a marca ativa entre as que o usuario ja pertence (V3, item 2): o
+ * cookie `marca_ativa` quando aponta para uma delas, senao a de acesso mais
+ * recente, regravando o cookie nesse caso. Cookie adulterado, com id de
+ * marca que o usuario nao e membro, cai na mesma regra do "senao": o cookie
+ * nunca concede pertencimento a marca nenhuma, so escolhe entre as que a
+ * consulta acima ja provou que sao do usuario.
+ *
+ * `cookies()` (leitura ou gravacao) so funciona dentro de uma requisicao do
+ * Next.js; `.set` alem disso so dentro de uma Server Action ou Route
+ * Handler. Chamada de fora (Server Component, job, script, teste de
+ * integracao que nao passa por uma Server Action de verdade), os dois
+ * try/catch abaixo engolem o erro: sem cookie para ler nem gravar, a marca
+ * padrao decide sozinha, e a proxima Server Action (ou a troca de marca)
+ * regrava o cookie normalmente.
+ */
+async function resolverMarcaAtiva(marcas: Cliente[]): Promise<Cliente | null> {
+  if (marcas.length === 0) return null;
+
+  let cookieStore: Awaited<ReturnType<typeof cookies>> | null = null;
+  try {
+    cookieStore = await cookies();
+  } catch {
+    // Fora de uma requisicao do Next.js; ver comentario da funcao.
+  }
+
+  const clienteIdDoCookie = cookieStore
+    ? lerClienteIdDoCookie(cookieStore.get(NOME_COOKIE_MARCA_ATIVA)?.value)
+    : null;
+  const marcaDoCookie = clienteIdDoCookie !== null ? marcas.find((m) => m.id === clienteIdDoCookie) : undefined;
+  if (marcaDoCookie) return marcaDoCookie;
+
+  const padrao = marcaPadrao(marcas);
+  try {
+    cookieStore?.set(NOME_COOKIE_MARCA_ATIVA, valorCookieMarcaAtiva(padrao.id), OPCOES_COOKIE_MARCA_ATIVA);
+  } catch {
+    // Server Component nao pode gravar cookie; ver comentario da funcao.
+  }
+  return padrao;
+}
+
+/**
+ * A marca ativa do usuario, para Server Components (paginas): `null` quando
+ * ele nao e membro de marca nenhuma. Substitui `clienteDoUsuario` (V3, item
+ * 2: "um cliente por usuario" deixou de existir).
+ */
+export async function clienteAtivoDoUsuario(usuarioId: string): Promise<Cliente | null> {
+  const marcas = await marcasDoUsuario(usuarioId);
+  return resolverMarcaAtiva(marcas);
+}
+
+/**
+ * Confere que o usuario e membro desta marca antes de qualquer acao sobre
+ * ela (troca de marca, dar/tirar acesso). Nunca abre marca de que o usuario
+ * nao e membro, nem com o id na mao (escopo 4.13, teste de isolamento).
+ */
+export async function garantirMembroDaMarca(usuarioId: string, clienteId: number): Promise<Cliente> {
+  const [linha] = await db()
+    .select({ cliente: clientes })
+    .from(membrosMarca)
+    .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
+  if (!linha) {
+    throw new ErroAcessoNegado("Esta marca pertence a outra pessoa.");
+  }
+  return linha.cliente;
+}
+
+/**
+ * Confere que o recurso pedido pertence a uma marca de que o usuario e
+ * membro. Dado de uma marca nunca aparece para quem nao tem acesso a ela
+ * (plataforma/CLAUDE.md).
+ */
+export async function garantirClientePermitido(clienteIdPedido: number, usuarioId: string): Promise<Cliente> {
+  return garantirMembroDaMarca(usuarioId, clienteIdPedido);
+}
+
+/**
+ * A marca ativa da sessao atual, direto, sem receber nenhum id de fora.
+ * Usada pelas Server Actions do painel (/comecar, /briefing, etc): como o
+ * clienteId nunca vem do cliente da requisicao, nao existe caminho para uma
+ * sessao ler ou gravar o de outra marca por essas rotas (isolamento no
+ * nivel de rota, plano de execucao etapa 5; V3, item 2: entre as marcas que
+ * o usuario pertence, nunca so por um id que ele mandou).
  */
 export async function clienteDaSessaoAtual(): Promise<Cliente> {
   const sessao = await sessaoAtual();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
-    throw new ErroAcessoNegado("Nenhum cliente encontrado para esta sessao.");
+    throw new ErroAcessoNegado("Nenhuma marca encontrada para esta sessao.");
   }
   return cliente;
+}
+
+/**
+ * Troca a marca ativa da sessao (V3, item 2), gravando o cookie assinado.
+ * So funciona chamada de dentro de uma Server Action de verdade
+ * (`cookies().set` exige isso; ver `resolverMarcaAtiva`).
+ */
+export async function trocarMarca(usuarioId: string, clienteId: number): Promise<Cliente> {
+  const cliente = await garantirMembroDaMarca(usuarioId, clienteId);
+  const cookieStore = await cookies();
+  cookieStore.set(NOME_COOKIE_MARCA_ATIVA, valorCookieMarcaAtiva(clienteId), OPCOES_COOKIE_MARCA_ATIVA);
+  return cliente;
+}
+
+export type MembroDaMarca = { usuarioId: string; nome: string; email: string; papel: PapelMarca };
+
+/**
+ * "Quem tem acesso a esta marca" (V3, item 4 e item 5): o dono primeiro,
+ * depois por nome. So leitura em Conta (o cliente ve quem mais entra nesta
+ * marca); o admin usa a mesma consulta para dar/tirar acesso (item 5).
+ */
+export async function membrosDaMarca(clienteId: number): Promise<MembroDaMarca[]> {
+  const linhas = await db()
+    .select({ usuarioId: user.id, nome: user.name, email: user.email, papel: membrosMarca.papel })
+    .from(membrosMarca)
+    .innerJoin(user, eq(user.id, membrosMarca.usuarioId))
+    .where(eq(membrosMarca.clienteId, clienteId));
+  return linhas.sort((a, b) => {
+    if (a.papel !== b.papel) return a.papel === "dono" ? -1 : 1;
+    return a.nome.localeCompare(b.nome, "pt-BR");
+  });
 }
 
 export type ClienteComNichoENome = {
@@ -111,48 +239,164 @@ export async function listarClientes(): Promise<ClienteComNichoENome[]> {
 }
 
 /**
- * O admin cria o usuario (sem senha, o cliente entra por link magico), o
- * registro de cliente, e ja manda o convite. auth.api.createUser e
- * signInMagicLink precisam dos headers da requisicao para saber quem esta
- * autenticado (o admin) e para onde mandar o e-mail.
+ * "Sem nome ainda" (V3, item 5, dúvida 8 do BRIEF.md): quem ganha acesso so
+ * pelo e-mail (`darAcesso`, sem campo de nome na folha) começa assim; o
+ * nome de verdade é a própria pessoa quem põe, em Conta, no primeiro
+ * acesso. Comparado por igualdade exata na lista do admin, para mostrar a
+ * etiqueta "não entrou ainda" em vez do nome.
+ */
+export const NOME_SEM_NOME_AINDA = "Sem nome ainda";
+
+/**
+ * Cria o usuario e a credencial com senha gerada (V3, item 5): mesmo padrao
+ * de `criarUsuarioComSenha` em `scripts/semear.ts` e `scripts/criar-admin.ts`
+ * (insert direto, nao `auth.api.createUser`, que nao aceita senha pronta
+ * fora do fluxo de signup completo).
+ */
+async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
+  const usuarioId = randomUUID();
+  const senha = gerarSenhaLegivel();
+  await db()
+    .insert(user)
+    .values({ id: usuarioId, name: nome, email, emailVerified: false, role: "cliente" as unknown as "admin" });
+  await db()
+    .insert(account)
+    .values({
+      id: `${usuarioId}-credential`,
+      issuer: "local:credential",
+      accountId: usuarioId,
+      providerId: "credential",
+      userId: usuarioId,
+      password: await hashPassword(senha),
+    });
+  return { usuarioId, senha };
+}
+
+/**
+ * Manda o convite por e-mail (link mágico, o "clique no link do e-mail" da
+ * folha "Convite mandado"); bônus sobre a senha, que já resolve o acesso
+ * sozinha, então uma falha aqui não derruba a ação inteira.
+ */
+async function mandarConviteMagico(email: string): Promise<void> {
+  const cabecalhos = await headers();
+  await auth.api
+    .signInMagicLink({ body: { email, callbackURL: "/comecar" }, headers: cabecalhos })
+    .catch(() => {});
+}
+
+export type ResultadoCriarCliente =
+  | { tipo: "jaTinhaLogin"; cliente: Cliente }
+  | { tipo: "convite"; cliente: Cliente; senha: string };
+
+/**
+ * "Convidar cliente" (uma marca nova): e-mail que já entra no painel segue
+ * a regra de "dar acesso" (a marca nasce e a pessoa entra direto, sem senha
+ * nova, dúvida 9 do BRIEF.md); e-mail novo ganha usuário com senha gerada e
+ * o convite por e-mail. Sempre dono da marca nova.
  */
 export async function criarClienteEConvidar(dados: {
   nome: string;
   email: string;
   nichoId: number;
-}): Promise<Cliente> {
-  const cabecalhos = await headers();
+}): Promise<ResultadoCriarCliente> {
+  const [usuarioExistente] = await db().select().from(user).where(eq(user.email, dados.email));
 
-  const { user: usuarioCriado } = await auth.api.createUser({
-    body: {
-      email: dados.email,
-      name: dados.nome,
-      /**
-       * O better-auth so infere papel customizado no tipo quando a opcao
-       * roles (controle de acesso) esta configurada; sem ela o tipo fica
-       * "user" | "admin" mesmo com defaultRole: "cliente" em auth.ts. Em
-       * tempo de execucao e so uma string na coluna role.
-       */
-      role: "cliente" as unknown as "admin",
-    },
-    headers: cabecalhos,
-  });
+  if (usuarioExistente) {
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId: cliente.id, papel: "dono" });
+    return { tipo: "jaTinhaLogin", cliente };
+  }
 
+  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(dados.email, dados.nome);
   const [cliente] = await db()
     .insert(clientes)
-    .values({
-      usuarioId: usuarioCriado.id,
-      nome: dados.nome,
-      nichoId: dados.nichoId,
-    })
+    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId })
     .returning();
+  await db().insert(membrosMarca).values({ usuarioId, clienteId: cliente.id, papel: "dono" });
+  await mandarConviteMagico(dados.email);
 
-  await auth.api.signInMagicLink({
-    body: { email: dados.email, callbackURL: "/comecar" },
-    headers: cabecalhos,
-  });
+  return { tipo: "convite", cliente, senha };
+}
 
-  return cliente;
+export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };
+
+/**
+ * "Dar acesso" a uma marca que já existe (V3, item 5, AdminCliente.dc.html):
+ * só o e-mail. Quem já entra no painel ganha a marca na hora, sem senha
+ * nova; quem não tem login recebe usuário com senha gerada e "Sem nome
+ * ainda" até se apresentar em Conta.
+ */
+export async function darAcesso(clienteId: number, email: string): Promise<ResultadoDarAcesso> {
+  const [usuarioExistente] = await db().select().from(user).where(eq(user.email, email));
+
+  if (usuarioExistente) {
+    const [jaMembro] = await db()
+      .select({ id: membrosMarca.id })
+      .from(membrosMarca)
+      .where(and(eq(membrosMarca.usuarioId, usuarioExistente.id), eq(membrosMarca.clienteId, clienteId)));
+    if (jaMembro) {
+      throw new ErroCliente(textosAdmin.acessos.erroJaTemAcesso);
+    }
+    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId, papel: "membro" });
+    return { tipo: "jaTinhaLogin", nome: usuarioExistente.name };
+  }
+
+  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(email, NOME_SEM_NOME_AINDA);
+  await db().insert(membrosMarca).values({ usuarioId, clienteId, papel: "membro" });
+  await mandarConviteMagico(email);
+
+  return { tipo: "convite", senha };
+}
+
+/**
+ * "Gerar senha nova" por pessoa (V3, item 5): substitui a credencial atual;
+ * so entra pela nova a partir de agora. Cria a credencial se por algum
+ * motivo nao existir (nunca deveria acontecer para quem entrou por aqui).
+ */
+export async function gerarSenhaNova(usuarioId: string): Promise<string> {
+  const senha = gerarSenhaLegivel();
+  const senhaHash = await hashPassword(senha);
+  const [contaCredencial] = await db()
+    .select({ id: account.id })
+    .from(account)
+    .where(and(eq(account.userId, usuarioId), eq(account.providerId, "credential")));
+
+  if (contaCredencial) {
+    await db().update(account).set({ password: senhaHash }).where(eq(account.id, contaCredencial.id));
+  } else {
+    await db()
+      .insert(account)
+      .values({
+        id: `${usuarioId}-credential`,
+        issuer: "local:credential",
+        accountId: usuarioId,
+        providerId: "credential",
+        userId: usuarioId,
+        password: senhaHash,
+      });
+  }
+  return senha;
+}
+
+/**
+ * "Tirar o acesso" (V3, item 5): o dono nao tem esse botao na tela (dúvida
+ * 7 do BRIEF.md), conferido aqui tambem, nao só escondido na UI.
+ */
+export async function tirarAcesso(clienteId: number, usuarioId: string): Promise<void> {
+  const [membro] = await db()
+    .select({ papel: membrosMarca.papel })
+    .from(membrosMarca)
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
+  if (!membro) return;
+  if (membro.papel === "dono") {
+    throw new ErroCliente(textosAdmin.acessos.erroDonoNaoPodeSerTirado);
+  }
+  await db()
+    .delete(membrosMarca)
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
 }
 
 /** Nichos ativos para a lista de ramo em /comecar (briefing-e-rubricas.md, secao 1). */
@@ -230,15 +474,45 @@ const perfilContaSchema = z.object({
     tiktok: z.string().trim().optional(),
     youtube: z.string().trim().optional(),
   }),
-  /**
-   * "HH:MM" (etapa 13, ajuste 4: o navegador nao obriga o `step` de hora
-   * cheia do campo, entao chega qualquer minuto). Arredondada para a hora
-   * cheia anterior antes de gravar; a faixa permitida (etapa 13, ajuste 3)
-   * e conferida depois do arredondamento.
-   */
-  horaLembrete: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "hora invalida"),
 });
 
+/**
+ * /conta (etapa D, parte 2): nome e perfis, gravados numa unica UPDATE.
+ * Diferente de salvarDadosFixos (/comecar), que exige cidade e persona: a
+ * tela de conta nao mostra esses campos, entao usar salvarDadosFixos aqui
+ * exigiria ler o cliente primeiro para preservar o resto (uma
+ * leitura-depois-escrita sem necessidade, no mesmo tipo de corrida de dado
+ * ja corrigido em src/servicos/briefing.ts). A hora do lembrete e da
+ * pessoa, nao da marca (V3, item 4): `salvarHoraLembrete`, abaixo.
+ */
+export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  const dados = perfilContaSchema.parse(dadosBrutos);
+
+  const perfis: PerfisCliente = {
+    instagram: dados.perfis.instagram?.trim() || null,
+    tiktok: dados.perfis.tiktok?.trim() || null,
+    youtube: dados.perfis.youtube?.trim() || null,
+  };
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ nome: dados.nome, perfis })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar a conta; cliente nao encontrado.");
+  return cliente;
+}
+
+export type PreferenciasUsuario = typeof preferenciasUsuario.$inferSelect;
+
+export async function preferenciasDoUsuario(usuarioId: string): Promise<PreferenciasUsuario | null> {
+  const [linha] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+  return linha ?? null;
+}
+
+/** "HH:MM" (etapa 13, ajuste 4: o navegador nao obriga o `step` de hora cheia do campo). */
+const horaMinutoSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "hora invalida");
 /** O tema do dia nasce as 05:30; o lembrete nao faz sentido antes disso nem tarde da noite. */
 const HORA_LEMBRETE_MINIMA = "06:00";
 const HORA_LEMBRETE_MAXIMA = "22:00";
@@ -249,38 +523,28 @@ function arredondarParaHoraCheia(horaMinuto: string): string {
 }
 
 /**
- * /conta (etapa D, parte 2; hora do lembrete na etapa 12, faixa e
- * arredondamento na etapa 13): nome, perfis e a hora do lembrete, gravados
- * numa unica UPDATE. Diferente de salvarDadosFixos (/comecar), que exige
- * cidade e persona: a tela de conta nao mostra esses campos, entao usar
- * salvarDadosFixos aqui exigiria ler o cliente primeiro para preservar o
- * resto (uma leitura-depois-escrita sem necessidade, no mesmo tipo de
- * corrida de dado ja corrigido em src/servicos/briefing.ts).
+ * A hora do lembrete e da pessoa, nao da marca (V3, item 4: o Bruno pode
+ * querer lembrete as 8h numa marca e as 20h noutra? Nao, o lembrete passa a
+ * ser um so por pessoa, item 6). Cria a linha de preferencias na primeira
+ * vez (quem existia antes da V3 ja tem uma, copiada pela migracao 0025).
+ * Arredondada para a hora cheia anterior antes de gravar; a faixa permitida
+ * (etapa 13, ajuste 3) e conferida depois do arredondamento.
  */
-export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
-  const dados = perfilContaSchema.parse(dadosBrutos);
-
-  const horaLembrete = arredondarParaHoraCheia(dados.horaLembrete);
+export async function salvarHoraLembrete(usuarioId: string, horaMinutoBruto: string): Promise<PreferenciasUsuario> {
+  const horaMinuto = horaMinutoSchema.parse(horaMinutoBruto);
+  const horaLembrete = arredondarParaHoraCheia(horaMinuto);
   if (horaLembrete < HORA_LEMBRETE_MINIMA || horaLembrete > HORA_LEMBRETE_MAXIMA) {
     throw new ErroCliente(
       `hora do lembrete fora da faixa permitida (${HORA_LEMBRETE_MINIMA} a ${HORA_LEMBRETE_MAXIMA}): ${horaLembrete}`,
     );
   }
 
-  const perfis: PerfisCliente = {
-    instagram: dados.perfis.instagram?.trim() || null,
-    tiktok: dados.perfis.tiktok?.trim() || null,
-    youtube: dados.perfis.youtube?.trim() || null,
-  };
-
-  const [cliente] = await db()
-    .update(clientes)
-    .set({ nome: dados.nome, perfis, horaLembrete })
-    .where(eq(clientes.id, clienteId))
+  const [preferencias] = await db()
+    .insert(preferenciasUsuario)
+    .values({ usuarioId, horaLembrete })
+    .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { horaLembrete } })
     .returning();
-
-  if (!cliente) throw new ErroCliente("nao foi possivel salvar a conta; cliente nao encontrado.");
-  return cliente;
+  return preferencias;
 }
 
 const TEMAS_VALIDOS: TemaPreferido[] = ["claro", "escuro", "sistema"];
@@ -316,25 +580,35 @@ export function acessouHoje(ultimoAcessoEm: Date | null, agora = new Date()): bo
 }
 
 /**
- * O layout do painel chama isto no maximo uma vez por dia por cliente
- * (etapa 12, decisao 5): confere com `acessouHoje` antes de chamar, para nao
- * gravar a cada navegacao.
+ * O layout do painel chama isto no maximo uma vez por dia por marca (etapa
+ * 12, decisao 5): confere com `acessouHoje` antes de chamar, para nao
+ * gravar a cada navegacao. Grava nos dois niveis (V3, item 1):
+ * `clientes.ultimoAcessoEm`, a marca inteira, e o `ultimoAcessoEm` desta
+ * pessoa em `membrosMarca`, para o cartao "quem tem acesso" do admin.
  */
-export async function registrarAcessoHoje(clienteId: number): Promise<void> {
-  await db().update(clientes).set({ ultimoAcessoEm: new Date() }).where(eq(clientes.id, clienteId));
+export async function registrarAcessoHoje(usuarioId: string, clienteId: number): Promise<void> {
+  const agora = new Date();
+  await Promise.all([
+    db().update(clientes).set({ ultimoAcessoEm: agora }).where(eq(clientes.id, clienteId)),
+    db()
+      .update(membrosMarca)
+      .set({ ultimoAcessoEm: agora })
+      .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId))),
+  ]);
 }
 
 /**
- * Aceite dos termos no primeiro acesso (etapa 12, decisao 7): quem nao
- * aceitou nao passa do layout `(completo)`.
+ * Aceite dos termos no primeiro acesso (etapa 12, decisao 7; V3, item 7: e
+ * da pessoa, nao da marca): quem nao aceitou nao passa do layout
+ * `(completo)`, em nenhuma marca. Cria a linha de preferencias na primeira
+ * vez (mesmo caso de `salvarHoraLembrete`).
  */
-export async function aceitarTermos(clienteId: number): Promise<Cliente> {
-  const [cliente] = await db()
-    .update(clientes)
-    .set({ aceitouTermosEm: new Date() })
-    .where(eq(clientes.id, clienteId))
+export async function aceitarTermos(usuarioId: string): Promise<PreferenciasUsuario> {
+  const agora = new Date();
+  const [preferencias] = await db()
+    .insert(preferenciasUsuario)
+    .values({ usuarioId, aceitouTermosEm: agora })
+    .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: agora } })
     .returning();
-
-  if (!cliente) throw new ErroCliente("nao foi possivel registrar o aceite; cliente nao encontrado.");
-  return cliente;
+  return preferencias;
 }

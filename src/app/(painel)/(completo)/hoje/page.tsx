@@ -9,9 +9,8 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
-import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { corpoDoRoteiro, roteiroDeHoje } from "@/servicos/roteiro";
@@ -19,6 +18,8 @@ import { resumoHistorico, temasParaCliente } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
+
+import { SeletorMarcaCelular } from "../../_casca/SeletorMarcaCelular";
 
 import { HojeCabecalho } from "./HojeCabecalho";
 import { HojeTela, type SemanaDia, type UltimoVideoAparte } from "./HojeTela";
@@ -66,12 +67,10 @@ export default async function Hoje() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
     redirect("/entrar");
   }
-
-  const iniciais = iniciaisDe(sessao.user.name);
 
   const [resultado, roteiroHoje, videoSubindo, resumo, ultimoVideoBruto] = await Promise.all([
     temasParaCliente(cliente),
@@ -126,7 +125,9 @@ export default async function Hoje() {
         evidenciaRoteiroHoje={evidenciaRoteiroHoje}
         semana={semana}
         ultimoVideo={ultimoVideo}
-        iniciais={iniciais}
+        marcaAtiva={cliente}
+        marcas={marcas}
+        nomePessoa={sessao.user.name}
       />
     );
   }
@@ -137,11 +138,7 @@ export default async function Hoje() {
       <div className={styles.pagina}>
         <BarraTopo
           titulo={textosHoje.titulo}
-          direita={
-            <a href="/conta" aria-label={textosHoje.conta} className={styles.avatarBarra}>
-              <span aria-hidden="true">{iniciais}</span>
-            </a>
-          }
+          direita={<SeletorMarcaCelular marcaAtiva={cliente} marcas={marcas} nomePessoa={sessao.user.name} />}
         />
         <div className={styles.miolo}>
           <HojeCabecalho
@@ -179,7 +176,9 @@ export default async function Hoje() {
       evidenciaRoteiroHoje={null}
       semana={semana}
       ultimoVideo={ultimoVideo}
-      iniciais={iniciais}
+      marcaAtiva={cliente}
+      marcas={marcas}
+      nomePessoa={sessao.user.name}
     />
   );
 }

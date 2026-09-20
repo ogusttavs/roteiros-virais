@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { blocoInicial, garantirBriefing } from "@/servicos/briefing";
-import { clienteDoUsuario, listarNichosAtivos } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, listarNichosAtivos } from "@/servicos/clientes";
 
 import { ComecarWizard } from "./ComecarWizard";
 
@@ -13,7 +13,7 @@ export default async function Comecar() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

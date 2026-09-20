@@ -176,6 +176,13 @@
       "when": 1789863244894,
       "tag": "0024_idioma-pais",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789905574251,
+      "tag": "0025_membros-marca",
+      "breakpoints": true
     }
   ]
 }

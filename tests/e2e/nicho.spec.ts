@@ -8,16 +8,18 @@
  * seed (`dentistas`, `produtos-de-limpeza`).
  */
 import { expect, test } from "@playwright/test";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { contas, nichos, verification } from "../../src/db/schema";
+import { contas, nichos } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
 const NOME_NICHO = "[exemplo e2e] Nicho de teste";
 const SLUG_NICHO = "exemplo-e2e-nicho-de-teste";
 const EMAIL_CLIENTE = "cliente-nicho-e2e@exemplo.teste";
+/** Formato de `gerarSenhaLegivel` (`src/lib/senha-legivel.ts`): substantivo-adjetivo-NN-substantivo. */
+const PADRAO_SENHA_GERADA = /[a-zà-ÿ]+-[a-zà-ÿ]+-\d{2}-[a-zà-ÿ]+/;
 
 test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente", async ({ page, browser }) => {
   // Dois fluxos num teste so (criar nicho, depois criar cliente com ele), varias
@@ -76,23 +78,22 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await modalConvidar.getByRole("combobox").selectOption({ label: NOME_NICHO });
   await modalConvidar.getByRole("button", { name: "convidar por e-mail" }).click();
 
-  await expect(page.getByRole("status")).toContainText(EMAIL_CLIENTE);
-
-  // O cliente novo entra pelo link magico (mesmo caminho de
-  // entrar-e-convidar.spec.ts): o token fica em verification, o mesmo dado que
-  // aparece no link logado.
-  const [linha] = await db()
-    .select({ token: verification.identifier })
-    .from(verification)
-    .orderBy(desc(verification.createdAt))
-    .limit(1);
-  expect(linha?.token).toBeTruthy();
+  // O cliente novo entra com a senha gerada (V3, item 5; mesmo caminho de
+  // entrar-e-convidar.spec.ts), nao mais por link magico.
+  const folha = page.getByRole("dialog", { name: "Convite mandado" });
+  await expect(folha).toBeVisible();
+  await expect(folha).toContainText(EMAIL_CLIENTE);
+  const textoFolha = await folha.innerText();
+  const senha = textoFolha.match(PADRAO_SENHA_GERADA)?.[0];
+  expect(senha, "senha gerada visivel na folha").toBeTruthy();
+  await folha.getByRole("button", { name: "copiei, pode fechar" }).click();
 
   const contextoCliente = await browser.newContext();
   const paginaCliente = await contextoCliente.newPage();
-  await paginaCliente.goto(
-    `/api/auth/magic-link/verify?token=${linha.token}&callbackURL=%2Fcomecar`,
-  );
+  await paginaCliente.goto("/entrar");
+  await paginaCliente.getByLabel("E-mail").fill(EMAIL_CLIENTE);
+  await paginaCliente.getByLabel("Senha").fill(senha!);
+  await paginaCliente.getByRole("button", { name: "entrar", exact: true }).click();
 
   await expect(paginaCliente).toHaveURL(/\/comecar/);
   await expect(paginaCliente.getByText("Antes de escrever, a gente precisa te conhecer")).toBeVisible();
