@@ -190,7 +190,8 @@ async function passo5TaxaForaDaCurvaPorConta() {
  * conhecido; senao fica nulo (a janela pode ter esvaziado desde a ultima
  * vez, "nao sei" e mais correto que um valor velho).
  */
-async function passo6IdiomaPrincipalPorConta() {
+/** Exportado para `scripts/preencher-idioma.ts` (V2b, item 5) reaproveitar sem duplicar a query. */
+export async function passo6IdiomaPrincipalPorConta() {
   return db().execute(sql`
     UPDATE contas c
     SET idioma_principal = a.moda
@@ -224,7 +225,8 @@ async function passo6IdiomaPrincipalPorConta() {
  * texto, não uma expressão simples de traduzir para SQL, e o universo de
  * contas candidatas (idioma "pt" e pais ainda desconhecido) é pequeno.
  */
-async function passo7PaisPorIdiomaPrincipal(): Promise<number> {
+/** Exportado para `scripts/preencher-idioma.ts` (V2b, item 5) reaproveitar sem duplicar a query. */
+export async function passo7PaisPorIdiomaPrincipal(): Promise<number> {
   const direto = await db().execute(sql`
     UPDATE contas SET pais = 'BR'
     WHERE pais IS NULL AND idioma_principal = 'pt-BR'
