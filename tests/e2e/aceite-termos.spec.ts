@@ -13,7 +13,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, user } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, user } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-aceite-termos@exemplo.teste";
@@ -40,11 +40,12 @@ test.describe("aceite dos termos no primeiro acesso", () => {
         userId: "e2e-aceite-termos",
         password: await hashPassword(SENHA),
       });
-    // Sem aceitouTermosEm de proposito: e exatamente o estado que este teste cobre.
+    // Sem preferenciasUsuario/aceitouTermosEm de proposito: e exatamente o estado que este teste cobre.
     const [cliente] = await db()
       .insert(clientes)
       .values({ usuarioId: "e2e-aceite-termos", nome: "[teste] Aceite Termos", nichoId: nicho.id })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-aceite-termos", clienteId: cliente.id, papel: "dono" });
 
     await db()
       .insert(briefings)

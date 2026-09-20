@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { roteiroPorId } from "@/servicos/roteiro";
 
 /**
@@ -69,7 +69,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }

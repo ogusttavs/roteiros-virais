@@ -27,7 +27,17 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, aprendizadoCliente, briefings, clientes, nichos, user, type AvaliacaoResposta } from "../../src/db/schema";
+import {
+  account,
+  aprendizadoCliente,
+  briefings,
+  clientes,
+  membrosMarca,
+  nichos,
+  preferenciasUsuario,
+  user,
+  type AvaliacaoResposta,
+} from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 
@@ -239,9 +249,10 @@ test.describe("briefing pela tela", () => {
         usuarioId: "e2e-briefing-vivo",
         nome: "[teste] Briefing Vivo",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-briefing-vivo", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-briefing-vivo", aceitouTermosEm: new Date() });
 
     const avaliacaoNota9 = (id: string): AvaliacaoResposta => ({
       nota: 9,
@@ -332,9 +343,14 @@ test.describe("briefing pela tela", () => {
         usuarioId: "e2e-briefing-aprendizado",
         nome: "[teste] Briefing Aprendizado",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-briefing-aprendizado", clienteId: cliente.id, papel: "dono" });
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: "e2e-briefing-aprendizado", aceitouTermosEm: new Date() });
 
     const avaliacaoNota9 = (id: string): AvaliacaoResposta => ({
       nota: 9,
@@ -425,6 +441,7 @@ test.describe("briefing pela tela", () => {
         nichoId: nicho.id,
       })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-cartao-notas", clienteId: cliente.id, papel: "dono" });
 
     // O bloco 1 inteiro avaliado (p1, p2, p3): blocoInicial pula direto para o bloco 2
     // (so avanca quando NENHUMA pergunta do bloco atual ainda esta pendente).
@@ -518,9 +535,10 @@ test.describe("briefing pela tela", () => {
           usuarioId: "e2e-folha-celular",
           nome: "[teste] Folha Celular",
           nichoId: nicho.id,
-          aceitouTermosEm: new Date(),
         })
         .returning();
+      await db().insert(membrosMarca).values({ usuarioId: "e2e-folha-celular", clienteId: cliente.id, papel: "dono" });
+      await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-folha-celular", aceitouTermosEm: new Date() });
 
       // Doze respostas avaliadas, cada uma com "melhorar" grande o bastante
       // para gerar uma linha de resumo (mesmo formato do teste "cartao de

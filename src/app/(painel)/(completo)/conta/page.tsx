@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
@@ -14,7 +14,10 @@ export default async function Conta() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const [cliente, preferencias] = await Promise.all([
+    clienteAtivoDoUsuario(sessao.user.id),
+    preferenciasDoUsuario(sessao.user.id),
+  ]);
   const perfis = cliente?.perfis;
 
   return (
@@ -27,7 +30,7 @@ export default async function Conta() {
         tiktokInicial={perfis?.tiktok ?? ""}
         youtubeInicial={perfis?.youtube ?? ""}
         temaInicial={cliente?.tema ?? "sistema"}
-        horaLembreteInicial={cliente?.horaLembrete ?? "08:00"}
+        horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
       />
       <BotaoSair />
     </div>

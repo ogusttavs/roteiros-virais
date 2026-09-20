@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
 
@@ -21,7 +21,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

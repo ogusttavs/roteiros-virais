@@ -8,7 +8,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, user } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-barra-lateral@exemplo.teste";
@@ -41,9 +41,11 @@ test.describe("barra lateral do painel", () => {
         usuarioId: "e2e-barra-lateral",
         nome: "[teste] Barra Lateral",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    // V3, item 1: sem o membro "dono", a sessao nao acha marca nenhuma.
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-barra-lateral", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-barra-lateral", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)

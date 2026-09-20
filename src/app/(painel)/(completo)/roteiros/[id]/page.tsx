@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
 import { corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
@@ -19,7 +19,7 @@ export default async function Roteiro({ params }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

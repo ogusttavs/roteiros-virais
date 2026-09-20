@@ -15,7 +15,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { clientes, nichos, user } from "@/db/schema";
+import { clientes, membrosMarca, nichos, user } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
 
@@ -56,6 +56,14 @@ beforeAll(async () => {
     .insert(clientes)
     .values({ usuarioId: "rota-b", nome: "[teste] Rota B", nichoId: nicho.id })
     .returning();
+
+  // V3, item 2: sem o membro "dono", clienteDaSessaoAtual nao acha marca nenhuma.
+  await db()
+    .insert(membrosMarca)
+    .values([
+      { usuarioId: "rota-a", clienteId: a.id, papel: "dono" },
+      { usuarioId: "rota-b", clienteId: b.id, papel: "dono" },
+    ]);
 
   clienteA = { id: a.id, usuarioId: a.usuarioId };
   clienteB = { id: b.id, usuarioId: b.usuarioId };

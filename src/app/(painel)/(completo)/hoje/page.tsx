@@ -11,7 +11,7 @@ import {
 } from "@/lib/formatarNumero";
 import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { corpoDoRoteiro, roteiroDeHoje } from "@/servicos/roteiro";
@@ -66,7 +66,7 @@ export default async function Hoje() {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

@@ -8,14 +8,24 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, nichos, user } from "@/db/schema";
-import { aceitarTermos, listarNichosAtivos, salvarDadosFixos, salvarPerfilConta, salvarTema } from "@/servicos/clientes";
+import { clientes, nichos, preferenciasUsuario, user } from "@/db/schema";
+import {
+  aceitarTermos,
+  listarNichosAtivos,
+  preferenciasDoUsuario,
+  salvarDadosFixos,
+  salvarHoraLembrete,
+  salvarPerfilConta,
+  salvarTema,
+} from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 let clienteId: number;
 let outroClienteId: number;
 let nichoAtivoId: number;
+const usuarioId = "dados-fixos-a";
+const outroUsuarioId = "dados-fixos-b";
 
 beforeAll(async () => {
   await resetarSchema(db());
@@ -29,17 +39,17 @@ beforeAll(async () => {
   await db()
     .insert(user)
     .values([
-      { id: "dados-fixos-a", name: "[teste] Dados Fixos A", email: "a@dados-fixos.teste" },
-      { id: "dados-fixos-b", name: "[teste] Dados Fixos B", email: "b@dados-fixos.teste" },
+      { id: usuarioId, name: "[teste] Dados Fixos A", email: "a@dados-fixos.teste" },
+      { id: outroUsuarioId, name: "[teste] Dados Fixos B", email: "b@dados-fixos.teste" },
     ]);
 
   const [clienteA] = await db()
     .insert(clientes)
-    .values({ usuarioId: "dados-fixos-a", nome: "[teste] Negocio A" })
+    .values({ usuarioId, nome: "[teste] Negocio A" })
     .returning();
   const [clienteB] = await db()
     .insert(clientes)
-    .values({ usuarioId: "dados-fixos-b", nome: "[teste] Negocio B" })
+    .values({ usuarioId: outroUsuarioId, nome: "[teste] Negocio B" })
     .returning();
 
   clienteId = clienteA.id;
@@ -137,71 +147,78 @@ describe("salvarTema", () => {
 });
 
 describe("salvarPerfilConta", () => {
-  it("comeca em 08:00 por padrao", async () => {
-    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
-    expect(cliente?.horaLembrete).toBe("08:00");
-  });
-
-  it("grava nome, perfis e a hora do lembrete", async () => {
+  it("grava nome e perfis", async () => {
     const cliente = await salvarPerfilConta(clienteId, {
       nome: "Sorriso Novo",
       perfis: { instagram: "@sorrisonovo" },
-      horaLembrete: "11:00",
     });
 
     expect(cliente.nome).toBe("Sorriso Novo");
     expect(cliente.perfis).toEqual({ instagram: "@sorrisonovo", tiktok: null, youtube: null });
-    expect(cliente.horaLembrete).toBe("11:00");
+  });
+});
+
+/** V3, item 4: a hora do lembrete e da pessoa, nao da marca. */
+describe("salvarHoraLembrete", () => {
+  it("comeca em 08:00 por padrao (sem linha em preferencias_usuario ainda)", async () => {
+    const preferencias = await preferenciasDoUsuario(outroUsuarioId);
+    expect(preferencias).toBeNull();
+  });
+
+  it("grava a hora do lembrete, criando a linha de preferencias na primeira vez", async () => {
+    const preferencias = await salvarHoraLembrete(usuarioId, "11:00");
+    expect(preferencias.horaLembrete).toBe("11:00");
   });
 
   it("arredonda para a hora cheia anterior (etapa 13: o navegador nao obriga o step de hora cheia)", async () => {
-    const cliente = await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "11:45" });
-    expect(cliente.horaLembrete).toBe("11:00");
+    const preferencias = await salvarHoraLembrete(usuarioId, "11:45");
+    expect(preferencias.horaLembrete).toBe("11:00");
   });
 
   it("aceita a hora cheia no limite da faixa (22:00)", async () => {
-    const cliente = await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "22:30" });
-    expect(cliente.horaLembrete).toBe("22:00");
+    const preferencias = await salvarHoraLembrete(usuarioId, "22:30");
+    expect(preferencias.horaLembrete).toBe("22:00");
   });
 
   it("recusa fora da faixa de 06:00 a 22:00, mesmo depois de arredondar (etapa 13, ajuste 3)", async () => {
-    await expect(
-      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "05:45" }),
-    ).rejects.toThrow();
-    await expect(
-      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "23:00" }),
-    ).rejects.toThrow();
+    await expect(salvarHoraLembrete(usuarioId, "05:45")).rejects.toThrow();
+    await expect(salvarHoraLembrete(usuarioId, "23:00")).rejects.toThrow();
   });
 
   it("recusa uma hora mal formada", async () => {
-    await expect(
-      salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "25:99" }),
-    ).rejects.toThrow();
+    await expect(salvarHoraLembrete(usuarioId, "25:99")).rejects.toThrow();
   });
 
-  it("salvar a conta de um cliente nao muda a hora de lembrete de outro", async () => {
-    await salvarPerfilConta(clienteId, { nome: "Sorriso Novo", perfis: {}, horaLembrete: "09:00" });
-    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
-    expect(outroCliente?.horaLembrete).toBe("08:00");
+  it("salvar a hora de lembrete de uma pessoa nao muda a de outra", async () => {
+    await salvarHoraLembrete(usuarioId, "09:00");
+    const preferencias = await preferenciasDoUsuario(outroUsuarioId);
+    expect(preferencias).toBeNull();
   });
 });
 
 describe("aceitarTermos", () => {
   it("comeca nulo, ninguem aceitou por padrao", async () => {
-    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
-    expect(cliente?.aceitouTermosEm).toBeNull();
+    const preferencias = await preferenciasDoUsuario(outroUsuarioId);
+    expect(preferencias?.aceitouTermosEm ?? null).toBeNull();
   });
 
-  it("grava a data do aceite", async () => {
+  it("grava a data do aceite, criando a linha de preferencias na primeira vez", async () => {
     const antes = new Date();
-    const cliente = await aceitarTermos(clienteId);
-    expect(cliente.aceitouTermosEm).not.toBeNull();
-    expect(cliente.aceitouTermosEm!.getTime()).toBeGreaterThanOrEqual(antes.getTime());
+    const preferencias = await aceitarTermos(usuarioId);
+    expect(preferencias.aceitouTermosEm).not.toBeNull();
+    expect(preferencias.aceitouTermosEm!.getTime()).toBeGreaterThanOrEqual(antes.getTime());
   });
 
-  it("aceitar por um cliente nao muda o aceite de outro (o layout do painel trava so quem nao aceitou)", async () => {
-    await aceitarTermos(clienteId);
-    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
-    expect(outroCliente?.aceitouTermosEm).toBeNull();
+  it("aceitar por uma pessoa nao muda o aceite de outra (o layout do painel trava so quem nao aceitou)", async () => {
+    await aceitarTermos(usuarioId);
+    const preferencias = await preferenciasDoUsuario(outroUsuarioId);
+    expect(preferencias?.aceitouTermosEm ?? null).toBeNull();
+  });
+
+  it("aceitar de novo so atualiza a data, nao duplica a linha", async () => {
+    await aceitarTermos(usuarioId);
+    await aceitarTermos(usuarioId);
+    const linhas = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+    expect(linhas).toHaveLength(1);
   });
 });

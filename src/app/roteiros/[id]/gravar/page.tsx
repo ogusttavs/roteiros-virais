@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -31,7 +31,7 @@ export default async function Gravar({ params }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteDoUsuario(sessao.user.id);
+  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
   }

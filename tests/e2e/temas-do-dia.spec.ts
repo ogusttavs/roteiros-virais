@@ -18,7 +18,18 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, nichos, temasDia, user, videos, type TemaDoDia } from "../../src/db/schema";
+import {
+  account,
+  briefings,
+  clientes,
+  membrosMarca,
+  nichos,
+  preferenciasUsuario,
+  temasDia,
+  user,
+  videos,
+  type TemaDoDia,
+} from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
 const SENHA = "ExemploSenha123";
@@ -55,9 +66,10 @@ test.describe("temas do dia pela tela", () => {
         usuarioId: "e2e-temas",
         nome: "[teste] Temas do dia",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-temas", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-temas", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)

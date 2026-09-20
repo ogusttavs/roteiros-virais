@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 
 import "../ui/tokens.css";
 import "../ui/base.css";
@@ -61,7 +61,7 @@ const SCRIPT_BARRA_LATERAL = `(function(){try{var v=localStorage.getItem("barra-
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const sessao = await sessaoAtual();
-  const cliente = sessao ? await clienteDoUsuario(sessao.user.id) : null;
+  const cliente = sessao ? await clienteAtivoDoUsuario(sessao.user.id) : null;
   const tema = cliente?.tema === "claro" || cliente?.tema === "escuro" ? cliente.tema : undefined;
 
   return (

@@ -16,7 +16,9 @@ import {
   briefings,
   clientes,
   contas,
+  membrosMarca,
   nichos,
+  preferenciasUsuario,
   roteiros,
   temasDia,
   user,
@@ -120,8 +122,10 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       });
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-layout", nome: "[teste] Layout", nichoId: nicho.id, aceitouTermosEm: new Date() })
+      .values({ usuarioId: "e2e-layout", nome: "[teste] Layout", nichoId: nicho.id })
       .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-layout", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-layout", aceitouTermosEm: new Date() });
 
     await db()
       .insert(briefings)
@@ -266,6 +270,9 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       })
       .returning();
     await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-layout-comecar", clienteId: clienteComecar.id, papel: "dono" });
+    await db()
       .insert(briefings)
       .values({
         clienteId: clienteComecar.id,
@@ -307,9 +314,14 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
         usuarioId: "e2e-layout-briefing",
         nome: "[teste] Layout Briefing",
         nichoId: nicho.id,
-        aceitouTermosEm: new Date(),
       })
       .returning();
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-layout-briefing", clienteId: clienteBriefing.id, papel: "dono" });
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: "e2e-layout-briefing", aceitouTermosEm: new Date() });
     const respostasBriefing: Record<string, string> = {};
     const avaliacoesBriefing: Record<string, AvaliacaoResposta> = {};
     for (let i = 1; i <= 12; i++) {

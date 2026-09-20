@@ -42,7 +42,7 @@ import { PERGUNTAS_BRIEFING } from "../src/config/briefing";
 import { db, getPool } from "../src/db";
 import { briefings, clientes, temasDia, videos, type AvaliacaoResposta, type TemaDoDia } from "../src/db/schema";
 import { hojeISO } from "../src/lib/config";
-import { clienteDoUsuario, salvarTema } from "../src/servicos/clientes";
+import { marcasDoUsuario, salvarTema } from "../src/servicos/clientes";
 import { gerarRoteiro, roteiroDeHoje } from "../src/servicos/roteiro";
 
 const SENHA_SEED = "ExemploSenha123";
@@ -155,7 +155,12 @@ async function main(): Promise<void> {
   const pastaDestino = path.resolve(__dirname, "..", "..", "entregaveis", "design", "capturas", nomeEtapa);
   await mkdir(pastaDestino, { recursive: true });
 
-  const cliente = await clienteDoUsuario(USUARIO_SEED);
+  /**
+   * `marcasDoUsuario`, nao `clienteAtivoDoUsuario` (V3, item 2): este script
+   * roda fora de uma requisicao do Next.js (`cookies()` nao funciona aqui),
+   * e o seed garante uma marca so por usuario, entao a primeira basta.
+   */
+  const [cliente] = await marcasDoUsuario(USUARIO_SEED);
   if (!cliente) {
     throw new Error(
       `cliente de seed "${USUARIO_SEED}" nao encontrado; rode "npm run db:seed" contra o banco desta sessao (roteiros_dev, nunca roteiros).`,
@@ -165,7 +170,7 @@ async function main(): Promise<void> {
     throw new Error(`cliente de seed "${USUARIO_SEED}" sem nicho; confira o seed.`);
   }
 
-  const clienteComecar = await clienteDoUsuario(USUARIO_SEED_COMECAR);
+  const [clienteComecar] = await marcasDoUsuario(USUARIO_SEED_COMECAR);
   if (!clienteComecar) {
     throw new Error(
       `cliente de seed "${USUARIO_SEED_COMECAR}" nao encontrado; rode "npm run db:seed" contra o banco desta sessao.`,
