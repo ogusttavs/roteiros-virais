@@ -9,7 +9,7 @@ import { iniciaisDe } from "@/lib/iniciais";
 import { textosNav } from "@/textos/nav";
 
 import styles from "./SeletorMarcaCelular.module.css";
-import { useTrocarMarca } from "./useTrocarMarca";
+import { useTrocaMarca } from "./TrocaMarcaContext";
 
 export type MarcaResumo = { id: number; nome: string };
 
@@ -27,7 +27,7 @@ type Props = {
  */
 export function SeletorMarcaCelular({ marcaAtiva, marcas, nomePessoa }: Props) {
   const [aberto, setAberto] = useState(false);
-  const { trocar, trocando, marcaAlvo, erro } = useTrocarMarca();
+  const { trocar, trocando, marcaAlvo, erro } = useTrocaMarca();
   const folhaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

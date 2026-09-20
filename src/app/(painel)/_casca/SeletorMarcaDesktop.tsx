@@ -9,7 +9,7 @@ import { textosNav } from "@/textos/nav";
 
 import type { MarcaResumo } from "./SeletorMarcaCelular";
 import styles from "./SeletorMarcaDesktop.module.css";
-import { useTrocarMarca } from "./useTrocarMarca";
+import { useTrocaMarca } from "./TrocaMarcaContext";
 
 type Props = {
   marcaAtiva: MarcaResumo;
@@ -28,7 +28,7 @@ const ICONE_TROCAR_PATH_BAIXO = "m7 15 5 5 5-5";
  */
 export function SeletorMarcaDesktop({ marcaAtiva, marcas, nomePessoa }: Props) {
   const [aberto, setAberto] = useState(false);
-  const { trocar, trocando, marcaAlvo, erro } = useTrocarMarca();
+  const { trocar, trocando, marcaAlvo, erro } = useTrocaMarca();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

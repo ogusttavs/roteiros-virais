@@ -17,7 +17,7 @@ function dataDeHojePorExtenso(): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
 }
 
-type Estado = "normal" | "carregando" | "vazio" | "erro";
+type Estado = "normal" | "carregando" | "vazio" | "erro" | "trocando";
 
 /**
  * Data, título e uma linha de estado no topo de `/hoje`, em todo estado
@@ -35,17 +35,24 @@ type Estado = "normal" | "carregando" | "vazio" | "erro";
  * `avisoVideoSubindo` (etapa 15, parte 1, decisão 4): uma linha curta
  * quando algum vídeo postado está acima do normal da própria conta, só no
  * estado normal, já formatada por quem chama.
+ *
+ * `mensagemTrocando` (V3, item 3, estado `trocando` de `Casca.dc.html`): a
+ * troca de marca diz o nome da marca que está chegando ("Abrindo <marca>"),
+ * não "carregando"; só faz sentido junto de `estado="trocando"`, calculada
+ * por quem chama (`HojeTela.tsx`) porque só ela sabe o nome da marca alvo.
  */
 export function HojeCabecalho({
   constancia,
   diasGravados = 0,
   avisoVideoSubindo = null,
   estado = "normal",
+  mensagemTrocando,
 }: {
   constancia: Constancia;
   diasGravados?: number;
   avisoVideoSubindo?: string | null;
   estado?: Estado;
+  mensagemTrocando?: string;
 }) {
   return (
     <div className={styles.cabecalhoTela}>
@@ -62,6 +69,10 @@ export function HojeCabecalho({
         <p className={styles.fraseEstado}>{textosHoje.carregando}</p>
       ) : estado === "vazio" ? (
         <p className={styles.fraseEstado}>{textosHoje.vazioTitulo}</p>
+      ) : estado === "trocando" ? (
+        <p className={styles.fraseEstado} role="status">
+          {mensagemTrocando}
+        </p>
       ) : (
         <p className={styles.fraseEstado}>{textosHoje.erroAviso}</p>
       )}

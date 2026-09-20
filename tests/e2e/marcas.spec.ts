@@ -36,6 +36,17 @@ const EMAIL_B = "e2e-marcas-b@exemplo.teste";
 const NOME_MARCA_UM = "[teste] Marca Um";
 const NOME_MARCA_DOIS = "[teste] Marca Dois";
 const NOME_MARCA_COMPARTILHADA = "[teste] Marca Compartilhada";
+/**
+ * O timeout padrao (10s) as vezes nao basta para a troca de marca terminar
+ * (`trocarMarcaAction` mais `router.refresh()`) quando a suite inteira ja
+ * rodou dezenas de testes antes deste arquivo: achado rodando a suite
+ * inteira algumas vezes, o pool do Postgres do servidor de e2e e pequeno
+ * (`max: 8`, `src/db/index.ts`) e fica mais devagar sob a carga acumulada,
+ * nao uma falha de logica (rodado sozinho ou em subconjuntos menores, este
+ * arquivo sempre passa no primeiro tempo). Só as asserções que dependem da
+ * troca terminar usam este timeout maior.
+ */
+const TIMEOUT_TROCA = { timeout: 25_000 };
 
 async function entrar(page: Page, email: string) {
   await page.goto("/entrar");
@@ -211,13 +222,13 @@ test.describe("trocar de marca pela tela", () => {
     await folha.getByRole("button", { name: NOME_MARCA_DOIS }).click();
 
     // O Hoje da outra marca: o tema exclusivo da Um some, o da Dois aparece.
-    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible(TIMEOUT_TROCA);
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).not.toBeVisible();
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
     // Recarrega e continua na marca trocada (cookie assinado, nao estado de tela).
     await page.reload();
-    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible(TIMEOUT_TROCA);
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
   });
 
@@ -230,25 +241,22 @@ test.describe("trocar de marca pela tela", () => {
     // ativa (`roteiroPorId(id, cliente.id)`, escopado por marca).
     await page.getByRole("button", { name: /^Trocar de marca/ }).click();
     const itemCompartilhada = page.getByRole("menuitemradio", { name: NOME_MARCA_COMPARTILHADA });
-    // Se ja for a marca ativa (depende de qual teste anterior rodou por
-    // ultimo), o clique so fecha o menu, sem chamar trocar() de verdade
-    // (SeletorMarcaDesktop.tsx: "if (!ativa) trocar(...)"), e o botao nunca
-    // fica desabilitado.
-    const jaEstavaAtiva = (await itemCompartilhada.getAttribute("aria-checked")) === "true";
     await itemCompartilhada.click();
     const botaoSeletor = page.getByRole("button", {
       name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_COMPARTILHADA),
     });
     await expect(botaoSeletor).toBeVisible();
-    if (!jaEstavaAtiva) {
-      // O nome no botao muda otimista, antes da troca terminar no servidor
-      // (useTrocarMarca.ts, marcaAlvo); esperar reabilitar confirma que o
-      // cookie ja foi gravado, senao o goto abaixo corre com o cookie antigo.
-      await expect(botaoSeletor).toBeEnabled();
-    }
+    // O nome no botao muda otimista, antes da troca terminar no servidor
+    // (useTrocarMarca.ts, marcaAlvo); esperar a rede ficar ociosa e o sinal
+    // direto de que o cookie ja foi gravado, sem depender do "disabled" da
+    // transicao React (que sob a carga da suite inteira pode demorar mais
+    // que o padrao, ver TIMEOUT_TROCA acima).
+    await page.waitForLoadState("networkidle", TIMEOUT_TROCA);
 
     await page.goto(`/roteiros/${roteiroCompartilhadoId}`);
-    await expect(page.getByRole("heading", { name: "o roteiro compartilhado da marca", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "o roteiro compartilhado da marca", level: 1 })).toBeVisible(
+      TIMEOUT_TROCA,
+    );
 
     const contextoB = await browser.newContext();
     const paginaB = await contextoB.newPage();
