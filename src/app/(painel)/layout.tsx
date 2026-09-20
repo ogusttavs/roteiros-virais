@@ -6,9 +6,10 @@ import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
-import { Logo } from "@/ui/Logo";
+import { Simbolo } from "@/ui/Logo";
 
 import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
+import { CapsulaAbas } from "./_casca/CapsulaAbas";
 import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
 import { SeletorMarcaDesktop } from "./_casca/SeletorMarcaDesktop";
 import { TrocaMarcaProvider } from "./_casca/TrocaMarcaContext";
@@ -55,7 +56,7 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
         <aside className={styles.colunaDesktop}>
           <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
           <div className={styles.identidadeDesktop}>
-            <Logo tamanho={24} />
+            <Simbolo altura={24} />
             <span className={styles.nomeDesktop}>{config.appName}</span>
           </div>
           <Nav compactavel />
@@ -64,9 +65,7 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
 
         <main className={styles.corpo}>{children}</main>
 
-        <div className={styles.barraInferior}>
-          <Nav />
-        </div>
+        <CapsulaAbas />
       </div>
     </TrocaMarcaProvider>
   );

@@ -1,0 +1,39 @@
+/**
+ * O logotipo e o símbolo (V5, item 3): dois arquivos por variante, um para
+ * cada modo, trocados por CSS (entregaveis/design-v2/entrega/marca/):
+ * `klaki-*.svg` no claro, `klaki-*-branco.svg` no escuro. Nunca recolorido
+ * fora das versões dadas (IDENTIDADE.md, "nunca"), por isso são dois
+ * arquivos, não um SVG com `currentColor`.
+ */
+.marca {
+  display: inline-flex;
+  align-items: center;
+}
+.marca img {
+  height: 100%;
+  width: auto;
+  display: block;
+}
+
+/* Mesma especificidade de ".marca img" (classe + elemento) em toda regra
+   daqui pra baixo, senão ".marca img { display: block }" acima vence por
+   especificidade e as duas versões aparecem juntas (achado rodando isto de
+   verdade: o computed style ficava "block" nas duas mesmo com ".escuro
+   { display: none }" escrito). */
+.marca img.escuro {
+  display: none;
+}
+:global(html[data-tema="escuro"]) .marca img.claro {
+  display: none;
+}
+:global(html[data-tema="escuro"]) .marca img.escuro {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  :global(html:not([data-tema="claro"])) .marca img.claro {
+    display: none;
+  }
+  :global(html:not([data-tema="claro"])) .marca img.escuro {
+    display: block;
+  }
+}

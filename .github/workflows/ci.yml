@@ -30,7 +30,7 @@ jobs:
     env:
       DATABASE_URL: postgres://roteiros:roteiros@localhost:5432/postgres
       AI_PROVIDER: mock
-      APP_NAME: "seu painel"
+      APP_NAME: "Klaki"
       BETTER_AUTH_SECRET: ci-secret-nao-e-producao
       JOBS_API_KEY: ci-secret-nao-e-producao
 

@@ -15,7 +15,7 @@ import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Botao } from "@/ui/componentes/Botao";
 import { Progresso } from "@/ui/componentes/Progresso";
-import { Logo } from "@/ui/Logo";
+import { Simbolo } from "@/ui/Logo";
 
 import { avaliarRespostaAction, salvarDadosFixosAction, salvarRascunhoAction } from "./acoes";
 import styles from "./ComecarWizard.module.css";
@@ -39,7 +39,7 @@ const ICONES_PROMESSA = [Clock, CircleCheck, Pencil];
 function CabecalhoSimples() {
   return (
     <header className={styles.cabecalho}>
-      <Logo tamanho={24} />
+      <Simbolo altura={24} />
       <span className={styles.nomeProduto}>{config.appName}</span>
       <BotaoSair className={styles.botaoSair} />
     </header>

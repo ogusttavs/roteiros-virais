@@ -1,21 +1,42 @@
 import { config } from "@/lib/config";
 
+import styles from "./Logo.module.css";
+
+type Props = {
+  /** A altura do desenho; a largura sai da proporção do SVG (entrega/README.md). */
+  altura?: number;
+};
+
 /**
- * Espaco reservado do logo (entrega/README.md): circulo em linha, 24 px.
- * Troca pelo SVG da marca quando ela existir; nenhuma tela referencia isso
- * direto (brief-frontend.md, secao 4.3).
+ * O logotipo por extenso (V5, item 3, entregaveis/design-v2/entrega/marca/):
+ * "klaki" desenhado, com a luz da marca na barriga do "a". Só a partir de
+ * 48 px de largura (IDENTIDADE.md, "nunca usar o logotipo menor que isso");
+ * abaixo disso, use `Simbolo`. Dois arquivos, trocados por tema (ver
+ * `Logo.module.css`); nunca recolorido fora das versões dadas.
  */
-export function Logo({ tamanho = 24 }: { tamanho?: number }) {
+export function Logo({ altura = 28 }: Props) {
   return (
-    <svg
-      width={tamanho}
-      height={tamanho}
-      viewBox="0 0 24 24"
-      fill="none"
-      role="img"
-      aria-label={`ícone de ${config.appName}`}
-    >
-      <circle cx="12" cy="12" r="11.25" stroke="var(--cor-titulo)" strokeWidth="1.5" />
-    </svg>
+    <span className={styles.marca} style={{ height: altura }} role="img" aria-label={config.appName}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- SVG de marca, arquivo estático, sem otimização de imagem. */}
+      <img src="/marca/klaki-logotipo.svg" alt="" className={styles.claro} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/marca/klaki-logotipo-branco.svg" alt="" className={styles.escuro} />
+    </span>
+  );
+}
+
+/**
+ * O símbolo (a claquete aberta, com a luz na tira): o ícone do aplicativo e
+ * o que cabe abaixo de 48 px de largura (barra do topo, barra lateral
+ * recolhida, cabeçalhos compactos).
+ */
+export function Simbolo({ altura = 24 }: Props) {
+  return (
+    <span className={styles.marca} style={{ height: altura }} role="img" aria-label={config.appName}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/marca/klaki-simbolo.svg" alt="" className={styles.claro} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/marca/klaki-simbolo-branco.svg" alt="" className={styles.escuro} />
+    </span>
   );
 }

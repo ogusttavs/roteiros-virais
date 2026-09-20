@@ -2,13 +2,13 @@
 
 import { RotateCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
 
 import { textosNav } from "@/textos/nav";
-import { Logo } from "@/ui/Logo";
+import { Simbolo } from "@/ui/Logo";
 
 import styles from "./CabecalhoCelular.module.css";
 import { SeletorMarcaCelular, type MarcaResumo } from "./SeletorMarcaCelular";
+import { useRolagemParaBaixo } from "./useRolagem";
 
 type Props = {
   nomeProduto: string;
@@ -25,23 +25,8 @@ type Props = {
  * depois da identidade do produto.
  */
 export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }: Props) {
-  const [escondido, setEscondido] = useState(false);
-  const ultimoRef = useRef(0);
+  const escondido = useRolagemParaBaixo();
   const router = useRouter();
-
-  useEffect(() => {
-    function aoRolar() {
-      const y = window.scrollY;
-      const ultimo = ultimoRef.current;
-      const desce = y > ultimo + 4 && y > 60;
-      const sobe = y < ultimo - 4 || y < 20;
-      if (desce) setEscondido(true);
-      else if (sobe) setEscondido(false);
-      ultimoRef.current = y;
-    }
-    window.addEventListener("scroll", aoRolar, { passive: true });
-    return () => window.removeEventListener("scroll", aoRolar);
-  }, []);
 
   return (
     <header
@@ -49,7 +34,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
       style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}
     >
       <div className={styles.identidade}>
-        <Logo tamanho={24} />
+        <Simbolo altura={24} />
         <span className={styles.nome}>{nomeProduto}</span>
       </div>
       <div className={styles.direita}>
