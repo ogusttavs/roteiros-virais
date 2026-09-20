@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
@@ -10,26 +10,51 @@ import "../ui/tokens.css";
 import "../ui/base.css";
 
 /**
- * Reserva de fonte do design v2 (BRIEF.md, secao 3; entrega/telas/README.md,
- * "tres coisas que dependem de codigo"): a fonte do sistema (SF Pro/Segoe UI)
- * e a primeira opcao em `--fonte-texto`/`--fonte-titulo` (tokens.css); Inter
- * so entra quando o aparelho nao tem fonte de sistema propria (a maioria dos
- * celulares deste publico, que e Android, sem isto cairia no Roboto). Mono
- * segue o mesmo padrao com JetBrains Mono. `next/font/google` hospeda os
- * arquivos junto do proprio aplicativo, sem chamada externa em tempo de
- * execucao (etapa D2 parte 1, item 2 do `PROXIMO.md`).
+ * As três fontes da identidade (V5, entregaveis/design-v2/IDENTIDADE.md,
+ * 19/09/2026), em arquivo junto do aplicativo, sem chamada externa em tempo
+ * de execução: Mona Sans (título e texto), JetBrains Mono (números e
+ * rótulos), Caveat (letra de mão, só no bilhete "Mais indicado para hoje").
+ * `next/font/local` faz a pré-carga; só a Mona Sans precisa dela de
+ * verdade (é a fonte que aparece em toda tela desde o primeiro pixel), por
+ * isso as outras duas têm `preload: false` (item 2 do `PROXIMO.md`).
  */
-const inter = Inter({ subsets: ["latin"], variable: "--fonte-inter", display: "swap" });
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "600"],
+const monaSans = localFont({
+  src: "../ui/fontes/monasans-latin.woff2",
+  weight: "200 900",
+  style: "normal",
+  variable: "--fonte-mona-sans",
+  display: "swap",
+});
+const jetbrainsMono = localFont({
+  src: "../ui/fontes/jetbrainsmono-latin.woff2",
+  weight: "400 800",
+  style: "normal",
   variable: "--fonte-jetbrains-mono",
   display: "swap",
+  preload: false,
+});
+const caveat = localFont({
+  src: "../ui/fontes/caveat-latin.woff2",
+  weight: "400 700",
+  style: "normal",
+  variable: "--fonte-caveat",
+  display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
   title: config.appName,
   description: config.appName,
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-48.png", sizes: "48x48", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 /**
@@ -68,7 +93,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html
       lang="pt-BR"
       data-tema={tema}
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${monaSans.variable} ${jetbrainsMono.variable} ${caveat.variable}`}
       suppressHydrationWarning
     >
       <head>
