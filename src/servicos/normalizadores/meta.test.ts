@@ -62,6 +62,7 @@ describe("normalizarBusinessDiscovery", () => {
         likes: 12000,
         comentarios: 300,
         midiaUrl: null,
+        idioma: null,
       },
     ]);
   });
@@ -161,6 +162,7 @@ describe("normalizarHashtagMedia", () => {
       likes: 500,
       comentarios: 10,
       midiaUrl: "https://exemplo.invalido/video1.mp4",
+      idioma: "pt",
     });
   });
 

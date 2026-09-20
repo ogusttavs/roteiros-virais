@@ -104,3 +104,21 @@ export function detectarIdioma(texto: string): Idioma {
 
   return vencedores[0][0] as Idioma;
 }
+
+/**
+ * Mapeia um codigo de idioma BCP-47/ISO 639-1 (ex.: "pt-BR", "en-US",
+ * "es-419", "ja") para o mesmo enum de `detectarIdioma` (V2b, item 2): o
+ * `defaultAudioLanguage`/`defaultLanguage` que o YouTube devolve para o
+ * video, quando o canal preencheu. So os dois primeiros caracteres
+ * importam; qualquer codigo que nao seja pt/en/es vira "outro" (o YouTube
+ * so devolve um codigo quando o canal de fato declarou um, nunca inventa),
+ * e a ausencia do campo devolve null.
+ */
+export function idiomaDoCodigoIso(codigo: string | null | undefined): Idioma {
+  if (!codigo) return null;
+  const prefixo = codigo.slice(0, 2).toLowerCase();
+  if (prefixo === "pt") return "pt";
+  if (prefixo === "en") return "en";
+  if (prefixo === "es") return "es";
+  return "outro";
+}

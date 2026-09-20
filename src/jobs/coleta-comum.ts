@@ -15,6 +15,8 @@ export type ContaParaGravar = {
   nome: string | null;
   url: string | null;
   seguidores: number | null;
+  /** So o YouTube preenche hoje, pelo `country` do canal (V2b, item 2). */
+  pais?: string | null;
 };
 
 export type VideoParaGravar = {
@@ -30,6 +32,8 @@ export type VideoParaGravar = {
   comentarios: number;
   /** So o normalizador da Meta preenche (V2a, item 3); as outras plataformas nunca passam isso. */
   midiaUrl?: string | null;
+  /** Detectado por codigo na coleta (V2b, item 2); a extracao em lote sobrescreve depois. */
+  idioma?: string | null;
 };
 
 /**
@@ -48,9 +52,10 @@ export function midiaUrlFresca(midiaUrlEm: Date | null, agora: Date = new Date()
 }
 
 export async function upsertConta(conta: ContaParaGravar, nichoId: number): Promise<number> {
+  const pais = conta.pais ?? null;
   const [linha] = await db()
     .insert(contas)
-    .values({ ...conta, nichoId })
+    .values({ ...conta, pais, nichoId })
     .onConflictDoUpdate({
       target: [contas.plataforma, contas.handle],
       set: {
@@ -61,6 +66,7 @@ export async function upsertConta(conta: ContaParaGravar, nichoId: number): Prom
         // pode apagar um valor ja gravado numa coleta anterior (mesmo
         // raciocinio do audio em upsertVideo).
         seguidores: sql`coalesce(${sql.param(conta.seguidores, contas.seguidores)}, ${contas.seguidores})`,
+        pais: sql`coalesce(${sql.param(pais, contas.pais)}, ${contas.pais})`,
         atualizadoEm: new Date(),
       },
     })
@@ -97,10 +103,11 @@ export async function upsertVideo(
   const midiaUrl = video.midiaUrl ?? null;
   /** So marca a hora da leitura quando ha url de verdade (V2a, item 3); sem ela, nao ha nada fresco para marcar. */
   const midiaUrlEm = midiaUrl ? new Date() : null;
+  const idioma = video.idioma ?? null;
 
   const [linha] = await db()
     .insert(videos)
-    .values({ ...video, midiaUrl, midiaUrlEm, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
+    .values({ ...video, midiaUrl, midiaUrlEm, idioma, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
     .onConflictDoUpdate({
       target: [videos.plataforma, videos.idExterno],
       set: {
@@ -115,6 +122,13 @@ export async function upsertVideo(
         // midiaUrlEm segue midiaUrl, nunca atualiza sozinha.
         midiaUrl: sql`coalesce(${sql.param(midiaUrl, videos.midiaUrl)}, ${videos.midiaUrl})`,
         midiaUrlEm: midiaUrl ? sql`${sql.param(midiaUrlEm, videos.midiaUrlEm)}` : sql`${videos.midiaUrlEm}`,
+        // Ordem invertida de proposito (V2b, item 2): o idioma que ja esta
+        // gravado manda sobre o novo, porque pode ter vindo da extracao em
+        // lote (le a transcricao inteira, mais confiavel) e uma recoleta
+        // desta funcao so tem a deteccao mais fraca por titulo/descricao;
+        // sem isso, toda recoleta noturna reverteria o idioma bom para o
+        // palpite fraco de novo.
+        idioma: sql`coalesce(${videos.idioma}, ${sql.param(idioma, videos.idioma)})`,
         atualizadoEm: new Date(),
       },
     })

@@ -3,6 +3,7 @@
  * ator do Apify, saida `{ video, conta, audio }` no mesmo formato do
  * YouTube, mais o audio (o TikTok expoe, o YouTube nao).
  */
+import { detectarIdioma, type Idioma } from "@/config/idioma";
 import type { VideoAudio } from "@/db/schema";
 import type { TiktokItemBruto } from "@/jobs/apify-api";
 
@@ -27,6 +28,7 @@ export type VideoNormalizado = {
   views: number;
   likes: number;
   comentarios: number;
+  idioma: Idioma;
 };
 
 export type VideoContaEAudioNormalizados = {
@@ -73,6 +75,7 @@ export function normalizarVideoTiktok(item: TiktokItemBruto): VideoContaEAudioNo
       views: item.playCount ?? 0,
       likes: item.diggCount ?? 0,
       comentarios: item.commentCount ?? 0,
+      idioma: detectarIdioma(descricao ?? ""),
     },
     conta: {
       plataforma: "tiktok",

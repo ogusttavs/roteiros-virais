@@ -3,6 +3,7 @@
  * do ator do Apify, saida `{ video, conta, audio }` no mesmo formato do
  * YouTube, mais o audio (o Instagram expoe, o YouTube nao).
  */
+import { detectarIdioma, type Idioma } from "@/config/idioma";
 import type { VideoAudio } from "@/db/schema";
 import type { InstagramItemBruto } from "@/jobs/apify-api";
 
@@ -27,6 +28,7 @@ export type VideoNormalizado = {
   views: number;
   likes: number;
   comentarios: number;
+  idioma: Idioma;
 };
 
 export type VideoContaEAudioNormalizados = {
@@ -62,6 +64,7 @@ export function normalizarVideoInstagram(item: InstagramItemBruto): VideoContaEA
       views: item.videoPlayCount ?? item.videoViewCount ?? 0,
       likes: item.likesCount ?? 0,
       comentarios: item.commentsCount ?? 0,
+      idioma: detectarIdioma(descricao ?? ""),
     },
     conta: {
       plataforma: "instagram",

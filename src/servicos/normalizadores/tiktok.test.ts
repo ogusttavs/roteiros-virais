@@ -36,6 +36,7 @@ describe("normalizarVideoTiktok", () => {
       views: 245310,
       likes: 18320,
       comentarios: 421,
+      idioma: "pt",
     });
     expect(conta).toEqual({
       plataforma: "tiktok",

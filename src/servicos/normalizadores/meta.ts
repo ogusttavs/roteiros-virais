@@ -4,6 +4,7 @@
  * chamada so devolve o perfil da conta MAIS ate 50 posts dela de uma vez,
  * entao a saida e uma conta e uma LISTA de videos.
  */
+import { detectarIdioma, type Idioma } from "@/config/idioma";
 import type { BusinessDiscovery, HashtagRecentMediaItem } from "@/jobs/meta-api";
 
 import { tituloDeVideo } from "./titulo";
@@ -33,6 +34,7 @@ export type VideoNormalizado = {
    * VIDEO). `upsertVideo` grava a hora da leitura junto.
    */
   midiaUrl: string | null;
+  idioma: Idioma;
 };
 
 /**
@@ -90,6 +92,7 @@ export function normalizarBusinessDiscovery(
       likes: item.like_count ?? 0,
       comentarios: item.comments_count ?? 0,
       midiaUrl: item.media_url ?? null,
+      idioma: detectarIdioma(descricao ?? ""),
     };
   });
 
@@ -121,5 +124,11 @@ export function normalizarHashtagMedia(item: HashtagRecentMediaItem, termo: stri
     likes: item.like_count ?? 0,
     comentarios: item.comments_count ?? 0,
     midiaUrl: item.media_url ?? null,
+    /**
+     * Detectado por codigo, mesmo raciocinio dos outros normalizadores; na
+     * pratica quase sempre "pt", porque o item so chega aqui depois de
+     * passar no filtro `temIndicioDeBrasil` (`meta-hashtags.ts`).
+     */
+    idioma: detectarIdioma(descricao ?? ""),
   };
 }
