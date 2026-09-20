@@ -40,21 +40,24 @@ export function contaEhBrasileira(pais: string | null, idiomaPrincipal: string |
 }
 
 /**
- * V2b, item 6, revisão do PR #46 (achado do Fable, medição em 600 vídeos
- * reais): a versão anterior calculava o teto de internacional sobre
- * `limite` (o alvo), não sobre o que de fato sai. Com 5 brasileiros e
- * `limite` 40, isso deixava passar `floor(40*0,3)=12` internacionais,
- * resultando em 5+12=17 itens finais, 71% deles internacionais, o oposto
- * da intenção ("no mínimo 70% do que sai é brasileiro"). Duas passadas
- * agora: primeiro quantos brasileiros cabem até `limite`, depois quantos
- * internacionais **esse número** permite
- * (`floor(brasileirosAceitos × (1 − proporcaoBrasil) / proporcaoBrasil)`),
- * com uma exceção: com pelo menos 1 brasileiro aceito, cabe pelo menos 1
- * internacional (para nicho pobre de conteúdo brasileiro não ficar mudo
- * de conteúdo internacional relevante). Sem nenhum brasileiro na lista, o
- * resultado é vazio, nunca só internacional. A ordem de prioridade
- * original é preservada na montagem final (um item não "pula a fila" por
- * ser de uma classe ou outra).
+ * V3, item 0 (resto da revisão do PR #46): a versão anterior fechava a
+ * porta do internacional quando sobrava brasileiro. Com 100 brasileiros e
+ * `limite` 40, `maxInternacional` dava zero mesmo que o vídeo de maior
+ * prioridade de todos fosse internacional; o Gustavo pediu 70% brasileiro
+ * **e** o que funciona lá fora na parte que sobra, não só um ou outro.
+ * Duas passadas: a primeira percorre a lista em ordem de prioridade
+ * aceitando brasileiro sempre e internacional até um teto fixo
+ * (`floor(limite × (1 − proporcaoBrasil))`, sobre o `limite`, não sobre
+ * quanto brasileiro existe), parando ao alcançar `limite`; a segunda
+ * confere o resultado dessa primeira passada pela proporção de verdade
+ * (sobre os brasileiros que de fato entraram: achado da rodada anterior,
+ * `max(1, floor(brasileiros × (1 − proporcaoBrasil) / proporcaoBrasil))`,
+ * com pelo menos 1 vaga internacional quando há pelo menos 1 brasileiro, e
+ * nenhuma quando não há nenhum) e tira o internacional excedente de menor
+ * prioridade. Se sobrar vaga depois do corte, completa com brasileiro que
+ * a primeira passada não chegou a examinar (só acontece quando ela parou
+ * em `limite` antes do fim da lista). A ordem de prioridade original é
+ * preservada em toda montagem; "outro" nunca entra.
  */
 export function aplicarProporcaoBrasil<T>(
   itens: T[],
@@ -62,33 +65,51 @@ export function aplicarProporcaoBrasil<T>(
   classificar: (item: T) => ClassificacaoBrasil,
   proporcaoBrasil: number,
 ): T[] {
-  const brasileirosDisponiveis = itens.filter((item) => classificar(item) === "brasileiro").length;
-  const brasileirosAceitos = Math.min(brasileirosDisponiveis, limite);
+  const capInternacionalPasse1 = Math.floor(limite * (1 - proporcaoBrasil));
 
-  let maxInternacional = 0;
-  if (brasileirosAceitos > 0) {
-    const proporcional = Math.floor((brasileirosAceitos * (1 - proporcaoBrasil)) / proporcaoBrasil);
-    maxInternacional = Math.min(Math.max(1, proporcional), limite - brasileirosAceitos);
-  }
+  const passe1: T[] = [];
+  let internacionaisPasse1 = 0;
+  let indiceParada = itens.length;
+  for (let i = 0; i < itens.length; i += 1) {
+    if (passe1.length >= limite) {
+      indiceParada = i;
+      break;
+    }
 
-  const resultado: T[] = [];
-  let brasileirosIncluidos = 0;
-  let internacionaisIncluidos = 0;
-
-  for (const item of itens) {
-    if (resultado.length >= limite) break;
-
+    const item = itens[i];
     const classe = classificar(item);
     if (classe === "outro") continue;
     if (classe === "brasileiro") {
-      if (brasileirosIncluidos >= brasileirosAceitos) continue;
-      brasileirosIncluidos += 1;
-    } else {
-      if (internacionaisIncluidos >= maxInternacional) continue;
-      internacionaisIncluidos += 1;
+      passe1.push(item);
+    } else if (internacionaisPasse1 < capInternacionalPasse1) {
+      internacionaisPasse1 += 1;
+      passe1.push(item);
     }
+  }
 
-    resultado.push(item);
+  const brasileirosNoPasse1 = passe1.filter((item) => classificar(item) === "brasileiro").length;
+  const tetoFinal =
+    brasileirosNoPasse1 === 0
+      ? 0
+      : Math.max(1, Math.floor((brasileirosNoPasse1 * (1 - proporcaoBrasil)) / proporcaoBrasil));
+
+  const resultado: T[] = [];
+  let internacionaisMantidos = 0;
+  for (const item of passe1) {
+    const classe = classificar(item);
+    if (classe === "brasileiro") {
+      resultado.push(item);
+    } else if (internacionaisMantidos < tetoFinal) {
+      internacionaisMantidos += 1;
+      resultado.push(item);
+    }
+  }
+
+  for (let i = indiceParada; i < itens.length && resultado.length < limite; i += 1) {
+    const item = itens[i];
+    if (classificar(item) === "brasileiro") {
+      resultado.push(item);
+    }
   }
 
   return resultado;
