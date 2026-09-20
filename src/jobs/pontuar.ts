@@ -18,10 +18,14 @@
  * 5. taxa_fora_da_curva por conta (só conta vídeo com `fora_da_curva` calculado, no
  *    numerador e no denominador; conta sem nenhum vídeo pontuado fica com taxa nula,
  *    não zero, ajuste da revisão da etapa 7 no `PROXIMO.md` da etapa 8)
+ * 6. idioma_principal por conta (V2b, item 4, escopo 5.11: o Brasil primeiro)
+ * 7. pais por conta, a partir do idioma_principal (mesmo item)
  */
-import { sql } from "drizzle-orm";
+import { and, eq, gte, isNull, sql } from "drizzle-orm";
 
+import { temIndicioDeBrasil } from "@/config/brasil";
 import { db } from "@/db";
+import { contas, videos } from "@/db/schema";
 import { config } from "@/lib/config";
 
 /**
@@ -41,6 +45,9 @@ const FATOR_SUBSTITUTO_BASE_FRACA = 100;
 /** Tambem usado por `contas-base.ts` (E6 parte 3, item 5): mesmo corte de "ainda sem base". */
 export const MINIMO_VIDEOS_MEDIANA = 5;
 const MINIMO_VIDEOS_MEDIANA_VELOCIDADE = 3;
+/** V2b, item 4: menos que isso, `idioma_principal` fica nulo (sem evidencia suficiente, nunca chuta). */
+const MINIMO_VIDEOS_IDIOMA_PRINCIPAL = 3;
+const NOVENTA_DIAS_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
  * Substituto de terceiro nível, quando a conta não tem mediana própria (menos
@@ -177,12 +184,82 @@ async function passo5TaxaForaDaCurvaPorConta() {
   `);
 }
 
+/**
+ * Moda do `idioma` dos videos da conta nos ultimos 90 dias (V2b, item 4),
+ * so quando houver pelo menos `MINIMO_VIDEOS_IDIOMA_PRINCIPAL` com idioma
+ * conhecido; senao fica nulo (a janela pode ter esvaziado desde a ultima
+ * vez, "nao sei" e mais correto que um valor velho).
+ */
+async function passo6IdiomaPrincipalPorConta() {
+  return db().execute(sql`
+    UPDATE contas c
+    SET idioma_principal = a.moda
+    FROM (
+      SELECT
+        c2.id AS conta_id,
+        CASE
+          WHEN count(v.id) >= ${MINIMO_VIDEOS_IDIOMA_PRINCIPAL} THEN mode() WITHIN GROUP (ORDER BY v.idioma)
+          ELSE NULL
+        END AS moda
+      FROM contas c2
+      LEFT JOIN videos v ON v.conta_id = c2.id
+        AND v.publicado_em >= now() - interval '90 days'
+        AND v.idioma IS NOT NULL
+      GROUP BY c2.id
+    ) a
+    WHERE c.id = a.conta_id
+  `);
+}
+
+/**
+ * Pais da conta a partir do idioma principal (V2b, item 4): nunca
+ * sobrescreve um pais ja conhecido (o `country` do canal do YouTube,
+ * gravado na coleta, `upsertConta`, manda). "pt-BR" ja confirma Brasil
+ * sozinho (só a extração em lote grava esse valor, lendo a fala real);
+ * "pt" genérico (da detecção por título/descrição, que nunca diferencia
+ * Brasil de Portugal) só vira "BR" com um indício de Brasil de verdade em
+ * algum vídeo recente da conta (`temIndicioDeBrasil`, mesma heurística que
+ * o `meta-hashtags` já usa). Essa segunda parte roda por conta, em JS
+ * (não SQL puro como o resto do arquivo): `temIndicioDeBrasil` é lógica de
+ * texto, não uma expressão simples de traduzir para SQL, e o universo de
+ * contas candidatas (idioma "pt" e pais ainda desconhecido) é pequeno.
+ */
+async function passo7PaisPorIdiomaPrincipal(): Promise<number> {
+  const direto = await db().execute(sql`
+    UPDATE contas SET pais = 'BR'
+    WHERE pais IS NULL AND idioma_principal = 'pt-BR'
+  `);
+
+  const candidatas = await db()
+    .select({ id: contas.id })
+    .from(contas)
+    .where(and(isNull(contas.pais), eq(contas.idiomaPrincipal, "pt")));
+
+  let porIndicio = 0;
+  for (const candidata of candidatas) {
+    const videosRecentes = await db()
+      .select({ titulo: videos.titulo, descricao: videos.descricao })
+      .from(videos)
+      .where(and(eq(videos.contaId, candidata.id), gte(videos.publicadoEm, new Date(Date.now() - NOVENTA_DIAS_MS))));
+
+    const temIndicio = videosRecentes.some((v) => temIndicioDeBrasil(`${v.titulo ?? ""} ${v.descricao ?? ""}`));
+    if (temIndicio) {
+      await db().update(contas).set({ pais: "BR" }).where(eq(contas.id, candidata.id));
+      porIndicio += 1;
+    }
+  }
+
+  return (direto.rowCount ?? 0) + porIndicio;
+}
+
 export async function rodarPontuar(): Promise<Record<string, unknown>> {
   const r1 = await passo1MedianaPorConta();
   const r2 = await passo2ForaDaCurvaPorVideo();
   const r3 = await passo3VelocidadePorVideo();
   const r4 = await passo4VelocidadeRelativa();
   const r5 = await passo5TaxaForaDaCurvaPorConta();
+  const r6 = await passo6IdiomaPrincipalPorConta();
+  const r7 = await passo7PaisPorIdiomaPrincipal();
 
   return {
     contasComMediana: r1.rowCount ?? 0,
@@ -190,6 +267,8 @@ export async function rodarPontuar(): Promise<Record<string, unknown>> {
     videosComVelocidade: r3.rowCount ?? 0,
     videosComVelocidadeRelativa: r4.rowCount ?? 0,
     contasComTaxa: r5.rowCount ?? 0,
+    contasComIdiomaPrincipal: r6.rowCount ?? 0,
+    contasComPaisPorIdioma: r7,
   };
 }
 
