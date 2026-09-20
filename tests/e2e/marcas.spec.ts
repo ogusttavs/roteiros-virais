@@ -12,6 +12,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { inArray } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -30,23 +31,15 @@ import {
 import { hojeISO } from "../../src/lib/config";
 import { textosNav } from "../../src/textos/nav";
 
+const SLUGS_NICHO = ["e2e-marcas-um", "e2e-marcas-dois"];
+const IDS_USUARIO = ["e2e-marcas-a", "e2e-marcas-b"];
+
 const SENHA = "ExemploSenha123";
 const EMAIL_A = "e2e-marcas-a@exemplo.teste";
 const EMAIL_B = "e2e-marcas-b@exemplo.teste";
 const NOME_MARCA_UM = "[teste] Marca Um";
 const NOME_MARCA_DOIS = "[teste] Marca Dois";
 const NOME_MARCA_COMPARTILHADA = "[teste] Marca Compartilhada";
-/**
- * O timeout padrao (10s) as vezes nao basta para a troca de marca terminar
- * (`trocarMarcaAction` mais `router.refresh()`) quando a suite inteira ja
- * rodou dezenas de testes antes deste arquivo: achado rodando a suite
- * inteira algumas vezes, o pool do Postgres do servidor de e2e e pequeno
- * (`max: 8`, `src/db/index.ts`) e fica mais devagar sob a carga acumulada,
- * nao uma falha de logica (rodado sozinho ou em subconjuntos menores, este
- * arquivo sempre passa no primeiro tempo). Só as asserções que dependem da
- * troca terminar usam este timeout maior.
- */
-const TIMEOUT_TROCA = { timeout: 25_000 };
 
 async function entrar(page: Page, email: string) {
   await page.goto("/entrar");
@@ -81,6 +74,36 @@ let roteiroCompartilhadoId: number;
 
 test.describe("trocar de marca pela tela", () => {
   test.beforeAll(async () => {
+    // Idempotente (achado da revisao do PR #47: no retry do CI, a segunda
+    // tentativa quebrava em "nichos_slug_unique" e nunca testava nada de
+    // verdade, escondendo se a falha da primeira era intermitente). Apagar o
+    // usuario cascateia clientes, membros_marca e preferencias_usuario
+    // (onDelete: cascade nessas FKs, schema.ts), mas nem toda FK para
+    // clientes.id ou nichos.id cascateia (achado rodando `--repeat-each`,
+    // uma rodada de cada vez: primeiro "briefings_cliente_id...", depois
+    // "temas_dia_nicho_id..."); as duas apagadas a mao antes, pelo id das
+    // marcas e nichos que este arquivo criou.
+    const marcasExistentes = await db()
+      .select({ id: clientes.id })
+      .from(clientes)
+      .where(inArray(clientes.usuarioId, IDS_USUARIO));
+    const idsMarcasExistentes = marcasExistentes.map((m) => m.id);
+    if (idsMarcasExistentes.length > 0) {
+      await db().delete(roteiros).where(inArray(roteiros.clienteId, idsMarcasExistentes));
+      await db().delete(briefings).where(inArray(briefings.clienteId, idsMarcasExistentes));
+    }
+    await db().delete(user).where(inArray(user.id, IDS_USUARIO));
+
+    const nichosExistentes = await db()
+      .select({ id: nichos.id })
+      .from(nichos)
+      .where(inArray(nichos.slug, SLUGS_NICHO));
+    const idsNichosExistentes = nichosExistentes.map((n) => n.id);
+    if (idsNichosExistentes.length > 0) {
+      await db().delete(temasDia).where(inArray(temasDia.nichoId, idsNichosExistentes));
+    }
+    await db().delete(nichos).where(inArray(nichos.slug, SLUGS_NICHO));
+
     const [nichoUm] = await db()
       .insert(nichos)
       .values({ slug: "e2e-marcas-um", nome: "[teste] Marcas Um" })
@@ -222,13 +245,13 @@ test.describe("trocar de marca pela tela", () => {
     await folha.getByRole("button", { name: NOME_MARCA_DOIS }).click();
 
     // O Hoje da outra marca: o tema exclusivo da Um some, o da Dois aparece.
-    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible(TIMEOUT_TROCA);
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).not.toBeVisible();
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
     // Recarrega e continua na marca trocada (cookie assinado, nao estado de tela).
     await page.reload();
-    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible(TIMEOUT_TROCA);
+    await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
   });
 
@@ -247,16 +270,15 @@ test.describe("trocar de marca pela tela", () => {
     });
     await expect(botaoSeletor).toBeVisible();
     // O nome no botao muda otimista, antes da troca terminar no servidor
-    // (useTrocarMarca.ts, marcaAlvo); esperar a rede ficar ociosa e o sinal
-    // direto de que o cookie ja foi gravado, sem depender do "disabled" da
-    // transicao React (que sob a carga da suite inteira pode demorar mais
-    // que o padrao, ver TIMEOUT_TROCA acima).
-    await page.waitForLoadState("networkidle", TIMEOUT_TROCA);
+    // (useTrocarMarca.ts, marcaAlvo); esperar reabilitar confirma que a
+    // transicao React terminou de verdade (cookie ja gravado), sem
+    // depender de um timeout maior nem da rede ficar ociosa.
+    await expect(botaoSeletor).toBeEnabled();
 
     await page.goto(`/roteiros/${roteiroCompartilhadoId}`);
-    await expect(page.getByRole("heading", { name: "o roteiro compartilhado da marca", level: 1 })).toBeVisible(
-      TIMEOUT_TROCA,
-    );
+    await expect(
+      page.getByRole("heading", { name: "o roteiro compartilhado da marca", level: 1 }),
+    ).toBeVisible();
 
     const contextoB = await browser.newContext();
     const paginaB = await contextoB.newPage();
