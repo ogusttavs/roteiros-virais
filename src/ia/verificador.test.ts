@@ -169,6 +169,60 @@ describe("verificarLocalmente", () => {
       expect(r.aprovado).toBe(true);
     });
   });
+
+  describe("ganchosUltimos5, a primeira palavra (V4, item 5)", () => {
+    it("reprova quando a primeira palavra repete a de um dos ultimos 5, mesmo com o resto diferente", () => {
+      const r = verificarLocalmente(
+        { gancho: "Espera, isso muda tudo no seu atendimento", corpo: "texto" },
+        { ganchosUltimos5: ["Espera ai que eu vou te mostrar uma coisa"] },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("primeira palavra");
+    });
+
+    it("aprova quando a primeira palavra e diferente, mesmo com o resto do gancho parecido", () => {
+      const r = verificarLocalmente(
+        { gancho: "Olha isso muda tudo no seu atendimento", corpo: "texto" },
+        { ganchosUltimos5: ["Espera ai que eu vou te mostrar uma coisa"] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("aprova quando a lista dos ultimos 5 esta vazia", () => {
+      const r = verificarLocalmente(
+        { gancho: "Espera, isso muda tudo", corpo: "texto" },
+        { ganchosUltimos5: [] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+  });
+
+  describe("tipoAbertura contra o roteiro anterior (V4, item 5)", () => {
+    it("reprova quando o tipo declarado repete o do roteiro anterior", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { tipoAberturaAtual: "cena", tipoAberturaAnterior: "cena" },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("tipoAbertura");
+    });
+
+    it("aprova quando o tipo declarado e diferente do anterior", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { tipoAberturaAtual: "cena", tipoAberturaAnterior: "resultado" },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("aprova sem tipoAberturaAnterior (primeiro roteiro do cliente, ou reuso liberado de proposito pelo servico)", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        { tipoAberturaAtual: "cena", tipoAberturaAnterior: null },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+  });
 });
 
 describe("gerarComVerificacao", () => {

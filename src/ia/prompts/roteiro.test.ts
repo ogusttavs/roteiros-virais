@@ -7,15 +7,17 @@ import { describe, expect, it } from "vitest";
 
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 
-import { montarEntrada, montarSistemaEstavel } from "./roteiro";
+import { montarEntrada, montarSistemaEstavel, type InstrucaoAbertura } from "./roteiro";
 
 // OBJETIVOS_EM_ORDEM[2] (nao o literal, checar-texto varre este diretorio): o objetivo
 // "gente me chamar para comprar" (`NOME_OBJETIVO`), o mesmo que a asserção abaixo confere.
+const SEM_INSTRUCAO_ABERTURA: InstrucaoAbertura = { tipo: null, tiposProibidos: [] };
 const BASE = {
   tema: "o erro que faz a mancha voltar",
   objetivo: OBJETIVOS_EM_ORDEM[2],
   evidencias: [],
   roteirosRecentes: [],
+  instrucaoAbertura: SEM_INSTRUCAO_ABERTURA,
 };
 
 describe("montarEntrada", () => {
@@ -50,6 +52,50 @@ describe("montarEntrada", () => {
 
     expect(entrada).toContain("O cliente reprovou a versão anterior por: Já falei disso.");
     expect(entrada).not.toContain("O que ele escreveu");
+  });
+});
+
+// V4, item 3: a instrução de abertura que o serviço decidiu, formatada na entrada.
+describe("montarEntrada, instrucaoAbertura", () => {
+  it("com tipo e gancho de exemplo, instrui o tipo e cita o exemplo sem pedir para copiar", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      instrucaoAbertura: { tipo: "resultado", ganchoExemplo: "olha o antes e o depois" },
+    });
+
+    expect(entrada).toContain("Tipo de abertura: resultado,");
+    expect(entrada).toContain("nunca copie a frase");
+    expect(entrada).toContain("olha o antes e o depois");
+  });
+
+  it("com tipo e sem exemplo, instrui o tipo sem inventar um vídeo", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      instrucaoAbertura: { tipo: "numero", ganchoExemplo: null },
+    });
+
+    expect(entrada).toContain("Tipo de abertura: numero,");
+    expect(entrada).not.toContain("Um vídeo de hoje abriu assim");
+  });
+
+  it("sem tipo e com proibidos, so lista o que evitar", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      instrucaoAbertura: { tipo: null, tiposProibidos: ["cena", "pergunta"] },
+    });
+
+    expect(entrada).toContain("Tipo de abertura: livre");
+    expect(entrada).toContain("menos estes");
+    expect(entrada).toContain("cena, pergunta");
+  });
+
+  it("sem tipo e sem proibidos (nicho novo), nao restringe nada", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      instrucaoAbertura: { tipo: null, tiposProibidos: [] },
+    });
+
+    expect(entrada).toContain("Tipo de abertura: livre, o que fizer mais sentido");
   });
 });
 

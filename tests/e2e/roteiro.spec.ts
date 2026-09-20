@@ -241,6 +241,7 @@ test.describe("roteiro pela tela", () => {
         },
         evidencias: [],
         semEvidencia: true,
+        forcaEvidencia: null,
       };
       const [roteiro] = await db()
         .insert(roteiros)
@@ -336,6 +337,7 @@ test.describe("roteiro pela tela", () => {
       edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
       evidencias: [],
       semEvidencia: true,
+      forcaEvidencia: null,
     };
     const [roteiro] = await db()
       .insert(roteiros)
@@ -396,6 +398,7 @@ test.describe("roteiro pela tela", () => {
       },
       evidencias: [],
       semEvidencia: true,
+      forcaEvidencia: null,
     };
     const [roteiro] = await db()
       .insert(roteiros)

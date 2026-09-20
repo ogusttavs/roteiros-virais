@@ -39,6 +39,7 @@ const CONTEUDO_ROTEIRO_MINIMO = {
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
   evidencias: [],
   semEvidencia: false,
+  forcaEvidencia: null,
 };
 
 let nichoId: number;

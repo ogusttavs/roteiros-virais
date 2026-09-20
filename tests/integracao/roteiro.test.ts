@@ -24,6 +24,7 @@ import {
   videosCliente,
   type ModeloNicho,
   type PerfilCompilado,
+  type TipoAbertura,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
@@ -112,7 +113,7 @@ async function criarCliente(): Promise<number> {
 async function criarVideoEvidencia(
   idExterno: string,
   assunto: string,
-  opcoes: { idioma?: string | null; foraDaCurva?: number } = {},
+  opcoes: { idioma?: string | null; foraDaCurva?: number; tipoAbertura?: TipoAbertura } = {},
 ): Promise<number> {
   const [video] = await db()
     .insert(videos)
@@ -126,6 +127,8 @@ async function criarVideoEvidencia(
       publicadoEm: new Date(),
       // V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela.
       idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
+      // V4, item 3: nulo por padrao (o caso "nicho novo" de escolherTipoAbertura), a nao ser que o teste peca um tipo especifico.
+      tipoAbertura: opcoes.tipoAbertura,
       analise: {
         assunto,
         gancho: "olha essa mancha saindo do estofado",
@@ -365,7 +368,11 @@ describe("historico de ganchos entre roteiros do mesmo cliente (achado do primei
 
   it("reprova quando o novo gancho repete o de um roteiro recente do mesmo cliente (mock e deterministico no tema)", async () => {
     const clienteId = await criarCliente();
-    await criarVideoEvidencia("ev-gancho-repete", "mancha de vinho no estofado");
+    // Um tipo so na evidencia (V4, item 3d): escolherTipoAbertura libera o
+    // mesmo tipo de novo por falta de alternativa, o mock fica deterministico
+    // no tema como antes, e o verificador nao reprova por tipoAbertura
+    // repetido (repeticao instruida de proposito, nao vicio do modelo).
+    await criarVideoEvidencia("ev-gancho-repete", "mancha de vinho no estofado", { tipoAbertura: "cena" });
 
     await gerarRoteiro(clienteId, {
       origem: "livre",
@@ -382,6 +389,55 @@ describe("historico de ganchos entre roteiros do mesmo cliente (achado do primei
         objetivo: "alcance",
       }),
     ).rejects.toThrow(ErroIA);
+  });
+});
+
+describe("V4, roteiro sem vicio (escopo 5.12, item 7)", () => {
+  it("cinco roteiros seguidos do mesmo cliente saem com cinco tipos de abertura diferentes e cinco primeiras palavras diferentes (item 7a)", async () => {
+    const clienteId = await criarCliente();
+    const tema = "erro comum ao limpar o carro por dentro";
+    const tipos: TipoAbertura[] = ["cena", "resultado", "objeto", "fala_direta", "numero"];
+    for (const [indice, tipo] of tipos.entries()) {
+      await criarVideoEvidencia(`ev-abertura-${indice}`, tema, { tipoAbertura: tipo, foraDaCurva: 6 + indice });
+    }
+
+    const tiposDeclarados = new Set<string>();
+    const primeirasPalavras = new Set<string>();
+    for (let i = 0; i < 5; i += 1) {
+      const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: tema, objetivo: "alcance" });
+      tiposDeclarados.add(roteiro.tipoAbertura!);
+      primeirasPalavras.add(roteiro.conteudo.gancho.split(" ")[0]);
+    }
+
+    expect(tiposDeclarados.size).toBe(5);
+    expect(primeirasPalavras.size).toBe(5);
+  });
+
+  it("os ultimos roteiros para a abertura sao so da marca ativa, nunca de outra marca do mesmo login (item 7c)", async () => {
+    const clienteIdA = await criarCliente();
+    const [{ usuarioId }] = await db()
+      .select({ usuarioId: clientes.usuarioId })
+      .from(clientes)
+      .where(eq(clientes.id, clienteIdA));
+    const [clienteB] = await db()
+      .insert(clientes)
+      .values({ usuarioId, nome: "[teste] marca b do mesmo login", nichoId })
+      .returning();
+    await db().insert(briefings).values({ clienteId: clienteB.id, completo: true, perfil: PERFIL_PADRAO });
+
+    const tema = "erro comum ao encerar o carro";
+    await criarVideoEvidencia("ev-isolamento-cena", tema, { tipoAbertura: "cena", foraDaCurva: 9 });
+    await criarVideoEvidencia("ev-isolamento-resultado", tema, { tipoAbertura: "resultado", foraDaCurva: 5 });
+
+    const roteiroA = await gerarRoteiro(clienteIdA, { origem: "livre", textoTema: tema, objetivo: "alcance" });
+    // primeiro roteiro da marca A: sem historico para evitar, escolhe o de maior fora da curva.
+    expect(roteiroA.tipoAbertura).toBe("cena");
+
+    const roteiroB = await gerarRoteiro(clienteB.id, { origem: "livre", textoTema: tema, objetivo: "alcance" });
+    // marca B nunca gerou roteiro antes: se a consulta dos "ultimos roteiros" vazasse entre
+    // marcas do mesmo login, o "cena" da marca A apareceria como usado e a marca B cairia para
+    // "resultado" mesmo sendo o primeiro roteiro dela.
+    expect(roteiroB.tipoAbertura).toBe("cena");
   });
 });
 

@@ -189,6 +189,7 @@ test.describe("trocar de marca pela tela", () => {
       edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
       evidencias: [],
       semEvidencia: true,
+      forcaEvidencia: null,
     };
     const [roteiro] = await db()
       .insert(roteiros)

@@ -132,13 +132,18 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
         }
       }
 
-      const { etiquetas, idioma, ...analise } = dados;
+      const { etiquetas, idioma, tipoAbertura, ...analise } = dados;
       const analiseVideo: AnaliseVideo = analise;
 
-      // Idioma da fala (V2b, item 3): sobrescreve a deteccao por titulo de
-      // `upsertVideo`, porque a extracao le a transcricao inteira, mais
-      // confiavel que titulo/descricao.
-      await db().update(videos).set({ analise: analiseVideo, etiquetas, idioma }).where(eq(videos.id, videoId));
+      // Idioma da fala (V2b, item 3) e tipo de abertura (V4, item 5): os dois
+      // sobrescrevem colunas proprias fora do jsonb `analise`, o mesmo
+      // caminho, porque a extracao le a transcricao inteira, mais confiavel
+      // que titulo/descricao (idioma) e mais precisa que uma classificacao
+      // so pelo gancho ja extraido (tipoAbertura).
+      await db()
+        .update(videos)
+        .set({ analise: analiseVideo, etiquetas, idioma, tipoAbertura })
+        .where(eq(videos.id, videoId));
       videosAtualizados += 1;
 
       await registrarGeracao({

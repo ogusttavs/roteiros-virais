@@ -48,6 +48,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockFiltrarNoticias(entrada);
     case "aprenderCliente":
       return mockAprenderCliente(entrada);
+    case "classificarAbertura":
+      return mockClassificarAbertura(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -173,18 +175,61 @@ function extrairIds(entrada: string): number[] {
  * o padrão de 40s, para o roteiro reescrito conseguir passar na checagem
  * do verificador (a nova versão tem de ficar mais curta que a reprovada).
  */
+const TIPOS_ABERTURA_MOCK = [
+  "cena",
+  "resultado",
+  "objeto",
+  "fala_direta",
+  "numero",
+  "contraste",
+  "pergunta",
+  "outro",
+] as const;
+
+/** Uma primeira palavra distinta por tipo (V4, item 7a): cinco tipos diferentes viram cinco ganchos com primeira palavra diferente, sem precisar de chave real para provar isso. */
+const PRIMEIRA_PALAVRA_MOCK_POR_TIPO: Record<(typeof TIPOS_ABERTURA_MOCK)[number], string> = {
+  cena: "veja",
+  resultado: "pronto",
+  objeto: "aqui",
+  fala_direta: "escuta",
+  numero: "3",
+  contraste: "antes",
+  pergunta: "sera",
+  outro: "olha",
+};
+
+/**
+ * `prompts/roteiro.ts`, `formatarInstrucaoAbertura` (V4, item 3): quando o
+ * serviço instrui um tipo concreto, a entrada tem "Tipo de abertura: X,";
+ * quando deixa livre, tem "Tipo de abertura: livre" e, às vezes, "menos
+ * estes: a, b" com os tipos a evitar. O mock obedece do mesmo jeito que um
+ * modelo de verdade deveria: usa o tipo instruído, ou escolhe o primeiro
+ * tipo fora da lista de proibidos.
+ */
+function tipoAberturaEscolhidoPeloMock(entrada: string): (typeof TIPOS_ABERTURA_MOCK)[number] {
+  const instruido = entrada.match(/Tipo de abertura: (\w+),/)?.[1];
+  if (instruido && (TIPOS_ABERTURA_MOCK as readonly string[]).includes(instruido)) {
+    return instruido as (typeof TIPOS_ABERTURA_MOCK)[number];
+  }
+  const proibidosBrutos = entrada.match(/deste cliente: ([^.]+)\./)?.[1] ?? "";
+  const proibidos = proibidosBrutos.split(",").map((t) => t.trim());
+  return TIPOS_ABERTURA_MOCK.find((t) => !proibidos.includes(t)) ?? "outro";
+}
+
 function mockRoteiro(entrada: string) {
   const tema = extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
   const reprovado = entrada.includes("reprovou a versão anterior");
   const reprovadoMuitoLongo = entrada.includes("Muito longo");
   const ids = extrairIds(entrada);
+  const tipoAbertura = tipoAberturaEscolhidoPeloMock(entrada);
+  const primeiraPalavra = PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura];
 
   return {
     titulo: tema,
     duracaoS: reprovadoMuitoLongo ? 25 : 40,
     gancho: reprovado
-      ? `um jeito diferente de mostrar ${tema}`
-      : `os 3 primeiros segundos sobre ${tema}`,
+      ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
+      : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
     corpo: reprovado
       ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
       : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
@@ -201,6 +246,7 @@ function mockRoteiro(entrada: string) {
         ids[0] !== undefined ? { videoId: ids[0], segundo: 4, oQueOlhar: "o gancho" } : null,
     },
     evidencias: ids,
+    tipoAbertura,
   };
 }
 
@@ -303,7 +349,16 @@ function mockExtrairVideo(entrada: string) {
       ? "a transcricao cita termo do nicho"
       : "a transcricao nao cita nenhum termo do nicho",
     idioma: "pt-BR" as const,
+    tipoAbertura: "outro" as const,
   };
+}
+
+/** V4, item 2: classifica pelo gancho, sem chave real (`scripts/preencher-tipo-abertura.ts`). */
+function mockClassificarAbertura(entrada: string) {
+  const gancho = extrairCampo(entrada, "Gancho:").toLowerCase();
+  if (gancho.includes("?")) return { tipoAbertura: "pergunta" as const };
+  if (/\d/.test(gancho)) return { tipoAbertura: "numero" as const };
+  return { tipoAbertura: "cena" as const };
 }
 
 function mockAnalisarVisual() {

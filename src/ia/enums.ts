@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AnaliseVideo, Objetivo } from "@/db/schema";
+import type { AnaliseVideo, Objetivo, TipoAbertura } from "@/db/schema";
 
 /**
  * Enums Zod usados nos schemas de saida das tarefas, e a traducao do
@@ -81,3 +81,20 @@ export const FORMATOS_EM_ORDEM: AnaliseVideo["formato"][] = [
   "esquete",
   "outro",
 ];
+
+/**
+ * A instrução de abertura por tipo (V4, roteiro sem vício, `prompts/roteiro.ts`,
+ * `montarEntrada`): "abra este roteiro com X". Mesma razão de `NOME_OBJETIVO`
+ * estar aqui, fora de `prompts/`, para o `checar-versao-prompt` só reagir a
+ * mudança de instrução de verdade, não a este texto compartilhado.
+ */
+export const INSTRUCAO_TIPO_ABERTURA: Record<TipoAbertura, string> = {
+  cena: "uma cena acontecendo, sem falar primeiro",
+  resultado: "o resultado final, antes de explicar como chegou lá",
+  objeto: "um objeto, produto ou ferramenta em destaque",
+  fala_direta: "uma frase afirmativa direto para a câmera, sem cena, sem pergunta",
+  numero: "um número ou dado concreto na primeira frase",
+  contraste: "um antes e depois, ou dois jeitos diferentes de fazer a mesma coisa",
+  pergunta: "uma pergunta direta para quem assiste",
+  outro: "o jeito que fizer mais sentido para este vídeo, fora dos sete tipos acima",
+};

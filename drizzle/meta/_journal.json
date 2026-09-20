@@ -183,6 +183,13 @@
       "when": 1789905574251,
       "tag": "0025_membros-marca",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789936565229,
+      "tag": "0026_tipo-abertura",
+      "breakpoints": true
     }
   ]
 }

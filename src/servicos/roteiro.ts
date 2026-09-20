@@ -9,6 +9,7 @@
  */
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 
+import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
@@ -19,8 +20,10 @@ import {
   type ConteudoRoteiro,
   type Objetivo,
   type Plataforma,
+  type TipoAbertura,
 } from "@/db/schema";
 import * as roteiroIA from "@/ia/prompts/roteiro";
+import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config, hojeISO } from "@/lib/config";
@@ -43,6 +46,8 @@ export class ErroRoteiro extends Error {}
 
 const LIMITE_EVIDENCIA = 8;
 const DIAS_HISTORICO = 10;
+/** V4, item 3 e item 5: quantos roteiros recentes contam para nao repetir tipo de abertura nem primeira palavra do gancho. */
+const ULTIMOS_ROTEIROS_PARA_ABERTURA = 5;
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 function diasAtras(dias: number): Date {
@@ -118,6 +123,86 @@ function escolherReferencia(
 
   const [maiorForaDaCurva] = [...evidencias].sort((a, b) => b.foraDaCurva - a.foraDaCurva);
   return { videoId: maiorForaDaCurva.id, segundo: 0, oQueOlhar: maiorForaDaCurva.gancho };
+}
+
+type EvidenciaParaAbertura = {
+  tipoAbertura: TipoAbertura | null;
+  foraDaCurva: number;
+  contaBrasileira: boolean;
+  gancho: string;
+};
+
+/** Maior múltiplo primeiro, brasileiro antes em caso de empate (V4, item 3c: "a evidência mais forte"). */
+function compararForcaDeAbertura(a: EvidenciaParaAbertura, b: EvidenciaParaAbertura): number {
+  if (b.foraDaCurva !== a.foraDaCurva) return b.foraDaCurva - a.foraDaCurva;
+  return Number(b.contaBrasileira) - Number(a.contaBrasileira);
+}
+
+function melhorEvidenciaDoTipo(
+  evidencias: readonly EvidenciaParaAbertura[],
+  tipo: TipoAbertura,
+): EvidenciaParaAbertura | undefined {
+  return evidencias.filter((e) => e.tipoAbertura === tipo).sort(compararForcaDeAbertura)[0];
+}
+
+/** (c): dos tipos disponíveis, o que tem a evidência mais forte. */
+function melhorTipo(candidatos: readonly TipoAbertura[], evidencias: readonly EvidenciaParaAbertura[]): TipoAbertura {
+  const comEvidencia = candidatos
+    .map((tipo) => ({ tipo, evidencia: melhorEvidenciaDoTipo(evidencias, tipo)! }))
+    .sort((a, b) => compararForcaDeAbertura(a.evidencia, b.evidencia));
+  return comEvidencia[0].tipo;
+}
+
+/**
+ * (d): nenhum tipo da evidência sobrou fora dos últimos usados, libera o
+ * usado há mais tempo, ou seja, o candidato cuja ocorrência mais recente em
+ * `ultimosTipos` (mais recente primeiro) está mais para trás.
+ */
+function tipoUsadoHaMaisTempo(
+  ultimosTipos: readonly (TipoAbertura | null)[],
+  candidatos: readonly TipoAbertura[],
+): TipoAbertura {
+  let melhor = candidatos[0];
+  let melhorIndice = -1;
+  for (const tipo of candidatos) {
+    const indice = ultimosTipos.findIndex((t) => t === tipo);
+    if (indice > melhorIndice) {
+      melhorIndice = indice;
+      melhor = tipo;
+    }
+  }
+  return melhor;
+}
+
+/**
+ * A abertura do próximo roteiro, escopo 5.12 item 7 e `PROXIMO.md`, item 3:
+ * (a) os tipos presentes na evidência de hoje, (b) tira os já usados nos
+ * últimos roteiros do cliente, (c) dos que sobram, o de evidência mais
+ * forte, (d) sem nenhum sobrando, libera o usado há mais tempo, (e) sem
+ * nenhuma evidência tipada (nicho novo), só a lista do que evitar. Pura,
+ * testada com tabela de casos.
+ */
+export function escolherTipoAbertura(
+  evidencias: readonly EvidenciaParaAbertura[],
+  ultimosTipos: readonly (TipoAbertura | null)[],
+): InstrucaoAbertura {
+  const tiposNaEvidencia = [
+    ...new Set(evidencias.map((e) => e.tipoAbertura).filter((t): t is TipoAbertura => t !== null)),
+  ];
+  const usadosRecentes = new Set(ultimosTipos.filter((t): t is TipoAbertura => t !== null));
+
+  if (tiposNaEvidencia.length === 0) {
+    return { tipo: null, tiposProibidos: [...usadosRecentes] };
+  }
+
+  const disponiveis = tiposNaEvidencia.filter((t) => !usadosRecentes.has(t));
+  const tipoEscolhido =
+    disponiveis.length > 0
+      ? melhorTipo(disponiveis, evidencias)
+      : tipoUsadoHaMaisTempo(ultimosTipos, tiposNaEvidencia);
+
+  const exemplo = melhorEvidenciaDoTipo(evidencias, tipoEscolhido);
+  return { tipo: tipoEscolhido, ganchoExemplo: exemplo?.gancho ?? null };
 }
 
 /**
@@ -201,6 +286,27 @@ async function historicoDeRoteiros(
   }));
 }
 
+/**
+ * Os últimos `ULTIMOS_ROTEIROS_PARA_ABERTURA` roteiros do cliente, por
+ * contagem (não por dia, ao contrário de `historicoDeRoteiros`), mais
+ * recente primeiro (V4, itens 3 e 5): de onde `escolherTipoAbertura` lê o
+ * que não repetir, e de onde sai o gancho para a checagem da primeira
+ * palavra no verificador. Escopado por `clienteId`, que já é a marca ativa
+ * (item 7c: nunca mistura com outra marca do mesmo login).
+ */
+async function ultimosRoteirosParaAbertura(
+  clienteId: number,
+): Promise<{ tipoAbertura: TipoAbertura | null; gancho: string }[]> {
+  const linhas = await db()
+    .select({ tipoAbertura: roteiros.tipoAbertura, conteudo: roteiros.conteudo })
+    .from(roteiros)
+    .where(eq(roteiros.clienteId, clienteId))
+    .orderBy(desc(roteiros.criadoEm))
+    .limit(ULTIMOS_ROTEIROS_PARA_ABERTURA);
+
+  return linhas.map((r) => ({ tipoAbertura: r.tipoAbertura, gancho: r.conteudo.gancho }));
+}
+
 /** Todas as versões da mesma série (etapa 11, decisão 4): a raiz e quem aponta para ela. */
 async function buscarSerie(raizId: number): Promise<RoteiroLinha[]> {
   return db()
@@ -277,7 +383,12 @@ type MontarERoteiroDados = {
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
 async function gerarConteudo(
   dados: MontarERoteiroDados,
-): Promise<{ conteudo: ConteudoRoteiro; geracaoId: number; referenciaVideoId: number | null }> {
+): Promise<{
+  conteudo: ConteudoRoteiro;
+  geracaoId: number;
+  referenciaVideoId: number | null;
+  tipoAbertura: TipoAbertura;
+}> {
   if (!dados.cliente.nichoId) {
     throw new ErroRoteiro("este cliente ainda nao tem um nicho definido.");
   }
@@ -288,18 +399,36 @@ async function gerarConteudo(
     throw new ErroRoteiro("o briefing deste cliente ainda nao foi compilado.");
   }
 
-  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente] = await Promise.all([
-    evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
-    evidenciaPorIds(dados.evidenciasPrevistas),
-    modeloNichoAtual(nichoId),
-    historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
-    regrasAtivasDoCliente(dados.clienteId),
-  ]);
+  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente, ultimosRoteiros] =
+    await Promise.all([
+      evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
+      evidenciaPorIds(dados.evidenciasPrevistas),
+      modeloNichoAtual(nichoId),
+      historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
+      regrasAtivasDoCliente(dados.clienteId),
+      ultimosRoteirosParaAbertura(dados.clienteId),
+    ]);
 
   const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil);
   const referenciaEscolhida = escolherReferencia(evidencias);
   const semEvidencia = evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
+
+  const ultimosTiposAbertura = ultimosRoteiros.map((r) => r.tipoAbertura);
+  const instrucaoAbertura = escolherTipoAbertura(evidencias, ultimosTiposAbertura);
+  /**
+   * V4, item 5: o verificador só reprova repetir o tipo do roteiro anterior
+   * quando essa repetição não foi o próprio serviço quem decidiu. Sem isto,
+   * um cliente cuja evidência só tem um tipo (ou nenhum novo sobrando fora
+   * dos últimos 5, o caso (d) de `escolherTipoAbertura`) nunca conseguiria
+   * gerar de novo: o serviço instruiria repetir de propósito, e o
+   * verificador reprovaria a instrução que ele mesmo deu, sempre, sem saída.
+   */
+  const tipoAberturaAnterior = ultimosTiposAbertura[0] ?? null;
+  const tipoAberturaAnteriorParaVerificar =
+    instrucaoAbertura.tipo !== null && instrucaoAbertura.tipo === tipoAberturaAnterior
+      ? null
+      : tipoAberturaAnterior;
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -331,6 +460,7 @@ async function gerarConteudo(
           : undefined,
       })),
       roteirosRecentes,
+      instrucaoAbertura,
       anguloParaEvitar: dados.anguloParaEvitar
         ? {
             gancho: dados.anguloParaEvitar.gancho,
@@ -355,6 +485,9 @@ async function gerarConteudo(
     ganchosRecentes: dados.anguloParaEvitar
       ? [...roteirosRecentes.map((r) => r.gancho), dados.anguloParaEvitar.gancho]
       : roteirosRecentes.map((r) => r.gancho),
+    ganchosUltimos5: ultimosRoteiros.map((r) => r.gancho),
+    tipoAberturaAnterior: tipoAberturaAnteriorParaVerificar,
+    extrairTipoAbertura: (d) => d.tipoAbertura,
     duracaoReprovadaS: dados.anguloParaEvitar?.motivosIds.includes("muito_longo")
       ? dados.anguloParaEvitar.duracaoAnteriorS
       : undefined,
@@ -391,9 +524,15 @@ async function gerarConteudo(
      */
     evidencias: semEvidencia ? [] : saida.evidencias,
     semEvidencia,
+    forcaEvidencia: semEvidencia ? null : forcaDaEvidencia(evidencias),
   };
 
-  return { conteudo, geracaoId, referenciaVideoId: referenciaEscolhida?.videoId ?? null };
+  return {
+    conteudo,
+    geracaoId,
+    referenciaVideoId: referenciaEscolhida?.videoId ?? null,
+    tipoAbertura: saida.tipoAbertura,
+  };
 }
 
 /**
@@ -410,7 +549,7 @@ export async function gerarRoteiro(
 
   const { tema, evidenciasPrevistas } = await resolverTema(cliente, params);
 
-  const { conteudo, geracaoId, referenciaVideoId } = await gerarConteudo({
+  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura } = await gerarConteudo({
     clienteId,
     cliente,
     tema,
@@ -431,6 +570,7 @@ export async function gerarRoteiro(
       referenciaVideoId,
       geracaoId,
       status: "gerado",
+      tipoAbertura,
     })
     .returning();
 
@@ -470,7 +610,7 @@ export async function reprovarERescrever(
   const serie = await buscarSerie(raizId);
   const proximaVersao = Math.max(...serie.map((r) => r.versao)) + 1;
 
-  const { conteudo, geracaoId, referenciaVideoId } = await gerarConteudo({
+  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura } = await gerarConteudo({
     clienteId: atual.clienteId,
     cliente,
     tema: atual.tema,
@@ -499,6 +639,7 @@ export async function reprovarERescrever(
       versaoDe: raizId,
       geracaoId,
       status: "gerado",
+      tipoAbertura,
     })
     .returning();
 
