@@ -35,7 +35,8 @@
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",
     "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
-    "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts"
+    "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
+    "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
