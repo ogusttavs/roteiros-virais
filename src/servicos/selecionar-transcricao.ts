@@ -58,7 +58,8 @@ export function limitarPorConta(
   return resultado;
 }
 
-const MAX_POR_CONTA = 2;
+/** Exportada para `transcrever.ts` (V2b, item 10) aplicar o mesmo teto já na consulta, antes do corte de tamanho. */
+export const MAX_POR_CONTA = 2;
 
 export function selecionarParaTranscrever(
   subindoHoje: number[],

@@ -48,7 +48,7 @@ import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente"
 import { config } from "@/lib/config";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
-import { selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
+import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
 import { ErroGroq, transcreverAudio } from "./groq-api";
@@ -103,9 +103,16 @@ function comMidiaFrescaComoDesempate<T extends { id: number }>(
 
 async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   const tamanhoFila = tetoDiario * FATOR_FILA;
+  // V2b, item 10: o teto por conta entra aqui, na consulta, antes do LIMIT
+  // (`maxPorConta`), não só depois em `limitarPorConta`; sem isso, quando as
+  // notas mais altas se concentram em poucas contas, o corte por tamanho da
+  // consulta já esgota a fila com poucas contas repetidas, e `limitarPorConta`
+  // encolhe o que sobrou para bem menos que `tetoDiario` (achado da prova em
+  // produção, 19/09 à noite: 187 vídeos fora da curva do Instagram, com mídia
+  // fresca, nunca chegavam a ser tentados).
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, tamanhoFila),
-    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila),
+    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];

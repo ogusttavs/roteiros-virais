@@ -3,6 +3,7 @@
  * a regra de nunca aparecer vídeo de seed fora de desenvolvimento (o Vitest
  * roda com NODE_ENV distinto de "development", então a regra vale aqui).
  */
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -124,6 +125,64 @@ describe("foraDaCurvaDoNicho", () => {
     expect(resultado.some((v) => v.foraDaCurva === 50)).toBe(false);
     expect(resultado.some((v) => v.foraDaCurva === 45)).toBe(true);
   });
+
+  /**
+   * V2b, item 10 (achado da prova em produção, 19/09 à noite): sem
+   * `maxPorConta`, o LIMIT corta pelos maiores valores globais antes de
+   * `limitarPorConta` poder agir; se as notas mais altas se concentram
+   * numa conta só (o cenário medido em produção), a fila final encolhe
+   * bem abaixo do teto. Trinta contas com 10 vídeos cada, todas as notas
+   * da conta A maiores que as da B e assim por diante: sem `maxPorConta`,
+   * um `limite` de 60 traria só os vídeos da conta A e da B (as duas com
+   * as notas mais altas); com `maxPorConta=2`, a fila tem que ter as 30
+   * contas representadas, 60 candidatos no total.
+   */
+  it("maxPorConta: o teto por conta entra na consulta, antes do limite, preservando contas diferentes", async () => {
+    const [nichoTeto] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-teto-conta-teste", nome: "Pesquisa teto conta teste", termos: [] })
+      .returning();
+
+    for (let conta = 0; conta < 30; conta += 1) {
+      const [c] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: `teto-conta-${conta}`, nichoId: nichoTeto.id })
+        .returning({ id: contas.id });
+      for (let video = 0; video < 10; video += 1) {
+        await db()
+          .insert(videos)
+          .values({
+            plataforma: "tiktok",
+            idExterno: `teto-conta-${conta}-video-${video}`,
+            url: `https://exemplo.invalido/teto-conta-${conta}-video-${video}`,
+            contaId: c.id,
+            nichoId: nichoTeto.id,
+            publicadoEm: diasAtras(10),
+            // Nota decrescente por conta: a conta 0 tem as 10 maiores notas de
+            // todo o nicho, a conta 1 as 10 seguintes, e assim por diante.
+            foraDaCurva: String(1000 - conta * 10 - video),
+          });
+      }
+    }
+
+    const semTeto = await foraDaCurvaDoNicho(nichoTeto.id, 90, 60);
+    const contasSemTeto = new Set(semTeto.map((v) => v.contaHandle));
+    // Sem maxPorConta, os 60 primeiros por nota vem so das contas 0 a 5 (10 videos cada).
+    expect(contasSemTeto.size).toBeLessThan(30);
+
+    const comTeto = await foraDaCurvaDoNicho(nichoTeto.id, 90, 60, 2);
+    expect(comTeto).toHaveLength(60);
+    const contasComTeto = new Set(comTeto.map((v) => v.contaHandle));
+    expect(contasComTeto.size).toBe(30);
+    // No maximo 2 videos por conta, mesmo antes do corte de tamanho.
+    for (const handle of contasComTeto) {
+      expect(comTeto.filter((v) => v.contaHandle === handle)).toHaveLength(2);
+    }
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoTeto.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoTeto.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoTeto.id));
+  }, 30_000);
 });
 
 describe("subindoHoje", () => {

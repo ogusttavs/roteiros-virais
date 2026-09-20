@@ -111,11 +111,91 @@ const COLUNAS = {
   publicadoEm: videos.publicadoEm,
 };
 
-/** O que está fora da curva no nicho nos últimos `dias` dias (escopo 5.1). */
+/**
+ * V2b, item 10 (achado da prova em produção, 19/09 à noite): sem
+ * `maxPorConta`, o `LIMIT` corta pelos maiores valores globais antes de
+ * `limitarPorConta` (`selecionar-transcricao.ts`) ter a chance de agir; se
+ * as notas altas se concentram em poucas contas, a fila final encolhe
+ * muito abaixo do teto diário (medido: 187 vídeos do Instagram fora da
+ * curva ficaram de fora, a fila fechou em 32 tentativas para um teto de
+ * 40). Com `maxPorConta`, o teto por conta entra dentro da própria
+ * consulta, via `row_number() over (partition by conta_id ...)`, antes do
+ * `LIMIT`: cada conta nunca ocupa mais que `maxPorConta` vagas do pool,
+ * então o pool inteiro fica cheio de contas diferentes, não só das que têm
+ * a nota mais alta. Vídeo sem dono (`conta_id` nulo) nunca é cortado por
+ * este teto (mesma regra de `limitarPorConta`): entra incondicionalmente
+ * no `WHERE` externo.
+ */
+async function comTetoPorConta(
+  colunaOrdenacao: "fora_da_curva" | "velocidade_relativa",
+  condicoesSql: ReturnType<typeof sql>,
+  limite: number,
+  maxPorConta: number,
+): Promise<VideoRankeado[]> {
+  // Sem alias curto (nao "v"/"c"): as `condicoesSql`, montadas com os
+  // fragmentos do Drizzle (`eq(videos.nichoId, ...)` etc.), sempre geram
+  // `"videos"."coluna"` (o nome completo da tabela); um alias diferente
+  // quebraria essa referencia ("invalid reference to FROM-clause entry",
+  // achado rodando o teste de integracao desta rodada).
+  const resultado = await db().execute<{
+    id: number;
+    plataforma: Plataforma;
+    url: string;
+    titulo: string | null;
+    conta_handle: string | null;
+    views: number;
+    fora_da_curva: string | null;
+    velocidade: string | null;
+    velocidade_relativa: string | null;
+    publicado_em: Date | null;
+  }>(sql`
+    WITH candidatos AS (
+      SELECT
+        videos.id, videos.plataforma, videos.url, videos.titulo, contas.handle AS conta_handle, videos.views,
+        videos.fora_da_curva, videos.velocidade, videos.velocidade_relativa, videos.publicado_em,
+        videos.conta_id,
+        row_number() OVER (
+          PARTITION BY videos.conta_id
+          ORDER BY videos.${sql.raw(colunaOrdenacao)} DESC NULLS LAST, videos.id ASC
+        ) AS posicao_na_conta
+      FROM videos
+      LEFT JOIN contas ON contas.id = videos.conta_id
+      WHERE ${condicoesSql}
+    )
+    SELECT id, plataforma, url, titulo, conta_handle, views, fora_da_curva, velocidade, velocidade_relativa, publicado_em
+    FROM candidatos
+    WHERE conta_id IS NULL OR posicao_na_conta <= ${maxPorConta}
+    ORDER BY ${sql.raw(colunaOrdenacao)} DESC NULLS LAST, id ASC
+    LIMIT ${limite}
+  `);
+
+  return resultado.rows.map((l) =>
+    mapear({
+      id: l.id,
+      plataforma: l.plataforma,
+      url: l.url,
+      titulo: l.titulo,
+      contaHandle: l.conta_handle,
+      views: l.views,
+      foraDaCurva: l.fora_da_curva,
+      velocidade: l.velocidade,
+      velocidadeRelativa: l.velocidade_relativa,
+      publicadoEm: l.publicado_em,
+    }),
+  );
+}
+
+/**
+ * O que está fora da curva no nicho nos últimos `dias` dias (escopo 5.1).
+ * `maxPorConta` (V2b, item 10, opcional): aplica o teto por conta dentro
+ * da própria consulta, antes do `limite`; sem ele, comportamento igual a
+ * antes (usado por quem não corta por conta depois, como `/admin`).
+ */
 export async function foraDaCurvaDoNicho(
   nichoId: number,
   dias = 90,
   limite?: number,
+  maxPorConta?: number,
 ): Promise<VideoRankeado[]> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -124,6 +204,10 @@ export async function foraDaCurvaDoNicho(
     PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+
+  if (maxPorConta !== undefined && limite !== undefined) {
+    return comTetoPorConta("fora_da_curva", and(...condicoes)!, limite, maxPorConta);
+  }
 
   const consulta = db()
     .select(COLUNAS)
@@ -136,8 +220,12 @@ export async function foraDaCurvaDoNicho(
   return linhas.map(mapear);
 }
 
-/** O que está subindo hoje no nicho: 2 a 7 dias, por velocidade relativa (escopo 5.1). */
-export async function subindoHoje(nichoId: number, limite?: number): Promise<VideoRankeado[]> {
+/**
+ * O que está subindo hoje no nicho: 2 a 7 dias, por velocidade relativa
+ * (escopo 5.1). `maxPorConta` (V2b, item 10, opcional): mesmo raciocínio
+ * de `foraDaCurvaDoNicho`.
+ */
+export async function subindoHoje(nichoId: number, limite?: number, maxPorConta?: number): Promise<VideoRankeado[]> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     lte(videos.publicadoEm, diasAtras(2)),
@@ -146,6 +234,10 @@ export async function subindoHoje(nichoId: number, limite?: number): Promise<Vid
     PERTENCE_AO_NICHO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+
+  if (maxPorConta !== undefined && limite !== undefined) {
+    return comTetoPorConta("velocidade_relativa", and(...condicoes)!, limite, maxPorConta);
+  }
 
   const consulta = db()
     .select(COLUNAS)
