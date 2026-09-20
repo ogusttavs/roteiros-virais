@@ -18,6 +18,13 @@
  * descoberta pelo motor. Fica sempre `vigiada = true`, nunca disputa o
  * ranking nem o teto de `vigilanciaPorNicho`: é escolha de gente, não
  * mérito por taxa fora da curva.
+ *
+ * V2b, item 7 (escopo 5.11: o Brasil primeiro): o ranking por nicho e
+ * plataforma passa a preferir conta brasileira (`pais = 'BR'` ou
+ * `idioma_principal` português) antes da taxa fora da curva; conta de
+ * idioma principal "outro" nunca é vigiada, mesmo com taxa alta (fica de
+ * fora do ranking desde o `WHERE`, não só perde posição). A semente
+ * continua sempre vigiada qualquer que seja o idioma, é escolha de gente.
  */
 import { sql } from "drizzle-orm";
 
@@ -52,12 +59,21 @@ export async function rodarVigilancia(): Promise<Record<string, unknown>> {
         c.id AS conta_id,
         row_number() OVER (
           PARTITION BY c.nicho_id, c.plataforma
-          ORDER BY c.taxa_fora_da_curva DESC NULLS LAST
+          -- COALESCE(..., false) e necessario (achado ao testar): pais='BR' e
+          -- null quando pais e null, e "null OR false" e null, nao false; sem
+          -- o coalesce, uma conta so com idioma "en" (nem pais nem portugues)
+          -- ordenava null no ORDER BY DESC, que o Postgres poe antes de
+          -- true/false por padrao (sem NULLS LAST nesta parte), furando a fila
+          -- na frente de conta brasileira de verdade.
+          ORDER BY
+            COALESCE(c.pais = 'BR' OR c.idioma_principal IN ('pt', 'pt-BR'), false) DESC,
+            c.taxa_fora_da_curva DESC NULLS LAST
         ) AS posicao
       FROM contas c
       JOIN candidatas cd ON cd.conta_id = c.id
       -- Semente nunca conta no teto de 50 por nicho e plataforma (item 2): e escolha de gente, o ranking e da maquina.
-      WHERE c.origem <> 'curadoria'
+      -- Idioma "outro" nunca e vigiada (V2b, item 7): fora do ranking desde o WHERE, nao so perde posicao.
+      WHERE c.origem <> 'curadoria' AND c.idioma_principal IS DISTINCT FROM 'outro'
     )
     UPDATE contas c
     SET vigiada = true
