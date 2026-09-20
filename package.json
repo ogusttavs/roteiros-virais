@@ -38,7 +38,8 @@
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
-    "capturas:v4-forca-evidencia": "AI_PROVIDER=mock tsx scripts/capturas-v4-forca-evidencia.ts"
+    "capturas:v4-forca-evidencia": "AI_PROVIDER=mock tsx scripts/capturas-v4-forca-evidencia.ts",
+    "capturas:v5-pele-nova": "AI_PROVIDER=mock tsx scripts/capturas-v5-pele-nova.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
