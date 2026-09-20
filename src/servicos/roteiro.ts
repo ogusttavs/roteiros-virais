@@ -487,6 +487,7 @@ async function gerarConteudo(
       : roteirosRecentes.map((r) => r.gancho),
     ganchosUltimos5: ultimosRoteiros.map((r) => r.gancho),
     tipoAberturaAnterior: tipoAberturaAnteriorParaVerificar,
+    instrucaoAbertura,
     extrairTipoAbertura: (d) => d.tipoAbertura,
     duracaoReprovadaS: dados.anguloParaEvitar?.motivosIds.includes("muito_longo")
       ? dados.anguloParaEvitar.duracaoAnteriorS

@@ -223,6 +223,54 @@ describe("verificarLocalmente", () => {
       expect(r.aprovado).toBe(true);
     });
   });
+
+  describe("tipoAbertura contra a instrucao do servico (V5, item 0b)", () => {
+    it("reprova quando o servico instruiu um tipo concreto e o modelo declarou outro", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        {
+          tipoAberturaAtual: "cena",
+          instrucaoAbertura: { tipo: "resultado", ganchoExemplo: null },
+        },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("tipoAbertura");
+    });
+
+    it("aprova quando o modelo declara o mesmo tipo concreto instruido", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        {
+          tipoAberturaAtual: "resultado",
+          instrucaoAbertura: { tipo: "resultado", ganchoExemplo: null },
+        },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("reprova quando a instrucao era livre e o tipo declarado esta na lista dos proibidos", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        {
+          tipoAberturaAtual: "cena",
+          instrucaoAbertura: { tipo: null, tiposProibidos: ["cena", "resultado"] },
+        },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("tipoAbertura");
+    });
+
+    it("aprova quando a instrucao era livre e o tipo declarado nao esta na lista dos proibidos", () => {
+      const r = verificarLocalmente(
+        { corpo: "texto limpo" },
+        {
+          tipoAberturaAtual: "cena",
+          instrucaoAbertura: { tipo: null, tiposProibidos: ["resultado"] },
+        },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+  });
 });
 
 describe("gerarComVerificacao", () => {
