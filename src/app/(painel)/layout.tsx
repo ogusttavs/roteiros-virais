@@ -1,16 +1,16 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
-import { iniciaisDe } from "@/lib/iniciais";
 import { sessaoAtual } from "@/lib/sessao";
+import { marcasDoUsuario } from "@/servicos/clientes";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
 import { Logo } from "@/ui/Logo";
 
 import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
 import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
+import { SeletorMarcaDesktop } from "./_casca/SeletorMarcaDesktop";
 import styles from "./layout.module.css";
 
 /**
@@ -19,7 +19,9 @@ import styles from "./layout.module.css";
  * conta na base no desktop, fixa ao rolar e recolhivel a partir do achado
  * do Gustavo usando o painel no iPad (etapa "acabamento visual 2"). A conta
  * saiu da Nav e foi para o avatar (decisao do Fable, PROXIMO.md, etapa D
- * parte 1).
+ * parte 1); com varias marcas por usuario (V3, item 3), o avatar passa a
+ * ser da marca ativa, nao da pessoa, e abre a troca de marca em vez de ir
+ * direto para Conta.
  */
 export default async function LayoutPainel({ children }: { children: ReactNode }) {
   const sessao = await sessaoAtual();
@@ -27,11 +29,19 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
     redirect("/entrar");
   }
 
-  const iniciais = iniciaisDe(sessao.user.name);
+  const marcas = await marcasDoUsuario(sessao.user.id);
+  // Sem marca nenhuma, o layout (completo) redireciona para /comecar ou /entrar;
+  // aqui so evita quebrar a casca com uma lista vazia enquanto isso acontece.
+  const marcaAtiva = marcas[0] ?? { id: 0, nome: "" };
 
   return (
     <div className={styles.pagina}>
-      <CascaCabecalhoCelular nomeProduto={config.appName} iniciais={iniciais} rotuloConta={textosNav.conta} />
+      <CascaCabecalhoCelular
+        nomeProduto={config.appName}
+        marcaAtiva={marcaAtiva}
+        marcas={marcas}
+        nomePessoa={sessao.user.name}
+      />
 
       <aside className={styles.colunaDesktop}>
         <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
@@ -40,10 +50,7 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
           <span className={styles.nomeDesktop}>{config.appName}</span>
         </div>
         <Nav compactavel />
-        <Link href="/conta" className={styles.contaDesktop} title={sessao.user.name}>
-          <span className={styles.avatarDesktop}>{iniciais}</span>
-          <span className={styles.nomeConta}>{sessao.user.name}</span>
-        </Link>
+        <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={sessao.user.name} />
       </aside>
 
       <main className={styles.corpo}>{children}</main>

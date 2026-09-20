@@ -12,6 +12,8 @@ import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
+import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
+
 import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
 
@@ -36,8 +38,14 @@ type Props = {
   evidenciaRoteiroHoje: EvidenciaTema | null;
   semana: SemanaDia[];
   ultimoVideo: UltimoVideoAparte | null;
-  /** Para o avatar de `/conta` na barra do topo, só no celular (revisão do PR #31, item 8). */
-  iniciais: string;
+  /**
+   * Para o seletor de marca na barra do topo, só no celular (revisão do PR
+   * #31, item 8; V3, item 3: virou a marca ativa, não mais o avatar da
+   * pessoa).
+   */
+  marcaAtiva: MarcaResumo;
+  marcas: MarcaResumo[];
+  nomePessoa: string;
 };
 
 function AparteSemanaCurva({ semana, ultimoVideo }: { semana: SemanaDia[]; ultimoVideo: UltimoVideoAparte | null }) {
@@ -96,7 +104,9 @@ export function HojeTela({
   evidenciaRoteiroHoje,
   semana,
   ultimoVideo,
-  iniciais,
+  marcaAtiva,
+  marcas,
+  nomePessoa,
 }: Props) {
   const router = useRouter();
   const [outrosAbertos, setOutrosAbertos] = useState(false);
@@ -108,9 +118,7 @@ export function HojeTela({
         titulo={textosHoje.titulo}
         direita={
           <>
-            <Link href="/conta" aria-label={textosHoje.conta} className={styles.avatarBarra}>
-              <span aria-hidden="true">{iniciais}</span>
-            </Link>
+            <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
             <button type="button" className={styles.botaoBarra} onClick={() => router.refresh()}>
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
               <span>{textosHoje.atualizar}</span>

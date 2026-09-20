@@ -35,6 +35,8 @@ import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
 
+import { SeletorMarcaCelular, type MarcaResumo } from "../../../_casca/SeletorMarcaCelular";
+
 import { marcarGravadoAction, marcarPostadoAction, reprovarERescreverAction } from "./acoes";
 import styles from "./RoteiroTela.module.css";
 
@@ -118,6 +120,10 @@ type Props = {
   corpo: ConteudoRoteiro;
   video: VideoParaEmbed | null;
   versoes: VersaoRoteiro[];
+  /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
+  marcaAtiva: MarcaResumo;
+  marcas: MarcaResumo[];
+  nomePessoa: string;
 };
 
 /**
@@ -125,7 +131,7 @@ type Props = {
  * D2 parte 1, item 6). Modo gravação virou rota própria
  * (`/roteiros/[id]/gravar`, item 7): o botão daqui só navega.
  */
-export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
+export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas, nomePessoa }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
   const [postado, setPostado] = useState(roteiro.status === "postado");
@@ -226,6 +232,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes }: Props) {
         }
         direita={
           <>
+            <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
             {/* Some no celular, fica no tablet e no desktop (design v2, Roteiro.dc.html mostra
                 nos dois lugares; PROXIMO.md, revisão do PR #31, item 7: "sai da barra do topo
                 no celular"). O rodapé sempre tem o botão, em toda largura. */}

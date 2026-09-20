@@ -25,32 +25,36 @@
   color: var(--cor-texto-suave);
 }
 
-.contaBotao {
-  width: 44px;
-  height: 44px;
-  margin-right: -6px;
+.direita {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  gap: var(--espaco-1);
 }
 
-.contaBotao:focus-visible {
+.botaoBarra {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  min-width: var(--altura-toque);
+  justify-content: center;
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-pill);
+  color: var(--cor-titulo);
+}
+
+.botaoBarra:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoBarra:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--cor-superficie-recuada);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-titulo);
+/** Com marca (varias ou uma so ainda sem pilula), o rotulo "Atualizar" cede o lugar, so o icone fica (Casca.dc.html). */
+.comMarca .cede {
+  display: none;
 }
 
 @media (min-width: 768px) {

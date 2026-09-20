@@ -1,0 +1,250 @@
+/**
+ * Design v2, `Casca.dc.html` e `base.css` (`.pilula-marca`, `.folha-marcas`,
+ * `.marca-destaque`, `.lista-marcas`, `.item-marca`, `.circulo-pessoa`):
+ * V3, item 3. So existe abaixo de 768px; do tablet para cima quem mostra a
+ * marca e SeletorMarcaDesktop.
+ */
+
+.avatarConta {
+  width: 44px;
+  height: 44px;
+  margin-right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.avatarConta span {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-titulo);
+}
+
+.pilulaMarca {
+  min-height: var(--altura-toque);
+  display: flex;
+  align-items: center;
+}
+
+.pilula {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  height: 2.25rem;
+  padding: 0 var(--espaco-2) 0 0.25rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  transition: background var(--duracao-rapida) var(--curva-saida);
+}
+
+.pilulaMarca:hover .pilula {
+  background: var(--cor-superficie-hover);
+}
+
+.pilulaMarca[aria-expanded="true"] .pilula {
+  background: var(--cor-selecao-suave);
+}
+
+.avatar {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+}
+
+.avatar.neutro {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+}
+
+.avatar.grande {
+  width: 2.75rem;
+  height: 2.75rem;
+  font-size: var(--tamanho-secundario);
+}
+
+.nome {
+  max-width: 8.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+}
+
+.folhaFundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--cor-sobreposicao);
+}
+
+.folha {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  display: grid;
+  gap: var(--espaco-4);
+  max-height: 80vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-6) + env(safe-area-inset-bottom, 0px));
+  background: var(--cor-superficie);
+  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
+  box-shadow: var(--sombra-md);
+  outline: none;
+}
+
+.folhaTopo {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: center;
+}
+
+.folhaAlca {
+  width: 2.25rem;
+  height: 0.3125rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda-forte);
+}
+
+.folhaTitulo {
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.folhaCorpo {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.marcaDestaque {
+  display: grid;
+  justify-items: center;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4) 0;
+  text-align: center;
+}
+
+.marcaDestaque .nome {
+  max-width: none;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.agora {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.cabecaLista {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--cor-texto-suave);
+}
+
+.listaMarcas {
+  display: grid;
+}
+
+.itemMarca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-2) var(--espaco-2);
+  border-radius: var(--raio-md);
+  text-align: left;
+  text-decoration: none;
+  color: var(--cor-titulo);
+}
+
+.itemMarca:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.itemMarca .nome {
+  max-width: none;
+  flex: 1;
+}
+
+.itemMarca .nome small {
+  display: block;
+  font-size: var(--tamanho-legenda);
+  font-weight: 400;
+  color: var(--cor-texto-dica);
+}
+
+.folhaPe {
+  border-top: 1px solid var(--cor-divisor);
+  padding-top: var(--espaco-2);
+}
+
+.circuloPessoa {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  border: 1px dashed var(--cor-borda-forte);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cor-texto-suave);
+}
+
+.seta {
+  flex: none;
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  position: fixed;
+  left: var(--margem-celular);
+  right: var(--margem-celular);
+  bottom: calc(64px + var(--espaco-4) + env(safe-area-inset-bottom));
+  z-index: 52;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  box-shadow: var(--sombra-md);
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .avatarConta,
+  .pilulaMarca,
+  .folhaFundo,
+  .folha,
+  .erro {
+    display: none;
+  }
+}

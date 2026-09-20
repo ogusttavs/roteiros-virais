@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -31,7 +31,7 @@ export default async function Gravar({ params }: Props) {
     redirect("/entrar");
   }
 
-  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
+  const [cliente, marcas] = await Promise.all([clienteAtivoDoUsuario(sessao.user.id), marcasDoUsuario(sessao.user.id)]);
   if (!cliente) {
     redirect("/entrar");
   }
@@ -58,6 +58,7 @@ export default async function Gravar({ params }: Props) {
         { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
         { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
       ]}
+      nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
     />
   );
 }
