@@ -31,6 +31,8 @@ export const textosAdmin = {
     colunaNota: "nota do briefing",
     colunaUltimoRoteiro: "último roteiro",
     colunaDiasSemGravar: "dias sem gravar",
+    /** V3, item 5: coluna "Pessoas" (quantas tem acesso a esta marca), antes de "Estado" (não existe hoje). */
+    colunaPessoas: "pessoas",
     semNicho: "sem nicho",
     semNota: "sem nota",
     semRoteiro: "sem roteiro ainda",
@@ -46,6 +48,10 @@ export const textosAdmin = {
     botaoConvidar: "convidar por e-mail",
     convidando: "convidando",
     sucesso: (email: string) => `cliente criado; o convite foi mandado para ${email}`,
+    /** V3, item 5, dúvida 9: e-mail que já entra no painel não recebe convite nem senha nova. */
+    sucessoJaTinhaLogin: (email: string) => `cliente criado; ${email} já entrava no painel, entrou direto`,
+    ajudaEmailJaExiste:
+      "Se esse e-mail já entra no painel, a marca nova aparece para a pessoa na hora, sem senha nova.",
     erroConvite: "não conseguimos criar o cliente; confira os dados e tente de novo",
   },
   nichos: {
@@ -245,6 +251,41 @@ export const textosAdmin = {
     aprendizadoRodape:
       "As regras ativas entram no prompt do roteiro e do tema deste cliente. Nunca saem daqui: não entram no modelo do nicho.",
     aprendizadoVazio: "ainda nenhuma reprovação",
+  },
+  /** V3, item 5: "Quem tem acesso" (substitui o cartão "Acesso"), AdminCliente.dc.html. */
+  acessos: {
+    titulo: "Quem tem acesso",
+    quantos: (n: number) => (n === 1 ? "1 pessoa" : `${n} pessoas`),
+    dono: "dono",
+    membro: "membro",
+    semNomeAinda: "não entrou ainda",
+    entraEmMaisUmaMarca: (n: number) => (n === 1 ? "Entra em mais 1 marca." : `Entra em mais ${n} marcas.`),
+    darAcesso: "dar acesso",
+    gerarSenhaNova: "gerar senha nova",
+    tirarOAcesso: "tirar o acesso",
+    cancelar: "cancelar",
+    confirmarTirarOAcesso: (nome: string, nomeMarca: string) =>
+      `Tirar o acesso de ${nome} a ${nomeMarca}? Ele deixa de ver esta marca na hora e continua entrando na outra marca que tiver. Os roteiros que ele escolheu aqui ficam na marca.`,
+    aoDarAcessoTitulo: (nomeMarca: string) => `Dar acesso a ${nomeMarca}`,
+    campoEmail: "e-mail da pessoa",
+    ajudaEmailJaTemLogin: "Se esse e-mail já entra no painel, a pessoa ganha esta marca na hora, ao lado das que já tem. Sem senha nova, sem e-mail de convite.",
+    ajudaEmailNovo: "Se ainda não entra, ela recebe o convite por e-mail com uma senha inicial, que aparece uma vez só, na tela seguinte.",
+    erroJaTemAcesso: "Essa pessoa já tem acesso a esta marca.",
+    erroDonoNaoPodeSerTirado: "O dono não pode ter o acesso tirado.",
+    erroDarAcesso: "não conseguimos dar acesso agora; confira o e-mail e tente de novo",
+    erroGerarSenha: "não conseguimos gerar a senha agora; tente de novo",
+    erroTirarAcesso: "não conseguimos tirar o acesso agora; tente de novo",
+    jaTinhaLoginAviso: (nome: string) => `${nome} já entrava no painel. Agora ela vê esta marca também, sem senha nova.`,
+    convenioTitulo: "Convite mandado",
+    convitePara: (email: string) =>
+      `${email} ainda não entrava no painel, então recebeu o convite por e-mail. Pode entrar pelo link do e-mail ou com a senha abaixo, e já cai na marca.`,
+    senhaInicial: "senha inicial",
+    copiarSenha: "copiar a senha",
+    copiado: "copiado",
+    copiarEmailESenha: "copiar e-mail e senha",
+    avisoSenhaUmaVez: "Esta senha não aparece de novo. Se fechar sem copiar, é só gerar outra na linha dele, em quem tem acesso.",
+    copieiPodeFechar: "copiei, pode fechar",
+    rodape: "Cada pessoa entra com o próprio e-mail e vê tudo desta marca. Tirar o acesso não apaga a pessoa: ela continua entrando nas outras marcas que tiver.",
   },
   geracoes: {
     titulo: "Gerações",

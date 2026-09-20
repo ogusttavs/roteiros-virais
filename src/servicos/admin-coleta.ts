@@ -15,6 +15,7 @@ import {
   execucoesJob,
   geracoesIA,
   hashtagsMetaUsadas,
+  membrosMarca,
   nichos,
   noticias,
   roteiros,
@@ -101,19 +102,21 @@ export type ClienteAdmin = {
   notaBriefing: number | null;
   ultimoRoteiro: Date | null;
   diasSemGravar: number | null;
+  /** V3, item 5: quantas pessoas tem acesso a esta marca (membros_marca). */
+  pessoas: number;
 };
 
 /**
  * Lista para /admin/clientes (AdminTela.dc.html): junta nota do briefing, a
  * data do roteiro mais recente (qualquer status, so para mostrar a coluna
- * "ultimo roteiro") e "dias sem gravar" (etapa 12, decisao 6), que vem de
+ * "ultimo roteiro"), "dias sem gravar" (etapa 12, decisao 6), que vem de
  * `constanciaDoCliente` (baseada em `gravadoEm`/`postadoEm`, nao em
  * `criadoEm`): nulo quando o cliente nunca gravou nem postou nada, 0 quando
  * esta gravando hoje ou ontem (em sequencia), e os dias corridos quando
- * parou.
+ * parou; e "pessoas" (V3, item 5), a contagem de membros_marca.
  */
 export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
-  const [linhas, notas, ultimosRoteiros] = await Promise.all([
+  const [linhas, notas, ultimosRoteiros, contagensPessoas] = await Promise.all([
     db()
       .select({
         id: clientes.id,
@@ -131,6 +134,10 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
       .select({ clienteId: roteiros.clienteId, ultima: max(roteiros.criadoEm) })
       .from(roteiros)
       .groupBy(roteiros.clienteId),
+    db()
+      .select({ clienteId: membrosMarca.clienteId, total: count() })
+      .from(membrosMarca)
+      .groupBy(membrosMarca.clienteId),
   ]);
 
   const constancias = await Promise.all(
@@ -145,11 +152,13 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
     const constancia = constanciaPorCliente.get(linha.id);
     const diasSemGravar =
       constancia?.tipo === "parado" ? constancia.dias : constancia?.tipo === "seguidos" ? 0 : null;
+    const pessoas = contagensPessoas.find((p) => p.clienteId === linha.id)?.total ?? 0;
     return {
       ...linha,
       notaBriefing: notaGeral ? Number(notaGeral) : null,
       ultimoRoteiro,
       diasSemGravar,
+      pessoas,
     };
   });
 }

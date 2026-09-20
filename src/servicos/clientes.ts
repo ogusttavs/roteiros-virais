@@ -1,9 +1,13 @@
+import { randomUUID } from "node:crypto";
+
+import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { db } from "@/db";
 import {
+  account,
   briefings,
   clientes,
   membrosMarca,
@@ -23,7 +27,9 @@ import {
   OPCOES_COOKIE_MARCA_ATIVA,
   valorCookieMarcaAtiva,
 } from "@/lib/marca-ativa";
+import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
+import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroAcessoNegado extends Error {}
@@ -233,56 +239,164 @@ export async function listarClientes(): Promise<ClienteComNichoENome[]> {
 }
 
 /**
- * O admin cria o usuario (sem senha, o cliente entra por link magico), o
- * registro de cliente, e ja manda o convite. auth.api.createUser e
- * signInMagicLink precisam dos headers da requisicao para saber quem esta
- * autenticado (o admin) e para onde mandar o e-mail.
+ * "Sem nome ainda" (V3, item 5, dúvida 8 do BRIEF.md): quem ganha acesso so
+ * pelo e-mail (`darAcesso`, sem campo de nome na folha) começa assim; o
+ * nome de verdade é a própria pessoa quem põe, em Conta, no primeiro
+ * acesso. Comparado por igualdade exata na lista do admin, para mostrar a
+ * etiqueta "não entrou ainda" em vez do nome.
+ */
+export const NOME_SEM_NOME_AINDA = "Sem nome ainda";
+
+/**
+ * Cria o usuario e a credencial com senha gerada (V3, item 5): mesmo padrao
+ * de `criarUsuarioComSenha` em `scripts/semear.ts` e `scripts/criar-admin.ts`
+ * (insert direto, nao `auth.api.createUser`, que nao aceita senha pronta
+ * fora do fluxo de signup completo).
+ */
+async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<{ usuarioId: string; senha: string }> {
+  const usuarioId = randomUUID();
+  const senha = gerarSenhaLegivel();
+  await db()
+    .insert(user)
+    .values({ id: usuarioId, name: nome, email, emailVerified: false, role: "cliente" as unknown as "admin" });
+  await db()
+    .insert(account)
+    .values({
+      id: `${usuarioId}-credential`,
+      issuer: "local:credential",
+      accountId: usuarioId,
+      providerId: "credential",
+      userId: usuarioId,
+      password: await hashPassword(senha),
+    });
+  return { usuarioId, senha };
+}
+
+/**
+ * Manda o convite por e-mail (link mágico, o "clique no link do e-mail" da
+ * folha "Convite mandado"); bônus sobre a senha, que já resolve o acesso
+ * sozinha, então uma falha aqui não derruba a ação inteira.
+ */
+async function mandarConviteMagico(email: string): Promise<void> {
+  const cabecalhos = await headers();
+  await auth.api
+    .signInMagicLink({ body: { email, callbackURL: "/comecar" }, headers: cabecalhos })
+    .catch(() => {});
+}
+
+export type ResultadoCriarCliente =
+  | { tipo: "jaTinhaLogin"; cliente: Cliente }
+  | { tipo: "convite"; cliente: Cliente; senha: string };
+
+/**
+ * "Convidar cliente" (uma marca nova): e-mail que já entra no painel segue
+ * a regra de "dar acesso" (a marca nasce e a pessoa entra direto, sem senha
+ * nova, dúvida 9 do BRIEF.md); e-mail novo ganha usuário com senha gerada e
+ * o convite por e-mail. Sempre dono da marca nova.
  */
 export async function criarClienteEConvidar(dados: {
   nome: string;
   email: string;
   nichoId: number;
-}): Promise<Cliente> {
-  const cabecalhos = await headers();
+}): Promise<ResultadoCriarCliente> {
+  const [usuarioExistente] = await db().select().from(user).where(eq(user.email, dados.email));
 
-  const { user: usuarioCriado } = await auth.api.createUser({
-    body: {
-      email: dados.email,
-      name: dados.nome,
-      /**
-       * O better-auth so infere papel customizado no tipo quando a opcao
-       * roles (controle de acesso) esta configurada; sem ela o tipo fica
-       * "user" | "admin" mesmo com defaultRole: "cliente" em auth.ts. Em
-       * tempo de execucao e so uma string na coluna role.
-       */
-      role: "cliente" as unknown as "admin",
-    },
-    headers: cabecalhos,
-  });
+  if (usuarioExistente) {
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId: cliente.id, papel: "dono" });
+    return { tipo: "jaTinhaLogin", cliente };
+  }
 
+  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(dados.email, dados.nome);
   const [cliente] = await db()
     .insert(clientes)
-    .values({
-      usuarioId: usuarioCriado.id,
-      nome: dados.nome,
-      nichoId: dados.nichoId,
-    })
+    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId })
     .returning();
+  await db().insert(membrosMarca).values({ usuarioId, clienteId: cliente.id, papel: "dono" });
+  await mandarConviteMagico(dados.email);
 
-  /**
-   * V3, item 1: sem o membro "dono", `clienteDaSessaoAtual` nao acha marca
-   * nenhuma para este usuario (o vinculo deixou de ser so
-   * `clientes.usuarioId`). O fluxo completo de convite (e-mail que ja
-   * entra no painel, senha gerada) e o item 5, ainda por vir.
-   */
-  await db().insert(membrosMarca).values({ usuarioId: usuarioCriado.id, clienteId: cliente.id, papel: "dono" });
+  return { tipo: "convite", cliente, senha };
+}
 
-  await auth.api.signInMagicLink({
-    body: { email: dados.email, callbackURL: "/comecar" },
-    headers: cabecalhos,
-  });
+export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };
 
-  return cliente;
+/**
+ * "Dar acesso" a uma marca que já existe (V3, item 5, AdminCliente.dc.html):
+ * só o e-mail. Quem já entra no painel ganha a marca na hora, sem senha
+ * nova; quem não tem login recebe usuário com senha gerada e "Sem nome
+ * ainda" até se apresentar em Conta.
+ */
+export async function darAcesso(clienteId: number, email: string): Promise<ResultadoDarAcesso> {
+  const [usuarioExistente] = await db().select().from(user).where(eq(user.email, email));
+
+  if (usuarioExistente) {
+    const [jaMembro] = await db()
+      .select({ id: membrosMarca.id })
+      .from(membrosMarca)
+      .where(and(eq(membrosMarca.usuarioId, usuarioExistente.id), eq(membrosMarca.clienteId, clienteId)));
+    if (jaMembro) {
+      throw new ErroCliente(textosAdmin.acessos.erroJaTemAcesso);
+    }
+    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId, papel: "membro" });
+    return { tipo: "jaTinhaLogin", nome: usuarioExistente.name };
+  }
+
+  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(email, NOME_SEM_NOME_AINDA);
+  await db().insert(membrosMarca).values({ usuarioId, clienteId, papel: "membro" });
+  await mandarConviteMagico(email);
+
+  return { tipo: "convite", senha };
+}
+
+/**
+ * "Gerar senha nova" por pessoa (V3, item 5): substitui a credencial atual;
+ * so entra pela nova a partir de agora. Cria a credencial se por algum
+ * motivo nao existir (nunca deveria acontecer para quem entrou por aqui).
+ */
+export async function gerarSenhaNova(usuarioId: string): Promise<string> {
+  const senha = gerarSenhaLegivel();
+  const senhaHash = await hashPassword(senha);
+  const [contaCredencial] = await db()
+    .select({ id: account.id })
+    .from(account)
+    .where(and(eq(account.userId, usuarioId), eq(account.providerId, "credential")));
+
+  if (contaCredencial) {
+    await db().update(account).set({ password: senhaHash }).where(eq(account.id, contaCredencial.id));
+  } else {
+    await db()
+      .insert(account)
+      .values({
+        id: `${usuarioId}-credential`,
+        issuer: "local:credential",
+        accountId: usuarioId,
+        providerId: "credential",
+        userId: usuarioId,
+        password: senhaHash,
+      });
+  }
+  return senha;
+}
+
+/**
+ * "Tirar o acesso" (V3, item 5): o dono nao tem esse botao na tela (dúvida
+ * 7 do BRIEF.md), conferido aqui tambem, nao só escondido na UI.
+ */
+export async function tirarAcesso(clienteId: number, usuarioId: string): Promise<void> {
+  const [membro] = await db()
+    .select({ papel: membrosMarca.papel })
+    .from(membrosMarca)
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
+  if (!membro) return;
+  if (membro.papel === "dono") {
+    throw new ErroCliente(textosAdmin.acessos.erroDonoNaoPodeSerTirado);
+  }
+  await db()
+    .delete(membrosMarca)
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
 }
 
 /** Nichos ativos para a lista de ramo em /comecar (briefing-e-rubricas.md, secao 1). */

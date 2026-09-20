@@ -1,0 +1,229 @@
+/** Design v2, `AdminCliente.dc.html` (`.pessoas-admin`, `.pessoa-admin`, `.senha-gerada`, `.aviso-uma-vez`): V3, item 5. */
+
+.acessos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+}
+
+.cabecalho {
+  display: flex;
+  align-items: baseline;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.cabecalho h2 {
+  margin: 0;
+}
+
+.quantos {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.botaoDarAcesso {
+  margin-left: auto;
+}
+
+.avisoCurto {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-positivo);
+  font-size: var(--tamanho-secundario);
+}
+
+.pessoas {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pessoa,
+.pedindo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+}
+
+.pessoa + .pessoa,
+.pessoa + .pedindo,
+.pedindo + .pessoa {
+  border-top: 1px solid var(--cor-divisor);
+}
+
+.pedindo {
+  background: var(--cor-selecao-suave);
+  border: 1px solid var(--cor-acao);
+}
+
+.avatar {
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+}
+
+.quem {
+  min-width: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.linhaNome {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.nome {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--cor-titulo);
+}
+
+.semNome {
+  color: var(--cor-texto-dica);
+  font-style: italic;
+}
+
+.etiqueta {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-rodape);
+  background: var(--cor-superficie-hover);
+  color: var(--cor-texto-suave);
+}
+
+.email {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detalhe {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.senhaLinha {
+  margin: var(--espaco-1) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-titulo);
+}
+
+.erroLinha {
+  margin: var(--espaco-1) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-erro);
+}
+
+.acoesPessoa {
+  display: flex;
+  gap: var(--espaco-2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.confirmacao {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-borda);
+}
+
+.confirmacao p {
+  margin: 0;
+  color: var(--cor-texto);
+}
+
+.confirmacaoAcoes {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.rodape {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+/* A folha "Dar acesso" (desktop/iPad: centralizada, sem alca de celular). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: var(--espaco-4);
+  background: var(--cor-sobreposicao);
+}
+
+.folha {
+  width: 100%;
+  max-width: 26rem;
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-6);
+  background: var(--cor-superficie);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--sombra-md);
+}
+
+.folhaTitulo {
+  margin: 0;
+}
+
+.forma {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.caminhos {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
+.folhaAcoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--espaco-2);
+}
