@@ -1,0 +1,9 @@
+# Fim de linha sempre LF no repositório, independente do sistema de quem edita
+# (achado da revisão do PR #48: cinco arquivos entraram na `main` com CRLF,
+# inflando o diff em milhares de linhas). Binários ficam de fora, para o Git
+# nunca tentar normalizar fim de linha dentro deles.
+* text=auto eol=lf
+
+*.png binary
+*.woff2 binary
+*.ico binary
