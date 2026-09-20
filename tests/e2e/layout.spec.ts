@@ -228,6 +228,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       },
       evidencias: [video.id],
       semEvidencia: false,
+      forcaEvidencia: "media",
     };
 
     const [roteiro] = await db()

@@ -14,6 +14,12 @@ type Props = {
   /** O que aparece na miniatura: o embed de verdade quando dá, um ícone quando não. */
   miniatura?: ReactNode;
   botao?: { rotulo: string; href: string };
+  /**
+   * A força da evidência (V4, item 6, escopo 5.12): já formatada por quem
+   * chama (`textosRoteiro.forcaEvidencia`). Nula sem nada a mostrar; a fraca
+   * aparece do mesmo jeito que as outras, escrita sem esconder.
+   */
+  forca?: string | null;
 };
 
 /**
@@ -21,7 +27,16 @@ type Props = {
  * reais (design v2, `entrega/telas/Roteiro.dc.html`, `.referencia`;
  * `PROXIMO.md`, D2 parte 1, item 6).
  */
-export function CartaoDeOndeVeio({ titulo, conta, multiplo, texto, segundoFormatado, miniatura, botao }: Props) {
+export function CartaoDeOndeVeio({
+  titulo,
+  conta,
+  multiplo,
+  texto,
+  segundoFormatado,
+  miniatura,
+  botao,
+  forca,
+}: Props) {
   return (
     <section className={styles.secao} aria-label={titulo}>
       <h2>{titulo}</h2>
@@ -35,6 +50,7 @@ export function CartaoDeOndeVeio({ titulo, conta, multiplo, texto, segundoFormat
             <b>{multiplo}</b> {texto}
           </p>
           {segundoFormatado ? <p className={styles.segundo}>{segundoFormatado}</p> : null}
+          {forca ? <p className={styles.forca}>{forca}</p> : null}
           {botao ? (
             <a href={botao.href} target="_blank" rel="noreferrer" className={styles.botao}>
               {botao.rotulo}

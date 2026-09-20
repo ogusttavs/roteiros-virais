@@ -214,6 +214,7 @@ describe("listarClientesAdmin, dias sem gravar", () => {
     edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
     evidencias: [],
     semEvidencia: false,
+    forcaEvidencia: null,
   };
 
   let clienteNuncaGravouId: number;

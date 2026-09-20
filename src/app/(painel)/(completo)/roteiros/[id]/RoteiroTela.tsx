@@ -334,6 +334,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
                 : null
             }
             botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
+            forca={corpo.forcaEvidencia ? textosRoteiro.forcaEvidencia[corpo.forcaEvidencia] : null}
           />
         ) : corpo.semEvidencia ? (
           <section className={styles.referenciaVazia}>

@@ -46,6 +46,7 @@ const CONTEUDO_MINIMO = {
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
   evidencias: [],
   semEvidencia: false,
+  forcaEvidencia: null,
 };
 
 async function entrar(page: Page, email: string) {

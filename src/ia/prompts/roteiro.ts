@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import type { Objetivo } from "@/db/schema";
+import { TIPOS_ABERTURA, type Objetivo, type TipoAbertura } from "@/db/schema";
 
-import { NOME_OBJETIVO } from "../enums";
+import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
@@ -70,8 +70,19 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * vale como uma proibicao dele", contradizendo a propria regra dura 8
  * (a fraca cede, so a firme vale como proibicao). So o texto do cabecalho
  * muda, a instrucao de verdade ja estava certa na regra 8. Versao 1.7.1.
+ *
+ * V4, roteiro sem vicio (escopo 5.12, item 4): o prompt deixa de ensinar
+ * abertura por conta propria (saem os exemplos fixos de gancho e a regra 6
+ * perde a frase "comece com outra pergunta ou outra cena", que prescrevia
+ * tipo). Quem decide o tipo de abertura agora e o servico
+ * (`servicos/roteiro.ts`, `escolherTipoAbertura`), a partir da evidencia do
+ * dia; a entrada traz essa instrucao (regra 9, nova) e o schema ganha
+ * `tipoAbertura`, o modelo declarando o que de fato escreveu. O motivo de
+ * reprovacao "Gancho fraco" (regra 7) para de prescrever "resultado ou
+ * cena, nunca pergunta" e passa a apontar para essa mesma instrucao.
+ * Versao 1.8.0.
  */
-export const versao = "1.7.1";
+export const versao = "1.8.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -104,6 +115,8 @@ export const schema = z.object({
   }),
   /** Ids de video que sustentam o roteiro; o verificador confere presenca. */
   evidencias: z.array(z.number()),
+  /** O tipo de abertura que de fato foi usado (V4, item 4): o modelo declara, o verificador confere. */
+  tipoAbertura: z.enum(TIPOS_ABERTURA),
 });
 
 export type SaidaRoteiro = z.infer<typeof schema>;
@@ -137,7 +150,7 @@ gravar com a própria cara no celular. Regras duras:
 6. Não repita o ângulo de um roteiro recente do mesmo cliente (lista abaixo, com o gancho de
    cada um); se o tema pedido for muito parecido com um deles, escolha um ângulo diferente
    para o gancho e a estrutura. O gancho novo não pode repetir nem parafrasear nenhum gancho
-   recente: comece de um jeito diferente, com outra pergunta ou outra cena.
+   recente.
 7. Quando o cliente reprovou a versão anterior, a entrada diz por qual motivo (um ou mais,
    desta lista fixa) e o que fazer em cada caso:
    Não é assim que eu falo: use só as palavras e o tom do perfil do cliente, nada de frase
@@ -151,13 +164,17 @@ gravar com a própria cara no celular. Regras duras:
    concreto.
    Não combina com o objetivo: reescreva o fechamento e a chamada final para o objetivo
    travado.
-   Gancho fraco: gancho novo que comece pelo resultado ou pela cena, nunca por pergunta
-   retórica.
+   Gancho fraco: outro tipo de abertura, o que o serviço indicou abaixo.
    Outro motivo: siga o que o cliente escreveu com as próprias palavras dele.
 8. Quando a lista "o que este cliente já reprovou" aparecer abaixo, siga cada regra dela à
    risca; a marcada "firme" (duas reprovações ou mais) vale tanto quanto uma proibição do
    perfil, a marcada "fraca" (uma reprovação só) ainda deve ser evitada, mas cede se
    conflitar de verdade com o tema pedido.
+9. A entrada diz o tipo de abertura deste roteiro (o serviço escolhe, a partir da evidência
+   de hoje, sem repetir os últimos roteiros do cliente), às vezes com um vídeo de exemplo:
+   inspire-se no estilo dele, nunca copie a frase. Quando a entrada só trouxer uma lista de
+   tipos a evitar, escolha livremente qualquer outro tipo. Declare no campo tipoAbertura da
+   saída qual tipo você de fato usou.
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -186,6 +203,29 @@ ${dados.modeloNicho}
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
+/**
+ * O que `escolherTipoAbertura` (`servicos/roteiro.ts`) decidiu (V4, item 3):
+ * com `tipo`, uma instrução concreta (com ou sem vídeo de exemplo); sem
+ * evidência tipada nenhuma, só a lista do que evitar.
+ */
+export type InstrucaoAbertura =
+  | { tipo: TipoAbertura; ganchoExemplo: string | null }
+  | { tipo: null; tiposProibidos: TipoAbertura[] };
+
+function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
+  if (instrucao.tipo === null) {
+    return instrucao.tiposProibidos.length > 0
+      ? `Tipo de abertura: livre, qualquer um dos oito tipos menos estes, já usados nos ` +
+          `últimos roteiros deste cliente: ${instrucao.tiposProibidos.join(", ")}.`
+      : `Tipo de abertura: livre, o que fizer mais sentido para este vídeo.`;
+  }
+  const exemplo = instrucao.ganchoExemplo
+    ? ` Um vídeo de hoje abriu assim, use só como inspiração de estilo, nunca copie a frase: ` +
+      `"${instrucao.ganchoExemplo}"`
+    : "";
+  return `Tipo de abertura: ${instrucao.tipo}, ${INSTRUCAO_TIPO_ABERTURA[instrucao.tipo]}.${exemplo}`;
+}
+
 export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
@@ -202,6 +242,8 @@ export function montarEntrada(dados: {
   }[];
   /** Dos ultimos 10 dias (`servicos/roteiro.ts`, `historicoDeRoteiros`), com o gancho de cada um. */
   roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
+  /** V4, item 3: o que `escolherTipoAbertura` decidiu para este roteiro. */
+  instrucaoAbertura: InstrucaoAbertura;
   /**
    * A versão que o cliente reprovou (E27, parte 1, item 3; antes "outro
    * ângulo", etapa 11, decisão 4): o gancho e o corpo dela, para o modelo
@@ -251,6 +293,7 @@ export function montarEntrada(dados: {
       : null,
     blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
+    formatarInstrucaoAbertura(dados.instrucaoAbertura),
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

@@ -385,6 +385,26 @@ export const contas = pgTable(
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],
 );
 
+/**
+ * O tipo de abertura de um vídeo (V4, roteiro sem vício, escopo 5.12, item
+ * 5): a extração declara o tipo que já funcionou (`videos.tipoAbertura`), o
+ * serviço do roteiro escolhe qual repetir a partir da evidência do dia sem
+ * repetir os últimos 5 do cliente (`roteiros.tipoAbertura`), e o modelo
+ * declara o que de fato escreveu. Fonte única para as duas colunas e para
+ * os dois schemas de saída de IA que usam este enum.
+ */
+export const TIPOS_ABERTURA = [
+  "cena",
+  "resultado",
+  "objeto",
+  "fala_direta",
+  "numero",
+  "contraste",
+  "pergunta",
+  "outro",
+] as const;
+export type TipoAbertura = (typeof TIPOS_ABERTURA)[number];
+
 export type AnaliseVideo = {
   assunto: string;
   gancho: string;
@@ -518,6 +538,15 @@ export const videos = pgTable(
      * "es", "outro" (alfabeto nao latino ou idioma nao reconhecido).
      */
     idioma: text("idioma"),
+    /**
+     * O tipo de abertura deste vídeo (V4, escopo 5.12, item 5), gravado pela
+     * extração em lote a partir do gancho e do formato (`extrair-coleta.ts`).
+     * Nulo em todo vídeo extraído antes desta coluna existir, até
+     * `scripts/preencher-tipo-abertura.ts` rodar (item 2). É o que
+     * `escolherTipoAbertura` (`servicos/roteiro.ts`) lê para decidir a
+     * abertura do próximo roteiro sem repetir os últimos 5 do cliente.
+     */
+    tipoAbertura: text("tipo_abertura").$type<TipoAbertura>(),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -652,6 +681,12 @@ export const avaliacoesTema = pgTable("avaliacoes_tema", {
 
 export type Objetivo = "alcance" | "engajamento" | "conversao";
 
+/**
+ * Força da evidência que sustenta o roteiro (V4, escopo 5.12, item 8):
+ * calculada por código (`src/config/forca-evidencia.ts`), nunca pela IA.
+ */
+export type ForcaEvidencia = "forte" | "media" | "fraca";
+
 export type ConteudoRoteiro = {
   titulo: string;
   duracaoS: number;
@@ -678,6 +713,12 @@ export type ConteudoRoteiro = {
    * tela troca a secao "Referencia" por um aviso quando isto e verdadeiro.
    */
   semEvidencia: boolean;
+  /**
+   * Força da evidência que sustenta este roteiro (V4, item 6): nula só
+   * quando `semEvidencia` é verdadeiro (nada para medir). Mostrada no
+   * cartão "de onde veio", fraca escrita sem esconder.
+   */
+  forcaEvidencia: ForcaEvidencia | null;
 };
 
 export const roteiros = pgTable(
@@ -692,6 +733,14 @@ export const roteiros = pgTable(
     origem: text("origem").$type<"sugerido" | "livre">().notNull(),
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
+    /**
+     * O tipo de abertura que o modelo declarou ter usado (V4, item 3): o
+     * serviço lê os últimos 5 roteiros do cliente por esta coluna para não
+     * repetir tipo (`escolherTipoAbertura`), e o verificador reprova quando
+     * bate com o do roteiro anterior (`verificador.ts`). Nulo em todo
+     * roteiro gerado antes desta coluna existir.
+     */
+    tipoAbertura: text("tipo_abertura").$type<TipoAbertura>(),
     referenciaVideoId: integer("referencia_video_id").references(() => videos.id),
     versao: integer("versao").notNull().default(1),
     /**

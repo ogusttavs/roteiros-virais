@@ -56,6 +56,13 @@
   font-family: var(--fonte-mono);
 }
 
+/** A força da evidência (V4, item 6): mesmo tom do segundo exato, nunca some mesmo quando fraca. */
+.forca {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
 .botao {
   justify-self: start;
   min-height: var(--altura-toque);

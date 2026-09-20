@@ -106,6 +106,7 @@ const CONTEUDO_ROTEIRO_MINIMO = {
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
   evidencias: [],
   semEvidencia: false,
+  forcaEvidencia: null,
 };
 
 async function criarRoteiroPostado(clienteId: number, objetivo: Objetivo, diasAtras: number) {

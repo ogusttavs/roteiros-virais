@@ -2,7 +2,11 @@ import type { NivelIA } from "@/config/precos-ia";
 
 export type { NivelIA };
 
-/** As dez tarefas do plano (plano de execucao, etapas 4 e 10). */
+/**
+ * As dez tarefas do plano (plano de execucao, etapas 4 e 10), mais
+ * `classificarAbertura` (V4, item 2: backfill do tipo de abertura de
+ * analise ja existente, sem ler transcricao de novo).
+ */
 export type TarefaIA =
   | "avaliarResposta"
   | "compilarPerfil"
@@ -14,7 +18,8 @@ export type TarefaIA =
   | "avaliarTema"
   | "roteiro"
   | "verificarTexto"
-  | "aprenderCliente";
+  | "aprenderCliente"
+  | "classificarAbertura";
 
 export type ImagemEntrada = {
   base64: string;

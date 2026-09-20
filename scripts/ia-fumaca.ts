@@ -1,6 +1,7 @@
 /**
- * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as dez
- * tarefas do plano uma vez cada, com dados ficticios encadeados (o resumo do
+ * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as onze
+ * tarefas do plano uma vez cada (dez do plano original mais
+ * `classificarAbertura`, V4, item 2), com dados ficticios encadeados (o resumo do
  * perfil e do modelo do nicho de uma chamada alimenta o sistema estavel da
  * proxima, como em producao), e imprime o resumo de cada saida com o custo.
  * Nivel e esforco de cada chamada vem do que o proprio modulo do prompt
@@ -19,6 +20,7 @@ import { gerarEstruturado } from "../src/ia/cliente";
 import * as analisarVisual from "../src/ia/prompts/analisarVisual";
 import * as avaliarResposta from "../src/ia/prompts/avaliarResposta";
 import * as avaliarTema from "../src/ia/prompts/avaliarTema";
+import * as classificarAbertura from "../src/ia/prompts/classificarAbertura";
 import * as compilarPerfil from "../src/ia/prompts/compilarPerfil";
 import * as extrairVideo from "../src/ia/prompts/extrairVideo";
 import * as filtrarNoticias from "../src/ia/prompts/filtrarNoticias";
@@ -129,6 +131,20 @@ async function main() {
         nomeNicho: "Limpeza de estofados",
         termosNicho: ["sofa", "estofado", "limpeza a seco"],
       }),
+    }),
+  );
+
+  await chamar(
+    "classificarAbertura",
+    classificarAbertura.nivel,
+    (d) => `tipo: ${d.tipoAbertura}`,
+    gerarEstruturado({
+      tarefa: "classificarAbertura",
+      nivel: classificarAbertura.nivel,
+      effort: classificarAbertura.esforco,
+      schema: classificarAbertura.schema,
+      sistemaEstavel: classificarAbertura.montarSistemaEstavel(),
+      entrada: classificarAbertura.montarEntrada({ gancho: extraido.gancho, formato: extraido.formato }),
     }),
   );
 
@@ -273,6 +289,7 @@ async function main() {
           },
         ],
         roteirosRecentes: [],
+        instrucaoAbertura: { tipo: extraido.tipoAbertura, ganchoExemplo: extraido.gancho },
       }),
     }),
   );

@@ -23,6 +23,7 @@ import {
   type MedianaOrigem,
   type ModeloNicho,
   type Plataforma,
+  type TipoAbertura,
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
@@ -429,6 +430,11 @@ export type VideoEvidenciaRoteiro = {
   /** V2b, item 6: para `combinarEvidencias` (roteiro.ts) aplicar a proporção 70/30. */
   idioma: string | null;
   contaBrasileira: boolean;
+  /** V4, item 3: para `escolherTipoAbertura` (roteiro.ts) decidir a abertura sem repetir os últimos 5 do cliente. */
+  tipoAbertura: TipoAbertura | null;
+  /** V4, item 6: para `forcaDaEvidencia` (roteiro.ts) contar contas distintas e a idade do vídeo mais novo. */
+  contaId: number | null;
+  publicadoEm: Date | null;
 };
 
 /**
@@ -446,6 +452,9 @@ function mapearEvidenciaRoteiro(
     idioma: string | null;
     contaPais: string | null;
     contaIdiomaPrincipal: string | null;
+    tipoAbertura: TipoAbertura | null;
+    contaId: number | null;
+    publicadoEm: Date | null;
   }[],
 ): VideoEvidenciaRoteiro[] {
   return linhas
@@ -461,6 +470,9 @@ function mapearEvidenciaRoteiro(
       analiseVisual: l.analiseVisual,
       idioma: l.idioma,
       contaBrasileira: contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal),
+      tipoAbertura: l.tipoAbertura,
+      contaId: l.contaId,
+      publicadoEm: l.publicadoEm,
     }));
 }
 
@@ -484,6 +496,9 @@ export async function evidenciaParaRoteiro(
       idioma: videos.idioma,
       contaPais: contas.pais,
       contaIdiomaPrincipal: contas.idiomaPrincipal,
+      tipoAbertura: videos.tipoAbertura,
+      contaId: videos.contaId,
+      publicadoEm: videos.publicadoEm,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -512,6 +527,9 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
       idioma: videos.idioma,
       contaPais: contas.pais,
       contaIdiomaPrincipal: contas.idiomaPrincipal,
+      tipoAbertura: videos.tipoAbertura,
+      contaId: videos.contaId,
+      publicadoEm: videos.publicadoEm,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))

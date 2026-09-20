@@ -76,6 +76,8 @@ describe("rodarExtrairColeta, checagem de idioma", () => {
     // mock e deterministico a partir do titulo: a retentativa repete o mesmo gancho em ingles,
     // empate na contagem de campos em portugues, entao fica com a analise original.
     expect(video.analise!.gancho).toBe("abertura sobre how to clean a couch fast without buying anything");
+    // V4, item 5: tipoAbertura sobrescreve a coluna propria, fora do jsonb analise (mesmo caminho de idioma).
+    expect(video.tipoAbertura).toBe("outro");
 
     // uma chamada de retentativa so, alem da do lote (que nao passa por gerarEstruturado).
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(1);

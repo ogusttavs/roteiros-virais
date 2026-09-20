@@ -35,6 +35,16 @@ export const textosRoteiro = {
     semAudio: "Sem indicação de áudio para este vídeo",
   },
   referencia: "Referência",
+  /**
+   * A força da evidência (V4, item 6, escopo 5.12, item 8): a fraca é a
+   * frase literal do escopo, "tema novo, pouca prova ainda", dita sem
+   * esconder.
+   */
+  forcaEvidencia: {
+    forte: "Vários vídeos confirmam isso essa semana.",
+    media: "Ainda é pouco vídeo para ter certeza, mas o sinal já apareceu.",
+    fraca: "Tema novo, pouca prova ainda.",
+  },
   semEvidencia:
     "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. Este " +
     "roteiro foi escrito só com o que funciona no seu nicho e com o seu briefing.",

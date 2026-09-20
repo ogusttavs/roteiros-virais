@@ -5,6 +5,7 @@
  * Reprovou, refaz uma vez com o motivo anexado a entrada; reprovou de novo,
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
+import type { TipoAbertura } from "@/db/schema";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
@@ -49,6 +50,27 @@ export function verificarLocalmente(
      */
     ganchosRecentes?: string[];
     /**
+     * V4, item 5, roteiro sem vício: a primeira palavra do gancho (sem
+     * acento, minúscula) não pode repetir a de nenhum dos últimos 5
+     * roteiros do cliente ("Espera", "Para", "Olha" são o vício que motivou
+     * a etapa). Checagem separada da de `ganchosRecentes` acima: aquela
+     * compara as seis primeiras palavras contra os roteiros dos últimos 10
+     * dias (achado do iPad, um jeito de pegar o mesmo ângulo reaparecendo);
+     * esta pega só o tique de abrir sempre pela mesma palavra, mesmo quando
+     * o resto do gancho muda, contra os últimos 5 (contagem, não dias).
+     */
+    ganchosUltimos5?: string[];
+    /**
+     * V4, item 5: o tipo de abertura que este roteiro declarou usar, e o do
+     * roteiro anterior do cliente. Reprova quando são iguais, a menos que
+     * `tipoAberturaAnterior` já venha `null` (quem chama zera isso quando o
+     * próprio serviço mandou repetir de propósito, `escolherTipoAbertura`
+     * "libera o tipo usado há mais tempo" por falta de alternativa: aí não é
+     * vício do modelo, é a única opção que a evidência de hoje tinha).
+     */
+    tipoAberturaAtual?: TipoAbertura;
+    tipoAberturaAnterior?: TipoAbertura | null;
+    /**
      * E27, parte 1, item 4: quando o cliente reprovou por "muito longo", a
      * nova versão precisa ficar mais curta que a reprovada. `campos` só tem
      * texto; duração é numérica, por isso entra à parte, já calculada por
@@ -82,6 +104,25 @@ export function verificarLocalmente(
         "gancho: repete ou parafraseia as primeiras palavras de um gancho recente do mesmo cliente",
       );
     }
+  }
+
+  if (campos.gancho && opcoes.ganchosUltimos5 && opcoes.ganchosUltimos5.length > 0) {
+    const palavraNova = primeiraPalavra(campos.gancho);
+    const repetePrimeiraPalavra =
+      palavraNova !== "" && opcoes.ganchosUltimos5.some((g) => primeiraPalavra(g) === palavraNova);
+    if (repetePrimeiraPalavra) {
+      motivos.push(
+        `gancho: começa com a mesma primeira palavra ("${palavraNova}") de um dos últimos 5 roteiros do cliente`,
+      );
+    }
+  }
+
+  if (
+    opcoes.tipoAberturaAtual &&
+    opcoes.tipoAberturaAnterior &&
+    opcoes.tipoAberturaAtual === opcoes.tipoAberturaAnterior
+  ) {
+    motivos.push(`tipoAbertura: repete o tipo de abertura do roteiro anterior ("${opcoes.tipoAberturaAtual}")`);
   }
 
   const evidenciasCitadas = opcoes.evidencias ?? [];
@@ -127,6 +168,16 @@ function inicioDoGancho(texto: string): string {
     .join(" ");
 }
 
+/** So a primeira palavra, minuscula, sem acento, sem pontuacao (V4, item 5: o tique de abrir sempre igual). */
+function primeiraPalavra(texto: string): string {
+  return (
+    normalizar(texto)
+      .replace(/[^\p{L}\p{N}\s]/gu, "")
+      .trim()
+      .split(/\s+/)[0] ?? ""
+  );
+}
+
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
   clienteId?: number;
@@ -136,6 +187,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   evidenciasFornecidas?: number[];
   /** O gancho dos roteiros recentes do mesmo cliente (ver `verificarLocalmente`). */
   ganchosRecentes?: string[];
+  /** V4, item 5: o gancho dos últimos 5 roteiros do cliente, para a checagem de primeira palavra (ver `verificarLocalmente`). */
+  ganchosUltimos5?: string[];
+  /** V4, item 5: o tipo de abertura do roteiro anterior do cliente (ver `verificarLocalmente`). */
+  tipoAberturaAnterior?: TipoAbertura | null;
+  extrairTipoAbertura?: (dados: T) => TipoAbertura;
   /**
    * Duração da versão reprovada, em segundos (E27, parte 1, item 4): só
    * informada quando o cliente reprovou por "muito longo", junto com
@@ -197,6 +253,9 @@ async function tentarGerarEVerificar<T>(
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,
     ganchosRecentes: params.ganchosRecentes,
+    ganchosUltimos5: params.ganchosUltimos5,
+    tipoAberturaAtual: params.extrairTipoAbertura?.(resultado.dados),
+    tipoAberturaAnterior: params.tipoAberturaAnterior,
     duracaoParaMuitoLongo:
       params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
         ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }

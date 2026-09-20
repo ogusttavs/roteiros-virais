@@ -1,6 +1,10 @@
 import { z } from "zod";
 
+import { TIPOS_ABERTURA } from "@/db/schema";
+
 import type { EsforcoIA, NivelIA } from "../tipos";
+
+import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
 
 /**
  * Extracao em dois passos (escopo 5.9.4): transforma a transcricao de um
@@ -28,8 +32,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * `extrair-coleta.ts`. Portugues de Portugal ("pt-PT") conta como
  * internacional na proporcao 70/30 (decisao do Gustavo), por isso e um
  * valor a parte de "pt-BR", nunca "pt".
+ *
+ * Tipo de abertura (1.5.0, V4, roteiro sem vicio, escopo 5.12, item 5): o
+ * gancho ja vinha sendo extraido literalmente; `tipoAbertura` classifica ele
+ * num enum fechado (`db/schema.ts`, `TIPOS_ABERTURA`), para o roteiro poder
+ * repetir o TIPO que funcionou sem repetir a FRASE. `extrair-coleta.ts`
+ * sobrescreve `videos.tipoAbertura`, fora do jsonb `analise` (mesmo caminho
+ * de `idioma`).
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -45,6 +56,7 @@ export const schema = z.object({
   pertenceAoNicho: z.boolean(),
   motivoNicho: z.string(),
   idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]),
+  tipoAbertura: z.enum(TIPOS_ABERTURA),
 });
 
 export type SaidaExtrairVideo = z.infer<typeof schema>;
@@ -74,6 +86,9 @@ literal e o tom.
   (inglês), "es" (espanhol) ou "outro" (qualquer outro idioma). Julgue pelo sotaque, pelo
   vocabulário e pelas expressões da transcrição, nunca pelo que você escreveu na ficha, que
   sai sempre em português do Brasil.
+- tipoAbertura: como os primeiros segundos do vídeo começam, um destes oito tipos:
+
+${definicoesTipoAbertura()}
 
 Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
 Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem

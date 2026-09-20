@@ -15,6 +15,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { TIPOS_ABERTURA } from "../src/db/schema";
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
@@ -66,6 +67,18 @@ const casoSchema = z.object({
     .optional(),
   /** A memória do cliente (E27, parte 2, item 7): casos com regras ativas de rodadas anteriores. */
   regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
+  /**
+   * V4, item 7b: o que `escolherTipoAbertura` decidiu para este caso.
+   * Ausente (todo caso do golden set gravado antes desta etapa) vira "livre,
+   * sem nada a evitar", o que descreve exatamente o que a entrada dizia
+   * antes deste campo existir.
+   */
+  instrucaoAbertura: z
+    .union([
+      z.object({ tipo: z.enum(TIPOS_ABERTURA), ganchoExemplo: z.string().nullable() }),
+      z.object({ tipo: z.null(), tiposProibidos: z.array(z.enum(TIPOS_ABERTURA)) }),
+    ])
+    .default({ tipo: null, tiposProibidos: [] }),
   pontoPrincipal: z.string(),
 });
 const conjuntoSchema = z.array(casoSchema);
@@ -140,6 +153,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         objetivo: caso.objetivo,
         evidencias: caso.evidencias,
         roteirosRecentes: caso.roteirosRecentes,
+        instrucaoAbertura: caso.instrucaoAbertura,
         anguloParaEvitar: caso.anguloParaEvitar,
       }),
     });
@@ -176,6 +190,10 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
       console.log();
     }
 
+    /** V4, item 7b: o tipo instruído e o que o modelo de fato declarou, lado a lado, para a leitura do golden set. */
+    console.log(
+      `tipo de abertura: instruido ${caso.instrucaoAbertura.tipo ?? "livre"}, declarado ${saida.tipoAbertura}`,
+    );
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s\n`);
     console.log("OS 3 PRIMEIROS SEGUNDOS");
