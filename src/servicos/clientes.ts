@@ -11,6 +11,7 @@ import {
   preferenciasUsuario,
   user,
   type Cliente,
+  type PapelMarca,
   type PerfisCliente,
   type TemaPreferido,
 } from "@/db/schema";
@@ -186,6 +187,25 @@ export async function trocarMarca(usuarioId: string, clienteId: number): Promise
   const cookieStore = await cookies();
   cookieStore.set(NOME_COOKIE_MARCA_ATIVA, valorCookieMarcaAtiva(clienteId), OPCOES_COOKIE_MARCA_ATIVA);
   return cliente;
+}
+
+export type MembroDaMarca = { usuarioId: string; nome: string; email: string; papel: PapelMarca };
+
+/**
+ * "Quem tem acesso a esta marca" (V3, item 4 e item 5): o dono primeiro,
+ * depois por nome. So leitura em Conta (o cliente ve quem mais entra nesta
+ * marca); o admin usa a mesma consulta para dar/tirar acesso (item 5).
+ */
+export async function membrosDaMarca(clienteId: number): Promise<MembroDaMarca[]> {
+  const linhas = await db()
+    .select({ usuarioId: user.id, nome: user.name, email: user.email, papel: membrosMarca.papel })
+    .from(membrosMarca)
+    .innerJoin(user, eq(user.id, membrosMarca.usuarioId))
+    .where(eq(membrosMarca.clienteId, clienteId));
+  return linhas.sort((a, b) => {
+    if (a.papel !== b.papel) return a.papel === "dono" ? -1 : 1;
+    return a.nome.localeCompare(b.nome, "pt-BR");
+  });
 }
 
 export type ClienteComNichoENome = {

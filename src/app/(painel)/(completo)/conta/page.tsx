@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteAtivoDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
 import { FormularioConta } from "./FormularioConta";
 import styles from "./page.module.css";
+import { QuemTemAcesso } from "./QuemTemAcesso";
 
 export default async function Conta() {
   const sessao = await sessaoAtual();
@@ -19,6 +20,7 @@ export default async function Conta() {
     preferenciasDoUsuario(sessao.user.id),
   ]);
   const perfis = cliente?.perfis;
+  const membros = cliente ? await membrosDaMarca(cliente.id) : [];
 
   return (
     <div className={styles.pagina}>
@@ -31,7 +33,11 @@ export default async function Conta() {
         youtubeInicial={perfis?.youtube ?? ""}
         temaInicial={cliente?.tema ?? "sistema"}
         horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
+        nomeMarca={cliente?.nome ?? ""}
       />
+      {cliente ? (
+        <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
+      ) : null}
       <BotaoSair />
     </div>
   );

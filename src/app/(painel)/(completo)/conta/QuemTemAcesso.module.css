@@ -1,0 +1,143 @@
+/** Design v2, `Conta.dc.html` e `base.css` (`.acessos`, `.marca-da-vez`, `.pessoas`, `.pessoa`): V3, item 4. */
+
+.acessos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.marcaDaVez {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  height: 1.75rem;
+  padding: 0 var(--espaco-2) 0 0.1875rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.avatar {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.cabecaLista {
+  padding-bottom: var(--espaco-2);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--cor-texto-suave);
+}
+
+.pessoas {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pessoa {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) 0;
+}
+
+/* Divisoria entre pessoas, nunca acima da primeira nem abaixo da ultima (Conta.dc.html). */
+.pessoa + .pessoa {
+  border-top: 1px solid var(--cor-divisor);
+}
+
+.avatarNeutro {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+}
+
+.quem {
+  display: grid;
+  min-width: 0;
+  gap: 0.125rem;
+}
+
+.nome {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.voce {
+  flex: none;
+  padding: 0.0625rem var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.email {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.peAcessos {
+  margin: 0;
+  padding-top: var(--espaco-3);
+  border-top: 1px solid var(--cor-divisor);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}

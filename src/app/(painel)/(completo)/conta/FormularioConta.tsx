@@ -20,6 +20,8 @@ type Props = {
   youtubeInicial: string;
   temaInicial: TemaPreferido;
   horaLembreteInicial: string;
+  /** V3, item 4: "Perfis nas redes" é da marca ativa, ganha o nome dela no subtítulo. */
+  nomeMarca: string;
 };
 
 const OPCOES_TEMA = textosConta.temas;
@@ -65,6 +67,7 @@ export function FormularioConta({
   youtubeInicial,
   temaInicial,
   horaLembreteInicial,
+  nomeMarca,
 }: Props) {
   const [nome, setNome] = useState(nomeInicial);
   const [instagram, setInstagram] = useState(instagramInicial);
@@ -111,6 +114,7 @@ export function FormularioConta({
 
         <div className={styles.grupo}>
           <span className={styles.rotuloGrupo}>{textosConta.redes}</span>
+          <p className={styles.subGrupo}>{textosConta.redesSub(nomeMarca)}</p>
           <Campo rotulo="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
           <Campo rotulo="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
           <Campo rotulo="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />

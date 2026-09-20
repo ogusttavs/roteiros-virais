@@ -26,6 +26,12 @@
   color: var(--cor-texto-suave);
 }
 
+.subGrupo {
+  margin: calc(var(--espaco-3) * -1) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
 .erro {
   display: flex;
   align-items: center;
