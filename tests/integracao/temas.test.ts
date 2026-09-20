@@ -253,6 +253,7 @@ describe("avaliarTema", () => {
           titulo: "como limpar sofa de estofado",
           foraDaCurva: "6",
           publicadoEm: new Date(),
+          idioma: "pt",
           analise: {
             assunto: "limpeza de sofa",
             gancho: "x",

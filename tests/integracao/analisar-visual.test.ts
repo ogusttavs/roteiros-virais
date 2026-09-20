@@ -69,6 +69,8 @@ async function criarVideo(
     midiaUrlEm?: Date;
     /** Ajuste 1 da revisao do PR #45: `atualizadoEm` antigo, para provar que a analise visual nao o move (e da coleta). */
     atualizadoEm?: Date;
+    /** V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela. */
+    idioma?: string | null;
   },
 ) {
   const [v] = await db()
@@ -89,6 +91,7 @@ async function criarVideo(
       midiaUrl: opcoes.midiaUrl,
       midiaUrlEm: opcoes.midiaUrlEm,
       atualizadoEm: opcoes.atualizadoEm,
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
     })
     .returning();
   return v;
@@ -265,6 +268,46 @@ describe("rodarAnalisarVisual", () => {
 
     const resumo = await rodarAnalisarVisual();
     expect(resumo.analisados).toBe(10);
+  });
+
+  /** V2b, item 6: a proporcao 70/30 corta o excesso internacional, mesmo com prioridade maior. */
+  it("video internacional em excesso nunca entra, mesmo com prioridade maior que o brasileiro que entrou", async () => {
+    // config.regras.visuaisPorSemana (10) * FATOR_POOL_BRASIL (4) = 40 no pool;
+    // maxInternacional = floor(10*0.3) = 3. Seis "en" com prioridade maior
+    // (foraDaCurva mais alto) que os dois "pt": so os 3 primeiros "en" cabem.
+    const urlsEn: { id: number; url: string }[] = [];
+    for (let i = 1; i <= 6; i += 1) {
+      const v = await criarVideo(`prop-en-${i}`, {
+        foraDaCurva: 20 - i,
+        publicadoEm: diasAtras(2),
+        transcricao: "transcricao qualquer",
+        duracaoS: 30,
+        analise: ANALISE_PADRAO,
+        idioma: "en",
+      });
+      urlsEn.push({ id: v.id, url: v.url });
+    }
+    const urlsPt: string[] = [];
+    for (let i = 1; i <= 2; i += 1) {
+      const v = await criarVideo(`prop-pt-${i}`, {
+        foraDaCurva: 5 - i,
+        publicadoEm: diasAtras(2),
+        transcricao: "transcricao qualquer",
+        duracaoS: 30,
+        analise: ANALISE_PADRAO,
+        idioma: "pt",
+      });
+      urlsPt.push(v.url);
+    }
+
+    await rodarAnalisarVisual();
+
+    const chamadas = vi.mocked(baixarVideo480p).mock.calls.map(([url]) => url);
+    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 3).map((v) => v.url)));
+    expect(chamadas).not.toContain(urlsEn[3].url);
+    expect(chamadas).not.toContain(urlsEn[4].url);
+    expect(chamadas).not.toContain(urlsEn[5].url);
+    expect(chamadas).toEqual(expect.arrayContaining(urlsPt));
   });
 
   it("video sem analise, ou marcado como fora do nicho, fica de fora (ajuste da revisao da etapa 9)", async () => {

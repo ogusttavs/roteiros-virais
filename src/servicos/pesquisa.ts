@@ -24,7 +24,9 @@ import {
   type ModeloNicho,
   type Plataforma,
 } from "@/db/schema";
+import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
+import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 
 export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
@@ -32,6 +34,16 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 function diasAtras(dias: number): Date {
   return new Date(Date.now() - dias * DIA_MS);
 }
+
+/**
+ * V2b, item 6: a proporção 70/30 corta depois da consulta, então a consulta
+ * SQL busca um pool maior que o `limite` final (mesmo raciocínio do
+ * `FATOR_FILA` de `transcrever.ts`), para sobrar candidato brasileiro
+ * suficiente para preencher a cota sem cortar a lista abaixo do necessário
+ * só porque os primeiros N por prioridade pura eram majoritariamente
+ * internacionais.
+ */
+const FATOR_POOL_BRASIL = 4;
 
 export type VideoRankeado = {
   id: number;
@@ -269,23 +281,48 @@ export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; 
  * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
  * `PROXIMO.md`). Sem palavra nem casamento textual, a lista vem vazia (o
  * prompt já sabe dizer "sem evidência" para isso).
+ *
+ * V2b, item 6: busca um pool de `limite * FATOR_POOL_BRASIL` antes da
+ * proporção 70/30 cortar para o `limite` de verdade (mesmo raciocínio do
+ * `transcrever`, sem isso o corte de tamanho do SQL já teria truncado a
+ * lista antes de a proporção ter candidato brasileiro suficiente para
+ * escolher).
  */
-export async function evidenciaParaTema(nichoId: number, texto: string, limite = 8): Promise<VideoEvidenciaTema[]> {
+export async function evidenciaParaTema(
+  nichoId: number,
+  texto: string,
+  limite = 8,
+  proporcaoBrasil = config.regras.proporcaoBrasil,
+): Promise<VideoEvidenciaTema[]> {
   const linhas = await db()
-    .select({ id: videos.id, analise: videos.analise, foraDaCurva: videos.foraDaCurva })
+    .select({
+      id: videos.id,
+      analise: videos.analise,
+      foraDaCurva: videos.foraDaCurva,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
+    })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoesEvidencia(nichoId, texto)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
-    .limit(limite);
+    .limit(limite * FATOR_POOL_BRASIL);
 
-  return linhas
-    .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
-    .map((l) => ({
-      id: l.id,
-      assunto: l.analise.assunto,
-      gancho: l.analise.gancho,
-      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
-    }));
+  const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
+  const comProporcao = aplicarProporcaoBrasil(
+    comAnalise,
+    limite,
+    (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
+    proporcaoBrasil,
+  );
+
+  return comProporcao.map((l) => ({
+    id: l.id,
+    assunto: l.analise.assunto,
+    gancho: l.analise.gancho,
+    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+  }));
 }
 
 export type VideoEvidenciaRoteiro = {
@@ -297,6 +334,9 @@ export type VideoEvidenciaRoteiro = {
   chamadaFinal: string;
   foraDaCurva: number;
   analiseVisual: AnaliseVisual | null;
+  /** V2b, item 6: para `combinarEvidencias` (roteiro.ts) aplicar a proporção 70/30. */
+  idioma: string | null;
+  contaBrasileira: boolean;
 };
 
 /**
@@ -306,7 +346,15 @@ export type VideoEvidenciaRoteiro = {
  * para o roteiro poder imitar o que já funcionou, não só citar o assunto.
  */
 function mapearEvidenciaRoteiro(
-  linhas: { id: number; analise: AnaliseVideo | null; analiseVisual: AnaliseVisual | null; foraDaCurva: string | null }[],
+  linhas: {
+    id: number;
+    analise: AnaliseVideo | null;
+    analiseVisual: AnaliseVisual | null;
+    foraDaCurva: string | null;
+    idioma: string | null;
+    contaPais: string | null;
+    contaIdiomaPrincipal: string | null;
+  }[],
 ): VideoEvidenciaRoteiro[] {
   return linhas
     .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
@@ -319,9 +367,17 @@ function mapearEvidenciaRoteiro(
       chamadaFinal: l.analise.chamadaFinal,
       foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
       analiseVisual: l.analiseVisual,
+      idioma: l.idioma,
+      contaBrasileira: contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal),
     }));
 }
 
+/**
+ * V2b, item 6: devolve um pool de `limite * FATOR_POOL_BRASIL`, sem cortar
+ * pela proporção aqui dentro; quem corta para o `limite` de verdade é
+ * `combinarEvidencias` (roteiro.ts), que combina isto com `evidenciaPorIds`
+ * antes de aplicar a proporção 70/30 no conjunto final.
+ */
 export async function evidenciaParaRoteiro(
   nichoId: number,
   texto: string,
@@ -333,11 +389,15 @@ export async function evidenciaParaRoteiro(
       analise: videos.analise,
       analiseVisual: videos.analiseVisual,
       foraDaCurva: videos.foraDaCurva,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoesEvidencia(nichoId, texto)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
-    .limit(limite);
+    .limit(limite * FATOR_POOL_BRASIL);
 
   return mapearEvidenciaRoteiro(linhas);
 }
@@ -357,8 +417,12 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
       analise: videos.analise,
       analiseVisual: videos.analiseVisual,
       foraDaCurva: videos.foraDaCurva,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(inArray(videos.id, ids));
 
   return mapearEvidenciaRoteiro(linhas);
@@ -456,8 +520,17 @@ const LIMIAR_FORA_DA_CURVA_CONSULTA = String(LIMIAR_FORA_DA_CURVA);
  * Filtra por `foraDaCurva >= 1,5` (achado do primeiro uso no iPad, item 4):
  * a consulta antiga só exigia `foraDaCurva` não nulo, e um vídeo na média
  * da conta (0,7x, 1,0x) aparecia como se fosse referência.
+ *
+ * V2b, item 6: a proporção 70/30 corta por página (o `limite` de cada
+ * chamada), então o pool buscado no SQL também cresce por
+ * `FATOR_POOL_BRASIL`, mesmo raciocínio de `evidenciaParaTema`.
  */
-export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60): Promise<VideoReferencia[]> {
+export async function referenciasDoNicho(
+  nichoId: number,
+  dias = 90,
+  limite = 60,
+  proporcaoBrasil = config.regras.proporcaoBrasil,
+): Promise<VideoReferencia[]> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
@@ -478,30 +551,39 @@ export async function referenciasDoNicho(nichoId: number, dias = 90, limite = 60
       publicadoEm: videos.publicadoEm,
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
     .orderBy(desc(videos.publicadoEm), asc(videos.id))
-    .limit(limite);
+    .limit(limite * FATOR_POOL_BRASIL);
 
-  return linhas
-    .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
-    .map((l) => ({
-      id: l.id,
-      plataforma: l.plataforma,
-      url: l.url,
-      contaHandle: l.contaHandle,
-      contaNome: l.contaNome,
-      contaMedianaOrigem: l.contaMedianaOrigem,
-      publicadoEm: l.publicadoEm,
-      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
-      assunto: l.analise.assunto,
-      gancho: l.analise.gancho,
-      estrutura: l.analise.estrutura,
-      porQueFuncionou: l.analise.porQueFuncionou,
-      formato: l.analise.formato,
-    }));
+  const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
+  const comProporcao = aplicarProporcaoBrasil(
+    comAnalise,
+    limite,
+    (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
+    proporcaoBrasil,
+  );
+
+  return comProporcao.map((l) => ({
+    id: l.id,
+    plataforma: l.plataforma,
+    url: l.url,
+    contaHandle: l.contaHandle,
+    contaNome: l.contaNome,
+    contaMedianaOrigem: l.contaMedianaOrigem,
+    publicadoEm: l.publicadoEm,
+    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+    assunto: l.analise.assunto,
+    gancho: l.analise.gancho,
+    estrutura: l.analise.estrutura,
+    porQueFuncionou: l.analise.porQueFuncionou,
+    formato: l.analise.formato,
+  }));
 }
 
 export type VideoParaEmbed = {

@@ -37,6 +37,10 @@ async function criarVideo(
     titulo?: string;
     etiquetas?: string[];
     semDono?: boolean;
+    /** V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela. */
+    idioma?: string | null;
+    contaId?: number;
+    nichoId?: number;
   },
 ) {
   const [v] = await db()
@@ -45,8 +49,8 @@ async function criarVideo(
       plataforma: opcoes.semDono ? "instagram" : "tiktok",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
-      contaId: opcoes.semDono ? null : contaId,
-      nichoId,
+      contaId: opcoes.semDono ? null : (opcoes.contaId ?? contaId),
+      nichoId: opcoes.nichoId ?? nichoId,
       titulo: opcoes.titulo,
       views: 100,
       publicadoEm: opcoes.publicadoEm,
@@ -56,6 +60,7 @@ async function criarVideo(
       analise: opcoes.analise as never,
       etiquetas: opcoes.etiquetas,
       semDono: opcoes.semDono ?? false,
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
     })
     .returning();
   return v;
@@ -261,6 +266,31 @@ describe("evidenciaParaTema", () => {
     const resultado = await evidenciaParaTema(nichoId, "questao juridica sobre contrato imobiliario extenso");
     expect(resultado).toEqual([]);
   });
+
+  /** V2b, item 6: a proporcao 70/30 corta o excesso internacional, mesmo com prioridade maior. */
+  it("com limite pequeno, so o brasileiro entra (nenhuma vaga internacional sobra)", async () => {
+    for (let i = 0; i < 4; i += 1) {
+      await criarVideo(`ev-prop-en-${i}`, {
+        foraDaCurva: 50 - i, // prioridade bem maior que os "pt" abaixo
+        publicadoEm: diasAtras(10),
+        titulo: "assunto exclusivo da proporcao internacional",
+        idioma: "en",
+        analise: { assunto: `en-${i}` },
+      });
+    }
+    await criarVideo("ev-prop-pt", {
+      foraDaCurva: 1,
+      publicadoEm: diasAtras(10),
+      titulo: "assunto exclusivo da proporcao internacional",
+      idioma: "pt",
+      analise: { assunto: "pt-0" },
+    });
+
+    // limite 3, proporcaoBrasil 0.7 => maxInternacional = floor(3*0.3) = 0.
+    const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da proporcao internacional", 3);
+
+    expect(resultado.map((v) => v.assunto)).toEqual(["pt-0"]);
+  });
 });
 
 describe("referenciasDoNicho", () => {
@@ -327,5 +357,51 @@ describe("referenciasDoNicho", () => {
     expect(resultado.some((v) => v.id === naMedia.id)).toBe(false);
     expect(resultado.some((v) => v.id === abaixo.id)).toBe(false);
     expect(resultado.some((v) => v.assunto === "no limiar")).toBe(true);
+  });
+
+  /** V2b, item 6: a proporcao 70/30 corta o excesso internacional, mesmo com prioridade maior (mais recente). */
+  it("com limite pequeno, so o brasileiro entra (nenhuma vaga internacional sobra)", async () => {
+    // Nicho proprio, isolado dos videos que os describes acima ja gravaram
+    // no nicho compartilhado (referenciasDoNicho nao filtra por assunto,
+    // so por nicho): sem isso o corte de proporcao competiria com dado de
+    // outro teste, nao so com o cenario desta rodada.
+    const [nichoProporcao] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-proporcao-teste", nome: "Pesquisa proporcao teste", termos: [] })
+      .returning();
+    const [contaProporcao] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-proporcao", nichoId: nichoProporcao.id })
+      .returning();
+
+    const analiseExemplo = {
+      gancho: "gancho",
+      estrutura: "estrutura",
+      porQueFuncionou: "funcionou por isso",
+      formato: "fala_para_camera",
+    };
+    for (let i = 1; i <= 4; i += 1) {
+      await criarVideo(`ref-prop-en-${i}`, {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(i), // mais recente que o "pt" abaixo: prioridade maior
+        idioma: "en",
+        contaId: contaProporcao.id,
+        nichoId: nichoProporcao.id,
+        analise: { ...analiseExemplo, assunto: `ref-en-${i}` },
+      });
+    }
+    await criarVideo("ref-prop-pt", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      idioma: "pt",
+      contaId: contaProporcao.id,
+      nichoId: nichoProporcao.id,
+      analise: { ...analiseExemplo, assunto: "ref-pt-0" },
+    });
+
+    // limite 3, proporcaoBrasil 0.7 => maxInternacional = floor(3*0.3) = 0.
+    const resultado = await referenciasDoNicho(nichoProporcao.id, 90, 3);
+
+    expect(resultado.map((v) => v.assunto)).toEqual(["ref-pt-0"]);
   });
 });

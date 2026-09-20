@@ -109,7 +109,11 @@ async function criarCliente(): Promise<number> {
   return cliente.id;
 }
 
-async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<number> {
+async function criarVideoEvidencia(
+  idExterno: string,
+  assunto: string,
+  opcoes: { idioma?: string | null; foraDaCurva?: number } = {},
+): Promise<number> {
   const [video] = await db()
     .insert(videos)
     .values({
@@ -118,8 +122,10 @@ async function criarVideoEvidencia(idExterno: string, assunto: string): Promise<
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
       titulo: assunto,
-      foraDaCurva: "6",
+      foraDaCurva: String(opcoes.foraDaCurva ?? 6),
       publicadoEm: new Date(),
+      // V2b, item 6: "pt" por padrao, para os testes que nao sao sobre a proporcao nao serem afetados por ela.
+      idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
       analise: {
         assunto,
         gancho: "olha essa mancha saindo do estofado",
@@ -262,6 +268,35 @@ describe("gerarRoteiro", () => {
       segundo: 0,
       oQueOlhar: "olha essa mancha saindo do estofado",
     });
+  });
+
+  /** V2b, item 6: a proporcao 70/30 corta o excesso de evidencia internacional. */
+  it("evidencia internacional em excesso fica de fora, mesmo com prioridade maior; brasileira entra sempre", async () => {
+    const clienteId = await criarCliente();
+    const idsEn: number[] = [];
+    for (let i = 1; i <= 4; i += 1) {
+      idsEn.push(
+        await criarVideoEvidencia(`prop-en-${i}`, "vazamento de agua no telhado", {
+          idioma: "en",
+          foraDaCurva: 20 - i, // prioridade maior que o "pt" abaixo
+        }),
+      );
+    }
+    const idPt = await criarVideoEvidencia("prop-pt", "vazamento de agua no telhado", {
+      idioma: "pt",
+      foraDaCurva: 1,
+    });
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "vazamento de agua no telhado",
+      objetivo: "conversao",
+    });
+
+    // LIMITE_EVIDENCIA = 8, proporcaoBrasil 0.7 => maxInternacional = floor(8*0.3) = 2.
+    const evidenciasEn = roteiro.conteudo.evidencias.filter((id) => idsEn.includes(id));
+    expect(evidenciasEn.length).toBeLessThanOrEqual(2);
+    expect(roteiro.conteudo.evidencias).toContain(idPt);
   });
 
   it("tema livre sem nenhuma evidência no banco: roteiro honesto, sem referência e sem citar id (ajuste 2 da revisão do PR #17)", async () => {
