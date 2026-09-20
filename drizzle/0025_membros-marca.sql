@@ -29,10 +29,10 @@ INSERT INTO "membros_marca" ("usuario_id", "cliente_id", "papel", "ultimo_acesso
 SELECT "usuario_id", "id", 'dono', "ultimo_acesso_em" FROM "clientes";
 --> statement-breakpoint
 -- V3, itens 4, 6 e 7: hora_lembrete, ultimo_lembrete_em e aceitou_termos_em eram da marca,
--- viram da pessoa. Copia o valor do dono antes de tirar as colunas de clientes, abaixo.
+-- viram da pessoa. Copia o valor do dono para preferencias_usuario.
 INSERT INTO "preferencias_usuario" ("usuario_id", "hora_lembrete", "ultimo_lembrete_em", "aceitou_termos_em")
 SELECT "usuario_id", "hora_lembrete", "ultimo_lembrete_em", "aceitou_termos_em" FROM "clientes";
---> statement-breakpoint
-ALTER TABLE "clientes" DROP COLUMN "hora_lembrete";--> statement-breakpoint
-ALTER TABLE "clientes" DROP COLUMN "aceitou_termos_em";--> statement-breakpoint
-ALTER TABLE "clientes" DROP COLUMN "ultimo_lembrete_em";
+-- As tres colunas ficam em "clientes", sem uso (saem do schema do Drizzle, so o codigo para de
+-- ler e escrever nelas): tirar o DROP COLUMN daqui mantem o caminho de volta para a imagem
+-- anterior se a V3 precisar ser desfeita em producao. A remocao e uma migracao de depois da
+-- viagem (decisao da revisao do PR #47, 20/09/2026).
