@@ -18,6 +18,8 @@
   background: var(--cor-sobreposicao);
 }
 
+/* Vidro, mais opaco que o das barras (V5, item 4): texto longo passa por
+   cima. No celular, o raio concêntrico com o do aparelho (--raio-folha). */
 .painel {
   position: fixed;
   left: 0;
@@ -30,9 +32,12 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-6) + env(safe-area-inset-bottom, 0px));
-  background: var(--cor-superficie);
-  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
-  box-shadow: var(--sombra-md);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-folha) var(--raio-folha) 0 0;
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
   outline: none;
 }
 
@@ -58,7 +63,6 @@
     width: min(20rem, calc(100vw - var(--espaco-8)));
     max-height: min(28rem, calc(100vh - 6rem));
     padding: var(--espaco-3);
-    border: 1px solid var(--cor-borda);
     border-radius: var(--raio-lg);
   }
 

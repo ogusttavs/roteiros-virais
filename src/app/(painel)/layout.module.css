@@ -13,17 +13,42 @@
   display: none;
 }
 
+/**
+ * A cápsula das abas (V5, item 5; IDENTIDADE.md): vidro que flutua solto das
+ * bordas, canto concêntrico com o do aparelho. Encolhe para só os ícones ao
+ * rolar para baixo (`.encolhida`, `useCapsulaAbas.ts`) e volta inteira ao
+ * subir; o nome de cada aba continua para o leitor de tela, só escondido da
+ * vista (`Nav.module.css`). Some inteira na tela com barra de ações própria
+ * (o Roteiro, `data-barra-acoes-propria`), para uma não flutuar sobre a
+ * outra (`:has()`, como o design descreve).
+ */
 .barraInferior {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 6;
-  background: var(--cor-material-barra);
-  backdrop-filter: var(--desfoque-barra);
-  -webkit-backdrop-filter: var(--desfoque-barra);
-  border-top: 1px solid var(--cor-divisor);
-  padding-bottom: env(safe-area-inset-bottom);
+  left: var(--espaco-3);
+  right: var(--espaco-3);
+  bottom: calc(var(--espaco-2) + env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  background: var(--vidro-fundo);
+  backdrop-filter: var(--vidro-desfoque);
+  -webkit-backdrop-filter: var(--vidro-desfoque);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
+  transition: left var(--duracao-base) var(--curva-saida), right var(--duracao-base) var(--curva-saida);
+}
+.barraInferior.encolhida {
+  left: 50%;
+  right: auto;
+  width: auto;
+  transform: translateX(-50%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .barraInferior {
+    transition: none;
+  }
+}
+:global(body:has([data-barra-acoes-propria])) .barraInferior {
+  display: none;
 }
 
 @media (min-width: 768px) {

@@ -1,16 +1,44 @@
 .pagina {
   min-height: 100vh;
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--espaco-10) var(--margem-celular);
 }
 
+/* O halo da luz atrás do cartão (V5, item 4; IDENTIDADE.md: "o halo atrás do
+   cartão de Entrar"). Decorativo, nunca lido por leitor de tela. */
+.pagina::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 32rem;
+  height: 32rem;
+  transform: translate(-50%, -50%);
+  background: var(--luz-degrade);
+  filter: blur(6rem);
+  opacity: calc(var(--luz-halo) * 0.4);
+  pointer-events: none;
+}
+
+/* O cartão de Entrar é vidro (V5, item 4, IDENTIDADE.md: "o que flutua por
+   cima do conteúdo"): aqui ele flutua sobre o halo. */
 .envoltorio {
+  position: relative;
   width: 100%;
   max-width: 24rem;
   display: flex;
   flex-direction: column;
+  padding: var(--espaco-8) var(--espaco-6);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-lg);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
 }
 
 .titulo {

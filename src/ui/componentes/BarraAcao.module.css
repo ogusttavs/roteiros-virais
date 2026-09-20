@@ -1,13 +1,18 @@
+/* Vidro (V5, item 4): mesmos tokens compartilhados da barra do topo e da
+   barra de ações do Roteiro, não mais um blur próprio (achado do
+   levantamento: era a única barra flutuante com um valor hardcoded, à
+   parte do resto). */
 .barra {
   position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 4;
-  background: color-mix(in srgb, var(--cor-superficie) 85%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-top: 1px solid var(--cor-borda);
+  background: var(--cor-material-barra);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border-top: var(--largura-borda) solid var(--vidro-contorno);
+  box-shadow: var(--vidro-brilho);
   padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-9) + env(safe-area-inset-bottom));
 }
 

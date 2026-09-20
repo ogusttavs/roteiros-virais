@@ -30,16 +30,24 @@ type Props = {
    * inferior do celular, que usa o mesmo componente sem a prop.
    */
   compactavel?: boolean;
+  /**
+   * Só a cápsula do celular passa isto (V5, item 5, `CapsulaAbas.tsx`): o
+   * rótulo escrito some da vista ao rolar para baixo, mas continua para o
+   * leitor de tela (`.escondidoDaVista`, não `display: none`, diferente de
+   * `compactavel` acima, que tem o `title` como alternativa de tooltip).
+   */
+  encolhida?: boolean;
 };
 
-export function Nav({ compactavel = false }: Props) {
+export function Nav({ compactavel = false, encolhida = false }: Props) {
   const pathname = usePathname();
 
+  const classes = [styles.nav, compactavel && styles.compactavel, encolhida && styles.navEncolhida]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <nav
-      className={compactavel ? `${styles.nav} ${styles.compactavel}` : styles.nav}
-      aria-label={textosNav.navegacaoPrincipal}
-    >
+    <nav className={classes} aria-label={textosNav.navegacaoPrincipal}>
       {ITENS.map(({ href, rotulo, Icone }) => {
         const ativo = ehRotaAtiva(pathname, href);
         return (
@@ -52,7 +60,9 @@ export function Nav({ compactavel = false }: Props) {
           >
             <span className={styles.traco} aria-hidden="true" />
             <Icone size={22} strokeWidth={1.5} />
-            <span className={styles.rotulo}>{rotulo}</span>
+            <span className={encolhida ? `${styles.rotulo} ${styles.escondidoDaVista}` : styles.rotulo}>
+              {rotulo}
+            </span>
           </Link>
         );
       })}
