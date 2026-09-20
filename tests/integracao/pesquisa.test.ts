@@ -336,7 +336,7 @@ describe("evidenciaParaTema", () => {
   it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
     const idsEn: string[] = [];
     for (let i = 0; i < 4; i += 1) {
-      const video = await criarVideo(`ev-prop-en-${i}`, {
+      await criarVideo(`ev-prop-en-${i}`, {
         foraDaCurva: 50 - i, // prioridade bem maior que o "pt" abaixo
         publicadoEm: diasAtras(10),
         titulo: "assunto exclusivo da proporcao internacional",

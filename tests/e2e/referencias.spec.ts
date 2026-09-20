@@ -78,6 +78,11 @@ test.describe("favoritar em /referencias", () => {
         url: "https://exemplo.invalido/e2e-referencias-mancha",
         nichoId: nicho.id,
         titulo: "o produto que tira qualquer mancha do estofado",
+        // V2b, item 6 (revisão do PR #46): sem idioma, o vídeo sem conta
+        // conta como internacional e, sem nenhum brasileiro no nicho, a
+        // proporção 70/30 devolve lista vazia (a regra nova). O vídeo é
+        // português de fato; só faltava marcar.
+        idioma: "pt",
         foraDaCurva: "6.2",
         publicadoEm: new Date(),
         analise: {
