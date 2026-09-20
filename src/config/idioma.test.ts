@@ -31,6 +31,28 @@ describe("detectarIdioma, portugues", () => {
   });
 });
 
+/**
+ * Revisão do Fable no PR #46: 600 vídeos fora da curva de produção, 23%
+ * voltando nulo, quase todos português de título curto. Os oito exemplos
+ * reais da medição.
+ */
+describe("detectarIdioma, portugues de titulo curto (revisao do PR #46, medicao em 600 videos reais)", () => {
+  const titulos = [
+    "Vem ARRUMAR o QUARTO COMIGO #shorts #donadecasa #vidareal",
+    "Como limpar a porta de vidro a seco #faxina #porta #vidro",
+    "Joguei sal nas manchas de ferrugem e me surpreendi...#dicas #limpeza #donadecasa",
+    "Dia chuvoso por aqui #donadecasa #vidademae #casasimples",
+    "Limpeza ASMR satisfatória #limpeza #viral",
+    "cheguei no interior",
+    "vizinho curioso #humor",
+    "maleta de maquiagem",
+  ];
+
+  it.each(titulos)("detecta pt em: %s", (titulo) => {
+    expect(detectarIdioma(titulo)).toBe("pt");
+  });
+});
+
 describe("detectarIdioma, ingles", () => {
   const titulos = [
     "you won't believe what happened next",
@@ -101,8 +123,8 @@ describe("detectarIdioma, nunca chuta: null quando nao da para saber", () => {
     expect(detectarIdioma("")).toBeNull();
   });
 
-  it("titulo so com hashtag, sem nenhuma palavra de sinal", () => {
-    expect(detectarIdioma("#limpeza #dicas #viral")).toBeNull();
+  it("titulo so com hashtag, sem nenhum radical do dicionario de portugues nem palavra de sinal", () => {
+    expect(detectarIdioma("#foryou #fyp #trending")).toBeNull();
   });
 
   it("texto curto demais (menos de tres palavras)", () => {
@@ -119,5 +141,33 @@ describe("detectarIdioma, nunca chuta: null quando nao da para saber", () => {
 
   it("titulo misturado, com sinal empatado entre dois idiomas", () => {
     expect(detectarIdioma("check isso")).toBeNull();
+  });
+});
+
+/**
+ * Item (b) da revisão do PR #46: antes desta rodada, "#limpeza #dicas
+ * #viral" devolvia null (o teste acima usava esse exemplo). Com o
+ * dicionário de radicais de hashtag e "limpeza"/"dicas" agora na lista de
+ * palavras, esse titulo passa a ter sinal de verdade: mudança intencional,
+ * é exatamente o caso que a rodada corrige (exemplo 5 da medição).
+ */
+describe("detectarIdioma, hashtag com radical do dicionario vira sinal de portugues (revisao do PR #46)", () => {
+  it("titulo so com hashtags de radical portugues: detecta pt", () => {
+    expect(detectarIdioma("#limpeza #dicas #viral")).toBe("pt");
+  });
+});
+
+/** Item (c) da revisão do PR #46: com exatamente 2 palavras, ambas do portugues, o minimo cai de 3 para 2. */
+describe("detectarIdioma, minimo de palavras cai para 2 quando ambas sao do portugues (revisao do PR #46)", () => {
+  it("duas palavras, ambas da lista do portugues: detecta pt", () => {
+    expect(detectarIdioma("faxina hoje")).toBe("pt");
+  });
+
+  it("duas palavras, so uma da lista do portugues: continua null (minimo de 3 nao cai)", () => {
+    expect(detectarIdioma("faxina bonita")).toBeNull();
+  });
+
+  it("uma palavra so: continua null, mesmo sendo da lista do portugues", () => {
+    expect(detectarIdioma("faxina")).toBeNull();
   });
 });

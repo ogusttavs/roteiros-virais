@@ -86,17 +86,34 @@ describe("selecionarParaTranscrever", () => {
     expect(selecionados).toEqual([1, 2, 3]);
   });
 
-  /** V2b, item 6: a proporcao 70/30 corta depois do teto por conta, antes do corte final por limite. */
+  /**
+   * V2b, item 6, revisão do PR #46: o teto de internacional é sobre quantos
+   * brasileiros de fato entraram, não sobre o limite. Com 1 "pt" só
+   * (candidato 2), maxInternacional = max(1, floor(1*0,3/0,7)) = 1: so o
+   * "en" de maior prioridade (candidato 1) cabe, os outros dois "en"
+   * excedentes ficam de fora.
+   */
   it("aplica a proporcao 70/30, cortando so o internacional excedente", () => {
     const candidatos = [
       candidato(1, { idioma: "en" }),
       candidato(2, { idioma: "pt" }),
-      candidato(3, { idioma: "en" }),
-      candidato(4, { idioma: "en" }), // excedente: limite 10, max internacional = 3... aqui so ha 3 no total
+      candidato(3, { idioma: "en" }), // excedente: so 1 internacional cabe
+      candidato(4, { idioma: "en" }), // excedente tambem
       candidato(5, { idioma: "outro" }), // nunca entra
     ];
     const selecionados = selecionarParaTranscrever([1, 2, 3, 4, 5], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
-    expect(selecionados).toEqual([1, 2, 3, 4]);
+    expect(selecionados).toEqual([1, 2]);
+  });
+
+  /** A nova regra: sem nenhum brasileiro entre os candidatos, a selecao fica vazia. */
+  it("sem nenhum candidato brasileiro, a selecao fica vazia mesmo com internacional de sobra", () => {
+    const candidatos = [
+      candidato(1, { idioma: "en" }),
+      candidato(2, { idioma: "en" }),
+      candidato(3, { idioma: "en" }),
+    ];
+    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    expect(selecionados).toEqual([]);
   });
 });
 

@@ -29,17 +29,31 @@ const ALFABETO_NAO_LATINO =
   /[一-鿿぀-ヿㇰ-ㇿ가-힯؀-ۿݐ-ݿЀ-ӿ฀-๿ऀ-ॿ]/;
 
 const PALAVRAS_MINIMAS = 3;
+/** Regra do item (c) da revisão do PR #46: com exatamente 2 palavras, ambas da lista do português, o mínimo cai para 2. */
+const PALAVRAS_MINIMAS_QUANDO_AMBAS_PT = 2;
 
 /**
  * Palavras funcionais do português, incluindo as citadas no PROXIMO.md
  * ("que", "não", "para", "com", "você"); "que" e "para" existem também em
  * espanhol, mas os sinais exclusivos de cada lista (abaixo) desempatam um
  * texto realmente escrito no outro idioma.
+ *
+ * Ampliada na revisão do PR #46 (medição em 600 vídeos reais: 23% voltavam
+ * nulos, quase todos português de título curto). A ordem pedia também "no" e
+ * "hoje"; "hoje" já estava na lista (fica sem duplicar) e "no" fica de fora
+ * por conta própria, além dos três que a ordem já excluía ("como", "casa",
+ * "nada"): é a negação espanhola mais comum ("no vas a creer..."), e
+ * incluído fazia empatar um teste de espanhol existente (2 a 2 com "que"),
+ * devolvendo null em vez de "es". Decisão registrada em TODO.md, "Decisões
+ * pendentes".
  */
 const PALAVRAS_PT = [
   "que", "não", "nao", "para", "com", "você", "voce", "muito", "hoje", "então", "entao", "já",
   "ja", "também", "tambem", "isso", "essa", "esse", "até", "ate", "fazer", "mostra", "seu",
   "sua", "são", "sao", "vídeo", "video", "olha", "aí", "ai", "né", "ne", "pra", "porque",
+  "do", "da", "dos", "das", "na", "nas", "nos", "em", "um", "uma", "meu", "minha", "vem",
+  "aqui", "mais", "sem", "depois", "antes", "quando", "onde", "quem", "tudo", "coisa", "gente",
+  "dia", "dicas", "limpeza", "limpar", "faxina",
 ];
 
 const PALAVRAS_EN = [
@@ -62,11 +76,41 @@ const CONJUNTO_ES = new Set(PALAVRAS_ES);
 const VOGAL_NASAL_PT = /[ãõ]/gi;
 /** Sufixo -ção/-ções/-ões, forte mesmo sem nenhuma palavra funcional (ex.: "transformação", "opções"). */
 const SUFIXO_PT = /ç(ão|ões)/giu;
+/**
+ * Sufixos acrescentados na revisão do PR #46, para título curto sem nenhuma
+ * palavra funcional de sinal (achado da medição em 600 vídeos: "vizinho
+ * curioso #humor", "maleta de maquiagem", "cheguei no interior" não tinham
+ * nenhum sinal com a lista de palavras e o dicionário de hashtag sozinhos).
+ * Decisão própria, registrada em TODO.md: diminutivo -inho/-inha (ex.:
+ * "vizinho", sem equivalente em espanhol, que usa -ito/-ita) e pretérito de
+ * verbo em -car/-gar na primeira pessoa, -quei/-guei (ex.: "cheguei",
+ * "joguei"; o espanhol equivalente termina em -qué/-gué, sem o "i").
+ */
+const SUFIXO_DIMINUTIVO_PT = /inh[oa]\b/giu;
+const SUFIXO_PRETERITO_PT = /(gu|qu)ei\b/giu;
+/** Sufixo -agem (ex.: "maquiagem", "lavagem"); o espanhol equivalente é -aje, sem o "m" final. */
+const SUFIXO_AGEM_PT = /agem\b/giu;
 /** ñ só existe em espanhol, entre os idiomas considerados aqui. */
 const TIL_ES = /ñ/gi;
 
+/**
+ * Radicais de hashtag do português (item (b) da revisão do PR #46): uma
+ * hashtag como "#donadecasa" ou "#vidademae" não bate com nenhuma palavra
+ * inteira da lista, mas contém um desses radicais. Cada hashtag que contém
+ * pelo menos um radical soma 1 ponto para português, não importa quantos
+ * radicais ela contém.
+ */
+const RADICAIS_PT_HASHTAG = [
+  "dona", "casa", "limpeza", "faxina", "dicas", "vida", "mae", "receita", "organizacao",
+];
+
 function contarOcorrencias(texto: string, regex: RegExp): number {
   return texto.match(regex)?.length ?? 0;
+}
+
+function pontosHashtagPt(minusculo: string): number {
+  const hashtags = minusculo.match(/#\p{L}+/gu) ?? [];
+  return hashtags.filter((hashtag) => RADICAIS_PT_HASHTAG.some((radical) => hashtag.includes(radical))).length;
 }
 
 /**
@@ -78,7 +122,9 @@ export function detectarIdioma(texto: string): Idioma {
 
   const minusculo = texto.toLowerCase();
   const palavras = minusculo.match(/\p{L}+/gu) ?? [];
-  if (palavras.length < PALAVRAS_MINIMAS) return null;
+  const ambasPt = palavras.length === 2 && palavras.every((palavra) => CONJUNTO_PT.has(palavra));
+  const minimoNecessario = ambasPt ? PALAVRAS_MINIMAS_QUANDO_AMBAS_PT : PALAVRAS_MINIMAS;
+  if (palavras.length < minimoNecessario) return null;
 
   let pt = 0;
   let en = 0;
@@ -90,6 +136,10 @@ export function detectarIdioma(texto: string): Idioma {
   }
   pt += 2 * contarOcorrencias(minusculo, VOGAL_NASAL_PT);
   pt += 2 * contarOcorrencias(minusculo, SUFIXO_PT);
+  pt += 2 * contarOcorrencias(minusculo, SUFIXO_DIMINUTIVO_PT);
+  pt += 2 * contarOcorrencias(minusculo, SUFIXO_PRETERITO_PT);
+  pt += 2 * contarOcorrencias(minusculo, SUFIXO_AGEM_PT);
+  pt += pontosHashtagPt(minusculo);
   es += 2 * contarOcorrencias(minusculo, TIL_ES);
 
   const maximo = Math.max(pt, en, es);

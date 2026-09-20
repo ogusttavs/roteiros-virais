@@ -62,7 +62,10 @@ describe("normalizarBusinessDiscovery", () => {
         likes: 12000,
         comentarios: 300,
         midiaUrl: null,
-        idioma: null,
+        // Revisao do PR #46 (ajuste 2): "do" entrou na lista de palavras do
+        // portugues, e a legenda de exemplo ("legenda do post") passa a ter
+        // sinal de verdade, correto, ja que o texto e mesmo portugues.
+        idioma: "pt",
       },
     ]);
   });
