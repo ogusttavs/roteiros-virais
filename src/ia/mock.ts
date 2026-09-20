@@ -298,6 +298,7 @@ function mockExtrairVideo(entrada: string) {
     motivoNicho: pertenceAoNicho
       ? "a transcricao cita termo do nicho"
       : "a transcricao nao cita nenhum termo do nicho",
+    idioma: "pt-BR" as const,
   };
 }
 

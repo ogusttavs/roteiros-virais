@@ -19,8 +19,17 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * idioma original (achado do Gustavo no iPad, 06/09). `extrair-coleta.ts`
  * reprova com uma checagem barata de idioma (`src/lib/idioma.ts`) e refaz
  * uma vez com a instrucao de traducao reforcada.
+ *
+ * Idioma da fala (1.4.0, V2b item 3, escopo 5.11: o Brasil primeiro): a
+ * extracao le a transcricao inteira, entao e a fonte mais confiavel do
+ * idioma original do video (mais que o titulo/descricao, que
+ * `detectarIdioma` usa na coleta, `src/config/idioma.ts`). O campo novo
+ * sobrescreve `videos.idioma` por cima da deteccao por titulo em
+ * `extrair-coleta.ts`. Portugues de Portugal ("pt-PT") conta como
+ * internacional na proporcao 70/30 (decisao do Gustavo), por isso e um
+ * valor a parte de "pt-BR", nunca "pt".
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -35,6 +44,7 @@ export const schema = z.object({
   etiquetas: z.array(z.string()),
   pertenceAoNicho: z.boolean(),
   motivoNicho: z.string(),
+  idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]),
 });
 
 export type SaidaExtrairVideo = z.infer<typeof schema>;
@@ -59,6 +69,11 @@ literal e o tom.
   assunto qualquer). Diga true só quando o vídeo fala mesmo do assunto do nicho descrito
   abaixo; false quando não fala.
 - motivoNicho: uma frase curta explicando a decisão de pertenceAoNicho.
+- idioma: o idioma falado na transcrição original, antes de qualquer tradução sua: "pt-BR"
+  (português do Brasil), "pt-PT" (português de Portugal ou de outro país lusófono), "en"
+  (inglês), "es" (espanhol) ou "outro" (qualquer outro idioma). Julgue pelo sotaque, pelo
+  vocabulário e pelas expressões da transcrição, nunca pelo que você escreveu na ficha, que
+  sai sempre em português do Brasil.
 
 Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
 Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem
