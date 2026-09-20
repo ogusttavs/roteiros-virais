@@ -136,10 +136,13 @@ export type TemaPreferido = "claro" | "escuro" | "sistema";
 
 export const clientes = pgTable("clientes", {
   id: id(),
-  /** Usuario do better-auth que administra esta conta de cliente. */
+  /**
+   * Usuario do better-auth que criou esta marca, "o dono" (V3, item 1: com
+   * varias marcas por usuario, este campo deixa de ser unico e de ser a
+   * porta de entrada; quem decide acesso e a tabela `membrosMarca`, abaixo).
+   */
   usuarioId: text("usuario_id")
     .notNull()
-    .unique()
     .references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
@@ -161,21 +164,73 @@ export const clientes = pgTable("clientes", {
     .notNull()
     .default({ concorrentes: [], termos: [], perfisAdmirados: [] }),
   ativo: boolean("ativo").notNull().default(true),
+  /**
+   * Atualizado pelo layout do painel uma vez por dia, por qualquer pessoa
+   * com acesso (etapa 12, decisao 5; V3: e da marca, nao da pessoa, porque
+   * o lembrete de um membro considera a marca aberta quando qualquer outro
+   * membro dela ja abriu hoje).
+   */
+  ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
+  criadoEm: criadoEm(),
+});
+
+/** "dono" criou a marca e nao perde o acesso pela tela; "membro" foi convidado (V3, item 1). */
+export type PapelMarca = "dono" | "membro";
+
+/**
+ * O vinculo entre pessoa e marca (V3, item 1, escopo 4.13): um usuario pode
+ * ser membro de varias marcas (`clientes`), e uma marca pode ter varios
+ * membros. `clienteDaSessaoAtual` so abre uma marca de que o usuario e
+ * membro aqui, nunca por `clientes.usuarioId` sozinho.
+ */
+export const membrosMarca = pgTable(
+  "membros_marca",
+  {
+    id: id(),
+    usuarioId: text("usuario_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    papel: text("papel").$type<PapelMarca>().notNull().default("membro"),
+    /**
+     * Diferente de `clientes.ultimoAcessoEm` (a marca inteira, atualizado por
+     * qualquer membro): este e o acesso de uma pessoa especifica a esta
+     * marca especifica, para o cartao "Quem tem acesso" do admin (item 5).
+     */
+    ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [
+    uniqueIndex("membros_marca_usuario_cliente").on(t.usuarioId, t.clienteId),
+    index("membros_marca_usuario_id").on(t.usuarioId),
+    index("membros_marca_cliente_id").on(t.clienteId),
+  ],
+);
+
+/**
+ * O que e da pessoa, nao da marca (V3, itens 4, 6 e 7): hora do lembrete,
+ * quando o lembrete foi mandado pela ultima vez, e quando aceitou os termos.
+ * Antes da V3 ficavam em `clientes` (a marca); com uma pessoa em varias
+ * marcas, isso teria que valer para todas ao mesmo tempo, o que nao faz
+ * sentido (o Bruno pode querer lembrete as 8h de uma marca e as 20h de
+ * outra, mas so aceita os termos uma vez, na conta, nao por marca).
+ */
+export const preferenciasUsuario = pgTable("preferencias_usuario", {
+  usuarioId: text("usuario_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
   /** "HH:00", hora cheia de Brasilia (etapa 12, decisao 5 do PROXIMO.md: job lembrete). */
   horaLembrete: text("hora_lembrete").notNull().default("08:00"),
   /**
-   * Atualizado pelo layout do painel uma vez por dia (etapa 12, decisao 5):
-   * o job `lembrete` nao manda e-mail para quem ja abriu o painel hoje.
-   */
-  ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
-  /** Nulo ate aceitar; quem nao aceitou nao passa do layout (completo) (etapa 12, decisao 7). */
-  aceitouTermosEm: timestamp("aceitou_termos_em", { withTimezone: true }),
-  /**
-   * Gravado pelo job `lembrete` ao mandar o e-mail (etapa 13, ajuste 3): evita
-   * mandar duas vezes no mesmo dia (execucao manual ou repeticao do pg-boss).
+   * Gravado pelo job `lembrete` ao mandar o e-mail (etapa 13, ajuste 3; V3,
+   * item 6: agora um e-mail por pessoa, nao por marca): evita mandar duas
+   * vezes no mesmo dia.
    */
   ultimoLembreteEm: timestamp("ultimo_lembrete_em", { withTimezone: true }),
-  criadoEm: criadoEm(),
+  /** Nulo ate aceitar; quem nao aceitou nao passa do layout (completo) (etapa 12, decisao 7; V3, item 7: da pessoa). */
+  aceitouTermosEm: timestamp("aceitou_termos_em", { withTimezone: true }),
 });
 
 // ---------------------------------------------------------------------------

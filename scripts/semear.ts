@@ -16,7 +16,9 @@ import {
   briefings,
   clientes,
   contas,
+  membrosMarca,
   nichos,
+  preferenciasUsuario,
   user,
   videos,
   type AnaliseVideo,
@@ -289,17 +291,32 @@ export async function semear(db: Db): Promise<ResumoSeed> {
         persona: "negocio",
         perfis: { instagram: `@${clienteSeed.perfil}`, tiktok: null, youtube: null },
         quemGrava: clienteSeed.quemGrava,
-        /**
-         * Os dois clientes de seed ja aceitaram os termos (etapa 12,
-         * decisao 7): so o briefing de dentistas fica de proposito
-         * incompleto (comentario abaixo), o aceite dos termos e uma
-         * checagem separada, depois do briefing, e nao faz parte do que
-         * `briefing.spec.ts` testa.
-         */
-        aceitouTermosEm: new Date(),
       })
       .returning();
     totalClientes += 1;
+
+    /**
+     * V3, item 1: sem o membro "dono", `clienteDaSessaoAtual` nao acha
+     * marca nenhuma para este usuario (o vinculo deixou de ser so
+     * `clientes.usuarioId`).
+     */
+    await db.insert(membrosMarca).values({
+      usuarioId: clienteSeed.usuarioId,
+      clienteId: clienteCriado.id,
+      papel: "dono",
+    });
+
+    /**
+     * Os dois clientes de seed ja aceitaram os termos (etapa 12, decisao 7;
+     * V3, item 7: e da pessoa, nao mais da marca): so o briefing de
+     * dentistas fica de proposito incompleto (comentario acima), o aceite
+     * dos termos e uma checagem separada, depois do briefing, e nao faz
+     * parte do que `briefing.spec.ts` testa.
+     */
+    await db.insert(preferenciasUsuario).values({
+      usuarioId: clienteSeed.usuarioId,
+      aceitouTermosEm: new Date(),
+    });
 
     /**
      * So o cliente de limpeza ganha briefing ja compilado e completo (etapa
