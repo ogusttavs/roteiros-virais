@@ -18,6 +18,7 @@
     "checar-texto": "tsx scripts/checar-texto.ts",
     "checar-tokens": "tsx scripts/checar-tokens.ts",
     "checar-versao-prompt": "tsx scripts/checar-versao-prompt.ts",
+    "checar-admin-protegido": "tsx scripts/checar-admin-protegido.ts",
     "db:up": "docker compose -f compose.dev.yml up -d",
     "db:down": "docker compose -f compose.dev.yml down",
     "db:generate": "drizzle-kit generate",

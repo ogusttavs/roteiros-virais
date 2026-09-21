@@ -2,6 +2,7 @@ import * as Sentry from "@sentry/node";
 import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
+import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
@@ -75,8 +76,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const roteiroId = Number(id);
-  if (!Number.isFinite(roteiroId)) {
+  const roteiroId = idDaRotaOuNulo(id);
+  if (roteiroId === null) {
     return NextResponse.json({ erro: "roteiro invalido" }, { status: 404 });
   }
 

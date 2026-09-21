@@ -2,6 +2,7 @@ import { List } from "lucide-react";
 import Link from "next/link";
 
 import type { AvaliacaoGeracao } from "@/db/schema";
+import { exigirAdmin } from "@/lib/sessao";
 import {
   custoPorClientePorMes,
   listarClientesComGeracao,
@@ -55,6 +56,8 @@ type SearchParams = { periodo?: string; tarefa?: string; clienteId?: string };
  * roteiro de cliente aparece aqui, so contagem e motivo.
  */
 export default async function AdminGeracoes({ searchParams }: { searchParams: Promise<SearchParams> }) {
+  await exigirAdmin();
+
   const params = await searchParams;
   const dias = params.periodo === "30" ? 30 : 7;
   const tarefa = params.tarefa || undefined;

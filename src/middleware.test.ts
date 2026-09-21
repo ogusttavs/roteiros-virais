@@ -10,7 +10,7 @@ import { getSessionCookie } from "better-auth/cookies";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { middleware } from "./middleware";
+import { config, middleware } from "./middleware";
 
 /** `vi.mock` e hoisted pelo Vitest para o topo do arquivo, antes de todos os imports acima. */
 vi.mock("better-auth/cookies", () => ({ getSessionCookie: vi.fn() }));
@@ -69,6 +69,51 @@ describe("middleware", () => {
       const resposta = middleware(requisicao("/roteiros/42/gravar"));
       expect(resposta.status).toBe(307);
       expect(new URL(resposta.headers.get("location")!).pathname).toBe("/entrar");
+    });
+  });
+
+  /**
+   * O `matcher` decide quais pedidos chegam ate a funcao `middleware` (o
+   * Next.js confere isto antes de rodar o codigo acima); testar a funcao nao
+   * basta. Achado de seguranca, 20/09/2026: a exclusao antiga por formato
+   * (`.*\.\w+$`) tratava `/admin/clientes/1.0` como se fosse um arquivo com
+   * extensao ".0", e esse pedido nunca chegava ao middleware.
+   */
+  describe("matcher (lista explicita de arquivo estatico, nao exclusao por formato)", () => {
+    const regexDoMatcher = new RegExp(`^${config.matcher[0]}$`);
+
+    function passaPeloMiddleware(pathname: string): boolean {
+      return regexDoMatcher.test(pathname);
+    }
+
+    it("um id de cliente com falsa extensao (1.0) continua passando pelo middleware", () => {
+      expect(passaPeloMiddleware("/admin/clientes/1.0")).toBe(true);
+      expect(passaPeloMiddleware("/admin/geracoes/1.0")).toBe(true);
+    });
+
+    it("uma tela comum continua passando pelo middleware", () => {
+      expect(passaPeloMiddleware("/hoje")).toBe(true);
+      expect(passaPeloMiddleware("/roteiros/42")).toBe(true);
+    });
+
+    it("os arquivos estaticos da lista explicita ficam de fora do middleware", () => {
+      expect(passaPeloMiddleware("/favicon.ico")).toBe(false);
+      expect(passaPeloMiddleware("/favicon.svg")).toBe(false);
+      expect(passaPeloMiddleware("/favicon-16.png")).toBe(false);
+      expect(passaPeloMiddleware("/favicon-32.png")).toBe(false);
+      expect(passaPeloMiddleware("/favicon-48.png")).toBe(false);
+      expect(passaPeloMiddleware("/apple-touch-icon.png")).toBe(false);
+      expect(passaPeloMiddleware("/icone-192.png")).toBe(false);
+      expect(passaPeloMiddleware("/icone-512.png")).toBe(false);
+      expect(passaPeloMiddleware("/icone-maskable-512.png")).toBe(false);
+      expect(passaPeloMiddleware("/manifest.webmanifest")).toBe(false);
+      expect(passaPeloMiddleware("/marca/klaki-logotipo.svg")).toBe(false);
+    });
+
+    it("_next/static, _next/image e api/auth continuam de fora", () => {
+      expect(passaPeloMiddleware("/_next/static/chunk.js")).toBe(false);
+      expect(passaPeloMiddleware("/_next/image/foo")).toBe(false);
+      expect(passaPeloMiddleware("/api/auth/session")).toBe(false);
     });
   });
 });

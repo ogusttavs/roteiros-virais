@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
+import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
@@ -12,7 +13,7 @@ type Props = { params: Promise<{ id: string }> };
 /** `/roteiros/[id]` (etapa 11, brief-frontend.md 6.5; `RoteiroTela.dc.html`). */
 export default async function Roteiro({ params }: Props) {
   const { id } = await params;
-  const roteiroId = Number(id);
+  const roteiroId = idDaRotaOuNulo(id);
 
   const sessao = await sessaoAtual();
   if (!sessao) {
@@ -24,8 +25,8 @@ export default async function Roteiro({ params }: Props) {
     redirect("/entrar");
   }
 
-  if (!Number.isFinite(roteiroId)) {
-    redirect("/hoje");
+  if (roteiroId === null) {
+    notFound();
   }
 
   const roteiro = await roteiroPorId(roteiroId, cliente.id);

@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { iniciaisDe } from "@/lib/iniciais";
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirAdmin } from "@/lib/sessao";
 import { textosAdmin } from "@/textos/admin";
 import { Simbolo } from "@/ui/Logo";
 
@@ -12,15 +11,14 @@ import styles from "./layout.module.css";
 
 const t = textosAdmin.navegacao;
 
-/** Casca do admin: abas, largura total, sem a navegacao do cliente (CascaAdmin.dc.html). */
+/**
+ * Casca do admin: abas, largura total, sem a navegacao do cliente
+ * (CascaAdmin.dc.html). `exigirAdmin` tambem e chamado na primeira linha de
+ * cada `page.tsx` do admin; o layout continua conferindo aqui como segunda
+ * camada, e o `cache` do React evita repetir a leitura da sessao.
+ */
 export default async function LayoutAdmin({ children }: { children: ReactNode }) {
-  const sessao = await sessaoAtual();
-  if (!sessao) {
-    redirect("/entrar");
-  }
-  if (sessao.user.role !== "admin") {
-    redirect("/hoje");
-  }
+  const sessao = await exigirAdmin();
 
   return (
     <div className={styles.pagina}>
