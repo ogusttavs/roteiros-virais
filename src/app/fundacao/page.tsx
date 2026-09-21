@@ -82,7 +82,7 @@ export default function Fundacao() {
       <header className={styles.cabecalho}>
         <div className={styles.identidade}>
           <Simbolo altura={24} />
-          <span>{config.appName}</span>
+          <span data-app-name="">{config.appName}</span>
         </div>
         <AlternarTema />
       </header>

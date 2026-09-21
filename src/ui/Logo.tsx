@@ -16,7 +16,13 @@ type Props = {
  */
 export function Logo({ altura = 28 }: Props) {
   return (
-    <span className={styles.marca} style={{ height: altura }} role="img" aria-label={config.appName}>
+    <span
+      className={styles.marca}
+      style={{ height: altura }}
+      role="img"
+      aria-label={config.appName}
+      data-logotipo=""
+    >
       {/* eslint-disable-next-line @next/next/no-img-element -- SVG de marca, arquivo estático, sem otimização de imagem. */}
       <img src="/marca/klaki-logotipo.svg" alt="" className={styles.claro} />
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -32,7 +38,13 @@ export function Logo({ altura = 28 }: Props) {
  */
 export function Simbolo({ altura = 24 }: Props) {
   return (
-    <span className={styles.marca} style={{ height: altura }} role="img" aria-label={config.appName}>
+    <span
+      className={styles.marca}
+      style={{ height: altura }}
+      role="img"
+      aria-label={config.appName}
+      data-simbolo=""
+    >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/marca/klaki-simbolo.svg" alt="" className={styles.claro} />
       {/* eslint-disable-next-line @next/next/no-img-element */}

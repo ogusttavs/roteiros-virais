@@ -8,7 +8,7 @@ export default function Inicio() {
   return (
     <main className={styles.pagina}>
       <Simbolo altura={32} />
-      <h1>{config.appName}</h1>
+      <h1 data-app-name="">{config.appName}</h1>
       <p className={styles.descricao}>{textosInicio.descricao}</p>
     </main>
   );

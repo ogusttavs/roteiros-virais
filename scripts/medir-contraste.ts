@@ -16,8 +16,8 @@
  * Uso: `npx tsx scripts/medir-contraste.ts` (precisa de `npm run dev`
  * rodando; `CAPTURAS_URL` para apontar para outra porta).
  */
-import { eq } from "drizzle-orm";
 import { chromium, type Page } from "@playwright/test";
+import { eq } from "drizzle-orm";
 
 import { db, getPool } from "../src/db";
 import { roteiros } from "../src/db/schema";

@@ -57,7 +57,9 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
           <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
           <div className={styles.identidadeDesktop}>
             <Simbolo altura={24} />
-            <span className={styles.nomeDesktop}>{config.appName}</span>
+            <span className={styles.nomeDesktop} data-app-name="">
+              {config.appName}
+            </span>
           </div>
           <Nav compactavel />
           <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={sessao.user.name} />

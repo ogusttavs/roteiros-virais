@@ -41,9 +41,10 @@ const USUARIO_SEED = "seed-cliente-limpeza";
 const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
 const EMAIL_ADMIN = "admin@exemplo.teste";
 
+/** As tres larguras do PROXIMO.md desta etapa: 820, nao 1024 (o iPad Air em pe, tablet como tamanho proprio). */
 const TAMANHOS = [
   { rotulo: "390", largura: 390, altura: 844 },
-  { rotulo: "1024", largura: 1024, altura: 768 },
+  { rotulo: "820", largura: 820, altura: 1180 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
 const MODOS = [
@@ -70,7 +71,7 @@ function avaliacaoExemplo(nota: number): AvaliacaoResposta {
 }
 
 /** Garante um roteiro pronto (não gerado pela IA, direto no banco) para Roteiro e Histórico. */
-async function garantirRoteiro(clienteId: number, nichoId: number): Promise<number> {
+async function garantirRoteiro(clienteId: number): Promise<number> {
   const tema = "[exemplo] o erro que faz a mancha voltar depois da limpeza";
   const existente = await db().select().from(roteiros).where(eq(roteiros.tema, tema));
   if (existente.length > 0) return existente[0].id;
@@ -260,7 +261,7 @@ async function main(): Promise<void> {
   }
 
   await garantirVideosReferencia(cliente.nichoId);
-  const roteiroId = await garantirRoteiro(cliente.id, cliente.nichoId);
+  const roteiroId = await garantirRoteiro(cliente.id);
   await garantirTemasDeHoje(cliente.nichoId);
   await preencherBriefingCompleto(cliente.id);
 

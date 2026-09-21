@@ -40,7 +40,9 @@ function CabecalhoSimples() {
   return (
     <header className={styles.cabecalho}>
       <Simbolo altura={24} />
-      <span className={styles.nomeProduto}>{config.appName}</span>
+      <span className={styles.nomeProduto} data-app-name="">
+        {config.appName}
+      </span>
       <BotaoSair className={styles.botaoSair} />
     </header>
   );
