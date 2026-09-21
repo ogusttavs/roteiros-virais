@@ -28,6 +28,7 @@ import {
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { aplicarTetoPorConta } from "@/servicos/teto-por-conta";
 
 export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
@@ -708,6 +709,7 @@ export async function referenciasDoNicho(
         plataforma: videos.plataforma,
         url: videos.url,
         titulo: videos.titulo,
+        contaId: videos.contaId,
         contaHandle: contas.handle,
         contaNome: contas.nome,
         contaMedianaOrigem: contas.medianaOrigem,
@@ -740,10 +742,19 @@ export async function referenciasDoNicho(
     (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
     proporcaoBrasil,
   );
+  /**
+   * O teto por conta (V6, atualização do `PROXIMO.md`): só no segmento "Fora
+   * da curva" (`apenasIds` é o segmento "Salvos", uma lista pequena e
+   * intencional, sem sentido limitar por conta ali). No máximo 2 cartões
+   * seguidos da mesma conta, no máximo 3 no total.
+   */
+  const comTetoPorConta = filtros.apenasIds
+    ? comProporcao
+    : aplicarTetoPorConta(comProporcao, (l) => l.contaId ?? -1);
 
   return {
     total: contagem[0]?.total ?? 0,
-    videos: comProporcao.map((l) => ({
+    videos: comTetoPorConta.map((l) => ({
       id: l.id,
       plataforma: l.plataforma,
       url: l.url,

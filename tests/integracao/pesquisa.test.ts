@@ -384,9 +384,18 @@ describe("evidenciaParaTema", () => {
 
 describe("referenciasDoNicho", () => {
   it("ordena por publicado_em desc (mais recente primeiro, diferenca de foraDaCurvaDoNicho), so com analise", async () => {
+    // Conta propria para os dois: a conta padrao do arquivo, compartilhada com describes
+    // anteriores, ja pode ter 3 ou mais videos fora da curva quando este teste roda, e o
+    // teto por conta (V6) cortaria um dos dois sem isso (achado com a chegada do teto).
+    const [contaPropria] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-ordenacao", nichoId })
+      .returning();
+
     await criarVideo("ref-antigo", {
       foraDaCurva: 9,
       publicadoEm: diasAtras(10),
+      contaId: contaPropria.id,
       analise: {
         assunto: "assunto antigo",
         gancho: "gancho antigo",
@@ -398,6 +407,7 @@ describe("referenciasDoNicho", () => {
     await criarVideo("ref-recente", {
       foraDaCurva: 3,
       publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
       analise: {
         assunto: "assunto recente",
         gancho: "gancho recente",
@@ -406,7 +416,11 @@ describe("referenciasDoNicho", () => {
         formato: "podcast",
       },
     });
-    const semAnalise = await criarVideo("ref-sem-analise", { foraDaCurva: 20, publicadoEm: diasAtras(1) });
+    const semAnalise = await criarVideo("ref-sem-analise", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
+    });
 
     const resultado = await referenciasDoNicho(nichoId, { periodoDias: 90 });
     const relevantes = resultado.videos.filter((v) => v.assunto === "assunto recente" || v.assunto === "assunto antigo");
@@ -418,6 +432,14 @@ describe("referenciasDoNicho", () => {
 
   /** Achado do primeiro uso no iPad, item 4: "1,0x" e "0,7x" apareciam como se fossem referencia. */
   it("so entra video fora da curva de verdade (>= 1,5x); na media ou abaixo, fica de fora", async () => {
+    // Conta propria (mesmo raciocinio do teste de ordenacao, acima): sem isso, o teste fica
+    // dependente de quantos videos fora da curva a conta compartilhada ja tinha quando este
+    // teste roda, por causa do teto por conta (V6).
+    const [contaPropria] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-limiar", nichoId })
+      .returning();
+
     const analiseExemplo = {
       assunto: "assunto do limiar",
       gancho: "gancho",
@@ -428,16 +450,19 @@ describe("referenciasDoNicho", () => {
     const naMedia = await criarVideo("ref-na-media", {
       foraDaCurva: 1.0,
       publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
       analise: { ...analiseExemplo, assunto: "na media" },
     });
     const abaixo = await criarVideo("ref-abaixo", {
       foraDaCurva: 0.7,
       publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
       analise: { ...analiseExemplo, assunto: "abaixo do normal" },
     });
     await criarVideo("ref-no-limiar", {
       foraDaCurva: 1.5,
       publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
       analise: { ...analiseExemplo, assunto: "no limiar" },
     });
 
@@ -704,6 +729,71 @@ describe("referenciasDoNicho", () => {
 
       expect(resultado.videos.length).toBeLessThanOrEqual(2);
       expect(resultado.total).toBe(5);
+    });
+
+    /**
+     * V6, atualização do `PROXIMO.md`: a força-tarefa mediu em 19/09 que a
+     * lista era quase toda de uma conta só. Quatro vídeos da mesma conta
+     * (mais recentes primeiro) e um de outra conta, intercalados: sem o
+     * teto, os quatro da mesma conta viriam seguidos antes do outro.
+     */
+    it("no máximo 2 cartões seguidos da mesma conta, no máximo 3 no total (teto por conta)", async () => {
+      const { nichoId: id, contaId: contaMuitos } = await nichoIsolado("pesquisa-filtro-teto-conta-teste");
+      const [contaPoucos] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: "conta-teto-outra", nichoId: id })
+        .returning();
+
+      for (let i = 1; i <= 4; i += 1) {
+        await criarVideo(`ref-teto-muitos-${i}`, {
+          foraDaCurva: 5,
+          publicadoEm: diasAtras(i), // mais recente primeiro: 1 vem antes de 2, 2 antes de 3...
+          contaId: contaMuitos,
+          nichoId: id,
+          analise: { ...analiseExemplo, assunto: `video da conta com muitos ${i}` },
+        });
+      }
+      await criarVideo("ref-teto-poucos-1", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(5), // o mais antigo de todos, sem o teto ficaria por ultimo
+        contaId: contaPoucos.id,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: "video da conta com poucos" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, limite: 10 });
+
+      // O quarto video da conta com muitos nunca entra (teto total de 3).
+      expect(resultado.videos.filter((v) => v.assunto.includes("conta com muitos"))).toHaveLength(3);
+      // Nao ha 3 seguidos da mesma conta na lista final.
+      const contaPorPosicao = resultado.videos.map((v) => (v.assunto.includes("conta com muitos") ? "muitos" : "poucos"));
+      for (let i = 0; i + 2 < contaPorPosicao.length; i += 1) {
+        const trio = [contaPorPosicao[i], contaPorPosicao[i + 1], contaPorPosicao[i + 2]];
+        expect(trio.every((c) => c === "muitos")).toBe(false);
+      }
+    });
+
+    it("o segmento Salvos (apenasIds) nao aplica o teto por conta", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-teto-salvos-teste");
+      const videosCriados = [];
+      for (let i = 1; i <= 4; i += 1) {
+        const v = await criarVideo(`ref-teto-salvos-${i}`, {
+          foraDaCurva: 5,
+          publicadoEm: diasAtras(i),
+          contaId: cId,
+          nichoId: id,
+          analise: { ...analiseExemplo, assunto: `video salvo ${i}` },
+        });
+        videosCriados.push(v);
+      }
+
+      const resultado = await referenciasDoNicho(id, {
+        periodoDias: 90,
+        apenasIds: videosCriados.map((v) => v.id),
+      });
+
+      // Os quatro entram: apenasIds (o segmento Salvos) nao tem o teto por conta.
+      expect(resultado.videos).toHaveLength(4);
     });
   });
 });
