@@ -82,3 +82,5 @@ jobs:
       - run: npm run checar-tokens
 
       - run: npm run checar-versao-prompt
+
+      - run: npm run checar-admin-protegido

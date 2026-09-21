@@ -23,7 +23,7 @@ npm run dev                # painel em http://localhost:3000
 npm run worker             # processo de jobs (pg-boss)
 npm run job -- <nome>      # rodar um job uma vez
 npm run admin:criar        # cria o primeiro admin (ADMIN_EMAIL, ADMIN_NOME, ADMIN_SENHA no ambiente)
-npm run lint && npm run typecheck && npm run test && npm run checar-texto && npm run build
+npm run lint && npm run typecheck && npm run test && npm run checar-texto && npm run checar-admin-protegido && npm run build
 npm run test:e2e           # Playwright contra `next build` mais `next start`; demora uns 2
                             # minutos; reusa um servidor já na porta 3000 fora de CI
 deploy/ensaio/ensaiar.sh   # ensaio do Compose de produção nesta máquina, antes de qualquer
