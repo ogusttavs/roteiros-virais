@@ -511,3 +511,137 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     });
   }
 });
+
+/**
+ * Referências no design v2 (V6, D2 parte 3a): 390, 820 e 1280 (o iPad Air em
+ * pé, como a V5 e a V5b passaram a usar), não 1024. Estados normal, filtrar
+ * e detalhes.
+ */
+const EMAIL_REFERENCIAS = "e2e-layout-referencias@exemplo.teste";
+const LARGURAS_V6 = [
+  { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "820", largura: 820, altura: 1180 },
+  { rotulo: "1280", largura: 1280, altura: 800 },
+];
+
+test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
+  test.beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "e2e-layout-referencias", nome: "[teste] Layout Referências" })
+      .returning();
+
+    await db().insert(user).values({ id: "e2e-layout-referencias", name: "[teste] Layout Referências", email: EMAIL_REFERENCIAS });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-layout-referencias-credential",
+        issuer: "local:credential",
+        accountId: "e2e-layout-referencias",
+        providerId: "credential",
+        userId: "e2e-layout-referencias",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-layout-referencias", nome: "[teste] Layout Referências", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-layout-referencias", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-layout-referencias", aceitouTermosEm: new Date() });
+
+    await db()
+      .insert(briefings)
+      .values({
+        clienteId: cliente.id,
+        completo: true,
+        perfil: {
+          fatos: {
+            oQueVende: "kit tira-mancha para estofados",
+            preco: "kit a partir de 89 reais",
+            clienteIdeal: "mora em apartamento",
+            medos: [],
+            frasesDaFala: [],
+            proibicoes: [],
+            cenasFilmaveis: [],
+            concorrentes: [],
+            perfisAdmirados: [],
+          },
+          resumo: "marca propria de produtos de limpeza",
+          referencias: [],
+        },
+      });
+
+    const [conta] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "instagram",
+        handle: "@e2e-layout-referencias",
+        nome: "[teste] Casa em Ordem",
+        nichoId: nicho.id,
+        medianaViews: "5000",
+        medianaOrigem: "conta",
+      })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "instagram",
+        idExterno: "e2e-layout-referencias-1",
+        url: "https://exemplo.invalido/e2e-layout-referencias-1",
+        nichoId: nicho.id,
+        contaId: conta.id,
+        titulo: "o produto que tira qualquer mancha do estofado, um titulo bem comprido para testar a reticencia",
+        views: 120000,
+        foraDaCurva: "24.0",
+        velocidade: "4000",
+        idioma: "pt",
+        publicadoEm: new Date(),
+        analise: {
+          assunto: "mancha em estofado",
+          gancho: "Abre com a mao ja esfregando a mancha, sem falar por dois segundos.",
+          estrutura: "Aplica o produto sem cortar o video, falando o tempo de espera em voz alta.",
+          fechamento: "Resumo do antes e depois.",
+          chamadaFinal: "Comenta se voce ja passou por isso.",
+          formato: "fala_para_camera",
+          porQueFuncionou: "A pessoa ve o problema dela na tela nos dois primeiros segundos e fica para saber se resolve.",
+        } as never,
+      });
+  });
+
+  async function entrarReferencias(page: Page) {
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(EMAIL_REFERENCIAS);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+  }
+
+  for (const { rotulo, largura, altura } of LARGURAS_V6) {
+    test(`Referências, normal, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarReferencias(page);
+      await page.goto("/referencias");
+      await expect(page.getByRole("heading", { name: "O que está funcionando no seu setor" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Referências, folha filtrar, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarReferencias(page);
+      await page.goto("/referencias");
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Referências, folha detalhes, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarReferencias(page);
+      await page.goto("/referencias");
+      await page.getByRole("button", { name: "Ver detalhes" }).first().click();
+      await expect(page.getByRole("dialog", { name: "Por que esse funcionou" })).toBeVisible();
+      await conferirLayout(page);
+    });
+  }
+});

@@ -28,6 +28,7 @@ import {
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { aplicarTetoPorConta } from "@/servicos/teto-por-conta";
 
 export type ModeloNichoLinha = typeof modelosNicho.$inferSelect;
 
@@ -592,6 +593,8 @@ export type VideoReferencia = {
   id: number;
   plataforma: Plataforma;
   url: string;
+  /** Uma linha, com reticências na tela; o normalizador garante título nas três plataformas desde a E6 parte 3. */
+  titulo: string | null;
   contaHandle: string | null;
   /**
    * O YouTube grava o id do canal em `contas.handle` (nunca um @handle
@@ -604,6 +607,11 @@ export type VideoReferencia = {
   contaMedianaOrigem: MedianaOrigem | null;
   publicadoEm: Date | null;
   foraDaCurva: number;
+  views: number;
+  /** `contas.medianaViews`: já reflete a origem certa (conta, seguidores ou setor), é sempre um número só. */
+  medianaConta: number | null;
+  /** views por hora; `pontuar.ts` só preenche entre 2 e 7 dias depois da publicação. */
+  velocidade: number | null;
   assunto: string;
   gancho: string;
   estrutura: string;
@@ -620,11 +628,60 @@ export type VideoReferencia = {
  */
 const LIMIAR_FORA_DA_CURVA_CONSULTA = String(LIMIAR_FORA_DA_CURVA);
 
+export type FiltrosReferencias = {
+  /** 7, 30 ou 90; padrão 7, como o design. */
+  periodoDias?: number;
+  /** Assunto ou conta (V6, item 1): a coluna `busca` (tsvector) mais `contas.nome`. */
+  busca?: string;
+  plataformas?: Plataforma[];
+  formatos?: AnaliseVideo["formato"][];
+  /** O segmento "Salvos" (V6, item 2): restringe aos vídeos favoritados, sem estado próprio de consulta. */
+  apenasIds?: number[];
+  limite?: number;
+  proporcaoBrasil?: number;
+};
+
+export type ResultadoReferencias = {
+  videos: VideoReferencia[];
+  /** Quantos vídeos batem nos filtros, sem o corte de `limite` nem a cota 70/30 (é o número do rótulo da tela). */
+  total: number;
+};
+
+/** As condições que a lista e a contagem de `referenciasDoNicho` compartilham (V6, item 1). */
+function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias) {
+  const condicoes = [
+    eq(videos.nichoId, nichoId),
+    gte(videos.publicadoEm, diasAtras(filtros.periodoDias ?? 7)),
+    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
+    isNotNull(videos.analise),
+    PERTENCE_AO_NICHO,
+  ];
+  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  if (filtros.apenasIds) condicoes.push(inArray(videos.id, filtros.apenasIds.length > 0 ? filtros.apenasIds : [-1]));
+  if (filtros.plataformas && filtros.plataformas.length > 0) {
+    condicoes.push(inArray(videos.plataforma, filtros.plataformas));
+  }
+  if (filtros.formatos && filtros.formatos.length > 0) {
+    const formatosSql = sql.join(
+      filtros.formatos.map((f) => sql`${f}`),
+      sql`, `,
+    );
+    condicoes.push(sql`(${videos.analise} ->> 'formato') = any(array[${formatosSql}]::text[])`);
+  }
+  const busca = filtros.busca?.trim();
+  if (busca) {
+    condicoes.push(sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${busca}) or ${contas.nome} ilike ${`%${busca}%`})`);
+  }
+  return condicoes;
+}
+
 /**
  * A biblioteca de referências (etapa 12, decisão 1 do `PROXIMO.md`, brief
- * 6.6): fora da curva do nicho, mais recentes primeiro (não por
- * `foraDaCurva`, diferença de `foraDaCurvaDoNicho`), com a ficha de análise
- * inteira para as três linhas do cartão e o filtro de formato. Só vídeo já
+ * 6.6; refeita na V6, item 1, D2 parte 3a): fora da curva do nicho, mais
+ * recentes primeiro (não por `foraDaCurva`, diferença de
+ * `foraDaCurvaDoNicho`), com a ficha de análise inteira para o cartão de
+ * métricas e a folha de detalhes, e os filtros da tela (período, busca,
+ * plataforma, formato) aplicados aqui, não no cliente. Só vídeo já
  * analisado entra (sem `analise` não tem o que mostrar).
  *
  * Filtra por `foraDaCurva >= 1,5` (achado do primeiro uso no iPad, item 4):
@@ -633,43 +690,50 @@ const LIMIAR_FORA_DA_CURVA_CONSULTA = String(LIMIAR_FORA_DA_CURVA);
  *
  * V2b, item 6: a proporção 70/30 corta por página (o `limite` de cada
  * chamada), então o pool buscado no SQL também cresce por
- * `FATOR_POOL_BRASIL`, mesmo raciocínio de `evidenciaParaTema`.
+ * `FATOR_POOL_BRASIL`, mesmo raciocínio de `evidenciaParaTema`. `total` vem
+ * de uma contagem à parte, com as mesmas condições mas sem `limit` nem a
+ * cota: é "quantos vídeos existem", não "quantos a página mostra".
  */
 export async function referenciasDoNicho(
   nichoId: number,
-  dias = 90,
-  limite = 60,
-  proporcaoBrasil = config.regras.proporcaoBrasil,
-): Promise<VideoReferencia[]> {
-  const condicoes = [
-    eq(videos.nichoId, nichoId),
-    gte(videos.publicadoEm, diasAtras(dias)),
-    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
-    isNotNull(videos.analise),
-    PERTENCE_AO_NICHO,
-  ];
-  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  filtros: FiltrosReferencias = {},
+): Promise<ResultadoReferencias> {
+  const limite = filtros.limite ?? 60;
+  const proporcaoBrasil = filtros.proporcaoBrasil ?? config.regras.proporcaoBrasil;
+  const condicoes = condicoesReferencias(nichoId, filtros);
 
-  const linhas = await db()
-    .select({
-      id: videos.id,
-      plataforma: videos.plataforma,
-      url: videos.url,
-      contaHandle: contas.handle,
-      contaNome: contas.nome,
-      contaMedianaOrigem: contas.medianaOrigem,
-      publicadoEm: videos.publicadoEm,
-      foraDaCurva: videos.foraDaCurva,
-      analise: videos.analise,
-      idioma: videos.idioma,
-      contaPais: contas.pais,
-      contaIdiomaPrincipal: contas.idiomaPrincipal,
-    })
-    .from(videos)
-    .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoes))
-    .orderBy(desc(videos.publicadoEm), asc(videos.id))
-    .limit(limite * FATOR_POOL_BRASIL);
+  const [linhas, contagem] = await Promise.all([
+    db()
+      .select({
+        id: videos.id,
+        plataforma: videos.plataforma,
+        url: videos.url,
+        titulo: videos.titulo,
+        contaId: videos.contaId,
+        contaHandle: contas.handle,
+        contaNome: contas.nome,
+        contaMedianaOrigem: contas.medianaOrigem,
+        publicadoEm: videos.publicadoEm,
+        foraDaCurva: videos.foraDaCurva,
+        views: videos.views,
+        medianaConta: contas.medianaViews,
+        velocidade: videos.velocidade,
+        analise: videos.analise,
+        idioma: videos.idioma,
+        contaPais: contas.pais,
+        contaIdiomaPrincipal: contas.idiomaPrincipal,
+      })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes))
+      .orderBy(desc(videos.publicadoEm), asc(videos.id))
+      .limit(limite * FATOR_POOL_BRASIL),
+    db()
+      .select({ total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes)),
+  ]);
 
   const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
   const comProporcao = aplicarProporcaoBrasil(
@@ -678,22 +742,88 @@ export async function referenciasDoNicho(
     (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
     proporcaoBrasil,
   );
+  /**
+   * O teto por conta (V6, atualização do `PROXIMO.md`): só no segmento "Fora
+   * da curva" (`apenasIds` é o segmento "Salvos", uma lista pequena e
+   * intencional, sem sentido limitar por conta ali). No máximo 2 cartões
+   * seguidos da mesma conta, no máximo 3 no total.
+   */
+  const comTetoPorConta = filtros.apenasIds
+    ? comProporcao
+    : aplicarTetoPorConta(comProporcao, (l) => l.contaId ?? -1);
 
-  return comProporcao.map((l) => ({
-    id: l.id,
-    plataforma: l.plataforma,
-    url: l.url,
-    contaHandle: l.contaHandle,
-    contaNome: l.contaNome,
-    contaMedianaOrigem: l.contaMedianaOrigem,
-    publicadoEm: l.publicadoEm,
-    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
-    assunto: l.analise.assunto,
-    gancho: l.analise.gancho,
-    estrutura: l.analise.estrutura,
-    porQueFuncionou: l.analise.porQueFuncionou,
-    formato: l.analise.formato,
-  }));
+  return {
+    total: contagem[0]?.total ?? 0,
+    videos: comTetoPorConta.map((l) => ({
+      id: l.id,
+      plataforma: l.plataforma,
+      url: l.url,
+      titulo: l.titulo,
+      contaHandle: l.contaHandle,
+      contaNome: l.contaNome,
+      contaMedianaOrigem: l.contaMedianaOrigem,
+      publicadoEm: l.publicadoEm,
+      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+      views: l.views,
+      medianaConta: l.medianaConta === null ? null : Number(l.medianaConta),
+      velocidade: l.velocidade === null ? null : Number(l.velocidade),
+      assunto: l.analise.assunto,
+      gancho: l.analise.gancho,
+      estrutura: l.analise.estrutura,
+      porQueFuncionou: l.analise.porQueFuncionou,
+      formato: l.analise.formato,
+    })),
+  };
+}
+
+export type ContagensFiltroReferencias = {
+  porPlataforma: Record<Plataforma, number>;
+  porFormato: Record<AnaliseVideo["formato"], number>;
+};
+
+/**
+ * A contagem que a folha "Filtrar" mostra ao lado de cada opção (V6, item 3):
+ * quantos vídeos aquela opção devolveria, contra o período e a busca de
+ * agora, mas sem considerar a própria plataforma nem o próprio formato (as
+ * duas listas são independentes uma da outra, não uma combinação). Mesmas
+ * condições de `referenciasDoNicho`, agrupadas.
+ */
+export async function contagensPorFiltroReferencias(
+  nichoId: number,
+  filtros: Pick<FiltrosReferencias, "periodoDias" | "busca" | "apenasIds"> = {},
+): Promise<ContagensFiltroReferencias> {
+  const condicoes = condicoesReferencias(nichoId, filtros);
+
+  const [porPlataformaLinhas, porFormatoLinhas] = await Promise.all([
+    db()
+      .select({ plataforma: videos.plataforma, total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes))
+      .groupBy(videos.plataforma),
+    db()
+      .select({ formato: sql<string>`${videos.analise} ->> 'formato'`, total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes))
+      .groupBy(sql`${videos.analise} ->> 'formato'`),
+  ]);
+
+  const porPlataforma = { youtube: 0, tiktok: 0, instagram: 0 } as Record<Plataforma, number>;
+  for (const linha of porPlataformaLinhas) porPlataforma[linha.plataforma] = linha.total;
+
+  const porFormato = {
+    fala_para_camera: 0,
+    podcast: 0,
+    caixinha: 0,
+    esquete: 0,
+    outro: 0,
+  } as Record<AnaliseVideo["formato"], number>;
+  for (const linha of porFormatoLinhas) {
+    if (linha.formato in porFormato) porFormato[linha.formato as AnaliseVideo["formato"]] = linha.total;
+  }
+
+  return { porPlataforma, porFormato };
 }
 
 export type VideoParaEmbed = {

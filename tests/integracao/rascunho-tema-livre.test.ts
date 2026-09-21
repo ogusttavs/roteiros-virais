@@ -1,11 +1,13 @@
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2 do `PROXIMO.md`): uma linha
- * por pessoa e por marca, sem prazo, que some quando a avaliação daquele
- * texto termina com sucesso e continua se ela der erro. Testa a Server
- * Action (a rota de verdade que a tela chama, mesmo padrão de
- * `isolamento-rotas-briefing.test.ts`), com duas marcas diferentes e duas
- * pessoas na mesma marca (item 2: "duas pessoas na mesma marca podem estar
- * escrevendo assuntos diferentes").
+ * O rascunho de `/hoje/tema-livre` (V5b, item 2 do `PROXIMO.md`; item 0 da
+ * V6, resto da revisão do PR #50): uma linha por pessoa e por marca, sem
+ * prazo, que **não** some quando a avaliação termina com sucesso (decisão
+ * do Fable, `entregaveis/design-v2/BRIEF.md`, Tema livre, ponto 3); só
+ * some quando a pessoa avalia outro assunto ou apaga o campo (texto
+ * vazio). Testa a Server Action (a rota de verdade que a tela chama,
+ * mesmo padrão de `isolamento-rotas-briefing.test.ts`), com duas marcas
+ * diferentes e duas pessoas na mesma marca (item 2: "duas pessoas na
+ * mesma marca podem estar escrevendo assuntos diferentes").
  */
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -138,16 +140,37 @@ describe("rascunho de tema livre, isolado por usuario e por marca", () => {
     expect(await rascunhoDireto("rascunho-membro-a", marcaA.id)).toBe("segunda versao, substitui a primeira");
   });
 
-  it("avaliar com sucesso apaga o rascunho de quem avaliou; nao mexe no rascunho de outra pessoa na mesma marca", async () => {
+  it("avaliar com sucesso mantem o rascunho (viagem com rede ruim: sai e volta, o texto continua la)", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("rascunho-membro-a"));
-    await salvarRascunhoAction("rascunho do membro, que nao deve sumir");
+    await salvarRascunhoAction("rascunho do membro, que nao deve mudar");
 
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("rascunho-dono-a"));
     await salvarRascunhoAction("assunto que vai ser avaliado");
     await avaliarTemaAction("assunto que vai ser avaliado");
 
-    expect(await rascunhoDireto("rascunho-dono-a", marcaA.id)).toBeNull();
-    expect(await rascunhoDireto("rascunho-membro-a", marcaA.id)).toBe("rascunho do membro, que nao deve sumir");
+    expect(await rascunhoDireto("rascunho-dono-a", marcaA.id)).toBe("assunto que vai ser avaliado");
+    expect(await rascunhoDireto("rascunho-membro-a", marcaA.id)).toBe("rascunho do membro, que nao deve mudar");
+  });
+
+  it("salvar texto vazio apaga a linha do rascunho", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("rascunho-dono-b"));
+    await salvarRascunhoAction("um assunto qualquer");
+    expect(await rascunhoDireto("rascunho-dono-b", marcaB.id)).toBe("um assunto qualquer");
+
+    await salvarRascunhoAction("");
+    expect(await rascunhoDireto("rascunho-dono-b", marcaB.id)).toBeNull();
+
+    await salvarRascunhoAction("   ");
+    expect(await rascunhoDireto("rascunho-dono-b", marcaB.id)).toBeNull();
+  });
+
+  it("avaliar um assunto diferente do guardado substitui o rascunho (o salvamento automatico ja faz isso)", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("rascunho-dono-a"));
+    await salvarRascunhoAction("primeiro assunto, digitado antes");
+    await salvarRascunhoAction("segundo assunto, o que a pessoa acabou avaliando");
+    await avaliarTemaAction("segundo assunto, o que a pessoa acabou avaliando");
+
+    expect(await rascunhoDireto("rascunho-dono-a", marcaA.id)).toBe("segundo assunto, o que a pessoa acabou avaliando");
   });
 
   it("sem sessao, salvar e avaliar recusam em vez de gravar em algum cliente", async () => {

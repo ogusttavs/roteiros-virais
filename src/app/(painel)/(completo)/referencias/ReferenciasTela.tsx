@@ -1,70 +1,144 @@
 "use client";
 
+import { Filter, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import type { Plataforma } from "@/db/schema";
-import { FORMATOS_EM_ORDEM } from "@/ia/enums";
-import { classificarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import type { VideoReferencia } from "@/servicos/pesquisa";
+import type { AnaliseVideo, Plataforma } from "@/db/schema";
+import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
+import type { ContagensFiltroReferencias, VideoReferencia } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
-import { Chips, SeparadorChips } from "@/ui/componentes/Chips";
-import chipsStyles from "@/ui/componentes/Chips.module.css";
-import { ReferenciaCartao } from "@/ui/componentes/ReferenciaCartao";
+import { Botao } from "@/ui/componentes/Botao";
+import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 import { Toast } from "@/ui/componentes/Toast";
 
 import { desfavoritarAction, favoritarAction } from "./acoes";
+import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
+import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
 import styles from "./ReferenciasTela.module.css";
 
-type Props = { videos: VideoReferencia[]; favoritosIniciais: number[] };
+export type Segmento = "foradacurva" | "salvos";
 
-const DIA_MS = 24 * 60 * 60 * 1000;
-const DIAS_POR_PERIODO = [7, 30, 90];
-const PLATAFORMA_POR_INDICE: (Plataforma | null)[] = [null, "youtube", "tiktok", "instagram"];
+type Props = {
+  videos: VideoReferencia[];
+  total: number;
+  favoritosIniciais: number[];
+  segmento: Segmento;
+  periodoDias: number;
+  busca: string;
+  plataformasAtivas: Plataforma[];
+  formatosAtivos: AnaliseVideo["formato"][];
+  contagensFiltro: ContagensFiltroReferencias;
+};
+
+const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  instagram: "Instagram",
+};
 
 const FORMATAR_DATA = new Intl.DateTimeFormat("pt-BR", {
   day: "numeric",
-  month: "short",
+  month: "long",
   timeZone: "America/Sao_Paulo",
 });
 
-function formatarVezes(valor: number): string {
-  return `${valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`;
+function formatarVideo(v: VideoReferencia): VideoFormatado {
+  const faixa = classificarMultiplo(v.foraDaCurva);
+  return {
+    id: v.id,
+    url: v.url,
+    multiplo: formatarMultiplo(v.foraDaCurva),
+    rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
+    faixaMultiplo: faixa,
+    views: v.views,
+    medianaConta: v.medianaConta,
+    velocidade: v.velocidade,
+    contaNome: v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada,
+    plataformaData: v.publicadoEm
+      ? `${ROTULO_PLATAFORMA[v.plataforma]}, ${FORMATAR_DATA.format(v.publicadoEm)}`
+      : ROTULO_PLATAFORMA[v.plataforma],
+    titulo: v.titulo,
+    assunto: v.assunto,
+    gancho: v.gancho,
+    estrutura: v.estrutura,
+    porQueFuncionou: v.porQueFuncionou,
+  };
 }
 
-/** `/referencias` (etapa 12, brief-frontend.md 6.6, `ReferenciasTela.dc.html`). */
-export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
+/** "no Instagram", "no Instagram e no YouTube", "no Instagram, no YouTube e no TikTok". */
+function juntarPlataformas(plataformas: Plataforma[]): string {
+  const nomes = plataformas.map((p) => `no ${ROTULO_PLATAFORMA[p]}`);
+  if (nomes.length === 0) return "";
+  if (nomes.length === 1) return nomes[0];
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
+
+function montarUrl(filtros: {
+  segmento: Segmento;
+  periodoDias: number;
+  busca: string;
+  plataformas: Plataforma[];
+  formatos: AnaliseVideo["formato"][];
+}): string {
+  const params = new URLSearchParams();
+  if (filtros.segmento !== "foradacurva") params.set("seg", filtros.segmento);
+  if (filtros.periodoDias !== 7) params.set("periodo", String(filtros.periodoDias));
+  if (filtros.busca.trim()) params.set("busca", filtros.busca.trim());
+  if (filtros.plataformas.length > 0) params.set("plataforma", filtros.plataformas.join(","));
+  if (filtros.formatos.length > 0) params.set("formato", filtros.formatos.join(","));
+  const query = params.toString();
+  return query ? `/referencias?${query}` : "/referencias";
+}
+
+/**
+ * `/referencias` (V6, D2 parte 3a; design v2, `Referencias.dc.html`, estados
+ * `normal`, `filtrar`, `detalhes`, `vazio`, `erro`; `todos`, `todosFiltrar` e
+ * `noticias` ficam para a parte 3b). Os filtros vivem na URL; esta tela só
+ * cuida de interação (folhas, favoritar otimista) e monta a URL nova ao
+ * aplicar um filtro, deixando o Server Component (`page.tsx`) reconsultar.
+ */
+export function ReferenciasTela({
+  videos,
+  total,
+  favoritosIniciais,
+  segmento,
+  periodoDias,
+  busca,
+  plataformasAtivas,
+  formatosAtivos,
+  contagensFiltro,
+}: Props) {
   const router = useRouter();
-  const [plataforma, setPlataforma] = useState(0);
-  const [periodo, setPeriodo] = useState(0);
-  const [formato, setFormato] = useState<number | null>(null);
-  const [soFavoritos, setSoFavoritos] = useState(false);
+  const [campoBusca, setCampoBusca] = useState(busca);
+  const [folhaFiltrarAberta, setFolhaFiltrarAberta] = useState(false);
+  const [videoDetalheId, setVideoDetalheId] = useState<number | null>(null);
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIniciais));
   const [toastAberto, setToastAberto] = useState(false);
   const [jaMostrouToast, setJaMostrouToast] = useState(false);
   const [idPendente, setIdPendente] = useState<number | null>(null);
   const [, iniciarTransicao] = useTransition();
 
-  const filtrados = useMemo(() => {
-    const plataformaFiltro = PLATAFORMA_POR_INDICE[plataforma];
-    const limiteData = Date.now() - DIAS_POR_PERIODO[periodo] * DIA_MS;
-    const formatoFiltro = formato === null ? null : FORMATOS_EM_ORDEM[formato];
+  const formatados = useMemo(() => videos.map(formatarVideo), [videos]);
+  const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
+  const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
-    return videos.filter((v) => {
-      if (plataformaFiltro && v.plataforma !== plataformaFiltro) return false;
-      if (v.publicadoEm && v.publicadoEm.getTime() < limiteData) return false;
-      if (formatoFiltro && v.formato !== formatoFiltro) return false;
-      if (soFavoritos && !favoritos.has(v.id)) return false;
-      return true;
-    });
-  }, [videos, plataforma, periodo, formato, soFavoritos, favoritos]);
+  const quantosFiltrosAtivos = plataformasAtivas.length + formatosAtivos.length;
 
-  /**
-   * Otimista: o marcador muda na hora; se a gravação falhar, desfaz. O botão
-   * fica desabilitado enquanto a Server Action não responde (achado da
-   * revisão da parte 1: sem isso, navegar ou recarregar antes da resposta
-   * podia abortar o pedido e o favorito sumia mesmo tendo "marcado" na tela).
-   */
+  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>) {
+    router.push(
+      montarUrl({
+        segmento,
+        periodoDias,
+        busca,
+        plataformas: plataformasAtivas,
+        formatos: formatosAtivos,
+        ...mudanca,
+      }),
+    );
+  }
+
+  /** Otimista: o marcador muda na hora; se a gravação falhar, desfaz (mesma lição da etapa 12). */
   function alternarFavorito(videoId: number) {
     const jaSalvo = favoritos.has(videoId);
     const primeiraVez = !jaSalvo && !jaMostrouToast;
@@ -100,81 +174,144 @@ export function ReferenciasTela({ videos, favoritosIniciais }: Props) {
 
   return (
     <div className={styles.pagina}>
-      <div className={styles.cabecalho}>
-        <h1 className={styles.titulo}>{textosReferencias.titulo}</h1>
-        <p className={styles.linha}>{textosReferencias.linha}</p>
+      <div className={styles.cabecalhoTela}>
+        <h1>{textosReferencias.titulo}</h1>
+        <p>{textosReferencias.linha}</p>
       </div>
 
       <div className={styles.filtros}>
-        <Chips
-          rotuloGrupo={textosReferencias.grupoPlataforma}
-          opcoes={textosReferencias.plataformas}
-          selecionado={plataforma}
-          onChange={setPlataforma}
-        />
-        <SeparadorChips />
-        <Chips
-          rotuloGrupo={textosReferencias.grupoPeriodo}
-          opcoes={textosReferencias.periodos}
-          selecionado={periodo}
-          onChange={setPeriodo}
-        />
-        <SeparadorChips />
-        <Chips
-          rotuloGrupo={textosReferencias.grupoFormato}
-          opcoes={textosReferencias.formatos}
-          selecionado={formato}
-          onChange={setFormato}
-        />
-        <SeparadorChips />
-        <button
-          type="button"
-          aria-pressed={soFavoritos}
-          onClick={() => setSoFavoritos((v) => !v)}
-          className={[chipsStyles.chip, soFavoritos ? chipsStyles.ativo : ""].filter(Boolean).join(" ")}
-        >
-          {textosReferencias.favoritos}
-        </button>
-      </div>
-
-      {filtrados.length === 0 ? (
-        <div className={styles.semResultado}>
-          <p className={styles.semResultadoTexto}>{textosReferencias.semResultado}</p>
-          <button type="button" className={styles.ver90} onClick={() => setPeriodo(2)}>
-            {textosReferencias.ver90}
+        <div className={styles.segmentado} role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={segmento === "foradacurva"}
+            className={[styles.segmentoBotao, segmento === "foradacurva" ? styles.segmentoAtivo : ""]
+              .filter(Boolean)
+              .join(" ")}
+            onClick={() => router.push(montarUrl({ segmento: "foradacurva", periodoDias, busca, plataformas: [], formatos: [] }))}
+          >
+            {textosReferencias.segmentoForaDaCurva}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={segmento === "salvos"}
+            className={[styles.segmentoBotao, segmento === "salvos" ? styles.segmentoAtivo : ""].filter(Boolean).join(" ")}
+            onClick={() => router.push(montarUrl({ segmento: "salvos", periodoDias, busca, plataformas: [], formatos: [] }))}
+          >
+            {textosReferencias.segmentoSalvos}
           </button>
         </div>
-      ) : (
-        <div className={styles.grade}>
-          {filtrados.map((v) => (
-            <ReferenciaCartao
-              key={v.id}
-              vezes={formatarVezes(v.foraDaCurva)}
-              rotuloVezes={rotuloMultiploConta(classificarMultiplo(v.foraDaCurva), v.contaMedianaOrigem)}
-              conta={v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada}
-              data={v.publicadoEm ? FORMATAR_DATA.format(v.publicadoEm) : ""}
-              analise={[
-                { rotulo: textosReferencias.analise.comecou, texto: v.gancho },
-                { rotulo: textosReferencias.analise.construiu, texto: v.estrutura },
-                { rotulo: textosReferencias.analise.funcionou, texto: v.porQueFuncionou },
-              ]}
-              embed={{
-                url: v.url,
-                alt: textosReferencias.embedAlt(v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada),
-                rotuloCarregamento: textosReferencias.embedCarregando,
-                linkExterno: { rotulo: textosReferencias.abrirVideo, href: v.url },
+
+        <div className={styles.filtrosLinha}>
+          <span className={styles.busca}>
+            <Search size={18} strokeWidth={1.5} aria-hidden="true" />
+            <input
+              placeholder={textosReferencias.buscaPlaceholder}
+              value={campoBusca}
+              onChange={(evento) => setCampoBusca(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter") navegar({ busca: campoBusca });
               }}
-              salvo={favoritos.has(v.id)}
-              salvando={idPendente === v.id}
-              rotuloUsar={textosReferencias.usar}
-              rotuloSalvar={favoritos.has(v.id) ? textosReferencias.remover : textosReferencias.salvar}
-              rotuloSalvando={textosReferencias.salvando}
-              onSalvar={() => alternarFavorito(v.id)}
-              onUsar={() => router.push(`/hoje/tema-livre?tema=${encodeURIComponent(v.assunto)}`)}
+              onBlur={() => {
+                if (campoBusca !== busca) navegar({ busca: campoBusca });
+              }}
             />
-          ))}
+          </span>
+          <select
+            className={styles.seletorPeriodo}
+            aria-label={textosReferencias.rotuloPeriodo}
+            value={periodoDias}
+            onChange={(evento) => navegar({ periodoDias: Number(evento.target.value) })}
+          >
+            {textosReferencias.periodos.map((p) => (
+              <option key={p.dias} value={p.dias}>
+                {p.rotulo}
+              </option>
+            ))}
+          </select>
+          <Botao variante="secundario" tamanho="md" onClick={() => setFolhaFiltrarAberta(true)} className={styles.botaoFiltrar}>
+            <Filter size={16} strokeWidth={1.5} aria-hidden="true" />
+            {textosReferencias.filtrar}
+            {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>, {quantosFiltrosAtivos}</span> : null}
+          </Botao>
         </div>
+      </div>
+
+      {formatados.length === 0 ? (
+        segmento === "salvos" ? (
+          <div className={styles.blocoVazio}>
+            <h3>{textosReferencias.vazioTituloSalvos}</h3>
+            <p>{textosReferencias.vazioTextoSalvos}</p>
+          </div>
+        ) : (
+          <div className={styles.blocoVazio}>
+            <h3>{textosReferencias.vazioTitulo}</h3>
+            <p>{textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}</p>
+            <div className={styles.blocoVazioAcoes}>
+              <Botao variante="primario" tamanho="lg" onClick={() => navegar({ periodoDias: 30 })}>
+                {textosReferencias.ver30Dias}
+              </Botao>
+              <Botao
+                variante="secundario"
+                tamanho="lg"
+                onClick={() => {
+                  setCampoBusca("");
+                  navegar({ busca: "", plataformas: [], formatos: [] });
+                }}
+              >
+                {textosReferencias.limparFiltros}
+              </Botao>
+            </div>
+          </div>
+        )
+      ) : (
+        <>
+          <p className={styles.contagem}>
+            {segmento === "salvos" ? textosReferencias.contagemSalvos(total) : textosReferencias.contagem(total, periodoDias)}
+          </p>
+          <div className={styles.grade}>
+            {formatados.map((video) => (
+              <ReferenciaCartao
+                key={video.id}
+                video={video}
+                salvo={favoritos.has(video.id)}
+                salvando={idPendente === video.id}
+                onVerDetalhes={() => setVideoDetalheId(video.id)}
+                onSalvar={() => alternarFavorito(video.id)}
+              />
+            ))}
+          </div>
+        </>
       )}
+
+      <FolhaDetalhesVideo
+        video={videoDetalhe}
+        url={urlDetalhe}
+        aberto={videoDetalheId !== null}
+        aoFechar={() => setVideoDetalheId(null)}
+        salvo={videoDetalheId !== null && favoritos.has(videoDetalheId)}
+        salvando={idPendente === videoDetalheId}
+        onUsarComoReferencia={() => {
+          if (videoDetalheId !== null && !favoritos.has(videoDetalheId)) alternarFavorito(videoDetalheId);
+        }}
+        onSalvar={() => {
+          if (videoDetalheId !== null) alternarFavorito(videoDetalheId);
+        }}
+      />
+
+      <FolhaFiltrarReferencias
+        aberto={folhaFiltrarAberta}
+        aoFechar={() => setFolhaFiltrarAberta(false)}
+        plataformasAtivas={plataformasAtivas}
+        formatosAtivos={formatosAtivos}
+        contagens={contagensFiltro}
+        totalAtual={total}
+        onAplicar={({ plataformas, formatos }) => {
+          setFolhaFiltrarAberta(false);
+          navegar({ plataformas, formatos });
+        }}
+      />
 
       <Toast texto={textosReferencias.toast} aberto={toastAberto} onFechar={() => setToastAberto(false)} />
     </div>

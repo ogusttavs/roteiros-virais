@@ -269,26 +269,26 @@ export default function Fundacao() {
         <h2 className={styles.tituloSecao}>Cartão de referência</h2>
         <div style={{ maxWidth: 340 }}>
           <ReferenciaCartao
-            vezes="6,2x"
-            rotuloVezes="acima do normal da conta"
-            conta="@casaemordem"
-            data="30 ago"
-            analise={[
-              { rotulo: "como começou", texto: "Abre com a mão já esfregando a mancha, sem falar por dois segundos." },
-              { rotulo: "por que funcionou", texto: "Todo mundo se reconhece no erro e fica para ver o certo." },
-            ]}
-            embed={{
+            video={{
+              id: 1,
               url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-              alt: "Vídeo de @casaemordem",
-              rotuloCarregamento: "embed oficial 9:16",
-              linkExterno: { rotulo: "abrir o vídeo", href: "https://www.youtube.com" },
+              multiplo: "6,2x",
+              rotuloMultiplo: "acima do normal dessa conta",
+              faixaMultiplo: "acima",
+              views: 42900,
+              medianaConta: 6900,
+              velocidade: 890,
+              contaNome: "Casa em Ordem",
+              plataformaData: "Instagram, 30 de agosto",
+              titulo: "a mancha que volta: o erro está na ordem, não no produto",
+              assunto: "mancha em estofado",
+              gancho: "Abre com a mão já esfregando a mancha, sem falar por dois segundos.",
+              estrutura: "Aplica o produto sem cortar o vídeo, falando o tempo de espera em voz alta.",
+              porQueFuncionou: "Todo mundo se reconhece no erro e fica para ver o certo.",
             }}
             salvo={false}
-            rotuloUsar="usar como referência"
-            rotuloSalvar="salvar nos favoritos"
-            rotuloSalvando="salvando"
+            onVerDetalhes={() => undefined}
             onSalvar={() => undefined}
-            onUsar={() => undefined}
           />
         </div>
       </section>
