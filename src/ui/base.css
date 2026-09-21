@@ -21,6 +21,22 @@ html[data-tema="escuro"] {
   color-scheme: dark;
 }
 
+/**
+ * `--area-topo`: quanto de cima da tela nao e do conteudo (V7, itens 2 e 8 do
+ * PROXIMO.md): o recorte do aparelho (`env(safe-area-inset-top)`, so vale com
+ * `viewport-fit=cover`, `layout.tsx`) mais a faixa "Sem conexao" enquanto ela
+ * aparece (`Conexao.tsx` liga o atributo `data-sem-conexao`). O cabecalho
+ * fixo, a barra de topo, o inicio do corpo e a barra lateral do tablet usam
+ * este valor em vez de `env()` direto, e descem juntos quando a faixa aparece.
+ */
+html {
+  --area-topo: env(safe-area-inset-top, 0px);
+}
+
+html[data-sem-conexao="true"] {
+  --area-topo: calc(env(safe-area-inset-top, 0px) + var(--altura-faixa-conexao));
+}
+
 @media (prefers-color-scheme: dark) {
   html:not([data-tema="claro"]) {
     color-scheme: dark;

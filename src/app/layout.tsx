@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
+import { COR_FUNDO_CLARO, COR_FUNDO_ESCURO } from "@/lib/cores-do-aparelho";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 
@@ -55,6 +56,34 @@ export const metadata: Metadata = {
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
+  /**
+   * O iPhone instalado (V7, item 5): abre sem a barra do Safari, com o nome
+   * do produto sob o ícone. `apple-mobile-web-app-capable` vai à mão porque o
+   * Next 15 só emite a versão sem o prefixo (`mobile-web-app-capable`) e o
+   * Safari mais antigo só lê a com prefixo. Barra de status "default": letra
+   * escura sobre fundo claro; o iOS não deixa a barra seguir o tema escuro, e
+   * a escolha fica registrada em "Decisões pendentes" (TODO.md).
+   */
+  appleWebApp: { capable: true, title: config.appName, statusBarStyle: "default" },
+  other: { "apple-mobile-web-app-capable": "yes" },
+};
+
+/**
+ * `viewport-fit=cover` (V7, item 2 do PROXIMO.md): o aplicativo ocupa a tela
+ * toda, inclusive atrás da ilha e da barra de gesto do iPhone; cada barra fixa
+ * se afasta com `env(safe-area-inset-*)` (CSS). Nada de `maximum-scale` nem
+ * `user-scalable=no` (tira o zoom de acessibilidade): o zoom automático do
+ * iPhone em campo pequeno se resolve com fonte de 16 px ou mais. A cor da barra
+ * do navegador acompanha o fundo do tema do aparelho.
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: COR_FUNDO_CLARO },
+    { media: "(prefers-color-scheme: dark)", color: COR_FUNDO_ESCURO },
+  ],
 };
 
 /**

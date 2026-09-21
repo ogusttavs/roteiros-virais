@@ -6,6 +6,7 @@ import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
 import { FormularioConta } from "./FormularioConta";
+import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
 
@@ -38,6 +39,7 @@ export default async function Conta() {
       {cliente ? (
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
       ) : null}
+      <InstalarNoCelular />
       <BotaoSair />
     </div>
   );

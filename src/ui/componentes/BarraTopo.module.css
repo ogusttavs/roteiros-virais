@@ -8,7 +8,7 @@
   gap: var(--espaco-3);
   min-height: 3rem;
   padding: var(--espaco-2) var(--margem-celular);
-  padding-top: calc(var(--espaco-2) + env(safe-area-inset-top, 0px));
+  padding-top: calc(var(--espaco-2) + var(--area-topo));
   background: var(--cor-material-barra);
   backdrop-filter: var(--desfoque-barra);
   -webkit-backdrop-filter: var(--desfoque-barra);

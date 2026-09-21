@@ -1,0 +1,25 @@
+/**
+ * A faixa "Sem conexao. Mostrando o que foi guardado." (V7, item 8 do
+ * PROXIMO.md): discreta, colada no topo, com a altura de `--area-topo` (o
+ * recorte do aparelho mais a propria faixa, `base.css`). O que fica no topo
+ * (cabecalho, barra de topo, corpo, barra lateral) desce esse mesmo valor em
+ * vez de ficar por baixo dela.
+ */
+.faixa {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--area-topo);
+  padding: env(safe-area-inset-top, 0px) var(--margem-celular) 0;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-rodape);
+  text-align: center;
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}

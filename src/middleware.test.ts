@@ -110,6 +110,23 @@ describe("middleware", () => {
       expect(passaPeloMiddleware("/marca/klaki-logotipo.svg")).toBe(false);
     });
 
+    /**
+     * V7, itens 6 e 8: o service worker e a pagina "Sem conexao" sao estaticos
+     * de `public/` sem dado de ninguem; o navegador busca o `sw.js` sem
+     * cookie em algumas atualizacoes, e a pagina offline tem de abrir para
+     * quem ja perdeu a sessao. Entram na lista pelo nome, nunca por formato.
+     */
+    it("o service worker e a pagina offline ficam de fora do middleware", () => {
+      expect(passaPeloMiddleware("/sw.js")).toBe(false);
+      expect(passaPeloMiddleware("/offline.html")).toBe(false);
+    });
+
+    it("um caminho parecido (formato .js ou .html qualquer) continua passando pelo middleware", () => {
+      expect(passaPeloMiddleware("/admin/outro.js")).toBe(true);
+      expect(passaPeloMiddleware("/admin/pagina.html")).toBe(true);
+      expect(passaPeloMiddleware("/roteiros/42.html")).toBe(true);
+    });
+
     it("_next/static, _next/image e api/auth continuam de fora", () => {
       expect(passaPeloMiddleware("/_next/static/chunk.js")).toBe(false);
       expect(passaPeloMiddleware("/_next/image/foo")).toBe(false);

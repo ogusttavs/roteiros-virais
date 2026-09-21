@@ -1,9 +1,10 @@
 .pagina {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .corpo {
-  padding: calc(56px + env(safe-area-inset-top) + var(--espaco-6)) var(--margem-celular)
+  padding: calc(56px + var(--area-topo) + var(--espaco-6)) var(--margem-celular)
     calc(64px + var(--espaco-6) + env(safe-area-inset-bottom));
   max-width: var(--largura-leitura);
   margin: 0 auto;
@@ -84,8 +85,8 @@
      * porque nao ha cabecalho acima dela no desktop.
      */
     position: sticky;
-    top: 0;
-    height: 100dvh;
+    top: var(--area-topo);
+    height: calc(100dvh - var(--area-topo));
     overflow-y: auto;
     transition: width var(--duracao-rapida) var(--curva-saida);
   }

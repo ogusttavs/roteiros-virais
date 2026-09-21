@@ -19,6 +19,7 @@ export const textosConta = {
   salvo: "salvo",
   sair: "sair",
   saindo: "saindo",
+  erroSair: "não conseguimos sair agora; tente de novo em um minuto",
   erro: "não conseguimos salvar agora; tente de novo em um minuto",
   /** V3, item 4: "Quem tem acesso a esta marca" (Conta.dc.html). */
   acessos: {
@@ -28,5 +29,18 @@ export const textosConta = {
     contagem: (n: number) => (n === 1 ? "1 pessoa" : `${n} pessoas`),
     voce: "você",
     rodape: "Para dar acesso a mais alguém, fale com a gente.",
+  },
+  /** V7, item 5: só aparece enquanto o aplicativo ainda não está na tela de início. */
+  instalar: {
+    titulo: "Instalar no celular",
+    explica: "Coloque na tela de início e abra o roteiro do dia com um toque, como um aplicativo.",
+    iphone: {
+      sistema: "iPhone",
+      passos: "toque em Compartilhar e depois em Adicionar à Tela de Início.",
+    },
+    android: {
+      sistema: "Android",
+      passos: "toque no botão de menu do navegador e escolha Instalar aplicativo.",
+    },
   },
 };

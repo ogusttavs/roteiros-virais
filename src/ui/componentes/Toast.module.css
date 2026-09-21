@@ -2,13 +2,16 @@
   position: fixed;
   left: var(--margem-celular);
   right: var(--margem-celular);
-  bottom: var(--espaco-6);
-  z-index: 30;
+  /* --toast-base: a altura da barra fixa da tela (cápsula das abas, barra de ações, controles), definida por cada tela. */
+  bottom: calc(var(--toast-base, var(--espaco-6)) + env(safe-area-inset-bottom, 0px));
+  /* Acima das folhas (50 e 51) e das barras fixas (30): o aviso nunca fica atrás do que o causou. */
+  z-index: 60;
+  pointer-events: none;
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  height: var(--altura-toque);
-  padding: 0 var(--espaco-4);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) var(--espaco-4);
   margin: 0 auto;
   max-width: 360px;
   border-radius: var(--raio-md);
@@ -17,6 +20,10 @@
   font-size: var(--tamanho-secundario);
   box-shadow: var(--sombra-md);
   animation: surgir var(--duracao-base) var(--curva-saida);
+}
+
+.toast > svg {
+  flex: none;
 }
 
 @keyframes surgir {

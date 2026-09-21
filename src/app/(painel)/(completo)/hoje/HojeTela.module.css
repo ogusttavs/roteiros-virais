@@ -6,7 +6,7 @@
  * o próprio `.miolo` abaixo devolve o espaçamento do design.
  */
 .pagina {
-  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+  margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6))) calc(-1 * var(--margem-celular))
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 

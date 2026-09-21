@@ -382,6 +382,8 @@
   --margem-celular: 1rem;
   --altura-toque: 2.75rem;
   --altura-toque-lg: 3.25rem;
+  /** A faixa "Sem conexao" no topo (V7, item 8): quando aparece, o resto do topo desce esta altura (--faixa-topo, base.css). */
+  --altura-faixa-conexao: 2rem;
   --traco-icone: 1.5;
 
   /** Opacidade do estado desabilitado (Botao, Campo, AreaTexto, Chips), fora do escopo desta parte. */

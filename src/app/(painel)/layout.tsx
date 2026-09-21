@@ -11,6 +11,7 @@ import { Simbolo } from "@/ui/Logo";
 import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
 import { CapsulaAbas } from "./_casca/CapsulaAbas";
 import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
+import { Conexao } from "./_casca/Conexao";
 import { SeletorMarcaDesktop } from "./_casca/SeletorMarcaDesktop";
 import { TrocaMarcaProvider } from "./_casca/TrocaMarcaContext";
 import styles from "./layout.module.css";
@@ -44,31 +45,33 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   const marcaAtiva = marcaAtivaResolvida ?? marcas[0] ?? { id: 0, nome: "" };
 
   return (
-    <TrocaMarcaProvider>
-      <div className={styles.pagina}>
-        <CascaCabecalhoCelular
-          nomeProduto={config.appName}
-          marcaAtiva={marcaAtiva}
-          marcas={marcas}
-          nomePessoa={sessao.user.name}
-        />
+    <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id}>
+      <TrocaMarcaProvider>
+        <div className={styles.pagina}>
+          <CascaCabecalhoCelular
+            nomeProduto={config.appName}
+            marcaAtiva={marcaAtiva}
+            marcas={marcas}
+            nomePessoa={sessao.user.name}
+          />
 
-        <aside className={styles.colunaDesktop}>
-          <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
-          <div className={styles.identidadeDesktop}>
-            <Simbolo altura={24} />
-            <span className={styles.nomeDesktop} data-app-name="">
-              {config.appName}
-            </span>
-          </div>
-          <Nav compactavel />
-          <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={sessao.user.name} />
-        </aside>
+          <aside className={styles.colunaDesktop}>
+            <BarraLateralToggle rotuloRecolher={textosNav.recolherMenu} rotuloAbrir={textosNav.abrirMenu} />
+            <div className={styles.identidadeDesktop}>
+              <Simbolo altura={24} />
+              <span className={styles.nomeDesktop} data-app-name="">
+                {config.appName}
+              </span>
+            </div>
+            <Nav compactavel />
+            <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={sessao.user.name} />
+          </aside>
 
-        <main className={styles.corpo}>{children}</main>
+          <main className={styles.corpo}>{children}</main>
 
-        <CapsulaAbas />
-      </div>
-    </TrocaMarcaProvider>
+          <CapsulaAbas />
+        </div>
+      </TrocaMarcaProvider>
+    </Conexao>
   );
 }

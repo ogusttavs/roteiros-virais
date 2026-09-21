@@ -7,9 +7,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 var(--margem-celular);
-  margin-top: env(safe-area-inset-top);
+  /* Cobre tambem a faixa do recorte do aparelho (senao o conteudo rola visivel atras da hora e da ilha). */
+  height: calc(56px + var(--area-topo));
+  padding: var(--area-topo) var(--margem-celular) 0;
   background: var(--cor-fundo);
   transition: transform var(--duracao-base) var(--curva-saida);
 }
