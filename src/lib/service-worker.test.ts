@@ -338,6 +338,19 @@ describe("sem rede", () => {
     expect(await (await sw.pedir("/roteiros/5/gravar")).resposta!.text()).toBe("pagina do servidor /roteiros/5/gravar");
   });
 
+  it("a pagina servida do guardado leva a marca 'guardado' em Server-Timing, e a da rede nao", async () => {
+    sw.definirEscopo("usuario-a:1");
+    redeResponde();
+    const daRede = (await sw.pedir("/roteiros/5")).resposta!;
+    expect(daRede.headers.get("server-timing")).toBeNull();
+
+    redeCaiu();
+    const guardada = (await sw.pedir("/roteiros/5")).resposta!;
+    expect(guardada.headers.get("server-timing")).toBe("guardado");
+    expect(guardada.headers.get("content-type")).toContain("text/html");
+    expect(await guardada.text()).toBe("pagina do servidor /roteiros/5");
+  });
+
   it("uma pagina fora da lista mostra 'Sem conexao', nunca dado guardado de outra tela (admin, referencias)", async () => {
     await sw.ciclo("install");
     redeResponde();

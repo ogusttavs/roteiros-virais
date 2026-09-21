@@ -31,6 +31,8 @@ var PREFIXO_PAGINAS = "roteiros-paginas";
 var CACHE_ESCOPO = "roteiros-escopo";
 var CHAVE_ESCOPO = "/__escopo";
 var PAGINA_OFFLINE = "/offline.html";
+/** Nome da marca em `Server-Timing` que diz a pagina "voce esta vendo o que foi guardado" (src/lib/offline.ts le). */
+var MARCA_GUARDADO = "guardado";
 
 var ESTATICOS_FIXOS = [
   "/favicon.svg",
@@ -125,6 +127,22 @@ function lerPaginaGuardada(pathname) {
   });
 }
 
+/**
+ * A pagina servida do guardado leva `Server-Timing: guardado`. A pagina le a marca
+ * (`performance.getEntriesByType("navigation")[0].serverTiming`) e acende a faixa "Sem conexao" mesmo
+ * quando o navegador ainda diz `navigator.onLine === true` (sinal fraco, portal de wifi, e o proprio
+ * Chromium recem-recarregado offline).
+ */
+function marcarComoGuardada(resposta) {
+  var cabecalhos = new Headers(resposta.headers);
+  cabecalhos.append("Server-Timing", MARCA_GUARDADO);
+  return new Response(resposta.body, {
+    status: resposta.status,
+    statusText: resposta.statusText,
+    headers: cabecalhos,
+  });
+}
+
 function paginaOffline() {
   return caches.match(PAGINA_OFFLINE, { cacheName: CACHE_ESTATICOS }).then(function (r) {
     return (
@@ -150,7 +168,7 @@ function responderNavegacao(event, request, url) {
       // /admin e /referencias) mostra "Sem conexao", nunca dado de outra tela.
       var guardada = ehPaginaPermitida(url.pathname) ? lerPaginaGuardada(url.pathname) : Promise.resolve(undefined);
       return guardada.then(function (g) {
-        return g || paginaOffline();
+        return g ? marcarComoGuardada(g) : paginaOffline();
       });
     },
   );

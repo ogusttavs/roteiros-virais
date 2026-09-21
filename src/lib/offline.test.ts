@@ -18,6 +18,7 @@ import {
   ehFalhaDeRede,
   fraseDeFalha,
   limparCachesDoAparelho,
+  MARCA_GUARDADO,
   nomeDoCacheDePaginas,
   PREFIXO_CACHE_PAGINAS,
   registrarEscopo,
@@ -60,6 +61,7 @@ describe("nomes e escopo", () => {
     expect(valor("PREFIXO_PAGINAS")).toBe(PREFIXO_CACHE_PAGINAS);
     expect(valor("CACHE_ESCOPO")).toBe(CACHE_ESCOPO);
     expect(valor("CHAVE_ESCOPO")).toBe(CHAVE_ESCOPO);
+    expect(valor("MARCA_GUARDADO")).toBe(MARCA_GUARDADO);
   });
 });
 

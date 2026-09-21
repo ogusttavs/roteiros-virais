@@ -18,6 +18,8 @@ import { textosConexao } from "@/textos/conexao";
 export const PREFIXO_CACHE_PAGINAS = "roteiros-paginas";
 export const CACHE_ESCOPO = "roteiros-escopo";
 export const CHAVE_ESCOPO = "/__escopo";
+/** A marca que `public/sw.js` poe em `Server-Timing` na pagina servida do guardado. */
+export const MARCA_GUARDADO = "guardado";
 
 /** So a parte de `CacheStorage` que usamos, para o teste passar um armazenamento de mentira. */
 export type Armazenamento = Pick<CacheStorage, "keys" | "delete" | "open">;
@@ -133,4 +135,17 @@ export function caminhosEstaticosCarregados(): string[] {
       (caminho): caminho is string =>
         caminho !== null && (caminho.startsWith("/_next/static/") || caminho.startsWith("/marca/")),
     );
+}
+
+/**
+ * A pagina que esta na tela veio do que o aparelho guardou (o service worker
+ * a serviu porque a rede caiu)? So o worker sabe: ele marca a resposta com
+ * `Server-Timing: guardado` e a pagina le a marca aqui. Vale mais que
+ * `navigator.onLine`, que continua "true" com sinal fraco, portal de wifi e
+ * logo depois de um recarregamento sem rede.
+ */
+export function paginaVeioDoGuardado(): boolean {
+  if (typeof performance === "undefined") return false;
+  const [navegacao] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+  return navegacao?.serverTiming?.some((metrica) => metrica.name === MARCA_GUARDADO) ?? false;
 }

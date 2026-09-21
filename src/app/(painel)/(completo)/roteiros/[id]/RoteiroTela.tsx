@@ -24,6 +24,7 @@ import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/li
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
+import { textosConexao } from "@/textos/conexao";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -34,6 +35,7 @@ import chipStyles from "@/ui/componentes/Chips.module.css";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
+import { useConexao } from "@/ui/ConexaoContext";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../../_casca/SeletorMarcaCelular";
 
@@ -145,6 +147,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
   const [toast, setToast] = useState(false);
   const [erro, setErro] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
+  const { semConexao } = useConexao();
 
   const versaoAtual = versoes.find((v) => v.id === roteiro.id);
   const idVersaoAtual = versoes.find((v) => v.atual)?.id;
@@ -361,9 +364,12 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
           {textosRoteiro.modoGravacao}
         </Link>
         {!gravadoEm ? (
-          <button type="button" onClick={gravei} disabled={pendente} className={styles.btnVazio}>
-            {textosRoteiro.jaGravei}
-          </button>
+          <>
+            <button type="button" onClick={gravei} disabled={pendente || semConexao} className={styles.btnVazio}>
+              {textosRoteiro.jaGravei}
+            </button>
+            {semConexao ? <span>{textosConexao.precisaDeConexao}</span> : null}
+          </>
         ) : !postado ? (
           <button type="button" onClick={() => setPainel("postei")} className={styles.btnVazio}>
             {textosRoteiro.postei}

@@ -3,9 +3,11 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { avisarRedeVoltou } from "@/lib/estado-de-rede";
 import { caminhosEstaticosCarregados, chaveDoEscopo, ehPaginaGuardavel, registrarEscopo } from "@/lib/offline";
 import { textosConexao } from "@/textos/conexao";
 import { ConexaoContext, ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
+import { useSemRede } from "@/ui/useSemRede";
 
 import styles from "./Conexao.module.css";
 
@@ -29,35 +31,33 @@ const INTERVALO_SONDA_MS = 5000;
  */
 export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; marcaId: number; children: ReactNode }) {
   const pathname = usePathname();
-  const [semRede, setSemRede] = useState(false);
+  // Aparelho sem rede, ou a pagina na tela foi servida do guardado (estado-de-rede.ts).
+  const semRede = useSemRede();
   const [ultimoPedidoCaiu, setUltimoPedidoCaiu] = useState(false);
+  const semConexao = semRede || ultimoPedidoCaiu;
 
   useEffect(() => {
-    setSemRede(!navigator.onLine);
+    // A rede voltou (o navegador avisou): a faixa some. `estado-de-rede.ts` cuida da marca do guardado.
     function aoVoltar() {
-      setSemRede(false);
       setUltimoPedidoCaiu(false);
     }
-    function aoCair() {
-      setSemRede(true);
-    }
     window.addEventListener("online", aoVoltar);
-    window.addEventListener("offline", aoCair);
-    return () => {
-      window.removeEventListener("online", aoVoltar);
-      window.removeEventListener("offline", aoCair);
-    };
+    return () => window.removeEventListener("online", aoVoltar);
   }, []);
 
-  // Um pedido caiu mas o aparelho acha que tem rede (sinal fraco, portal de wifi): sem esta conferencia a
-  // faixa so sumiria quando uma acao desse certo, e as acoes que precisam de rede estariam desabilitadas.
+  // A faixa esta acesa mas o navegador diz que tem rede (sinal fraco, portal de wifi, pagina servida do
+  // guardado, um pedido que caiu): sem esta conferencia ela so sumiria quando uma acao desse certo, e as
+  // acoes que precisam de rede estariam desabilitadas. Com `navigator.onLine` falso nao confere: o
+  // navegador avisa sozinho quando a rede volta (evento `online`, acima).
   useEffect(() => {
-    if (!ultimoPedidoCaiu || semRede) return;
+    if (!semConexao || !navigator.onLine) return;
     let cancelado = false;
     const id = setInterval(async () => {
       try {
         const resposta = await fetch("/api/saude", { cache: "no-store" });
-        if (!cancelado && resposta.ok) setUltimoPedidoCaiu(false);
+        if (cancelado || !resposta.ok) return;
+        avisarRedeVoltou();
+        setUltimoPedidoCaiu(false);
       } catch {
         // Continua sem rede; confere de novo no proximo intervalo.
       }
@@ -66,9 +66,7 @@ export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; m
       cancelado = true;
       clearInterval(id);
     };
-  }, [ultimoPedidoCaiu, semRede]);
-
-  const semConexao = semRede || ultimoPedidoCaiu;
+  }, [semConexao]);
 
   useEffect(() => {
     document.documentElement.dataset.semConexao = semConexao ? "true" : "false";

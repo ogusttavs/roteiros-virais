@@ -257,6 +257,12 @@ test.describe("painel sem rede", () => {
     await criarMarca("e2e-semrede-d", "[teste] Sem rede D", nichoDois.id);
   });
 
+  // A marca ativa no primeiro login e a de acesso mais recente (`marcaPadrao`); o teste de troca de marca
+  // deixa a Dois como a mais recente, entao zera antes de cada teste para a Um ser sempre a ativa.
+  test.beforeEach(async () => {
+    await db().update(clientes).set({ ultimoAcessoEm: null }).where(inArray(clientes.usuarioId, IDS_USUARIO));
+  });
+
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
   test("o roteiro do dia abre sem rede, com o modo gravacao, e as outras telas dizem que precisam de conexao", async ({
@@ -276,7 +282,7 @@ test.describe("painel sem rede", () => {
 
     await page.getByRole("link", { name: textosRoteiro.modoGravacao }).first().click();
     await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroUmId}/gravar`));
-    await page.getByRole("link", { name: textosGravacao.sair }).click();
+    await page.getByRole("button", { name: textosGravacao.sair }).click();
     await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroUmId}$`));
 
     // Sem rede: recarrega o roteiro e o texto inteiro continua ali, com a faixa.
@@ -455,7 +461,7 @@ test.describe("painel sem rede", () => {
       .getByRole("button", { name: NOME_MARCA_DOIS })
       .click();
 
-    await expect(page.getByText(textosConexao.trocarDeMarcaSemRede)).toBeVisible();
+    await expect(page.getByText(textosConexao.trocarDeMarcaSemRede).filter({ visible: true })).toBeVisible();
     await expect(faixaSemConexao(page)).toBeVisible();
     // A marca de antes continua ativa.
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();

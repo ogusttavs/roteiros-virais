@@ -6,8 +6,10 @@ import { useEffect, useState } from "react";
 
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
 import { iniciaisDe } from "@/lib/iniciais";
+import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { Toast } from "@/ui/componentes/Toast";
+import { useSemRede } from "@/ui/useSemRede";
 
 import styles from "./GravacaoTela.module.css";
 
@@ -38,6 +40,7 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
   const [temWakeLock, setTemWakeLock] = useState(false);
   const [gravado, setGravado] = useState(jaGravado);
   const [marcando, setMarcando] = useState(false);
+  const semRede = useSemRede();
   const [erroToast, setErroToast] = useState(false);
 
   /**
@@ -171,13 +174,14 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
           aria-label={gravado ? textosGravacao.gravado : textosGravacao.marcarGravei}
           aria-pressed={gravado}
           className={`${styles.redondo} ${gravado ? styles.redondoFeito : ""}`}
-          disabled={marcando}
+          disabled={marcando || semRede}
           onClick={marcarGravado}
         >
           <Check size={24} strokeWidth={1.75} aria-hidden="true" />
         </button>
       </div>
 
+      {semRede ? <p>{textosConexao.precisaDeConexao}</p> : null}
       <Toast texto={textosGravacao.erroMarcar} aberto={erroToast} onFechar={() => setErroToast(false)} />
     </div>
   );
