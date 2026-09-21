@@ -13,6 +13,13 @@ type Props = {
   aoFechar: () => void;
   /** "menu" para uma lista de acoes (role="menuitem" nos filhos); "dialog" para formulario ou lista. */
   role?: "menu" | "dialog";
+  /**
+   * Rodapé que não rola com o resto (V7, item 3: o botão principal precisa
+   * ficar dentro da área visível mesmo com a viewport reduzida). Só o painel
+   * "reprovar" usa hoje, o mais alto dos quatro; os outros continuam com
+   * tudo dentro de `children`, que ainda rola inteiro se passar de 80vh.
+   */
+  rodape?: ReactNode;
   children: ReactNode;
 };
 
@@ -43,7 +50,7 @@ type Props = {
  * digitação; um formulário ancorado (tablet para cima) tem o mesmo problema
  * e também não fecha ao rolar.
  */
-export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", children }: Props) {
+export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rodape, children }: Props) {
   const painelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -79,10 +86,17 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", chi
         aria-modal={role === "dialog" ? true : undefined}
         aria-label={titulo}
         tabIndex={-1}
-        className={styles.painel}
+        className={rodape ? styles.painelComRodape : styles.painel}
       >
         <span className={styles.alca} aria-hidden="true" />
-        {children}
+        {rodape ? (
+          <>
+            <div className={styles.corpo}>{children}</div>
+            <div className={styles.rodape}>{rodape}</div>
+          </>
+        ) : (
+          children
+        )}
       </div>
     </>
   );

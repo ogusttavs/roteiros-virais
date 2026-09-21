@@ -446,6 +446,27 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
         titulo={pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
         aberto={painel === "reprovar"}
         aoFechar={fecharPainel}
+        rodape={
+          <>
+            {erroReprovar ? <p className={styles.fraseErroPainel}>{textosRoteiro.reprovar.erro}</p> : null}
+            <button
+              type="button"
+              onClick={reprovarRoteiro}
+              disabled={pendente || motivosSelecionados.size === 0}
+              className={styles.btn}
+            >
+              {pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.reescrever}
+            </button>
+            <p className={styles.avisoTempoReprovar}>
+              {motivosSelecionados.size === 0
+                ? textosRoteiro.reprovar.semMotivoMarcado
+                : textosRoteiro.reprovar.tempoEstimado}
+            </p>
+            <button type="button" onClick={fecharPainel} className={styles.btnTextoCancelar}>
+              {textosRoteiro.reprovar.cancelar}
+            </button>
+          </>
+        }
       >
         <h2 className={styles.tituloPainel}>
           {pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
@@ -477,23 +498,6 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
         <p className={styles.objetivoTravado}>
           {textosRoteiro.reprovar.objetivoContinua(ROTULO_OBJETIVO_TRAVADO[roteiro.objetivo])}
         </p>
-        {erroReprovar ? <p className={styles.fraseErroPainel}>{textosRoteiro.reprovar.erro}</p> : null}
-        <button
-          type="button"
-          onClick={reprovarRoteiro}
-          disabled={pendente || motivosSelecionados.size === 0}
-          className={styles.btn}
-        >
-          {pendente ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.reescrever}
-        </button>
-        <p className={styles.avisoTempoReprovar}>
-          {motivosSelecionados.size === 0
-            ? textosRoteiro.reprovar.semMotivoMarcado
-            : textosRoteiro.reprovar.tempoEstimado}
-        </p>
-        <button type="button" onClick={fecharPainel} className={styles.btnTextoCancelar}>
-          {textosRoteiro.reprovar.cancelar}
-        </button>
       </PainelFlutuante>
 
       <PainelFlutuante

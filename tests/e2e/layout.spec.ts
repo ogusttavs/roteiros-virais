@@ -5,6 +5,13 @@
  * estourar na horizontal, e nenhum alvo de toque pode ficar abaixo de
  * 44 px. Roteiro próprio ("e2e-layout"), sem `resetarSchema` (mesma lição
  * de `roteiro.spec.ts`): o seed roda uma vez só, no globalSetup.
+ *
+ * V7, item 1 e 3: a 360 x 740 (Android pequeno) entrou ao lado da 390 em
+ * toda tela já coberta, e o caminho da viagem ganhou as cinco telas que
+ * faltavam (Entrar, Tema livre, Objetivo, Histórico, Conta). O botão
+ * principal continuar dentro da área visível com a viewport reduzida a
+ * 390 x 500 (simula o teclado tirando altura) é um bloco à parte, no fim
+ * do arquivo, só nas telas que têm um botão principal claro.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -36,6 +43,7 @@ const EMAIL_BRIEFING = "e2e-layout-briefing@exemplo.teste";
 const EMAIL_MARCAS = "e2e-layout-marcas@exemplo.teste";
 const LARGURAS = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "360", largura: 360, altura: 740 },
   { rotulo: "1024", largura: 1024, altura: 768 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
@@ -498,6 +506,46 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await expect(suasMarcas).toBeVisible();
       await conferirLayout(page);
     });
+
+    /** V7, item 1: as cinco telas do caminho da viagem que layout.spec.ts ainda não cobria. */
+    test(`Entrar em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await page.goto("/entrar");
+      await expect(page.getByRole("heading", { name: "Bom te ver" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Tema livre em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/hoje/tema-livre");
+      await expect(page.getByRole("heading", { name: "Sobre o que você quer falar?" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Objetivo em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      await expect(page.getByRole("heading", { name: "O que você quer que esse vídeo faça?" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Histórico em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/historico");
+      await expect(page.getByRole("heading", { name: "Histórico" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Conta em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/conta");
+      await expect(page.getByRole("heading", { name: "Conta" })).toBeVisible();
+      await conferirLayout(page);
+    });
   }
 
   for (const { rotulo, largura, altura } of LARGURAS_COM_FOLHA) {
@@ -510,6 +558,79 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await conferirLayout(page);
     });
   }
+
+  /**
+   * V7, item 3: "o botão principal está dentro da área visível com a viewport
+   * reduzida a 390 x 500 (teclado)". Só nas telas com um botão principal
+   * claro; Hoje (três cartões), Briefing (revisão), Referências (grade) e
+   * Começar (formulário em blocos) não têm um botão único e ficam de fora
+   * (decisão registrada em "Decisões pendentes" do TODO.md).
+   */
+  for (const { rotulo, nome, ir, botao } of [
+    { rotulo: "Entrar", nome: "entrar", ir: async (page: Page) => page.goto("/entrar"), botao: "entrar" },
+    {
+      rotulo: "Tema livre",
+      nome: "Avaliar o tema",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto("/hoje/tema-livre");
+      },
+      botao: "Avaliar o tema",
+    },
+    {
+      rotulo: "Objetivo",
+      nome: "escrever o roteiro",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      },
+      botao: "escrever o roteiro",
+    },
+    {
+      rotulo: "Roteiro",
+      nome: "Já gravei",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}`);
+      },
+      botao: "Já gravei",
+    },
+    {
+      rotulo: "Gravação",
+      nome: "Próximo bloco",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}/gravar`);
+      },
+      botao: "Próximo bloco",
+    },
+    {
+      rotulo: "Roteiro, folha reprovar",
+      nome: "Reescrever com isso em mente",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}`);
+        await page.getByRole("button", { name: "Mais opções" }).click();
+        await page.getByRole("menuitem", { name: "Reprovar" }).click();
+        await expect(page.getByRole("dialog", { name: "O que não ficou bom?" })).toBeVisible();
+      },
+      botao: "Reescrever com isso em mente",
+    },
+  ]) {
+    test(`${rotulo}, botão "${nome}" visível a 390x500`, async ({ page }) => {
+      // Carrega em tamanho cheio e só depois encolhe: simula o teclado abrindo numa tela já
+      // carregada (o que dispara o listener de `visualViewport`, `TemaLivreTela.tsx`), não uma
+      // tela que já nasce pequena, que nenhum aparelho de verdade produz.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await ir(page);
+      // Espera a hidratacao: o teclado so abre depois de o usuario tocar no campo, e o listener de
+      // `visualViewport` da tela so existe depois de hidratar (sem isto o teste encolhe antes e
+      // mede uma corrida, nao o produto; mesma convencao de tema-livre.spec.ts).
+      await page.waitForLoadState("networkidle");
+      await page.setViewportSize({ width: 390, height: 500 });
+      await expect(page.getByRole("button", { name: botao, exact: true })).toBeInViewport();
+    });
+  }
 });
 
 /**
@@ -520,6 +641,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
 const EMAIL_REFERENCIAS = "e2e-layout-referencias@exemplo.teste";
 const LARGURAS_V6 = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "360", largura: 360, altura: 740 },
   { rotulo: "820", largura: 820, altura: 1180 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
