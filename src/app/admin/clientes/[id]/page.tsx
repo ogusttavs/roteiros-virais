@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
+import { idDaRotaOuNulo } from "@/lib/id-rota";
+import { exigirAdmin } from "@/lib/sessao";
 import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
 import { membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
@@ -32,8 +34,13 @@ function formatarData(data: string): string {
  * Só leitura.
  */
 export default async function AdminClienteDetalhe({ params }: { params: Promise<{ id: string }> }) {
+  await exigirAdmin();
+
   const { id } = await params;
-  const cliente = await clienteDetalheAdmin(Number(id));
+  const clienteId = idDaRotaOuNulo(id);
+  if (clienteId === null) notFound();
+
+  const cliente = await clienteDetalheAdmin(clienteId);
   if (!cliente) notFound();
 
   const roteiros = await roteirosDoCliente(cliente.id, 50);

@@ -2,6 +2,7 @@ import { List } from "lucide-react";
 import Link from "next/link";
 
 import { FILAS, FILAS_POR_EVENTO, type NomeFila } from "@/jobs/fila";
+import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import chipStyles from "@/ui/componentes/Chips.module.css";
@@ -43,6 +44,8 @@ function formatarTaxa(foraDaCurva: number, consumidos: number | null): string {
 }
 
 export default async function AdminJobs({ searchParams }: { searchParams: Promise<{ job?: string }> }) {
+  await exigirAdmin();
+
   const { job } = await searchParams;
   const filtro = ehNomeDeJob(job) ? job : undefined;
   const execucoes = await listarExecucoesRecentes(filtro, 50);

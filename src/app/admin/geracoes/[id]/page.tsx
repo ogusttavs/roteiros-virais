@@ -3,6 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import type { AvaliacaoGeracao } from "@/db/schema";
+import { idDaRotaOuNulo } from "@/lib/id-rota";
+import { exigirAdmin } from "@/lib/sessao";
 import { geracaoPorId } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 
@@ -31,8 +33,13 @@ function formatarAvaliacao(avaliacao: AvaliacaoGeracao | null, motivo: string | 
  * (roteiro, tema, nota do briefing...). Só leitura.
  */
 export default async function AdminGeracaoDetalhe({ params }: { params: Promise<{ id: string }> }) {
+  await exigirAdmin();
+
   const { id } = await params;
-  const geracao = await geracaoPorId(Number(id));
+  const geracaoId = idDaRotaOuNulo(id);
+  if (geracaoId === null) notFound();
+
+  const geracao = await geracaoPorId(geracaoId);
   if (!geracao) notFound();
 
   return (

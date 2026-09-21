@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { FILAS } from "@/jobs/fila";
 import { config } from "@/lib/config";
+import { exigirAdmin } from "@/lib/sessao";
 import {
   listarContasVigiadas,
   nichoPorSlug,
@@ -68,6 +69,8 @@ function TabelaVideos({ videos, colunaNumero }: { videos: VideoRankeado[]; colun
 }
 
 export default async function AdminNichoDetalhe({ params }: { params: Promise<{ slug: string }> }) {
+  await exigirAdmin();
+
   const { slug } = await params;
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();

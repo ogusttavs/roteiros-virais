@@ -2,6 +2,7 @@ import { ArrowLeft, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { exigirAdmin } from "@/lib/sessao";
 import { nichoPorSlug, videosPorId } from "@/servicos/admin-coleta";
 import { modeloNichoAtual } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
@@ -17,6 +18,8 @@ function formatarData(iso: string): string {
 }
 
 export default async function AdminNichoModelo({ params }: { params: Promise<{ slug: string }> }) {
+  await exigirAdmin();
+
   const { slug } = await params;
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();

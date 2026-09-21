@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, garantirClientePermitido } from "@/servicos/clientes";
 
@@ -10,7 +11,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const clienteId = Number(id);
+  const clienteId = idDaRotaOuNulo(id);
+  if (clienteId === null) {
+    return NextResponse.json({ erro: "nao encontrado" }, { status: 404 });
+  }
 
   try {
     const cliente = await garantirClientePermitido(clienteId, sessao.user.id);
