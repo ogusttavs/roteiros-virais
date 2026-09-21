@@ -6,7 +6,16 @@
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { db } from "@/db";
-import { avaliacoesTema, nichos, roteiros, temasDia, type Cliente, type Objetivo, type TemaDoDia } from "@/db/schema";
+import {
+  avaliacoesTema,
+  nichos,
+  rascunhosTemaLivre,
+  roteiros,
+  temasDia,
+  type Cliente,
+  type Objetivo,
+  type TemaDoDia,
+} from "@/db/schema";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
@@ -235,6 +244,38 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
     justificativaNovidade: dados.pilares.novidade.justificativa,
     justificativaFacilidade: dados.pilares.facilidade.justificativa,
   };
+}
+
+/**
+ * O rascunho de `/hoje/tema-livre` (V5b, item 2): uma linha por pessoa e
+ * por marca, sem prazo. `salvarRascunhoTemaLivre` faz upsert (o índice
+ * único `usuarioId` + `clienteId` decide); `apagarRascunhoTemaLivre` some
+ * o rascunho quando a pessoa avalia o texto com sucesso (chamado pela
+ * Server Action, nunca daqui, para `avaliarTema` continuar sem esse
+ * efeito colateral).
+ */
+export async function salvarRascunhoTemaLivre(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  await db()
+    .insert(rascunhosTemaLivre)
+    .values({ usuarioId, clienteId, texto, atualizadoEm: new Date() })
+    .onConflictDoUpdate({
+      target: [rascunhosTemaLivre.usuarioId, rascunhosTemaLivre.clienteId],
+      set: { texto, atualizadoEm: new Date() },
+    });
+}
+
+export async function rascunhoTemaLivre(usuarioId: string, clienteId: number): Promise<string | null> {
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  return linha?.texto ?? null;
+}
+
+export async function apagarRascunhoTemaLivre(usuarioId: string, clienteId: number): Promise<void> {
+  await db()
+    .delete(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
 }
 
 /**
