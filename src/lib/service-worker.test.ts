@@ -426,6 +426,47 @@ describe("estaticos", () => {
   });
 });
 
+describe("teto do cache dos estaticos", () => {
+  const limite = Number(/var LIMITE_ESTATICOS = (\d+);/.exec(CODIGO)?.[1]);
+
+  it("passado do teto, apaga os mais antigos e nunca os fixos (pagina 'Sem conexao' e icones)", async () => {
+    await sw.ciclo("install");
+    const cache = sw.mapa.get("roteiros-estaticos-v1")!;
+    for (let i = 0; i < limite + 5; i++) cache.set(href(`/_next/static/chunks/velho-${i}.js`), new Response("x"));
+    sw.fetchMock.mockResolvedValue(
+      respostaDeRede("novo", { tipo: "text/javascript", caminho: "/_next/static/chunks/novo.js" }),
+    );
+
+    await sw.pedir("/_next/static/chunks/novo.js", { mode: "no-cors" });
+
+    const chaves = sw.chavesGuardadas("roteiros-estaticos-v1");
+    const fixos = ["/favicon.svg", "/icone-192.png", "/offline.html"];
+    expect(chaves.length).toBe(limite + fixos.length);
+    for (const fixo of fixos) expect(chaves).toContain(fixo);
+    expect(chaves).toContain("/_next/static/chunks/novo.js");
+    // Passou seis do teto (cinco a mais, mais o novo): os seis primeiros que entraram foram os apagados.
+    for (let i = 0; i < 6; i++) expect(chaves).not.toContain(`/_next/static/chunks/velho-${i}.js`);
+    expect(chaves).toContain("/_next/static/chunks/velho-6.js");
+  });
+
+  it("abaixo do teto nao apaga nada", async () => {
+    await sw.ciclo("install");
+    sw.fetchMock.mockResolvedValue(
+      respostaDeRede("x", { tipo: "text/javascript", caminho: "/_next/static/chunks/a.js" }),
+    );
+
+    await sw.pedir("/_next/static/chunks/a.js", { mode: "no-cors" });
+    await sw.pedir("/_next/static/chunks/a.js", { mode: "no-cors" });
+
+    expect(sw.chavesGuardadas("roteiros-estaticos-v1")).toEqual([
+      "/_next/static/chunks/a.js",
+      "/favicon.svg",
+      "/icone-192.png",
+      "/offline.html",
+    ]);
+  });
+});
+
 describe("instalar e ativar", () => {
   it("instalar guarda so a pagina 'Sem conexao' e os icones dela, nenhuma rota do app", async () => {
     await sw.ciclo("install");

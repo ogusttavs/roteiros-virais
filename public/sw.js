@@ -30,6 +30,8 @@ var CACHE_ESTATICOS = "roteiros-estaticos-" + VERSAO;
 var PREFIXO_PAGINAS = "roteiros-paginas";
 var CACHE_ESCOPO = "roteiros-escopo";
 var CHAVE_ESCOPO = "/__escopo";
+/** Teto de arquivos no cache dos estaticos: cada versao nova do aplicativo traz arquivos com nome novo, e sem teto o cache so cresceria. */
+var LIMITE_ESTATICOS = 300;
 var PAGINA_OFFLINE = "/offline.html";
 /** Nome da marca em `Server-Timing` que diz a pagina "voce esta vendo o que foi guardado" (src/lib/offline.ts le). */
 var MARCA_GUARDADO = "guardado";
@@ -174,15 +176,40 @@ function responderNavegacao(event, request, url) {
   );
 }
 
+/**
+ * Mantem o cache dos estaticos abaixo do teto: apaga os mais antigos, nunca os fixos (a pagina "Sem
+ * conexao" e os icones). `keys()` vem na ordem de insercao e cada `put` refaz a insercao, entao o que
+ * sobra no comeco e o que nenhuma pagina pede ha mais tempo (arquivos de versoes antigas).
+ */
+function podarEstaticos() {
+  return caches.open(CACHE_ESTATICOS).then(function (cache) {
+    return cache.keys().then(function (chaves) {
+      var removiveis = chaves.filter(function (chave) {
+        return ESTATICOS_FIXOS.indexOf(new URL(chave.url).pathname) === -1;
+      });
+      var excesso = removiveis.length - LIMITE_ESTATICOS;
+      if (excesso <= 0) return undefined;
+      return Promise.all(
+        removiveis.slice(0, excesso).map(function (chave) {
+          return cache["delete"](chave);
+        }),
+      );
+    });
+  });
+}
+
 function responderEstatico(event, request) {
   return fetch(request).then(
     function (resposta) {
       if (resposta.status === 200 && resposta.type === "basic") {
         var copia = resposta.clone();
         event.waitUntil(
-          caches.open(CACHE_ESTATICOS).then(function (cache) {
-            return cache.put(request, copia);
-          }),
+          caches
+            .open(CACHE_ESTATICOS)
+            .then(function (cache) {
+              return cache.put(request, copia);
+            })
+            .then(podarEstaticos),
         );
       }
       return resposta;
@@ -270,31 +297,34 @@ function buscarEGuardarPagina(caminho) {
 }
 
 function guardarEstaticos(caminhos) {
-  return caches.open(CACHE_ESTATICOS).then(function (cache) {
-    return Promise.all(
-      caminhos.slice(0, 200).map(function (caminho) {
-        var url;
-        try {
-          url = new URL(caminho, self.location.origin);
-        } catch (erro) {
-          return undefined;
-        }
-        if (url.origin !== self.location.origin || !ehEstaticoPermitido(url.pathname)) return undefined;
-        return cache.match(url.href).then(function (ja) {
-          if (ja) return undefined;
-          return fetch(url.href).then(
-            function (resposta) {
-              if (resposta.status === 200 && resposta.type === "basic") return cache.put(url.href, resposta);
-              return undefined;
-            },
-            function () {
-              return undefined;
-            },
-          );
-        });
-      }),
-    );
-  });
+  return caches
+    .open(CACHE_ESTATICOS)
+    .then(function (cache) {
+      return Promise.all(
+        caminhos.slice(0, 200).map(function (caminho) {
+          var url;
+          try {
+            url = new URL(caminho, self.location.origin);
+          } catch (erro) {
+            return undefined;
+          }
+          if (url.origin !== self.location.origin || !ehEstaticoPermitido(url.pathname)) return undefined;
+          return cache.match(url.href).then(function (ja) {
+            if (ja) return undefined;
+            return fetch(url.href).then(
+              function (resposta) {
+                if (resposta.status === 200 && resposta.type === "basic") return cache.put(url.href, resposta);
+                return undefined;
+              },
+              function () {
+                return undefined;
+              },
+            );
+          });
+        }),
+      );
+    })
+    .then(podarEstaticos);
 }
 
 self.addEventListener("message", function (event) {
