@@ -679,6 +679,30 @@ export const avaliacoesTema = pgTable("avaliacoes_tema", {
   criadoEm: criadoEm(),
 });
 
+/**
+ * O rascunho de `/hoje/tema-livre` (V5b, item 2, `PROXIMO.md`): o que a
+ * pessoa digitou e ainda não avaliou. Uma linha por pessoa e por marca
+ * (`usuarioId` + `clienteId` único), porque duas pessoas na mesma marca
+ * podem estar escrevendo assuntos diferentes ao mesmo tempo. Sem prazo;
+ * some só quando a avaliação daquele texto termina com sucesso (continua se
+ * a avaliação der erro, para não perder o que a pessoa escreveu).
+ */
+export const rascunhosTemaLivre = pgTable(
+  "rascunhos_tema_livre",
+  {
+    id: id(),
+    usuarioId: text("usuario_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    texto: text("texto").notNull(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("rascunhos_tema_livre_usuario_cliente").on(t.usuarioId, t.clienteId)],
+);
+
 export type Objetivo = "alcance" | "engajamento" | "conversao";
 
 /**
