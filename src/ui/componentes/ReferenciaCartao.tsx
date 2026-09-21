@@ -1,79 +1,103 @@
 "use client";
 
-import { Bookmark } from "lucide-react";
+import { Bookmark, Play } from "lucide-react";
 
+import type { FaixaMultiplo } from "@/lib/formatarNumero";
+import { formatarViewsExato } from "@/lib/formatarNumero";
+import { textosReferencias } from "@/textos/referencias";
+
+import { Botao } from "./Botao";
 import styles from "./ReferenciaCartao.module.css";
-import type { VideoEmbedProps } from "./VideoEmbed";
-import { VideoEmbed } from "./VideoEmbed";
 
-export type AnaliseLinha = { rotulo: string; texto: string };
+/** Computado uma vez a partir do `VideoReferencia` bruto (`ReferenciasTela`), reaproveitado pelo cartão e pela folha de detalhes. */
+export type VideoFormatado = {
+  id: number;
+  url: string;
+  multiplo: string;
+  rotuloMultiplo: string;
+  faixaMultiplo: FaixaMultiplo;
+  views: number;
+  medianaConta: number | null;
+  velocidade: number | null;
+  contaNome: string;
+  /** "Instagram, 5 de setembro" */
+  plataformaData: string;
+  titulo: string | null;
+  assunto: string;
+  gancho: string;
+  estrutura: string;
+  porQueFuncionou: string;
+};
 
 type Props = {
-  /** Ja formatado ("6,2x"). */
-  vezes: string;
-  /** Ja formatado ("acima do normal da conta"). */
-  rotuloVezes: string;
-  conta: string;
-  data: string;
-  analise: AnaliseLinha[];
-  embed: VideoEmbedProps;
+  video: VideoFormatado;
   salvo: boolean;
   /** Enquanto a Server Action de favoritar não responde (achado da revisão da parte 1). */
   salvando?: boolean;
-  rotuloUsar: string;
-  rotuloSalvar: string;
-  rotuloSalvando: string;
+  onVerDetalhes: () => void;
   onSalvar: () => void;
-  onUsar: () => void;
 };
 
-/** Um vídeo da biblioteca de referências, com a analise e as duas ações (ReferenciasTela). */
-export function ReferenciaCartao({
-  vezes,
-  rotuloVezes,
-  conta,
-  data,
-  analise,
-  embed,
-  salvo,
-  salvando = false,
-  rotuloUsar,
-  rotuloSalvar,
-  rotuloSalvando,
-  onSalvar,
-  onUsar,
-}: Props) {
+function linhaVelocidade(velocidade: number | null): string {
+  if (velocidade === null) return textosReferencias.passouDas72Horas;
+  return textosReferencias.viewsPorHora(formatarViewsExato(velocidade));
+}
+
+/**
+ * Um vídeo da biblioteca de referências (V6, item 4, `Referencias.dc.html`,
+ * `.video-topo`/`.video-conta`/`.titulo-video`/`.acoes-video`):
+ * a capa neutra (sem coletor de miniatura nesta rodada), o múltiplo com a
+ * palavra ao lado, os três números que fizeram o vídeo ser fora da curva,
+ * o canal e a data, o título em uma linha, e as duas ações. A análise
+ * inteira mora na folha de detalhes, não aqui.
+ */
+export function ReferenciaCartao({ video, salvo, salvando = false, onVerDetalhes, onSalvar }: Props) {
   return (
     <article className={styles.cartao}>
-      <div className={styles.cabecalho}>
-        <span className={styles.vezes}>{vezes}</span>
-        <span className={styles.rotuloVezes}>{rotuloVezes}</span>
+      <div className={styles.videoTopo}>
+        <span className={styles.capa} aria-hidden="true">
+          <Play size={24} strokeWidth={1.5} aria-hidden="true" />
+        </span>
+        <div className={styles.multiplo}>
+          <span
+            className={[styles.valor, video.faixaMultiplo !== "acima" ? styles.valorNeutro : ""]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            {video.multiplo}
+          </span>
+          <span className={styles.frase}>{video.rotuloMultiplo}</span>
+        </div>
       </div>
-      <VideoEmbed {...embed} />
-      <span className={styles.contaData}>
-        {conta} · {data}
-      </span>
-      <div className={styles.analise}>
-        {analise.map((linha) => (
-          <div key={linha.rotulo} className={styles.linhaAnalise}>
-            <span className={styles.rotuloAnalise}>{linha.rotulo}</span>
-            <p className={styles.textoAnalise}>{linha.texto}</p>
-          </div>
-        ))}
+
+      <div className={styles.numeros}>
+        <span>{textosReferencias.viewsRotulo(formatarViewsExato(video.views))}</span>
+        {video.medianaConta !== null ? (
+          <span>{textosReferencias.normalDessaConta(formatarViewsExato(video.medianaConta))}</span>
+        ) : null}
+        <span>{linhaVelocidade(video.velocidade)}</span>
       </div>
-      <div className={styles.rodape}>
-        <button type="button" className={styles.usar} onClick={onUsar}>
-          {rotuloUsar}
-        </button>
+
+      <div className={styles.videoConta}>
+        <span className={styles.nome}>{video.contaNome}</span>
+        <span className={styles.quando}>{video.plataformaData}</span>
+      </div>
+
+      {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}
+
+      <div className={styles.acoes}>
+        <Botao variante="secundario" tamanho="md" className={styles.acaoVerDetalhes} onClick={onVerDetalhes}>
+          {textosReferencias.verDetalhes}
+        </Botao>
         <button
           type="button"
           aria-pressed={salvo}
-          aria-label={salvando ? rotuloSalvando : rotuloSalvar}
+          aria-label={salvando ? textosReferencias.salvando : salvo ? textosReferencias.salvo : textosReferencias.salvar}
           disabled={salvando}
           onClick={onSalvar}
           className={styles.salvar}
         >
-          <Bookmark size={24} strokeWidth={1.5} fill={salvo ? "currentColor" : "none"} aria-hidden="true" />
+          <Bookmark size={20} strokeWidth={1.5} fill={salvo ? "currentColor" : "none"} aria-hidden="true" />
         </button>
       </div>
     </article>

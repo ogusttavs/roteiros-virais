@@ -1,0 +1,134 @@
+/**
+ * Design v2, `Referencias.dc.html`, `.folha-detalhe` (V6, item 5): o corpo
+ * vem de `Folha.module.css`; aqui só o que é específico desta folha.
+ */
+.videoConta {
+  display: grid;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+.nome {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}
+
+.quando {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  font-family: var(--fonte-mono);
+}
+
+.tituloVideo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  white-space: normal;
+}
+
+.numeros {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.numeros b {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.analise {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.analise div {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.analise strong {
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+  font-weight: var(--peso-medio);
+}
+
+.analise p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.linhaPe {
+  display: flex;
+  gap: var(--espaco-3);
+}
+
+.abrirNaPlataforma {
+  flex: 1 1 auto;
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.abrirNaPlataforma:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.abrirNaPlataforma:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoSalvar {
+  flex: 0 0 auto;
+  width: var(--altura-toque-lg);
+  height: var(--altura-toque-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-titulo);
+  cursor: pointer;
+  padding: 0;
+}
+
+.botaoSalvar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoSalvar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoSalvar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

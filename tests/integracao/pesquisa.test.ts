@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { contas, nichos, videos } from "@/db/schema";
+import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import {
   evidenciaParaTema,
   foraDaCurvaDoNicho,
@@ -42,18 +42,20 @@ async function criarVideo(
     idioma?: string | null;
     contaId?: number;
     nichoId?: number;
+    plataforma?: Plataforma;
+    views?: number;
   },
 ) {
   const [v] = await db()
     .insert(videos)
     .values({
-      plataforma: opcoes.semDono ? "instagram" : "tiktok",
+      plataforma: opcoes.plataforma ?? (opcoes.semDono ? "instagram" : "tiktok"),
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       contaId: opcoes.semDono ? null : (opcoes.contaId ?? contaId),
       nichoId: opcoes.nichoId ?? nichoId,
       titulo: opcoes.titulo,
-      views: 100,
+      views: opcoes.views ?? 100,
       publicadoEm: opcoes.publicadoEm,
       origem: opcoes.origem ?? (opcoes.semDono ? "meta" : "coleta"),
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
@@ -406,12 +408,12 @@ describe("referenciasDoNicho", () => {
     });
     const semAnalise = await criarVideo("ref-sem-analise", { foraDaCurva: 20, publicadoEm: diasAtras(1) });
 
-    const resultado = await referenciasDoNicho(nichoId, 90);
-    const relevantes = resultado.filter((v) => v.assunto === "assunto recente" || v.assunto === "assunto antigo");
+    const resultado = await referenciasDoNicho(nichoId, { periodoDias: 90 });
+    const relevantes = resultado.videos.filter((v) => v.assunto === "assunto recente" || v.assunto === "assunto antigo");
 
     expect(relevantes.map((v) => v.assunto)).toEqual(["assunto recente", "assunto antigo"]);
     expect(relevantes.find((v) => v.assunto === "assunto recente")?.formato).toBe("podcast");
-    expect(resultado.some((v) => v.id === semAnalise.id)).toBe(false); // sem analise, nunca entra
+    expect(resultado.videos.some((v) => v.id === semAnalise.id)).toBe(false); // sem analise, nunca entra
   });
 
   /** Achado do primeiro uso no iPad, item 4: "1,0x" e "0,7x" apareciam como se fossem referencia. */
@@ -439,11 +441,11 @@ describe("referenciasDoNicho", () => {
       analise: { ...analiseExemplo, assunto: "no limiar" },
     });
 
-    const resultado = await referenciasDoNicho(nichoId, 90);
+    const resultado = await referenciasDoNicho(nichoId, { periodoDias: 90 });
 
-    expect(resultado.some((v) => v.id === naMedia.id)).toBe(false);
-    expect(resultado.some((v) => v.id === abaixo.id)).toBe(false);
-    expect(resultado.some((v) => v.assunto === "no limiar")).toBe(true);
+    expect(resultado.videos.some((v) => v.id === naMedia.id)).toBe(false);
+    expect(resultado.videos.some((v) => v.id === abaixo.id)).toBe(false);
+    expect(resultado.videos.some((v) => v.assunto === "no limiar")).toBe(true);
   });
 
   /**
@@ -492,10 +494,10 @@ describe("referenciasDoNicho", () => {
       analise: { ...analiseExemplo, assunto: "ref-pt-0" },
     });
 
-    const resultado = await referenciasDoNicho(nichoProporcao.id, 90, 10);
+    const resultado = await referenciasDoNicho(nichoProporcao.id, { periodoDias: 90, limite: 10 });
 
-    expect(resultado).toHaveLength(2);
-    const assuntos = resultado.map((v) => v.assunto);
+    expect(resultado.videos).toHaveLength(2);
+    const assuntos = resultado.videos.map((v) => v.assunto);
     expect(assuntos).toContain("ref-pt-0");
     // So o "en" de maior prioridade (mais recente, ref-en-1) entra.
     expect(assuntos).toContain("ref-en-1");
@@ -536,12 +538,172 @@ describe("referenciasDoNicho", () => {
       });
     }
 
-    const resultado = await referenciasDoNicho(nichoSemBrasil.id, 90, 10);
+    const resultado = await referenciasDoNicho(nichoSemBrasil.id, { periodoDias: 90, limite: 10 });
 
-    expect(resultado).toEqual([]);
+    expect(resultado.videos).toEqual([]);
 
     await db().delete(videos).where(eq(videos.nichoId, nichoSemBrasil.id));
     await db().delete(contas).where(eq(contas.nichoId, nichoSemBrasil.id));
     await db().delete(nichos).where(eq(nichos.id, nichoSemBrasil.id));
+  });
+
+  /**
+   * Os filtros da tela (V6, item 1): cada um isolado num nicho proprio, para
+   * nao competir com o dado dos describes acima (o nicho padrao do arquivo
+   * ja acumula videos de varios its).
+   */
+  describe("filtros da tela (periodo, busca, plataforma, formato) e a contagem total", () => {
+    async function nichoIsolado(slug: string) {
+      const [nicho] = await db().insert(nichos).values({ slug, nome: slug, termos: [] }).returning();
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: `conta-${slug}`, nichoId: nicho.id })
+        .returning();
+      return { nichoId: nicho.id, contaId: conta.id };
+    }
+
+    const analiseExemplo = {
+      gancho: "gancho",
+      estrutura: "estrutura",
+      porQueFuncionou: "funcionou por isso",
+      formato: "fala_para_camera" as const,
+    };
+
+    it("periodoDias exclui video fora da janela", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-periodo-teste");
+      await criarVideo("ref-filtro-periodo-dentro", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(5),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: "dentro do periodo" },
+      });
+      await criarVideo("ref-filtro-periodo-fora", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(20),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: "fora do periodo" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 7 });
+
+      expect(resultado.videos.map((v) => v.assunto)).toEqual(["dentro do periodo"]);
+      expect(resultado.total).toBe(1);
+    });
+
+    it("busca por assunto (tsvector) so devolve o video que casa", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-busca-assunto-teste");
+      await criarVideo("ref-filtro-busca-camurca", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        titulo: "tirando mancha de sofa de camurca",
+        analise: { ...analiseExemplo, assunto: "mancha em sofa de camurca" },
+      });
+      await criarVideo("ref-filtro-busca-outro", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        titulo: "organizando o guarda roupa em dez minutos",
+        analise: { ...analiseExemplo, assunto: "organizacao do guarda roupa" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, busca: "camurca" });
+
+      expect(resultado.videos.map((v) => v.assunto)).toEqual(["mancha em sofa de camurca"]);
+    });
+
+    it("busca por nome da conta so devolve video daquela conta", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-busca-conta-teste");
+      const [contaAlvo] = await db()
+        .insert(contas)
+        .values({ plataforma: "tiktok", handle: "conta-alvo-busca", nome: "Casa em Ordem", nichoId: id })
+        .returning();
+      await criarVideo("ref-filtro-busca-conta-alvo", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: contaAlvo.id,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: "video da conta alvo" },
+      });
+      await criarVideo("ref-filtro-busca-conta-outra", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: "video de outra conta" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, busca: "Casa em Ordem" });
+
+      expect(resultado.videos.map((v) => v.assunto)).toEqual(["video da conta alvo"]);
+    });
+
+    it("plataformas filtra so as marcadas", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-plataforma-teste");
+      await criarVideo("ref-filtro-plataforma-youtube", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        plataforma: "youtube",
+        analise: { ...analiseExemplo, assunto: "video do youtube" },
+      });
+      await criarVideo("ref-filtro-plataforma-tiktok", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        plataforma: "tiktok",
+        analise: { ...analiseExemplo, assunto: "video do tiktok" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, plataformas: ["youtube"] });
+
+      expect(resultado.videos.map((v) => v.assunto)).toEqual(["video do youtube"]);
+    });
+
+    it("formatos filtra so os marcados", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-formato-teste");
+      await criarVideo("ref-filtro-formato-podcast", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, formato: "podcast", assunto: "video em podcast" },
+      });
+      await criarVideo("ref-filtro-formato-esquete", {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(1),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, formato: "esquete", assunto: "video em esquete" },
+      });
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, formatos: ["podcast"] });
+
+      expect(resultado.videos.map((v) => v.assunto)).toEqual(["video em podcast"]);
+    });
+
+    it("total conta os vídeos disponíveis mesmo quando o limite corta a lista devolvida", async () => {
+      const { nichoId: id, contaId: cId } = await nichoIsolado("pesquisa-filtro-total-teste");
+      for (let i = 1; i <= 5; i += 1) {
+        await criarVideo(`ref-filtro-total-${i}`, {
+          foraDaCurva: 5,
+          publicadoEm: diasAtras(i),
+          contaId: cId,
+          nichoId: id,
+          analise: { ...analiseExemplo, assunto: `video total ${i}` },
+        });
+      }
+
+      const resultado = await referenciasDoNicho(id, { periodoDias: 90, limite: 2 });
+
+      expect(resultado.videos.length).toBeLessThanOrEqual(2);
+      expect(resultado.total).toBe(5);
+    });
   });
 });

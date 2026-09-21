@@ -1,0 +1,91 @@
+/**
+ * Design v2, `Referencias.dc.html`, `.opcao-filtro` (só no `<style>` desta
+ * tela, não em `base.css`; V6, item 3).
+ */
+.grupo {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.rotuloGrupo {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.opcao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-3);
+  align-items: center;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcao.marcada {
+  border-color: var(--cor-acao);
+  background: var(--cor-selecao-suave);
+}
+
+.aoLado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  color: var(--cor-acao);
+}
+
+.quantos {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.opcao.marcada .quantos {
+  color: var(--cor-destaque);
+}
+
+.botaoAplicar {
+  min-height: var(--altura-toque-lg);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  cursor: pointer;
+}
+
+.botaoAplicar:hover {
+  background: var(--cor-acao-hover);
+}
+
+.botaoLimpar {
+  min-height: var(--altura-toque-lg);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.botaoLimpar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoAplicar:focus-visible,
+.botaoLimpar:focus-visible,
+.opcao:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}

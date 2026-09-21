@@ -1,0 +1,95 @@
+/**
+ * Design v2, `entrega/telas/Referencias.dc.html` (`.folha-detalhe`,
+ * `.folha-filtrar`) mais `base.css` (`.folha-fundo`, `.folha`, `.folha-topo`,
+ * `.folha-alca`, `.folha-titulo`, `.folha-corpo`, `.folha-pe`): a folha sobe
+ * de baixo no celular; a partir de 768px centraliza na tela, em vez de
+ * ancorar num canto (diferença do `PainelFlutuante.tsx`, pensado para os
+ * painéis do Roteiro).
+ */
+.folhaFundo {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--cor-sobreposicao);
+}
+
+.folha {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  max-height: 88vh;
+  border-radius: var(--raio-folha) var(--raio-folha) 0 0;
+  border: var(--largura-borda) solid var(--vidro-borda);
+  background: var(--vidro-fundo-forte);
+  backdrop-filter: var(--vidro-desfoque);
+  -webkit-backdrop-filter: var(--vidro-desfoque);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
+  outline: none;
+}
+
+@media (max-width: 767px) {
+  .folha {
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    max-height: calc(88vh - 0.5rem);
+  }
+}
+
+.folhaTopo {
+  display: grid;
+  justify-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-5) var(--espaco-4);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.folhaAlca {
+  width: 2.25rem;
+  height: 0.3125rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda-forte);
+}
+
+.folhaTitulo {
+  justify-self: start;
+}
+
+.folhaCorpo {
+  overflow-y: auto;
+  padding: var(--espaco-5);
+  display: grid;
+  gap: var(--espaco-5);
+  align-content: start;
+}
+
+.folhaPe {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4) var(--espaco-5) calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.folhaPe > * {
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .folha {
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(var(--largura-folha), calc(100vw - var(--espaco-12)));
+    max-height: 86vh;
+    border-radius: var(--raio-lg);
+  }
+  .folhaAlca {
+    display: none;
+  }
+}

@@ -1,85 +1,164 @@
+/**
+ * Design v2, `Referencias.dc.html` e `base.css` (V6, D2 parte 3a): o
+ * cabeçalho, os filtros em três níveis e a grade. `.grade`, `.segmentado`,
+ * `.segmento`, `.busca`, `.seletor-pill` já existem em `base.css`; as
+ * classes de filtro específicas desta tela (`.filtros-linha`, `.btn-filtrar`,
+ * `.opcao-filtro`) moram só no `<style>` de `Referencias.dc.html`.
+ */
 .pagina {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-7);
+  display: grid;
+  gap: var(--espaco-6);
 }
 
-.cabecalho {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-3);
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-1);
 }
 
-.titulo {
+.cabecalhoTela h1 {
   margin: 0;
   font-size: var(--tamanho-titulo);
 }
 
-.linha {
+.cabecalhoTela p {
   margin: 0;
   font-size: var(--tamanho-secundario);
-  line-height: 1.5;
   color: var(--cor-texto-suave);
 }
 
 .filtros {
-  display: flex;
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.segmentado {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
+  width: 100%;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+@media (min-width: 768px) {
+  .segmentado {
+    display: inline-grid;
+    width: auto;
+    justify-self: start;
+  }
+}
+
+.segmentoBotao {
+  min-height: var(--altura-toque);
+  min-width: 0;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--espaco-2);
-  overflow-x: auto;
-  scrollbar-width: none;
+  padding: 0 var(--espaco-2);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .segmentoBotao {
+    padding: 0 var(--espaco-5);
+  }
+}
+
+.segmentoAtivo {
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  box-shadow: var(--sombra-controle);
+}
+
+.filtrosLinha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+  align-items: center;
+}
+
+.busca {
+  flex: 1 1 14rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+}
+
+.busca svg {
+  color: var(--cor-texto-dica);
+}
+
+.busca input {
+  border: 0;
+  background: transparent;
+  min-width: 0;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+}
+
+.busca input:focus {
+  outline: none;
+}
+
+.busca input::placeholder {
+  color: var(--cor-texto-dica);
+}
+
+.seletorPeriodo {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+}
+
+.botaoFiltrar {
+  white-space: nowrap;
+}
+
+.quantosAtivos {
+  font-family: var(--fonte-mono);
+  color: var(--cor-acao);
+  font-weight: var(--peso-semibold);
+}
+
+.contagem {
+  margin: 0;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
 }
 
 .grade {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--espaco-8);
-}
-
-.semResultado {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--espaco-4);
-  padding: var(--espaco-9) 0;
+  align-items: start;
 }
 
-.semResultadoTexto {
-  margin: 0;
-}
-
-.ver90 {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--altura-toque);
-  padding: 0 var(--espaco-5);
-  border-radius: var(--raio-pill);
-  border: 1px solid var(--cor-borda-forte);
-  background: transparent;
-  color: var(--cor-titulo);
-  font-family: var(--fonte-texto);
-  font-size: var(--tamanho-secundario);
-  font-weight: 500;
-  cursor: pointer;
-  transition: background var(--duracao-rapida) var(--curva-saida);
-}
-
-.ver90:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.ver90:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-/**
- * Tres colunas so a partir de 1180px (achado do Gustavo no iPad, 06/09,
- * acabamento visual 2): em 768px cabiam tres colunas apertadas, uma
- * palavra por linha na analise e o botao "usar como referencia" quebrando
- * em tres linhas. Duas colunas de 768 a 1179; uma so ate 767.
- */
 @media (min-width: 768px) {
   .grade {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -89,5 +168,42 @@
 @media (min-width: 1180px) {
   .grade {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--espaco-5);
   }
+}
+
+.blocoVazio {
+  display: grid;
+  gap: var(--espaco-4);
+  justify-items: start;
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-5);
+}
+
+.blocoVazio h3 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+}
+
+.blocoVazio p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.blocoVazioAcoes {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+  max-width: 22rem;
+}
+
+.avisoErro {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-erro);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-secundario);
 }
