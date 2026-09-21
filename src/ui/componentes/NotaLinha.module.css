@@ -1,0 +1,64 @@
+.pilares {
+  display: grid;
+  gap: var(--espaco-5);
+}
+
+/** design v2, `base.css`, ".nota-linha": grid de 2 colunas, a barra e a frase ocupam a linha toda. */
+.linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-2) var(--espaco-3);
+  align-items: center;
+}
+
+.nome {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+.valor {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-cabecalho);
+  line-height: 1;
+  color: var(--cor-nota);
+}
+
+.barra {
+  grid-column: 1;
+  display: block;
+  height: 0.375rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-nota-trilho);
+  overflow: hidden;
+}
+
+.barraPreenchida {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cor-borda-forte);
+}
+
+.palavra {
+  grid-column: 1 / -1;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.naMeta .valor {
+  color: var(--cor-destaque);
+}
+
+.naMeta .barraPreenchida {
+  background: var(--cor-destaque);
+}
+
+.baixa .valor {
+  color: var(--cor-atencao);
+}
+
+.baixa .barraPreenchida {
+  background: var(--cor-atencao);
+}

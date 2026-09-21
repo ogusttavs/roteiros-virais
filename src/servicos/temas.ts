@@ -6,11 +6,21 @@
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { db } from "@/db";
-import { avaliacoesTema, roteiros, temasDia, type Cliente, type Objetivo, type TemaDoDia } from "@/db/schema";
+import {
+  avaliacoesTema,
+  nichos,
+  rascunhosTemaLivre,
+  roteiros,
+  temasDia,
+  type Cliente,
+  type Objetivo,
+  type TemaDoDia,
+} from "@/db/schema";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual } from "@/servicos/pesquisa";
+import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
@@ -237,6 +247,49 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
 }
 
 /**
+ * O rascunho de `/hoje/tema-livre` (V5b, item 2): uma linha por pessoa e
+ * por marca, sem prazo. `salvarRascunhoTemaLivre` faz upsert (o índice
+ * único `usuarioId` + `clienteId` decide); `apagarRascunhoTemaLivre` some
+ * o rascunho quando a pessoa avalia o texto com sucesso (chamado pela
+ * Server Action, nunca daqui, para `avaliarTema` continuar sem esse
+ * efeito colateral).
+ */
+export async function salvarRascunhoTemaLivre(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  await db()
+    .insert(rascunhosTemaLivre)
+    .values({ usuarioId, clienteId, texto, atualizadoEm: new Date() })
+    .onConflictDoUpdate({
+      target: [rascunhosTemaLivre.usuarioId, rascunhosTemaLivre.clienteId],
+      set: { texto, atualizadoEm: new Date() },
+    });
+}
+
+export async function rascunhoTemaLivre(usuarioId: string, clienteId: number): Promise<string | null> {
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  return linha?.texto ?? null;
+}
+
+export async function apagarRascunhoTemaLivre(usuarioId: string, clienteId: number): Promise<void> {
+  await db()
+    .delete(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+}
+
+/**
+ * `SaidaAvaliarTema` mais `anguloTemProva` (V5b, item 4): se `anguloSugerido`
+ * vale a pena mostrar. Calculado por código, nunca pela IA (mesma régua da
+ * V2b, item 8, que os três temas do dia já usam: `temaTemProvaSuficiente`,
+ * `prova-tema.ts`), sobre `dados.evidencias`, os ids que de fato sustentam
+ * esta avaliação. Sem prova suficiente, a tela mostra só "seguir com o meu
+ * mesmo assim", nunca o ângulo (regra do `PROXIMO.md`: nada de número ou
+ * recomendação sem evidência de verdade por trás).
+ */
+export type ResultadoAvaliarTema = avaliarTemaIA.SaidaAvaliarTema & { anguloTemProva: boolean };
+
+/**
  * Nota em cinco pilares de um tema proposto pelo cliente (etapa 10, decisão
  * 5 do `PROXIMO.md`): evidência do banco, perfil compilado e modelo do
  * nicho no bloco estável, e o resultado gravado em `avaliacoes_tema`.
@@ -249,7 +302,7 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
  * baixa no pilar "viralizar"), mas nenhum id fora do que foi fornecido pode
  * ser citado.
  */
-export async function avaliarTema(cliente: Cliente, texto: string): Promise<avaliarTemaIA.SaidaAvaliarTema> {
+export async function avaliarTema(cliente: Cliente, texto: string): Promise<ResultadoAvaliarTema> {
   if (!cliente.nichoId) {
     throw new ErroTemas("este cliente ainda nao tem um nicho definido.");
   }
@@ -259,10 +312,11 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
     throw new ErroTemas("o briefing deste cliente ainda nao foi compilado.");
   }
 
-  const [evidencias, modeloNicho, regrasCliente] = await Promise.all([
+  const [evidencias, modeloNicho, regrasCliente, [nicho]] = await Promise.all([
     evidenciaParaTema(cliente.nichoId, texto),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),
+    db().select({ criadoEm: nichos.criadoEm }).from(nichos).where(eq(nichos.id, cliente.nichoId)),
   ]);
 
   const { dados } = await gerarComVerificacao({
@@ -298,5 +352,12 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<aval
       evidencias: dados.evidencias,
     });
 
-  return dados;
+  let anguloTemProva = false;
+  if (dados.anguloSugerido && dados.evidencias.length > 0 && nicho) {
+    const agora = new Date();
+    const videosPorId = await buscarVideosParaProva(dados.evidencias);
+    anguloTemProva = temaTemProvaSuficiente(dados.evidencias, videosPorId, agora, janelaDeProva(nicho.criadoEm, agora));
+  }
+
+  return { ...dados, anguloTemProva };
 }

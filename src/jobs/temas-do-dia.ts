@@ -32,80 +32,24 @@
  * ela. Tema que não passa é descartado, não corrigido: o nicho fecha o dia
  * com menos de três temas quando for o caso.
  */
-import { and, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { contas, nichos, noticias, temasDia, videos, type TemaDoDia } from "@/db/schema";
+import { nichos, noticias, temasDia, type TemaDoDia } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
 import { formatarModeloNicho, modeloNichoAtual, semDonoComAnalise, subindoHojeComAnalise } from "@/servicos/pesquisa";
-import { classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
 
-const DIA_MS = 24 * 60 * 60 * 1000;
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 const LIMITE_NOTICIAS = 60;
 const LIMITE_SUBINDO = 30;
 
-/**
- * V2b, item 8: pelo menos este tanto de vídeo distinto, de pelo menos
- * `MINIMO_CONTAS_PROVA` contas diferentes, com maioria brasileira.
- */
-const MINIMO_VIDEOS_PROVA = 3;
-const MINIMO_CONTAS_PROVA = 2;
-/** Janela padrão da prova; nicho com menos de 7 dias de base usa `JANELA_PROVA_NICHO_NOVO_DIAS`. */
-const JANELA_PROVA_DIAS = 7;
-/** Nicho novo tem menos evidência acumulada; dobra a janela para ter chance de juntar prova de verdade. */
-const JANELA_PROVA_NICHO_NOVO_DIAS = 14;
-
 type NoticiaCandidata = { id: number; titulo: string; resumo: string | null };
 type NichoAtivo = { id: number; slug: string; nome: string; termos: string[]; criadoEm: Date };
-
-/** Janela de dias da prova (V2b, item 8): dobra para nicho com menos de 7 dias de base. */
-function janelaDeProva(nicho: NichoAtivo, agora: Date): number {
-  const diasDeBase = (agora.getTime() - nicho.criadoEm.getTime()) / DIA_MS;
-  return diasDeBase < JANELA_PROVA_DIAS ? JANELA_PROVA_NICHO_NOVO_DIAS : JANELA_PROVA_DIAS;
-}
-
-export type VideoParaProva = {
-  id: number;
-  contaId: number | null;
-  publicadoEm: Date | null;
-  idioma: string | null;
-  contaPais: string | null;
-  contaIdiomaPrincipal: string | null;
-};
-
-/**
- * Função pura (V2b, item 8), testável sem banco: pelo menos
- * `MINIMO_VIDEOS_PROVA` vídeos citados dentro da janela, de pelo menos
- * `MINIMO_CONTAS_PROVA` contas diferentes (vídeo sem dono, `contaId` nulo,
- * nunca conta para "contas diferentes", só para a contagem de vídeos), com
- * maioria brasileira entre os vídeos da janela.
- */
-export function temaTemProvaSuficiente(
-  idsEvidenciaVideo: number[],
-  videosPorId: Map<number, VideoParaProva>,
-  agora: Date,
-  janelaDias: number,
-): boolean {
-  const desde = new Date(agora.getTime() - janelaDias * DIA_MS);
-  const naJanela = idsEvidenciaVideo
-    .map((id) => videosPorId.get(id))
-    .filter((v): v is VideoParaProva => v !== undefined && v.publicadoEm !== null && v.publicadoEm >= desde);
-
-  if (naJanela.length < MINIMO_VIDEOS_PROVA) return false;
-
-  const contasDistintas = new Set(naJanela.filter((v) => v.contaId !== null).map((v) => v.contaId));
-  if (contasDistintas.size < MINIMO_CONTAS_PROVA) return false;
-
-  const brasileiros = naJanela.filter(
-    (v) => classificarBrasil(v.idioma, contaEhBrasileira(v.contaPais, v.contaIdiomaPrincipal)) === "brasileiro",
-  ).length;
-  return brasileiros > naJanela.length / 2;
-}
 
 async function noticiasCandidatas(nichoId: number): Promise<NoticiaCandidata[]> {
   return db()
@@ -261,21 +205,8 @@ async function filtrarTemasComProva(
     return { temasComProva: [], temasSemProva: temas.length };
   }
 
-  const linhas = await db()
-    .select({
-      id: videos.id,
-      contaId: videos.contaId,
-      publicadoEm: videos.publicadoEm,
-      idioma: videos.idioma,
-      contaPais: contas.pais,
-      contaIdiomaPrincipal: contas.idiomaPrincipal,
-    })
-    .from(videos)
-    .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(inArray(videos.id, idsVideo));
-
-  const videosPorId = new Map(linhas.map((l) => [l.id, l]));
-  const janela = janelaDeProva(nicho, agora);
+  const videosPorId = await buscarVideosParaProva(idsVideo);
+  const janela = janelaDeProva(nicho.criadoEm, agora);
 
   const temasComProva = temas.filter((tema) => temaTemProvaSuficiente(tema.evidencias, videosPorId, agora, janela));
   return { temasComProva, temasSemProva: temas.length - temasComProva.length };

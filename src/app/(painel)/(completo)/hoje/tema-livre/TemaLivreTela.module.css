@@ -1,65 +1,235 @@
+/**
+ * `/hoje/tema-livre` (design v2, `entrega/telas/TemaLivre.dc.html`;
+ * `PROXIMO.md`, V5b). Mesmo truque de `RoteiroTela.module.css`: cancela o
+ * padding de `(painel)/layout.module.css` porque esta tela tem a própria
+ * `BarraTopo`.
+ */
 .pagina {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-6);
-  max-width: var(--largura-leitura);
-  padding-bottom: var(--espaco-10);
+  margin: calc(-1 * (56px + env(safe-area-inset-top, 0px) + var(--espaco-6)))
+    calc(-1 * var(--margem-celular))
+    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
 }
 
-.titulo {
-  margin: 0;
-  font-size: var(--tamanho-titulo);
+@media (min-width: 768px) {
+  .pagina {
+    margin: calc(-1 * var(--espaco-10));
+  }
 }
 
-.semEvidencia {
-  margin: 0;
-  padding: var(--espaco-4);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie-recuada);
-  color: var(--cor-texto);
-  font-size: var(--tamanho-secundario);
-  line-height: var(--altura-corpo);
-}
-
-.cartaoAngulo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-3);
-  padding: var(--espaco-5);
-  border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-lg);
-  background: var(--cor-superficie);
-}
-
-.anguloTitulo {
-  margin: 0;
-  font-size: var(--tamanho-secundario);
-  font-weight: 600;
+.botaoBarra {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
   color: var(--cor-titulo);
-}
-
-.anguloTexto {
-  margin: 0;
-  font-size: var(--tamanho-corpo);
-  color: var(--cor-texto);
-}
-
-.avaliarOutro {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-  text-decoration: underline;
   cursor: pointer;
 }
 
-.avaliarOutro:hover {
+.botaoBarra:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoBarra:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.miolo {
+  padding: var(--espaco-5) var(--margem-celular) calc(var(--espaco-8) + env(safe-area-inset-bottom, 0px));
+  max-width: var(--largura-leitura);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (min-width: 768px) {
+  .miolo {
+    padding: var(--espaco-8) var(--espaco-10) var(--espaco-10);
+  }
+}
+
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.titulo {
+  font-size: var(--tamanho-titulo-1);
+  font-weight: var(--peso-titulo);
   color: var(--cor-titulo);
 }
 
-.avaliarOutro:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
+.subtitulo {
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- Cartão base (design v2, base.css, ".cartao") ---------- */
+
+.cartao {
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-5);
+  display: grid;
+  gap: var(--espaco-4);
+  align-content: start;
+  min-width: 0;
+}
+
+.cartaoRecuado {
+  background: var(--cor-superficie-recuada);
+  border-color: transparent;
+}
+
+.rotulo {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+/* ---------- Estado "proposta": o campo ---------- */
+
+.campo {
+  gap: var(--espaco-3);
+}
+
+.campoRodape {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.contador {
+  margin-left: auto;
+  font-family: var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.notaRodape {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+/* ---------- "O que você escreveu" (esperando, naMeta, abaixoDaMeta, erro) ---------- */
+
+.temaProposto {
+  gap: var(--espaco-3);
+}
+
+.textoProposto {
+  padding-left: var(--espaco-4);
+  border-left: 3px solid var(--cor-borda-forte);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+}
+
+.botaoEditar {
+  justify-self: start;
+  padding-left: 0 !important;
+}
+
+/* ---------- naMeta / abaixoDaMeta: a média e os pilares ---------- */
+
+.mediaTema {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.mediaValor {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-titulo-grande);
+  line-height: 1;
+  color: var(--cor-nota);
+}
+
+.mediaFaixa {
+  font-size: var(--tamanho-cabecalho);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-texto-suave);
+}
+
+.mediaMeta {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  line-height: 1;
+  color: var(--cor-texto-dica);
+  margin-left: auto;
+}
+
+.naMeta .mediaValor,
+.naMeta .mediaFaixa {
+  color: var(--cor-destaque);
+}
+
+.mediaFrase {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.divisor {
+  height: var(--largura-borda);
+  background: var(--cor-divisor);
+}
+
+.acaoUnica {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+}
+
+/* ---------- abaixoDaMeta: o ângulo sugerido ---------- */
+
+.recomendacao {
+  gap: var(--espaco-4);
+}
+
+.anguloNome {
+  font-size: var(--tamanho-titulo-2);
+  color: var(--cor-titulo);
+}
+
+.duasAcoes {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+}
+
+@media (min-width: 768px) {
+  .duasAcoes {
+    display: flex;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---------- erro ---------- */
+
+.blocoErro {
+  justify-items: start;
+}
+
+.avisoErro {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-erro);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-secundario);
+}
+
+.erroTitulo {
+  font-size: var(--tamanho-titulo-2);
+  color: var(--cor-titulo);
 }

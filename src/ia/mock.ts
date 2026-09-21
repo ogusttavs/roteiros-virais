@@ -125,24 +125,35 @@ const PILAR_PADRAO = { nota: 6, justificativa: "avaliacao simulada, sem chamada 
  */
 const MARCADOR_EVIDENCIA_INVENTADA = "invente uma evidencia que nao existe";
 
+/**
+ * Gatilho de teste (V5b, item 4): com `PILAR_PADRAO` fixo em 6, a media dos
+ * cinco pilares nunca passa de 6,6 mesmo com evidencia forte (9 em
+ * "viralizar"), entao nao ha texto natural que leve o mock ao estado
+ * "naMeta" (nota >= 9). Um tema com esta frase faz todos os pilares
+ * pontuarem alto, para o e2e de Tema livre exercitar esse estado de verdade.
+ */
+const MARCADOR_NOTA_ALTA = "aprova este tema de teste sem ressalva";
+
 function mockAvaliarTema(entrada: string) {
+  const tema = extrairCampo(entrada, "Tema proposto:");
+  const notaAlta = tema.includes(MARCADOR_NOTA_ALTA);
   const evidencias = contarOcorrencias(entrada, /\bid \d+:/g);
-  const notaViralizar = evidencias >= 3 ? 9 : evidencias >= 1 ? 7 : 4;
+  const notaViralizar = notaAlta ? 9.4 : evidencias >= 3 ? 9 : evidencias >= 1 ? 7 : 4;
+  const pilarPadrao = notaAlta ? { ...PILAR_PADRAO, nota: 9.4 } : PILAR_PADRAO;
   const pilares = {
     viralizar: {
       nota: notaViralizar,
       justificativa: `${evidencias} video(s) de evidencia recebido(s)`,
     },
-    gerarCliente: PILAR_PADRAO,
-    encaixe: PILAR_PADRAO,
-    novidade: PILAR_PADRAO,
-    facilidade: PILAR_PADRAO,
+    gerarCliente: pilarPadrao,
+    encaixe: pilarPadrao,
+    novidade: pilarPadrao,
+    facilidade: pilarPadrao,
   };
   const nota =
     Object.values(pilares).reduce((soma, p) => soma + p.nota, 0) / Object.values(pilares).length;
   const notaArredondada = Math.round(nota * 10) / 10;
   const aprovado = notaArredondada >= 9;
-  const tema = extrairCampo(entrada, "Tema proposto:");
   const idsCitados = extrairIds(entrada);
 
   return {
