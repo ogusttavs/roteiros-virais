@@ -8,7 +8,7 @@ import styles from "./VideoEmbed.module.css";
 export type VideoEmbedProps = {
   url: string;
   alt: string;
-  /** Ja formatado ("vídeo embedado 9:16 · carrega ao entrar na tela"). */
+  /** Ja formatado ("Carregando o vídeo"). */
   rotuloCarregamento: string;
   /** Quando o ator/API nao devolve embed oficial para a plataforma (TikTok e Instagram hoje). */
   falhou?: boolean;

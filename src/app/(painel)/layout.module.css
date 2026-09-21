@@ -51,6 +51,11 @@
   display: none;
 }
 
+/** V7, item 0c: some com o teclado aberto, para nao cobrir o campo em foco. */
+.barraInferior.escondidaTeclado {
+  display: none;
+}
+
 @media (min-width: 768px) {
   .pagina {
     display: flex;

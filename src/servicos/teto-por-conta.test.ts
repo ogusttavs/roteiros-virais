@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { aplicarTetoPorConta } from "./teto-por-conta";
 
-type ItemTeste = { id: string; contaId: number };
+type ItemTeste = { id: string; contaId: number | null };
 
-function item(id: string, contaId: number): ItemTeste {
+function item(id: string, contaId: number | null): ItemTeste {
   return { id, contaId };
 }
 
@@ -44,5 +44,19 @@ describe("aplicarTetoPorConta", () => {
 
   it("lista vazia devolve vazia", () => {
     expect(aplicarTetoPorConta([], (i: ItemTeste) => i.contaId)).toEqual([]);
+  });
+
+  /** Item 0 da V7: contaId nulo nao pode virar um balde unico que limita todo video sem conta entre si. */
+  it("video sem conta (contaId nulo) nunca e limitado, nem conta para o teto de outro sem conta", () => {
+    const lista = [item("s1", null), item("s2", null), item("s3", null), item("s4", null), item("s5", null)];
+    expect(ids(aplicarTetoPorConta(lista, (i) => i.contaId))).toEqual(["s1", "s2", "s3", "s4", "s5"]);
+  });
+
+  it("video sem conta intercalado com uma conta de verdade: so a conta de verdade e limitada", () => {
+    const lista = [item("a1", 1), item("s1", null), item("a2", 1), item("a3", 1), item("a4", 1)];
+    const resultado = ids(aplicarTetoPorConta(lista, (i) => i.contaId));
+    expect(resultado).toContain("s1");
+    // a4 e o quarto da conta 1: nao entra, mesmo com o "s1" no meio quebrando a sequencia.
+    expect(resultado.filter((id) => id.startsWith("a"))).toHaveLength(3);
   });
 });

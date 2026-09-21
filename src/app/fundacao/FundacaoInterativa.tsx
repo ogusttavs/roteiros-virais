@@ -31,7 +31,7 @@ export function FundacaoInterativa() {
             <VideoEmbed
               url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
               alt="Vídeo de referência"
-              rotuloCarregamento="vídeo embedado 9:16 · carrega ao entrar na tela"
+              rotuloCarregamento="Carregando o vídeo"
               linkExterno={{ rotulo: "abrir o vídeo de referência", href: "https://www.youtube.com" }}
             />
           </div>
@@ -39,7 +39,7 @@ export function FundacaoInterativa() {
             <VideoEmbed
               url="https://www.tiktok.com/@exemplo/video/1"
               alt="Vídeo de referência"
-              rotuloCarregamento="vídeo embedado 9:16"
+              rotuloCarregamento="Carregando o vídeo"
               falhou
               linkExterno={{ rotulo: "abrir o vídeo", href: "https://www.tiktok.com" }}
             />

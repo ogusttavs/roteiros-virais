@@ -51,8 +51,8 @@ export const textosReferencias = {
   usarComoReferencia: "Usar como referência",
   abrirNaPlataforma: "Abrir na plataforma",
   toast: "salvo; entra como referência no seu briefing",
-  embedAlt: (conta: string) => `vídeo de ${conta}, 9 por 16, carrega ao entrar na tela`,
-  embedCarregando: "vídeo embedado 9:16 · carrega ao entrar na tela",
+  embedAlt: (conta: string) => `vídeo de ${conta}`,
+  embedCarregando: "Carregando o vídeo",
 
   // Estados vazio e erro
   vazioTitulo: "Nada fora da curva com esses filtros",
