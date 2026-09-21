@@ -1,0 +1,79 @@
+/** design v2, `base.css`, ".cartao" mais ".esperando-curto" (gap maior). */
+.cartao {
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espaco-6);
+  align-content: start;
+  min-width: 0;
+}
+.cartao > * {
+  min-width: 0;
+}
+
+.titulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.passos {
+  display: grid;
+  gap: var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-3);
+  align-items: start;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto-dica);
+}
+
+.marca {
+  width: 1.375rem;
+  height: 1.375rem;
+  margin-top: 0.15rem;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  color: transparent;
+}
+
+.feito {
+  color: var(--cor-texto-suave);
+}
+.feito .marca {
+  border-color: var(--cor-positivo);
+  color: var(--cor-positivo);
+}
+
+.agora {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+.agora .marca {
+  border-color: var(--cor-acao);
+}
+.agora .marca::before {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+}
+
+.dica {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}

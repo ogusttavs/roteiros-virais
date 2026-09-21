@@ -34,8 +34,8 @@ import { Constancia } from "@/ui/componentes/Constancia";
 import { EstadoErro } from "@/ui/componentes/EstadoErro";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 import { Nota } from "@/ui/componentes/Nota";
+import { NotasLinha } from "@/ui/componentes/NotaLinha";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
-import { Pilares } from "@/ui/componentes/PilarLinha";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { ReferenciaCartao } from "@/ui/componentes/ReferenciaCartao";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
@@ -195,13 +195,13 @@ export default function Fundacao() {
       <section className={styles.secao}>
         <h2 className={styles.tituloSecao}>Pilares</h2>
         <div style={{ maxWidth: 480 }}>
-          <Pilares
+          <NotasLinha
             pilares={[
-              { nome: "chance de viralizar", valor: 7.2, porque: "o assunto está sendo assistido até o fim, mas com poucos vídeos" },
-              { nome: "chance de gerar cliente", valor: 8.4, porque: "quem pergunta isso já está limpando e já compra produto" },
-              { nome: "encaixe com você", valor: 9.1, porque: "é o seu produto de vidro, na sua bancada" },
-              { nome: "novidade", valor: 6.0, porque: "muita gente já explicou o embaçado; falta o seu jeito" },
-              { nome: "facilidade de gravar", valor: 8.3, porque: "dá para gravar na sua janela com o celular na mão" },
+              { nome: "chance de viralizar", valor: 7.2, porque: "o assunto está sendo assistido até o fim, mas com poucos vídeos", meta: 9 },
+              { nome: "chance de te chamarem para comprar", valor: 8.4, porque: "quem pergunta isso já está limpando e já compra produto", meta: 9 },
+              { nome: "encaixe com você", valor: 9.1, porque: "é o seu produto de vidro, na sua bancada", meta: 9 },
+              { nome: "novidade", valor: 6.0, porque: "muita gente já explicou o embaçado; falta o seu jeito", meta: 9 },
+              { nome: "facilidade de gravar", valor: 8.3, porque: "dá para gravar na sua janela com o celular na mão", meta: 9 },
             ]}
           />
         </div>

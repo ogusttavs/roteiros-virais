@@ -61,13 +61,20 @@
 }
 
 /**
- * Faixa por meta (design v2, `base.css`, ".nota-linha"): petróleo na meta,
- * neutra abaixo, âmbar abaixo de 6, nunca vermelha (`notaFaixaMeta.ts`).
+ * Faixa por meta (design v2, `base.css`, ".nota-linha"): a luz da marca na
+ * meta, neutra abaixo, âmbar abaixo de 6, nunca vermelha (`notaFaixaMeta.ts`).
  * Por ultimo no arquivo, de proposito: precisa vencer tanto
  * `.numeroDestaque` quanto `.numeroLista`, que tambem definem `color`.
+ *
+ * Achado na V5b: usava `--cor-acao` (o preto/branco do botao), sobrado de
+ * antes da V5 trocar o acento de "petroleo" para a luz da marca; a entrega
+ * (`base.css`, ".nota-linha.na-meta .nota-valor") sempre pediu
+ * `--cor-destaque`. Corrigido aqui porque o tema livre (V5b) e o primeiro
+ * uso novo desta faixa depois da V5, e a cor errada ja valia tambem para o
+ * Briefing (unico uso anterior), sem ninguem ter notado.
  */
 .naMeta {
-  color: var(--cor-acao);
+  color: var(--cor-destaque);
 }
 
 .neutra {
