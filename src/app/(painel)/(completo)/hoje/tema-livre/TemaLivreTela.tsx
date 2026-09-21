@@ -91,6 +91,9 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
     }
     setCampoVazio(false);
     setFase("esperando");
+    // Cancela o salvamento de rascunho pendente: sem isto, um debounce em voo podia gravar de
+    // novo o rascunho logo depois da avaliação já ter apagado ele (achado testando esta etapa).
+    if (timerRascunhoRef.current) clearTimeout(timerRascunhoRef.current);
     avaliarTemaAction(limpo)
       .then((dados) => {
         setTexto(limpo);
@@ -147,7 +150,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
 
         {fase === "proposta" ? (
           <>
-            <section className={[styles.cartao, styles.campo].join(" ")} aria-label={textosTemaLivre.titulo}>
+            <section className={[styles.cartao, styles.campo].join(" ")}>
               <AreaTexto
                 rotulo={textosTemaLivre.titulo}
                 rotuloOculto
