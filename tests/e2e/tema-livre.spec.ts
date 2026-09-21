@@ -261,6 +261,31 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await expect(page.getByText("Editar o texto")).toBeVisible();
   });
 
+  test("avaliar com sucesso mantém o rascunho: sai para o Hoje, volta, o texto continua no campo", async ({ page }) => {
+    // Item 0 da V6 (resto da revisão do PR #50): antes o rascunho era apagado ao avaliar; na
+    // viagem, com rede ruim, quem recebe uma nota abaixo da meta, sai e volta, precisa achar o
+    // texto lá.
+    await entrar(page);
+    await page.goto("/hoje/tema-livre");
+    await page
+      .getByLabel("Sobre o que você quer falar?")
+      .fill("assunto avaliado que precisa sobreviver a sair e voltar");
+    // Espera o debounce de 800ms do rascunho terminar antes de avaliar: sem isto, o clique
+    // acontece rápido demais (o mock responde antes do debounce disparar) e o `page.goto`
+    // seguinte, um reload completo, cancela o timer pendente antes dele salvar nada (achado
+    // escrevendo este teste; não reflete o uso real, onde a chamada de verdade demora mais que
+    // 800ms).
+    await page.waitForTimeout(1200);
+    await page.getByRole("button", { name: "Avaliar o tema" }).click();
+    await expect(page.getByText("Editar o texto")).toBeVisible();
+
+    await page.goto("/hoje");
+    await page.goto("/hoje/tema-livre");
+    await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(
+      "assunto avaliado que precisa sobreviver a sair e voltar",
+    );
+  });
+
   test("o rascunho é da marca ativa: escreve numa marca, troca para a outra (campo vazio), volta (texto de volta)", async ({
     page,
   }) => {

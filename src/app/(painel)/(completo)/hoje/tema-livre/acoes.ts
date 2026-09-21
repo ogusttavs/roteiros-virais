@@ -2,12 +2,7 @@
 
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual } from "@/servicos/clientes";
-import {
-  apagarRascunhoTemaLivre,
-  avaliarTema,
-  salvarRascunhoTemaLivre,
-  type ResultadoAvaliarTema,
-} from "@/servicos/temas";
+import { avaliarTema, salvarRascunhoTemaLivre, type ResultadoAvaliarTema } from "@/servicos/temas";
 
 /**
  * `/hoje/tema-livre` (V5b, item 2): o rascunho salva sozinho, sem bloquear a
@@ -24,8 +19,11 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
 }
 
 /**
- * O cliente sempre vem da sessão, nunca de um parâmetro. O rascunho some
- * quando a avaliação termina com sucesso; continua se der erro.
+ * O cliente sempre vem da sessão, nunca de um parâmetro. O rascunho não
+ * some mais quando a avaliação termina com sucesso (item 0 da V6, resto da
+ * revisão do PR #50): quem recebe uma nota abaixo da meta, sai e volta
+ * precisa achar o texto lá. Só some quando a pessoa avalia outro assunto
+ * ou apaga o campo (`salvarRascunhoTemaLivre`).
  */
 export async function avaliarTemaAction(texto: string): Promise<ResultadoAvaliarTema> {
   const sessao = await sessaoAtual();
@@ -33,7 +31,5 @@ export async function avaliarTemaAction(texto: string): Promise<ResultadoAvaliar
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
   const cliente = await clienteDaSessaoAtual();
-  const resultado = await avaliarTema(cliente, texto);
-  await apagarRascunhoTemaLivre(sessao.user.id, cliente.id);
-  return resultado;
+  return avaliarTema(cliente, texto);
 }

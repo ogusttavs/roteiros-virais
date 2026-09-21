@@ -91,9 +91,8 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
     }
     setCampoVazio(false);
     setFase("esperando");
-    // Cancela o salvamento de rascunho pendente: sem isto, um debounce em voo podia gravar de
-    // novo o rascunho logo depois da avaliação já ter apagado ele (achado testando esta etapa).
-    if (timerRascunhoRef.current) clearTimeout(timerRascunhoRef.current);
+    // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
+    // continuar e gravar a versão mais recente, sem corrida com a avaliação.
     avaliarTemaAction(limpo)
       .then((dados) => {
         setTexto(limpo);

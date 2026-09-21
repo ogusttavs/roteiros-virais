@@ -247,14 +247,21 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
 }
 
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2): uma linha por pessoa e
- * por marca, sem prazo. `salvarRascunhoTemaLivre` faz upsert (o índice
- * único `usuarioId` + `clienteId` decide); `apagarRascunhoTemaLivre` some
- * o rascunho quando a pessoa avalia o texto com sucesso (chamado pela
- * Server Action, nunca daqui, para `avaliarTema` continuar sem esse
- * efeito colateral).
+ * O rascunho de `/hoje/tema-livre` (V5b, item 2; ajuste do item 0 da V6,
+ * resto da revisão do PR #50): uma linha por pessoa e por marca, sem
+ * prazo. `salvarRascunhoTemaLivre` faz upsert (o índice único `usuarioId`
+ * + `clienteId` decide), ou apaga a linha quando o texto fica vazio. Não
+ * some mais quando a avaliação termina com sucesso: na viagem, com rede
+ * ruim, quem recebe uma nota abaixo da meta, sai e volta precisa achar o
+ * texto lá (decisão do Fable, `entregaveis/design-v2/BRIEF.md`, Tema
+ * livre, ponto 3). Só some quando a pessoa avalia outro assunto (o
+ * salvamento automático já substitui o texto guardado) ou apaga o campo.
  */
 export async function salvarRascunhoTemaLivre(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  if (texto.trim() === "") {
+    await apagarRascunhoTemaLivre(usuarioId, clienteId);
+    return;
+  }
   await db()
     .insert(rascunhosTemaLivre)
     .values({ usuarioId, clienteId, texto, atualizadoEm: new Date() })
