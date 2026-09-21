@@ -27,7 +27,7 @@ import { chromium, type Page } from "@playwright/test";
 import { and, desc, eq } from "drizzle-orm";
 
 import { db, getPool } from "../src/db";
-import { briefings, clientes, membrosMarca, temasDia, videos, type TemaDoDia } from "../src/db/schema";
+import { briefings, clientes, contas, membrosMarca, temasDia, videos, type TemaDoDia } from "../src/db/schema";
 import { hojeISO } from "../src/lib/config";
 import { marcasDoUsuario } from "../src/servicos/clientes";
 import { gerarRoteiro, roteiroDeHoje } from "../src/servicos/roteiro";
@@ -106,6 +106,39 @@ async function garantirTemasDeHoje(nichoId: number): Promise<void> {
   await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
 }
 
+/** Um vídeo fora da curva de verdade e recente, para Referências ter cartão, "Ver detalhes" e "Filtrar" com o que mostrar. */
+async function garantirVideoDeReferencia(nichoId: number): Promise<void> {
+  const idExterno = "captura-v7-referencia-1";
+  const [existente] = await db().select().from(videos).where(eq(videos.idExterno, idExterno));
+  if (existente) return;
+  const [conta] = await db().select().from(contas).where(eq(contas.nichoId, nichoId)).limit(1);
+  await db().update(contas).set({ medianaViews: "5000", medianaOrigem: "conta" }).where(eq(contas.id, conta.id));
+  await db()
+    .insert(videos)
+    .values({
+      plataforma: "instagram",
+      idExterno,
+      url: `https://exemplo.invalido/${idExterno}`,
+      nichoId,
+      contaId: conta.id,
+      titulo: "a mancha que volta: o erro esta na ordem, nao no produto",
+      views: 31000,
+      foraDaCurva: "6.2",
+      velocidade: "1200",
+      publicadoEm: new Date(),
+      idioma: "pt",
+      analise: {
+        assunto: "mancha em sofa de camurca",
+        gancho: "Abre com a mao ja esfregando a mancha, sem falar por dois segundos.",
+        estrutura: "Aplica o produto sem cortar o video, falando o tempo de espera em voz alta.",
+        fechamento: "Resumo do antes e depois.",
+        chamadaFinal: "Comenta se voce ja passou por isso.",
+        formato: "fala_para_camera",
+        porQueFuncionou: "A pessoa ve o problema dela na tela nos dois primeiros segundos e fica para saber se resolve.",
+      } as never,
+    });
+}
+
 /** A segunda marca do cliente de seed, para a folha "Suas marcas" ter o que mostrar. */
 async function garantirSegundaMarca(nichoId: number): Promise<void> {
   const marcas = await marcasDoUsuario(USUARIO_SEED);
@@ -158,7 +191,11 @@ async function main(): Promise<void> {
   }
   await garantirTemasDeHoje(principal.nichoId);
   await garantirSegundaMarca(principal.nichoId);
+  await garantirVideoDeReferencia(principal.nichoId);
   const roteiroId = await garantirRoteiro(principal.id);
+  // A marca ativa no login e a de acesso mais recente (`marcaPadrao`): sem isto a segunda marca, criada por
+  // ultimo, seria a ativa e o roteiro da marca principal nao abriria.
+  await db().update(clientes).set({ ultimoAcessoEm: new Date() }).where(eq(clientes.id, principal.id));
 
   const gravados: string[] = [];
   const browser = await chromium.launch();

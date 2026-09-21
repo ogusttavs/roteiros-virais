@@ -41,6 +41,12 @@
   min-height: var(--altura-toque);
   display: flex;
   align-items: center;
+  /* O botao nativo desenhava um retangulo cinza com borda em volta da pilula (aparece nas capturas do PR #47): so a pilula e visivel. */
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 .pilula {

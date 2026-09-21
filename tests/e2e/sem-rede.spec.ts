@@ -305,6 +305,16 @@ test.describe("painel sem rede", () => {
     await expect(page.getByRole("button", { name: textosGravacao.marcarGravei })).toBeDisabled();
     await expect(page.getByText(textosConexao.precisaDeConexao).first()).toBeVisible();
 
+    // Sair do modo gravacao volta ao roteiro guardado, e do roteiro o Voltar leva ao Hoje guardado: cada
+    // navegacao interna sem rede cai na navegacao de documento (item 10), que o worker responde.
+    await page.getByRole("button", { name: textosGravacao.sair }).click();
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${roteiroUmId}$`));
+    await expect(page.getByRole("heading", { name: TITULO_ROTEIRO, level: 1 })).toBeVisible();
+    await page.getByRole("link", { name: "Voltar" }).first().click();
+    await expect(page).toHaveURL(/\/hoje$/);
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+    await expect(faixaSemConexao(page)).toBeVisible();
+
     // /admin e /referencias sem rede: a pagina de "Sem conexao", nunca dado guardado de outra tela.
     for (const caminho of ["/admin/clientes", "/referencias"]) {
       await page.goto(caminho);
