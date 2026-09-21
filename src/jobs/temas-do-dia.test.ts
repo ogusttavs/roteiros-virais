@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import type { TemaDoDia } from "@/db/schema";
+import { temaTemProvaSuficiente, type VideoParaProva } from "@/servicos/prova-tema";
 
-import { evidenciaValida, temaTemProvaSuficiente, type VideoParaProva } from "./temas-do-dia";
+import { evidenciaValida } from "./temas-do-dia";
 
 function tema(dados: Partial<TemaDoDia> = {}): TemaDoDia {
   return {
