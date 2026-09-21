@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Filter, Search } from "lucide-react";
+import { Filter, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
@@ -9,7 +9,6 @@ import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/li
 import type { ContagensFiltroReferencias, VideoReferencia } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
-import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 import { Toast } from "@/ui/componentes/Toast";
 
@@ -241,10 +240,10 @@ export function ReferenciasTela({
 
       {formatados.length === 0 ? (
         segmento === "salvos" ? (
-          <EstadoVazio
-            icone={<Bookmark size={24} strokeWidth={1.5} aria-hidden="true" />}
-            frase={textosReferencias.vazioTextoSalvos}
-          />
+          <div className={styles.blocoVazio}>
+            <h3>{textosReferencias.vazioTituloSalvos}</h3>
+            <p>{textosReferencias.vazioTextoSalvos}</p>
+          </div>
         ) : (
           <div className={styles.blocoVazio}>
             <h3>{textosReferencias.vazioTitulo}</h3>

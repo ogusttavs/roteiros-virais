@@ -107,6 +107,7 @@
 }
 
 .busca input {
+  height: 100%;
   border: 0;
   background: transparent;
   min-width: 0;
