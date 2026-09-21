@@ -150,16 +150,16 @@ test.describe("temas do dia pela tela", () => {
     await expect(page.getByRole("heading", { name: "tema de teste 2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 3" })).toBeVisible();
 
-    await page.getByRole("button", { name: "escrever o meu assunto" }).click();
+    await page.getByRole("button", { name: "Escrever o meu assunto" }).click();
     await expect(page).toHaveURL(/\/hoje\/tema-livre/);
 
     await page.getByLabel("Sobre o que você quer falar?").fill("clarear os dentes em casa");
-    await page.getByRole("button", { name: "avaliar o tema" }).click();
+    await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
-    await expect(page.getByText("chance de viralizar")).toBeVisible();
-    await expect(page.getByText("chance de gerar cliente")).toBeVisible();
-    await expect(page.getByText("encaixe com você")).toBeVisible();
-    await expect(page.getByText("novidade")).toBeVisible();
-    await expect(page.getByText("facilidade de gravar")).toBeVisible();
+    await expect(page.getByText("Chance de viralizar")).toBeVisible();
+    await expect(page.getByText("Chance de te chamarem para comprar")).toBeVisible();
+    await expect(page.getByText("Encaixe com você")).toBeVisible();
+    await expect(page.getByText("Novidade")).toBeVisible();
+    await expect(page.getByText("Facilidade de gravar")).toBeVisible();
   });
 });
