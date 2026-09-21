@@ -597,26 +597,36 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
      * toque no centro da pílula de marca (Hoje, Conta) e do botão Voltar (Roteiro) cai neles.
      */
     if (largura < 768) {
-      for (const { tela, ir, alvo } of [
+      // A pílula de marca só existe com mais de uma marca: Hoje e Conta entram com o usuário de duas marcas.
+      for (const { tela, entrarNa, ir, alvo } of [
         {
           tela: "Hoje",
+          entrarNa: async (page: Page) => {
+            await entrarComo(page, EMAIL_MARCAS);
+            await expect(page).toHaveURL(/\/hoje/);
+          },
           ir: async (page: Page) => page.goto("/hoje"),
           alvo: (page: Page) => page.getByRole("button", { name: /^Trocar de marca/ }),
         },
         {
           tela: "Roteiro",
+          entrarNa: entrar,
           ir: async (page: Page) => page.goto(`/roteiros/${roteiroId}`),
           alvo: (page: Page) => page.getByRole("link", { name: "Voltar" }).first(),
         },
         {
           tela: "Conta",
+          entrarNa: async (page: Page) => {
+            await entrarComo(page, EMAIL_MARCAS);
+            await expect(page).toHaveURL(/\/hoje/);
+          },
           ir: async (page: Page) => page.goto("/conta"),
           alvo: (page: Page) => page.getByRole("button", { name: /^Trocar de marca/ }),
         },
       ]) {
         test(`${tela}, faixa "Sem conexão" visível, em ${rotulo}px`, async ({ page, context }) => {
           await page.setViewportSize({ width: largura, height: altura });
-          await entrar(page);
+          await entrarNa(page);
           await ir(page);
           await page.waitForLoadState("networkidle");
           await context.setOffline(true);
@@ -752,7 +762,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
    * Começar (formulário em blocos) não têm um botão único e ficam de fora
    * (decisão registrada em "Decisões pendentes" do TODO.md).
    */
-  for (const { rotulo, nome, ir, botao } of [
+  for (const { rotulo, nome, ir, botao, conferirCobertura = true } of [
     { rotulo: "Entrar", nome: "entrar", ir: async (page: Page) => page.goto("/entrar"), botao: "entrar" },
     {
       rotulo: "Tema livre",
@@ -762,6 +772,10 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
         await page.goto("/hoje/tema-livre");
       },
       botao: "Avaliar o tema",
+      // A cápsula das abas some quando o teclado abre (`useTecladoAberto`, item 0c); o Playwright encolhe a
+      // janela inteira, sem a diferença entre `innerHeight` e `visualViewport` que o teclado de verdade cria, então
+      // aqui a cápsula continua na tela e cobre o botão: só a versão em `toBeInViewport` faz sentido.
+      conferirCobertura: false,
     },
     {
       rotulo: "Objetivo",
@@ -816,7 +830,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await page.setViewportSize({ width: 390, height: 500 });
       const principal = page.getByRole("button", { name: botao, exact: true });
       await expect(principal).toBeInViewport();
-      await conferirNaoCoberto(principal);
+      if (conferirCobertura) await conferirNaoCoberto(principal);
     });
   }
 });

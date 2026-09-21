@@ -5,8 +5,13 @@ import { useCallback, useEffect, useRef } from "react";
 /** O que a entrada empurrada carrega no estado do histórico (só para quem inspeciona; a decisão não depende dele). */
 const MARCA = "folhaAberta";
 
-/** Se o `popstate` do `history.back()` não vier neste tempo (histórico no começo, outra aba), o próximo pedido é liberado. */
-const ESPERA_POPSTATE_MS = 1000;
+/**
+ * Se o `popstate` do `history.back()` não vier neste tempo (na prática nunca acontece: a entrada empurrada sempre
+ * tem uma anterior), a folha fecha só pelo estado e a ação pendente roda mesmo assim, para a pessoa nunca ficar
+ * presa numa folha que não fecha. Longo de propósito: sob carga o `popstate` chegou depois de 1 s e a ação de
+ * "Ver os N vídeos" era descartada (achado do e2e completo da V7).
+ */
+const ESPERA_POPSTATE_MS = 4000;
 
 /**
  * O botão voltar (do Android, o gesto do iPhone, o do navegador) fecha a folha
@@ -60,6 +65,8 @@ export function useFolhaNoHistorico(
   const voltandoRef = useRef(false);
   /** A tela recusou o último fechamento (o gancho devolveu a entrada); `fecharEDepois` então não roda a ação. */
   const recusouRef = useRef(false);
+  /** O tempo de espera do `popstate` de `fechar`, para o `popstate` que chega o cancelar. */
+  const esperaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const empurrar = useCallback(() => {
     window.history.pushState({ [MARCA]: true }, "");
@@ -70,6 +77,8 @@ export function useFolhaNoHistorico(
     if (!aberto) return;
     empurrar();
     function aoVoltar() {
+      if (esperaRef.current) clearTimeout(esperaRef.current);
+      esperaRef.current = null;
       empurradoRef.current = false;
       voltandoRef.current = false;
       recusouRef.current = aoFecharRef.current() === false;
@@ -87,8 +96,11 @@ export function useFolhaNoHistorico(
     }
     voltandoRef.current = true;
     window.history.back();
-    setTimeout(() => {
+    esperaRef.current = setTimeout(() => {
+      esperaRef.current = null;
       voltandoRef.current = false;
+      empurradoRef.current = false;
+      aoFecharRef.current();
     }, ESPERA_POPSTATE_MS);
   }, []);
 
@@ -107,8 +119,11 @@ export function useFolhaNoHistorico(
     // Registrado depois do ouvinte do efeito acima: no mesmo `popstate` a folha fecha (ou recusa) primeiro e `acao` roda em seguida.
     window.addEventListener("popstate", depois);
     const desistir = setTimeout(() => {
+      // O `popstate` não veio: fecha pelo estado e faz o que a pessoa pediu.
       window.removeEventListener("popstate", depois);
       voltandoRef.current = false;
+      empurradoRef.current = false;
+      if (aoFecharRef.current() !== false) acao();
     }, ESPERA_POPSTATE_MS);
     window.history.back();
   }, []);
