@@ -245,6 +245,10 @@ async function main(): Promise<void> {
       await page.goto(`${baseUrl}/hoje/tema-livre`);
       await page.waitForLoadState("networkidle");
       await page.getByLabel("Sobre o que você quer falar?").focus();
+      // Playwright headless nao abre teclado virtual de verdade, entao o evento de resize do
+      // visualViewport (o gatilho real do handler da tela) nunca dispara aqui; rola manualmente
+      // ate o botao, so para a captura mostrar o que o handler garante num aparelho de verdade.
+      await page.getByRole("button", { name: "Avaliar o tema" }).scrollIntoViewIfNeeded();
       const nomeArquivo = "TemaLivre.Teclado.390.Claro.png";
       await page.screenshot({ path: path.join(pastaDestino, nomeArquivo) });
       arquivosGravados.push(
