@@ -64,15 +64,19 @@ export function middleware(request: NextRequest) {
 }
 
 /**
- * V5, item 3: o matcher so excluia `favicon.ico` por nome; os ativos novos
- * da marca (`/marca/*.svg`, os icones, `/manifest.webmanifest`) caiam na
- * regra geral e o middleware os redirecionava para `/entrar` sem sessao,
- * quebrando a propria logo da tela de entrar (achado rodando as capturas da
- * etapa: a imagem carregava com 0x0, o pedido voltava 307). Em vez de listar
- * cada arquivo nome a nome, a exclusao e por formato: qualquer caminho cujo
- * ultimo segmento tenha extensao (um ponto) e um arquivo estatico de
- * `public/` ou de uma rota gerada (manifest, sitemap), nunca uma tela.
+ * Lista explicita dos arquivos estaticos, nunca exclusao por formato (achado
+ * de seguranca em producao, 20/09/2026): a V5 (item 3) trocou por um tempo
+ * para "qualquer caminho cujo ultimo segmento tenha um ponto", pensando em
+ * `favicon.ico`, `/marca/*.svg` e `/manifest.webmanifest`, mas isso tambem
+ * casava com `/admin/clientes/1.0`, um id de cliente com uma falsa extensao
+ * ".0" (`Number("1.0")` e 1). Com essa exclusao, o pedido nunca passava pelo
+ * middleware, e a unica barreira sobrando era o layout do admin, que nao
+ * bastava sozinho (o App Router roda layout e pagina em paralelo; ver
+ * `exigirAdmin` em `src/lib/sessao.ts`). Lista fixa: cresce quando um arquivo
+ * novo entrar em `public/`, nunca por formato.
  */
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\.\\w+$).*)"],
+  matcher: [
+    "/((?!api/auth|_next/static|_next/image|favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|favicon-48\\.png|apple-touch-icon\\.png|icone-192\\.png|icone-512\\.png|icone-maskable-512\\.png|manifest\\.webmanifest|marca/).*)",
+  ],
 };
