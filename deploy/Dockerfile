@@ -20,7 +20,7 @@ ENV AI_PROVIDER=mock
 # A coleta de paginas do build cria o pool do Postgres (sem conectar); precisa
 # de uma URL, qualquer uma. A de verdade so entra em runtime, pelo .env da VPS.
 ENV DATABASE_URL=postgres://build:build@localhost:5432/build
-# O projeto ainda nao tem pasta public; o estagio final a copia mesmo assim.
+# mkdir -p e so defesa (a pasta public/ existe de verdade desde a V5, a marca e os icones).
 RUN mkdir -p public && npm run build
 
 FROM node:24-slim AS runner
