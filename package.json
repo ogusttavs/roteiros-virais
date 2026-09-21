@@ -41,7 +41,8 @@
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
     "capturas:v4-forca-evidencia": "AI_PROVIDER=mock tsx scripts/capturas-v4-forca-evidencia.ts",
     "capturas:v5-pele-nova": "AI_PROVIDER=mock tsx scripts/capturas-v5-pele-nova.ts",
-    "capturas:v5b-tema-livre": "AI_PROVIDER=mock tsx scripts/capturas-v5b-tema-livre.ts"
+    "capturas:v5b-tema-livre": "AI_PROVIDER=mock tsx scripts/capturas-v5b-tema-livre.ts",
+    "capturas:v6-referencias": "AI_PROVIDER=mock tsx scripts/capturas-v6-referencias.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
