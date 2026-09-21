@@ -11,6 +11,8 @@
   inset: 0;
   z-index: 50;
   background: var(--cor-sobreposicao);
+  /* V7, item 1 do PROXIMO.md: arrastar no véu não rola a página de trás (o `base.css` trava a rolagem do `html`). */
+  touch-action: none;
 }
 
 .folha {
@@ -21,7 +23,9 @@
   z-index: 51;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  /* `vh` fica como reserva; `dvh` acompanha a barra do navegador que sobe e desce no celular (V7, item 3 do PROXIMO.md). */
   max-height: 88vh;
+  max-height: 88dvh;
   border-radius: var(--raio-folha) var(--raio-folha) 0 0;
   border: var(--largura-borda) solid var(--vidro-borda);
   background: var(--vidro-fundo-forte);
@@ -37,15 +41,24 @@
     right: 0.5rem;
     bottom: 0.5rem;
     max-height: calc(88vh - 0.5rem);
+    max-height: calc(88dvh - 0.5rem);
   }
 }
 
+/*
+ * A alça e o título são a área de arrastar (`usePuxarParaFechar`, V7, item 1 do
+ * PROXIMO.md): pelo menos 44px de altura para o dedo acertar, e sem seleção de
+ * texto para o arrasto (com o dedo parado ou o mouse) não marcar o título.
+ */
 .folhaTopo {
   display: grid;
   justify-items: center;
   gap: var(--espaco-3);
+  min-height: var(--altura-toque);
   padding: var(--espaco-3) var(--espaco-5) var(--espaco-4);
   border-bottom: var(--largura-borda) solid var(--cor-divisor);
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .folhaAlca {
@@ -61,10 +74,17 @@
 
 .folhaCorpo {
   overflow-y: auto;
+  /* Rolar até o fim da folha não continua rolando a página de trás (V7, item 1 do PROXIMO.md). */
+  overscroll-behavior: contain;
   padding: var(--espaco-5);
   display: grid;
   gap: var(--espaco-5);
   align-content: start;
+}
+
+/* Folha sem rodapé: o corpo é o último bloco e também respeita a barra de gesto do iPhone (V7, item 2). */
+.folhaCorpo:last-child {
+  padding-bottom: calc(var(--espaco-5) + env(safe-area-inset-bottom, 0px));
 }
 
 .folhaPe {
@@ -84,9 +104,15 @@
     right: auto;
     bottom: auto;
     top: 50%;
-    transform: translate(-50%, -50%);
+    /*
+     * A propriedade `translate`, e não `transform`: o arrasto (`usePuxarParaFechar`)
+     * escreve `transform` na folha, que se soma ao `translate` em vez de
+     * desfazer o centro da tela.
+     */
+    translate: -50% -50%;
     width: min(var(--largura-folha), calc(100vw - var(--espaco-12)));
     max-height: 86vh;
+    max-height: 86dvh;
     border-radius: var(--raio-lg);
   }
   .folhaAlca {

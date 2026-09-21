@@ -34,13 +34,40 @@
   cursor: pointer;
 }
 
-.botaoBarra:hover {
+.botaoBarra:hover:not(:disabled) {
   background: var(--cor-superficie-hover);
 }
 
 .botaoBarra:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+/* Atualizar em andamento (V7, item 4): desabilitado e o ícone gira; desabilitado por outro toque, só esmaece. */
+.botaoBarra:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoBarra[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation-duration: 1.6s;
+  }
 }
 
 /* ---------- Conteúdo ---------- */
@@ -275,7 +302,7 @@
   color: var(--cor-acao-texto);
 }
 
-.botaoPrimario:hover {
+.botaoPrimario:hover:not(:disabled) {
   background: var(--cor-acao-hover);
 }
 
@@ -286,7 +313,7 @@
   font-weight: var(--peso-medio);
 }
 
-.botaoSecundario:hover {
+.botaoSecundario:hover:not(:disabled) {
   background: var(--cor-superficie-hover);
 }
 
@@ -294,6 +321,19 @@
 .botaoSecundario:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+/* Desabilitado (V7, itens 4 e 8): outra tela já está abrindo, ou sem conexão. O toque em andamento ("Abrindo") fica inteiro. */
+.botaoPrimario:disabled,
+.botaoSecundario:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoPrimario[aria-busy="true"]:disabled,
+.botaoSecundario[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
 /* ---------- Recolhidos: os outros temas ---------- */
@@ -371,8 +411,19 @@
   color: var(--cor-titulo);
 }
 
+/* "Trocar" e, sem conexão, o motivo embaixo dele (V7, item 8); os dois alinhados à direita da linha. */
+.acaoOutro {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: var(--espaco-1);
+}
+
 .trocar {
   flex: none;
+  /* Alvo de toque de 44 px (V7, item 1): antes era só a altura da linha de texto. */
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
   background: none;
   border: none;
   padding: 0;
@@ -387,6 +438,16 @@
 .trocar:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+.trocar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.trocar[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
 /* ---------- Prefere um assunto seu ---------- */
@@ -495,6 +556,10 @@
 
 .verComoFoi {
   justify-self: start;
+  /* Alvo de toque de 44 px (V7, item 1 do PROXIMO.md): o link sozinho tinha uns 22 px de altura. */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
   padding: 0;
   background: none;
   border: none;

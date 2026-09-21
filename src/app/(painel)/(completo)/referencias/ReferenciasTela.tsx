@@ -2,7 +2,7 @@
 
 import { Filter, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
 import type { AnaliseVideo, Plataforma } from "@/db/schema";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
@@ -11,6 +11,8 @@ import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 import { Toast } from "@/ui/componentes/Toast";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { desfavoritarAction, favoritarAction } from "./acoes";
 import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
@@ -97,6 +99,10 @@ function montarUrl(filtros: {
  * `noticias` ficam para a parte 3b). Os filtros vivem na URL; esta tela só
  * cuida de interação (folhas, favoritar otimista) e monta a URL nova ao
  * aplicar um filtro, deixando o Server Component (`page.tsx`) reconsultar.
+ *
+ * V7, celular e rede ruim: o botão Voltar fecha as duas folhas em vez de sair
+ * da tela; toda navegação mostra andamento e, sem rede, só avisa; o aviso de
+ * "salvo" só sai depois que o servidor respondeu.
  */
 export function ReferenciasTela({
   videos,
@@ -110,14 +116,39 @@ export function ReferenciasTela({
   contagensFiltro,
 }: Props) {
   const router = useRouter();
+  const { semConexao, avisarRedeOk } = useConexao();
+  const tratarFalha = useTratarFalha();
   const [campoBusca, setCampoBusca] = useState(busca);
   const [folhaFiltrarAberta, setFolhaFiltrarAberta] = useState(false);
   const [videoDetalheId, setVideoDetalheId] = useState<number | null>(null);
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIniciais));
-  const [toastAberto, setToastAberto] = useState(false);
-  const [jaMostrouToast, setJaMostrouToast] = useState(false);
-  const [idPendente, setIdPendente] = useState<number | null>(null);
+  const [aviso, setAviso] = useState<{ id: number; texto: string; variante: "sucesso" | "erro" } | null>(null);
+  /** Cada aviso ganha um número: o `Toast` remonta (`key`) e reinicia o tempo, em vez de o aviso novo herdar o que restava do anterior. */
+  const contadorDeAvisos = useRef(0);
+  function mostrarAviso(texto: string, variante: "sucesso" | "erro") {
+    contadorDeAvisos.current += 1;
+    setAviso({ id: contadorDeAvisos.current, texto, variante });
+  }
+  // O texto que explica o que "salvar" faz sai só na primeira vez que um salvar dá certo.
+  const jaMostrouToast = useRef(false);
+  const [idsPendentes, setIdsPendentes] = useState<Set<number>>(() => new Set());
   const [, iniciarTransicao] = useTransition();
+  // A navegação (abas, busca, período, filtros) tem a transição própria: o andamento dela não acende o do salvar.
+  const [navegando, iniciarNavegacao] = useTransition();
+  // Aba e período mostram a escolha na hora; o valor de verdade chega com a página nova e a tela volta a ele sozinha.
+  const [segmentoExibido, setSegmentoOtimista] = useOptimistic(segmento);
+  const [periodoExibido, setPeriodoOtimista] = useOptimistic(periodoDias);
+  const urlPendente = useRef<string | null>(null);
+  // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
+  const detalheAtual = useRef<number | null>(null);
+  useEffect(() => {
+    detalheAtual.current = videoDetalheId;
+  });
+
+  // O botão Voltar do celular fecha a folha em vez de sair da tela (V7, item 1 do PROXIMO.md): uma chamada por folha.
+  const detalhes = useFolhaNoHistorico(videoDetalheId !== null, () => setVideoDetalheId(null));
+  const filtrar = useFolhaNoHistorico(folhaFiltrarAberta, () => setFolhaFiltrarAberta(false));
+  const fecharAviso = useCallback(() => setAviso(null), []);
 
   const formatados = useMemo(() => videos.map(formatarVideo), [videos]);
   const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
@@ -125,23 +156,48 @@ export function ReferenciasTela({
 
   const quantosFiltrosAtivos = plataformasAtivas.length + formatosAtivos.length;
 
-  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>) {
-    router.push(
-      montarUrl({
-        segmento,
-        periodoDias,
-        busca,
-        plataformas: plataformasAtivas,
-        formatos: formatosAtivos,
-        ...mudanca,
-      }),
-    );
+  /**
+   * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
+   * possível: o navegador troca o aplicativo pela página de erro dele e a tela se perde. Por isso, sem rede,
+   * só avisa (V7, item 8 do PROXIMO.md); guardar a busca para depois está fora desta etapa.
+   */
+  function semRedeParaBuscar(): boolean {
+    if (!semConexao && navigator.onLine) return false;
+    mostrarAviso(textosReferencias.semConexaoParaBuscar, "erro");
+    return true;
   }
 
-  /** Otimista: o marcador muda na hora; se a gravação falhar, desfaz (mesma lição da etapa 12). */
-  function alternarFavorito(videoId: number) {
+  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>) {
+    if (semRedeParaBuscar()) return;
+    // O que está escrito na busca vai junto de qualquer outra mudança: a busca só vale com Enter ou ao sair do
+    // campo, e a troca de aba ou de período pode chegar antes e apagá-la da URL.
+    const filtros = {
+      segmento,
+      periodoDias,
+      busca: campoBusca,
+      plataformas: plataformasAtivas,
+      formatos: formatosAtivos,
+      ...mudanca,
+    };
+    const url = montarUrl(filtros);
+    // Toque duplo, ou Enter seguido do onBlur, enquanto o mesmo pedido ainda não chegou: um pedido só.
+    if (navegando && urlPendente.current === url) return;
+    urlPendente.current = url;
+    iniciarNavegacao(() => {
+      setSegmentoOtimista(filtros.segmento);
+      setPeriodoOtimista(filtros.periodoDias);
+      router.push(url);
+    });
+  }
+
+  /**
+   * Otimista: o marcador muda na hora; se a gravação falhar, desfaz e diz por quê (V7, item 4 do PROXIMO.md;
+   * mesma lição da etapa 12). O aviso de "salvo" só sai depois que o servidor respondeu: antes disso a tela não
+   * afirma o que ainda não sabe.
+   */
+  function alternarFavorito(videoId: number, opcoes: { usarComoReferencia?: boolean } = {}) {
+    if (idsPendentes.has(videoId)) return;
     const jaSalvo = favoritos.has(videoId);
-    const primeiraVez = !jaSalvo && !jaMostrouToast;
 
     setFavoritos((atual) => {
       const proximo = new Set(atual);
@@ -149,27 +205,55 @@ export function ReferenciasTela({
       else proximo.add(videoId);
       return proximo;
     });
-    if (primeiraVez) {
-      setToastAberto(true);
-      setJaMostrouToast(true);
-    }
+    setIdsPendentes((atual) => new Set(atual).add(videoId));
 
-    setIdPendente(videoId);
     iniciarTransicao(async () => {
       try {
         if (jaSalvo) await desfavoritarAction(videoId);
         else await favoritarAction(videoId);
-      } catch {
+        avisarRedeOk();
+        if (!jaSalvo) {
+          // "Usar como referência" é a decisão da pessoa: fecha a folha (se ainda for a deste vídeo) e sempre avisa.
+          if (opcoes.usarComoReferencia && detalheAtual.current === videoId) detalhes.fechar();
+          if (opcoes.usarComoReferencia || !jaMostrouToast.current) {
+            jaMostrouToast.current = true;
+            mostrarAviso(textosReferencias.toast, "sucesso");
+          }
+        }
+      } catch (erro) {
         setFavoritos((atual) => {
           const proximo = new Set(atual);
           if (jaSalvo) proximo.add(videoId);
           else proximo.delete(videoId);
           return proximo;
         });
+        mostrarAviso(tratarFalha(erro, textosReferencias.erroAoSalvar, textosReferencias.erroAoSalvarSemRede), "erro");
       } finally {
-        setIdPendente((atual) => (atual === videoId ? null : atual));
+        setIdsPendentes((atual) => {
+          const proximo = new Set(atual);
+          proximo.delete(videoId);
+          return proximo;
+        });
       }
     });
+  }
+
+  function usarComoReferencia() {
+    if (videoDetalheId === null) return;
+    // Já salvo: não há o que gravar. Fecha a folha e avisa, em vez de deixar um botão que não faz nada.
+    if (favoritos.has(videoDetalheId)) {
+      detalhes.fechar();
+      mostrarAviso(textosReferencias.toast, "sucesso");
+      return;
+    }
+    alternarFavorito(videoDetalheId, { usarComoReferencia: true });
+  }
+
+  function aplicarFiltros({ plataformas, formatos }: { plataformas: Plataforma[]; formatos: AnaliseVideo["formato"][] }) {
+    // Sem rede a folha continua aberta, com o que foi marcado. Um segundo toque antes de a folha sair é
+    // ignorado pelo próprio gancho do histórico (`fecharEDepois` é idempotente).
+    if (semRedeParaBuscar()) return;
+    filtrar.fecharEDepois(() => navegar({ plataformas, formatos }));
   }
 
   return (
@@ -180,24 +264,24 @@ export function ReferenciasTela({
       </div>
 
       <div className={styles.filtros}>
-        <div className={styles.segmentado} role="tablist">
+        <div className={styles.segmentado} role="tablist" aria-busy={navegando || undefined}>
           <button
             type="button"
             role="tab"
-            aria-selected={segmento === "foradacurva"}
-            className={[styles.segmentoBotao, segmento === "foradacurva" ? styles.segmentoAtivo : ""]
+            aria-selected={segmentoExibido === "foradacurva"}
+            className={[styles.segmentoBotao, segmentoExibido === "foradacurva" ? styles.segmentoAtivo : ""]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => router.push(montarUrl({ segmento: "foradacurva", periodoDias, busca, plataformas: [], formatos: [] }))}
+            onClick={() => navegar({ segmento: "foradacurva", plataformas: [], formatos: [] })}
           >
             {textosReferencias.segmentoForaDaCurva}
           </button>
           <button
             type="button"
             role="tab"
-            aria-selected={segmento === "salvos"}
-            className={[styles.segmentoBotao, segmento === "salvos" ? styles.segmentoAtivo : ""].filter(Boolean).join(" ")}
-            onClick={() => router.push(montarUrl({ segmento: "salvos", periodoDias, busca, plataformas: [], formatos: [] }))}
+            aria-selected={segmentoExibido === "salvos"}
+            className={[styles.segmentoBotao, segmentoExibido === "salvos" ? styles.segmentoAtivo : ""].filter(Boolean).join(" ")}
+            onClick={() => navegar({ segmento: "salvos", plataformas: [], formatos: [] })}
           >
             {textosReferencias.segmentoSalvos}
           </button>
@@ -214,14 +298,14 @@ export function ReferenciasTela({
                 if (evento.key === "Enter") navegar({ busca: campoBusca });
               }}
               onBlur={() => {
-                if (campoBusca !== busca) navegar({ busca: campoBusca });
+                if (campoBusca.trim() !== busca) navegar({ busca: campoBusca });
               }}
             />
           </span>
           <select
             className={styles.seletorPeriodo}
             aria-label={textosReferencias.rotuloPeriodo}
-            value={periodoDias}
+            value={periodoExibido}
             onChange={(evento) => navegar({ periodoDias: Number(evento.target.value) })}
           >
             {textosReferencias.periodos.map((p) => (
@@ -230,13 +314,25 @@ export function ReferenciasTela({
               </option>
             ))}
           </select>
-          <Botao variante="secundario" tamanho="md" onClick={() => setFolhaFiltrarAberta(true)} className={styles.botaoFiltrar}>
+          <Botao
+            variante="secundario"
+            tamanho="md"
+            aria-busy={navegando || undefined}
+            onClick={() => setFolhaFiltrarAberta(true)}
+            className={styles.botaoFiltrar}
+          >
             <Filter size={16} strokeWidth={1.5} aria-hidden="true" />
             {textosReferencias.filtrar}
             {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>, {quantosFiltrosAtivos}</span> : null}
           </Botao>
         </div>
       </div>
+
+      {navegando ? (
+        <p className={styles.contagem} role="status">
+          {textosReferencias.buscando}
+        </p>
+      ) : null}
 
       {formatados.length === 0 ? (
         segmento === "salvos" ? (
@@ -249,12 +345,13 @@ export function ReferenciasTela({
             <h3>{textosReferencias.vazioTitulo}</h3>
             <p>{textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}</p>
             <div className={styles.blocoVazioAcoes}>
-              <Botao variante="primario" tamanho="lg" onClick={() => navegar({ periodoDias: 30 })}>
+              <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ periodoDias: 30 })}>
                 {textosReferencias.ver30Dias}
               </Botao>
               <Botao
                 variante="secundario"
                 tamanho="lg"
+                carregando={navegando}
                 onClick={() => {
                   setCampoBusca("");
                   navegar({ busca: "", plataformas: [], formatos: [] });
@@ -267,16 +364,20 @@ export function ReferenciasTela({
         )
       ) : (
         <>
-          <p className={styles.contagem}>
-            {segmento === "salvos" ? textosReferencias.contagemSalvos(total) : textosReferencias.contagem(total, periodoDias)}
-          </p>
+          {navegando ? null : (
+            <p className={styles.contagem}>
+              {segmento === "salvos" ? textosReferencias.contagemSalvos(total) : textosReferencias.contagem(total, periodoDias)}
+            </p>
+          )}
           <div className={styles.grade}>
             {formatados.map((video) => (
               <ReferenciaCartao
                 key={video.id}
                 video={video}
                 salvo={favoritos.has(video.id)}
-                salvando={idPendente === video.id}
+                // Sem rede o salvar também fica desabilitado (o cartão não tem o motivo escrito; a faixa do topo explica).
+                salvando={idsPendentes.has(video.id)}
+                semRede={semConexao}
                 onVerDetalhes={() => setVideoDetalheId(video.id)}
                 onSalvar={() => alternarFavorito(video.id)}
               />
@@ -289,31 +390,35 @@ export function ReferenciasTela({
         video={videoDetalhe}
         url={urlDetalhe}
         aberto={videoDetalheId !== null}
-        aoFechar={() => setVideoDetalheId(null)}
+        aoFechar={detalhes.fechar}
         salvo={videoDetalheId !== null && favoritos.has(videoDetalheId)}
-        salvando={idPendente === videoDetalheId}
-        onUsarComoReferencia={() => {
-          if (videoDetalheId !== null && !favoritos.has(videoDetalheId)) alternarFavorito(videoDetalheId);
-        }}
+        salvando={videoDetalheId !== null && idsPendentes.has(videoDetalheId)}
+        onUsarComoReferencia={usarComoReferencia}
         onSalvar={() => {
           if (videoDetalheId !== null) alternarFavorito(videoDetalheId);
         }}
       />
 
-      <FolhaFiltrarReferencias
-        aberto={folhaFiltrarAberta}
-        aoFechar={() => setFolhaFiltrarAberta(false)}
-        plataformasAtivas={plataformasAtivas}
-        formatosAtivos={formatosAtivos}
-        contagens={contagensFiltro}
-        totalAtual={total}
-        onAplicar={({ plataformas, formatos }) => {
-          setFolhaFiltrarAberta(false);
-          navegar({ plataformas, formatos });
-        }}
-      />
+      {/* Só montada com a folha aberta: a cada abertura a seleção nasce da URL, sem sobras de marcas não aplicadas. */}
+      {folhaFiltrarAberta ? (
+        <FolhaFiltrarReferencias
+          aberto
+          aoFechar={filtrar.fechar}
+          plataformasAtivas={plataformasAtivas}
+          formatosAtivos={formatosAtivos}
+          contagens={contagensFiltro}
+          totalAtual={total}
+          onAplicar={aplicarFiltros}
+        />
+      ) : null}
 
-      <Toast texto={textosReferencias.toast} aberto={toastAberto} onFechar={() => setToastAberto(false)} />
+      <Toast
+        key={aviso?.id ?? 0}
+        texto={aviso?.texto ?? ""}
+        variante={aviso?.variante}
+        aberto={aviso !== null}
+        onFechar={fecharAviso}
+      />
     </div>
   );
 }

@@ -10,6 +10,17 @@
   gap: var(--espaco-6);
 }
 
+/**
+ * V7, item 1 do PROXIMO.md: no celular o aviso (Toast) sobe acima da cápsula das
+ * abas (62px de altura mais folga) em vez de ficar escondido atrás dela; do
+ * tablet para cima a cápsula não existe e vale o padrão do Toast.
+ */
+@media (max-width: 767px) {
+  .pagina {
+    --toast-base: calc(62px + var(--espaco-4));
+  }
+}
+
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-1);
@@ -132,7 +143,8 @@
   background: var(--cor-superficie);
   color: var(--cor-titulo);
   font-family: var(--fonte-texto);
-  font-size: var(--tamanho-secundario);
+  /* 17px, como o campo de busca: o iPhone dá zoom ao focar um campo com menos de 16px (V7, item 2 do PROXIMO.md). */
+  font-size: var(--tamanho-corpo);
 }
 
 .botaoFiltrar {

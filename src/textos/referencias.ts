@@ -42,6 +42,13 @@ export const textosReferencias = {
   salvar: "Salvar",
   salvando: "salvando",
   salvo: "Salvo",
+  /** V7, item 4 do PROXIMO.md: o salvar não deu certo e o marcador voltou ao que era. */
+  erroAoSalvar: "Não conseguimos salvar agora. Tente de novo.",
+  erroAoSalvarSemRede: "Sem conexão agora. Não conseguimos salvar; tente de novo quando a rede voltar.",
+  /** Busca, período, abas e filtros vão ao servidor: sem rede a tela avisa em vez de navegar (V7, item 8). */
+  semConexaoParaBuscar: "Busca e filtros precisam de conexão.",
+  /** No lugar da contagem, enquanto a busca nova não chegou. */
+  buscando: "buscando os vídeos",
   contaNaoIdentificada: "conta não identificada",
 
   // A folha de detalhes ("Por que esse funcionou")

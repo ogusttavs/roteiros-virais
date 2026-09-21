@@ -10,6 +10,13 @@ import { useEffect, useState } from "react";
 const LIMIAR_TECLADO_PX = 150;
 
 /**
+ * Acima disso a pessoa está com zoom de pinça (V7, item 2 do PROXIMO.md): o
+ * `visualViewport` também encolhe (altura da janela dividida pela escala), e
+ * sem esta conferência a cápsula das abas sumia sem teclado nenhum.
+ */
+const ESCALA_SEM_ZOOM = 1.01;
+
+/**
  * O teclado virtual do celular está aberto: o `visualViewport` fica bem
  * menor que a janela inteira (V7, item 0c, achado do PR #50: a cápsula das
  * abas ficava por cima do conteúdo com o teclado aberto). `false` em
@@ -24,7 +31,9 @@ export function useTecladoAberto(): boolean {
     if (!vv) return;
 
     function aoRedimensionar() {
-      setAberto(window.innerHeight - vv!.height > LIMIAR_TECLADO_PX);
+      setAberto(
+        vv!.scale <= ESCALA_SEM_ZOOM && window.innerHeight - vv!.height > LIMIAR_TECLADO_PX,
+      );
     }
 
     vv.addEventListener("resize", aoRedimensionar);

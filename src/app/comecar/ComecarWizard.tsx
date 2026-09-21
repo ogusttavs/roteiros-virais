@@ -2,7 +2,7 @@
 
 import { CircleCheck, Clock, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
@@ -15,6 +15,7 @@ import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Botao } from "@/ui/componentes/Botao";
 import { Progresso } from "@/ui/componentes/Progresso";
+import { Toast } from "@/ui/componentes/Toast";
 import { Simbolo } from "@/ui/Logo";
 
 import { avaliarRespostaAction, salvarDadosFixosAction, salvarRascunhoAction } from "./acoes";
@@ -73,12 +74,41 @@ export function ComecarWizard({
   const [avaliacoes, setAvaliacoes] = useState(avaliacoesIniciais);
   const [notaGeral, setNotaGeral] = useState(notaGeralInicial);
   const [perguntaParaRolar, setPerguntaParaRolar] = useState<string | null>(null);
+  /** As perguntas com avaliacao em curso, que falhou ou com rascunho que nao salvou (`onPendencia`). */
+  const [pendentes, setPendentes] = useState<ReadonlySet<string>>(() => new Set());
+  const [avisoDeSaida, setAvisoDeSaida] = useState(false);
+
+  const aoMudarPendencia = useCallback((perguntaId: string, pendente: boolean) => {
+    setPendentes((atual) => {
+      if (atual.has(perguntaId) === pendente) return atual;
+      const proximo = new Set(atual);
+      if (pendente) proximo.add(perguntaId);
+      else proximo.delete(perguntaId);
+      return proximo;
+    });
+  }, []);
+  const fecharAviso = useCallback(() => setAvisoDeSaida(false), []);
+
+  /**
+   * O que o servidor ja tem de cada resposta, para o campo voltar com o texto certo se a tela dele for
+   * desmontada e montada de novo (voltar do bloco 1 para os dados do negocio): antes so a avaliacao
+   * atualizava `respostas`, e o texto digitado e nao avaliado voltava vazio ou antigo (V7, item 4 do
+   * PROXIMO.md). So depois de o servidor confirmar, para nunca mostrar como salvo o que nao foi.
+   */
+  const salvarRascunho = useCallback(async (perguntaId: string, texto: string) => {
+    await salvarRascunhoAction(perguntaId, texto);
+    setRespostas((atual) => (atual[perguntaId] === texto ? atual : { ...atual, [perguntaId]: texto }));
+  }, []);
 
   /**
    * Tocar numa linha da lista de notas rola ate a pergunta (brief-frontend.md
    * 6.2, "Ajuste de 06/09/2026"); se a pergunta e de outro bloco,
-   * `aoSelecionarPergunta` troca o bloco primeiro. O efeito reroda quando
-   * `bloco` muda, entao a segunda vez ja acha o elemento no DOM.
+   * `aoSelecionarPergunta` troca o bloco. Os 12 campos ficam montados o
+   * tempo todo (os de outros blocos escondidos com `hidden`, V7, item 4 do
+   * PROXIMO.md), entao o elemento ja esta no DOM na primeira passada; o
+   * `scrollIntoView` so funciona porque `aoSelecionarPergunta` troca `bloco`
+   * e `perguntaParaRolar` no mesmo evento, na mesma renderizacao (num campo
+   * ainda `hidden` ele nao faz nada).
    */
   useEffect(() => {
     if (!perguntaParaRolar) return;
@@ -179,10 +209,23 @@ export function ComecarWizard({
   const perguntas = perguntasDoBloco(bloco);
   const dica = perguntaQueMaisAjuda(avaliacoes);
 
+  /**
+   * Os cinco blocos ficam montados o tempo todo, so escondidos (V7, item 4 do PROXIMO.md): com um bloco
+   * por vez, "Proximo bloco" desmontava os campos e o texto que ainda nao tinha sido avaliado se perdia,
+   * e o erro de uma avaliacao que falhasse caia num componente que ja nao existia. Assim o estado de cada
+   * campo sobrevive. Sair de um bloco com uma resposta ainda pendente nao descarta nada, mas avisa.
+   */
+  function avisarSeHouverPendencia() {
+    if (perguntasDoBloco(bloco).some((pergunta) => pendentes.has(pergunta.id))) setAvisoDeSaida(true);
+  }
+
   function aoSelecionarPergunta(perguntaId: string) {
     const pergunta = perguntaPorId(perguntaId);
     if (!pergunta) return;
-    if (pergunta.bloco !== bloco) setBloco(pergunta.bloco);
+    if (pergunta.bloco !== bloco) {
+      avisarSeHouverPendencia();
+      setBloco(pergunta.bloco);
+    }
     setPerguntaParaRolar(perguntaId);
   }
 
@@ -221,15 +264,17 @@ export function ComecarWizard({
               total={PERGUNTAS_BRIEFING.length}
             />
           </div>
-          {perguntas.map((pergunta) => (
-            <div key={pergunta.id} id={`pergunta-${pergunta.id}`}>
+          {/* `hidden` num div sem classe: uma classe com `display` valeria mais que o atributo. */}
+          {PERGUNTAS_BRIEFING.map((pergunta) => (
+            <div key={pergunta.id} id={`pergunta-${pergunta.id}`} hidden={pergunta.bloco !== bloco}>
               <PerguntaCampo
                 pergunta={pergunta}
                 resposta={respostas[pergunta.id] ?? ""}
                 avaliacao={avaliacoes[pergunta.id] ?? null}
-                onSalvarRascunho={salvarRascunhoAction}
+                onSalvarRascunho={salvarRascunho}
                 onAvaliar={avaliarRespostaAction}
                 onAtualizado={aoAtualizarPergunta}
+                onPendencia={aoMudarPendencia}
                 meta={meta}
               />
             </div>
@@ -237,19 +282,38 @@ export function ComecarWizard({
           <BarraAcao
             secundaria={{
               rotulo: textosBriefing.navegacaoBlocos.botaoVoltar,
-              onClick: () => (bloco > 1 ? setBloco((atual) => atual - 1) : setEtapa("dadosFixos")),
+              onClick: () => {
+                if (bloco > 1) {
+                  avisarSeHouverPendencia();
+                  setBloco((atual) => atual - 1);
+                } else {
+                  // Os campos desmontam aqui: o rascunho pendente vai antes (`PerguntaCampo`) e volta com o
+                  // texto salvo (`salvarRascunho`). O aviso ficaria preso e apareceria na volta.
+                  setAvisoDeSaida(false);
+                  setEtapa("dadosFixos");
+                }
+              },
             }}
             primaria={
               bloco < TOTAL_BLOCOS
                 ? {
                     rotulo: textosBriefing.navegacaoBlocos.botaoProximoBloco,
-                    onClick: () => setBloco((atual) => atual + 1),
+                    onClick: () => {
+                      avisarSeHouverPendencia();
+                      setBloco((atual) => atual + 1);
+                    },
                   }
                 : undefined
             }
           />
         </div>
       </div>
+      <Toast
+        texto={textosBriefing.navegacaoBlocos.avisoRespostaPendente}
+        aberto={avisoDeSaida}
+        onFechar={fecharAviso}
+        variante="erro"
+      />
     </div>
   );
 }

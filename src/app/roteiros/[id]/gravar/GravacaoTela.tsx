@@ -2,13 +2,14 @@
 
 import { Check, ChevronLeft, Eye, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState, useTransition } from "react";
 
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
 import { iniciaisDe } from "@/lib/iniciais";
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { Toast } from "@/ui/componentes/Toast";
+import { useTratarFalha } from "@/ui/ConexaoContext";
 import { useSemRede } from "@/ui/useSemRede";
 
 import styles from "./GravacaoTela.module.css";
@@ -41,7 +42,14 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
   const [gravado, setGravado] = useState(jaGravado);
   const [marcando, setMarcando] = useState(false);
   const semRede = useSemRede();
-  const [erroToast, setErroToast] = useState(false);
+  // A frase do aviso de falha (ou null, sem aviso): falha do servidor e queda de conexão dizem coisas diferentes.
+  const [avisoErro, setAvisoErro] = useState<string | null>(null);
+  // Fora do layout do painel não há o provedor `Conexao`: `tratarFalha` só escolhe a frase, não acende faixa.
+  const tratarFalha = useTratarFalha();
+  const idMotivoSemRede = useId();
+  // "Sair" só navega e espera o servidor sem mostrar nada (V7, item 4); sem conexão o navegador faz a navegação
+  // inteira e a página do roteiro vem do que foi guardado, então continua funcionando.
+  const [saindo, iniciarSaida] = useTransition();
 
   /**
    * O navegador solta o wake lock sozinho quando a aba fica escondida (a
@@ -92,7 +100,7 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
     setMarcando(true);
     marcarGravadoAction(roteiroId)
       .then(() => setGravado(true))
-      .catch(() => setErroToast(true))
+      .catch((falha) => setAvisoErro(tratarFalha(falha, textosGravacao.erroMarcar, textosGravacao.erroMarcarSemRede)))
       .finally(() => setMarcando(false));
   }
 
@@ -110,8 +118,10 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
         <button
           type="button"
           aria-label={textosGravacao.sair}
+          aria-busy={saindo || undefined}
+          disabled={saindo}
           className={styles.botaoSair}
-          onClick={() => router.push(`/roteiros/${roteiroId}`)}
+          onClick={() => iniciarSaida(() => router.push(`/roteiros/${roteiroId}`))}
         >
           <X size={22} strokeWidth={1.75} aria-hidden="true" />
         </button>
@@ -173,16 +183,28 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
           type="button"
           aria-label={gravado ? textosGravacao.gravado : textosGravacao.marcarGravei}
           aria-pressed={gravado}
+          aria-describedby={semRede ? idMotivoSemRede : undefined}
           className={`${styles.redondo} ${gravado ? styles.redondoFeito : ""}`}
           disabled={marcando || semRede}
           onClick={marcarGravado}
         >
           <Check size={24} strokeWidth={1.75} aria-hidden="true" />
         </button>
+        {/* Na linha de baixo dos controles, ocupando a largura toda: não cobre nenhum toque nem some fora da tela
+            (a `.gravacao` tem altura fixa, um irmão a mais dos controles cairia numa linha de fora). */}
+        {semRede ? (
+          <p id={idMotivoSemRede} className={styles.motivoSemRede}>
+            {textosConexao.precisaDeConexao}
+          </p>
+        ) : null}
       </div>
 
-      {semRede ? <p>{textosConexao.precisaDeConexao}</p> : null}
-      <Toast texto={textosGravacao.erroMarcar} aberto={erroToast} onFechar={() => setErroToast(false)} />
+      <Toast
+        variante="erro"
+        texto={avisoErro ?? ""}
+        aberto={avisoErro !== null}
+        onFechar={() => setAvisoErro(null)}
+      />
     </div>
   );
 }

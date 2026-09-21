@@ -7,10 +7,12 @@ import type { Objetivo } from "@/db/schema";
 import { AJUDA_OBJETIVO, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
+import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { Progresso } from "@/ui/componentes/Progresso";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { gerarRoteiroAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
@@ -31,9 +33,12 @@ type Props = {
 export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }: Props) {
   const router = useRouter();
   const [escolhido, setEscolhido] = useState<Objetivo | null>(null);
-  const [erro, setErro] = useState(false);
+  // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
+  const [erro, setErro] = useState<string | null>(null);
   const [demorando, setDemorando] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
+  const tratarFalha = useTratarFalha();
+  const { avisarRedeOk } = useConexao();
 
   useEffect(() => {
     if (!pendente) {
@@ -46,13 +51,16 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
 
   function escrever() {
     if (!escolhido) return;
-    setErro(false);
+    setErro(null);
     iniciarTransicao(async () => {
       try {
         const { id } = await gerarRoteiroAction(origem, escolhido);
+        avisarRedeOk();
         router.push(`/roteiros/${id}`);
-      } catch {
-        setErro(true);
+      } catch (falha) {
+        // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir cria outro roteiro,
+        // então a frase de rede manda olhar o Histórico primeiro (V7, item 4 do PROXIMO.md).
+        setErro(tratarFalha(falha, textosObjetivo.erro, textosConexao.conexaoCaiuNoMeio));
       }
     });
   }
@@ -68,12 +76,31 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     );
   }
 
-  if (erro) {
+  if (erro !== null) {
+    // O tema e o objetivo escolhidos continuam na tela: quem tenta de novo confere o que vai pedir (e o Voltar
+    // leva de volta sem perder o tema).
     return (
       <div className={styles.pagina}>
         <div className={styles.espera}>
-          <p className={styles.fraseErro}>{textosObjetivo.erro}</p>
-          <BarraAcao primaria={{ rotulo: textosComuns.tentarDeNovo, onClick: escrever }} />
+          <div className={styles.escolha}>
+            <div className={styles.temaEscolhido}>
+              <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
+              <span className={styles.tema}>{temaEscolhidoTexto}</span>
+            </div>
+            {escolhido ? (
+              <div className={styles.temaEscolhido}>
+                <span className={styles.rotulo}>{textosObjetivo.objetivoEscolhido}</span>
+                <span className={styles.tema}>{primeiraMaiuscula(NOME_OBJETIVO[escolhido])}</span>
+              </div>
+            ) : null}
+          </div>
+          <p className={styles.fraseErro} role="alert">
+            {erro}
+          </p>
+          <BarraAcao
+            secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
+            primaria={{ rotulo: textosComuns.tentarDeNovo, onClick: escrever, precisaDeRede: true }}
+          />
         </div>
       </div>
     );
@@ -104,7 +131,7 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
 
       <BarraAcao
         secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
-        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: !escolhido }}
+        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: !escolhido, precisaDeRede: true }}
       />
     </div>
   );

@@ -480,7 +480,11 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByText("bloco 2 de 5")).toBeVisible();
 
     // a primeira frase de "o que pode melhorar" da P1 aparece na lista (corte na primeira pontuação final).
-    await expect(page.getByText("Falta dizer para quem e o serviço, com um número real da clínica.").last()).toBeVisible();
+    // (`aside`: os 12 campos ficam montados e escondidos por bloco desde a V7, e o cartao fechado da P1, do bloco 1,
+    // tambem traz a frase; so a lista da barra esta visivel.)
+    await expect(
+      page.locator("aside").getByText("Falta dizer para quem e o serviço, com um número real da clínica."),
+    ).toBeVisible();
 
     // P8 e do bloco 3 ("Sobre o que você quer que aconteça"); tocar a linha troca o bloco e rola ate a pergunta.
     await page.getByRole("button", { name: /P8 · onde posta hoje/ }).last().click();
@@ -498,6 +502,95 @@ test.describe("briefing pela tela", () => {
    * cliente ainda lendo. Viewport de celular so neste bloco (`test.use`),
    * as outras tres tests deste arquivo continuam no viewport padrao.
    */
+  /**
+   * O cliente das doze notas (um briefing completo, com "melhorar" grande em cada resposta) e a folha aberta
+   * pela barra fina do topo. Um id por teste: cada teste cria o proprio usuario, sem depender dos outros.
+   */
+  async function prepararCliente(id: string) {
+  const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+  await db().insert(user).values({
+    id: id,
+    name: "[teste] Folha Celular",
+    email: `${id}@exemplo.teste`,
+  });
+  await db()
+    .insert(account)
+    .values({
+      id: `${id}-credential`,
+      issuer: "local:credential",
+      accountId: id,
+      providerId: "credential",
+      userId: id,
+      password: await hashPassword(SENHA),
+    });
+  const [cliente] = await db()
+    .insert(clientes)
+    .values({
+      usuarioId: id,
+      nome: "[teste] Folha Celular",
+      nichoId: nicho.id,
+    })
+    .returning();
+  await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+  await db().insert(preferenciasUsuario).values({ usuarioId: id, aceitouTermosEm: new Date() });
+
+  // Doze respostas avaliadas, cada uma com "melhorar" grande o bastante
+  // para gerar uma linha de resumo (mesmo formato do teste "cartao de
+  // notas" acima): e o que deixa a lista mais alta que a folha no celular.
+  // Nota abaixo da meta (8) de proposito (item 0 do PROXIMO.md): na meta, a lista
+  // mostra "Na meta.", curto o bastante para a lista nao estourar a folha mais.
+  const avaliacao = (id: string): AvaliacaoResposta => ({
+    nota: 7,
+    bom: `A resposta de ${id} tem exemplo concreto.`,
+    melhorar: `Poderia trazer mais um numero ou exemplo real do negocio na resposta de ${id}, para ficar ainda mais forte.`,
+    como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
+    impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+  });
+  const respostas: Record<string, string> = {};
+  const avaliacoes: Record<string, AvaliacaoResposta> = {};
+  for (let i = 1; i <= 12; i++) {
+    const id = `p${i}`;
+    respostas[id] = `Resposta concreta para ${id}, com o numero 42 na frase e o bairro de Pinheiros.`;
+    avaliacoes[id] = avaliacao(id);
+  }
+
+  await db().insert(briefings).values({
+    clienteId: cliente.id,
+    respostas,
+    avaliacoes,
+    notaGeral: "9.00",
+    completo: true,
+  });
+
+  }
+
+  async function abrirFolhaDasDozeNotas(page: Page, id: string) {
+    await entrar(page, `${id}@exemplo.teste`);
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto("/briefing");
+    await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
+
+    // barra fina fixa no topo (barraCelular): abre a folha ao tocar.
+    await page.getByRole("button", { name: "as doze notas" }).click();
+    const folha = page.getByRole("dialog", { name: "as doze notas" });
+    await expect(folha).toBeVisible();
+
+    const caixa = await folha.boundingBox();
+    if (!caixa) throw new Error("folha sem caixa delimitadora");
+    const centroFolha = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
+
+    // rola a lista por dentro, varias vezes, ate passar do fim.
+    await page.mouse.move(centroFolha.x, centroFolha.y);
+    for (let i = 0; i < 15; i++) {
+      await page.mouse.wheel(0, 800);
+    }
+    await expect(folha).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    return { folha, centroFolha };
+  }
+
   test.describe("na folha do celular", () => {
     // So o viewport de celular, sem `defaultBrowserType` (o resto de
     // `devices["iPhone 13"]`): o Playwright recusa esse campo num
@@ -511,87 +604,34 @@ test.describe("briefing pela tela", () => {
       hasTouch: devices["iPhone 13"].hasTouch,
     });
 
-    test("rolar a lista por dentro ate o fim nao fecha a folha; rolar o véu fecha", async ({ page }) => {
-      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
-
-      await db().insert(user).values({
-        id: "e2e-folha-celular",
-        name: "[teste] Folha Celular",
-        email: "e2e-folha-celular@exemplo.teste",
-      });
-      await db()
-        .insert(account)
-        .values({
-          id: "e2e-folha-celular-credential",
-          issuer: "local:credential",
-          accountId: "e2e-folha-celular",
-          providerId: "credential",
-          userId: "e2e-folha-celular",
-          password: await hashPassword(SENHA),
-        });
-      const [cliente] = await db()
-        .insert(clientes)
-        .values({
-          usuarioId: "e2e-folha-celular",
-          nome: "[teste] Folha Celular",
-          nichoId: nicho.id,
-        })
-        .returning();
-      await db().insert(membrosMarca).values({ usuarioId: "e2e-folha-celular", clienteId: cliente.id, papel: "dono" });
-      await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-folha-celular", aceitouTermosEm: new Date() });
-
-      // Doze respostas avaliadas, cada uma com "melhorar" grande o bastante
-      // para gerar uma linha de resumo (mesmo formato do teste "cartao de
-      // notas" acima): e o que deixa a lista mais alta que a folha no celular.
-      // Nota abaixo da meta (8) de proposito (item 0 do PROXIMO.md): na meta, a lista
-      // mostra "Na meta.", curto o bastante para a lista nao estourar a folha mais.
-      const avaliacao = (id: string): AvaliacaoResposta => ({
-        nota: 7,
-        bom: `A resposta de ${id} tem exemplo concreto.`,
-        melhorar: `Poderia trazer mais um numero ou exemplo real do negocio na resposta de ${id}, para ficar ainda mais forte.`,
-        como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
-        impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
-      });
-      const respostas: Record<string, string> = {};
-      const avaliacoes: Record<string, AvaliacaoResposta> = {};
-      for (let i = 1; i <= 12; i++) {
-        const id = `p${i}`;
-        respostas[id] = `Resposta concreta para ${id}, com o numero 42 na frase e o bairro de Pinheiros.`;
-        avaliacoes[id] = avaliacao(id);
-      }
-
-      await db().insert(briefings).values({
-        clienteId: cliente.id,
-        respostas,
-        avaliacoes,
-        notaGeral: "9.00",
-        completo: true,
-      });
-
-      await entrar(page, "e2e-folha-celular@exemplo.teste");
-      await expect(page).toHaveURL(/\/hoje/);
-
-      await page.goto("/briefing");
-      await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
-
-      // barra fina fixa no topo (barraCelular): abre a folha ao tocar.
-      await page.getByRole("button", { name: "as doze notas" }).click();
-      const folha = page.getByRole("dialog", { name: "as doze notas" });
-      await expect(folha).toBeVisible();
-
-      const caixa = await folha.boundingBox();
-      if (!caixa) throw new Error("folha sem caixa delimitadora");
-      const centroFolha = { x: caixa.x + caixa.width / 2, y: caixa.y + caixa.height / 2 };
-
-      // rola a lista por dentro, varias vezes, ate passar do fim.
-      await page.mouse.move(centroFolha.x, centroFolha.y);
-      for (let i = 0; i < 15; i++) {
-        await page.mouse.wheel(0, 800);
-      }
-      await expect(folha).toBeVisible();
-      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    /**
+     * V7, item 1: com a folha aberta no celular a pagina de tras fica travada (`base.css`, `data-folha-aberta`),
+     * entao rolar sobre o veu nao anda com a pagina e nao fecha a folha (antes, o `scroll` da janela fechava).
+     * Fechar e por toque fora, Esc, Voltar e arrastar (`layout.spec.ts`, `conferirFolhaFecha`).
+     */
+    test("rolar a lista por dentro ate o fim nao fecha a folha; rolar o véu nao anda com a pagina de tras", async ({ page }) => {
+      await prepararCliente("e2e-folha-celular");
+      const { folha, centroFolha } = await abrirFolhaDasDozeNotas(page, "e2e-folha-celular");
 
       // agora rola em cima do véu, fora da folha (topo da tela, acima dela).
+      await page.mouse.move(centroFolha.x, 10);
+      await page.mouse.wheel(0, 400);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      await expect(folha).toBeVisible();
+    });
+  });
+
+  /**
+   * Do tablet para cima (768 a 1179 px) a pagina de tras nao trava: rolar sobre o veu continua fechando a folha,
+   * como antes (`BarraNotaGeral.tsx`, ouvinte de `scroll`).
+   */
+  test.describe("na folha do tablet", () => {
+    test.use({ viewport: { width: 820, height: 700 } });
+
+    test("rolar o véu fecha a folha", async ({ page }) => {
+      await prepararCliente("e2e-folha-tablet");
+      const { folha, centroFolha } = await abrirFolhaDasDozeNotas(page, "e2e-folha-tablet");
+
       await page.mouse.move(centroFolha.x, 10);
       await page.mouse.wheel(0, 400);
       await expect(folha).toBeHidden();

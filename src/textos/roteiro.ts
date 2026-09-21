@@ -52,10 +52,15 @@ export const textosRoteiro = {
   abrirReferencia: "Abrir o vídeo de referência",
   /** Rodapé como no design (revisão do PR #31, item 7): preenchido enquanto não gravou. */
   jaGravei: "Já gravei",
+  /** O rótulo de "Já gravei" e do botão de salvar o link enquanto o pedido está indo (V7, item 4 do PROXIMO.md). */
+  salvando: "Salvando",
   postei: "Postei",
   postado: "Postado",
   ondePostou: "Onde você postou?",
   coleLink: "Cole o link do vídeo",
+  /** Link colado que não dá para salvar (V7, item 4 do PROXIMO.md): a frase aparece no painel, junto do campo. */
+  linkVazio: "Cole o link do vídeo que você postou.",
+  linkInvalido: "Esse link não parece certo. Confira se colou o endereço inteiro do vídeo.",
   menu: {
     reprovar: "Reprovar",
     copiar: "Copiar texto",
@@ -65,11 +70,24 @@ export const textosRoteiro = {
   /** aria-label do botão só de ícone na barra de ações do desktop (achado do primeiro uso no iPad, item 5). */
   baixarPdf: "Baixar em PDF",
   textoCopiado: "Texto copiado",
+  /** Enquanto o PDF é gerado (leva alguns segundos), no lugar de "Baixar em PDF" (V7, item 4 do PROXIMO.md). */
+  gerandoPdf: "Gerando o PDF",
   versao: (a: number, b: number) => `Versão ${a} de ${b}`,
   versaoAntiga: (a: number, b: number) => `Versão ${a}; a atual é a ${b}`,
   verAtual: "Ver a atual",
   escrevendo: "Escrevendo do jeito que você fala",
-  erro: "Não conseguimos escrever agora",
+  /**
+   * Uma frase por ação que pode falhar, cada uma no lugar onde o olho está
+   * (V7, item 4 do PROXIMO.md; a de antes, "Não conseguimos escrever agora",
+   * falava de escrever quando a pessoa tinha tocado em outra coisa). As de
+   * "sem rede" trocam a frase padrão de `textosConexao` quando ela não cabe.
+   */
+  erroMarcarGravado: "Não conseguimos marcar como gravado agora. Toque em Já gravei de novo em alguns instantes.",
+  erroMarcarGravadoSemRede: "Sem conexão agora. Toque em Já gravei de novo quando a rede voltar.",
+  erroSalvarLink: "Não conseguimos salvar o link agora. O que você colou continua aqui; tente de novo.",
+  erroCopiar: "Não conseguimos copiar o texto agora. Tente de novo.",
+  erroPdf: "Não conseguimos gerar o PDF agora. Tente de novo em alguns instantes.",
+  erroPdfSemRede: "Sem conexão agora. Toque em Baixar em PDF de novo quando a rede voltar.",
   sair: "Sair",
   modoGravacao: "Modo gravação",
   maisOpcoes: "Mais opções",
@@ -89,6 +107,11 @@ export const textosRoteiro = {
     reescrevendo: "Reescrevendo o roteiro",
     semMotivoMarcado: "Marque pelo menos um motivo para reescrever",
     tempoEstimado: "Leva de 30 segundos a 3 minutos. O tema e o objetivo continuam os mesmos.",
+    /**
+     * Depois de uns 10 segundos escrevendo (V7, item 4 do PROXIMO.md): sem dizer "mais que o normal", porque a
+     * estimativa acima já vai a 3 minutos.
+     */
+    demorando: "Ainda escrevendo. Com conexão fraca pode levar mais; quando terminar, o roteiro novo abre sozinho.",
     erro: "Não deu para reescrever agora. A falha foi nossa; o que você marcou continua aqui.",
     cancelar: "Cancelar",
     etiqueta: "reprovada",

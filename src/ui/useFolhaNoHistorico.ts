@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
+/** O que a entrada empurrada carrega no estado do histórico (só para quem inspeciona; a decisão não depende dele). */
 const MARCA = "folhaAberta";
+
+/** Se o `popstate` do `history.back()` não vier neste tempo (histórico no começo, outra aba), o próximo pedido é liberado. */
+const ESPERA_POPSTATE_MS = 1000;
 
 /**
  * O botão voltar (do Android, o gesto do iPhone, o do navegador) fecha a folha
@@ -11,59 +15,101 @@ const MARCA = "folhaAberta";
  *
  * Como funciona: ao abrir, empurra uma entrada no histórico do navegador
  * (`history.pushState`, o Next 15 aceita e a URL não muda). Voltar desfaz essa
- * entrada, e o `popstate` fecha a folha. O histórico é a fonte da verdade:
+ * entrada, e o `popstate` chama `aoFechar`. O histórico é a fonte da verdade:
  * quem fecha por outro caminho (toque no véu, Esc, botão, arrastar) chama o
  * `fechar` devolvido aqui, que desfaz a entrada com `history.back()` e deixa o
  * mesmo `popstate` fechar. Assim o Voltar seguinte não precisa de dois toques.
  *
+ * Quem sabe se a entrada ainda está no histórico é este gancho (um ref), NÃO o
+ * `history.state`: o Next refaz o estado (`replaceState`) a cada `refresh` ou
+ * Server Action que termina com a folha aberta, e a marca some sem a entrada
+ * sair do lugar (achado da revisão do pacote 3 da V7, lido em
+ * `refresh-reducer.js` e `server-action-reducer.js`).
+ *
+ * `aoFechar` fecha (estado) e pode RECUSAR devolvendo `false` (uma reescrita
+ * em andamento, por exemplo): o gancho devolve a entrada ao histórico e o
+ * próximo Voltar volta a pedir para fechar. `aoFechar` pode mudar a cada
+ * renderização sem mexer no histórico.
+ *
+ * `fechar` e `fecharEDepois` são idempotentes: um segundo pedido antes do
+ * `popstate` chegar (um toque duplo, uma rolagem que dispara vários eventos)
+ * é ignorado. Sem isso o segundo `history.back()` tiraria a pessoa da tela.
+ *
  * `fecharEDepois(acao)` é para o toque que fecha a folha E navega (aplicar
  * filtros, ir à Conta, abrir o roteiro reescrito): desfaz a entrada primeiro e
  * só então roda `acao`. Navegar antes de desfazer deixaria uma entrada
- * fantasma da mesma tela no meio do histórico.
+ * fantasma da mesma tela no meio do histórico. Se a tela recusar o fechamento,
+ * `acao` não roda.
  *
  * O efeito não desfaz nada na limpeza de propósito: em desenvolvimento o
  * React executa cada efeito duas vezes, e um `history.back()` na limpeza
  * fecharia a folha sozinha.
- *
- * `aoFechar` só precisa fechar (estado); pode mudar a cada renderização sem
- * mexer no histórico.
  */
 export function useFolhaNoHistorico(
   aberto: boolean,
-  aoFechar: () => void,
+  aoFechar: () => boolean | void,
 ): { fechar: () => void; fecharEDepois: (acao: () => void) => void } {
   const aoFecharRef = useRef(aoFechar);
   useEffect(() => {
     aoFecharRef.current = aoFechar;
   });
 
+  /** Empurramos uma entrada e ela ainda está no histórico. */
+  const empurradoRef = useRef(false);
+  /** `history.back()` pedido e o `popstate` ainda não chegou. */
+  const voltandoRef = useRef(false);
+  /** A tela recusou o último fechamento (o gancho devolveu a entrada); `fecharEDepois` então não roda a ação. */
+  const recusouRef = useRef(false);
+
+  const empurrar = useCallback(() => {
+    window.history.pushState({ [MARCA]: true }, "");
+    empurradoRef.current = true;
+  }, []);
+
   useEffect(() => {
     if (!aberto) return;
-    window.history.pushState({ [MARCA]: true }, "");
+    empurrar();
     function aoVoltar() {
-      aoFecharRef.current();
+      empurradoRef.current = false;
+      voltandoRef.current = false;
+      recusouRef.current = aoFecharRef.current() === false;
+      if (recusouRef.current) empurrar();
     }
     window.addEventListener("popstate", aoVoltar);
     return () => window.removeEventListener("popstate", aoVoltar);
-  }, [aberto]);
+  }, [aberto, empurrar]);
 
   const fechar = useCallback(() => {
-    if (window.history.state?.[MARCA]) window.history.back();
-    else aoFecharRef.current();
+    if (voltandoRef.current) return;
+    if (!empurradoRef.current) {
+      aoFecharRef.current();
+      return;
+    }
+    voltandoRef.current = true;
+    window.history.back();
+    setTimeout(() => {
+      voltandoRef.current = false;
+    }, ESPERA_POPSTATE_MS);
   }, []);
 
   const fecharEDepois = useCallback((acao: () => void) => {
-    if (!window.history.state?.[MARCA]) {
-      aoFecharRef.current();
-      acao();
+    if (voltandoRef.current) return;
+    if (!empurradoRef.current) {
+      if (aoFecharRef.current() !== false) acao();
       return;
     }
+    voltandoRef.current = true;
     function depois() {
       window.removeEventListener("popstate", depois);
-      acao();
+      clearTimeout(desistir);
+      if (!recusouRef.current) acao();
     }
-    // Registrado depois do ouvinte do efeito acima: no mesmo `popstate` a folha fecha primeiro e `acao` roda em seguida.
+    // Registrado depois do ouvinte do efeito acima: no mesmo `popstate` a folha fecha (ou recusa) primeiro e `acao` roda em seguida.
     window.addEventListener("popstate", depois);
+    const desistir = setTimeout(() => {
+      window.removeEventListener("popstate", depois);
+      voltandoRef.current = false;
+    }, ESPERA_POPSTATE_MS);
     window.history.back();
   }, []);
 

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import styles from "./BarraNotaGeral.module.css";
 import { faixaMeta } from "./notaFaixaMeta";
@@ -40,6 +42,10 @@ function formatarNota(valor: number): string {
  * tocar) e cartao fixo no desktop com a lista sempre visivel (entrega/README.md,
  * "abre folha"; CascaCelular/CascaDesktop). A dica ja vem formatada de quem
  * chama; o componente nunca escreve texto de tela.
+ *
+ * A folha fecha por veu, Esc, rolagem da pagina de tras e pelo Voltar do
+ * aparelho (`useFolhaNoHistorico`; V7, item 1 do PROXIMO.md), leva o foco ao
+ * abrir e o devolve ao botao da barra ao fechar.
  */
 export function BarraNotaGeral({
   notaAtual,
@@ -53,26 +59,50 @@ export function BarraNotaGeral({
   aoTocarItem,
 }: Props) {
   const [aberto, setAberto] = useState(false);
+  const { fechar, fecharEDepois } = useFolhaNoHistorico(aberto, () => setAberto(false));
+  const gatilhoRef = useRef<HTMLButtonElement>(null);
+  const folhaRef = useRef<HTMLDivElement>(null);
   const atingiu = notaAtual >= meta;
 
   /**
    * Fecha ao rolar a pagina de tras (brief-frontend.md 6.2, "Ajuste de
    * 06/09/2026"): so ouve o scroll do documento, nunca o scroll interno da
    * propria folha (`.folha` tem overflow-y proprio, que nao borbulha como
-   * evento de scroll da window).
+   * evento de scroll da window). O ouvinte se remove no primeiro disparo: a
+   * rolagem dispara o evento varias vezes antes de o Voltar do historico
+   * chegar, e cada `fechar` desfaz uma entrada, entao a segunda chamada
+   * tiraria a pessoa da tela.
+   *
+   * Esc fecha, a folha recebe o foco ao abrir e o botao da barra o recebe de
+   * volta ao fechar (V7, item 1 do PROXIMO.md). `preventScroll` nos dois:
+   * mover o foco nunca pode rolar a pagina (a rolagem fecharia a folha).
    */
   useEffect(() => {
     if (!aberto) return;
-    function fechar() {
-      setAberto(false);
+    const gatilho = gatilhoRef.current;
+    function fecharAoRolar() {
+      window.removeEventListener("scroll", fecharAoRolar);
+      fechar();
     }
-    window.addEventListener("scroll", fechar, { passive: true });
-    return () => window.removeEventListener("scroll", fechar);
-  }, [aberto]);
+    function aoTeclar(evento: KeyboardEvent) {
+      if (evento.key === "Escape") fechar();
+    }
+    window.addEventListener("scroll", fecharAoRolar, { passive: true });
+    document.addEventListener("keydown", aoTeclar);
+    folhaRef.current?.focus({ preventScroll: true });
+    return () => {
+      window.removeEventListener("scroll", fecharAoRolar);
+      document.removeEventListener("keydown", aoTeclar);
+      gatilho?.focus({ preventScroll: true });
+    };
+  }, [aberto, fechar]);
 
   function tocarItem(id: string) {
-    setAberto(false);
-    aoTocarItem?.(id);
+    // O historico devolve a posicao de rolagem que a pagina tinha quando a folha abriu; rolar ate a pergunta no
+    // mesmo instante do fechamento seria desfeito. O `setTimeout` deixa a rolagem para depois do Voltar.
+    fecharEDepois(() => {
+      setTimeout(() => aoTocarItem?.(id), 0);
+    });
   }
 
   const lista = (
@@ -100,10 +130,12 @@ export function BarraNotaGeral({
   return (
     <>
       <button
+        ref={gatilhoRef}
         type="button"
         className={styles.barraCelular}
         onClick={() => setAberto(true)}
         aria-haspopup="dialog"
+        aria-expanded={aberto}
         aria-label={tituloFolha}
       >
         <span className={styles.resumo}>
@@ -119,11 +151,14 @@ export function BarraNotaGeral({
       </button>
 
       {aberto ? (
-        <div className={styles.veu} onClick={() => setAberto(false)}>
+        <div className={styles.veu} data-folha-aberta="" onClick={fechar}>
           <div
+            ref={folhaRef}
             role="dialog"
             aria-modal="true"
             aria-label={tituloFolha}
+            tabIndex={-1}
+            data-folha-aberta=""
             className={styles.folha}
             onClick={(evento) => evento.stopPropagation()}
           >

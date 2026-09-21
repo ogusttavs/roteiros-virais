@@ -3,16 +3,13 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { avisarRedeVoltou } from "@/lib/estado-de-rede";
 import { caminhosEstaticosCarregados, chaveDoEscopo, ehPaginaGuardavel, registrarEscopo } from "@/lib/offline";
 import { textosConexao } from "@/textos/conexao";
 import { ConexaoContext, ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
 import { useSemRede } from "@/ui/useSemRede";
+import { useSondaDeRede } from "@/ui/useSondaDeRede";
 
 import styles from "./Conexao.module.css";
-
-/** De quanto em quanto tempo a faixa confere se a rede voltou, quando ela acendeu por um pedido que caiu. */
-const INTERVALO_SONDA_MS = 5000;
 
 /**
  * O painel sem rede (V7, itens 5 a 10 do PROXIMO.md), do lado da pagina:
@@ -45,28 +42,9 @@ export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; m
     return () => window.removeEventListener("online", aoVoltar);
   }, []);
 
-  // A faixa esta acesa mas o navegador diz que tem rede (sinal fraco, portal de wifi, pagina servida do
-  // guardado, um pedido que caiu): sem esta conferencia ela so sumiria quando uma acao desse certo, e as
-  // acoes que precisam de rede estariam desabilitadas. Com `navigator.onLine` falso nao confere: o
-  // navegador avisa sozinho quando a rede volta (evento `online`, acima).
-  useEffect(() => {
-    if (!semConexao || !navigator.onLine) return;
-    let cancelado = false;
-    const id = setInterval(async () => {
-      try {
-        const resposta = await fetch("/api/saude", { cache: "no-store" });
-        if (cancelado || !resposta.ok) return;
-        avisarRedeVoltou();
-        setUltimoPedidoCaiu(false);
-      } catch {
-        // Continua sem rede; confere de novo no proximo intervalo.
-      }
-    }, INTERVALO_SONDA_MS);
-    return () => {
-      cancelado = true;
-      clearInterval(id);
-    };
-  }, [semConexao]);
+  // Faixa acesa com o navegador achando que tem rede: confere a rede de tempos em tempos (`useSondaDeRede`).
+  const avisarRedeOk = useCallback(() => setUltimoPedidoCaiu(false), []);
+  useSondaDeRede(semConexao, avisarRedeOk);
 
   useEffect(() => {
     document.documentElement.dataset.semConexao = semConexao ? "true" : "false";
@@ -102,7 +80,6 @@ export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; m
   }, [escopo, pathname]);
 
   const avisarFalhaDeRede = useCallback(() => setUltimoPedidoCaiu(true), []);
-  const avisarRedeOk = useCallback(() => setUltimoPedidoCaiu(false), []);
   const valor = useMemo(
     () => ({ semConexao, avisarFalhaDeRede, avisarRedeOk }),
     [semConexao, avisarFalhaDeRede, avisarRedeOk],

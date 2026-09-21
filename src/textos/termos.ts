@@ -129,5 +129,7 @@ export const textosTermos = {
     lerTermos: "ler os termos",
     aceitar: "li e aceito",
     erro: "não conseguimos salvar agora; tente de novo em um minuto",
+    /** A rede caiu no meio do aceite (V7, item 4 do PROXIMO.md): o aceite não foi guardado, é só tentar de novo. */
+    erroSemRede: "Sem conexão agora. Você ainda não aceitou os termos; tente de novo quando a rede voltar.",
   },
 };

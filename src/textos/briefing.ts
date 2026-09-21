@@ -76,6 +76,11 @@ export const textosBriefing = {
     fraseAjuste: "Você pode ajustar agora ou seguir assim.",
     erroAviso: "Não deu para avaliar agora",
     erroExplicacao: "A sua resposta está salva. A falha foi nossa e você não precisa escrever de novo.",
+    /**
+     * Quando o rascunho NAO foi salvo (V7, item 3 do PROXIMO.md): o "está salva" acima seria falso, e
+     * quem sai da tela perde o que escreveu. A falha de rede tem frase propria (`textosConexao`).
+     */
+    erroExplicacaoSemSalvar: "A sua resposta ainda não foi salva: o texto está só nesta tela. Tente de novo antes de sair.",
     botaoTentarDeNovo: "Tentar de novo",
     rascunhoSalvo: "salvo",
     rascunhoAindaNao: "ainda não salvo",
@@ -87,6 +92,12 @@ export const textosBriefing = {
   navegacaoBlocos: {
     botaoVoltar: "Voltar",
     botaoProximoBloco: "Próximo bloco",
+    /**
+     * Sair de um bloco com uma resposta ainda sendo lida, ou que não foi salva (V7, item 4 do
+     * PROXIMO.md). Os campos continuam no bloco, então nada se perde; o aviso diz onde olhar.
+     */
+    avisoRespostaPendente:
+      "Uma resposta deste bloco ainda está sendo lida ou não foi salva. Ela continua no bloco; volte a ela para conferir.",
   },
   analiseRotulos: {
     bom: "O que está bom",
@@ -150,5 +161,14 @@ export const textosBriefing = {
         : `De ${contagem} roteiros que você reprovou, o último em ${formatarDiaMesPorExtenso(ultimaEm)}.`,
     vazio:
       "Ainda nada. Quando você reprovar um roteiro dizendo por quê, o que a gente aprender aparece aqui, e você pode desligar o que não fizer sentido.",
+    /**
+     * Falha ao desligar ou desfazer (V7, item 4 do PROXIMO.md): a linha volta ao que era e o erro
+     * aparece embaixo dela. A frase de rede não é a `falhaDeRede` geral, que fala do que a pessoa
+     * "escreveu": aqui ninguém escreveu nada.
+     */
+    erroDesligar: "Não conseguimos desligar esta regra agora. Tente de novo em instantes.",
+    erroDesfazer: "Não conseguimos desfazer agora. Tente de novo em instantes.",
+    semConexaoDesligar: "Sem conexão. Não deu para desligar esta regra; tente de novo quando a rede voltar.",
+    semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
   },
 };

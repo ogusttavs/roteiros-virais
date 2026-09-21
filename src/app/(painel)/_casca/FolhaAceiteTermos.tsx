@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { textosTermos } from "@/textos/termos";
 import { Botao } from "@/ui/componentes/Botao";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { aceitarTermosAction } from "./aceite-acoes";
 import styles from "./FolhaAceiteTermos.module.css";
@@ -19,9 +20,15 @@ const t = textosTermos.aceite;
  * `clientes.aceitou_termos_em` for nulo. `router.refresh()` reexecuta o
  * layout no servidor depois do aceite, que então renderiza a rota de
  * verdade.
+ *
+ * O aceite chama o servidor (V7, itens 4 e 8 do PROXIMO.md): sem rede o botão
+ * fica desabilitado com o motivo escrito, e se a rede cai no meio a frase diz
+ * que foi a rede e que o aceite ainda não foi guardado.
  */
 export function FolhaAceiteTermos() {
   const router = useRouter();
+  const { avisarRedeOk } = useConexao();
+  const tratarFalha = useTratarFalha();
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -30,9 +37,10 @@ export function FolhaAceiteTermos() {
     setSalvando(true);
     try {
       await aceitarTermosAction();
+      avisarRedeOk();
       router.refresh();
-    } catch {
-      setErro(t.erro);
+    } catch (falha) {
+      setErro(tratarFalha(falha, t.erro, t.erroSemRede));
       setSalvando(false);
     }
   }
@@ -60,6 +68,7 @@ export function FolhaAceiteTermos() {
           variante="primario"
           tamanho="lg"
           carregando={salvando}
+          precisaDeRede
           onClick={aceitar}
           className={styles.botao}
         >

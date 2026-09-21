@@ -8,12 +8,23 @@
   margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6)))
     calc(-1 * var(--margem-celular))
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
+  /* Onde o Toast pousa: acima da barra de ações fixa (altura do botão mais o respiro dela, mais uma folga, mais a linha do motivo sem rede), V7, item 4 do PROXIMO.md. */
+  --toast-base: calc(var(--altura-toque-lg) + var(--espaco-8) + var(--folga-motivo, 0px));
 }
 
 @media (min-width: 768px) {
   .pagina {
     margin: calc(-1 * var(--espaco-10));
   }
+}
+
+/**
+ * Sem conexão (`ConexaoContext`, V7, item 8 do PROXIMO.md): a barra de ações
+ * ganha uma linha com o motivo ("Precisa de conexão.") acima dos botões, e o
+ * miolo reserva essa linha a mais no fim, para ela não cobrir o último bloco.
+ */
+.semRede {
+  --folga-motivo: var(--espaco-8);
 }
 
 .botaoBarra {
@@ -46,9 +57,10 @@
 
 /* ---------- Conteúdo ---------- */
 
+/* Sem o `+ 64px` de antes: eram da cápsula das abas, que some nesta tela (a barra de ações fica em `bottom: 0`), V7, item 2 do PROXIMO.md. */
 .miolo {
   padding: var(--espaco-5) var(--margem-celular)
-    calc(var(--altura-toque-lg) + var(--espaco-9) + 64px + env(safe-area-inset-bottom, 0px));
+    calc(var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px) + env(safe-area-inset-bottom, 0px));
   display: grid;
   gap: var(--espaco-8);
   max-width: var(--largura-leitura);
@@ -56,7 +68,8 @@
 
 @media (min-width: 768px) {
   .miolo {
-    padding: var(--espaco-8) var(--espaco-6) calc(var(--altura-toque-lg) + var(--espaco-9));
+    padding: var(--espaco-8) var(--espaco-6)
+      calc(var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px));
   }
 }
 
@@ -178,12 +191,6 @@
   color: var(--cor-texto-suave);
 }
 
-.fraseErro {
-  margin: 0 var(--margem-celular) var(--espaco-4);
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto);
-}
-
 /**
  * "Não ficou bom? Reprovar", no fim do cartão do roteiro (design v2,
  * `.julgar`): só no celular, porque do tablet para cima "Reprovar" já está
@@ -218,13 +225,31 @@
   cursor: pointer;
 }
 
+.linkReprovar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+/* O motivo ao lado do link, na mesma linha do parágrafo (`MotivoSemRede` chega como bloco centralizado). */
+.julgar .motivoJulgar {
+  display: inline;
+  margin-left: var(--espaco-2);
+  text-align: left;
+}
+
 /* ---------- Barra de ações, fixa embaixo ---------- */
 
+/*
+ * `bottom: 0` (V7, item 2 do PROXIMO.md): os 64px de antes eram da barra de
+ * abas antiga; com a cápsula escondida nesta tela sobrava uma faixa
+ * transparente sob a barra, e a área segura do aparelho era contada em
+ * dobro. O desenho também tem a barra encostada no fundo.
+ */
 .barraAcoes {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 64px;
+  bottom: 0;
   z-index: 25;
   display: flex;
   align-items: center;
@@ -237,12 +262,35 @@
   border-top: var(--largura-borda) solid var(--cor-divisor);
 }
 
+/* Sem conexão o motivo ganha uma linha só dele, acima dos botões (com ele na mesma linha, a 360px os botões estouravam a largura). */
+.semRede .barraAcoes {
+  flex-wrap: wrap;
+}
+
+.barraAcoes .motivoBarra {
+  flex: 1 0 100%;
+  order: -1;
+}
+
+/* No celular, com o roteiro já postado, nada na barra precisa de rede: o motivo só aparece do tablet para cima (o PDF e o Reprovar ficam lá). */
+.barraAcoes .motivoSoTablet {
+  display: none;
+}
+
 @media (min-width: 768px) {
   .barraAcoes {
     left: var(--largura-barra-recolhida);
     bottom: 0;
     padding-inline: var(--espaco-6);
     justify-content: flex-start;
+  }
+
+  .barraAcoes .motivoBarra {
+    text-align: left;
+  }
+
+  .barraAcoes .motivoSoTablet {
+    display: block;
   }
 }
 
@@ -325,6 +373,12 @@
   background: var(--cor-superficie-hover);
 }
 
+/* "Já gravei" enquanto salva, ou sem conexão: sem isto o botão desabilitado ficava idêntico ao ativo (V7, item 4 do PROXIMO.md). */
+.btnVazio:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
 .btn:focus-visible,
 .btnVazio:focus-visible {
   outline: none;
@@ -346,9 +400,10 @@
 }
 
 /**
- * "Baixar em PDF" é um `<a>`, os outros itens são `<button>` (ajuste da
- * revisão do PR #33, item 3): sem `text-decoration` e `color: inherit`, o
- * link nascia sublinhado e azul, do jeito padrão do navegador.
+ * Todos os itens são `<button>` (o "Baixar em PDF" era um `<a>` até a V7,
+ * item 4 do PROXIMO.md, e nascia sublinhado e azul, do jeito padrão do
+ * navegador, sem `text-decoration` e `color: inherit`; as duas linhas
+ * continuam valendo para o botão herdar a cor do painel).
  */
 .itemMenu {
   display: flex;
@@ -367,8 +422,20 @@
   cursor: pointer;
 }
 
-.itemMenu:hover {
+.itemMenu:hover:not(:disabled) {
   background: var(--cor-superficie-hover);
+}
+
+/* Item que precisa de conexão (Reprovar, Baixar em PDF) sem rede, ou o PDF sendo gerado (V7, item 8 do PROXIMO.md). */
+.itemMenu:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+/* O motivo no fim da linha do item (`MotivoSemRede` chega como bloco centralizado). */
+.itemMenu .motivoItem {
+  margin-left: auto;
+  text-align: right;
 }
 
 .itemMenu:focus-visible {
@@ -403,6 +470,12 @@
 
 .input {
   height: var(--altura-toque);
+}
+
+/* O formulário do "Postei": o campo, a frase de erro e o botão de salvar (Enter no teclado do celular também salva). */
+.formPostei {
+  display: grid;
+  gap: var(--espaco-4);
 }
 
 .textarea {
@@ -454,6 +527,12 @@
   font-weight: var(--peso-medio);
   color: var(--cor-texto-suave);
   cursor: pointer;
+}
+
+/* Reescrevendo: Cancelar não fecha o painel, e diz isso com o botão apagado (V7, item 4 do PROXIMO.md). */
+.btnTextoCancelar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
 }
 
 .listaVersoes {

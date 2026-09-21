@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { DADOS_FIXOS } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava } from "@/db/schema";
@@ -9,6 +9,7 @@ import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
+import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./DadosFixosForm.module.css";
 
@@ -58,6 +59,16 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
   const [erro, setErro] = useState<string | null>(null);
 
   const [tentouEnviar, setTentouEnviar] = useState(false);
+  const tratarFalha = useTratarFalha();
+  const erroRef = useRef<HTMLParagraphElement>(null);
+
+  /**
+   * O erro fica no fim do formulario, e o "Continuar" e a barra fixa de baixo: quem tocou de cima
+   * nao via nada acontecer (V7, item 4 do PROXIMO.md). Rola ate ele.
+   */
+  useEffect(() => {
+    if (erro) erroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [erro]);
 
   const podeContinuar =
     nome.trim().length > 0 &&
@@ -66,6 +77,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
+    if (salvando) return;
     if (!podeContinuar) {
       setTentouEnviar(true);
       return;
@@ -87,8 +99,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
         },
         quemGrava: quemGrava || undefined,
       });
-    } catch {
-      setErro(t.erro);
+    } catch (falha) {
+      // Falha de rede nao e campo errado: a frase diz que foi a rede e que o digitado continua aqui.
+      setErro(tratarFalha(falha, t.erro));
     } finally {
       setSalvando(false);
     }
@@ -177,7 +190,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
       </Cartao>
 
       {erro ? (
-        <p className={styles.erro} role="alert">
+        <p ref={erroRef} className={styles.erro} role="alert">
           {erro}
         </p>
       ) : null}

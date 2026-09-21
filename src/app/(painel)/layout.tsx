@@ -67,7 +67,15 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
             <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={sessao.user.name} />
           </aside>
 
-          <main className={styles.corpo}>{children}</main>
+          {/*
+            key pela marca (V7, item 1 do PROXIMO.md, achado de estado antigo): a troca de marca so revalida o
+            layout, e o React preserva o estado dos componentes de cliente entre uma marca e outra. Sem a key,
+            quem trocava em Briefing, Conta, Referencias ou Tema livre continuava vendo (e gravando na marca nova)
+            o que era da marca anterior. Conexao e TrocaMarcaProvider ficam acima e nao remontam.
+          */}
+          <main key={marcaAtiva.id} className={styles.corpo}>
+            {children}
+          </main>
 
           <CapsulaAbas />
         </div>

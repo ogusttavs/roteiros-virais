@@ -160,3 +160,20 @@ iframe {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+/**
+ * Folha aberta no celular trava a rolagem da página de trás (V7, item 1 do
+ * PROXIMO.md): rolar o fim da folha ou arrastar no véu não anda com a tela
+ * por baixo, nem vira "puxar para recarregar" no Chrome do Android. Cada folha
+ * (`Folha`, `PainelFlutuante`, as notas do Briefing, a troca de marca) marca a
+ * si mesma e o véu com `data-folha-aberta`. O `:has()` faz a trava valer só
+ * enquanto a folha existe no documento: ela some sozinha quando a folha sai,
+ * sem limpeza para esquecer e deixar a página presa. Do tablet para cima a
+ * folha é uma janela no centro e a página segue como está.
+ */
+@media (max-width: 767px) {
+  html:has([data-folha-aberta]) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}

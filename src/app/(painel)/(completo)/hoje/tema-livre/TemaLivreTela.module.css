@@ -29,13 +29,24 @@
   cursor: pointer;
 }
 
-.botaoBarra:hover {
+.botaoBarra:hover:not(:disabled) {
   background: var(--cor-superficie-hover);
 }
 
 .botaoBarra:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+/* A tela seguinte está abrindo (V7, item 4): a seta fica desabilitada até ela chegar. */
+.botaoBarra:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoBarra[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 
 .miolo {
@@ -108,6 +119,11 @@
   color: var(--cor-texto-dica);
 }
 
+/* O rascunho não foi para o servidor (V7, item 4): a frase "salva sozinho" vira aviso, como em PerguntaCampo. */
+.rascunhoComErro {
+  color: var(--cor-erro);
+}
+
 .contador {
   margin-left: auto;
   font-family: var(--fonte-mono);
@@ -126,6 +142,8 @@
 }
 
 .textoProposto {
+  /* Um link colado sem espaco nao pode estourar o cartao e criar rolagem horizontal (V7, item 1 do PROXIMO.md). */
+  overflow-wrap: anywhere;
   padding-left: var(--espaco-4);
   border-left: 3px solid var(--cor-borda-forte);
   color: var(--cor-titulo);

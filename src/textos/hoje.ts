@@ -51,6 +51,8 @@ export const textosHoje = {
   evidenciaParecidos: (n: number) => `Mais ${n} vídeo${n === 1 ? "" : "s"} parecido${n === 1 ? "" : "s"} nos últimos 7 dias`,
   maisIndicadoParaHoje: "Mais indicado para hoje",
   queroEsse: "Quero esse",
+  /** Enquanto a tela seguinte abre depois do toque (V7, item 4): o botão que foi tocado diz isto, os outros ficam desabilitados. */
+  abrindo: "Abrindo",
   escreverMeuAssunto: "Escrever o meu assunto",
   preferAssuntoSeu: "Prefere um assunto seu?",
   preferAssuntoSeuTexto: "Escreva o que você quer gravar e a gente diz se vale a pena hoje, com nota e com o que mudar.",

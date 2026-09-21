@@ -24,6 +24,8 @@
   font-size: var(--tamanho-secundario);
   font-weight: 500;
   color: var(--cor-titulo);
+  /* Tema livre pode trazer um endereço colado, sem espaço para quebrar (V7, item 1: nada de rolagem horizontal). */
+  overflow-wrap: anywhere;
 }
 
 .pergunta {
@@ -64,4 +66,11 @@
   font-size: var(--tamanho-leitura);
   line-height: 1.45;
   color: var(--cor-texto);
+}
+
+/* Tela de erro: o tema e o objetivo escolhidos, um sobre o outro, acima da frase. */
+.escolha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
 }

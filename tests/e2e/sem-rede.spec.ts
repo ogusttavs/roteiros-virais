@@ -321,6 +321,37 @@ test.describe("painel sem rede", () => {
     await expect(page.getByRole("button", { name: "Já gravei", exact: true })).toBeEnabled();
   });
 
+  /**
+   * Os arquivos do modo sem rede sao servidos SEM sessao (o middleware os deixa de fora pela lista
+   * explicita, nunca por formato) e o service worker nunca fica em cache por tempo (item 6 e definicao de
+   * pronto do PROXIMO.md). Um caminho parecido (`/sw.jsx`, `/offline.htm`) continua exigindo sessao.
+   */
+  test("o service worker, a pagina 'Sem conexao' e o manifesto saem sem sessao, e o worker nao fica em cache por tempo", async ({
+    request,
+  }) => {
+    const worker = await request.get("/sw.js");
+    expect(worker.status()).toBe(200);
+    expect(worker.headers()["content-type"]).toContain("javascript");
+    expect(worker.headers()["cache-control"]).toContain("no-cache");
+
+    const semConexao = await request.get("/offline.html");
+    expect(semConexao.status()).toBe(200);
+    expect(await semConexao.text()).toContain("Sem conexão");
+
+    const manifesto = await request.get("/manifest.webmanifest");
+    expect(manifesto.status()).toBe(200);
+    const corpo = await manifesto.json();
+    expect(corpo.display).toBe("standalone");
+    expect(corpo.start_url).toBe("/hoje");
+    expect(corpo.scope).toBe("/");
+
+    for (const parecido of ["/sw.jsx", "/offline.htm", "/sw.js.map"]) {
+      const resposta = await request.get(parecido, { maxRedirects: 0 });
+      expect([307, 308, 404], `${parecido} nao pode ser servido sem sessao`).toContain(resposta.status());
+      if (resposta.status() !== 404) expect(resposta.headers()["location"]).toContain("/entrar");
+    }
+  });
+
   test("a faixa aparece e some com a rede, sem recarregar a pagina", async ({ page, context }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-a");

@@ -1,5 +1,8 @@
 .pagina {
   min-height: 100vh;
+  /* 100vh e a altura com as barras do navegador recolhidas: com a barra do Safari ou do Chrome visivel
+     a pagina ficava maior que a tela e rolava sem ter o que rolar (V7, item 2 do PROXIMO.md). */
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -66,6 +69,11 @@
   cursor: pointer;
 }
 
+.linkAcao:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
 .confirmacao {
   margin-top: var(--espaco-6);
   text-wrap: pretty;
@@ -73,4 +81,18 @@
 
 .confirmacao + .linkAcao {
   margin-top: var(--espaco-4);
+}
+
+/* Falha ao entrar que nao e de um campo (rede, limite de tentativas, servidor): texto de erro sem
+   pintar a borda de nenhum campo (V7, item 4 do PROXIMO.md). Dentro do formulario o espacamento vem
+   do gap dele; embaixo do link por e-mail vem da margem abaixo. */
+.erroAviso {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.linkAcao + .erroAviso {
+  margin-top: var(--espaco-2);
 }

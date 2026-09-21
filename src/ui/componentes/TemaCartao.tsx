@@ -3,7 +3,9 @@
 import { Check } from "lucide-react";
 
 import { textosHoje } from "@/textos/hoje";
+import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
 
+import { MotivoSemRede } from "./MotivoSemRede";
 import styles from "./TemaCartao.module.css";
 
 export type EvidenciaTema = {
@@ -28,10 +30,29 @@ type Props = {
   primario?: boolean;
   rotuloBotao: string;
   onEscolher: () => void;
+  /** Este foi o cartão tocado e a tela seguinte está abrindo (V7, item 4): o botão diz "Abrindo". */
+  abrindo?: boolean;
+  /** Alguma tela já está abrindo por outro toque: o botão fica desabilitado até ela chegar. */
+  desabilitado?: boolean;
+  /** A tela seguinte precisa do servidor (V7, item 8): sem conexão o botão fica desabilitado, com o motivo escrito embaixo. */
+  precisaDeRede?: boolean;
 };
 
 /** Um tema do dia, com evidência e o rótulo de objetivo (design v2, `entrega/telas/Hoje.dc.html`, `.tema`). */
-export function TemaCartao({ rotulo, tema, porque, evidencia, primario = false, rotuloBotao, onEscolher }: Props) {
+export function TemaCartao({
+  rotulo,
+  tema,
+  porque,
+  evidencia,
+  primario = false,
+  rotuloBotao,
+  onEscolher,
+  abrindo = false,
+  desabilitado = false,
+  precisaDeRede = false,
+}: Props) {
+  const { semConexao } = useConexao();
+  const semRede = precisaDeRede && semConexao;
   return (
     <article className={[styles.cartao, primario ? styles.primario : ""].filter(Boolean).join(" ")}>
       {primario ? (
@@ -64,10 +85,14 @@ export function TemaCartao({ rotulo, tema, porque, evidencia, primario = false, 
         <button
           type="button"
           onClick={onEscolher}
+          disabled={desabilitado || semRede}
+          aria-busy={abrindo || undefined}
+          aria-describedby={semRede ? ID_FAIXA_SEM_CONEXAO : undefined}
           className={[styles.botao, primario ? styles.botaoPrimario : styles.botaoSecundario].join(" ")}
         >
-          {rotuloBotao}
+          {abrindo ? textosHoje.abrindo : rotuloBotao}
         </button>
+        {precisaDeRede ? <MotivoSemRede className={styles.motivo} /> : null}
       </div>
     </article>
   );

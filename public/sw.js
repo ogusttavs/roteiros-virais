@@ -83,7 +83,7 @@ function podeGuardar(resposta, url) {
   var destino;
   try {
     destino = new URL(resposta.url);
-  } catch (erro) {
+  } catch {
     return false;
   }
   if (destino.pathname !== url.pathname) return false;
@@ -305,7 +305,7 @@ function guardarEstaticos(caminhos) {
           var url;
           try {
             url = new URL(caminho, self.location.origin);
-          } catch (erro) {
+          } catch {
             return undefined;
           }
           if (url.origin !== self.location.origin || !ehEstaticoPermitido(url.pathname)) return undefined;

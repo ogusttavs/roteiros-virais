@@ -4,7 +4,9 @@ import { Bookmark, Play } from "lucide-react";
 
 import type { FaixaMultiplo } from "@/lib/formatarNumero";
 import { formatarViewsExato } from "@/lib/formatarNumero";
+import { textosConexao } from "@/textos/conexao";
 import { textosReferencias } from "@/textos/referencias";
+import { ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
 
 import { Botao } from "./Botao";
 import styles from "./ReferenciaCartao.module.css";
@@ -34,6 +36,12 @@ type Props = {
   salvo: boolean;
   /** Enquanto a Server Action de favoritar não responde (achado da revisão da parte 1). */
   salvando?: boolean;
+  /**
+   * Sem conexão (V7, item 8 do PROXIMO.md): favoritar chama o servidor, então o botão fica desabilitado. É um
+   * ícone sozinho, sem espaço para uma linha de motivo em cada cartão: o motivo é a faixa "Sem conexão" do topo
+   * (`aria-describedby`) e o `title`. O nome acessível continua "salvar", nunca "salvando" sem estar salvando.
+   */
+  semRede?: boolean;
   onVerDetalhes: () => void;
   onSalvar: () => void;
 };
@@ -51,7 +59,7 @@ function linhaVelocidade(velocidade: number | null): string {
  * o canal e a data, o título em uma linha, e as duas ações. A análise
  * inteira mora na folha de detalhes, não aqui.
  */
-export function ReferenciaCartao({ video, salvo, salvando = false, onVerDetalhes, onSalvar }: Props) {
+export function ReferenciaCartao({ video, salvo, salvando = false, semRede = false, onVerDetalhes, onSalvar }: Props) {
   return (
     <article className={styles.cartao}>
       <div className={styles.videoTopo}>
@@ -93,7 +101,9 @@ export function ReferenciaCartao({ video, salvo, salvando = false, onVerDetalhes
           type="button"
           aria-pressed={salvo}
           aria-label={salvando ? textosReferencias.salvando : salvo ? textosReferencias.salvo : textosReferencias.salvar}
-          disabled={salvando}
+          aria-describedby={semRede ? ID_FAIXA_SEM_CONEXAO : undefined}
+          title={semRede ? textosConexao.precisaDeConexao : undefined}
+          disabled={salvando || semRede}
           onClick={onSalvar}
           className={styles.salvar}
         >
