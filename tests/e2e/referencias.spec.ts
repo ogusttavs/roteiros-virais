@@ -13,9 +13,12 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, contas, membrosMarca, nichos, preferenciasUsuario, user, videos } from "../../src/db/schema";
+import { textosNav } from "../../src/textos/nav";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-referencias@exemplo.teste";
+const NOME_MARCA_UM = "[teste] Referências Um";
+const NOME_MARCA_DOIS = "[teste] Referências Dois";
 
 async function entrar(page: Page, email: string) {
   await page.goto("/entrar");
@@ -39,7 +42,8 @@ function analiseExemplo(assunto: string, formato: "fala_para_camera" | "podcast"
 
 test.describe("/referencias no design v2", () => {
   test.beforeAll(async () => {
-    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+    const [nichoUm] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+    const [nichoDois] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 
     await db().insert(user).values({ id: "e2e-referencias", name: "[teste] Referencias", email: EMAIL });
     await db()
@@ -52,33 +56,95 @@ test.describe("/referencias no design v2", () => {
         userId: "e2e-referencias",
         password: await hashPassword(SENHA),
       });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-referencias", aceitouTermosEm: new Date() });
+
+    // Dois primeiro, Um depois: marcaPadrao (sem cookie ainda) usa a de criacao mais
+    // recente, e os testes abaixo pressupoe que a marca ativa no primeiro login e a Um
+    // (mesmo raciocinio de tema-livre.spec.ts).
+    const [marcaDois] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id })
+      .returning();
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-referencias", nome: "[teste] Referencias", nichoId: nicho.id })
+      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_UM, nichoId: nichoUm.id })
       .returning();
-    await db().insert(membrosMarca).values({ usuarioId: "e2e-referencias", clienteId: cliente.id, papel: "dono" });
-    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-referencias", aceitouTermosEm: new Date() });
+    await db()
+      .insert(membrosMarca)
+      .values([
+        { usuarioId: "e2e-referencias", clienteId: cliente.id, papel: "dono" },
+        { usuarioId: "e2e-referencias", clienteId: marcaDois.id, papel: "dono" },
+      ]);
 
     await db()
       .insert(briefings)
-      .values({
-        clienteId: cliente.id,
-        completo: true,
-        perfil: {
-          fatos: {
-            oQueVende: "kit tira-mancha para estofados",
-            preco: "kit a partir de 89 reais",
-            clienteIdeal: "mora em apartamento",
-            medos: [],
-            frasesDaFala: [],
-            proibicoes: [],
-            cenasFilmaveis: [],
-            concorrentes: [],
-            perfisAdmirados: [],
+      .values([
+        {
+          clienteId: cliente.id,
+          completo: true,
+          perfil: {
+            fatos: {
+              oQueVende: "kit tira-mancha para estofados",
+              preco: "kit a partir de 89 reais",
+              clienteIdeal: "mora em apartamento",
+              medos: [],
+              frasesDaFala: [],
+              proibicoes: [],
+              cenasFilmaveis: [],
+              concorrentes: [],
+              perfisAdmirados: [],
+            },
+            resumo: "marca propria de produtos de limpeza",
+            referencias: [],
           },
-          resumo: "marca propria de produtos de limpeza",
-          referencias: [],
         },
+        {
+          clienteId: marcaDois.id,
+          completo: true,
+          perfil: {
+            fatos: {
+              oQueVende: "consultas odontologicas",
+              preco: "consulta a partir de 150 reais",
+              clienteIdeal: "familia da regiao",
+              medos: [],
+              frasesDaFala: [],
+              proibicoes: [],
+              cenasFilmaveis: [],
+              concorrentes: [],
+              perfisAdmirados: [],
+            },
+            resumo: "clinica odontologica de bairro",
+            referencias: [],
+          },
+        },
+      ]);
+
+    const [contaDentista] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "youtube",
+        handle: "@e2e-referencias-dentista",
+        nome: "[teste] Sorriso em Dia",
+        nichoId: nichoDois.id,
+        medianaViews: "3000",
+        medianaOrigem: "conta",
+      })
+      .returning();
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "e2e-referencias-dentista-1",
+        url: "https://exemplo.invalido/e2e-referencias-dentista-1",
+        nichoId: nichoDois.id,
+        contaId: contaDentista.id,
+        titulo: "o aparelho que corrigiu o sorriso em seis meses",
+        views: 60000,
+        foraDaCurva: "20.0",
+        velocidade: "3000",
+        idioma: "pt",
+        publicadoEm: new Date(),
+        analise: analiseExemplo("aparelho ortodontico") as never,
       });
 
     const [contaInstagram] = await db()
@@ -87,7 +153,7 @@ test.describe("/referencias no design v2", () => {
         plataforma: "instagram",
         handle: "@e2e-referencias-instagram",
         nome: "[teste] Casa em Ordem",
-        nichoId: nicho.id,
+        nichoId: nichoUm.id,
         medianaViews: "5000",
         medianaOrigem: "conta",
       })
@@ -98,7 +164,7 @@ test.describe("/referencias no design v2", () => {
         plataforma: "tiktok",
         handle: "@e2e-referencias-tiktok",
         nome: "[teste] Limpeza da Ana",
-        nichoId: nicho.id,
+        nichoId: nichoUm.id,
         medianaViews: "8000",
         medianaOrigem: "conta",
       })
@@ -110,7 +176,7 @@ test.describe("/referencias no design v2", () => {
         plataforma: "instagram",
         idExterno: "e2e-referencias-instagram-1",
         url: "https://exemplo.invalido/e2e-referencias-instagram-1",
-        nichoId: nicho.id,
+        nichoId: nichoUm.id,
         contaId: contaInstagram.id,
         titulo: "o produto que tira qualquer mancha do estofado",
         views: 120000,
@@ -127,7 +193,7 @@ test.describe("/referencias no design v2", () => {
         plataforma: "tiktok",
         idExterno: "e2e-referencias-tiktok-1",
         url: "https://exemplo.invalido/e2e-referencias-tiktok-1",
-        nichoId: nicho.id,
+        nichoId: nichoUm.id,
         contaId: contaTiktok.id,
         titulo: "organizando o guarda roupa em dez minutos",
         views: 40000,
@@ -235,5 +301,35 @@ test.describe("/referencias no design v2", () => {
     await expect(page.getByRole("heading", { name: "Nada fora da curva com esses filtros" })).toBeVisible();
     await page.getByRole("button", { name: "Ver os últimos 30 dias" }).click();
     await expect(page).toHaveURL(/periodo=30/);
+  });
+
+  test("referências é escopado pela marca ativa: trocar de marca troca os vídeos", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page, EMAIL);
+
+    // A marca ativa no primeiro login e a de criacao mais recente (marcaPadrao, sem cookie
+    // ainda): Marca Um, criada depois da Dois neste fixture.
+    await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();
+
+    await page.goto("/referencias");
+    await expect(page.locator("article", { hasText: "o produto que tira qualquer mancha do estofado" })).toBeVisible();
+    await expect(page.locator("article", { hasText: "o aparelho que corrigiu o sorriso" })).not.toBeVisible();
+
+    await page.goto("/hoje");
+    const pilula = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) });
+    await pilula.click();
+    const folha = page.getByRole("dialog", { name: textosNav.suasMarcas });
+    await expect(folha).toBeVisible();
+    await folha.getByRole("button", { name: NOME_MARCA_DOIS }).click();
+    await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
+    // Espera a rede assentar antes de recarregar (mesmo achado de tema-livre.spec.ts: o nome
+    // do botao muda otimista, antes da troca terminar de verdade no servidor).
+    await page.waitForLoadState("networkidle");
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+
+    await page.goto("/referencias");
+    await expect(page.locator("article", { hasText: "o aparelho que corrigiu o sorriso" })).toBeVisible();
+    await expect(page.locator("article", { hasText: "o produto que tira qualquer mancha do estofado" })).not.toBeVisible();
   });
 });
