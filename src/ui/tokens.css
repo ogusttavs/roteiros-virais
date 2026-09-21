@@ -3,117 +3,178 @@
  * componente: tudo vem daqui (brief-frontend.md, secao 4).
  *
  * Entrega do Claude Design v1 integrada na etapa D, parte 1 (02/09/2026).
+ * Design v2 integrado na etapa D2, parte 1 (07/09/2026).
  *
- * Design v2 integrado na etapa D2, parte 1 (07/09/2026, entregaveis/design-v2/
- * entrega/tokens.css): app nativo da Apple, acento petroleo, tipografia do
- * sistema. Os nomes de token do painel foram mantidos (PROXIMO.md, D2 parte
- * 1, item 1); onde o design tem um nome novo sem equivalente no painel, o
- * nome novo entra como esta na entrega. Tema por atributo `data-tema` no
- * `<html>` ("claro" ou "escuro"); "do sistema" e a ausencia do atributo,
- * resolvida pelo bloco `@media (prefers-color-scheme: dark)` abaixo. O tema
- * cinza ([data-tema="cinza"]) e so para teste em desenvolvimento, nunca
- * oferecido ao cliente, e nao foi tocado nesta integracao.
+ * V5, a pele nova (19/09/2026, entregaveis/design-v2/IDENTIDADE.md): a
+ * identidade D, "vidro e luz", entregaveis/design-v2/entrega/tokens.css,
+ * revisao 3.0. A integracao troca valores, nao tela: os nomes de token do
+ * painel continuam valendo. Base neutra (quase branca no claro, quase preta
+ * no escuro), os controles de vidro por cima do conteudo (barra do topo,
+ * capsula das abas, folhas, menus, barra de acoes do Roteiro, cartao de
+ * Entrar), e um acento so, a luz da marca (degrade "hora dourada", do limao
+ * ao dourado), so como borda e brilho, nunca texto nem fundo de tela.
+ *
+ * Dezessete tokens sao proprios do codigo, sem par na entrega: ficam, com um
+ * comentario ao lado dizendo de onde derivam quando sao cor (a paleta mudou)
+ * ou so "proprio do codigo" quando sao tamanho, peso ou duracao (a escala
+ * numerica nao mudou, so a familia de fonte). Tres pares de nomes ja
+ * coexistiam desde a integracao D2 (--tamanho-legenda/--tamanho-rodape,
+ * --tamanho-titulo/--tamanho-titulo-grande, --tamanho-titulo-sm/--tamanho-titulo-1),
+ * mesmo valor, dois nomes: o antigo do painel (uso extenso, nao vale a pena
+ * renomear so por causa da entrega) e o novo da entrega, lado a lado.
+ *
+ * Tema por atributo `data-tema` no `<html>` ("claro" ou "escuro"); "do
+ * sistema" e a ausencia do atributo, resolvida pelo bloco
+ * `@media (prefers-color-scheme: dark)` abaixo. O tema cinza
+ * ([data-tema="cinza"]) e so para teste em desenvolvimento, nunca oferecido
+ * ao cliente, e nao foi tocado nesta integracao.
  *
  * A identidade propria troca em tres passos (entrega/README.md): os valores
- * deste arquivo, o SVG do Logo, e as variaveis de fonte em src/app/layout.tsx.
+ * deste arquivo, o SVG de src/ui/Logo.tsx, e APP_NAME (src/lib/config.ts).
  */
 
 :root,
 [data-tema="claro"] {
-  --cor-fundo: #f2f2f7;
+  --cor-fundo: #f7f7f5;
   --cor-superficie: #ffffff;
-  --cor-superficie-recuada: #e9e9ef;
+  --cor-superficie-recuada: #efefec;
   --cor-superficie-elevada: #ffffff;
-  --cor-superficie-hover: #e3e3e9;
-  --cor-superficie-pressionada: #d8d8df;
-  --cor-superficie-desabilitada: #ededf2;
-  --cor-titulo: #111114;
-  --cor-texto: #2c2c30;
-  --cor-texto-suave: #55555e;
-  --cor-texto-dica: #5b5b64;
-  --cor-texto-desabilitado: #82828a;
-  --cor-acao: #0b6386;
+  --cor-superficie-hover: #e8e8e4;
+  --cor-superficie-pressionada: #dcdcd7;
+  --cor-superficie-desabilitada: #f0f0ee;
+  --cor-titulo: #0c0c0e;
+  --cor-texto: #1e1e22;
+  --cor-texto-suave: #4e4e56;
+  --cor-texto-dica: #56565e;
+  --cor-texto-desabilitado: #8a8a90;
+  --cor-acao: #0c0c0e;
   --cor-acao-texto: #ffffff;
-  --cor-acao-hover: #095471;
-  --cor-acao-pressionada: #07455d;
-  --cor-destaque: #095471;
-  --cor-borda: rgba(60, 60, 67, 0.18);
-  --cor-borda-forte: rgba(60, 60, 67, 0.34);
-  --cor-divisor: rgba(60, 60, 67, 0.14);
-  --cor-sobreposicao: rgba(0, 0, 0, 0.42);
-  --cor-material-barra: rgba(249, 249, 251, 0.84);
-  --cor-material-menu: rgba(255, 255, 255, 0.94);
-  --cor-esqueleto-base: #dedee5;
-  --cor-esqueleto-luz: #f4f4f8;
-  --cor-gravando: #d92d20;
-  --cor-nota: #111114;
-  --cor-nota-trilho: rgba(60, 60, 67, 0.16);
-  --cor-selecao-suave: #e2f0f7;
-  --cor-selecao-borda: #a3cee2;
-  --cor-foco: rgba(11, 99, 134, 0.32);
-  --cor-foco-forte: #095471;
-  --cor-positivo: #17703f;
+  --cor-acao-hover: #26262b;
+  --cor-acao-pressionada: #3a3a40;
+  --cor-destaque: #3e5c00;
+  --cor-borda: rgba(15, 15, 20, 0.12);
+  --cor-borda-forte: rgba(15, 15, 20, 0.28);
+  --cor-divisor: rgba(15, 15, 20, 0.09);
+  --cor-sobreposicao: rgba(12, 12, 14, 0.28);
+  --cor-esqueleto-base: #e9e9e5;
+  --cor-esqueleto-luz: #f7f7f4;
+  --cor-gravando: #e5382b;
+  --cor-nota: #0c0c0e;
+  --cor-nota-trilho: rgba(15, 15, 20, 0.12);
+  --cor-selecao-suave: #f0f8da;
+  --cor-selecao-borda: #c7e27a;
+  --cor-foco: rgba(12, 12, 14, 0.25);
+  --cor-foco-forte: #0c0c0e;
+  --cor-positivo: #1f7a45;
   --cor-atencao: #8a5a00;
-  --cor-erro: #c1121f;
-  --cor-positivo-fundo: #e3f2e8;
+  --cor-erro: #c4161c;
+  --cor-positivo-fundo: #e4f3e9;
   --cor-atencao-fundo: #fdf0d0;
-  --cor-erro-fundo: #fce8e8;
+  --cor-erro-fundo: #fce6e6;
 
-  --cor-erro-suave: #fce8e8;
-  --cor-skeleton-brilho: #f4f4f8;
+  /* Proprios do codigo: mesmo papel de um token da entrega, valor derivado dele. */
+  --cor-erro-suave: var(--cor-erro-fundo);
+  --cor-skeleton-brilho: var(--cor-esqueleto-luz);
 
-  --sombra-sm: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.12);
-  --sombra-md: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.2);
-  --sombra-foco: 0 0 0 3px rgba(11, 99, 134, 0.32);
-  --desfoque-barra: blur(1.25rem) saturate(160%);
+  --sombra-sm: 0 0.5rem 1.5rem rgba(20, 20, 30, 0.10);
+  --sombra-md: 0 1.25rem 3.75rem rgba(20, 20, 30, 0.18);
+  --sombra-controle: 0 1px 3px rgba(0, 0, 0, 0.10);
+  /* Proprio do codigo: o anel de foco, reconstruido com a cor de foco nova. */
+  --sombra-foco: 0 0 0 3px var(--cor-foco);
+
+  /* ---------- novo: a luz da marca, o acento ----------
+     So borda e brilho: o botao principal, o numero que passou do normal, o
+     anel do que esta subindo, o progresso da gravacao, o logotipo. */
+  --luz-degrade: linear-gradient(120deg, #c9ff2e 0%, #ffcc33 100%);
+  --luz-a: #c9ff2e;
+  --luz-b: #ffcc33;
+  --luz-halo: 0.55;
+  --cor-marca: #c9ff2e;
+  --cor-marca-texto: #0c0c0e;
+  --cor-marcador: #c9ff2e;
+
+  /* ---------- novo: o vidro ----------
+     80% opaco nas barras e 90% nas folhas: o minimo para o texto suave
+     passar no AA com preto ou branco puro passando por baixo. Sem desfoque,
+     ou com transparencia reduzida pedida no aparelho, vira o solido. */
+  --vidro-fundo: rgba(252, 252, 250, 0.80);
+  --vidro-fundo-forte: rgba(252, 252, 250, 0.90);
+  --vidro-solido: #f4f4f2;
+  --vidro-desfoque: blur(24px) saturate(180%);
+  --vidro-borda: rgba(255, 255, 255, 0.95);
+  --vidro-contorno: rgba(12, 12, 14, 0.08);
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(12, 12, 14, 0.04);
+  --vidro-sombra: 0 12px 32px rgba(20, 20, 30, 0.14), 0 2px 6px rgba(20, 20, 30, 0.06);
+  --vidro-selecao: rgba(12, 12, 14, 0.07);
+  --raio-folha: 2.25rem;
+
+  /* As barras e os menus de sempre agora sao vidro. */
+  --cor-material-barra: var(--vidro-fundo);
+  --cor-material-menu: var(--vidro-fundo-forte);
+  --desfoque-barra: var(--vidro-desfoque);
 }
 
 [data-tema="escuro"] {
-  --cor-fundo: #000000;
-  --cor-superficie: #1c1c1e;
-  --cor-superficie-recuada: #2c2c2e;
-  --cor-superficie-elevada: #303034;
-  --cor-superficie-hover: #3a3a3c;
-  --cor-superficie-pressionada: #48484a;
-  --cor-superficie-desabilitada: #242426;
+  --cor-fundo: #050506;
+  --cor-superficie: #141416;
+  --cor-superficie-recuada: #1e1e21;
+  --cor-superficie-elevada: #242428;
+  --cor-superficie-hover: #2a2a2f;
+  --cor-superficie-pressionada: #36363c;
+  --cor-superficie-desabilitada: #18181a;
   --cor-titulo: #ffffff;
-  --cor-texto: #f2f2f7;
-  --cor-texto-suave: #bcbcc4;
-  --cor-texto-dica: #a8a8b0;
-  --cor-texto-desabilitado: #7d7d85;
-  --cor-acao: #6ac6ee;
-  --cor-acao-texto: #032330;
-  --cor-acao-hover: #88d3f2;
-  --cor-acao-pressionada: #a6e0f6;
-  --cor-destaque: #78ccf0;
-  --cor-borda: rgba(235, 235, 245, 0.2);
-  --cor-borda-forte: rgba(235, 235, 245, 0.36);
-  --cor-divisor: rgba(235, 235, 245, 0.16);
-  --cor-sobreposicao: rgba(0, 0, 0, 0.66);
-  --cor-material-barra: rgba(22, 22, 24, 0.82);
-  --cor-material-menu: rgba(44, 44, 46, 0.96);
-  --cor-esqueleto-base: #2c2c2e;
-  --cor-esqueleto-luz: #48484a;
-  --cor-gravando: #ff6a5e;
+  --cor-texto: #eeeef0;
+  --cor-texto-suave: #b6b6be;
+  --cor-texto-dica: #a4a4ac;
+  --cor-texto-desabilitado: #6c6c72;
+  --cor-acao: #f5f5f7;
+  --cor-acao-texto: #0c0c0e;
+  --cor-acao-hover: #ffffff;
+  --cor-acao-pressionada: #e5e5ea;
+  --cor-destaque: #d4ff3a;
+  --cor-borda: rgba(255, 255, 255, 0.12);
+  --cor-borda-forte: rgba(255, 255, 255, 0.28);
+  --cor-divisor: rgba(255, 255, 255, 0.09);
+  --cor-sobreposicao: rgba(0, 0, 0, 0.45);
+  --cor-esqueleto-base: #1e1e21;
+  --cor-esqueleto-luz: #2e2e33;
+  --cor-gravando: #ff5147;
   --cor-nota: #ffffff;
-  --cor-nota-trilho: rgba(235, 235, 245, 0.18);
-  --cor-selecao-suave: #0f313f;
-  --cor-selecao-borda: #266378;
-  --cor-foco: rgba(106, 198, 238, 0.4);
-  --cor-foco-forte: #78ccf0;
-  --cor-positivo: #5ad693;
+  --cor-nota-trilho: rgba(255, 255, 255, 0.14);
+  --cor-selecao-suave: #1e250b;
+  --cor-selecao-borda: #4e6412;
+  --cor-foco: rgba(212, 255, 58, 0.36);
+  --cor-foco-forte: #d4ff3a;
+  --cor-positivo: #6ee7a0;
   --cor-atencao: #f5c463;
-  --cor-erro: #ff8a8a;
-  --cor-positivo-fundo: #12361f;
+  --cor-erro: #ff7a7a;
+  --cor-positivo-fundo: #10301e;
   --cor-atencao-fundo: #3d2c0d;
-  --cor-erro-fundo: #451a1c;
+  --cor-erro-fundo: #3f1616;
 
-  --cor-erro-suave: #451a1c;
-  --cor-skeleton-brilho: #48484a;
+  --cor-erro-suave: var(--cor-erro-fundo);
+  --cor-skeleton-brilho: var(--cor-esqueleto-luz);
 
-  --sombra-sm: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.38);
-  --sombra-md: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.58);
-  --sombra-foco: 0 0 0 3px rgba(106, 198, 238, 0.4);
+  --sombra-sm: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  --sombra-md: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.60);
+  --sombra-controle: 0 1px 3px rgba(0, 0, 0, 0.44);
+  --sombra-foco: 0 0 0 3px var(--cor-foco);
+
+  --luz-halo: 0.7;
+  --cor-marcador: rgba(201, 255, 46, 0.34);
+
+  --vidro-fundo: rgba(28, 28, 32, 0.82);
+  --vidro-fundo-forte: rgba(28, 28, 32, 0.92);
+  --vidro-solido: #1e1e21;
+  --vidro-borda: rgba(255, 255, 255, 0.16);
+  --vidro-contorno: rgba(0, 0, 0, 0.5);
+  --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --vidro-sombra: 0 14px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --vidro-selecao: rgba(255, 255, 255, 0.10);
+
+  --cor-material-barra: var(--vidro-fundo);
+  --cor-material-menu: var(--vidro-fundo-forte);
+  --desfoque-barra: var(--vidro-desfoque);
 }
 
 /**
@@ -122,52 +183,89 @@
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="claro"]) {
-    --cor-fundo: #000000;
-    --cor-superficie: #1c1c1e;
-    --cor-superficie-recuada: #2c2c2e;
-    --cor-superficie-elevada: #303034;
-    --cor-superficie-hover: #3a3a3c;
-    --cor-superficie-pressionada: #48484a;
-    --cor-superficie-desabilitada: #242426;
+    --cor-fundo: #050506;
+    --cor-superficie: #141416;
+    --cor-superficie-recuada: #1e1e21;
+    --cor-superficie-elevada: #242428;
+    --cor-superficie-hover: #2a2a2f;
+    --cor-superficie-pressionada: #36363c;
+    --cor-superficie-desabilitada: #18181a;
     --cor-titulo: #ffffff;
-    --cor-texto: #f2f2f7;
-    --cor-texto-suave: #bcbcc4;
-    --cor-texto-dica: #a8a8b0;
-    --cor-texto-desabilitado: #7d7d85;
-    --cor-acao: #6ac6ee;
-    --cor-acao-texto: #032330;
-    --cor-acao-hover: #88d3f2;
-    --cor-acao-pressionada: #a6e0f6;
-    --cor-destaque: #78ccf0;
-    --cor-borda: rgba(235, 235, 245, 0.2);
-    --cor-borda-forte: rgba(235, 235, 245, 0.36);
-    --cor-divisor: rgba(235, 235, 245, 0.16);
-    --cor-sobreposicao: rgba(0, 0, 0, 0.66);
-    --cor-material-barra: rgba(22, 22, 24, 0.82);
-    --cor-material-menu: rgba(44, 44, 46, 0.96);
-    --cor-esqueleto-base: #2c2c2e;
-    --cor-esqueleto-luz: #48484a;
-    --cor-gravando: #ff6a5e;
+    --cor-texto: #eeeef0;
+    --cor-texto-suave: #b6b6be;
+    --cor-texto-dica: #a4a4ac;
+    --cor-texto-desabilitado: #6c6c72;
+    --cor-acao: #f5f5f7;
+    --cor-acao-texto: #0c0c0e;
+    --cor-acao-hover: #ffffff;
+    --cor-acao-pressionada: #e5e5ea;
+    --cor-destaque: #d4ff3a;
+    --cor-borda: rgba(255, 255, 255, 0.12);
+    --cor-borda-forte: rgba(255, 255, 255, 0.28);
+    --cor-divisor: rgba(255, 255, 255, 0.09);
+    --cor-sobreposicao: rgba(0, 0, 0, 0.45);
+    --cor-esqueleto-base: #1e1e21;
+    --cor-esqueleto-luz: #2e2e33;
+    --cor-gravando: #ff5147;
     --cor-nota: #ffffff;
-    --cor-nota-trilho: rgba(235, 235, 245, 0.18);
-    --cor-selecao-suave: #0f313f;
-    --cor-selecao-borda: #266378;
-    --cor-foco: rgba(106, 198, 238, 0.4);
-    --cor-foco-forte: #78ccf0;
-    --cor-positivo: #5ad693;
+    --cor-nota-trilho: rgba(255, 255, 255, 0.14);
+    --cor-selecao-suave: #1e250b;
+    --cor-selecao-borda: #4e6412;
+    --cor-foco: rgba(212, 255, 58, 0.36);
+    --cor-foco-forte: #d4ff3a;
+    --cor-positivo: #6ee7a0;
     --cor-atencao: #f5c463;
-    --cor-erro: #ff8a8a;
-    --cor-positivo-fundo: #12361f;
+    --cor-erro: #ff7a7a;
+    --cor-positivo-fundo: #10301e;
     --cor-atencao-fundo: #3d2c0d;
-    --cor-erro-fundo: #451a1c;
+    --cor-erro-fundo: #3f1616;
 
-    --cor-erro-suave: #451a1c;
-    --cor-skeleton-brilho: #48484a;
+    --cor-erro-suave: var(--cor-erro-fundo);
+    --cor-skeleton-brilho: var(--cor-esqueleto-luz);
 
-    --sombra-sm: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.38);
-    --sombra-md: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.58);
-    --sombra-foco: 0 0 0 3px rgba(106, 198, 238, 0.4);
+    --sombra-sm: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+    --sombra-md: 0 1.25rem 3.75rem rgba(0, 0, 0, 0.60);
+    --sombra-controle: 0 1px 3px rgba(0, 0, 0, 0.44);
+    --sombra-foco: 0 0 0 3px var(--cor-foco);
+
+    --luz-halo: 0.7;
+    --cor-marcador: rgba(201, 255, 46, 0.34);
+
+    --vidro-fundo: rgba(28, 28, 32, 0.82);
+    --vidro-fundo-forte: rgba(28, 28, 32, 0.92);
+    --vidro-solido: #1e1e21;
+    --vidro-borda: rgba(255, 255, 255, 0.16);
+    --vidro-contorno: rgba(0, 0, 0, 0.5);
+    --vidro-brilho: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+    --vidro-sombra: 0 14px 40px rgba(0, 0, 0, 0.55), 0 2px 8px rgba(0, 0, 0, 0.35);
+    --vidro-selecao: rgba(255, 255, 255, 0.10);
+
+    --cor-material-barra: var(--vidro-fundo);
+    --cor-material-menu: var(--vidro-fundo-forte);
+    --desfoque-barra: var(--vidro-desfoque);
   }
+}
+
+/* Sem desfoque no navegador, ou com transparencia reduzida pedida: o vidro
+   vira solido, nos dois modos. `.vidro-solido` forca a versao solida num
+   trecho (identidade D, 19/09/2026). */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root,
+  [data-tema="escuro"] {
+    --vidro-fundo: var(--vidro-solido);
+    --vidro-fundo-forte: var(--vidro-solido);
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  [data-tema="escuro"] {
+    --vidro-fundo: var(--vidro-solido);
+    --vidro-fundo-forte: var(--vidro-solido);
+  }
+}
+.vidro-solido {
+  --vidro-fundo: var(--vidro-solido);
+  --vidro-fundo-forte: var(--vidro-solido);
 }
 
 /** Teste do cinza: mesma luminosidade, nenhuma cor. So em desenvolvimento. Nao faz parte do design v2. */
@@ -203,16 +301,21 @@
 
 :root {
   /**
-   * Tipografia do sistema (BRIEF.md, secao 3): SF Pro no Apple, Inter como
-   * reserva (autohospedada por next/font/google em src/app/layout.tsx, sem
-   * chamada externa em tempo de execucao) no Android e no Windows. Mono: SF
-   * Mono no Apple, JetBrains Mono como reserva.
+   * As tres fontes da identidade (V5, IDENTIDADE.md): Mona Sans (titulo e
+   * texto), JetBrains Mono (numeros e rotulos), Caveat (letra de mao, so no
+   * bilhete "Mais indicado para hoje"). Arquivos locais
+   * (src/app/layout.tsx, next/font/local), com a fonte do sistema como
+   * reserva se a fonte propria falhar.
    */
-  --fonte-texto: -apple-system, BlinkMacSystemFont, "SF Pro Text", var(--fonte-inter, "Inter"), "Segoe UI", Roboto,
-    sans-serif;
-  --fonte-titulo: -apple-system, BlinkMacSystemFont, "SF Pro Display", var(--fonte-inter, "Inter"), "Segoe UI",
-    Roboto, sans-serif;
-  --fonte-mono: "SF Mono", var(--fonte-jetbrains-mono, "JetBrains Mono"), ui-monospace, Menlo, Consolas, monospace;
+  --fonte-texto: var(--fonte-mona-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fonte-titulo: var(--fonte-mona-sans), -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fonte-mono: var(--fonte-jetbrains-mono), ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fonte-mao: var(--fonte-caveat), "Segoe Print", cursive;
+
+  /* ---------- novo: a tipografia larga, o peso do titulo ---------- */
+  --largura-titulo: 118%;
+  --largura-texto: 104%;
+  --peso-forte: 850;
 
   /** Escala da HIG (BRIEF.md, secao 3). Nomes do painel mantidos; os nomes novos do design entram como estao na entrega. */
   --tamanho-rotulo: 0.6875rem;
@@ -241,18 +344,19 @@
   --peso-medio: 500;
   --peso-semibold: 600;
 
-  --altura-titulo: 1.18;
+  --altura-titulo-grande: 1.04;
+  --altura-titulo: 1.14;
   --altura-corpo: 1.47;
-  --altura-titulo-grande: 1.12;
   --altura-compacta: 1.28;
   --altura-gravacao: 1.45;
   --espacamento-titulo: -0.015em;
   --espacamento-rotulo: 0.12em;
   --espacamento-legenda: 0.035em;
 
-  --raio-sm: 0.5rem;
-  --raio-md: 0.75rem;
-  --raio-lg: 1rem;
+  /* Forma: cantos concentricos com o do aparelho. */
+  --raio-sm: 0.75rem;
+  --raio-md: 1.125rem;
+  --raio-lg: 1.75rem;
   --raio-pill: 999px;
   --largura-borda: 1px;
 
@@ -271,6 +375,7 @@
   --espaco-12: 3rem;
 
   --largura-leitura: 42rem;
+  --largura-comparacao: 58rem;
   --largura-barra-lateral: 16rem;
   --largura-barra-recolhida: 4.5rem;
   --largura-folha: 38rem;
@@ -291,9 +396,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --duracao-rapida: 0ms;
-    --duracao-base: 0ms;
-    --duracao-lenta: 0ms;
+    --duracao-rapida: 1ms;
+    --duracao-base: 1ms;
+    --duracao-lenta: 1ms;
   }
   *,
   *::before,

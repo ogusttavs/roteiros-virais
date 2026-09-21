@@ -16,7 +16,7 @@ export default async function Entrar() {
   return (
     <div className={styles.pagina}>
       <div className={styles.envoltorio}>
-        <Logo />
+        <Logo altura={44} />
         <h1 className={styles.titulo}>{textosEntrar.titulo}</h1>
         <FormularioEntrar />
       </div>

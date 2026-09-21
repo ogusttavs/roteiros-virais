@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
 import { textosTermos } from "@/textos/termos";
-import { Logo } from "@/ui/Logo";
+import { Simbolo } from "@/ui/Logo";
 
 import styles from "./PaginaLegal.module.css";
 
@@ -22,7 +22,7 @@ export function PaginaLegal({ titulo, secoes }: { titulo: string; secoes: Secao[
     <main className={styles.pagina}>
       <div className={styles.envoltorio}>
         <div className={styles.cabecalho}>
-          <Logo />
+          <Simbolo altura={24} />
           <Link href="/hoje" className={styles.voltar}>
             <ArrowLeft size={18} strokeWidth={1.5} aria-hidden="true" />
             {textosTermos.voltar}

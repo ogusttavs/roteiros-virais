@@ -11,6 +11,16 @@
   height: var(--altura-toque-lg);
 }
 
+/* A cápsula encolhida (V5, item 5): colunas de largura fixa, não mais
+   proporcionais à barra inteira, para o container (`layout.module.css`,
+   `.barraInferior.encolhida`, `width: auto`) encolher junto com o grid. */
+.navEncolhida {
+  grid-template-columns: repeat(4, 3.25rem);
+}
+.navEncolhida .item {
+  min-height: var(--altura-toque);
+}
+
 .item {
   position: relative;
   display: flex;
@@ -43,6 +53,20 @@
   line-height: 1;
   font-weight: var(--peso-medio);
   letter-spacing: 0.01em;
+}
+
+/* A cápsula encolhida (V5, item 5): o rótulo some da vista, sem sumir da
+   árvore de acessibilidade (`display: none` sumiria dos dois). */
+.escondidoDaVista {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (min-width: 768px) {

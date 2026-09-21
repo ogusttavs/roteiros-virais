@@ -1,3 +1,5 @@
+/* Vidro (V5, item 4): mesmos tokens compartilhados da barra do topo, não
+   mais um blur próprio. */
 .barraCelular {
   position: sticky;
   top: 0;
@@ -9,9 +11,11 @@
   height: 48px;
   padding: 0 var(--margem-celular);
   border: 0;
-  border-bottom: 1px solid var(--cor-borda);
-  background: color-mix(in srgb, var(--cor-superficie) 85%, transparent);
-  backdrop-filter: blur(12px);
+  border-bottom: var(--largura-borda) solid var(--vidro-contorno);
+  background: var(--cor-material-barra);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  box-shadow: var(--vidro-brilho);
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-legenda);
   color: var(--cor-titulo);
@@ -51,16 +55,20 @@
   background: color-mix(in srgb, var(--cor-titulo) 30%, transparent);
 }
 
+/* Vidro, mais opaco que o das barras (V5, item 4): texto passa por cima, e
+   o raio concêntrico com o do aparelho (--raio-folha). */
 .folha {
   position: fixed;
   z-index: 21;
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--cor-superficie);
-  border-top: 1px solid var(--cor-borda);
-  border-radius: var(--raio-lg) var(--raio-lg) 0 0;
-  box-shadow: var(--sombra-md);
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-folha) var(--raio-folha) 0 0;
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
   display: flex;
   flex-direction: column;
   gap: var(--espaco-4);

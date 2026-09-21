@@ -1,5 +1,7 @@
 import { config } from "@/lib/config";
 
+import { envolverEmail, linkEmail } from "./casca-email";
+
 /**
  * Lembrete diário do tema pronto (etapa 12, decisão 5 do `PROXIMO.md`). Sem
  * "de hoje" (ajuste da revisão da etapa 13, parte 2): o lembrete usa a
@@ -9,6 +11,9 @@ import { config } from "@/lib/config";
  * V3, item 6: um e-mail por pessoa, listando as marcas dela com tema
  * pendente (uma marca só, ou várias). `nomesMarcas` sempre não vazio, quem
  * chama (`src/jobs/lembrete.ts`) só envia quando há pelo menos uma pendente.
+ *
+ * V5, item 7: a casca (cor, fonte de sistema, logotipo) vem de
+ * `casca-email.ts`; o texto abaixo não muda.
  */
 function listaMarcas(nomesMarcas: string[]): string {
   if (nomesMarcas.length === 1) return nomesMarcas[0];
@@ -20,7 +25,9 @@ function listaMarcas(nomesMarcas: string[]): string {
 export const textosEmail = {
   assuntoLembrete: "O seu tema está pronto para gravar",
   corpoLembrete: (nomesMarcas: string[]) =>
-    nomesMarcas.length === 1
-      ? `<p>O tema de <strong>${nomesMarcas[0]}</strong> está pronto para gravar.</p><p><a href="${config.appUrl}/hoje">abrir o painel</a></p>`
-      : `<p>O tema está pronto para gravar em ${listaMarcas(nomesMarcas)}.</p><p><a href="${config.appUrl}/hoje">abrir o painel</a></p>`,
+    envolverEmail(
+      nomesMarcas.length === 1
+        ? `<p>O tema de <strong>${nomesMarcas[0]}</strong> está pronto para gravar.</p><p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`
+        : `<p>O tema está pronto para gravar em ${listaMarcas(nomesMarcas)}.</p><p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
+    ),
 };

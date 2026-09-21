@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { config } from "@/lib/config";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -40,7 +41,7 @@ import { ReferenciaCartao } from "@/ui/componentes/ReferenciaCartao";
 import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 import { TemaCartao } from "@/ui/componentes/TemaCartao";
-import { Logo } from "@/ui/Logo";
+import { Logo, Simbolo } from "@/ui/Logo";
 
 import { AlternarTema } from "./AlternarTema";
 import { FundacaoInterativa } from "./FundacaoInterativa";
@@ -80,8 +81,8 @@ export default function Fundacao() {
     <div className={styles.pagina}>
       <header className={styles.cabecalho}>
         <div className={styles.identidade}>
-          <Logo tamanho={24} />
-          <span>seu painel</span>
+          <Simbolo altura={24} />
+          <span data-app-name="">{config.appName}</span>
         </div>
         <AlternarTema />
       </header>
@@ -372,10 +373,14 @@ export default function Fundacao() {
       </section>
 
       <section className={styles.secao}>
-        <h2 className={styles.tituloSecao}>Logo reservado, 24 px</h2>
+        <h2 className={styles.tituloSecao}>Símbolo, 24 px</h2>
         <div className={styles.linha} style={{ alignItems: "center" }}>
-          <Logo tamanho={24} />
-          <span className={styles.legendaIcone}>Círculo em linha. Troca pelo símbolo da marca quando ele existir.</span>
+          <Simbolo altura={24} />
+          <span className={styles.legendaIcone}>A claquete aberta, com a luz da marca na tira.</span>
+        </div>
+        <h2 className={styles.tituloSecao}>Logotipo, 44 px de altura</h2>
+        <div className={styles.linha} style={{ alignItems: "center" }}>
+          <Logo altura={44} />
         </div>
       </section>
 

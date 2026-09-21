@@ -63,6 +63,16 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+/**
+ * V5, item 3: o matcher so excluia `favicon.ico` por nome; os ativos novos
+ * da marca (`/marca/*.svg`, os icones, `/manifest.webmanifest`) caiam na
+ * regra geral e o middleware os redirecionava para `/entrar` sem sessao,
+ * quebrando a propria logo da tela de entrar (achado rodando as capturas da
+ * etapa: a imagem carregava com 0x0, o pedido voltava 307). Em vez de listar
+ * cada arquivo nome a nome, a exclusao e por formato: qualquer caminho cujo
+ * ultimo segmento tenha extensao (um ponto) e um arquivo estatico de
+ * `public/` ou de uma rota gerada (manifest, sitemap), nunca uma tela.
+ */
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|.*\\.\\w+$).*)"],
 };

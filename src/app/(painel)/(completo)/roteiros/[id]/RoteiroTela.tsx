@@ -353,7 +353,9 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
 
       {erro ? <p className={styles.fraseErro}>{textosRoteiro.erro}</p> : null}
 
-      <div className={styles.barraAcoes}>
+      {/* `data-barra-acoes-propria`, sem valor: o gancho para a cápsula de abas (layout.module.css)
+          sumir aqui (V5, item 5, IDENTIDADE.md item 8), para uma não flutuar sobre a outra. */}
+      <div className={styles.barraAcoes} data-barra-acoes-propria="">
         <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.btn}>
           <Video size={18} strokeWidth={1.75} aria-hidden="true" />
           {textosRoteiro.modoGravacao}

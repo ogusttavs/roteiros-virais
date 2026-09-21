@@ -23,7 +23,8 @@ function provedorIA(): ProvedorIA {
 }
 
 export const config = {
-  appName: env("APP_NAME", "seu painel"),
+  /** Nome de trabalho (V5, entregaveis/design-v2/IDENTIDADE.md, 19/09/2026): troca sem tocar em código, só a variável de ambiente. */
+  appName: env("APP_NAME", "Klaki"),
   appUrl: env("APP_URL", "http://localhost:3000"),
   jobsApiKey: env("JOBS_API_KEY", ""),
   auth: {

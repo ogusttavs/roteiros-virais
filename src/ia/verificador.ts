@@ -10,6 +10,7 @@ import { encontrarProblemas } from "@/lib/regras-de-texto";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
+import type { InstrucaoAbertura } from "./prompts/roteiro";
 import * as verificarTexto from "./prompts/verificarTexto";
 import type { GeneroTexto } from "./prompts/verificarTexto";
 import { registrarGeracao } from "./registro";
@@ -71,6 +72,16 @@ export function verificarLocalmente(
     tipoAberturaAtual?: TipoAbertura;
     tipoAberturaAnterior?: TipoAbertura | null;
     /**
+     * V5, item 0b (revisão do PR #48): o que `escolherTipoAbertura` de fato
+     * instruiu para este roteiro. Reprova quando o serviço instruiu um tipo
+     * concreto e o modelo declarou outro, e quando a instrução era livre e o
+     * tipo declarado está na lista dos proibidos. Cinto de segurança: na
+     * prova com chave real o modelo obedeceu 9 de 9, mas o checo antigo (só
+     * contra o roteiro anterior) deixava passar um modelo que ignorasse a
+     * instrução e declarasse um tipo qualquer nunca usado antes.
+     */
+    instrucaoAbertura?: InstrucaoAbertura;
+    /**
      * E27, parte 1, item 4: quando o cliente reprovou por "muito longo", a
      * nova versão precisa ficar mais curta que a reprovada. `campos` só tem
      * texto; duração é numérica, por isso entra à parte, já calculada por
@@ -123,6 +134,19 @@ export function verificarLocalmente(
     opcoes.tipoAberturaAtual === opcoes.tipoAberturaAnterior
   ) {
     motivos.push(`tipoAbertura: repete o tipo de abertura do roteiro anterior ("${opcoes.tipoAberturaAtual}")`);
+  }
+
+  if (opcoes.tipoAberturaAtual && opcoes.instrucaoAbertura) {
+    const instrucao = opcoes.instrucaoAbertura;
+    if (instrucao.tipo !== null && opcoes.tipoAberturaAtual !== instrucao.tipo) {
+      motivos.push(
+        `tipoAbertura: o serviço instruiu "${instrucao.tipo}" e o modelo declarou "${opcoes.tipoAberturaAtual}"`,
+      );
+    } else if (instrucao.tipo === null && instrucao.tiposProibidos.includes(opcoes.tipoAberturaAtual)) {
+      motivos.push(
+        `tipoAbertura: a instrução era livre, evitando ${instrucao.tiposProibidos.join(", ")}, e o modelo declarou "${opcoes.tipoAberturaAtual}", um dos proibidos`,
+      );
+    }
   }
 
   const evidenciasCitadas = opcoes.evidencias ?? [];
@@ -191,6 +215,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   ganchosUltimos5?: string[];
   /** V4, item 5: o tipo de abertura do roteiro anterior do cliente (ver `verificarLocalmente`). */
   tipoAberturaAnterior?: TipoAbertura | null;
+  /** V5, item 0b: o que `escolherTipoAbertura` instruiu, para o verificador conferir contra a instrução (ver `verificarLocalmente`). */
+  instrucaoAbertura?: InstrucaoAbertura;
   extrairTipoAbertura?: (dados: T) => TipoAbertura;
   /**
    * Duração da versão reprovada, em segundos (E27, parte 1, item 4): só
@@ -256,6 +282,7 @@ async function tentarGerarEVerificar<T>(
     ganchosUltimos5: params.ganchosUltimos5,
     tipoAberturaAtual: params.extrairTipoAbertura?.(resultado.dados),
     tipoAberturaAnterior: params.tipoAberturaAnterior,
+    instrucaoAbertura: params.instrucaoAbertura,
     duracaoParaMuitoLongo:
       params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
         ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }
