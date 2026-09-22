@@ -1,0 +1,6 @@
+.motivo {
+  display: block;
+  text-align: center;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}

@@ -12,9 +12,11 @@
 
 export const textosObjetivo = {
   temaEscolhido: "Tema escolhido",
+  /** Na tela de erro (V7, item 2 do PROXIMO.md): o que a pessoa tinha escolhido continua na tela, ao lado do "Tentar de novo". */
+  objetivoEscolhido: "Objetivo escolhido",
   pergunta: "O que você quer que esse vídeo faça?",
   recomendado: "Recomendado hoje",
   escrever: "escrever o roteiro",
-  demorando: "está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
-  erro: "não conseguimos escrever agora; o tema ficou salvo, tente de novo em um minuto",
+  demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
+  erro: "Não conseguimos escrever agora. O tema e o objetivo continuam aqui; tente de novo.",
 };

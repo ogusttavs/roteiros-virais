@@ -61,6 +61,11 @@ function OpcaoFiltro({
  * "Views acima de" só fazem sentido no segmento "Todos" e ficam para a
  * parte 3b. Estado local até "Ver os N vídeos" (que navega para a URL
  * nova); "Limpar" some com plataforma e formato, mantém período e busca.
+ *
+ * `ReferenciasTela` só monta este componente com a folha aberta (V7, item 1
+ * do PROXIMO.md): o estado local nasce da URL a cada abertura, em vez de
+ * guardar marcas que a pessoa não aplicou. `aoFechar` é o `fechar` do
+ * `useFolhaNoHistorico` de lá.
  */
 export function FolhaFiltrarReferencias({
   aberto,
@@ -94,11 +99,7 @@ export function FolhaFiltrarReferencias({
           <button
             type="button"
             className={styles.botaoLimpar}
-            onClick={() => {
-              setPlataformas([]);
-              setFormatos([]);
-              onAplicar({ plataformas: [], formatos: [] });
-            }}
+            onClick={() => onAplicar({ plataformas: [], formatos: [] })}
           >
             {textosReferencias.limpar}
           </button>

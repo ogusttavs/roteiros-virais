@@ -2,10 +2,12 @@
 
 import { captureException } from "@sentry/nextjs";
 import { AlertTriangle } from "lucide-react";
-import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useTransition } from "react";
 
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { Botao } from "@/ui/componentes/Botao";
 
 import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
@@ -17,9 +19,25 @@ import styles from "./HojeTela.module.css";
  * já deixa o ponto certo pronto.
  */
 export default function ErroHoje({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const router = useRouter();
+  const [pendente, iniciarTransicao] = useTransition();
+
   useEffect(() => {
     captureException(error);
   }, [error]);
+
+  /**
+   * Só `reset()` refaz a renderização no cliente: quando a falha veio do servidor (banco lento, tempo
+   * esgotado), a tela voltava idêntica, com o mesmo erro e sem sinal nenhum, e parecia travada (V7, item 4
+   * do PROXIMO.md). `router.refresh()` pede a página de novo ao servidor, e a transição mantém o botão em
+   * andamento até chegar.
+   */
+  function tentarDeNovo() {
+    iniciarTransicao(() => {
+      router.refresh();
+      reset();
+    });
+  }
 
   return (
     <div className={styles.pagina}>
@@ -34,9 +52,9 @@ export default function ErroHoje({ error, reset }: { error: Error & { digest?: s
           <h3>{textosHoje.erroTitulo}</h3>
           <p>{textosHoje.erro}</p>
           <div className={styles.estadoAcoes}>
-            <button type="button" onClick={reset} className={styles.botaoPrimario}>
+            <Botao variante="primario" tamanho="lg" carregando={pendente} onClick={tentarDeNovo}>
               {textosHoje.tentarDeNovo}
-            </button>
+            </Botao>
           </div>
         </div>
       </div>

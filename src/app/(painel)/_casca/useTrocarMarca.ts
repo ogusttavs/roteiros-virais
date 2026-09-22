@@ -2,7 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 
+import { textosConexao } from "@/textos/conexao";
 import { textosNav } from "@/textos/nav";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { trocarMarcaAction } from "./marca-acoes";
 
@@ -28,6 +30,8 @@ export function useTrocarMarca() {
   const [pendente, iniciarTransicao] = useTransition();
   const [marcaAlvo, setMarcaAlvo] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  const { avisarRedeOk } = useConexao();
+  const tratarFalha = useTratarFalha();
 
   useEffect(() => {
     if (!pendente) setMarcaAlvo(null);
@@ -38,9 +42,14 @@ export function useTrocarMarca() {
     setMarcaAlvo(nomeMarca);
     iniciarTransicao(async () => {
       try {
+        // O roteiro guardado da marca de antes não pode aparecer sem rede na marca nova (V7, item 7): quem
+        // apaga é `Conexao` (`registrarEscopo`) quando o painel reabre com a marca nova, não daqui. Apagar
+        // antes da ação tiraria a cópia da marca atual justo quando a troca falha por falta de rede, e
+        // apagar depois disputaria com o escopo novo que `Conexao` acabou de gravar.
         await trocarMarcaAction(clienteId);
-      } catch {
-        setErro(textosNav.erroTrocarMarca);
+        avisarRedeOk();
+      } catch (falha) {
+        setErro(tratarFalha(falha, textosNav.erroTrocarMarca, textosConexao.trocarDeMarcaSemRede));
       }
     });
   }

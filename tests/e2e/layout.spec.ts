@@ -5,8 +5,15 @@
  * estourar na horizontal, e nenhum alvo de toque pode ficar abaixo de
  * 44 px. Roteiro próprio ("e2e-layout"), sem `resetarSchema` (mesma lição
  * de `roteiro.spec.ts`): o seed roda uma vez só, no globalSetup.
+ *
+ * V7, item 1 e 3: a 360 x 740 (Android pequeno) entrou ao lado da 390 em
+ * toda tela já coberta, e o caminho da viagem ganhou as cinco telas que
+ * faltavam (Entrar, Tema livre, Objetivo, Histórico, Conta). O botão
+ * principal continuar dentro da área visível com a viewport reduzida a
+ * 390 x 500 (simula o teclado tirando altura) é um bloco à parte, no fim
+ * do arquivo, só nas telas que têm um botão principal claro.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 
 import { db } from "../../src/db";
@@ -28,6 +35,7 @@ import {
   type TemaDoDia,
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
+import { textosConexao } from "../../src/textos/conexao";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-layout@exemplo.teste";
@@ -36,6 +44,7 @@ const EMAIL_BRIEFING = "e2e-layout-briefing@exemplo.teste";
 const EMAIL_MARCAS = "e2e-layout-marcas@exemplo.teste";
 const LARGURAS = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "360", largura: 360, altura: 740 },
   { rotulo: "1024", largura: 1024, altura: 768 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
@@ -81,7 +90,7 @@ async function conferirLayout(page: Page) {
   expect(semRolagemHorizontal, "a tela nao pode rolar na horizontal").toBe(true);
 
   const alvosPequenos = await page.evaluate((minimo) => {
-    const elementos = document.querySelectorAll('button, a[href], input, [role="button"]');
+    const elementos = document.querySelectorAll('button, a[href], input, select, textarea, [role="button"]');
     const pequenos: string[] = [];
     elementos.forEach((el) => {
       const estilo = getComputedStyle(el);
@@ -96,6 +105,89 @@ async function conferirLayout(page: Page) {
   }, ALTURA_TOQUE_MINIMA);
 
   expect(alvosPequenos, "alvo de toque abaixo de 44px").toEqual([]);
+
+  // V7, item 2: o iPhone da zoom sozinho ao focar um campo com fonte abaixo de 16 px (o zoom nao volta
+  // sem pinca). So vale abaixo do tablet, onde o teclado do celular aparece.
+  if ((page.viewportSize()?.width ?? 0) < 768) {
+    const camposPequenos = await page.evaluate(() => {
+      const achados: string[] = [];
+      document.querySelectorAll("input, select, textarea").forEach((el) => {
+        const campo = el as HTMLInputElement;
+        if (["checkbox", "radio", "hidden", "range", "file", "submit", "button"].includes(campo.type)) return;
+        const estilo = getComputedStyle(el);
+        if (estilo.display === "none" || estilo.visibility === "hidden") return;
+        const r = el.getBoundingClientRect();
+        if (r.width === 0 && r.height === 0) return;
+        if (parseFloat(estilo.fontSize) < 16) {
+          achados.push(`${el.tagName.toLowerCase()} ${campo.type} "${(campo.getAttribute("aria-label") || campo.name || "").slice(0, 40)}" (${estilo.fontSize})`);
+        }
+      });
+      return achados;
+    });
+    expect(camposPequenos, "campo com fonte abaixo de 16px (o iPhone da zoom)").toEqual([]);
+  }
+}
+
+/**
+ * O botao nao esta coberto por outra coisa (a capsula das abas, uma barra
+ * fixa): o toque no centro dele cai nele. `toBeInViewport` sozinho nao pega:
+ * um botao coberto ainda esta dentro da area visivel (achado da V7, Objetivo:
+ * a capsula das abas cobria metade do "escrever o roteiro").
+ */
+async function conferirNaoCoberto(alvo: Locator) {
+  const coberto = await alvo.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const topo = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !(topo && (topo === el || el.contains(topo)));
+  });
+  expect(coberto, "o toque no centro do botao cai em outra coisa (coberto por uma barra fixa)").toBe(false);
+}
+
+/**
+ * V7, item 1: a folha fecha por Voltar (o botao do Android e o gesto do
+ * iPhone), por Esc, por toque fora e, no celular, arrastando a alca para
+ * baixo, sempre sem sair da tela e sem deixar entrada fantasma no historico.
+ */
+async function conferirFolhaFecha(
+  page: Page,
+  { abrir, dialogo, arrasta }: { abrir: () => Promise<void>; dialogo: Locator; arrasta: boolean },
+) {
+  const urlAntes = page.url();
+  const semMarcaNoHistorico = async () => expect(await page.evaluate(() => history.state?.folhaAberta ?? null)).toBeNull();
+
+  await abrir();
+  await expect(dialogo).toBeVisible();
+  await page.goBack();
+  await expect(dialogo).toBeHidden();
+  expect(page.url(), "o Voltar fechou a folha, nao saiu da tela").toBe(urlAntes);
+
+  await abrir();
+  await expect(dialogo).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(dialogo).toBeHidden();
+  expect(page.url()).toBe(urlAntes);
+  await semMarcaNoHistorico();
+
+  await abrir();
+  await expect(dialogo).toBeVisible();
+  await page.mouse.click(5, 120);
+  await expect(dialogo).toBeHidden();
+  expect(page.url()).toBe(urlAntes);
+  await semMarcaNoHistorico();
+
+  if (arrasta) {
+    await abrir();
+    await expect(dialogo).toBeVisible();
+    const caixa = (await dialogo.boundingBox())!;
+    const x = caixa.x + caixa.width / 2;
+    await page.mouse.move(x, caixa.y + 14);
+    await page.mouse.down();
+    for (let passo = 1; passo <= 8; passo++) await page.mouse.move(x, caixa.y + 14 + passo * 25);
+    await page.mouse.up();
+    await expect(dialogo).toBeHidden();
+    expect(page.url()).toBe(urlAntes);
+    await semMarcaNoHistorico();
+  }
 }
 
 test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
@@ -498,6 +590,143 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await expect(suasMarcas).toBeVisible();
       await conferirLayout(page);
     });
+
+    /**
+     * V7, item 8: a faixa "Sem conexão" no topo empurra o cabeçalho, a barra de topo e o corpo em vez
+     * de ficar por cima (`--area-topo`, base.css): nada de rolagem horizontal, nenhum alvo pequeno, e o
+     * toque no centro da pílula de marca (Hoje, Conta) e do botão Voltar (Roteiro) cai neles.
+     */
+    if (largura < 768) {
+      // A pílula de marca só existe com mais de uma marca: Hoje e Conta entram com o usuário de duas marcas.
+      for (const { tela, entrarNa, ir, alvo } of [
+        {
+          tela: "Hoje",
+          entrarNa: async (page: Page) => {
+            await entrarComo(page, EMAIL_MARCAS);
+            await expect(page).toHaveURL(/\/hoje/);
+          },
+          ir: async (page: Page) => page.goto("/hoje"),
+          alvo: (page: Page) => page.getByRole("button", { name: /^Trocar de marca/ }),
+        },
+        {
+          tela: "Roteiro",
+          entrarNa: entrar,
+          ir: async (page: Page) => page.goto(`/roteiros/${roteiroId}`),
+          alvo: (page: Page) => page.getByRole("link", { name: "Voltar" }).first(),
+        },
+        {
+          tela: "Conta",
+          entrarNa: async (page: Page) => {
+            await entrarComo(page, EMAIL_MARCAS);
+            await expect(page).toHaveURL(/\/hoje/);
+          },
+          ir: async (page: Page) => page.goto("/conta"),
+          alvo: (page: Page) => page.getByRole("button", { name: /^Trocar de marca/ }),
+        },
+      ]) {
+        test(`${tela}, faixa "Sem conexão" visível, em ${rotulo}px`, async ({ page, context }) => {
+          await page.setViewportSize({ width: largura, height: altura });
+          await entrarNa(page);
+          await ir(page);
+          await page.waitForLoadState("networkidle");
+          await context.setOffline(true);
+          await expect(page.getByRole("status").filter({ hasText: textosConexao.faixa })).toBeVisible();
+          await conferirLayout(page);
+          await conferirNaoCoberto(alvo(page));
+        });
+      }
+    }
+
+    /**
+     * V7, item 1: a folha do Roteiro ("O que não ficou bom?", aberta pelo menu) fecha por Voltar, Esc,
+     * toque fora e, no celular, arrastando; e o campo de texto dela mantém o foco a cada tecla (o
+     * `.fill()` dos outros testes escreve tudo de uma vez e nunca pegaria o foco pulando).
+     */
+    test(`Roteiro, folha reprovar fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await page.waitForLoadState("networkidle");
+      await conferirFolhaFecha(page, {
+        abrir: async () => {
+          await page.getByRole("button", { name: "Mais opções" }).click();
+          await page.getByRole("menuitem", { name: "Reprovar" }).click();
+        },
+        dialogo: page.getByRole("dialog", { name: "O que não ficou bom?" }),
+        arrasta: largura < 768,
+      });
+    });
+
+    test(`Roteiro, campo da folha reprovar mantém o foco tecla a tecla, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await page.waitForLoadState("networkidle");
+      await page.getByRole("button", { name: "Mais opções" }).click();
+      await page.getByRole("menuitem", { name: "Reprovar" }).click();
+      const campo = page.getByLabel("Se quiser, diga com as suas palavras");
+      await campo.click();
+      await campo.pressSequentially("o gancho", { delay: 30 });
+      await expect(campo).toBeFocused();
+      await expect(campo).toHaveValue("o gancho");
+    });
+
+    /** V7, item 1: a folha "Suas marcas" (celular) e as doze notas fecham por Voltar e Esc, sem sair da tela. */
+    if (largura < 768) {
+      test(`Hoje, folha "Suas marcas" fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: altura });
+        await entrarComo(page, EMAIL_MARCAS);
+        await expect(page).toHaveURL(/\/hoje/);
+        await page.waitForLoadState("networkidle");
+        await conferirFolhaFecha(page, {
+          abrir: async () => {
+            await page.getByRole("button", { name: /^Trocar de marca/ }).click();
+          },
+          dialogo: page.getByRole("dialog", { name: "Suas marcas" }),
+          arrasta: true,
+        });
+      });
+    }
+
+    /** V7, item 1: as cinco telas do caminho da viagem que layout.spec.ts ainda não cobria. */
+    test(`Entrar em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await page.goto("/entrar");
+      await expect(page.getByRole("heading", { name: "Bom te ver" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Tema livre em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/hoje/tema-livre");
+      await expect(page.getByRole("heading", { name: "Sobre o que você quer falar?" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Objetivo em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      await expect(page.getByRole("heading", { name: "O que você quer que esse vídeo faça?" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Histórico em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/historico");
+      await expect(page.getByRole("heading", { name: "Histórico" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Conta em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/conta");
+      await expect(page.getByRole("heading", { name: "Conta" })).toBeVisible();
+      await conferirLayout(page);
+    });
   }
 
   for (const { rotulo, largura, altura } of LARGURAS_COM_FOLHA) {
@@ -508,6 +737,100 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await page.getByRole("button", { name: "as doze notas" }).click();
       await expect(page.getByRole("dialog", { name: "as doze notas" })).toBeVisible();
       await conferirLayout(page);
+    });
+
+    /** V7, item 1: as doze notas fecham por Voltar, Esc e toque fora (a folha não desenha alça: sem arrastar). */
+    test(`Começar, folha "as doze notas" fecha por Voltar, Esc e toque fora, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarComo(page, EMAIL_COMECAR);
+      await expect(page).toHaveURL(/\/comecar/);
+      await page.waitForLoadState("networkidle");
+      await conferirFolhaFecha(page, {
+        abrir: async () => {
+          await page.getByRole("button", { name: "as doze notas" }).click();
+        },
+        dialogo: page.getByRole("dialog", { name: "as doze notas" }),
+        arrasta: false,
+      });
+    });
+  }
+
+  /**
+   * V7, item 3: "o botão principal está dentro da área visível com a viewport
+   * reduzida a 390 x 500 (teclado)". Só nas telas com um botão principal
+   * claro; Hoje (três cartões), Briefing (revisão), Referências (grade) e
+   * Começar (formulário em blocos) não têm um botão único e ficam de fora
+   * (decisão registrada em "Decisões pendentes" do TODO.md).
+   */
+  for (const { rotulo, nome, ir, botao, conferirCobertura = true } of [
+    { rotulo: "Entrar", nome: "entrar", ir: async (page: Page) => page.goto("/entrar"), botao: "entrar" },
+    {
+      rotulo: "Tema livre",
+      nome: "Avaliar o tema",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto("/hoje/tema-livre");
+      },
+      botao: "Avaliar o tema",
+      // A cápsula das abas some quando o teclado abre (`useTecladoAberto`, item 0c); o Playwright encolhe a
+      // janela inteira, sem a diferença entre `innerHeight` e `visualViewport` que o teclado de verdade cria, então
+      // aqui a cápsula continua na tela e cobre o botão: só a versão em `toBeInViewport` faz sentido.
+      conferirCobertura: false,
+    },
+    {
+      rotulo: "Objetivo",
+      nome: "escrever o roteiro",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      },
+      botao: "escrever o roteiro",
+    },
+    {
+      rotulo: "Roteiro",
+      nome: "Já gravei",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}`);
+      },
+      botao: "Já gravei",
+    },
+    {
+      rotulo: "Gravação",
+      nome: "Próximo bloco",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}/gravar`);
+      },
+      botao: "Próximo bloco",
+    },
+    {
+      rotulo: "Roteiro, folha reprovar",
+      nome: "Reescrever com isso em mente",
+      ir: async (page: Page) => {
+        await entrar(page);
+        await page.goto(`/roteiros/${roteiroId}`);
+        await page.getByRole("button", { name: "Mais opções" }).click();
+        await page.getByRole("menuitem", { name: "Reprovar" }).click();
+        await expect(page.getByRole("dialog", { name: "O que não ficou bom?" })).toBeVisible();
+      },
+      botao: "Reescrever com isso em mente",
+    },
+  ]) {
+    test(`${rotulo}, botão "${nome}" visível a 390x500`, async ({ page }) => {
+      // Carrega em tamanho cheio e só depois encolhe: simula o teclado abrindo numa tela já
+      // carregada (o que dispara o listener de `visualViewport`, `TemaLivreTela.tsx`), não uma
+      // tela que já nasce pequena, que nenhum aparelho de verdade produz.
+      await page.setViewportSize({ width: 390, height: 844 });
+      await ir(page);
+      // Espera a hidratacao: o teclado so abre depois de o usuario tocar no campo, e o listener de
+      // `visualViewport` da tela so existe depois de hidratar (sem isto o teste encolhe antes e
+      // mede uma corrida, nao o produto; mesma convencao de tema-livre.spec.ts).
+      await page.waitForLoadState("networkidle");
+      await page.setViewportSize({ width: 390, height: 500 });
+      const principal = page.getByRole("button", { name: botao, exact: true });
+      await expect(principal).toBeInViewport();
+      if (conferirCobertura) await conferirNaoCoberto(principal);
     });
   }
 });
@@ -520,6 +843,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
 const EMAIL_REFERENCIAS = "e2e-layout-referencias@exemplo.teste";
 const LARGURAS_V6 = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "360", largura: 360, altura: 740 },
   { rotulo: "820", largura: 820, altura: 1180 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
@@ -642,6 +966,35 @@ test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
       await page.getByRole("button", { name: "Ver detalhes" }).first().click();
       await expect(page.getByRole("dialog", { name: "Por que esse funcionou" })).toBeVisible();
       await conferirLayout(page);
+    });
+
+    /** V7, item 1: as duas folhas de Referências fecham por Voltar, Esc, toque fora e, no celular, arrastando. */
+    test(`Referências, folha detalhes fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarReferencias(page);
+      await page.goto("/referencias");
+      await page.waitForLoadState("networkidle");
+      await conferirFolhaFecha(page, {
+        abrir: async () => {
+          await page.getByRole("button", { name: "Ver detalhes" }).first().click();
+        },
+        dialogo: page.getByRole("dialog", { name: "Por que esse funcionou" }),
+        arrasta: largura < 768,
+      });
+    });
+
+    test(`Referências, folha filtrar fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrarReferencias(page);
+      await page.goto("/referencias");
+      await page.waitForLoadState("networkidle");
+      await conferirFolhaFecha(page, {
+        abrir: async () => {
+          await page.getByRole("button", { name: "Filtrar" }).click();
+        },
+        dialogo: page.getByRole("dialog", { name: "Filtrar" }),
+        arrasta: largura < 768,
+      });
     });
   }
 });

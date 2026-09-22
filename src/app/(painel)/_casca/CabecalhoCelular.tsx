@@ -2,8 +2,10 @@
 
 import { RotateCw } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 import { textosNav } from "@/textos/nav";
+import { useConexao } from "@/ui/ConexaoContext";
 import { Simbolo } from "@/ui/Logo";
 
 import styles from "./CabecalhoCelular.module.css";
@@ -23,10 +25,28 @@ type Props = {
  * abaixo de 768px (CabecalhoCelular.module.css). A pilula de marca e o
  * botao "Atualizar" (V3, item 3, Casca.dc.html) ficam do lado direito,
  * depois da identidade do produto.
+ *
+ * "Atualizar" (V7, itens 4 e 8 do PROXIMO.md) mostra que esta em andamento
+ * (o icone gira e o botao nao aceita toque duplo) e, sem rede, nao chama o
+ * servidor: `router.refresh()` sem rede vira uma navegacao de documento e
+ * derruba o aplicativo para a pagina de erro do navegador.
  */
 export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }: Props) {
   const escondido = useRolagemParaBaixo();
   const router = useRouter();
+  const { avisarFalhaDeRede } = useConexao();
+  const [atualizando, iniciarAtualizacao] = useTransition();
+
+  function atualizar() {
+    if (!navigator.onLine) {
+      // A faixa "Sem conexao" (Conexao.tsx) diz o resto.
+      avisarFalhaDeRede();
+      return;
+    }
+    iniciarAtualizacao(() => {
+      router.refresh();
+    });
+  }
 
   return (
     <header
@@ -43,9 +63,15 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
           type="button"
           className={styles.botaoBarra}
           aria-label={textosNav.atualizar}
-          onClick={() => router.refresh()}
+          aria-busy={atualizando || undefined}
+          disabled={atualizando}
+          onClick={atualizar}
         >
-          <RotateCw size={18} aria-hidden="true" />
+          <RotateCw
+            size={18}
+            aria-hidden="true"
+            className={atualizando ? styles.girando : undefined}
+          />
           <span className={styles.cede}>{textosNav.atualizar}</span>
         </button>
       </div>

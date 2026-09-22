@@ -13,12 +13,19 @@
   -webkit-backdrop-filter: var(--desfoque-barra);
   border-top: var(--largura-borda) solid var(--vidro-contorno);
   box-shadow: var(--vidro-brilho);
-  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-9) + env(safe-area-inset-bottom));
+  /* V7, itens 1 e 2 do PROXIMO.md: a cápsula das abas some com esta barra na tela (data-barra-acoes-propria),
+     então não sobra o espaço de --espaco-9 que era dela; só a área segura do aparelho. */
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
 }
 
 .botoes {
   display: flex;
   gap: var(--espaco-3);
+}
+
+/* "Precisa de conexão." embaixo dos botões (V7, item 8); o tamanho e a cor vêm de MotivoSemRede. */
+.motivo {
+  margin-top: var(--espaco-2);
 }
 
 .primaria,
@@ -85,6 +92,11 @@
 
   .botoes {
     justify-content: flex-start;
+  }
+
+  /* Com os botões alinhados à esquerda, o motivo também (especificidade maior que a de MotivoSemRede, que centraliza). */
+  .barra .motivo {
+    text-align: left;
   }
 
   .primaria {

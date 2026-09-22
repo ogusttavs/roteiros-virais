@@ -1,10 +1,16 @@
 "use client";
 
+import { CircleAlert } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import type { RegraCliente } from "@/servicos/aprendizado";
 import { textosBriefing } from "@/textos/briefing";
 import cartaoStyles from "@/ui/componentes/Cartao.module.css";
+import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
+import { ID_FAIXA_SEM_CONEXAO, useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+
+// O erro em linha do briefing (icone e cor de erro), o mesmo das respostas, para a mensagem sob a regra.
+import perguntaStyles from "../../_briefing/PerguntaCampo.module.css";
 
 import { desativarRegraAction, reativarRegraAction } from "./acoes";
 import styles from "./AprendizadoCard.module.css";
@@ -21,8 +27,16 @@ type Props = { regrasIniciais: RegraCliente[] };
  * `ReferenciasTela.tsx`: a tela muda na hora, desfaz se a ação falhar.
  */
 export function AprendizadoCard({ regrasIniciais }: Props) {
+  const { semConexao, avisarRedeOk } = useConexao();
+  const tratarFalha = useTratarFalha();
   const [regras, setRegras] = useState(regrasIniciais);
-  const [idPendente, setIdPendente] = useState<number | null>(null);
+  /**
+   * Um Set de ids, nao um id so (V7, item 4 do PROXIMO.md): tocar na regra B com a A ainda pendente
+   * liberava o botao da A, e o desfazer da A depois podia apagar um toque novo nela.
+   */
+  const [idsPendentes, setIdsPendentes] = useState<ReadonlySet<number>>(() => new Set());
+  /** A frase de erro de cada regra, embaixo da linha dela. */
+  const [erros, setErros] = useState<Record<number, string>>({});
   const [, iniciarTransicao] = useTransition();
 
   function alternar(regraId: number, ativarDeNovo: boolean) {
@@ -32,19 +46,35 @@ export function AprendizadoCard({ regrasIniciais }: Props) {
       ),
     );
 
-    setIdPendente(regraId);
+    setErros((atual) => {
+      const proximo = { ...atual };
+      delete proximo[regraId];
+      return proximo;
+    });
+    setIdsPendentes((atual) => new Set(atual).add(regraId));
     iniciarTransicao(async () => {
       try {
         if (ativarDeNovo) await reativarRegraAction(regraId);
         else await desativarRegraAction(regraId);
-      } catch {
+        avisarRedeOk();
+      } catch (falha) {
+        // A linha volta ao que era, e a frase diz que nao deu certo (antes voltava calada, e a regra
+        // rejeitada seguia guiando os roteiros sem a pessoa saber).
+        const frase = ativarDeNovo
+          ? tratarFalha(falha, t.erroDesfazer, t.semConexaoDesfazer)
+          : tratarFalha(falha, t.erroDesligar, t.semConexaoDesligar);
         setRegras((atual) =>
           atual.map((regra) =>
             regra.id === regraId ? { ...regra, ativa: !ativarDeNovo, desativadaEm: ativarDeNovo ? new Date() : null } : regra,
           ),
         );
+        setErros((atual) => ({ ...atual, [regraId]: frase }));
       } finally {
-        setIdPendente((atual) => (atual === regraId ? null : atual));
+        setIdsPendentes((atual) => {
+          const proximo = new Set(atual);
+          proximo.delete(regraId);
+          return proximo;
+        });
       }
     });
   }
@@ -79,7 +109,8 @@ export function AprendizadoCard({ regrasIniciais }: Props) {
                   <button
                     type="button"
                     className={styles.acao}
-                    disabled={idPendente === regra.id}
+                    disabled={idsPendentes.has(regra.id) || semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
                     onClick={() => alternar(regra.id, false)}
                   >
                     {t.naoEBemAssim}
@@ -90,7 +121,8 @@ export function AprendizadoCard({ regrasIniciais }: Props) {
                     <button
                       type="button"
                       className={styles.acao}
-                      disabled={idPendente === regra.id}
+                      disabled={idsPendentes.has(regra.id) || semConexao}
+                      aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
                       onClick={() => alternar(regra.id, true)}
                     >
                       {t.desfazer}
@@ -100,6 +132,16 @@ export function AprendizadoCard({ regrasIniciais }: Props) {
                 <span className={styles.deOnde}>
                   {regra.ativa ? t.deOnde(regra.contagem, regra.ultimaEm) : t.naoEntraMaisNosSeusRoteiros}
                 </span>
+                {/* Sem conexao os dois botoes acima ficam desabilitados: o motivo escrito, na coluna do texto. */}
+                <MotivoSemRede className={styles.deOnde} />
+                {erros[regra.id] ? (
+                  <span className={styles.deOnde} role="alert">
+                    <span className={perguntaStyles.erroInline}>
+                      <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+                      {erros[regra.id]}
+                    </span>
+                  </span>
+                ) : null}
               </div>
             ))}
           </div>

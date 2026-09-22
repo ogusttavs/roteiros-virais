@@ -8,7 +8,7 @@ import styles from "./VideoEmbed.module.css";
 export type VideoEmbedProps = {
   url: string;
   alt: string;
-  /** Ja formatado ("vídeo embedado 9:16 · carrega ao entrar na tela"). */
+  /** Ja formatado ("Carregando o vídeo"). */
   rotuloCarregamento: string;
   /** Quando o ator/API nao devolve embed oficial para a plataforma (TikTok e Instagram hoje). */
   falhou?: boolean;
@@ -18,6 +18,9 @@ export type VideoEmbedProps = {
 };
 
 type Props = VideoEmbedProps;
+
+/** Quanto esperar a resposta do TikTok antes de mostrar só o link (V7, item 4 do PROXIMO.md). */
+const TEMPO_LIMITE_OEMBED_MS = 8000;
 
 function idDoYoutube(url: string): string | null {
   try {
@@ -93,7 +96,16 @@ export function VideoEmbed({
   useEffect(() => {
     if (!visivel || !eTiktok || idTiktok || falhouTiktok) return;
     let cancelado = false;
-    fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`)
+    // Rede ruim não deixa o bloco 9:16 em "Carregando o vídeo" sem fim (V7, item 4 do PROXIMO.md): sem rede nem
+    // tenta, e com rede lenta desiste em 8 s. Nos dois casos cai no link para a plataforma, pelo mesmo caminho
+    // da falha (assíncrono).
+    const pedido =
+      navigator.onLine === false
+        ? Promise.reject(new Error("sem rede"))
+        : fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`, {
+            signal: AbortSignal.timeout(TEMPO_LIMITE_OEMBED_MS),
+          });
+    pedido
       .then((resposta) => {
         if (!resposta.ok) throw new Error("oembed do tiktok falhou");
         return resposta.json() as Promise<{ embed_product_id?: string; html?: string }>;

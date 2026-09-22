@@ -42,6 +42,13 @@ export const textosReferencias = {
   salvar: "Salvar",
   salvando: "salvando",
   salvo: "Salvo",
+  /** V7, item 4 do PROXIMO.md: o salvar não deu certo e o marcador voltou ao que era. */
+  erroAoSalvar: "Não conseguimos salvar agora. Tente de novo.",
+  erroAoSalvarSemRede: "Sem conexão agora. Não conseguimos salvar; tente de novo quando a rede voltar.",
+  /** Busca, período, abas e filtros vão ao servidor: sem rede a tela avisa em vez de navegar (V7, item 8). */
+  semConexaoParaBuscar: "Busca e filtros precisam de conexão.",
+  /** No lugar da contagem, enquanto a busca nova não chegou. */
+  buscando: "buscando os vídeos",
   contaNaoIdentificada: "conta não identificada",
 
   // A folha de detalhes ("Por que esse funcionou")
@@ -51,8 +58,8 @@ export const textosReferencias = {
   usarComoReferencia: "Usar como referência",
   abrirNaPlataforma: "Abrir na plataforma",
   toast: "salvo; entra como referência no seu briefing",
-  embedAlt: (conta: string) => `vídeo de ${conta}, 9 por 16, carrega ao entrar na tela`,
-  embedCarregando: "vídeo embedado 9:16 · carrega ao entrar na tela",
+  embedAlt: (conta: string) => `vídeo de ${conta}`,
+  embedCarregando: "Carregando o vídeo",
 
   // Estados vazio e erro
   vazioTitulo: "Nada fora da curva com esses filtros",

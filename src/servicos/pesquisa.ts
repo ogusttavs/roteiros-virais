@@ -743,14 +743,16 @@ export async function referenciasDoNicho(
     proporcaoBrasil,
   );
   /**
-   * O teto por conta (V6, atualização do `PROXIMO.md`): só no segmento "Fora
-   * da curva" (`apenasIds` é o segmento "Salvos", uma lista pequena e
-   * intencional, sem sentido limitar por conta ali). No máximo 2 cartões
-   * seguidos da mesma conta, no máximo 3 no total.
+   * O teto por conta (V6, atualização do `PROXIMO.md`; ajuste do item 0 da
+   * V7: vídeo sem conta, `contaId` nulo, não entra na conta de teto
+   * nenhuma, nunca disputa espaço com outro vídeo sem conta). Só no
+   * segmento "Fora da curva" (`apenasIds` é o segmento "Salvos", uma lista
+   * pequena e intencional, sem sentido limitar por conta ali). No máximo 2
+   * cartões seguidos da mesma conta, no máximo 3 no total.
    */
   const comTetoPorConta = filtros.apenasIds
     ? comProporcao
-    : aplicarTetoPorConta(comProporcao, (l) => l.contaId ?? -1);
+    : aplicarTetoPorConta(comProporcao, (l) => l.contaId);
 
   return {
     total: contagem[0]?.total ?? 0,

@@ -3,7 +3,7 @@
 import { Check, RefreshCw, Video } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 
 import type { ConteudoRoteiro, Objetivo, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -11,7 +11,9 @@ import type { Constancia } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
+import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
 import { useTrocaMarca } from "../../_casca/TrocaMarcaContext";
@@ -129,6 +131,30 @@ export function HojeTela({
   const [outrosAbertos, setOutrosAbertos] = useState(false);
   const diasGravados = semana.filter((dia) => dia.gravou).length;
   const { trocando, marcaAlvo } = useTrocaMarca();
+  const { semConexao, avisarFalhaDeRede } = useConexao();
+  // Toque que só navega (ou atualiza) espera a resposta do servidor sem mostrar nada; com sinal fraco parecia travado
+  // e o segundo toque só descartava o primeiro (V7, item 4 do PROXIMO.md). `acao` diz qual toque está em andamento.
+  const [ocupado, iniciarTransicao] = useTransition();
+  const [acao, setAcao] = useState<string | null>(null);
+  const emAndamento = (chave: string) => ocupado && acao === chave;
+  const atualizando = emAndamento("atualizar");
+
+  function ir(chave: string, destino: string) {
+    if (ocupado) return;
+    setAcao(chave);
+    iniciarTransicao(() => router.push(destino));
+  }
+
+  function atualizar() {
+    if (ocupado) return;
+    // Sem rede o pedido cai e o Next sai da tela inteira para a página de erro do navegador; avisa em vez de tentar.
+    if (!navigator.onLine) {
+      avisarFalhaDeRede();
+      return;
+    }
+    setAcao("atualizar");
+    iniciarTransicao(() => router.refresh());
+  }
 
   return (
     <div className={styles.pagina}>
@@ -141,9 +167,16 @@ export function HojeTela({
               type="button"
               className={styles.botaoBarra}
               aria-label={textosHoje.atualizar}
-              onClick={() => router.refresh()}
+              aria-busy={atualizando || undefined}
+              disabled={ocupado}
+              onClick={atualizar}
             >
-              <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" />
+              <RefreshCw
+                size={18}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className={atualizando ? styles.girando : undefined}
+              />
               {marcas.length <= 1 ? <span>{textosHoje.atualizar}</span> : null}
             </button>
           </>
@@ -245,13 +278,19 @@ export function HojeTela({
                               </span>
                               <span className={styles.temaOutro}>{tema.titulo}</span>
                             </span>
-                            <button
-                              type="button"
-                              className={styles.trocar}
-                              onClick={() => router.push(`/hoje/objetivo?tema=${indice}`)}
-                            >
-                              {textosHoje.trocar}
-                            </button>
+                            <span className={styles.acaoOutro}>
+                              <button
+                                type="button"
+                                className={styles.trocar}
+                                disabled={ocupado || semConexao}
+                                aria-busy={emAndamento(`trocar-${indice}`) || undefined}
+                                aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                                onClick={() => ir(`trocar-${indice}`, `/hoje/objetivo?tema=${indice}`)}
+                              >
+                                {emAndamento(`trocar-${indice}`) ? textosHoje.abrindo : textosHoje.trocar}
+                              </button>
+                              <MotivoSemRede />
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -275,7 +314,10 @@ export function HojeTela({
                       evidencia={evidenciasTemas[indice] ?? null}
                       primario={indice === 0}
                       rotuloBotao={textosHoje.queroEsse}
-                      onEscolher={() => router.push(`/hoje/objetivo?tema=${indice}`)}
+                      abrindo={emAndamento(`tema-${indice}`)}
+                      desabilitado={ocupado}
+                      precisaDeRede
+                      onEscolher={() => ir(`tema-${indice}`, `/hoje/objetivo?tema=${indice}`)}
                     />
                   ))}
                 </div>
@@ -286,10 +328,14 @@ export function HojeTela({
                   <button
                     type="button"
                     className={styles.botaoSecundario}
-                    onClick={() => router.push("/hoje/tema-livre")}
+                    disabled={ocupado || semConexao}
+                    aria-busy={emAndamento("proprio") || undefined}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => ir("proprio", "/hoje/tema-livre")}
                   >
-                    {textosHoje.escreverMeuAssunto}
+                    {emAndamento("proprio") ? textosHoje.abrindo : textosHoje.escreverMeuAssunto}
                   </button>
+                  <MotivoSemRede />
                 </div>
               </div>
 

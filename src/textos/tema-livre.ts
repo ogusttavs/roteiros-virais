@@ -19,6 +19,14 @@ export const textosTemaLivre = {
   placeholder:
     "Uma cliente me perguntou hoje se dá para usar o produto em sofá de camurça, e eu não soube responder de primeira.",
   salvaSozinho: "salva sozinho, dá para sair e voltar",
+  /**
+   * Troca a frase acima enquanto o rascunho não conseguiu ir para o servidor
+   * (V7, item 4 do PROXIMO.md): a promessa "salva sozinho" seria falsa. Mesma
+   * frase de `PerguntaCampo` (briefing), no mesmo tom.
+   */
+  rascunhoComErro: "não conseguimos salvar; o texto ainda está só nesta tela",
+  /** Enquanto uma tela abre depois do toque (V7, item 4): o botão que foi tocado diz isto. */
+  abrindo: "Abrindo",
   contador: (n: number) => `${n} caractere${n === 1 ? "" : "s"}`,
   campoVazio: "escreva um assunto antes de avaliar",
   avaliar: "Avaliar o tema",

@@ -2,14 +2,20 @@
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* O Toast de "resposta pendente" (ComecarWizard.tsx) fica logo acima da barra fixa de baixo: a altura
+     do botao mais o respiro dela mais uma folga (V7, item 4 do PROXIMO.md). */
+  --toast-base: calc(var(--altura-toque-lg) + var(--espaco-3) * 2 + var(--espaco-4));
 }
 
+/* O nome e o Sair descem pelo recorte do aparelho (`--area-topo`, base.css): com a tela cobrindo tudo
+   (viewport-fit=cover) eles caiam por baixo da hora e da ilha do iPhone (V7, item 2 do PROXIMO.md). */
 .cabecalho {
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
-  height: 56px;
+  height: calc(56px + var(--area-topo));
   padding: 0 var(--margem-celular);
+  padding-top: var(--area-topo);
   flex: none;
 }
 

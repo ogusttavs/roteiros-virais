@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="robots" content="noindex" />
+    <title>Sem conexão</title>
+    <!--
+      Página do service worker (V7, item 8 do PROXIMO.md): guardada na instalação e
+      mostrada quando a rede cai numa tela que não foi guardada. Autossuficiente de
+      propósito (sem CSS nem script do app, que talvez nem estejam guardados). As
+      cores repetem o claro e o escuro de src/ui/tokens.css (--cor-fundo, --cor-titulo,
+      --cor-texto, --cor-acao); public/ não passa pelo checar-tokens, então a mão
+      precisa acompanhar o token, e src/lib/offline.test.ts confere os valores.
+    -->
+    <style>
+      :root {
+        --fundo: #f7f7f5;
+        --titulo: #0c0c0e;
+        --texto: #1e1e22;
+        --acao: #0c0c0e;
+        --acao-texto: #ffffff;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fundo: #050506;
+          --titulo: #ffffff;
+          --texto: #eeeef0;
+          --acao: #f5f5f7;
+          --acao-texto: #0c0c0e;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        min-height: 100dvh;
+        padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
+          max(24px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
+        background: var(--fundo);
+        color: var(--texto);
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        font-size: 1rem;
+        line-height: 1.5;
+      }
+      main {
+        max-width: 28rem;
+      }
+      h1 {
+        margin: 0 0 12px;
+        color: var(--titulo);
+        font-size: 1.75rem;
+        line-height: 1.2;
+      }
+      p {
+        margin: 0 0 24px;
+      }
+      a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 44px;
+        padding: 0 24px;
+        border-radius: 999px;
+        background: var(--acao);
+        color: var(--acao-texto);
+        font-weight: 600;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sem conexão</h1>
+      <p>
+        Esta tela precisa de internet. O roteiro que você abriu por último e o modo gravação dele
+        continuam disponíveis sem rede.
+      </p>
+      <a href="/hoje">Voltar para o Hoje</a>
+    </main>
+  </body>
+</html>

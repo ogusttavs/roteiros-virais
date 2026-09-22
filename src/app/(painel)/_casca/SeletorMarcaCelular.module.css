@@ -41,6 +41,12 @@
   min-height: var(--altura-toque);
   display: flex;
   align-items: center;
+  /* O botao nativo desenhava um retangulo cinza com borda em volta da pilula (aparece nas capturas do PR #47): so a pilula e visivel. */
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
 
 .pilula {
@@ -113,7 +119,9 @@
   z-index: 51;
   display: grid;
   gap: var(--espaco-4);
+  /* dvh acompanha as barras do navegador (V7, item 2 do PROXIMO.md); o vh antes fica de reserva para iOS anterior ao 15.4. */
   max-height: 80vh;
+  max-height: 80dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-6) + env(safe-area-inset-bottom, 0px));
@@ -239,12 +247,18 @@
   color: var(--cor-texto-suave);
 }
 
+/**
+ * O aviso de falha da troca some sozinho em 6 s (`TrocaMarcaContext.tsx`) e nao
+ * captura toque (V7, item 4 do PROXIMO.md): sem isto ele ficava por cima da
+ * barra de acoes do Roteiro e das abas, tomando o toque dessa faixa.
+ */
 .erro {
   position: fixed;
   left: var(--margem-celular);
   right: var(--margem-celular);
   bottom: calc(64px + var(--espaco-4) + env(safe-area-inset-bottom));
   z-index: 52;
+  pointer-events: none;
   padding: var(--espaco-3);
   border-radius: var(--raio-md);
   background: var(--cor-superficie);

@@ -8,6 +8,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
 import { Chips } from "@/ui/componentes/Chips";
 import { Toast } from "@/ui/componentes/Toast";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { salvarContaAction } from "./acoes";
 import styles from "./page.module.css";
@@ -46,12 +47,18 @@ function arredondarParaHoraCheia(horaMinuto: string): string {
   return `${hora}:00`;
 }
 
-function aplicarTema(tema: TemaPreferido) {
+/**
+ * `persistir` so depois de salvar (V7, item 4 do PROXIMO.md): tocar no chip mostra o tema na hora (o tema e
+ * local, nao precisa de rede), mas so o "salvar" bem sucedido o grava no navegador. Sem isso, quem toca
+ * "Escuro" e sai sem salvar ficaria escuro a cada recarga com a conta guardando "do sistema".
+ */
+function aplicarTema(tema: TemaPreferido, persistir: boolean) {
   if (tema === "claro" || tema === "escuro") {
     document.documentElement.setAttribute("data-tema", tema);
   } else {
     document.documentElement.removeAttribute("data-tema");
   }
+  if (!persistir) return;
   try {
     localStorage.setItem("tema", tema);
   } catch {
@@ -78,6 +85,8 @@ export function FormularioConta({
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [toastAberto, setToastAberto] = useState(false);
+  const tratarFalha = useTratarFalha();
+  const { avisarRedeOk } = useConexao();
 
   const indiceTema = OPCOES_TEMA.findIndex((opcao) => opcao.valor === tema);
 
@@ -92,10 +101,13 @@ export function FormularioConta({
     setSalvando(true);
     try {
       await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete: horaArredondada });
-      aplicarTema(tema);
+      avisarRedeOk();
+      // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
+      aplicarTema(tema, true);
       setToastAberto(true);
-    } catch {
-      setErro(textosConta.erro);
+    } catch (falha) {
+      // Sem rede, a causa é a rede (V7, item 4 do PROXIMO.md), não "tente de novo em um minuto".
+      setErro(tratarFalha(falha, textosConta.erro));
     } finally {
       setSalvando(false);
     }
@@ -136,7 +148,13 @@ export function FormularioConta({
             rotuloGrupo={textosConta.tema}
             opcoes={OPCOES_TEMA.map((opcao) => opcao.rotulo)}
             selecionado={indiceTema}
-            onChange={(indice) => setTema(OPCOES_TEMA[indice].valor as TemaPreferido)}
+            onChange={(indice) => {
+              // O tema é local: aplica na hora, sem esperar o servidor (sem rede o toque no chip não fazia nada).
+              // O que fica guardado na conta continua sendo só o do "salvar".
+              const escolhido = OPCOES_TEMA[indice].valor as TemaPreferido;
+              setTema(escolhido);
+              aplicarTema(escolhido, false);
+            }}
           />
         </div>
 
@@ -146,7 +164,7 @@ export function FormularioConta({
           </p>
         ) : null}
 
-        <Botao type="submit" variante="secundario" carregando={salvando} className={styles.botaoSalvar}>
+        <Botao type="submit" variante="secundario" carregando={salvando} precisaDeRede className={styles.botaoSalvar}>
           {salvando ? textosConta.salvando : textosConta.salvar}
         </Botao>
       </form>

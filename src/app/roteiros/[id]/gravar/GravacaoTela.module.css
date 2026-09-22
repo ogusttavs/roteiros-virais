@@ -9,6 +9,15 @@
  * ligado para as outras rotas depois de uma navegação do lado do cliente).
  */
 .gravacao {
+  /* Com o celular deitado (o jeito mais provável de gravar) o entalhe e a ilha ficam nas bordas de lado: o
+     recuo das barras e dos controles é a margem de sempre ou a área segura, a maior (V7, item 2 do PROXIMO.md).
+     Só nesta tela: as demais ficam em retrato. */
+  --recuo-esq: max(var(--margem-celular), env(safe-area-inset-left, 0px));
+  --recuo-dir: max(var(--margem-celular), env(safe-area-inset-right, 0px));
+  /* Acima dos controles (o botão de 3.75rem mais o recuo de cima e o de baixo, --espaco-8), com mais um
+     --espaco-8 de folga para a linha "Precisa de conexão." que aparece dentro deles sem rede: o aviso de falha
+     nunca cai sobre os três botões (V7, item 4). */
+  --toast-base: calc(3.75rem + var(--espaco-8) + var(--espaco-8));
   height: 100dvh;
   overflow: hidden;
   display: grid;
@@ -21,7 +30,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--espaco-3);
-  padding: var(--espaco-3) var(--margem-celular);
+  padding: var(--espaco-3) var(--recuo-dir) var(--espaco-3) var(--recuo-esq);
   padding-top: calc(var(--espaco-3) + env(safe-area-inset-top, 0px));
   border-bottom: var(--largura-borda) solid var(--cor-divisor);
 }
@@ -119,11 +128,17 @@
   box-shadow: var(--sombra-foco);
 }
 
+/* A saída está abrindo a tela do roteiro (V7, item 4): desabilitada até ela chegar. */
+.botaoSair:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: progress;
+}
+
 .palco {
   display: grid;
   align-content: center;
   gap: var(--espaco-6);
-  padding: var(--espaco-6) var(--margem-celular);
+  padding: var(--espaco-6) var(--recuo-dir) var(--espaco-6) var(--recuo-esq);
   overflow-y: auto;
 }
 
@@ -195,10 +210,19 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--espaco-3);
   align-items: center;
-  padding: var(--espaco-4) var(--margem-celular);
+  padding: var(--espaco-4) var(--recuo-dir) var(--espaco-4) var(--recuo-esq);
   padding-bottom: calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
   border-top: var(--largura-borda) solid var(--cor-divisor);
   background: var(--cor-superficie);
+}
+
+/* "Precisa de conexão." (V7, item 8): numa linha própria embaixo dos três botões, a largura toda, sem cobrir nenhum. */
+.motivoSemRede {
+  grid-column: 1 / -1;
+  margin: 0;
+  text-align: center;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
 }
 
 .redondo {
@@ -267,11 +291,14 @@
     font-size: var(--tamanho-gravacao-lg);
   }
 
+  /* Um iPhone deitado passa dos 768 px de largura e ainda tem entalhe: a margem larga também cede à área segura. */
   .palco {
-    padding-inline: var(--espaco-8);
+    padding-left: max(var(--espaco-8), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--espaco-8), env(safe-area-inset-right, 0px));
   }
 
   .controles {
-    padding-inline: var(--espaco-8);
+    padding-left: max(var(--espaco-8), env(safe-area-inset-left, 0px));
+    padding-right: max(var(--espaco-8), env(safe-area-inset-right, 0px));
   }
 }

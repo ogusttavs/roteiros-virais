@@ -1,12 +1,26 @@
 .pagina {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .corpo {
-  padding: calc(56px + env(safe-area-inset-top) + var(--espaco-6)) var(--margem-celular)
+  padding: calc(56px + var(--area-topo) + var(--espaco-6)) var(--margem-celular)
     calc(64px + var(--espaco-6) + env(safe-area-inset-bottom));
   max-width: var(--largura-leitura);
   margin: 0 auto;
+}
+
+/**
+ * V7, item 2 do PROXIMO.md: o Toast das telas que nao definem base propria
+ * (Conta, Referencias) sobe acima da capsula das abas, que ocupa 62px na
+ * base. As telas com barra de acoes propria (o Roteiro) definem
+ * `--toast-base` no proprio container, e esse valor, mais perto do Toast,
+ * vale por cima deste.
+ */
+@media (max-width: 767px) {
+  .pagina {
+    --toast-base: calc(62px + var(--espaco-4));
+  }
 }
 
 .colunaDesktop {
@@ -51,6 +65,11 @@
   display: none;
 }
 
+/** V7, item 0c: some com o teclado aberto, para nao cobrir o campo em foco. */
+.barraInferior.escondidaTeclado {
+  display: none;
+}
+
 @media (min-width: 768px) {
   .pagina {
     display: flex;
@@ -79,8 +98,8 @@
      * porque nao ha cabecalho acima dela no desktop.
      */
     position: sticky;
-    top: 0;
-    height: 100dvh;
+    top: var(--area-topo);
+    height: calc(100dvh - var(--area-topo));
     overflow-y: auto;
     transition: width var(--duracao-rapida) var(--curva-saida);
   }

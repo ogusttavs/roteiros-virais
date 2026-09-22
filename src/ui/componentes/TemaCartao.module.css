@@ -114,7 +114,7 @@
   color: var(--cor-acao-texto);
 }
 
-.botaoPrimario:hover {
+.botaoPrimario:hover:not(:disabled) {
   background: var(--cor-acao-hover);
 }
 
@@ -125,7 +125,7 @@
   font-weight: var(--peso-medio);
 }
 
-.botaoSecundario:hover {
+.botaoSecundario:hover:not(:disabled) {
   background: var(--cor-superficie-hover);
 }
 
@@ -134,9 +134,29 @@
   box-shadow: var(--sombra-foco);
 }
 
+/* Desabilitado (V7, item 4): outra tela já está abrindo, ou sem conexão. O cartão tocado ("Abrindo") fica inteiro. */
+.botao:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botao[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+/* "Precisa de conexão." embaixo do botão (V7, item 8); tamanho e cor vêm de MotivoSemRede. */
+.rodape .motivo {
+  margin-top: var(--espaco-2);
+}
+
 @media (min-width: 768px) {
   .botao {
     width: auto;
     justify-self: start;
+  }
+
+  .rodape .motivo {
+    text-align: left;
   }
 }

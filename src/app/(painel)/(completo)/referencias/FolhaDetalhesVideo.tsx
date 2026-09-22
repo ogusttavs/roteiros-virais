@@ -6,8 +6,10 @@ import { formatarViewsExato } from "@/lib/formatarNumero";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
+import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
+import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
 
 import styles from "./FolhaDetalhesVideo.module.css";
 
@@ -15,8 +17,10 @@ type Props = {
   video: VideoFormatado | null;
   url: string | null;
   aberto: boolean;
+  /** O `fechar` do `useFolhaNoHistorico` de quem abre a folha (o botão Voltar do celular também fecha). */
   aoFechar: () => void;
   salvo: boolean;
+  /** A gravação deste vídeo está em andamento: o botão principal mostra o andamento e nenhum dos dois aceita toque duplo. */
   salvando?: boolean;
   onUsarComoReferencia: () => void;
   onSalvar: () => void;
@@ -36,6 +40,7 @@ function linhaVelocidade(velocidade: number | null): string {
  * Decisões pendentes).
  */
 export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvando = false, onUsarComoReferencia, onSalvar }: Props) {
+  const { semConexao } = useConexao();
   if (!video || !url) return null;
 
   return (
@@ -45,7 +50,8 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
       aoFechar={aoFechar}
       rodape={
         <>
-          <Botao variante="primario" tamanho="lg" onClick={onUsarComoReferencia}>
+          {/* Já salvo, o botão só fecha a folha e avisa (sem chamar o servidor), então não precisa de rede. */}
+          <Botao variante="primario" tamanho="lg" carregando={salvando} precisaDeRede={!salvo} onClick={onUsarComoReferencia}>
             {textosReferencias.usarComoReferencia}
           </Botao>
           <div className={styles.linhaPe}>
@@ -57,13 +63,16 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
               type="button"
               aria-pressed={salvo}
               aria-label={salvando ? textosReferencias.salvando : salvo ? textosReferencias.salvo : textosReferencias.salvar}
-              disabled={salvando}
+              disabled={salvando || semConexao}
+              aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
               onClick={onSalvar}
               className={styles.botaoSalvar}
             >
               <Bookmark size={20} strokeWidth={1.5} fill={salvo ? "currentColor" : "none"} aria-hidden="true" />
             </button>
           </div>
+          {/* Salvo, o botão principal não precisa de rede e não escreve o motivo; o de desfazer o salvo escreve aqui. */}
+          {salvo ? <MotivoSemRede /> : null}
         </>
       }
     >

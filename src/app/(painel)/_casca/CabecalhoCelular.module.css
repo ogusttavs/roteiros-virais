@@ -7,9 +7,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  padding: 0 var(--margem-celular);
-  margin-top: env(safe-area-inset-top);
+  /* Cobre tambem a faixa do recorte do aparelho (senao o conteudo rola visivel atras da hora e da ilha). */
+  height: calc(56px + var(--area-topo));
+  padding: var(--area-topo) var(--margem-celular) 0;
   background: var(--cor-fundo);
   transition: transform var(--duracao-base) var(--curva-saida);
 }
@@ -50,6 +50,23 @@
 .botaoBarra:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
+}
+
+/** Atualizando (V7, item 4 do PROXIMO.md): o icone gira ate a tela nova chegar; o botao fica desabilitado, sem toque duplo. */
+.girando {
+  animation: girar 0.9s linear infinite;
+}
+
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .girando {
+    animation-duration: 1.6s;
+  }
 }
 
 /** Com marca (varias ou uma so ainda sem pilula), o rotulo "Atualizar" cede o lugar, so o icone fica (Casca.dc.html). */

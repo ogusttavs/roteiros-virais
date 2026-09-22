@@ -16,6 +16,8 @@
   inset: 0;
   z-index: 50;
   background: var(--cor-sobreposicao);
+  /* V7, item 1 do PROXIMO.md: arrastar no véu não rola a página de trás (o `base.css` trava a rolagem do `html`). */
+  touch-action: none;
 }
 
 /* Vidro, mais opaco que o das barras (V5, item 4): texto longo passa por
@@ -28,7 +30,9 @@
   z-index: 51;
   display: grid;
   gap: var(--espaco-4);
+  /* `vh` fica como reserva; `dvh` acompanha a barra do navegador que sobe e desce no celular (V7, item 3 do PROXIMO.md). */
   max-height: 80vh;
+  max-height: 80dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-6) + env(safe-area-inset-bottom, 0px));
@@ -49,10 +53,79 @@
   background: var(--cor-borda-forte);
 }
 
+/**
+ * A área de arrastar (`usePuxarParaFechar`, V7, item 1 do PROXIMO.md): pelo
+ * menos 44px de altura em volta da alça de 5px, para o dedo acertar, e sem
+ * seleção de texto para o arrasto não marcar nada. As margens negativas
+ * devolvem o padding do painel e o vão da grade para dentro da área: a alça
+ * continua no mesmo lugar de antes e só o conteúdo desce um pouco. Some do
+ * tablet para cima, junto com a alça.
+ */
+.areaAlca {
+  display: grid;
+  justify-items: center;
+  align-items: start;
+  min-height: var(--altura-toque);
+  margin-top: calc(-1 * var(--espaco-3));
+  margin-bottom: calc(-1 * var(--espaco-4));
+  padding-top: var(--espaco-3);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/**
+ * O painel "reprovar" (o mais alto dos quatro) usa isto em vez de `.painel`
+ * (V7, item 3): o rodapé com o botão principal fica fora da área que rola,
+ * então ele continua dentro da área visível mesmo com a viewport reduzida
+ * (achado do e2e de layout a 390 x 500). Mesma ideia de `Folha.module.css`
+ * (`.folhaCorpo` / `.folhaPe`), adaptada ao painel ancorado embaixo.
+ */
+.painelComRodape {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 51;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: var(--espaco-2);
+  max-height: 80vh;
+  max-height: 80dvh;
+  padding: var(--espaco-3) 0 0;
+  background: var(--cor-material-menu);
+  backdrop-filter: var(--desfoque-barra);
+  -webkit-backdrop-filter: var(--desfoque-barra);
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-folha) var(--raio-folha) 0 0;
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
+  outline: none;
+}
+
+.painelComRodape .areaAlca {
+  margin-bottom: calc(-1 * var(--espaco-2));
+}
+
+.corpo {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: var(--espaco-4);
+  padding: 0 var(--margem-celular);
+}
+
+.rodape {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-4) + env(safe-area-inset-bottom, 0px));
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
 @media (min-width: 768px) {
   .veu {
     /* Do tablet para cima o painel fecha ao clicar fora (sem fundo escurecido, que é so do celular). */
     background: transparent;
+    /* E o menu ali continua fechando ao rolar a página (`PainelFlutuante.tsx`): o arrasto no véu precisa rolar. */
+    touch-action: auto;
   }
 
   .painel {
@@ -62,11 +135,13 @@
     top: calc(56px + env(safe-area-inset-top, 0px) + var(--espaco-2));
     width: min(20rem, calc(100vw - var(--espaco-8)));
     max-height: min(28rem, calc(100vh - 6rem));
+    max-height: min(28rem, calc(100dvh - 6rem));
     padding: var(--espaco-3);
     border-radius: var(--raio-lg);
   }
 
-  .alca {
+  .alca,
+  .areaAlca {
     display: none;
   }
 }

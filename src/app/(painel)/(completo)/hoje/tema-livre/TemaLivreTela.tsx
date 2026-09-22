@@ -2,7 +2,7 @@
 
 import { ArrowLeft, CircleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
@@ -13,6 +13,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { EsperaEtapas } from "@/ui/componentes/EsperaEtapas";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { NotasLinha } from "@/ui/componentes/NotaLinha";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { avaliarTemaAction, salvarRascunhoAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
@@ -70,18 +71,72 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
   const [fase, setFase] = useState<Fase>("proposta");
   const [resultado, setResultado] = useState<ResultadoAvaliarTema | null>(null);
   const [campoVazio, setCampoVazio] = useState(false);
+  // A frase da tela de erro: a de sempre (falha do servidor, "a falha foi nossa") ou a de rede (V7, item 4).
+  const [fraseErro, setFraseErro] = useState(textosTemaLivre.textoErro);
+  const [rascunhoComErro, setRascunhoComErro] = useState(false);
   const timerRascunhoRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // O que a pessoa digitou por último, e se isso ainda não chegou ao servidor (o reenvio depende dos dois).
+  const textoAtualRef = useRef(temaInicial);
+  const rascunhoPendenteRef = useRef(false);
   const botaoRef = useRef<HTMLDivElement>(null);
+  const tratarFalha = useTratarFalha();
+  const { avisarRedeOk } = useConexao();
+  // Toque que só navega espera o servidor sem mostrar nada; "Abrindo" no botão tocado, os outros desabilitados
+  // (V7, item 4). `destino` diz qual toque está em andamento.
+  const [abrindo, iniciarTransicao] = useTransition();
+  const [destino, setDestino] = useState<string | null>(null);
+  const abrindoEste = (chave: string) => abrindo && destino === chave;
+  const urlObjetivo = `/hoje/objetivo?livre=${encodeURIComponent(texto)}`;
+
+  function abrir(chave: string, url: string) {
+    if (abrindo) return;
+    setDestino(chave);
+    iniciarTransicao(() => router.push(url));
+  }
+
+  // Salva sozinho, sem bloquear a digitação. Se falhar, a frase "salva sozinho" seria falsa: troca por uma
+  // honesta e o texto continua pendente para o reenvio (rede de volta, ou a pessoa trocando de app).
+  const salvarRascunho = useCallback((valor: string) => {
+    salvarRascunhoAction(valor)
+      .then(() => {
+        // Uma resposta antiga não apaga o pendente de um texto que a pessoa já mudou depois.
+        if (textoAtualRef.current !== valor) return;
+        rascunhoPendenteRef.current = false;
+        setRascunhoComErro(false);
+      })
+      .catch(() => {
+        if (textoAtualRef.current === valor) setRascunhoComErro(true);
+      });
+  }, []);
 
   function aoMudarTexto(valor: string) {
     setTexto(valor);
     setCampoVazio(false);
+    textoAtualRef.current = valor;
+    rascunhoPendenteRef.current = true;
     if (timerRascunhoRef.current) clearTimeout(timerRascunhoRef.current);
-    timerRascunhoRef.current = setTimeout(() => {
-      // Salva sozinho, sem bloquear a digitação; falhou, tenta de novo na próxima tecla, sem aviso (PROXIMO.md, item 2).
-      salvarRascunhoAction(valor).catch(() => {});
-    }, 800);
+    timerRascunhoRef.current = setTimeout(() => salvarRascunho(valor), 800);
   }
+
+  // Reenvia o que ficou pendente quando a rede volta e quando a aba vai para o fundo (o iOS descarta aba
+  // escondida: sem isto o texto digitado sumia com a tela dizendo que estava salvo). O que ainda esperava o
+  // debounce também sai agora.
+  useEffect(() => {
+    function reenviarPendente() {
+      if (!rascunhoPendenteRef.current) return;
+      if (timerRascunhoRef.current) clearTimeout(timerRascunhoRef.current);
+      salvarRascunho(textoAtualRef.current);
+    }
+    function aoMudarVisibilidade() {
+      if (document.visibilityState === "hidden") reenviarPendente();
+    }
+    window.addEventListener("online", reenviarPendente);
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+    return () => {
+      window.removeEventListener("online", reenviarPendente);
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
+    };
+  }, [salvarRascunho]);
 
   function avaliar(textoParaAvaliar: string) {
     const limpo = textoParaAvaliar.trim();
@@ -95,11 +150,16 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
     avaliarTemaAction(limpo)
       .then((dados) => {
+        avisarRedeOk();
         setTexto(limpo);
         setResultado(dados);
         setFase(dados.nota >= notaMinima ? "naMeta" : "abaixoDaMeta");
       })
-      .catch(() => setFase("erro"));
+      .catch((falha) => {
+        // Rede caída não é "falha nossa": a frase de rede diz o que aconteceu, e o texto continua na tela.
+        setFraseErro(tratarFalha(falha, textosTemaLivre.textoErro));
+        setFase("erro");
+      });
   }
 
   // No celular o teclado não pode cobrir o botão de avaliar (item 1, PROXIMO.md): quando o
@@ -133,8 +193,10 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
           <button
             type="button"
             aria-label={textosTemaLivre.voltar}
+            aria-busy={abrindoEste("voltar") || undefined}
+            disabled={abrindo}
             className={styles.botaoBarra}
-            onClick={() => router.push("/hoje")}
+            onClick={() => abrir("voltar", "/hoje")}
           >
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -160,11 +222,13 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
                 caixaAlta="longa"
               />
               <div className={styles.campoRodape}>
-                <span>{textosTemaLivre.salvaSozinho}</span>
+                <span className={rascunhoComErro ? styles.rascunhoComErro : undefined} aria-live="polite">
+                  {rascunhoComErro ? textosTemaLivre.rascunhoComErro : textosTemaLivre.salvaSozinho}
+                </span>
                 <span className={styles.contador}>{textosTemaLivre.contador(texto.length)}</span>
               </div>
               <div ref={botaoRef}>
-                <Botao variante="primario" tamanho="lg" onClick={() => avaliar(texto)}>
+                <Botao variante="primario" tamanho="lg" precisaDeRede onClick={() => avaliar(texto)}>
                   {textosTemaLivre.avaliar}
                 </Botao>
               </div>
@@ -178,7 +242,13 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
             <span className={styles.rotulo}>{textosTemaLivre.oQueEscreveu}</span>
             <p className={styles.textoProposto}>{texto}</p>
             {fase !== "esperando" ? (
-              <Botao variante="ghost" tamanho="md" onClick={() => setFase("proposta")} className={styles.botaoEditar}>
+              <Botao
+                variante="ghost"
+                tamanho="md"
+                disabled={abrindo}
+                onClick={() => setFase("proposta")}
+                className={styles.botaoEditar}
+              >
                 {textosTemaLivre.editarTexto}
               </Botao>
             ) : null}
@@ -212,8 +282,14 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
 
         {fase === "naMeta" ? (
           <div className={styles.acaoUnica}>
-            <Botao variante="primario" tamanho="lg" onClick={() => router.push(`/hoje/objetivo?livre=${encodeURIComponent(texto)}`)}>
-              {textosTemaLivre.escreverRoteiro}
+            <Botao
+              variante="primario"
+              tamanho="lg"
+              precisaDeRede
+              disabled={abrindo}
+              onClick={() => abrir("objetivo", urlObjetivo)}
+            >
+              {abrindoEste("objetivo") ? textosTemaLivre.abrindo : textosTemaLivre.escreverRoteiro}
             </Botao>
             <p className={styles.notaRodape}>{textosTemaLivre.proximaTelaObjetivo}</p>
           </div>
@@ -228,15 +304,23 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
               <span className={styles.rotulo}>{textosTemaLivre.anguloTitulo}</span>
               <h2 className={styles.anguloNome}>{resultado.anguloSugerido}</h2>
               <div className={styles.duasAcoes}>
-                <Botao variante="primario" tamanho="lg" onClick={() => avaliar(resultado.anguloSugerido!)}>
+                <Botao
+                  variante="primario"
+                  tamanho="lg"
+                  precisaDeRede
+                  disabled={abrindo}
+                  onClick={() => avaliar(resultado.anguloSugerido!)}
+                >
                   {textosTemaLivre.usarAngulo}
                 </Botao>
                 <Botao
                   variante="secundario"
                   tamanho="lg"
-                  onClick={() => router.push(`/hoje/objetivo?livre=${encodeURIComponent(texto)}`)}
+                  precisaDeRede
+                  disabled={abrindo}
+                  onClick={() => abrir("objetivo", urlObjetivo)}
                 >
-                  {textosTemaLivre.seguirMeu}
+                  {abrindoEste("objetivo") ? textosTemaLivre.abrindo : textosTemaLivre.seguirMeu}
                 </Botao>
               </div>
             </section>
@@ -245,9 +329,11 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
               <Botao
                 variante="secundario"
                 tamanho="lg"
-                onClick={() => router.push(`/hoje/objetivo?livre=${encodeURIComponent(texto)}`)}
+                precisaDeRede
+                disabled={abrindo}
+                onClick={() => abrir("objetivo", urlObjetivo)}
               >
-                {textosTemaLivre.seguirMeu}
+                {abrindoEste("objetivo") ? textosTemaLivre.abrindo : textosTemaLivre.seguirMeu}
               </Botao>
             </div>
           )
@@ -260,13 +346,24 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
               {textosTemaLivre.avisoErro}
             </span>
             <h2 className={styles.erroTitulo}>{textosTemaLivre.tituloErro}</h2>
-            <p>{textosTemaLivre.textoErro}</p>
+            <p>{fraseErro}</p>
             <div className={styles.duasAcoes}>
-              <Botao variante="primario" tamanho="lg" onClick={() => avaliar(texto)}>
+              <Botao
+                variante="primario"
+                tamanho="lg"
+                precisaDeRede
+                disabled={abrindo}
+                onClick={() => avaliar(texto)}
+              >
                 {textosComuns.tentarDeNovo}
               </Botao>
-              <Botao variante="secundario" tamanho="lg" onClick={() => router.push("/hoje")}>
-                {textosTemaLivre.escolherTemaDoDia}
+              <Botao
+                variante="secundario"
+                tamanho="lg"
+                disabled={abrindo}
+                onClick={() => abrir("hoje", "/hoje")}
+              >
+                {abrindoEste("hoje") ? textosTemaLivre.abrindo : textosTemaLivre.escolherTemaDoDia}
               </Botao>
             </div>
           </div>

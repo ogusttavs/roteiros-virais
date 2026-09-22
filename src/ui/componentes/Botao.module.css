@@ -115,3 +115,11 @@
     animation-duration: 1.6s;
   }
 }
+
+/** Motivo escrito de um botao que precisa de rede e esta sem (V7, item 8): curto, ao lado do botao desabilitado. */
+.motivo {
+  display: block;
+  text-align: center;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}

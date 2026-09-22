@@ -77,6 +77,6 @@ export function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|favicon-48\\.png|apple-touch-icon\\.png|icone-192\\.png|icone-512\\.png|icone-maskable-512\\.png|manifest\\.webmanifest|marca/).*)",
+    "/((?!api/auth|_next/static|_next/image|favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|favicon-48\\.png|apple-touch-icon\\.png|icone-192\\.png|icone-512\\.png|icone-maskable-512\\.png|manifest\\.webmanifest|sw\\.js|offline\\.html|marca/).*)",
   ],
 };

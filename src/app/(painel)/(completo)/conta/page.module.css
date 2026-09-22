@@ -49,7 +49,10 @@
   align-self: flex-start;
   margin-top: var(--espaco-11);
   padding: var(--espaco-2) 0;
+  min-width: var(--altura-toque);
   min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
   background: none;
   border: none;
   color: var(--cor-acao);

@@ -14,4 +14,6 @@ export const textosGravacao = {
   /** Resposta na tela depois de marcar (revisão do PR #31, item 6): o botão vira o estado feito. */
   gravado: "Gravado",
   erroMarcar: "Não deu para marcar agora; tente de novo",
+  /** A conexão caiu no meio do toque em "Marcar que gravei" (V7, item 4): marcar de novo é seguro, o roteiro só muda de estado. */
+  erroMarcarSemRede: "Sem conexão agora; marque de novo quando a rede voltar",
 };
