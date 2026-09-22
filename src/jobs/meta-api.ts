@@ -316,6 +316,87 @@ export async function buscarTopMediaDaHashtag(hashtagId: string, limite = 50): P
   return resposta.data ?? [];
 }
 
+/**
+ * Uma Pagina que o usuario do sistema do token enxerga, com a conta do
+ * Instagram ligada a ela (V8, item 1). So tem `instagramBusinessAccountId`
+ * quando a Pagina tem uma conta profissional ou de criador ligada.
+ */
+export type PaginaComInstagram = { pageId: string; pageName?: string; instagramBusinessAccountId: string; username: string };
+
+type ContaDoPortfolio = {
+  id: string;
+  name?: string;
+  instagram_business_account?: { id: string; username?: string };
+};
+
+/**
+ * As Paginas do Portfolio empresarial que o token enxerga, com a conta do
+ * Instagram de cada uma (V8, item 1; confirmado rodando de verdade em
+ * 08/09/2026, `acessos/meta-app.md`: `me/accounts?fields=name,
+ * instagram_business_account` devolveu 20 Paginas do Gustavo, cada uma com o
+ * id do Instagram ligado). So as que tem Instagram ligado entram no
+ * resultado; sem `username` (raro, a API sempre trouxe nas provas), a Pagina
+ * tambem sai, porque `resolverMetaIgId` casa pelo `username`.
+ */
+export async function buscarPaginasComInstagram(): Promise<PaginaComInstagram[]> {
+  const paginas = await buscarTodasAsPaginas<ContaDoPortfolio>("me/accounts", {
+    fields: "name,instagram_business_account{id,username}",
+  });
+  return paginas
+    .filter((pagina): pagina is ContaDoPortfolio & { instagram_business_account: { id: string; username: string } } =>
+      Boolean(pagina.instagram_business_account?.id && pagina.instagram_business_account.username),
+    )
+    .map((pagina) => ({
+      pageId: pagina.id,
+      pageName: pagina.name,
+      instagramBusinessAccountId: pagina.instagram_business_account.id,
+      username: pagina.instagram_business_account.username,
+    }));
+}
+
+/**
+ * So os campos que `curva-cliente.ts` usa (V8, item 2). `total_views_count` e
+ * o campo confirmado para midia de video (Reels inclusive) da PROPRIA conta
+ * ligada por login do Facebook, verificado em 21/09/2026 contra
+ * https://developers.facebook.com/docs/instagram-platform/reference/instagram-media/:
+ * "Total view count of video content across all surfaces", que so funciona
+ * fora da Business Discovery (o `view_count` de `BusinessDiscoveryMedia`,
+ * acima, e o equivalente so para Reels de conta de TERCEIRO). Ausente em
+ * midia que nao e video (post so de foto, carrossel).
+ */
+export type MetaMediaItem = {
+  id: string;
+  permalink?: string;
+  media_type?: string;
+  media_product_type?: string;
+  like_count?: number;
+  comments_count?: number;
+  total_views_count?: number;
+};
+
+const CAMPOS_MEDIA_DA_CONTA = "permalink,media_type,media_product_type,like_count,comments_count,total_views_count";
+
+/**
+ * A midia da propria conta do cliente, mais recente primeiro (V8, item 2):
+ * `curva-cliente.ts` casa o codigo curto do `permalink` de cada item com o
+ * `idExterno` (o codigo que a propria pagina extraiu da url que o cliente
+ * colou em "Postei") para achar o video certo, na primeira medicao. 10
+ * paginas (250 midias) cobrem de sobra um cliente que posta com frequencia
+ * normal e cujo video tem no maximo 30 dias (`LIMITE_DIAS` de `curva.ts`).
+ */
+export async function buscarMediaDaConta(igId: string, maxPaginas = 10): Promise<MetaMediaItem[]> {
+  return buscarTodasAsPaginas<MetaMediaItem>(`${igId}/media`, { fields: CAMPOS_MEDIA_DA_CONTA }, maxPaginas);
+}
+
+/**
+ * Uma midia especifica pelo id que `buscarMediaDaConta` ja achou e guardou
+ * (V8, item 2, "nas seguintes leia a midia direto pelo id, uma chamada so"):
+ * evita listar a conta inteira de novo a cada medicao.
+ */
+export async function buscarMediaPorId(mediaId: string): Promise<MetaMediaItem> {
+  return chamar<MetaMediaItem>(mediaId, { fields: CAMPOS_MEDIA_DA_CONTA });
+}
+
 /** Mesmos campos do `top_media`, mais `media_product_type` (distingue REELS de VIDEO puro, como a Business Discovery). */
 export type HashtagRecentMediaItem = HashtagTopMediaItem & { media_product_type?: string };
 

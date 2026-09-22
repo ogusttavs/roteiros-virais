@@ -398,6 +398,32 @@ test.describe("painel sem rede", () => {
     await expect(page.getByText(GANCHO)).toHaveCount(0);
   });
 
+  /**
+   * V8, item 0 (o resto da revisao do PR #53): a sessao pode acabar sem passar pelo botao Sair (o
+   * cookie vence, ou alguem apaga na mao); "/entrar" e a unica tela que aparece toda vez que isso
+   * acontece, entao ela apaga o que o aparelho guardou ao montar, mesmo sem o cliente tocar em nada.
+   */
+  test("a sessao acaba sem passar por Sair: '/entrar' apaga o que foi guardado, e sem rede o roteiro nao abre", async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page, "e2e-semrede-a");
+    await page.goto(`/roteiros/${roteiroUmId}`);
+    await esperarGuardado(page, `/roteiros/${roteiroUmId}`);
+
+    await context.clearCookies();
+    await page.goto("/entrar");
+    await expect
+      .poll(async () => (await paginasGuardadas(page)).filter((par) => par.endsWith(`/roteiros/${roteiroUmId}`)))
+      .toEqual([]);
+
+    await context.setOffline(true);
+    await page.goto(`/roteiros/${roteiroUmId}`);
+    await expect(page.getByRole("heading", { name: "Sem conexão" })).toBeVisible();
+    await expect(page.getByText(GANCHO)).toHaveCount(0);
+  });
+
   test("trocar de marca apaga o roteiro guardado da marca de antes", async ({ page, context }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-a");

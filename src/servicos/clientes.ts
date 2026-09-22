@@ -29,6 +29,7 @@ import {
 } from "@/lib/marca-ativa";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
+import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -494,13 +495,32 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
     youtube: dados.perfis.youtube?.trim() || null,
   };
 
+  /**
+   * O Instagram mudou (V8, item 1): o `meta_ig_id` que estava salvo era da
+   * conta antiga, e `resolverMetaIgId` nunca resolve de novo sozinho
+   * enquanto houver um id salvo. Zera junto com o perfil, na mesma
+   * atualizacao, para a chamada logo abaixo resolver contra o handle novo.
+   */
+  const [antes] = await db().select({ perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+  const instagramMudou = (antes?.perfis?.instagram ?? null) !== perfis.instagram;
+
   const [cliente] = await db()
     .update(clientes)
-    .set({ nome: dados.nome, perfis })
+    .set(instagramMudou ? { nome: dados.nome, perfis, metaIgId: null } : { nome: dados.nome, perfis })
     .where(eq(clientes.id, clienteId))
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar a conta; cliente nao encontrado.");
+
+  /**
+   * Dispara a resolucao do id da Meta SEM ESPERAR (V8, item 1; achado da revisao: `aguardarJanela`,
+   * `meta-api.ts`, pode demorar de verdade, quase uma hora, quando o orcamento de 200 chamadas por
+   * hora esta esgotado, e salvar o perfil e uma acao interativa que nao pode ficar presa nisso). Um
+   * cliente ja resolvido nem chama a rede. `resolverMetaIgId` pode relancar um erro de token ou de
+   * limite (para o job da curva saber parar de tentar a Meta); aqui isso e so ignorado.
+   */
+  if (perfis.instagram) void resolverMetaIgId(clienteId).catch(() => undefined);
+
   return cliente;
 }
 

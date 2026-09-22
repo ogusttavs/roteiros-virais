@@ -8,6 +8,7 @@ import { exigirAdmin } from "@/lib/sessao";
 import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
 import { membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
+import { fontesDoHistorico } from "@/servicos/curva";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { textosAdmin } from "@/textos/admin";
 import { textosHistorico } from "@/textos/historico";
@@ -44,6 +45,8 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
   if (!cliente) notFound();
 
   const roteiros = await roteirosDoCliente(cliente.id, 50);
+  const roteirosPostadosIds = roteiros.filter((r) => r.status === "postado").map((r) => r.id);
+  const fontes = await fontesDoHistorico(cliente.id, roteirosPostadosIds);
   const regras = await regrasDoCliente(cliente.id);
   const totalReprovacoes = await contarReprovacoes(cliente.id);
   const regrasAtivas = regras.filter((regra) => regra.ativa).length;
@@ -114,16 +117,21 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
                   <th>{t.colunaData}</th>
                   <th>{t.colunaTema}</th>
                   <th>{t.colunaStatus}</th>
+                  <th>{t.colunaFonte}</th>
                 </tr>
               </thead>
               <tbody>
-                {roteiros.map((roteiro) => (
-                  <tr key={roteiro.id}>
-                    <td className={styles.mono}>{formatarData(roteiro.data)}</td>
-                    <td>{roteiro.tema}</td>
-                    <td>{textosHistorico.status[roteiro.status]}</td>
-                  </tr>
-                ))}
+                {roteiros.map((roteiro) => {
+                  const fonte = fontes.get(roteiro.id);
+                  return (
+                    <tr key={roteiro.id}>
+                      <td className={styles.mono}>{formatarData(roteiro.data)}</td>
+                      <td>{roteiro.tema}</td>
+                      <td>{textosHistorico.status[roteiro.status]}</td>
+                      <td className={styles.mono}>{fonte ? t.fonteRotulo[fonte] : "-"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
