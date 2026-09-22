@@ -171,6 +171,15 @@ export const clientes = pgTable("clientes", {
    * membro dela ja abriu hoje).
    */
   ultimoAcessoEm: timestamp("ultimo_acesso_em", { withTimezone: true }),
+  /**
+   * O id numerico da conta do Instagram do cliente na Graph API da Meta (V8,
+   * item 1): so preenchido quando essa conta esta entre as Paginas que o
+   * usuario do sistema do token enxerga (`meta-ig-cliente.ts`,
+   * `resolverMetaIgId`). Nulo enquanto nao resolvido, ou quando o cliente nao
+   * tem Instagram ligado a nenhuma Pagina do nosso portfolio: nesse caso a
+   * curva continua pelo Apify, sem erro.
+   */
+  metaIgId: text("meta_ig_id"),
   criadoEm: criadoEm(),
 });
 
@@ -825,7 +834,20 @@ export const videosCliente = pgTable("videos_cliente", {
   idExterno: text("id_externo"),
   postadoEm: timestamp("postado_em", { withTimezone: true }).notNull().defaultNow(),
   ultimaColeta: timestamp("ultima_coleta", { withTimezone: true }),
+  /**
+   * O id da midia na Graph API da Meta (V8, item 2), guardado na primeira vez
+   * que `curva-cliente.ts` acha o video na conta do cliente (casando o codigo
+   * curto do `idExterno` com o `permalink` de cada midia listada). Nas
+   * medicoes seguintes, le a midia direto por este id (uma chamada so, sem
+   * listar tudo de novo). Nunca sobrescreve `idExterno`: ele continua sendo o
+   * codigo curto que monta a url do Apify (`buscarInstagramPorUrl`), a
+   * reserva de sempre se a Meta falhar.
+   */
+  metaMediaId: text("meta_media_id"),
 });
+
+/** "youtube" e "meta" sao API oficial; "apify" e raspagem por url (V8, item 3). */
+export type FonteMedida = "youtube" | "apify" | "meta";
 
 export const metricasVideoCliente = pgTable("metricas_video_cliente", {
   id: id(),
@@ -836,6 +858,8 @@ export const metricasVideoCliente = pgTable("metricas_video_cliente", {
   views: integer("views").notNull().default(0),
   likes: integer("likes").notNull().default(0),
   comentarios: integer("comentarios").notNull().default(0),
+  /** De onde veio esta medida (V8, item 3); nula no que foi medido antes desta etapa. */
+  fonte: text("fonte").$type<FonteMedida>(),
 });
 
 // ---------------------------------------------------------------------------

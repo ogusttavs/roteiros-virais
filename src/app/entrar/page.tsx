@@ -5,6 +5,7 @@ import { textosEntrar } from "@/textos/entrar";
 import { Logo } from "@/ui/Logo";
 
 import { FormularioEntrar } from "./FormularioEntrar";
+import { LimparCachesAoEntrar } from "./LimparCachesAoEntrar";
 import styles from "./page.module.css";
 
 export default async function Entrar() {
@@ -15,6 +16,7 @@ export default async function Entrar() {
 
   return (
     <div className={styles.pagina}>
+      <LimparCachesAoEntrar />
       <div className={styles.envoltorio}>
         <Logo altura={44} />
         <h1 className={styles.titulo}>{textosEntrar.titulo}</h1>

@@ -24,6 +24,9 @@ import {
   aguardarJanela,
   buscarBusinessDiscovery,
   buscarIdDaHashtag,
+  buscarMediaDaConta,
+  buscarMediaPorId,
+  buscarPaginasComInstagram,
   buscarRecentMediaDaHashtag,
   buscarTodasAsPaginas,
   buscarTopMediaDaHashtag,
@@ -313,5 +316,98 @@ describe("aguardarJanela", () => {
     // A mais antiga (inicio) sai da janela de 10s em inicio+10s; o relogio
     // falso avançou até pelo menos esse ponto.
     expect(relogio.getTime()).toBeGreaterThanOrEqual(inicio.getTime() + 10_000);
+  });
+});
+
+describe("buscarPaginasComInstagram", () => {
+  it("so as Paginas com Instagram ligado (username presente), com os campos confirmados em 08/09/2026", async () => {
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = decodeURIComponent(url.toString());
+      expect(texto).toContain("/me/accounts");
+      expect(texto).toContain("instagram_business_account{id,username}");
+      return respostaJson({
+        data: [
+          { id: "515845284934381", name: "Velura", instagram_business_account: { id: "17841463597140638", username: "veluracosmetics" } },
+          { id: "999", name: "Pagina sem Instagram" },
+        ],
+      });
+    });
+
+    expect(await buscarPaginasComInstagram()).toEqual([
+      { pageId: "515845284934381", pageName: "Velura", instagramBusinessAccountId: "17841463597140638", username: "veluracosmetics" },
+    ]);
+  });
+
+  it("segue a paginacao (me/accounts pode ter mais de uma pagina de Paginas)", async () => {
+    mockFetch
+      .mockResolvedValueOnce(
+        respostaJson({
+          data: [{ id: "1", instagram_business_account: { id: "ig1", username: "um" } }],
+          paging: { cursors: { after: "cursor-2" } },
+        }),
+      )
+      .mockResolvedValueOnce(
+        respostaJson({ data: [{ id: "2", instagram_business_account: { id: "ig2", username: "dois" } }] }),
+      );
+
+    const paginas = await buscarPaginasComInstagram();
+    expect(paginas.map((p) => p.username)).toEqual(["um", "dois"]);
+  });
+
+  it("devolve lista vazia sem nenhuma Pagina com Instagram", async () => {
+    mockFetch.mockResolvedValue(respostaJson({ data: [{ id: "1", name: "sem instagram" }] }));
+    expect(await buscarPaginasComInstagram()).toEqual([]);
+  });
+});
+
+describe("buscarMediaDaConta e buscarMediaPorId", () => {
+  it("lista a midia da conta com os campos de views, curtidas e comentarios", async () => {
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = decodeURIComponent(url.toString());
+      expect(texto).toContain("/17841463597140638/media");
+      expect(texto).toContain("total_views_count");
+      return respostaJson({
+        data: [
+          {
+            id: "media1",
+            permalink: "https://www.instagram.com/reel/Cexemplo1/",
+            media_type: "VIDEO",
+            media_product_type: "REELS",
+            like_count: 500,
+            comments_count: 20,
+            total_views_count: 9000,
+          },
+        ],
+      });
+    });
+
+    const midias = await buscarMediaDaConta("17841463597140638");
+    expect(midias).toEqual([
+      {
+        id: "media1",
+        permalink: "https://www.instagram.com/reel/Cexemplo1/",
+        media_type: "VIDEO",
+        media_product_type: "REELS",
+        like_count: 500,
+        comments_count: 20,
+        total_views_count: 9000,
+      },
+    ]);
+  });
+
+  it("busca uma midia especifica pelo id, sem listar a conta inteira", async () => {
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = decodeURIComponent(url.toString());
+      expect(texto).toContain("/media1?");
+      expect(texto).not.toContain("/media?");
+      return respostaJson({ id: "media1", like_count: 600, comments_count: 25, total_views_count: 9500 });
+    });
+
+    expect(await buscarMediaPorId("media1")).toEqual({
+      id: "media1",
+      like_count: 600,
+      comments_count: 25,
+      total_views_count: 9500,
+    });
   });
 });

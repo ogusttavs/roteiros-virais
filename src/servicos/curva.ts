@@ -10,7 +10,7 @@
 import { and, desc, eq, gte, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, contas, metricasVideoCliente, videosCliente, type Plataforma } from "@/db/schema";
+import { clientes, contas, metricasVideoCliente, videosCliente, type FonteMedida, type Plataforma } from "@/db/schema";
 
 const HORA_MS = 60 * 60 * 1000;
 const LIMITE_DIAS = 30;
@@ -52,6 +52,8 @@ export type VideoParaMedir = {
   idExterno: string;
   postadoEm: Date;
   ultimaColeta: Date | null;
+  /** O id da midia na Graph API da Meta, se ja foi achado numa medicao anterior (V8, item 2). */
+  metaMediaId: string | null;
 };
 
 /**
@@ -71,6 +73,7 @@ export async function videosParaMedir(agora: Date): Promise<VideoParaMedir[]> {
       idExterno: videosCliente.idExterno,
       postadoEm: videosCliente.postadoEm,
       ultimaColeta: videosCliente.ultimaColeta,
+      metaMediaId: videosCliente.metaMediaId,
     })
     .from(videosCliente)
     .where(
@@ -82,6 +85,18 @@ export async function videosParaMedir(agora: Date): Promise<VideoParaMedir[]> {
     );
 
   return linhas as VideoParaMedir[];
+}
+
+/**
+ * O codigo curto de um permalink do Instagram ("https://www.instagram.com/
+ * reel/CODIGO/" ou ".../p/CODIGO/"), a mesma forma que `inferirPlataforma`
+ * (`roteiro.ts`) extrai da url que o cliente cola em "Postei" e guarda em
+ * `videos_cliente.id_externo` (V8, item 2). `curva-cliente.ts` casa os dois
+ * para achar, na midia da conta que a Meta devolve, qual é o video certo.
+ */
+export function shortcodeDoPermalink(permalink: string): string | null {
+  const match = /\/(?:reel|p)\/([^/]+)/.exec(permalink);
+  return match?.[1] ?? null;
 }
 
 export type MedianaConta = { mediana: number | null; aprendendo: boolean };
@@ -282,6 +297,11 @@ export async function ultimoVideoParaAparte(clienteId: number): Promise<UltimoVi
  * A curva de cada vídeo postado da lista de `roteiroId` de `/historico`,
  * pelo `roteiroId` (decisão 5 do `PROXIMO.md`). Sem entrada no mapa para um
  * `roteiroId` que não tem `videos_cliente` (ainda não postado).
+ *
+ * Mais de um `videos_cliente` para o mesmo `roteiroId` (hoje possível quando
+ * a conexão cai no meio de "Postei", achado da revisão da V8: decisão
+ * pendente do PR #53, adiada para depois da viagem) usa o mais recente
+ * (`postadoEm desc`), nunca um sorteio pela ordem que o Postgres devolver.
  */
 export async function curvasDoHistorico(
   clienteId: number,
@@ -298,11 +318,55 @@ export async function curvasDoHistorico(
       idExterno: videosCliente.idExterno,
     })
     .from(videosCliente)
-    .where(inArray(videosCliente.roteiroId, roteiroIds));
+    .where(inArray(videosCliente.roteiroId, roteiroIds))
+    .orderBy(desc(videosCliente.postadoEm));
 
   for (const video of videos) {
-    if (video.roteiroId === null) continue;
+    if (video.roteiroId === null || resultado.has(video.roteiroId)) continue;
     resultado.set(video.roteiroId, await curvaDoVideo({ ...video, clienteId }));
+  }
+  return resultado;
+}
+
+/**
+ * De onde veio a última medida de cada `roteiroId` da lista, pelo `roteiroId`
+ * (V8, item 3: "de onde veio a medida" no admin). Sem entrada para um
+ * `roteiroId` sem `videos_cliente` (ainda não postado) ou sem nenhuma
+ * medida ainda; `null` na entrada para o que foi medido antes desta etapa
+ * (`fonte` nula no banco).
+ *
+ * Mais de um `videos_cliente` para o mesmo `roteiroId` (mesma ressalva de
+ * `curvasDoHistorico`, acima): o mais recente (`postadoEm desc`) vence.
+ */
+export async function fontesDoHistorico(
+  clienteId: number,
+  roteiroIds: number[],
+): Promise<Map<number, FonteMedida | null>> {
+  const resultado = new Map<number, FonteMedida | null>();
+  if (roteiroIds.length === 0) return resultado;
+
+  const videos = await db()
+    .select({ id: videosCliente.id, roteiroId: videosCliente.roteiroId })
+    .from(videosCliente)
+    .where(and(eq(videosCliente.clienteId, clienteId), inArray(videosCliente.roteiroId, roteiroIds)))
+    .orderBy(desc(videosCliente.postadoEm));
+  if (videos.length === 0) return resultado;
+
+  const idsVideos = videos.map((v) => v.id);
+  const metricas = await db()
+    .select({ videoClienteId: metricasVideoCliente.videoClienteId, coletadoEm: metricasVideoCliente.coletadoEm, fonte: metricasVideoCliente.fonte })
+    .from(metricasVideoCliente)
+    .where(inArray(metricasVideoCliente.videoClienteId, idsVideos))
+    .orderBy(desc(metricasVideoCliente.coletadoEm));
+
+  const fontePorVideo = new Map<number, FonteMedida | null>();
+  for (const m of metricas) {
+    if (!fontePorVideo.has(m.videoClienteId)) fontePorVideo.set(m.videoClienteId, m.fonte);
+  }
+
+  for (const video of videos) {
+    if (video.roteiroId === null || resultado.has(video.roteiroId) || !fontePorVideo.has(video.id)) continue;
+    resultado.set(video.roteiroId, fontePorVideo.get(video.id) ?? null);
   }
   return resultado;
 }

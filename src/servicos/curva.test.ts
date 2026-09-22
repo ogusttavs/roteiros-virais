@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { estaAcimaDoNormal, estaNaHoraDeMedir, intervaloDeMedicaoH, normalizarHandle } from "./curva";
+import { estaAcimaDoNormal, estaNaHoraDeMedir, intervaloDeMedicaoH, normalizarHandle, shortcodeDoPermalink } from "./curva";
 
 const HORA_MS = 60 * 60 * 1000;
 const DIA_MS = 24 * HORA_MS;
@@ -117,5 +117,25 @@ describe("normalizarHandle", () => {
   it("tira espaco em volta e no meio, de qualquer plataforma", () => {
     expect(normalizarHandle("  @ nina dobre  ", "tiktok")).toBe("ninadobre");
     expect(normalizarHandle(" nina dobre ", "youtube")).toBe("@ninadobre");
+  });
+});
+
+/** V8, item 2: casa o permalink que a Meta devolve com o `idExterno` que `inferirPlataforma` (roteiro.ts) ja guardou. */
+describe("shortcodeDoPermalink", () => {
+  it("reel: o codigo entre /reel/ e a barra seguinte", () => {
+    expect(shortcodeDoPermalink("https://www.instagram.com/reel/Cexemplo123/")).toBe("Cexemplo123");
+  });
+
+  it("post: o codigo entre /p/ e a barra seguinte", () => {
+    expect(shortcodeDoPermalink("https://www.instagram.com/p/Cexemplo456/")).toBe("Cexemplo456");
+  });
+
+  it("sem a barra final tambem funciona", () => {
+    expect(shortcodeDoPermalink("https://www.instagram.com/reel/Cexemplo789")).toBe("Cexemplo789");
+  });
+
+  it("permalink de outro formato (perfil, ou tv): null", () => {
+    expect(shortcodeDoPermalink("https://www.instagram.com/veluracosmetics/")).toBeNull();
+    expect(shortcodeDoPermalink("https://www.instagram.com/tv/Cexemplo/")).toBeNull();
   });
 });
