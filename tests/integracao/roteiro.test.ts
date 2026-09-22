@@ -11,11 +11,22 @@ vi.mock("@/ia/cliente", async (importarOriginal) => {
   return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
 });
 
+// V9a, item 1: espiona a busca de evidencia para provar que a origem "momento" nunca a chama.
+vi.mock("@/servicos/pesquisa", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/servicos/pesquisa")>();
+  return {
+    ...original,
+    evidenciaParaRoteiro: vi.fn(original.evidenciaParaRoteiro),
+    evidenciaPorIds: vi.fn(original.evidenciaPorIds),
+  };
+});
+
 import { db, getPool } from "@/db";
 import {
   briefings,
   clientes,
   geracoesIA,
+  membrosMarca,
   modelosNicho,
   nichos,
   roteiros,
@@ -29,6 +40,7 @@ import {
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { boss, FILAS } from "@/jobs/fila";
+import { evidenciaParaRoteiro, evidenciaPorIds } from "@/servicos/pesquisa";
 import {
   ErroRoteiro,
   gerarRoteiro,
@@ -40,6 +52,8 @@ import {
 import { resetarSchema } from "../../scripts/resetar-schema";
 
 const gerarEstruturadoMock = vi.mocked(gerarEstruturado);
+const evidenciaParaRoteiroMock = vi.mocked(evidenciaParaRoteiro);
+const evidenciaPorIdsMock = vi.mocked(evidenciaPorIds);
 
 const PERFIL_PADRAO: PerfilCompilado = {
   fatos: {
@@ -166,6 +180,8 @@ afterEach(async () => {
   await db().delete(roteiros);
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   await db().delete(modelosNicho).where(eq(modelosNicho.nichoId, nichoId));
+  evidenciaParaRoteiroMock.mockClear();
+  evidenciaPorIdsMock.mockClear();
 });
 
 describe("gerarRoteiro", () => {
@@ -621,6 +637,140 @@ describe("reprovarERescrever", () => {
 
     expect(v2.versao).toBe(2);
     expect(v2.versaoDe).toBe(v1.id);
+  });
+});
+
+describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
+  const MOMENTO_1 = {
+    onde: "no aeroporto, cinco da manha",
+    oQueEstaAcontecendo: "esperando o embarque para a feira de fornecedores",
+    oQueDaParaMostrar: "a fila do check-in e a mala de amostras",
+  };
+
+  it("nao chama a busca de evidencia, e grava origem e momento inteiros, com forca media", async () => {
+    const clienteId = await criarCliente();
+    // Evidencia de verdade existe no banco; se a busca rodasse, ela apareceria na entrada.
+    await criarVideoEvidencia("ev-momento-existente", "esperando o embarque para a feira de fornecedores");
+
+    const roteiro = await gerarRoteiro(clienteId, { origem: "momento", momento: MOMENTO_1, objetivo: "engajamento" });
+
+    expect(evidenciaParaRoteiroMock).not.toHaveBeenCalled();
+    expect(evidenciaPorIdsMock).not.toHaveBeenCalled();
+    expect(roteiro.origem).toBe("momento");
+    expect(roteiro.momento).toEqual(MOMENTO_1);
+    expect(roteiro.conteudo.semEvidencia).toBe(true);
+    expect(roteiro.conteudo.evidencias).toEqual([]);
+    expect(roteiro.conteudo.forcaEvidencia).toBe("media");
+    expect(roteiro.conteudo.edicao.referencia).toBeNull();
+  });
+
+  it("o tema gravado vem do temaCurto que o modelo devolveu, nao do texto provisorio", async () => {
+    const clienteId = await criarCliente();
+    const roteiro = await gerarRoteiro(clienteId, { origem: "momento", momento: MOMENTO_1, objetivo: "alcance" });
+
+    // O mock so preenche temaCurto com momento, sempre com o prefixo "sobre " (ver src/ia/mock.ts).
+    expect(roteiro.tema).toBe(`sobre ${MOMENTO_1.oQueEstaAcontecendo}`.slice(0, 60));
+    expect(roteiro.tema).not.toBe(MOMENTO_1.oQueEstaAcontecendo.slice(0, 80));
+  });
+
+  it("contexto de serie: o roteiro seguinte cita o tema e o gancho do momento anterior do mesmo cliente", async () => {
+    const clienteId = await criarCliente();
+    const v1 = await gerarRoteiro(clienteId, { origem: "momento", momento: MOMENTO_1, objetivo: "engajamento" });
+
+    const momento2 = {
+      onde: "na feira de fornecedores",
+      oQueEstaAcontecendo: "conversando com um fornecedor novo sobre embalagem",
+      oQueDaParaMostrar: "as amostras em cima da mesa",
+    };
+    const v2 = await gerarRoteiro(clienteId, { origem: "momento", momento: momento2, objetivo: "engajamento" });
+
+    const [geracaoV2] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, v2.geracaoId!));
+    const entradaV2 = (geracaoV2.entradas as { entrada: string }).entrada;
+
+    expect(entradaV2).toContain("O que já foi gravado nesta sequência de momentos");
+    expect(entradaV2).toContain(v1.tema);
+    expect(entradaV2).toContain(v1.conteudo.gancho);
+  });
+
+  it("marca citada: a entrada leva o nome e o perfil da marca que a pessoa citou, com a regra dura 11", async () => {
+    const clienteId = await criarCliente();
+    contadorUsuario += 1;
+    const usuarioIdB = `roteiro-teste-marca-citada-${contadorUsuario}`;
+    await db().insert(user).values({ id: usuarioIdB, name: "[teste] dono da marca citada", email: `${usuarioIdB}@roteiro.teste` });
+    const [marcaCitada] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuarioIdB, nome: "[teste] Marca Citada", nichoId })
+      .returning();
+    await db().insert(briefings).values({
+      clienteId: marcaCitada.id,
+      completo: true,
+      perfil: { ...PERFIL_PADRAO, resumo: "vende cera automotiva artesanal" },
+    });
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "momento",
+      momento: { ...MOMENTO_1, marcaId: marcaCitada.id },
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.momento?.marcaId).toBe(marcaCitada.id);
+    const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, roteiro.geracaoId!));
+    const entrada = (geracao.entradas as { entrada: string }).entrada;
+    expect(entrada).toContain("Marca citada por quem está gravando");
+    expect(entrada).toContain("Marca Citada");
+    expect(entrada).toContain("vende cera automotiva artesanal");
+  });
+
+  it("marca citada inexistente: gera mesmo assim, sem a camada secundaria (nunca derruba a geracao por isso)", async () => {
+    const clienteId = await criarCliente();
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "momento",
+      momento: { ...MOMENTO_1, marcaId: 999999 },
+      objetivo: "engajamento",
+    });
+
+    expect(roteiro.origem).toBe("momento");
+    const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, roteiro.geracaoId!));
+    const entrada = (geracao.entradas as { entrada: string }).entrada;
+    expect(entrada).not.toContain("Marca citada por quem está gravando");
+  });
+
+  it("reprovar e reescrever um roteiro de momento continua sem busca de evidencia, e herda o mesmo momento", async () => {
+    const clienteId = await criarCliente();
+    const v1 = await gerarRoteiro(clienteId, { origem: "momento", momento: MOMENTO_1, objetivo: "engajamento" });
+    evidenciaParaRoteiroMock.mockClear();
+    evidenciaPorIdsMock.mockClear();
+
+    const v2 = await reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco");
+
+    expect(evidenciaParaRoteiroMock).not.toHaveBeenCalled();
+    expect(v2.origem).toBe("momento");
+    expect(v2.momento).toEqual(MOMENTO_1);
+    expect(v2.conteudo.semEvidencia).toBe(true);
+  });
+
+  /**
+   * Isolamento (item 4, "id de marca de que não é membro é recusado"): o
+   * mecanismo de verdade que a Server Action usa antes de chamar
+   * `gerarRoteiro` (`garantirMembroDaMarca`, já testado a fundo em
+   * `isolamento.test.ts`); aqui, no contexto especifico do momento, para a
+   * definicao de pronto da V9a.
+   */
+  it("garantirMembroDaMarca recusa uma marca de que a pessoa nao e membro, antes de qualquer geracao", async () => {
+    const { garantirMembroDaMarca, ErroAcessoNegado } = await import("@/servicos/clientes");
+    contadorUsuario += 1;
+    const usuarioIdA = `roteiro-teste-isolamento-momento-a-${contadorUsuario}`;
+    const usuarioIdB = `roteiro-teste-isolamento-momento-b-${contadorUsuario}`;
+    await db()
+      .insert(user)
+      .values([
+        { id: usuarioIdA, name: "[teste] a", email: `${usuarioIdA}@roteiro.teste` },
+        { id: usuarioIdB, name: "[teste] b", email: `${usuarioIdB}@roteiro.teste` },
+      ]);
+    const [marcaDeB] = await db().insert(clientes).values({ usuarioId: usuarioIdB, nome: "[teste] marca de b", nichoId }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: usuarioIdB, clienteId: marcaDeB.id, papel: "dono" });
+
+    await expect(garantirMembroDaMarca(usuarioIdA, marcaDeB.id)).rejects.toThrow(ErroAcessoNegado);
   });
 });
 

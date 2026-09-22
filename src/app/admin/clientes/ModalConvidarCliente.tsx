@@ -25,6 +25,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [nichoId, setNichoId] = useState(nichos[0]?.id ?? 0);
+  const [tipo, setTipo] = useState<"negocio" | "pessoa">("negocio");
   const [convidando, setConvidando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [toastTexto, setToastTexto] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
     setConvidando(true);
     setErro(null);
     try {
-      const resultado = await criarClienteAction({ nome, email, nichoId });
+      const resultado = await criarClienteAction({ nome, email, nichoId, tipo });
       setNome("");
       onFechar();
       if (resultado.tipo === "convite") {
@@ -79,6 +80,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
                 {t.campoNicho}
                 <select
                   className={styles.select}
+                  aria-label={t.campoNicho}
                   value={nichoId}
                   onChange={(e) => setNichoId(Number(e.target.value))}
                 >
@@ -87,6 +89,18 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
                       {nicho.nome}
                     </option>
                   ))}
+                </select>
+              </label>
+              <label className={styles.rotuloSelect}>
+                {t.campoTipo}
+                <select
+                  className={styles.select}
+                  aria-label={t.campoTipo}
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value as "negocio" | "pessoa")}
+                >
+                  <option value="negocio">{t.tipoNegocio}</option>
+                  <option value="pessoa">{t.tipoPessoa}</option>
                 </select>
               </label>
               {erro ? (

@@ -9,15 +9,18 @@ import type { ConteudoRoteiro, Objetivo, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { Constancia } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
+import { textosMomento } from "@/textos/momento";
 import { textosNav } from "@/textos/nav";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
 import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
+import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
 import { useTrocaMarca } from "../../_casca/TrocaMarcaContext";
 
+import { FolhaGravarAgora } from "./FolhaGravarAgora";
 import { HojeCabecalho } from "./HojeCabecalho";
 import { HojeEsqueleto } from "./HojeEsqueleto";
 import styles from "./HojeTela.module.css";
@@ -51,6 +54,10 @@ type Props = {
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
+  /** V9a, item 3: o objetivo já marcado na folha "Gravar agora" (mesma origem de `/hoje/objetivo`). */
+  objetivoRecomendado: Objetivo | null;
+  /** V9a, item 4: as outras marcas, para o seletor "Falar de" da folha (a ativa já fora desta lista). */
+  outrasMarcas: MarcaResumo[];
 };
 
 function AparteSemanaCurva({
@@ -126,9 +133,16 @@ export function HojeTela({
   marcaAtiva,
   marcas,
   nomePessoa,
+  objetivoRecomendado,
+  outrasMarcas,
 }: Props) {
   const router = useRouter();
   const [outrosAbertos, setOutrosAbertos] = useState(false);
+  const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
+  const { fechar: fecharFolhaMomento, fecharEDepois: fecharFolhaMomentoEDepois } = useFolhaNoHistorico(
+    folhaMomentoAberta,
+    () => setFolhaMomentoAberta(false),
+  );
   const diasGravados = semana.filter((dia) => dia.gravou).length;
   const { trocando, marcaAlvo } = useTrocaMarca();
   const { semConexao, avisarFalhaDeRede } = useConexao();
@@ -297,6 +311,22 @@ export function HojeTela({
                     ) : null}
                   </div>
                 ) : null}
+
+                {/* V9a, item 3: "Gravar agora" tambem quando ja existe roteiro de hoje (achado do e2e: um momento pode acontecer depois do roteiro sugerido do dia). */}
+                <div className={styles.proprio}>
+                  <h4>{textosMomento.tituloFolha}</h4>
+                  <p>{textosMomento.instrucaoAudio}</p>
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaMomentoAberta(true)}
+                  >
+                    {textosMomento.botaoAbrirHoje}
+                  </button>
+                  <MotivoSemRede />
+                </div>
               </div>
 
               <AparteSemanaCurva semana={semana} ultimoVideo={ultimoVideo} />
@@ -337,6 +367,22 @@ export function HojeTela({
                   </button>
                   <MotivoSemRede />
                 </div>
+
+                {/* V9a, item 3: "Gravar agora", abaixo dos três temas (`PROXIMO.md`). */}
+                <div className={styles.proprio}>
+                  <h4>{textosMomento.tituloFolha}</h4>
+                  <p>{textosMomento.instrucaoAudio}</p>
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaMomentoAberta(true)}
+                  >
+                    {textosMomento.botaoAbrirHoje}
+                  </button>
+                  <MotivoSemRede />
+                </div>
               </div>
 
               <AparteSemanaCurva semana={semana} ultimoVideo={ultimoVideo} />
@@ -344,6 +390,15 @@ export function HojeTela({
           )}
         </div>
       )}
+
+      {folhaMomentoAberta ? (
+        <FolhaGravarAgora
+          aoFechar={fecharFolhaMomento}
+          fecharEDepois={fecharFolhaMomentoEDepois}
+          objetivoRecomendado={objetivoRecomendado}
+          marcas={outrasMarcas}
+        />
+      ) : null}
     </div>
   );
 }

@@ -95,7 +95,10 @@ export function HistoricoTela({ resumo, grupos }: Props) {
               return (
                 <Link key={item.id} href={`/roteiros/${item.id}`} className={styles.item}>
                   <span className={styles.itemInfo}>
-                    <span className={styles.itemData}>{formatarData(item.data)}</span>
+                    <span className={styles.itemData}>
+                      {formatarData(item.data)}
+                      {item.origem === "momento" ? ` · ${textosHistorico.origemMomento}` : ""}
+                    </span>
                     <span className={styles.itemTema}>{item.tema}</span>
                     {medida ? <span className={styles.itemMedida}>{medida}</span> : null}
                   </span>

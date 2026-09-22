@@ -18,6 +18,7 @@ import {
   type PapelMarca,
   type PerfisCliente,
   type TemaPreferido,
+  type TipoMarca,
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hojeISO } from "@/lib/config";
@@ -299,13 +300,16 @@ export async function criarClienteEConvidar(dados: {
   nome: string;
   email: string;
   nichoId: number;
+  /** V9a, item 4: o admin escolhe ao criar a marca; "negocio" é o padrão, sem tela nova. */
+  tipo?: TipoMarca;
 }): Promise<ResultadoCriarCliente> {
+  const tipo = dados.tipo ?? "negocio";
   const [usuarioExistente] = await db().select().from(user).where(eq(user.email, dados.email));
 
   if (usuarioExistente) {
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId })
+      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId, tipo })
       .returning();
     await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId: cliente.id, papel: "dono" });
     return { tipo: "jaTinhaLogin", cliente };
@@ -314,7 +318,7 @@ export async function criarClienteEConvidar(dados: {
   const { usuarioId, senha } = await criarUsuarioComSenhaGerada(dados.email, dados.nome);
   const [cliente] = await db()
     .insert(clientes)
-    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId })
+    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId, tipo })
     .returning();
   await db().insert(membrosMarca).values({ usuarioId, clienteId: cliente.id, papel: "dono" });
   await mandarConviteMagico(dados.email);

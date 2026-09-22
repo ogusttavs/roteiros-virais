@@ -48,6 +48,8 @@ export const textosRoteiro = {
   semEvidencia:
     "Não achamos vídeo fora da curva sobre isso no seu setor nos últimos 90 dias. Este " +
     "roteiro foi escrito só com o que funciona no seu nicho e com o seu briefing.",
+  /** V9a, item 1: "de onde veio" para um roteiro de momento, no lugar de `semEvidencia`. */
+  semEvidenciaMomento: "Este roteiro veio do momento que você descreveu, não de um vídeo do banco.",
   irPara: (t: string) => `Ir para ${t}`,
   abrirReferencia: "Abrir o vídeo de referência",
   /** Rodapé como no design (revisão do PR #31, item 7): preenchido enquanto não gravou. */

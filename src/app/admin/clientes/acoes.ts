@@ -16,6 +16,7 @@ export async function criarClienteAction(dados: {
   nome: string;
   email: string;
   nichoId: number;
+  tipo: "negocio" | "pessoa";
 }): Promise<ResultadoCriarCliente> {
   garantirSessaoAdmin(await sessaoAtual());
 

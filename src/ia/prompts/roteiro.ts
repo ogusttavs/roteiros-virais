@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { TIPOS_ABERTURA, type Objetivo, type TipoAbertura } from "@/db/schema";
+import { TIPOS_ABERTURA, type Objetivo, type TipoAbertura, type TipoMarca } from "@/db/schema";
 
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
@@ -81,8 +81,21 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * reprovacao "Gancho fraco" (regra 7) para de prescrever "resultado ou
  * cena, nunca pergunta" e passa a apontar para essa mesma instrucao.
  * Versao 1.8.0.
+ *
+ * V9a, o momento (item 1, 2 e 4 do `PROXIMO.md`): terceira origem de
+ * roteiro, "a pessoa fala onde está e o que está acontecendo, sem busca de
+ * evidência no banco". `montarSistemaEstavel` ganha `tipo` (regra dura 12,
+ * nova: "pessoa" escreve em primeira pessoa do singular, "negocio" continua
+ * como sempre); `montarEntrada` ganha o bloco do momento (regra dura 10,
+ * nova: o gancho nasce da cena, cita pelo menos um elemento concreto), o
+ * contexto de série (os últimos momentos gravados por este cliente, para
+ * não repetir ângulo) e a marca citada (regra dura 11, nova: aparece como
+ * parte da vida de quem grava, nunca como anúncio). O schema ganha
+ * `temaCurto`, preenchido só com o momento, a linha curta que vira
+ * `roteiros.tema` (a busca de evidência não roda para esta origem, não há
+ * tema escolhido de antemão). Versao 1.9.0.
  */
-export const versao = "1.8.0";
+export const versao = "1.9.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -117,6 +130,13 @@ export const schema = z.object({
   evidencias: z.array(z.number()),
   /** O tipo de abertura que de fato foi usado (V4, item 4): o modelo declara, o verificador confere. */
   tipoAbertura: z.enum(TIPOS_ABERTURA),
+  /**
+   * V9a, item 1: só preenchido quando a entrada traz o bloco "O momento que
+   * a pessoa descreveu agora", uma linha curta (até 8 palavras) resumindo o
+   * assunto, que vira `roteiros.tema` no lugar do tema provisório. Nulo nos
+   * demais casos (sugerido e livre já têm o tema antes de gerar).
+   */
+  temaCurto: z.string().nullable(),
 });
 
 export type SaidaRoteiro = z.infer<typeof schema>;
@@ -127,6 +147,8 @@ export function montarSistemaEstavel(dados: {
   camadaExclusiva: string;
   /** A memória do cliente (E27, parte 2): `regrasAtivasDoCliente`, ordenada por contagem. Vazia sem nenhuma regra ainda. */
   regrasCliente: { regra: string; contagem: number }[];
+  /** V9a, item 4: "negocio" (padrão) fala como a marca; "pessoa" fala em primeira pessoa do singular. */
+  tipo: TipoMarca;
 }): string {
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
@@ -134,6 +156,12 @@ export function montarSistemaEstavel(dados: {
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";
+  const regraVoz =
+    dados.tipo === "pessoa"
+      ? `12. Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira ` +
+        `pessoa do singular ("eu", "meu", "minha"), nunca "a gente" ou "nosso".`
+      : `12. Este cliente é um negócio: continue na voz de sempre ("a gente", "nossa loja"), nunca ` +
+        `em primeira pessoa do singular.`;
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
 
@@ -175,6 +203,16 @@ gravar com a própria cara no celular. Regras duras:
    inspire-se no estilo dele, nunca copie a frase. Quando a entrada só trouxer uma lista de
    tipos a evitar, escolha livremente qualquer outro tipo. Declare no campo tipoAbertura da
    saída qual tipo você de fato usou.
+10. Quando a entrada trouxer um bloco "O momento que a pessoa descreveu agora", o gancho
+    nasce da cena que está na frente do celular, não do tema abstrato: cite pelo menos um
+    elemento concreto do momento (o lugar, o que está acontecendo ou o que dá para mostrar)
+    nos primeiros três segundos. Nesse caso, preencha também o campo temaCurto do schema com
+    uma linha curta (até 8 palavras) resumindo o assunto; nos demais casos, deixe temaCurto
+    nulo.
+11. Quando a entrada trouxer uma marca citada, ela aparece como parte da vida real de quem
+    grava, nunca como anúncio ou propaganda; se o objetivo for as pessoas comprarem, a
+    chamada final aponta para a marca citada, não para a marca deste roteiro.
+${regraVoz}
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou
@@ -252,6 +290,24 @@ export function montarEntrada(dados: {
    * (não os ids); sempre pelo menos um, `reprovarERescrever` exige.
    */
   anguloParaEvitar?: { gancho: string; corpo: string; motivos: string[]; motivoTexto?: string };
+  /**
+   * V9a, item 1: só quando `origem = "momento"`; sem busca de evidência,
+   * esta é a única descrição da cena, então substitui a linha "Tema
+   * escolhido" e o bloco de evidência (ver regra dura 10).
+   */
+  momento?: { onde: string; oQueEstaAcontecendo: string; oQueDaParaMostrar: string };
+  /**
+   * V9a, item 2: os últimos momentos gravados por este cliente nos últimos
+   * 10 dias (mesma janela de `roteirosRecentes`), "o que já foi gravado
+   * nesta sequência". Vazio ou ausente fora da origem momento.
+   */
+  contextoDeSerie?: { tema: string; gancho: string }[];
+  /**
+   * V9a, item 4: a marca que a pessoa citou durante o momento, já resolvida
+   * (nome e perfil compilado), quando ela é membro de mais de uma marca e
+   * escolheu "Falar de" uma diferente da ativa. Ver regra dura 11.
+   */
+  marcaCitada?: { nome: string; perfilCompilado: string };
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -278,8 +334,25 @@ export function montarEntrada(dados: {
           .join("; ")
       : "nenhum roteiro anterior";
 
+  const blocoMomento = dados.momento
+    ? `O momento que a pessoa descreveu agora:\nOnde: ${dados.momento.onde}\nO que está ` +
+      `acontecendo: ${dados.momento.oQueEstaAcontecendo}\nO que dá para mostrar: ` +
+      `${dados.momento.oQueDaParaMostrar}`
+    : null;
+
+  const blocoSerie =
+    dados.contextoDeSerie && dados.contextoDeSerie.length > 0
+      ? `O que já foi gravado nesta sequência de momentos, não repita o mesmo ângulo:\n${dados.contextoDeSerie
+          .map((r) => `"${r.tema}", gancho: "${r.gancho}"`)
+          .join("; ")}`
+      : null;
+
+  const blocoMarcaCitada = dados.marcaCitada
+    ? `Marca citada por quem está gravando (regra dura 11):\n${dados.marcaCitada.nome}: ${dados.marcaCitada.perfilCompilado}`
+    : null;
+
   const partes = [
-    `Tema escolhido: ${dados.tema}`,
+    dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
@@ -291,7 +364,10 @@ export function montarEntrada(dados: {
         `${NOME_OBJETIVO[dados.objetivo]}). Não repita o gancho nem a estrutura dela:\n` +
         `gancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
       : null,
-    blocoEvidencia,
+    blocoMomento,
+    blocoSerie,
+    blocoMarcaCitada,
+    dados.momento ? null : blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
     formatarInstrucaoAbertura(dados.instrucaoAbertura),
   ].filter((parte): parte is string => Boolean(parte));

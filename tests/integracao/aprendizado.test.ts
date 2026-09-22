@@ -220,12 +220,14 @@ describe("isolamento entre clientes ate o texto do prompt do roteiro (segunda ro
       modeloNicho: "modelo",
       camadaExclusiva: "camada",
       regrasCliente: regrasA,
+      tipo: "negocio",
     });
     const sistemaB = montarSistemaEstavel({
       perfilCompilado: "perfil",
       modeloNicho: "modelo",
       camadaExclusiva: "camada",
       regrasCliente: regrasB,
+      tipo: "negocio",
     });
 
     expect(sistemaA).toContain("regra exclusiva do cliente a");

@@ -67,6 +67,8 @@ const casoSchema = z.object({
     .optional(),
   /** A memória do cliente (E27, parte 2, item 7): casos com regras ativas de rodadas anteriores. */
   regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
+  /** V9a, item 4: ausente (todo caso gravado antes desta etapa) vira "negocio", o mesmo padrão da coluna. */
+  tipo: z.enum(["negocio", "pessoa"]).default("negocio"),
   /**
    * V4, item 7b: o que `escolherTipoAbertura` decidiu para este caso.
    * Ausente (todo caso do golden set gravado antes desta etapa) vira "livre,
@@ -147,6 +149,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         camadaExclusiva: caso.camadaExclusiva,
         modeloNicho: caso.modeloNicho,
         regrasCliente: caso.regrasCliente,
+        tipo: caso.tipo,
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,

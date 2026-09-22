@@ -5,7 +5,9 @@ export type { NivelIA };
 /**
  * As dez tarefas do plano (plano de execucao, etapas 4 e 10), mais
  * `classificarAbertura` (V4, item 2: backfill do tipo de abertura de
- * analise ja existente, sem ler transcricao de novo).
+ * analise ja existente, sem ler transcricao de novo) e `lerMomento` (V9a,
+ * item 3: separa os campos do momento a partir da transcricao ou do texto
+ * digitado na folha "Gravar agora").
  */
 export type TarefaIA =
   | "avaliarResposta"
@@ -19,7 +21,8 @@ export type TarefaIA =
   | "roteiro"
   | "verificarTexto"
   | "aprenderCliente"
-  | "classificarAbertura";
+  | "classificarAbertura"
+  | "lerMomento";
 
 export type ImagemEntrada = {
   base64: string;

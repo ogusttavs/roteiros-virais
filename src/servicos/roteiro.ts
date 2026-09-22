@@ -18,13 +18,14 @@ import {
   videosCliente,
   type Cliente,
   type ConteudoRoteiro,
+  type Momento,
   type Objetivo,
   type Plataforma,
   type TipoAbertura,
 } from "@/db/schema";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
-import { gerarComVerificacao } from "@/ia/verificador";
+import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config, hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
@@ -67,7 +68,18 @@ export function corpoDoRoteiro(roteiro: RoteiroLinha): ConteudoRoteiro {
 }
 
 export type OrigemRoteiro =
-  { origem: "sugerido"; temaIndice: number } | { origem: "livre"; textoTema: string };
+  | { origem: "sugerido"; temaIndice: number }
+  | { origem: "livre"; textoTema: string }
+  /**
+   * V9a, item 1: a pessoa contou o momento (por áudio ou por texto) em vez
+   * de escolher ou escrever um tema; `momento` é a mesma forma gravada em
+   * `roteiros.momento`. Quem confere que a pessoa é membro da marca citada
+   * (`momento.marcaId`, item 4) é a Server Action, via
+   * `garantirMembroDaMarca`, antes de chamar `gerarRoteiro`; este serviço
+   * só resolve o nome e o perfil dela (`marcaCitadaPorId`, abaixo), sem
+   * saber de sessão.
+   */
+  | { origem: "momento"; momento: Momento };
 
 export type ParametrosGerarRoteiro = OrigemRoteiro & { objetivo: Objetivo; observacao?: string };
 
@@ -99,6 +111,24 @@ function formatarCamadaExclusiva(cliente: Cliente): string {
   return linhas.length > 0
     ? linhas.join(" ")
     : "nenhum dado exclusivo deste cliente registrado ainda.";
+}
+
+/**
+ * Nome e perfil compilado da marca que a pessoa citou durante o momento
+ * (V9a, item 4, `momento.marcaId`). `undefined` sem `marcaId`, ou se a marca
+ * ou o perfil dela sumiram entretanto (nunca derruba a geração por isso, o
+ * roteiro sai sem a camada secundária). Quem confere que a pessoa é membro
+ * dela é a Server Action, antes de chegar aqui (ver `OrigemRoteiro`).
+ */
+async function marcaCitadaPorId(
+  marcaId: number | undefined,
+): Promise<{ nome: string; perfilCompilado: string } | undefined> {
+  if (!marcaId) return undefined;
+  const marca = await clientePorId(marcaId);
+  if (!marca) return undefined;
+  const perfil = await perfilDoCliente(marcaId);
+  if (!perfil) return undefined;
+  return { nome: marca.nome, perfilCompilado: formatarPerfilCompilado(perfil) };
 }
 
 /**
@@ -244,6 +274,18 @@ async function resolverTema(
     return { tema: params.textoTema, evidenciasPrevistas: [] };
   }
 
+  /**
+   * V9a, item 1: o tema de verdade só existe depois de gerar (o `temaCurto`
+   * que o modelo devolve, `gerarConteudo` usa para regravar `tema` em
+   * `gerarRoteiro`). Este aqui é só um valor provisório, para o caso raro
+   * do modelo devolver `temaCurto` nulo; nunca entra na entrada da IA
+   * (`montarEntrada` pula a linha "Tema escolhido" com `momento`).
+   */
+  if (params.origem === "momento") {
+    const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [] };
+  }
+
   const resultado = await temasParaCliente(cliente);
   if (resultado.status !== "ok") {
     throw new ErroRoteiro("nao ha tema do dia disponivel para este cliente.");
@@ -263,16 +305,16 @@ async function resolverTema(
  * em vez de contagem fixa, para o histórico crescer com o cliente sem um
  * número escolhido a dedo.
  */
-async function historicoDeRoteiros(
-  clienteId: number,
-  dias: number,
-): Promise<{ tema: string; objetivo: Objetivo; status: string; gancho: string }[]> {
+type RoteiroRecente = { tema: string; objetivo: Objetivo; status: string; gancho: string; origem: OrigemRoteiro["origem"] };
+
+async function historicoDeRoteiros(clienteId: number, dias: number): Promise<RoteiroRecente[]> {
   const linhas = await db()
     .select({
       tema: roteiros.tema,
       objetivo: roteiros.objetivo,
       status: roteiros.status,
       conteudo: roteiros.conteudo,
+      origem: roteiros.origem,
     })
     .from(roteiros)
     .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.criadoEm, diasAtras(dias))))
@@ -283,6 +325,7 @@ async function historicoDeRoteiros(
     objetivo: r.objetivo,
     status: r.status,
     gancho: r.conteudo.gancho,
+    origem: r.origem,
   }));
 }
 
@@ -355,6 +398,7 @@ export function extrairCamposRoteiro(dados: roteiroIA.SaidaRoteiro): Record<stri
   });
   if (dados.edicao.audio) campos.audio = dados.edicao.audio;
   if (dados.edicao.referencia) campos.referenciaOQueOlhar = dados.edicao.referencia.oQueOlhar;
+  if (dados.temaCurto) campos.temaCurto = dados.temaCurto;
   return campos;
 }
 
@@ -378,6 +422,14 @@ type MontarERoteiroDados = {
     motivoTexto?: string;
     duracaoAnteriorS: number;
   };
+  /**
+   * V9a, item 1: presente só quando `origem = "momento"`. Faz `gerarConteudo`
+   * pular a busca de evidência inteira (nunca chama `evidenciaParaRoteiro`
+   * nem `evidenciaPorIds`), forçar `semEvidencia` e `forcaEvidencia: "media"`
+   * (a cena descrita é a própria evidência, não um vídeo do banco), e passar
+   * o bloco do momento e o contexto de série para o prompt.
+   */
+  momento?: Momento;
 };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
@@ -388,6 +440,8 @@ async function gerarConteudo(
   geracaoId: number;
   referenciaVideoId: number | null;
   tipoAbertura: TipoAbertura;
+  /** V9a, item 1: o `temaCurto` que o modelo devolveu, só com `momento`; `gerarRoteiro` usa para regravar `tema`. */
+  temaCurto: string | null;
 }> {
   if (!dados.cliente.nichoId) {
     throw new ErroRoteiro("este cliente ainda nao tem um nicho definido.");
@@ -399,20 +453,42 @@ async function gerarConteudo(
     throw new ErroRoteiro("o briefing deste cliente ainda nao foi compilado.");
   }
 
-  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente, ultimosRoteiros] =
+  const ehMomento = dados.momento !== undefined;
+
+  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente, ultimosRoteiros, marcaCitada] =
     await Promise.all([
-      evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
-      evidenciaPorIds(dados.evidenciasPrevistas),
+      ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
+      ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas),
       modeloNichoAtual(nichoId),
       historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
       regrasAtivasDoCliente(dados.clienteId),
       ultimosRoteirosParaAbertura(dados.clienteId),
+      marcaCitadaPorId(dados.momento?.marcaId),
     ]);
 
-  const evidencias = combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil);
-  const referenciaEscolhida = escolherReferencia(evidencias);
-  const semEvidencia = evidencias.length === 0;
+  const evidencias = ehMomento
+    ? []
+    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil);
+  const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
+  const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
+
+  /**
+   * V9a, item 2: os últimos momentos gravados por este cliente, "o que já
+   * foi gravado nesta sequência" (reaproveita `historicoDeRoteiros`, já
+   * limitado aos últimos `DIAS_HISTORICO` dias, em vez de uma consulta
+   * nova); só os 3 mais recentes, e só com `momento`.
+   */
+  const contextoDeSerie = ehMomento
+    ? roteirosRecentes
+        .filter((r) => r.origem === "momento")
+        .slice(0, 3)
+        .map((r) => ({ tema: r.tema, gancho: r.gancho }))
+    : undefined;
+
+  const palavrasDoMomento = dados.momento
+    ? palavrasDeConteudo(`${dados.momento.onde} ${dados.momento.oQueEstaAcontecendo}`)
+    : undefined;
 
   const ultimosTiposAbertura = ultimosRoteiros.map((r) => r.tipoAbertura);
   const instrucaoAbertura = escolherTipoAbertura(evidencias, ultimosTiposAbertura);
@@ -442,6 +518,7 @@ async function gerarConteudo(
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
       regrasCliente,
+      tipo: dados.cliente.tipo,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
@@ -469,10 +546,20 @@ async function gerarConteudo(
             motivoTexto: dados.anguloParaEvitar.motivoTexto,
           }
         : undefined,
+      momento: dados.momento
+        ? {
+            onde: dados.momento.onde,
+            oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo,
+            oQueDaParaMostrar: dados.momento.oQueDaParaMostrar,
+          }
+        : undefined,
+      contextoDeSerie,
+      marcaCitada,
     }),
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
+    palavrasDoMomento,
     /**
      * O gancho da versão reprovada entra aqui também (E27, parte 1, item 4:
      * "com gancho_fraco, o gancho novo tem de ser diferente do reprovado, a
@@ -525,7 +612,14 @@ async function gerarConteudo(
      */
     evidencias: semEvidencia ? [] : saida.evidencias,
     semEvidencia,
-    forcaEvidencia: semEvidencia ? null : forcaDaEvidencia(evidencias),
+    /**
+     * V9a, item 1: com momento a força é sempre "media", fixada por código
+     * (não por `forcaDaEvidencia`, que não sabe avaliar uma cena descrita
+     * pela própria pessoa, só vídeo do banco); a cena real não é "fraca"
+     * (tema novo, pouca prova), mas também não é "forte" (vários vídeos
+     * confirmando), então fica no meio.
+     */
+    forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidencias),
   };
 
   return {
@@ -533,6 +627,7 @@ async function gerarConteudo(
     geracaoId,
     referenciaVideoId: referenciaEscolhida?.videoId ?? null,
     tipoAbertura: saida.tipoAbertura,
+    temaCurto: saida.temaCurto,
   };
 }
 
@@ -549,14 +644,16 @@ export async function gerarRoteiro(
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
   const { tema, evidenciasPrevistas } = await resolverTema(cliente, params);
+  const momento = params.origem === "momento" ? params.momento : undefined;
 
-  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura } = await gerarConteudo({
+  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
     cliente,
     tema,
     objetivo: params.objetivo,
     observacao: params.observacao,
     evidenciasPrevistas,
+    momento,
   });
 
   const [roteiro] = await db()
@@ -564,8 +661,10 @@ export async function gerarRoteiro(
     .values({
       clienteId,
       data: hojeISO(),
-      tema,
+      // V9a, item 1: com momento, o tema de verdade é o que o modelo devolveu (temaCurto), não o provisório.
+      tema: momento ? (temaCurto ?? tema) : tema,
       origem: params.origem,
+      momento: momento ?? null,
       objetivo: params.objetivo,
       conteudo,
       referenciaVideoId,
@@ -611,7 +710,10 @@ export async function reprovarERescrever(
   const serie = await buscarSerie(raizId);
   const proximaVersao = Math.max(...serie.map((r) => r.versao)) + 1;
 
-  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura } = await gerarConteudo({
+  // V9a, item 1: um roteiro de momento reescrito continua sem busca de evidência, com o mesmo bloco na entrada.
+  const momento = atual.momento ?? undefined;
+
+  const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId: atual.clienteId,
     cliente,
     tema: atual.tema,
@@ -624,6 +726,7 @@ export async function reprovarERescrever(
       motivoTexto,
       duracaoAnteriorS: atual.conteudo.duracaoS,
     },
+    momento,
   });
 
   const [novaVersao] = await db()
@@ -631,8 +734,9 @@ export async function reprovarERescrever(
     .values({
       clienteId: atual.clienteId,
       data: hojeISO(),
-      tema: atual.tema,
+      tema: momento ? (temaCurto ?? atual.tema) : atual.tema,
       origem: atual.origem,
+      momento: momento ?? null,
       objetivo: atual.objetivo,
       conteudo,
       referenciaVideoId,
@@ -875,6 +979,8 @@ export type RoteiroHistoricoLinha = {
   status: "gerado" | "gravado" | "postado";
   gravadoEm: Date | null;
   postadoEm: Date | null;
+  /** V9a, item 5: `HistoricoTela` mostra o rótulo "momento" só para esta origem. */
+  origem: OrigemRoteiro["origem"];
 };
 
 /** Só a ponta de cada série (sem versão mais nova apontando `versaoDe` para ela). */
@@ -894,6 +1000,7 @@ export async function roteirosDoCliente(clienteId: number, limite = 200): Promis
       status: roteiros.status,
       gravadoEm: roteiros.gravadoEm,
       postadoEm: roteiros.postadoEm,
+      origem: roteiros.origem,
     })
     .from(roteiros)
     .where(and(eq(roteiros.clienteId, clienteId), SEM_VERSAO_MAIS_NOVA))
