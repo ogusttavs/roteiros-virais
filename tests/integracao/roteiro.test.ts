@@ -40,6 +40,7 @@ import {
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { boss, FILAS } from "@/jobs/fila";
+import { hojeISO } from "@/lib/config";
 import { evidenciaParaRoteiro, evidenciaPorIds } from "@/servicos/pesquisa";
 import {
   ErroRoteiro,
@@ -47,6 +48,7 @@ import {
   marcarGravado,
   marcarPostado,
   reprovarERescrever,
+  roteirosDeHoje,
 } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -815,5 +817,102 @@ describe("marcarGravado e marcarPostado", () => {
     expect(videoCliente.clienteId).toBe(clienteId);
     expect(videoCliente.plataforma).toBe("tiktok");
     expect(videoCliente.idExterno).toBe("1234567890");
+  });
+});
+
+const CONTEUDO_ROTEIRO_MINIMO = {
+  titulo: "titulo",
+  duracaoS: 40,
+  gancho: "gancho",
+  corpo: "corpo",
+  fechamento: "fechamento",
+  chamadaFinal: "chamada final",
+  cenas: [],
+  ondeGravar: "no local do negocio",
+  edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+  evidencias: [],
+  semEvidencia: false,
+  forcaEvidencia: null,
+};
+
+/** Insercao direta, sem passar por `gerarRoteiro` (mais rapido; `roteirosDeHoje` so le a tabela). */
+async function inserirRoteiroDireto(
+  clienteId: number,
+  opcoes: { data: string; origem?: "sugerido" | "momento"; versaoDe?: number },
+) {
+  const [roteiro] = await db()
+    .insert(roteiros)
+    .values({
+      clienteId,
+      data: opcoes.data,
+      tema: `tema de ${opcoes.data}`,
+      origem: opcoes.origem ?? "sugerido",
+      objetivo: "alcance",
+      conteudo: CONTEUDO_ROTEIRO_MINIMO,
+      versaoDe: opcoes.versaoDe,
+    })
+    .returning();
+  return roteiro;
+}
+
+describe("roteirosDeHoje (V9b-0, plano sem_limite)", () => {
+  it("traz todos os roteiros de hoje, mais recente primeiro", async () => {
+    const clienteId = await criarCliente();
+    const primeiro = await inserirRoteiroDireto(clienteId, { data: hojeISO() });
+    const segundo = await inserirRoteiroDireto(clienteId, { data: hojeISO() });
+
+    const lista = await roteirosDeHoje(clienteId);
+
+    expect(lista.map((r) => r.id)).toEqual([segundo.id, primeiro.id]);
+  });
+
+  it("nunca traz roteiro de outro dia, mesmo sendo o mais recente", async () => {
+    const clienteId = await criarCliente();
+    await inserirRoteiroDireto(clienteId, { data: "2026-01-01" });
+    const deHoje = await inserirRoteiroDireto(clienteId, { data: hojeISO() });
+
+    const lista = await roteirosDeHoje(clienteId);
+
+    expect(lista.map((r) => r.id)).toEqual([deHoje.id]);
+  });
+
+  it("so traz a versao mais nova de cada serie (outro angulo nao duplica cartao)", async () => {
+    const clienteId = await criarCliente();
+    const v1 = await inserirRoteiroDireto(clienteId, { data: hojeISO() });
+    const v2 = await inserirRoteiroDireto(clienteId, { data: hojeISO(), versaoDe: v1.id });
+
+    const lista = await roteirosDeHoje(clienteId);
+
+    expect(lista.map((r) => r.id)).toEqual([v2.id]);
+  });
+
+  it("isolado por cliente: o roteiro de hoje de outro cliente nunca aparece", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    const deA = await inserirRoteiroDireto(clienteA, { data: hojeISO() });
+    await inserirRoteiroDireto(clienteB, { data: hojeISO() });
+
+    const lista = await roteirosDeHoje(clienteA);
+
+    expect(lista.map((r) => r.id)).toEqual([deA.id]);
+  });
+
+  it("sem nenhum roteiro hoje, devolve lista vazia", async () => {
+    const clienteId = await criarCliente();
+
+    const lista = await roteirosDeHoje(clienteId);
+
+    expect(lista).toEqual([]);
+  });
+
+  it("roteiro de origem momento entra na lista junto com os de tema sugerido", async () => {
+    const clienteId = await criarCliente();
+    const doTema = await inserirRoteiroDireto(clienteId, { data: hojeISO(), origem: "sugerido" });
+    const doMomento = await inserirRoteiroDireto(clienteId, { data: hojeISO(), origem: "momento" });
+
+    const lista = await roteirosDeHoje(clienteId);
+
+    expect(lista.map((r) => r.origem).sort()).toEqual(["momento", "sugerido"]);
+    expect(lista.map((r) => r.id).sort()).toEqual([doMomento.id, doTema.id].sort());
   });
 });

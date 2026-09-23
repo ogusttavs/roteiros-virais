@@ -2,9 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import type { PlanoMarca } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import {
   darAcesso,
+  definirPlano,
   ErroCliente,
   garantirSessaoAdmin,
   gerarSenhaNova,
@@ -51,4 +53,11 @@ export async function tirarAcessoAction(clienteId: number, usuarioId: string): P
     if (erro instanceof ErroCliente) return { ok: false, erro: erro.message };
     throw erro;
   }
+}
+
+/** V9b-0, item 1: o interruptor de plano em `/admin/clientes/[id]`. */
+export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): Promise<void> {
+  garantirSessaoAdmin(await sessaoAtual());
+  await definirPlano(clienteId, plano);
+  revalidatePath(`/admin/clientes/${clienteId}`);
 }

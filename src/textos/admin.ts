@@ -49,6 +49,10 @@ export const textosAdmin = {
     campoTipo: "tipo de marca",
     tipoNegocio: "negócio",
     tipoPessoa: "pessoa",
+    /** V9b-0: quantos roteiros a marca pode gerar por dia. */
+    campoPlano: "roteiros por dia",
+    planoPadrao: "um por dia",
+    planoSemLimite: "sem limite",
     botaoConvidar: "convidar por e-mail",
     convidando: "convidando",
     sucesso: (email: string) => `cliente criado; o convite foi mandado para ${email}`,
@@ -226,6 +230,12 @@ export const textosAdmin = {
   clienteDetalhe: {
     voltar: "clientes",
     naoEncontrado: "cliente não encontrado",
+    /** V9b-0: o interruptor de plano, ao lado do nicho no cabeçalho. */
+    campoPlano: "roteiros por dia",
+    planoPadrao: "um por dia",
+    planoSemLimite: "sem limite",
+    planoSalvo: "salvo",
+    planoErro: "não conseguimos salvar; tente de novo",
     briefingTitulo: "briefing",
     briefingCompleto: "completo",
     briefingIncompleto: "incompleto",

@@ -26,6 +26,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
   const [email, setEmail] = useState("");
   const [nichoId, setNichoId] = useState(nichos[0]?.id ?? 0);
   const [tipo, setTipo] = useState<"negocio" | "pessoa">("negocio");
+  const [plano, setPlano] = useState<"padrao" | "sem_limite">("padrao");
   const [convidando, setConvidando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [toastTexto, setToastTexto] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
     setConvidando(true);
     setErro(null);
     try {
-      const resultado = await criarClienteAction({ nome, email, nichoId, tipo });
+      const resultado = await criarClienteAction({ nome, email, nichoId, tipo, plano });
       setNome("");
       onFechar();
       if (resultado.tipo === "convite") {
@@ -101,6 +102,18 @@ export function ModalConvidarCliente({ nichos, aberto, onFechar }: Props) {
                 >
                   <option value="negocio">{t.tipoNegocio}</option>
                   <option value="pessoa">{t.tipoPessoa}</option>
+                </select>
+              </label>
+              <label className={styles.rotuloSelect}>
+                {t.campoPlano}
+                <select
+                  className={styles.select}
+                  aria-label={t.campoPlano}
+                  value={plano}
+                  onChange={(e) => setPlano(e.target.value as "padrao" | "sem_limite")}
+                >
+                  <option value="padrao">{t.planoPadrao}</option>
+                  <option value="sem_limite">{t.planoSemLimite}</option>
                 </select>
               </label>
               {erro ? (

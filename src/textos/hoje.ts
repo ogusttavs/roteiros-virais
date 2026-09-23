@@ -68,6 +68,8 @@ export const textosHoje = {
   tentarDeNovo: "Tentar de novo",
   roteiroDeHoje: "Roteiro de hoje",
   roteiroDeHojePronto: "Seu roteiro de hoje está pronto",
+  /** V9b-0: plano sem limite diário, título do bloco de cartões, com a contagem só acima de um. */
+  seusRoteirosDeHoje: (n: number) => (n > 1 ? `Seus roteiros de hoje (${n})` : "Seus roteiros de hoje"),
   escritoAs: (h: string) => `Escrito às ${h}`,
   abrirRoteiro: "Abrir o roteiro",
   modoGravacao: "Modo gravação",

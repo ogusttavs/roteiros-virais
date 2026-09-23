@@ -148,6 +148,14 @@ export type TipoMarca = "negocio" | "pessoa";
 /** Preferencia de tema salva pelo cliente em /conta (etapa D, parte 2). */
 export type TemaPreferido = "claro" | "escuro" | "sistema";
 
+/**
+ * O nivel de assinatura da marca (V9b-0, decisao do Gustavo em 22/09/2026):
+ * `sem_limite` gera quantos roteiros quiser no mesmo dia, todos visiveis no
+ * Hoje; `padrao` continua com um roteiro por dia. Interruptor por marca ate
+ * os niveis de assinatura serem desenhados (E22).
+ */
+export type PlanoMarca = "padrao" | "sem_limite";
+
 export const clientes = pgTable("clientes", {
   id: id(),
   /**
@@ -166,6 +174,7 @@ export const clientes = pgTable("clientes", {
   ramoOutro: text("ramo_outro"),
   persona: text("persona").$type<Persona>().notNull().default("negocio"),
   tipo: text("tipo").$type<TipoMarca>().notNull().default("negocio"),
+  plano: text("plano").$type<PlanoMarca>().notNull().default("padrao"),
   perfis: jsonb("perfis").$type<PerfisCliente>(),
   quemGrava: text("quem_grava").$type<QuemGrava>(),
   tema: text("tema").$type<TemaPreferido>().notNull().default("sistema"),

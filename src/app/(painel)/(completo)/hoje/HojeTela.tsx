@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import type { ConteudoRoteiro, Objetivo, TemaDoDia } from "@/db/schema";
+import type { ConteudoRoteiro, Objetivo, PlanoMarca, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { ItemPlano } from "@/servicos/plano";
+import type { OrigemRoteiro } from "@/servicos/roteiro";
 import type { Constancia } from "@/servicos/temas";
+import { textosHistorico } from "@/textos/historico";
 import { textosHoje } from "@/textos/hoje";
 import { textosMomento } from "@/textos/momento";
 import { textosNav } from "@/textos/nav";
@@ -32,6 +34,9 @@ import { pularPlanoAction } from "./plano/acoes";
 
 type RoteiroDeHoje = { id: number; objetivo: Objetivo; criadoEm: Date; corpo: ConteudoRoteiro };
 
+/** V9b-0, plano `sem_limite`: cada cartão sabe a própria origem, para o rótulo "momento" do Histórico. */
+type RoteiroDeHojeComOrigem = RoteiroDeHoje & { origem: OrigemRoteiro["origem"] };
+
 export type SemanaDia = { rotulo: string; gravou: boolean; hoje: boolean };
 
 export type UltimoVideoAparte = {
@@ -49,6 +54,12 @@ type Props = {
   constancia: Constancia;
   roteiroHoje: RoteiroDeHoje | null;
   evidenciaRoteiroHoje: EvidenciaTema | null;
+  /** V9b-0: plano da marca ativa; `sem_limite` troca o cartão único pela lista de cartões abaixo. */
+  plano: PlanoMarca;
+  /** V9b-0, plano `sem_limite`: todos os roteiros de hoje, mais recente primeiro; vazio no plano `padrao`. */
+  roteirosDeHoje: RoteiroDeHojeComOrigem[];
+  /** V9b-0, plano `sem_limite`: a evidência de cada roteiro de `roteirosDeHoje`, no mesmo índice. */
+  evidenciasRoteirosDeHoje: (EvidenciaTema | null)[];
   semana: SemanaDia[];
   ultimoVideo: UltimoVideoAparte | null;
   /**
@@ -137,6 +148,9 @@ export function HojeTela({
   constancia,
   roteiroHoje,
   evidenciaRoteiroHoje,
+  plano,
+  roteirosDeHoje,
+  evidenciasRoteirosDeHoje,
   semana,
   ultimoVideo,
   marcaAtiva,
@@ -316,7 +330,121 @@ export function HojeTela({
             </section>
           ) : null}
 
-          {roteiroHoje ? (
+          {plano === "sem_limite" ? (
+            <div className={styles.duasColunas}>
+              <div className={styles.colunaPrincipal}>
+                {roteirosDeHoje.length > 0 ? (
+                  <>
+                    <span className={styles.marcaRecomendado}>
+                      <Check size={14} strokeWidth={1.75} aria-hidden="true" />
+                      {textosHoje.seusRoteirosDeHoje(roteirosDeHoje.length)}
+                    </span>
+                    {roteirosDeHoje.map((roteiro, indice) => (
+                      <article key={roteiro.id} className={styles.cartaoRoteiro}>
+                        <div className={styles.tituloArea}>
+                          <span className={styles.rotulo}>
+                            {ROTULO_TEMA_CARTAO[roteiro.objetivo]}
+                            {roteiro.origem === "momento" ? ` · ${textosHistorico.origemMomento}` : ""}
+                          </span>
+                          <h3 className={styles.temaTitulo}>{roteiro.corpo.titulo}</h3>
+                        </div>
+                        <p className={styles.porque}>
+                          {textosHoje.roteiroGeradoDescricao(roteiro.corpo.duracaoS)}
+                        </p>
+                        {evidenciasRoteirosDeHoje[indice] ? (
+                          <div className={styles.evidencia}>
+                            {evidenciasRoteirosDeHoje[indice]!.conta ? (
+                              <span className={styles.evidenciaLinha}>
+                                <span className={styles.conta}>{evidenciasRoteirosDeHoje[indice]!.conta}</span>
+                              </span>
+                            ) : null}
+                            <span className={styles.evidenciaLinha}>
+                              <b>{evidenciasRoteirosDeHoje[indice]!.multiplo}</b>{" "}
+                              {textosHoje.evidenciaMultiplo(
+                                evidenciasRoteirosDeHoje[indice]!.rotulo,
+                                evidenciasRoteirosDeHoje[indice]!.views,
+                                evidenciasRoteirosDeHoje[indice]!.quando,
+                              )}
+                            </span>
+                          </div>
+                        ) : null}
+                        <div className={styles.acoes}>
+                          <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.botaoPrimario}>
+                            <Video size={20} strokeWidth={1.75} aria-hidden="true" />
+                            {textosHoje.modoGravacao}
+                          </Link>
+                          <Link href={`/roteiros/${roteiro.id}`} className={styles.botaoSecundario}>
+                            {textosHoje.abrirRoteiro}
+                          </Link>
+                        </div>
+                      </article>
+                    ))}
+                  </>
+                ) : null}
+
+                {/* V9b-0: os tres temas sempre visiveis neste plano, nunca escondidos atras de "ver outros" (`PROXIMO.md`). */}
+                <div className={styles.temasTres}>
+                  {temas.map((tema, indice) => (
+                    <TemaCartao
+                      key={`${tema.titulo}-${indice}`}
+                      rotulo={ROTULO_TEMA_CARTAO[tema.puxaPara]}
+                      tema={tema.titulo}
+                      porque={tema.porQue}
+                      evidencia={evidenciasTemas[indice] ?? null}
+                      primario={indice === 0}
+                      rotuloBotao={textosMomento.escreverRoteiro}
+                      abrindo={emAndamento(`tema-${indice}`)}
+                      desabilitado={ocupado}
+                      precisaDeRede
+                      onEscolher={() => ir(`tema-${indice}`, `/hoje/objetivo?tema=${indice}`)}
+                    />
+                  ))}
+                </div>
+
+                <div className={styles.proprio}>
+                  <h4>{textosHoje.preferAssuntoSeu}</h4>
+                  <p>{textosHoje.preferAssuntoSeuTexto}</p>
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={ocupado || semConexao}
+                    aria-busy={emAndamento("proprio") || undefined}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => ir("proprio", "/hoje/tema-livre")}
+                  >
+                    {emAndamento("proprio") ? textosHoje.abrindo : textosHoje.escreverMeuAssunto}
+                  </button>
+                  <MotivoSemRede />
+                </div>
+
+                <div className={styles.proprio}>
+                  <h4>{textosMomento.tituloFolha}</h4>
+                  <p>{textosMomento.instrucaoAudio}</p>
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaMomentoAberta(true)}
+                  >
+                    {textosMomento.botaoAbrirHoje}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaAgendaAberta(true)}
+                  >
+                    {textosPlano.botaoColarAgenda}
+                  </button>
+                  <MotivoSemRede />
+                </div>
+              </div>
+
+              <AparteSemanaCurva semana={semana} ultimoVideo={ultimoVideo} />
+            </div>
+          ) : roteiroHoje ? (
             <div className={styles.duasColunas}>
               <div className={styles.colunaPrincipal}>
                 <article className={styles.cartaoRoteiro}>

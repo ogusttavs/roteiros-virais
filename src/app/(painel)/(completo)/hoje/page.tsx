@@ -15,7 +15,7 @@ import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { planoDoDia, planoQueVem } from "@/servicos/plano";
-import { corpoDoRoteiro, roteiroDeHoje } from "@/servicos/roteiro";
+import { corpoDoRoteiro, roteiroDeHoje, roteirosDeHoje, type RoteiroLinha } from "@/servicos/roteiro";
 import { resumoHistorico, temasParaCliente } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -75,10 +75,13 @@ export default async function Hoje() {
   }
 
   const hoje = hojeISO();
-  const [resultado, roteiroHoje, videoSubindo, resumo, ultimoVideoBruto, planoDeHoje, planoOsDiasQueVem] =
+  const semLimite = cliente.plano === "sem_limite";
+  const [resultado, roteiroHoje, roteirosDeHojeBrutos, videoSubindo, resumo, ultimoVideoBruto, planoDeHoje, planoOsDiasQueVem] =
     await Promise.all([
       temasParaCliente(cliente),
-      roteiroDeHoje(cliente.id),
+      // V9b-0: plano `padrao` só lê o mais recente; plano `sem_limite` lê a lista inteira abaixo.
+      semLimite ? Promise.resolve(null) : roteiroDeHoje(cliente.id),
+      semLimite ? roteirosDeHoje(cliente.id) : Promise.resolve<RoteiroLinha[]>([]),
       videoSubindoParaAviso(cliente.id),
       resumoHistorico(cliente.id),
       ultimoVideoParaAparte(cliente.id),
@@ -103,22 +106,30 @@ export default async function Hoje() {
 
   /**
    * O roteiro de hoje tem precedência sobre o estado "sem tema" (revisão do
-   * PR #31, item 10): quem escreveu o próprio assunto antes da busca de
-   * hoje sair não pode ficar sem ver o roteiro que já tem. Sem temas de
-   * verdade (`resultado.status !== "ok"`), a lista de temas some da tela
-   * (`temas` vazio já esconde "ver os outros temas" em `HojeTela`).
+   * PR #31, item 10; generalizado no V9b-0 para a lista inteira do plano
+   * `sem_limite`): quem escreveu o próprio assunto antes da busca de hoje
+   * sair não pode ficar sem ver o roteiro que já tem. Sem temas de verdade
+   * (`resultado.status !== "ok"`), a lista de temas some da tela (`temas`
+   * vazio já esconde "ver os outros temas" em `HojeTela`).
    */
+  const temRoteiroHoje = semLimite ? roteirosDeHojeBrutos.length > 0 : roteiroHoje !== null;
+
   // V9a, item 4: as outras marcas, para o seletor "Falar de" da folha "Gravar agora"; a marca ativa nunca aparece na própria lista.
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
 
-  if (roteiroHoje) {
+  if (temRoteiroHoje) {
     const temas = resultado.status === "ok" ? resultado.temas : [];
     const evidenciasTemas =
       resultado.status === "ok"
         ? await Promise.all(temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)))
         : [];
-    const evidenciaRoteiroHoje = await evidenciaResumoPorIds(corpoDoRoteiro(roteiroHoje).evidencias).then(paraEvidenciaTema);
+    const evidenciaRoteiroHoje = roteiroHoje
+      ? await evidenciaResumoPorIds(corpoDoRoteiro(roteiroHoje).evidencias).then(paraEvidenciaTema)
+      : null;
+    const evidenciasRoteirosDeHoje = await Promise.all(
+      roteirosDeHojeBrutos.map((r) => evidenciaResumoPorIds(corpoDoRoteiro(r).evidencias).then(paraEvidenciaTema)),
+    );
 
     return (
       <HojeTela
@@ -127,13 +138,26 @@ export default async function Hoje() {
         avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
         avisoVideoSubindo={avisoVideoSubindo}
         constancia={resultado.constancia}
-        roteiroHoje={{
-          id: roteiroHoje.id,
-          objetivo: roteiroHoje.objetivo,
-          criadoEm: roteiroHoje.criadoEm,
-          corpo: corpoDoRoteiro(roteiroHoje),
-        }}
+        roteiroHoje={
+          roteiroHoje
+            ? {
+                id: roteiroHoje.id,
+                objetivo: roteiroHoje.objetivo,
+                criadoEm: roteiroHoje.criadoEm,
+                corpo: corpoDoRoteiro(roteiroHoje),
+              }
+            : null
+        }
         evidenciaRoteiroHoje={evidenciaRoteiroHoje}
+        plano={cliente.plano}
+        roteirosDeHoje={roteirosDeHojeBrutos.map((r) => ({
+          id: r.id,
+          objetivo: r.objetivo,
+          criadoEm: r.criadoEm,
+          corpo: corpoDoRoteiro(r),
+          origem: r.origem,
+        }))}
+        evidenciasRoteirosDeHoje={evidenciasRoteirosDeHoje}
         semana={semana}
         ultimoVideo={ultimoVideo}
         marcaAtiva={cliente}
@@ -189,6 +213,9 @@ export default async function Hoje() {
       constancia={resultado.constancia}
       roteiroHoje={null}
       evidenciaRoteiroHoje={null}
+      plano={cliente.plano}
+      roteirosDeHoje={[]}
+      evidenciasRoteirosDeHoje={[]}
       semana={semana}
       ultimoVideo={ultimoVideo}
       marcaAtiva={cliente}

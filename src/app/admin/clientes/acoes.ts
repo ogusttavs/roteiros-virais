@@ -17,6 +17,7 @@ export async function criarClienteAction(dados: {
   email: string;
   nichoId: number;
   tipo: "negocio" | "pessoa";
+  plano: "padrao" | "sem_limite";
 }): Promise<ResultadoCriarCliente> {
   garantirSessaoAdmin(await sessaoAtual());
 
