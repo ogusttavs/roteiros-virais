@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
+import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
   avaliarRoteiro,
   marcarGravado,
@@ -26,6 +27,8 @@ async function roteiroDoClienteOuFalha(roteiroId: number) {
 export async function marcarGravadoAction(roteiroId: number): Promise<void> {
   await roteiroDoClienteOuFalha(roteiroId);
   await marcarGravado(roteiroId);
+  // V9b, item 3: fecha o círculo do plano quando este roteiro veio de um item aceito (sem-op sem plano).
+  await marcarGravadoNoPlano(roteiroId);
 }
 
 export async function marcarPostadoAction(roteiroId: number, url: string): Promise<void> {

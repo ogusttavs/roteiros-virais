@@ -3,15 +3,18 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverMomento } from "@/servicos/momento";
+import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverAudioEnviado } from "@/servicos/momento";
 
 /**
- * `/api/momento/transcrever` (V9a, item 3, a folha "Gravar agora"): recebe
- * o áudio gravado no navegador (`MediaRecorder`) por `multipart/form-data`,
- * transcreve pela Groq e devolve os três campos já separados. Rota, não
- * Server Action (as duas são aceitas pelo plano): um upload de arquivo
- * binário aqui fica mais direto que empacotar em FormData de Server Action,
- * mesmo padrão de `/api/roteiros/[id]/pdf` para a sessão.
+ * `/api/momento/transcrever` (V9a, item 3, a folha "Gravar agora"; V9b,
+ * item 1, "mesmo botão de áudio, mesma rota" para a agenda): recebe o
+ * áudio gravado no navegador (`MediaRecorder`) por `multipart/form-data` e
+ * devolve só o texto transcrito pela Groq. Rota, não Server Action (as
+ * duas são aceitas pelo plano): um upload de arquivo binário aqui fica mais
+ * direto que empacotar em FormData de Server Action, mesmo padrão de
+ * `/api/roteiros/[id]/pdf` para a sessão. Separar em momento ou em dias de
+ * agenda é responsabilidade de quem chama depois, com o texto devolvido
+ * aqui (`lerMomentoDeTextoAction` ou `lerAgendaAction`).
  */
 export async function POST(request: Request) {
   const sessao = await sessaoAtual();
@@ -50,7 +53,7 @@ export async function POST(request: Request) {
 
   try {
     const bytes = Buffer.from(await audio.arrayBuffer());
-    const resultado = await transcreverMomento(bytes, audio.type, duracaoS);
+    const resultado = await transcreverAudioEnviado(bytes, audio.type, duracaoS);
     return NextResponse.json(resultado);
   } catch (erro) {
     if (erro instanceof ErroMomento) {

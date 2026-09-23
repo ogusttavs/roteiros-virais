@@ -1,10 +1,19 @@
 /**
- * O momento (V9a, item 3, "Gravar agora"): grava o áudio enviado num
- * arquivo temporário, transcreve pela Groq e separa os três campos com a
- * tarefa `lerMomento`. `src/app/api/momento/transcrever/route.ts` só cuida
- * de sessão e do corpo da requisição; a lógica de verdade mora aqui, e
- * `momento/acoes.ts` chama `gerarLerMomentoDeTexto` direto no caminho por
- * texto (a pessoa ignorou o áudio e escreveu).
+ * O momento (V9a, item 3, "Gravar agora"): transcreve o áudio enviado pela
+ * Groq e separa os três campos com a tarefa `lerMomento`.
+ * `src/app/api/momento/transcrever/route.ts` só cuida de sessão e do corpo
+ * da requisição; a lógica de verdade mora aqui, e `momento/acoes.ts` chama
+ * `lerMomentoDeTexto` direto no caminho por texto (a pessoa ignorou o áudio
+ * e escreveu) e via Server Action depois da transcrição (o caminho por
+ * áudio).
+ *
+ * V9b, item 1 ("mesmo botão de áudio da V9a, mesma rota, mesmo limite"): a
+ * transcrição (`transcreverAudioEnviado`) saiu daqui separada de
+ * `lerMomentoDeTexto`, para a rota devolver só o texto transcrito e quem
+ * chama decidir se separa em momento (`lerMomento`) ou em dias de agenda
+ * (`lerAgenda`, `servicos/plano.ts`). Antes da V9b, a rota fazia as duas
+ * coisas numa chamada só; a divisão custa uma chamada a mais do navegador
+ * para a Server Action, sem chamada de IA extra.
  */
 import { randomUUID } from "node:crypto";
 import { writeFile } from "node:fs/promises";
@@ -118,19 +127,21 @@ export async function lerMomentoDeTexto(texto: string): Promise<CamposMomento> {
   return resultado.dados;
 }
 
-export type ResultadoTranscreverMomento = CamposMomento & { transcricao: string };
+export type ResultadoTranscricao = { transcricao: string };
 
 /**
- * O caminho por áudio da folha "Gravar agora": salva o blob enviado, chama
- * a Groq, separa os campos, e sempre apaga o arquivo temporário (sucesso ou
- * erro). `duracaoS` vem do cronômetro do navegador (o front sabe a duração
- * exata; abrir o arquivo para medir de novo seria redundante).
+ * `/api/momento/transcrever` (V9a e V9b, "mesma rota" para o momento e para
+ * a agenda): salva o blob enviado, chama a Groq, e sempre apaga o arquivo
+ * temporário (sucesso ou erro). `duracaoS` vem do cronômetro do navegador
+ * (o front sabe a duração exata; abrir o arquivo para medir de novo seria
+ * redundante). Devolve só o texto transcrito; separar em campos (momento ou
+ * agenda) é responsabilidade de quem chama, depois desta função.
  */
-export async function transcreverMomento(
+export async function transcreverAudioEnviado(
   bytes: Buffer,
   tipoMime: string,
   duracaoS: number,
-): Promise<ResultadoTranscreverMomento> {
+): Promise<ResultadoTranscricao> {
   if (duracaoS > LIMITE_SEGUNDOS_AUDIO) {
     throw new ErroMomento(`audio maior que o limite de ${LIMITE_SEGUNDOS_AUDIO}s: ${duracaoS}s`);
   }
@@ -148,8 +159,7 @@ export async function transcreverMomento(
       throw new ErroMomento("a transcricao veio vazia.");
     }
 
-    const campos = await lerMomentoDeTexto(transcricao);
-    return { ...campos, transcricao };
+    return { transcricao };
   } finally {
     await apagarAudio(caminho);
   }

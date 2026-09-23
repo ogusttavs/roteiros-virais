@@ -3,7 +3,23 @@
 import type { Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
+import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
 import { ErroRoteiro, gerarRoteiro } from "@/servicos/roteiro";
+
+/**
+ * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
+ * `/api/momento/transcrever` devolver o texto (a rota deixou de separar em
+ * campos, "mesma rota" reaproveitada pela agenda). Sessão só para não
+ * gastar a tarefa barata sem ninguém logado; o resultado não depende de
+ * marca nenhuma.
+ */
+export async function lerMomentoDeTextoAction(texto: string): Promise<CamposMomento> {
+  const sessao = await sessaoAtual();
+  if (!sessao) {
+    throw new ErroAcessoNegado("E preciso entrar de novo.");
+  }
+  return lerMomentoDeTexto(texto);
+}
 
 export type DadosMomento = {
   onde: string;
