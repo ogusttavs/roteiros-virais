@@ -1,7 +1,7 @@
 /**
- * Roda os quatro golden sets em sequencia (etapa 18, decisao 4 do
- * `PROXIMO.md`; momentos desde a V9a) e grava o resultado num JSON, porque a CI nao tem chave de
- * producao (etapa 13) e cada rodada custa credito: o PR que muda um prompt
+ * Roda os cinco golden sets em sequencia (etapa 18, decisao 4 do
+ * `PROXIMO.md`; momentos desde a V9a, agendas desde a V9b) e grava o resultado num JSON, porque
+ * a CI nao tem chave de producao (etapa 13) e cada rodada custa credito: o PR que muda um prompt
  * traz esse arquivo (ou o resumo dele) no corpo, em vez da CI rodar de
  * novo. Grava em `<GOLDEN_SET_DIR ou ../avaliacoes-privadas>/resultados/
  * <AAAA-MM-DD>-<sha curto>.json`, criando a pasta se nao existir; sem
@@ -12,6 +12,7 @@ import { execSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
+import { avaliarAgendas } from "./avaliar-agendas";
 import { avaliarBriefing } from "./avaliar-briefing";
 import { avaliarMomentos } from "./avaliar-momentos";
 import { avaliarRoteiros } from "./avaliar-roteiros";
@@ -38,6 +39,9 @@ async function avaliarTudo() {
   console.log("\n=== momentos ===\n");
   const momentos = await avaliarMomentos();
 
+  console.log("\n=== agendas ===\n");
+  const agendas = await avaliarAgendas();
+
   const resultado = {
     data: hojeAAAAMMDD(),
     sha: shaCurto(),
@@ -45,6 +49,7 @@ async function avaliarTudo() {
     temas,
     roteiros,
     momentos,
+    agendas,
   };
 
   const dirResultados = path.resolve(process.cwd(), process.env.GOLDEN_SET_DIR ?? "../avaliacoes-privadas", "resultados");

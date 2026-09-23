@@ -187,14 +187,23 @@ describe("montarSistemaEstavel", () => {
     expect(sistema).toContain("- nao citar concorrente (fraca)");
   });
 
-  // V9a, item 4: "negocio" continua na voz de sempre; "pessoa" muda para primeira pessoa do singular.
-  it("tipo negocio: instrui continuar na voz de sempre, nunca primeira pessoa do singular", () => {
+  // V9b, item 0.1 (revisao do PR #55): "negocio" pode usar a primeira pessoa do singular quando
+  // quem grava conta a propria experiencia; so nao pode inventar um "nos" que nao existe.
+  it("tipo negocio: instrui a voz da marca, mas permite primeira pessoa do singular na experiencia de quem grava", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "negocio" });
-    expect(sistema).toContain('continue na voz de sempre ("a gente", "nossa loja")');
+    expect(sistema).toContain('a voz é a da marca ("a gente", "nossa loja") quando fala do negócio');
+    expect(sistema).toContain('primeira pessoa do singular é bem-vinda quando quem grava conta a própria experiência');
+    expect(sistema).toContain('nunca invente um "nós" que não existe');
   });
 
   it("tipo pessoa: instrui primeira pessoa do singular", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "pessoa" });
     expect(sistema).toContain('escreva sempre em primeira pessoa do singular ("eu", "meu", "minha")');
+  });
+
+  // V9b, item 0.3 (revisao do PR #55): a regra dura 11 ganhou "uma marca so" na chamada final.
+  it("regra 11 sempre diz que a chamada final cita uma marca so", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "negocio" });
+    expect(sistema).toContain("sempre cita uma marca só, nunca as duas.");
   });
 });

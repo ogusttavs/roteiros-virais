@@ -1,8 +1,10 @@
 /**
- * POST /api/momento/transcrever (V9a, item 3): sessão protegida, salva o
- * áudio enviado num arquivo temporário, chama a Groq (mockada aqui, nunca a
- * rede de verdade) e devolve os três campos separados pela tarefa
- * `lerMomento` (mock determinístico, `AI_PROVIDER=mock`, `vitest.config.mts`).
+ * POST /api/momento/transcrever (V9a, item 3; V9b, item 1): sessão
+ * protegida, salva o áudio enviado num arquivo temporário, chama a Groq
+ * (mockada aqui, nunca a rede de verdade) e devolve só o texto transcrito.
+ * Separar em campos (momento ou agenda) saiu da rota na V9b, para a mesma
+ * rota servir os dois casos; `momento-acoes.test.ts` cobre
+ * `lerMomentoDeTextoAction` e `agenda-acoes.test.ts` cobre `lerAgendaAction`.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -42,6 +44,19 @@ function formaComAudio(duracaoS = "12"): FormData {
   return forma;
 }
 
+/**
+ * Item 0.2 da revisão do PR #55 (V9b): um `File` maior que o limite, sem
+ * depender da fixture pequena. `duracaoS` mentiroso de propósito (5s): a
+ * rota tem de recusar pelo tamanho, não pela duração informada pelo cliente.
+ */
+function formaComAudioGrande(tamanhoBytes: number): FormData {
+  const bytes = new Uint8Array(tamanhoBytes);
+  const forma = new FormData();
+  forma.append("audio", new File([bytes], "audio-grande.webm", { type: "audio/webm" }));
+  forma.append("duracaoS", "5");
+  return forma;
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db().insert(nichos).values({ slug: "momento-rota-teste", nome: "Momento rota teste" }).returning();
@@ -73,7 +88,20 @@ describe("POST /api/momento/transcrever", () => {
     expect(resposta.status).toBe(400);
   });
 
-  it("com sessao e audio validos, transcreve pela Groq (mockada) e devolve os tres campos separados", async () => {
+  it("arquivo maior que 25 MB: recusa com 413, sem chamar a Groq, mesmo com duracaoS mentindo que e curto", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("momento-rota"));
+    transcreverAudioMock.mockClear();
+    const { POST } = await import("@/app/api/momento/transcrever/route");
+
+    const resposta = await POST(requisicao(formaComAudioGrande(26 * 1024 * 1024)));
+    const corpo = (await resposta.json()) as { erro: string };
+    expect(resposta.status).toBe(413);
+    // Sem jargao (regra 6 do CLAUDE.md): nem "MB", nem "bytes", nem numero tecnico do limite.
+    expect(corpo.erro).not.toMatch(/mb|bytes|\d/i);
+    expect(transcreverAudioMock).not.toHaveBeenCalled();
+  });
+
+  it("com sessao e audio validos, transcreve pela Groq (mockada) e devolve so o texto transcrito", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("momento-rota"));
     transcreverAudioMock.mockResolvedValue(
       "Eu tô aqui no aeroporto, cinco da manhã. Acabei de passar pela segurança, vou embarcar para a feira de fornecedores. Dá para mostrar a fila do check-in e a mala de amostras que eu levo.",
@@ -81,19 +109,13 @@ describe("POST /api/momento/transcrever", () => {
     const { POST } = await import("@/app/api/momento/transcrever/route");
 
     const resposta = await POST(requisicao(formaComAudio("18")));
-    const corpo = (await resposta.json()) as {
-      onde: string;
-      oQueEstaAcontecendo: string;
-      oQueDaParaMostrar: string;
-      transcricao: string;
-    };
+    const corpo = (await resposta.json()) as { transcricao: string };
 
     expect(resposta.status).toBe(200);
     expect(transcreverAudioMock).toHaveBeenCalledOnce();
     expect(corpo.transcricao).toContain("aeroporto");
-    expect(corpo.onde).toBeTruthy();
-    expect(corpo.oQueEstaAcontecendo).toBeTruthy();
-    expect(corpo.oQueDaParaMostrar).toBeTruthy();
+    // V9b, item 1: a rota nao separa mais em campos (momento ou agenda); so devolve o texto.
+    expect(Object.keys(corpo)).toEqual(["transcricao"]);
   });
 
   it("audio maior que o limite de 2 minutos: recusa com 422, sem chamar a Groq", async () => {

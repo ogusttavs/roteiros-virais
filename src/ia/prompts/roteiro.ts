@@ -94,8 +94,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * `temaCurto`, preenchido só com o momento, a linha curta que vira
  * `roteiros.tema` (a busca de evidência não roda para esta origem, não há
  * tema escolhido de antemão). Versao 1.9.0.
+ *
+ * Item 0 da revisão do PR #55 (V9b, item 1): a regra 12 para "negocio"
+ * proibia qualquer primeira pessoa do singular, o que também bloqueava "eu
+ * testei" ou "eu uso" na fala de quem grava contando a própria experiência,
+ * exatamente a voz que a tese do produto pede. A regra passa a proibir só um
+ * "nós" inventado, não a pessoa contando o que ela fez. Versao 1.9.1.
  */
-export const versao = "1.9.0";
+export const versao = "1.9.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -160,8 +166,9 @@ export function montarSistemaEstavel(dados: {
     dados.tipo === "pessoa"
       ? `12. Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira ` +
         `pessoa do singular ("eu", "meu", "minha"), nunca "a gente" ou "nosso".`
-      : `12. Este cliente é um negócio: continue na voz de sempre ("a gente", "nossa loja"), nunca ` +
-        `em primeira pessoa do singular.`;
+      : `12. Este cliente é um negócio: a voz é a da marca ("a gente", "nossa loja") quando fala do ` +
+        `negócio, e a primeira pessoa do singular é bem-vinda quando quem grava conta a própria ` +
+        `experiência ("eu testei", "eu uso"); nunca invente um "nós" que não existe.`;
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
 
@@ -211,7 +218,8 @@ gravar com a própria cara no celular. Regras duras:
     nulo.
 11. Quando a entrada trouxer uma marca citada, ela aparece como parte da vida real de quem
     grava, nunca como anúncio ou propaganda; se o objetivo for as pessoas comprarem, a
-    chamada final aponta para a marca citada, não para a marca deste roteiro.
+    chamada final aponta para a marca citada, não para a marca deste roteiro. A chamada final
+    sempre cita uma marca só, nunca as duas.
 ${regraVoz}
 
 O objetivo escolhido muda o roteiro:

@@ -26,6 +26,11 @@
  * no catch, para não perder o lembrete da pessoa naquele dia por causa de
  * uma falha comum do provedor de e-mail (mais provável que o processo cair
  * no meio).
+ *
+ * V9b, item 4: quando a marca tem plano colado para hoje, o e-mail traz os
+ * itens do plano (lugar e situação, `planoDoDia` já exclui pulado) acima do
+ * texto de sempre. `nomesPendentes` virou `MarcaPendente[]` para carregar
+ * esses itens junto do nome.
  */
 import { eq } from "drizzle-orm";
 
@@ -34,8 +39,9 @@ import { clientes, membrosMarca, preferenciasUsuario, user } from "@/db/schema";
 import { hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { acessouHoje } from "@/servicos/clientes";
+import { planoDoDia } from "@/servicos/plano";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
-import { textosEmail } from "@/textos/email";
+import { textosEmail, type MarcaPendente } from "@/textos/email";
 
 /**
  * `agora` é injetável (hora real por padrão) para o teste de integração
@@ -69,6 +75,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
 
     const marcasDoCandidato = await db()
       .select({
+        id: clientes.id,
         nome: clientes.nome,
         ativo: clientes.ativo,
         nichoId: clientes.nichoId,
@@ -78,12 +85,16 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
       .where(eq(membrosMarca.usuarioId, candidato.usuarioId));
 
-    const nomesPendentes: string[] = [];
+    const nomesPendentes: MarcaPendente[] = [];
     for (const marca of marcasDoCandidato) {
       if (!marca.ativo) continue;
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
       if (!marca.nichoId || !(await temasDoDiaOuRecente(marca.nichoId, hoje))) continue;
-      nomesPendentes.push(marca.nome);
+      const planoHoje = await planoDoDia(marca.id, hoje);
+      nomesPendentes.push({
+        nome: marca.nome,
+        planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),
+      });
     }
 
     if (nomesPendentes.length === 0) {

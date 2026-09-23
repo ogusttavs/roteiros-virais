@@ -5,9 +5,11 @@ export type { NivelIA };
 /**
  * As dez tarefas do plano (plano de execucao, etapas 4 e 10), mais
  * `classificarAbertura` (V4, item 2: backfill do tipo de abertura de
- * analise ja existente, sem ler transcricao de novo) e `lerMomento` (V9a,
+ * analise ja existente, sem ler transcricao de novo), `lerMomento` (V9a,
  * item 3: separa os campos do momento a partir da transcricao ou do texto
- * digitado na folha "Gravar agora").
+ * digitado na folha "Gravar agora"), `lerAgenda` (V9b, item 1: separa a
+ * agenda colada ou falada em dias) e `planejarDia` (V9b, item 2: sugere de
+ * 1 a 3 gravacoes por dia do plano).
  */
 export type TarefaIA =
   | "avaliarResposta"
@@ -22,7 +24,9 @@ export type TarefaIA =
   | "verificarTexto"
   | "aprenderCliente"
   | "classificarAbertura"
-  | "lerMomento";
+  | "lerMomento"
+  | "lerAgenda"
+  | "planejarDia";
 
 export type ImagemEntrada = {
   base64: string;

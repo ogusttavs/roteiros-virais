@@ -844,6 +844,49 @@ export const roteiros = pgTable(
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],
 );
 
+/**
+ * O estado de um item do plano (V9b, E35 enxuta): "sugerido" é o que
+ * `planejarDia` propôs; "aceito" quando a pessoa gera o roteiro a partir
+ * dele (`roteiroId` preenchido); "gravado" quando esse roteiro é marcado
+ * "Já gravei" (`servicos/plano.ts`, `marcarGravado`, ligado pelo
+ * `roteiroId`); "pulado" some do bloco "o seu plano de hoje".
+ */
+export type EstadoPlano = "sugerido" | "aceito" | "gravado" | "pulado";
+
+/**
+ * O plano de gravações a partir da agenda colada (V9b, E35 enxuta, migração
+ * 0030): uma linha por gravação sugerida num dia. `clienteId` é a marca dona
+ * do plano (a agenda é da pessoa, mas o plano vive na marca ativa, mesma
+ * regra do momento); `marcaId` é a marca citada nesse item ("Falar de" do
+ * momento, item 4 da V9a), nula usa a marca ativa. Colar a agenda de novo
+ * substitui o plano a partir de hoje (`servicos/plano.ts`, `limparPlano`); o
+ * passado fica.
+ */
+export const planoGravacoes = pgTable(
+  "plano_gravacoes",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id),
+    dia: date("dia").notNull(),
+    /** A ordem dentro do dia (1 a 3 sugestões), para a lista sair sempre na mesma ordem. */
+    ordem: integer("ordem").notNull(),
+    lugar: text("lugar").notNull(),
+    /** O compromisso da agenda que vira o momento (o `oQueEstaAcontecendo` do roteiro gerado). */
+    situacao: text("situacao").notNull(),
+    /** A sugestão de cena (o `oQueDaParaMostrar` do roteiro gerado). */
+    oQueMostrar: text("o_que_mostrar").notNull(),
+    objetivo: text("objetivo").$type<Objetivo>().notNull(),
+    marcaId: integer("marca_id").references(() => clientes.id),
+    estado: text("estado").$type<EstadoPlano>().notNull().default("sugerido"),
+    /** Nulo até a pessoa aceitar (`servicos/plano.ts`, `aceitar`), gerando o roteiro (origem "momento"). */
+    roteiroId: integer("roteiro_id").references(() => roteiros.id),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("plano_gravacoes_cliente_dia").on(t.clienteId, t.dia)],
+);
+
 export const favoritos = pgTable(
   "favoritos",
   {

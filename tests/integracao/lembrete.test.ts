@@ -16,7 +16,16 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 vi.mock("@/lib/email", () => ({ enviarEmail: vi.fn().mockResolvedValue(undefined) }));
 
 import { db, getPool } from "@/db";
-import { clientes, membrosMarca, nichos, type PapelMarca, preferenciasUsuario, temasDia, user } from "@/db/schema";
+import {
+  clientes,
+  membrosMarca,
+  nichos,
+  type PapelMarca,
+  planoGravacoes,
+  preferenciasUsuario,
+  temasDia,
+  user,
+} from "@/db/schema";
 import { rodarLembrete } from "@/jobs/lembrete";
 import { enviarEmail } from "@/lib/email";
 
@@ -57,6 +66,22 @@ async function criarMarca(
 
 async function adicionarMembro(usuarioId: string, clienteId: number, papel: PapelMarca = "membro") {
   await db().insert(membrosMarca).values({ usuarioId, clienteId, papel });
+}
+
+let contadorPlano = 0;
+async function criarItemPlano(clienteId: number, dia: string, dados: { lugar: string; situacao: string }) {
+  contadorPlano += 1;
+  await db()
+    .insert(planoGravacoes)
+    .values({
+      clienteId,
+      dia,
+      ordem: contadorPlano,
+      lugar: dados.lugar,
+      situacao: dados.situacao,
+      oQueMostrar: `a cena de ${dados.lugar}`,
+      objetivo: "engajamento",
+    });
 }
 
 function htmlsEnviados(): string[] {
@@ -119,6 +144,8 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
+  // plano_gravacoes nao tem cascade a partir de clientes (schema.ts); precisa ir antes.
+  await db().delete(planoGravacoes);
   // cascade cuida de clientes, membrosMarca e preferenciasUsuario (schema.ts).
   await db().delete(user);
   vi.mocked(enviarEmail).mockClear();
@@ -303,6 +330,56 @@ describe("rodarLembrete", () => {
     expect(html).toContain(pendenteA.nome);
     expect(html).toContain(pendenteB.nome);
     expect(html).not.toContain(aberta.nome);
+  });
+
+  it("marca com plano colado para hoje: o e-mail traz lugar e situacao acima do texto de sempre", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarItemPlano(marca.id, "2026-09-03", { lugar: "fabrica do fornecedor", situacao: "ver a linha nova" });
+    await criarItemPlano(marca.id, "2026-09-03", { lugar: "escritorio", situacao: "reuniao de fechamento" });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain("fabrica do fornecedor: ver a linha nova");
+    expect(html).toContain("escritorio: reuniao de fechamento");
+    expect(html).toContain(`O tema de <strong>${marca.nome}</strong> está pronto para gravar.`);
+    expect(html.indexOf("fabrica do fornecedor")).toBeLessThan(html.indexOf("está pronto para gravar"));
+  });
+
+  it("marca sem plano colado para hoje: o e-mail so tem o texto de sempre, sem bloco de plano", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain(`O tema de <strong>${marca.nome}</strong> está pronto para gravar.`);
+    expect(html).not.toContain(": ");
+  });
+
+  it("plano colado so em uma das duas marcas pendentes: cada uma mostra o seu bloco, com o nome na frente", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const comPlano = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarMarca(pessoa, { nichoId: nichoTemaOntemId });
+    await criarItemPlano(comPlano.id, "2026-09-03", { lugar: "fabrica", situacao: "ver a linha" });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain(`<strong>${comPlano.nome}</strong></p><p>fabrica: ver a linha`);
+  });
+
+  it("item pulado do plano nao entra no e-mail (planoDoDia ja exclui pulado)", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarItemPlano(marca.id, "2026-09-03", { lugar: "fabrica", situacao: "ver a linha" });
+    await db().update(planoGravacoes).set({ estado: "pulado" }).where(eq(planoGravacoes.clienteId, marca.id));
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).not.toContain("ver a linha");
   });
 
   it("se o envio falhar, desfaz o ultimo_lembrete_em da pessoa (nao perde o lembrete do dia por falha do provedor)", async () => {

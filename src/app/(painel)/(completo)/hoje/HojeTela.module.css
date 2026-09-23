@@ -147,6 +147,24 @@
   line-height: var(--altura-corpo);
 }
 
+/* ---------- O seu plano de hoje (V9b) ---------- */
+
+.planoHoje {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.planoHojeCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
 /* ---------- Duas colunas ---------- */
 
 .duasColunas {
