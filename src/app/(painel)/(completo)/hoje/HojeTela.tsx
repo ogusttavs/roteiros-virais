@@ -7,10 +7,12 @@ import { useState, useTransition } from "react";
 
 import type { ConteudoRoteiro, Objetivo, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import type { ItemPlano } from "@/servicos/plano";
 import type { Constancia } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 import { textosMomento } from "@/textos/momento";
 import { textosNav } from "@/textos/nav";
+import { textosPlano } from "@/textos/plano";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
@@ -20,10 +22,13 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
 import { useTrocaMarca } from "../../_casca/TrocaMarcaContext";
 
-import { FolhaGravarAgora } from "./FolhaGravarAgora";
+import { FolhaColarAgenda } from "./FolhaColarAgenda";
+import { FolhaGravarAgora, type ValoresIniciaisMomento } from "./FolhaGravarAgora";
+import { FolhaMeuPlano } from "./FolhaMeuPlano";
 import { HojeCabecalho } from "./HojeCabecalho";
 import { HojeEsqueleto } from "./HojeEsqueleto";
 import styles from "./HojeTela.module.css";
+import { pularPlanoAction } from "./plano/acoes";
 
 type RoteiroDeHoje = { id: number; objetivo: Objetivo; criadoEm: Date; corpo: ConteudoRoteiro };
 
@@ -58,6 +63,10 @@ type Props = {
   objetivoRecomendado: Objetivo | null;
   /** V9a, item 4: as outras marcas, para o seletor "Falar de" da folha (a ativa já fora desta lista). */
   outrasMarcas: MarcaResumo[];
+  /** V9b, item 3: o bloco "o seu plano de hoje", vazio sem plano para hoje. */
+  planoDeHoje: ItemPlano[];
+  /** V9b, item 3: os dias que vêm, para a folha "Meu plano" (só existe quando há plano hoje). */
+  planoQueVem: ItemPlano[];
 };
 
 function AparteSemanaCurva({
@@ -135,14 +144,51 @@ export function HojeTela({
   nomePessoa,
   objetivoRecomendado,
   outrasMarcas,
+  planoDeHoje: planoDeHojeInicial,
+  planoQueVem,
 }: Props) {
   const router = useRouter();
   const [outrosAbertos, setOutrosAbertos] = useState(false);
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
+  const [itemPlanoParaFolha, setItemPlanoParaFolha] = useState<ItemPlano | null>(null);
   const { fechar: fecharFolhaMomento, fecharEDepois: fecharFolhaMomentoEDepois } = useFolhaNoHistorico(
     folhaMomentoAberta,
-    () => setFolhaMomentoAberta(false),
+    () => {
+      setFolhaMomentoAberta(false);
+      setItemPlanoParaFolha(null);
+    },
   );
+  const [folhaAgendaAberta, setFolhaAgendaAberta] = useState(false);
+  const { fechar: fecharFolhaAgenda, fecharEDepois: fecharFolhaAgendaEDepois } = useFolhaNoHistorico(
+    folhaAgendaAberta,
+    () => setFolhaAgendaAberta(false),
+  );
+  const [folhaMeuPlanoAberta, setFolhaMeuPlanoAberta] = useState(false);
+  const { fechar: fecharFolhaMeuPlano } = useFolhaNoHistorico(folhaMeuPlanoAberta, () => setFolhaMeuPlanoAberta(false));
+
+  // V9b, item 3: "Pular" some do bloco na hora, sem esperar o `router.refresh()` do fim da acao.
+  const [planoDeHoje, setPlanoDeHoje] = useState(planoDeHojeInicial);
+  const [pulandoId, setPulandoId] = useState<number | null>(null);
+
+  function abrirGravarAgoraDoPlano(item: ItemPlano) {
+    setItemPlanoParaFolha(item);
+    setFolhaMomentoAberta(true);
+  }
+
+  async function pularItemDoPlano(item: ItemPlano) {
+    if (pulandoId !== null) return;
+    setPulandoId(item.id);
+    try {
+      await pularPlanoAction(item.id);
+      setPlanoDeHoje((atual) => atual.filter((i) => i.id !== item.id));
+    } catch {
+      // A falha fica só visual (o item continua no bloco); tentar de novo e uma frase dedicada
+      // ficam para a próxima rodada de acabamento, mesmo espírito das outras acoes desta tela.
+    } finally {
+      setPulandoId(null);
+    }
+  }
+
   const diasGravados = semana.filter((dia) => dia.gravou).length;
   const { trocando, marcaAlvo } = useTrocaMarca();
   const { semConexao, avisarFalhaDeRede } = useConexao();
@@ -216,6 +262,52 @@ export function HojeTela({
           />
 
           {avisoLinhaEditorial ? <p className={styles.aviso}>{avisoLinhaEditorial}</p> : null}
+
+          {/* V9b, item 3: "o seu plano de hoje", acima dos três temas (e do roteiro do dia, se já existir). */}
+          {planoDeHoje.length > 0 ? (
+            <section className={styles.planoHoje}>
+              <div className={styles.planoHojeCabecalho}>
+                <h4>{textosPlano.tituloBlocoHoje}</h4>
+                <button type="button" className={styles.trocar} onClick={() => setFolhaMeuPlanoAberta(true)}>
+                  {textosPlano.botaoMeuPlano}
+                </button>
+              </div>
+              <div className={styles.listaOutros}>
+                {planoDeHoje.map((item) => (
+                  <div key={item.id} className={styles.linhaOutro}>
+                    <span className={styles.blocoOutro}>
+                      <span className={styles.rotuloOutro}>
+                        {item.lugar.trim() || textosPlano.semLugar} · {ROTULO_TEMA_CARTAO[item.objetivo]}
+                      </span>
+                      <span className={styles.temaOutro}>{item.situacao}</span>
+                    </span>
+                    <span className={styles.acaoOutro}>
+                      {item.estado === "sugerido" ? (
+                        <>
+                          <button type="button" className={styles.trocar} onClick={() => abrirGravarAgoraDoPlano(item)}>
+                            {textosPlano.botaoEscreverRoteiro}
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.trocar}
+                            disabled={pulandoId === item.id}
+                            aria-busy={pulandoId === item.id || undefined}
+                            onClick={() => pularItemDoPlano(item)}
+                          >
+                            {pulandoId === item.id ? textosPlano.pulando : textosPlano.botaoPular}
+                          </button>
+                        </>
+                      ) : item.roteiroId ? (
+                        <Link href={`/roteiros/${item.roteiroId}`} className={styles.trocar}>
+                          {item.estado === "gravado" ? textosPlano.rotuloGravado : textosPlano.botaoAbrirRoteiro}
+                        </Link>
+                      ) : null}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           {roteiroHoje ? (
             <div className={styles.duasColunas}>
@@ -325,6 +417,16 @@ export function HojeTela({
                   >
                     {textosMomento.botaoAbrirHoje}
                   </button>
+                  {/* V9b, item 3: "ao lado de Gravar agora" (`PROXIMO.md`). */}
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaAgendaAberta(true)}
+                  >
+                    {textosPlano.botaoColarAgenda}
+                  </button>
                   <MotivoSemRede />
                 </div>
               </div>
@@ -381,6 +483,16 @@ export function HojeTela({
                   >
                     {textosMomento.botaoAbrirHoje}
                   </button>
+                  {/* V9b, item 3: "ao lado de Gravar agora" (`PROXIMO.md`). */}
+                  <button
+                    type="button"
+                    className={styles.botaoSecundario}
+                    disabled={semConexao}
+                    aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
+                    onClick={() => setFolhaAgendaAberta(true)}
+                  >
+                    {textosPlano.botaoColarAgenda}
+                  </button>
                   <MotivoSemRede />
                 </div>
               </div>
@@ -397,8 +509,24 @@ export function HojeTela({
           fecharEDepois={fecharFolhaMomentoEDepois}
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
+          planoItemId={itemPlanoParaFolha?.id}
+          valoresIniciais={
+            itemPlanoParaFolha
+              ? ({
+                  onde: itemPlanoParaFolha.lugar,
+                  oQueEstaAcontecendo: itemPlanoParaFolha.situacao,
+                  oQueDaParaMostrar: itemPlanoParaFolha.oQueMostrar,
+                  objetivo: itemPlanoParaFolha.objetivo,
+                  marcaId: itemPlanoParaFolha.marcaId,
+                } satisfies ValoresIniciaisMomento)
+              : undefined
+          }
         />
       ) : null}
+
+      {folhaAgendaAberta ? <FolhaColarAgenda aoFechar={fecharFolhaAgenda} fecharEDepois={fecharFolhaAgendaEDepois} /> : null}
+
+      {folhaMeuPlanoAberta ? <FolhaMeuPlano aoFechar={fecharFolhaMeuPlano} itens={planoQueVem} /> : null}
     </div>
   );
 }

@@ -15,7 +15,8 @@ import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./FolhaGravarAgora.module.css";
-import { gerarRoteiroMomentoAction } from "./momento/acoes";
+import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "./momento/acoes";
+import { aceitarPlanoAction } from "./plano/acoes";
 
 /** O `MediaRecorder` do navegador para aqui (PROXIMO.md, V9a, item 3); a rota recusa áudio mais longo. */
 const LIMITE_SEGUNDOS_AUDIO = 120;
@@ -36,6 +37,15 @@ function tipoMimeSuportado(): string | null {
 
 type MarcaResumo = { id: number; nome: string };
 
+/** V9b, item 3: o que um item do plano já sugeriu, para a folha abrir preenchida. */
+export type ValoresIniciaisMomento = {
+  onde: string;
+  oQueEstaAcontecendo: string;
+  oQueDaParaMostrar: string;
+  objetivo: Objetivo;
+  marcaId: number | null;
+};
+
 type Props = {
   /** Fecha a folha sem navegar (véu, Escape, "Cancelar", Voltar do aparelho). */
   aoFechar: () => void;
@@ -44,6 +54,15 @@ type Props = {
   objetivoRecomendado: Objetivo | null;
   /** As outras marcas de que a pessoa é membro, sem a marca ativa (V9a, item 4, "Falar de"). */
   marcas: MarcaResumo[];
+  /**
+   * V9b, item 3: aberta a partir de um item do plano ("Escrever o roteiro"
+   * no bloco "o seu plano de hoje"). Presente, "Escrever o roteiro" chama
+   * `aceitarPlanoAction` em vez de `gerarRoteiroMomentoAction`, para ligar
+   * o roteiro novo ao item; `valoresIniciais` pré-preenche os campos com o
+   * que `planejarDia` sugeriu (a pessoa ainda pode editar antes de confirmar).
+   */
+  planoItemId?: number;
+  valoresIniciais?: ValoresIniciaisMomento;
 };
 
 /**
@@ -54,7 +73,14 @@ type Props = {
  * `Mic`/`Square` do `lucide-react`, como o resto do painel já faz para todo
  * ícone fora dos poucos que vêm da entrega (`HojeTela.tsx`, `RoteiroTela.tsx`).
  */
-export function FolhaGravarAgora({ aoFechar, fecharEDepois, objetivoRecomendado, marcas }: Props) {
+export function FolhaGravarAgora({
+  aoFechar,
+  fecharEDepois,
+  objetivoRecomendado,
+  marcas,
+  planoItemId,
+  valoresIniciais,
+}: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
 
@@ -64,11 +90,15 @@ export function FolhaGravarAgora({ aoFechar, fecharEDepois, objetivoRecomendado,
   const [erroAudio, setErroAudio] = useState<string | null>(null);
   const [transcricao, setTranscricao] = useState<string | null>(null);
 
-  const [onde, setOnde] = useState("");
-  const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState("");
-  const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState("");
-  const [objetivo, setObjetivo] = useState<Objetivo | null>(objetivoRecomendado);
-  const [marcaIndice, setMarcaIndice] = useState<number | null>(marcas.length > 0 ? 0 : null);
+  const [onde, setOnde] = useState(valoresIniciais?.onde ?? "");
+  const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? "");
+  const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? "");
+  const [objetivo, setObjetivo] = useState<Objetivo | null>(valoresIniciais?.objetivo ?? objetivoRecomendado);
+  const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
+    if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
+    const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
+    return indice >= 0 ? indice + 1 : 0;
+  });
 
   const [camposFaltando, setCamposFaltando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -96,18 +126,17 @@ export function FolhaGravarAgora({ aoFechar, fecharEDepois, objetivoRecomendado,
 
     try {
       const resposta = await fetch("/api/momento/transcrever", { method: "POST", body: forma });
-      const dados = (await resposta.json().catch(() => null)) as
-        | { onde: string; oQueEstaAcontecendo: string; oQueDaParaMostrar: string; transcricao: string }
-        | { erro: string }
-        | null;
+      const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
       if (!resposta.ok || !dados || "erro" in dados) {
         setFaseAudio("erro");
         setErroAudio(textosMomento.erroTranscricao);
         return;
       }
-      setOnde(dados.onde);
-      setOQueEstaAcontecendo(dados.oQueEstaAcontecendo);
-      setOQueDaParaMostrar(dados.oQueDaParaMostrar);
+      // V9b, item 1: a rota só transcreve; separar em campos é uma chamada à parte (a mesma rota serve a agenda).
+      const campos = await lerMomentoDeTextoAction(dados.transcricao);
+      setOnde(campos.onde);
+      setOQueEstaAcontecendo(campos.oQueEstaAcontecendo);
+      setOQueDaParaMostrar(campos.oQueDaParaMostrar);
       setTranscricao(dados.transcricao);
       setFaseAudio("inicial");
     } catch {
@@ -177,14 +206,17 @@ export function FolhaGravarAgora({ aoFechar, fecharEDepois, objetivoRecomendado,
     try {
       const marcaId =
         marcaIndice !== null && marcaIndice > 0 ? marcas[marcaIndice - 1]?.id : undefined;
-      const { id } = await gerarRoteiroMomentoAction({
-        onde,
-        oQueEstaAcontecendo,
-        oQueDaParaMostrar,
-        objetivo,
-        marcaId,
-        transcricao: transcricao ?? undefined,
-      });
+      const { id } =
+        planoItemId !== undefined
+          ? await aceitarPlanoAction(planoItemId, { onde, oQueEstaAcontecendo, oQueDaParaMostrar, objetivo, marcaId })
+          : await gerarRoteiroMomentoAction({
+              onde,
+              oQueEstaAcontecendo,
+              oQueDaParaMostrar,
+              objetivo,
+              marcaId,
+              transcricao: transcricao ?? undefined,
+            });
       fecharEDepois(() => router.push(`/roteiros/${id}`));
     } catch (falha) {
       setErroEnvio(tratarFalha(falha, textosMomento.erroGerar));

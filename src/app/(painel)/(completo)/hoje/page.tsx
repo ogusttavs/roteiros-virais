@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { hojeISO } from "@/lib/config";
 import {
   classificarMultiplo,
   diasDesde,
@@ -13,6 +14,7 @@ import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
+import { planoDoDia, planoQueVem } from "@/servicos/plano";
 import { corpoDoRoteiro, roteiroDeHoje } from "@/servicos/roteiro";
 import { resumoHistorico, temasParaCliente } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
@@ -72,13 +74,18 @@ export default async function Hoje() {
     redirect("/entrar");
   }
 
-  const [resultado, roteiroHoje, videoSubindo, resumo, ultimoVideoBruto] = await Promise.all([
-    temasParaCliente(cliente),
-    roteiroDeHoje(cliente.id),
-    videoSubindoParaAviso(cliente.id),
-    resumoHistorico(cliente.id),
-    ultimoVideoParaAparte(cliente.id),
-  ]);
+  const hoje = hojeISO();
+  const [resultado, roteiroHoje, videoSubindo, resumo, ultimoVideoBruto, planoDeHoje, planoOsDiasQueVem] =
+    await Promise.all([
+      temasParaCliente(cliente),
+      roteiroDeHoje(cliente.id),
+      videoSubindoParaAviso(cliente.id),
+      resumoHistorico(cliente.id),
+      ultimoVideoParaAparte(cliente.id),
+      // V9b, item 3: "o seu plano de hoje" e a folha "Meu plano" (só os dias que vêm, a partir de hoje).
+      planoDoDia(cliente.id, hoje),
+      planoQueVem(cliente.id, hoje),
+    ]);
 
   const avisoVideoSubindo = videoSubindo
     ? textosHoje.avisoVideoSubindo(diaDaSemana(videoSubindo.postadoEm), formatarMultiplo(videoSubindo.multiplicador))
@@ -134,6 +141,8 @@ export default async function Hoje() {
         nomePessoa={sessao.user.name}
         objetivoRecomendado={objetivoRecomendado}
         outrasMarcas={outrasMarcas}
+        planoDeHoje={planoDeHoje}
+        planoQueVem={planoOsDiasQueVem}
       />
     );
   }
@@ -187,6 +196,8 @@ export default async function Hoje() {
       nomePessoa={sessao.user.name}
       objetivoRecomendado={objetivoRecomendado}
       outrasMarcas={outrasMarcas}
+      planoDeHoje={planoDeHoje}
+      planoQueVem={planoOsDiasQueVem}
     />
   );
 }

@@ -1,0 +1,56 @@
+.grupoDia {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.diaData {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.item {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.itemCabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--espaco-2);
+}
+
+.itemLugar {
+  font-size: var(--tamanho-corpo);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.itemEstado {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.itemSituacao {
+  margin: 0;
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+}
+
+.itemObjetivo {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.vazio {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-corpo);
+}
