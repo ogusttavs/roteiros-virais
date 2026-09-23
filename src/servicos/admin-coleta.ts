@@ -24,6 +24,7 @@ import {
   videos,
   type AvaliacaoGeracao,
   type Nicho,
+  type PlanoMarca,
   type Plataforma,
   type TemaDoDia,
 } from "@/db/schema";
@@ -494,11 +495,13 @@ export type ClienteDetalheAdmin = {
   nichoNome: string | null;
   ativo: boolean;
   criadoEm: Date;
+  /** V9b-0: o interruptor de roteiros por dia, editável nesta tela. */
+  plano: PlanoMarca;
   briefing: { completo: boolean; notaGeral: number | null; resumo: string | null } | null;
   diasSemGravar: number | null;
 };
 
-/** /admin/clientes/[id] (etapa 12, decisão 9 do `PROXIMO.md`): briefing, saúde da conta. Só leitura. */
+/** /admin/clientes/[id] (etapa 12, decisão 9 do `PROXIMO.md`): briefing, saúde da conta. Editável: só o plano (V9b-0). */
 export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDetalheAdmin | null> {
   const [linha] = await db()
     .select({
@@ -508,6 +511,7 @@ export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDet
       nichoNome: nichos.nome,
       ativo: clientes.ativo,
       criadoEm: clientes.criadoEm,
+      plano: clientes.plano,
     })
     .from(clientes)
     .innerJoin(user, eq(user.id, clientes.usuarioId))

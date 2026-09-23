@@ -939,6 +939,9 @@ export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro
   });
 }
 
+/** Só a ponta de cada série (sem versão mais nova apontando `versaoDe` para ela). */
+const SEM_VERSAO_MAIS_NOVA = sql`not exists (select 1 from roteiros mais_novo where mais_novo.versao_de = roteiros.id)`;
+
 /**
  * O roteiro mais recente gerado hoje para o cliente (etapa 11, decisão 6:
  * o cartão de roteiro em `/hoje`, quando já existe). `null` sem nenhum
@@ -954,6 +957,20 @@ export async function roteiroDeHoje(clienteId: number): Promise<RoteiroLinha | n
 
   const [roteiro] = linhas;
   return roteiro && roteiro.data === hojeISO() ? roteiro : null;
+}
+
+/**
+ * Todos os roteiros de hoje do cliente, mais recente primeiro, só a ponta de
+ * cada série (V9b-0, plano `sem_limite`: o Hoje mostra um cartão por
+ * roteiro do dia, não só o mais recente). Mesmo filtro de "ponta de série"
+ * de `roteirosDoCliente`.
+ */
+export async function roteirosDeHoje(clienteId: number): Promise<RoteiroLinha[]> {
+  return db()
+    .select()
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO()), SEM_VERSAO_MAIS_NOVA))
+    .orderBy(desc(roteiros.criadoEm));
 }
 
 /**
@@ -982,9 +999,6 @@ export type RoteiroHistoricoLinha = {
   /** V9a, item 5: `HistoricoTela` mostra o rótulo "momento" só para esta origem. */
   origem: OrigemRoteiro["origem"];
 };
-
-/** Só a ponta de cada série (sem versão mais nova apontando `versaoDe` para ela). */
-const SEM_VERSAO_MAIS_NOVA = sql`not exists (select 1 from roteiros mais_novo where mais_novo.versao_de = roteiros.id)`;
 
 /**
  * A lista de `/historico` (etapa 12, decisão 3 do `PROXIMO.md`): mais

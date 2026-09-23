@@ -17,6 +17,7 @@ import {
   type Cliente,
   type PapelMarca,
   type PerfisCliente,
+  type PlanoMarca,
   type TemaPreferido,
   type TipoMarca,
 } from "@/db/schema";
@@ -302,14 +303,17 @@ export async function criarClienteEConvidar(dados: {
   nichoId: number;
   /** V9a, item 4: o admin escolhe ao criar a marca; "negocio" é o padrão, sem tela nova. */
   tipo?: TipoMarca;
+  /** V9b-0, item 1: o admin escolhe ao criar a marca; "padrao" é o padrão, sem tela nova. */
+  plano?: PlanoMarca;
 }): Promise<ResultadoCriarCliente> {
   const tipo = dados.tipo ?? "negocio";
+  const plano = dados.plano ?? "padrao";
   const [usuarioExistente] = await db().select().from(user).where(eq(user.email, dados.email));
 
   if (usuarioExistente) {
     const [cliente] = await db()
       .insert(clientes)
-      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId, tipo })
+      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId, tipo, plano })
       .returning();
     await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId: cliente.id, papel: "dono" });
     return { tipo: "jaTinhaLogin", cliente };
@@ -318,12 +322,17 @@ export async function criarClienteEConvidar(dados: {
   const { usuarioId, senha } = await criarUsuarioComSenhaGerada(dados.email, dados.nome);
   const [cliente] = await db()
     .insert(clientes)
-    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId, tipo })
+    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId, tipo, plano })
     .returning();
   await db().insert(membrosMarca).values({ usuarioId, clienteId: cliente.id, papel: "dono" });
   await mandarConviteMagico(dados.email);
 
   return { tipo: "convite", cliente, senha };
+}
+
+/** V9b-0, item 1: o admin liga ou desliga o limite diário de roteiros de uma marca em `/admin/clientes/[id]`. */
+export async function definirPlano(clienteId: number, plano: PlanoMarca): Promise<void> {
+  await db().update(clientes).set({ plano }).where(eq(clientes.id, clienteId));
 }
 
 export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };

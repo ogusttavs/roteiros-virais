@@ -1,0 +1,1 @@
+ALTER TABLE "clientes" ADD COLUMN "plano" text DEFAULT 'padrao' NOT NULL;

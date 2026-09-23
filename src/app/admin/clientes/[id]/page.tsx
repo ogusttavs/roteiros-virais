@@ -15,6 +15,7 @@ import { textosHistorico } from "@/textos/historico";
 
 import styles from "./page.module.css";
 import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
+import { SeletorPlanoAdmin } from "./SeletorPlanoAdmin";
 
 const t = textosAdmin.clienteDetalhe;
 const LIMIAR_ATENCAO = 5;
@@ -65,6 +66,7 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
         <p className={styles.subtitulo}>
           {cliente.nichoNome ?? textosAdmin.clientes.semNicho} · {textosAdmin.acessos.quantos(membros.length)}
         </p>
+        <SeletorPlanoAdmin clienteId={cliente.id} planoInicial={cliente.plano} />
       </div>
 
       <QuemTemAcessoAdmin clienteId={cliente.id} nomeMarca={cliente.nome} membros={membros} />

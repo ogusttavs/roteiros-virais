@@ -1,0 +1,34 @@
+.envoltorio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.select {
+  height: 32px;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-md);
+  border: 1px solid var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+}
+
+.ok {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-positivo);
+}
+
+.erro {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-erro);
+}
