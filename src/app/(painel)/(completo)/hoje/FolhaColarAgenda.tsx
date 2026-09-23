@@ -44,7 +44,6 @@ function formatarData(dataISO: string): string {
 
 type Props = {
   aoFechar: () => void;
-  fecharEDepois: (acao: () => void) => void;
 };
 
 /**
@@ -53,8 +52,15 @@ type Props = {
  * dias (`lerAgendaAction`), a pessoa confere a lista antes de confirmar
  * (`criarPlanoAction`); sem edição campo a campo nesta rodada, só a
  * conferência e o "Montar o plano".
+ *
+ * `confirmar` chama `router.refresh()` e só depois `aoFechar()`, nessa
+ * ordem, em vez de `fecharEDepois` (achado do e2e desta etapa): sem URL
+ * nova, o `history.back()` de `fecharEDepois` corre com o `refresh` e o
+ * bloco "o seu plano de hoje" às vezes não aparecia sem um recarregamento
+ * manual. `fecharEDepois` continua certo para fechar-e-navegar (as outras
+ * folhas do projeto); aqui não há navegação, só dado novo na mesma tela.
  */
-export function FolhaColarAgenda({ aoFechar, fecharEDepois }: Props) {
+export function FolhaColarAgenda({ aoFechar }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
 
@@ -171,7 +177,8 @@ export function FolhaColarAgenda({ aoFechar, fecharEDepois }: Props) {
     setFase("confirmando");
     try {
       await criarPlanoAction(dias);
-      fecharEDepois(() => router.refresh());
+      router.refresh();
+      aoFechar();
     } catch (falha) {
       setErro(tratarFalha(falha, textosPlano.erroCriarPlano));
       setFase("revisao");

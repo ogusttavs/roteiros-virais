@@ -16,7 +16,6 @@ export const textosPlano = {
   lendoAgenda: "Separando os dias",
   campoVazio: "conte pelo menos um dia antes de continuar",
 
-  tituloRevisao: "Confira os dias",
   subtituloRevisao: "Esses são os dias que a gente entendeu. Se estiver certo, confirme para montar o plano.",
   semDiaEntendido:
     "Não conseguimos entender nenhum dia nessa agenda. Tente de novo, dizendo o dia, o lugar e o que vai acontecer.",

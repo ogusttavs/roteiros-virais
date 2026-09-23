@@ -43,24 +43,30 @@ function somarDias(dataISO: string, dias: number): string {
 
 /**
  * `hoje` é a data de hoje já resolvida (`AAAA-MM-DD`, fuso do Brasil,
- * `src/lib/config.ts`, `hojeISO`). Entende: "hoje", "amanhã", os sete dias
- * da semana (o mesmo dia de hoje volta hoje, não a semana que vem: quem
- * planeja no domingo de manhã e escreve "domingo: embarque" quer dizer
- * hoje) e "dia N" (o dia N deste mês, ou do mês seguinte se esse dia já
- * passou; um N que não existe no mês candidato, como 31 de fevereiro, é
- * erro, nunca rola para o mês seguinte sozinho). Lança `ErroDataRelativa`
- * para o que não reconhece, para `lerAgenda` (quem chama) descartar o dia
- * em vez de inventar uma data.
+ * `src/lib/config.ts`, `hojeISO`). Entende: "hoje", "amanhã", "depois de
+ * amanhã" (achado do golden set da agenda, item 5: uma viagem de vários
+ * dias contada de uma vez usa essa referência com frequência), os sete
+ * dias da semana tanto na forma curta ("segunda") quanto na forma cheia
+ * ("segunda-feira", com ou sem hífen; outro achado do mesmo golden set, o
+ * modelo real prefere a forma cheia) (o mesmo dia de hoje volta hoje, não
+ * a semana que vem: quem planeja no domingo de manhã e escreve "domingo:
+ * embarque" quer dizer hoje) e "dia N" (o dia N deste mês, ou do mês
+ * seguinte se esse dia já passou; um N que não existe no mês candidato,
+ * como 31 de fevereiro, é erro, nunca rola para o mês seguinte sozinho).
+ * Lança `ErroDataRelativa` para o que não reconhece, para `lerAgenda`
+ * (quem chama) descartar o dia em vez de inventar uma data.
  */
 export function resolverDataRelativa(referencia: string, hoje: string): string {
   const texto = normalizar(referencia);
 
   if (texto === "hoje") return hoje;
   if (texto === "amanha") return somarDias(hoje, 1);
+  if (texto === "depois de amanha") return somarDias(hoje, 2);
 
-  if (texto in DIAS_DA_SEMANA) {
+  const nomeDoDia = texto.replace(/[\s-]*feira$/, "");
+  if (nomeDoDia in DIAS_DA_SEMANA) {
     const diaDeHoje = paraData(hoje).getUTCDay();
-    const alvo = DIAS_DA_SEMANA[texto];
+    const alvo = DIAS_DA_SEMANA[nomeDoDia];
     const diferenca = (alvo - diaDeHoje + 7) % 7;
     return somarDias(hoje, diferenca);
   }

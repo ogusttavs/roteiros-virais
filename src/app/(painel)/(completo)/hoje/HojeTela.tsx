@@ -3,7 +3,7 @@
 import { Check, RefreshCw, Video } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import type { ConteudoRoteiro, Objetivo, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -159,16 +159,23 @@ export function HojeTela({
     },
   );
   const [folhaAgendaAberta, setFolhaAgendaAberta] = useState(false);
-  const { fechar: fecharFolhaAgenda, fecharEDepois: fecharFolhaAgendaEDepois } = useFolhaNoHistorico(
-    folhaAgendaAberta,
-    () => setFolhaAgendaAberta(false),
-  );
+  const { fechar: fecharFolhaAgenda } = useFolhaNoHistorico(folhaAgendaAberta, () => setFolhaAgendaAberta(false));
   const [folhaMeuPlanoAberta, setFolhaMeuPlanoAberta] = useState(false);
   const { fechar: fecharFolhaMeuPlano } = useFolhaNoHistorico(folhaMeuPlanoAberta, () => setFolhaMeuPlanoAberta(false));
 
   // V9b, item 3: "Pular" some do bloco na hora, sem esperar o `router.refresh()` do fim da acao.
   const [planoDeHoje, setPlanoDeHoje] = useState(planoDeHojeInicial);
   const [pulandoId, setPulandoId] = useState<number | null>(null);
+
+  /**
+   * `useState(planoDeHojeInicial)` acima só lê a prop na primeira montagem: sem este efeito, o
+   * plano recém colado (`FolhaColarAgenda`, `router.refresh()` sem navegação) nunca aparecia,
+   * porque o Hoje não desmonta nesse refresh (achado do e2e desta etapa, `plano.spec.ts`). Este
+   * efeito resincroniza sempre que o servidor manda uma lista nova.
+   */
+  useEffect(() => {
+    setPlanoDeHoje(planoDeHojeInicial);
+  }, [planoDeHojeInicial]);
 
   function abrirGravarAgoraDoPlano(item: ItemPlano) {
     setItemPlanoParaFolha(item);
@@ -524,7 +531,7 @@ export function HojeTela({
         />
       ) : null}
 
-      {folhaAgendaAberta ? <FolhaColarAgenda aoFechar={fecharFolhaAgenda} fecharEDepois={fecharFolhaAgendaEDepois} /> : null}
+      {folhaAgendaAberta ? <FolhaColarAgenda aoFechar={fecharFolhaAgenda} /> : null}
 
       {folhaMeuPlanoAberta ? <FolhaMeuPlano aoFechar={fecharFolhaMeuPlano} itens={planoQueVem} /> : null}
     </div>

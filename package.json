@@ -37,6 +37,7 @@
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",
     "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
     "avaliar:momentos": "tsx scripts/avaliar-momentos.ts",
+    "avaliar:agendas": "tsx scripts/avaliar-agendas.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
