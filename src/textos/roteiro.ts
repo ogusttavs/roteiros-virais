@@ -22,6 +22,8 @@ export const textosRoteiro = {
     meio: "O meio",
     fechamento: "O fechamento",
     chamada: "A chamada final",
+    /** V9c, item 4: o rótulo de cada bloco de leitura em Story, um por cartão. */
+    cartao: (n: number) => `Cartão ${n}`,
   },
   ondeGravar: "Onde gravar e o que mostrar",
   comoEditar: "Como editar",
@@ -34,6 +36,15 @@ export const textosRoteiro = {
     semRecurso: "Nenhum recurso extra além do corte",
     semAudio: "Sem indicação de áudio para este vídeo",
   },
+  /** V9c, item 4: o detalhe de cada cartão de Story, no lugar do bloco "Como editar" clássico. */
+  cartaoStory: {
+    oQueMostrar: "O que mostrar",
+    textoNaTela: "Texto na tela",
+    figurinha: "Figurinha",
+    semFigurinha: "Sem figurinha neste cartão",
+  },
+  /** V9c, item 4: por que o roteiro saiu assim, uma linha por regra aplicada (`porQueAssim` do prompt). */
+  porQueAssim: "Por que assim",
   referencia: "Referência",
   /**
    * A força da evidência (V4, item 6, escopo 5.12, item 8): a fraca é a

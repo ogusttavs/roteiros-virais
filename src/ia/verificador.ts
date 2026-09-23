@@ -5,11 +5,13 @@
  * Reprovou, refaz uma vez com o motivo anexado a entrada; reprovou de novo,
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
-import type { TipoAbertura } from "@/db/schema";
+import type { CartaoStory, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
+
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
+import { NUMEROS_REGRAS_STORY } from "./prompts/regras-formato";
 import type { InstrucaoAbertura } from "./prompts/roteiro";
 import * as verificarTexto from "./prompts/verificarTexto";
 import type { GeneroTexto } from "./prompts/verificarTexto";
@@ -69,7 +71,8 @@ export function verificarLocalmente(
      * "libera o tipo usado há mais tempo" por falta de alternativa: aí não é
      * vício do modelo, é a única opção que a evidência de hoje tinha).
      */
-    tipoAberturaAtual?: TipoAbertura;
+    /** Nulo em Story (V9c): `escolherTipoAbertura` (V4) não se aplica, a checagem abaixo não roda. */
+    tipoAberturaAtual?: TipoAbertura | null;
     tipoAberturaAnterior?: TipoAbertura | null;
     /**
      * V5, item 0b (revisão do PR #48): o que `escolherTipoAbertura` de fato
@@ -96,6 +99,15 @@ export function verificarLocalmente(
      * conta, a regra é sobre os primeiros três segundos.
      */
     palavrasDoMomento?: string[];
+    /**
+     * V9c, item 3: as checagens conferíveis por código da seção 9.1
+     * (`R-IG-STORY-03` a `07`), só quando `formato === "story"`.
+     * `porQueAssim` é conferido sempre que vier, mesmo em Reels (vazio lá,
+     * a checagem não encontra nada para reprovar).
+     */
+    formato?: FormatoRoteiro;
+    cartoes?: CartaoStory[] | null;
+    porQueAssim?: { regra: string; motivo: string }[];
   } = {},
 ): ResultadoVerificacaoLocal {
   const motivos: string[] = [];
@@ -191,6 +203,19 @@ export function verificarLocalmente(
     }
   }
 
+  if (opcoes.formato === "story" && opcoes.cartoes) {
+    motivos.push(...verificarCartoesStory(opcoes.cartoes));
+  }
+
+  if (opcoes.porQueAssim && opcoes.porQueAssim.length > 0) {
+    const invalidas = opcoes.porQueAssim
+      .map((item) => item.regra)
+      .filter((regra) => !NUMEROS_REGRAS_STORY.has(regra));
+    if (invalidas.length > 0) {
+      motivos.push(`porQueAssim cita regra que nao existe na lista: ${invalidas.join(", ")}`);
+    }
+  }
+
   return { aprovado: motivos.length === 0, motivos };
 }
 
@@ -273,6 +298,66 @@ export function palavrasDeConteudo(texto: string): string[] {
   return [...new Set(palavras)];
 }
 
+/** 2,5 palavras por segundo, até 15 segundos por cartão (`R-IG-STORY-03`, decisão nossa, `estudo-stories.md`). */
+const PALAVRAS_POR_SEGUNDO_STORY = 2.5;
+const SEGUNDOS_MAX_POR_CARTAO = 15;
+const PALAVRAS_MAX_POR_CARTAO = Math.floor(PALAVRAS_POR_SEGUNDO_STORY * SEGUNDOS_MAX_POR_CARTAO);
+
+/** Verbo que fecha a conversa no último cartão (`R-IG-STORY-07`): "me chama" e "no direct" contam como duas palavras. */
+const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "comenta"];
+
+function contarPalavras(texto: string): number {
+  return normalizar(texto)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+}
+
+/**
+ * O que a seção 9.1 marca como "sim" (conferível por código) para Story
+ * (V9c, item 3): número de cartões entre 2 e 5 e até 15 segundos de fala por
+ * cartão (`R-IG-STORY-03`, o schema já garante 2 a 5, esta é a segunda
+ * camada, mesmo espírito do resto do verificador); algum cartão com
+ * figurinha (`R-IG-STORY-04`); texto na tela em todo cartão (`R-IG-STORY-05`,
+ * já que todo cartão tem fala, `oQueFalar` é obrigatório no schema); o
+ * último cartão com verbo de resposta e sem "segue" (`R-IG-STORY-01` e
+ * `R-IG-STORY-07`).
+ */
+function verificarCartoesStory(cartoes: CartaoStory[]): string[] {
+  const motivos: string[] = [];
+
+  if (cartoes.length < 2 || cartoes.length > 5) {
+    motivos.push(`cartoes: ${cartoes.length} cartao(oes), a regra R-IG-STORY-03 pede de 2 a 5`);
+  }
+
+  cartoes.forEach((cartao, indice) => {
+    const palavras = contarPalavras(cartao.oQueFalar);
+    if (palavras > PALAVRAS_MAX_POR_CARTAO) {
+      motivos.push(
+        `cartao ${indice + 1}: ${palavras} palavras passam de ${PALAVRAS_MAX_POR_CARTAO} (R-IG-STORY-03, ate 15s de fala)`,
+      );
+    }
+    if (!cartao.textoNaTela.trim()) {
+      motivos.push(`cartao ${indice + 1}: sem texto na tela (R-IG-STORY-05)`);
+    }
+  });
+
+  const temFigurinha = cartoes.some((cartao) => cartao.figurinha !== "nenhuma");
+  if (!temFigurinha) {
+    motivos.push("cartoes: nenhum pede interacao por figurinha (R-IG-STORY-04)");
+  }
+
+  const ultimo = normalizar(cartoes[cartoes.length - 1]?.oQueFalar ?? "");
+  if (/\bsegue\b|\bseguir\b/.test(ultimo)) {
+    motivos.push('ultimo cartao: pede para "seguir", quem ve story ja segue (R-IG-STORY-01)');
+  }
+  if (!VERBOS_RESPOSTA_STORY.some((verbo) => ultimo.includes(verbo))) {
+    motivos.push("ultimo cartao: nao fecha pedindo resposta (R-IG-STORY-07)");
+  }
+
+  return motivos;
+}
+
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
   clienteId?: number;
@@ -288,7 +373,7 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   tipoAberturaAnterior?: TipoAbertura | null;
   /** V5, item 0b: o que `escolherTipoAbertura` instruiu, para o verificador conferir contra a instrução (ver `verificarLocalmente`). */
   instrucaoAbertura?: InstrucaoAbertura;
-  extrairTipoAbertura?: (dados: T) => TipoAbertura;
+  extrairTipoAbertura?: (dados: T) => TipoAbertura | null;
   /**
    * Duração da versão reprovada, em segundos (E27, parte 1, item 4): só
    * informada quando o cliente reprovou por "muito longo", junto com
@@ -305,6 +390,10 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   generoTexto?: GeneroTexto;
   /** V9a, item 2: as palavras de conteúdo do momento, para `verificarLocalmente` (ver lá). */
   palavrasDoMomento?: string[];
+  /** V9c, item 3: o formato do roteiro, e como extrair os cartões e o "por que assim" da saída, quando houver. */
+  formato?: FormatoRoteiro;
+  extrairCartoes?: (dados: T) => CartaoStory[] | null;
+  extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
 };
@@ -361,6 +450,9 @@ async function tentarGerarEVerificar<T>(
         ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }
         : undefined,
     palavrasDoMomento: params.palavrasDoMomento,
+    formato: params.formato,
+    cartoes: params.extrairCartoes?.(resultado.dados),
+    porQueAssim: params.extrairPorQueAssim?.(resultado.dados),
   });
 
   let aprovado = local.aprovado;

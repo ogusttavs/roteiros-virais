@@ -1,9 +1,9 @@
 /**
- * Roda os cinco golden sets em sequencia (etapa 18, decisao 4 do
- * `PROXIMO.md`; momentos desde a V9a, agendas desde a V9b) e grava o resultado num JSON, porque
- * a CI nao tem chave de producao (etapa 13) e cada rodada custa credito: o PR que muda um prompt
- * traz esse arquivo (ou o resumo dele) no corpo, em vez da CI rodar de
- * novo. Grava em `<GOLDEN_SET_DIR ou ../avaliacoes-privadas>/resultados/
+ * Roda os seis golden sets em sequencia (etapa 18, decisao 4 do
+ * `PROXIMO.md`; momentos desde a V9a, agendas desde a V9b, stories desde a V9c) e grava o
+ * resultado num JSON, porque a CI nao tem chave de producao (etapa 13) e cada rodada custa
+ * credito: o PR que muda um prompt traz esse arquivo (ou o resumo dele) no corpo, em vez da CI
+ * rodar de novo. Grava em `<GOLDEN_SET_DIR ou ../avaliacoes-privadas>/resultados/
  * <AAAA-MM-DD>-<sha curto>.json`, criando a pasta se nao existir; sem
  * `GOLDEN_SET_DIR`, cada golden set avisa e usa o proprio exemplo, como
  * `npm run avaliar:briefing` etc ja fazem sozinhos.
@@ -16,6 +16,7 @@ import { avaliarAgendas } from "./avaliar-agendas";
 import { avaliarBriefing } from "./avaliar-briefing";
 import { avaliarMomentos } from "./avaliar-momentos";
 import { avaliarRoteiros } from "./avaliar-roteiros";
+import { avaliarStories } from "./avaliar-stories";
 import { avaliarTemas } from "./avaliar-temas";
 
 function shaCurto(): string {
@@ -42,6 +43,9 @@ async function avaliarTudo() {
   console.log("\n=== agendas ===\n");
   const agendas = await avaliarAgendas();
 
+  console.log("\n=== stories ===\n");
+  const stories = await avaliarStories();
+
   const resultado = {
     data: hojeAAAAMMDD(),
     sha: shaCurto(),
@@ -50,6 +54,7 @@ async function avaliarTudo() {
     roteiros,
     momentos,
     agendas,
+    stories,
   };
 
   const dirResultados = path.resolve(process.cwd(), process.env.GOLDEN_SET_DIR ?? "../avaliacoes-privadas", "resultados");

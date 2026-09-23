@@ -41,6 +41,8 @@ const CONTEUDO_MINIMO = {
   corpo: "corpo do e2e",
   fechamento: "fechamento",
   chamadaFinal: "chamada final",
+  cartoes: null,
+  porQueAssim: [],
   cenas: [],
   ondeGravar: "no local do negocio",
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },

@@ -652,6 +652,7 @@ export function HojeTela({
                   oQueEstaAcontecendo: itemPlanoParaFolha.situacao,
                   oQueDaParaMostrar: itemPlanoParaFolha.oQueMostrar,
                   objetivo: itemPlanoParaFolha.objetivo,
+                  formato: itemPlanoParaFolha.formato,
                   marcaId: itemPlanoParaFolha.marcaId,
                 } satisfies ValoresIniciaisMomento)
               : undefined

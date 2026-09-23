@@ -81,3 +81,20 @@ npm run avaliar:temas
 
 Imprime, por caso, a nota que a IA deu e a esperada em cada um dos cinco pilares, e a
 diferença média por pilar no final. Meta: diferença média abaixo de 1,5.
+
+## Formato de `stories.json` e `stories.exemplo.json` (V9c)
+
+O roteiro em Story não tem nota de 0 a 10 (mesmo raciocínio de `roteiros.exemplo.json` e
+`momentos.exemplo.json`): o julgamento é "o Gustavo leria isso e gravaria?". Cada caso é
+origem "tema" (como `roteiros.json`, com `tema` e `evidencias`) ou origem "momento" (como
+`momentos.json`, com o bloco `momento`), nunca os dois. `GOLDEN_SET_DIR/stories.json` é o
+real; sem ele, roda com `stories.exemplo.json`, cinco casos fictícios da Dr.Wash e da viagem
+do Bruno.
+
+```bash
+npm run avaliar:stories
+```
+
+Imprime cada cartão gerado (o que falar, o que mostrar, o texto na tela, a figurinha), o
+"por que assim", e quantos casos o verificador de produção (checagem por regra `R-IG-STORY`
+mais `verificarTexto`) reprovaria.

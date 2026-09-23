@@ -7,6 +7,8 @@ export const textosHistorico = {
   status: { gerado: "escrito", gravado: "gravado", postado: "postado" },
   /** V9a, item 5: só aparece para `origem === "momento"`, ao lado da data. */
   origemMomento: "momento",
+  /** V9c, item 4: só aparece para `formato === "story"`, ao lado da data, como `origemMomento`. */
+  formatoStory: "story",
   pontoCurva: (views: string, horas: number) => `${views} views em ${horas}h`,
   aprendendo: "ainda aprendendo o normal da sua conta",
   acimaDoNormal: (vezes: string) => `${vezes} acima do normal da sua conta; responda os comentários hoje`,

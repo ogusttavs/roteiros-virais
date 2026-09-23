@@ -150,10 +150,12 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         modeloNicho: caso.modeloNicho,
         regrasCliente: caso.regrasCliente,
         tipo: caso.tipo,
+        formato: "reels",
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,
         objetivo: caso.objetivo,
+        formato: "reels",
         evidencias: caso.evidencias,
         roteirosRecentes: caso.roteirosRecentes,
         instrucaoAbertura: caso.instrucaoAbertura,

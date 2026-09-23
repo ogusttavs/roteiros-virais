@@ -98,6 +98,7 @@ export function HistoricoTela({ resumo, grupos }: Props) {
                     <span className={styles.itemData}>
                       {formatarData(item.data)}
                       {item.origem === "momento" ? ` · ${textosHistorico.origemMomento}` : ""}
+                      {item.formato === "story" ? ` · ${textosHistorico.formatoStory}` : ""}
                     </span>
                     <span className={styles.itemTema}>{item.tema}</span>
                     {medida ? <span className={styles.itemMedida}>{medida}</span> : null}

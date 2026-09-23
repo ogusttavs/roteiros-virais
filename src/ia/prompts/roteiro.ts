@@ -1,9 +1,18 @@
 import { z } from "zod";
 
-import { TIPOS_ABERTURA, type Objetivo, type TipoAbertura, type TipoMarca } from "@/db/schema";
+import {
+  FIGURINHAS_STORY,
+  TIPOS_ABERTURA,
+  type FormatoRoteiro,
+  type Objetivo,
+  type TipoAbertura,
+  type TipoMarca,
+} from "@/db/schema";
 
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
+
+import { textoRegrasStory } from "./regras-formato";
 
 /**
  * O roteiro (briefing-e-rubricas.md, secao 7, regras duras, texto literal:
@@ -100,8 +109,21 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * testei" ou "eu uso" na fala de quem grava contando a própria experiência,
  * exatamente a voz que a tese do produto pede. A regra passa a proibir só um
  * "nós" inventado, não a pessoa contando o que ela fez. Versao 1.9.1.
+ *
+ * V9c, Story como formato (item 2, E34 enxuta, primeiro uso da base numerada
+ * de `estrategia/briefing-e-rubricas.md`, seção 9, num prompt inteiro):
+ * `montarSistemaEstavel` e `montarEntrada` ganham `formato`. Com "story", a
+ * regra 5 e o parágrafo de estrutura trocam de texto (cartões numerados no
+ * lugar de gancho/corpo/fechamento/chamada, as dez regras `R-IG-STORY` de
+ * `regras-formato.ts` citadas por número), e a linha de tipo de abertura
+ * some da entrada (o primeiro cartão tem regra própria, R-IG-STORY-02; V4
+ * não se aplica). O schema ganha `cartoes` (2 a 5, nulo em Reels) e
+ * `porQueAssim` (uma entrada por regra numerada que o modelo seguiu, vazio
+ * em Reels nesta rodada); `gancho`, `corpo`, `fechamento` e `chamadaFinal`
+ * ficam nuláveis (nulos em Story) e `tipoAbertura` também (nulo em Story).
+ * Versao 2.0.0.
  */
-export const versao = "1.9.1";
+export const versao = "2.0.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -114,14 +136,28 @@ const referencia = z
     oQueOlhar: z.string(),
   })
   .nullable();
+/** V9c, item 2: um cartão de Story (`R-IG-STORY-03`). */
+const cartaoStory = z.object({
+  oQueFalar: z.string(),
+  oQueMostrar: z.string(),
+  textoNaTela: z.string(),
+  figurinha: z.enum(FIGURINHAS_STORY),
+});
+/** V9c, item 2: uma entrada por regra numerada que o modelo seguiu de fato. */
+const porQueAssimItem = z.object({ regra: z.string(), motivo: z.string() });
 
 export const schema = z.object({
   titulo: z.string(),
   duracaoS: z.number(),
-  gancho: z.string(),
-  corpo: z.string(),
-  fechamento: z.string(),
-  chamadaFinal: z.string(),
+  /** Nulo em Story: a estrutura desse formato é `cartoes`, abaixo (V9c, item 2). */
+  gancho: z.string().nullable(),
+  corpo: z.string().nullable(),
+  fechamento: z.string().nullable(),
+  chamadaFinal: z.string().nullable(),
+  /** Só em Story, de 2 a 5 (`R-IG-STORY-03`); nulo em Reels (V9c, item 2). */
+  cartoes: z.array(cartaoStory).min(2).max(5).nullable(),
+  /** As regras que o modelo seguiu de fato, com o motivo em português de gente; vazio em Reels nesta rodada. */
+  porQueAssim: z.array(porQueAssimItem),
   cenas: z.array(cena),
   /** Por que este roteiro so funciona com a pessoa de verdade (a tese, na tela). */
   ondeGravar: z.string(),
@@ -134,8 +170,13 @@ export const schema = z.object({
   }),
   /** Ids de video que sustentam o roteiro; o verificador confere presenca. */
   evidencias: z.array(z.number()),
-  /** O tipo de abertura que de fato foi usado (V4, item 4): o modelo declara, o verificador confere. */
-  tipoAbertura: z.enum(TIPOS_ABERTURA),
+  /**
+   * O tipo de abertura que de fato foi usado (V4, item 4): o modelo declara,
+   * o verificador confere. Nulo em Story (V9c, item 2): o primeiro cartão
+   * tem regra própria, `R-IG-STORY-02`; `escolherTipoAbertura` (V4) não se
+   * aplica a este formato.
+   */
+  tipoAbertura: z.enum(TIPOS_ABERTURA).nullable(),
   /**
    * V9a, item 1: só preenchido quando a entrada traz o bloco "O momento que
    * a pessoa descreveu agora", uma linha curta (até 8 palavras) resumindo o
@@ -155,7 +196,10 @@ export function montarSistemaEstavel(dados: {
   regrasCliente: { regra: string; contagem: number }[];
   /** V9a, item 4: "negocio" (padrão) fala como a marca; "pessoa" fala em primeira pessoa do singular. */
   tipo: TipoMarca;
+  /** V9c, item 2: troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cartões e as regras R-IG-STORY. */
+  formato: FormatoRoteiro;
 }): string {
+  const ehStory = dados.formato === "story";
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
       ? `\n\nO que este cliente já reprovou (siga a regra 8: a firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
@@ -169,6 +213,48 @@ export function montarSistemaEstavel(dados: {
       : `12. Este cliente é um negócio: a voz é a da marca ("a gente", "nossa loja") quando fala do ` +
         `negócio, e a primeira pessoa do singular é bem-vinda quando quem grava conta a própria ` +
         `experiência ("eu testei", "eu uso"); nunca invente um "nós" que não existe.`;
+
+  /** V9c, item 2: Reels continua "fala direta, vertical, curto"; Story troca para "cartões, sem gancho de três segundos". */
+  const regra5 = ehStory
+    ? `5. Formato Story: o vídeo sai em cartões curtos (de 2 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
+      `gancho, corpo, fechamento e chamada; a duração de cada cartão é a que a fala dele pede, até 15 ` +
+      `segundos.`
+    : `5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do\n   nicho.`;
+
+  /**
+   * V9c, item 2: em Story, o primeiro cartão tem regra própria (R-IG-STORY-02); `escolherTipoAbertura`
+   * (V4) não se aplica, e a entrada nunca traz a linha "Tipo de abertura" para este formato
+   * (`montarEntrada`). Deixe `tipoAbertura` nulo na saída.
+   */
+  const regra9 = ehStory
+    ? `9. Este roteiro é um Story: não existe "tipo de abertura" (isso é coisa de Reels, regra R-IG-STORY-02
+   cuida do primeiro cartão). Deixe o campo tipoAbertura da saída nulo.`
+    : `9. A entrada diz o tipo de abertura deste roteiro (o serviço escolhe, a partir da evidência
+   de hoje, sem repetir os últimos roteiros do cliente), às vezes com um vídeo de exemplo:
+   inspire-se no estilo dele, nunca copie a frase. Quando a entrada só trouxer uma lista de
+   tipos a evitar, escolha livremente qualquer outro tipo. Declare no campo tipoAbertura da
+   saída qual tipo você de fato usou.`;
+
+  /**
+   * V9c, item 2: o bloco de estrutura por formato, primeiro uso da base numerada (E36) num prompt
+   * inteiro. O texto das regras vem de `regras-formato.ts`, que copia a seção 9.1 das rubricas.
+   */
+  const blocoEstrutura = ehStory
+    ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão; cada cartão tem
+o que falar, o que mostrar, o texto curto que fica fixo na tela, e a figurinha de interação quando
+fizer sentido (ou "nenhuma" quando não pedir interação nenhuma). Siga as regras do Story à risca:
+
+${textoRegrasStory()}
+
+Depois de escrever, preencha também porQueAssim: uma entrada por regra numerada da lista acima que
+você de fato seguiu, com o número (ex. "R-IG-STORY-04") e o motivo em português de gente, sem
+jargão, sem citar o número dentro do motivo. Nunca cite uma regra que não está nesta lista.`
+    : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
+Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
+(quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
+(o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
+visual.`;
+
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
 
@@ -180,8 +266,7 @@ gravar com a própria cara no celular. Regras duras:
 3. O roteiro usa frases que o cliente disse de verdade (estão no perfil) e nunca fere uma
    proibição dele.
 4. Sem travessão, sem emoji, sem jargão em nenhum campo de texto.
-5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do
-   nicho.
+${regra5}
 6. Não repita o ângulo de um roteiro recente do mesmo cliente (lista abaixo, com o gancho de
    cada um); se o tema pedido for muito parecido com um deles, escolha um ângulo diferente
    para o gancho e a estrutura. O gancho novo não pode repetir nem parafrasear nenhum gancho
@@ -205,11 +290,7 @@ gravar com a própria cara no celular. Regras duras:
    risca; a marcada "firme" (duas reprovações ou mais) vale tanto quanto uma proibição do
    perfil, a marcada "fraca" (uma reprovação só) ainda deve ser evitada, mas cede se
    conflitar de verdade com o tema pedido.
-9. A entrada diz o tipo de abertura deste roteiro (o serviço escolhe, a partir da evidência
-   de hoje, sem repetir os últimos roteiros do cliente), às vezes com um vídeo de exemplo:
-   inspire-se no estilo dele, nunca copie a frase. Quando a entrada só trouxer uma lista de
-   tipos a evitar, escolha livremente qualquer outro tipo. Declare no campo tipoAbertura da
-   saída qual tipo você de fato usou.
+${regra9}
 10. Quando a entrada trouxer um bloco "O momento que a pessoa descreveu agora", o gancho
     nasce da cena que está na frente do celular, não do tema abstrato: cite pelo menos um
     elemento concreto do momento (o lugar, o que está acontecendo ou o que dá para mostrar)
@@ -230,11 +311,7 @@ O objetivo escolhido muda o roteiro:
 - Gente me chamar para comprar: ataca o medo antes da compra, mostra prova real, chamada
   final de chamar ou agendar.
 
-Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
-Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
-(quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
-(o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
-visual.
+${blocoEstrutura}
 
 Perfil do cliente:
 ${dados.perfilCompilado}${blocoRegrasCliente}
@@ -275,6 +352,8 @@ function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
 export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
+  /** V9c, item 2: com "story", a linha "Tipo de abertura" nunca entra (regra dura 9). */
+  formato: FormatoRoteiro;
   observacao?: string;
   evidencias: {
     id: number;
@@ -377,7 +456,7 @@ export function montarEntrada(dados: {
     blocoMarcaCitada,
     dados.momento ? null : blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
-    formatarInstrucaoAbertura(dados.instrucaoAbertura),
+    dados.formato === "reels" ? formatarInstrucaoAbertura(dados.instrucaoAbertura) : null,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

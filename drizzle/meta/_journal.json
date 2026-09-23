@@ -225,6 +225,13 @@
       "when": 1790166397582,
       "tag": "0031_plano-por-marca",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790192881260,
+      "tag": "0032_volatile_vapor",
+      "breakpoints": true
     }
   ]
 }

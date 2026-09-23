@@ -107,6 +107,8 @@ const CONTEUDO: ConteudoRoteiro = {
   corpo: "explique o passo a passo na ordem certa, sem pular nenhuma etapa.",
   fechamento: "mostre o resultado limpo",
   chamadaFinal: "manda mensagem se quiser saber qual produto",
+  cartoes: null,
+  porQueAssim: [],
   cenas: [{ momento: "abertura", oQueFazer: "mostrar a mancha" }],
   ondeGravar: "na sala",
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },

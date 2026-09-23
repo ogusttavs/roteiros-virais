@@ -1,6 +1,6 @@
 "use server";
 
-import type { Objetivo } from "@/db/schema";
+import type { FormatoRoteiro, Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
@@ -44,6 +44,8 @@ export type DadosAceitarPlano = {
   oQueEstaAcontecendo: string;
   oQueDaParaMostrar: string;
   objetivo: Objetivo;
+  /** V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. */
+  formato?: FormatoRoteiro;
   marcaId?: number;
 };
 
@@ -76,6 +78,7 @@ export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlan
     oQueEstaAcontecendo,
     oQueDaParaMostrar,
     objetivo: dados.objetivo,
+    formato: dados.formato,
     marcaId: dados.marcaId,
   });
   return { id: roteiro.id };

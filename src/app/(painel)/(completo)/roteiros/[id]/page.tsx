@@ -4,7 +4,7 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
-import { corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
+import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
 import { RoteiroTela } from "./RoteiroTela";
 
@@ -43,6 +43,7 @@ export default async function Roteiro({ params }: Props) {
     <RoteiroTela
       roteiro={roteiro}
       corpo={corpoDoRoteiro(roteiro)}
+      blocos={blocosParaLeitura(roteiro)}
       video={video}
       versoes={versoes}
       marcaAtiva={cliente}

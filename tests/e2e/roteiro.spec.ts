@@ -172,6 +172,9 @@ test.describe("roteiro pela tela", () => {
 
     await expect(page).toHaveURL(/\/hoje\/objetivo/);
     await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
+    // V9c, item 1: esse objetivo sugere Story por padrao (R-IG-STORY-10); este teste cobre o
+    // fluxo classico de Reels (reprovar, versoes, PDF), Story tem o proprio em story.spec.ts.
+    await page.getByRole("tablist", { name: "Formato" }).getByRole("tab", { name: "Reels" }).click();
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
@@ -230,6 +233,8 @@ test.describe("roteiro pela tela", () => {
         corpo: "corpo de teste",
         fechamento: "fechamento de teste",
         chamadaFinal: "chamada final de teste",
+        cartoes: null,
+        porQueAssim: [],
         cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
         ondeGravar: "na cozinha",
         edicao: {
@@ -332,6 +337,8 @@ test.describe("roteiro pela tela", () => {
       corpo: "corpo de teste",
       fechamento: "fechamento de teste",
       chamadaFinal: "chamada final de teste",
+      cartoes: null,
+      porQueAssim: [],
       cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
       ondeGravar: "na cozinha",
       edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
@@ -387,6 +394,8 @@ test.describe("roteiro pela tela", () => {
       corpo: "corpo de teste",
       fechamento: "fechamento de teste",
       chamadaFinal: "chamada final de teste",
+      cartoes: null,
+      porQueAssim: [],
       cenas: [{ momento: "abertura", oQueFazer: "mostrar o produto" }],
       ondeGravar: "na cozinha",
       edicao: {

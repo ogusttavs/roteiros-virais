@@ -18,6 +18,7 @@ import {
   videosCliente,
   type Cliente,
   type ConteudoRoteiro,
+  type FormatoRoteiro,
   type Momento,
   type Objetivo,
   type Plataforma,
@@ -29,6 +30,7 @@ import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config, hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
@@ -67,6 +69,37 @@ export function corpoDoRoteiro(roteiro: RoteiroLinha): ConteudoRoteiro {
   return roteiro.conteudo;
 }
 
+function splitParagrafos(texto: string): string[] {
+  return texto
+    .split("\n")
+    .map((linha) => linha.trim())
+    .filter(Boolean);
+}
+
+/**
+ * O roteiro em blocos de leitura, um por vez (V9c, item 4): em Reels, os
+ * quatro de sempre (gancho, corpo, fechamento, chamada); em Story, um bloco
+ * por cartão, com o que falar (o resto do cartão, o que mostrar, o texto na
+ * tela e a figurinha, ficam no "Como editar" da tela, não aqui). Usada por
+ * `RoteiroTela.tsx`, `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`,
+ * as três telas que hoje montavam essa lista cada uma do seu jeito.
+ */
+export function blocosParaLeitura(roteiro: RoteiroLinha): { rotulo: string; paragrafos: string[] }[] {
+  const corpo = corpoDoRoteiro(roteiro);
+  if (roteiro.formato === "story" && corpo.cartoes) {
+    return corpo.cartoes.map((cartao, indice) => ({
+      rotulo: textosRoteiro.blocos.cartao(indice + 1),
+      paragrafos: [cartao.oQueFalar],
+    }));
+  }
+  return [
+    { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
+    { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
+    { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
+    { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
+  ];
+}
+
 export type OrigemRoteiro =
   | { origem: "sugerido"; temaIndice: number }
   | { origem: "livre"; textoTema: string }
@@ -81,7 +114,12 @@ export type OrigemRoteiro =
    */
   | { origem: "momento"; momento: Momento };
 
-export type ParametrosGerarRoteiro = OrigemRoteiro & { objetivo: Objetivo; observacao?: string };
+/** V9c, item 1: "reels" (padrão) se ausente, para quem chama de antes da etapa continuar valendo. */
+export type ParametrosGerarRoteiro = OrigemRoteiro & {
+  objetivo: Objetivo;
+  observacao?: string;
+  formato?: FormatoRoteiro;
+};
 
 /**
  * A camada exclusiva do cliente (cidade, bairro, concorrentes, perfis
@@ -380,13 +418,22 @@ function respeitarDuracaoDoNicho(
 export function extrairCamposRoteiro(dados: roteiroIA.SaidaRoteiro): Record<string, string> {
   const campos: Record<string, string> = {
     titulo: dados.titulo,
-    gancho: dados.gancho,
-    corpo: dados.corpo,
-    fechamento: dados.fechamento,
-    chamadaFinal: dados.chamadaFinal,
     ondeGravar: dados.ondeGravar,
     ritmoDeCorte: dados.edicao.ritmoDeCorte,
   };
+  // V9c, item 2: nulos em Story (o texto de verdade está em cartoes, abaixo).
+  if (dados.gancho) campos.gancho = dados.gancho;
+  if (dados.corpo) campos.corpo = dados.corpo;
+  if (dados.fechamento) campos.fechamento = dados.fechamento;
+  if (dados.chamadaFinal) campos.chamadaFinal = dados.chamadaFinal;
+  dados.cartoes?.forEach((cartao, i) => {
+    campos[`cartao${i}Falar`] = cartao.oQueFalar;
+    campos[`cartao${i}Mostrar`] = cartao.oQueMostrar;
+    campos[`cartao${i}TextoNaTela`] = cartao.textoNaTela;
+  });
+  dados.porQueAssim.forEach((item, i) => {
+    campos[`porQueAssim${i}`] = item.motivo;
+  });
   dados.cenas.forEach((cena, i) => {
     campos[`cena${i}`] = cena.oQueFazer;
   });
@@ -407,6 +454,8 @@ type MontarERoteiroDados = {
   cliente: Cliente;
   tema: string;
   objetivo: Objetivo;
+  /** V9c, item 1: "reels" ou "story"; troca o bloco de estrutura do prompt e o verificador por regra. */
+  formato: FormatoRoteiro;
   observacao?: string;
   evidenciasPrevistas: number[];
   /**
@@ -439,7 +488,8 @@ async function gerarConteudo(
   conteudo: ConteudoRoteiro;
   geracaoId: number;
   referenciaVideoId: number | null;
-  tipoAbertura: TipoAbertura;
+  /** Nulo em Story (V9c, item 2): `escolherTipoAbertura` (V4) não se aplica a este formato. */
+  tipoAbertura: TipoAbertura | null;
   /** V9a, item 1: o `temaCurto` que o modelo devolveu, só com `momento`; `gerarRoteiro` usa para regravar `tema`. */
   temaCurto: string | null;
 }> {
@@ -519,10 +569,12 @@ async function gerarConteudo(
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
       regrasCliente,
       tipo: dados.cliente.tipo,
+      formato: dados.formato,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
       objetivo: dados.objetivo,
+      formato: dados.formato,
       observacao: dados.observacao,
       evidencias: evidencias.map((v) => ({
         id: v.id,
@@ -581,6 +633,9 @@ async function gerarConteudo(
       : undefined,
     extrairDuracaoS: (d) => d.duracaoS,
     generoTexto: "roteiro",
+    formato: dados.formato,
+    extrairCartoes: (d) => d.cartoes,
+    extrairPorQueAssim: (d) => d.porQueAssim,
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,
   });
@@ -590,10 +645,13 @@ async function gerarConteudo(
   const conteudo: ConteudoRoteiro = {
     titulo: saida.titulo,
     duracaoS,
-    gancho: saida.gancho,
-    corpo: saida.corpo,
-    fechamento: saida.fechamento,
-    chamadaFinal: saida.chamadaFinal,
+    // V9c, item 2: nulos em Story (o schema aceita nulo); "" para ConteudoRoteiro continuar `string` em todo o resto do código.
+    gancho: saida.gancho ?? "",
+    corpo: saida.corpo ?? "",
+    fechamento: saida.fechamento ?? "",
+    chamadaFinal: saida.chamadaFinal ?? "",
+    cartoes: saida.cartoes,
+    porQueAssim: saida.porQueAssim,
     cenas: saida.cenas,
     ondeGravar: saida.ondeGravar,
     edicao: {
@@ -645,12 +703,14 @@ export async function gerarRoteiro(
 
   const { tema, evidenciasPrevistas } = await resolverTema(cliente, params);
   const momento = params.origem === "momento" ? params.momento : undefined;
+  const formato = params.formato ?? "reels";
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
     cliente,
     tema,
     objetivo: params.objetivo,
+    formato,
     observacao: params.observacao,
     evidenciasPrevistas,
     momento,
@@ -666,6 +726,7 @@ export async function gerarRoteiro(
       origem: params.origem,
       momento: momento ?? null,
       objetivo: params.objetivo,
+      formato,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -718,6 +779,8 @@ export async function reprovarERescrever(
     cliente,
     tema: atual.tema,
     objetivo: atual.objetivo,
+    // V9c, item 1: a reescrita mantem o formato da versao anterior, nunca troca sozinha.
+    formato: atual.formato,
     evidenciasPrevistas: atual.conteudo.evidencias,
     anguloParaEvitar: {
       gancho: atual.conteudo.gancho,
@@ -738,6 +801,7 @@ export async function reprovarERescrever(
       origem: atual.origem,
       momento: momento ?? null,
       objetivo: atual.objetivo,
+      formato: atual.formato,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,
@@ -998,6 +1062,8 @@ export type RoteiroHistoricoLinha = {
   postadoEm: Date | null;
   /** V9a, item 5: `HistoricoTela` mostra o rótulo "momento" só para esta origem. */
   origem: OrigemRoteiro["origem"];
+  /** V9c, item 4: `HistoricoTela` mostra "· story" ao lado da data, como "· momento". */
+  formato: FormatoRoteiro;
 };
 
 /**
@@ -1015,6 +1081,7 @@ export async function roteirosDoCliente(clienteId: number, limite = 200): Promis
       gravadoEm: roteiros.gravadoEm,
       postadoEm: roteiros.postadoEm,
       origem: roteiros.origem,
+      formato: roteiros.formato,
     })
     .from(roteiros)
     .where(and(eq(roteiros.clienteId, clienteId), SEM_VERSAO_MAIS_NOVA))

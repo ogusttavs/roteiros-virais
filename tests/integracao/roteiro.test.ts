@@ -357,6 +357,71 @@ describe("gerarRoteiro", () => {
   });
 });
 
+describe("V9c, formato (Story)", () => {
+  it("sem formato, gera reels: coluna formato e narrativa classica, sem cartoes", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-formato-1", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.formato).toBe("reels");
+    expect(roteiro.conteudo.gancho).toBeTruthy();
+    expect(roteiro.conteudo.cartoes).toBeNull();
+    expect(roteiro.conteudo.porQueAssim).toEqual([]);
+  });
+
+  it("com formato story, grava a coluna e o conteudo em cartoes, com porQueAssim preenchido", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-formato-2", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+      formato: "story",
+    });
+
+    expect(roteiro.formato).toBe("story");
+    expect(roteiro.conteudo.gancho).toBe("");
+    expect(roteiro.conteudo.corpo).toBe("");
+    expect(roteiro.conteudo.fechamento).toBe("");
+    expect(roteiro.conteudo.chamadaFinal).toBe("");
+    expect(roteiro.tipoAbertura).toBeNull();
+    expect(roteiro.conteudo.cartoes).not.toBeNull();
+    expect(roteiro.conteudo.cartoes!.length).toBeGreaterThanOrEqual(2);
+    expect(roteiro.conteudo.cartoes!.length).toBeLessThanOrEqual(5);
+    for (const cartao of roteiro.conteudo.cartoes!) {
+      expect(cartao.oQueFalar).toBeTruthy();
+      expect(cartao.textoNaTela).toBeTruthy();
+    }
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-IG-STORY-\d\d$/);
+    }
+  });
+
+  it("reprovarERescrever preserva o formato da versao anterior", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-formato-3", "mancha de vinho no estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+      formato: "story",
+    });
+
+    const v2 = await reprovarERescrever(v1.id, ["ja_falei_disso"]);
+
+    expect(v2.formato).toBe("story");
+    expect(v2.conteudo.cartoes).not.toBeNull();
+  });
+});
+
 describe("historico de ganchos entre roteiros do mesmo cliente (achado do primeiro uso no iPad, item 3)", () => {
   it("o gancho do roteiro anterior entra na entrada da geracao seguinte", async () => {
     const clienteId = await criarCliente();
@@ -827,6 +892,8 @@ const CONTEUDO_ROTEIRO_MINIMO = {
   corpo: "corpo",
   fechamento: "fechamento",
   chamadaFinal: "chamada final",
+  cartoes: null,
+  porQueAssim: [],
   cenas: [],
   ondeGravar: "no local do negocio",
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },

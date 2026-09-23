@@ -38,6 +38,7 @@
     "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
     "avaliar:momentos": "tsx scripts/avaliar-momentos.ts",
     "avaliar:agendas": "tsx scripts/avaliar-agendas.ts",
+    "avaliar:stories": "tsx scripts/avaliar-stories.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
@@ -48,7 +49,8 @@
     "capturas:v7-celular": "AI_PROVIDER=mock tsx scripts/capturas-v7-celular.ts",
     "capturas:v9a-momento": "AI_PROVIDER=mock tsx scripts/capturas-v9a-momento.ts",
     "capturas:v9b-plano": "AI_PROVIDER=mock tsx scripts/capturas-v9b-plano.ts",
-    "capturas:sem-limite-diario": "AI_PROVIDER=mock tsx scripts/capturas-sem-limite-diario.ts"
+    "capturas:sem-limite-diario": "AI_PROVIDER=mock tsx scripts/capturas-sem-limite-diario.ts",
+    "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

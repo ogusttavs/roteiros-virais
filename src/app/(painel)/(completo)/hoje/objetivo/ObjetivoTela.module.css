@@ -74,3 +74,52 @@
   flex-direction: column;
   gap: var(--espaco-4);
 }
+
+/** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (mesmo padrão de `ReferenciasTela.module.css`). */
+.grupoFormato {
+  display: grid;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-6);
+}
+
+.segmentado {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  width: 100%;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.segmentoBotao {
+  min-height: var(--altura-toque);
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.segmentoAtivo {
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  box-shadow: var(--sombra-controle);
+}
+
+.formatoAjuda {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
