@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { ErroMomento, transcreverMomento } from "@/servicos/momento";
+import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverMomento } from "@/servicos/momento";
 
 /**
  * `/api/momento/transcrever` (V9a, item 3, a folha "Gravar agora"): recebe
@@ -38,6 +38,14 @@ export async function POST(request: Request) {
   const duracaoS = Number(duracaoBruta);
   if (!Number.isFinite(duracaoS) || duracaoS <= 0) {
     return NextResponse.json({ erro: "duracao invalida" }, { status: 400 });
+  }
+  /**
+   * Item 0.2 da revisão do PR #55 (V9b): confere o tamanho pelo `size` do
+   * `File` antes de ler `arrayBuffer()`, para nunca carregar um arquivo
+   * grande demais na memória só para descartar depois.
+   */
+  if (audio.size > LIMITE_TAMANHO_AUDIO_BYTES) {
+    return NextResponse.json({ erro: "esse audio e maior do que conseguimos ouvir, grave um pedaco mais curto" }, { status: 413 });
   }
 
   try {

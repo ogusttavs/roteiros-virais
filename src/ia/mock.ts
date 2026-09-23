@@ -52,6 +52,10 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockClassificarAbertura(entrada);
     case "lerMomento":
       return mockLerMomento(entrada);
+    case "lerAgenda":
+      return mockLerAgenda(entrada);
+    case "planejarDia":
+      return mockPlanejarDia(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -401,6 +405,60 @@ function mockLerMomento(entrada: string) {
     oQueEstaAcontecendo: frases[1] || texto,
     oQueDaParaMostrar: frases[2] || frases[1] || texto,
   };
+}
+
+/**
+ * V9b, item 1: separa por ";" (um bloco por dia) e por ":" dentro do bloco
+ * (referenciaDia contra o resto), como no formato de exemplo do plano
+ * ("segunda: voo para Dubai; terça: feira, fornecedor às 15h"). Nunca
+ * resolve data (isso é `src/lib/data-relativa.ts`, por código); o mock só
+ * imita a separação em dias que o modelo de verdade faria.
+ */
+function mockLerAgenda(entrada: string) {
+  const texto = entrada.split("A agenda que a pessoa contou:\n")[1]?.trim() || entrada.trim();
+  const blocos = texto
+    .split(";")
+    .map((bloco) => bloco.trim())
+    .filter(Boolean);
+
+  const dias = blocos.map((bloco) => {
+    const [referenciaBruta, ...resto] = bloco.split(":");
+    const referenciaDia = (referenciaBruta ?? "").trim() || "hoje";
+    const linhaResto = resto.join(":").trim();
+    const partes = linhaResto
+      .split(",")
+      .map((parte) => parte.trim())
+      .filter(Boolean);
+    return {
+      referenciaDia,
+      lugar: partes[0] ?? "",
+      compromissos: partes.length > 0 ? partes : [linhaResto || "compromisso simulado"],
+    };
+  });
+
+  return { dias };
+}
+
+/** V9b, item 2: uma sugestão por compromisso (até 3), o objetivo rodiziando entre os três. */
+function mockPlanejarDia(entrada: string) {
+  const lugar = extrairCampo(entrada, "Lugar:") || "o lugar";
+  const linhasCompromissos =
+    entrada
+      .split("Compromissos do dia:\n")[1]
+      ?.split("\n")
+      .map((linha) => linha.replace(/^-\s*/, "").trim())
+      .filter(Boolean) ?? [];
+
+  const OBJETIVOS_MOCK = ["engajamento", "alcance", "conversao"] as const;
+  const compromissos = linhasCompromissos.length > 0 ? linhasCompromissos : ["compromisso simulado"];
+
+  const sugestoes = compromissos.slice(0, 3).map((compromisso, indice) => ({
+    situacao: compromisso,
+    oQueMostrar: `a cena de ${lugar} durante ${compromisso}`,
+    objetivo: OBJETIVOS_MOCK[indice % OBJETIVOS_MOCK.length],
+  }));
+
+  return { sugestoes };
 }
 
 function mockAnalisarVisual() {

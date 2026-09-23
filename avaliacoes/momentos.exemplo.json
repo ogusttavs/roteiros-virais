@@ -57,18 +57,19 @@
     "pontoPrincipal": "quarto momento, tipo pessoa (fala em primeira pessoa do singular, nunca a gente); os tres anteriores no contexto de serie, o gancho precisa ser sobre o hotel/as amostras, nao repetir nenhum dos tres"
   },
   {
-    "onde": "numa sala de reuniao com um fornecedor",
-    "oQueEstaAcontecendo": "negociando o preco do frasco novo para o proximo lote",
-    "oQueDaParaMostrar": "a mesa de reuniao com o contrato e as amostras em cima",
+    "onde": "dentro da fábrica de um fornecedor de embalagem, no mesmo dia da visita",
+    "oQueEstaAcontecendo": "acompanhando de perto uma marca que eu ajudo a tocar, vendo o frasco novo sair da linha de produção",
+    "oQueDaParaMostrar": "a linha de produção rodando e os frascos prontos saindo na esteira",
     "objetivo": "conversao",
-    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
-    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
-    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
-    "tipo": "negocio",
-    "contextoDeSerie": [
-      { "tema": "sobre revendo as amostras que trouxe da feira antes de decidir o que comprar", "gancho": "aqui no hotel, revendo as amostras que trouxe da feira" }
-    ],
-    "marcaCitada": { "nome": "Clínica do Bruno", "perfilCompilado": "clínica odontológica de bairro, vende avaliação de ortodontia gratuita" },
-    "pontoPrincipal": "quinto momento, com marca citada (regra dura 11: aparece como parte da vida de quem grava, nunca como anuncio; objetivo e comprar, entao a chamada final deveria apontar para a marca citada, nao para a Dr.Wash)"
+    "perfilCompilado": "Sócio que apoia pequenos negócios locais, hoje acompanhando de perto a Dr.Wash (marca própria de produtos de limpeza) numa visita a fornecedor. Fala em primeira pessoa, sobre o que está vendo e aprendendo junto com quem toca a marca. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: bastidor de negócio, visita a fornecedor. Ganchos que funcionam: mostrar o bastidor acontecendo (alta frequência). Estruturas comuns: mostrar o lugar, explicar o que está sendo decidido, mostrar o resultado. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta se você já passou por isso.",
+    "tipo": "pessoa",
+    "contextoDeSerie": [],
+    "marcaCitada": {
+      "nome": "Dr.Wash",
+      "perfilCompilado": "Marca própria de produtos de limpeza. Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir."
+    },
+    "pontoPrincipal": "quinto momento, tipo pessoa citando uma marca com relação real (o sócio acompanhando a marca que apoia), objetivo comprar: a chamada final deve citar só a Dr.Wash, uma marca só, nunca misturar com outro negócio sem relação (item 0.3 da revisão do PR #55: o caso anterior juntava dois negócios sem relação nenhuma)"
   }
 ]

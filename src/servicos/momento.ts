@@ -29,6 +29,15 @@ export class ErroMomento extends Error {}
 export const LIMITE_SEGUNDOS_AUDIO = 120;
 
 /**
+ * Item 0.2 da revisão do PR #55 (V9b): o mesmo limite de arquivo que a
+ * própria Groq impõe. Sem isso, um `duracaoS` mentiroso (o navegador manda,
+ * a rota confiava sem conferir) deixava passar um arquivo de qualquer
+ * tamanho antes mesmo de escrever no disco. A rota confere isto antes de ler
+ * `audio.arrayBuffer()`, pelo `size` do próprio `File` do FormData.
+ */
+export const LIMITE_TAMANHO_AUDIO_BYTES = 25 * 1024 * 1024;
+
+/**
  * `MediaRecorder` grava webm/opus no Chrome e no Android, mp4/aac no Safari
  * (PROXIMO.md, item 3: "aceitar os dois com mimeType"). A extensão é só
  * para o arquivo temporário ter um nome legível; a Groq detecta o formato
