@@ -45,6 +45,10 @@ export const textosAdmin = {
     campoNome: "nome",
     campoEmail: "e-mail",
     campoNicho: "nicho",
+    /** V9a, item 4: a marca fala como negócio ("a gente") ou como uma pessoa (primeira pessoa do singular). */
+    campoTipo: "tipo de marca",
+    tipoNegocio: "negócio",
+    tipoPessoa: "pessoa",
     botaoConvidar: "convidar por e-mail",
     convidando: "convidando",
     sucesso: (email: string) => `cliente criado; o convite foi mandado para ${email}`,

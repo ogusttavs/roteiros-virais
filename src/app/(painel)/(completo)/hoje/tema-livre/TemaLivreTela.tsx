@@ -4,8 +4,10 @@ import { ArrowLeft, CircleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import type { Objetivo } from "@/db/schema";
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
+import { textosMomento } from "@/textos/momento";
 import { textosTemaLivre } from "@/textos/tema-livre";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -14,6 +16,9 @@ import { EsperaEtapas } from "@/ui/componentes/EsperaEtapas";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { NotasLinha } from "@/ui/componentes/NotaLinha";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
+
+import { FolhaGravarAgora } from "../FolhaGravarAgora";
 
 import { avaliarTemaAction, salvarRascunhoAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
@@ -56,7 +61,15 @@ function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
-type Props = { notaMinima: number; temaInicial?: string };
+type MarcaResumo = { id: number; nome: string };
+
+type Props = {
+  notaMinima: number;
+  temaInicial?: string;
+  /** V9a, item 3: "Estou num momento" abre a mesma folha "Gravar agora" de `/hoje`. */
+  objetivoRecomendado: Objetivo | null;
+  outrasMarcas: MarcaResumo[];
+};
 
 /**
  * `/hoje/tema-livre` (V5b, D2 parte 4; design v2,
@@ -65,10 +78,15 @@ type Props = { notaMinima: number; temaInicial?: string };
  * (item 2) só existe para sobreviver a troca de tela, de aparelho ou queda
  * de rede antes de avaliar.
  */
-export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
+export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendado, outrasMarcas }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
+  const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
+  const { fechar: fecharFolhaMomento, fecharEDepois: fecharFolhaMomentoEDepois } = useFolhaNoHistorico(
+    folhaMomentoAberta,
+    () => setFolhaMomentoAberta(false),
+  );
   const [resultado, setResultado] = useState<ResultadoAvaliarTema | null>(null);
   const [campoVazio, setCampoVazio] = useState(false);
   // A frase da tela de erro: a de sempre (falha do servidor, "a falha foi nossa") ou a de rede (V7, item 4).
@@ -211,6 +229,9 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
 
         {fase === "proposta" ? (
           <>
+            <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
+              {textosMomento.botaoAbrirTemaLivre}
+            </Botao>
             <section className={[styles.cartao, styles.campo].join(" ")}>
               <AreaTexto
                 rotulo={textosTemaLivre.titulo}
@@ -369,6 +390,15 @@ export function TemaLivreTela({ notaMinima, temaInicial = "" }: Props) {
           </div>
         ) : null}
       </div>
+
+      {folhaMomentoAberta ? (
+        <FolhaGravarAgora
+          aoFechar={fecharFolhaMomento}
+          fecharEDepois={fecharFolhaMomentoEDepois}
+          objetivoRecomendado={objetivoRecomendado}
+          marcas={outrasMarcas}
+        />
+      ) : null}
     </div>
   );
 }

@@ -88,6 +88,14 @@ export function verificarLocalmente(
      * quem chama.
      */
     duracaoParaMuitoLongo?: { anteriorS: number; novaS: number };
+    /**
+     * V9a, item 2: com o momento (o gancho precisa nascer da cena que está
+     * na frente do celular), as palavras de conteúdo de `onde` e
+     * `oQueEstaAcontecendo` (`palavrasDeConteudo`, abaixo). Reprova quando
+     * `campos.gancho` existe e nenhuma delas aparece nele; campos.corpo não
+     * conta, a regra é sobre os primeiros três segundos.
+     */
+    palavrasDoMomento?: string[];
   } = {},
 ): ResultadoVerificacaoLocal {
   const motivos: string[] = [];
@@ -149,6 +157,16 @@ export function verificarLocalmente(
     }
   }
 
+  if (campos.gancho && opcoes.palavrasDoMomento && opcoes.palavrasDoMomento.length > 0) {
+    const ganchoNormalizado = normalizar(campos.gancho);
+    const citaAlguma = opcoes.palavrasDoMomento.some((palavra) => ganchoNormalizado.includes(palavra));
+    if (!citaAlguma) {
+      motivos.push(
+        "gancho: não cita nenhum elemento concreto do momento descrito (onde ou o que está acontecendo) nos primeiros segundos",
+      );
+    }
+  }
+
   const evidenciasCitadas = opcoes.evidencias ?? [];
 
   if (opcoes.exigeEvidencia && evidenciasCitadas.length === 0) {
@@ -202,6 +220,59 @@ function primeiraPalavra(texto: string): string {
   );
 }
 
+/**
+ * Palavras curtas ou de ligação demais para contar como "elemento concreto"
+ * do momento (V9a, item 2): a lista é pequena de propósito, só o que
+ * apareceria demais e derrubaria a checagem por acaso, não uma lista
+ * completa de preposições e artigos do português.
+ */
+const PALAVRAS_PARADA_MOMENTO = new Set([
+  "para",
+  "pela",
+  "pelo",
+  "esta",
+  "estou",
+  "estamos",
+  "aqui",
+  "isso",
+  "essa",
+  "esse",
+  "muito",
+  "muita",
+  "hoje",
+  "agora",
+  "onde",
+  "aonde",
+  "sendo",
+  "tendo",
+  "depois",
+  "antes",
+  "porque",
+  "porem",
+  "entao",
+  "sobre",
+  "ainda",
+  "todo",
+  "toda",
+  "todos",
+  "todas",
+]);
+
+/**
+ * As palavras de conteúdo de um texto (V9a, item 2, verificador local do
+ * momento): minúsculas, sem acento, com 4 letras ou mais, fora da lista de
+ * parada acima. Pura e exportada para o teste unitário (3 casos: cita, não
+ * cita, cita só no corpo) e para `servicos/roteiro.ts` montar
+ * `palavrasDoMomento` a partir de `onde` e `oQueEstaAcontecendo`.
+ */
+export function palavrasDeConteudo(texto: string): string[] {
+  const palavras = normalizar(texto)
+    .replace(/[^\p{L}\p{N}\s]/gu, "")
+    .split(/\s+/)
+    .filter((palavra) => palavra.length >= 4 && !PALAVRAS_PARADA_MOMENTO.has(palavra));
+  return [...new Set(palavras)];
+}
+
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
   clienteId?: number;
@@ -232,6 +303,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    * `prompts/verificarTexto.ts`.
    */
   generoTexto?: GeneroTexto;
+  /** V9a, item 2: as palavras de conteúdo do momento, para `verificarLocalmente` (ver lá). */
+  palavrasDoMomento?: string[];
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
 };
@@ -287,6 +360,7 @@ async function tentarGerarEVerificar<T>(
       params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
         ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }
         : undefined,
+    palavrasDoMomento: params.palavrasDoMomento,
   });
 
   let aprovado = local.aprovado;

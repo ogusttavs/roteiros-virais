@@ -12,7 +12,7 @@ vi.mock("./registro", () => ({
 }));
 
 import { ErroIA } from "./erro";
-import { gerarComVerificacao, verificarLocalmente } from "./verificador";
+import { gerarComVerificacao, palavrasDeConteudo, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
 
@@ -270,6 +270,59 @@ describe("verificarLocalmente", () => {
       );
       expect(r.aprovado).toBe(true);
     });
+  });
+
+  // V9a, item 2: com o momento, o gancho precisa citar pelo menos um elemento concreto do que a pessoa descreveu.
+  describe("palavrasDoMomento (V9a, item 2)", () => {
+    const PALAVRAS = palavrasDeConteudo("no aeroporto esperando o embarque para a feira de fornecedores");
+
+    it("cita uma palavra do momento no gancho: aprova", () => {
+      const r = verificarLocalmente(
+        { gancho: "aqui no aeroporto, cinco da manha, ja com a mala pronta" },
+        { palavrasDoMomento: PALAVRAS },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("nao cita nenhuma palavra do momento no gancho: reprova", () => {
+      const r = verificarLocalmente(
+        { gancho: "olha essa novidade que eu trouxe para voce hoje" },
+        { palavrasDoMomento: PALAVRAS },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("elemento concreto do momento");
+    });
+
+    it("cita a palavra so no corpo, nunca no gancho: reprova (a regra e sobre os primeiros segundos)", () => {
+      const r = verificarLocalmente(
+        {
+          gancho: "olha essa novidade que eu trouxe para voce hoje",
+          corpo: "estou aqui no aeroporto esperando o embarque para a feira de fornecedores",
+        },
+        { palavrasDoMomento: PALAVRAS },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("elemento concreto do momento");
+    });
+
+    it("sem palavrasDoMomento (fora da origem momento), nao aplica a checagem", () => {
+      const r = verificarLocalmente({ gancho: "olha essa novidade que eu trouxe para voce hoje" });
+      expect(r.aprovado).toBe(true);
+    });
+  });
+});
+
+describe("palavrasDeConteudo (V9a, item 2)", () => {
+  it("so palavras de 4 ou mais letras, minusculas, sem acento, sem repetir", () => {
+    expect(palavrasDeConteudo("Estou no Aeroporto, no aeroporto, as 5h")).toEqual(["aeroporto"]);
+  });
+
+  it("tira as palavras de parada (para, esta, aqui, muito, hoje...) mesmo com 4 letras ou mais", () => {
+    expect(palavrasDeConteudo("estou aqui hoje muito ansiosa")).toEqual(["ansiosa"]);
+  });
+
+  it("string vazia devolve lista vazia", () => {
+    expect(palavrasDeConteudo("")).toEqual([]);
   });
 });
 

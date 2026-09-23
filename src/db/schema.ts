@@ -131,6 +131,20 @@ export type PerfisCliente = {
 /** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
 export type Persona = "negocio" | "criador";
 
+/**
+ * "negocio" fala como a marca ("a gente", "nossa loja"); "pessoa" fala em
+ * primeira pessoa do singular (V9a, item 4, escopo 5.13, o pedaco da E33 que
+ * a viagem precisa: o perfil do Bruno vira uma marca de tipo pessoa). Nao e
+ * o mesmo campo que `Persona` (acima): `persona` diz quem se beneficia do
+ * video (a propria marca vendendo, ou um criador atraindo marca patrocinadora);
+ * `tipo` diz so a voz gramatical do roteiro. Uma marca "criador" pode muito
+ * bem ser "negocio" (vende o proprio curso, por exemplo) ou "pessoa" (o
+ * criador fala de si). As doze perguntas de briefing proprias de pessoa
+ * ficam para a E33, depois da viagem; por enquanto uma marca de tipo pessoa
+ * passa pelo briefing de hoje.
+ */
+export type TipoMarca = "negocio" | "pessoa";
+
 /** Preferencia de tema salva pelo cliente em /conta (etapa D, parte 2). */
 export type TemaPreferido = "claro" | "escuro" | "sistema";
 
@@ -151,6 +165,7 @@ export const clientes = pgTable("clientes", {
   /** Texto do ramo quando o cliente escolheu "outro" na lista (briefing-e-rubricas.md, secao 1). */
   ramoOutro: text("ramo_outro"),
   persona: text("persona").$type<Persona>().notNull().default("negocio"),
+  tipo: text("tipo").$type<TipoMarca>().notNull().default("negocio"),
   perfis: jsonb("perfis").$type<PerfisCliente>(),
   quemGrava: text("quem_grava").$type<QuemGrava>(),
   tema: text("tema").$type<TemaPreferido>().notNull().default("sistema"),
@@ -754,6 +769,22 @@ export type ConteudoRoteiro = {
   forcaEvidencia: ForcaEvidencia | null;
 };
 
+/**
+ * O que a pessoa contou sobre o momento que esta vivendo agora (V9a, item 1,
+ * "Gravar agora"): preenchido por transcricao de audio (`lerMomento.ts`) ou
+ * digitado direto na folha. `marcaId` so existe quando a pessoa e membro de
+ * mais de uma marca e escolheu "Falar de" uma marca diferente da ativa
+ * (item 4); `transcricao` guarda a fala inteira, mostrada no bloco "o que
+ * voce disse", e fica nula quando o caminho foi so por texto.
+ */
+export type Momento = {
+  onde: string;
+  oQueEstaAcontecendo: string;
+  oQueDaParaMostrar: string;
+  marcaId?: number;
+  transcricao?: string;
+};
+
 export const roteiros = pgTable(
   "roteiros",
   {
@@ -763,7 +794,13 @@ export const roteiros = pgTable(
       .references(() => clientes.id),
     data: date("data").notNull(),
     tema: text("tema").notNull(),
-    origem: text("origem").$type<"sugerido" | "livre">().notNull(),
+    origem: text("origem").$type<"sugerido" | "livre" | "momento">().notNull(),
+    /**
+     * So preenchido quando `origem = "momento"` (V9a, item 1): o roteiro
+     * nasceu do que a pessoa contou estar vivendo agora, sem busca de
+     * evidencia no banco (`resolverTema` pula a busca para esta origem).
+     */
+    momento: jsonb("momento").$type<Momento>(),
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     /**

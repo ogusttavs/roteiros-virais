@@ -73,9 +73,10 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   const modalConvidar = page.getByRole("dialog", { name: "Convidar cliente" });
   await modalConvidar.getByLabel("nome", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
   await modalConvidar.getByLabel("e-mail", { exact: true }).fill(EMAIL_CLIENTE);
-  // getByLabel("nicho") nunca resolvia aqui (achado rodando de verdade, timeout sem
-  // erro de ambiguidade): o unico combobox dentro do proprio dialog e mais direto.
-  await modalConvidar.getByRole("combobox").selectOption({ label: NOME_NICHO });
+  // V9a, item 4: o modal ganhou um segundo select ("tipo de marca"), entao o antigo atalho
+  // por getByRole("combobox") (o unico da modal) deixou de resolver so um elemento; agora os
+  // dois selects tem aria-label igual ao rotulo visivel (mesma regra dos demais, plataforma/CLAUDE.md).
+  await modalConvidar.getByLabel("nicho", { exact: true }).selectOption({ label: NOME_NICHO });
   await modalConvidar.getByRole("button", { name: "convidar por e-mail" }).click();
 
   // O cliente novo entra com a senha gerada (V3, item 5; mesmo caminho de

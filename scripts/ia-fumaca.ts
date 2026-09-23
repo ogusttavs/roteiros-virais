@@ -1,7 +1,7 @@
 /**
- * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as onze
+ * Fumaca manual da camada de IA (plano de execucao, etapa 4): chama as doze
  * tarefas do plano uma vez cada (dez do plano original mais
- * `classificarAbertura`, V4, item 2), com dados ficticios encadeados (o resumo do
+ * `classificarAbertura`, V4, item 2, e `lerMomento`, V9a, item 3), com dados ficticios encadeados (o resumo do
  * perfil e do modelo do nicho de uma chamada alimenta o sistema estavel da
  * proxima, como em producao), e imprime o resumo de cada saida com o custo.
  * Nivel e esforco de cada chamada vem do que o proprio modulo do prompt
@@ -24,6 +24,7 @@ import * as classificarAbertura from "../src/ia/prompts/classificarAbertura";
 import * as compilarPerfil from "../src/ia/prompts/compilarPerfil";
 import * as extrairVideo from "../src/ia/prompts/extrairVideo";
 import * as filtrarNoticias from "../src/ia/prompts/filtrarNoticias";
+import * as lerMomento from "../src/ia/prompts/lerMomento";
 import * as modeloNicho from "../src/ia/prompts/modeloNicho";
 import * as roteiro from "../src/ia/prompts/roteiro";
 import * as temasDoDia from "../src/ia/prompts/temasDoDia";
@@ -145,6 +146,24 @@ async function main() {
       schema: classificarAbertura.schema,
       sistemaEstavel: classificarAbertura.montarSistemaEstavel(),
       entrada: classificarAbertura.montarEntrada({ gancho: extraido.gancho, formato: extraido.formato }),
+    }),
+  );
+
+  await chamar(
+    "lerMomento",
+    lerMomento.nivel,
+    (d) => `onde: ${d.onde.slice(0, 60)}`,
+    gerarEstruturado({
+      tarefa: "lerMomento",
+      nivel: lerMomento.nivel,
+      effort: lerMomento.esforco,
+      schema: lerMomento.schema,
+      sistemaEstavel: lerMomento.montarSistemaEstavel(),
+      entrada: lerMomento.montarEntrada({
+        texto:
+          "Eu tô aqui no aeroporto, são cinco da manhã. Acabei de passar pela segurança e vou embarcar " +
+          "para a feira de fornecedores. Dá para mostrar a fila do check-in e a mala de amostras que eu levo.",
+      }),
     }),
   );
 
@@ -273,6 +292,7 @@ async function main() {
         modeloNicho: nicho.resumo,
         camadaExclusiva: "Cidade: Sao Paulo, bairro Pinheiros. Nenhum concorrente citado.",
         regrasCliente: [],
+        tipo: "negocio",
       }),
       entrada: roteiro.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",

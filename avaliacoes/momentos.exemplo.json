@@ -1,0 +1,74 @@
+[
+  {
+    "onde": "no aeroporto, cinco da manhã",
+    "oQueEstaAcontecendo": "acabei de passar pela segurança e vou embarcar para a feira de fornecedores",
+    "oQueDaParaMostrar": "a fila do check-in e a mala de amostras que eu levo",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "tipo": "negocio",
+    "contextoDeSerie": [],
+    "pontoPrincipal": "primeiro momento da viagem, sem contexto de serie; o gancho precisa citar o aeroporto ou a viagem, nao um tema generico do nicho"
+  },
+  {
+    "onde": "no corredor da feira de fornecedores, no meio da manha",
+    "oQueEstaAcontecendo": "andando entre os estandes, procurando um fornecedor novo de embalagem",
+    "oQueDaParaMostrar": "as prateleiras cheias de produtos e o movimento de gente andando",
+    "objetivo": "alcance",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "tipo": "negocio",
+    "contextoDeSerie": [
+      { "tema": "sobre acabei de passar pela seguranca e vou embarcar para a feira de fornecedores", "gancho": "aqui no aeroporto, cinco da manha, ja com a mala de amostras pronta" }
+    ],
+    "pontoPrincipal": "segundo momento da viagem, com o aeroporto no contexto de serie; o angulo precisa ser outro (a feira, nao o aeroporto de novo)"
+  },
+  {
+    "onde": "dentro da fábrica de um fornecedor novo",
+    "oQueEstaAcontecendo": "vendo de perto como o fornecedor produz o frasco que eu uso no meu produto",
+    "oQueDaParaMostrar": "a linha de producao rodando e os frascos saindo prontos",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: marca de limpeza de mercado com cheiro forte.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "tipo": "negocio",
+    "contextoDeSerie": [
+      { "tema": "sobre acabei de passar pela seguranca e vou embarcar para a feira de fornecedores", "gancho": "aqui no aeroporto, cinco da manha, ja com a mala de amostras pronta" },
+      { "tema": "sobre andando entre os estandes procurando um fornecedor novo de embalagem", "gancho": "olha quanta gente andando aqui na feira de fornecedores" }
+    ],
+    "pontoPrincipal": "terceiro momento, dois anteriores no contexto de serie (aeroporto e feira); o angulo aqui e a fabrica por dentro, nunca repetindo os dois anteriores"
+  },
+  {
+    "onde": "no quarto do hotel, de noite",
+    "oQueEstaAcontecendo": "revendo as amostras que trouxe da feira antes de decidir o que comprar",
+    "oQueDaParaMostrar": "as amostras espalhadas em cima da cama",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "tipo": "pessoa",
+    "contextoDeSerie": [
+      { "tema": "sobre vendo de perto como o fornecedor produz o frasco que eu uso no meu produto", "gancho": "aqui dentro da fabrica, olhando a linha de producao de perto" },
+      { "tema": "sobre andando entre os estandes procurando um fornecedor novo de embalagem", "gancho": "olha quanta gente andando aqui na feira de fornecedores" },
+      { "tema": "sobre acabei de passar pela seguranca e vou embarcar para a feira de fornecedores", "gancho": "aqui no aeroporto, cinco da manha, ja com a mala de amostras pronta" }
+    ],
+    "pontoPrincipal": "quarto momento, tipo pessoa (fala em primeira pessoa do singular, nunca a gente); os tres anteriores no contexto de serie, o gancho precisa ser sobre o hotel/as amostras, nao repetir nenhum dos tres"
+  },
+  {
+    "onde": "numa sala de reuniao com um fornecedor",
+    "oQueEstaAcontecendo": "negociando o preco do frasco novo para o proximo lote",
+    "oQueDaParaMostrar": "a mesa de reuniao com o contrato e as amostras em cima",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: mancha em estofado, bastidor da marca. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o problema, mostrar a solução. Fechamentos comuns: resultado sem falar. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "tipo": "negocio",
+    "contextoDeSerie": [
+      { "tema": "sobre revendo as amostras que trouxe da feira antes de decidir o que comprar", "gancho": "aqui no hotel, revendo as amostras que trouxe da feira" }
+    ],
+    "marcaCitada": { "nome": "Clínica do Bruno", "perfilCompilado": "clínica odontológica de bairro, vende avaliação de ortodontia gratuita" },
+    "pontoPrincipal": "quinto momento, com marca citada (regra dura 11: aparece como parte da vida de quem grava, nunca como anuncio; objetivo e comprar, entao a chamada final deveria apontar para a marca citada, nao para a Dr.Wash)"
+  }
+]

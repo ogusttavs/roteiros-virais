@@ -5,6 +5,8 @@ export const textosHistorico = {
   ultimosDias: (n: number) => `últimos 30 dias: gravou em ${n} dia${n === 1 ? "" : "s"}`,
   grupos: { estaSemana: "Esta semana", semanaPassada: "Semana passada" },
   status: { gerado: "escrito", gravado: "gravado", postado: "postado" },
+  /** V9a, item 5: só aparece para `origem === "momento"`, ao lado da data. */
+  origemMomento: "momento",
   pontoCurva: (views: string, horas: number) => `${views} views em ${horas}h`,
   aprendendo: "ainda aprendendo o normal da sua conta",
   acimaDoNormal: (vezes: string) => `${vezes} acima do normal da sua conta; responda os comentários hoje`,

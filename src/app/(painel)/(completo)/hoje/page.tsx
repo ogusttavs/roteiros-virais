@@ -101,6 +101,10 @@ export default async function Hoje() {
    * verdade (`resultado.status !== "ok"`), a lista de temas some da tela
    * (`temas` vazio já esconde "ver os outros temas" em `HojeTela`).
    */
+  // V9a, item 4: as outras marcas, para o seletor "Falar de" da folha "Gravar agora"; a marca ativa nunca aparece na própria lista.
+  const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
+  const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
+
   if (roteiroHoje) {
     const temas = resultado.status === "ok" ? resultado.temas : [];
     const evidenciasTemas =
@@ -128,6 +132,8 @@ export default async function Hoje() {
         marcaAtiva={cliente}
         marcas={marcas}
         nomePessoa={sessao.user.name}
+        objetivoRecomendado={objetivoRecomendado}
+        outrasMarcas={outrasMarcas}
       />
     );
   }
@@ -179,6 +185,8 @@ export default async function Hoje() {
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}
+      objetivoRecomendado={objetivoRecomendado}
+      outrasMarcas={outrasMarcas}
     />
   );
 }

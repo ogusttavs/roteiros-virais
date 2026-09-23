@@ -512,7 +512,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
         ) : corpo.semEvidencia ? (
           <section className={styles.referenciaVazia}>
             <h2>{textosRoteiro.referencia}</h2>
-            <p>{textosRoteiro.semEvidencia}</p>
+            <p>{roteiro.origem === "momento" ? textosRoteiro.semEvidenciaMomento : textosRoteiro.semEvidencia}</p>
           </section>
         ) : null}
 

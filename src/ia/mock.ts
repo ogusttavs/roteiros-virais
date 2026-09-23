@@ -50,6 +50,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
       return mockAprenderCliente(entrada);
     case "classificarAbertura":
       return mockClassificarAbertura(entrada);
+    case "lerMomento":
+      return mockLerMomento(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -227,8 +229,17 @@ function tipoAberturaEscolhidoPeloMock(entrada: string): (typeof TIPOS_ABERTURA_
   return TIPOS_ABERTURA_MOCK.find((t) => !proibidos.includes(t)) ?? "outro";
 }
 
+/**
+ * V9a, item 1: sem "Tema escolhido:" na entrada (`montarEntrada` pula essa
+ * linha com momento), o tema simulado vem de "O que está acontecendo:",
+ * para o mock não ficar sempre igual em todo caso de momento; `temaCurto`
+ * só sai preenchido aqui, mesma regra do prompt de verdade (regra dura 10).
+ */
 function mockRoteiro(entrada: string) {
-  const tema = extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
+  const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
+  const tema = ehMomento
+    ? extrairCampo(entrada, "O que está acontecendo:") || "momento simulado"
+    : extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
   const reprovado = entrada.includes("reprovou a versão anterior");
   const reprovadoMuitoLongo = entrada.includes("Muito longo");
   const ids = extrairIds(entrada);
@@ -236,6 +247,7 @@ function mockRoteiro(entrada: string) {
   const primeiraPalavra = PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura];
 
   return {
+    temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
     titulo: tema,
     duracaoS: reprovadoMuitoLongo ? 25 : 40,
     gancho: reprovado
@@ -370,6 +382,25 @@ function mockClassificarAbertura(entrada: string) {
   if (gancho.includes("?")) return { tipoAbertura: "pergunta" as const };
   if (/\d/.test(gancho)) return { tipoAbertura: "numero" as const };
   return { tipoAbertura: "cena" as const };
+}
+
+/**
+ * V9a, item 3: separa por frase, na ordem em que a pessoa falou (mesmo
+ * espírito de `mockRoteiro`, determinístico a partir da entrada, sem chave
+ * real). `lerMomento.ts`, `montarEntrada`, sempre manda o texto na linha
+ * seguinte ao rótulo.
+ */
+function mockLerMomento(entrada: string) {
+  const texto = entrada.split("O que a pessoa disse ou escreveu:\n")[1]?.trim() || entrada.trim();
+  const frases = texto
+    .split(/[.!?]+\s*/)
+    .map((frase) => frase.trim())
+    .filter(Boolean);
+  return {
+    onde: frases[0] || texto,
+    oQueEstaAcontecendo: frases[1] || texto,
+    oQueDaParaMostrar: frases[2] || frases[1] || texto,
+  };
 }
 
 function mockAnalisarVisual() {

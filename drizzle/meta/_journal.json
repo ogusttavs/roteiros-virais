@@ -204,6 +204,13 @@
       "when": 1790043293041,
       "tag": "0028_meta-ig-cliente",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790080257531,
+      "tag": "0029_momento-e-tipo-marca",
+      "breakpoints": true
     }
   ]
 }

@@ -97,6 +97,65 @@ describe("montarEntrada, instrucaoAbertura", () => {
 
     expect(entrada).toContain("Tipo de abertura: livre, o que fizer mais sentido");
   });
+
+  // V9a, item 1, 2 e 4: com momento a entrada muda de forma (sem "Tema escolhido" nem bloco de evidência).
+  describe("momento (V9a)", () => {
+    const MOMENTO = {
+      onde: "no aeroporto",
+      oQueEstaAcontecendo: "esperando o embarque para a feira de fornecedores",
+      oQueDaParaMostrar: "a fila do check-in e a mala de amostras",
+    };
+
+    it("sem momento, a entrada tem 'Tema escolhido' e o bloco de evidencia", () => {
+      const entrada = montarEntrada(BASE);
+      expect(entrada).toContain("Tema escolhido: o erro que faz a mancha voltar");
+      expect(entrada).toContain("Não há vídeo fora da curva");
+    });
+
+    it("com momento, a entrada nao tem 'Tema escolhido' nem bloco de evidencia, so o bloco do momento", () => {
+      const entrada = montarEntrada({ ...BASE, momento: MOMENTO });
+
+      expect(entrada).not.toContain("Tema escolhido:");
+      expect(entrada).not.toContain("Não há vídeo fora da curva");
+      expect(entrada).not.toContain("Evidencia disponivel");
+      expect(entrada).toContain("O momento que a pessoa descreveu agora:");
+      expect(entrada).toContain("Onde: no aeroporto");
+      expect(entrada).toContain("O que está acontecendo: esperando o embarque para a feira de fornecedores");
+      expect(entrada).toContain("O que dá para mostrar: a fila do check-in e a mala de amostras");
+    });
+
+    it("com contextoDeSerie, lista o que ja foi gravado nesta sequencia", () => {
+      const entrada = montarEntrada({
+        ...BASE,
+        momento: MOMENTO,
+        contextoDeSerie: [{ tema: "sobre a fabrica", gancho: "aqui dentro da fabrica" }],
+      });
+
+      expect(entrada).toContain("O que já foi gravado nesta sequência de momentos");
+      expect(entrada).toContain('"sobre a fabrica", gancho: "aqui dentro da fabrica"');
+    });
+
+    it("sem contextoDeSerie (primeiro momento), nao menciona sequencia nenhuma", () => {
+      const entrada = montarEntrada({ ...BASE, momento: MOMENTO });
+      expect(entrada).not.toContain("sequência de momentos");
+    });
+
+    it("com marcaCitada, leva o nome e o perfil dela, com a regra dura 11", () => {
+      const entrada = montarEntrada({
+        ...BASE,
+        momento: MOMENTO,
+        marcaCitada: { nome: "Cera Boa", perfilCompilado: "vende cera automotiva artesanal" },
+      });
+
+      expect(entrada).toContain("Marca citada por quem está gravando");
+      expect(entrada).toContain("Cera Boa: vende cera automotiva artesanal");
+    });
+
+    it("sem marcaCitada, nao menciona marca nenhuma", () => {
+      const entrada = montarEntrada({ ...BASE, momento: MOMENTO });
+      expect(entrada).not.toContain("Marca citada");
+    });
+  });
 });
 
 // E27, parte 2, item 3: sem nenhuma regra o bloco nao aparece; com regra, aparece com o
@@ -106,6 +165,7 @@ describe("montarSistemaEstavel", () => {
     perfilCompilado: "perfil do cliente",
     modeloNicho: "modelo do nicho",
     camadaExclusiva: "camada exclusiva",
+    tipo: "negocio" as const,
   };
 
   it("sem regrasCliente, nao monta o bloco da memoria", () => {
@@ -125,5 +185,16 @@ describe("montarSistemaEstavel", () => {
     expect(sistema).toContain("siga a regra 8: a firme vale como proibição, a fraca deve ser evitada");
     expect(sistema).toContain("- nao comecar com pergunta (firme)");
     expect(sistema).toContain("- nao citar concorrente (fraca)");
+  });
+
+  // V9a, item 4: "negocio" continua na voz de sempre; "pessoa" muda para primeira pessoa do singular.
+  it("tipo negocio: instrui continuar na voz de sempre, nunca primeira pessoa do singular", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "negocio" });
+    expect(sistema).toContain('continue na voz de sempre ("a gente", "nossa loja")');
+  });
+
+  it("tipo pessoa: instrui primeira pessoa do singular", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "pessoa" });
+    expect(sistema).toContain('escreva sempre em primeira pessoa do singular ("eu", "meu", "minha")');
   });
 });
