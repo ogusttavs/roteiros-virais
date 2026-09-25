@@ -8,6 +8,7 @@ import {
   type TipoAbertura,
   type TipoMarca,
 } from "@/db/schema";
+import { JARGAO } from "@/lib/regras-de-texto";
 
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
@@ -122,8 +123,28 @@ import { textoRegrasStory } from "./regras-formato";
  * em Reels nesta rodada); `gancho`, `corpo`, `fechamento` e `chamadaFinal`
  * ficam nuláveis (nulos em Story) e `tipoAbertura` também (nulo em Story).
  * Versao 2.0.0.
+ *
+ * V9d, item 0 (golden set de Stories rodado pelo Fable em 25/09 com chave
+ * real: 5 de 5 reprovados no verificador, sempre pelos mesmos três motivos,
+ * do prompt, não do verificador): **um**, `porQueAssim` citava as regras
+ * duras gerais (1 a 12) além das `R-IG-STORY`, porque "uma entrada por
+ * regra numerada da lista acima" não deixava claro qual lista; agora diz
+ * explicitamente que só regra com número `R-IG-STORY-nn` entra, nunca as
+ * regras duras do começo do texto, mesmo sendo numeradas. **Dois**, cartões
+ * passavam de 15 segundos de fala (até 48 palavras num caso; o verificador
+ * reprova acima de 37, `PALAVRAS_MAX_POR_CARTAO`): o modelo não conta
+ * segundos, conta palavras, então a regra 5 e o bloco de estrutura passam a
+ * dizer o número direto, "no máximo 35 palavras" (dois de folga abaixo do
+ * teto do verificador). **Três**, jargão dentro do motivo de `porQueAssim`
+ * (uma das palavras do catálogo `JARGAO`, `lib/regras-de-texto.ts`): a
+ * instrução agora proíbe a lista inteira também nesse campo, montada em
+ * tempo de execução (`montarInstrucaoJargaoPorQueAssim`, mesmo padrão de
+ * `avaliarResposta.ts`, para o `checar-texto` não reprovar este arquivo por
+ * escrever a palavra proibida por extenso). O verificador não mudou
+ * (`ia/verificador.ts` já cobria os três casos; o
+ * problema era só o modelo não saber a regra certa). Versao 2.0.1.
  */
-export const versao = "2.0.0";
+export const versao = "2.0.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -188,6 +209,16 @@ export const schema = z.object({
 
 export type SaidaRoteiro = z.infer<typeof schema>;
 
+/**
+ * V9d, item 0 (golden set de Stories, achado do Fable em 25/09: jargão dentro do motivo de
+ * `porQueAssim`): mesmo padrão de `avaliarResposta.ts`, `montarInstrucaoJargao`, montado em tempo de
+ * execução porque o `checar-texto` reprova qualquer arquivo de `src/ia/prompts/` que tenha a palavra
+ * escrita inteira; este arquivo só referencia `item.palavra` e `item.usar`, nunca a palavra em si.
+ */
+function montarInstrucaoJargaoPorQueAssim(): string {
+  return JARGAO.map((item) => `nunca "${item.palavra}"`).join(", ");
+}
+
 export function montarSistemaEstavel(dados: {
   perfilCompilado: string;
   modeloNicho: string;
@@ -214,11 +245,15 @@ export function montarSistemaEstavel(dados: {
         `negócio, e a primeira pessoa do singular é bem-vinda quando quem grava conta a própria ` +
         `experiência ("eu testei", "eu uso"); nunca invente um "nós" que não existe.`;
 
-  /** V9c, item 2: Reels continua "fala direta, vertical, curto"; Story troca para "cartões, sem gancho de três segundos". */
+  /**
+   * V9c, item 2: Reels continua "fala direta, vertical, curto"; Story troca para "cartões, sem gancho de
+   * três segundos". V9d, item 0: "até 15 segundos" virou "no máximo 35 palavras" porque o modelo não
+   * conta segundos, conta palavras (o golden set achou cartões de até 48 palavras contra o teto de 37 do
+   * verificador); 35 é a folga de dois abaixo do teto.
+   */
   const regra5 = ehStory
     ? `5. Formato Story: o vídeo sai em cartões curtos (de 2 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
-      `gancho, corpo, fechamento e chamada; a duração de cada cartão é a que a fala dele pede, até 15 ` +
-      `segundos.`
+      `gancho, corpo, fechamento e chamada; cada cartão tem no máximo 35 palavras de fala, nunca mais.`
     : `5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do\n   nicho.`;
 
   /**
@@ -238,17 +273,27 @@ export function montarSistemaEstavel(dados: {
   /**
    * V9c, item 2: o bloco de estrutura por formato, primeiro uso da base numerada (E36) num prompt
    * inteiro. O texto das regras vem de `regras-formato.ts`, que copia a seção 9.1 das rubricas.
+   *
+   * V9d, item 0 (golden set de Stories, 5 de 5 reprovados, os três motivos do Fable em 25/09): "no
+   * máximo 35 palavras" no lugar de "até 15 segundos" (o modelo conta palavras, não segundos);
+   * `porQueAssim` agora diz explicitamente que só regra `R-IG-STORY-nn` entra, nunca as regras duras
+   * numeradas de 1 a 12 do começo do texto (o modelo entendia "regra numerada" como as duas listas
+   * juntas); e o motivo proíbe o mesmo jargão da regra dura 4, para o campo `porQueAssim` em si, não só
+   * os campos de texto de tela.
    */
   const blocoEstrutura = ehStory
-    ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão; cada cartão tem
-o que falar, o que mostrar, o texto curto que fica fixo na tela, e a figurinha de interação quando
-fizer sentido (ou "nenhuma" quando não pedir interação nenhuma). Siga as regras do Story à risca:
+    ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão, cada um com no
+máximo 35 palavras de fala; cada cartão tem o que falar, o que mostrar, o texto curto que fica fixo na
+tela, e a figurinha de interação quando fizer sentido (ou "nenhuma" quando não pedir interação
+nenhuma). Siga as regras do Story à risca:
 
 ${textoRegrasStory()}
 
-Depois de escrever, preencha também porQueAssim: uma entrada por regra numerada da lista acima que
-você de fato seguiu, com o número (ex. "R-IG-STORY-04") e o motivo em português de gente, sem
-jargão, sem citar o número dentro do motivo. Nunca cite uma regra que não está nesta lista.`
+Depois de escrever, preencha também porQueAssim: uma entrada só para cada regra com número
+R-IG-STORY-nn da lista acima que você de fato seguiu (nunca as regras duras numeradas de 1 a 12 do
+começo deste texto, mesmo sendo numeradas), com o número (ex. "R-IG-STORY-04") e o motivo em
+português de gente, sem jargão no motivo (${montarInstrucaoJargaoPorQueAssim()}), sem citar o número
+dentro do motivo. Nunca cite uma regra que não está na lista das R-IG-STORY acima.`
     : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
 Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
 (quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência

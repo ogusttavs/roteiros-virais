@@ -21,16 +21,23 @@
   align-items: center;
 }
 
-/** Sem coletor de miniatura nesta rodada (registrado em Decisões pendentes): o retângulo neutro do design. */
+/** Miniatura real quando a plataforma trouxe (V9d, item 0b); sem ela, ou se o link expirou, o retângulo neutro do design. */
 .capa {
   width: 4.5rem;
   aspect-ratio: 9 / 16;
   display: grid;
   place-items: center;
+  overflow: hidden;
   border-radius: var(--raio-md);
   background: var(--cor-superficie-recuada);
   border: var(--largura-borda) solid var(--cor-borda);
   color: var(--cor-texto-dica);
+}
+
+.capaImagem {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .multiplo {

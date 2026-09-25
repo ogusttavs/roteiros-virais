@@ -411,8 +411,81 @@ describe("verificarLocalmente", () => {
       expect(r.motivos.join(" ")).toContain("R-IG-STORY-07");
     });
 
+    // V9d, item 0: achado do golden set de Stories com chave real, depois do ajuste do prompt
+    // ("qual dos dois você já usou aí em casa?" fecha pedindo resposta sem nenhum verbo da lista fixa).
+    it("aprova quando o ultimo cartao fecha com uma pergunta direta, mesmo sem nenhum verbo da lista fixa", () => {
+      const r = verificarLocalmente(
+        {},
+        {
+          formato: "story",
+          cartoes: [
+            { ...CARTAO_OK, figurinha: "enquete" },
+            { ...CARTAO_OK, oQueFalar: "qual dos dois voce ja usou ai em casa?" },
+          ],
+        },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
     it("em reels (sem formato story), nao roda checagem de cartao nenhuma mesmo se cartoes vier preenchido", () => {
       const r = verificarLocalmente({}, { cartoes: [ULTIMO_CARTAO_OK] });
+      expect(r.aprovado).toBe(true);
+    });
+  });
+
+  // V9d, item 1: o schema 2.0.0 aceita nulo nos quatro campos de reels e em cartoes, pensado para o
+  // outro formato; sem esta checagem, um roteiro em branco (o formato errado devolvendo nulo) passava
+  // sem ninguem reprovar.
+  describe("roteiro vazio (V9d, item 1)", () => {
+    it("reprova story com cartoes nulo", () => {
+      const r = verificarLocalmente({}, { formato: "story", cartoes: null });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("cartões");
+    });
+
+    it("reprova story com cartoes um array vazio", () => {
+      const r = verificarLocalmente({}, { formato: "story", cartoes: [] });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("cartões");
+    });
+
+    it("reprova reels com gancho nulo", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "reels", narrativa: { gancho: null, corpo: "corpo ok", chamadaFinal: "comenta ai" } },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("gancho");
+    });
+
+    it("reprova reels com corpo vazio", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "reels", narrativa: { gancho: "gancho ok", corpo: "", chamadaFinal: "comenta ai" } },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("corpo");
+    });
+
+    it("reprova reels com chamadaFinal nula", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "reels", narrativa: { gancho: "gancho ok", corpo: "corpo ok", chamadaFinal: null } },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("chamadaFinal");
+    });
+
+    it("aprova reels com os tres campos preenchidos", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "reels", narrativa: { gancho: "gancho ok", corpo: "corpo ok", chamadaFinal: "comenta ai" } },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("sem narrativa (nao informada), nao reprova por isso mesmo em reels", () => {
+      const r = verificarLocalmente({}, { formato: "reels" });
       expect(r.aprovado).toBe(true);
     });
   });

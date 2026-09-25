@@ -34,6 +34,13 @@ export type VideoParaGravar = {
   midiaUrl?: string | null;
   /** Detectado por codigo na coleta (V2b, item 2); a extracao em lote sobrescreve depois. */
   idioma?: string | null;
+  /**
+   * A miniatura do vídeo (V9d, item 0b): YouTube monta por código
+   * (`normalizadores/youtube.ts`, sempre presente); Instagram guarda o
+   * `thumbnail_url` da Business Discovery, quando vem; TikTok, a capa do
+   * Apify, quando vem.
+   */
+  capaUrl?: string | null;
 };
 
 /**
@@ -104,10 +111,11 @@ export async function upsertVideo(
   /** So marca a hora da leitura quando ha url de verdade (V2a, item 3); sem ela, nao ha nada fresco para marcar. */
   const midiaUrlEm = midiaUrl ? new Date() : null;
   const idioma = video.idioma ?? null;
+  const capaUrl = video.capaUrl ?? null;
 
   const [linha] = await db()
     .insert(videos)
-    .values({ ...video, midiaUrl, midiaUrlEm, idioma, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
+    .values({ ...video, midiaUrl, midiaUrlEm, idioma, capaUrl, contaId, nichoId, audio, origem, semDono: contaId === null, execucaoId })
     .onConflictDoUpdate({
       target: [videos.plataforma, videos.idExterno],
       set: {
@@ -122,6 +130,10 @@ export async function upsertVideo(
         // midiaUrlEm segue midiaUrl, nunca atualiza sozinha.
         midiaUrl: sql`coalesce(${sql.param(midiaUrl, videos.midiaUrl)}, ${videos.midiaUrl})`,
         midiaUrlEm: midiaUrl ? sql`${sql.param(midiaUrlEm, videos.midiaUrlEm)}` : sql`${videos.midiaUrlEm}`,
+        // Mesmo raciocinio do midiaUrl (V9d, item 0b): uma recoleta sem capa
+        // (Instagram sem thumbnail_url desta vez, ou o TikTok ainda suspenso)
+        // nao pode apagar a capa ja gravada numa coleta anterior.
+        capaUrl: sql`coalesce(${sql.param(capaUrl, videos.capaUrl)}, ${videos.capaUrl})`,
         // Ordem invertida de proposito (V2b, item 2): o idioma que ja esta
         // gravado manda sobre o novo, porque pode ter vindo da extracao em
         // lote (le a transcricao inteira, mais confiavel) e uma recoleta

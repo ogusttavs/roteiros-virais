@@ -334,11 +334,16 @@ export type Plataforma = "youtube" | "tiktok" | "instagram";
 /**
  * De onde `medianaViews` veio (PROXIMO.md, E6 parte 3, item 2): "conta" e a
  * mediana de verdade (5 ou mais videos nos ultimos 90 dias); sem isso,
- * "seguidores" e o substituto por seguidor (`FATOR_SUBSTITUTO_BASE_FRACA`
- * em `pontuar.ts`); sem seguidores nem, "setor" e a mediana de views do
- * nicho inteiro naquela plataforma. Assim que a conta ganha uma mediana de
- * nivel melhor, a origem muda e o multiplo de todo video da conta e
- * recalculado no `pontuar` seguinte.
+ * "seguidores" e o substituto por seguidor (`seguidores * taxa tipica do
+ * nicho e da plataforma`, `src/jobs/pontuar.ts`); sem seguidores nem,
+ * "setor" e a mediana de views do nicho inteiro naquela plataforma. Assim
+ * que a conta ganha uma mediana de nivel melhor, a origem muda e o
+ * multiplo de todo video da conta e recalculado no `pontuar` seguinte.
+ *
+ * V9d, item 0b (achado do Gustavo em 25/09, usando o painel): a formula do
+ * substituto por seguidor mudou (`seguidores * taxa tipica`, no lugar de
+ * `views do video / seguidores * 100`); o nome "seguidores" da origem
+ * continua o mesmo, só a conta por trás dele mudou.
  */
 export type MedianaOrigem = "conta" | "seguidores" | "setor";
 
@@ -590,6 +595,17 @@ export const videos = pgTable(
      * abertura do próximo roteiro sem repetir os últimos 5 do cliente.
      */
     tipoAbertura: text("tipo_abertura").$type<TipoAbertura>(),
+    /**
+     * A miniatura do vídeo (V9d, item 0b, migração 0033): o cartão de
+     * Referências não tinha prévia nenhuma (lacuna do PR #52), e o Gustavo
+     * leu isso como "não aparece a prévia". YouTube monta a url por código
+     * (`https://i.ytimg.com/vi/<id>/hqdefault.jpg`, sem chamada nova, nunca
+     * gravada aqui); Instagram guarda o `thumbnail_url` que a Business
+     * Discovery já devolve; TikTok, a capa que o Apify devolve (suspenso
+     * desde 09/09). A Meta expira link de mídia; se o `<img>` falhar no
+     * cliente, o cartão volta ao retângulo neutro, nunca quebrado.
+     */
+    capaUrl: text("capa_url"),
     coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },

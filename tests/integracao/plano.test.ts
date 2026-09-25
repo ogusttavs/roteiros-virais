@@ -3,10 +3,19 @@
  * contra o Postgres real, em mock (`AI_PROVIDER=mock`, `vitest.config.mts`).
  */
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+// V9d, item 3: espiona gerarEstruturado para simular o modelo falhando no meio de criarPlano
+// (o segundo dia de uma agenda de dois dias), mesmo padrao de tests/integracao/roteiro.test.ts.
+vi.mock("@/ia/cliente", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/ia/cliente")>();
+  return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
+});
 
 import { db, getPool } from "@/db";
 import { briefings, clientes, nichos, planoGravacoes, roteiros, user, type PerfilCompilado } from "@/db/schema";
+import { gerarEstruturado } from "@/ia/cliente";
+import { ErroIA } from "@/ia/erro";
 import {
   ErroPlano,
   aceitar,
@@ -21,6 +30,8 @@ import {
 } from "@/servicos/plano";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+
+const gerarEstruturadoMock = vi.mocked(gerarEstruturado);
 
 const PERFIL_PADRAO: PerfilCompilado = {
   fatos: {
@@ -41,6 +52,7 @@ const PERFIL_PADRAO: PerfilCompilado = {
 // Quarta-feira (confere resolverDataRelativa.test.ts).
 const HOJE = "2026-09-23";
 const ONTEM = "2026-09-22";
+const AMANHA = "2026-09-24";
 
 let nichoId: number;
 let contadorUsuario = 0;
@@ -68,16 +80,48 @@ afterEach(async () => {
   await db().update(planoGravacoes).set({ roteiroId: null });
   await db().delete(roteiros);
   await db().delete(planoGravacoes);
+  gerarEstruturadoMock.mockClear();
 });
 
 describe("lerAgendaDeTexto", () => {
   it("separa em dias, com a data ja resolvida por codigo (nao pelo modelo)", async () => {
-    const dias = await lerAgendaDeTexto("segunda: voo para Dubai; terça: feira, fornecedor às 15h; quarta: fábrica", HOJE);
+    const { dias, diasNaoEntendidos } = await lerAgendaDeTexto(
+      "segunda: voo para Dubai; terça: feira, fornecedor às 15h; quarta: fábrica",
+      HOJE,
+    );
 
     expect(dias).toHaveLength(3);
     expect(dias[0]).toEqual({ data: "2026-09-28", lugar: "voo para Dubai", compromissos: ["voo para Dubai"] });
     expect(dias[1].data).toBe("2026-09-29");
     expect(dias[2].data).toBe("2026-09-23");
+    expect(diasNaoEntendidos).toEqual([]);
+  });
+
+  // V9d, item 4: um dia cuja referencia resolverDataRelativa nao entende ("na volta") volta em
+  // diasNaoEntendidos, nunca some em silencio.
+  it("um dia com referencia nao reconhecida volta em diasNaoEntendidos, os outros continuam normais", async () => {
+    const { dias, diasNaoEntendidos } = await lerAgendaDeTexto(
+      "segunda: feira, fornecedor novo; na volta: fabrica, visita ao fornecedor",
+      HOJE,
+    );
+
+    expect(dias).toHaveLength(1);
+    expect(dias[0].data).toBe("2026-09-28");
+
+    expect(diasNaoEntendidos).toHaveLength(1);
+    expect(diasNaoEntendidos[0]).toEqual({
+      referenciaDia: "na volta",
+      lugar: "fabrica",
+      compromissos: ["fabrica", "visita ao fornecedor"],
+    });
+  });
+
+  it("quando nada e reconhecido, dias fica vazio e diasNaoEntendidos leva tudo", async () => {
+    const { dias, diasNaoEntendidos } = await lerAgendaDeTexto("na volta: fabrica", HOJE);
+
+    expect(dias).toEqual([]);
+    expect(diasNaoEntendidos).toHaveLength(1);
+    expect(diasNaoEntendidos[0].referenciaDia).toBe("na volta");
   });
 });
 
@@ -156,6 +200,35 @@ describe("criarPlano", () => {
     for (const item of itens) {
       expect(item.formato).toBe(item.objetivo === "alcance" ? "reels" : "story");
     }
+  });
+
+  // V9d, item 3 (observacao da revisao do PR #56): antes, limparPlano rodava antes do loop que
+  // gera as sugestoes; uma falha do modelo no segundo dia deixava o plano antigo ja apagado e nada
+  // no lugar. Agora tudo e gerado em memoria primeiro, e o apagar-e-inserir e uma transacao so.
+  it("modelo falha no segundo dia: o plano antigo continua inteiro, nada parcial e gravado", async () => {
+    const cliente = await criarCliente();
+    await criarPlano(cliente, [{ data: HOJE, lugar: "feira antiga", compromissos: ["estande velho"] }], HOJE);
+    const planoAntes = await planoDoDia(cliente.id, HOJE);
+    expect(planoAntes.length).toBeGreaterThan(0);
+
+    const implementacaoOriginal = gerarEstruturadoMock.getMockImplementation()!;
+    gerarEstruturadoMock.mockImplementationOnce(implementacaoOriginal);
+    gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: modelo fora do ar no segundo dia"));
+
+    await expect(
+      criarPlano(
+        cliente,
+        [
+          { data: HOJE, lugar: "feira nova", compromissos: ["estande novo"] },
+          { data: AMANHA, lugar: "fabrica", compromissos: ["visita ao fornecedor"] },
+        ],
+        HOJE,
+      ),
+    ).rejects.toThrow(ErroIA);
+
+    const planoDepois = await planoDoDia(cliente.id, HOJE);
+    expect(planoDepois).toEqual(planoAntes);
+    expect(await planoDoDia(cliente.id, AMANHA)).toEqual([]);
   });
 });
 

@@ -87,3 +87,32 @@
   color: var(--cor-texto);
   font-size: var(--tamanho-secundario);
 }
+
+/** V9d, item 4: o cartao de um dia cuja referencia nao foi reconhecida ("na volta", por exemplo). */
+.diaNaoEntendido {
+  border-color: var(--cor-atencao);
+  gap: var(--espaco-3);
+}
+
+.campoData {
+  display: grid;
+  gap: var(--espaco-1);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.inputData {
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-md);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  outline: none;
+}
+
+.inputData:focus-visible {
+  box-shadow: var(--sombra-foco);
+}

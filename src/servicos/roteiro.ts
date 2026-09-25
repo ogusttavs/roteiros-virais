@@ -13,6 +13,7 @@ import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
+  FORMATOS_ROTEIRO,
   geracoesIA,
   roteiros,
   videosCliente,
@@ -46,6 +47,20 @@ import { aplicarProporcaoBrasil, classificarBrasil } from "./proporcao-brasil";
 import { temasParaCliente } from "./temas";
 
 export class ErroRoteiro extends Error {}
+
+/**
+ * V9d, item 2: `formato` chega à Server Action como texto livre do navegador, não como o tipo
+ * `FormatoRoteiro` (isso é só compilação, o valor de verdade na rede pode ser qualquer coisa).
+ * Confere contra `FORMATOS_ROTEIRO` antes de chegar ao banco; `undefined` continua `undefined` (a
+ * ausência de formato cai no padrão "reels" mais adiante, em `gerarRoteiro`/`aceitar`).
+ */
+export function validarFormato(valor: string | undefined): FormatoRoteiro | undefined {
+  if (valor === undefined) return undefined;
+  if (!(FORMATOS_ROTEIRO as readonly string[]).includes(valor)) {
+    throw new ErroRoteiro("formato de roteiro invalido.");
+  }
+  return valor as FormatoRoteiro;
+}
 
 const LIMITE_EVIDENCIA = 8;
 const DIAS_HISTORICO = 10;
@@ -636,6 +651,7 @@ async function gerarConteudo(
     formato: dados.formato,
     extrairCartoes: (d) => d.cartoes,
     extrairPorQueAssim: (d) => d.porQueAssim,
+    extrairNarrativa: (d) => ({ gancho: d.gancho, corpo: d.corpo, chamadaFinal: d.chamadaFinal }),
     extrairCampos: extrairCamposRoteiro,
     extrairEvidencias: (d) => d.evidencias,
   });

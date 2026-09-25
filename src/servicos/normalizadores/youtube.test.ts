@@ -49,6 +49,7 @@ describe("normalizarVideoYoutube", () => {
       likes: 9021,
       comentarios: 312,
       idioma: "pt",
+      capaUrl: "https://i.ytimg.com/vi/exVid00000a/hqdefault.jpg",
     });
     expect(conta).toEqual({
       plataforma: "youtube",
@@ -104,5 +105,11 @@ describe("normalizarVideoYoutube", () => {
   it("codigo de idioma que nao e pt/en/es vira outro (ex.: japones)", () => {
     const { video } = normalizarVideoYoutube(itemComIdioma({ defaultAudioLanguage: "ja" }));
     expect(video.idioma).toBe("outro");
+  });
+
+  // V9d, item 0b, sub-item 4: a capa monta por codigo, sem chamada nova.
+  it("capaUrl monta pelo id do video, sempre no formato hqdefault", () => {
+    const { video } = normalizarVideoYoutube(itens[0]);
+    expect(video.capaUrl).toBe("https://i.ytimg.com/vi/exVid00000a/hqdefault.jpg");
   });
 });

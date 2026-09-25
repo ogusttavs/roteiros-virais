@@ -28,20 +28,6 @@ import { db } from "@/db";
 import { contas, videos } from "@/db/schema";
 import { config } from "@/lib/config";
 
-/**
- * Fator do substituto de mediana para conta com base fraca (menos de 5
- * vídeos nos últimos 90 dias, decisão 2 do `PROXIMO.md`): mediana de
- * (views do vídeo / seguidores da conta) × este fator, entre as poucas
- * amostras que existirem (1 a 4 vídeos). O fator escala a taxa "views por
- * seguidor" (tipicamente bem menor que 1) para a mesma ordem de grandeza de
- * uma mediana de views normal, para o resto da conta (fora_da_curva,
- * taxa_fora_da_curva) continuar comparável sem tratamento especial. Sem
- * seguidores cadastrados, ou zero vídeo na janela, a mediana fica nula e os
- * vídeos da conta não recebem fora_da_curva (decisão explícita do
- * `PROXIMO.md`).
- */
-const FATOR_SUBSTITUTO_BASE_FRACA = 100;
-
 /** Tambem usado por `contas-base.ts` (E6 parte 3, item 5): mesmo corte de "ainda sem base". */
 export const MINIMO_VIDEOS_MEDIANA = 5;
 const MINIMO_VIDEOS_MEDIANA_VELOCIDADE = 3;
@@ -50,44 +36,84 @@ const MINIMO_VIDEOS_IDIOMA_PRINCIPAL = 3;
 const NOVENTA_DIAS_MS = 90 * 24 * 60 * 60 * 1000;
 
 /**
- * Substituto de terceiro nível, quando a conta não tem mediana própria (menos
- * de 5 vídeos) nem seguidores cadastrados (decisão de 07/09, 16:20,
- * `PROXIMO.md` E6 parte 3, item 2): a mediana de views de todo o nicho
- * naquela plataforma, nos últimos 90 dias, sem olhar de qual conta cada
- * vídeo veio. É o que faz o estoque parado (conta nova, sem seguidor
- * gravado) entrar no motor em vez de ficar sem múltiplo para sempre.
+ * Uma linha por conta, nos ultimos 90 dias: quantos videos entraram na
+ * janela e a mediana de views deles (nula sem nenhum video). Reaproveitada
+ * pelas duas consultas de `passo1MedianaPorConta` (o relatorio da taxa
+ * tipica e o UPDATE de verdade), para as duas nunca divergirem.
  */
-async function passo1MedianaPorConta() {
-  return db().execute(sql`
+const porContaComMediana = sql`
+  SELECT
+    c2.id AS conta_id,
+    c2.nicho_id,
+    c2.plataforma,
+    c2.seguidores,
+    count(v.id) AS n,
+    percentile_cont(0.5) WITHIN GROUP (ORDER BY v.views) AS mediana_views
+  FROM contas c2
+  LEFT JOIN videos v ON v.conta_id = c2.id AND v.publicado_em >= now() - interval '90 days'
+  GROUP BY c2.id
+`;
+
+/**
+ * A taxa tipica "views por seguidor" de um nicho e uma plataforma: mediana
+ * de `mediana_views / seguidores` entre as contas que TEM mediana propria
+ * (`MINIMO_VIDEOS_MEDIANA` ou mais videos na janela) e seguidores
+ * cadastrados. E o segundo nivel do substituto de conta com base fraca.
+ */
+const taxaTipicaPorNichoEPlataforma = sql`
+  SELECT
+    nicho_id,
+    plataforma,
+    count(*) AS contas,
+    percentile_cont(0.5) WITHIN GROUP (ORDER BY mediana_views / NULLIF(seguidores, 0)) AS taxa
+  FROM (${porContaComMediana}) por_conta
+  WHERE n >= ${MINIMO_VIDEOS_MEDIANA} AND seguidores IS NOT NULL AND seguidores > 0
+  GROUP BY nicho_id, plataforma
+`;
+
+export type TaxaSubstituta = { nichoId: number; plataforma: string; taxa: number; contas: number };
+
+/**
+ * V9d, item 0b (achado do Gustavo em 25/09, usando o painel): a formula
+ * antiga do substituto de terceiro nivel (`views do video / seguidores *
+ * 100`, mediana entre as poucas amostras da propria conta) tinha um bug com
+ * base fraca de 1 video so, o caso mais comum: `fora_da_curva = views /
+ * mediana = views / (views/seguidores*100) = seguidores/100`, o multiplo
+ * so dependia dos seguidores, nunca das views de verdade. Uma conta de 319
+ * mil seguidores com um unico video de 837 views virava 3.219x "fora da
+ * curva" sozinha, so pelo tamanho da conta.
+ *
+ * Formula nova: `seguidores * taxa tipica do nicho e da plataforma`
+ * (`taxaTipicaPorNichoEPlataforma`, acima), a mediana de "views por
+ * seguidor" entre as contas que JA TEM mediana propria naquele nicho e
+ * plataforma. Sem nenhuma conta com mediana propria ali (taxa tipica
+ * nula), cai para o terceiro nivel que ja existia, a mediana do setor.
+ * `mediana_origem` continua "seguidores" para este segundo nivel: so a
+ * conta por tras do numero mudou, o nome da origem nao.
+ */
+async function passo1MedianaPorConta(): Promise<{ atualizadas: number; taxasSubstitutas: TaxaSubstituta[] }> {
+  const taxas = await db().execute<{ nicho_id: number; plataforma: string; taxa: string; contas: string }>(sql`
+    ${taxaTipicaPorNichoEPlataforma}
+  `);
+
+  const resultado = await db().execute(sql`
     UPDATE contas c
     SET
       base_fraca = COALESCE(a.n, 0) < ${MINIMO_VIDEOS_MEDIANA},
       mediana_views = CASE
         WHEN COALESCE(a.n, 0) >= ${MINIMO_VIDEOS_MEDIANA} THEN a.mediana_views
-        WHEN a.mediana_substituta IS NOT NULL THEN a.mediana_substituta
+        WHEN t.taxa IS NOT NULL AND c.seguidores IS NOT NULL AND c.seguidores > 0 THEN c.seguidores * t.taxa
         WHEN s.mediana_setor IS NOT NULL THEN s.mediana_setor
         ELSE NULL
       END,
       mediana_origem = CASE
         WHEN COALESCE(a.n, 0) >= ${MINIMO_VIDEOS_MEDIANA} THEN 'conta'
-        WHEN a.mediana_substituta IS NOT NULL THEN 'seguidores'
+        WHEN t.taxa IS NOT NULL AND c.seguidores IS NOT NULL AND c.seguidores > 0 THEN 'seguidores'
         WHEN s.mediana_setor IS NOT NULL THEN 'setor'
         ELSE NULL
       END
-    FROM (
-      SELECT
-        c2.id AS conta_id,
-        c2.nicho_id,
-        c2.plataforma,
-        count(v.id) AS n,
-        percentile_cont(0.5) WITHIN GROUP (ORDER BY v.views) AS mediana_views,
-        percentile_cont(0.5) WITHIN GROUP (
-          ORDER BY v.views::numeric / NULLIF(c2.seguidores, 0) * ${FATOR_SUBSTITUTO_BASE_FRACA}
-        ) AS mediana_substituta
-      FROM contas c2
-      LEFT JOIN videos v ON v.conta_id = c2.id AND v.publicado_em >= now() - interval '90 days'
-      GROUP BY c2.id
-    ) a
+    FROM (${porContaComMediana}) a
+    LEFT JOIN (${taxaTipicaPorNichoEPlataforma}) t ON t.nicho_id = a.nicho_id AND t.plataforma = a.plataforma
     LEFT JOIN (
       SELECT
         nicho_id,
@@ -99,6 +125,16 @@ async function passo1MedianaPorConta() {
     ) s ON s.nicho_id = a.nicho_id AND s.plataforma = a.plataforma
     WHERE c.id = a.conta_id
   `);
+
+  return {
+    atualizadas: resultado.rowCount ?? 0,
+    taxasSubstitutas: taxas.rows.map((linha) => ({
+      nichoId: Number(linha.nicho_id),
+      plataforma: String(linha.plataforma),
+      taxa: Number(linha.taxa),
+      contas: Number(linha.contas),
+    })),
+  };
 }
 
 async function passo2ForaDaCurvaPorVideo() {
@@ -173,7 +209,12 @@ async function passo5TaxaForaDaCurvaPorConta() {
       SELECT
         c2.id AS conta_id,
         count(v.id) AS n,
-        count(v.id) FILTER (WHERE v.fora_da_curva >= ${config.regras.limiarForaDaCurva}) AS acima
+        -- V9d, item 0b: o piso vem antes do múltiplo, também para a lista de vigilância (o ranking usa
+        -- esta taxa); um vídeo abaixo do piso nunca conta como "acima" da curva.
+        count(v.id) FILTER (
+          WHERE v.fora_da_curva >= ${config.regras.limiarForaDaCurva}
+            AND v.views >= ${config.regras.pisoViewsReferencia}
+        ) AS acima
       FROM contas c2
       LEFT JOIN videos v ON v.conta_id = c2.id
         AND v.publicado_em >= now() - interval '90 days'
@@ -264,7 +305,9 @@ export async function rodarPontuar(): Promise<Record<string, unknown>> {
   const r7 = await passo7PaisPorIdiomaPrincipal();
 
   return {
-    contasComMediana: r1.rowCount ?? 0,
+    contasComMediana: r1.atualizadas,
+    /** V9d, item 0b: a taxa "views por seguidor" usada no segundo nivel do substituto, por nicho e plataforma. */
+    taxasSubstitutas: r1.taxasSubstitutas,
     videosComForaDaCurva: r2.rowCount ?? 0,
     videosComVelocidade: r3.rowCount ?? 0,
     videosComVelocidadeRelativa: r4.rowCount ?? 0,

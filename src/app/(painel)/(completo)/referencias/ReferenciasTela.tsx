@@ -65,6 +65,7 @@ function formatarVideo(v: VideoReferencia): VideoFormatado {
     gancho: v.gancho,
     estrutura: v.estrutura,
     porQueFuncionou: v.porQueFuncionou,
+    capaUrl: v.capaUrl,
   };
 }
 

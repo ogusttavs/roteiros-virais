@@ -232,6 +232,13 @@
       "when": 1790192881260,
       "tag": "0032_volatile_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790333240359,
+      "tag": "0033_spicy_peter_quill",
+      "breakpoints": true
     }
   ]
 }

@@ -66,8 +66,28 @@ describe("normalizarBusinessDiscovery", () => {
         // portugues, e a legenda de exemplo ("legenda do post") passa a ter
         // sinal de verdade, correto, ja que o texto e mesmo portugues.
         idioma: "pt",
+        // Sem thumbnail_url no item de exemplo (V9d, item 0b, sub-item 4).
+        capaUrl: null,
       },
     ]);
+  });
+
+  /** V9d, item 0b, sub-item 4: thumbnail_url ja vem no mesmo fields da Business Discovery, sem chamada nova. */
+  it("normaliza thumbnail_url quando a Business Discovery devolve", () => {
+    const resultado = normalizarBusinessDiscovery("natgeo", {
+      username: "natgeo",
+      media: {
+        data: [
+          {
+            id: "333",
+            media_type: "VIDEO",
+            timestamp: "2026-08-20T10:00:00.000Z",
+            thumbnail_url: "https://scontent.cdninstagram.com/capa333.jpg",
+          },
+        ],
+      },
+    });
+    expect(resultado.videos[0].capaUrl).toBe("https://scontent.cdninstagram.com/capa333.jpg");
   });
 
   /** V2a, item 3: media_url entra no normalizado, para transcrever/analisar-visual baixarem direto. */
@@ -166,6 +186,8 @@ describe("normalizarHashtagMedia", () => {
       comentarios: 10,
       midiaUrl: "https://exemplo.invalido/video1.mp4",
       idioma: "pt",
+      // A Hashtag Search nao pede thumbnail_url (V9d, item 0b, sub-item 4).
+      capaUrl: null,
     });
   });
 
