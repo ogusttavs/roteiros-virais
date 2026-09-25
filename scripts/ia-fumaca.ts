@@ -281,7 +281,7 @@ async function main() {
   const script = await chamar(
     "roteiro",
     roteiro.nivel,
-    (d) => `"${d.titulo}": ${d.gancho.slice(0, 80)}`,
+    (d) => `"${d.titulo}": ${(d.gancho ?? "").slice(0, 80)}`,
     gerarEstruturado({
       tarefa: "roteiro",
       nivel: roteiro.nivel,
@@ -293,10 +293,12 @@ async function main() {
         camadaExclusiva: "Cidade: Sao Paulo, bairro Pinheiros. Nenhum concorrente citado.",
         regrasCliente: [],
         tipo: "negocio",
+        formato: "reels",
       }),
       entrada: roteiro.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
         objetivo: "conversao",
+        formato: "reels",
         evidencias: [
           {
             id: 2,

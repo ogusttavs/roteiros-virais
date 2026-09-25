@@ -184,6 +184,8 @@ test.describe("trocar de marca pela tela", () => {
       corpo: "explique o passo a passo na ordem certa.",
       fechamento: "mostre o resultado",
       chamadaFinal: "manda mensagem se quiser saber qual produto",
+      cartoes: null,
+      porQueAssim: [],
       cenas: [{ momento: "abertura", oQueFazer: "mostrar a mancha" }],
       ondeGravar: "na sala",
       edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },

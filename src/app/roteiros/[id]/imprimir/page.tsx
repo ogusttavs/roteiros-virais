@@ -1,9 +1,10 @@
-import { Music, Scissors, Type, Eye } from "lucide-react";
+import { Music, Scissors, Type, Eye, Sparkles, HelpCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
+import { ROTULO_FIGURINHA, ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { validarTokenImpressao } from "@/lib/tokenImpressao";
-import { corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
+import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosRoteiro } from "@/textos/roteiro";
 import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
@@ -13,13 +14,6 @@ import styles from "./ImpressaoRoteiro.module.css";
 
 type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string }> };
 type Edicao = ReturnType<typeof corpoDoRoteiro>["edicao"];
-
-function splitParagrafos(texto: string): string[] {
-  return texto
-    .split("\n")
-    .map((linha) => linha.trim())
-    .filter(Boolean);
-}
 
 function formatarData(dataISO: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -49,6 +43,24 @@ function itensEdicao(edicao: Edicao): ItemEdicao[] {
       texto: edicao.audio ?? textosRoteiro.edicao.semAudio,
     },
   ];
+}
+
+/** Mesma composição de `RoteiroTela.tsx`, item a item (V9c, item 4). */
+function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
+  return [
+    { icone: Eye, rotulo: textosRoteiro.cartaoStory.oQueMostrar, texto: cartao.oQueMostrar },
+    { icone: Type, rotulo: textosRoteiro.cartaoStory.textoNaTela, texto: cartao.textoNaTela },
+    {
+      icone: Sparkles,
+      rotulo: textosRoteiro.cartaoStory.figurinha,
+      texto:
+        cartao.figurinha === "nenhuma" ? textosRoteiro.cartaoStory.semFigurinha : ROTULO_FIGURINHA[cartao.figurinha],
+    },
+  ];
+}
+
+function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdicao[] {
+  return porQueAssim.map((item) => ({ icone: HelpCircle, rotulo: "", texto: item.motivo, mono: item.regra }));
 }
 
 /**
@@ -90,21 +102,25 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
         </p>
       </header>
 
-      <RoteiroTexto
-        blocos={[
-          { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-          { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-          {
-            rotulo: textosRoteiro.blocos.fechamento,
-            paragrafos: splitParagrafos(corpo.fechamento),
-          },
-          { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
-        ]}
-      />
+      <RoteiroTexto blocos={blocosParaLeitura(roteiro)} />
 
       <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
 
-      <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+      {roteiro.formato === "story" && corpo.cartoes ? (
+        corpo.cartoes.map((cartao, indice) => (
+          <BlocoEdicao
+            key={indice}
+            titulo={textosRoteiro.blocos.cartao(indice + 1)}
+            itens={itensCartaoStory(cartao)}
+          />
+        ))
+      ) : (
+        <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+      )}
+
+      {corpo.porQueAssim.length > 0 ? (
+        <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
+      ) : null}
     </main>
   );
 }

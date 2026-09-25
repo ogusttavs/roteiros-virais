@@ -19,4 +19,10 @@ export const textosObjetivo = {
   escrever: "escrever o roteiro",
   demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
   erro: "Não conseguimos escrever agora. O tema e o objetivo continuam aqui; tente de novo.",
+  /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (`sugerirFormatoPeloObjetivo`). */
+  formato: "Formato",
+  formatoAjuda: {
+    reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
+    story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
+  },
 };

@@ -3,8 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import type { Objetivo } from "@/db/schema";
-import { AJUDA_OBJETIVO, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM } from "@/ia/enums";
+import type { FormatoRoteiro, Objetivo } from "@/db/schema";
+import { AJUDA_OBJETIVO, FORMATOS_ROTEIRO_EM_ORDEM, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM, ROTULO_FORMATO_ROTEIRO, sugerirFormatoPeloObjetivo } from "@/ia/enums";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
@@ -33,6 +33,10 @@ type Props = {
 export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }: Props) {
   const router = useRouter();
   const [escolhido, setEscolhido] = useState<Objetivo | null>(null);
+  // V9c, item 1: enquanto a pessoa nao mexe no controle, o formato segue o objetivo escolhido
+  // (`sugerirFormatoPeloObjetivo`); depois do primeiro toque, a escolha dela e que manda.
+  const [formato, setFormato] = useState<FormatoRoteiro>("reels");
+  const [formatoTocado, setFormatoTocado] = useState(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
   const [erro, setErro] = useState<string | null>(null);
   const [demorando, setDemorando] = useState(false);
@@ -49,12 +53,17 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     return () => clearTimeout(id);
   }, [pendente]);
 
+  useEffect(() => {
+    if (formatoTocado || !escolhido) return;
+    setFormato(sugerirFormatoPeloObjetivo(escolhido));
+  }, [escolhido, formatoTocado]);
+
   function escrever() {
     if (!escolhido) return;
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        const { id } = await gerarRoteiroAction(origem, escolhido);
+        const { id } = await gerarRoteiroAction(origem, escolhido, formato);
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
       } catch (falha) {
@@ -127,6 +136,30 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
             onEscolher={() => setEscolhido(objetivo)}
           />
         ))}
+      </div>
+
+      <div className={styles.grupoFormato}>
+        <span className={styles.rotulo}>{textosObjetivo.formato}</span>
+        <div role="tablist" aria-label={textosObjetivo.formato} className={styles.segmentado}>
+          {FORMATOS_ROTEIRO_EM_ORDEM.map((opcao) => (
+            <button
+              key={opcao}
+              type="button"
+              role="tab"
+              aria-selected={formato === opcao}
+              className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => {
+                setFormatoTocado(true);
+                setFormato(opcao);
+              }}
+            >
+              {ROTULO_FORMATO_ROTEIRO[opcao]}
+            </button>
+          ))}
+        </div>
+        {!formatoTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.formatoAjuda[formato]}</p> : null}
       </div>
 
       <BarraAcao

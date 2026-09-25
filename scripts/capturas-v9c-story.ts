@@ -1,16 +1,15 @@
 /**
- * Capturas do Hoje com o plano `sem_limite` (V9b-0, definição de pronto do
- * `PROXIMO.md`): dois cartões de roteiro, com os três temas sempre
- * visíveis abaixo, em 390 e 1280, claro e escuro. Mesmo padrão de
- * `scripts/capturas-v9b-plano.ts`: insere direto no banco (mais rápido e
- * determinístico do que gerar pela tela) e liga o plano `sem_limite` no
- * cliente de seed.
+ * Capturas do roteiro em Story e do modo gravação (V9c, definição de pronto
+ * do `PROXIMO.md`): cartões numerados com "Por que assim", em 390, 820 e
+ * 1280, claro e escuro. Mesmo padrão de `scripts/capturas-sem-limite-diario.ts`:
+ * insere direto no banco (mais rápido e determinístico do que gerar pela
+ * tela).
  *
  * Pré-requisitos, antes de rodar: os mesmos de `scripts/capturas.ts`
  * (`DATABASE_URL` apontando para `roteiros_dev`, `npm run db:seed`,
  * `npm run dev` na mesma porta que `CAPTURAS_URL` aponta).
  *
- * Uso: `npm run capturas:sem-limite-diario -- <nome-da-etapa>`.
+ * Uso: `npm run capturas:v9c-story -- <nome-da-etapa>`.
  */
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -19,7 +18,7 @@ import { chromium, type Page } from "@playwright/test";
 import { and, eq } from "drizzle-orm";
 
 import { db, getPool } from "../src/db";
-import { clientes, roteiros, temasDia, videos, type ConteudoRoteiro, type TemaDoDia } from "../src/db/schema";
+import { roteiros, temasDia, videos, type ConteudoRoteiro, type TemaDoDia } from "../src/db/schema";
 import { hojeISO } from "../src/lib/config";
 import { marcasDoUsuario } from "../src/servicos/clientes";
 
@@ -29,6 +28,7 @@ const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
 
 const TAMANHOS = [
   { rotulo: "390", largura: 390, altura: 844 },
+  { rotulo: "820", largura: 820, altura: 1180 },
   { rotulo: "1280", largura: 1280, altura: 800 },
 ];
 const MODOS = [
@@ -36,21 +36,50 @@ const MODOS = [
   { rotulo: "Escuro", colorScheme: "dark" as const },
 ];
 
-function conteudoExemplo(titulo: string): ConteudoRoteiro {
+function conteudoStoryExemplo(titulo: string): ConteudoRoteiro {
   return {
     titulo,
-    duracaoS: 40,
-    gancho: "olha essa mancha saindo em segundos",
-    corpo: "explicacao direta sobre o produto, com uma cena real do negocio",
-    fechamento: "resumo do que foi mostrado",
-    chamadaFinal: "comenta se voce ja passou por isso",
-    cartoes: null,
-    porQueAssim: [],
-    cenas: [],
-    ondeGravar: "no balcao da loja",
-    edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+    duracaoS: 30,
+    gancho: "",
+    corpo: "",
+    fechamento: "",
+    chamadaFinal: "",
+    cartoes: [
+      {
+        oQueFalar: "hoje eu vou te mostrar o erro que faz a mancha de vinho espalhar em vez de sair",
+        oQueMostrar: "o sofá com a mancha, luz da janela batendo no tecido",
+        textoNaTela: "o erro que faz a mancha espalhar",
+        figurinha: "nenhuma",
+      },
+      {
+        oQueFalar: "voce ja tentou esfregar em circulo e viu a mancha abrir ainda mais",
+        oQueMostrar: "o pano branco com a mancha aberta no tecido",
+        textoNaTela: "e voce, ja passou por isso",
+        figurinha: "perguntas",
+      },
+      {
+        oQueFalar: "manda a sua duvida aqui na caixinha que eu te respondo com o passo a passo certo",
+        oQueMostrar: "o kit tira-mancha em cima da bancada, olhando para a camera",
+        textoNaTela: "manda sua duvida aqui",
+        figurinha: "nenhuma",
+      },
+    ],
+    porQueAssim: [
+      { regra: "R-IG-STORY-02", motivo: "o primeiro cartão já mostra a cena, sem se apresentar do zero" },
+      { regra: "R-IG-STORY-04", motivo: "a caixinha de perguntas pede interação de quem já compra o produto" },
+      { regra: "R-IG-STORY-07", motivo: "o último cartão fecha pedindo para responder na caixinha, não para seguir" },
+    ],
+    cenas: [{ momento: "abertura", oQueFazer: "mostrar o sofá com a mancha de verdade" }],
+    ondeGravar: "na sala, de frente para o sofá, com a luz da janela",
+    edicao: {
+      textoNaTela: [],
+      ritmoDeCorte: "um cartão por vez",
+      recursos: [],
+      audio: null,
+      referencia: null,
+    },
     evidencias: [],
-    semEvidencia: false,
+    semEvidencia: true,
     forcaEvidencia: null,
   };
 }
@@ -90,29 +119,23 @@ async function garantirTemasDeHoje(nichoId: number): Promise<void> {
   await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
 }
 
-/** Dois roteiros de hoje, direto no banco, para o cartão duplo (`roteirosDeHoje` só lê a tabela). */
-async function garantirDoisRoteirosDeHoje(clienteId: number): Promise<void> {
+/** Um roteiro de hoje em Story, direto no banco, para a tela do roteiro e o modo gravação. */
+async function garantirRoteiroStoryDeHoje(clienteId: number): Promise<number> {
+  const titulo = "o erro que faz a mancha de vinho espalhar em vez de sair";
   await db().delete(roteiros).where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO())));
-  await db()
+  const [linha] = await db()
     .insert(roteiros)
-    .values([
-      {
-        clienteId,
-        data: hojeISO(),
-        tema: "o erro que faz a mancha voltar depois da limpeza",
-        origem: "sugerido",
-        objetivo: "conversao",
-        conteudo: conteudoExemplo("o erro que faz a mancha voltar depois da limpeza"),
-      },
-      {
-        clienteId,
-        data: hojeISO(),
-        tema: "andando entre os estandes, atras de embalagem nova",
-        origem: "momento",
-        objetivo: "engajamento",
-        conteudo: conteudoExemplo("andando entre os estandes, atras de embalagem nova"),
-      },
-    ]);
+    .values({
+      clienteId,
+      data: hojeISO(),
+      tema: titulo,
+      origem: "sugerido",
+      objetivo: "conversao",
+      formato: "story",
+      conteudo: conteudoStoryExemplo(titulo),
+    })
+    .returning();
+  return linha.id;
 }
 
 async function entrar(page: Page, baseUrl: string): Promise<void> {
@@ -126,7 +149,7 @@ async function entrar(page: Page, baseUrl: string): Promise<void> {
 async function main(): Promise<void> {
   const nomeEtapa = process.argv[2];
   if (!nomeEtapa) {
-    console.error('uso: npm run capturas:sem-limite-diario -- <nome-da-etapa> (ex.: "pr-57")');
+    console.error('uso: npm run capturas:v9c-story -- <nome-da-etapa> (ex.: "pr-58")');
     process.exitCode = 1;
     return;
   }
@@ -145,9 +168,8 @@ async function main(): Promise<void> {
     throw new Error(`cliente de seed "${USUARIO_SEED}" sem nicho; confira o seed.`);
   }
 
-  await db().update(clientes).set({ plano: "sem_limite" }).where(eq(clientes.id, cliente.id));
   await garantirTemasDeHoje(cliente.nichoId);
-  await garantirDoisRoteirosDeHoje(cliente.id);
+  const roteiroId = await garantirRoteiroStoryDeHoje(cliente.id);
 
   const arquivosGravados: string[] = [];
   const browser = await chromium.launch();
@@ -161,12 +183,19 @@ async function main(): Promise<void> {
         });
         const page = await contexto.newPage();
         await entrar(page, baseUrl);
-        await page.goto(`${baseUrl}/hoje`);
-        await page.getByText("Seus roteiros de hoje (2)").waitFor({ state: "visible" });
 
-        const nomeArquivo = `SemLimiteDiario.DoisCartoes.${tamanho.rotulo}.${modo.rotulo}.png`;
-        await page.screenshot({ path: path.join(pastaDestino, nomeArquivo), fullPage: true });
-        arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), path.join(pastaDestino, nomeArquivo)));
+        await page.goto(`${baseUrl}/roteiros/${roteiroId}`);
+        await page.getByText("Cartão 1").first().waitFor({ state: "visible" });
+        const nomeRoteiro = `V9cStory.Roteiro.${tamanho.rotulo}.${modo.rotulo}.png`;
+        await page.screenshot({ path: path.join(pastaDestino, nomeRoteiro), fullPage: true });
+        arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), path.join(pastaDestino, nomeRoteiro)));
+
+        await page.goto(`${baseUrl}/roteiros/${roteiroId}/gravar`);
+        await page.getByText("Cartão 1").first().waitFor({ state: "visible" });
+        const nomeGravacao = `V9cStory.Gravacao.${tamanho.rotulo}.${modo.rotulo}.png`;
+        await page.screenshot({ path: path.join(pastaDestino, nomeGravacao), fullPage: true });
+        arquivosGravados.push(path.relative(path.resolve(__dirname, "..", ".."), path.join(pastaDestino, nomeGravacao)));
+
         await contexto.close();
       }
     }

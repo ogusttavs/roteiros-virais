@@ -6,10 +6,12 @@ import {
   Download,
   Ellipsis,
   Eye,
+  HelpCircle,
   History,
   Music,
   RotateCcw,
   Scissors,
+  Sparkles,
   Type,
   Video,
 } from "lucide-react";
@@ -26,8 +28,8 @@ import {
 } from "react";
 
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
-import type { ConteudoRoteiro } from "@/db/schema";
-import { ROTULO_OBJETIVO_TRAVADO, ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
+import { ROTULO_FIGURINHA, ROTULO_OBJETIVO_TRAVADO, ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -43,7 +45,7 @@ import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
-import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
+import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
 import { ID_FAIXA_SEM_CONEXAO, useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
@@ -52,13 +54,6 @@ import { SeletorMarcaCelular, type MarcaResumo } from "../../../_casca/SeletorMa
 
 import { marcarGravadoAction, marcarPostadoAction, reprovarERescreverAction } from "./acoes";
 import styles from "./RoteiroTela.module.css";
-
-function splitParagrafos(texto: string): string[] {
-  return texto
-    .split("\n")
-    .map((linha) => linha.trim())
-    .filter(Boolean);
-}
 
 function formatarData(dataISO: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -117,8 +112,32 @@ function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
   ];
 }
 
-function textoParaCopiar(corpo: ConteudoRoteiro): string {
-  return [corpo.gancho, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\n\n");
+function textoParaCopiar(blocos: BlocoRoteiro[]): string {
+  return blocos.map((bloco) => bloco.paragrafos.join("\n")).join("\n\n");
+}
+
+/** V9c, item 4: o que mostrar, o texto na tela e a figurinha de um cartão, no lugar do "Como editar" de Reels. */
+function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
+  return [
+    { icone: Eye, rotulo: textosRoteiro.cartaoStory.oQueMostrar, texto: cartao.oQueMostrar },
+    { icone: Type, rotulo: textosRoteiro.cartaoStory.textoNaTela, texto: cartao.textoNaTela },
+    {
+      icone: Sparkles,
+      rotulo: textosRoteiro.cartaoStory.figurinha,
+      texto:
+        cartao.figurinha === "nenhuma" ? textosRoteiro.cartaoStory.semFigurinha : ROTULO_FIGURINHA[cartao.figurinha],
+    },
+  ];
+}
+
+/** V9c, item 4: "Por que assim", uma linha por regra que o modelo seguiu (`corpo.porQueAssim`). */
+function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdicao[] {
+  return porQueAssim.map((item) => ({
+    icone: HelpCircle,
+    rotulo: "",
+    texto: item.motivo,
+    mono: item.regra,
+  }));
 }
 
 /** "O que funcionou ali:" mais a análise, que vem de um campo com maiúscula (design v2, achado do iPad, item 2). */
@@ -155,6 +174,8 @@ type Painel = "menu" | "postei" | "reprovar" | "versoes" | null;
 type Props = {
   roteiro: RoteiroLinha;
   corpo: ConteudoRoteiro;
+  /** Os blocos de leitura, já montados no servidor (`blocosParaLeitura`, `servicos/roteiro.ts`): reels ou story. */
+  blocos: BlocoRoteiro[];
   video: VideoParaEmbed | null;
   versoes: VersaoRoteiro[];
   /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
@@ -168,7 +189,7 @@ type Props = {
  * D2 parte 1, item 6). Modo gravação virou rota própria
  * (`/roteiros/[id]/gravar`, item 7): o botão daqui só navega.
  */
-export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas, nomePessoa }: Props) {
+export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva, marcas, nomePessoa }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
   const [postado, setPostado] = useState(roteiro.status === "postado");
@@ -341,7 +362,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
     try {
       // A cópia é do aparelho e não chama o servidor: funciona sem rede, e um erro aqui nunca é de rede
       // (por isso a frase fixa em vez de `tratarFalha`, que trataria "sem rede" como falha de conexão).
-      await navigator.clipboard.writeText(textoParaCopiar(corpo));
+      await navigator.clipboard.writeText(textoParaCopiar(blocos));
       fechar();
       setToast(true);
     } catch {
@@ -464,17 +485,7 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
         </div>
 
         <article className={styles.blocos}>
-          <RoteiroTexto
-            blocos={[
-              { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-              { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-              {
-                rotulo: textosRoteiro.blocos.fechamento,
-                paragrafos: splitParagrafos(corpo.fechamento),
-              },
-              { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
-            ]}
-          />
+          <RoteiroTexto blocos={blocos} />
           {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
           <p className={styles.julgar}>
             {textosRoteiro.reprovar.naoFicouBom}{" "}
@@ -493,7 +504,21 @@ export function RoteiroTela({ roteiro, corpo, video, versoes, marcaAtiva, marcas
 
         <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
 
-        <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+        {roteiro.formato === "story" && corpo.cartoes ? (
+          corpo.cartoes.map((cartao, indice) => (
+            <BlocoEdicao
+              key={indice}
+              titulo={textosRoteiro.blocos.cartao(indice + 1)}
+              itens={itensCartaoStory(cartao)}
+            />
+          ))
+        ) : (
+          <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+        )}
+
+        {corpo.porQueAssim.length > 0 ? (
+          <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
+        ) : null}
 
         {referencia && video ? (
           <CartaoDeOndeVeio

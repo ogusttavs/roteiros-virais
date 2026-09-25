@@ -309,6 +309,8 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       corpo: "explique a ordem certa enquanto faz. aplicar, esperar o tempo, e so entao esfregar.",
       fechamento: "mostre a peca limpa",
       chamadaFinal: "manda uma mensagem que eu te digo qual produto usar",
+      cartoes: null,
+      porQueAssim: [],
       cenas: [{ momento: "abertura", oQueFazer: "mostrar a mancha" }],
       ondeGravar: "na sala, perto do sofa",
       edicao: {

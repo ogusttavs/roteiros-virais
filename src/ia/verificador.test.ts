@@ -11,6 +11,8 @@ vi.mock("./registro", () => ({
   registrarGeracao: (...args: unknown[]) => registrarGeracaoMock(...args),
 }));
 
+import type { CartaoStory } from "@/db/schema";
+
 import { ErroIA } from "./erro";
 import { gerarComVerificacao, palavrasDeConteudo, verificarLocalmente } from "./verificador";
 
@@ -307,6 +309,139 @@ describe("verificarLocalmente", () => {
 
     it("sem palavrasDoMomento (fora da origem momento), nao aplica a checagem", () => {
       const r = verificarLocalmente({ gancho: "olha essa novidade que eu trouxe para voce hoje" });
+      expect(r.aprovado).toBe(true);
+    });
+  });
+
+  // V9c, item 3: as checagens da seção 9.1 conferíveis por código, só com formato "story".
+  describe("cartoes de Story (V9c, item 3)", () => {
+    const CARTAO_OK: CartaoStory = {
+      oQueFalar: "hoje eu vou te mostrar como a gente resolve isso aqui no dia a dia",
+      oQueMostrar: "o balcao de atendimento com o produto em cima",
+      textoNaTela: "como resolver isso",
+      figurinha: "nenhuma",
+    };
+    const ULTIMO_CARTAO_OK: CartaoStory = {
+      ...CARTAO_OK,
+      oQueFalar: "manda a sua pergunta aqui na caixinha que eu respondo",
+    };
+
+    function cartoes(...extra: CartaoStory[]): CartaoStory[] {
+      return [{ ...CARTAO_OK, figurinha: "perguntas" }, ...extra, ULTIMO_CARTAO_OK];
+    }
+
+    it("aprova de 2 a 5 cartoes, com figurinha, texto na tela e o ultimo pedindo resposta", () => {
+      const r = verificarLocalmente({}, { formato: "story", cartoes: cartoes() });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("reprova com 1 cartao so", () => {
+      const r = verificarLocalmente({}, { formato: "story", cartoes: [ULTIMO_CARTAO_OK] });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-03");
+    });
+
+    it("reprova com 6 cartoes", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "story", cartoes: cartoes(CARTAO_OK, CARTAO_OK, CARTAO_OK, CARTAO_OK) },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-03");
+    });
+
+    it("reprova cartao com mais de 15s de fala (2,5 palavras por segundo)", () => {
+      const falaLonga = Array.from({ length: 40 }, () => "palavra").join(" ");
+      const r = verificarLocalmente(
+        {},
+        { formato: "story", cartoes: cartoes({ ...CARTAO_OK, oQueFalar: falaLonga }) },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("ate 15s de fala");
+    });
+
+    it("reprova cartao sem texto na tela", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "story", cartoes: cartoes({ ...CARTAO_OK, textoNaTela: "" }) },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-05");
+    });
+
+    it("reprova quando nenhum cartao pede interacao por figurinha", () => {
+      const r = verificarLocalmente(
+        {},
+        {
+          formato: "story",
+          cartoes: [
+            { ...CARTAO_OK, figurinha: "nenhuma" },
+            { ...ULTIMO_CARTAO_OK, figurinha: "nenhuma" },
+          ],
+        },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-04");
+    });
+
+    it('reprova quando o ultimo cartao pede para "seguir"', () => {
+      const r = verificarLocalmente(
+        {},
+        {
+          formato: "story",
+          cartoes: [
+            { ...CARTAO_OK, figurinha: "perguntas" },
+            { ...ULTIMO_CARTAO_OK, oQueFalar: "segue a gente para nao perder" },
+          ],
+        },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-01");
+    });
+
+    it("reprova quando o ultimo cartao nao fecha pedindo resposta", () => {
+      const r = verificarLocalmente(
+        {},
+        {
+          formato: "story",
+          cartoes: [{ ...CARTAO_OK, figurinha: "perguntas" }, { ...CARTAO_OK, oQueFalar: "e so isso por hoje" }],
+        },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-07");
+    });
+
+    it("em reels (sem formato story), nao roda checagem de cartao nenhuma mesmo se cartoes vier preenchido", () => {
+      const r = verificarLocalmente({}, { cartoes: [ULTIMO_CARTAO_OK] });
+      expect(r.aprovado).toBe(true);
+    });
+  });
+
+  describe("porQueAssim (V9c, item 3)", () => {
+    it("aprova quando toda regra citada existe na lista", () => {
+      const r = verificarLocalmente(
+        {},
+        { porQueAssim: [{ regra: "R-IG-STORY-04", motivo: "pediu enquete para lembrar da marca" }] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("reprova quando cita uma regra que nao existe na lista", () => {
+      const r = verificarLocalmente(
+        {},
+        { porQueAssim: [{ regra: "R-IG-STORY-99", motivo: "regra inventada" }] },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("R-IG-STORY-99");
+    });
+
+    it("sem porQueAssim, nao reprova nada", () => {
+      const r = verificarLocalmente({});
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("porQueAssim vazio (Reels nesta rodada), nao reprova nada", () => {
+      const r = verificarLocalmente({}, { porQueAssim: [] });
       expect(r.aprovado).toBe(true);
     });
   });

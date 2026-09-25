@@ -18,10 +18,12 @@ import {
   planoGravacoes,
   type Cliente,
   type EstadoPlano,
+  type FormatoRoteiro,
   type Momento,
   type Objetivo,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
+import { sugerirFormatoPeloObjetivo } from "@/ia/enums";
 import * as lerAgendaIA from "@/ia/prompts/lerAgenda";
 import * as planejarDiaIA from "@/ia/prompts/planejarDia";
 import { registrarGeracao } from "@/ia/registro";
@@ -44,6 +46,8 @@ export type ItemPlano = {
   situacao: string;
   oQueMostrar: string;
   objetivo: Objetivo;
+  /** V9c, item 1: sugerido por código a partir do objetivo (`sugerirFormatoPeloObjetivo`); a folha respeita, a pessoa troca se quiser. */
+  formato: FormatoRoteiro;
   marcaId: number | null;
   estado: EstadoPlano;
   roteiroId: number | null;
@@ -58,6 +62,7 @@ function linhaParaItem(linha: typeof planoGravacoes.$inferSelect): ItemPlano {
     situacao: linha.situacao,
     oQueMostrar: linha.oQueMostrar,
     objetivo: linha.objetivo,
+    formato: linha.formato,
     marcaId: linha.marcaId,
     estado: linha.estado,
     roteiroId: linha.roteiroId,
@@ -198,6 +203,7 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
         situacao: sugestao.situacao,
         oQueMostrar: sugestao.oQueMostrar,
         objetivo: sugestao.objetivo,
+        formato: sugerirFormatoPeloObjetivo(sugestao.objetivo),
         estado: "sugerido",
       });
     });
@@ -256,6 +262,8 @@ export async function aceitar(
     oQueEstaAcontecendo: string;
     oQueDaParaMostrar: string;
     objetivo: Objetivo;
+    /** V9c, item 1: o que a pessoa confirmou na folha; sem isto, cai no mesmo sugerido pelo objetivo. */
+    formato?: FormatoRoteiro;
     marcaId?: number;
   },
 ): Promise<RoteiroLinha> {
@@ -265,17 +273,23 @@ export async function aceitar(
     if (roteiroExistente) return roteiroExistente;
   }
 
+  const formato = dados.formato ?? sugerirFormatoPeloObjetivo(dados.objetivo);
   const momento: Momento = {
     onde: dados.onde,
     oQueEstaAcontecendo: dados.oQueEstaAcontecendo,
     oQueDaParaMostrar: dados.oQueDaParaMostrar,
     marcaId: dados.marcaId,
   };
-  const roteiro = await gerarRoteiro(cliente.id, { origem: "momento", momento, objetivo: dados.objetivo });
+  const roteiro = await gerarRoteiro(cliente.id, {
+    origem: "momento",
+    momento,
+    objetivo: dados.objetivo,
+    formato,
+  });
 
   await db()
     .update(planoGravacoes)
-    .set({ roteiroId: roteiro.id, estado: "aceito", marcaId: dados.marcaId ?? null })
+    .set({ roteiroId: roteiro.id, estado: "aceito", marcaId: dados.marcaId ?? null, formato })
     .where(eq(planoGravacoes.id, itemId));
 
   return roteiro;

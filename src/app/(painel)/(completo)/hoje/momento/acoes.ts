@@ -1,6 +1,6 @@
 "use server";
 
-import type { Objetivo } from "@/db/schema";
+import type { FormatoRoteiro, Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
@@ -30,6 +30,8 @@ export type DadosMomento = {
   marcaId?: number;
   /** A fala inteira, só no caminho por áudio (o bloco "o que você disse"). */
   transcricao?: string;
+  /** V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. */
+  formato?: FormatoRoteiro;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -72,6 +74,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ 
       transcricao: dados.transcricao?.trim() || undefined,
     },
     objetivo: dados.objetivo,
+    formato: dados.formato,
   });
 
   return { id: roteiro.id };

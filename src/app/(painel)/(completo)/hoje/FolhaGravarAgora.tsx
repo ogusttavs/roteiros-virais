@@ -4,8 +4,15 @@ import { Mic, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import type { Objetivo } from "@/db/schema";
-import { AJUDA_OBJETIVO, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM } from "@/ia/enums";
+import type { FormatoRoteiro, Objetivo } from "@/db/schema";
+import {
+  AJUDA_OBJETIVO,
+  FORMATOS_ROTEIRO_EM_ORDEM,
+  NOME_OBJETIVO,
+  OBJETIVOS_EM_ORDEM,
+  ROTULO_FORMATO_ROTEIRO,
+  sugerirFormatoPeloObjetivo,
+} from "@/ia/enums";
 import { textosMomento } from "@/textos/momento";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -43,6 +50,7 @@ export type ValoresIniciaisMomento = {
   oQueEstaAcontecendo: string;
   oQueDaParaMostrar: string;
   objetivo: Objetivo;
+  formato: FormatoRoteiro;
   marcaId: number | null;
 };
 
@@ -94,6 +102,13 @@ export function FolhaGravarAgora({
   const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? "");
   const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? "");
   const [objetivo, setObjetivo] = useState<Objetivo | null>(valoresIniciais?.objetivo ?? objetivoRecomendado);
+  // V9c, item 1: enquanto a pessoa nao mexe no controle, o formato segue o objetivo (`sugerirFormatoPeloObjetivo`);
+  // vindo de um item do plano, comeca no que `planejarDia` ja sugeriu e conta como "tocado" (a pessoa ve o que o
+  // sistema escolheu, sem a ajuda por cima, do jeito que os outros campos ja chegam preenchidos).
+  const [formato, setFormato] = useState<FormatoRoteiro>(
+    valoresIniciais?.formato ?? (objetivo ? sugerirFormatoPeloObjetivo(objetivo) : "reels"),
+  );
+  const [formatoTocado, setFormatoTocado] = useState(valoresIniciais?.formato !== undefined);
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
@@ -117,6 +132,11 @@ export function FolhaGravarAgora({
       streamRef.current?.getTracks().forEach((faixa) => faixa.stop());
     };
   }, []);
+
+  useEffect(() => {
+    if (formatoTocado || !objetivo) return;
+    setFormato(sugerirFormatoPeloObjetivo(objetivo));
+  }, [objetivo, formatoTocado]);
 
   async function transcrever(blob: Blob, tipoMime: string) {
     setFaseAudio("transcrevendo");
@@ -208,12 +228,20 @@ export function FolhaGravarAgora({
         marcaIndice !== null && marcaIndice > 0 ? marcas[marcaIndice - 1]?.id : undefined;
       const { id } =
         planoItemId !== undefined
-          ? await aceitarPlanoAction(planoItemId, { onde, oQueEstaAcontecendo, oQueDaParaMostrar, objetivo, marcaId })
+          ? await aceitarPlanoAction(planoItemId, {
+              onde,
+              oQueEstaAcontecendo,
+              oQueDaParaMostrar,
+              objetivo,
+              formato,
+              marcaId,
+            })
           : await gerarRoteiroMomentoAction({
               onde,
               oQueEstaAcontecendo,
               oQueDaParaMostrar,
               objetivo,
+              formato,
               marcaId,
               transcricao: transcricao ?? undefined,
             });
@@ -318,6 +346,30 @@ export function FolhaGravarAgora({
             />
           ))}
         </div>
+      </div>
+
+      <div className={styles.grupoFormato}>
+        <span className={styles.rotuloGrupo}>{textosMomento.formato}</span>
+        <div role="tablist" aria-label={textosMomento.formato} className={styles.segmentado}>
+          {FORMATOS_ROTEIRO_EM_ORDEM.map((opcao) => (
+            <button
+              key={opcao}
+              type="button"
+              role="tab"
+              aria-selected={formato === opcao}
+              className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => {
+                setFormatoTocado(true);
+                setFormato(opcao);
+              }}
+            >
+              {ROTULO_FORMATO_ROTEIRO[opcao]}
+            </button>
+          ))}
+        </div>
+        {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
       </div>
 
       {marcas.length > 0 ? (

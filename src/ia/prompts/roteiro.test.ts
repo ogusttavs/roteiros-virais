@@ -15,6 +15,7 @@ const SEM_INSTRUCAO_ABERTURA: InstrucaoAbertura = { tipo: null, tiposProibidos: 
 const BASE = {
   tema: "o erro que faz a mancha voltar",
   objetivo: OBJETIVOS_EM_ORDEM[2],
+  formato: "reels" as const,
   evidencias: [],
   roteirosRecentes: [],
   instrucaoAbertura: SEM_INSTRUCAO_ABERTURA,
@@ -158,6 +159,28 @@ describe("montarEntrada, instrucaoAbertura", () => {
   });
 });
 
+// V9c, item 2: com formato "story" a linha "Tipo de abertura" nunca entra (regra dura 9, o
+// primeiro cartão tem regra própria, R-IG-STORY-02).
+describe("montarEntrada, formato story", () => {
+  it("nao inclui a linha de tipo de abertura", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      formato: "story",
+      instrucaoAbertura: { tipo: "resultado", ganchoExemplo: "olha o antes e o depois" },
+    });
+    expect(entrada).not.toContain("Tipo de abertura");
+  });
+
+  it("em reels, a linha de tipo de abertura continua presente", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      formato: "reels",
+      instrucaoAbertura: { tipo: "resultado", ganchoExemplo: "olha o antes e o depois" },
+    });
+    expect(entrada).toContain("Tipo de abertura");
+  });
+});
+
 // E27, parte 2, item 3: sem nenhuma regra o bloco nao aparece; com regra, aparece com o
 // rotulo firme (contagem >= 2) ou fraca (contagem 1).
 describe("montarSistemaEstavel", () => {
@@ -166,6 +189,7 @@ describe("montarSistemaEstavel", () => {
     modeloNicho: "modelo do nicho",
     camadaExclusiva: "camada exclusiva",
     tipo: "negocio" as const,
+    formato: "reels" as const,
   };
 
   it("sem regrasCliente, nao monta o bloco da memoria", () => {
@@ -205,5 +229,45 @@ describe("montarSistemaEstavel", () => {
   it("regra 11 sempre diz que a chamada final cita uma marca so", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "negocio" });
     expect(sistema).toContain("sempre cita uma marca só, nunca as duas.");
+  });
+});
+
+// V9c, item 2: formato "story" troca a regra 5, a regra 9 e o paragrafo de estrutura pelo
+// bloco de cartoes com as regras R-IG-STORY, citadas por numero.
+describe("montarSistemaEstavel, formato story", () => {
+  const BASE_SISTEMA = {
+    perfilCompilado: "perfil do cliente",
+    modeloNicho: "modelo do nicho",
+    camadaExclusiva: "camada exclusiva",
+    tipo: "negocio" as const,
+    regrasCliente: [],
+  };
+
+  it("troca a estrutura de reels por cartoes numerados", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("cartões numerados");
+    expect(sistema).not.toContain("gancho nos primeiros segundos, corpo, fechamento, chamada final");
+  });
+
+  it("cita as regras R-IG-STORY pelo numero", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("R-IG-STORY-01");
+    expect(sistema).toContain("R-IG-STORY-10");
+  });
+
+  it("pede o preenchimento de porQueAssim", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("porQueAssim");
+  });
+
+  it("diz que nao existe tipo de abertura em story", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("não existe \"tipo de abertura\"");
+  });
+
+  it("em reels, mantem a estrutura classica e nao cita regras R-IG-STORY", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "reels" });
+    expect(sistema).toContain("gancho nos primeiros segundos, corpo, fechamento, chamada final");
+    expect(sistema).not.toContain("R-IG-STORY-01");
   });
 });

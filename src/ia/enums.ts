@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { AnaliseVideo, Objetivo, TipoAbertura } from "@/db/schema";
+import { FORMATOS_ROTEIRO, type AnaliseVideo, type FigurinhaStory, type FormatoRoteiro, type Objetivo, type TipoAbertura } from "@/db/schema";
 
 /**
  * Enums Zod usados nos schemas de saida das tarefas, e a traducao do
@@ -97,4 +97,37 @@ export const INSTRUCAO_TIPO_ABERTURA: Record<TipoAbertura, string> = {
   contraste: "um antes e depois, ou dois jeitos diferentes de fazer a mesma coisa",
   pergunta: "uma pergunta direta para quem assiste",
   outro: "o jeito que fizer mais sentido para este vídeo, fora dos sete tipos acima",
+};
+
+/** V9c, item 1: o rótulo do controle segmentado (Objetivo, Gravar agora, o item do plano). */
+export const ROTULO_FORMATO_ROTEIRO: Record<FormatoRoteiro, string> = {
+  reels: "Reels",
+  story: "Story",
+};
+
+/** Reels antes de Story, mesma ordem do controle segmentado nas três telas (V9c, item 1). */
+export const FORMATOS_ROTEIRO_EM_ORDEM: FormatoRoteiro[] = [...FORMATOS_ROTEIRO];
+
+/**
+ * V9c, item 1 (R-IG-STORY-10 e R-IG-REEL-11, `estudo-stories.md`, seção 2):
+ * quem puxa para "conhecer" nunca chega por Story, que alcança quase só
+ * quem já segue; os outros dois objetivos (lembrar, comprar) vivem de
+ * resposta e conversa, o que o Story faz melhor. Decisão por código, não
+ * pelo modelo: a pessoa troca se quiser, o controle só já vem marcado.
+ */
+export function sugerirFormatoPeloObjetivo(objetivo: Objetivo): FormatoRoteiro {
+  return objetivo === "alcance" ? "reels" : "story";
+}
+
+/** V9c, item 2: o rótulo de cada figurinha nativa do Story, para a tela do roteiro ("Por que assim" e o cartão). */
+export const ROTULO_FIGURINHA: Record<FigurinhaStory, string> = {
+  enquete: "enquete",
+  emoji_deslizavel: "emoji deslizável",
+  teste: "teste",
+  perguntas: "caixinha de perguntas",
+  link: "link",
+  localizacao: "localização",
+  mencao: "menção",
+  contagem_regressiva: "contagem regressiva",
+  nenhuma: "nenhuma",
 };

@@ -88,6 +88,8 @@ async function garantirRoteiro(clienteId: number): Promise<number> {
     corpo: "explique a ordem certa enquanto faz. aplicar, esperar o tempo, e so entao esfregar.",
     fechamento: "mostre a peca limpa, sem mancha nenhuma",
     chamadaFinal: "manda uma mensagem que eu te digo qual produto usar",
+    cartoes: null,
+    porQueAssim: [],
     cenas: [
       { momento: "abertura", oQueFazer: "mostrar a mancha de perto" },
       { momento: "meio", oQueFazer: "aplicar o produto na ordem certa" },

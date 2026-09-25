@@ -2,19 +2,11 @@ import { redirect } from "next/navigation";
 
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
-import { corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
-import { textosRoteiro } from "@/textos/roteiro";
+import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 
 import { GravacaoTela } from "./GravacaoTela";
 
 type Props = { params: Promise<{ id: string }> };
-
-function splitParagrafos(texto: string): string[] {
-  return texto
-    .split("\n")
-    .map((linha) => linha.trim())
-    .filter(Boolean);
-}
 
 /**
  * `/roteiros/[id]/gravar`: fora de `(painel)/`, de propósito, sem sidebar
@@ -52,12 +44,7 @@ export default async function Gravar({ params }: Props) {
       roteiroId={roteiro.id}
       titulo={corpo.titulo}
       jaGravado={roteiro.gravadoEm !== null}
-      blocos={[
-        { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-        { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-        { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
-        { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
-      ]}
+      blocos={blocosParaLeitura(roteiro)}
       nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
     />
   );

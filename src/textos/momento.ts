@@ -32,4 +32,10 @@ export const textosMomento = {
   erroTranscricao: "Não conseguimos ouvir o áudio agora. Tente de novo ou escreva direto.",
   tentarDeNovo: "Tentar de novo",
   erroGerar: "Não conseguimos escrever o roteiro agora. A falha foi nossa; o que você contou continua aqui.",
+  /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (`sugerirFormatoPeloObjetivo`). */
+  formato: "Formato",
+  formatoAjuda: {
+    reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
+    story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
+  },
 };

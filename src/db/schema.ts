@@ -438,6 +438,16 @@ export const TIPOS_ABERTURA = [
 ] as const;
 export type TipoAbertura = (typeof TIPOS_ABERTURA)[number];
 
+/**
+ * O formato do roteiro (V9c, E34 enxuta): "reels" continua a estrutura de
+ * gancho, corpo, fechamento e chamada; "story" sai em cartões numerados
+ * (`ConteudoRoteiro.cartoes`), a partir das regras `R-IG-STORY`
+ * (`src/ia/prompts/regras-formato.ts`). Coluna em `roteiros` e em
+ * `plano_gravacoes` (a sugestão de `planejarDia` já nasce com um formato).
+ */
+export const FORMATOS_ROTEIRO = ["reels", "story"] as const;
+export type FormatoRoteiro = (typeof FORMATOS_ROTEIRO)[number];
+
 export type AnaliseVideo = {
   assunto: string;
   gancho: string;
@@ -744,13 +754,56 @@ export type Objetivo = "alcance" | "engajamento" | "conversao";
  */
 export type ForcaEvidencia = "forte" | "media" | "fraca";
 
+/**
+ * A figurinha nativa que um cartão de Story pode pedir (V9c, item 2; a
+ * lista de `pesquisa/plataformas/docs/instagram/figurinhas-ajuda.md`,
+ * restrita às que servem de interação por objetivo, R-IG-STORY-04);
+ * "nenhuma" quando o cartão não pede interação nenhuma.
+ */
+export const FIGURINHAS_STORY = [
+  "enquete",
+  "emoji_deslizavel",
+  "teste",
+  "perguntas",
+  "link",
+  "localizacao",
+  "mencao",
+  "contagem_regressiva",
+  "nenhuma",
+] as const;
+export type FigurinhaStory = (typeof FIGURINHAS_STORY)[number];
+
+/** Um cartão de Story (V9c, item 2, `R-IG-STORY-03`): o que falar, o que mostrar, o texto fixo e a figurinha. */
+export type CartaoStory = {
+  oQueFalar: string;
+  oQueMostrar: string;
+  textoNaTela: string;
+  figurinha: FigurinhaStory;
+};
+
 export type ConteudoRoteiro = {
   titulo: string;
   duracaoS: number;
+  /**
+   * Em Story (V9c), string vazia: a estrutura desse formato é `cartoes`,
+   * abaixo. O schema de saída da IA (`ia/prompts/roteiro.ts`) aceita nulo
+   * aqui; `gerarConteudo` (`servicos/roteiro.ts`) troca por "" antes de
+   * gravar, para este tipo continuar `string` em todo o resto do código
+   * (a tela e o PDF já checam `roteiro.formato`, não precisam checar nulo).
+   */
   gancho: string;
   corpo: string;
   fechamento: string;
   chamadaFinal: string;
+  /** Só em Story (V9c, item 2): de 2 a 5 cartões (`R-IG-STORY-03`); nulo em Reels. */
+  cartoes: CartaoStory[] | null;
+  /**
+   * Por que o modelo escreveu do jeito que escreveu (V9c, item 2, E36): uma
+   * entrada por regra numerada que ele seguiu (`R-IG-STORY-04`, ...), com o
+   * motivo em português de gente. Vazio em Reels nesta rodada (o bloco
+   * estável por formato ainda não existe para Reels).
+   */
+  porQueAssim: { regra: string; motivo: string }[];
   cenas: { momento: string; oQueFazer: string }[];
   /** Por que este roteiro so funciona com a pessoa de verdade (tese do produto) */
   ondeGravar: string;
@@ -811,6 +864,8 @@ export const roteiros = pgTable(
      */
     momento: jsonb("momento").$type<Momento>(),
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
+    /** V9c, item 1: "reels" (padrão) ou "story"; reescrever mantém o formato da versão anterior. */
+    formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     /**
      * O tipo de abertura que o modelo declarou ter usado (V4, item 3): o
@@ -887,6 +942,8 @@ export const planoGravacoes = pgTable(
     /** A sugestão de cena (o `oQueDaParaMostrar` do roteiro gerado). */
     oQueMostrar: text("o_que_mostrar").notNull(),
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
+    /** V9c, item 1: sugerido pelo objetivo (`sugerirFormatoPeloObjetivo`), a folha pré-preenchida respeita. */
+    formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
     marcaId: integer("marca_id").references(() => clientes.id),
     estado: text("estado").$type<EstadoPlano>().notNull().default("sugerido"),
     /** Nulo até a pessoa aceitar (`servicos/plano.ts`, `aceitar`), gerando o roteiro (origem "momento"). */

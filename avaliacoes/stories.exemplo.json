@@ -1,0 +1,80 @@
+[
+  {
+    "tema": "o erro que faz a mancha de vinho no sofá espalhar em vez de sair",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já tentou um produto que estragou o tecido do sofá. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Cenas filmáveis: cozinha, sala com o sofá, bancada com os produtos.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos que funcionam: mostrar o produto agindo antes de explicar (alta frequência). Estruturas comuns: mostrar o erro comum, mostrar o jeito certo, resultado final. Fechamentos comuns: mostrar o resultado sem falar por dois segundos. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 101,
+        "assunto": "o produto que tira qualquer mancha do estofado",
+        "gancho": "esse produto tira qualquer mancha do estofado",
+        "estrutura": "mostra o produto agindo na mancha antes de explicar",
+        "fechamento": "estofado limpo, sem falar por dois segundos",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 6.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "caixinha de perguntas sobre a mancha (R-IG-STORY-04, objetivo comprar): o cartão que pede interação usa perguntas, link ou 'me responde aqui', nunca enquete; o último cartão fecha pedindo resposta, sem 'segue' (R-IG-STORY-01 e 07)"
+  },
+  {
+    "tema": "qual produto tira cheiro de bicho de estimação mais rápido, o spray ou o concentrado",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89 e o concentrado multiuso por R$ 65. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já tentou um produto que estragou o tecido do sofá. Frase que fala: uma direção só, a gordura sai em vez de espalhar.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: cheiro de bicho de estimação, comparação entre produtos. Ganchos que funcionam: comparação direta entre dois produtos (alta frequência). Estruturas comuns: mostrar os dois produtos, testar os dois, mostrar o resultado. Fechamentos comuns: resultado lado a lado. Chamadas finais comuns: comenta qual voce ja usou.",
+    "evidencias": [],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "enquete entre dois produtos (R-IG-STORY-04, objetivo lembrar): o cartão que pede interação usa enquete, emoji deslizável ou teste, nunca caixinha de perguntas; sem nenhuma evidência no banco, o roteiro precisa admitir isso, não inventar número"
+  },
+  {
+    "tema": "como é o dia a dia de quem fabrica o tira-mancha antes de ir para o frasco",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já tentou um produto que estragou o tecido do sofá. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Cenas filmáveis: a bancada de produção, a bancada com os produtos prontos.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 35 segundos. Assuntos quentes: bastidor da marca, como o produto é feito. Ganchos que funcionam: mostrar o bastidor acontecendo (alta frequência). Estruturas comuns: mostrar o lugar, explicar o passo, mostrar o produto pronto. Fechamentos comuns: produto pronto, sem falar por dois segundos. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "bastidor da fábrica com 'responde aqui' (R-IG-STORY-06, cena real, nunca parede lisa): o último cartão fecha convidando para o Direct ou a caixinha, nunca 'segue a gente' (R-IG-STORY-01)"
+  },
+  {
+    "tema": "o lembrete para quem já comprou o kit tira-mancha guardar certo e não perder a validade",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: comprar em quantidade e o produto perder a validade antes de usar. Frase que fala: uma direção só, a gordura sai em vez de espalhar.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: organização do armário de limpeza, validade de produto. Ganchos que funcionam: mostrar o armário organizado (média frequência). Estruturas comuns: mostrar o problema, mostrar a solução, resultado. Fechamentos comuns: armário pronto, sem falar. Chamadas finais comuns: comenta se voce faz igual.",
+    "evidencias": [
+      {
+        "id": 601,
+        "assunto": "armario de limpeza organizado por validade",
+        "gancho": "esse armario de limpeza organizado assim nunca mais perde produto vencido",
+        "estrutura": "mostra o armario bagunçado antes de organizar",
+        "fechamento": "armario pronto, sem falar por dois segundos",
+        "chamadaFinal": "comenta se voce faz igual",
+        "foraDaCurva": 3.8
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "lembrete para quem já comprou (fala com quem já segue, R-IG-STORY-01: nunca se apresenta do zero); o primeiro cartão precisa dar um motivo para não deslizar, sem repetir um gancho de desconhecido"
+  },
+  {
+    "momento": {
+      "onde": "dentro da fábrica de um fornecedor de embalagem, no mesmo dia da visita",
+      "oQueEstaAcontecendo": "acompanhando de perto uma marca que eu ajudo a tocar, vendo o frasco novo sair da linha de produção",
+      "oQueDaParaMostrar": "a linha de produção rodando e os frascos prontos saindo na esteira"
+    },
+    "objetivo": "conversao",
+    "perfilCompilado": "Sócio que apoia pequenos negócios locais, hoje acompanhando de perto a Dr.Wash (marca própria de produtos de limpeza) numa visita a fornecedor. Fala em primeira pessoa, sobre o que está vendo e aprendendo junto com quem toca a marca. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: bastidor de negócio, visita a fornecedor. Ganchos que funcionam: mostrar o bastidor acontecendo (alta frequência). Estruturas comuns: mostrar o lugar, explicar o que está sendo decidido, mostrar o resultado. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta se você já passou por isso.",
+    "tipo": "pessoa",
+    "contextoDeSerie": [],
+    "marcaCitada": {
+      "nome": "Dr.Wash",
+      "perfilCompilado": "Marca própria de produtos de limpeza. Vende o kit tira-mancha por R$ 89. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Frase que fala: uma direção só, a gordura sai em vez de espalhar. Nunca promete resultado que não pode cumprir."
+    },
+    "pontoPrincipal": "a viagem do Bruno como pessoa citando a marca: primeira pessoa do singular, a marca citada aparece como parte da vida real de quem grava, nunca como anúncio (regra dura 11); a chamada final do último cartão cita só a Dr.Wash, uma marca só"
+  }
+]

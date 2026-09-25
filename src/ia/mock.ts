@@ -16,15 +16,17 @@ const USO_ZERO = {
 };
 
 export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<ResultadoGeracao<T>> {
-  const dados = params.schema.parse(construirSaidaMock(params.tarefa, params.entrada));
+  const dados = params.schema.parse(construirSaidaMock(params.tarefa, params.entrada, params.sistemaEstavel));
   return { dados, modelo: "mock", ...USO_ZERO };
 }
 
 /**
  * Exportada para src/ia/lote.ts reusar o mesmo mock por tarefa no lote,
  * em vez de um objeto generico que so passaria em schema com tudo opcional.
+ * `sistemaEstavel` e opcional (so "roteiro" usa, para saber o formato,
+ * V9c, item 2: a entrada nao diz "story" em lugar nenhum, so o sistema).
  */
-export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
+export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEstavel = ""): unknown {
   switch (tarefa) {
     case "avaliarResposta":
       return mockAvaliarResposta(entrada);
@@ -33,7 +35,7 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string): unknown {
     case "avaliarTema":
       return mockAvaliarTema(entrada);
     case "roteiro":
-      return mockRoteiro(entrada);
+      return mockRoteiro(entrada, sistemaEstavel);
     case "verificarTexto":
       return mockVerificarTexto(entrada);
     case "temasDoDia":
@@ -239,7 +241,41 @@ function tipoAberturaEscolhidoPeloMock(entrada: string): (typeof TIPOS_ABERTURA_
  * para o mock não ficar sempre igual em todo caso de momento; `temaCurto`
  * só sai preenchido aqui, mesma regra do prompt de verdade (regra dura 10).
  */
-function mockRoteiro(entrada: string) {
+/**
+ * V9c, item 2: 3 cartões determinísticos, o primeiro citando o tema (R-IG-STORY-02), o do meio
+ * com a única figurinha (R-IG-STORY-04) e o último fechando com um verbo de resposta, sem
+ * "segue" (R-IG-STORY-01 e 07). `porQueAssim` cita duas regras reais, como o modelo de verdade faria.
+ */
+function mockCartoesStory(tema: string, reprovado: boolean) {
+  return {
+    cartoes: [
+      {
+        oQueFalar: reprovado ? `Outro jeito de contar sobre ${tema}` : `Hoje eu vou te contar sobre ${tema}`,
+        oQueMostrar: "o local do negocio de verdade",
+        textoNaTela: tema,
+        figurinha: "nenhuma" as const,
+      },
+      {
+        oQueFalar: "aqui a gente lida com isso toda semana, e voce ja deve ter passado por isso tambem",
+        oQueMostrar: "o processo acontecendo",
+        textoNaTela: "e voce, ja passou por isso",
+        figurinha: "perguntas" as const,
+      },
+      {
+        oQueFalar: "manda a sua duvida aqui na caixinha que eu respondo",
+        oQueMostrar: "convite final, olhando para a camera",
+        textoNaTela: "manda sua duvida",
+        figurinha: "nenhuma" as const,
+      },
+    ],
+    porQueAssim: [
+      { regra: "R-IG-STORY-02", motivo: "o primeiro cartao ja cita o assunto para quem ja segue continuar vendo" },
+      { regra: "R-IG-STORY-04", motivo: "a caixinha de perguntas pede interacao de quem esta vendo" },
+    ],
+  };
+}
+
+function mockRoteiro(entrada: string, sistemaEstavel: string) {
   const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
   const tema = ehMomento
     ? extrairCampo(entrada, "O que está acontecendo:") || "momento simulado"
@@ -247,21 +283,32 @@ function mockRoteiro(entrada: string) {
   const reprovado = entrada.includes("reprovou a versão anterior");
   const reprovadoMuitoLongo = entrada.includes("Muito longo");
   const ids = extrairIds(entrada);
-  const tipoAbertura = tipoAberturaEscolhidoPeloMock(entrada);
-  const primeiraPalavra = PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura];
+  // V9c, item 2: so o sistema estavel diz o formato (a entrada nunca cita "story"); a marca
+  // do bloco de estrutura de Story e o numero da primeira regra da lista.
+  const ehStory = sistemaEstavel.includes("R-IG-STORY-01");
+  const tipoAbertura = ehStory ? null : tipoAberturaEscolhidoPeloMock(entrada);
+  const primeiraPalavra = tipoAbertura ? PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura] : "";
+
+  const narrativa = ehStory
+    ? { gancho: null, corpo: null, fechamento: null, chamadaFinal: null, ...mockCartoesStory(tema, reprovado) }
+    : {
+        gancho: reprovado
+          ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
+          : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
+        corpo: reprovado
+          ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
+          : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
+        fechamento: "resumo do que foi mostrado",
+        chamadaFinal: "comenta se voce ja passou por isso",
+        cartoes: null,
+        porQueAssim: [],
+      };
 
   return {
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
     titulo: tema,
     duracaoS: reprovadoMuitoLongo ? 25 : 40,
-    gancho: reprovado
-      ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
-      : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
-    corpo: reprovado
-      ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
-      : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
-    fechamento: "resumo do que foi mostrado",
-    chamadaFinal: "comenta se voce ja passou por isso",
+    ...narrativa,
     cenas: [{ momento: "abertura", oQueFazer: "mostrar o local de verdade" }],
     ondeGravar: "no proprio local do negocio, com o cliente aparecendo",
     edicao: {

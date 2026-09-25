@@ -101,6 +101,8 @@ const CONTEUDO_ROTEIRO_MINIMO = {
   corpo: "corpo",
   fechamento: "fechamento",
   chamadaFinal: "chamada final",
+  cartoes: null,
+  porQueAssim: [],
   cenas: [],
   ondeGravar: "no local do negocio",
   edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },

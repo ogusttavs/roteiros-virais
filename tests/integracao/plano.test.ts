@@ -142,6 +142,21 @@ describe("criarPlano", () => {
       criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["a"] }], HOJE),
     ).rejects.toThrow(ErroPlano);
   });
+
+  // V9c, item 1: cada sugestao ja nasce com o formato de `sugerirFormatoPeloObjetivo(objetivo)`.
+  it("cada item ja nasce com o formato sugerido pelo objetivo", async () => {
+    const cliente = await criarCliente();
+    const itens = await criarPlano(
+      cliente,
+      [{ data: HOJE, lugar: "feira", compromissos: ["estande novo", "fornecedor as 15h"] }],
+      HOJE,
+    );
+
+    // mockPlanejarDia rodizia engajamento, alcance, conversao: so alcance sugere reels.
+    for (const item of itens) {
+      expect(item.formato).toBe(item.objetivo === "alcance" ? "reels" : "story");
+    }
+  });
 });
 
 describe("limparPlano", () => {
@@ -246,6 +261,38 @@ describe("aceitar", () => {
     const serie = await db().select().from(roteiros).where(eq(roteiros.clienteId, cliente.id));
     expect(serie).toHaveLength(1);
   });
+
+  // V9c, item 1: a folha pode trocar o formato antes de confirmar; o roteiro e o item guardam o final.
+  it("com formato explicito, gera o roteiro nesse formato e atualiza a coluna do item", async () => {
+    const cliente = await criarCliente();
+    const [item] = await criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["fornecedor novo"] }], HOJE);
+
+    const roteiro = await aceitar(item.id, cliente, {
+      onde: "na feira",
+      oQueEstaAcontecendo: "fornecedor novo",
+      oQueDaParaMostrar: "os estandes",
+      objetivo: "engajamento",
+      formato: "reels",
+    });
+
+    expect(roteiro.formato).toBe("reels");
+    const [linha] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
+    expect(linha.formato).toBe("reels");
+  });
+
+  it("sem formato explicito, usa o mesmo sugerido pelo objetivo", async () => {
+    const cliente = await criarCliente();
+    const [item] = await criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["fornecedor novo"] }], HOJE);
+
+    const roteiro = await aceitar(item.id, cliente, {
+      onde: "na feira",
+      oQueEstaAcontecendo: "fornecedor novo",
+      oQueDaParaMostrar: "os estandes",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.formato).toBe("story");
+  });
 });
 
 describe("pular", () => {
@@ -296,6 +343,8 @@ describe("marcarGravado", () => {
           corpo: "c",
           fechamento: "f",
           chamadaFinal: "cf",
+          cartoes: null,
+          porQueAssim: [],
           cenas: [],
           ondeGravar: "o",
           edicao: { textoNaTela: [], ritmoDeCorte: "", recursos: [], audio: null, referencia: null },
