@@ -427,6 +427,22 @@ describe("verificarLocalmente", () => {
       expect(r.aprovado).toBe(true);
     });
 
+    // V9d, item 0, segunda rodada do mesmo golden set com chave real: "me conta aqui qual e a
+    // mancha" fecha pedindo resposta (imperativo, sem "?" e sem nenhum verbo da lista antiga).
+    it("aprova quando o ultimo cartao pede resposta no imperativo, com 'conta'", () => {
+      const r = verificarLocalmente(
+        {},
+        {
+          formato: "story",
+          cartoes: [
+            { ...CARTAO_OK, figurinha: "perguntas" },
+            { ...CARTAO_OK, oQueFalar: "se voce ja passou por isso, me conta aqui qual e a mancha que esta te incomodando" },
+          ],
+        },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
     it("em reels (sem formato story), nao roda checagem de cartao nenhuma mesmo se cartoes vier preenchido", () => {
       const r = verificarLocalmente({}, { cartoes: [ULTIMO_CARTAO_OK] });
       expect(r.aprovado).toBe(true);

@@ -329,13 +329,15 @@ const SEGUNDOS_MAX_POR_CARTAO = 15;
 const PALAVRAS_MAX_POR_CARTAO = Math.floor(PALAVRAS_POR_SEGUNDO_STORY * SEGUNDOS_MAX_POR_CARTAO);
 
 /** Verbo que fecha a conversa no último cartão (`R-IG-STORY-07`): "me chama" e "no direct" contam como duas palavras. */
-const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "comenta"];
+const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "comenta", "conta"];
 
 /**
- * V9d, item 0 (achado do golden set de Stories rodado com chave real depois do ajuste do prompt):
+ * V9d, item 0 (achados do golden set de Stories rodado com chave real depois do ajuste do prompt):
  * "qual dos dois você já usou?" fecha pedindo resposta tanto quanto "vota aqui", mas não usa nenhum
  * verbo da lista acima. Uma pergunta direta no último cartão (termina com "?") também conta como
- * pedir resposta; basta um dos dois sinais (o verbo ou a pergunta) para aprovar.
+ * pedir resposta; basta um dos dois sinais (o verbo ou a pergunta) para aprovar. Rodada seguinte do
+ * mesmo golden set: "me conta aqui qual é a mancha" também fecha pedindo resposta, e "conta" (de
+ * "contar") entrou na lista.
  */
 function fechaPedindoResposta(ultimoCartaoFalar: string): boolean {
   return VERBOS_RESPOSTA_STORY.some((verbo) => ultimoCartaoFalar.includes(verbo)) || ultimoCartaoFalar.includes("?");
