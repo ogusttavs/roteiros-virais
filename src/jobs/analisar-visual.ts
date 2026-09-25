@@ -61,6 +61,10 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, new Date(Date.now() - SETE_DIAS_MS)),
+    // V9d, item 0b: o piso vem antes do múltiplo, também na seleção de leitura: ler primeiro o
+    // que passa do piso (a análise visual é cara, 10 por semana, nunca vale gastar num vídeo que
+    // nunca vai virar referência nem evidência de qualquer jeito).
+    gte(videos.views, config.regras.pisoViewsReferencia),
     isNotNull(videos.foraDaCurva),
     isNotNull(videos.transcricao),
     isNotNull(videos.analise),

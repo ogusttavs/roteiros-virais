@@ -36,7 +36,9 @@ export const textosReferencias = {
   abaixoDaMediaDoSetor: "abaixo da média do seu setor",
   viewsRotulo: (views: string) => `${views} views`,
   normalDessaConta: (mediana: string) => `normal dessa conta: ${mediana}`,
-  viewsPorHora: (velocidade: string) => `${velocidade} views por hora`,
+  /** V9d, item 0b: `velocidade` já vem arredondada e com o singular decidido (`formatarVelocidade`). */
+  viewsPorHora: (velocidade: { texto: string; singular: boolean }) =>
+    `${velocidade.texto} view${velocidade.singular ? "" : "s"} por hora`,
   passouDas72Horas: "já passou das 72 horas de medição",
   verDetalhes: "Ver detalhes",
   salvar: "Salvar",

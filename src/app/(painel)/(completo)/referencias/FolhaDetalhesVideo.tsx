@@ -2,7 +2,7 @@
 
 import { Bookmark, ExternalLink } from "lucide-react";
 
-import { formatarViewsExato } from "@/lib/formatarNumero";
+import { formatarVelocidade, formatarViewsExato } from "@/lib/formatarNumero";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
@@ -28,7 +28,7 @@ type Props = {
 
 function linhaVelocidade(velocidade: number | null): string {
   if (velocidade === null) return textosReferencias.passouDas72Horas;
-  return textosReferencias.viewsPorHora(formatarViewsExato(velocidade));
+  return textosReferencias.viewsPorHora(formatarVelocidade(velocidade));
 }
 
 /**

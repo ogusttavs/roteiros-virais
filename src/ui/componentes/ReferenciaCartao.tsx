@@ -1,9 +1,10 @@
 "use client";
 
 import { Bookmark, Play } from "lucide-react";
+import { useState } from "react";
 
 import type { FaixaMultiplo } from "@/lib/formatarNumero";
-import { formatarViewsExato } from "@/lib/formatarNumero";
+import { formatarVelocidade, formatarViewsExato } from "@/lib/formatarNumero";
 import { textosConexao } from "@/textos/conexao";
 import { textosReferencias } from "@/textos/referencias";
 import { ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
@@ -29,6 +30,7 @@ export type VideoFormatado = {
   gancho: string;
   estrutura: string;
   porQueFuncionou: string;
+  capaUrl: string | null;
 };
 
 type Props = {
@@ -48,23 +50,37 @@ type Props = {
 
 function linhaVelocidade(velocidade: number | null): string {
   if (velocidade === null) return textosReferencias.passouDas72Horas;
-  return textosReferencias.viewsPorHora(formatarViewsExato(velocidade));
+  return textosReferencias.viewsPorHora(formatarVelocidade(velocidade));
 }
 
 /**
  * Um vídeo da biblioteca de referências (V6, item 4, `Referencias.dc.html`,
  * `.video-topo`/`.video-conta`/`.titulo-video`/`.acoes-video`):
- * a capa neutra (sem coletor de miniatura nesta rodada), o múltiplo com a
- * palavra ao lado, os três números que fizeram o vídeo ser fora da curva,
- * o canal e a data, o título em uma linha, e as duas ações. A análise
- * inteira mora na folha de detalhes, não aqui.
+ * a capa (miniatura real quando a plataforma trouxe, V9d item 0b; senão o
+ * retângulo neutro), o múltiplo com a palavra ao lado, os três números que
+ * fizeram o vídeo ser fora da curva, o canal e a data, o título em uma
+ * linha, e as duas ações. A análise inteira mora na folha de detalhes, não
+ * aqui.
  */
 export function ReferenciaCartao({ video, salvo, salvando = false, semRede = false, onVerDetalhes, onSalvar }: Props) {
+  const [capaComErro, setCapaComErro] = useState(false);
+  const mostrarCapa = video.capaUrl !== null && !capaComErro;
+
   return (
     <article className={styles.cartao}>
       <div className={styles.videoTopo}>
         <span className={styles.capa} aria-hidden="true">
-          <Play size={24} strokeWidth={1.5} aria-hidden="true" />
+          {mostrarCapa ? (
+            // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
+            <img
+              src={video.capaUrl ?? undefined}
+              alt=""
+              className={styles.capaImagem}
+              onError={() => setCapaComErro(true)}
+            />
+          ) : (
+            <Play size={24} strokeWidth={1.5} aria-hidden="true" />
+          )}
         </span>
         <div className={styles.multiplo}>
           <span

@@ -141,6 +141,13 @@ export const config = {
     minimoParaAvisoLinhaEditorial: 5,
     /** V2b, item 6, escopo 5.11: no minimo 70% brasileiro em tudo que escolhe video (`aplicarProporcaoBrasil`). */
     proporcaoBrasil: 0.7,
+    /**
+     * V9d, item 0b (decisão do Gustavo em 25/09/2026, achado usando o painel): um vídeo de 128
+     * views contra uma mediana de 71 não ensina nada e não pode virar referência nem evidência,
+     * mesmo passando do múltiplo (`limiarForaDaCurva`). O piso vem antes do múltiplo, nessa ordem
+     * fixa; `PISO_VIEWS_REFERENCIA` (variável de ambiente) ajusta sem mexer em código.
+     */
+    pisoViewsReferencia: envNumero("PISO_VIEWS_REFERENCIA", 50_000),
   },
 };
 

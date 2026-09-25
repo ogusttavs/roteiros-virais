@@ -285,6 +285,7 @@ export default function Fundacao() {
               gancho: "Abre com a mão já esfregando a mancha, sem falar por dois segundos.",
               estrutura: "Aplica o produto sem cortar o vídeo, falando o tempo de espera em voz alta.",
               porQueFuncionou: "Todo mundo se reconhece no erro e fica para ver o certo.",
+              capaUrl: null,
             }}
             salvo={false}
             onVerDetalhes={() => undefined}

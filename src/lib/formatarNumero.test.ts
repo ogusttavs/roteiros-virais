@@ -4,6 +4,7 @@ import {
   classificarMultiplo,
   diasDesde,
   formatarMultiplo,
+  formatarVelocidade,
   formatarViewsCompacto,
   formatarViewsExato,
   fraseDiasAtras,
@@ -23,6 +24,34 @@ describe("formatarViewsExato", () => {
   it("usa ponto como separador de milhar", () => {
     expect(formatarViewsExato(1240)).toBe("1.240");
     expect(formatarViewsExato(12)).toBe("12");
+  });
+});
+
+// V9d, item 0b: achado do Gustavo em 25/09, usando o painel. formatarViewsExato(7.664) imprimia
+// "7,664" (sete mil e seiscentos e sessenta e quatro), quando a velocidade de verdade era 7,664
+// views por hora, arredondado para 8.
+describe("formatarVelocidade", () => {
+  it("arredonda para inteiro, sem casas decimais lidas como milhar", () => {
+    expect(formatarVelocidade(7.664)).toEqual({ texto: "8", singular: false });
+    expect(formatarVelocidade(0.994)).toEqual({ texto: "menos de 1", singular: true });
+  });
+
+  it("numeros grandes continuam com separador de milhar (arredondados)", () => {
+    expect(formatarVelocidade(1234.5)).toEqual({ texto: "1.235", singular: false });
+  });
+
+  it("abaixo de 1, 'menos de 1', singular", () => {
+    expect(formatarVelocidade(0.5)).toEqual({ texto: "menos de 1", singular: true });
+    expect(formatarVelocidade(0)).toEqual({ texto: "menos de 1", singular: true });
+  });
+
+  it("exatamente 1 (ou arredondando para 1) fica singular", () => {
+    expect(formatarVelocidade(1)).toEqual({ texto: "1", singular: true });
+    expect(formatarVelocidade(1.2)).toEqual({ texto: "1", singular: true });
+  });
+
+  it("2 ou mais fica plural", () => {
+    expect(formatarVelocidade(2)).toEqual({ texto: "2", singular: false });
   });
 });
 

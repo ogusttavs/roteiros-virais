@@ -28,6 +28,22 @@ export function formatarViewsExato(views: number): string {
   return FORMATO_EXATO.format(views);
 }
 
+/**
+ * "8" (arredondado, para "8 views por hora"), "menos de 1" abaixo de 1 (V9d,
+ * item 0b, achado do Gustavo em 25/09, usando o painel): `formatarViewsExato`
+ * imprimia "7,664" para uma velocidade de 7,664 views por hora, lido como
+ * sete mil e seiscentos e sessenta e quatro, o vírgula decimal do `Intl` em
+ * português lido como separador de milhar. Velocidade nunca é um número
+ * grande de verdade (é views por hora, não o total do vídeo), arredondar
+ * para inteiro não perde nada que importe. `singular` é só para "1 view por
+ * hora" não virar "1 views por hora".
+ */
+export function formatarVelocidade(viewsPorHora: number): { texto: string; singular: boolean } {
+  if (viewsPorHora < 1) return { texto: "menos de 1", singular: true };
+  const arredondado = Math.round(viewsPorHora);
+  return { texto: FORMATO_EXATO.format(arredondado), singular: arredondado === 1 };
+}
+
 /** "4,1x": o múltiplo fora da curva, uma casa decimal, sempre com o "x". */
 export function formatarMultiplo(vezes: number): string {
   return `${vezes.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}x`;
