@@ -11,13 +11,11 @@ import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
-import { Progresso } from "@/ui/componentes/Progresso";
+import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { gerarRoteiroAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
-
-const LIMIAR_DEMORANDO_MS = 10000;
 
 function primeiraMaiuscula(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
@@ -39,19 +37,9 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
   const [formatoTocado, setFormatoTocado] = useState(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
   const [erro, setErro] = useState<string | null>(null);
-  const [demorando, setDemorando] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
-
-  useEffect(() => {
-    if (!pendente) {
-      setDemorando(false);
-      return;
-    }
-    const id = setTimeout(() => setDemorando(true), LIMIAR_DEMORANDO_MS);
-    return () => clearTimeout(id);
-  }, [pendente]);
 
   useEffect(() => {
     if (formatoTocado || !escolhido) return;
@@ -76,12 +64,11 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
 
   if (pendente) {
     return (
-      <div className={styles.pagina}>
-        <div className={styles.espera}>
-          <Progresso frases={textosComuns.espera} />
-          {demorando ? <p className={styles.demorando}>{textosObjetivo.demorando}</p> : null}
-        </div>
-      </div>
+      <TelaEscrevendo
+        aberto
+        fraseDemorando={textosObjetivo.demorando}
+        aoVoltarDepois={() => router.push("/hoje")}
+      />
     );
   }
 

@@ -24,4 +24,8 @@ export const textosComuns = {
     "Escrevendo do jeito que você fala",
     "Conferindo se dá para gravar hoje",
   ],
+  /** V11, item 2: `TelaEscrevendo`, a mesma tela de espera para tema, tema livre e momento. */
+  esperaTitulo: "Escrevendo o seu roteiro",
+  esperaDuracao: "Costuma levar de 30 segundos a 3 minutos",
+  esperaVoltarDepois: "Voltar depois",
 };

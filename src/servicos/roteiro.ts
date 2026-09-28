@@ -25,6 +25,7 @@ import {
   type Plataforma,
   type TipoAbertura,
 } from "@/db/schema";
+import { ROTULO_FIGURINHA } from "@/ia/enums";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
@@ -92,26 +93,75 @@ function splitParagrafos(texto: string): string[] {
 }
 
 /**
+ * Palavras que costumam aparecer no `quando` livre de um item de texto na
+ * tela quando ele de fato fala do bloco (V11, item 6b): `quando` é texto
+ * solto que o modelo escreve (o prompt só pede "quando, o quê, onde", nunca
+ * um segundo exato), sem intervalo numérico para casar com o bloco. Sem uma
+ * palavra destas, o item fica de fora do bloco (nunca aparece em nenhum,
+ * nunca aparece em todos por padrão); é uma pista, não uma prova, registrada
+ * como desvio do pedido literal do PROXIMO.md (que supunha um intervalo em
+ * segundos) em `HISTORICO.md`.
+ */
+const PALAVRAS_CHAVE_BLOCO: Record<"abertura" | "meio" | "fechamento" | "chamada", string[]> = {
+  abertura: ["abertura", "gancho", "início", "inicio", "começo", "comeco", "primeiro"],
+  meio: ["meio", "corpo", "explica", "demonstra", "desenvolvimento"],
+  fechamento: ["fechamento", "resumo", "encerra", "conclus"],
+  chamada: ["chamada", "cta", "convite", "convoca"],
+};
+
+function bateComBloco(quando: string, bloco: keyof typeof PALAVRAS_CHAVE_BLOCO): boolean {
+  const minusculo = quando.toLowerCase();
+  return PALAVRAS_CHAVE_BLOCO[bloco].some((palavra) => minusculo.includes(palavra));
+}
+
+/** O que mostrar num bloco de Reels (V11, item 6b): só os itens de `textoNaTela` cujo `quando` bate com o bloco. */
+function mostrarNoBlocoReels(edicao: ConteudoRoteiro["edicao"], bloco: keyof typeof PALAVRAS_CHAVE_BLOCO): string[] {
+  return edicao.textoNaTela
+    .filter((item) => bateComBloco(item.quando, bloco))
+    .map((item) => textosRoteiro.mostrar.textoNaTela(item.oQue));
+}
+
+/** O que mostrar num cartão de Story (V11, item 6a): sempre as três linhas, a figurinha só quando pedida. */
+function mostrarNoCartao(cartao: NonNullable<ConteudoRoteiro["cartoes"]>[number]): string[] {
+  const linhas = [
+    textosRoteiro.mostrar.oQueMostrar(cartao.oQueMostrar),
+    textosRoteiro.mostrar.textoNaTela(cartao.textoNaTela),
+  ];
+  if (cartao.figurinha !== "nenhuma") {
+    linhas.push(textosRoteiro.mostrar.figurinha(ROTULO_FIGURINHA[cartao.figurinha]));
+  }
+  return linhas;
+}
+
+/**
  * O roteiro em blocos de leitura, um por vez (V9c, item 4): em Reels, os
  * quatro de sempre (gancho, corpo, fechamento, chamada); em Story, um bloco
- * por cartão, com o que falar (o resto do cartão, o que mostrar, o texto na
- * tela e a figurinha, ficam no "Como editar" da tela, não aqui). Usada por
- * `RoteiroTela.tsx`, `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`,
- * as três telas que hoje montavam essa lista cada uma do seu jeito.
+ * por cartão, com o que falar. `mostrar` (V11, item 6) é o que mostrar
+ * enquanto grava aquele bloco, menor que a fala e nunca competindo com ela
+ * (modo gravação, `GravacaoTela.tsx`); o PDF e `RoteiroTela.tsx` continuam
+ * como estão, ignoram o campo. Usada por `RoteiroTela.tsx`,
+ * `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`.
  */
-export function blocosParaLeitura(roteiro: RoteiroLinha): { rotulo: string; paragrafos: string[] }[] {
+export function blocosParaLeitura(
+  roteiro: RoteiroLinha,
+): { rotulo: string; paragrafos: string[]; mostrar?: string[] }[] {
   const corpo = corpoDoRoteiro(roteiro);
   if (roteiro.formato === "story" && corpo.cartoes) {
     return corpo.cartoes.map((cartao, indice) => ({
       rotulo: textosRoteiro.blocos.cartao(indice + 1),
       paragrafos: [cartao.oQueFalar],
+      mostrar: mostrarNoCartao(cartao),
     }));
   }
   return [
-    { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-    { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-    { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
-    { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
+    { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho], mostrar: mostrarNoBlocoReels(corpo.edicao, "abertura") },
+    { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo), mostrar: mostrarNoBlocoReels(corpo.edicao, "meio") },
+    {
+      rotulo: textosRoteiro.blocos.fechamento,
+      paragrafos: splitParagrafos(corpo.fechamento),
+      mostrar: mostrarNoBlocoReels(corpo.edicao, "fechamento"),
+    },
+    { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal], mostrar: mostrarNoBlocoReels(corpo.edicao, "chamada") },
   ];
 }
 

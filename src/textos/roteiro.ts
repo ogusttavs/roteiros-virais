@@ -43,6 +43,16 @@ export const textosRoteiro = {
     figurinha: "Figurinha",
     semFigurinha: "Sem figurinha neste cartão",
   },
+  /**
+   * V11, item 6: o que mostrar em cada bloco do modo gravação, junto da fala
+   * (`blocosParaLeitura`, `servicos/roteiro.ts`). Story usa as três linhas;
+   * Reels só a de texto na tela, quando algum item bate com o bloco.
+   */
+  mostrar: {
+    oQueMostrar: (texto: string) => `Mostrar: ${texto}`,
+    textoNaTela: (texto: string) => `Na tela: "${texto}"`,
+    figurinha: (rotulo: string) => `Figurinha: ${rotulo}`,
+  },
   /** V9c, item 4: por que o roteiro saiu assim, uma linha por regra aplicada (`porQueAssim` do prompt). */
   porQueAssim: "Por que assim",
   referencia: "Referência",
