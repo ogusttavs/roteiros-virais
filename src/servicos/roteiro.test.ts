@@ -135,15 +135,23 @@ describe("blocosParaLeitura, o campo mostrar", () => {
     expect(blocos[1].mostrar).toEqual(["Mostrar: o resultado pronto", 'Na tela: "pronto"']);
   });
 
-  it("Reels: só os itens de textoNaTela cujo quando bate com o bloco, os outros ficam de fora", () => {
+  /**
+   * Revisão do PR #62, item 1: valores exatos conferidos no banco de produção (30 itens de
+   * `edicao.textoNaTela` em cinco roteiros de Reels), sempre em segundos ou "Do começo ao fim",
+   * nunca com as palavras que a primeira versão desta rodada tentava casar.
+   */
+  it("Reels: casa cada item pela posição do primeiro número do quando dentro da duração, não por palavra-chave", () => {
     const roteiro = roteiroDeTeste(
       "reels",
       conteudoBase({
+        duracaoS: 48,
         edicao: {
           textoNaTela: [
-            { quando: "na abertura", oQue: "titulo do vídeo", onde: "topo" },
-            { quando: "no fechamento", oQue: "resumo em tela", onde: "centro" },
-            { quando: "um momento qualquer, sem palavra-chave", oQue: "nunca deve aparecer", onde: "rodapé" },
+            { quando: "0 a 5 segundos", oQue: "titulo do vídeo", onde: "topo" },
+            { quando: "12 a 22 segundos", oQue: "o preço", onde: "centro" },
+            { quando: "35 a 42 segundos", oQue: "antes e depois", onde: "canto" },
+            { quando: "42 a 48 segundos", oQue: "chama no direct", onde: "rodapé" },
+            { quando: "Do começo ao fim", oQue: "nome da marca", onde: "canto superior" },
           ],
           ritmoDeCorte: "moderado",
           recursos: [],
@@ -155,13 +163,41 @@ describe("blocosParaLeitura, o campo mostrar", () => {
 
     const [abertura, meio, fechamento, chamada] = blocosParaLeitura(roteiro);
 
-    expect(abertura.mostrar).toEqual(['Na tela: "titulo do vídeo"']);
-    expect(meio.mostrar).toEqual([]);
-    expect(fechamento.mostrar).toEqual(['Na tela: "resumo em tela"']);
-    expect(chamada.mostrar).toEqual([]);
-    expect(blocosParaLeitura(roteiro).flatMap((b) => b.mostrar ?? [])).not.toContain(
-      expect.stringContaining("nunca deve aparecer"),
+    expect(abertura.mostrar).toEqual([
+      'Na tela (0 a 5 segundos): "titulo do vídeo"',
+      'Na tela (Do começo ao fim): "nome da marca"',
+    ]);
+    expect(meio.mostrar).toEqual(['Na tela (12 a 22 segundos): "o preço"']);
+    expect(fechamento.mostrar).toEqual(['Na tela (35 a 42 segundos): "antes e depois"']);
+    expect(chamada.mostrar).toEqual(['Na tela (42 a 48 segundos): "chama no direct"']);
+  });
+
+  it("Reels: um número com 's' colado (\"8s a 12s\") ou um número só (\"26 segundos\") também casam pelo primeiro número", () => {
+    const roteiro = roteiroDeTeste(
+      "reels",
+      conteudoBase({
+        duracaoS: 30,
+        edicao: {
+          textoNaTela: [
+            { quando: "8s a 12s", oQue: "primeiro item", onde: "topo" },
+            { quando: "26 segundos", oQue: "segundo item", onde: "centro" },
+          ],
+          ritmoDeCorte: "moderado",
+          recursos: [],
+          audio: null,
+          referencia: null,
+        },
+      }),
     );
+
+    // Com 30s de duração: 8 fica entre o limiar de abertura (3s) e o de fechamento (65% = 19,5s), cai no meio;
+    // 26 já passa do limiar de chamada (85% = 25,5s).
+    const [abertura, meio, fechamento, chamada] = blocosParaLeitura(roteiro);
+
+    expect(abertura.mostrar).toEqual([]);
+    expect(meio.mostrar).toEqual(['Na tela (8s a 12s): "primeiro item"']);
+    expect(fechamento.mostrar).toEqual([]);
+    expect(chamada.mostrar).toEqual(['Na tela (26 segundos): "segundo item"']);
   });
 
   it("Reels: sem nenhum item de textoNaTela, mostrar vem vazio em todo bloco (nunca undefined)", () => {

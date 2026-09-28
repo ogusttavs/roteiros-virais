@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { FormatoRoteiro, Objetivo } from "@/db/schema";
 import { AJUDA_OBJETIVO, FORMATOS_ROTEIRO_EM_ORDEM, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM, ROTULO_FORMATO_ROTEIRO, sugerirFormatoPeloObjetivo } from "@/ia/enums";
@@ -40,6 +40,13 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
   const [pendente, iniciarTransicao] = useTransition();
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
+  /**
+   * Revisão do PR #62, item 2: "Voltar depois" navegava para o Hoje, mas a transição continuava
+   * rodando, e quando `gerarRoteiroAction` terminava, o `router.push` para o roteiro disparava de
+   * onde a pessoa estivesse (achado do Fable). Mesma ref que `FolhaGravarAgora` já usa: marcada no
+   * clique, o sucesso (ou o erro) depois dela não navega nem escreve na tela mais.
+   */
+  const saiuRef = useRef(false);
 
   useEffect(() => {
     if (formatoTocado || !escolhido) return;
@@ -52,9 +59,11 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     iniciarTransicao(async () => {
       try {
         const { id } = await gerarRoteiroAction(origem, escolhido, formato);
+        if (saiuRef.current) return;
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
       } catch (falha) {
+        if (saiuRef.current) return;
         // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir cria outro roteiro,
         // então a frase de rede manda olhar o Histórico primeiro (V7, item 4 do PROXIMO.md).
         setErro(tratarFalha(falha, textosObjetivo.erro, textosConexao.conexaoCaiuNoMeio));
@@ -62,14 +71,13 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     });
   }
 
+  function voltarDepois() {
+    saiuRef.current = true;
+    router.push("/hoje");
+  }
+
   if (pendente) {
-    return (
-      <TelaEscrevendo
-        aberto
-        fraseDemorando={textosObjetivo.demorando}
-        aoVoltarDepois={() => router.push("/hoje")}
-      />
-    );
+    return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} />;
   }
 
   if (erro !== null) {

@@ -92,33 +92,49 @@ function splitParagrafos(texto: string): string[] {
     .filter(Boolean);
 }
 
-/**
- * Palavras que costumam aparecer no `quando` livre de um item de texto na
- * tela quando ele de fato fala do bloco (V11, item 6b): `quando` é texto
- * solto que o modelo escreve (o prompt só pede "quando, o quê, onde", nunca
- * um segundo exato), sem intervalo numérico para casar com o bloco. Sem uma
- * palavra destas, o item fica de fora do bloco (nunca aparece em nenhum,
- * nunca aparece em todos por padrão); é uma pista, não uma prova, registrada
- * como desvio do pedido literal do PROXIMO.md (que supunha um intervalo em
- * segundos) em `HISTORICO.md`.
- */
-const PALAVRAS_CHAVE_BLOCO: Record<"abertura" | "meio" | "fechamento" | "chamada", string[]> = {
-  abertura: ["abertura", "gancho", "início", "inicio", "começo", "comeco", "primeiro"],
-  meio: ["meio", "corpo", "explica", "demonstra", "desenvolvimento"],
-  fechamento: ["fechamento", "resumo", "encerra", "conclus"],
-  chamada: ["chamada", "cta", "convite", "convoca"],
-};
+type BlocoReels = "abertura" | "meio" | "fechamento" | "chamada";
 
-function bateComBloco(quando: string, bloco: keyof typeof PALAVRAS_CHAVE_BLOCO): boolean {
-  const minusculo = quando.toLowerCase();
-  return PALAVRAS_CHAVE_BLOCO[bloco].some((palavra) => minusculo.includes(palavra));
+/** Até quantos segundos do início um `quando` ainda conta como abertura (revisão do PR #62, item 1). */
+const LIMIAR_ABERTURA_S = 3;
+/** A partir de que fração da duração um `quando` já conta como chamada final. */
+const FRACAO_CHAMADA = 0.85;
+/** A partir de que fração da duração um `quando` já conta como fechamento. */
+const FRACAO_FECHAMENTO = 0.65;
+
+/**
+ * O primeiro número do `quando` livre (revisão do PR #62, item 1: conferido
+ * no banco de produção, os 30 itens de `edicao.textoNaTela` dos cinco
+ * roteiros de Reels vieram sempre em segundos, "0 a 5 segundos", "8s a 12s",
+ * "26 segundos", nunca com as palavras que a primeira versão desta rodada
+ * tentava casar). `null` sem nenhum número ("Do começo ao fim", "legenda o
+ * tempo todo").
+ */
+function primeiroSegundo(quando: string): number | null {
+  const numero = /\d+/.exec(quando);
+  return numero ? Number(numero[0]) : null;
 }
 
-/** O que mostrar num bloco de Reels (V11, item 6b): só os itens de `textoNaTela` cujo `quando` bate com o bloco. */
-function mostrarNoBlocoReels(edicao: ConteudoRoteiro["edicao"], bloco: keyof typeof PALAVRAS_CHAVE_BLOCO): string[] {
+/** Em qual dos quatro blocos um segundo cai, pela posição dentro da duração do roteiro (revisão do PR #62, item 1). */
+function blocoDoSegundo(segundo: number, duracaoS: number): BlocoReels {
+  if (segundo <= LIMIAR_ABERTURA_S) return "abertura";
+  if (segundo >= duracaoS * FRACAO_CHAMADA) return "chamada";
+  if (segundo >= duracaoS * FRACAO_FECHAMENTO) return "fechamento";
+  return "meio";
+}
+
+/**
+ * O que mostrar num bloco de Reels (V11, item 6b; casamento por posição
+ * desde a revisão do PR #62, item 1, não mais por palavra-chave): um item
+ * sem número no `quando` sempre cai na abertura, com o `quando` na frente da
+ * linha (`textosRoteiro.mostrar.textoNaTela`).
+ */
+function mostrarNoBlocoReels(edicao: ConteudoRoteiro["edicao"], duracaoS: number, bloco: BlocoReels): string[] {
   return edicao.textoNaTela
-    .filter((item) => bateComBloco(item.quando, bloco))
-    .map((item) => textosRoteiro.mostrar.textoNaTela(item.oQue));
+    .filter((item) => {
+      const segundo = primeiroSegundo(item.quando);
+      return segundo === null ? bloco === "abertura" : blocoDoSegundo(segundo, duracaoS) === bloco;
+    })
+    .map((item) => textosRoteiro.mostrar.textoNaTelaComQuando(item.quando, item.oQue));
 }
 
 /** O que mostrar num cartão de Story (V11, item 6a): sempre as três linhas, a figurinha só quando pedida. */
@@ -154,14 +170,26 @@ export function blocosParaLeitura(
     }));
   }
   return [
-    { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho], mostrar: mostrarNoBlocoReels(corpo.edicao, "abertura") },
-    { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo), mostrar: mostrarNoBlocoReels(corpo.edicao, "meio") },
+    {
+      rotulo: textosRoteiro.blocos.abertura,
+      paragrafos: [corpo.gancho],
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "abertura"),
+    },
+    {
+      rotulo: textosRoteiro.blocos.meio,
+      paragrafos: splitParagrafos(corpo.corpo),
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "meio"),
+    },
     {
       rotulo: textosRoteiro.blocos.fechamento,
       paragrafos: splitParagrafos(corpo.fechamento),
-      mostrar: mostrarNoBlocoReels(corpo.edicao, "fechamento"),
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "fechamento"),
     },
-    { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal], mostrar: mostrarNoBlocoReels(corpo.edicao, "chamada") },
+    {
+      rotulo: textosRoteiro.blocos.chamada,
+      paragrafos: [corpo.chamadaFinal],
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "chamada"),
+    },
   ];
 }
 

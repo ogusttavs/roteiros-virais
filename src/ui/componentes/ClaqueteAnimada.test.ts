@@ -26,11 +26,11 @@ describe("ClaqueteAnimada", () => {
     expect(html).toContain(`width="${48 * PROPORCAO}"`);
   });
 
-  it("respeita prefers-reduced-motion: a haste para, aberta (0deg)", () => {
+  it("respeita prefers-reduced-motion: a haste para, aberta (-17deg, a posição de descanso do símbolo estático)", () => {
     const css = readFileSync(join(__dirname, "ClaqueteAnimada.module.css"), "utf-8");
     const blocoReduzido = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*)\}\s*$/.exec(css)?.[1] ?? "";
     expect(blocoReduzido).toContain(".braco");
     expect(blocoReduzido).toMatch(/animation:\s*none/);
-    expect(blocoReduzido).toMatch(/rotate\(0deg\)/);
+    expect(blocoReduzido).toMatch(/rotate\(-17deg\)/);
   });
 });

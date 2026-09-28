@@ -46,11 +46,14 @@ export const textosRoteiro = {
   /**
    * V11, item 6: o que mostrar em cada bloco do modo gravação, junto da fala
    * (`blocosParaLeitura`, `servicos/roteiro.ts`). Story usa as três linhas;
-   * Reels só a de texto na tela, quando algum item bate com o bloco.
+   * Reels só a de texto na tela, com o `quando` livre na frente (revisão do
+   * PR #62, item 1: o casamento por posição não some com a informação de
+   * quando, ela só deixa de decidir o bloco sozinha).
    */
   mostrar: {
     oQueMostrar: (texto: string) => `Mostrar: ${texto}`,
     textoNaTela: (texto: string) => `Na tela: "${texto}"`,
+    textoNaTelaComQuando: (quando: string, oQue: string) => `Na tela (${quando}): "${oQue}"`,
     figurinha: (rotulo: string) => `Figurinha: ${rotulo}`,
   },
   /** V9c, item 4: por que o roteiro saiu assim, uma linha por regra aplicada (`porQueAssim` do prompt). */
