@@ -7,7 +7,7 @@ vi.mock("node:child_process", () => ({ execFile: vi.fn() }));
 
 import { config } from "@/lib/config";
 
-import { argumentosDeAudio, baixarAudio, ErroAudio } from "./audio";
+import { argumentosDeAudio, baixarAudio, ErroAudio, ocultarSegredos } from "./audio";
 
 const PROXY = "http://usuario:senha@proxy.exemplo.invalido:823";
 const URL_CDN_INSTAGRAM = "https://scontent-gru2-1.cdninstagram.com/o1/v/t16/f2/m86/AQexemplo.mp4?_nc_cat=100&oh=abc";
@@ -76,5 +76,31 @@ describe("baixarAudio", () => {
     const chamada = () => baixarAudio(URL_CDN_INSTAGRAM, "instagram");
     await expect(chamada()).rejects.toThrow(ErroAudio);
     await expect(chamada()).rejects.toThrow(URL_CDN_INSTAGRAM);
+  });
+
+  /**
+   * Achado do Fable em 28/09/2026 conferindo produção: o erro do `execFile` repete a linha de comando
+   * inteira do yt-dlp, com `--proxy http://usuario:senha@host`, e isso ia parar em `execucoes_job` e no
+   * admin. A mensagem do `ErroAudio` nunca pode carregar a senha.
+   */
+  it("falha do yt-dlp com a linha de comando inteira nunca vaza a senha do proxy na mensagem", async () => {
+    config.transcricao.ytdlpProxy = PROXY;
+    vi.mocked(execFile).mockImplementation(((_comando: string, _args: string[], retorno: (erro: Error | null) => void) =>
+      retorno(new Error(`Command failed: yt-dlp -x --proxy ${PROXY} -o /tmp/a.mp3 https://www.tiktok.com/@x/video/1`))) as never);
+
+    const chamada = () => baixarAudio("https://www.tiktok.com/@x/video/1", "tiktok");
+    await expect(chamada()).rejects.toThrow(ErroAudio);
+    await expect(chamada()).rejects.not.toThrow("senha");
+    await expect(chamada()).rejects.toThrow("--proxy [oculto]");
+  });
+});
+
+describe("ocultarSegredos", () => {
+  it("tira o argumento --proxy inteiro e qualquer url com usuario e senha", () => {
+    expect(ocultarSegredos(`yt-dlp --proxy ${PROXY} -o x`)).toBe("yt-dlp --proxy [oculto] -o x");
+    expect(ocultarSegredos(`falhou em ${PROXY}/caminho`)).toBe("falhou em http://[oculto]@proxy.exemplo.invalido:823/caminho");
+    expect(ocultarSegredos("sem segredo nenhum https://www.youtube.com/watch?v=abc")).toBe(
+      "sem segredo nenhum https://www.youtube.com/watch?v=abc",
+    );
   });
 });

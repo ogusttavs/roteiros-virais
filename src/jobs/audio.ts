@@ -40,6 +40,21 @@ export function argumentosDeAudio(url: string, plataforma: Plataforma, modeloDeS
 }
 
 /**
+ * Tira segredo de uma mensagem de erro antes de ela ir para o banco
+ * (`execucoes_job.resumo` e `.erro`, lidos no admin) ou para o log: o erro
+ * do `execFile` repete a linha de comando inteira do `yt-dlp`, e nela vai
+ * `--proxy http://usuario:senha@host:porta` (achado do Fable em 28/09/2026
+ * conferindo produção; os registros antigos foram redigidos à mão no banco
+ * e a senha do proxy foi trocada). Cobre o argumento `--proxy` e qualquer
+ * url com credencial, em qualquer texto.
+ */
+export function ocultarSegredos(texto: string): string {
+  return texto
+    .replace(/--proxy\s+\S+/g, "--proxy [oculto]")
+    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/g, "$1[oculto]@");
+}
+
+/**
  * Baixa so o audio em mp3 a 64 kbps; devolve o caminho do arquivo
  * temporario. `plataforma` e obrigatoria (ajuste 2 da revisao do PR #45,
  * V2a): a url direta de midia da Meta, que `transcrever` e `meta-hashtags`
@@ -54,7 +69,7 @@ export async function baixarAudio(url: string, plataforma: Plataforma): Promise<
   try {
     await execFileAsync("yt-dlp", argumentosDeAudio(url, plataforma, join(pasta, `${prefixo}.%(ext)s`)));
   } catch (erro) {
-    throw new ErroAudio(`nao foi possivel baixar o audio de ${url}: ${String(erro)}`);
+    throw new ErroAudio(`nao foi possivel baixar o audio de ${url}: ${ocultarSegredos(String(erro))}`);
   }
 
   return caminho;
