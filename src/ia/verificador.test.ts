@@ -14,7 +14,7 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
-import { gerarComVerificacao, palavrasDeConteudo, verificarLocalmente } from "./verificador";
+import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
 
@@ -585,7 +585,10 @@ describe("gerarComVerificacao", () => {
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
 
     const segundaChamada = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
-    expect(segundaChamada.entrada).toContain("reprovada");
+    // V10, item 2: admin-acompanhamento.ts usa este mesmo marcador para achar "reprovada duas
+    // vezes" so entre a primeira e a sua propria segunda tentativa; nunca reescrever esta
+    // asserção so pelo texto solto "reprovada" sem conferir a constante exportada.
+    expect(segundaChamada.entrada).toContain(MARCADOR_SEGUNDA_TENTATIVA);
     expect(segundaChamada.entrada).toContain("travessao");
 
     // as duas tentativas da tarefa real ficam registradas, mais a chamada de verificarTexto

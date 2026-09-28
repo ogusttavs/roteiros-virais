@@ -15,6 +15,7 @@ import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
+import { rodarEmailAcompanhamento } from "./email-acompanhamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
@@ -59,6 +60,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.temasDoDia]: () => rodarTemasDoDia(),
   [FILAS.lembrete]: () => rodarLembrete(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
+  [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
   /**
    * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
    * item 2): sem um "todos os clientes" que faca sentido, o disparo manual
