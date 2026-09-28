@@ -202,6 +202,9 @@ export async function foraDaCurvaDoNicho(
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
+    // V9d, item 0b: o piso vem antes do múltiplo, também na seleção de leitura (transcrição e
+    // análise usam esta função via `transcrever.ts`): ler primeiro o que passa do piso.
+    gte(videos.views, config.regras.pisoViewsReferencia),
     isNotNull(videos.foraDaCurva),
     PERTENCE_AO_NICHO,
   ];
@@ -358,6 +361,9 @@ function condicoesEvidencia(nichoId: number, texto: string) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(90)),
+    // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); vale para a
+    // evidência do tema e do roteiro tanto quanto para a biblioteca de referências.
+    gte(videos.views, config.regras.pisoViewsReferencia),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
@@ -617,6 +623,8 @@ export type VideoReferencia = {
   estrutura: string;
   porQueFuncionou: string;
   formato: AnaliseVideo["formato"];
+  /** `null` quando a plataforma não trouxe (Hashtag Search da Meta, TikTok ainda suspenso); a tela cai no retângulo neutro. */
+  capaUrl: string | null;
 };
 
 /**
@@ -652,6 +660,9 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(filtros.periodoDias ?? 7)),
+    // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
+    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho.
+    gte(videos.views, config.regras.pisoViewsReferencia),
     gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
@@ -722,6 +733,7 @@ export async function referenciasDoNicho(
         idioma: videos.idioma,
         contaPais: contas.pais,
         contaIdiomaPrincipal: contas.idiomaPrincipal,
+        capaUrl: videos.capaUrl,
       })
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -774,6 +786,7 @@ export async function referenciasDoNicho(
       estrutura: l.analise.estrutura,
       porQueFuncionou: l.analise.porQueFuncionou,
       formato: l.analise.formato,
+      capaUrl: l.capaUrl,
     })),
   };
 }

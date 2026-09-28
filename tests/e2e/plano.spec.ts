@@ -142,4 +142,69 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await expect(folhaMeuPlano.getByText("escritorio").first()).toBeVisible();
     await expect(folhaMeuPlano.getByText("reuniao de fechamento")).toBeVisible();
   });
+
+  // V9d, item 4: um dia cuja referencia resolverDataRelativa nao entende ("na volta") nao some em
+  // silencio; a folha mostra "não entendi este dia" e deixa a pessoa escolher a data.
+  test("um dia 'na volta' vira 'nao entendi este dia', a pessoa escolhe a data e o item entra no plano", async ({
+    page,
+  }) => {
+    // Data bem no futuro, calculada na hora do teste (nunca uma literal fixa): evita a mesma
+    // corrosao ja achada nesta suite com data literal caindo no passado.
+    const dataEscolhida = new Date();
+    dataEscolhida.setFullYear(dataEscolhida.getFullYear() + 1);
+    const dataEscolhidaISO = dataEscolhida.toISOString().slice(0, 10);
+
+    await entrar(page);
+    await page.goto("/hoje");
+
+    await page.getByRole("button", { name: "Colar a agenda" }).click();
+    const folhaAgenda = page.getByRole("dialog", { name: "Colar a agenda" });
+    await expect(folhaAgenda).toBeVisible();
+
+    await folhaAgenda
+      .getByLabel("A sua agenda")
+      .fill("hoje: fabrica, ver a linha nova; na volta: escritorio, reuniao de fechamento");
+    await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
+
+    await expect(folhaAgenda.getByText("Não entendi este dia")).toBeVisible();
+    await expect(folhaAgenda.getByText("reuniao de fechamento")).toBeVisible();
+    await expect(folhaAgenda.getByText('Você disse "na volta"')).toBeVisible();
+
+    await folhaAgenda.getByLabel("Data").fill(dataEscolhidaISO);
+    await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
+    await expect(folhaAgenda).toBeHidden();
+
+    await page.getByRole("button", { name: "Meu plano" }).click();
+    const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
+    await expect(folhaMeuPlano).toBeVisible();
+    await expect(folhaMeuPlano.getByText("reuniao de fechamento")).toBeVisible();
+  });
+
+  // V9d, item 4: "deixar de fora" some com o cartao, e o dia nunca entra no plano.
+  test("'deixar de fora' num dia nao entendido: o item nunca entra no plano", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/hoje");
+
+    await page.getByRole("button", { name: "Colar a agenda" }).click();
+    const folhaAgenda = page.getByRole("dialog", { name: "Colar a agenda" });
+    await expect(folhaAgenda).toBeVisible();
+
+    await folhaAgenda
+      .getByLabel("A sua agenda")
+      .fill("hoje: fabrica, conferir estoque; na volta: deposito, contar caixas");
+    await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
+
+    await expect(folhaAgenda.getByText("Não entendi este dia")).toBeVisible();
+    await folhaAgenda.getByRole("button", { name: "Deixar de fora" }).click();
+    await expect(folhaAgenda.getByText("Não entendi este dia")).toHaveCount(0);
+
+    await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
+    await expect(folhaAgenda).toBeHidden();
+
+    await page.getByRole("button", { name: "Meu plano" }).click();
+    const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
+    await expect(folhaMeuPlano).toBeVisible();
+    await expect(folhaMeuPlano.getByText("conferir estoque")).toBeVisible();
+    await expect(folhaMeuPlano.getByText("contar caixas")).toHaveCount(0);
+  });
 });

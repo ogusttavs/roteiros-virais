@@ -128,4 +128,18 @@ describe("gerarRoteiroMomentoAction", () => {
       gerarRoteiroMomentoAction({ ...MOMENTO, oQueDaParaMostrar: "   ", objetivo: "engajamento" }),
     ).rejects.toThrow(ErroRoteiro);
   });
+
+  // V9d, item 2: `formato` chega como texto livre do navegador; um valor fora de "reels"/"story"
+  // precisa ser recusado antes de gerar, nunca chegar ao banco.
+  it("com formato invalido, erro nomeado, sem gerar", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+
+    await expect(
+      gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", formato: "carrossel" }),
+    ).rejects.toThrow(ErroRoteiro);
+
+    const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    expect(depois.length).toBe(antes.length);
+  });
 });

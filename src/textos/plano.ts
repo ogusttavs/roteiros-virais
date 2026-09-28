@@ -24,6 +24,12 @@ export const textosPlano = {
   confirmandoPlano: "Montando o plano",
   semLugar: "lugar não informado",
 
+  /** V9d, item 4: um dia cuja referência ("na volta", por exemplo) a gente não conseguiu resolver sozinho. */
+  naoEntendiEsteDia: "Não entendi este dia",
+  naoEntendiAjuda: (referencia: string) => `Você disse "${referencia}". Qual é a data certa?`,
+  rotuloDataEscolhida: "Data",
+  botaoDeixarDeFora: "Deixar de fora",
+
   erroLerAgenda: "Não conseguimos separar os dias agora. A falha foi nossa; tente de novo.",
   erroCriarPlano: "Não conseguimos montar o plano agora. A falha foi nossa; os dias continuam aqui.",
   tentarDeNovo: "Tentar de novo",

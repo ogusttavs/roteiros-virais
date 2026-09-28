@@ -112,6 +112,14 @@ export default defineConfig({
       GROQ_API_KEY: "",
       APIFY_TOKEN: "",
       YOUTUBE_API_KEY: "",
+      /**
+       * V9d, item 0b: o piso de 50 mil views para referência/evidência (padrão de
+       * `src/lib/config.ts`) quebraria fixture de vídeo com views pequenas em várias
+       * suítes e2e (`historico.spec.ts`, `layout.spec.ts`, o TikTok de `referencias.spec.ts`).
+       * Mesma solução do `vitest.config.mts`: zera aqui, e um teste próprio confere o piso de
+       * verdade sem depender de fixture de e2e nenhuma.
+       */
+      PISO_VIEWS_REFERENCIA: "0",
     },
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

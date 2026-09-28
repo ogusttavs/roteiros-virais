@@ -146,6 +146,25 @@ test.describe("/referencias no design v2", () => {
         publicadoEm: new Date(),
         analise: analiseExemplo("aparelho ortodontico") as never,
       });
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "e2e-referencias-dentista-embed",
+        // Vídeo real do YouTube ("Me at the zoo", o primeiro do site, estável e sempre no ar),
+        // só para este teste confirmar que a folha "Ver detalhes" carrega o iframe de verdade
+        // (V9d, item 0b, sub-item 4: o observador do VideoEmbed precisa disparar dentro da folha).
+        url: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+        nichoId: nichoDois.id,
+        contaId: contaDentista.id,
+        titulo: "video de teste do embed dentro da folha",
+        views: 65000,
+        foraDaCurva: "18.0",
+        velocidade: "2500",
+        idioma: "pt",
+        publicadoEm: new Date(),
+        analise: analiseExemplo("embed de teste") as never,
+      });
 
     const [contaInstagram] = await db()
       .insert(contas)
@@ -331,5 +350,35 @@ test.describe("/referencias no design v2", () => {
     await page.goto("/referencias");
     await expect(page.locator("article", { hasText: "o aparelho que corrigiu o sorriso" })).toBeVisible();
     await expect(page.locator("article", { hasText: "o produto que tira qualquer mancha do estofado" })).not.toBeVisible();
+  });
+
+  test("abrir Ver detalhes de um vídeo do YouTube carrega o iframe (V9d, item 0b: o observador dispara dentro da folha)", async ({
+    page,
+  }) => {
+    // O botão "Trocar de marca" só aparece na pílula do celular.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page, EMAIL);
+
+    // O vídeo de teste do embed está na Marca Dois (nichoDois). A marca ativa no login novo
+    // segue "o acesso mais recente" (`src/lib/marca-ativa.ts`), então pode já ser a Dois, se o
+    // teste anterior (que também troca de marca) rodou antes deste; troca só se precisar.
+    await page.goto("/hoje");
+    const jaNaDois = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) });
+    if (!(await jaNaDois.isVisible())) {
+      await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) }).click();
+      const folhaMarcas = page.getByRole("dialog", { name: textosNav.suasMarcas });
+      await folhaMarcas.getByRole("button", { name: NOME_MARCA_DOIS }).click();
+      await page.waitForLoadState("networkidle");
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+    }
+
+    await page.goto("/referencias");
+    const cartao = page.locator("article", { hasText: "video de teste do embed dentro da folha" });
+    await cartao.getByRole("button", { name: "Ver detalhes" }).click();
+
+    const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
+    await expect(folha).toBeVisible();
+    await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube\.com\/embed\/jNQXAC9IVRw/);
   });
 });

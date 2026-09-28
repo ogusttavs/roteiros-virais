@@ -31,6 +31,7 @@
     "preencher:nome-contas": "tsx scripts/preencher-nome-contas.ts",
     "preencher:idioma": "tsx scripts/preencher-idioma.ts",
     "preencher:tipo-abertura": "tsx scripts/preencher-tipo-abertura.ts",
+    "preencher:capas": "tsx scripts/preencher-capas.ts",
     "corrigir:titulos": "tsx scripts/corrigir-titulos.ts",
     "ia:fumaca": "tsx scripts/ia-fumaca.ts",
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",

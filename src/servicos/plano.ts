@@ -38,6 +38,16 @@ export class ErroPlano extends Error {}
 
 export type DiaAgenda = { data: string; lugar: string; compromissos: string[] };
 
+/**
+ * V9d, item 4: um dia cuja referência `resolverDataRelativa` não entendeu ("na volta", por
+ * exemplo). Mesmos campos de `DiaAgenda`, menos `data` (é exatamente o que falta); a folha "Colar
+ * a agenda" mostra "não entendi este dia" com um campo de data para a pessoa escolher, ou "deixar
+ * de fora".
+ */
+export type DiaNaoEntendido = { referenciaDia: string; lugar: string; compromissos: string[] };
+
+export type ResultadoLerAgenda = { dias: DiaAgenda[]; diasNaoEntendidos: DiaNaoEntendido[] };
+
 export type ItemPlano = {
   id: number;
   dia: string;
@@ -72,14 +82,17 @@ function linhaParaItem(linha: typeof planoGravacoes.$inferSelect): ItemPlano {
 /**
  * Separa a agenda (texto colado ou transcrito) em dias, com a data de cada
  * um já resolvida por código (`resolverDataRelativa`), nunca pelo modelo.
- * Um dia cuja referência a função não reconhece é descartado, não
- * inventado (registra em log seria o ideal; por ora, silencioso, para a
- * pessoa só ver os dias que fizeram sentido na revisão). `hoje` é
- * injetável (a data real por padrão, `hojeISO()`) para o teste de
+ * `hoje` é injetável (a data real por padrão, `hojeISO()`) para o teste de
  * integração poder escolher uma data determinística, mesmo padrão de
  * `jobs/lembrete.ts`, `rodarLembrete`.
+ *
+ * V9d, item 4 (observação da revisão do PR #56): um dia cuja referência
+ * `resolverDataRelativa` não reconhece ("na volta", por exemplo) não some
+ * mais em silêncio, volta em `diasNaoEntendidos` para a folha "Colar a
+ * agenda" mostrar "não entendi este dia" e deixar a pessoa escolher a data
+ * ou deixar de fora.
  */
-export async function lerAgendaDeTexto(texto: string, hoje = hojeISO()): Promise<DiaAgenda[]> {
+export async function lerAgendaDeTexto(texto: string, hoje = hojeISO()): Promise<ResultadoLerAgenda> {
   const resultado = await gerarEstruturado({
     tarefa: "lerAgenda",
     nivel: lerAgendaIA.nivel,
@@ -105,15 +118,17 @@ export async function lerAgendaDeTexto(texto: string, hoje = hojeISO()): Promise
   });
 
   const dias: DiaAgenda[] = [];
+  const diasNaoEntendidos: DiaNaoEntendido[] = [];
   for (const dia of resultado.dados.dias) {
     try {
       const data = resolverDataRelativa(dia.referenciaDia, hoje);
       dias.push({ data, lugar: dia.lugar, compromissos: dia.compromissos });
     } catch (erro) {
       if (!(erro instanceof ErroDataRelativa)) throw erro;
+      diasNaoEntendidos.push({ referenciaDia: dia.referenciaDia, lugar: dia.lugar, compromissos: dia.compromissos });
     }
   }
-  return dias;
+  return { dias, diasNaoEntendidos };
 }
 
 /** Sugere de 1 a 3 gravações para um dia (`planejarDia`, barato, sem verificador, mesmo espírito de `lerMomento`). */
@@ -166,10 +181,19 @@ export async function limparPlano(clienteId: number, apartirDe: string): Promise
 
 /**
  * Cria o plano a partir dos dias já confirmados pela pessoa (a revisão da
- * folha "Colar a agenda"): substitui o que já existia a partir de hoje
- * (`limparPlano`), ignora dia no passado, e sugere de 1 a 3 gravações por
- * dia (`planejarDia`). Devolve os itens criados, ordenados por dia e ordem.
- * `hoje` injetável, mesmo motivo de `lerAgendaDeTexto`.
+ * folha "Colar a agenda"): substitui o que já existia a partir de hoje,
+ * ignora dia no passado, e sugere de 1 a 3 gravações por dia (`planejarDia`).
+ * Devolve os itens criados, ordenados por dia e ordem. `hoje` injetável,
+ * mesmo motivo de `lerAgendaDeTexto`.
+ *
+ * V9d, item 3 (observação da revisão do PR #56): as sugestões de todos os
+ * dias são geradas em memória primeiro (`planejarUmDia` pode falhar no
+ * meio, se o modelo errar num dia); só depois de tudo pronto é que o plano
+ * antigo é apagado e o novo entra, dentro de uma transação. Antes,
+ * `limparPlano` rodava logo no começo: uma falha do modelo no segundo dia
+ * deixava o plano de ontem já apagado e nada gravado no lugar dele. Teste
+ * de integração em `tests/integracao/plano.test.ts`, "modelo falha no
+ * segundo dia".
  */
 export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hojeISO()): Promise<ItemPlano[]> {
   if (!cliente.nichoId) {
@@ -188,8 +212,6 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
   const modeloNichoLinha = await modeloNichoAtual(cliente.nichoId);
   const perfilCompiladoFormatado = formatarPerfilCompilado(perfil);
   const modeloNichoFormatado = formatarModeloNicho(modeloNichoLinha?.modelo ?? null);
-
-  await limparPlano(cliente.id, hoje);
 
   const linhasParaInserir: (typeof planoGravacoes.$inferInsert)[] = [];
   for (const dia of diasFuturos) {
@@ -211,7 +233,11 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
 
   if (linhasParaInserir.length === 0) return [];
 
-  const linhasGravadas = await db().insert(planoGravacoes).values(linhasParaInserir).returning();
+  const linhasGravadas = await db().transaction(async (tx) => {
+    await tx.delete(planoGravacoes).where(and(eq(planoGravacoes.clienteId, cliente.id), gte(planoGravacoes.dia, hoje)));
+    return tx.insert(planoGravacoes).values(linhasParaInserir).returning();
+  });
+
   return linhasGravadas
     .sort((a, b) => (a.dia === b.dia ? a.ordem - b.ordem : a.dia.localeCompare(b.dia)))
     .map(linhaParaItem);

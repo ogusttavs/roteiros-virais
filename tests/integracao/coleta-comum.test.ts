@@ -68,6 +68,27 @@ describe("upsertVideo", () => {
       original: true,
     });
   });
+
+  // V9d, item 0b, sub-item 4: mesmo raciocinio do audio, para a Meta sem thumbnail_url desta vez
+  // (ou o TikTok, ainda suspenso) nao apagar a capa gravada numa coleta anterior.
+  it("uma recoleta sem capa nao apaga a capa ja gravada", async () => {
+    const contaId = await upsertConta(
+      { plataforma: "tiktok", handle: "exemplo.capa", nome: null, url: null, seguidores: null },
+      nichoId,
+    );
+    const videoComCapa: VideoParaGravar = { ...videoBase, idExterno: "coleta-comum-teste-capa", capaUrl: "https://exemplo.invalido/capa.jpg" };
+
+    await upsertVideo(videoComCapa, contaId, nichoId);
+    await upsertVideo({ ...videoComCapa, capaUrl: null, views: 300 }, contaId, nichoId);
+
+    const [linha] = await db()
+      .select()
+      .from(videos)
+      .where(and(eq(videos.plataforma, "tiktok"), eq(videos.idExterno, videoComCapa.idExterno)));
+
+    expect(linha.views).toBe(300);
+    expect(linha.capaUrl).toBe("https://exemplo.invalido/capa.jpg");
+  });
 });
 
 describe("upsertConta", () => {

@@ -108,6 +108,14 @@ export function verificarLocalmente(
     formato?: FormatoRoteiro;
     cartoes?: CartaoStory[] | null;
     porQueAssim?: { regra: string; motivo: string }[];
+    /**
+     * V9d, item 1: os valores brutos de `gancho`, `corpo` e `chamadaFinal`, antes do filtro de
+     * `extrairCamposRoteiro` (que já tira do `campos` qualquer um vazio ou nulo, em qualquer
+     * formato). Sem isto, um roteiro em Reels que saísse com `gancho` nulo (o schema 2.0.0 aceita,
+     * pensado para Story) não tinha nenhum campo `campos.gancho` para reprovar, e um roteiro em
+     * branco passava. Só confere em `formato === "reels"`; em Story a estrutura é `cartoes`, abaixo.
+     */
+    narrativa?: { gancho: string | null; corpo: string | null; chamadaFinal: string | null };
   } = {},
 ): ResultadoVerificacaoLocal {
   const motivos: string[] = [];
@@ -203,8 +211,25 @@ export function verificarLocalmente(
     }
   }
 
-  if (opcoes.formato === "story" && opcoes.cartoes) {
-    motivos.push(...verificarCartoesStory(opcoes.cartoes));
+  if (opcoes.formato === "story") {
+    if (!opcoes.cartoes || opcoes.cartoes.length === 0) {
+      motivos.push("cartoes: nulo ou vazio, um roteiro em story precisa de cartões (V9d, item 1)");
+    } else {
+      motivos.push(...verificarCartoesStory(opcoes.cartoes));
+    }
+  }
+
+  if (opcoes.formato === "reels" && opcoes.narrativa) {
+    const { gancho, corpo, chamadaFinal } = opcoes.narrativa;
+    if (!gancho?.trim()) {
+      motivos.push("gancho: nulo ou vazio, um roteiro em reels precisa de gancho (V9d, item 1)");
+    }
+    if (!corpo?.trim()) {
+      motivos.push("corpo: nulo ou vazio, um roteiro em reels precisa de corpo (V9d, item 1)");
+    }
+    if (!chamadaFinal?.trim()) {
+      motivos.push("chamadaFinal: nula ou vazia, um roteiro em reels precisa de chamada final (V9d, item 1)");
+    }
   }
 
   if (opcoes.porQueAssim && opcoes.porQueAssim.length > 0) {
@@ -304,7 +329,19 @@ const SEGUNDOS_MAX_POR_CARTAO = 15;
 const PALAVRAS_MAX_POR_CARTAO = Math.floor(PALAVRAS_POR_SEGUNDO_STORY * SEGUNDOS_MAX_POR_CARTAO);
 
 /** Verbo que fecha a conversa no último cartão (`R-IG-STORY-07`): "me chama" e "no direct" contam como duas palavras. */
-const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "comenta"];
+const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "comenta", "conta"];
+
+/**
+ * V9d, item 0 (achados do golden set de Stories rodado com chave real depois do ajuste do prompt):
+ * "qual dos dois você já usou?" fecha pedindo resposta tanto quanto "vota aqui", mas não usa nenhum
+ * verbo da lista acima. Uma pergunta direta no último cartão (termina com "?") também conta como
+ * pedir resposta; basta um dos dois sinais (o verbo ou a pergunta) para aprovar. Rodada seguinte do
+ * mesmo golden set: "me conta aqui qual é a mancha" também fecha pedindo resposta, e "conta" (de
+ * "contar") entrou na lista.
+ */
+function fechaPedindoResposta(ultimoCartaoFalar: string): boolean {
+  return VERBOS_RESPOSTA_STORY.some((verbo) => ultimoCartaoFalar.includes(verbo)) || ultimoCartaoFalar.includes("?");
+}
 
 function contarPalavras(texto: string): number {
   return normalizar(texto)
@@ -351,7 +388,7 @@ function verificarCartoesStory(cartoes: CartaoStory[]): string[] {
   if (/\bsegue\b|\bseguir\b/.test(ultimo)) {
     motivos.push('ultimo cartao: pede para "seguir", quem ve story ja segue (R-IG-STORY-01)');
   }
-  if (!VERBOS_RESPOSTA_STORY.some((verbo) => ultimo.includes(verbo))) {
+  if (!fechaPedindoResposta(ultimo)) {
     motivos.push("ultimo cartao: nao fecha pedindo resposta (R-IG-STORY-07)");
   }
 
@@ -394,6 +431,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   formato?: FormatoRoteiro;
   extrairCartoes?: (dados: T) => CartaoStory[] | null;
   extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
+  /** V9d, item 1: gancho, corpo e chamadaFinal brutos, para `verificarLocalmente` reprovar um Reels vazio (ver lá). */
+  extrairNarrativa?: (dados: T) => { gancho: string | null; corpo: string | null; chamadaFinal: string | null };
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
 };
@@ -453,6 +492,7 @@ async function tentarGerarEVerificar<T>(
     formato: params.formato,
     cartoes: params.extrairCartoes?.(resultado.dados),
     porQueAssim: params.extrairPorQueAssim?.(resultado.dados),
+    narrativa: params.extrairNarrativa?.(resultado.dados),
   });
 
   let aprovado = local.aprovado;

@@ -1,10 +1,10 @@
 "use server";
 
-import type { FormatoRoteiro, Objetivo } from "@/db/schema";
+import type { Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
-import { ErroRoteiro, gerarRoteiro } from "@/servicos/roteiro";
+import { ErroRoteiro, gerarRoteiro, validarFormato } from "@/servicos/roteiro";
 
 /**
  * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
@@ -30,8 +30,11 @@ export type DadosMomento = {
   marcaId?: number;
   /** A fala inteira, só no caminho por áudio (o bloco "o que você disse"). */
   transcricao?: string;
-  /** V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. */
-  formato?: FormatoRoteiro;
+  /**
+   * V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. Chega
+   * como texto livre do navegador (V9d, item 2): `validarFormato` confere antes de chegar ao banco.
+   */
+  formato?: string;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -74,7 +77,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ 
       transcricao: dados.transcricao?.trim() || undefined,
     },
     objetivo: dados.objetivo,
-    formato: dados.formato,
+    formato: validarFormato(dados.formato),
   });
 
   return { id: roteiro.id };

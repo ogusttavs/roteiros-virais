@@ -4,7 +4,7 @@ import { Mic, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import type { DiaAgenda } from "@/servicos/plano";
+import type { DiaAgenda, DiaNaoEntendido } from "@/servicos/plano";
 import { textosPlano } from "@/textos/plano";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -18,6 +18,9 @@ import { criarPlanoAction, lerAgendaAction } from "./plano/acoes";
 const LIMITE_SEGUNDOS_AUDIO = 120;
 
 type Fase = "entrada" | "gravando" | "transcrevendo" | "lendo" | "revisao" | "confirmando";
+
+/** V9d, item 4: um dia não entendido, mais a data que a pessoa escolheu (vazia até ela preencher). */
+type DiaNaoEntendidoComEscolha = DiaNaoEntendido & { dataEscolhida: string };
 
 /** webm/opus no Chrome e no Android, mp4/aac no Safari (`MediaRecorder.isTypeSupported`). */
 function tipoMimeSuportado(): string | null {
@@ -69,6 +72,7 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
   const [segundos, setSegundos] = useState(0);
   const [semMicrofone, setSemMicrofone] = useState(false);
   const [dias, setDias] = useState<DiaAgenda[]>([]);
+  const [diasNaoEntendidos, setDiasNaoEntendidos] = useState<DiaNaoEntendidoComEscolha[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [camposFaltando, setCamposFaltando] = useState(false);
 
@@ -95,18 +99,29 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
     setErro(null);
     setFase("lendo");
     try {
-      const diasLidos = await lerAgendaAction(limpo);
-      if (diasLidos.length === 0) {
+      const resultado = await lerAgendaAction(limpo);
+      if (resultado.dias.length === 0 && resultado.diasNaoEntendidos.length === 0) {
         setErro(textosPlano.semDiaEntendido);
         setFase("entrada");
         return;
       }
-      setDias(diasLidos);
+      setDias(resultado.dias);
+      setDiasNaoEntendidos(resultado.diasNaoEntendidos.map((dia) => ({ ...dia, dataEscolhida: "" })));
       setFase("revisao");
     } catch (falha) {
       setErro(tratarFalha(falha, textosPlano.erroLerAgenda));
       setFase("entrada");
     }
+  }
+
+  /** V9d, item 4: a pessoa escolheu a data de um dia que não tinha sido entendido. */
+  function escolherData(indice: number, data: string) {
+    setDiasNaoEntendidos((atual) => atual.map((dia, i) => (i === indice ? { ...dia, dataEscolhida: data } : dia)));
+  }
+
+  /** V9d, item 4: "deixar de fora" remove o cartão; um dia sem data escolhida também fica de fora ao confirmar. */
+  function deixarDeFora(indice: number) {
+    setDiasNaoEntendidos((atual) => atual.filter((_, i) => i !== indice));
   }
 
   async function transcrever(blob: Blob, tipoMime: string) {
@@ -176,7 +191,12 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
     setErro(null);
     setFase("confirmando");
     try {
-      await criarPlanoAction(dias);
+      // V9d, item 4: um dia nao entendido sem data escolhida fica de fora, do mesmo jeito que
+      // "deixar de fora" (o botao so remove o cartao mais cedo da tela).
+      const diasResolvidos: DiaAgenda[] = diasNaoEntendidos
+        .filter((dia) => dia.dataEscolhida)
+        .map((dia) => ({ data: dia.dataEscolhida, lugar: dia.lugar, compromissos: dia.compromissos }));
+      await criarPlanoAction([...dias, ...diasResolvidos]);
       router.refresh();
       aoFechar();
     } catch (falha) {
@@ -277,6 +297,30 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
                     <li key={indiceCompromisso}>{compromisso}</li>
                   ))}
                 </ul>
+              </div>
+            ))}
+            {diasNaoEntendidos.map((dia, indice) => (
+              <div key={`nao-entendido-${indice}`} className={`${styles.diaCartao} ${styles.diaNaoEntendido}`}>
+                <span className={styles.diaData}>{textosPlano.naoEntendiEsteDia}</span>
+                <span className={styles.diaLugar}>{dia.lugar.trim() || textosPlano.semLugar}</span>
+                <ul className={styles.diaCompromissos}>
+                  {dia.compromissos.map((compromisso, indiceCompromisso) => (
+                    <li key={indiceCompromisso}>{compromisso}</li>
+                  ))}
+                </ul>
+                <label className={styles.campoData}>
+                  <span>{textosPlano.naoEntendiAjuda(dia.referenciaDia)}</span>
+                  <input
+                    type="date"
+                    aria-label={textosPlano.rotuloDataEscolhida}
+                    value={dia.dataEscolhida}
+                    onChange={(evento) => escolherData(indice, evento.target.value)}
+                    className={styles.inputData}
+                  />
+                </label>
+                <Botao variante="ghost" tamanho="md" onClick={() => deixarDeFora(indice)}>
+                  {textosPlano.botaoDeixarDeFora}
+                </Botao>
               </div>
             ))}
           </div>

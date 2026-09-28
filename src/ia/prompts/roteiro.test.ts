@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
+import { JARGAO } from "@/lib/regras-de-texto";
 
 import { montarEntrada, montarSistemaEstavel, type InstrucaoAbertura } from "./roteiro";
 
@@ -269,5 +270,27 @@ describe("montarSistemaEstavel, formato story", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "reels" });
     expect(sistema).toContain("gancho nos primeiros segundos, corpo, fechamento, chamada final");
     expect(sistema).not.toContain("R-IG-STORY-01");
+  });
+
+  // V9d, item 0: o golden set de Stories (rodado pelo Fable em 25/09 com chave real) reprovou 5 de 5,
+  // sempre pelos mesmos tres motivos do prompt. Os tres testes abaixo travam a correcao de cada um.
+  // A regra R-IG-STORY-03 (texto copiado da rubrica, nao reescrito) ainda fala em segundos como
+  // contexto; o que muda e a instrucao de verdade da regra 5 e do bloco de estrutura, que agora dao
+  // o numero de palavras direto (o modelo conta palavras, nao segundos).
+  it("regra 5 e o bloco de estrutura dizem o numero de palavras direto", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("no máximo 35 palavras de fala");
+  });
+
+  it("porQueAssim so aceita regra R-IG-STORY, nunca as regras duras numeradas de 1 a 12", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    expect(sistema).toContain("nunca as regras duras numeradas de 1 a 12");
+  });
+
+  it("porQueAssim proibe cada palavra do catalogo de jargao, montado em tempo de execucao", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
+    for (const item of JARGAO) {
+      expect(sistema).toContain(`nunca "${item.palavra}"`);
+    }
   });
 });

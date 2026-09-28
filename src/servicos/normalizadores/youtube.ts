@@ -32,6 +32,8 @@ export type VideoNormalizado = {
   likes: number;
   comentarios: number;
   idioma: Idioma;
+  /** Montada por codigo, sem chamada nova (V9d, item 0b): o YouTube serve a miniatura direto por convencao de url. */
+  capaUrl: string;
 };
 
 export type VideoEContaNormalizados = { video: VideoNormalizado; conta: ContaNormalizada };
@@ -72,6 +74,7 @@ export function normalizarVideoYoutube(item: YoutubeVideoItem): VideoEContaNorma
       likes: Number(item.statistics.likeCount ?? 0),
       comentarios: Number(item.statistics.commentCount ?? 0),
       idioma: idiomaDoVideoYoutube(item),
+      capaUrl: `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
     },
     conta: {
       plataforma: "youtube",

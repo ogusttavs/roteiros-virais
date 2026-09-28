@@ -144,6 +144,29 @@ describe("aceitarPlanoAction e pularPlanoAction", () => {
     ).rejects.toThrow(ErroRoteiro);
   });
 
+  // V9d, item 2: `formato` chega como texto livre do navegador; um valor fora de "reels"/"story"
+  // precisa ser recusado antes de gerar, nunca chegar ao banco.
+  it("formato invalido: erro nomeado, sem gerar", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const [item] = await criarPlanoAction([
+      { data: hojeMais(5), lugar: "escritorio", compromissos: ["reuniao de fornecedor"] },
+    ]);
+    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+
+    await expect(
+      aceitarPlanoAction(item.id, {
+        onde: "no escritorio",
+        oQueEstaAcontecendo: "reuniao de fornecedor",
+        oQueDaParaMostrar: "a mesa de reuniao",
+        objetivo: "engajamento",
+        formato: "carrossel",
+      }),
+    ).rejects.toThrow(ErroRoteiro);
+
+    const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    expect(depois.length).toBe(antes.length);
+  });
+
   it("pularPlanoAction e isolado pela sessao", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const [item] = await criarPlanoAction([{ data: hojeMais(4), lugar: "reuniao", compromissos: ["negociar preco"] }]);

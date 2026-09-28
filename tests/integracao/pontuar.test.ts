@@ -10,7 +10,7 @@ import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { rodarPontuar, rodarPontuarVelocidade } from "../../src/jobs/pontuar";
+import { rodarPontuar, rodarPontuarVelocidade, type TaxaSubstituta } from "../../src/jobs/pontuar";
 
 type OpcoesVideo = { idioma?: string | null; titulo?: string | null; descricao?: string | null };
 
@@ -70,16 +70,18 @@ afterAll(async () => {
 describe("rodarPontuar", () => {
   it("calcula mediana, fora_da_curva, velocidade, velocidade_relativa e taxa batendo com conta feita a mao", async () => {
     // Conta "forte": 5 videos na janela de 90 dias, mediana = 3000 (percentil 0.5 de
-    // [1000,2000,3000,4000,5000]).
-    const forte = await criarConta("forte");
+    // [1000,2000,3000,4000,5000]). Com 10000 seguidores: e a unica conta deste nicho e
+    // plataforma com mediana propria e seguidores, entao a taxa tipica (V9d, item 0b) fica
+    // 3000/10000 = 0,3, sem ambiguidade (mediana de uma amostra so).
+    const forte = await criarConta("forte", 10000);
     const viewsForte = [1000, 2000, 3000, 4000, 5000];
     for (const [i, v] of viewsForte.entries()) {
       await criarVideo(forte, `forte-${i}`, v, diasAtras(10));
     }
 
     // Conta "fraca-com-seguidores": so 2 videos na janela (< 5 => base_fraca), com
-    // seguidores=1000. Substituto = mediana de (views/seguidores*100) = mediana de
-    // [5, 15] = 10 (interpolacao linear entre as duas amostras).
+    // seguidores=1000. Substituto (V9d, item 0b) = seguidores * taxa tipica do nicho e da
+    // plataforma = 1000 * 0,3 = 300.
     const fracaComSeguidores = await criarConta("fraca-com-seguidores", 1000);
     await criarVideo(fracaComSeguidores, "fraca-a", 50, diasAtras(10));
     await criarVideo(fracaComSeguidores, "fraca-b", 150, diasAtras(10));
@@ -101,11 +103,12 @@ describe("rodarPontuar", () => {
     }
     await criarVideo(escopoB, "escopo-b-especial", 3_000_000, diasAtras(100));
 
-    // Conta "taxa": 5 videos, mediana = 3000 (mesmo formato da conta forte), com
-    // fora_da_curva de 0,33 / 0,67 / 1,0 / 2,0 / 3,0 -- so o ultimo bate o limiar de
-    // 3 (config.regras.limiarForaDaCurva), entao taxa esperada = 1/5 = 0,2.
+    // Conta "taxa": 5 videos (escala de 10x sobre o exemplo original para o video "acima" tambem
+    // passar do piso de 50 mil views, V9d item 0b), mediana = 30000, com fora_da_curva de
+    // 0,33 / 0,67 / 1,0 / 2,0 / 3,0 -- so o ultimo bate o limiar de 3
+    // (config.regras.limiarForaDaCurva) E o piso de views, entao taxa esperada = 1/5 = 0,2.
     const taxa = await criarConta("taxa");
-    for (const [i, v] of [1000, 2000, 3000, 6000, 9000].entries()) {
+    for (const [i, v] of [10_000, 20_000, 30_000, 60_000, 90_000].entries()) {
       await criarVideo(taxa, `taxa-${i}`, v, diasAtras(10));
     }
 
@@ -126,6 +129,14 @@ describe("rodarPontuar", () => {
     const resumo = await rodarPontuar();
     expect(resumo.contasComMediana).toBeGreaterThan(0);
 
+    // V9d, item 0b: a taxa tipica entra no resumo do job. "forte" e a unica conta deste nicho e
+    // plataforma com mediana propria e seguidores, entao a taxa fica exatamente 0,3 (3000/10000).
+    const taxasSubstitutas = resumo.taxasSubstitutas as TaxaSubstituta[];
+    const taxaDesteNicho = taxasSubstitutas.find((t) => t.nichoId === nichoId && t.plataforma === "tiktok");
+    expect(taxaDesteNicho).toBeDefined();
+    expect(taxaDesteNicho?.taxa).toBeCloseTo(0.3, 3);
+    expect(taxaDesteNicho?.contas).toBe(1);
+
     async function linhaConta(id: number) {
       const [c] = await db().select().from(contas).where(eq(contas.id, id));
       return c;
@@ -143,15 +154,15 @@ describe("rodarPontuar", () => {
     const vForte = await linhaVideo("forte-4"); // views=5000
     expect(Number(vForte.foraDaCurva)).toBeCloseTo(5000 / 3000, 3);
 
-    // Conta fraca com seguidores: base fraca, mediana substituta = 10
+    // Conta fraca com seguidores: base fraca, mediana substituta = 1000 * 0,3 = 300 (V9d, item 0b).
     const cFraca = await linhaConta(fracaComSeguidores);
     expect(cFraca.baseFraca).toBe(true);
-    expect(Number(cFraca.medianaViews)).toBeCloseTo(10, 2);
+    expect(Number(cFraca.medianaViews)).toBeCloseTo(300, 2);
     expect(cFraca.medianaOrigem).toBe("seguidores");
     const vFracaA = await linhaVideo("fraca-a"); // views=50
-    expect(Number(vFracaA.foraDaCurva)).toBeCloseTo(5, 3);
+    expect(Number(vFracaA.foraDaCurva)).toBeCloseTo(50 / 300, 3);
     const vFracaB = await linhaVideo("fraca-b"); // views=150
-    expect(Number(vFracaB.foraDaCurva)).toBeCloseTo(15, 3);
+    expect(Number(vFracaB.foraDaCurva)).toBeCloseTo(150 / 300, 3);
 
     // O exemplo do escopo 5.1
     const vEspecialA = await linhaVideo("escopo-a-especial");
@@ -195,14 +206,16 @@ describe("mediana do setor (substituto de terceiro nivel, E6 parte 3, item 2)", 
 
     // Conta com mediana propria (5 videos, mediana 3000), que tambem alimenta o
     // calculo do setor (a mediana do setor olha todo video do nicho+plataforma,
-    // sem distinguir de qual conta ele veio).
-    const fonte = await criarConta("setor-fonte", null, nichoSetor);
+    // sem distinguir de qual conta ele veio). Com 10000 seguidores: e a unica conta
+    // deste nicho e plataforma com mediana propria e seguidores, entao a taxa tipica
+    // (V9d, item 0b) fica 3000/10000 = 0,3.
+    const fonte = await criarConta("setor-fonte", 10000, nichoSetor);
     for (const [i, v] of [1000, 2000, 3000, 4000, 5000].entries()) {
       await criarVideo(fonte, `setor-fonte-${i}`, v, diasAtras(10), nichoSetor);
     }
 
-    // Conta sob teste: 1 video, sem seguidores. Sem mediana propria (n < 5) e
-    // sem substituto por seguidor (nulo), cai no setor: mediana de
+    // Conta sob teste: 1 video, sem seguidores. Sem mediana propria (n < 5) e sem
+    // seguidores (nao da para multiplicar pela taxa), cai no setor: mediana de
     // [1000,2000,3000,4000,5000,6000] (o proprio video entra no calculo do
     // setor) = 3500 (interpolacao entre 3000 e 4000, n par).
     const semSeguidores = await criarConta("setor-sem-seguidores", null, nichoSetor);
@@ -216,16 +229,16 @@ describe("mediana do setor (substituto de terceiro nivel, E6 parte 3, item 2)", 
     const [vAntes] = await db().select().from(videos).where(eq(videos.idExterno, "setor-alvo"));
     expect(Number(vAntes.foraDaCurva)).toBeCloseTo(6000 / 3500, 3);
 
-    // Ganha seguidores: substituto por seguidor passa a existir (so 1 video,
-    // mediana = 6000/1000*100 = 600) e vence o setor no proximo pontuar.
+    // Ganha seguidores: substituto por seguidor passa a existir (V9d, item 0b:
+    // 1000 * taxa tipica 0,3 = 300) e vence o setor no proximo pontuar.
     await db().update(contas).set({ seguidores: 1000 }).where(eq(contas.id, semSeguidores));
     await rodarPontuar();
 
     const [cDepois] = await db().select().from(contas).where(eq(contas.id, semSeguidores));
     expect(cDepois.medianaOrigem).toBe("seguidores");
-    expect(Number(cDepois.medianaViews)).toBeCloseTo(600, 2);
+    expect(Number(cDepois.medianaViews)).toBeCloseTo(300, 2);
     const [vDepois] = await db().select().from(videos).where(eq(videos.idExterno, "setor-alvo"));
-    expect(Number(vDepois.foraDaCurva)).toBeCloseTo(10, 3);
+    expect(Number(vDepois.foraDaCurva)).toBeCloseTo(20, 3);
   }, 30_000);
 
   it("nicho sem nenhum video: sem setor para usar, a mediana continua nula (nunca um valor antigo preso)", async () => {
@@ -248,6 +261,39 @@ describe("mediana do setor (substituto de terceiro nivel, E6 parte 3, item 2)", 
     expect(cVazia.medianaViews).toBeNull();
     expect(cVazia.medianaOrigem).toBeNull();
     expect(cVazia.taxaForaDaCurva).toBeNull();
+  }, 30_000);
+});
+
+describe("V9d, item 0b: o substituto por seguidor nao depende mais so dos seguidores (achado do Gustavo em 25/09)", () => {
+  it("conta de muitos seguidores com um unico video nao vira fora da curva sozinha pelo tamanho da conta", async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-substituto-teste", nome: "Pontuar substituto teste", termos: [] })
+      .returning();
+    const nichoSub = nicho.id;
+
+    // Estabelece a taxa tipica do nicho e da plataforma: unica conta com mediana propria e
+    // seguidores, mediana 3000, 10000 seguidores, taxa = 3000/10000 = 0,3.
+    const forte = await criarConta("substituto-forte", 10000, nichoSub);
+    for (const [i, v] of [1000, 2000, 3000, 4000, 5000].entries()) {
+      await criarVideo(forte, `substituto-forte-${i}`, v, diasAtras(10), nichoSub);
+    }
+
+    // O caso real do achado: conta de 319 mil seguidores, um unico video de 837 views. Antes
+    // (formula antiga): mediana = 837/319000*100 = 0,26, fora_da_curva = 837/0,26 = 3219x. Agora:
+    // mediana = 319000 * 0,3 = 95700, fora_da_curva = 837/95700, bem abaixo do limiar.
+    const grande = await criarConta("substituto-grande", 319_000, nichoSub);
+    await criarVideo(grande, "substituto-grande-video", 837, diasAtras(10), nichoSub);
+
+    await rodarPontuar();
+
+    const [cGrande] = await db().select().from(contas).where(eq(contas.id, grande));
+    expect(cGrande.baseFraca).toBe(true);
+    expect(cGrande.medianaOrigem).toBe("seguidores");
+    expect(Number(cGrande.medianaViews)).toBeCloseTo(319_000 * 0.3, 0);
+
+    const [vGrande] = await db().select().from(videos).where(eq(videos.idExterno, "substituto-grande-video"));
+    expect(Number(vGrande.foraDaCurva)).toBeLessThan(0.1);
   }, 30_000);
 });
 

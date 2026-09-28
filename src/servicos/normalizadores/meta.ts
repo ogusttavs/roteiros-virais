@@ -35,6 +35,13 @@ export type VideoNormalizado = {
    */
   midiaUrl: string | null;
   idioma: Idioma;
+  /**
+   * A miniatura do vídeo (V9d, item 0b): a Business Discovery já traz
+   * `thumbnail_url` no mesmo `fields`, sem chamada nova; a Hashtag Search não
+   * pede esse campo (só serve de sinal de assunto), então vem sempre nulo por
+   * ali.
+   */
+  capaUrl: string | null;
 };
 
 /**
@@ -93,6 +100,7 @@ export function normalizarBusinessDiscovery(
       comentarios: item.comments_count ?? 0,
       midiaUrl: item.media_url ?? null,
       idioma: detectarIdioma(descricao ?? ""),
+      capaUrl: item.thumbnail_url ?? null,
     };
   });
 
@@ -130,5 +138,7 @@ export function normalizarHashtagMedia(item: HashtagRecentMediaItem, termo: stri
      * passar no filtro `temIndicioDeBrasil` (`meta-hashtags.ts`).
      */
     idioma: detectarIdioma(descricao ?? ""),
+    // A Hashtag Search nao pede thumbnail_url no fields (V9d, item 0b).
+    capaUrl: null,
   };
 }

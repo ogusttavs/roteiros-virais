@@ -1,6 +1,6 @@
 "use server";
 
-import type { FormatoRoteiro, Objetivo } from "@/db/schema";
+import type { Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
@@ -10,15 +10,18 @@ import {
   pular,
   type DiaAgenda,
   type ItemPlano,
+  type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro } from "@/servicos/roteiro";
+import { ErroRoteiro, validarFormato } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
  * pela mesma rota do momento) em dias, com a data de cada um já resolvida
  * por código. A pessoa confere a lista antes de confirmar (`criarPlanoAction`).
+ * V9d, item 4: `diasNaoEntendidos` vai junto, para a folha mostrar "não
+ * entendi este dia" em vez de descartar em silêncio.
  */
-export async function lerAgendaAction(texto: string): Promise<DiaAgenda[]> {
+export async function lerAgendaAction(texto: string): Promise<ResultadoLerAgenda> {
   const sessao = await sessaoAtual();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
@@ -44,8 +47,11 @@ export type DadosAceitarPlano = {
   oQueEstaAcontecendo: string;
   oQueDaParaMostrar: string;
   objetivo: Objetivo;
-  /** V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. */
-  formato?: FormatoRoteiro;
+  /**
+   * V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. Chega
+   * como texto livre do navegador (V9d, item 2): `validarFormato` confere antes de chegar ao banco.
+   */
+  formato?: string;
   marcaId?: number;
 };
 
@@ -78,7 +84,7 @@ export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlan
     oQueEstaAcontecendo,
     oQueDaParaMostrar,
     objetivo: dados.objetivo,
-    formato: dados.formato,
+    formato: validarFormato(dados.formato),
     marcaId: dados.marcaId,
   });
   return { id: roteiro.id };
