@@ -117,6 +117,12 @@ export const config = {
   },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
+  /**
+   * Para onde o e-mail diario de acompanhamento da viagem vai (V10, item 4).
+   * Vazia por padrao: sem ela, o job nao manda nada (nao e erro, so nao ha
+   * destinatario configurado ainda).
+   */
+  emailAcompanhamento: env("EMAIL_ACOMPANHAMENTO"),
   /** Vazio ate o Gustavo criar a conta (etapa 13, decisao 1); sem DSN, o Sentry nao inicia. */
   sentryDsn: env("SENTRY_DSN"),
   /**

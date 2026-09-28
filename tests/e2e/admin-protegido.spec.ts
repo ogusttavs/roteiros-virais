@@ -155,4 +155,31 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
       contaVigiadaHandle,
     ]);
   });
+
+  // V10, item 1: a mesma prova das outras telas do admin, agora para /admin/viagem.
+  test("viagem: so a sessao de admin ve o nome da marca", async ({ page, request }) => {
+    await provarQueSoAdminVe(page, request, "/admin/viagem", ["/admin/viagem"], [clienteNome]);
+  });
+
+  // V10, item 3: rota de saude, sem sessao nenhuma (o inverso das outras: sempre 200, nunca dado de cliente).
+  test("saude/viagem: sem sessao devolve 200, e nenhuma sessao ve dado de cliente", async ({ page, request }) => {
+    for (const cookie of [undefined, COOKIE_FALSO]) {
+      const resposta = await request.get("/api/saude/viagem", { headers: cookie ? { Cookie: cookie } : {} });
+      expect(resposta.status()).toBe(200);
+      const corpo = await resposta.text();
+      expect(corpo).not.toContain(clienteNome);
+      expect(corpo).not.toContain(clienteEmail);
+      expect(corpo).not.toContain(MARCA_UNICA_GERACAO);
+    }
+
+    await entrar(page, EMAIL_ADMIN);
+    const cookieAdmin = await cookieDeSessao(page);
+    const resposta = await request.get("/api/saude/viagem", { headers: { Cookie: cookieAdmin } });
+    expect(resposta.status()).toBe(200);
+    const corpo = await resposta.text();
+    expect(corpo).not.toContain(clienteNome);
+    const dados = JSON.parse(corpo);
+    expect(dados.ok).toBe(true);
+    expect(typeof dados.marcasAtivas).toBe("number");
+  });
 });

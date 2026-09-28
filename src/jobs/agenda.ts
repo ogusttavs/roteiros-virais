@@ -174,6 +174,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     cron: "5 * * * *",
     descricao: "curva de viralizacao dos videos postados, a cada hora cheia (as :05)",
   },
+  {
+    fila: FILAS.emailAcompanhamento,
+    cron: "0 8 * * *",
+    descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",
+    condicao: () => config.emailAcompanhamento !== "",
+  },
 ];
 
 export async function agendarTudo(): Promise<void> {

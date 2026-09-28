@@ -26,6 +26,7 @@ import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
+import { rodarEmailAcompanhamento } from "./email-acompanhamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairColeta } from "./extrair-coleta";
@@ -121,6 +122,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.curvaCliente, async () => {
     await executarComRegistro(FILAS.curvaCliente, () => rodarCurvaCliente());
+  });
+  await boss().work(FILAS.emailAcompanhamento, async () => {
+    await executarComRegistro(FILAS.emailAcompanhamento, () => rodarEmailAcompanhamento());
   });
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {

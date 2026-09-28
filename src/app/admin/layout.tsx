@@ -27,7 +27,7 @@ export default async function LayoutAdmin({ children }: { children: ReactNode })
           <Simbolo altura={24} />
           <span className={styles.equipe}>{t.equipe}</span>
         </div>
-        <AbasAdmin rotulos={{ clientes: t.clientes, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes }} />
+        <AbasAdmin rotulos={{ clientes: t.clientes, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes, viagem: t.viagem }} />
         <div className={styles.conta}>
           <span className={styles.nomeConta}>{sessao.user.name}</span>
           <span className={styles.avatar}>{iniciaisDe(sessao.user.name)}</span>

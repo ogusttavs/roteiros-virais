@@ -449,6 +449,17 @@ export type ResultadoVerificacao<T> = {
 };
 
 /**
+ * V10, item 2 (achado da revisão): o texto que marca a entrada da segunda
+ * tentativa. `admin-acompanhamento.ts` usa esta mesma constante para achar
+ * "reprovada duas vezes" só entre uma primeira e a sua própria segunda
+ * tentativa (nunca entre duas tarefas de invocações diferentes que por
+ * acaso caíram lado a lado em `geracoes_ia`, ex. duas perguntas seguidas do
+ * briefing, mesma tarefa, mesmo cliente, cada uma com a sua própria
+ * primeira tentativa).
+ */
+export const MARCADOR_SEGUNDA_TENTATIVA = "A tentativa anterior foi reprovada.";
+
+/**
  * Gera, verifica em duas camadas, e refaz uma vez se reprovar. As duas
  * tentativas (quando houver a segunda) ficam registradas em geracoes_ia.
  */
@@ -460,7 +471,7 @@ export async function gerarComVerificacao<T>(
 
   const segunda = await tentarGerarEVerificar({
     ...params,
-    entrada: `${params.entrada}\n\nA tentativa anterior foi reprovada. Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`,
+    entrada: `${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`,
   });
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
 
