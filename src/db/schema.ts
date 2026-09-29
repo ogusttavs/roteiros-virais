@@ -204,6 +204,14 @@ export const clientes = pgTable("clientes", {
    * curva continua pelo Apify, sem erro.
    */
   metaIgId: text("meta_ig_id"),
+  /**
+   * A rede onde a marca mais posta (V12, item 3a): perguntada uma vez, na
+   * primeira vez que a porta Reels abre ("Onde você posta mais?"), nula até
+   * responder, trocável pelo chip a qualquer hora. Prefere vídeos dessa rede
+   * na evidência do roteiro (nunca exclui as outras) e prefiltra as
+   * Referências.
+   */
+  redePrincipal: text("rede_principal").$type<Plataforma>(),
   criadoEm: criadoEm(),
 });
 

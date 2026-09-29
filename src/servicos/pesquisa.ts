@@ -442,6 +442,8 @@ export type VideoEvidenciaRoteiro = {
   /** V4, item 6: para `forcaDaEvidencia` (roteiro.ts) contar contas distintas e a idade do vídeo mais novo. */
   contaId: number | null;
   publicadoEm: Date | null;
+  /** V12, item 3a: para `combinarEvidencias` (roteiro.ts) preferir a rede principal da marca, sem excluir as outras. */
+  plataforma: Plataforma;
 };
 
 /**
@@ -462,6 +464,7 @@ function mapearEvidenciaRoteiro(
     tipoAbertura: TipoAbertura | null;
     contaId: number | null;
     publicadoEm: Date | null;
+    plataforma: Plataforma;
   }[],
 ): VideoEvidenciaRoteiro[] {
   return linhas
@@ -480,6 +483,7 @@ function mapearEvidenciaRoteiro(
       tipoAbertura: l.tipoAbertura,
       contaId: l.contaId,
       publicadoEm: l.publicadoEm,
+      plataforma: l.plataforma,
     }));
 }
 
@@ -506,6 +510,7 @@ export async function evidenciaParaRoteiro(
       tipoAbertura: videos.tipoAbertura,
       contaId: videos.contaId,
       publicadoEm: videos.publicadoEm,
+      plataforma: videos.plataforma,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -537,6 +542,7 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
       tipoAbertura: videos.tipoAbertura,
       contaId: videos.contaId,
       publicadoEm: videos.publicadoEm,
+      plataforma: videos.plataforma,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))

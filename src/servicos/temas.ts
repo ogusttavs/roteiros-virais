@@ -101,12 +101,22 @@ export async function constanciaDoCliente(clienteId: number): Promise<Constancia
   return { tipo: "seguidos", dias: seguidos };
 }
 
+/** V12, item 1: os três estados do dia na semana do Hoje; "postou" vale mais que "gravou" no mesmo dia. */
+export type EstadoDia = "gravou" | "postou" | "nada";
+
 export type ResumoHistorico = {
   diasSeguidos: number;
   gravadosNoMes: number;
   postadosNoMes: number;
   /** Um por dia, dos últimos 30 (mais antigo primeiro, hoje por último). */
   ultimos30Dias: boolean[];
+  /**
+   * V12, item 1: os últimos 7 dias com os três estados (gravou, postou,
+   * nada), para "sua semana" no topo do Hoje (design v2, `Hoje.dc.html`,
+   * `.legenda-semana`). `ultimos30Dias` continua como está, para
+   * `/historico` (regra 6 do `PROXIMO.md`: o que não muda).
+   */
+  ultimos7DiasEstado: EstadoDia[];
 };
 
 const DIAS_JANELA_HISTORICO = 35;
@@ -136,7 +146,17 @@ export async function resumoHistorico(clienteId: number): Promise<ResumoHistoric
   );
   const ultimos30Dias = Array.from({ length: 30 }, (_, i) => diasGravados.has(diasAtrasISO(29 - i)));
 
-  return { diasSeguidos, gravadosNoMes, postadosNoMes, ultimos30Dias };
+  const diasPostados = new Set(
+    linhas.filter((l): l is typeof l & { postadoEm: Date } => l.postadoEm !== null).map((l) => hojeISO(l.postadoEm)),
+  );
+  const ultimos7DiasEstado: EstadoDia[] = Array.from({ length: 7 }, (_, i) => {
+    const dia = diasAtrasISO(6 - i);
+    if (diasPostados.has(dia)) return "postou";
+    if (diasGravados.has(dia)) return "gravou";
+    return "nada";
+  });
+
+  return { diasSeguidos, gravadosNoMes, postadosNoMes, ultimos30Dias, ultimos7DiasEstado };
 }
 
 /**

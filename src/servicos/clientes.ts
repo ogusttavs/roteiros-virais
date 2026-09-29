@@ -17,6 +17,7 @@ import {
   type Cliente,
   type PapelMarca,
   type PerfisCliente,
+  type Plataforma,
   type PlanoMarca,
   type TemaPreferido,
   type TipoMarca,
@@ -599,6 +600,27 @@ export async function salvarTema(clienteId: number, tema: string): Promise<Clien
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar o tema; cliente nao encontrado.");
+  return cliente;
+}
+
+const REDES_VALIDAS: Plataforma[] = ["instagram", "tiktok", "youtube"];
+
+/**
+ * A rede principal da marca (V12, item 3a): perguntada uma vez na porta
+ * Reels ("Onde você posta mais?"), trocável pelo chip a qualquer hora.
+ */
+export async function salvarRedePrincipal(clienteId: number, rede: string): Promise<Cliente> {
+  if (!REDES_VALIDAS.includes(rede as Plataforma)) {
+    throw new ErroCliente(`rede invalida: ${rede}`);
+  }
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({ redePrincipal: rede as Plataforma })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar a rede principal; cliente nao encontrado.");
   return cliente;
 }
 

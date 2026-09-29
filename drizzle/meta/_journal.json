@@ -239,6 +239,13 @@
       "when": 1790333240359,
       "tag": "0033_spicy_peter_quill",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790643992485,
+      "tag": "0034_rede-principal",
+      "breakpoints": true
     }
   ]
 }

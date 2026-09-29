@@ -44,7 +44,7 @@ import {
   modeloNichoAtual,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
-import { aplicarProporcaoBrasil, classificarBrasil } from "./proporcao-brasil";
+import { aplicarProporcaoBrasil, classificarBrasil, preferirRedePrincipal } from "./proporcao-brasil";
 import { temasParaCliente } from "./temas";
 
 export class ErroRoteiro extends Error {}
@@ -368,7 +368,8 @@ export function escolherTipoAbertura(
 
 /**
  * Os ids já vetados pelo tema do dia entram primeiro; junta com a busca sem
- * duplicar, e a proporção 70/30 (V2b, item 6) faz o corte final para o
+ * duplicar, prefere a rede principal da marca sem excluir as outras (V12,
+ * item 3a), e a proporção 70/30 (V2b, item 6) faz o corte final para o
  * `limite` de verdade, no lugar do corte simples por tamanho que havia
  * antes. O loop não para mais em `limite` (achado ao implementar a
  * proporção): parar cedo tiraria candidato brasileiro da busca que a
@@ -380,6 +381,7 @@ function combinarEvidencias(
   daBusca: VideoEvidenciaRoteiro[],
   limite: number,
   proporcaoBrasil: number,
+  redePrincipal: Plataforma | null,
 ): VideoEvidenciaRoteiro[] {
   const combinado = [...prevista];
   const idsJaIncluidos = new Set(prevista.map((v) => v.id));
@@ -388,7 +390,8 @@ function combinarEvidencias(
     combinado.push(video);
     idsJaIncluidos.add(video.id);
   }
-  return aplicarProporcaoBrasil(combinado, limite, (v) => classificarBrasil(v.idioma, v.contaBrasileira), proporcaoBrasil);
+  const preferido = preferirRedePrincipal(combinado, redePrincipal, (v) => v.plataforma);
+  return aplicarProporcaoBrasil(preferido, limite, (v) => classificarBrasil(v.idioma, v.contaBrasileira), proporcaoBrasil);
 }
 
 /**
@@ -611,7 +614,7 @@ async function gerarConteudo(
 
   const evidencias = ehMomento
     ? []
-    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil);
+    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil, dados.cliente.redePrincipal);
   const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);

@@ -1,17 +1,25 @@
 /**
- * Texto do plano de gravações a partir da agenda colada (V9b, E35 enxuta):
- * a folha "Colar a agenda", a revisão dos dias, o bloco "o seu plano de
- * hoje" e a folha "Meu plano". Nunca "agenda" sozinho sem contexto de tela
- * (o cliente entende "a viagem" ou "a semana"), nunca "input" nem "dado".
+ * Texto do plano de gravações a partir dos próximos dias contados (V9b, E35
+ * enxuta; V12, item 4b: a folha "Colar a agenda" virou "Planejar os próximos
+ * dias", o desenho não mudou, só o nome e a instrução, porque com o nome
+ * novo "agenda" sozinho vira jargão de sistema). A folha "Planejar os
+ * próximos dias", a revisão dos dias, o bloco "o seu plano de hoje" e a
+ * folha "Meu plano". Nunca "agenda" sozinho sem contexto de tela, nunca
+ * "input" nem "dado".
  */
 export const textosPlano = {
-  botaoColarAgenda: "Colar a agenda",
-  tituloFolhaAgenda: "Colar a agenda",
+  botaoPlanejarDias: "Planejar os próximos dias",
+  /** V12, item 4b: o título da folha muda com a fase (design v2, `PlanejarDias.dc.html`). */
+  tituloFolhaContar: "Planejar os próximos dias",
+  tituloFolhaRevisao: "Os dias que a gente entendeu",
   instrucaoAgenda:
-    "Conte os dias da viagem ou da semana, com o lugar e o que você vai fazer em cada um. Por exemplo: segunda, voo para Dubai; terça, feira, fornecedor às 15h.",
-  botaoGravarAgenda: "Gravar a agenda",
-  ouEscrevaAgenda: "Ou escreva a agenda",
-  rotuloTextoAgenda: "A sua agenda",
+    "Conte o que você vai fazer nos próximos dias: onde, quando, com quem, o que dá para mostrar. Por exemplo: quinta, voo para Dubai; sexta, feira, fornecedor às 15h.",
+  botaoGravarAgenda: "Gravar os próximos dias",
+  gravandoAgenda: (segundos: number) => `Gravando, ${segundos}s`,
+  pararGravacaoAgenda: "Parar",
+  limiteGravacaoAgenda: "até 2 minutos",
+  ouEscrevaAgenda: "Ou escreva os dias",
+  rotuloTextoAgenda: "Os seus próximos dias",
   botaoVerDias: "Ver os dias",
   lendoAgenda: "Separando os dias",
   campoVazio: "conte pelo menos um dia antes de continuar",
@@ -45,5 +53,14 @@ export const textosPlano = {
   botaoAbrirRoteiro: "Abrir o roteiro",
 
   tituloFolhaMeuPlano: "Meu plano",
-  semPlano: "Nenhum plano ainda. Cole a agenda para começar.",
+  /** V12, item 4b: ajuste do Fable na revisão (dúvida 5 do design v2, que deixava o texto como estava). */
+  semPlano: "Nenhum plano ainda. Planeje os próximos dias para começar.",
+  botaoPlanejarDeNovo: "Planejar os próximos dias de novo",
+
+  /** V12, item 4b: "Tirar este plano" no pé de Meu plano, com a confirmação no próprio pé (design v2). */
+  botaoTirarPlano: "Tirar este plano",
+  confirmarTirarPlano: "Tirar o plano dos próximos dias? Os roteiros já escritos continuam.",
+  botaoDeixarComoEsta: "Deixar como está",
+  tirandoPlano: "Tirando o plano",
+  erroTirarPlano: "Não conseguimos tirar o plano agora. Tente de novo.",
 };

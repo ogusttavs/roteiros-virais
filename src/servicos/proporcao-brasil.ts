@@ -114,3 +114,25 @@ export function aplicarProporcaoBrasil<T>(
 
   return resultado;
 }
+
+/**
+ * A rede principal da marca vem primeiro na ordem de prioridade (V12, item
+ * 3a): reordenação estável, nunca um corte; sem rede principal, devolve a
+ * lista como veio. Chamada antes de `aplicarProporcaoBrasil`, para a
+ * preferência de rede influenciar o que entra no corte final, não só a
+ * ordem de exibição.
+ */
+export function preferirRedePrincipal<T>(
+  itens: T[],
+  redePrincipal: string | null,
+  plataformaDoItem: (item: T) => string,
+): T[] {
+  if (!redePrincipal) return itens;
+  const preferidos: T[] = [];
+  const outros: T[] = [];
+  for (const item of itens) {
+    if (plataformaDoItem(item) === redePrincipal) preferidos.push(item);
+    else outros.push(item);
+  }
+  return [...preferidos, ...outros];
+}
