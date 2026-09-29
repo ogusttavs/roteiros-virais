@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
+import { SeletorMarcaCelular, type MarcaResumo } from "@/app/(painel)/_casca/SeletorMarcaCelular";
+import { SeletorMarcaDesktop } from "@/app/(painel)/_casca/SeletorMarcaDesktop";
 import { PERGUNTAS_BRIEFING, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { config } from "@/lib/config";
@@ -23,6 +25,10 @@ import styles from "./ComecarWizard.module.css";
 import { DadosFixosForm, type DadosFixosIniciais } from "./DadosFixosForm";
 
 type Props = {
+  /** V12b, item 0: quem tem mais de uma marca troca daqui, sem ficar presa no briefing incompleto de uma so. */
+  marcaAtiva: MarcaResumo;
+  marcas: MarcaResumo[];
+  nomePessoa: string;
   nichos: { id: number; nome: string }[];
   dadosFixosCompletos: boolean;
   dadosFixosIniciais: DadosFixosIniciais;
@@ -37,14 +43,39 @@ type Etapa = "intro" | "dadosFixos" | "blocos" | "liberado";
 
 const ICONES_PROMESSA = [Clock, CircleCheck, Pencil];
 
-function CabecalhoSimples() {
+/**
+ * V12b, item 0: com uma marca só, o cabeçalho continua como sempre foi
+ * (nada novo para a maioria); com mais de uma, ganha o mesmo seletor da
+ * casca (`SeletorMarcaCelular`/`SeletorMarcaDesktop`, um escondido por vez
+ * pela largura) e a linha "Briefing da <marca>", para a pessoa saber onde
+ * está e trocar sem ficar presa no briefing de uma marca só.
+ */
+function CabecalhoSimples({ marcaAtiva, marcas, nomePessoa }: { marcaAtiva: MarcaResumo; marcas: MarcaResumo[]; nomePessoa: string }) {
+  const variasMarcas = marcas.length > 1;
   return (
-    <header className={styles.cabecalho}>
-      <Simbolo altura={24} />
-      <span className={styles.nomeProduto} data-app-name="">
-        {config.appName}
-      </span>
-      <BotaoSair className={styles.botaoSair} />
+    <header className={styles.cabecalhoEnvoltorio}>
+      <div className={styles.cabecalho}>
+        <Simbolo altura={24} />
+        <span className={styles.nomeProduto} data-app-name="">
+          {config.appName}
+        </span>
+        <div className={styles.direita}>
+          {variasMarcas ? (
+            <>
+              <span className={styles.seletorCelular}>
+                <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+              </span>
+              <span className={styles.seletorDesktop}>
+                <SeletorMarcaDesktop marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
+              </span>
+            </>
+          ) : null}
+          <BotaoSair className={styles.botaoSair} />
+        </div>
+      </div>
+      {variasMarcas ? (
+        <p className={styles.deQualMarca}>{textosBriefing.comecar.deQualMarca(marcaAtiva.nome)}</p>
+      ) : null}
     </header>
   );
 }
@@ -58,6 +89,9 @@ function CabecalhoSimples() {
  * mora fora do grupo (painel), sem a casca compartilhada.
  */
 export function ComecarWizard({
+  marcaAtiva,
+  marcas,
+  nomePessoa,
   nichos,
   dadosFixosCompletos,
   dadosFixosIniciais,
@@ -136,7 +170,7 @@ export function ComecarWizard({
   if (etapa === "intro") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
         <div className={styles.corpoIntro}>
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.comecar.passoUm}</span>
@@ -164,7 +198,7 @@ export function ComecarWizard({
   if (etapa === "dadosFixos") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
         <div className={styles.corpo}>
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.dadosFixos.passoUm}</span>
@@ -185,7 +219,7 @@ export function ComecarWizard({
   if (etapa === "liberado") {
     return (
       <div className={styles.pagina}>
-        <CabecalhoSimples />
+        <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
         <div className={styles.corpoLiberado}>
           <span className={styles.selo} aria-hidden="true">
             <CircleCheck size={28} strokeWidth={1.5} />
@@ -231,7 +265,7 @@ export function ComecarWizard({
 
   return (
     <div className={styles.pagina}>
-      <CabecalhoSimples />
+      <CabecalhoSimples marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
       <div className={styles.corpoComNota}>
         <BarraNotaGeral
           notaAtual={notaGeral}
