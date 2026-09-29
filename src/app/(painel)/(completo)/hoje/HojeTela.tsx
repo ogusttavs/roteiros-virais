@@ -41,6 +41,9 @@ type RoteiroDeHojeComOrigem = RoteiroDeHoje & { origem: OrigemRoteiro["origem"] 
 
 export type SemanaDia = { rotulo: string; estado: EstadoDia; hoje: boolean };
 
+/** H3, item 1: o aviso que substitui os três temas na porta Reels quando não há tema de hoje. */
+export type AvisoSemTema = { titulo: string; texto: string };
+
 export type UltimoVideoAparte = {
   views: string;
   horas: number;
@@ -66,6 +69,8 @@ type Props = {
   evidenciasTemas: (EvidenciaTema | null)[];
   avisoLinhaEditorial: string | null;
   avisoVideoSubindo: string | null;
+  /** H3, item 1: sem tema (ou com a busca de hoje falhando) e sem roteiro de hoje já escrito. */
+  avisoSemTema: AvisoSemTema | null;
   roteiroHoje: RoteiroDeHoje | null;
   evidenciaRoteiroHoje: EvidenciaTema | null;
   /** V9b-0: plano da marca ativa; `sem_limite` troca o cartão único pela lista de cartões abaixo. */
@@ -239,6 +244,7 @@ export function HojeTela({
   evidenciasTemas,
   avisoLinhaEditorial,
   avisoVideoSubindo,
+  avisoSemTema,
   roteiroHoje,
   evidenciaRoteiroHoje,
   plano,
@@ -541,7 +547,12 @@ export function HojeTela({
                   <p className={styles.dicaRede}>{textosHoje.dicaRedePrincipal}</p>
                 </div>
 
-                {mostrarTemasAbertos ? (
+                {avisoSemTema ? (
+                  <div className={styles.estadoCartao}>
+                    <h3>{avisoSemTema.titulo}</h3>
+                    <p>{avisoSemTema.texto}</p>
+                  </div>
+                ) : mostrarTemasAbertos ? (
                   <div className={styles.temasTres}>
                     {temas.map((tema, indice) => (
                       <TemaCartao

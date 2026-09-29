@@ -170,9 +170,17 @@ export function ReferenciasTela({
    * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
    * possível: o navegador troca o aplicativo pela página de erro dele e a tela se perde. Por isso, sem rede,
    * só avisa (V7, item 8 do PROXIMO.md); guardar a busca para depois está fora desta etapa.
+   *
+   * Só `semConexao` (do contexto, valor estável desta renderização), nunca `navigator.onLine` direto
+   * (H3, item 0b): `aplicarFiltros` chama esta função e, em seguida, `navegar` chama de novo, e antes as
+   * duas liam `navigator.onLine` fresco cada vez, dois pedidos independentes à API do navegador que pode
+   * mudar entre um e outro sob carga. Isso corria com `fecharENavegar` fechando a folha de verdade
+   * (passava no primeiro pedido) e a navegação em si não acontecendo (falhava no segundo, silenciosamente),
+   * exatamente o sintoma visto no CI: a folha fecha, a URL não muda. Com um valor só, estável dentro do
+   * mesmo evento, os dois pedidos nunca mais discordam entre si.
    */
   function semRedeParaBuscar(): boolean {
-    if (!semConexao && navigator.onLine) return false;
+    if (!semConexao) return false;
     mostrarAviso(textosReferencias.semConexaoParaBuscar, "erro");
     return true;
   }

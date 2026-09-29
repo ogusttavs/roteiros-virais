@@ -28,6 +28,30 @@ async function entrar(page: Page, email: string) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
+/**
+ * Troca para a Marca Dois se a marca ativa ainda não for ela: dois testes
+ * dependem da ordem em que rodam (a marca ativa segue o acesso mais
+ * recente), então trocam só se precisar. Espera de verdade por uma das duas
+ * pílulas (`.or`) antes de checar qual está visível: um `isVisible()` sem
+ * espera nenhuma antes respondia falso cedo demais com a máquina ocupada, e
+ * o teste ficava esperando um botão que não existia (H3, item 0, achado na
+ * revisão do PR #66).
+ */
+async function garantirMarcaDoisAtiva(page: Page) {
+  await page.goto("/hoje");
+  const pilulaDois = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) });
+  const pilulaUm = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) });
+  await expect(pilulaDois.or(pilulaUm)).toBeVisible();
+  if (!(await pilulaDois.isVisible())) {
+    await pilulaUm.click();
+    const folhaMarcas = page.getByRole("dialog", { name: textosNav.suasMarcas });
+    await folhaMarcas.getByRole("button", { name: NOME_MARCA_DOIS }).click();
+    await page.waitForLoadState("networkidle");
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+  }
+}
+
 function analiseExemplo(assunto: string, formato: "fala_para_camera" | "podcast" = "fala_para_camera") {
   return {
     assunto,
@@ -412,16 +436,7 @@ test.describe("/referencias no design v2", () => {
 
     // Marca Dois tem "tiktok" como rede principal, mas só vídeo de youtube no nicho (mesma
     // troca condicional do teste do embed, abaixo, para não depender da ordem dos testes).
-    await page.goto("/hoje");
-    const jaNaDois = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) });
-    if (!(await jaNaDois.isVisible())) {
-      await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) }).click();
-      const folhaMarcas = page.getByRole("dialog", { name: textosNav.suasMarcas });
-      await folhaMarcas.getByRole("button", { name: NOME_MARCA_DOIS }).click();
-      await page.waitForLoadState("networkidle");
-      await page.reload();
-      await page.waitForLoadState("networkidle");
-    }
+    await garantirMarcaDoisAtiva(page);
 
     await page.goto("/referencias");
     await expect(page.getByText("Sem vídeo do TikTok neste período; mostrando as outras redes.")).toBeVisible();
@@ -438,16 +453,7 @@ test.describe("/referencias no design v2", () => {
     // O vídeo de teste do embed está na Marca Dois (nichoDois). A marca ativa no login novo
     // segue "o acesso mais recente" (`src/lib/marca-ativa.ts`), então pode já ser a Dois, se o
     // teste anterior (que também troca de marca) rodou antes deste; troca só se precisar.
-    await page.goto("/hoje");
-    const jaNaDois = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) });
-    if (!(await jaNaDois.isVisible())) {
-      await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) }).click();
-      const folhaMarcas = page.getByRole("dialog", { name: textosNav.suasMarcas });
-      await folhaMarcas.getByRole("button", { name: NOME_MARCA_DOIS }).click();
-      await page.waitForLoadState("networkidle");
-      await page.reload();
-      await page.waitForLoadState("networkidle");
-    }
+    await garantirMarcaDoisAtiva(page);
 
     await page.goto("/referencias");
     const cartao = page.locator("article", { hasText: "video de teste do embed dentro da folha" });

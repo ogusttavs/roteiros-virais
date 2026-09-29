@@ -16,16 +16,12 @@ import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { planoDoDia, planoQueVem } from "@/servicos/plano";
 import { corpoDoRoteiro, roteiroDeHoje, roteirosDeHoje, type RoteiroLinha } from "@/servicos/roteiro";
-import { resumoHistorico, temasParaCliente, type EstadoDia } from "@/servicos/temas";
+import { resumoHistorico, temasParaCliente, type EstadoDia, type ResultadoTemasHoje } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
-import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
-import { SeletorMarcaCelular } from "../../_casca/SeletorMarcaCelular";
-
-import { HojeCabecalho } from "./HojeCabecalho";
+import { avisoSemTema } from "./aviso-sem-tema";
 import { HojeTela, type SemanaDia, type UltimoVideoAparte } from "./HojeTela";
-import styles from "./HojeTela.module.css";
 
 const FORMATAR_DIA = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "America/Sao_Paulo" });
 const FORMATAR_DIA_CURTO = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "America/Sao_Paulo" });
@@ -80,7 +76,9 @@ export default async function Hoje() {
   const semLimite = cliente.plano === "sem_limite";
   const [resultado, roteiroHoje, roteirosDeHojeBrutos, videoSubindo, resumo, ultimoVideoBruto, planoDeHoje, planoOsDiasQueVem] =
     await Promise.all([
-      temasParaCliente(cliente),
+      // H3, item 1: uma falha aqui não pode derrubar a página inteira (error.tsx), sem a semana, o
+      // plano e "Gravar agora" junto; vira o aviso da porta Reels, como "sem tema".
+      temasParaCliente(cliente).catch((): ResultadoTemasHoje | { status: "erro" } => ({ status: "erro" })),
       // V9b-0: plano `padrao` só lê o mais recente; plano `sem_limite` lê a lista inteira abaixo.
       semLimite ? Promise.resolve(null) : roteiroDeHoje(cliente.id),
       semLimite ? roteirosDeHoje(cliente.id) : Promise.resolve<RoteiroLinha[]>([]),
@@ -120,97 +118,54 @@ export default async function Hoje() {
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
 
-  if (temRoteiroHoje) {
-    const temas = resultado.status === "ok" ? resultado.temas : [];
-    const evidenciasTemas =
-      resultado.status === "ok"
-        ? await Promise.all(temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)))
-        : [];
-    const evidenciaRoteiroHoje = roteiroHoje
-      ? await evidenciaResumoPorIds(corpoDoRoteiro(roteiroHoje).evidencias).then(paraEvidenciaTema)
-      : null;
-    const evidenciasRoteirosDeHoje = await Promise.all(
-      roteirosDeHojeBrutos.map((r) => evidenciaResumoPorIds(corpoDoRoteiro(r).evidencias).then(paraEvidenciaTema)),
-    );
-
-    return (
-      <HojeTela
-        temas={temas}
-        evidenciasTemas={evidenciasTemas}
-        avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
-        avisoVideoSubindo={avisoVideoSubindo}
-        roteiroHoje={
-          roteiroHoje
-            ? {
-                id: roteiroHoje.id,
-                objetivo: roteiroHoje.objetivo,
-                criadoEm: roteiroHoje.criadoEm,
-                corpo: corpoDoRoteiro(roteiroHoje),
-              }
-            : null
-        }
-        evidenciaRoteiroHoje={evidenciaRoteiroHoje}
-        plano={cliente.plano}
-        roteirosDeHoje={roteirosDeHojeBrutos.map((r) => ({
-          id: r.id,
-          objetivo: r.objetivo,
-          criadoEm: r.criadoEm,
-          corpo: corpoDoRoteiro(r),
-          origem: r.origem,
-        }))}
-        evidenciasRoteirosDeHoje={evidenciasRoteirosDeHoje}
-        semana={semana}
-        ultimoVideo={ultimoVideo}
-        marcaAtiva={cliente}
-        marcas={marcas}
-        nomePessoa={sessao.user.name}
-        objetivoRecomendado={objetivoRecomendado}
-        outrasMarcas={outrasMarcas}
-        planoDeHoje={planoDeHoje}
-        planoQueVem={planoOsDiasQueVem}
-        redePrincipal={cliente.redePrincipal}
-      />
-    );
-  }
-
-  if (resultado.status === "sem_tema") {
-    return (
-      <div className={styles.pagina}>
-        <BarraTopo
-          titulo={textosHoje.titulo}
-          direita={<SeletorMarcaCelular marcaAtiva={cliente} marcas={marcas} nomePessoa={sessao.user.name} />}
-        />
-        <div className={styles.miolo}>
-          <HojeCabecalho avisoVideoSubindo={avisoVideoSubindo} estado="vazio" />
-          <div className={styles.estadoCartao}>
-            <h3>{textosHoje.vazioTitulo}</h3>
-            <p>{textosHoje.vazio}</p>
-            <div className={styles.estadoAcoes}>
-              <a href="/hoje/tema-livre" className={styles.botaoPrimario}>
-                {textosHoje.escreverMeuAssunto}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const evidenciasTemas = await Promise.all(
-    resultado.temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)),
+  /**
+   * H3, item 1: o Hoje é sempre o Hoje das portas (a semana, os roteiros de
+   * hoje, o plano, a pergunta e as duas portas), com ou sem tema, com ou sem
+   * falha na busca. Sem tema de verdade (`resultado.status !== "ok"`), a
+   * lista de temas fica vazia e a porta Reels mostra `avisoSemTemaValor` no
+   * lugar dela; com um roteiro de hoje já escrito, o aviso não aparece (quem
+   * já tem o que gravar não precisa da explicação).
+   */
+  const temas = resultado.status === "ok" ? resultado.temas : [];
+  const evidenciasTemas =
+    resultado.status === "ok"
+      ? await Promise.all(temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)))
+      : [];
+  const evidenciaRoteiroHoje = roteiroHoje
+    ? await evidenciaResumoPorIds(corpoDoRoteiro(roteiroHoje).evidencias).then(paraEvidenciaTema)
+    : null;
+  const evidenciasRoteirosDeHoje = await Promise.all(
+    roteirosDeHojeBrutos.map((r) => evidenciaResumoPorIds(corpoDoRoteiro(r).evidencias).then(paraEvidenciaTema)),
   );
+  const avisoSemTemaValor = temRoteiroHoje ? null : avisoSemTema(resultado, new Date());
 
   return (
     <HojeTela
-      temas={resultado.temas}
+      temas={temas}
       evidenciasTemas={evidenciasTemas}
-      avisoLinhaEditorial={resultado.avisoLinhaEditorial}
+      avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
       avisoVideoSubindo={avisoVideoSubindo}
-      roteiroHoje={null}
-      evidenciaRoteiroHoje={null}
+      avisoSemTema={avisoSemTemaValor}
+      roteiroHoje={
+        roteiroHoje
+          ? {
+              id: roteiroHoje.id,
+              objetivo: roteiroHoje.objetivo,
+              criadoEm: roteiroHoje.criadoEm,
+              corpo: corpoDoRoteiro(roteiroHoje),
+            }
+          : null
+      }
+      evidenciaRoteiroHoje={evidenciaRoteiroHoje}
       plano={cliente.plano}
-      roteirosDeHoje={[]}
-      evidenciasRoteirosDeHoje={[]}
+      roteirosDeHoje={roteirosDeHojeBrutos.map((r) => ({
+        id: r.id,
+        objetivo: r.objetivo,
+        criadoEm: r.criadoEm,
+        corpo: corpoDoRoteiro(r),
+        origem: r.origem,
+      }))}
+      evidenciasRoteirosDeHoje={evidenciasRoteirosDeHoje}
       semana={semana}
       ultimoVideo={ultimoVideo}
       marcaAtiva={cliente}
