@@ -30,6 +30,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { Chips, SeparadorChips } from "@/ui/componentes/Chips";
+import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
 import { Constancia } from "@/ui/componentes/Constancia";
 import { EstadoErro } from "@/ui/componentes/EstadoErro";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -382,6 +383,13 @@ export default function Fundacao() {
         <h2 className={styles.tituloSecao}>Logotipo, 44 px de altura</h2>
         <div className={styles.linha} style={{ alignItems: "center" }}>
           <Logo altura={44} />
+        </div>
+        <h2 className={styles.tituloSecao}>Claquete animada, 96 px (V11, tela de espera)</h2>
+        <div className={styles.linha} style={{ alignItems: "center" }}>
+          <ClaqueteAnimada altura={96} />
+          <span className={styles.legendaIcone}>
+            A haste bate de -17° a 0° e volta; parada e aberta com prefers-reduced-motion.
+          </span>
         </div>
       </section>
 

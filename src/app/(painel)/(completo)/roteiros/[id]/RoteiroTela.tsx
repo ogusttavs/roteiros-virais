@@ -36,6 +36,7 @@ import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
+import { textosGravacao } from "@/textos/gravacao";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -204,6 +205,8 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
   const [demorando, setDemorando] = useState(false);
   const [versoesDesatualizadas, setVersoesDesatualizadas] = useState(false);
   const [toast, setToast] = useState(false);
+  /** V11, item 5: "Terminei de gravar" no modo gravação manda para cá com `?gravado=1` (o roteiro já vem gravado do servidor; isto é só o toast). */
+  const [toastGravado, setToastGravado] = useState(false);
   /** A frase de falha de uma ação sem painel aberto ("Já gravei", o PDF da barra do tablet): sai num Toast de erro. */
   const [erroToast, setErroToast] = useState<string | null>(null);
   /** A frase de falha de "Copiar texto" e "Baixar em PDF" quando o menu está aberto: sai dentro dele. */
@@ -223,6 +226,18 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
   useEffect(() => {
     painelAbertoRef.current = painel;
   });
+
+  /**
+   * V11, item 5: "Terminei de gravar" chega aqui com `?gravado=1` na URL; o `gravadoEm` já veio
+   * certo do servidor (a página é nova, não uma navegação suave), isto só mostra o toast e limpa
+   * a marca da URL, para um F5 depois não mostrar de novo.
+   */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("gravado") !== "1") return;
+    setToastGravado(true);
+    router.replace(`/roteiros/${roteiro.id}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só na primeira renderização, a URL de chegada.
+  }, []);
 
   const versaoAtual = versoes.find((v) => v.id === roteiro.id);
   const idVersaoAtual = versoes.find((v) => v.atual)?.id;
@@ -818,6 +833,7 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
 
       <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
       <Toast texto={erroToast ?? ""} variante="erro" aberto={erroToast !== null} onFechar={fecharToastErro} />
+      <Toast texto={textosGravacao.gravadoToast} aberto={toastGravado} onFechar={() => setToastGravado(false)} />
     </div>
   );
 }

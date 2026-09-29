@@ -26,6 +26,8 @@ export const textosMomento = {
   campoVazio: "conte onde você está, o que está acontecendo e o que dá para mostrar",
   escreverRoteiro: "Escrever o roteiro",
   escrevendo: "Escrevendo",
+  /** V11, item 3: `TelaEscrevendo`, depois do limiar de demora. */
+  demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
   cancelar: "Cancelar",
   semMicrofone: "Não conseguimos usar o microfone deste aparelho. Pode escrever direto abaixo.",
   audioVazio: "Não deu para entender o áudio. Tente de novo ou escreva direto.",

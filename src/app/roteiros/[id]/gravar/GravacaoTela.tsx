@@ -14,7 +14,8 @@ import { useSemRede } from "@/ui/useSemRede";
 
 import styles from "./GravacaoTela.module.css";
 
-type Bloco = { rotulo: string; paragrafos: string[] };
+/** V11, item 6: `mostrar` é opcional (nem todo bloco tem o que mostrar além da fala). */
+type Bloco = { rotulo: string; paragrafos: string[]; mostrar?: string[] };
 
 type Props = {
   roteiroId: number;
@@ -44,6 +45,8 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
   const semRede = useSemRede();
   // A frase do aviso de falha (ou null, sem aviso): falha do servidor e queda de conexão dizem coisas diferentes.
   const [avisoErro, setAvisoErro] = useState<string | null>(null);
+  /** V11, item 5: o toast "Gravado" de quem marca pelo botão redondo, sem sair da tela. */
+  const [avisoSucesso, setAvisoSucesso] = useState(false);
   // Fora do layout do painel não há o provedor `Conexao`: `tratarFalha` só escolhe a frase, não acende faixa.
   const tratarFalha = useTratarFalha();
   const idMotivoSemRede = useId();
@@ -94,12 +97,37 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
   const bloco = blocos[passo];
   const proximo = blocos[passo + 1] ?? null;
   const primeiroParagrafoProximo = proximo?.paragrafos[0] ?? null;
+  const ultimoBloco = passo === blocos.length - 1;
 
+  /** O botão redondo, nos blocos que não são o último (V11, item 5): marca e mostra o toast, sem sair da tela. */
   function marcarGravado() {
     if (gravado || marcando) return;
     setMarcando(true);
     marcarGravadoAction(roteiroId)
-      .then(() => setGravado(true))
+      .then(() => {
+        setGravado(true);
+        setAvisoSucesso(true);
+      })
+      .catch((falha) => setAvisoErro(tratarFalha(falha, textosGravacao.erroMarcar, textosGravacao.erroMarcarSemRede)))
+      .finally(() => setMarcando(false));
+  }
+
+  /**
+   * "Terminei de gravar" (V11, item 5): só no último bloco. Marca gravado (se ainda não estava) e
+   * sai para o roteiro, com o toast "Gravado" chegando lá (`?gravado=1`, `RoteiroTela.tsx`).
+   */
+  function terminarGravacao() {
+    if (marcando) return;
+    if (gravado) {
+      iniciarSaida(() => router.push(`/roteiros/${roteiroId}?gravado=1`));
+      return;
+    }
+    setMarcando(true);
+    marcarGravadoAction(roteiroId)
+      .then(() => {
+        setGravado(true);
+        iniciarSaida(() => router.push(`/roteiros/${roteiroId}?gravado=1`));
+      })
       .catch((falha) => setAvisoErro(tratarFalha(falha, textosGravacao.erroMarcar, textosGravacao.erroMarcarSemRede)))
       .finally(() => setMarcando(false));
   }
@@ -146,6 +174,15 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
               {paragrafo}
             </p>
           ))}
+          {bloco.mostrar && bloco.mostrar.length > 0 ? (
+            <div className={styles.mostrar}>
+              {bloco.mostrar.map((linha, indice) => (
+                <p key={indice} className={styles.mostrarLinha}>
+                  {linha}
+                </p>
+              ))}
+            </div>
+          ) : null}
           {primeiroParagrafoProximo ? (
             <div className={styles.proximo}>
               <span className={styles.rotuloProximo}>{textosGravacao.depoisVem}</span>
@@ -171,25 +208,40 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
         >
           <ChevronLeft size={24} strokeWidth={1.75} aria-hidden="true" />
         </button>
-        <button
-          type="button"
-          className={styles.btn}
-          disabled={passo === blocos.length - 1}
-          onClick={() => setPasso((p) => Math.min(blocos.length - 1, p + 1))}
-        >
-          {textosGravacao.proximoBloco}
-        </button>
-        <button
-          type="button"
-          aria-label={gravado ? textosGravacao.gravado : textosGravacao.marcarGravei}
-          aria-pressed={gravado}
-          aria-describedby={semRede ? idMotivoSemRede : undefined}
-          className={`${styles.redondo} ${gravado ? styles.redondoFeito : ""}`}
-          disabled={marcando || semRede}
-          onClick={marcarGravado}
-        >
-          <Check size={24} strokeWidth={1.75} aria-hidden="true" />
-        </button>
+        {ultimoBloco ? (
+          <button
+            type="button"
+            className={styles.btn}
+            disabled={marcando || semRede}
+            aria-busy={marcando || undefined}
+            aria-describedby={semRede ? idMotivoSemRede : undefined}
+            onClick={terminarGravacao}
+          >
+            {textosGravacao.terminei}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={styles.btn}
+              disabled={passo === blocos.length - 1}
+              onClick={() => setPasso((p) => Math.min(blocos.length - 1, p + 1))}
+            >
+              {textosGravacao.proximoBloco}
+            </button>
+            <button
+              type="button"
+              aria-label={gravado ? textosGravacao.gravado : textosGravacao.marcarGravei}
+              aria-pressed={gravado}
+              aria-describedby={semRede ? idMotivoSemRede : undefined}
+              className={`${styles.redondo} ${gravado ? styles.redondoFeito : ""}`}
+              disabled={marcando || semRede}
+              onClick={marcarGravado}
+            >
+              <Check size={24} strokeWidth={1.75} aria-hidden="true" />
+            </button>
+          </>
+        )}
         {/* Na linha de baixo dos controles, ocupando a largura toda: não cobre nenhum toque nem some fora da tela
             (a `.gravacao` tem altura fixa, um irmão a mais dos controles cairia numa linha de fora). */}
         {semRede ? (
@@ -205,6 +257,7 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca }
         aberto={avisoErro !== null}
         onFechar={() => setAvisoErro(null)}
       />
+      <Toast texto={textosGravacao.gravadoToast} aberto={avisoSucesso} onFechar={() => setAvisoSucesso(false)} />
     </div>
   );
 }

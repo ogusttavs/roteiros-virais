@@ -126,4 +126,46 @@ test.describe("gravar agora, o caminho por texto", () => {
     await page.getByRole("button", { name: "Estou num momento" }).click();
     await expect(page.getByRole("dialog", { name: "Gravar agora" })).toBeVisible();
   });
+
+  /**
+   * V11, item 2 e item 3a: a tela de espera com a claquete cobre o Hoje
+   * enquanto o servidor escreve. Com `AI_PROVIDER=mock` a resposta é rápida
+   * demais para pegar a tela por sorte; atrasa o pedido da Server Action um
+   * pouco (mesma técnica de `sem-rede.spec.ts`, `next-action` no cabeçalho)
+   * só para este teste ter uma janela confiável de asserção.
+   */
+  test("a tela de espera com a claquete cobre o Hoje enquanto o roteiro escreve", async ({ page }) => {
+    let atrasou = false;
+    await page.route("**/*", async (rota) => {
+      const pedido = rota.request();
+      if (!atrasou && pedido.method() === "POST" && pedido.headers()["next-action"]) {
+        atrasou = true;
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+      }
+      await rota.continue();
+    });
+
+    await entrar(page);
+    await page.goto("/hoje");
+
+    await page.getByRole("button", { name: "Gravar agora" }).click();
+    const folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folha).toBeVisible();
+
+    await folha.getByLabel("Onde você está").fill("no ponto de ônibus");
+    await folha.getByLabel("O que está acontecendo").fill("esperando enquanto o cliente liga");
+    await folha.getByLabel("O que dá para mostrar").fill("o produto na sacola");
+    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+
+    // A folha fecha na hora e a tela de espera cobre o Hoje, sem barra de abas (item 2 e 3a).
+    await expect(folha).toHaveCount(0);
+    await expect(page.getByRole("status")).toBeVisible();
+    await expect(page.getByText("Escrevendo o seu roteiro")).toBeVisible();
+    await expect(page.getByText("Costuma levar de 30 segundos a 3 minutos")).toBeVisible();
+
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
+    await page.unroute("**/*");
+  });
 });

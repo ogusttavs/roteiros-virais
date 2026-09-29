@@ -16,4 +16,11 @@ export const textosGravacao = {
   erroMarcar: "Não deu para marcar agora; tente de novo",
   /** A conexão caiu no meio do toque em "Marcar que gravei" (V7, item 4): marcar de novo é seguro, o roteiro só muda de estado. */
   erroMarcarSemRede: "Sem conexão agora; marque de novo quando a rede voltar",
+  /**
+   * V11, item 5: no último bloco, o botão do meio substitui "Próximo bloco"; marca gravado e sai
+   * para o roteiro. O toast some sozinho (achado do Gustavo testando em produção: o círculo redondo
+   * só mudava de cor, "parecia que nada tinha acontecido").
+   */
+  terminei: "Terminei de gravar",
+  gravadoToast: "Gravado. Quando postar, marque em Histórico.",
 };

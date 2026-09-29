@@ -1,5 +1,6 @@
 import { fileURLToPath } from "node:url";
 
+import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
 const alias = {
@@ -32,6 +33,9 @@ export default defineConfig({
      */
     projects: [
       {
+        // React (V11): so os testes de componente importam `.tsx`; o plugin so faz a
+        // transformacao de JSX, nunca muda o ambiente "node" nem exige jsdom.
+        plugins: [react()],
         resolve: { alias },
         test: {
           name: "unitario",

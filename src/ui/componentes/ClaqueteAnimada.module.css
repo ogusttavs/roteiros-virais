@@ -1,0 +1,39 @@
+.claquete {
+  flex: none;
+  color: var(--cor-titulo);
+}
+
+.braco {
+  transform-box: view-box;
+  transform-origin: 16px 42px;
+  animation: bater 1.6s var(--curva-saida) infinite;
+}
+
+@keyframes bater {
+  0% {
+    transform: rotate(-17deg);
+  }
+  35% {
+    transform: rotate(0deg);
+  }
+  55% {
+    transform: rotate(0deg);
+  }
+  90%,
+  100% {
+    transform: rotate(-17deg);
+  }
+}
+
+/**
+ * A claquete fica parada, aberta (V11, item 1; IDENTIDADE.md, "o movimento"): nunca bate sem parar.
+ * Aberta é a posição de descanso do símbolo estático (`marca.js`, `claquete()`, `rotate(-17 16 42)`,
+ * a mesma que `Simbolo`/`Logo.tsx` desenham sempre); `0deg` é a claquete batida, fechada (revisão do
+ * PR #62, item 3: estava com as duas trocadas).
+ */
+@media (prefers-reduced-motion: reduce) {
+  .braco {
+    animation: none;
+    transform: rotate(-17deg);
+  }
+}

@@ -53,14 +53,6 @@
   padding: var(--espaco-10) 0;
 }
 
-.demorando {
-  margin: 0;
-  padding-left: var(--espaco-6);
-  font-size: var(--tamanho-secundario);
-  line-height: 1.5;
-  color: var(--cor-texto-suave);
-}
-
 .fraseErro {
   margin: 0;
   font-size: var(--tamanho-leitura);

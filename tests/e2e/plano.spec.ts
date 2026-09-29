@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -36,9 +37,17 @@ async function entrar(page: Page) {
 
 test.describe("colar a agenda e o plano de gravações", () => {
   test.beforeAll(async () => {
-    const [nicho] = await db().insert(nichos).values({ slug: "e2e-plano", nome: "[teste] Plano" }).returning();
+    /**
+     * Seguro para repetição (revisão do PR #62, item 4): a CI reprovou uma vez (tempo de resposta da
+     * máquina) e a repetição automática do Playwright rodou este `beforeAll` de novo no mesmo worker,
+     * batendo na chave única do nicho. `onConflictDoNothing` mais uma leitura de volta faz uma segunda
+     * passada reaproveitar a linha em vez de tentar inserir de novo (nicho por `slug`, `user` e
+     * `account` por `id`, todos fixos neste arquivo).
+     */
+    await db().insert(nichos).values({ slug: "e2e-plano", nome: "[teste] Plano" }).onConflictDoNothing();
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "e2e-plano"));
 
-    await db().insert(user).values({ id: "e2e-plano", name: "[teste] Plano", email: EMAIL });
+    await db().insert(user).values({ id: "e2e-plano", name: "[teste] Plano", email: EMAIL }).onConflictDoNothing();
     await db()
       .insert(account)
       .values({
@@ -48,8 +57,12 @@ test.describe("colar a agenda e o plano de gravações", () => {
         providerId: "credential",
         userId: "e2e-plano",
         password: await hashPassword(SENHA),
-      });
-    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-plano", aceitouTermosEm: new Date() });
+      })
+      .onConflictDoNothing();
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: "e2e-plano", aceitouTermosEm: new Date() })
+      .onConflictDoNothing();
 
     const [marca] = await db()
       .insert(clientes)
@@ -83,7 +96,7 @@ test.describe("colar a agenda e o plano de gravações", () => {
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
       { titulo: "tema de teste 3", descricao: "descricao 3", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
     ];
-    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
+    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas }).onConflictDoNothing();
   });
 
   test("cola uma agenda de dois dias, ve a lista, ve o bloco no Hoje, aceita um item ate o roteiro, pula outro, ve Meu plano", async ({
@@ -109,8 +122,10 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
-    // "O seu plano de hoje", so os itens de hoje (o dia de amanha nao aparece aqui).
-    await expect(page.getByText("O seu plano de hoje")).toBeVisible();
+    // "O seu plano de hoje", so os itens de hoje (o dia de amanha nao aparece aqui). `criarPlanoAction`
+    // só responde depois de gravar; limiar maior (revisão do PR #62, item 4), mesmo valor que os outros
+    // pontos desta suíte que esperam uma Server Action terminar (`momento.spec.ts`, `story.spec.ts`).
+    await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("reuniao de fechamento")).toHaveCount(0);
 
     // Aceita "ver a linha nova": abre a folha "Gravar agora" pre-preenchida, e o roteiro sai com origem momento.

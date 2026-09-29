@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import type { FormatoRoteiro, Objetivo } from "@/db/schema";
 import { AJUDA_OBJETIVO, FORMATOS_ROTEIRO_EM_ORDEM, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM, ROTULO_FORMATO_ROTEIRO, sugerirFormatoPeloObjetivo } from "@/ia/enums";
@@ -11,13 +11,11 @@ import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
-import { Progresso } from "@/ui/componentes/Progresso";
+import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { gerarRoteiroAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
-
-const LIMIAR_DEMORANDO_MS = 10000;
 
 function primeiraMaiuscula(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
@@ -39,19 +37,16 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
   const [formatoTocado, setFormatoTocado] = useState(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
   const [erro, setErro] = useState<string | null>(null);
-  const [demorando, setDemorando] = useState(false);
   const [pendente, iniciarTransicao] = useTransition();
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
-
-  useEffect(() => {
-    if (!pendente) {
-      setDemorando(false);
-      return;
-    }
-    const id = setTimeout(() => setDemorando(true), LIMIAR_DEMORANDO_MS);
-    return () => clearTimeout(id);
-  }, [pendente]);
+  /**
+   * Revisão do PR #62, item 2: "Voltar depois" navegava para o Hoje, mas a transição continuava
+   * rodando, e quando `gerarRoteiroAction` terminava, o `router.push` para o roteiro disparava de
+   * onde a pessoa estivesse (achado do Fable). Mesma ref que `FolhaGravarAgora` já usa: marcada no
+   * clique, o sucesso (ou o erro) depois dela não navega nem escreve na tela mais.
+   */
+  const saiuRef = useRef(false);
 
   useEffect(() => {
     if (formatoTocado || !escolhido) return;
@@ -64,9 +59,11 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     iniciarTransicao(async () => {
       try {
         const { id } = await gerarRoteiroAction(origem, escolhido, formato);
+        if (saiuRef.current) return;
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
       } catch (falha) {
+        if (saiuRef.current) return;
         // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir cria outro roteiro,
         // então a frase de rede manda olhar o Histórico primeiro (V7, item 4 do PROXIMO.md).
         setErro(tratarFalha(falha, textosObjetivo.erro, textosConexao.conexaoCaiuNoMeio));
@@ -74,15 +71,13 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     });
   }
 
+  function voltarDepois() {
+    saiuRef.current = true;
+    router.push("/hoje");
+  }
+
   if (pendente) {
-    return (
-      <div className={styles.pagina}>
-        <div className={styles.espera}>
-          <Progresso frases={textosComuns.espera} />
-          {demorando ? <p className={styles.demorando}>{textosObjetivo.demorando}</p> : null}
-        </div>
-      </div>
-    );
+    return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} />;
   }
 
   if (erro !== null) {

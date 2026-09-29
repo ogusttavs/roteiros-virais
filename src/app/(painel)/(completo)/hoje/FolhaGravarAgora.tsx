@@ -19,6 +19,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Chips } from "@/ui/componentes/Chips";
 import { Folha } from "@/ui/componentes/Folha";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
+import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./FolhaGravarAgora.module.css";
@@ -118,6 +119,13 @@ export function FolhaGravarAgora({
   const [camposFaltando, setCamposFaltando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
+  /**
+   * V11, item 4: "Voltar depois" fecha a folha na hora, mas `escrever()` continua rodando (o
+   * servidor termina e grava o roteiro mesmo sem ninguém esperando,
+   * `momento-continua-sem-espera.test.ts`); esta ref, e não um estado, porque o closure de
+   * `escrever()` precisa ler o valor mais recente mesmo depois do componente sair da tela.
+   */
+  const saiuRef = useRef(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const gravadorRef = useRef<MediaRecorder | null>(null);
@@ -245,152 +253,168 @@ export function FolhaGravarAgora({
               marcaId,
               transcricao: transcricao ?? undefined,
             });
+      // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
+      // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
+      if (saiuRef.current) return;
       fecharEDepois(() => router.push(`/roteiros/${id}`));
     } catch (falha) {
+      if (saiuRef.current) return;
       setErroEnvio(tratarFalha(falha, textosMomento.erroGerar));
     } finally {
-      setEnviando(false);
+      if (!saiuRef.current) setEnviando(false);
     }
+  }
+
+  function voltarDepois() {
+    saiuRef.current = true;
+    aoFechar();
   }
 
   const opcoesFalarDe = [textosMomento.falarDeNenhuma, ...marcas.map((marca) => marca.nome)];
 
   return (
-    <Folha
-      titulo={textosMomento.tituloFolha}
-      aberto
-      aoFechar={aoFechar}
-      rodape={
-        <Botao variante="primario" tamanho="lg" precisaDeRede carregando={enviando} onClick={escrever}>
-          {enviando ? textosMomento.escrevendo : textosMomento.escreverRoteiro}
-        </Botao>
-      }
-    >
-      <p className={styles.instrucao}>{textosMomento.instrucaoAudio}</p>
+    <>
+      <Folha
+        titulo={textosMomento.tituloFolha}
+        aberto={!enviando}
+        aoFechar={aoFechar}
+        rodape={
+          <Botao variante="primario" tamanho="lg" precisaDeRede carregando={enviando} onClick={escrever}>
+            {enviando ? textosMomento.escrevendo : textosMomento.escreverRoteiro}
+          </Botao>
+        }
+      >
+        <p className={styles.instrucao}>{textosMomento.instrucaoAudio}</p>
 
-      {semMicrofone ? (
-        <p className={styles.avisoAudio}>{textosMomento.semMicrofone}</p>
-      ) : (
-        <div className={styles.blocoAudio}>
-          {faseAudio === "gravando" ? (
-            <Botao variante="secundario" tamanho="lg" onClick={pararGravacao}>
-              <Square size={18} strokeWidth={1.75} aria-hidden="true" />
-              {textosMomento.botaoParar}
-            </Botao>
-          ) : (
-            <Botao
-              variante="secundario"
-              tamanho="lg"
-              precisaDeRede
-              disabled={faseAudio === "transcrevendo"}
-              carregando={faseAudio === "transcrevendo"}
-              onClick={iniciarGravacao}
-            >
-              <Mic size={18} strokeWidth={1.75} aria-hidden="true" />
-              {faseAudio === "transcrevendo" ? textosMomento.transcrevendo : textosMomento.botaoGravar}
-            </Botao>
-          )}
-          {faseAudio === "gravando" ? (
-            <span className={[styles.status, styles.gravando].join(" ")} aria-live="polite">
-              {textosMomento.gravando(segundos)}
-            </span>
-          ) : null}
-          {erroAudio ? (
-            <p className={styles.erro} role="alert">
-              {erroAudio}
-            </p>
-          ) : null}
-        </div>
-      )}
+        {semMicrofone ? (
+          <p className={styles.avisoAudio}>{textosMomento.semMicrofone}</p>
+        ) : (
+          <div className={styles.blocoAudio}>
+            {faseAudio === "gravando" ? (
+              <Botao variante="secundario" tamanho="lg" onClick={pararGravacao}>
+                <Square size={18} strokeWidth={1.75} aria-hidden="true" />
+                {textosMomento.botaoParar}
+              </Botao>
+            ) : (
+              <Botao
+                variante="secundario"
+                tamanho="lg"
+                precisaDeRede
+                disabled={faseAudio === "transcrevendo"}
+                carregando={faseAudio === "transcrevendo"}
+                onClick={iniciarGravacao}
+              >
+                <Mic size={18} strokeWidth={1.75} aria-hidden="true" />
+                {faseAudio === "transcrevendo" ? textosMomento.transcrevendo : textosMomento.botaoGravar}
+              </Botao>
+            )}
+            {faseAudio === "gravando" ? (
+              <span className={[styles.status, styles.gravando].join(" ")} aria-live="polite">
+                {textosMomento.gravando(segundos)}
+              </span>
+            ) : null}
+            {erroAudio ? (
+              <p className={styles.erro} role="alert">
+                {erroAudio}
+              </p>
+            ) : null}
+          </div>
+        )}
 
-      {transcricao ? (
-        <div className={styles.oQueDisse}>
-          <span className={styles.oQueDisseRotulo}>{textosMomento.oQueVoceDisse}</span>
-          <p className={styles.oQueDisseTexto}>{transcricao}</p>
-        </div>
-      ) : null}
+        {transcricao ? (
+          <div className={styles.oQueDisse}>
+            <span className={styles.oQueDisseRotulo}>{textosMomento.oQueVoceDisse}</span>
+            <p className={styles.oQueDisseTexto}>{transcricao}</p>
+          </div>
+        ) : null}
 
-      <div className={styles.divisor}>{textosMomento.ouEscreva}</div>
+        <div className={styles.divisor}>{textosMomento.ouEscreva}</div>
 
-      <AreaTexto
-        rotulo={textosMomento.rotuloOnde}
-        value={onde}
-        onChange={(evento) => setOnde(evento.target.value)}
-        linhasMin={2}
-      />
-      <AreaTexto
-        rotulo={textosMomento.rotuloOQueEstaAcontecendo}
-        value={oQueEstaAcontecendo}
-        onChange={(evento) => setOQueEstaAcontecendo(evento.target.value)}
-        linhasMin={2}
-      />
-      <AreaTexto
-        rotulo={textosMomento.rotuloOQueDaParaMostrar}
-        value={oQueDaParaMostrar}
-        onChange={(evento) => setOQueDaParaMostrar(evento.target.value)}
-        linhasMin={2}
-      />
-
-      <div className={styles.grupoObjetivo}>
-        <span className={styles.rotuloGrupo}>{textosMomento.objetivo}</span>
-        <div role="radiogroup" aria-label={textosMomento.objetivo} className={styles.opcoesObjetivo}>
-          {OBJETIVOS_EM_ORDEM.map((opcao) => (
-            <OpcaoObjetivo
-              key={opcao}
-              titulo={primeiraMaiuscula(NOME_OBJETIVO[opcao])}
-              ajuda={AJUDA_OBJETIVO[opcao]}
-              marcada={objetivo === opcao}
-              recomendada={objetivoRecomendado === opcao}
-              rotuloRecomendado={textosMomento.recomendado}
-              onEscolher={() => setObjetivo(opcao)}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.grupoFormato}>
-        <span className={styles.rotuloGrupo}>{textosMomento.formato}</span>
-        <div role="tablist" aria-label={textosMomento.formato} className={styles.segmentado}>
-          {FORMATOS_ROTEIRO_EM_ORDEM.map((opcao) => (
-            <button
-              key={opcao}
-              type="button"
-              role="tab"
-              aria-selected={formato === opcao}
-              className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
-                .filter(Boolean)
-                .join(" ")}
-              onClick={() => {
-                setFormatoTocado(true);
-                setFormato(opcao);
-              }}
-            >
-              {ROTULO_FORMATO_ROTEIRO[opcao]}
-            </button>
-          ))}
-        </div>
-        {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
-      </div>
-
-      {marcas.length > 0 ? (
-        <Chips
-          rotuloGrupo={textosMomento.falarDe}
-          opcoes={opcoesFalarDe}
-          selecionado={marcaIndice}
-          onChange={setMarcaIndice}
+        <AreaTexto
+          rotulo={textosMomento.rotuloOnde}
+          value={onde}
+          onChange={(evento) => setOnde(evento.target.value)}
+          linhasMin={2}
         />
-      ) : null}
+        <AreaTexto
+          rotulo={textosMomento.rotuloOQueEstaAcontecendo}
+          value={oQueEstaAcontecendo}
+          onChange={(evento) => setOQueEstaAcontecendo(evento.target.value)}
+          linhasMin={2}
+        />
+        <AreaTexto
+          rotulo={textosMomento.rotuloOQueDaParaMostrar}
+          value={oQueDaParaMostrar}
+          onChange={(evento) => setOQueDaParaMostrar(evento.target.value)}
+          linhasMin={2}
+        />
 
-      {camposFaltando ? (
-        <p className={styles.erro} role="alert">
-          {textosMomento.campoVazio}
-        </p>
-      ) : null}
-      {erroEnvio ? (
-        <p className={styles.erro} role="alert">
-          {erroEnvio}
-        </p>
-      ) : null}
-    </Folha>
+        <div className={styles.grupoObjetivo}>
+          <span className={styles.rotuloGrupo}>{textosMomento.objetivo}</span>
+          <div role="radiogroup" aria-label={textosMomento.objetivo} className={styles.opcoesObjetivo}>
+            {OBJETIVOS_EM_ORDEM.map((opcao) => (
+              <OpcaoObjetivo
+                key={opcao}
+                titulo={primeiraMaiuscula(NOME_OBJETIVO[opcao])}
+                ajuda={AJUDA_OBJETIVO[opcao]}
+                marcada={objetivo === opcao}
+                recomendada={objetivoRecomendado === opcao}
+                rotuloRecomendado={textosMomento.recomendado}
+                onEscolher={() => setObjetivo(opcao)}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.grupoFormato}>
+          <span className={styles.rotuloGrupo}>{textosMomento.formato}</span>
+          <div role="tablist" aria-label={textosMomento.formato} className={styles.segmentado}>
+            {FORMATOS_ROTEIRO_EM_ORDEM.map((opcao) => (
+              <button
+                key={opcao}
+                type="button"
+                role="tab"
+                aria-selected={formato === opcao}
+                className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                onClick={() => {
+                  setFormatoTocado(true);
+                  setFormato(opcao);
+                }}
+              >
+                {ROTULO_FORMATO_ROTEIRO[opcao]}
+              </button>
+            ))}
+          </div>
+          {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
+        </div>
+
+        {marcas.length > 0 ? (
+          <Chips
+            rotuloGrupo={textosMomento.falarDe}
+            opcoes={opcoesFalarDe}
+            selecionado={marcaIndice}
+            onChange={setMarcaIndice}
+          />
+        ) : null}
+
+        {camposFaltando ? (
+          <p className={styles.erro} role="alert">
+            {textosMomento.campoVazio}
+          </p>
+        ) : null}
+        {erroEnvio ? (
+          <p className={styles.erro} role="alert">
+            {erroEnvio}
+          </p>
+        ) : null}
+      </Folha>
+      <TelaEscrevendo
+        aberto={enviando}
+        fraseDemorando={textosMomento.demorando}
+        aoVoltarDepois={voltarDepois}
+      />
+    </>
   );
 }

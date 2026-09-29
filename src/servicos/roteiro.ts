@@ -25,6 +25,7 @@ import {
   type Plataforma,
   type TipoAbertura,
 } from "@/db/schema";
+import { ROTULO_FIGURINHA } from "@/ia/enums";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
@@ -91,27 +92,104 @@ function splitParagrafos(texto: string): string[] {
     .filter(Boolean);
 }
 
+type BlocoReels = "abertura" | "meio" | "fechamento" | "chamada";
+
+/** Até quantos segundos do início um `quando` ainda conta como abertura (revisão do PR #62, item 1). */
+const LIMIAR_ABERTURA_S = 3;
+/** A partir de que fração da duração um `quando` já conta como chamada final. */
+const FRACAO_CHAMADA = 0.85;
+/** A partir de que fração da duração um `quando` já conta como fechamento. */
+const FRACAO_FECHAMENTO = 0.65;
+
+/**
+ * O primeiro número do `quando` livre (revisão do PR #62, item 1: conferido
+ * no banco de produção, os 30 itens de `edicao.textoNaTela` dos cinco
+ * roteiros de Reels vieram sempre em segundos, "0 a 5 segundos", "8s a 12s",
+ * "26 segundos", nunca com as palavras que a primeira versão desta rodada
+ * tentava casar). `null` sem nenhum número ("Do começo ao fim", "legenda o
+ * tempo todo").
+ */
+function primeiroSegundo(quando: string): number | null {
+  const numero = /\d+/.exec(quando);
+  return numero ? Number(numero[0]) : null;
+}
+
+/** Em qual dos quatro blocos um segundo cai, pela posição dentro da duração do roteiro (revisão do PR #62, item 1). */
+function blocoDoSegundo(segundo: number, duracaoS: number): BlocoReels {
+  if (segundo <= LIMIAR_ABERTURA_S) return "abertura";
+  if (segundo >= duracaoS * FRACAO_CHAMADA) return "chamada";
+  if (segundo >= duracaoS * FRACAO_FECHAMENTO) return "fechamento";
+  return "meio";
+}
+
+/**
+ * O que mostrar num bloco de Reels (V11, item 6b; casamento por posição
+ * desde a revisão do PR #62, item 1, não mais por palavra-chave): um item
+ * sem número no `quando` sempre cai na abertura, com o `quando` na frente da
+ * linha (`textosRoteiro.mostrar.textoNaTela`).
+ */
+function mostrarNoBlocoReels(edicao: ConteudoRoteiro["edicao"], duracaoS: number, bloco: BlocoReels): string[] {
+  return edicao.textoNaTela
+    .filter((item) => {
+      const segundo = primeiroSegundo(item.quando);
+      return segundo === null ? bloco === "abertura" : blocoDoSegundo(segundo, duracaoS) === bloco;
+    })
+    .map((item) => textosRoteiro.mostrar.textoNaTelaComQuando(item.quando, item.oQue));
+}
+
+/** O que mostrar num cartão de Story (V11, item 6a): sempre as três linhas, a figurinha só quando pedida. */
+function mostrarNoCartao(cartao: NonNullable<ConteudoRoteiro["cartoes"]>[number]): string[] {
+  const linhas = [
+    textosRoteiro.mostrar.oQueMostrar(cartao.oQueMostrar),
+    textosRoteiro.mostrar.textoNaTela(cartao.textoNaTela),
+  ];
+  if (cartao.figurinha !== "nenhuma") {
+    linhas.push(textosRoteiro.mostrar.figurinha(ROTULO_FIGURINHA[cartao.figurinha]));
+  }
+  return linhas;
+}
+
 /**
  * O roteiro em blocos de leitura, um por vez (V9c, item 4): em Reels, os
  * quatro de sempre (gancho, corpo, fechamento, chamada); em Story, um bloco
- * por cartão, com o que falar (o resto do cartão, o que mostrar, o texto na
- * tela e a figurinha, ficam no "Como editar" da tela, não aqui). Usada por
- * `RoteiroTela.tsx`, `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`,
- * as três telas que hoje montavam essa lista cada uma do seu jeito.
+ * por cartão, com o que falar. `mostrar` (V11, item 6) é o que mostrar
+ * enquanto grava aquele bloco, menor que a fala e nunca competindo com ela
+ * (modo gravação, `GravacaoTela.tsx`); o PDF e `RoteiroTela.tsx` continuam
+ * como estão, ignoram o campo. Usada por `RoteiroTela.tsx`,
+ * `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`.
  */
-export function blocosParaLeitura(roteiro: RoteiroLinha): { rotulo: string; paragrafos: string[] }[] {
+export function blocosParaLeitura(
+  roteiro: RoteiroLinha,
+): { rotulo: string; paragrafos: string[]; mostrar?: string[] }[] {
   const corpo = corpoDoRoteiro(roteiro);
   if (roteiro.formato === "story" && corpo.cartoes) {
     return corpo.cartoes.map((cartao, indice) => ({
       rotulo: textosRoteiro.blocos.cartao(indice + 1),
       paragrafos: [cartao.oQueFalar],
+      mostrar: mostrarNoCartao(cartao),
     }));
   }
   return [
-    { rotulo: textosRoteiro.blocos.abertura, paragrafos: [corpo.gancho] },
-    { rotulo: textosRoteiro.blocos.meio, paragrafos: splitParagrafos(corpo.corpo) },
-    { rotulo: textosRoteiro.blocos.fechamento, paragrafos: splitParagrafos(corpo.fechamento) },
-    { rotulo: textosRoteiro.blocos.chamada, paragrafos: [corpo.chamadaFinal] },
+    {
+      rotulo: textosRoteiro.blocos.abertura,
+      paragrafos: [corpo.gancho],
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "abertura"),
+    },
+    {
+      rotulo: textosRoteiro.blocos.meio,
+      paragrafos: splitParagrafos(corpo.corpo),
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "meio"),
+    },
+    {
+      rotulo: textosRoteiro.blocos.fechamento,
+      paragrafos: splitParagrafos(corpo.fechamento),
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "fechamento"),
+    },
+    {
+      rotulo: textosRoteiro.blocos.chamada,
+      paragrafos: [corpo.chamadaFinal],
+      mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "chamada"),
+    },
   ];
 }
 
