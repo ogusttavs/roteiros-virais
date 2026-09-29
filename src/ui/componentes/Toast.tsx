@@ -16,6 +16,13 @@ type Props = {
    * leitor de tela anunciar na hora, e fica mais tempo na tela por padrão.
    */
   variante?: "sucesso" | "erro";
+  /**
+   * P1, item 8: "Usar esta sugestão" precisa de um "desfazer" curto dentro
+   * do próprio toast. O toast não captura toque (`pointer-events: none`,
+   * para nunca cobrir um botão atrás dele), então só este botão reabre
+   * `pointer-events: auto` para si mesmo.
+   */
+  acao?: { rotulo: string; onClique: () => void };
 };
 
 /**
@@ -25,7 +32,7 @@ type Props = {
  * (`pointer-events: none`), para nunca cobrir um botão que a pessoa precisa
  * tocar de novo.
  */
-export function Toast({ texto, aberto, onFechar, duracaoMs, variante = "sucesso" }: Props) {
+export function Toast({ texto, aberto, onFechar, duracaoMs, variante = "sucesso", acao }: Props) {
   const duracao = duracaoMs ?? (variante === "erro" ? 5000 : 3000);
 
   useEffect(() => {
@@ -41,6 +48,18 @@ export function Toast({ texto, aberto, onFechar, duracaoMs, variante = "sucesso"
     <div role={variante === "erro" ? "alert" : "status"} className={styles.toast}>
       <Icone size={18} strokeWidth={1.5} aria-hidden="true" />
       {texto}
+      {acao ? (
+        <button
+          type="button"
+          className={styles.acao}
+          onClick={() => {
+            acao.onClique();
+            onFechar();
+          }}
+        >
+          {acao.rotulo}
+        </button>
+      ) : null}
     </div>
   );
 }

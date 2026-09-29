@@ -12,6 +12,13 @@ type Props = {
   /** Meta da nota (design v2, `base.css`, ".analise"): pinta o topo e escolhe a palavra da faixa. */
   meta: number;
   rotulosFaixa: RotulosFaixa;
+  /**
+   * P1, item 8 (achado do Gustavo: o exemplo de "como melhorar" foi lido
+   * como a própria resposta da pessoa): rótulo visível de sugestão e o botão
+   * "Usar esta sugestão". Sem isto (a vitrine em `fundacao/page.tsx`), o
+   * exemplo aparece só com aspas, sem rótulo nem botão.
+   */
+  sugestao?: { rotulo: string; botaoUsar: string; onUsar: () => void };
 };
 
 const ORDEM: (keyof Rotulos)[] = ["bom", "melhorar", "como", "impacto"];
@@ -29,7 +36,7 @@ function formatarNota(valor: number): string {
  * existe: avaliacoes gravadas antes da versao 1.2.0 de `avaliarResposta` nao
  * tem esse campo, e continuam validas sem o bloco.
  */
-export function AnaliseQuatroPartes({ avaliacao, rotulos, meta, rotulosFaixa }: Props) {
+export function AnaliseQuatroPartes({ avaliacao, rotulos, meta, rotulosFaixa, sugestao }: Props) {
   const faixa = faixaMeta(avaliacao.nota, meta);
   return (
     <div className={[styles.analise, styles[CLASSE_FAIXA[faixa]]].join(" ")}>
@@ -44,7 +51,13 @@ export function AnaliseQuatroPartes({ avaliacao, rotulos, meta, rotulosFaixa }: 
             <dd className={styles.texto}>{avaliacao[chave]}</dd>
             {chave === "como" && avaliacao.exemplo ? (
               <dd className={styles.exemplo}>
-                <p className={styles.textoExemplo}>{avaliacao.exemplo}</p>
+                {sugestao ? <p className={styles.rotuloSugestao}>{sugestao.rotulo}</p> : null}
+                <p className={styles.textoExemplo}>“{avaliacao.exemplo}”</p>
+                {sugestao ? (
+                  <button type="button" className={styles.botaoUsarSugestao} onClick={sugestao.onUsar}>
+                    {sugestao.botaoUsar}
+                  </button>
+                ) : null}
               </dd>
             ) : null}
           </div>

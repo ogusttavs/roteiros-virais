@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { PERGUNTAS_BRIEFING, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
-import type { AvaliacaoResposta, PerfilCompilado } from "@/db/schema";
+import { perguntasDoBriefing, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
+import type { AvaliacaoResposta, PerfilCompilado, TipoMarca } from "@/db/schema";
 import type { RegraCliente } from "@/servicos/aprendizado";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
@@ -23,6 +23,7 @@ type Props = {
   perfil: PerfilCompilado | null;
   regrasIniciais: RegraCliente[];
   meta: number;
+  tipo: TipoMarca;
 };
 
 const BLOCOS = Array.from({ length: TOTAL_BLOCOS }, (_, i) => i + 1);
@@ -39,6 +40,12 @@ function itensDoPerfil(perfil: PerfilCompilado) {
     { titulo: textosBriefing.briefing.perfilMedos, texto: perfil.fatos.medos.join(" ") },
     { titulo: textosBriefing.briefing.perfilProibicoes, texto: perfil.fatos.proibicoes.join(", ") },
     { titulo: textosBriefing.briefing.perfilCenas, texto: perfil.fatos.cenasFilmaveis.join(", ") },
+    /** So marca do tipo pessoa (P1, item 4). */
+    { titulo: textosBriefing.briefing.perfilHistoria, texto: perfil.fatos.historia ?? "" },
+    {
+      titulo: textosBriefing.briefing.perfilPosicionamentos,
+      texto: (perfil.fatos.posicionamentos ?? []).join(" "),
+    },
   ].filter((item) => item.texto.trim().length > 0);
 }
 
@@ -50,6 +57,7 @@ export function BriefingVivo({
   perfil,
   regrasIniciais,
   meta,
+  tipo,
 }: Props) {
   const [respostas, setRespostas] = useState(respostasIniciais);
   const [avaliacoes, setAvaliacoes] = useState(avaliacoesIniciais);
@@ -61,7 +69,7 @@ export function BriefingVivo({
     setNotaGeral(resultado.notaGeral);
   }
 
-  const dica = perguntaQueMaisAjuda(avaliacoes);
+  const dica = perguntaQueMaisAjuda(avaliacoes, tipo);
   const itensPerfil = perfil ? itensDoPerfil(perfil) : [];
 
   function aoSelecionarPergunta(perguntaId: string) {
@@ -80,7 +88,7 @@ export function BriefingVivo({
           semNota={textosBriefing.barraNotaGeral.semNota}
           tituloFolha={textosBriefing.barraNotaGeral.tituloFolha}
           aoTocarItem={aoSelecionarPergunta}
-          notas={PERGUNTAS_BRIEFING.map((p) => ({
+          notas={perguntasDoBriefing(tipo).map((p) => ({
             id: p.id,
             rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id, p.rotuloCurto),
             nota: avaliacoes[p.id]?.nota ?? null,
@@ -114,7 +122,7 @@ export function BriefingVivo({
           <AprendizadoCard regrasIniciais={regrasIniciais} />
 
           {BLOCOS.map((bloco) => {
-            const perguntas = perguntasDoBloco(bloco);
+            const perguntas = perguntasDoBloco(bloco, tipo);
             return (
               <section key={bloco} className={styles.bloco}>
                 <h2 className={styles.blocoTitulo}>{perguntas[0]?.blocoNome}</h2>

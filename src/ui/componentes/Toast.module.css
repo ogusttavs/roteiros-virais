@@ -26,6 +26,21 @@
   flex: none;
 }
 
+.acao {
+  /* O toast inteiro tem pointer-events: none; so este botao volta a capturar toque. */
+  pointer-events: auto;
+  flex: none;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 @keyframes surgir {
   from {
     opacity: 0;

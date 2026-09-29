@@ -21,7 +21,7 @@ import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
 import { and, desc, eq } from "drizzle-orm";
 
-import { PERGUNTAS_BRIEFING } from "../src/config/briefing";
+import { perguntasDoBriefing } from "../src/config/briefing";
 import { db, getPool } from "../src/db";
 import {
   briefings,
@@ -232,7 +232,7 @@ async function garantirTemasDeHoje(nichoId: number): Promise<void> {
 async function preencherBriefingCompleto(clienteId: number): Promise<void> {
   const respostas: Record<string, string> = {};
   const avaliacoes: Record<string, AvaliacaoResposta> = {};
-  for (const pergunta of PERGUNTAS_BRIEFING) {
+  for (const pergunta of perguntasDoBriefing("negocio")) {
     respostas[pergunta.id] = `Resposta de exemplo para ${pergunta.id}, com um numero 42 e um caso real.`;
     avaliacoes[pergunta.id] = avaliacaoExemplo(8.6);
   }

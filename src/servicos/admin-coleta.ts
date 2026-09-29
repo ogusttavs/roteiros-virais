@@ -25,6 +25,7 @@ import {
   type AvaliacaoGeracao,
   type Nicho,
   type PlanoMarca,
+  type TipoMarca,
   type Plataforma,
   type TemaDoDia,
 } from "@/db/schema";
@@ -503,6 +504,8 @@ export type ClienteDetalheAdmin = {
   criadoEm: Date;
   /** V9b-0: o interruptor de roteiros por dia, editável nesta tela. */
   plano: PlanoMarca;
+  /** P1, item 1: o interruptor de tipo de conteúdo, editável nesta tela (apaga o briefing ao trocar). */
+  tipo: TipoMarca;
   briefing: { completo: boolean; notaGeral: number | null; resumo: string | null } | null;
   diasSemGravar: number | null;
 };
@@ -523,6 +526,7 @@ export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDet
       ativo: clientes.ativo,
       criadoEm: clientes.criadoEm,
       plano: clientes.plano,
+      tipo: clientes.tipo,
     })
     .from(clientes)
     .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))

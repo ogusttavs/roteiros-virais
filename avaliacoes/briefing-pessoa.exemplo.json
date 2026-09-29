@@ -1,0 +1,74 @@
+[
+  {
+    "perguntaId": "p1",
+    "resposta": "Sou o Marcos, tenho 34 anos e toco duas coisas ao mesmo tempo: uma linha de barra de proteína, a Vigor, e três academias pequenas em Belo Horizonte. Comecei há oito anos vendendo barra numa mochila na porta da academia onde eu treinava.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "linha de vida concreta, com numero e lugar, nao so o cargo"
+  },
+  {
+    "perguntaId": "p2",
+    "resposta": "Quero ser lembrado por mostrar que dá para empreender no fitness sem ser o cara do suplemento genérico: já vivi treino de madrugada, produção numa cozinha de fundo de quintal, e abri três unidades em cinco anos.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "assunto nomeado com a prova de que ele vive aquilo"
+  },
+  {
+    "perguntaId": "p3",
+    "resposta": "A virada foi em 2019, quando um lote inteiro de barra estragou na fábrica terceirizada e eu quase fechei tudo. Resolvi trazer a produção para dentro de casa, aprender sozinho a fazer certo, e recomeçar em três meses.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "episodio com antes, virada e depois, epoca e lugar"
+  },
+  {
+    "perguntaId": "p4",
+    "resposta": "Quero que me siga quem já treina mas não organizou a rotina: gente de 25 a 40 anos, que trabalha o dia inteiro e chega cansada demais à noite para pensar em comida ou treino.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "retrato de tipo que da para enxergar, com o momento de vida"
+  },
+  {
+    "perguntaId": "p5",
+    "resposta": "Eles querem ver como eu organizo o dia entre a academia e a fábrica, e sempre perguntam \"como você não desiste às 5 da manhã\" e \"dá pra fazer isso sem gastar rios de dinheiro\".",
+    "notaEsperada": 9,
+    "pontoPrincipal": "frases em primeira pessoa do publico, literais"
+  },
+  {
+    "perguntaId": "p6",
+    "resposta": "Acho que rotina rígida de dieta não funciona pra quase ninguém, mesmo sendo o que todo treinador vende. Acho que academia pequena de bairro cuida melhor do aluno do que rede grande. E acho que motivação não existe, só hábito.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "tres posicionamentos literais, cada um com o motivo"
+  },
+  {
+    "perguntaId": "p7",
+    "resposta": "Quero que quem assiste me siga e, com o tempo, comece a treinar numa das minhas academias ou experimente a Vigor. A Vigor ainda é pequena, então mostrar ela crescendo é parte da minha vida, nunca como anúncio.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "acao principal e secundaria, negocio como parte da vida, nunca anuncio"
+  },
+  {
+    "perguntaId": "p8",
+    "resposta": "Hoje posto só no Instagram, umas três vezes por semana, meio sem plano. O vídeo que mais deu certo foi mostrando a fábrica às 5 da manhã, passou de 200 mil visualizações porque ninguém esperava ver o processo de perto.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "rede, ritmo real e um episodio com o motivo"
+  },
+  {
+    "perguntaId": "p9",
+    "resposta": "Eu falo direto, sem enrolar: \"treino não é sobre motivação, é sobre hábito\", \"se não coube na rotina, o problema é a rotina, não a academia\", \"barra boa é a que você recompra sem pensar\". Meu tom é direto, quase provocador.",
+    "notaEsperada": 10,
+    "pontoPrincipal": "tres frases literais com o tom nomeado"
+  },
+  {
+    "perguntaId": "p10",
+    "resposta": "Nunca falo de dinheiro da empresa nem mostro número de faturamento, e minha filha não aparece em vídeo nenhum, isso é combinado com minha esposa.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "limites explicitos, inclusive o que fica fora da camera"
+  },
+  {
+    "perguntaId": "p11",
+    "resposta": "Minha semana tem a fábrica de manhã cedo, visita às três academias, treino às 6h, e às sextas uma reunião com a equipe. Dá pra filmar a produção, o treino, a visita às unidades; não pode aparecer o financeiro nem conversa de RH.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "lista de cenas filmaveis da vida real, com o limite claro"
+  },
+  {
+    "perguntaId": "p12",
+    "resposta": "Admiro o @cyriaco.oficial pela didática e o @flaviotreinador pela consistência. Um perfil parecido com o que eu quero é o @donodeacademia, que também mistura bastidor de negócio com treino.",
+    "notaEsperada": 8,
+    "pontoPrincipal": "handles validos, admirados e parecidos"
+  }
+]

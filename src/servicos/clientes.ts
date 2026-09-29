@@ -67,15 +67,22 @@ export async function briefingCompleto(clienteId: number): Promise<boolean> {
 }
 
 /**
- * Todas as marcas de que o usuario e membro (V3, item 1, escopo 4.13),
- * ordenadas por nome: a lista "Suas marcas" da casca e da folha de troca.
+ * Todas as marcas ativas de que o usuario e membro (V3, item 1, escopo
+ * 4.13), ordenadas por nome: a lista "Suas marcas" da casca, a folha de
+ * troca, o seletor e os chips "Falar de".
+ *
+ * P1, item 7 (achado do Fable desativando Velura e Hiduck em producao):
+ * uma marca desativada nunca aparece aqui, so no admin (que tem a propria
+ * consulta, sem este filtro, para reativar). `resolverMarcaAtiva` nunca ve
+ * uma marca desativada nesta lista, entao um cookie apontando para uma
+ * cai sozinho na marca padrao, sem tratamento especial.
  */
 export async function marcasDoUsuario(usuarioId: string): Promise<Cliente[]> {
   const linhas = await db()
     .select({ cliente: clientes })
     .from(membrosMarca)
     .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
-    .where(eq(membrosMarca.usuarioId, usuarioId))
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(clientes.ativo, true)))
     .orderBy(clientes.nome);
   return linhas.map((l) => l.cliente);
 }
@@ -117,7 +124,10 @@ async function marcaPadrao(marcas: Cliente[]): Promise<Cliente> {
  * recente, regravando o cookie nesse caso. Cookie adulterado, com id de
  * marca que o usuario nao e membro, cai na mesma regra do "senao": o cookie
  * nunca concede pertencimento a marca nenhuma, so escolhe entre as que a
- * consulta acima ja provou que sao do usuario.
+ * consulta acima ja provou que sao do usuario. Uma marca desativada (P1,
+ * item 7) cai na mesma regra: `marcasDoUsuario` ja a tira da lista, entao um
+ * cookie apontando para ela nunca acha `marcaDoCookie` e a marca padrao
+ * decide, sem tratamento especial aqui.
  *
  * `cookies()` (leitura ou gravacao) so funciona dentro de uma requisicao do
  * Next.js; `.set` alem disso so dentro de uma Server Action ou Route
@@ -380,6 +390,25 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
   await db().update(clientes).set({ plano }).where(eq(clientes.id, clienteId));
 }
 
+/**
+ * Trocar o tipo de conteúdo de uma marca (P1, item 1): as doze perguntas do
+ * negócio e as da pessoa têm o mesmo id, mas enunciados diferentes, então
+ * uma resposta de um tipo nunca pode ficar pareada com a avaliação do
+ * outro. O admin já avisa antes de chamar isto; aqui a troca sempre apaga o
+ * briefing, sem checar se havia resposta de verdade.
+ */
+export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promise<Cliente> {
+  const [cliente] = await db().update(clientes).set({ tipo }).where(eq(clientes.id, clienteId)).returning();
+  if (!cliente) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
+
+  await db()
+    .update(briefings)
+    .set({ respostas: {}, avaliacoes: {}, notaGeral: null, completo: false, perfil: null })
+    .where(eq(briefings.clienteId, clienteId));
+
+  return cliente;
+}
+
 export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };
 
 /**
@@ -487,7 +516,8 @@ export const dadosFixosSchema = z
     bairro: z.string().trim().optional(),
     nichoId: z.number().int().positive().optional(),
     ramoOutro: z.string().trim().optional(),
-    persona: z.enum(["negocio", "criador"]),
+    /** P1, item 2: "conhecido" e "negocios" sao valores da persona da marca pessoa (briefing-e-rubricas.md, secao 1b). */
+    persona: z.enum(["negocio", "criador", "conhecido", "negocios"]),
     perfis: z
       .object({
         instagram: z.string().trim().optional(),

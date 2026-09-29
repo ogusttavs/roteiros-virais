@@ -38,7 +38,7 @@ import path from "node:path";
 import { chromium, type Page } from "@playwright/test";
 import { and, desc, eq } from "drizzle-orm";
 
-import { PERGUNTAS_BRIEFING } from "../src/config/briefing";
+import { perguntasDoBriefing } from "../src/config/briefing";
 import { db, getPool } from "../src/db";
 import { briefings, clientes, temasDia, videos, type AvaliacaoResposta, type TemaDoDia } from "../src/db/schema";
 import { hojeISO } from "../src/lib/config";
@@ -233,7 +233,7 @@ async function main(): Promise<void> {
      */
     const respostasBriefing: Record<string, string> = {};
     const avaliacoesBriefing: Record<string, AvaliacaoResposta> = {};
-    for (const [indice, pergunta] of PERGUNTAS_BRIEFING.entries()) {
+    for (const [indice, pergunta] of perguntasDoBriefing("negocio").entries()) {
       respostasBriefing[pergunta.id] = `Resposta de exemplo para ${pergunta.id}, com um numero 42 e um caso real.`;
       avaliacoesBriefing[pergunta.id] = avaliacaoExemplo(indice === 2 ? 4.8 : indice === 1 ? 7.1 : 8.6);
     }
@@ -317,7 +317,7 @@ async function main(): Promise<void> {
      */
     const respostasQuaseCompletas: Record<string, string> = {};
     const avaliacoesQuaseCompletas: Record<string, AvaliacaoResposta> = {};
-    for (const pergunta of PERGUNTAS_BRIEFING) {
+    for (const pergunta of perguntasDoBriefing("negocio")) {
       if (pergunta.id === "p12") continue;
       respostasQuaseCompletas[pergunta.id] = `Resposta de exemplo para ${pergunta.id}, com um numero 42 e um caso real.`;
       avaliacoesQuaseCompletas[pergunta.id] = avaliacaoExemplo(8.2);
@@ -329,7 +329,7 @@ async function main(): Promise<void> {
         .set({ respostas: respostasQuaseCompletas, avaliacoes: avaliacoesQuaseCompletas, notaGeral: "7.69", completo: false })
         .where(eq(briefings.clienteId, clienteComecar.id));
       await page.goto(`${baseUrl}/comecar`);
-      await page.getByLabel(PERGUNTAS_BRIEFING.at(-1)!.enunciado).fill(
+      await page.getByLabel(perguntasDoBriefing("negocio").at(-1)!.enunciado).fill(
         'Admiro @perfilexemplo pela didatica, com quem aprendi a testar antes de aplicar. Concorrente direto e a Clinica Exemplo, na Rua das Flores, 42.',
       );
       await page.getByRole("button", { name: "Avaliar esta resposta" }).click();

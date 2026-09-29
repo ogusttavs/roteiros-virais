@@ -24,6 +24,15 @@ const OBJETIVOS: Objetivo[] = ["alcance", "engajamento", "conversao"];
 const MISTURA_REFERENCIA: Record<Persona, Record<Objetivo, number>> = {
   negocio: { alcance: 0.4, engajamento: 0.3, conversao: 0.3 },
   criador: { alcance: 0.5, engajamento: 0.35, conversao: 0.15 },
+  /**
+   * P1 (briefing-e-rubricas.md, secao 1b): valor novo da persona da marca
+   * pessoa ("ficar conhecido no que eu faço"). Mistura provisória, sem
+   * quase nada de conversão; a V12c (item 2) calibra com dado real e
+   * estende "conhecido" para negócio também.
+   */
+  conhecido: { alcance: 0.55, engajamento: 0.35, conversao: 0.1 },
+  /** P1 (secao 1b): "levar gente para os meus negócios", perto do negócio. */
+  negocios: { alcance: 0.4, engajamento: 0.3, conversao: 0.3 },
 };
 
 export type AvisoLinhaEditorial = {
