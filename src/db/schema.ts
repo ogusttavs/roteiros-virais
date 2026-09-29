@@ -159,13 +159,14 @@ export type PlanoMarca = "padrao" | "sem_limite";
 export const clientes = pgTable("clientes", {
   id: id(),
   /**
-   * Usuario do better-auth que criou esta marca, "o dono" (V3, item 1: com
-   * varias marcas por usuario, este campo deixa de ser unico e de ser a
-   * porta de entrada; quem decide acesso e a tabela `membrosMarca`, abaixo).
+   * Usuario do better-auth que criou esta marca (V3, item 1: com varias
+   * marcas por usuario, este campo deixa de ser unico e de ser a porta de
+   * entrada; quem decide acesso e a tabela `membrosMarca`, abaixo). Nulo
+   * (V12b, item 2, migracao 0035): uma marca pode existir sem ninguem, criada
+   * so pelo admin; a primeira pessoa a ganhar acesso (`darAcesso`) vira o
+   * dono em `membrosMarca`, este campo nunca e escrito depois da criacao.
    */
-  usuarioId: text("usuario_id")
-    .notNull()
-    .references(() => user.id, { onDelete: "cascade" }),
+  usuarioId: text("usuario_id").references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
   cidade: text("cidade"),

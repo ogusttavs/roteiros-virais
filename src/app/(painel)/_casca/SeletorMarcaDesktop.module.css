@@ -183,12 +183,14 @@ html[data-barra-lateral="aberta"] .trocar {
   display: grid;
 }
 
+/** `border: 0` faltava (mesmo achado do V12b item 7 na folha do celular): sem isso o navegador desenha a propria borda do botao por baixo. */
 .itemMarca {
   display: flex;
   align-items: center;
   gap: var(--espaco-3);
   min-height: var(--altura-toque);
   padding: var(--espaco-2);
+  border: 0;
   border-radius: var(--raio-md);
   background: transparent;
   color: var(--cor-titulo);

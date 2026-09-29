@@ -12,6 +12,37 @@
   margin: var(--espaco-4) 0 0;
 }
 
+/* V12b, item 3: o nome da marca, editável ao lado do título (mesmo padrão de Nichos). */
+.linhaNomeMarca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-4);
+}
+
+.linhaNomeMarca h1 {
+  margin: 0;
+}
+
+.formaNome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  max-width: 28rem;
+  margin-top: var(--espaco-4);
+}
+
+.botoesNome {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.erroNome {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
 .subtitulo {
   margin: var(--espaco-2) 0 0;
   font-size: var(--tamanho-secundario);

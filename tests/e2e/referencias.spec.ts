@@ -63,7 +63,9 @@ test.describe("/referencias no design v2", () => {
     // (mesmo raciocinio de tema-livre.spec.ts).
     const [marcaDois] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id })
+      // Item 8, V12b: "tiktok" nao tem nenhum video no nicho de dentistas (so
+      // youtube abaixo), a rede principal sem video do teste do prefiltro.
+      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id, redePrincipal: "tiktok" })
       .returning();
     const [cliente] = await db()
       .insert(clientes)
@@ -273,6 +275,57 @@ test.describe("/referencias no design v2", () => {
     await expect(page.locator("article", { hasText: "mancha do estofado" })).not.toBeVisible();
   });
 
+  /**
+   * Ajuste A do PR #66: a mesma interação de "filtrar por plataforma pela folha", repetida várias vezes
+   * na mesma página (sem recarregar, sem passar pelo `beforeAll` de novo). É a prova de robustez que a
+   * revisão do Fable pediu com `--repeat-each=20`: o `--repeat-each` do Playwright recria o `beforeAll` a
+   * cada repetição (achado desta rodada, com os IDs fixos do fixture colidindo, "duplicate key"), então a
+   * repetição de verdade tem que morar dentro do teste, não na flag da linha de comando.
+   */
+  test("filtrar e limpar pela folha, repetido várias vezes seguidas, nunca fica na URL de antes", async ({ page }) => {
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+
+    for (let volta = 0; volta < 10; volta++) {
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      const folha = page.getByRole("dialog", { name: "Filtrar" });
+      await expect(folha).toBeVisible();
+      await folha.getByRole("button", { name: "TikTok", exact: false }).click();
+      await folha.getByRole("button", { name: /Ver os \d+ vídeos?/ }).click();
+      await expect(folha).not.toBeVisible();
+      await expect(page, `volta ${volta}: aplicar nao mudou a URL`).toHaveURL(/plataforma=tiktok/);
+
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).toBeVisible();
+      await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: "Limpar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).not.toBeVisible();
+      await expect(page, `volta ${volta}: limpar nao mudou a URL`).toHaveURL(/plataforma=todas/);
+    }
+  });
+
+  /**
+   * Ajuste A do PR #66: `fecharENavegar` troca a entrada que a folha empurrou pelo destino
+   * (`router.replace`), em vez de `history.back()` mais `router.push`. O Voltar do aparelho, depois de
+   * aplicar um filtro, precisa sair direto para a lista de antes de abrir a folha (a entrada da folha não
+   * existe mais como "voltar para a folha aberta"), não ficar preso nem voltar para a folha.
+   */
+  test("o Voltar do aparelho depois de aplicar um filtro sai para a lista de antes, não para a folha", async ({ page }) => {
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+    await expect(page).toHaveURL(/^[^?]*\/referencias$/);
+
+    await page.getByRole("button", { name: "Filtrar" }).click();
+    await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: "TikTok", exact: false }).click();
+    await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: /Ver os \d+ vídeos?/ }).click();
+    await expect(page).toHaveURL(/plataforma=tiktok/);
+
+    await page.goBack();
+
+    await expect(page).toHaveURL(/^[^?]*\/referencias$/);
+    await expect(page.getByRole("dialog", { name: "Filtrar" })).not.toBeVisible();
+    await expect(page.locator("article", { hasText: "mancha do estofado" })).toBeVisible();
+  });
+
   test("abrir Ver detalhes mostra as três partes da análise", async ({ page }) => {
     await entrar(page, EMAIL);
     await page.goto("/referencias");
@@ -352,6 +405,29 @@ test.describe("/referencias no design v2", () => {
     await expect(page.locator("article", { hasText: "o produto que tira qualquer mancha do estofado" })).not.toBeVisible();
   });
 
+  test("a rede principal sem vídeo no período mostra todas as redes e avisa (item 8, V12b)", async ({ page }) => {
+    // O botão "Trocar de marca" só aparece na pílula do celular.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page, EMAIL);
+
+    // Marca Dois tem "tiktok" como rede principal, mas só vídeo de youtube no nicho (mesma
+    // troca condicional do teste do embed, abaixo, para não depender da ordem dos testes).
+    await page.goto("/hoje");
+    const jaNaDois = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) });
+    if (!(await jaNaDois.isVisible())) {
+      await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) }).click();
+      const folhaMarcas = page.getByRole("dialog", { name: textosNav.suasMarcas });
+      await folhaMarcas.getByRole("button", { name: NOME_MARCA_DOIS }).click();
+      await page.waitForLoadState("networkidle");
+      await page.reload();
+      await page.waitForLoadState("networkidle");
+    }
+
+    await page.goto("/referencias");
+    await expect(page.getByText("Sem vídeo do TikTok neste período; mostrando as outras redes.")).toBeVisible();
+    await expect(page.locator("article", { hasText: "o aparelho que corrigiu o sorriso" })).toBeVisible();
+  });
+
   test("abrir Ver detalhes de um vídeo do YouTube carrega o iframe (V9d, item 0b: o observador dispara dentro da folha)", async ({
     page,
   }) => {
@@ -380,5 +456,149 @@ test.describe("/referencias no design v2", () => {
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
     await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube\.com\/embed\/jNQXAC9IVRw/);
+  });
+});
+
+/**
+ * Item 8, V12b: "Limpar os filtros" precisa limpar de verdade, mesmo com uma
+ * rede principal escolhida (antes, a próxima navegação que não mexesse em
+ * plataforma reaplicava o padrão, porque `montarUrl` omitia o parâmetro em
+ * vez de mandar `plataforma=todas`). Fixture própria, separada da marca
+ * usada no resto do arquivo: aqui a rede principal precisa ter vídeo (para
+ * "Limpar" ter o que ampliar), o oposto do teste acima.
+ */
+test.describe("/referencias, 'Limpar os filtros' com rede principal (item 8, V12b)", () => {
+  const EMAIL_LIMPAR = "e2e-referencias-limpar@exemplo.teste";
+
+  test.beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "e2e-referencias-limpar", nome: "[teste] Referências Limpar" })
+      .returning();
+
+    await db().insert(user).values({ id: "e2e-referencias-limpar", name: "[teste] Referências Limpar", email: EMAIL_LIMPAR });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-referencias-limpar-credential",
+        issuer: "local:credential",
+        accountId: "e2e-referencias-limpar",
+        providerId: "credential",
+        userId: "e2e-referencias-limpar",
+        password: await hashPassword(SENHA),
+      });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-referencias-limpar", aceitouTermosEm: new Date() });
+
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-referencias-limpar", nome: "[teste] Referências Limpar", nichoId: nicho.id, redePrincipal: "instagram" })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-referencias-limpar", clienteId: cliente.id, papel: "dono" });
+    await db()
+      .insert(briefings)
+      .values({
+        clienteId: cliente.id,
+        completo: true,
+        perfil: {
+          fatos: {
+            oQueVende: "kit tira-mancha para estofados",
+            preco: "kit a partir de 89 reais",
+            clienteIdeal: "mora em apartamento",
+            medos: [],
+            frasesDaFala: [],
+            proibicoes: [],
+            cenasFilmaveis: [],
+            concorrentes: [],
+            perfisAdmirados: [],
+          },
+          resumo: "marca propria de produtos de limpeza",
+          referencias: [],
+        },
+      });
+
+    const [contaInstagram] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "instagram",
+        handle: "@e2e-referencias-limpar-instagram",
+        nome: "[teste] Casa em Ordem",
+        nichoId: nicho.id,
+        medianaViews: "5000",
+        medianaOrigem: "conta",
+      })
+      .returning();
+    const [contaTiktok] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "tiktok",
+        handle: "@e2e-referencias-limpar-tiktok",
+        nome: "[teste] Limpeza da Ana",
+        nichoId: nicho.id,
+        medianaViews: "8000",
+        medianaOrigem: "conta",
+      })
+      .returning();
+
+    await db()
+      .insert(videos)
+      .values([
+        {
+          plataforma: "instagram",
+          idExterno: "e2e-referencias-limpar-instagram-1",
+          url: "https://exemplo.invalido/e2e-referencias-limpar-instagram-1",
+          nichoId: nicho.id,
+          contaId: contaInstagram.id,
+          titulo: "o produto que tira qualquer mancha do estofado",
+          views: 120000,
+          foraDaCurva: "24.0",
+          velocidade: "4000",
+          idioma: "pt",
+          publicadoEm: new Date(),
+          analise: analiseExemplo("mancha em estofado") as never,
+        },
+        {
+          plataforma: "tiktok",
+          idExterno: "e2e-referencias-limpar-tiktok-1",
+          url: "https://exemplo.invalido/e2e-referencias-limpar-tiktok-1",
+          nichoId: nicho.id,
+          contaId: contaTiktok.id,
+          titulo: "organizando o guarda roupa em dez minutos",
+          views: 40000,
+          foraDaCurva: "5.0",
+          velocidade: "900",
+          idioma: "pt",
+          publicadoEm: new Date(),
+          analise: analiseExemplo("organizacao do guarda roupa", "podcast") as never,
+        },
+      ]);
+  });
+
+  test("'Limpar os filtros' na folha continua limpo depois de trocar o período", async ({ page }) => {
+    await entrar(page, EMAIL_LIMPAR);
+
+    // A rede principal (instagram) prefiltra de saída: só o vídeo de instagram aparece.
+    await page.goto("/referencias");
+    await expect(page.getByText("1 vídeo fora da curva nos últimos 7 dias")).toBeVisible();
+    await expect(page.locator("article", { hasText: "mancha do estofado" })).toBeVisible();
+    await expect(page.locator("article", { hasText: "guarda roupa" })).not.toBeVisible();
+
+    await page.getByRole("button", { name: "Filtrar" }).click();
+    const folha = page.getByRole("dialog", { name: "Filtrar" });
+    await expect(folha).toBeVisible();
+    await folha.getByRole("button", { name: "Limpar" }).click();
+
+    await expect(folha).not.toBeVisible();
+    await expect(page).toHaveURL(/plataforma=todas/);
+    await expect(page.getByText("2 vídeos fora da curva nos últimos 7 dias")).toBeVisible();
+    await expect(page.locator("article", { hasText: "guarda roupa" })).toBeVisible();
+
+    // Troca o período sem tocar em plataforma: antes desta correção, isto reaplicava o
+    // prefiltro da rede principal (o parâmetro sumia da URL). Continua nos dois vídeos.
+    await page.getByLabel("Período").selectOption("30");
+    await expect(page).toHaveURL(/plataforma=todas/);
+    await expect(page).toHaveURL(/periodo=30/);
+    await expect(page.getByText("2 vídeos fora da curva nos últimos 30 dias")).toBeVisible();
+    await expect(page.locator("article", { hasText: "guarda roupa" })).toBeVisible();
+    await expect(page.locator("article", { hasText: "mancha do estofado" })).toBeVisible();
   });
 });

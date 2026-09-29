@@ -75,8 +75,8 @@ beforeAll(async () => {
     { clienteId: b.id, completo: true, perfil: PERFIL },
   ]);
 
-  marcaA = { id: a.id, usuarioId: a.usuarioId };
-  marcaB = { id: b.id, usuarioId: b.usuarioId };
+  marcaA = { id: a.id, usuarioId: a.usuarioId! };
+  marcaB = { id: b.id, usuarioId: b.usuarioId! };
 }, 30_000);
 
 afterAll(async () => {

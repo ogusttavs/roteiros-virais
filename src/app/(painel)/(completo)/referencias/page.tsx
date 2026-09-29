@@ -1,10 +1,10 @@
 import { Bookmark } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import type { AnaliseVideo, Plataforma } from "@/db/schema";
+import type { AnaliseVideo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { contagensPorFiltroReferencias, referenciasDoNicho } from "@/servicos/pesquisa";
+import { contagensPorFiltroReferencias, referenciasDoNicho, resolverPlataformasReferencias } from "@/servicos/pesquisa";
 import { favoritosDoCliente } from "@/servicos/referencias";
 import { textosReferencias } from "@/textos/referencias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -12,7 +12,6 @@ import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 import { ReferenciasTela, type Segmento } from "./ReferenciasTela";
 
 const PERIODOS_VALIDOS = new Set([7, 30, 90]);
-const PLATAFORMAS_VALIDAS = new Set<Plataforma>(["youtube", "tiktok", "instagram"]);
 const FORMATOS_VALIDOS = new Set<AnaliseVideo["formato"]>(["fala_para_camera", "podcast", "caixinha", "esquete", "outro"]);
 
 type SearchParams = { seg?: string; periodo?: string; busca?: string; plataforma?: string; formato?: string };
@@ -46,38 +45,35 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
   const periodoNumero = Number(params.periodo);
   const periodoDias = PERIODOS_VALIDOS.has(periodoNumero) ? periodoNumero : 7;
   const busca = params.busca ?? "";
-  /**
-   * V12, item 3a: sem filtro nenhum na URL, abre já filtrado pela rede
-   * principal da marca (quando ela tem uma escolhida). Um `?plataforma=`
-   * explícito, mesmo vazio, sempre manda mais que esse padrão. Desvio
-   * registrado em `TODO.md`, "Decisões pendentes": `ReferenciasTela.tsx`
-   * (`montarUrl`) omite o parâmetro quando a lista de plataformas fica
-   * vazia (para não sujar a URL nas outras trocas de filtro), então limpar
-   * o filtro nesta tela volta a mostrar tudo só até a próxima navegação com
-   * a URL sem o parâmetro, que reaplica este padrão. Tentei fazer
-   * `montarUrl` mandar `plataforma=` sempre, mesmo vazio, para fechar esse
-   * ciclo, e isso quebrou a navegação da folha de filtro (achado rodando o
-   * e2e: alguma outra chamada de `navegar` competia com a da folha); reverti
-   * para não arriscar o que já funciona.
-   */
-  const plataformasAtivas =
-    params.plataforma === undefined && cliente.redePrincipal ? [cliente.redePrincipal] : listaValida(params.plataforma, PLATAFORMAS_VALIDAS);
   const formatosAtivos = listaValida(params.formato, FORMATOS_VALIDOS);
 
   const favoritos = await favoritosDoCliente(cliente.id);
+  const apenasIds = segmento === "salvos" ? [...favoritos] : undefined;
+
+  /**
+   * As contagens por plataforma precisam vir antes de resolver
+   * `plataformasAtivas` (item 8, V12b): é delas que a gente sabe se a rede
+   * principal tem algum vídeo no período, antes de decidir se o prefiltro
+   * vale a pena. `referenciasDoNicho` só roda depois, então os dois
+   * deixaram de ser paralelos (eram um `Promise.all`).
+   */
+  const contagensFiltro = await contagensPorFiltroReferencias(cliente.nichoId, { periodoDias, busca, apenasIds });
+
+  const { plataformas: plataformasAtivas, redePrincipalSemVideo } = resolverPlataformasReferencias(
+    params.plataforma,
+    cliente.redePrincipal,
+    contagensFiltro.porPlataforma,
+  );
 
   const filtrosBase = {
     periodoDias,
     busca,
     plataformas: plataformasAtivas,
     formatos: formatosAtivos,
-    apenasIds: segmento === "salvos" ? [...favoritos] : undefined,
+    apenasIds,
   };
 
-  const [resultado, contagensFiltro] = await Promise.all([
-    referenciasDoNicho(cliente.nichoId, filtrosBase),
-    contagensPorFiltroReferencias(cliente.nichoId, { periodoDias, busca, apenasIds: filtrosBase.apenasIds }),
-  ]);
+  const resultado = await referenciasDoNicho(cliente.nichoId, filtrosBase);
 
   return (
     <ReferenciasTela
@@ -90,6 +86,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       plataformasAtivas={plataformasAtivas}
       formatosAtivos={formatosAtivos}
       contagensFiltro={contagensFiltro}
+      redePrincipalSemVideo={redePrincipalSemVideo}
     />
   );
 }

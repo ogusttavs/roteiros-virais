@@ -213,6 +213,29 @@
 }
 
 /**
+ * A coluna ficava colada na margem esquerda do tablet deitado (1024px) para
+ * cima, porque `margin: 0` de 768px so troca padding por recuo, nunca
+ * centraliza de novo (item 9, V12b: achado do Gustavo em producao, monitor
+ * largo, "1024 ou mais"). `.deQualMarca` ganha o mesmo `max-width` e o mesmo
+ * recuo lateral de `.corpo` (`--espaco-10`) para acompanhar a coluna, em vez
+ * do proprio `--margem-celular`.
+ */
+@media (min-width: 1024px) {
+  .corpo,
+  .corpoIntro,
+  .corpoLiberado {
+    margin: 0 auto;
+  }
+
+  .deQualMarca {
+    max-width: var(--largura-leitura);
+    margin: 0 auto;
+    padding: 0 var(--espaco-10) var(--espaco-3);
+    box-sizing: border-box;
+  }
+}
+
+/**
  * 1180px, nao 768 (revisao do PR #28, medido no iPad em 800px: o cartao de
  * 320px espremia o formulario a 312px). Entre 768 e 1179 vale o
  * comportamento do celular (a barra fina de BarraNotaGeral, que so vira
@@ -225,15 +248,24 @@
    * DOM) encostava na borda da janela. A .corpo continua com o proprio
    * max-width; so perde o padding proprio aqui dentro, para nao dobrar o
    * recuo.
+   *
+   * `justify-content: center` centraliza o par (formulario mais cartao de
+   * nota) como uma unidade so (item 9, V12b: sem isso, o par ficava colado a
+   * esquerda em monitor largo, com uma folga enorme sobrando a direita); o
+   * `margin: 0 auto` de `.corpo` acima e cancelado aqui, senao a
+   * margem automatica de um item flex numa linha disputa espaco com o
+   * `justify-content` do pai e separa o formulario do cartao.
    */
   .corpoComNota {
     flex-direction: row;
     align-items: flex-start;
+    justify-content: center;
     gap: var(--espaco-8);
     padding: var(--espaco-10);
   }
 
   .corpoComNota .corpo {
+    margin: 0;
     padding: 0;
   }
 }

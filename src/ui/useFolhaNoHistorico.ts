@@ -40,11 +40,24 @@ const ESPERA_POPSTATE_MS = 4000;
  * `popstate` chegar (um toque duplo, uma rolagem que dispara vários eventos)
  * é ignorado. Sem isso o segundo `history.back()` tiraria a pessoa da tela.
  *
- * `fecharEDepois(acao)` é para o toque que fecha a folha E navega (aplicar
- * filtros, ir à Conta, abrir o roteiro reescrito): desfaz a entrada primeiro e
- * só então roda `acao`. Navegar antes de desfazer deixaria uma entrada
- * fantasma da mesma tela no meio do histórico. Se a tela recusar o fechamento,
- * `acao` não roda.
+ * `fecharEDepois(acao)` é para o toque que fecha a folha E faz alguma coisa que
+ * NÃO navega pelo router (trocar de marca por Server Action, rolar até uma
+ * pergunta): desfaz a entrada primeiro e só então roda `acao`. Navegar antes de
+ * desfazer deixaria uma entrada fantasma da mesma tela no meio do histórico. Se
+ * a tela recusar o fechamento, `acao` não roda.
+ *
+ * `fecharENavegar(navegar)` é para o toque que fecha a folha E navega pelo
+ * router (aplicar filtros, ir à Conta, abrir o roteiro reescrito): troca a
+ * entrada empurrada pelo destino (`router.replace`, não `router.push`), sem
+ * passar por `history.back()`. Achado da revisão do PR #66: `fecharEDepois`
+ * nesse caso corria com a própria restauração que o App Router faz no mesmo
+ * `popstate` de `history.back()` (ele também escuta o evento, para trocar a
+ * árvore de volta para a URL anterior); quando essa restauração terminava
+ * depois do `router.push` de `acao`, a tela ficava na URL de antes, como se o
+ * filtro nunca tivesse sido aplicado. Sem `history.back()` não há `popstate`
+ * para competir. O botão voltar do aparelho, depois de `fecharENavegar`, sai
+ * direto para a tela de antes da folha abrir (a entrada que ela empurrou virou
+ * a URL nova, não existe mais como "voltar para a folha aberta").
  *
  * O efeito não desfaz nada na limpeza de propósito: em desenvolvimento o
  * React executa cada efeito duas vezes, e um `history.back()` na limpeza
@@ -53,7 +66,7 @@ const ESPERA_POPSTATE_MS = 4000;
 export function useFolhaNoHistorico(
   aberto: boolean,
   aoFechar: () => boolean | void,
-): { fechar: () => void; fecharEDepois: (acao: () => void) => void } {
+): { fechar: () => void; fecharEDepois: (acao: () => void) => void; fecharENavegar: (navegar: () => void) => void } {
   const aoFecharRef = useRef(aoFechar);
   useEffect(() => {
     aoFecharRef.current = aoFechar;
@@ -128,5 +141,13 @@ export function useFolhaNoHistorico(
     window.history.back();
   }, []);
 
-  return { fechar, fecharEDepois };
+  const fecharENavegar = useCallback((navegar: () => void) => {
+    if (voltandoRef.current) return;
+    if (aoFecharRef.current() === false) return;
+    // A entrada empurrada (se existia) vira a URL nova: não sobra como "voltar para a folha aberta".
+    empurradoRef.current = false;
+    navegar();
+  }, []);
+
+  return { fechar, fecharEDepois, fecharENavegar };
 }

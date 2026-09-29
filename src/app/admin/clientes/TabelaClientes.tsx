@@ -10,7 +10,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
-import { ModalConvidarCliente } from "./ModalConvidarCliente";
+import { ModalNovaMarca } from "./ModalNovaMarca";
 import styles from "./page.module.css";
 
 const t = textosAdmin.clientes;
@@ -58,7 +58,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
             onChange={(evento) => setBusca(evento.target.value)}
             className={styles.buscaCampo}
           />
-          <Botao onClick={() => setModalAberto(true)}>{t.convidar}</Botao>
+          <Botao onClick={() => setModalAberto(true)}>{t.novaMarca}</Botao>
         </div>
       </div>
 
@@ -71,7 +71,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
           <table className={styles.tabela}>
             <thead>
               <tr>
-                <th>{t.colunaNegocio}</th>
+                <th>{t.colunaMarca}</th>
                 <th>{t.colunaNicho}</th>
                 <th>{t.colunaNota}</th>
                 <th>{t.colunaUltimoRoteiro}</th>
@@ -116,7 +116,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
         </div>
       )}
 
-      <ModalConvidarCliente nichos={nichos} aberto={modalAberto} onFechar={() => setModalAberto(false)} />
+      <ModalNovaMarca nichos={nichos} aberto={modalAberto} onFechar={() => setModalAberto(false)} />
     </div>
   );
 }

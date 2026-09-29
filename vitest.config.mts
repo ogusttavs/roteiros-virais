@@ -45,6 +45,23 @@ export default defineConfig({
         },
       },
       {
+        /**
+         * `.test.tsx` (V12b, ajuste A do PR #66): so para o que precisa de
+         * `window`/`history`/`document` de verdade, como `useFolhaNoHistorico`
+         * (que le `window.history` e `popstate`). `jsdom` e
+         * `@testing-library/react` entraram so para isto; o resto dos testes
+         * continua em "node" puro, sem DOM nenhum.
+         */
+        plugins: [react()],
+        resolve: { alias },
+        test: {
+          name: "unitario-dom",
+          environment: "jsdom",
+          include: ["src/**/*.test.tsx"],
+          env: envDeTeste,
+        },
+      },
+      {
         resolve: { alias },
         test: {
           name: "integracao",

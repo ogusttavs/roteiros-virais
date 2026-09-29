@@ -83,7 +83,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
-  const { fechar: fecharFolhaMomento, fecharEDepois: fecharFolhaMomentoEDepois } = useFolhaNoHistorico(
+  const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
     () => setFolhaMomentoAberta(false),
   );
@@ -394,7 +394,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
       {folhaMomentoAberta ? (
         <FolhaGravarAgora
           aoFechar={fecharFolhaMomento}
-          fecharEDepois={fecharFolhaMomentoEDepois}
+          fecharENavegar={fecharFolhaMomentoENavegar}
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
         />

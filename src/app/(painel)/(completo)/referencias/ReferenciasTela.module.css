@@ -165,6 +165,16 @@
   color: var(--cor-texto-dica);
 }
 
+/** V12b, item 8: a rede principal escolhida não tinha vídeo no período; discreta, não é erro. */
+.avisoRedePrincipal {
+  margin: 0;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
 .grade {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

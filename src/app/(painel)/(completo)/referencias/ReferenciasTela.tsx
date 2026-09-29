@@ -31,6 +31,8 @@ type Props = {
   plataformasAtivas: Plataforma[];
   formatosAtivos: AnaliseVideo["formato"][];
   contagensFiltro: ContagensFiltroReferencias;
+  /** V12b, item 8: a rede principal da marca não tinha vídeo no período, então a tela mostrou todas em vez dela. */
+  redePrincipalSemVideo?: Plataforma;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -88,7 +90,13 @@ function montarUrl(filtros: {
   if (filtros.segmento !== "foradacurva") params.set("seg", filtros.segmento);
   if (filtros.periodoDias !== 7) params.set("periodo", String(filtros.periodoDias));
   if (filtros.busca.trim()) params.set("busca", filtros.busca.trim());
-  if (filtros.plataformas.length > 0) params.set("plataforma", filtros.plataformas.join(","));
+  /**
+   * `plataforma=todas` explícito quando a lista fica vazia, nunca omitido
+   * (V12b, item 8): sem isso, a próxima navegação que não mexesse em
+   * plataforma (busca, período) voltava a cair no padrão da rede principal
+   * de `page.tsx`, e "Limpar os filtros" não limpava de verdade.
+   */
+  params.set("plataforma", filtros.plataformas.length > 0 ? filtros.plataformas.join(",") : "todas");
   if (filtros.formatos.length > 0) params.set("formato", filtros.formatos.join(","));
   const query = params.toString();
   return query ? `/referencias?${query}` : "/referencias";
@@ -115,6 +123,7 @@ export function ReferenciasTela({
   plataformasAtivas,
   formatosAtivos,
   contagensFiltro,
+  redePrincipalSemVideo,
 }: Props) {
   const router = useRouter();
   const { semConexao, avisarRedeOk } = useConexao();
@@ -168,7 +177,7 @@ export function ReferenciasTela({
     return true;
   }
 
-  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>) {
+  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>, opcoes: { substituir?: boolean } = {}) {
     if (semRedeParaBuscar()) return;
     // O que está escrito na busca vai junto de qualquer outra mudança: a busca só vale com Enter ou ao sair do
     // campo, e a troca de aba ou de período pode chegar antes e apagá-la da URL.
@@ -187,7 +196,11 @@ export function ReferenciasTela({
     iniciarNavegacao(() => {
       setSegmentoOtimista(filtros.segmento);
       setPeriodoOtimista(filtros.periodoDias);
-      router.push(url);
+      // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
+      // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
+      // navegação da pessoa e continua entrando no histórico como sempre.
+      if (opcoes.substituir) router.replace(url);
+      else router.push(url);
     });
   }
 
@@ -252,9 +265,9 @@ export function ReferenciasTela({
 
   function aplicarFiltros({ plataformas, formatos }: { plataformas: Plataforma[]; formatos: AnaliseVideo["formato"][] }) {
     // Sem rede a folha continua aberta, com o que foi marcado. Um segundo toque antes de a folha sair é
-    // ignorado pelo próprio gancho do histórico (`fecharEDepois` é idempotente).
+    // ignorado pelo próprio gancho do histórico (`fecharENavegar` é idempotente).
     if (semRedeParaBuscar()) return;
-    filtrar.fecharEDepois(() => navegar({ plataformas, formatos }));
+    filtrar.fecharENavegar(() => navegar({ plataformas, formatos }, { substituir: true }));
   }
 
   return (
@@ -328,6 +341,12 @@ export function ReferenciasTela({
           </Botao>
         </div>
       </div>
+
+      {redePrincipalSemVideo && segmento === "foradacurva" && !navegando ? (
+        <p className={styles.avisoRedePrincipal} role="status">
+          {textosReferencias.semVideoRedePrincipal(ROTULO_PLATAFORMA[redePrincipalSemVideo])}
+        </p>
+      ) : null}
 
       {navegando ? (
         <p className={styles.contagem} role="status">

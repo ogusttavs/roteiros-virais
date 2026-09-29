@@ -38,7 +38,7 @@ export function SeletorMarcaCelular({ marcaAtiva, marcas, nomePessoa }: Props) {
   const pathname = usePathname();
   const [aberto, setAberto] = useState(false);
   const { trocar, trocando, marcaAlvo, erro } = useTrocaMarca();
-  const { fechar, fecharEDepois } = useFolhaNoHistorico(aberto, () => setAberto(false));
+  const { fechar, fecharEDepois, fecharENavegar } = useFolhaNoHistorico(aberto, () => setAberto(false));
   const { folhaRef, alca } = usePuxarParaFechar(fechar);
 
   useEffect(() => {
@@ -145,7 +145,7 @@ export function SeletorMarcaCelular({ marcaAtiva, marcas, nomePessoa }: Props) {
                     className={styles.itemMarca}
                     onClick={(evento) => {
                       evento.preventDefault();
-                      fecharEDepois(() => router.push("/conta"));
+                      fecharENavegar(() => router.replace("/conta"));
                     }}
                   >
                     <span className={styles.circuloPessoa} aria-hidden="true">

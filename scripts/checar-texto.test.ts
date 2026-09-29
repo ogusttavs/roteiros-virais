@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { rmSync, writeFileSync } from "node:fs";
 
-import { verificarLinha } from "./checar-texto-regras";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { verificarArquivo, verificarLinha } from "./checar-texto-regras";
 
 describe("verificarLinha", () => {
   it("aceita texto limpo", () => {
@@ -36,5 +38,29 @@ describe("verificarLinha", () => {
     ]) {
       expect(verificarLinha(`texto com ${palavra} no meio`).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("verificarArquivo: o jargao fica de fora do admin (V12b, item 1)", () => {
+  const caminhoAdmin = "src/app/admin/__fixture-checar-texto.tsx";
+  const caminhoNaoAdmin = "src/textos/__fixture-checar-texto.ts";
+
+  afterEach(() => {
+    rmSync(caminhoAdmin, { force: true });
+    rmSync(caminhoNaoAdmin, { force: true });
+  });
+
+  it("nao reprova jargao dentro de src/app/admin, mas continua reprovando travessao e emoji", () => {
+    writeFileSync(caminhoAdmin, 'const x = "tipo de conteudo — exemplo \u{1F389}";\n');
+    const problemas = verificarArquivo(caminhoAdmin);
+    expect(problemas.some((p) => p.motivo.startsWith("jargao"))).toBe(false);
+    expect(problemas.some((p) => p.motivo.includes("travessao"))).toBe(true);
+    expect(problemas.some((p) => p.motivo.includes("emoji"))).toBe(true);
+  });
+
+  it("continua reprovando jargao fora do admin", () => {
+    writeFileSync(caminhoNaoAdmin, 'const x = "tipo de conteudo";\n');
+    const problemas = verificarArquivo(caminhoNaoAdmin);
+    expect(problemas.some((p) => p.motivo.startsWith("jargao"))).toBe(true);
   });
 });

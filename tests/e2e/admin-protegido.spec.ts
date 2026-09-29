@@ -105,7 +105,7 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
     clienteId = cliente.id;
     clienteNome = cliente.nome;
 
-    const [usuarioCliente] = await db().select({ email: user.email }).from(user).where(eq(user.id, cliente.usuarioId));
+    const [usuarioCliente] = await db().select({ email: user.email }).from(user).where(eq(user.id, cliente.usuarioId!));
     clienteEmail = usuarioCliente.email;
 
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));

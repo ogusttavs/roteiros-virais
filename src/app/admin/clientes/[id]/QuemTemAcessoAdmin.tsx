@@ -11,7 +11,7 @@ import { Campo } from "@/ui/componentes/Campo";
 
 import { FolhaSenhaGerada } from "../FolhaSenhaGerada";
 
-import { darAcessoAction, gerarSenhaNovaAction, tirarAcessoAction } from "./acoes";
+import { darAcessoAction, gerarSenhaNovaAction, renomearPessoaAction, tirarAcessoAction } from "./acoes";
 import styles from "./QuemTemAcessoAdmin.module.css";
 
 const t = textosAdmin.acessos;
@@ -33,19 +33,23 @@ type Props = {
 
 /**
  * "Quem tem acesso" (V3, item 5, AdminCliente.dc.html): cartão com a lista
- * por pessoa, a folha "Dar acesso" (email, os dois caminhos) e a folha de
- * senha gerada (compartilhada com "Convidar cliente"); "Tirar o acesso"
- * confirma na própria linha; o dono nunca mostra esse botão.
+ * por pessoa, a folha "Dar acesso" (nome e email, os dois caminhos, V12b
+ * item 4) e a folha de senha gerada (compartilhada com "Nova marca"); "Tirar
+ * o acesso" confirma na própria linha, "editar" o nome também (V12b, item
+ * 4); o dono nunca mostra o botão de tirar.
  */
 export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
   const router = useRouter();
   const [folhaAberta, setFolhaAberta] = useState(false);
+  const [nomeNovo, setNomeNovo] = useState("");
   const [email, setEmail] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erroDarAcesso, setErroDarAcesso] = useState<string | null>(null);
   const [senhaGerada, setSenhaGerada] = useState<{ email: string; senha: string } | null>(null);
   const [avisoJaTinhaLogin, setAvisoJaTinhaLogin] = useState<string | null>(null);
   const [confirmandoTirar, setConfirmandoTirar] = useState<string | null>(null);
+  const [editandoNome, setEditandoNome] = useState<string | null>(null);
+  const [nomeEditado, setNomeEditado] = useState("");
   const [processando, setProcessando] = useState<string | null>(null);
   const [senhaPorUsuario, setSenhaPorUsuario] = useState<Record<string, string>>({});
   const [erroLinha, setErroLinha] = useState<{ usuarioId: string; texto: string } | null>(null);
@@ -54,7 +58,7 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
     evento.preventDefault();
     setEnviando(true);
     setErroDarAcesso(null);
-    const resultado = await darAcessoAction(clienteId, email);
+    const resultado = await darAcessoAction(clienteId, nomeNovo, email);
     setEnviando(false);
     if (!resultado.ok) {
       setErroDarAcesso(resultado.erro);
@@ -66,6 +70,7 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
     } else {
       setAvisoJaTinhaLogin(t.jaTinhaLoginAviso(resultado.dado.nome));
     }
+    setNomeNovo("");
     setEmail("");
     router.refresh();
   }
@@ -91,6 +96,25 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
       return;
     }
     setConfirmandoTirar(null);
+    router.refresh();
+  }
+
+  function iniciarEdicaoNome(membro: Membro) {
+    setConfirmandoTirar(null);
+    setErroLinha(null);
+    setEditandoNome(membro.usuarioId);
+    setNomeEditado(membro.semNome ? "" : membro.nome);
+  }
+
+  async function salvarNome(usuarioId: string) {
+    setProcessando(usuarioId);
+    const resultado = await renomearPessoaAction(clienteId, usuarioId, nomeEditado);
+    setProcessando(null);
+    if (!resultado.ok) {
+      setErroLinha({ usuarioId, texto: resultado.erro });
+      return;
+    }
+    setEditandoNome(null);
     router.refresh();
   }
 
@@ -138,7 +162,28 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
                 ) : null}
               </div>
 
-              {confirmandoTirar === membro.usuarioId ? (
+              {editandoNome === membro.usuarioId ? (
+                <div className={styles.confirmacao}>
+                  <Campo
+                    rotulo={t.campoNome}
+                    rotuloOculto
+                    value={nomeEditado}
+                    onChange={(e) => setNomeEditado(e.target.value)}
+                  />
+                  <div className={styles.confirmacaoAcoes}>
+                    <Botao
+                      type="button"
+                      carregando={processando === membro.usuarioId}
+                      onClick={() => salvarNome(membro.usuarioId)}
+                    >
+                      {processando === membro.usuarioId ? t.salvandoNome : t.salvarNome}
+                    </Botao>
+                    <Botao type="button" variante="ghost" onClick={() => setEditandoNome(null)}>
+                      {t.cancelar}
+                    </Botao>
+                  </div>
+                </div>
+              ) : confirmandoTirar === membro.usuarioId ? (
                 <div className={styles.confirmacao}>
                   <p>{t.confirmarTirarOAcesso(membro.nome, nomeMarca)}</p>
                   <div className={styles.confirmacaoAcoes}>
@@ -156,6 +201,9 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
                 </div>
               ) : (
                 <div className={styles.acoesPessoa}>
+                  <Botao type="button" variante="ghost" onClick={() => iniciarEdicaoNome(membro)}>
+                    {t.editarNome}
+                  </Botao>
                   <Botao
                     type="button"
                     variante="ghost"
@@ -189,6 +237,7 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
           >
             <h3 className={styles.folhaTitulo}>{t.aoDarAcessoTitulo(nomeMarca)}</h3>
             <form onSubmit={darAcesso} className={styles.forma}>
+              <Campo rotulo={t.campoNome} required value={nomeNovo} onChange={(e) => setNomeNovo(e.target.value)} />
               <Campo
                 rotulo={t.campoEmail}
                 type="email"

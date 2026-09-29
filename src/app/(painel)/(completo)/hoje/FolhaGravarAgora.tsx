@@ -59,7 +59,7 @@ type Props = {
   /** Fecha a folha sem navegar (véu, Escape, "Cancelar", Voltar do aparelho). */
   aoFechar: () => void;
   /** Fecha a folha e só então abre o roteiro novo (`useFolhaNoHistorico`, o mesmo padrão de "abrir o roteiro reescrito"). */
-  fecharEDepois: (acao: () => void) => void;
+  fecharENavegar: (navegar: () => void) => void;
   objetivoRecomendado: Objetivo | null;
   /** As outras marcas de que a pessoa é membro, sem a marca ativa (V9a, item 4, "Falar de"). */
   marcas: MarcaResumo[];
@@ -91,7 +91,7 @@ type Props = {
  */
 export function FolhaGravarAgora({
   aoFechar,
-  fecharEDepois,
+  fecharENavegar,
   objetivoRecomendado,
   marcas,
   planoItemId,
@@ -264,7 +264,7 @@ export function FolhaGravarAgora({
       // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
       // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
       if (saiuRef.current) return;
-      fecharEDepois(() => router.push(`/roteiros/${id}`));
+      fecharENavegar(() => router.replace(`/roteiros/${id}`));
     } catch (falha) {
       if (saiuRef.current) return;
       setErroEnvio(tratarFalha(falha, textosMomento.erroGerar));
@@ -399,12 +399,16 @@ export function FolhaGravarAgora({
         </div>
 
         {marcas.length > 0 ? (
-          <Chips
-            rotuloGrupo={textosMomento.falarDe}
-            opcoes={opcoesFalarDe}
-            selecionado={marcaIndice}
-            onChange={setMarcaIndice}
-          />
+          <div className={styles.grupoFalarDe}>
+            <Chips
+              rotuloGrupo={textosMomento.falarDe}
+              rotuloVisivel={textosMomento.falarDe}
+              opcoes={opcoesFalarDe}
+              selecionado={marcaIndice}
+              onChange={setMarcaIndice}
+            />
+            <p className={styles.falarDeAjuda}>{textosMomento.falarDeAjuda}</p>
+          </div>
         ) : null}
 
         {camposFaltando ? (

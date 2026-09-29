@@ -77,4 +77,7 @@ export const textosReferencias = {
   tentarDeNovo: "Tentar de novo",
 
   vazioSemNicho: "Os vídeos que estão funcionando no seu setor aparecem aqui depois da primeira leitura, que roda de madrugada.",
+
+  /** V12b, item 8: a rede principal escolhida em "Onde você posta mais?" não tem vídeo no período; mostra todas em vez de abrir vazio. */
+  semVideoRedePrincipal: (rede: string) => `Sem vídeo do ${rede} neste período; mostrando as outras redes.`,
 };

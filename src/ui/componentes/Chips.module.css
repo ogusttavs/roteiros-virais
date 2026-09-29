@@ -4,6 +4,18 @@
   flex-wrap: wrap;
 }
 
+/** So existe quando `rotuloVisivel` e passado (V12b, item 6). */
+.bloco {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.rotulo {
+  font-size: var(--tamanho-secundario);
+  font-weight: 500;
+  color: var(--cor-titulo);
+}
+
 /**
  * Alvo de 44px de verdade (`--altura-toque`, achado do e2e de layout com a
  * folha de reprovar aberta, item 3 do acabamento da E27): `display: inline-flex`
