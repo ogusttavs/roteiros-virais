@@ -84,3 +84,36 @@ test("escolhe escuro, salva, recarrega com data-tema escuro; volta para do siste
   await page.reload();
   await expect(page.locator("html")).not.toHaveAttribute("data-tema");
 });
+
+/** H3, item 4: a folha "Informações do aparelho", só leitura, sem dado de cliente. */
+test("Informações do aparelho: abre a folha, mostra a largura da janela e o navegador, e o botão Copiar funciona", async ({
+  page,
+  context,
+}) => {
+  await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+
+  await page.goto("/entrar");
+  await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_CLIENTE);
+  await page.getByLabel("senha", { exact: true }).fill(SENHA);
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
+  await expect(page).toHaveURL(/\/hoje/);
+
+  await page.goto("/conta");
+  await page.getByRole("button", { name: "Informações do aparelho" }).click();
+
+  const folha = page.getByRole("dialog", { name: "Informações do aparelho" });
+  await expect(folha).toBeVisible();
+  await expect(folha.getByText("largura da janela")).toBeVisible();
+  await expect(folha.getByText("navegador", { exact: true })).toBeVisible();
+  await expect(folha.getByText(/^\d+px$/).first()).toBeVisible();
+
+  await folha.getByRole("button", { name: "Copiar" }).click();
+  await expect(folha.getByRole("button", { name: "Copiado" })).toBeVisible();
+
+  const { copiado, userAgent } = await page.evaluate(async () => ({
+    copiado: await navigator.clipboard.readText(),
+    userAgent: navigator.userAgent,
+  }));
+  expect(copiado).toContain("largura da janela");
+  expect(copiado).toContain(userAgent);
+});

@@ -178,3 +178,97 @@ test.describe("gravar agora, o caminho por texto", () => {
     await page.unroute("**/*");
   });
 });
+
+/**
+ * H3, item 1: antes, uma marca sem tema de hoje (nenhuma linha em
+ * `temas_dia` ainda) caía num estado à parte, sem a semana, sem "Gravar
+ * agora", sem a porta Story, sem o plano. Agora `/hoje` é sempre o Hoje das
+ * portas: o aviso substitui só os três temas, dentro da porta Reels.
+ */
+test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
+  const EMAIL_SEM_TEMA = "e2e-momento-sem-tema@exemplo.teste";
+
+  test.beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "e2e-momento-sem-tema", nome: "[teste] Momento sem tema" })
+      .returning();
+
+    await db().insert(user).values({ id: "e2e-momento-sem-tema", name: "[teste] Sem tema", email: EMAIL_SEM_TEMA });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-momento-sem-tema-credential",
+        issuer: "local:credential",
+        accountId: "e2e-momento-sem-tema",
+        providerId: "credential",
+        userId: "e2e-momento-sem-tema",
+        password: await hashPassword(SENHA),
+      });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-momento-sem-tema", aceitouTermosEm: new Date() });
+
+    const [marca] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-momento-sem-tema", nome: "[teste] Sem tema", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-momento-sem-tema", clienteId: marca.id, papel: "dono" });
+    await db().insert(briefings).values({
+      clienteId: marca.id,
+      completo: true,
+      perfil: {
+        fatos: {
+          oQueVende: "consultoria financeira",
+          preco: "pacote mensal por R$ 400",
+          clienteIdeal: "autonomo",
+          medos: [],
+          frasesDaFala: [],
+          proibicoes: [],
+          cenasFilmaveis: [],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo: "consultoria financeira para autonomos",
+        referencias: [],
+      },
+    });
+    // De propósito, nenhuma linha em temas_dia: o nicho nunca teve coleta.
+  });
+
+  test("a 390px: a porta Reels mostra o aviso no lugar dos temas, e a porta Story gera um roteiro normalmente", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(EMAIL_SEM_TEMA);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    // A semana e o restante da tela continuam ali, mesmo sem tema (não é o estado à parte de antes).
+    await expect(page.getByText("Sua semana")).toBeVisible();
+    await expect(page.getByText("O que você quer gravar agora?")).toBeVisible();
+
+    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    await expect(page.getByText("Hoje não saiu tema para o seu setor")).toBeVisible();
+    await expect(page.getByText("Dá para gravar do mesmo jeito")).toBeVisible();
+    // "Quer outro assunto?" e "Gravar agora" continuam, mesmo sem tema nenhum.
+    await expect(page.getByRole("heading", { name: "Quer outro assunto?" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Gravar agora" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Trocar" }).click();
+    await page.getByRole("button", { name: /^Story/ }).click();
+    await expect(page.getByText("O que você quer gravar agora?")).not.toBeVisible();
+
+    await page.getByRole("button", { name: "Gravar agora" }).click();
+    const folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folha).toBeVisible();
+
+    await folha.getByLabel("Onde você está").fill("no escritorio, hora do almoco");
+    await folha.getByLabel("O que está acontecendo").fill("organizando os recibos do mes de um cliente");
+    await folha.getByLabel("O que dá para mostrar").fill("a planilha e a pilha de notas fiscais");
+    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
+  });
+});

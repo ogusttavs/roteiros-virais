@@ -190,7 +190,10 @@ export function ComecarWizard({
             })}
           </div>
         </div>
-        <BarraAcao primaria={{ rotulo: textosBriefing.comecar.botaoComecar, onClick: () => setEtapa("dadosFixos") }} />
+        <BarraAcao
+          presaAoFluxo
+          primaria={{ rotulo: textosBriefing.comecar.botaoComecar, onClick: () => setEtapa("dadosFixos") }}
+        />
       </div>
     );
   }
@@ -314,6 +317,7 @@ export function ComecarWizard({
             </div>
           ))}
           <BarraAcao
+            presaAoFluxo
             secundaria={{
               rotulo: textosBriefing.navegacaoBlocos.botaoVoltar,
               onClick: () => {

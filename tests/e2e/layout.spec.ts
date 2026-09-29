@@ -835,6 +835,36 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       if (conferirCobertura) await conferirNaoCoberto(principal);
     });
   }
+
+  /**
+   * H3, item 5: "não dá para provar no Playwright o que é do iPhone" continua
+   * valendo (o Playwright encolhe `window.innerHeight` e `visualViewport`
+   * juntos, sem a diferença entre os dois que o teclado de verdade cria no
+   * iPhone em modo aplicativo, comentário do loop acima); o que dá para
+   * confirmar aqui é que encolher a viewport e devolver ao tamanho cheio
+   * nunca deixa nada preso: a cápsula das abas volta a aparecer, no pé da
+   * tela, e o corpo da página continua alcançável.
+   */
+  test("Hoje: encolher a viewport (simula o teclado) e devolver ao tamanho cheio traz a cápsula das abas de volta ao pé, sem nada preso", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page);
+    await page.waitForLoadState("networkidle");
+
+    const capsula = page.getByRole("navigation", { name: "Navegação principal" });
+    await expect(capsula).toBeInViewport();
+
+    await page.setViewportSize({ width: 390, height: 500 });
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await expect(capsula).toBeInViewport();
+    const caixa = await capsula.boundingBox();
+    if (!caixa) throw new Error("cápsula sem caixa delimitadora");
+    // No pé da tela, não a meio caminho (a exata forma do defeito do item 3: uma peça fixa
+    // flutuando onde o teclado costumava terminar, em vez de voltar para onde deveria estar).
+    expect(caixa.y + caixa.height).toBeGreaterThan(800);
+  });
 });
 
 /**

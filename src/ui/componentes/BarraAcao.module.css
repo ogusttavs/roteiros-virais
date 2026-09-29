@@ -18,6 +18,19 @@
   padding: var(--espaco-3) var(--margem-celular) calc(var(--espaco-3) + env(safe-area-inset-bottom, 0px));
 }
 
+/**
+ * H3, item 3: `/comecar` no celular, no lugar de `position: fixed` (achado do
+ * Gustavo no iPhone em modo aplicativo, a barra flutuando a meio da tela
+ * depois de fechar o teclado). Precisa ser a última coisa do fluxo da
+ * página para "grudar" no pé de verdade; quem usa isto (`ComecarWizard`,
+ * `DadosFixosForm`) já renderiza a barra por último.
+ */
+.presaAoFluxo {
+  position: sticky;
+  left: auto;
+  right: auto;
+}
+
 .botoes {
   display: flex;
   gap: var(--espaco-3);

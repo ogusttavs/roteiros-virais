@@ -258,3 +258,14 @@ export function horaAtualISO(d = new Date()): string {
   });
   return `${fmt.format(d)}:00`;
 }
+
+/** "HH:MM" na hora local do Brasil, com o minuto certo (H3, item 1: o aviso de "sem tema" muda às 6h30). */
+export function horaMinutoAtualISO(d = new Date()): string {
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "America/Sao_Paulo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return fmt.format(d);
+}

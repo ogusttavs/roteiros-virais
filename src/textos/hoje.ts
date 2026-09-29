@@ -61,6 +61,13 @@ export const textosHoje = {
   vazioTitulo: "Os temas de hoje saem até as 6h30",
   vazio:
     "A busca do que está funcionando no seu setor roda de madrugada. Se você chegou antes, ainda dá para escrever o seu assunto.",
+  /**
+   * H3, item 1: depois das 6h30 (fuso da marca) ainda sem tema é um caso diferente de "chegou cedo
+   * demais" (`vazioTitulo`/`vazio` continuam valendo antes desse horário): o tema de hoje já devia ter
+   * saído e não saiu. Mostrado dentro da porta Reels, no lugar dos três temas.
+   */
+  semTemaDepoisTitulo: "Hoje não saiu tema para o seu setor",
+  semTemaDepois: "Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
   erroAviso: "A busca de hoje falhou",
   erroTitulo: "Ainda dá para gravar",
   erro:

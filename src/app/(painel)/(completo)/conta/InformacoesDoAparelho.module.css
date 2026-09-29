@@ -1,0 +1,78 @@
+/**
+ * H3, item 4: a folha "Informações do aparelho". Sem desenho de referência
+ * (Fable escreveu o conteúdo direto no `PROXIMO.md`); peças e tokens que o
+ * resto de Conta já usa, nada novo.
+ */
+
+.linha {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) 0;
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-align: left;
+  cursor: pointer;
+}
+
+.linha:hover {
+  color: var(--cor-titulo);
+}
+
+.explica {
+  margin: 0 0 var(--espaco-4);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+}
+
+.linhaDado {
+  display: grid;
+  gap: var(--espaco-1);
+  padding-bottom: var(--espaco-3);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.linhaDado:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.linhaDado dt {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.linhaDado dd {
+  margin: 0;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  overflow-wrap: anywhere;
+}
+
+.botaoCopiar {
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.botaoCopiar:hover {
+  background: var(--cor-superficie-hover);
+}
