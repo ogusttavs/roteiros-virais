@@ -279,10 +279,17 @@ describe("rodarMetaHashtags", () => {
     expect(linhas).toHaveLength(0);
   });
 
-  it("com nichoId, roda so para aquele nicho e so ate 10 termos", async () => {
+  /**
+   * V12b, item 5: com nichoId, so este nicho esta "ativo" na consulta, entao
+   * quantidadeTermosPorNicho vira Math.max(3, Math.floor(30/1)) = 30 (o
+   * limite semanal inteiro, ja que ninguem mais disputa nesta rodada); o
+   * teste passa 35 termos, mais que o limite, para provar que o corte de 30
+   * ainda vale mesmo com um so nicho.
+   */
+  it("com nichoId, roda so para aquele nicho e ate 30 termos (Math.max(3, 30/1), o limite semanal inteiro so para ele)", async () => {
     await db()
       .update(nichos)
-      .set({ termos: Array.from({ length: 12 }, (_, i) => `termo-${i}`) })
+      .set({ termos: Array.from({ length: 35 }, (_, i) => `termo-${i}`) })
       .where(eq(nichos.id, nichoId));
 
     vi.mocked(buscarIdDaHashtag).mockResolvedValue("hashtag-x");
@@ -290,7 +297,7 @@ describe("rodarMetaHashtags", () => {
 
     await rodarMetaHashtags(nichoId);
 
-    expect(buscarIdDaHashtag).toHaveBeenCalledTimes(10);
+    expect(buscarIdDaHashtag).toHaveBeenCalledTimes(30);
 
     await db().update(nichos).set({ termos: ["limpeza"] }).where(eq(nichos.id, nichoId));
   });

@@ -60,17 +60,46 @@ import { upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
-/**
- * De 8 para 10 (decisao do Fable em 15/09, achado da conferencia de 10/09): dois termos fora
- * do corte de 8 existem como hashtag na Meta ("antesedepoislimpeza" e
- * "produtodelimpezaquefunciona") e ficavam descartados todo dia. A trava de verdade continua
- * sendo LIMITE_HASHTAGS_SEMANA (30 hashtags unicas por semana por conta profissional); 10 por
- * nicho cabem em ate tres nichos por semana sem estourar esse limite.
- */
-const TERMOS_POR_NICHO = 10;
 /** 30 por semana, o limite real da Meta na resolucao. Exportado para o admin mostrar "hashtags usadas na semana" (PROXIMO.md, item 5). */
 export const LIMITE_HASHTAGS_SEMANA = 30;
 export const JANELA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Quantos termos tentar por nicho nesta rodada (V12b, item 5, achado do
+ * Fable em 29/09 com cinco nichos em producao: antes era um numero fixo, 10,
+ * e com mais de tres nichos ativos ao mesmo tempo o limite semanal da Meta
+ * (LIMITE_HASHTAGS_SEMANA, 30 hashtags unicas) esgotava nos tres primeiros,
+ * deixando o resto sem Instagram por hashtag a semana inteira). Divide o
+ * limite pelos nichos desta rodada, nunca menos que 3 (o minimo que ainda
+ * cobre alguma coisa por nicho quando ha muitos ativos).
+ */
+export function termosPorNicho(quantidadeNichos: number): number {
+  return Math.max(3, Math.floor(LIMITE_HASHTAGS_SEMANA / quantidadeNichos));
+}
+
+/**
+ * Numero de semanas desde a epoca (V12b, item 5): par ou impar decide o
+ * ponto de partida da rotacao de termos, em `termosDaSemana`. `agora` e
+ * parametro para o teste unitario nao depender do relogio de verdade.
+ */
+export function numeroDaSemana(agora: Date = new Date()): number {
+  return Math.floor(agora.getTime() / JANELA_SEMANA_MS);
+}
+
+/**
+ * Os termos do nicho para esta semana (V12b, item 5): semana par comeca no
+ * termo 0, impar no termo `quantidade` (o tamanho da fatia), para o resto
+ * dos termos do nicho (alem dos primeiros `quantidade`) entrar na semana
+ * seguinte em vez de nunca ser tentado. O `% termos.length` evita comecar
+ * depois do fim da lista quando o nicho tem menos termos que `quantidade`
+ * (um nicho pequeno voltaria vazio toda semana impar, sem isso).
+ */
+export function termosDaSemana(termos: string[], quantidade: number, semana: number): string[] {
+  if (termos.length === 0) return [];
+  const inicioBruto = semana % 2 === 0 ? 0 : quantidade;
+  const inicio = inicioBruto % termos.length;
+  return termos.slice(inicio, inicio + quantidade);
+}
 
 async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefined): Promise<boolean> {
   if (!config.transcricao.groqKey || !mediaUrl) return false;
@@ -105,6 +134,8 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
 
   const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
   const nichosAtivos = await db().select().from(nichos).where(condicao);
+  const quantidadeTermosPorNicho = termosPorNicho(nichosAtivos.length);
+  const semanaAtual = numeroDaSemana();
 
   let videosNovos = 0;
   let videosAtualizados = 0;
@@ -122,7 +153,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
-    for (const termo of nicho.termos.slice(0, TERMOS_POR_NICHO)) {
+    for (const termo of termosDaSemana(nicho.termos, quantidadeTermosPorNicho, semanaAtual)) {
       let hashtagId = mapaResolvidos.get(termo);
 
       if (!hashtagId) {
