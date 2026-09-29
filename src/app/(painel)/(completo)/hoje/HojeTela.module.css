@@ -671,12 +671,15 @@
   background: var(--cor-superficie);
 }
 
-.legendaGravou {
+/* Revisão do PR #63 (Fable): `.legendaSemana i` acima tem um elemento a mais na especificidade e vencia
+   estas duas classes; na captura os três quadrinhos da legenda saíam iguais, vazios. O seletor repete o
+   pai para empatar em especificidade e ganhar pela ordem, como `.diaGravou i` já faz nos dias. */
+.legendaSemana i.legendaGravou {
   background: var(--cor-acao);
   border-color: var(--cor-acao);
 }
 
-.legendaPostou {
+.legendaSemana i.legendaPostou {
   border: 2px solid var(--cor-borda-forte);
 }
 
