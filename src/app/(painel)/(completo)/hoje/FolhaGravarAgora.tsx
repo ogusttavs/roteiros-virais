@@ -399,12 +399,16 @@ export function FolhaGravarAgora({
         </div>
 
         {marcas.length > 0 ? (
-          <Chips
-            rotuloGrupo={textosMomento.falarDe}
-            opcoes={opcoesFalarDe}
-            selecionado={marcaIndice}
-            onChange={setMarcaIndice}
-          />
+          <div className={styles.grupoFalarDe}>
+            <Chips
+              rotuloGrupo={textosMomento.falarDe}
+              rotuloVisivel={textosMomento.falarDe}
+              opcoes={opcoesFalarDe}
+              selecionado={marcaIndice}
+              onChange={setMarcaIndice}
+            />
+            <p className={styles.falarDeAjuda}>{textosMomento.falarDeAjuda}</p>
+          </div>
         ) : null}
 
         {camposFaltando ? (

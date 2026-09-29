@@ -143,3 +143,14 @@
   font-size: var(--tamanho-legenda);
   color: var(--cor-texto-suave);
 }
+
+/** V12b, item 6: rotulo visivel (pelo Chips) mais a linha de ajuda abaixo dele. */
+.grupoFalarDe {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.falarDeAjuda {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}

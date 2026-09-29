@@ -5,6 +5,14 @@ import { chipsAtivos } from "./chipsAtivo";
 
 type Props = {
   rotuloGrupo: string;
+  /**
+   * Rotulo visivel acima dos chips, no mesmo estilo dos outros rotulos de
+   * grupo da tela (V12b, item 6: achado do Gustavo em producao, sem um
+   * rotulo visivel a pessoa nao entendia o que a fileira de chips era, so
+   * `rotuloGrupo` no `aria-label` nao aparece na tela). Opcional: sem ele,
+   * o grupo continua so com o `aria-label`, como sempre foi.
+   */
+  rotuloVisivel?: string;
   opcoes: string[];
   /** Indice da opcao marcada, ou nulo se nenhuma (grupo de filtro opcional). */
   selecionado: number | null;
@@ -16,10 +24,10 @@ type Props = {
  * Uma tela com varios grupos (ReferenciasTela) compoe varias instancias lado
  * a lado, com um separador entre elas.
  */
-export function Chips({ rotuloGrupo, opcoes, selecionado, onChange }: Props) {
+export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChange }: Props) {
   const ativos = chipsAtivos(opcoes.length, selecionado);
 
-  return (
+  const grupo = (
     <div role="group" aria-label={rotuloGrupo} className={styles.grupo}>
       {opcoes.map((rotulo, indice) => {
         const ativo = ativos[indice];
@@ -35,6 +43,22 @@ export function Chips({ rotuloGrupo, opcoes, selecionado, onChange }: Props) {
           </button>
         );
       })}
+    </div>
+  );
+
+  /**
+   * So embrulha num bloco empilhado (rotulo em cima) quando `rotuloVisivel`
+   * e passado: os outros usos (Referencias, fundacao/page.tsx) poem varios
+   * Chips lado a lado com SeparadorChips entre eles, e um embrulho sempre
+   * presente quebraria essa fileira (`.grupo` e `inline-flex`, um `<div>`
+   * novo por fora seria `block` e forcaria cada grupo para a propria linha).
+   */
+  if (!rotuloVisivel) return grupo;
+
+  return (
+    <div className={styles.bloco}>
+      <span className={styles.rotulo}>{rotuloVisivel}</span>
+      {grupo}
     </div>
   );
 }

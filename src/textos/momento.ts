@@ -21,7 +21,9 @@ export const textosMomento = {
   oQueVoceDisse: "O que você disse",
   objetivo: "O que você quer que aconteça com o vídeo?",
   recomendado: "Recomendado",
-  falarDe: "Falar de",
+  /** V12b, item 6: rotulo visivel acima dos chips (achado do Gustavo em producao, sem titulo a pessoa nao entendia o que era). */
+  falarDe: "Falar de outra marca sua também?",
+  falarDeAjuda: "Se este vídeo também vai citar outra marca sua, escolha aqui. A marca do vídeo continua sendo a que está aberta.",
   falarDeNenhuma: "Nenhuma",
   campoVazio: "conte onde você está, o que está acontecendo e o que dá para mostrar",
   escreverRoteiro: "Escrever o roteiro",
