@@ -1000,3 +1000,81 @@ test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
     });
   }
 });
+
+/**
+ * Item 9, V12b: o `/comecar` no desktop, achado do Gustavo em produção com
+ * um ramo comprido de verdade ("Empreendedorismo e Construção de Marcas").
+ * Nicho e cliente próprios, sem dados fixos (cai em "intro", "Começar" leva
+ * ao passo do ramo, já com o nicho do cliente selecionado).
+ */
+const EMAIL_COMECAR_DESKTOP = "e2e-layout-comecar-desktop@exemplo.teste";
+const NOME_RAMO_COMPRIDO = "Empreendedorismo e Construção de Marcas";
+
+let nichoComecarDesktopId: number;
+
+test.describe("layout: /comecar no desktop (item 9, V12b)", () => {
+  test.beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "e2e-layout-comecar-desktop", nome: NOME_RAMO_COMPRIDO })
+      .returning();
+    nichoComecarDesktopId = nicho.id;
+
+    await db()
+      .insert(user)
+      .values({ id: "e2e-layout-comecar-desktop", name: "[teste] Layout Começar Desktop", email: EMAIL_COMECAR_DESKTOP });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-layout-comecar-desktop-credential",
+        issuer: "local:credential",
+        accountId: "e2e-layout-comecar-desktop",
+        providerId: "credential",
+        userId: "e2e-layout-comecar-desktop",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-layout-comecar-desktop", nome: "[teste] Layout Começar Desktop", nichoId: nicho.id })
+      .returning();
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-layout-comecar-desktop", clienteId: cliente.id, papel: "dono" });
+  });
+
+  async function abrirPassoDoRamo(page: Page) {
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(EMAIL_COMECAR_DESKTOP);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/comecar/);
+    await page.getByRole("button", { name: "Começar", exact: true }).click();
+    await expect(page.locator("#ramo")).toBeVisible();
+  }
+
+  for (const largura of [1024, 1280, 1920]) {
+    test(`a coluna fica centralizada e o nome do ramo aparece inteiro, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await abrirPassoDoRamo(page);
+
+      const select = page.locator("#ramo");
+      await expect(select).toHaveValue(String(nichoComecarDesktopId));
+
+      // O select mostra a opção escolhida por inteiro (o navegador não corta o texto da option marcada).
+      const textoOpcaoMarcada = await select.evaluate((el: HTMLSelectElement) => el.options[el.selectedIndex]?.text);
+      expect(textoOpcaoMarcada).toBe(NOME_RAMO_COMPRIDO);
+
+      // A coluna do formulário fica centralizada, não colada na margem esquerda (folga dos dois lados parecida).
+      const caixa = await page.locator("form").boundingBox();
+      expect(caixa, "o formulário precisa estar visível").not.toBeNull();
+      const folgaEsquerda = caixa!.x;
+      const folgaDireita = largura - (caixa!.x + caixa!.width);
+      expect(
+        Math.abs(folgaEsquerda - folgaDireita),
+        `folgas muito diferentes (esquerda ${folgaEsquerda}, direita ${folgaDireita}): a coluna não está centralizada`,
+      ).toBeLessThan(caixa!.width * 0.15);
+
+      await conferirLayout(page);
+    });
+  }
+});
