@@ -70,8 +70,9 @@ type SearchParams = { periodo?: string; marcaId?: string };
  * `/admin/viagem` (V10, item 1 e 2): dia a dia por marca, mais o topo "o
  * que está quebrado agora". Cada célula mostra um ponto colorido (o pior
  * estado entre coleta e transcrição naquele dia) e a contagem de roteiros;
- * o resto do detalhe (temas, curva, plano, gravado/postado) fica no
- * `title` nativo, sem tooltip novo desenhado (regra 11).
+ * o resto do detalhe (temas, curva, plano, gravado/postado) abre num toque
+ * (V12, item 7: o `title` nativo não abre no celular). `<details>` nativo,
+ * sem tooltip novo desenhado (regra 11).
  */
 export default async function AdminViagem({ searchParams }: { searchParams: Promise<SearchParams> }) {
   await exigirAdmin();
@@ -174,9 +175,14 @@ export default async function AdminViagem({ searchParams }: { searchParams: Prom
                     const linha = marca.linhas[indiceDia];
                     const estado = piorEstado(linha.coleta.estado, linha.transcrever.estado);
                     return (
-                      <td key={marca.id} title={detalheCelula(linha)}>
-                        <span className={styles.ponto} data-estado={estado} aria-hidden="true" />
-                        {t.roteirosRotulo(linha.roteiros.total)}
+                      <td key={marca.id}>
+                        <details className={styles.celulaDetalhe}>
+                          <summary>
+                            <span className={styles.ponto} data-estado={estado} aria-hidden="true" />
+                            {t.roteirosRotulo(linha.roteiros.total)}
+                          </summary>
+                          <pre className={styles.celulaDetalhePre}>{detalheCelula(linha)}</pre>
+                        </details>
                       </td>
                     );
                   })}

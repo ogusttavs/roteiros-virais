@@ -46,7 +46,22 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
   const periodoNumero = Number(params.periodo);
   const periodoDias = PERIODOS_VALIDOS.has(periodoNumero) ? periodoNumero : 7;
   const busca = params.busca ?? "";
-  const plataformasAtivas = listaValida(params.plataforma, PLATAFORMAS_VALIDAS);
+  /**
+   * V12, item 3a: sem filtro nenhum na URL, abre já filtrado pela rede
+   * principal da marca (quando ela tem uma escolhida). Um `?plataforma=`
+   * explícito, mesmo vazio, sempre manda mais que esse padrão. Desvio
+   * registrado em `TODO.md`, "Decisões pendentes": `ReferenciasTela.tsx`
+   * (`montarUrl`) omite o parâmetro quando a lista de plataformas fica
+   * vazia (para não sujar a URL nas outras trocas de filtro), então limpar
+   * o filtro nesta tela volta a mostrar tudo só até a próxima navegação com
+   * a URL sem o parâmetro, que reaplica este padrão. Tentei fazer
+   * `montarUrl` mandar `plataforma=` sempre, mesmo vazio, para fechar esse
+   * ciclo, e isso quebrou a navegação da folha de filtro (achado rodando o
+   * e2e: alguma outra chamada de `navegar` competia com a da folha); reverti
+   * para não arriscar o que já funciona.
+   */
+  const plataformasAtivas =
+    params.plataforma === undefined && cliente.redePrincipal ? [cliente.redePrincipal] : listaValida(params.plataforma, PLATAFORMAS_VALIDAS);
   const formatosAtivos = listaValida(params.formato, FORMATOS_VALIDOS);
 
   const favoritos = await favoritosDoCliente(cliente.id);

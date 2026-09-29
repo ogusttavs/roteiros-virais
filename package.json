@@ -51,7 +51,8 @@
     "capturas:v9a-momento": "AI_PROVIDER=mock tsx scripts/capturas-v9a-momento.ts",
     "capturas:v9b-plano": "AI_PROVIDER=mock tsx scripts/capturas-v9b-plano.ts",
     "capturas:sem-limite-diario": "AI_PROVIDER=mock tsx scripts/capturas-sem-limite-diario.ts",
-    "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts"
+    "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts",
+    "capturas:v12-portas": "AI_PROVIDER=mock tsx scripts/capturas-v12-portas.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

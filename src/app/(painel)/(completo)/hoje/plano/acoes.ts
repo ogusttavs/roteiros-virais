@@ -1,6 +1,7 @@
 "use server";
 
 import type { Objetivo } from "@/db/schema";
+import { hojeISO } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
@@ -8,6 +9,7 @@ import {
   criarPlano,
   lerAgendaDeTexto,
   pular,
+  removerPlano,
   type DiaAgenda,
   type ItemPlano,
   type ResultadoLerAgenda,
@@ -98,4 +100,14 @@ export async function pularPlanoAction(itemId: number): Promise<void> {
   }
   const cliente = await clienteDaSessaoAtual();
   await pular(itemId, cliente.id);
+}
+
+/** "Tirar este plano" (V12, item 4b): apaga os próximos dias ainda não aceitos; os já aceitos continuam. */
+export async function removerPlanoAction(): Promise<void> {
+  const sessao = await sessaoAtual();
+  if (!sessao) {
+    throw new ErroAcessoNegado("E preciso entrar de novo.");
+  }
+  const cliente = await clienteDaSessaoAtual();
+  await removerPlano(cliente.id, hojeISO());
 }

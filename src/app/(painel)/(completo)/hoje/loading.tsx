@@ -11,7 +11,7 @@ export default function CarregandoHoje() {
     <div className={styles.pagina}>
       <BarraTopo titulo={textosHoje.titulo} />
       <div className={styles.miolo}>
-        <HojeCabecalho constancia={{ tipo: "primeiro_dia" }} estado="carregando" />
+        <HojeCabecalho estado="carregando" />
         <HojeEsqueleto mensagemEsperando={textosHoje.carregandoAviso} />
       </div>
     </div>
