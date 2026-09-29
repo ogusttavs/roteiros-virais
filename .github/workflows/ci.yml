@@ -67,14 +67,18 @@ jobs:
         env:
           PLAYWRIGHT_SEM_BUILD: "1"
 
-      # so quando o e2e falha (achado da revisao do PR #47): sem isto, o
-      # error-context.md e o trace de uma falha no CI nao sobrevivem ao fim
-      # do job, e nao ha como saber o que a tela mostrava na hora.
+      # Sempre, nao so quando o job falha (item 0c, 29/09/2026): com retries em
+      # CI, um teste que reprova na primeira tentativa e passa na segunda deixa
+      # o job verde e o rastro da falha (error-context.md, trace) morria aqui.
+      # E o proprio erro que estamos cacando em referencias.spec.ts aparece uma
+      # vez em tres, entao o rastro da tentativa que falhou e o que importa.
+      # `if-no-files-found: ignore`: numa execucao limpa a pasta nem existe.
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-test-results
           path: test-results/
+          if-no-files-found: ignore
           retention-days: 7
 
       - run: npm run checar-texto
