@@ -163,6 +163,32 @@ describe("resumoHistorico: os ultimos 30 dias", () => {
   });
 });
 
+/** V12, item 1: a semana no topo do Hoje, com os três estados por dia. */
+describe("resumoHistorico: os ultimos 7 dias em tres estados", () => {
+  it("postou vale mais que gravou no mesmo dia; sem nenhum dos dois, nada", async () => {
+    const clienteId = await criarCliente();
+    await criarRoteiro(clienteId, { diasAtras: 0, status: "postado", gravadoEm: dataHora(0), postadoEm: dataHora(0) });
+    await criarRoteiro(clienteId, { diasAtras: 2, status: "gravado", gravadoEm: dataHora(2) });
+
+    const resumo = await resumoHistorico(clienteId);
+
+    expect(resumo.ultimos7DiasEstado).toHaveLength(7);
+    expect(resumo.ultimos7DiasEstado[6]).toBe("postou"); // hoje
+    expect(resumo.ultimos7DiasEstado[4]).toBe("gravou"); // 2 dias atras
+    expect(resumo.ultimos7DiasEstado[5]).toBe("nada"); // 1 dia atras, nada
+  });
+
+  it("gravado e postado no mesmo dia em roteiros diferentes ainda conta postou, nao os dois", async () => {
+    const clienteId = await criarCliente();
+    await criarRoteiro(clienteId, { diasAtras: 3, status: "gravado", gravadoEm: dataHora(3) });
+    await criarRoteiro(clienteId, { diasAtras: 3, status: "postado", gravadoEm: dataHora(3), postadoEm: dataHora(3) });
+
+    const resumo = await resumoHistorico(clienteId);
+
+    expect(resumo.ultimos7DiasEstado[3]).toBe("postou");
+  });
+});
+
 describe("roteirosDoCliente", () => {
   it("so traz a versao mais nova de cada serie (outro angulo nao duplica linha)", async () => {
     const clienteId = await criarCliente();

@@ -238,6 +238,9 @@ test.describe("trocar de marca pela tela", () => {
     // Marca Um e a ativa no primeiro login (criadoEm desc, sem cookie ainda).
     const pilula = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) });
     await expect(pilula).toBeVisible();
+    // V12, item 3: os temas do dia ficam dentro da porta Reels; a URL com `?porta=reels` continua
+    // valendo depois da troca de marca e do recarregar, então basta abrir a porta uma vez.
+    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).toBeVisible();
 
     await pilula.click();

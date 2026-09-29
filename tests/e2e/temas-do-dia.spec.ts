@@ -146,6 +146,9 @@ test.describe("temas do dia pela tela", () => {
     await entrar(page, "e2e-temas@exemplo.teste");
     await expect(page).toHaveURL(/\/hoje/);
 
+    // V12, item 3: os temas do dia e "Escrever o meu assunto" ficam dentro da porta Reels.
+    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+
     await expect(page.getByRole("heading", { name: "tema de teste 1" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 3" })).toBeVisible();

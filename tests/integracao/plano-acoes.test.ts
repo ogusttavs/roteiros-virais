@@ -10,13 +10,19 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, membrosMarca, nichos, roteiros, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, membrosMarca, nichos, planoGravacoes, roteiros, user, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 import { ErroRoteiro } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { aceitarPlanoAction, criarPlanoAction, lerAgendaAction, pularPlanoAction } from "../../src/app/(painel)/(completo)/hoje/plano/acoes";
+import {
+  aceitarPlanoAction,
+  criarPlanoAction,
+  lerAgendaAction,
+  pularPlanoAction,
+  removerPlanoAction,
+} from "../../src/app/(painel)/(completo)/hoje/plano/acoes";
 import { hojeISO } from "../../src/lib/config";
 
 /** Datas relativas a hoje (revisão do PR #58, Fable): as literais de 23/09 passaram a cair no passado dois dias depois e derrubavam a suíte. */
@@ -177,5 +183,46 @@ describe("aceitarPlanoAction e pularPlanoAction", () => {
 
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     await expect(pularPlanoAction(item.id)).resolves.toBeUndefined();
+  });
+});
+
+describe("removerPlanoAction", () => {
+  it("sem sessao, recusa", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(null);
+    await expect(removerPlanoAction()).rejects.toThrow(ErroAcessoNegado);
+  });
+
+  it("apaga so os itens da marca da sessao, isolado da outra marca", async () => {
+    await db().insert(planoGravacoes).values([
+      {
+        clienteId: marcaA.id,
+        dia: hojeMais(0),
+        ordem: 1,
+        lugar: "x",
+        situacao: "sugerido de A para remover",
+        oQueMostrar: "z",
+        objetivo: "engajamento",
+        estado: "sugerido",
+      },
+      {
+        clienteId: marcaB.id,
+        dia: hojeMais(0),
+        ordem: 1,
+        lugar: "x",
+        situacao: "sugerido de B, nao pode sumir",
+        oQueMostrar: "z",
+        objetivo: "engajamento",
+        estado: "sugerido",
+      },
+    ]);
+
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    await removerPlanoAction();
+
+    const deA = await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, marcaA.id));
+    expect(deA.some((l) => l.situacao === "sugerido de A para remover")).toBe(false);
+
+    const deB = await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, marcaB.id));
+    expect(deB.some((l) => l.situacao === "sugerido de B, nao pode sumir")).toBe(true);
   });
 });

@@ -26,6 +26,7 @@ import {
   planoDoDia,
   planoQueVem,
   pular,
+  removerPlano,
   type DiaAgenda,
 } from "@/servicos/plano";
 
@@ -248,6 +249,32 @@ describe("limparPlano", () => {
     const deB = await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, clienteB.id));
     expect(deA).toHaveLength(1);
     expect(deA[0].dia).toBe(ONTEM);
+    expect(deB).toHaveLength(1);
+  });
+});
+
+describe("removerPlano", () => {
+  // V12, item 4b: "Tirar este plano" (`MeuPlano.dc.html`, estado `tirando`) apaga só o que ainda não
+  // virou roteiro; a frase da confirmação ("os roteiros já escritos continuam") é uma promessa do
+  // produto, este teste é o que a garante.
+  it("apaga sugerido e pulado, nunca aceito ou gravado, isolado por marca", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    await db().insert(planoGravacoes).values([
+      { clienteId: clienteA.id, dia: HOJE, ordem: 1, lugar: "x", situacao: "sugerido", oQueMostrar: "z", objetivo: "engajamento", estado: "sugerido" },
+      { clienteId: clienteA.id, dia: HOJE, ordem: 2, lugar: "x", situacao: "pulado", oQueMostrar: "z", objetivo: "engajamento", estado: "pulado" },
+      { clienteId: clienteA.id, dia: HOJE, ordem: 3, lugar: "x", situacao: "aceito", oQueMostrar: "z", objetivo: "engajamento", estado: "aceito" },
+      { clienteId: clienteA.id, dia: AMANHA, ordem: 1, lugar: "x", situacao: "gravado", oQueMostrar: "z", objetivo: "engajamento", estado: "gravado" },
+      { clienteId: clienteA.id, dia: ONTEM, ordem: 1, lugar: "x", situacao: "sugerido ontem", oQueMostrar: "z", objetivo: "engajamento", estado: "sugerido" },
+      { clienteId: clienteB.id, dia: HOJE, ordem: 1, lugar: "x", situacao: "sugerido de outra marca", oQueMostrar: "z", objetivo: "engajamento", estado: "sugerido" },
+    ]);
+
+    await removerPlano(clienteA.id, HOJE);
+
+    const deA = await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, clienteA.id));
+    expect(deA.map((l) => l.situacao).sort()).toEqual(["aceito", "gravado", "sugerido ontem"]);
+
+    const deB = await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, clienteB.id));
     expect(deB).toHaveLength(1);
   });
 });

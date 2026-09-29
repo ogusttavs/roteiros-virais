@@ -33,6 +33,12 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
+/** V12, item 2: "Gravar agora" agora fica dentro da porta Reels (a porta em si não importa para estes testes). */
+async function abrirPortaReels(page: Page) {
+  await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+  await expect(page.getByText("Reels ou vídeo curto", { exact: true })).toBeVisible();
+}
+
 test.describe("gravar agora, o caminho por texto", () => {
   test.beforeAll(async () => {
     const [nicho] = await db().insert(nichos).values({ slug: "e2e-momento", nome: "[teste] Momento" }).returning();
@@ -75,7 +81,7 @@ test.describe("gravar agora, o caminho por texto", () => {
       },
     });
 
-    // O botao "Gravar agora" fica abaixo dos tres temas (item 3 do PROXIMO.md): sem uma
+    // O botao "Gravar agora" fica dentro da porta Reels (V12, item 3d): sem uma
     // linha em temas_dia para hoje, /hoje cai no estado "sem_tema", que nao usa HojeTela.
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
@@ -89,6 +95,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     await entrar(page);
     await page.goto("/hoje");
 
+    await abrirPortaReels(page);
     await page.getByRole("button", { name: "Gravar agora" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
@@ -111,6 +118,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     await entrar(page);
     await page.goto("/hoje");
 
+    await abrirPortaReels(page);
     await page.getByRole("button", { name: "Gravar agora" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
@@ -148,6 +156,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     await entrar(page);
     await page.goto("/hoje");
 
+    await abrirPortaReels(page);
     await page.getByRole("button", { name: "Gravar agora" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();

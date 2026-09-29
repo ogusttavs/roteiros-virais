@@ -35,6 +35,7 @@ import {
   videosCliente,
   type ModeloNicho,
   type PerfilCompilado,
+  type Plataforma,
   type TipoAbertura,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
@@ -129,12 +130,12 @@ async function criarCliente(): Promise<number> {
 async function criarVideoEvidencia(
   idExterno: string,
   assunto: string,
-  opcoes: { idioma?: string | null; foraDaCurva?: number; tipoAbertura?: TipoAbertura } = {},
+  opcoes: { idioma?: string | null; foraDaCurva?: number; tipoAbertura?: TipoAbertura; plataforma?: Plataforma } = {},
 ): Promise<number> {
   const [video] = await db()
     .insert(videos)
     .values({
-      plataforma: "youtube",
+      plataforma: opcoes.plataforma ?? "youtube",
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
@@ -220,6 +221,24 @@ describe("gerarRoteiro", () => {
     expect(c.duracaoS).toBe(30);
 
     expect(cliente.nichoId).toBe(nichoId);
+  });
+
+  it("V12, item 3a: prefere a rede principal da marca na ordem das evidencias, sem excluir a outra", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ redePrincipal: "instagram" }).where(eq(clientes.id, clienteId));
+    const idYoutube = await criarVideoEvidencia("ev-rede-yt", "risco no carro depois da lavagem", { plataforma: "youtube" });
+    const idInstagram = await criarVideoEvidencia("ev-rede-ig", "risco no carro depois da lavagem", {
+      plataforma: "instagram",
+    });
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "risco no carro depois da lavagem",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.evidencias).toEqual(expect.arrayContaining([idYoutube, idInstagram]));
+    expect(roteiro.conteudo.evidencias.indexOf(idInstagram)).toBeLessThan(roteiro.conteudo.evidencias.indexOf(idYoutube));
   });
 
   it("sem modelo do nicho, aceita a duracao que veio (sem faixa para respeitar)", async () => {

@@ -164,6 +164,9 @@ test.describe("roteiro pela tela", () => {
     await page.getByRole("button", { name: "entrar", exact: true }).click();
     await expect(page).toHaveURL(/\/hoje/);
 
+    // V12, item 3b: os temas do dia ficam dentro da porta Reels.
+    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+
     const cartaoDoTema = page.getByRole("heading", {
       name: "o erro que faz a mancha de vinho no sofa espalhar em vez de sair",
     });

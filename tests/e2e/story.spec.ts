@@ -79,9 +79,10 @@ test.describe("V9c, Story como formato", () => {
       },
     });
 
-    // O botao "Gravar agora" fica abaixo dos tres temas (item 3 da V9a): sem uma linha em
-    // temas_dia para hoje, /hoje cai num estado que nao usa HojeTela (mesma licao de
-    // momento.spec.ts). Os temas em si nao importam para este teste.
+    // O botao "Gravar agora" do Hoje (dentro de uma porta, V12) ja chega com o formato
+    // preso a porta escolhida; este teste e sobre o formato seguir o objetivo sozinho
+    // (V9c), entao entra por "Estou num momento" em `/hoje/tema-livre`, que abre a mesma
+    // folha sem formato nenhum preso (mesma entrada de `momento.spec.ts`, "pelo Tema livre").
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
@@ -94,9 +95,9 @@ test.describe("V9c, Story como formato", () => {
     page,
   }) => {
     await entrar(page);
-    await page.goto("/hoje");
+    await page.goto("/hoje/tema-livre");
 
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
 
@@ -123,9 +124,9 @@ test.describe("V9c, Story como formato", () => {
 
   test("objetivo 'que mais gente te conheça' continua um Reels normal, sem cartão nenhum", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje");
+    await page.goto("/hoje/tema-livre");
 
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
 
