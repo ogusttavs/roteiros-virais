@@ -847,6 +847,36 @@ export async function contagensPorFiltroReferencias(
   return { porPlataforma, porFormato };
 }
 
+/**
+ * A plataforma que a URL de `/referencias` pede, sem consultar o banco (V12b,
+ * item 8): `?plataforma=todas` fecha o prefiltro de propósito ("Limpar os
+ * filtros"); sem parâmetro nenhum e com uma rede principal na marca, ela só
+ * entra como prefiltro se tiver ao menos um vídeo fora da curva no período
+ * (`contagemPorPlataforma`, de `contagensPorFiltroReferencias`); sem vídeo
+ * nenhum dela, a tela mostra todas e avisa por quê (achado do Gustavo com a
+ * Dr.Wash no TikTok, coleta suspensa desde 09/09: a tela abria vazia sem
+ * pista nenhuma). Um parâmetro explícito (a lista de uma ou mais
+ * plataformas) sempre vence os dois casos acima.
+ */
+export function resolverPlataformasReferencias(
+  parametroPlataforma: string | undefined,
+  redePrincipal: Plataforma | null,
+  contagemPorPlataforma: Record<Plataforma, number>,
+): { plataformas: Plataforma[]; redePrincipalSemVideo?: Plataforma } {
+  if (parametroPlataforma === "todas") return { plataformas: [] };
+
+  if (parametroPlataforma === undefined) {
+    if (!redePrincipal) return { plataformas: [] };
+    if (contagemPorPlataforma[redePrincipal] > 0) return { plataformas: [redePrincipal] };
+    return { plataformas: [], redePrincipalSemVideo: redePrincipal };
+  }
+
+  const plataformas = parametroPlataforma
+    .split(",")
+    .filter((v): v is Plataforma => v === "youtube" || v === "tiktok" || v === "instagram");
+  return { plataformas };
+}
+
 export type VideoParaEmbed = {
   id: number;
   plataforma: Plataforma;
