@@ -638,3 +638,85 @@ test.describe("briefing pela tela", () => {
     });
   });
 });
+
+/**
+ * V12b, item 0: quem tem mais de uma marca e a ativa ainda nao tem briefing
+ * completo ficava presa em /comecar, porque essa rota nao tinha o seletor de
+ * marca (ele so existia na casca de `(painel)/(completo)`). Agora /comecar
+ * ganha o mesmo `SeletorMarcaCelular`/`SeletorMarcaDesktop` da casca quando a
+ * pessoa tem mais de uma marca, e trocar ali leva para o Hoje da marca
+ * escolhida (via `revalidatePath`, sem navegacao propria: o redirect que
+ * `page.tsx` ja fazia para marca com briefing completo dispara sozinho).
+ */
+test.describe("trocar de marca a partir do /comecar (V12b, item 0)", () => {
+  test("marca ativa sem briefing completo, troca pelo seletor para a marca que tem, e cai no Hoje", async ({
+    page,
+  }) => {
+    const idUsuario = "e2e-comecar-troca-marca";
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+    await db().insert(user).values({
+      id: idUsuario,
+      name: "[teste] Troca de Marca no Comecar",
+      email: `${idUsuario}@exemplo.teste`,
+    });
+    await db()
+      .insert(account)
+      .values({
+        id: `${idUsuario}-credential`,
+        issuer: "local:credential",
+        accountId: idUsuario,
+        providerId: "credential",
+        userId: idUsuario,
+        password: await hashPassword(SENHA),
+      });
+    await db().insert(preferenciasUsuario).values({ usuarioId: idUsuario, aceitouTermosEm: new Date() });
+
+    // Cidade e nicho ja preenchidos: cai direto no bloco 1, sem passar pela
+    // tela de dados fixos (nao e o que este teste verifica).
+    const [marcaSemBriefing] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: idUsuario,
+        nome: "[teste] Marca Sem Briefing",
+        cidade: "Sao Paulo",
+        nichoId: nicho.id,
+      })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: idUsuario, clienteId: marcaSemBriefing.id, papel: "dono" });
+
+    await entrar(page, `${idUsuario}@exemplo.teste`);
+    await expect(page).toHaveURL(/\/comecar/);
+    await expect(page.getByText("bloco 1 de 5")).toBeVisible();
+
+    // Pina o cookie `marca_ativa` na marca sem briefing por uma acao de
+    // servidor de verdade (avaliar uma resposta), antes de a segunda marca
+    // existir: so assim o cenario de "presa" acontece de verdade. Se a
+    // segunda marca (com briefing completo) ja existisse aqui, o proprio
+    // `marcaPadrao` pularia direto para ela sem cookie nenhum (esse
+    // desempate ja esta coberto no teste de integracao).
+    await responderEAvaliar(
+      page,
+      "o que o seu negócio faz hoje",
+      'Somos uma clinica odontologica em Sao Paulo que atende familias inteiras. Fazemos 42 procedimentos por semana, e uma cliente disse "finalmente perdi o medo de sorrir".',
+    );
+
+    // A pessoa ganha uma segunda marca, com briefing completo (por exemplo, o admin deu acesso a outra marca dela).
+    const [marcaComBriefing] = await db()
+      .insert(clientes)
+      .values({ usuarioId: idUsuario, nome: "[teste] Marca Com Briefing", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: idUsuario, clienteId: marcaComBriefing.id, papel: "dono" });
+    await db().insert(briefings).values({ clienteId: marcaComBriefing.id, completo: true });
+
+    // Recarrega: agora com duas marcas, mas o cookie ainda aponta para a sem briefing, entao continua presa nela.
+    await page.reload();
+    await expect(page).toHaveURL(/\/comecar/);
+    await expect(page.getByText("Briefing da [teste] Marca Sem Briefing")).toBeVisible();
+
+    await page.getByRole("button", { name: /^Trocar de marca/ }).click();
+    await page.getByRole("menuitemradio", { name: "[teste] Marca Com Briefing" }).click();
+
+    await expect(page).toHaveURL(/\/hoje/);
+  });
+});

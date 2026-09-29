@@ -9,6 +9,10 @@
 
 /* O nome e o Sair descem pelo recorte do aparelho (`--area-topo`, base.css): com a tela cobrindo tudo
    (viewport-fit=cover) eles caiam por baixo da hora e da ilha do iPhone (V7, item 2 do PROXIMO.md). */
+.cabecalhoEnvoltorio {
+  flex: none;
+}
+
 .cabecalho {
   display: flex;
   align-items: center;
@@ -16,7 +20,6 @@
   height: calc(56px + var(--area-topo));
   padding: 0 var(--margem-celular);
   padding-top: var(--area-topo);
-  flex: none;
 }
 
 .nomeProduto {
@@ -24,8 +27,41 @@
   font-size: var(--tamanho-secundario);
 }
 
-.botaoSair {
+/* V12b, item 0: o seletor de marca (com mais de uma) e o Sair, agrupados à direita. */
+.direita {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+/* Um por vez, pela largura (mesmo corte de `(painel)/layout.module.css`, `.colunaDesktop`). */
+.seletorCelular {
+  display: block;
+}
+
+.seletorDesktop {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .seletorCelular {
+    display: none;
+  }
+
+  .seletorDesktop {
+    display: block;
+  }
+}
+
+.deQualMarca {
+  margin: 0;
+  padding: 0 var(--margem-celular) var(--espaco-3);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.botaoSair {
   min-height: var(--altura-toque);
   padding: 0 var(--espaco-3);
   border: 0;
