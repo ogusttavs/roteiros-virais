@@ -85,7 +85,7 @@ beforeAll(async () => {
   await db().insert(membrosMarca).values({ usuarioId: "momento-sem-espera", clienteId: cliente.id, papel: "dono" });
   await db().insert(briefings).values({ clienteId: cliente.id, completo: true, perfil: PERFIL });
 
-  marca = { id: cliente.id, usuarioId: cliente.usuarioId };
+  marca = { id: cliente.id, usuarioId: cliente.usuarioId! };
 }, 30_000);
 
 afterAll(async () => {

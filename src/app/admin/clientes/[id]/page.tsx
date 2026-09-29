@@ -13,6 +13,7 @@ import { roteirosDoCliente } from "@/servicos/roteiro";
 import { textosAdmin } from "@/textos/admin";
 import { textosHistorico } from "@/textos/historico";
 
+import { NomeMarcaAdmin } from "./NomeMarcaAdmin";
 import styles from "./page.module.css";
 import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
 import { SeletorPlanoAdmin } from "./SeletorPlanoAdmin";
@@ -62,7 +63,7 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
         <Link href="/admin/clientes" className={styles.voltar}>
           <ArrowLeft size={16} strokeWidth={1.5} aria-hidden="true" /> {t.voltar}
         </Link>
-        <h1>{cliente.nome}</h1>
+        <NomeMarcaAdmin clienteId={cliente.id} nomeInicial={cliente.nome} />
         <p className={styles.subtitulo}>
           {cliente.nichoNome ?? textosAdmin.clientes.semNicho} · {textosAdmin.acessos.quantos(membros.length)}
         </p>

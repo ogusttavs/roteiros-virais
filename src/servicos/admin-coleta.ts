@@ -97,7 +97,8 @@ export async function listarNichosComContagem(): Promise<NichoComContagem[]> {
 export type ClienteAdmin = {
   id: number;
   nome: string;
-  email: string;
+  /** O e-mail do dono; nulo quando a marca ainda nao tem ninguem (V12b, item 2). */
+  email: string | null;
   nichoNome: string | null;
   ativo: boolean;
   notaBriefing: number | null;
@@ -114,7 +115,10 @@ export type ClienteAdmin = {
  * `constanciaDoCliente` (baseada em `gravadoEm`/`postadoEm`, nao em
  * `criadoEm`): nulo quando o cliente nunca gravou nem postou nada, 0 quando
  * esta gravando hoje ou ontem (em sequencia), e os dias corridos quando
- * parou; e "pessoas" (V3, item 5), a contagem de membros_marca.
+ * parou; e "pessoas" (V3, item 5), a contagem de membros_marca. O e-mail vem
+ * do dono em `membrosMarca` (V12b, item 2), nao de `clientes.usuarioId`
+ * (legado, nunca escrito por uma marca criada sem ninguem); `leftJoin` em
+ * vez de `innerJoin` deixa a marca sem dono ainda aparecer na lista.
  */
 export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
   const [linhas, notas, ultimosRoteiros, contagensPessoas] = await Promise.all([
@@ -127,7 +131,8 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
         ativo: clientes.ativo,
       })
       .from(clientes)
-      .innerJoin(user, eq(user.id, clientes.usuarioId))
+      .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))
+      .leftJoin(user, eq(user.id, membrosMarca.usuarioId))
       .leftJoin(nichos, eq(nichos.id, clientes.nichoId))
       .orderBy(clientes.criadoEm),
     db().select({ clienteId: briefings.clienteId, notaGeral: briefings.notaGeral }).from(briefings),
@@ -491,7 +496,8 @@ export async function noticiasPorId(ids: number[]): Promise<NoticiaLinkavel[]> {
 export type ClienteDetalheAdmin = {
   id: number;
   nome: string;
-  email: string;
+  /** O e-mail do dono; nulo quando a marca ainda nao tem ninguem (V12b, item 2). */
+  email: string | null;
   nichoNome: string | null;
   ativo: boolean;
   criadoEm: Date;
@@ -501,7 +507,12 @@ export type ClienteDetalheAdmin = {
   diasSemGravar: number | null;
 };
 
-/** /admin/clientes/[id] (etapa 12, decisão 9 do `PROXIMO.md`): briefing, saúde da conta. Editável: só o plano (V9b-0). */
+/**
+ * /admin/clientes/[id] (etapa 12, decisão 9 do `PROXIMO.md`): briefing, saúde
+ * da conta. Editável: o plano (V9b-0), o nome da marca (V12b, item 3). O
+ * e-mail vem do dono em `membrosMarca` (V12b, item 2), `leftJoin` para a
+ * marca sem dono ainda continuar existindo aqui.
+ */
 export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDetalheAdmin | null> {
   const [linha] = await db()
     .select({
@@ -514,7 +525,8 @@ export async function clienteDetalheAdmin(clienteId: number): Promise<ClienteDet
       plano: clientes.plano,
     })
     .from(clientes)
-    .innerJoin(user, eq(user.id, clientes.usuarioId))
+    .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))
+    .leftJoin(user, eq(user.id, membrosMarca.usuarioId))
     .leftJoin(nichos, eq(nichos.id, clientes.nichoId))
     .where(eq(clientes.id, clienteId));
 

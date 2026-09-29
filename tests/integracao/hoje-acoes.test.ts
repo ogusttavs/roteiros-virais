@@ -40,8 +40,8 @@ beforeAll(async () => {
       { usuarioId: "hoje-acoes-a", clienteId: a.id, papel: "dono" },
       { usuarioId: "hoje-acoes-b", clienteId: b.id, papel: "dono" },
     ]);
-  marcaA = { id: a.id, usuarioId: a.usuarioId };
-  marcaB = { id: b.id, usuarioId: b.usuarioId };
+  marcaA = { id: a.id, usuarioId: a.usuarioId! };
+  marcaB = { id: b.id, usuarioId: b.usuarioId! };
 }, 30_000);
 
 afterAll(async () => {

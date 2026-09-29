@@ -8,10 +8,11 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, contas, execucoesJob, nichos, roteiros, user, videos } from "@/db/schema";
+import { clientes, contas, execucoesJob, membrosMarca, nichos, roteiros, user, videos } from "@/db/schema";
 import { upsertVideo } from "@/jobs/coleta-comum";
 import { hojeISO } from "@/lib/config";
 import {
+  clienteDetalheAdmin,
   listarClientesAdmin,
   listarExecucoesRecentes,
   listarNichosComContagem,
@@ -281,6 +282,33 @@ describe("listarClientesAdmin, dias sem gravar", () => {
     expect(constancia.tipo).toBe("parado");
     const diasEsperados = constancia.tipo === "parado" ? constancia.dias : null;
     expect(lista.find((c) => c.id === clienteParadoId)?.diasSemGravar).toBe(diasEsperados);
+  });
+});
+
+describe("listarClientesAdmin e clienteDetalheAdmin, marca sem dono (V12b, item 2)", () => {
+  it("aparece na lista e no detalhe com email nulo antes de ter dono, e com o email do dono depois", async () => {
+    const [marcaSemDono] = await db().insert(clientes).values({ nome: "[teste] Marca sem dono", nichoId }).returning();
+
+    const listaAntes = await listarClientesAdmin();
+    const linhaAntes = listaAntes.find((c) => c.id === marcaSemDono.id);
+    expect(linhaAntes).toBeDefined();
+    expect(linhaAntes?.email).toBeNull();
+
+    const detalheAntes = await clienteDetalheAdmin(marcaSemDono.id);
+    expect(detalheAntes?.email).toBeNull();
+
+    await db()
+      .insert(user)
+      .values({ id: "admin-coleta-dono-depois", name: "[teste] Dono depois", email: "dono-depois@admin-coleta.teste" });
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "admin-coleta-dono-depois", clienteId: marcaSemDono.id, papel: "dono" });
+
+    const listaDepois = await listarClientesAdmin();
+    expect(listaDepois.find((c) => c.id === marcaSemDono.id)?.email).toBe("dono-depois@admin-coleta.teste");
+
+    const detalheDepois = await clienteDetalheAdmin(marcaSemDono.id);
+    expect(detalheDepois?.email).toBe("dono-depois@admin-coleta.teste");
   });
 });
 

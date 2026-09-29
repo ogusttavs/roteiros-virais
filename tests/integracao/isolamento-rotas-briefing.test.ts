@@ -65,8 +65,8 @@ beforeAll(async () => {
       { usuarioId: "rota-b", clienteId: b.id, papel: "dono" },
     ]);
 
-  clienteA = { id: a.id, usuarioId: a.usuarioId };
-  clienteB = { id: b.id, usuarioId: b.usuarioId };
+  clienteA = { id: a.id, usuarioId: a.usuarioId! };
+  clienteB = { id: b.id, usuarioId: b.usuarioId! };
 }, 30_000);
 
 afterAll(async () => {

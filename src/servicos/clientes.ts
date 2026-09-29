@@ -221,12 +221,18 @@ export async function membrosDaMarca(clienteId: number): Promise<MembroDaMarca[]
 export type ClienteComNichoENome = {
   id: number;
   nome: string;
-  email: string;
+  /** O e-mail do dono (`membrosMarca`, papel "dono"), nulo quando a marca ainda nao tem ninguem (V12b, item 2). */
+  email: string | null;
   nichoNome: string | null;
   ativo: boolean;
 };
 
-/** Lista para /admin/clientes (brief-frontend.md, 6.10). */
+/**
+ * Lista para /admin/clientes (brief-frontend.md, 6.10). O e-mail vem do dono
+ * em `membrosMarca`, nao de `clientes.usuarioId` (V12b, item 2: uma marca
+ * criada pelo admin sem ninguem ainda nunca escreve esse campo legado); os
+ * dois `leftJoin` deixam a marca aparecer mesmo sem dono nenhum.
+ */
 export async function listarClientes(): Promise<ClienteComNichoENome[]> {
   return db()
     .select({
@@ -237,7 +243,8 @@ export async function listarClientes(): Promise<ClienteComNichoENome[]> {
       ativo: clientes.ativo,
     })
     .from(clientes)
-    .innerJoin(user, eq(user.id, clientes.usuarioId))
+    .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))
+    .leftJoin(user, eq(user.id, membrosMarca.usuarioId))
     .leftJoin(nichos, eq(nichos.id, clientes.nichoId))
     .orderBy(clientes.criadoEm);
 }
@@ -279,56 +286,72 @@ async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<
 /**
  * Manda o convite por e-mail (link mágico, o "clique no link do e-mail" da
  * folha "Convite mandado"); bônus sobre a senha, que já resolve o acesso
- * sozinha, então uma falha aqui não derruba a ação inteira.
+ * sozinha, então uma falha aqui não derruba a ação inteira. `headers()` só
+ * funciona dentro de uma requisição de verdade (mesmo motivo documentado em
+ * `resolverMarcaAtiva`, acima); o try/catch cobre a função inteira, não só a
+ * chamada à API, para um teste de integração que chama `darAcesso` direto
+ * (fora de uma Server Action) também cair no "bônus", não travar a ação.
  */
 async function mandarConviteMagico(email: string): Promise<void> {
-  const cabecalhos = await headers();
-  await auth.api
-    .signInMagicLink({ body: { email, callbackURL: "/comecar" }, headers: cabecalhos })
-    .catch(() => {});
+  try {
+    const cabecalhos = await headers();
+    await auth.api.signInMagicLink({ body: { email, callbackURL: "/comecar" }, headers: cabecalhos });
+  } catch {
+    // Best-effort; ver comentario acima.
+  }
 }
 
-export type ResultadoCriarCliente =
-  | { tipo: "jaTinhaLogin"; cliente: Cliente }
-  | { tipo: "convite"; cliente: Cliente; senha: string };
-
 /**
- * "Convidar cliente" (uma marca nova): e-mail que já entra no painel segue
- * a regra de "dar acesso" (a marca nasce e a pessoa entra direto, sem senha
- * nova, dúvida 9 do BRIEF.md); e-mail novo ganha usuário com senha gerada e
- * o convite por e-mail. Sempre dono da marca nova.
+ * "Nova marca" (V12b, item 2): so a marca, sem ninguem ainda. A pessoa entra
+ * depois, dentro da marca, por `darAcesso` (que decide quem vira dono). Nome
+ * e nicho continuam obrigatorios; tipo e plano tem o mesmo padrao de antes.
  */
-export async function criarClienteEConvidar(dados: {
+export async function criarMarca(dados: {
   nome: string;
-  email: string;
   nichoId: number;
   /** V9a, item 4: o admin escolhe ao criar a marca; "negocio" é o padrão, sem tela nova. */
   tipo?: TipoMarca;
   /** V9b-0, item 1: o admin escolhe ao criar a marca; "padrao" é o padrão, sem tela nova. */
   plano?: PlanoMarca;
-}): Promise<ResultadoCriarCliente> {
+}): Promise<Cliente> {
   const tipo = dados.tipo ?? "negocio";
   const plano = dados.plano ?? "padrao";
-  const [usuarioExistente] = await db().select().from(user).where(eq(user.email, dados.email));
+  const [cliente] = await db().insert(clientes).values({ nome: dados.nome, nichoId: dados.nichoId, tipo, plano }).returning();
+  return cliente;
+}
 
-  if (usuarioExistente) {
-    const [cliente] = await db()
-      .insert(clientes)
-      .values({ usuarioId: usuarioExistente.id, nome: dados.nome, nichoId: dados.nichoId, tipo, plano })
-      .returning();
-    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId: cliente.id, papel: "dono" });
-    return { tipo: "jaTinhaLogin", cliente };
-  }
+/**
+ * Nome da marca, editavel no admin (V12b, item 3): sem vazio, ate 80
+ * caracteres, espacos aparados, mesmo padrao de `atualizarNicho`.
+ */
+export async function renomearCliente(clienteId: number, nome: string): Promise<Cliente> {
+  const nomeAparado = nome.trim();
+  if (!nomeAparado) throw new ErroCliente("o nome da marca nao pode ficar vazio.");
+  if (nomeAparado.length > 80) throw new ErroCliente("o nome da marca pode ter ate 80 caracteres.");
 
-  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(dados.email, dados.nome);
-  const [cliente] = await db()
-    .insert(clientes)
-    .values({ usuarioId, nome: dados.nome, nichoId: dados.nichoId, tipo, plano })
-    .returning();
-  await db().insert(membrosMarca).values({ usuarioId, clienteId: cliente.id, papel: "dono" });
-  await mandarConviteMagico(dados.email);
+  const [cliente] = await db().update(clientes).set({ nome: nomeAparado }).where(eq(clientes.id, clienteId)).returning();
+  if (!cliente) throw new ErroCliente("nao foi possivel renomear a marca; marca nao encontrada.");
+  return cliente;
+}
 
-  return { tipo: "convite", cliente, senha };
+/**
+ * Nome de uma pessoa, editavel no admin em "Quem tem acesso" (V12b, item 4):
+ * confere que ela e membro desta marca antes de gravar (nunca por
+ * `usuarioId` solto, mesmo isolamento de `tirarAcesso`), e grava em
+ * `user.name` (a mesma coluna que a propria pessoa edita em Conta).
+ */
+export async function renomearPessoa(clienteId: number, usuarioId: string, nome: string): Promise<void> {
+  const nomeAparado = nome.trim();
+  if (!nomeAparado) throw new ErroCliente("o nome nao pode ficar vazio.");
+  if (nomeAparado.length > 80) throw new ErroCliente("o nome pode ter ate 80 caracteres.");
+
+  const [membro] = await db()
+    .select({ id: membrosMarca.id })
+    .from(membrosMarca)
+    .where(and(eq(membrosMarca.usuarioId, usuarioId), eq(membrosMarca.clienteId, clienteId)));
+  if (!membro) throw new ErroCliente("esta pessoa nao tem acesso a esta marca.");
+
+  await db().update(user).set({ name: nomeAparado }).where(eq(user.id, usuarioId));
 }
 
 /** V9b-0, item 1: o admin liga ou desliga o limite diário de roteiros de uma marca em `/admin/clientes/[id]`. */
@@ -339,12 +362,18 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
 export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };
 
 /**
- * "Dar acesso" a uma marca que já existe (V3, item 5, AdminCliente.dc.html):
- * só o e-mail. Quem já entra no painel ganha a marca na hora, sem senha
- * nova; quem não tem login recebe usuário com senha gerada e "Sem nome
- * ainda" até se apresentar em Conta.
+ * "Dar acesso" a uma marca (V3, item 5, AdminCliente.dc.html; V12b, item 2:
+ * agora tambem o jeito de a primeira pessoa entrar numa marca criada sem
+ * ninguem). Quem ja entra no painel ganha a marca na hora, sem senha nova,
+ * com o nome que ja tinha (o `nome` daqui nao sobrescreve); quem nao tem
+ * login recebe usuario com senha gerada e o nome que a folha "Dar acesso"
+ * pediu (V12b, item 4: antes era sempre "Sem nome ainda", a folha nao
+ * perguntava). Dono e quem chega primeiro (marca sem nenhum membro ainda),
+ * os seguintes entram como membro.
  */
-export async function darAcesso(clienteId: number, email: string): Promise<ResultadoDarAcesso> {
+export async function darAcesso(clienteId: number, nome: string, email: string): Promise<ResultadoDarAcesso> {
+  const membrosAtuais = await membrosDaMarca(clienteId);
+  const papel: PapelMarca = membrosAtuais.length === 0 ? "dono" : "membro";
   const [usuarioExistente] = await db().select().from(user).where(eq(user.email, email));
 
   if (usuarioExistente) {
@@ -355,12 +384,12 @@ export async function darAcesso(clienteId: number, email: string): Promise<Resul
     if (jaMembro) {
       throw new ErroCliente(textosAdmin.acessos.erroJaTemAcesso);
     }
-    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId, papel: "membro" });
+    await db().insert(membrosMarca).values({ usuarioId: usuarioExistente.id, clienteId, papel });
     return { tipo: "jaTinhaLogin", nome: usuarioExistente.name };
   }
 
-  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(email, NOME_SEM_NOME_AINDA);
-  await db().insert(membrosMarca).values({ usuarioId, clienteId, papel: "membro" });
+  const { usuarioId, senha } = await criarUsuarioComSenhaGerada(email, nome.trim() || NOME_SEM_NOME_AINDA);
+  await db().insert(membrosMarca).values({ usuarioId, clienteId, papel });
   await mandarConviteMagico(email);
 
   return { tipo: "convite", senha };

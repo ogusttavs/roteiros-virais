@@ -15,7 +15,7 @@ function formatarDiaMesAbreviado(data: Date): string {
 export const textosAdmin = {
   navegacao: {
     equipe: "Equipe",
-    clientes: "Clientes",
+    clientes: "Marcas",
     nichos: "Nichos",
     jobs: "Jobs",
     geracoes: "Gerações",
@@ -24,10 +24,10 @@ export const textosAdmin = {
     saindo: "saindo",
   },
   clientes: {
-    titulo: "Clientes",
-    subtitulo: (n: number) => (n === 1 ? "1 cliente" : `${n} clientes`),
+    titulo: "Marcas",
+    subtitulo: (n: number) => (n === 1 ? "1 marca" : `${n} marcas`),
     buscar: "buscar por nome",
-    colunaNegocio: "negócio",
+    colunaMarca: "marca",
     colunaNicho: "nicho",
     colunaNota: "nota do briefing",
     colunaUltimoRoteiro: "último roteiro",
@@ -39,29 +39,26 @@ export const textosAdmin = {
     semRoteiro: "sem roteiro ainda",
     diasAtencao: (n: number) => `${n} dias, atenção`,
     botaoAbrir: "abrir",
-    vazio: "Nenhum cliente ainda. Convide o primeiro para começar.",
-    semResultado: "nenhum cliente com esse nome",
-    convidar: "convidar cliente",
-    modalTitulo: "Convidar cliente",
+    vazio: "Nenhuma marca ainda. Crie a primeira para começar.",
+    semResultado: "nenhuma marca com esse nome",
+    /** V12b, item 2: a marca nasce sem ninguém; a pessoa entra depois, dentro dela ("dar acesso"). */
+    novaMarca: "nova marca",
+    modalTitulo: "Nova marca",
     campoNome: "nome",
-    campoEmail: "e-mail",
     campoNicho: "nicho",
-    /** V9a, item 4: a marca fala como negócio ("a gente") ou como uma pessoa (primeira pessoa do singular). */
-    campoTipo: "tipo de marca",
-    tipoNegocio: "negócio",
-    tipoPessoa: "pessoa",
+    /** V12b, item 2: ao lado do campo nicho, quando o setor da marca ainda não existe na lista. */
+    criarUmNicho: "criar um nicho",
+    /** V12b, item 1: era "tipo de marca"; o campo decide a voz do roteiro, não a natureza da empresa. */
+    campoTipo: "tipo de conteúdo",
+    tipoNegocio: 'de negócio: a marca fala ("a gente", "nossa loja")',
+    tipoPessoa: 'de pessoa: você fala ("eu")',
     /** V9b-0: quantos roteiros a marca pode gerar por dia. */
     campoPlano: "roteiros por dia",
     planoPadrao: "um por dia",
     planoSemLimite: "sem limite",
-    botaoConvidar: "convidar por e-mail",
-    convidando: "convidando",
-    sucesso: (email: string) => `cliente criado; o convite foi mandado para ${email}`,
-    /** V3, item 5, dúvida 9: e-mail que já entra no painel não recebe convite nem senha nova. */
-    sucessoJaTinhaLogin: (email: string) => `cliente criado; ${email} já entrava no painel, entrou direto`,
-    ajudaEmailJaExiste:
-      "Se esse e-mail já entra no painel, a marca nova aparece para a pessoa na hora, sem senha nova.",
-    erroConvite: "não conseguimos criar o cliente; confira os dados e tente de novo",
+    botaoCriar: "criar marca",
+    criando: "criando",
+    erroCriar: "não conseguimos criar a marca; confira os dados e tente de novo",
   },
   nichos: {
     titulo: "Nichos",
@@ -229,14 +226,20 @@ export const textosAdmin = {
     erroDisparar: (mensagem: string) => `não conseguimos disparar o job: ${mensagem}`,
   },
   clienteDetalhe: {
-    voltar: "clientes",
-    naoEncontrado: "cliente não encontrado",
+    voltar: "marcas",
+    naoEncontrado: "marca não encontrada",
     /** V9b-0: o interruptor de plano, ao lado do nicho no cabeçalho. */
     campoPlano: "roteiros por dia",
     planoPadrao: "um por dia",
     planoSemLimite: "sem limite",
     planoSalvo: "salvo",
     planoErro: "não conseguimos salvar; tente de novo",
+    /** V12b, item 3: editar o nome da marca, ao lado do título (mesmo padrão de Nichos). */
+    editarNome: "editar",
+    salvarNome: "salvar",
+    salvandoNome: "salvando",
+    cancelarNome: "cancelar",
+    erroRenomear: "não conseguimos salvar o nome; tente de novo",
     briefingTitulo: "briefing",
     briefingCompleto: "completo",
     briefingIncompleto: "incompleto",
@@ -285,12 +288,19 @@ export const textosAdmin = {
     confirmarTirarOAcesso: (nome: string, nomeMarca: string) =>
       `Tirar o acesso de ${nome} a ${nomeMarca}? Ele deixa de ver esta marca na hora e continua entrando na outra marca que tiver. Os roteiros que ele escolheu aqui ficam na marca.`,
     aoDarAcessoTitulo: (nomeMarca: string) => `Dar acesso a ${nomeMarca}`,
+    /** V12b, item 4: a folha passou a pedir o nome também, não só o e-mail. */
+    campoNome: "nome da pessoa",
     campoEmail: "e-mail da pessoa",
-    ajudaEmailJaTemLogin: "Se esse e-mail já entra no painel, a pessoa ganha esta marca na hora, ao lado das que já tem. Sem senha nova, sem e-mail de convite.",
+    ajudaEmailJaTemLogin: "Se esse e-mail já entra no painel, a pessoa ganha esta marca na hora, ao lado das que já tem. Sem senha nova, sem e-mail de convite, e o nome de hoje continua.",
     ajudaEmailNovo: "Se ainda não entra, ela recebe o convite por e-mail com uma senha inicial, que aparece uma vez só, na tela seguinte.",
+    /** V12b, item 4: editar o nome de uma pessoa já com acesso, na própria linha. */
+    editarNome: "editar",
+    salvarNome: "salvar",
+    salvandoNome: "salvando",
+    erroRenomear: "não conseguimos salvar o nome; tente de novo",
     erroJaTemAcesso: "Essa pessoa já tem acesso a esta marca.",
     erroDonoNaoPodeSerTirado: "O dono não pode ter o acesso tirado.",
-    erroDarAcesso: "não conseguimos dar acesso agora; confira o e-mail e tente de novo",
+    erroDarAcesso: "não conseguimos dar acesso agora; confira o nome e o e-mail e tente de novo",
     erroGerarSenha: "não conseguimos gerar a senha agora; tente de novo",
     erroTirarAcesso: "não conseguimos tirar o acesso agora; tente de novo",
     jaTinhaLoginAviso: (nome: string) => `${nome} já entrava no painel. Agora ela vê esta marca também, sem senha nova.`,
