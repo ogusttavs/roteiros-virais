@@ -37,6 +37,19 @@ html[data-sem-conexao="true"] {
   --area-topo: calc(env(safe-area-inset-top, 0px) + var(--altura-faixa-conexao));
 }
 
+/**
+ * As outras três áreas seguras (H3, item 4: a folha "Informações do aparelho",
+ * em Conta, lê as quatro por `getComputedStyle`). Nenhuma tela usa estas três
+ * no layout ainda (só a de baixo, dentro de cada barra fixa, com
+ * `env(safe-area-inset-bottom)` direto); existem aqui só para o diagnóstico
+ * conseguir lê-las.
+ */
+html {
+  --area-baixo: env(safe-area-inset-bottom, 0px);
+  --area-esquerda: env(safe-area-inset-left, 0px);
+  --area-direita: env(safe-area-inset-right, 0px);
+}
+
 @media (prefers-color-scheme: dark) {
   html:not([data-tema="claro"]) {
     color-scheme: dark;

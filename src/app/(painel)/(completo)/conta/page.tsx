@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 
+import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
 import { FormularioConta } from "./FormularioConta";
+import { InformacoesDoAparelho } from "./InformacoesDoAparelho";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
@@ -40,6 +42,7 @@ export default async function Conta() {
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
       ) : null}
       <InstalarNoCelular />
+      <InformacoesDoAparelho versaoPainel={config.gitSha} />
       <BotaoSair />
     </div>
   );

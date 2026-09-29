@@ -8,7 +8,7 @@ import { Cartao } from "@/ui/componentes/Cartao";
 import styles from "./InstalarNoCelular.module.css";
 
 /** O aplicativo já está instalado na tela de início? (Android e desktop: `display-mode`; iPhone: `navigator.standalone`.) */
-function jaEstaInstalado(): boolean {
+export function jaEstaInstalado(): boolean {
   if (window.matchMedia("(display-mode: standalone)").matches) return true;
   return (navigator as Navigator & { standalone?: boolean }).standalone === true;
 }

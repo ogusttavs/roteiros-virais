@@ -30,6 +30,34 @@ export const textosConta = {
     voce: "você",
     rodape: "Para dar acesso a mais alguém, fale com a gente.",
   },
+  /**
+   * H3, item 4: a folha "Informações do aparelho", para o Gustavo mandar ao
+   * Fable quando algo aparece torto no telefone dele ou no do Bruno. Sem dado
+   * de cliente, sem mandar nada para servidor nenhum.
+   */
+  diagnostico: {
+    linha: "Informações do aparelho",
+    tituloFolha: "Informações do aparelho",
+    explica: "Só para o Fable entender o que apareceu torto no seu aparelho. Nada daqui sai do seu navegador.",
+    larguraJanela: "largura da janela",
+    alturaJanela: "altura da janela",
+    alturaVisivel: "altura visível",
+    escala: "escala",
+    areaSeguraTopo: "área segura, em cima",
+    areaSeguraBaixo: "área segura, embaixo",
+    areaSeguraEsquerda: "área segura, à esquerda",
+    areaSeguraDireita: "área segura, à direita",
+    modoAplicativo: "modo aplicativo",
+    tecladoAberto: "teclado considerado aberto",
+    sim: "sim",
+    nao: "não",
+    versaoPainel: "versão do painel",
+    versaoDesconhecida: "não sei dizer",
+    naoDisponivel: "não disponível",
+    navegador: "navegador",
+    copiar: "Copiar",
+    copiado: "Copiado",
+  },
   /** V7, item 5: só aparece enquanto o aplicativo ainda não está na tela de início. */
   instalar: {
     titulo: "Instalar no celular",

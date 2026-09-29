@@ -25,7 +25,7 @@ type Props = {
   secundaria?: AcaoBarra;
   /**
    * H3, item 3: no celular, `/comecar` (o briefing) deixa de ter a barra fixa
-   * por cima do conteúdo e passa a ser a última coisa do fluxo da página,
+   * por cima do resto da tela e passa a ser a última coisa do fluxo da página,
    * grudada no pé (`position: sticky`); sem isto, no iPhone em modo
    * aplicativo, a barra podia flutuar a meio da tela depois de fechar o
    * teclado. As outras telas (Roteiro, Objetivo) continuam fixas: a defesa
