@@ -24,7 +24,7 @@ vi.mock("next/headers", () => ({
 }));
 
 import { db, getPool } from "@/db";
-import { clientes, membrosMarca, nichos, roteiros, user } from "@/db/schema";
+import { briefings, clientes, membrosMarca, nichos, roteiros, user } from "@/db/schema";
 import { valorCookieMarcaAtiva } from "@/lib/marca-ativa";
 import {
   clienteAtivoDoUsuario,
@@ -200,5 +200,78 @@ describe("isolamento entre marcas, com varias por usuario (V3, item 2)", () => {
     expect(lidoPorB.id).toBe(roteiro.id);
     await expect(garantirMembroDaMarca("varias-marcas-a", marca2.id)).resolves.toBeTruthy();
     await expect(garantirMembroDaMarca("varias-marcas-b", marca2.id)).resolves.toBeTruthy();
+  });
+});
+
+describe("marcaPadrao prefere briefing completo (V12b, item 0)", () => {
+  let nichoId: number;
+
+  beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "marca-padrao-briefing-teste", nome: "Marca padrao briefing teste" })
+      .returning();
+    nichoId = nicho.id;
+
+    await db().insert(user).values({ id: "marca-padrao-c", name: "[teste] Usuario C", email: "c@marca-padrao.teste" });
+  }, 30_000);
+
+  it("sem cookie, prefere a marca com briefing completo, mesmo sendo a mais antiga e com acesso mais antigo", async () => {
+    cookieJar.clear();
+
+    const [semBriefing] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "marca-padrao-c", nome: "[teste] Sem briefing, criada por ultimo", nichoId })
+      .returning();
+    const [comBriefing] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "marca-padrao-c",
+        nome: "[teste] Com briefing, criada primeiro",
+        nichoId,
+        ultimoAcessoEm: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+      })
+      .returning();
+    await db().insert(membrosMarca).values([
+      { usuarioId: "marca-padrao-c", clienteId: semBriefing.id, papel: "membro" },
+      { usuarioId: "marca-padrao-c", clienteId: comBriefing.id, papel: "membro" },
+    ]);
+    await db().insert(briefings).values({ clienteId: comBriefing.id, completo: true });
+
+    const marcaResolvida = await clienteAtivoDoUsuario("marca-padrao-c");
+
+    expect(marcaResolvida?.id).toBe(comBriefing.id);
+  });
+
+  it("entre duas com briefing completo, continua desempatando por acesso mais recente", async () => {
+    cookieJar.clear();
+
+    const [acessoAntigo] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "marca-padrao-c",
+        nome: "[teste] Acesso antigo",
+        nichoId,
+        ultimoAcessoEm: new Date(Date.now() - 1000 * 60 * 60 * 24 * 30),
+      })
+      .returning();
+    const [acessoRecente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "marca-padrao-c", nome: "[teste] Acesso recente", nichoId, ultimoAcessoEm: new Date() })
+      .returning();
+    await db().insert(membrosMarca).values([
+      { usuarioId: "marca-padrao-c", clienteId: acessoAntigo.id, papel: "membro" },
+      { usuarioId: "marca-padrao-c", clienteId: acessoRecente.id, papel: "membro" },
+    ]);
+    await db()
+      .insert(briefings)
+      .values([
+        { clienteId: acessoAntigo.id, completo: true },
+        { clienteId: acessoRecente.id, completo: true },
+      ]);
+
+    const marcaResolvida = await clienteAtivoDoUsuario("marca-padrao-c");
+
+    expect(marcaResolvida?.id).toBe(acessoRecente.id);
   });
 });

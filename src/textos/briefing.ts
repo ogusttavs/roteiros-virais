@@ -42,6 +42,8 @@ export const textosBriefing = {
       },
     ],
     botaoComecar: "Começar",
+    /** V12b, item 0: no topo, só com mais de uma marca, para a pessoa saber de qual é este briefing. */
+    deQualMarca: (nomeMarca: string) => `Briefing da ${nomeMarca}`,
   },
   dadosFixos: {
     passoUm: "Passo 1 de 6",

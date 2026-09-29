@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { hashPassword } from "better-auth/crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
@@ -80,9 +80,30 @@ export async function marcasDoUsuario(usuarioId: string): Promise<Cliente[]> {
   return linhas.map((l) => l.cliente);
 }
 
-/** A marca de acesso mais recente entre as que o usuario pertence, para quando o cookie nao serve. */
-function marcaPadrao(marcas: Cliente[]): Cliente {
+/** Como `briefingCompleto`, para varias marcas de uma vez (`marcaPadrao`, uma consulta so em vez de N). */
+async function briefingsCompletos(clienteIds: number[]): Promise<Set<number>> {
+  if (clienteIds.length === 0) return new Set();
+  const linhas = await db()
+    .select({ clienteId: briefings.clienteId })
+    .from(briefings)
+    .where(and(inArray(briefings.clienteId, clienteIds), eq(briefings.completo, true)));
+  return new Set(linhas.map((l) => l.clienteId));
+}
+
+/**
+ * A marca padrao entre as que o usuario pertence, para quando o cookie nao
+ * serve. Prefere uma marca com briefing completo antes de qualquer outra
+ * (V12b, item 0: quem tem varias marcas e entra pela primeira vez no
+ * aparelho, sem cookie ainda, cai numa marca que ja funciona, nao presa no
+ * briefing incompleto de outra); entre as empatadas nisso, a de acesso mais
+ * recente, depois a mais nova.
+ */
+async function marcaPadrao(marcas: Cliente[]): Promise<Cliente> {
+  const completos = await briefingsCompletos(marcas.map((m) => m.id));
   return [...marcas].sort((a, b) => {
+    const completoA = completos.has(a.id);
+    const completoB = completos.has(b.id);
+    if (completoA !== completoB) return completoA ? -1 : 1;
     const acessoA = a.ultimoAcessoEm?.getTime() ?? 0;
     const acessoB = b.ultimoAcessoEm?.getTime() ?? 0;
     if (acessoA !== acessoB) return acessoB - acessoA;
@@ -122,7 +143,7 @@ async function resolverMarcaAtiva(marcas: Cliente[]): Promise<Cliente | null> {
   const marcaDoCookie = clienteIdDoCookie !== null ? marcas.find((m) => m.id === clienteIdDoCookie) : undefined;
   if (marcaDoCookie) return marcaDoCookie;
 
-  const padrao = marcaPadrao(marcas);
+  const padrao = await marcaPadrao(marcas);
   try {
     cookieStore?.set(NOME_COOKIE_MARCA_ATIVA, valorCookieMarcaAtiva(padrao.id), OPCOES_COOKIE_MARCA_ATIVA);
   } catch {
