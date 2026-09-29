@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "./proporcao-brasil";
+import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira, preferirRedePrincipal } from "./proporcao-brasil";
 
 type ItemTeste = { id: number; idioma: string | null; contaBrasileira?: boolean };
 
@@ -185,5 +185,39 @@ describe("aplicarProporcaoBrasil", () => {
     ];
     const resultado = aplicarProporcaoBrasil(itens, 1, classificar, 0.7);
     expect(resultado.map((i) => i.id)).toEqual([1]);
+  });
+});
+
+/** V12, item 3a: a rede principal vem primeiro, sem excluir as outras. */
+describe("preferirRedePrincipal", () => {
+  type ItemComRede = { id: number; plataforma: string };
+
+  it("traz a rede principal para a frente, preservando a ordem dentro de cada grupo", () => {
+    const itens: ItemComRede[] = [
+      { id: 1, plataforma: "youtube" },
+      { id: 2, plataforma: "instagram" },
+      { id: 3, plataforma: "tiktok" },
+      { id: 4, plataforma: "instagram" },
+    ];
+    const resultado = preferirRedePrincipal(itens, "instagram", (i) => i.plataforma);
+    expect(resultado.map((i) => i.id)).toEqual([2, 4, 1, 3]);
+  });
+
+  it("sem rede principal, devolve a lista exatamente como veio", () => {
+    const itens: ItemComRede[] = [
+      { id: 1, plataforma: "youtube" },
+      { id: 2, plataforma: "instagram" },
+    ];
+    expect(preferirRedePrincipal(itens, null, (i) => i.plataforma)).toEqual(itens);
+  });
+
+  it("nunca exclui as outras redes, só reordena", () => {
+    const itens: ItemComRede[] = [
+      { id: 1, plataforma: "youtube" },
+      { id: 2, plataforma: "tiktok" },
+    ];
+    const resultado = preferirRedePrincipal(itens, "instagram", (i) => i.plataforma);
+    expect(resultado).toHaveLength(2);
+    expect(resultado.map((i) => i.id).sort()).toEqual([1, 2]);
   });
 });

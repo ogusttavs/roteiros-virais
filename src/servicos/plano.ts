@@ -11,7 +11,7 @@
  * projeto: as funções daqui recebem `clienteId` já resolvido, nunca leem
  * sessão.
  */
-import { and, asc, eq, gte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -241,6 +241,26 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
   return linhasGravadas
     .sort((a, b) => (a.dia === b.dia ? a.ordem - b.ordem : a.dia.localeCompare(b.dia)))
     .map(linhaParaItem);
+}
+
+/**
+ * "Tirar este plano" (V12, item 4b, `MeuPlano.dc.html`, estado `tirando`):
+ * apaga só os itens ainda não aceitos (`sugerido` ou `pulado`) a partir de
+ * `apartirDe`; os já aceitos ou gravados continuam ("Os roteiros já
+ * escritos continuam", a frase da confirmação), diferente de `limparPlano`
+ * (acima), que apaga tudo para o "colar de novo" substituir o plano
+ * inteiro.
+ */
+export async function removerPlano(clienteId: number, apartirDe: string): Promise<void> {
+  await db()
+    .delete(planoGravacoes)
+    .where(
+      and(
+        eq(planoGravacoes.clienteId, clienteId),
+        gte(planoGravacoes.dia, apartirDe),
+        inArray(planoGravacoes.estado, ["sugerido", "pulado"]),
+      ),
+    );
 }
 
 /** O plano de um dia (o bloco "o seu plano de hoje"); nunca mostra item pulado. */

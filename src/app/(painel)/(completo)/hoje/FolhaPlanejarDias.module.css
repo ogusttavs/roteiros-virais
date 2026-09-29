@@ -1,6 +1,7 @@
 /**
- * A folha "Colar a agenda" (V9b): mesmo padrão de `FolhaGravarAgora.module.css`,
- * sem tela do Opus (regra 11 do CLAUDE.md).
+ * A folha "Planejar os próximos dias" (V9b; V12, item 4b, era "Colar a
+ * agenda"): mesmo padrão de `FolhaGravarAgora.module.css`, sem tela do Opus
+ * (regra 11 do CLAUDE.md).
  */
 .instrucao {
   color: var(--cor-texto-suave);

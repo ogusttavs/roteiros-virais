@@ -11,7 +11,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
-import styles from "./FolhaColarAgenda.module.css";
+import styles from "./FolhaPlanejarDias.module.css";
 import { criarPlanoAction, lerAgendaAction } from "./plano/acoes";
 
 /** Mesmo limite do momento (V9a, item 3; V9b, item 1, "mesmo botão de áudio, mesma rota, mesmo limite"). */
@@ -50,11 +50,13 @@ type Props = {
 };
 
 /**
- * "Colar a agenda" (V9b, item 1): por áudio (mesma rota do momento,
- * `/api/momento/transcrever`) ou por texto direto. Depois de separar em
- * dias (`lerAgendaAction`), a pessoa confere a lista antes de confirmar
- * (`criarPlanoAction`); sem edição campo a campo nesta rodada, só a
- * conferência e o "Montar o plano".
+ * "Planejar os próximos dias" (V9b, item 1; V12, item 4b: era "Colar a
+ * agenda" até a porta Story do Hoje existir; o nome e a instrução mudaram, o
+ * desenho não, `entregaveis/design-v2/entrega/telas/PlanejarDias.dc.html`).
+ * Por áudio (mesma rota do momento, `/api/momento/transcrever`) ou por texto
+ * direto. Depois de separar em dias (`lerAgendaAction`), a pessoa confere a
+ * lista antes de confirmar (`criarPlanoAction`); sem edição campo a campo
+ * nesta rodada, só a conferência e o "Montar o plano".
  *
  * `confirmar` chama `router.refresh()` e só depois `aoFechar()`, nessa
  * ordem, em vez de `fecharEDepois` (achado do e2e desta etapa): sem URL
@@ -63,7 +65,7 @@ type Props = {
  * manual. `fecharEDepois` continua certo para fechar-e-navegar (as outras
  * folhas do projeto); aqui não há navegação, só dado novo na mesma tela.
  */
-export function FolhaColarAgenda({ aoFechar }: Props) {
+export function FolhaPlanejarDias({ aoFechar }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
 
@@ -209,7 +211,7 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
 
   return (
     <Folha
-      titulo={textosPlano.tituloFolhaAgenda}
+      titulo={naEntrada ? textosPlano.tituloFolhaContar : textosPlano.tituloFolhaRevisao}
       aberto
       aoFechar={aoFechar}
       rodape={
@@ -245,7 +247,7 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
               {fase === "gravando" ? (
                 <Botao variante="secundario" tamanho="lg" onClick={pararGravacao}>
                   <Square size={18} strokeWidth={1.75} aria-hidden="true" />
-                  {textosPlano.botaoGravarAgenda}
+                  {textosPlano.pararGravacaoAgenda}
                 </Botao>
               ) : (
                 <Botao
@@ -262,7 +264,7 @@ export function FolhaColarAgenda({ aoFechar }: Props) {
               )}
               {fase === "gravando" ? (
                 <span className={[styles.status, styles.gravando].join(" ")} aria-live="polite">
-                  {segundos}s
+                  {textosPlano.gravandoAgenda(segundos)}
                 </span>
               ) : null}
             </div>

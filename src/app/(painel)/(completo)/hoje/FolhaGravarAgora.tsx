@@ -72,6 +72,13 @@ type Props = {
    */
   planoItemId?: number;
   valoresIniciais?: ValoresIniciaisMomento;
+  /**
+   * V12, itens 3d e 4a: a porta que abriu a folha já escolhe o formato (Reels
+   * ou Story), contando como "tocado" (mesmo espírito de `valoresIniciais`,
+   * que também já chega com o controle escolhido). Ignorado quando
+   * `valoresIniciais` existe (o item do plano manda).
+   */
+  formatoInicial?: FormatoRoteiro;
 };
 
 /**
@@ -89,6 +96,7 @@ export function FolhaGravarAgora({
   marcas,
   planoItemId,
   valoresIniciais,
+  formatoInicial,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -107,9 +115,9 @@ export function FolhaGravarAgora({
   // vindo de um item do plano, comeca no que `planejarDia` ja sugeriu e conta como "tocado" (a pessoa ve o que o
   // sistema escolheu, sem a ajuda por cima, do jeito que os outros campos ja chegam preenchidos).
   const [formato, setFormato] = useState<FormatoRoteiro>(
-    valoresIniciais?.formato ?? (objetivo ? sugerirFormatoPeloObjetivo(objetivo) : "reels"),
+    valoresIniciais?.formato ?? formatoInicial ?? (objetivo ? sugerirFormatoPeloObjetivo(objetivo) : "reels"),
   );
-  const [formatoTocado, setFormatoTocado] = useState(valoresIniciais?.formato !== undefined);
+  const [formatoTocado, setFormatoTocado] = useState(valoresIniciais?.formato !== undefined || formatoInicial !== undefined);
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);

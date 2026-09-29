@@ -66,9 +66,7 @@ export const textosHoje = {
   erro:
     "Não conseguimos falar com uma das fontes agora. O que já estava guardado continua valendo, e você pode escrever o seu assunto.",
   tentarDeNovo: "Tentar de novo",
-  roteiroDeHoje: "Roteiro de hoje",
-  roteiroDeHojePronto: "Seu roteiro de hoje está pronto",
-  /** V9b-0: plano sem limite diário, título do bloco de cartões, com a contagem só acima de um. */
+  /** V9b-0: plano sem limite diário; V12: também o padrão, para um roteiro só. Título do bloco, com a contagem só acima de um. */
   seusRoteirosDeHoje: (n: number) => (n > 1 ? `Seus roteiros de hoje (${n})` : "Seus roteiros de hoje"),
   escritoAs: (h: string) => `Escrito às ${h}`,
   abrirRoteiro: "Abrir o roteiro",
@@ -91,5 +89,33 @@ export const textosHoje = {
   roteiroGeradoDescricao: (duracaoS: number) =>
     `Quatro blocos, ${duracaoS} segundos, com a edição junto. Escrito com o que funcionou no seu setor esta semana.`,
   hoje: "hoje",
-  semVideoAinda: "Assim que você postar um vídeo, o acompanhamento aparece aqui",
+
+  /** V12, item 1: a legenda dos três estados do dia na semana do topo (design v2, `.legenda-semana`). */
+  legendaSemana: { gravou: "gravou", postou: "postou", nada: "nada" },
+
+  /** V12, item 2: a pergunta das duas portas, antes de qualquer tema (design v2, `Hoje.dc.html`, estado `portas`). */
+  pergunta: "O que você quer gravar agora?",
+  portaReels: "Reels ou vídeo curto",
+  portaReelsAjuda: "para Instagram, TikTok e YouTube",
+  portaStory: "Story",
+  portaStoryAjuda: "um vídeo com o que está acontecendo agora",
+
+  /** V12, item 3a: a rede principal, na porta Reels. */
+  ondeVocePostaMais: "Onde você posta mais?",
+  /**
+   * A revisão do Fable (ajuste a, `PROXIMO.md`): o desenho dizia "O roteiro
+   * sai no jeito dessa rede", mas o prompt ainda não tem as regras por
+   * plataforma (V12b); a frase promete só o que o código já faz nesta
+   * rodada.
+   */
+  dicaRedePrincipal: "As referências e os exemplos vêm dessa rede. Dá para trocar quando quiser.",
+
+  /** V12, item 4a: o cartão "Planejar os próximos dias" na porta Story (a instrução da folha em si é mais longa). */
+  planejarDiasDescricao: "Conte o que você vai fazer, onde e quando; a gente monta o que gravar em cada dia.",
+
+  /** V12, item 3c: o tema livre, como botão na porta Reels (mesmo texto de baixo de `preferAssuntoSeuTexto`). */
+  querOutroAssunto: "Quer outro assunto?",
+
+  /** V12, ajuste (d): o botão do cartão de roteiro compacto, quando há dois ou mais roteiros de hoje. */
+  abrir: "Abrir",
 };

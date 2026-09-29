@@ -1,9 +1,10 @@
 /**
- * "Colar a agenda" e o plano de gravações (V9b, item 3, definição de pronto
- * do `PROXIMO.md`): cola uma agenda de dois dias, confere a lista, vê o
- * bloco "O seu plano de hoje", aceita um item até o roteiro, pula outro, e
- * vê a folha "Meu plano". O caminho por áudio não tem e2e (mesmo raciocínio
- * de `momento.spec.ts`): a rota de transcrição é a mesma, já coberta em
+ * "Planejar os próximos dias" (V9b, item 3; V12, item 4b: a folha era "Colar
+ * a agenda", agora fica dentro da porta Story) e o plano de gravações: cola
+ * uma agenda de dois dias, confere a lista, vê o bloco "O seu plano de
+ * hoje", aceita um item até o roteiro, pula outro, vê a folha "Meu plano" e
+ * "Tirar este plano". O caminho por áudio não tem e2e (mesmo raciocínio de
+ * `momento.spec.ts`): a rota de transcrição é a mesma, já coberta em
  * `tests/integracao/momento-transcrever-route.test.ts`.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -33,6 +34,12 @@ async function entrar(page: Page) {
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await expect(page).toHaveURL(/\/hoje/);
+}
+
+/** V12, item 4a e 4b: "Planejar os próximos dias" fica dentro da porta Story. */
+async function abrirPlanejarDias(page: Page) {
+  await page.getByRole("button", { name: "Story" }).first().click();
+  await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
 }
 
 test.describe("colar a agenda e o plano de gravações", () => {
@@ -89,8 +96,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
       },
     });
 
-    // O botao "Colar a agenda" fica ao lado de "Gravar agora" (item 3 do PROXIMO.md): sem uma
-    // linha em temas_dia para hoje, /hoje cai no estado "sem_tema", que nao usa HojeTela.
+    // "Planejar os próximos dias" fica na porta Story (V12, item 4): sem uma linha em temas_dia
+    // para hoje, /hoje cai no estado "sem_tema", que nao usa HojeTela.
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
@@ -105,12 +112,12 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await entrar(page);
     await page.goto("/hoje");
 
-    await page.getByRole("button", { name: "Colar a agenda" }).click();
-    const folhaAgenda = page.getByRole("dialog", { name: "Colar a agenda" });
+    await abrirPlanejarDias(page);
+    const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
 
     await folhaAgenda
-      .getByLabel("A sua agenda")
+      .getByLabel("Os seus próximos dias")
       .fill("hoje: fabrica do fornecedor, ver a linha nova, gravar o frasco; amanha: escritorio, reuniao de fechamento");
     await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
 
@@ -172,12 +179,12 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await entrar(page);
     await page.goto("/hoje");
 
-    await page.getByRole("button", { name: "Colar a agenda" }).click();
-    const folhaAgenda = page.getByRole("dialog", { name: "Colar a agenda" });
+    await abrirPlanejarDias(page);
+    const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
 
     await folhaAgenda
-      .getByLabel("A sua agenda")
+      .getByLabel("Os seus próximos dias")
       .fill("hoje: fabrica, ver a linha nova; na volta: escritorio, reuniao de fechamento");
     await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
 
@@ -200,12 +207,12 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await entrar(page);
     await page.goto("/hoje");
 
-    await page.getByRole("button", { name: "Colar a agenda" }).click();
-    const folhaAgenda = page.getByRole("dialog", { name: "Colar a agenda" });
+    await abrirPlanejarDias(page);
+    const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
 
     await folhaAgenda
-      .getByLabel("A sua agenda")
+      .getByLabel("Os seus próximos dias")
       .fill("hoje: fabrica, conferir estoque; na volta: deposito, contar caixas");
     await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
 
@@ -221,5 +228,106 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await expect(folhaMeuPlano).toBeVisible();
     await expect(folhaMeuPlano.getByText("conferir estoque")).toBeVisible();
     await expect(folhaMeuPlano.getByText("contar caixas")).toHaveCount(0);
+  });
+
+  // V12, item 4b: "Tirar este plano" apaga os dias que vem ainda nao aceitos; o de hoje, ja aceito
+  // (um roteiro escrito a partir dele), continua. Conta de novo (nao reaproveita a de cima): o teste
+  // depende do plano comecar vazio, e os tres testes acima ja deixam varios dias no plano da "e2e-plano".
+  test("'Tirar este plano': apaga so o que ainda nao foi aceito, o que ja virou roteiro continua", async ({ page }) => {
+    const email = "e2e-plano-tirar@exemplo.teste";
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "e2e-plano"));
+
+    await db().insert(user).values({ id: "e2e-plano-tirar", name: "[teste] Plano Tirar", email });
+    await db().insert(account).values({
+      id: "e2e-plano-tirar-credential",
+      issuer: "local:credential",
+      accountId: "e2e-plano-tirar",
+      providerId: "credential",
+      userId: "e2e-plano-tirar",
+      password: await hashPassword(SENHA),
+    });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-plano-tirar", aceitouTermosEm: new Date() });
+    const [marca] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-plano-tirar", nome: "[teste] Plano Tirar", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-plano-tirar", clienteId: marca.id, papel: "dono" });
+    await db().insert(briefings).values({
+      clienteId: marca.id,
+      completo: true,
+      perfil: {
+        fatos: {
+          oQueVende: "lavagem de estofados",
+          preco: "sofa de 3 lugares por R$ 180",
+          clienteIdeal: "mora em apartamento",
+          medos: [],
+          frasesDaFala: [],
+          proibicoes: [],
+          cenasFilmaveis: [],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo: "lava estofados em domicilio",
+        referencias: [],
+      },
+    });
+
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    // V12, "confirme com um teste de descricao livre": uma frase corrida, nao uma lista telegrafica,
+    // ainda com o dia antes dos dois pontos (do jeito que a pessoa fala ao contar a agenda em voz alta).
+    await abrirPlanejarDias(page);
+    const folhaAgenda = page.getByRole("dialog");
+    await expect(folhaAgenda).toBeVisible();
+    await folhaAgenda
+      .getByLabel("Os seus próximos dias")
+      .fill(
+        "hoje: vou ficar de manhã na oficina, revisando a peça nova antes de mandar pro cliente; " +
+          "depois de amanha: tem a feira do fornecedor, e lá eu quero ver o estande novo dele",
+      );
+    await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
+    await expect(folhaAgenda.getByText("Esses são os dias que a gente entendeu")).toBeVisible();
+    await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
+    await expect(folhaAgenda).toBeHidden();
+
+    await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
+    const linhaAceitar = page.locator("div").filter({ hasText: "revisando a peça nova" }).last();
+    await linhaAceitar.getByRole("button", { name: "Escrever o roteiro" }).click();
+    const folhaGravar = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folhaGravar).toBeVisible();
+    await folhaGravar.getByRole("button", { name: "Escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/);
+
+    await page.goto("/hoje");
+    await page.getByRole("button", { name: "Meu plano" }).click();
+    const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
+    await expect(folhaMeuPlano).toBeVisible();
+    await expect(folhaMeuPlano.getByText("estande novo")).toBeVisible();
+
+    await folhaMeuPlano.getByRole("button", { name: "Tirar este plano" }).click();
+    await expect(folhaMeuPlano.getByText("Tirar o plano dos próximos dias? Os roteiros já escritos continuam.")).toBeVisible();
+    await folhaMeuPlano.getByRole("button", { name: "Tirar este plano" }).click();
+    await expect(folhaMeuPlano).toBeHidden();
+
+    /**
+     * Reabre "Meu plano": o dia de hoje (ja aceito, com roteiro) continua; "depois de amanha" sumiu.
+     * `page.goto` de proposito, nao só esperar: o `history.back()` que fecha a folha (mesma ordem de
+     * `FolhaPlanejarDias.confirmar()`, "router.refresh() e só depois aoFechar()") reaproveita o
+     * retrato daquela entrada do histórico de antes do `refresh`, e reabrir sem navegar de novo
+     * mostrava "estande novo" preso, confirmado com uma consulta direta ao banco (a linha já não
+     * existe la, só a tela é que ficava velha). Achado desta etapa; registrado em `TODO.md`,
+     * "Decisões pendentes".
+     */
+    await page.goto("/hoje");
+    await page.getByRole("button", { name: "Meu plano" }).click();
+    const folhaMeuPlanoDepois = page.getByRole("dialog", { name: "Meu plano" });
+    await expect(folhaMeuPlanoDepois).toBeVisible();
+    await expect(folhaMeuPlanoDepois.getByText("revisando a peça nova")).toBeVisible();
+    await expect(folhaMeuPlanoDepois.getByText("Roteiro pronto")).toBeVisible();
+    await expect(folhaMeuPlanoDepois.getByText("estande novo")).toHaveCount(0);
   });
 });

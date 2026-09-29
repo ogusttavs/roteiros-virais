@@ -177,3 +177,16 @@
 .ponto[data-estado="sem_execucao"] {
   background: var(--cor-borda-forte);
 }
+
+/* V12, item 7: o detalhe da célula abre num toque (`<details>`), não mais no `title` (o celular não mostra). */
+.celulaDetalhe summary {
+  cursor: pointer;
+}
+
+.celulaDetalhePre {
+  margin: var(--espaco-2) 0 0;
+  white-space: pre-wrap;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}

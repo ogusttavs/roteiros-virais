@@ -88,6 +88,12 @@ test.describe("/admin/viagem", () => {
     const linhaHoje = page.locator("tbody tr").last();
     await expect(linhaHoje.getByText("1 roteiro", { exact: true })).toBeVisible();
 
+    // V12, item 7: o detalhe da célula abre num toque (`<details>`), o `title` não funcionava no celular.
+    const detalheCelula = linhaHoje.locator("details").first();
+    await expect(detalheCelula.locator("pre")).toBeHidden();
+    await detalheCelula.locator("summary").click();
+    await expect(detalheCelula.locator("pre")).toContainText("coleta:");
+
     await page.getByLabel("marca").selectOption({ label: cliente.nome });
     await expect(page).toHaveURL(/marcaId=/);
     await expect(page.locator("thead th")).toHaveCount(2); // "dia" mais a marca escolhida, nenhuma outra coluna

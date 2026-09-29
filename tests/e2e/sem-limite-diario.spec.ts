@@ -80,7 +80,17 @@ async function criarClienteComPlano(
   return cliente;
 }
 
+/**
+ * V12, item 3b: os temas do dia ficam dentro da porta Reels, tanto no plano
+ * `padrao` quanto no `sem_limite`; `/hoje` sempre recomeça na pergunta das
+ * duas portas, a porta escolhida nunca fica lembrada.
+ */
+async function abrirPortaReels(page: Page) {
+  await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+}
+
 async function escolherTemaEGerar(page: Page, tituloTema: string, rotuloBotao: string) {
+  await abrirPortaReels(page);
   const cartao = page.getByRole("heading", { name: tituloTema });
   await expect(cartao).toBeVisible();
   await cartao.locator("../..").getByRole("button", { name: rotuloBotao }).click();
@@ -116,24 +126,30 @@ test.describe("plano por marca (V9b-0)", () => {
     await entrar(page, "e2e-sem-limite-a@exemplo.teste");
 
     // Os tres temas aparecem com "Escrever o roteiro" (nunca "Quero esse" ou "Trocar" neste plano).
+    await abrirPortaReels(page);
     await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Quero esse" })).toHaveCount(0);
+    await page.getByRole("heading", { name: "tema sem limite 1" }).locator("../..").getByRole("button", { name: "Escrever o roteiro" }).click();
 
-    await escolherTemaEGerar(page, "tema sem limite 1", "Escrever o roteiro");
+    await expect(page).toHaveURL(/\/hoje\/objetivo/);
+    await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
+    await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
     await page.goto("/hoje");
     await expect(page.getByText("Seus roteiros de hoje")).toBeVisible();
     // Ainda so um cartao: sem a contagem entre parenteses.
     await expect(page.getByText("Seus roteiros de hoje (2)")).toHaveCount(0);
-    // Os tres temas continuam visiveis, mesmo com um roteiro ja gerado hoje.
-    await expect(page.getByRole("heading", { name: "tema sem limite 2" })).toBeVisible();
 
+    // Os tres temas continuam visiveis, mesmo com um roteiro ja gerado hoje.
     await escolherTemaEGerar(page, "tema sem limite 2", "Escrever o roteiro");
 
     await page.goto("/hoje");
     await expect(page.getByText("Seus roteiros de hoje (2)")).toBeVisible();
     await expect(page.getByRole("link", { name: "Modo gravação" })).toHaveCount(2);
+
     // Os temas continuam visiveis mesmo com dois roteiros ja gerados hoje.
+    await abrirPortaReels(page);
     await expect(page.getByRole("heading", { name: "tema sem limite 3" })).toBeVisible();
   });
 
@@ -144,9 +160,10 @@ test.describe("plano por marca (V9b-0)", () => {
     await escolherTemaEGerar(page, "tema sem limite 1", "quero esse");
 
     await page.goto("/hoje");
-    await expect(page.getByText("Seu roteiro de hoje está pronto")).toBeVisible();
+    await expect(page.getByText("Seus roteiros de hoje")).toBeVisible();
     await expect(page.getByRole("link", { name: "Modo gravação" })).toHaveCount(1);
 
+    await abrirPortaReels(page);
     await page.getByRole("button", { name: "Ver os outros temas de hoje" }).click();
     await expect(page.getByRole("button", { name: "Trocar" }).first()).toBeVisible();
     await expect(page.getByText("Trocar de tema escreve um roteiro novo")).toBeVisible();

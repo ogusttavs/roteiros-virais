@@ -440,6 +440,8 @@ test.describe("painel sem rede", () => {
       .getByRole("dialog", { name: textosNav.suasMarcas })
       .getByRole("button", { name: NOME_MARCA_DOIS })
       .click();
+    // V12, item 3: os temas do dia ficam dentro da porta Reels.
+    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
     await expect(page.getByRole("heading", { name: "tema da marca dois" })).toBeVisible();
 
     // O escopo novo entra e o da Um sai: nenhuma pagina da Um continua guardada.
