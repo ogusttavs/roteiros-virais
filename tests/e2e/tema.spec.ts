@@ -104,7 +104,7 @@ test("Informações do aparelho: abre a folha, mostra a largura da janela e o na
   const folha = page.getByRole("dialog", { name: "Informações do aparelho" });
   await expect(folha).toBeVisible();
   await expect(folha.getByText("largura da janela")).toBeVisible();
-  await expect(folha.getByText("navegador")).toBeVisible();
+  await expect(folha.getByText("navegador", { exact: true })).toBeVisible();
   await expect(folha.getByText(/^\d+px$/).first()).toBeVisible();
 
   await folha.getByRole("button", { name: "Copiar" }).click();
