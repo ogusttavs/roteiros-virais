@@ -69,18 +69,26 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   ).toContainText("apify");
 
   await page.goto("/admin/clientes");
-  await page.getByRole("button", { name: "convidar cliente" }).click();
-  const modalConvidar = page.getByRole("dialog", { name: "Convidar cliente" });
-  await modalConvidar.getByLabel("nome", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
-  await modalConvidar.getByLabel("e-mail", { exact: true }).fill(EMAIL_CLIENTE);
-  // V9a, item 4: o modal ganhou um segundo select ("tipo de marca"), entao o antigo atalho
-  // por getByRole("combobox") (o unico da modal) deixou de resolver so um elemento; agora os
-  // dois selects tem aria-label igual ao rotulo visivel (mesma regra dos demais, plataforma/CLAUDE.md).
-  await modalConvidar.getByLabel("nicho", { exact: true }).selectOption({ label: NOME_NICHO });
-  await modalConvidar.getByRole("button", { name: "convidar por e-mail" }).click();
+  await page.getByRole("button", { name: "nova marca" }).click();
+  const modalNovaMarca = page.getByRole("dialog", { name: "Nova marca" });
+  await modalNovaMarca.getByLabel("nome", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
+  // V9a, item 4 / V12b, item 1: o modal tem um segundo select ("tipo de conteudo"), entao o
+  // antigo atalho por getByRole("combobox") (o unico da modal) deixou de resolver so um
+  // elemento; os selects tem aria-label igual ao rotulo visivel (mesma regra dos demais,
+  // plataforma/CLAUDE.md).
+  await modalNovaMarca.getByLabel("nicho", { exact: true }).selectOption({ label: NOME_NICHO });
+  await modalNovaMarca.getByRole("button", { name: "criar marca" }).click();
 
-  // O cliente novo entra com a senha gerada (V3, item 5; mesmo caminho de
-  // entrar-e-convidar.spec.ts), nao mais por link magico.
+  // V12b, item 2: a marca nasce sem ninguem; a pessoa entra depois, na propria pagina da
+  // marca, por "dar acesso" (item 4), com a mesma senha gerada de sempre (V3, item 5; mesmo
+  // caminho de entrar-e-convidar.spec.ts), nao mais por link magico.
+  await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);
+  await page.getByRole("button", { name: "dar acesso" }).click();
+  const folhaDarAcesso = page.getByRole("dialog", { name: /^Dar acesso a/ });
+  await folhaDarAcesso.getByLabel("nome da pessoa", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
+  await folhaDarAcesso.getByLabel("e-mail da pessoa", { exact: true }).fill(EMAIL_CLIENTE);
+  await folhaDarAcesso.getByRole("button", { name: "dar acesso", exact: true }).click();
+
   const folha = page.getByRole("dialog", { name: "Convite mandado" });
   await expect(folha).toBeVisible();
   await expect(folha).toContainText(EMAIL_CLIENTE);

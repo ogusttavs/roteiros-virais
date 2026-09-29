@@ -1,12 +1,14 @@
 /**
  * Fluxo critico da etapa 3 (plano de execucao, criterio de aceite): admin do
- * seed entra, cria um cliente, o cliente entra e cai em /comecar.
+ * seed entra, cria uma marca, da acesso a uma pessoa, a pessoa entra e cai
+ * em /comecar.
  *
- * V3, item 5: "Convidar cliente" parou de mandar link magico como caminho
- * principal (continua tentando mandar um, best-effort, mas a tela nao
- * depende mais disso, `mandarConviteMagico` em `servicos/clientes.ts`); a
- * folha "Convite mandado" mostra uma senha gerada, e e essa senha que a
- * pessoa usa para entrar pela primeira vez.
+ * V3, item 5: a folha "Convite mandado" mostra uma senha gerada (best-effort
+ * tambem manda um link magico, `mandarConviteMagico` em
+ * `servicos/clientes.ts`), e e essa senha que a pessoa usa para entrar pela
+ * primeira vez. V12b, item 2: criar a marca ("nova marca") parou de pedir
+ * e-mail; a pessoa entra depois, na propria pagina da marca, por "dar
+ * acesso" (item 4).
  */
 import { expect, test } from "@playwright/test";
 
@@ -32,10 +34,16 @@ test("admin entra, cria cliente, cliente entra com a senha gerada e cai em /come
 
   await expect(page).toHaveURL(/\/admin\/clientes/);
 
-  await page.getByRole("button", { name: "convidar cliente" }).click();
+  await page.getByRole("button", { name: "nova marca" }).click();
   await page.getByLabel("nome", { exact: true }).fill("[exemplo] Cliente e2e");
-  await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_NOVO_CLIENTE);
-  await page.getByRole("button", { name: "convidar por e-mail" }).click();
+  await page.getByRole("button", { name: "criar marca" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);
+  await page.getByRole("button", { name: "dar acesso" }).click();
+  const folhaDarAcesso = page.getByRole("dialog", { name: /^Dar acesso a/ });
+  await folhaDarAcesso.getByLabel("nome da pessoa", { exact: true }).fill("[exemplo] Cliente e2e");
+  await folhaDarAcesso.getByLabel("e-mail da pessoa", { exact: true }).fill(EMAIL_NOVO_CLIENTE);
+  await folhaDarAcesso.getByRole("button", { name: "dar acesso", exact: true }).click();
 
   const folha = page.getByRole("dialog", { name: "Convite mandado" });
   await expect(folha).toBeVisible();
