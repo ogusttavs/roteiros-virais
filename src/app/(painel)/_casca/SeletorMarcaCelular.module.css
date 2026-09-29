@@ -92,7 +92,7 @@
 .avatar.grande {
   width: 2.75rem;
   height: 2.75rem;
-  font-size: var(--tamanho-secundario);
+  font-size: var(--tamanho-cabecalho);
 }
 
 .nome {
@@ -155,28 +155,49 @@
   gap: var(--espaco-3);
 }
 
+/**
+ * Avatar a esquerda, nome e "agora" empilhados a direita (design v2,
+ * `Casca.dc.html`, `.folha-marcas .marca-destaque`; acabamento da V12b, item
+ * 7): antes ficava tudo centralizado, empilhado, diferente do desenho
+ * aprovado.
+ */
 .marcaDestaque {
   display: grid;
-  justify-items: center;
-  gap: var(--espaco-2);
-  padding: var(--espaco-4) 0;
-  text-align: center;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-1) var(--espaco-4);
+  align-items: center;
+  padding: var(--espaco-5) 0;
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.marcaDestaque .avatar {
+  grid-column: 1;
+  grid-row: 1 / span 2;
 }
 
 .nomeDestaque {
   /**
-   * Substitui o `max-width: 8.5rem` da pilula (achado corrigindo o e2e de
-   * layout: sem limite nenhum, um nome comprido estourava a folha na
-   * horizontal, e `.nome` de base ja garante nowrap/ellipsis por cima disto).
+   * Cancela o `max-width`/`nowrap`/reticencia de `.nome` (base, feito para a
+   * pilula estreita): o nome em destaque pode quebrar linha em vez de cortar
+   * (achado corrigindo o e2e de layout: um nome comprido nao pode estourar a
+   * folha na horizontal).
    */
+  grid-column: 2;
+  grid-row: 1;
   max-width: 100%;
-  font-size: 1.0625rem;
-  font-weight: 600;
+  overflow: visible;
+  white-space: normal;
+  text-overflow: unset;
+  overflow-wrap: anywhere;
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / var(--altura-titulo) var(--fonte-titulo);
+  color: var(--cor-titulo);
 }
 
 .agora {
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-texto-dica);
+  grid-column: 2;
+  grid-row: 2;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
 }
 
 .cabecaLista {
@@ -197,13 +218,22 @@
   display: grid;
 }
 
+/**
+ * O `<button>` nao tinha `border: 0` nem `background: transparent` (achado
+ * do Gustavo em producao, V12b item 7): sem isso o navegador desenha o
+ * proprio botao por baixo, uma pilula com borda grossa em vez de uma linha
+ * lisa (`.item-marca`, design v2, `base.css`).
+ */
 .itemMarca {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--espaco-3);
-  min-height: var(--altura-toque-lg);
-  padding: var(--espaco-2) var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-1) var(--espaco-3);
+  border: 0;
   border-radius: var(--raio-md);
+  background: transparent;
   text-align: left;
   text-decoration: none;
   color: var(--cor-titulo);
@@ -215,7 +245,6 @@
 
 .itemMarca .nome {
   max-width: none;
-  flex: 1;
 }
 
 .itemMarca .nome small {
@@ -225,9 +254,32 @@
   color: var(--cor-texto-dica);
 }
 
+/**
+ * As linhas da lista, separadas por divisor fino em vez de borda em volta de
+ * cada uma (design v2, `.folha-marcas .lista-marcas .item-marca`): sem
+ * cantos arredondados, ocupam a largura toda da folha.
+ */
+.listaMarcas .itemMarca {
+  min-height: var(--altura-toque-lg);
+  padding-inline: 0;
+  border-radius: 0;
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+  font-size: var(--tamanho-corpo);
+}
+
+.listaMarcas .itemMarca:last-child {
+  border-bottom: 0;
+}
+
 .folhaPe {
   border-top: 1px solid var(--cor-divisor);
   padding-top: var(--espaco-2);
+}
+
+.folhaPe .itemMarca {
+  min-height: var(--altura-toque-lg);
+  padding-inline: 0;
+  font-size: var(--tamanho-corpo);
 }
 
 .circuloPessoa {
