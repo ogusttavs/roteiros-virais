@@ -1,6 +1,7 @@
 "use client";
 
 import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
+import { useRecalcularAoFecharTeclado } from "@/ui/useRecalcularAoFecharTeclado";
 
 import styles from "./BarraAcao.module.css";
 import { MotivoSemRede } from "./MotivoSemRede";
@@ -22,6 +23,15 @@ type Props = {
   /** Opcional: o ultimo bloco do briefing nao tem para onde avancar manualmente (ComecarWizard). */
   primaria?: AcaoBarra;
   secundaria?: AcaoBarra;
+  /**
+   * H3, item 3: no celular, `/comecar` (o briefing) deixa de ter a barra fixa
+   * por cima do conteúdo e passa a ser a última coisa do fluxo da página,
+   * grudada no pé (`position: sticky`); sem isto, no iPhone em modo
+   * aplicativo, a barra podia flutuar a meio da tela depois de fechar o
+   * teclado. As outras telas (Roteiro, Objetivo) continuam fixas: a defesa
+   * de `useRecalcularAoFecharTeclado`, abaixo, já vale para todas.
+   */
+  presaAoFluxo?: boolean;
 };
 
 /**
@@ -35,13 +45,17 @@ type Props = {
  * como no Roteiro. Sem isto a capsula ficava por cima e cobria metade do
  * botao principal do Objetivo.
  */
-export function BarraAcao({ primaria, secundaria }: Props) {
+export function BarraAcao({ primaria, secundaria, presaAoFluxo }: Props) {
   const { semConexao } = useConexao();
   const primariaSemRede = Boolean(primaria?.precisaDeRede) && semConexao;
   const secundariaSemRede = Boolean(secundaria?.precisaDeRede) && semConexao;
+  useRecalcularAoFecharTeclado();
 
   return (
-    <div className={styles.barra} data-barra-acoes-propria="">
+    <div
+      className={[styles.barra, presaAoFluxo ? styles.presaAoFluxo : ""].filter(Boolean).join(" ")}
+      data-barra-acoes-propria=""
+    >
       <div className={styles.botoes}>
         {secundaria ? (
           <button

@@ -196,6 +196,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
       ) : null}
 
       <BarraAcao
+        presaAoFluxo
         secundaria={{ rotulo: textosBriefing.navegacaoBlocos.botaoVoltar, onClick: onVoltar }}
         primaria={{
           rotulo: salvando ? t.salvando : t.botaoContinuar,
