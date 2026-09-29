@@ -25,7 +25,8 @@ import {
   ErroYoutubeApi,
 } from "./youtube-api";
 
-const LIMITE_DIARIO_UNIDADES = 9000;
+/** Exportado para o painel de acompanhamento da viagem (V10, item 2) mostrar o teto ao lado do consumo. */
+export const LIMITE_DIARIO_UNIDADES = 9000;
 const JANELA_DIAS = 7;
 const FONTE = "youtube";
 
