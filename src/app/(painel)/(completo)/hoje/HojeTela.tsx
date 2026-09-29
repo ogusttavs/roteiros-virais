@@ -262,7 +262,7 @@ export function HojeTela({
   const [outrosAbertos, setOutrosAbertos] = useState(false);
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const [itemPlanoParaFolha, setItemPlanoParaFolha] = useState<ItemPlano | null>(null);
-  const { fechar: fecharFolhaMomento, fecharEDepois: fecharFolhaMomentoEDepois } = useFolhaNoHistorico(
+  const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
     () => {
       setFolhaMomentoAberta(false);
@@ -696,7 +696,7 @@ export function HojeTela({
       {folhaMomentoAberta ? (
         <FolhaGravarAgora
           aoFechar={fecharFolhaMomento}
-          fecharEDepois={fecharFolhaMomentoEDepois}
+          fecharENavegar={fecharFolhaMomentoENavegar}
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
           planoItemId={itemPlanoParaFolha?.id}

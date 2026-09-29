@@ -255,7 +255,7 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
     setPainel(null);
     botaoMenuRef.current?.focus();
   }
-  const { fechar, fecharEDepois } = useFolhaNoHistorico(painel !== null, fecharPainel);
+  const { fechar, fecharENavegar } = useFolhaNoHistorico(painel !== null, fecharPainel);
 
   /** O que os painéis recebem para fechar: com a reescrita rodando, véu, Esc, Cancelar e arrastar não fecham. */
   function fecharSeLivre() {
@@ -350,10 +350,11 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         );
         reescritaEmCursoRef.current = false;
         avisarRedeOk();
-        // Fecha o painel e só então navega (sem entrada fantasma no histórico), e só se a pessoa ainda está neste
+        // Fecha o painel e só então navega, trocando a entrada empurrada pelo destino (sem entrada fantasma no
+        // histórico, sem `history.back()` competindo com o `router.replace`), e só se a pessoa ainda está neste
         // roteiro: se ela saiu enquanto a reescrita rodava, o roteiro novo está na lista de versões e no Histórico.
-        fecharEDepois(() => {
-          if (window.location.pathname === `/roteiros/${roteiro.id}`) router.push(`/roteiros/${id}`);
+        fecharENavegar(() => {
+          if (window.location.pathname === `/roteiros/${roteiro.id}`) router.replace(`/roteiros/${id}`);
         });
       } catch (erro) {
         reescritaEmCursoRef.current = false;
@@ -369,7 +370,7 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
     // Com Ctrl, Cmd, Shift, Alt ou o botão do meio a pessoa quer outra aba: deixa o navegador fazer.
     if (evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey || evento.button !== 0) return;
     evento.preventDefault();
-    fecharEDepois(() => router.push(`/roteiros/${id}`));
+    fecharENavegar(() => router.replace(`/roteiros/${id}`));
   }
 
   async function copiarTexto() {

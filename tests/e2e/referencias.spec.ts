@@ -275,6 +275,57 @@ test.describe("/referencias no design v2", () => {
     await expect(page.locator("article", { hasText: "mancha do estofado" })).not.toBeVisible();
   });
 
+  /**
+   * Ajuste A do PR #66: a mesma interação de "filtrar por plataforma pela folha", repetida várias vezes
+   * na mesma página (sem recarregar, sem passar pelo `beforeAll` de novo). É a prova de robustez que a
+   * revisão do Fable pediu com `--repeat-each=20`: o `--repeat-each` do Playwright recria o `beforeAll` a
+   * cada repetição (achado desta rodada, com os IDs fixos do fixture colidindo, "duplicate key"), então a
+   * repetição de verdade tem que morar dentro do teste, não na flag da linha de comando.
+   */
+  test("filtrar e limpar pela folha, repetido várias vezes seguidas, nunca fica na URL de antes", async ({ page }) => {
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+
+    for (let volta = 0; volta < 10; volta++) {
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      const folha = page.getByRole("dialog", { name: "Filtrar" });
+      await expect(folha).toBeVisible();
+      await folha.getByRole("button", { name: "TikTok", exact: false }).click();
+      await folha.getByRole("button", { name: /Ver os \d+ vídeos?/ }).click();
+      await expect(folha).not.toBeVisible();
+      await expect(page, `volta ${volta}: aplicar nao mudou a URL`).toHaveURL(/plataforma=tiktok/);
+
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).toBeVisible();
+      await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: "Limpar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).not.toBeVisible();
+      await expect(page, `volta ${volta}: limpar nao mudou a URL`).toHaveURL(/plataforma=todas/);
+    }
+  });
+
+  /**
+   * Ajuste A do PR #66: `fecharENavegar` troca a entrada que a folha empurrou pelo destino
+   * (`router.replace`), em vez de `history.back()` mais `router.push`. O Voltar do aparelho, depois de
+   * aplicar um filtro, precisa sair direto para a lista de antes de abrir a folha (a entrada da folha não
+   * existe mais como "voltar para a folha aberta"), não ficar preso nem voltar para a folha.
+   */
+  test("o Voltar do aparelho depois de aplicar um filtro sai para a lista de antes, não para a folha", async ({ page }) => {
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+    await expect(page).toHaveURL(/^[^?]*\/referencias$/);
+
+    await page.getByRole("button", { name: "Filtrar" }).click();
+    await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: "TikTok", exact: false }).click();
+    await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: /Ver os \d+ vídeos?/ }).click();
+    await expect(page).toHaveURL(/plataforma=tiktok/);
+
+    await page.goBack();
+
+    await expect(page).toHaveURL(/^[^?]*\/referencias$/);
+    await expect(page.getByRole("dialog", { name: "Filtrar" })).not.toBeVisible();
+    await expect(page.locator("article", { hasText: "mancha do estofado" })).toBeVisible();
+  });
+
   test("abrir Ver detalhes mostra as três partes da análise", async ({ page }) => {
     await entrar(page, EMAIL);
     await page.goto("/referencias");

@@ -177,7 +177,7 @@ export function ReferenciasTela({
     return true;
   }
 
-  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>) {
+  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>, opcoes: { substituir?: boolean } = {}) {
     if (semRedeParaBuscar()) return;
     // O que está escrito na busca vai junto de qualquer outra mudança: a busca só vale com Enter ou ao sair do
     // campo, e a troca de aba ou de período pode chegar antes e apagá-la da URL.
@@ -196,7 +196,11 @@ export function ReferenciasTela({
     iniciarNavegacao(() => {
       setSegmentoOtimista(filtros.segmento);
       setPeriodoOtimista(filtros.periodoDias);
-      router.push(url);
+      // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
+      // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
+      // navegação da pessoa e continua entrando no histórico como sempre.
+      if (opcoes.substituir) router.replace(url);
+      else router.push(url);
     });
   }
 
@@ -261,9 +265,9 @@ export function ReferenciasTela({
 
   function aplicarFiltros({ plataformas, formatos }: { plataformas: Plataforma[]; formatos: AnaliseVideo["formato"][] }) {
     // Sem rede a folha continua aberta, com o que foi marcado. Um segundo toque antes de a folha sair é
-    // ignorado pelo próprio gancho do histórico (`fecharEDepois` é idempotente).
+    // ignorado pelo próprio gancho do histórico (`fecharENavegar` é idempotente).
     if (semRedeParaBuscar()) return;
-    filtrar.fecharEDepois(() => navegar({ plataformas, formatos }));
+    filtrar.fecharENavegar(() => navegar({ plataformas, formatos }, { substituir: true }));
   }
 
   return (
