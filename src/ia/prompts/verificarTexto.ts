@@ -41,12 +41,22 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * confunde instrução direta e correta com instrução interna. A regra
  * aparece no Briefing do próprio cliente (`AprendizadoCard.tsx`), então é
  * texto de tela sim, só que no formato de regra, não de conversa.
+ *
+ * `tema` (29/09/2026, achado do Gustavo em produção, na Dr.Wash): a
+ * recomendação de `avaliarTema` diz como ajustar o tema antes de gravar (o
+ * que mostrar, em que ordem, com que teste), e o modelo barato reprovou duas
+ * vezes seguidas dizendo que era "um briefing de direção de gravação, não um
+ * texto para o dono do negócio ler" e depois "instruções detalhadas que soam
+ * como briefing interno". A mesma classe de erro dos gêneros "roteiro" e
+ * "regra": instrução de gravação escrita para o próprio dono é o formato
+ * certo desta recomendação, e o verificador precisa saber disso para não
+ * transformar uma avaliação boa (nota 8,6) num erro na tela.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
-export type GeneroTexto = "padrao" | "analise" | "roteiro" | "regra";
+export type GeneroTexto = "padrao" | "analise" | "roteiro" | "regra" | "tema";
 
 export const schema = z.object({
   aprovado: z.boolean(),
@@ -67,9 +77,14 @@ const CRITERIO_TOM: Record<GeneroTexto, string> = {
     "seguir ou evitar: frase imperativa, do tipo não fazer X e sim Y, é o formato esperado e " +
     "correto, não reprove só por isso; reprove apenas se soar como propaganda de venda ou usar " +
     "jargão de marketing ou de tecnologia;",
+  tema:
+    "o texto é a recomendação sobre um tema que o dono do negócio propôs: dizer como ajustar e " +
+    "como gravar (o que mostrar, em que ordem, que teste fazer) é esperado e correto, não reprove " +
+    "só por isso; reprove apenas se soar como propaganda de venda ou usar jargão de marketing " +
+    "ou de tecnologia;",
 };
 
-/** Só os generos "roteiro" e "regra" precisam desta explicação extra; os outros não mudam de comportamento. */
+/** Só os generos "roteiro", "regra" e "tema" precisam desta explicação extra; os outros não mudam de comportamento. */
 const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
   roteiro:
     "\nO texto é um roteiro que o próprio dono do negócio vai gravar sozinho no celular: gancho, " +
@@ -83,6 +98,13 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "briefing, ao lado de outras regras assim. Frase curta e imperativa é o formato certo deste " +
     "gênero, não instrução interna de equipe; nunca reprove achando que parece um manual de " +
     "produção ou uma nota técnica, isso não é um erro de gênero.\n",
+  tema:
+    "\nO texto é a recomendação que o dono do negócio lê depois de propor um tema: ela diz se vale " +
+    "gravar hoje e, quando pede ajuste, sugere o ângulo mais próximo do que já funcionou, com " +
+    "instruções de gravação (o que mostrar primeiro, que teste fazer, onde parar) escritas para " +
+    "ele seguir sozinho no celular. Instrução de gravação é o formato certo deste gênero, não um " +
+    "briefing interno nem direção para uma equipe; nunca reprove achando que não é o texto que o " +
+    "cliente vê, isso não é um erro de gênero.\n",
 };
 
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao"): string {

@@ -363,6 +363,8 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: false,
     evidenciasFornecidas: evidencias.map((v) => v.id),
+    // A recomendação traz instrução de gravação de propósito (29/09/2026, `verificarTexto.ts`, gênero "tema").
+    generoTexto: "tema",
     extrairCampos: extrairCamposAvaliarTema,
     extrairEvidencias: (d) => d.evidencias,
   });
