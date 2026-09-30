@@ -125,5 +125,25 @@ export default defineConfig({
       PISO_VIEWS_REFERENCIA: "0",
     },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        /**
+         * P2, item 2: "Responder falando" precisa de um microfone de verdade para o
+         * `MediaRecorder` gravar algo; sem hardware real (nem na maquina do Gustavo, nem em
+         * CI), o Chromium ganha um dispositivo de audio sintetico (um tom constante, nunca
+         * silencio puro: `useGravadorDeAudio` descarta blob vazio como "audioVazio"), e a
+         * permissao de microfone e aceita sozinha, sem dialogo. So afeta este navegador de
+         * teste, nunca producao. `GROQ_API_KEY` continua vazia no `webServer.env` acima; a
+         * rota de transcricao e interceptada pelo teste (`page.route`), nunca chama a Groq
+         * de verdade.
+         */
+        launchOptions: {
+          args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"],
+        },
+      },
+    },
+  ],
 });
