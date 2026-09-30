@@ -400,6 +400,10 @@ export const textosAdmin = {
     geracaoReprovadaRotulo: "geração reprovada duas vezes",
     geracaoReprovadaVazio: "nenhuma",
     geracaoReprovadaComMotivo: (tarefa: string, motivo: string) => `tarefa "${tarefa}": ${motivo}`,
+    /** M1, item 3: o lote de análise que passou de 2 horas parado no provedor. */
+    lotePendenteRotulo: "lote de análise",
+    lotePendenteVazio: "em dia",
+    lotePendenteComHoras: (horas: number) => `pendente há ${horas} hora${horas === 1 ? "" : "s"}`,
     periodo7: "7 dias",
     periodo14: "14 dias",
     periodo30: "30 dias",

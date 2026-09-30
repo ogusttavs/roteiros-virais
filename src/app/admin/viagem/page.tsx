@@ -124,6 +124,12 @@ export default async function AdminViagem({ searchParams }: { searchParams: Prom
                 : t.geracaoReprovadaVazio}
             </span>
           </div>
+          <div className={styles.cartao}>
+            <span className={styles.cartaoRotulo}>{t.lotePendenteRotulo}</span>
+            <span className={styles.cartaoValor}>
+              {resumo.lotePendente ? t.lotePendenteComHoras(resumo.lotePendente.horasPendente) : t.lotePendenteVazio}
+            </span>
+          </div>
         </div>
       </section>
 

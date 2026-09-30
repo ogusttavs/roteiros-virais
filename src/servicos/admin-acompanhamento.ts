@@ -24,6 +24,7 @@ import {
   clientes,
   consumoApi,
   execucoesJob,
+  lotesIa,
   metricasVideoCliente,
   planoGravacoes,
   roteiros,
@@ -430,20 +431,47 @@ export async function ultimaGeracaoReprovadaDuasVezes(): Promise<GeracaoReprovad
   return { tarefa: linha.tarefa, clienteId: linha.cliente_id, motivo: linha.motivo_avaliacao, quando: new Date(linha.criado_em) };
 }
 
+/** Duas horas: menos que isso é o tempo normal (19 a 80 minutos, medido); mais, vira aviso. */
+const HORAS_PARA_LOTE_ATRASADO = 2;
+
+export type LotePendente = { tarefa: string; horasPendente: number };
+
+/**
+ * Bloco 12 (M1, item 3): o lote de análise mais antigo ainda `em_andamento`. Achado em produção
+ * em 30/09/2026: o lote do dia ficou mais de três horas parado no provedor (19 a 80 minutos nos
+ * outros dias) e ninguém via isso até o painel de Referências chegar vazio na manhã seguinte.
+ * `null` quando não há lote pendente ou o mais antigo ainda está dentro do normal.
+ */
+export async function lotePendenteHaHoras(agora: Date = new Date()): Promise<LotePendente | null> {
+  const [linha] = await db()
+    .select({ tarefa: lotesIa.tarefa, criadoEm: lotesIa.criadoEm })
+    .from(lotesIa)
+    .where(eq(lotesIa.status, "em_andamento"))
+    .orderBy(lotesIa.criadoEm)
+    .limit(1);
+  if (!linha) return null;
+
+  const horasPendente = (agora.getTime() - linha.criadoEm.getTime()) / (60 * 60 * 1000);
+  if (horasPendente < HORAS_PARA_LOTE_ATRASADO) return null;
+  return { tarefa: linha.tarefa, horasPendente: Math.floor(horasPendente) };
+}
+
 export type ResumoQuebradoAgora = {
   ultimoErroJob: UltimoErroJob | null;
   consumo: ConsumoFonte[];
   geracaoReprovadaDuasVezes: GeracaoReprovadaDuasVezes | null;
+  lotePendente: LotePendente | null;
 };
 
-/** O topo da tela (item 2): as três linhas fixas, uma consulta cada, em paralelo. */
+/** O topo da tela (item 2, mais o item 3 da M1): as linhas fixas, uma consulta cada, em paralelo. */
 export async function resumoQuebradoAgora(): Promise<ResumoQuebradoAgora> {
-  const [ultimoErroJob, consumo, geracaoReprovadaDuasVezes] = await Promise.all([
+  const [ultimoErroJob, consumo, geracaoReprovadaDuasVezes, lotePendente] = await Promise.all([
     ultimoErroDeJob(),
     consumoAgoraPorFonte(),
     ultimaGeracaoReprovadaDuasVezes(),
+    lotePendenteHaHoras(),
   ]);
-  return { ultimoErroJob, consumo, geracaoReprovadaDuasVezes };
+  return { ultimoErroJob, consumo, geracaoReprovadaDuasVezes, lotePendente };
 }
 
 export type SaudeViagem = {
@@ -454,6 +482,8 @@ export type SaudeViagem = {
   ultimoErroJob: { nome: string; quando: string } | null;
   consumo: ConsumoFonte[];
   geracaoReprovadaDuasVezesAgora: boolean;
+  /** M1, item 3: horas desde que o lote de análise mais antigo ainda pendente foi criado; `null` sem lote atrasado. */
+  lotePendenteHaHoras: number | null;
 };
 
 /**
@@ -479,5 +509,6 @@ export async function saudeDaViagem(): Promise<SaudeViagem> {
     ultimoErroJob: resumo.ultimoErroJob ? { nome: resumo.ultimoErroJob.nome, quando: resumo.ultimoErroJob.quando.toISOString() } : null,
     consumo: resumo.consumo,
     geracaoReprovadaDuasVezesAgora: resumo.geracaoReprovadaDuasVezes !== null,
+    lotePendenteHaHoras: resumo.lotePendente?.horasPendente ?? null,
   };
 }
