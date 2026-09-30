@@ -60,4 +60,24 @@ describe("avisoSemTema (H3, item 1)", () => {
       texto: textosHoje.erro,
     });
   });
+
+  it("ainda lendo, antes das 6h30: o aviso de leitura vence o de cedo demais (M1, item 5)", () => {
+    const aviso = avisoSemTema({ status: "sem_tema", constancia: { tipo: "primeiro_dia" } }, ANTES_DAS_0630, true);
+    expect(aviso).toEqual({ titulo: textosHoje.aindaLendoTitulo, texto: textosHoje.aindaLendo });
+  });
+
+  it("ainda lendo, depois das 6h30: o aviso de leitura vence o de não saiu (M1, item 5)", () => {
+    const aviso = avisoSemTema({ status: "sem_tema", constancia: { tipo: "primeiro_dia" } }, DEPOIS_DAS_0630, true);
+    expect(aviso).toEqual({ titulo: textosHoje.aindaLendoTitulo, texto: textosHoje.aindaLendo });
+  });
+
+  it("ainda lendo, mas com erro na busca: o aviso de erro continua vencendo (M1, item 5)", () => {
+    const aviso = avisoSemTema({ status: "erro" }, DEPOIS_DAS_0630, true);
+    expect(aviso).toEqual({ titulo: textosHoje.erroTitulo, texto: textosHoje.erro });
+  });
+
+  it("sem o terceiro argumento, o comportamento de antes continua (padrão false)", () => {
+    const aviso = avisoSemTema({ status: "sem_tema", constancia: { tipo: "primeiro_dia" } }, ANTES_DAS_0630);
+    expect(aviso).toEqual({ titulo: textosHoje.vazioTitulo, texto: textosHoje.vazio });
+  });
 });

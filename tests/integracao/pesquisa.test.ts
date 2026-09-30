@@ -15,6 +15,7 @@ import {
   foraDaCurvaDoNicho,
   referenciasDoNicho,
   semDonoComAnalise,
+  setorAindaLendo,
   subindoHoje,
   subindoHojeComAnalise,
 } from "@/servicos/pesquisa";
@@ -1037,5 +1038,45 @@ describe("estatisticasDoSetor", () => {
     const estatisticas = await estatisticasDoSetor(nichoEstreitoId);
     expect(estatisticas.acimaDoPiso30Dias).toBeGreaterThanOrEqual(10);
     expect(estatisticas.setorEstreito).toBe(false);
+  });
+});
+
+/**
+ * `setorAindaLendo` (M1, item 5): nicho e conta próprios, isolados dos outros testes deste
+ * arquivo, cada `it` com o seu próprio nicho para não acumular vídeo de um teste no outro.
+ */
+describe("setorAindaLendo", () => {
+  async function criarNicho(slug: string): Promise<{ nichoId: number; contaId: number }> {
+    const [nicho] = await db().insert(nichos).values({ slug, nome: slug, termos: [] }).returning();
+    const [conta] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: slug, nichoId: nicho.id })
+      .returning();
+    return { nichoId: nicho.id, contaId: conta.id };
+  }
+
+  it("setor sem vídeo nenhum: nao esta lendo (nunca coletou)", async () => {
+    const { nichoId: id } = await criarNicho("aindalendo-vazio");
+    expect(await setorAindaLendo(id)).toBe(false);
+  });
+
+  it("setor com vídeo coletado e nenhum analisado: esta lendo", async () => {
+    const { nichoId: id, contaId: cid } = await criarNicho("aindalendo-coletado");
+    await criarVideo("aindalendo-sem-analise", { publicadoEm: diasAtras(1), nichoId: id, contaId: cid });
+
+    expect(await setorAindaLendo(id)).toBe(true);
+  });
+
+  it("setor com pelo menos um vídeo analisado: nao esta mais lendo, mesmo com outros ainda sem análise", async () => {
+    const { nichoId: id, contaId: cid } = await criarNicho("aindalendo-parcial");
+    await criarVideo("aindalendo-parcial-analisado", {
+      publicadoEm: diasAtras(1),
+      nichoId: id,
+      contaId: cid,
+      analise: { pertenceAoNicho: true },
+    });
+    await criarVideo("aindalendo-parcial-pendente", { publicadoEm: diasAtras(1), nichoId: id, contaId: cid });
+
+    expect(await setorAindaLendo(id)).toBe(false);
   });
 });

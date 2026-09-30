@@ -68,6 +68,10 @@ export const textosHoje = {
    */
   semTemaDepoisTitulo: "Hoje não saiu tema para o seu setor",
   semTemaDepois: "Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
+  /** M1, item 5: mesmo espírito do aviso de Referências, aqui na porta Reels, no lugar dos três temas. */
+  aindaLendoTitulo: "Estamos lendo os vídeos do seu setor",
+  aindaLendo:
+    "As primeiras referências aparecem em algumas horas. Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
   erroAviso: "A busca de hoje falhou",
   erroTitulo: "Ainda dá para gravar",
   erro:

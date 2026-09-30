@@ -1058,3 +1058,20 @@ export async function estatisticasDoSetor(nichoId: number): Promise<Estatisticas
     setorEstreito: (linha?.acimaDoPiso30Dias ?? 0) < LIMIAR_SETOR_ESTREITO,
   };
 }
+
+/**
+ * M1, item 5: Referências e a porta Reels de Hoje mostram um aviso diferente do "vazio" de sempre
+ * quando o setor já tem vídeo coletado mas a análise ainda não rodou (nem pelo caminho imediato
+ * nem pelo lote), em vez de parecer que não existe nada fora da curva ou nenhum tema. Uma
+ * consulta só, sem o `porRede` de `estatisticasDoSetor` (que essas duas telas não precisam).
+ */
+export async function setorAindaLendo(nichoId: number): Promise<boolean> {
+  const [linha] = await db()
+    .select({
+      total: sql<number>`count(*)::int`,
+      analisados: sql<number>`count(*) filter (where ${isNotNull(videos.analise)})::int`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId));
+  return (linha?.total ?? 0) > 0 && (linha?.analisados ?? 0) === 0;
+}
