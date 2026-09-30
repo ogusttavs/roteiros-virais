@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import type { Nicho, ResumoPesquisaSetor } from "@/db/schema";
-import type { ContaSemente, ExecucaoResumo, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
+import type { ContaSemente, ExecucaoResumo, PassoSetor, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -36,6 +36,8 @@ type Props = {
   contasSemente: ContaSemente[];
   /** M2, item 6: a rodada mais recente do pesquisa-de-setor, para o resumo e os termos/hashtags sugeridos. */
   ultimaPesquisa: { criadoEm: Date; resumo: ResumoPesquisaSetor } | null;
+  /** M2, item 4: em que passo o setor está (pesquisando contas, coletando, lendo, pronto). */
+  passo: PassoSetor;
 };
 
 function formatarQuando(data: Date | undefined): string {
@@ -43,7 +45,14 @@ function formatarQuando(data: Date | undefined): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
 }
 
-export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, ultimaPesquisa }: Props) {
+const ROTULO_PASSO: Record<PassoSetor, string> = {
+  pesquisando_contas: t.passoPesquisandoContas,
+  coletando: t.passoColetando,
+  lendo: t.passoLendo,
+  pronto: t.passoPronto,
+};
+
+export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, ultimaPesquisa, passo }: Props) {
   const router = useRouter();
 
   const [editando, setEditando] = useState(false);
@@ -155,7 +164,7 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, u
             className={[styles.ponto, nicho.ativo ? styles.pontoPositivo : styles.pontoErro].join(" ")}
             aria-hidden="true"
           />
-          {nicho.ativo ? t.ativo : t.inativo}
+          {nicho.ativo ? t.ativo : t.inativo}, {ROTULO_PASSO[passo]}
         </span>
       </div>
 

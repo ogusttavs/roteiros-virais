@@ -325,6 +325,34 @@ export async function ultimaPesquisaDeSetor(nichoId: number): Promise<{ criadoEm
   return linha ?? null;
 }
 
+export type PassoSetor = "pesquisando_contas" | "coletando" | "lendo" | "pronto";
+
+/**
+ * M2, item 4: "/admin/nichos/[slug] mostra em que passo está" (pesquisando contas, coletando,
+ * lendo, pronto), e quanto falta. Sem `pesquisas_setor` nenhuma, a pesquisa ainda não rodou (ou
+ * está rodando agora: é sempre a primeira coisa que `rodarPesquisaDeSetor` grava, e só grava
+ * depois de terminar a pesquisa em si, então "pesquisando contas" cobre os dois casos). Com vídeo
+ * coletado mas nada transcrito, ainda é coleta; com transcrição mas nada analisado, é leitura
+ * (`setorAindaLendo`, M1, é o mesmo sinal, mas aqui como um passo entre quatro, não um booleano).
+ */
+export async function passoDoSetor(nichoId: number): Promise<PassoSetor> {
+  const [pesquisa] = await db().select({ id: pesquisasSetor.id }).from(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nichoId)).limit(1);
+  if (!pesquisa) return "pesquisando_contas";
+
+  const [linha] = await db()
+    .select({
+      total: sql<number>`count(*)::int`,
+      transcritos: sql<number>`count(*) filter (where ${isNotNull(videos.transcricao)})::int`,
+      analisados: sql<number>`count(*) filter (where ${isNotNull(videos.analise)})::int`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId));
+
+  if (!linha || linha.total === 0 || linha.transcritos === 0) return "coletando";
+  if (linha.analisados === 0) return "lendo";
+  return "pronto";
+}
+
 export type StatusMetaApi = {
   chamadasNaHora: number;
   limiteChamadasHora: number;

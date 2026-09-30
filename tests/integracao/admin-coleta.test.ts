@@ -8,7 +8,7 @@ import { eq, inArray } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, contas, execucoesJob, membrosMarca, nichos, roteiros, user, videos } from "@/db/schema";
+import { clientes, contas, execucoesJob, membrosMarca, nichos, pesquisasSetor, roteiros, user, videos } from "@/db/schema";
 import { upsertVideo } from "@/jobs/coleta-comum";
 import { hojeISO } from "@/lib/config";
 import {
@@ -16,6 +16,7 @@ import {
   listarClientesAdmin,
   listarExecucoesRecentes,
   listarNichosComContagem,
+  passoDoSetor,
   resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   taxaDeAcertoPorExecucao,
@@ -606,5 +607,133 @@ describe("resumoLeituraPorPlataforma", () => {
     await db().delete(videos).where(eq(videos.nichoId, nichoBrasil.id));
     await db().delete(contas).where(eq(contas.nichoId, nichoBrasil.id));
     await db().delete(nichos).where(eq(nichos.id, nichoBrasil.id));
+  });
+});
+
+/**
+ * `passoDoSetor` (M2, item 4): nicho e conta próprios, isolados dos outros testes deste arquivo.
+ */
+describe("passoDoSetor", () => {
+  it("sem nenhuma pesquisa_setor, o passo e pesquisando contas", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "passo-setor-vazio", nome: "Passo setor vazio", termos: [] }).returning();
+    expect(await passoDoSetor(nicho.id)).toBe("pesquisando_contas");
+    await db().delete(nichos).where(eq(nichos.id, nicho.id));
+  });
+
+  it("com pesquisa mas sem video nenhum, o passo e coletando", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "passo-setor-coletando", nome: "Passo setor coletando", termos: [] }).returning();
+    await db().insert(pesquisasSetor).values({
+      nichoId: nicho.id,
+      resumo: {
+        sugeridas: { youtube: 0, tiktok: 0, instagram: 0 },
+        confirmadas: { youtube: 0, tiktok: 0, instagram: 0 },
+        descartadas: {},
+        contasNovas: 0,
+        contasAtualizadas: 0,
+        termosSugeridos: [],
+        hashtagsSugeridas: [],
+        custo: { unidadesYoutube: 0, chamadasMeta: 0, resultadosApify: 0, custoIaUsd: 0 },
+      },
+    });
+
+    expect(await passoDoSetor(nicho.id)).toBe("coletando");
+
+    await db().delete(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nicho.id));
+    await db().delete(nichos).where(eq(nichos.id, nicho.id));
+  });
+
+  it("com video coletado mas nada transcrito, o passo continua coletando", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "passo-setor-sem-transcricao", nome: "Passo setor sem transcricao", termos: [] }).returning();
+    await db().insert(pesquisasSetor).values({
+      nichoId: nicho.id,
+      resumo: {
+        sugeridas: { youtube: 0, tiktok: 0, instagram: 0 },
+        confirmadas: { youtube: 0, tiktok: 0, instagram: 0 },
+        descartadas: {},
+        contasNovas: 0,
+        contasAtualizadas: 0,
+        termosSugeridos: [],
+        hashtagsSugeridas: [],
+        custo: { unidadesYoutube: 0, chamadasMeta: 0, resultadosApify: 0, custoIaUsd: 0 },
+      },
+    });
+    await db()
+      .insert(videos)
+      .values({ plataforma: "youtube", idExterno: "passo-sem-transcricao-v1", url: "https://x/passo-sem-transcricao-v1", nichoId: nicho.id, publicadoEm: new Date() });
+
+    expect(await passoDoSetor(nicho.id)).toBe("coletando");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+    await db().delete(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nicho.id));
+    await db().delete(nichos).where(eq(nichos.id, nicho.id));
+  });
+
+  it("com transcricao mas nada analisado, o passo e lendo", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "passo-setor-lendo", nome: "Passo setor lendo", termos: [] }).returning();
+    await db().insert(pesquisasSetor).values({
+      nichoId: nicho.id,
+      resumo: {
+        sugeridas: { youtube: 0, tiktok: 0, instagram: 0 },
+        confirmadas: { youtube: 0, tiktok: 0, instagram: 0 },
+        descartadas: {},
+        contasNovas: 0,
+        contasAtualizadas: 0,
+        termosSugeridos: [],
+        hashtagsSugeridas: [],
+        custo: { unidadesYoutube: 0, chamadasMeta: 0, resultadosApify: 0, custoIaUsd: 0 },
+      },
+    });
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "passo-lendo-v1",
+        url: "https://x/passo-lendo-v1",
+        nichoId: nicho.id,
+        publicadoEm: new Date(),
+        transcricao: "transcricao de exemplo",
+        transcritoEm: new Date(),
+      });
+
+    expect(await passoDoSetor(nicho.id)).toBe("lendo");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+    await db().delete(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nicho.id));
+    await db().delete(nichos).where(eq(nichos.id, nicho.id));
+  });
+
+  it("com pelo menos um video analisado, o passo e pronto", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "passo-setor-pronto", nome: "Passo setor pronto", termos: [] }).returning();
+    await db().insert(pesquisasSetor).values({
+      nichoId: nicho.id,
+      resumo: {
+        sugeridas: { youtube: 0, tiktok: 0, instagram: 0 },
+        confirmadas: { youtube: 0, tiktok: 0, instagram: 0 },
+        descartadas: {},
+        contasNovas: 0,
+        contasAtualizadas: 0,
+        termosSugeridos: [],
+        hashtagsSugeridas: [],
+        custo: { unidadesYoutube: 0, chamadasMeta: 0, resultadosApify: 0, custoIaUsd: 0 },
+      },
+    });
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "passo-pronto-v1",
+        url: "https://x/passo-pronto-v1",
+        nichoId: nicho.id,
+        publicadoEm: new Date(),
+        transcricao: "transcricao de exemplo",
+        transcritoEm: new Date(),
+        analise: { pertenceAoNicho: true } as never,
+      });
+
+    expect(await passoDoSetor(nicho.id)).toBe("pronto");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+    await db().delete(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nicho.id));
+    await db().delete(nichos).where(eq(nichos.id, nicho.id));
   });
 });

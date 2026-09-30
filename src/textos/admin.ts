@@ -144,6 +144,11 @@ export const textosAdmin = {
     origemPesquisa: "achada pela pesquisa",
     origemCuradoria: "cadastrada a mão",
     tirarConta: "tirar",
+    /** M2, item 4: em que passo o setor está, ao lado de ativo/inativo no topo do painel. */
+    passoPesquisandoContas: "pesquisando contas",
+    passoColetando: "coletando",
+    passoLendo: "lendo",
+    passoPronto: "pronto",
     coletarAgoraTitulo: "coleta deste nicho",
     coletarAgora: "rodar a primeira coleta agora",
     /** M1, item 4: o botão dispara coleta, transcrição e análise imediata em sequência, para o setor novo ficar pronto em minutos. */

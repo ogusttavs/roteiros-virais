@@ -11,6 +11,7 @@ import {
   listarContasVigiadas,
   nichoPorSlug,
   noticiasPorId,
+  passoDoSetor,
   resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   statusMetaApi,
@@ -89,6 +90,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     estatisticas,
     contasSemente,
     ultimaPesquisa,
+    passo,
   ] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
@@ -101,6 +103,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     estatisticasDoSetor(nicho.id),
     listarContasSemente(nicho.id),
     ultimaPesquisaDeSetor(nicho.id),
+    passoDoSetor(nicho.id),
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -135,6 +138,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         resumoLeitura={resumoLeitura}
         contasSemente={contasSemente}
         ultimaPesquisa={ultimaPesquisa}
+        passo={passo}
       />
 
       <section className={styles.secao}>
