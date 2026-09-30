@@ -44,6 +44,8 @@ async function criarVideo(
     nichoId?: number;
     plataforma?: Plataforma;
     views?: number;
+    /** Hotfix de 30/09/2026 (teto de duração): nulo por padrão, como boa parte do Instagram pela Meta. */
+    duracaoS?: number | null;
   },
 ) {
   const [v] = await db()
@@ -56,6 +58,7 @@ async function criarVideo(
       nichoId: opcoes.nichoId ?? nichoId,
       titulo: opcoes.titulo,
       views: opcoes.views ?? 100,
+      duracaoS: opcoes.duracaoS ?? null,
       publicadoEm: opcoes.publicadoEm,
       origem: opcoes.origem ?? (opcoes.semDono ? "meta" : "coleta"),
       foraDaCurva: opcoes.foraDaCurva === undefined ? undefined : String(opcoes.foraDaCurva),
@@ -795,5 +798,117 @@ describe("referenciasDoNicho", () => {
       // Os quatro entram: apenasIds (o segmento Salvos) nao tem o teto por conta.
       expect(resultado.videos).toHaveLength(4);
     });
+  });
+});
+
+/**
+ * Hotfix de 30/09/2026 (achado do Gustavo na Overtake Pro: duas das três Referências eram vídeos
+ * longos, um de dez minutos): o produto é vídeo curto, então vídeo acima de
+ * `config.regras.tetoDuracaoReferenciaS` (180 s) não é referência, tema nem evidência, e não entra
+ * na fila de leitura. Vídeo sem duração guardada passa.
+ */
+describe("teto de duração: vídeo longo nunca é referência, tema nem evidência", () => {
+  const analise = {
+    assunto: "assunto do teto de duracao",
+    gancho: "gancho",
+    estrutura: "estrutura",
+    porQueFuncionou: "funcionou por isso",
+    formato: "fala_para_camera",
+  };
+
+  it("referenciasDoNicho: 420 s fica de fora; 180 s e sem duração entram", async () => {
+    // Contas próprias, uma por vídeo, para o teto por conta (V6) não entrar na conta deste teste.
+    const contasProprias = await db()
+      .insert(contas)
+      .values([
+        { plataforma: "youtube", handle: "teto-duracao-longo", nichoId },
+        { plataforma: "youtube", handle: "teto-duracao-no-limite", nichoId },
+        { plataforma: "instagram", handle: "teto-duracao-sem-duracao", nichoId },
+      ])
+      .returning();
+
+    const longo = await criarVideo("teto-ref-longo", {
+      foraDaCurva: 8,
+      publicadoEm: diasAtras(1),
+      contaId: contasProprias[0].id,
+      plataforma: "youtube",
+      duracaoS: 420,
+      analise: { ...analise, assunto: "video longo de sete minutos" },
+    });
+    const noLimite = await criarVideo("teto-ref-no-limite", {
+      foraDaCurva: 3,
+      publicadoEm: diasAtras(1),
+      contaId: contasProprias[1].id,
+      plataforma: "youtube",
+      duracaoS: 180,
+      analise: { ...analise, assunto: "video de tres minutos exatos" },
+    });
+    const semDuracao = await criarVideo("teto-ref-sem-duracao", {
+      foraDaCurva: 3,
+      publicadoEm: diasAtras(1),
+      contaId: contasProprias[2].id,
+      plataforma: "instagram",
+      duracaoS: null,
+      analise: { ...analise, assunto: "reel sem duracao guardada" },
+    });
+
+    const resultado = await referenciasDoNicho(nichoId, { periodoDias: 90, limite: 500 });
+    const ids = resultado.videos.map((v) => v.id);
+
+    expect(ids).not.toContain(longo.id);
+    expect(ids).toContain(noLimite.id);
+    expect(ids).toContain(semDuracao.id);
+  });
+
+  it("foraDaCurvaDoNicho (de onde sai a fila de transcrição): o longo não entra", async () => {
+    const longo = await criarVideo("teto-fdc-longo", { foraDaCurva: 50, publicadoEm: diasAtras(2), duracaoS: 611 });
+    const curto = await criarVideo("teto-fdc-curto", { foraDaCurva: 49, publicadoEm: diasAtras(2), duracaoS: 45 });
+
+    const ids = (await foraDaCurvaDoNicho(nichoId, 90)).map((v) => v.id);
+
+    expect(ids).not.toContain(longo.id);
+    expect(ids).toContain(curto.id);
+  });
+
+  it("subindoHojeComAnalise (de onde saem os temas do dia): o longo não entra", async () => {
+    const longo = await criarVideo("teto-sobe-longo", {
+      velocidadeRelativa: 40,
+      publicadoEm: diasAtras(3),
+      duracaoS: 900,
+      analise: { assunto: "aula longa subindo" },
+    });
+    const curto = await criarVideo("teto-sobe-curto", {
+      velocidadeRelativa: 39,
+      publicadoEm: diasAtras(3),
+      duracaoS: 30,
+      analise: { assunto: "video curto subindo" },
+    });
+
+    const ids = (await subindoHojeComAnalise(nichoId, 500)).map((v) => v.id);
+
+    expect(ids).not.toContain(longo.id);
+    expect(ids).toContain(curto.id);
+  });
+
+  it("evidenciaParaTema (a prova do tema e do roteiro): o longo não entra", async () => {
+    await criarVideo("teto-ev-longo", {
+      foraDaCurva: 30,
+      publicadoEm: diasAtras(5),
+      duracaoS: 420,
+      titulo: "envelopamento fosco completo passo a passo",
+      analise: { assunto: "envelopamento em video longo" },
+    });
+    await criarVideo("teto-ev-curto", {
+      foraDaCurva: 4,
+      publicadoEm: diasAtras(5),
+      duracaoS: 40,
+      titulo: "envelopamento fosco antes e depois",
+      analise: { assunto: "envelopamento em video curto" },
+    });
+
+    const assuntos = (await evidenciaParaTema(nichoId, "envelopamento fosco")).map((v) => v.assunto);
+
+    expect(assuntos).toContain("envelopamento em video curto");
+    expect(assuntos).not.toContain("envelopamento em video longo");
   });
 });
