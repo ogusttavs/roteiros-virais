@@ -1,7 +1,7 @@
 "use client";
 
-import { CircleAlert, Mic } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { CircleAlert, Mic, Square } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
@@ -14,7 +14,7 @@ import { Nota } from "@/ui/componentes/Nota";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Toast } from "@/ui/componentes/Toast";
-import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
+import { useGravadorDeAudio, type ResultadoUseGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
@@ -75,6 +75,51 @@ function Chip({ pergunta }: { pergunta: PerguntaBriefing }) {
 }
 
 /**
+ * P2, item 2: "Responder falando" ao lado do campo, nas duas variantes (vivo e wizard, as duas já
+ * editando quando o botão aparece). Alvo redondo provisório: o desenho definitivo é do Opus (mesmo
+ * espírito da nota da P1, item 8, quando o `Briefing.dc.html` não tinha o estado ainda).
+ */
+function CampoComMicrofone({
+  gravador,
+  erroFala,
+  children,
+}: {
+  gravador: ResultadoUseGravadorDeAudio;
+  erroFala: string | null;
+  children: ReactNode;
+}) {
+  const gravando = gravador.fase === "gravando";
+  const rotulo = gravando ? t.botaoPararDeFalar : t.botaoResponderFalando;
+  return (
+    <>
+      <div className={styles.linhaComMicrofone}>
+        {children}
+        <button
+          type="button"
+          className={[styles.botaoFalar, gravando ? styles.botaoFalarGravando : ""].filter(Boolean).join(" ")}
+          onClick={() => (gravando ? gravador.pararGravacao() : void gravador.iniciarGravacao())}
+          disabled={gravador.fase === "transcrevendo"}
+          aria-label={rotulo}
+          title={rotulo}
+        >
+          {gravando ? <Square size={18} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={18} strokeWidth={1.75} aria-hidden="true" />}
+        </button>
+      </div>
+      {gravador.fase === "transcrevendo" ? (
+        <p className={styles.dicaFalar}>{t.organizandoFala}</p>
+      ) : erroFala ? (
+        <p className={styles.erroInline} role="alert">
+          <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
+          {erroFala}
+        </p>
+      ) : (
+        <p className={styles.dicaFalar}>{t.dicaResponderFalando}</p>
+      )}
+    </>
+  );
+}
+
+/**
  * Uma pergunta do briefing, com os dois estados que /comecar (6.2) e
  * /briefing (6.8) compartilham: fechado (nota, analise em quatro partes,
  * "ajustar resposta") e aberto (area de texto, rascunho com debounce,
@@ -110,8 +155,11 @@ export function PerguntaCampo({
   const [erro, setErro] = useState<ErroDeAvaliacao | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState(true);
   const [rascunhoComErro, setRascunhoComErro] = useState(false);
-  /** P1, item 8: guarda o texto de antes de "Usar esta sugestão", para o "desfazer" do toast. */
-  const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string } | null>(null);
+  /**
+   * P1, item 8: guarda o texto de antes de "Usar esta sugestão" ou de "Responder falando", para o
+   * "desfazer" do toast. `tipo` escolhe o texto do toast (a sugestão e a fala usam frases diferentes).
+   */
+  const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string; tipo: "sugestao" | "fala" } | null>(null);
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
@@ -121,6 +169,13 @@ export function PerguntaCampo({
    */
   const textoRef = useRef(resposta);
   const salvoRef = useRef(resposta);
+  /**
+   * P2, item 3: a fala bruta de "Responder falando", para ir junto do rascunho quando ele salvar. Só
+   * existe entre o momento em que a fala organizada entra no campo e o rascunho salvar; uma edição
+   * manual depois (`aoMudarTexto` sem o segundo argumento) limpa, porque o texto deixou de ser o que
+   * a pessoa falou.
+   */
+  const transcricaoBrutaPendenteRef = useRef<string | undefined>(undefined);
   const caixaAlta = pergunta.peso === 2 ? "longa" : "padrao";
 
   /**
@@ -134,17 +189,20 @@ export function PerguntaCampo({
   const salvarPendente = useCallback(async (): Promise<boolean> => {
     if (timerRef.current) clearTimeout(timerRef.current);
     const valor = textoRef.current;
+    const transcricaoBruta = transcricaoBrutaPendenteRef.current;
     if (valor === salvoRef.current) {
       setRascunhoSalvo(true);
       setRascunhoComErro(false);
       return true;
     }
     try {
-      await onSalvarRascunho(pergunta.id, valor);
+      await onSalvarRascunho(pergunta.id, valor, transcricaoBruta);
       salvoRef.current = valor;
       if (textoRef.current === valor) {
         setRascunhoSalvo(true);
         setRascunhoComErro(false);
+        // So limpa depois do sucesso, e so se nada mudou de novo enquanto salvava.
+        if (transcricaoBrutaPendenteRef.current === transcricaoBruta) transcricaoBrutaPendenteRef.current = undefined;
       }
       avisarRedeOk();
       return true;
@@ -188,8 +246,15 @@ export function PerguntaCampo({
     return () => onPendencia?.(pergunta.id, false);
   }, [onPendencia, pergunta.id, pendente]);
 
-  function aoMudarTexto(valor: string) {
+  /**
+   * `transcricaoBruta` (P2, item 3): só quando o texto novo veio do microfone (via
+   * `aplicarFalaOrganizada`). Uma edição manual (o `onChange` do campo, "Usar esta sugestão",
+   * "desfazer") nunca passa o segundo argumento, e a fala bruta pendente é limpa: o texto deixou de
+   * ser exatamente o que a pessoa falou.
+   */
+  function aoMudarTexto(valor: string, transcricaoBruta?: string) {
     textoRef.current = valor;
+    transcricaoBrutaPendenteRef.current = transcricaoBruta;
     setTexto(valor);
     setRascunhoSalvo(false);
     setRascunhoComErro(false);
@@ -206,7 +271,7 @@ export function PerguntaCampo({
    * Guarda o texto de antes para o "desfazer" do toast.
    */
   function usarSugestaoEAbrirEdicao(exemplo: string) {
-    setSugestaoAplicada({ anterior: textoRef.current });
+    setSugestaoAplicada({ anterior: textoRef.current, tipo: "sugestao" });
     aoMudarTexto(exemplo);
     setEditando(true);
     requestAnimationFrame(() => areaRef.current?.focus());
@@ -217,6 +282,33 @@ export function PerguntaCampo({
     aoMudarTexto(sugestaoAplicada.anterior);
     setSugestaoAplicada(null);
   }
+
+  /**
+   * "Responder falando" (P2, item 2): a transcrição organizada (`organizarFalaBriefing`) substitui
+   * o campo, editável, com "desfazer" pelo toast, igual à "Usar esta sugestão". Ao contrário da
+   * sugestão, o campo já está aberto quando o microfone aparece (nas duas variantes), então não
+   * precisa de `setEditando(true)`. O texto falado bruto vai junto do rascunho (item 3).
+   */
+  function aplicarFalaOrganizada(textoOrganizado: string, textoFalado: string) {
+    setSugestaoAplicada({ anterior: textoRef.current, tipo: "fala" });
+    aoMudarTexto(textoOrganizado, textoFalado);
+    requestAnimationFrame(() => areaRef.current?.focus());
+  }
+
+  const gravador = useGravadorDeAudio({
+    nomeArquivo: "briefing",
+    async onTranscrito(textoFalado) {
+      const textoOrganizado = await organizarFalaBriefingAction(pergunta.enunciado, textoFalado);
+      aplicarFalaOrganizada(textoOrganizado, textoFalado);
+    },
+  });
+  const erroFala = gravador.semMicrofone
+    ? t.semMicrofone
+    : gravador.erro === "audioVazio"
+      ? t.audioVazioFala
+      : gravador.erro === "falhaTranscricao"
+        ? t.erroTranscricaoFala
+        : null;
 
   async function avaliar() {
     /**
@@ -284,15 +376,17 @@ export function PerguntaCampo({
       return (
         <div className={styles.linhaVivo}>
           <p className={styles.enunciado}>{pergunta.enunciado}</p>
-          <AreaTexto
-            rotulo={pergunta.enunciado}
-            rotuloOculto
-            value={texto}
-            onChange={(evento) => aoMudarTexto(evento.target.value)}
-            caixaAlta={caixaAlta}
-            erro={erro?.frase}
-            disabled={avaliando}
-          />
+          <CampoComMicrofone gravador={gravador} erroFala={erroFala}>
+            <AreaTexto
+              rotulo={pergunta.enunciado}
+              rotuloOculto
+              value={texto}
+              onChange={(evento) => aoMudarTexto(evento.target.value)}
+              caixaAlta={caixaAlta}
+              erro={erro?.frase}
+              disabled={avaliando || gravador.fase !== "inicial"}
+            />
+          </CampoComMicrofone>
           <div className={styles.rodapeAberto}>{indicadorRascunho}</div>
           <div className={styles.acoesVivo}>
             <Botao
@@ -384,7 +478,7 @@ export function PerguntaCampo({
           {t.botaoAjustarResposta}
         </Botao>
         <Toast
-          texto={t.sugestaoAplicada}
+          texto={sugestaoAplicada?.tipo === "fala" ? t.respostaFaladaAplicada : t.sugestaoAplicada}
           aberto={sugestaoAplicada !== null}
           onFechar={() => setSugestaoAplicada(null)}
           acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}
@@ -408,16 +502,18 @@ export function PerguntaCampo({
     <div className={styles.cartaoAberto}>
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
-      <AreaTexto
-        ref={areaRef}
-        rotulo={pergunta.enunciado}
-        rotuloOculto
-        value={texto}
-        onChange={(evento) => aoMudarTexto(evento.target.value)}
-        onBlur={aoSairDoCampo}
-        caixaAlta={caixaAlta}
-        disabled={avaliando}
-      />
+      <CampoComMicrofone gravador={gravador} erroFala={erroFala}>
+        <AreaTexto
+          ref={areaRef}
+          rotulo={pergunta.enunciado}
+          rotuloOculto
+          value={texto}
+          onChange={(evento) => aoMudarTexto(evento.target.value)}
+          onBlur={aoSairDoCampo}
+          caixaAlta={caixaAlta}
+          disabled={avaliando || gravador.fase !== "inicial"}
+        />
+      </CampoComMicrofone>
       <div className={styles.rodapeAberto}>
         {indicadorRascunho}
         <span className={styles.contador}>{t.contador(texto.length)}</span>
@@ -441,7 +537,7 @@ export function PerguntaCampo({
         </Botao>
       )}
       <Toast
-        texto={t.sugestaoAplicada}
+        texto={sugestaoAplicada?.tipo === "fala" ? t.respostaFaladaAplicada : t.sugestaoAplicada}
         aberto={sugestaoAplicada !== null}
         onFechar={() => setSugestaoAplicada(null)}
         acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}

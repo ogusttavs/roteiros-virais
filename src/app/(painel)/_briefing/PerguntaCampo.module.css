@@ -135,6 +135,56 @@
   color: var(--cor-erro);
 }
 
+/**
+ * P2, item 2: "Responder falando" ao lado do campo. Alvo redondo provisório (o Opus desenha o
+ * estado definitivo depois, mesmo espírito da nota em `AnaliseQuatroPartes`/P1, item 8); por
+ * enquanto, o mesmo tamanho de alvo de toque dos botões do painel (2,75rem).
+ */
+.linhaComMicrofone {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+.linhaComMicrofone > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.botaoFalar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  background: var(--cor-superficie);
+  color: var(--cor-acao);
+  cursor: pointer;
+}
+
+.botaoFalar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoFalar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.botaoFalarGravando {
+  border-color: var(--cor-erro);
+  color: var(--cor-erro);
+}
+
+.dicaFalar {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
 /* ---------- Briefing vivo: linha fechada (Briefing.dc.html, ".resposta") ---------- */
 
 .resposta {
