@@ -53,6 +53,13 @@
   color: var(--cor-texto-suave);
 }
 
+/** M1, item 4: a linha de ajuda abaixo de "rodar a primeira coleta agora". */
+.ajuda {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
 .termosLista {
   display: flex;
   flex-wrap: wrap;

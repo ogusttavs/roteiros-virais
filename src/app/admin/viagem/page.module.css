@@ -153,6 +153,15 @@
   color: var(--cor-texto-dica);
 }
 
+/** M1, item 5b: o aviso de setor estreito, no cabeçalho da marca. */
+.aviso {
+  font-size: var(--tamanho-legenda);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--cor-atencao);
+}
+
 /** Mesmas cores de estado de `/admin/jobs` (ponto de 6px ao lado do valor da célula). */
 .ponto {
   display: inline-block;

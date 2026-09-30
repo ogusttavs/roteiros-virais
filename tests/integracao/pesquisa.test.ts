@@ -8,7 +8,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
+import { config } from "@/lib/config";
 import {
+  estatisticasDoSetor,
   evidenciaParaTema,
   foraDaCurvaDoNicho,
   referenciasDoNicho,
@@ -910,5 +912,130 @@ describe("teto de duração: vídeo longo nunca é referência, tema nem evidên
 
     expect(assuntos).toContain("envelopamento em video curto");
     expect(assuntos).not.toContain("envelopamento em video longo");
+  });
+});
+
+/**
+ * `estatisticasDoSetor` (M1, item 5b): nicho e contas próprios, isolados dos outros testes deste
+ * arquivo, que não limpam `videos` entre um `it` e outro.
+ */
+describe("estatisticasDoSetor", () => {
+  let nichoEstreitoId: number;
+  let contaEstreitaId: number;
+  let contaEstreitaBId: number;
+
+  beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-estatisticas-teste", nome: "Pesquisa estatisticas teste", termos: [] })
+      .returning();
+    nichoEstreitoId = nicho.id;
+    const contasCriadas = await db()
+      .insert(contas)
+      .values([
+        { plataforma: "tiktok", handle: "estatisticas-a", nichoId: nichoEstreitoId },
+        { plataforma: "youtube", handle: "estatisticas-b", nichoId: nichoEstreitoId },
+      ])
+      .returning();
+    contaEstreitaId = contasCriadas[0].id;
+    contaEstreitaBId = contasCriadas[1].id;
+  }, 30_000);
+
+  it("conta analisados, dentro do setor, acima do piso em 7 e 30 dias, e por rede", async () => {
+    // dentro do setor, acima do piso, dentro dos 7 dias (conta para 7 e para 30).
+    await criarVideo("estat-dentro-7d", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(3),
+      views: config.regras.pisoViewsReferencia + 1,
+      analise: { pertenceAoNicho: true },
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+      plataforma: "tiktok",
+    });
+    // dentro do setor, acima do piso, so dentro dos 30 dias (fora da janela de 7).
+    await criarVideo("estat-dentro-30d", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(15),
+      views: config.regras.pisoViewsReferencia + 1,
+      analise: { pertenceAoNicho: true },
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaBId,
+      plataforma: "youtube",
+    });
+    // analisado, mas fora do setor: conta em videosAnalisados, nao no resto.
+    await criarVideo("estat-fora-do-setor", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(3),
+      views: config.regras.pisoViewsReferencia + 1,
+      analise: { pertenceAoNicho: false },
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+    });
+    // dentro do setor, acima do piso, mas sem fora_da_curva (o job pontuar ainda nao rodou):
+    // nao conta nas linhas de piso, que exigem fora_da_curva preenchido.
+    await criarVideo("estat-sem-fora-da-curva", {
+      publicadoEm: diasAtras(3),
+      views: config.regras.pisoViewsReferencia + 1,
+      analise: { pertenceAoNicho: true },
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+    });
+    // sem analise nenhuma: nao conta em nada.
+    await criarVideo("estat-sem-analise", {
+      publicadoEm: diasAtras(3),
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+    });
+
+    const estatisticas = await estatisticasDoSetor(nichoEstreitoId);
+
+    expect(estatisticas.videosAnalisados).toBe(4);
+    expect(estatisticas.dentroDoSetor).toBe(3);
+    expect(estatisticas.acimaDoPiso7Dias).toBe(1);
+    expect(estatisticas.acimaDoPiso30Dias).toBe(2);
+    expect(estatisticas.contasDistintasAcimaDoPiso30Dias).toBe(2);
+    expect(estatisticas.porRede).toEqual(
+      expect.arrayContaining([
+        { plataforma: "tiktok", acimaDoPiso30Dias: 1 },
+        { plataforma: "youtube", acimaDoPiso30Dias: 1 },
+      ]),
+    );
+    // menos de LIMIAR_SETOR_ESTREITO (10) acima do piso em 30 dias: setor estreito.
+    expect(estatisticas.setorEstreito).toBe(true);
+  });
+
+  it("video longo (hotfix #72) nao conta acima do piso", async () => {
+    await criarVideo("estat-longo", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(3),
+      views: config.regras.pisoViewsReferencia + 1,
+      duracaoS: config.regras.tetoDuracaoReferenciaS + 60,
+      analise: { pertenceAoNicho: true },
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+    });
+
+    const estatisticas = await estatisticasDoSetor(nichoEstreitoId);
+    // so os cinco videos do teste anterior continuam nesta base (o arquivo nao limpa entre it()s);
+    // o longo criado agora nao entra em nenhuma das contagens acima do piso.
+    expect(estatisticas.videosAnalisados).toBe(5);
+    expect(estatisticas.acimaDoPiso30Dias).toBe(2);
+  });
+
+  it("com 10 ou mais acima do piso em 30 dias, deixa de ser setor estreito", async () => {
+    for (let i = 0; i < 10; i++) {
+      await criarVideo(`estat-fartura-${i}`, {
+        foraDaCurva: 5,
+        publicadoEm: diasAtras(3),
+        views: config.regras.pisoViewsReferencia + 1,
+        analise: { pertenceAoNicho: true },
+        nichoId: nichoEstreitoId,
+        contaId: contaEstreitaId,
+      });
+    }
+
+    const estatisticas = await estatisticasDoSetor(nichoEstreitoId);
+    expect(estatisticas.acimaDoPiso30Dias).toBeGreaterThanOrEqual(10);
+    expect(estatisticas.setorEstreito).toBe(false);
   });
 });

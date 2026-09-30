@@ -17,7 +17,7 @@ import {
   ultimaExecucaoPorJob,
   videosPorId,
 } from "@/servicos/admin-coleta";
-import { foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
+import { estatisticasDoSetor, foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
@@ -75,7 +75,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta, resumoLeitura] =
+  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta, resumoLeitura, estatisticas] =
     await Promise.all([
       foraDaCurvaDoNicho(nicho.id, 90, 30),
       subindoHoje(nicho.id, 30),
@@ -85,6 +85,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
       resumoMedianaPorPlataforma(nicho.id),
       config.coleta.metaAtivo ? statusMetaApi() : null,
       resumoLeituraPorPlataforma(nicho.id),
+      estatisticasDoSetor(nicho.id),
     ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -114,6 +115,55 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
       </div>
 
       <PainelNicho nicho={nicho} jobsColeta={jobsColeta} resumoLeitura={resumoLeitura} />
+
+      <section className={styles.secao}>
+        <h2>{t.estatisticasTitulo}</h2>
+        {estatisticas.setorEstreito ? (
+          <p className={styles.aviso}>{t.setorEstreitoAviso}</p>
+        ) : null}
+        <div className={styles.tabelaEnvoltorio}>
+          <table className={styles.tabela}>
+            <thead>
+              <tr>
+                <th>{t.colunaAnalisados}</th>
+                <th>{t.colunaDentroDoSetor}</th>
+                <th>{t.colunaAcimaDoPiso7Dias}</th>
+                <th>{t.colunaAcimaDoPiso30Dias}</th>
+                <th>{t.colunaContasDistintas}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className={styles.mono}>{estatisticas.videosAnalisados}</td>
+                <td className={styles.mono}>{estatisticas.dentroDoSetor}</td>
+                <td className={styles.mono}>{estatisticas.acimaDoPiso7Dias}</td>
+                <td className={styles.mono}>{estatisticas.acimaDoPiso30Dias}</td>
+                <td className={styles.mono}>{estatisticas.contasDistintasAcimaDoPiso30Dias}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {estatisticas.porRede.length > 0 ? (
+          <div className={styles.tabelaEnvoltorio}>
+            <table className={styles.tabela}>
+              <thead>
+                <tr>
+                  <th>{t.colunaPlataforma}</th>
+                  <th>{t.colunaAcimaDoPiso30Dias}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {estatisticas.porRede.map((linha) => (
+                  <tr key={linha.plataforma}>
+                    <td>{linha.plataforma}</td>
+                    <td className={styles.mono}>{linha.acimaDoPiso30Dias}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>

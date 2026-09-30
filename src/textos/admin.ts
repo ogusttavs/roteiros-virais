@@ -127,11 +127,13 @@ export const textosAdmin = {
     adicionandoContas: "adicionando",
     sucessoContas: (n: number) => (n === 1 ? "1 conta semente adicionada" : `${n} contas semente adicionadas`),
     coletarAgoraTitulo: "coleta deste nicho",
-    coletarAgora: "coletar agora",
-    coletando: "pedindo a coleta",
-    sucessoColetar: "coleta pedida; começa em instantes",
+    coletarAgora: "rodar a primeira coleta agora",
+    /** M1, item 4: o botão dispara coleta, transcrição e análise imediata em sequência, para o setor novo ficar pronto em minutos. */
+    coletarAgoraAjuda: "busca vídeos novos, transcreve e já lê os deste setor, sem esperar a rodada da madrugada",
+    coletando: "pedindo a coleta, a transcrição e a leitura",
+    sucessoColetar: "pedido; a coleta, a transcrição e a leitura deste setor começam em instantes",
     duplicadoColetar: (nomes: string[]) => `já estava na fila: ${nomes.join(", ")}`,
-    erroColetar: (mensagem: string) => `não conseguimos enfileirar a coleta: ${mensagem}`,
+    erroColetar: (mensagem: string) => `não conseguimos enfileirar: ${mensagem}`,
     ultimaExecucaoJob: (nome: string, quando: string) => `${nome}: ${quando}`,
     semExecucao: "ainda não rodou",
     /**
@@ -153,6 +155,14 @@ export const textosAdmin = {
         transcritosHoje > 0 ? `, ${Math.round((transcritosHojeBrasileiros / transcritosHoje) * 100)}% brasileiros` : "";
       return `${plataforma}, lidos hoje: ${transcritosHoje} transcritos${percentualBrasileiros}, ${analisadosHoje} analisados; nos últimos 7 dias: ${transcritosUltimos7Dias} e ${analisadosUltimos7Dias}`;
     },
+    /** M1, item 5b: medido em produção na Overtake Pro, o setor tinha 48 transcritos e só 3 Referências de verdade. */
+    estatisticasTitulo: "matéria-prima do setor",
+    setorEstreitoAviso: "setor com pouca matéria-prima: faltam contas semente",
+    colunaAnalisados: "analisados",
+    colunaDentroDoSetor: "dentro do setor",
+    colunaAcimaDoPiso7Dias: "acima do piso, 7 dias",
+    colunaAcimaDoPiso30Dias: "acima do piso, 30 dias",
+    colunaContasDistintas: "contas distintas",
     estoqueTitulo: "estoque por plataforma",
     colunaContasComMediana: "contas com mediana",
     colunaOrigemMediana: "conta / seguidores / setor",
@@ -411,6 +421,8 @@ export const textosAdmin = {
     filtroMarcaTodas: "todas as marcas ativas",
     ultimoAcesso: (data: string) => `último acesso: ${data}`,
     ultimoAcessoNunca: "nunca acessou",
+    /** M1, item 5b: mesmo aviso de `/admin/nichos/[slug]`, aqui por marca. */
+    setorEstreitoAviso: "setor com pouca matéria-prima",
     colunaDia: "dia",
     estadoOk: "ok",
     estadoErro: "erro",

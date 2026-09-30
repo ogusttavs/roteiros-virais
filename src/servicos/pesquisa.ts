@@ -1000,3 +1000,61 @@ export function formatarModeloNicho(modelo: ModeloNicho | null): string {
   linhas.push(`Baseado em ${modelo.baseadoEm} vídeo(s), ${modelo.acimaDoLimiar} fora da curva de verdade.`);
   return linhas.join("\n");
 }
+
+/** Menos que isso, acima do piso e dentro do setor em 30 dias, é "faltam contas semente" (M1, item 5b). */
+export const LIMIAR_SETOR_ESTREITO = 10;
+
+export type EstatisticasSetor = {
+  videosAnalisados: number;
+  dentroDoSetor: number;
+  acimaDoPiso7Dias: number;
+  acimaDoPiso30Dias: number;
+  contasDistintasAcimaDoPiso30Dias: number;
+  porRede: { plataforma: Plataforma; acimaDoPiso30Dias: number }[];
+  setorEstreito: boolean;
+};
+
+/**
+ * M1, item 5b: medido em produção em 30/09/2026 na Overtake Pro (com a análise feita à mão), o
+ * setor ficou com 3 Referências em 30 dias e nenhum tema, porque 22 de 39 vídeos analisados
+ * foram julgados fora do setor e só 3 passam do piso. Sem esta linha, o admin só via "48
+ * transcritos" e não enxergava que a matéria-prima de verdade era pouca. Só leitura; a decisão
+ * sobre o piso é do Gustavo (`config.regras.pisoViewsReferencia`).
+ */
+export async function estatisticasDoSetor(nichoId: number): Promise<EstatisticasSetor> {
+  const piso = config.regras.pisoViewsReferencia;
+  const acimaDoPiso = (dias: number) =>
+    sql`(${PERTENCE_AO_NICHO} and ${videos.views} >= ${piso} and ${isNotNull(videos.foraDaCurva)} and ${videos.publicadoEm} >= ${diasAtras(dias)} and ${DENTRO_DO_TETO_DE_DURACAO})`;
+
+  // `count(...)` do Postgres devolve bigint, que o driver le como string em JS; ::int converte
+  // na propria consulta (a contagem nunca chega perto de estourar um int de verdade aqui).
+  const [linha] = await db()
+    .select({
+      videosAnalisados: sql<number>`count(*) filter (where ${isNotNull(videos.analise)})::int`,
+      dentroDoSetor: sql<number>`count(*) filter (where ${isNotNull(videos.analise)} and ${PERTENCE_AO_NICHO})::int`,
+      acimaDoPiso7Dias: sql<number>`count(*) filter (where ${acimaDoPiso(7)})::int`,
+      acimaDoPiso30Dias: sql<number>`count(*) filter (where ${acimaDoPiso(30)})::int`,
+      contasDistintasAcimaDoPiso30Dias: sql<number>`count(distinct ${videos.contaId}) filter (where ${acimaDoPiso(30)})::int`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId));
+
+  const porRedeLinhas = await db()
+    .select({
+      plataforma: videos.plataforma,
+      acimaDoPiso30Dias: sql<number>`count(*) filter (where ${acimaDoPiso(30)})::int`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId))
+    .groupBy(videos.plataforma);
+
+  return {
+    videosAnalisados: linha?.videosAnalisados ?? 0,
+    dentroDoSetor: linha?.dentroDoSetor ?? 0,
+    acimaDoPiso7Dias: linha?.acimaDoPiso7Dias ?? 0,
+    acimaDoPiso30Dias: linha?.acimaDoPiso30Dias ?? 0,
+    contasDistintasAcimaDoPiso30Dias: linha?.contasDistintasAcimaDoPiso30Dias ?? 0,
+    porRede: porRedeLinhas,
+    setorEstreito: (linha?.acimaDoPiso30Dias ?? 0) < LIMIAR_SETOR_ESTREITO,
+  };
+}

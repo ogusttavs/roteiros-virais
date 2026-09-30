@@ -85,19 +85,22 @@ export async function adicionarContasSementeAction(
 }
 
 /**
- * "Coletar agora" (decisao 4 do PROXIMO.md): os tres jobs de coleta, um de
- * cada vez, na ordem YouTube, Apify, noticias, e devolve na hora (nao
- * espera os jobs terminarem; quem processa e o worker). Cada chamada passa
- * pela mesma rota autenticada de sempre (`dispararJobAction`), so que com
- * `{ nichoId }` no corpo, que a rota usa tanto para escopar a coleta quanto
- * para recusar duplicar um job pendente do mesmo nicho.
+ * "Coletar agora" (decisao 4 do PROXIMO.md; M1, item 4: acrescenta transcricao e analise
+ * imediata a este caminho, para o setor novo ficar pronto em minutos): os cinco jobs, um de cada
+ * vez, na ordem YouTube, Apify, noticias, transcricao, analise imediata, e devolve na hora (nao
+ * espera os jobs terminarem; quem processa e o worker, e cada job so comeca depois que o worker
+ * pegar o anterior na fila, entao a ordem aqui e a ordem em que eles tendem a rodar). Cada
+ * chamada passa pela mesma rota autenticada de sempre (`dispararJobAction`), so que com
+ * `{ nichoId }` no corpo, que a rota usa tanto para escopar o job quanto para recusar duplicar
+ * um pendente do mesmo nicho. `extrairAgora` sozinho ja pula setor com 20 ou mais vídeos
+ * analisados (item 1), entao dispara-lo aqui e seguro mesmo depois que o setor deixa de ser novo.
  */
 export async function coletarAgoraAction(
   nichoId: number,
 ): Promise<{ ok: boolean; detalhes: { job: string; ok: boolean; mensagem: string; duplicado?: boolean }[] }> {
   garantirSessaoAdmin(await sessaoAtual());
 
-  const ordem = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias];
+  const ordem = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias, FILAS.transcrever, FILAS.extrairAgora];
   const detalhes: { job: string; ok: boolean; mensagem: string; duplicado?: boolean }[] = [];
 
   for (const job of ordem) {
