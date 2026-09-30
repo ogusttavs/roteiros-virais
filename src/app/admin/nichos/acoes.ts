@@ -6,11 +6,13 @@ import { FILAS } from "@/jobs/fila";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirSessaoAdmin } from "@/servicos/clientes";
 import {
+  aceitarTermoSugerido,
   adicionarContasSemente,
   alternarAtivoNicho,
   atualizarNicho,
   criarNicho,
   ErroNicho,
+  tirarConta,
 } from "@/servicos/nichos";
 
 import { dispararJobAction } from "../_jobs/acoes";
@@ -109,4 +111,38 @@ export async function coletarAgoraAction(
   }
 
   return { ok: detalhes.every((d) => d.ok), detalhes };
+}
+
+/** "Pesquisar o mercado de novo" (M2, item 1): enfileira o job pesquisa-de-setor para este setor. */
+export async function pesquisarMercadoAction(nichoId: number): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  const resultado = await dispararJobAction(FILAS.pesquisaDeSetor, { nichoId });
+  return { ok: resultado.ok, mensagem: resultado.duplicado ? "ja tem uma pesquisa rodando para este setor." : resultado.mensagem };
+}
+
+/** "Tirar" uma conta semente (M2, item 3): nao volta a ser sugerida pela pesquisa de setor. */
+export async function tirarContaAction(contaId: number, slug: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await tirarConta(contaId);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, mensagem: mensagemDeErro(erro) };
+  }
+}
+
+/** Aceita um termo ou hashtag que a pesquisa de setor sugeriu (M2, item 6). */
+export async function aceitarTermoSugeridoAction(nichoId: number, slug: string, termo: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await aceitarTermoSugerido(nichoId, termo);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, mensagem: mensagemDeErro(erro) };
+  }
 }

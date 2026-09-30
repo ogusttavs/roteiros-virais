@@ -121,6 +121,30 @@ export async function atualizarNicho(
   return nicho;
 }
 
+/**
+ * Aceita um termo ou hashtag sugerido pela pesquisa de setor (M2, item 6: "termo muda a busca de
+ * todo dia, então esse o Gustavo confirma", um toque no admin). Ignora se já existe (mesma
+ * normalização de `normalizarTermos`) ou se o nicho já está no teto de termos.
+ */
+export async function aceitarTermoSugerido(id: number, termo: string): Promise<Nicho> {
+  const [nicho] = await db().select().from(nichos).where(eq(nichos.id, id));
+  if (!nicho) throw new ErroNicho("nicho nao encontrado.");
+
+  const chave = termo.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const jaTem = nicho.termos.some((t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() === chave);
+  if (jaTem) return nicho;
+  if (nicho.termos.length >= TERMOS_MAX) {
+    throw new ErroNicho(`no maximo ${TERMOS_MAX} termos de busca; remova um antes de aceitar este.`);
+  }
+
+  const [atualizado] = await db()
+    .update(nichos)
+    .set({ termos: [...nicho.termos, termo.trim()] })
+    .where(eq(nichos.id, id))
+    .returning();
+  return atualizado;
+}
+
 /** Desativar tira o nicho de /comecar e das coletas; reativar volta. Nunca apaga nada. */
 export async function alternarAtivoNicho(id: number, ativo: boolean): Promise<Nicho> {
   const [nicho] = await db().update(nichos).set({ ativo }).where(eq(nichos.id, id)).returning();

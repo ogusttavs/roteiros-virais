@@ -18,6 +18,7 @@ import {
   membrosMarca,
   nichos,
   noticias,
+  pesquisasSetor,
   roteiros,
   temasDia,
   user,
@@ -27,6 +28,7 @@ import {
   type PlanoMarca,
   type TipoMarca,
   type Plataforma,
+  type ResumoPesquisaSetor,
   type TemaDoDia,
 } from "@/db/schema";
 import { chamadasDesde, JANELA_MS, LIMITE_CHAMADAS_HORA } from "@/jobs/meta-api";
@@ -284,6 +286,43 @@ export async function listarContasVigiadas(nichoId: number): Promise<ContaVigiad
     ultimaLeituraMetaEm: l.ultimaLeituraMetaEm,
     contaIndisponivelNaMeta: l.plataforma === "instagram" && l.apiIndisponivelEm !== null,
   }));
+}
+
+export type ContaSemente = {
+  id: number;
+  plataforma: Plataforma;
+  handle: string;
+  nome: string | null;
+  /** "curadoria" (colada pelo admin) ou "pesquisa" (achada e conferida pelo job pesquisa-de-setor, M2). */
+  origem: "curadoria" | "pesquisa";
+};
+
+/** M2, item 3: as contas semente do setor (curadoria e pesquisa), para o admin ver de onde vieram e "tirar" uma. */
+export async function listarContasSemente(nichoId: number): Promise<ContaSemente[]> {
+  const linhas = await db()
+    .select({ id: contas.id, plataforma: contas.plataforma, handle: contas.handle, nome: contas.nome, origem: contas.origem })
+    .from(contas)
+    .where(
+      and(
+        eq(contas.nichoId, nichoId),
+        inArray(contas.origem, ["curadoria", "pesquisa"]),
+        sql`${contas.removidaEm} is null`,
+      ),
+    )
+    .orderBy(contas.plataforma, contas.handle);
+
+  return linhas.map((l) => ({ ...l, origem: l.origem as "curadoria" | "pesquisa" }));
+}
+
+/** M2, item 6: a rodada mais recente do job pesquisa-de-setor para este nicho, para o admin ver o resumo e aceitar termos/hashtags. */
+export async function ultimaPesquisaDeSetor(nichoId: number): Promise<{ criadoEm: Date; resumo: ResumoPesquisaSetor } | null> {
+  const [linha] = await db()
+    .select({ criadoEm: pesquisasSetor.criadoEm, resumo: pesquisasSetor.resumo })
+    .from(pesquisasSetor)
+    .where(eq(pesquisasSetor.nichoId, nichoId))
+    .orderBy(desc(pesquisasSetor.criadoEm))
+    .limit(1);
+  return linha ?? null;
 }
 
 export type StatusMetaApi = {

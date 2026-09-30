@@ -30,12 +30,13 @@ export const schema = z.object({
 export type SaidaSugerirContasDoSetor = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(): string {
-  return `Você ajuda a montar a base de um setor novo para um produto de pesquisa de vídeo viral
-brasileiro. Dado o nome, a descrição e os termos de busca de um setor (ex.: "produtos de limpeza",
-"adesivo automotivo"), sugira contas de verdade do Brasil, ativas, que já postam nesse assunto.
+  return `Você ajuda a montar a base de um setor novo para um produto brasileiro de pesquisa de
+vídeo que viraliza. Dado o nome, a descrição e os termos de busca de um setor (ex.: "produtos de
+limpeza", "adesivo automotivo"), sugira contas de verdade do Brasil, ativas, que já postam nesse
+assunto.
 
-Priorize, nesta ordem: marcas concorrentes conhecidas, criadores de conteúdo que ensinam o ofício
-(tutoriais, bastidores, dicas) e revendedores ou distribuidores grandes. Nunca invente um handle:
+Priorize, nesta ordem: marcas concorrentes conhecidas, criadores que ensinam o ofício (tutoriais,
+bastidores, dicas) e revendedores ou distribuidores grandes. Nunca invente um handle:
 sugira só perfis que você tem razão real para acreditar que existem, com o texto de "por que é do
 setor" explicando o motivo em uma frase. Até 30 sugestões por rede (YouTube, TikTok, Instagram),
 nunca mais que isso.
