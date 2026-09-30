@@ -59,6 +59,17 @@ const ESPERA_POPSTATE_MS = 4000;
  * direto para a tela de antes da folha abrir (a entrada que ela empurrou virou
  * a URL nova, não existe mais como "voltar para a folha aberta").
  *
+ * `navegar` roda dois `requestAnimationFrame` depois do fechamento, nunca no
+ * mesmo tique (F1, item 2a, `PROXIMO.md`): o CI viu a folha fechar e a URL
+ * nunca mudar, na primeira navegação de uma sessão nova (`referencias.spec.ts`,
+ * "o Voltar do aparelho..." e "'Limpar os filtros'..."), sem reproduzir local
+ * com freio de CPU até 80x nem com atraso de rede; a suspeita, não provada, é
+ * uma corrida entre o fechamento (que muda `history.state` por cima da marca
+ * que `empurrar` pôs) e o `router.replace` disparado no mesmo evento de clique.
+ * Separar os dois em tiques diferentes custa dois quadros (imperceptível) e
+ * não piora o caminho que já funciona; a prova de verdade é o CI cinco vezes
+ * verde no mesmo commit, não um laço local (`PROXIMO.md`, item 6).
+ *
  * O efeito não desfaz nada na limpeza de propósito: em desenvolvimento o
  * React executa cada efeito duas vezes, e um `history.back()` na limpeza
  * fecharia a folha sozinha.
@@ -146,7 +157,9 @@ export function useFolhaNoHistorico(
     if (aoFecharRef.current() === false) return;
     // A entrada empurrada (se existia) vira a URL nova: não sobra como "voltar para a folha aberta".
     empurradoRef.current = false;
-    navegar();
+    // Dois quadros depois do fechamento, nunca no mesmo tique (F1, item 2a): ver o comentário
+    // acima da função.
+    requestAnimationFrame(() => requestAnimationFrame(navegar));
   }, []);
 
   return { fechar, fecharEDepois, fecharENavegar };

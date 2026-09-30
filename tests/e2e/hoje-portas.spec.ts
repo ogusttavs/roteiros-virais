@@ -9,6 +9,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -37,6 +38,10 @@ async function entrar(page: Page) {
 
 test.describe("V12, o Hoje em duas portas", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-hoje-portas"));
+    if (jaExiste) return;
+
     const [nicho] = await db().insert(nichos).values({ slug: "e2e-hoje-portas", nome: "[teste] Hoje portas" }).returning();
 
     await db().insert(user).values({ id: "e2e-hoje-portas", name: "[teste] Hoje portas", email: EMAIL });

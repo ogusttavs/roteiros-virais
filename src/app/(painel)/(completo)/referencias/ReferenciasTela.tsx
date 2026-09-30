@@ -148,6 +148,20 @@ export function ReferenciasTela({
   // Aba e período mostram a escolha na hora; o valor de verdade chega com a página nova e a tela volta a ele sozinha.
   const [segmentoExibido, setSegmentoOtimista] = useOptimistic(segmento);
   const [periodoExibido, setPeriodoOtimista] = useOptimistic(periodoDias);
+  /**
+   * F1, item 3 (modo B): a folha "Filtrar" nasce de `plataformasAtivas`/`formatosAtivos`, as props
+   * confirmadas pelo servidor. Se ela reabrir enquanto uma navegação anterior ainda não voltou (o
+   * "Limpar" de uma volta anterior, por exemplo), essas props continuam com o valor de ANTES daquela
+   * navegação, e a folha nasce marcada com o que já foi pedido, não com o que está na tela. A pessoa
+   * então desmarca o que já estava pedindo para sumir, "Ver os N vídeos" monta a mesma URL que já está
+   * pendente, e a chamada nova é descartada (`navegar` só bloqueia URL igual à pendente) ou, pior, as
+   * duas chamadas ficam em voo e a que volta por último decide a URL final, não a mais recente (achado
+   * do CI, `referencias.spec.ts:316`, volta 4: pediu tiktok, ficou todas). Otimista junto de
+   * `segmentoOtimista` e `periodoOtimista`: a folha sempre nasce do que foi pedido, nunca do que ainda
+   * não voltou.
+   */
+  const [plataformasExibidas, setPlataformasOtimista] = useOptimistic(plataformasAtivas);
+  const [formatosExibidos, setFormatosOtimista] = useOptimistic(formatosAtivos);
   const urlPendente = useRef<string | null>(null);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
   const detalheAtual = useRef<number | null>(null);
@@ -164,7 +178,7 @@ export function ReferenciasTela({
   const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
   const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
-  const quantosFiltrosAtivos = plataformasAtivas.length + formatosAtivos.length;
+  const quantosFiltrosAtivos = plataformasExibidas.length + formatosExibidos.length;
 
   /**
    * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
@@ -193,8 +207,11 @@ export function ReferenciasTela({
       segmento,
       periodoDias,
       busca: campoBusca,
-      plataformas: plataformasAtivas,
-      formatos: formatosAtivos,
+      // Otimista, não a prop (F1, item 3, modo B): uma mudança que não mexe em plataforma ou formato
+      // (período, busca) não pode reverter um filtro que a pessoa acabou de pedir e ainda não voltou
+      // do servidor.
+      plataformas: plataformasExibidas,
+      formatos: formatosExibidos,
       ...mudanca,
     };
     const url = montarUrl(filtros);
@@ -204,12 +221,32 @@ export function ReferenciasTela({
     iniciarNavegacao(() => {
       setSegmentoOtimista(filtros.segmento);
       setPeriodoOtimista(filtros.periodoDias);
+      setPlataformasOtimista(filtros.plataformas);
+      setFormatosOtimista(filtros.formatos);
       // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
       // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
       // navegação da pessoa e continua entrando no histórico como sempre.
       if (opcoes.substituir) router.replace(url);
       else router.push(url);
     });
+    /**
+     * F1, item 2 (modo A e o achado que apareceu testando o modo B): o `router.replace`/`push` do App
+     * Router às vezes busca a página nova (o pedido chega no servidor, a resposta volta 200) e nunca
+     * termina de aplicar, sem erro nenhum, sem `navegando` voltar a `false`; reproduzido com freio de
+     * CPU e um atraso no `_rsc`, mas não com repetição rápida sem nenhum dos dois, e continua
+     * acontecendo com a folha sem disputar o histórico (item 3) e com `fecharENavegar` nunca no mesmo
+     * tique (item 2a), então não é esta tela que decide errado, é a navegação que não termina. Sem saber
+     * a causa exata dentro do App Router, a rede de segurança: se depois de um tempo generoso a URL
+     * ainda não é a que foi pedida (e ninguém pediu outra coisa depois), força uma navegação de
+     * verdade. É o último recurso, não o primeiro: só dispara quando o caminho normal já deveria ter
+     * terminado.
+     */
+    setTimeout(() => {
+      if (urlPendente.current !== url) return;
+      const atual = window.location.pathname + window.location.search;
+      if (atual === url) return;
+      window.location.assign(url);
+    }, 6000);
   }
 
   /**
@@ -340,6 +377,10 @@ export function ReferenciasTela({
             variante="secundario"
             tamanho="md"
             aria-busy={navegando || undefined}
+            // F1, item 3 (modo B): sem isto, a folha podia abrir de novo antes de uma navegação
+            // anterior voltar, nascendo com plataformasAtivas/formatosAtivos ainda desatualizados e
+            // as duas chamadas de `navegar` ficando em voo ao mesmo tempo (achado do CI).
+            disabled={navegando}
             onClick={() => setFolhaFiltrarAberta(true)}
             className={styles.botaoFiltrar}
           >
@@ -432,8 +473,8 @@ export function ReferenciasTela({
         <FolhaFiltrarReferencias
           aberto
           aoFechar={filtrar.fechar}
-          plataformasAtivas={plataformasAtivas}
-          formatosAtivos={formatosAtivos}
+          plataformasAtivas={plataformasExibidas}
+          formatosAtivos={formatosExibidos}
           contagens={contagensFiltro}
           totalAtual={total}
           onAplicar={aplicarFiltros}

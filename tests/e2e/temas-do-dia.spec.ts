@@ -43,6 +43,10 @@ async function entrar(page: Page, email: string) {
 
 test.describe("temas do dia pela tela", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-temas"));
+    if (jaExiste) return;
+
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 
     await db().insert(user).values({

@@ -189,6 +189,30 @@ describe("mudarTipoMarca apaga o briefing (P1, item 1)", () => {
     expect(depois.completo).toBe(false);
     expect(depois.perfil).toBeNull();
   });
+
+  /** F1, item 5: pedir o tipo que a marca já tem não pode custar o briefing (achado da revisão do PR #70). */
+  it("pedir o mesmo tipo que a marca já tem não apaga o briefing", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-mesmo-tipo", name: "[teste] Mesmo tipo", email: "mesmotipo@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Mesmo tipo", nichoId, tipo: "negocio" })
+      .returning();
+
+    for (const pergunta of perguntasDoBriefing("negocio")) {
+      await avaliarResposta(cliente.id, pergunta.id, respostaConcreta(pergunta.id), "negocio");
+    }
+    const antes = await garantirBriefing(cliente.id);
+    expect(antes.completo).toBe(true);
+
+    const clienteTrocado = await mudarTipoMarca(cliente.id, "negocio");
+    expect(clienteTrocado.tipo).toBe("negocio");
+
+    const depois = await garantirBriefing(cliente.id);
+    expect(depois).toEqual(antes);
+  });
 });
 
 describe("briefing: isolamento entre clientes", () => {

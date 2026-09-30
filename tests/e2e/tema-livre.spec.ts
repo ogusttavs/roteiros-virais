@@ -19,6 +19,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -71,6 +72,10 @@ function briefingCompletoExemplo() {
 
 test.describe("tema livre pela tela, os cinco estados", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-tema-livre"));
+    if (jaExiste) return;
+
     const [nichoUm] = await db()
       .insert(nichos)
       .values({ slug: "e2e-tema-livre-um", nome: "[teste] Tema Livre Um" })
