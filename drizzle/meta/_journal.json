@@ -267,6 +267,13 @@
       "when": 1790799195895,
       "tag": "0037_nichos-regua-por-setor",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790811114998,
+      "tag": "0038_briefing-transcricoes-brutas",
+      "breakpoints": true
     }
   ]
 }

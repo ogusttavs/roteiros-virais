@@ -1,8 +1,8 @@
 "use server";
 
 import { sessaoAtual } from "@/lib/sessao";
-import { ErroAcessoNegado } from "@/servicos/clientes";
 import { organizarFalaBriefing } from "@/servicos/briefing";
+import { ErroAcessoNegado } from "@/servicos/clientes";
 
 /**
  * P2, item 3: o caminho por áudio de `PerguntaCampo` passa por aqui depois de `/api/transcrever`

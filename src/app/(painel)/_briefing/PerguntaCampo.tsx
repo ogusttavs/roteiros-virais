@@ -17,9 +17,9 @@ import { Toast } from "@/ui/componentes/Toast";
 import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { organizarFalaBriefingAction } from "./acoes";
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
 
+import { organizarFalaBriefingAction } from "./acoes";
 import styles from "./PerguntaCampo.module.css";
 
 export type ResultadoAcaoBriefing = {
