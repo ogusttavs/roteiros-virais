@@ -110,6 +110,12 @@ export const config = {
      * nem inscreve (mesmo mecanismo `condicao` de `metaAtivo`).
      */
     coletaMeioDia: env("COLETA_MEIO_DIA") === "1",
+    /**
+     * P2, item 0b da revisão do PR #74: cada termo custa 200 unidades do YouTube (duas buscas,
+     * `pesquisa-de-setor.ts`); com 9.000 por dia e uma pesquisa por setor por mês, cabem 8 a 10.
+     * Os termos mais curtos entram primeiro (são os mais genéricos, acham mais candidato).
+     */
+    termosPesquisaSetor: envNumero("TERMOS_PESQUISA_SETOR", 8),
   },
   email: {
     resendKey: env("RESEND_API_KEY"),
@@ -169,6 +175,13 @@ export const config = {
      * de 50 mil. `ALCANCE_MINIMO_CONTA_SETOR` ajusta sem mexer em código.
      */
     alcanceMinimoContaSetor: envNumero("ALCANCE_MINIMO_CONTA_SETOR", 5_000),
+    /**
+     * M3, item 2: teto diário próprio da análise de vídeo sem fala (quadros + legenda), separado
+     * de `visuaisPorSemana` (que é semanal e exige transcrição e análise já prontas). Só roda para
+     * setor com `nichos.video_sem_fala_vale` true (`reguaDoSetor`); mais caro que a extração por
+     * transcrição (baixa o vídeo e chama o modelo forte com imagem), por isso um teto conservador.
+     */
+    analiseSemFalaPorDia: envNumero("ANALISE_SEM_FALA_POR_DIA", 15),
   },
 };
 

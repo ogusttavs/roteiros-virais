@@ -57,18 +57,19 @@ async function nichosParaAnaliseImediata(nichoId?: number): Promise<{ id: number
 
 type CandidatoImediato = { id: number; titulo: string | null; transcricao: string | null };
 
-async function candidatosDoSetor(nichoId: number): Promise<CandidatoImediato[]> {
+/**
+ * `contasIds` (P2, item 0a): escopa aos vídeos dessas contas, em vez de todo o setor. Usado pela
+ * primeira carga do `pesquisa-de-setor.ts`, que quer analisar só as contas que acabou de
+ * cadastrar, mesmo num setor já estabelecido (com 20 ou mais vídeos analisados no total).
+ */
+async function candidatosDoSetor(nichoId: number, contasIds?: number[]): Promise<CandidatoImediato[]> {
+  const condicoes = [eq(videos.nichoId, nichoId), isNotNull(videos.transcricao), isNull(videos.analise), DENTRO_DO_TETO_DE_DURACAO];
+  if (contasIds && contasIds.length > 0) condicoes.push(inArray(videos.contaId, contasIds));
+
   return db()
     .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao })
     .from(videos)
-    .where(
-      and(
-        eq(videos.nichoId, nichoId),
-        isNotNull(videos.transcricao),
-        isNull(videos.analise),
-        DENTRO_DO_TETO_DE_DURACAO,
-      ),
-    )
+    .where(and(...condicoes))
     .orderBy(sql`${videos.foraDaCurva} desc nulls last`, desc(videos.views))
     .limit(LIMITE_CANDIDATOS_IMEDIATO);
 }
@@ -114,12 +115,95 @@ async function extrairUmVideo(
   return { reprovadoPorIdioma };
 }
 
+type ResultadoNicho = {
+  videosAnalisados: number;
+  transcricaoCurtaDemais: number;
+  reprovadosPorIdioma: number;
+  temaEnfileirado: boolean;
+  erros: string[];
+};
+
+async function processarNicho(nicho: { id: number; slug: string }, candidatos: CandidatoImediato[]): Promise<ResultadoNicho> {
+  const curtos = candidatos.filter((v) => (v.transcricao ?? "").trim().length < TAMANHO_MINIMO_TRANSCRICAO);
+  const prontos = candidatos.filter((v) => (v.transcricao ?? "").trim().length >= TAMANHO_MINIMO_TRANSCRICAO);
+  const resultado: ResultadoNicho = { videosAnalisados: 0, transcricaoCurtaDemais: 0, reprovadosPorIdioma: 0, temaEnfileirado: false, erros: [] };
+
+  if (curtos.length > 0) {
+    await db()
+      .update(videos)
+      .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+      .where(
+        inArray(
+          videos.id,
+          curtos.map((v) => v.id),
+        ),
+      );
+    resultado.transcricaoCurtaDemais = curtos.length;
+  }
+
+  if (prontos.length === 0) return resultado;
+
+  const [linhaNicho] = await db().select({ nome: nichos.nome, termos: nichos.termos }).from(nichos).where(eq(nichos.id, nicho.id));
+  if (!linhaNicho) return resultado;
+
+  let algumAnalisado = false;
+  for (const video of prontos) {
+    try {
+      const { reprovadoPorIdioma } = await extrairUmVideo(video, linhaNicho.nome, linhaNicho.termos);
+      resultado.videosAnalisados += 1;
+      algumAnalisado = true;
+      if (reprovadoPorIdioma) resultado.reprovadosPorIdioma += 1;
+    } catch (erro) {
+      resultado.erros.push(`setor "${nicho.slug}", video ${video.id}: ${erro instanceof Error ? erro.message : String(erro)}`);
+    }
+  }
+
+  // M1, item 2: os temas nascem quando a análise chega, não só às 06:30; `temasDoDia` com
+  // `nichoId` confere sozinho se o setor já tem tema hoje e pula se tiver. A fila nunca
+  // derruba a análise (mesma regra de `reprovarERescrever`, E27 parte 2): se o pg-boss
+  // estiver fora do ar, o erro fica só no log.
+  if (algumAnalisado) {
+    try {
+      await garantirBossPronto();
+      await boss().send(FILAS.temasDoDia, { nichoId: nicho.id });
+      resultado.temaEnfileirado = true;
+    } catch (erro) {
+      logger.error({ err: erro, nichoId: nicho.id }, "nao foi possivel enfileirar temas-do-dia depois da analise imediata");
+    }
+  }
+
+  return resultado;
+}
+
 /**
- * `nichoId` presente: só aquele setor (o "rodar agora" do admin, item 4). Ausente: todos os
- * setores ativos com menos de `LIMITE_ANALISADOS_SETOR_NOVO` analisados (chamado por
- * `rodarExtrair`, antes de montar o lote do dia).
+ * `nichoId` presente, sem `opts`: só aquele setor, com a regra de sempre (menos de
+ * `LIMITE_ANALISADOS_SETOR_NOVO` no total, o "rodar agora" do admin, item 4). Ausente: todos os
+ * setores ativos que se qualificam (chamado por `rodarExtrair`, antes de montar o lote do dia).
+ *
+ * `opts.contasIds` (P2, item 0a): ignora a regra de setor novo e analisa só os vídeos dessas
+ * contas, até o mesmo teto de `LIMITE_CANDIDATOS_IMEDIATO`. Usado pela primeira carga do
+ * `pesquisa-de-setor.ts`: um setor já estabelecido (52 vídeos analisados, por exemplo) não entra
+ * mais no caminho de setor novo, mas as contas que a pesquisa acabou de cadastrar ainda merecem
+ * leitura imediata, sem esperar o lote da madrugada. Exige `nichoId`.
  */
-export async function rodarExtrairAgora(nichoId?: number): Promise<Record<string, unknown>> {
+export async function rodarExtrairAgora(nichoId?: number, opts?: { contasIds?: number[] }): Promise<Record<string, unknown>> {
+  if (opts?.contasIds && opts.contasIds.length > 0) {
+    if (nichoId === undefined) throw new Error("rodarExtrairAgora: contasIds precisa de nichoId");
+    const [nicho] = await db().select({ id: nichos.id, slug: nichos.slug }).from(nichos).where(eq(nichos.id, nichoId));
+    if (!nicho) return { setoresNovos: 0, videosAnalisados: 0, transcricaoCurtaDemais: 0, reprovadosPorIdioma: 0, setoresComTemaEnfileirado: 0 };
+
+    const candidatos = await candidatosDoSetor(nichoId, opts.contasIds);
+    const resultado = await processarNicho(nicho, candidatos);
+    return {
+      setoresNovos: 1,
+      videosAnalisados: resultado.videosAnalisados,
+      transcricaoCurtaDemais: resultado.transcricaoCurtaDemais,
+      reprovadosPorIdioma: resultado.reprovadosPorIdioma,
+      setoresComTemaEnfileirado: resultado.temaEnfileirado ? 1 : 0,
+      erros: resultado.erros.length > 0 ? resultado.erros : undefined,
+    };
+  }
+
   const nichosNovos = await nichosParaAnaliseImediata(nichoId);
 
   let videosAnalisados = 0;
@@ -130,52 +214,12 @@ export async function rodarExtrairAgora(nichoId?: number): Promise<Record<string
 
   for (const nicho of nichosNovos) {
     const candidatos = await candidatosDoSetor(nicho.id);
-    const curtos = candidatos.filter((v) => (v.transcricao ?? "").trim().length < TAMANHO_MINIMO_TRANSCRICAO);
-    const prontos = candidatos.filter((v) => (v.transcricao ?? "").trim().length >= TAMANHO_MINIMO_TRANSCRICAO);
-
-    if (curtos.length > 0) {
-      await db()
-        .update(videos)
-        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
-        .where(
-          inArray(
-            videos.id,
-            curtos.map((v) => v.id),
-          ),
-        );
-      transcricaoCurtaDemais += curtos.length;
-    }
-
-    if (prontos.length === 0) continue;
-
-    const [linhaNicho] = await db().select({ nome: nichos.nome, termos: nichos.termos }).from(nichos).where(eq(nichos.id, nicho.id));
-    if (!linhaNicho) continue;
-
-    let algumAnalisado = false;
-    for (const video of prontos) {
-      try {
-        const { reprovadoPorIdioma } = await extrairUmVideo(video, linhaNicho.nome, linhaNicho.termos);
-        videosAnalisados += 1;
-        algumAnalisado = true;
-        if (reprovadoPorIdioma) reprovadosPorIdioma += 1;
-      } catch (erro) {
-        erros.push(`setor "${nicho.slug}", video ${video.id}: ${erro instanceof Error ? erro.message : String(erro)}`);
-      }
-    }
-
-    // M1, item 2: os temas nascem quando a análise chega, não só às 06:30; `temasDoDia` com
-    // `nichoId` confere sozinho se o setor já tem tema hoje e pula se tiver. A fila nunca
-    // derruba a análise (mesma regra de `reprovarERescrever`, E27 parte 2): se o pg-boss
-    // estiver fora do ar, o erro fica só no log.
-    if (algumAnalisado) {
-      try {
-        await garantirBossPronto();
-        await boss().send(FILAS.temasDoDia, { nichoId: nicho.id });
-        setoresComTemaEnfileirado += 1;
-      } catch (erro) {
-        logger.error({ err: erro, nichoId: nicho.id }, "nao foi possivel enfileirar temas-do-dia depois da analise imediata");
-      }
-    }
+    const resultado = await processarNicho(nicho, candidatos);
+    videosAnalisados += resultado.videosAnalisados;
+    transcricaoCurtaDemais += resultado.transcricaoCurtaDemais;
+    reprovadosPorIdioma += resultado.reprovadosPorIdioma;
+    if (resultado.temaEnfileirado) setoresComTemaEnfileirado += 1;
+    erros.push(...resultado.erros);
   }
 
   return {

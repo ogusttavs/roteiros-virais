@@ -17,6 +17,7 @@ import { db } from "@/db";
 import {
   contas,
   modelosNicho,
+  nichos,
   videos,
   type AnaliseVideo,
   type AnaliseVisual,
@@ -67,6 +68,39 @@ export type VideoRankeado = {
  */
 export function incluirSeed(): boolean {
   return process.env.NODE_ENV === "development";
+}
+
+/** M3: os três ajustes por setor, sempre resolvidos (nunca `null`: `reguaDoSetor` já aplica o padrão). */
+export type ReguaSetor = {
+  pisoViews: number;
+  proporcaoBrasil: number;
+  videoSemFalaVale: boolean;
+};
+
+/**
+ * M3, a régua por setor: piso de views, proporção mínima de vídeo brasileiro e "vídeo sem fala
+ * vale" eram globais (`config.regras`); agora cada setor pode ajustar os três no admin, sem
+ * mexer em `.env` nem em código (colunas de `nichos`, anuláveis; nulo usa o padrão de
+ * `config.regras`, "voltar ao padrão" só grava nulo de novo). Única função que lê essas três
+ * colunas: toda consulta de `pesquisa.ts` e os jobs `pontuar`, `transcrever`, `extrair-agora` e a
+ * análise visual passam por aqui, nunca direto em `config.regras`. O teto de duração (180 s) fica
+ * de fora de propósito: vídeo curto é regra do produto, não do setor.
+ */
+export async function reguaDoSetor(nichoId: number): Promise<ReguaSetor> {
+  const [linha] = await db()
+    .select({
+      pisoViews: nichos.pisoViews,
+      proporcaoBrasil: nichos.proporcaoBrasil,
+      videoSemFalaVale: nichos.videoSemFalaVale,
+    })
+    .from(nichos)
+    .where(eq(nichos.id, nichoId));
+
+  return {
+    pisoViews: linha?.pisoViews ?? config.regras.pisoViewsReferencia,
+    proporcaoBrasil: linha?.proporcaoBrasil == null ? config.regras.proporcaoBrasil : Number(linha.proporcaoBrasil),
+    videoSemFalaVale: linha?.videoSemFalaVale ?? false,
+  };
 }
 
 /**
@@ -209,12 +243,14 @@ export async function foraDaCurvaDoNicho(
   limite?: number,
   maxPorConta?: number,
 ): Promise<VideoRankeado[]> {
+  const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(dias)),
     // V9d, item 0b: o piso vem antes do múltiplo, também na seleção de leitura (transcrição e
     // análise usam esta função via `transcrever.ts`): ler primeiro o que passa do piso.
-    gte(videos.views, config.regras.pisoViewsReferencia),
+    // M3: o piso é do setor (`reguaDoSetor`), não mais global.
+    gte(videos.views, regua.pisoViews),
     isNotNull(videos.foraDaCurva),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
@@ -242,10 +278,14 @@ export async function foraDaCurvaDoNicho(
  * de `foraDaCurvaDoNicho`.
  */
 export async function subindoHoje(nichoId: number, limite?: number, maxPorConta?: number): Promise<VideoRankeado[]> {
+  const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
     lte(videos.publicadoEm, diasAtras(2)),
     gte(videos.publicadoEm, diasAtras(7)),
+    // M3: mesmo piso do setor que "fora da curva" e Referências; sem ele, "subindo hoje" mostrava
+    // vídeo com poucas views só porque a velocidade relativa da conta é alta.
+    gte(videos.views, regua.pisoViews),
     isNotNull(videos.velocidadeRelativa),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
@@ -275,10 +315,12 @@ export type VideoComAssunto = { id: number; assunto: string; velocidadeRelativa:
  * conta; sem `analise` não tem assunto para o tema descrever.
  */
 export async function subindoHojeComAnalise(nichoId: number, limite = 30): Promise<VideoComAssunto[]> {
+  const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
     lte(videos.publicadoEm, diasAtras(2)),
     gte(videos.publicadoEm, diasAtras(7)),
+    gte(videos.views, regua.pisoViews),
     isNotNull(videos.velocidadeRelativa),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
@@ -359,7 +401,7 @@ export function palavrasChave(texto: string): string[] {
  * `TODO.md`), só `lower()`: "não" buscado não casa "nao" numa etiqueta, e
  * vice versa.
  */
-function condicoesEvidencia(nichoId: number, texto: string) {
+function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor) {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
   // "text[]" pede um array de verdade; um array JS interpolado direto vira
@@ -376,8 +418,8 @@ function condicoesEvidencia(nichoId: number, texto: string) {
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(90)),
     // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); vale para a
-    // evidência do tema e do roteiro tanto quanto para a biblioteca de referências.
-    gte(videos.views, config.regras.pisoViewsReferencia),
+    // evidência do tema e do roteiro tanto quanto para a biblioteca de referências. M3: piso do setor.
+    gte(videos.views, regua.pisoViews),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
@@ -407,8 +449,10 @@ export async function evidenciaParaTema(
   nichoId: number,
   texto: string,
   limite = 8,
-  proporcaoBrasil = config.regras.proporcaoBrasil,
+  proporcaoBrasilExplicita?: number,
 ): Promise<VideoEvidenciaTema[]> {
+  const regua = await reguaDoSetor(nichoId);
+  const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
   const linhas = await db()
     .select({
       id: videos.id,
@@ -420,7 +464,7 @@ export async function evidenciaParaTema(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto)))
+    .where(and(...condicoesEvidencia(nichoId, texto, regua)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
@@ -513,6 +557,7 @@ export async function evidenciaParaRoteiro(
   texto: string,
   limite = 8,
 ): Promise<VideoEvidenciaRoteiro[]> {
+  const regua = await reguaDoSetor(nichoId);
   const linhas = await db()
     .select({
       id: videos.id,
@@ -529,7 +574,7 @@ export async function evidenciaParaRoteiro(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto)))
+    .where(and(...condicoesEvidencia(nichoId, texto, regua)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
@@ -677,13 +722,13 @@ export type ResultadoReferencias = {
 };
 
 /** As condições que a lista e a contagem de `referenciasDoNicho` compartilham (V6, item 1). */
-function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias) {
+function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regua: ReguaSetor) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(filtros.periodoDias ?? 7)),
     // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
-    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho.
-    gte(videos.views, config.regras.pisoViewsReferencia),
+    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho. M3: piso do setor.
+    gte(videos.views, regua.pisoViews),
     gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
@@ -731,9 +776,10 @@ export async function referenciasDoNicho(
   nichoId: number,
   filtros: FiltrosReferencias = {},
 ): Promise<ResultadoReferencias> {
+  const regua = await reguaDoSetor(nichoId);
   const limite = filtros.limite ?? 60;
-  const proporcaoBrasil = filtros.proporcaoBrasil ?? config.regras.proporcaoBrasil;
-  const condicoes = condicoesReferencias(nichoId, filtros);
+  const proporcaoBrasil = filtros.proporcaoBrasil ?? regua.proporcaoBrasil;
+  const condicoes = condicoesReferencias(nichoId, filtros, regua);
 
   const [linhas, contagem] = await Promise.all([
     db()
@@ -829,7 +875,8 @@ export async function contagensPorFiltroReferencias(
   nichoId: number,
   filtros: Pick<FiltrosReferencias, "periodoDias" | "busca" | "apenasIds"> = {},
 ): Promise<ContagensFiltroReferencias> {
-  const condicoes = condicoesReferencias(nichoId, filtros);
+  const regua = await reguaDoSetor(nichoId);
+  const condicoes = condicoesReferencias(nichoId, filtros, regua);
 
   const [porPlataformaLinhas, porFormatoLinhas] = await Promise.all([
     db()
@@ -1028,8 +1075,33 @@ export type EstatisticasSetor = {
  * `condicoesReferencias`, as mesmas condições que a tela usa, para a contagem nunca divergir de
  * novo.
  */
+export type EfeitoPiso = { acima7Dias: number; acima30Dias: number };
+
+/**
+ * M3, item 3: "ao mexer num dos três, a tela diz quantos vídeos do setor passariam nos últimos 7
+ * e 30 dias com o valor novo". Só o piso de views muda uma contagem de verdade (as outras
+ * condições de `condicoesReferencias` continuam as de agora): a proporção de vídeo brasileiro só
+ * redistribui dentro do que já passa, nunca muda o total; "vídeo sem fala vale" não decide quem é
+ * referência, decide quem ganha análise (`contagemElegivelSemFala`, `extrair-sem-fala.ts`).
+ */
+export async function efeitoPiso(nichoId: number, pisoViewsProposto: number): Promise<EfeitoPiso> {
+  const reguaProposta: ReguaSetor = { pisoViews: pisoViewsProposto, proporcaoBrasil: 1, videoSemFalaVale: false };
+  const acima = (dias: number) => and(...condicoesReferencias(nichoId, { periodoDias: dias }, reguaProposta));
+
+  const [linha] = await db()
+    .select({
+      acima7Dias: sql<number>`count(*) filter (where ${acima(7)})::int`,
+      acima30Dias: sql<number>`count(*) filter (where ${acima(30)})::int`,
+    })
+    .from(videos)
+    .where(eq(videos.nichoId, nichoId));
+
+  return { acima7Dias: linha?.acima7Dias ?? 0, acima30Dias: linha?.acima30Dias ?? 0 };
+}
+
 export async function estatisticasDoSetor(nichoId: number): Promise<EstatisticasSetor> {
-  const acimaDoPiso = (dias: number) => and(...condicoesReferencias(nichoId, { periodoDias: dias }));
+  const regua = await reguaDoSetor(nichoId);
+  const acimaDoPiso = (dias: number) => and(...condicoesReferencias(nichoId, { periodoDias: dias }, regua));
 
   // `count(...)` do Postgres devolve bigint, que o driver le como string em JS; ::int converte
   // na propria consulta (a contagem nunca chega perto de estourar um int de verdade aqui).

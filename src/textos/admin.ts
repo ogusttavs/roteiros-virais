@@ -202,6 +202,27 @@ export const textosAdmin = {
     colunaMetaUso: "uso",
     metaChamadasNaHora: "chamadas na hora",
     metaHashtagsNaSemana: "hashtags na semana",
+    /** M3: os três ajustes por setor (piso de views, proporção mínima de vídeo brasileiro, vídeo sem fala vale). */
+    reguaTitulo: "régua deste setor",
+    reguaAjuda: "esses três ajustes valem só para este setor; sem mexer, o setor usa o padrão do produto. Afetam Referências, os temas do dia e a evidência do roteiro deste setor, na hora.",
+    campoPisoViews: "piso de views",
+    ajudaPisoViews: "abaixo desse número de views, o vídeo nunca vira referência, tema nem evidência de roteiro, mesmo bem acima da curva da conta.",
+    padraoPisoViews: (valor: string) => `padrão do produto: ${valor} views`,
+    campoProporcaoBrasil: "mínimo de vídeo brasileiro",
+    ajudaProporcaoBrasil: "de cada lista de referências e evidências, quanto tem que ser de conta brasileira; o resto pode vir de fora só quando faltar brasileiro suficiente para completar.",
+    padraoProporcaoBrasil: (valor: string) => `padrão do produto: ${valor}`,
+    campoVideoSemFalaVale: "vídeo sem fala vale",
+    ajudaVideoSemFalaVale: "quando ligado, um vídeo sem fala (ou com fala baixa demais para transcrever) também pode virar referência: o sistema lê os quadros e a legenda do post no lugar da transcrição, com um teto próprio por dia.",
+    padraoVideoSemFalaVale: "padrão do produto: desligado",
+    botaoVoltarPadrao: "voltar ao padrão",
+    salvarRegua: "salvar régua",
+    salvandoRegua: "salvando",
+    sucessoRegua: "régua salva",
+    efeitoPisoFrase: (acima7: number, acima30: number) =>
+      `com este piso, ${acima7} vídeo${acima7 === 1 ? "" : "s"} passariam nos últimos 7 dias e ${acima30} nos últimos 30.`,
+    efeitoSemFalaFrase: (elegiveis7: number, elegiveis30: number) =>
+      `${elegiveis7} vídeo${elegiveis7 === 1 ? "" : "s"} sem fala ganhariam leitura por imagem nos últimos 7 dias, ${elegiveis30} nos últimos 30.`,
+    calculandoEfeito: "calculando o efeito",
   },
   nichoModelo: {
     voltar: "nicho",

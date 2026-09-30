@@ -56,8 +56,6 @@ import {
 
 /** Até 30 por rede (item 3), nunca mais. */
 const TOP_POR_REDE = 30;
-/** Poucos termos por rodada (item 7, custo e teto): o YouTube gasta 100 unidades por busca de termo. */
-const TERMOS_PARA_BUSCA = 3;
 /** Últimos 90 dias (item 1a), não os 7 da coleta diária: pesquisa de mercado, não "o que subiu hoje". */
 const JANELA_DIAS_BUSCA_YOUTUBE = 90;
 const TRINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -309,10 +307,19 @@ function rankearEcortar(aprovados: CandidatoAprovado[]): CandidatoAprovado[] {
     .slice(0, TOP_POR_REDE);
 }
 
+/**
+ * P2, item 0b da revisão do PR #74: cada termo custa 200 unidades do YouTube (duas buscas), então
+ * só `config.coleta.termosPesquisaSetor` entram por rodada; os mais curtos primeiro, porque são
+ * os mais genéricos (acham mais candidato). Função pura, para testar sem rede nem banco.
+ */
+export function escolherTermosParaPesquisa(termos: string[], limite: number): string[] {
+  return [...termos].sort((a, b) => a.length - b.length).slice(0, limite);
+}
+
 /** YouTube, item 1a: canais que mais aparecem na busca por termo (`type=channel`) e donos dos vídeos mais vistos por termo. */
 async function candidatosYoutubePorTermo(termos: string[]): Promise<string[]> {
   const candidatos = new Set<string>();
-  for (const termo of termos.slice(0, TERMOS_PARA_BUSCA)) {
+  for (const termo of escolherTermosParaPesquisa(termos, config.coleta.termosPesquisaSetor)) {
     const canaisResp = await buscarCanaisPorTermo(termo);
     await registrarConsumo(FONTE_YOUTUBE, CUSTO_SEARCH);
     for (const item of canaisResp.items ?? []) {
@@ -332,7 +339,7 @@ async function candidatosYoutubePorTermo(termos: string[]): Promise<string[]> {
 async function resumoHashtagsDoSetor(termos: string[]): Promise<number> {
   if (!config.coleta.metaAtivo) return 0;
   let reelsFortes = 0;
-  for (const termo of termos.slice(0, TERMOS_PARA_BUSCA)) {
+  for (const termo of escolherTermosParaPesquisa(termos, config.coleta.termosPesquisaSetor)) {
     try {
       const hashtagId = await buscarIdDaHashtag(termo);
       if (!hashtagId) continue;
@@ -533,12 +540,17 @@ async function pesquisarUmSetor(nichoId: number): Promise<Record<string, unknown
    * execução deste job, para o setor criado às 10h ter Referências antes do almoço. Cadeia de
    * verdade: cada passo espera o anterior terminar, ao contrário de `coletarAgoraAction` (item 0b
    * da revisão do PR #73), que só enfileira e não espera nada.
+   *
+   * `contasIds: contasParaPrimeiraCarga` (P2, item 0a da revisão do PR #74): um setor já
+   * estabelecido (20 ou mais vídeos analisados no total) não entra mais no caminho de setor novo
+   * da M1, mas as contas que esta rodada acabou de cadastrar ainda merecem leitura imediata, sem
+   * esperar o lote da madrugada.
    */
   let temasGerados: number | undefined;
   if (contasParaPrimeiraCarga.length > 0) {
     await rodarPontuar();
     await rodarTranscrever(nichoId);
-    await rodarExtrairAgora(nichoId);
+    await rodarExtrairAgora(nichoId, { contasIds: contasParaPrimeiraCarga });
     const temas = await rodarTemasDoDia(nichoId);
     temasGerados = (temas as { gerados?: number }).gerados;
   }

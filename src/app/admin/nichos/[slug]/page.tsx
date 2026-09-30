@@ -139,6 +139,8 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         contasSemente={contasSemente}
         ultimaPesquisa={ultimaPesquisa}
         passo={passo}
+        padraoPisoViews={config.regras.pisoViewsReferencia}
+        padraoProporcaoBrasil={config.regras.proporcaoBrasil}
       />
 
       <section className={styles.secao}>

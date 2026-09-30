@@ -260,6 +260,13 @@
       "when": 1790788874603,
       "tag": "0036_pesquisa-de-setor",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790799195895,
+      "tag": "0037_nichos-regua-por-setor",
+      "breakpoints": true
     }
   ]
 }

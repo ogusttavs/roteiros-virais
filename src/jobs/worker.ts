@@ -31,6 +31,7 @@ import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
+import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
@@ -117,6 +118,10 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.analisarVisual, async () => {
     await executarComRegistro(FILAS.analisarVisual, rodarAnalisarVisual);
+  });
+  /** M3, item 2: sem `nichoId`, roda para todo setor ativo que aceita "vídeo sem fala vale" (o cron diário). */
+  await boss().work<{ nichoId?: number }>(FILAS.extrairSemFala, async (job) => {
+    await executarComRegistro(FILAS.extrairSemFala, () => rodarExtrairSemFala(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.modeloNicho, async () => {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);

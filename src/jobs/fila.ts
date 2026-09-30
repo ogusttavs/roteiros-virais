@@ -34,6 +34,8 @@ export const FILAS = {
   /** M1, item 1: setor com menos de 20 vídeos analisados não espera o lote. */
   extrairAgora: "extrair-agora",
   analisarVisual: "analisar-visual",
+  /** M3, item 2: vídeo sem fala (quadros + legenda), diário, só para setor que aceita. */
+  extrairSemFala: "extrair-sem-fala",
   modeloNicho: "modelo-nicho",
   temasDoDia: "temas-do-dia",
   /** M2: o setor nasce pesquisado (ao criar, "Pesquisar o mercado de novo" no admin, e mensal para os ativos). */

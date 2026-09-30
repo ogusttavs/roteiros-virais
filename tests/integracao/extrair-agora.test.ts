@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { lotesIa, nichos, videos } from "@/db/schema";
+import { contas, lotesIa, nichos, videos } from "@/db/schema";
 import { rodarExtrair } from "@/jobs/extrair";
 import { LIMITE_ANALISADOS_SETOR_NOVO, LIMITE_CANDIDATOS_IMEDIATO, rodarExtrairAgora } from "@/jobs/extrair-agora";
 import { rodarExtrairColeta } from "@/jobs/extrair-coleta";
@@ -33,7 +33,7 @@ const ANALISE_EXEMPLO = {
 async function criarVideo(
   nichoId: number,
   idExterno: string,
-  opcoes: { transcricao?: string; analise?: unknown; foraDaCurva?: string; duracaoS?: number } = {},
+  opcoes: { transcricao?: string; analise?: unknown; foraDaCurva?: string; duracaoS?: number; contaId?: number } = {},
 ) {
   const [v] = await db()
     .insert(videos)
@@ -42,6 +42,7 @@ async function criarVideo(
       idExterno,
       url: `https://exemplo.invalido/${idExterno}`,
       nichoId,
+      contaId: opcoes.contaId,
       titulo: `[exemplo] video ${idExterno}`,
       views: 100,
       transcricao: opcoes.transcricao,
@@ -177,6 +178,49 @@ describe("rodarExtrairAgora", () => {
 
     const [atualizado] = await db().select().from(videos).where(eq(videos.id, doNovo.id));
     expect(atualizado.analise).not.toBeNull();
+  });
+
+  /**
+   * P2, item 0a da revisão do PR #74: a primeira carga de `pesquisa-de-setor.ts` chama
+   * `rodarExtrairAgora` com `contasIds` das contas que acabou de cadastrar; num setor já
+   * estabelecido (20+ analisados no total), isso precisa funcionar mesmo assim, e nunca tocar
+   * vídeo de outra conta do mesmo setor.
+   */
+  it("com contasIds, analisa as contas indicadas mesmo num setor ja estabelecido, sem tocar as outras contas", async () => {
+    await estabelecerNicho(nichoEstabelecidoId);
+    const [contaNova] = await db()
+      .insert(contas)
+      .values({ plataforma: "youtube", handle: "conta-nova-pesquisa", nichoId: nichoEstabelecidoId })
+      .returning({ id: contas.id });
+    const [outraConta] = await db()
+      .insert(contas)
+      .values({ plataforma: "youtube", handle: "conta-de-sempre", nichoId: nichoEstabelecidoId })
+      .returning({ id: contas.id });
+
+    const daContaNova = await criarVideo(nichoEstabelecidoId, "video-da-conta-nova", {
+      transcricao: TRANSCRICAO_BOA,
+      contaId: contaNova.id,
+    });
+    const daOutraConta = await criarVideo(nichoEstabelecidoId, "video-de-outra-conta", {
+      transcricao: TRANSCRICAO_BOA,
+      contaId: outraConta.id,
+    });
+
+    const resumo = await rodarExtrairAgora(nichoEstabelecidoId, { contasIds: [contaNova.id] });
+    expect(resumo.setoresNovos).toBe(1);
+    expect(resumo.videosAnalisados).toBe(1);
+
+    const [videoAnalisado] = await db().select().from(videos).where(eq(videos.id, daContaNova.id));
+    expect(videoAnalisado.analise).not.toBeNull();
+
+    const [videoIntocado] = await db().select().from(videos).where(eq(videos.id, daOutraConta.id));
+    expect(videoIntocado.analise).toBeNull();
+
+    // As contas precisam sair antes do afterEach apagar os videos (FK), senao a referencia fica presa.
+    await db().delete(videos).where(eq(videos.id, daContaNova.id));
+    await db().delete(videos).where(eq(videos.id, daOutraConta.id));
+    await db().delete(contas).where(eq(contas.id, contaNova.id));
+    await db().delete(contas).where(eq(contas.id, outraConta.id));
   });
 });
 

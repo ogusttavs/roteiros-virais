@@ -140,6 +140,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "transcricao dos videos que passaram no filtro, todo dia as 04:00, depois de pontuar",
   },
   {
+    fila: FILAS.extrairSemFala,
+    cron: "40 4 * * *",
+    descricao:
+      "analise de video sem fala por quadros e legenda (M3, so setor que aceita), todo dia as 04:40, depois de meta-hashtags e antes de montar o lote",
+  },
+  {
     fila: FILAS.extrair,
     cron: "0 5 * * *",
     descricao: "monta o lote de extracao, todo dia as 05:00, depois de transcrever",

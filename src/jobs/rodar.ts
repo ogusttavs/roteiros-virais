@@ -20,6 +20,7 @@ import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
+import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { FILAS } from "./fila";
 import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
@@ -71,6 +72,10 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
     return rodarExtrairAgora(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
   },
   [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
+  [FILAS.extrairSemFala]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarExtrairSemFala(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.modeloNicho]: () => rodarModeloNicho(),
   [FILAS.temasDoDia]: () => rodarTemasDoDia(),
   [FILAS.pesquisaDeSetor]: () => {
