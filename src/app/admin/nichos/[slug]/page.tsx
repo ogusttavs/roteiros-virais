@@ -7,14 +7,17 @@ import { FILAS } from "@/jobs/fila";
 import { config } from "@/lib/config";
 import { exigirAdmin } from "@/lib/sessao";
 import {
+  listarContasSemente,
   listarContasVigiadas,
   nichoPorSlug,
   noticiasPorId,
+  passoDoSetor,
   resumoLeituraPorPlataforma,
   resumoMedianaPorPlataforma,
   statusMetaApi,
   temaDoDiaAtual,
   ultimaExecucaoPorJob,
+  ultimaPesquisaDeSetor,
   videosPorId,
 } from "@/servicos/admin-coleta";
 import { estatisticasDoSetor, foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
@@ -75,18 +78,33 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const nicho = await nichoPorSlug(slug);
   if (!nicho) notFound();
 
-  const [foraDaCurva, subindo, vigiadas, temasHoje, ultimasExecucoes, estoquePorPlataforma, statusMeta, resumoLeitura, estatisticas] =
-    await Promise.all([
-      foraDaCurvaDoNicho(nicho.id, 90, 30),
-      subindoHoje(nicho.id, 30),
-      listarContasVigiadas(nicho.id),
-      temaDoDiaAtual(nicho.id),
-      ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
-      resumoMedianaPorPlataforma(nicho.id),
-      config.coleta.metaAtivo ? statusMetaApi() : null,
-      resumoLeituraPorPlataforma(nicho.id),
-      estatisticasDoSetor(nicho.id),
-    ]);
+  const [
+    foraDaCurva,
+    subindo,
+    vigiadas,
+    temasHoje,
+    ultimasExecucoes,
+    estoquePorPlataforma,
+    statusMeta,
+    resumoLeitura,
+    estatisticas,
+    contasSemente,
+    ultimaPesquisa,
+    passo,
+  ] = await Promise.all([
+    foraDaCurvaDoNicho(nicho.id, 90, 30),
+    subindoHoje(nicho.id, 30),
+    listarContasVigiadas(nicho.id),
+    temaDoDiaAtual(nicho.id),
+    ultimaExecucaoPorJob([FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias]),
+    resumoMedianaPorPlataforma(nicho.id),
+    config.coleta.metaAtivo ? statusMetaApi() : null,
+    resumoLeituraPorPlataforma(nicho.id),
+    estatisticasDoSetor(nicho.id),
+    listarContasSemente(nicho.id),
+    ultimaPesquisaDeSetor(nicho.id),
+    passoDoSetor(nicho.id),
+  ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
   const idsEvidenciaNoticias = [
@@ -114,7 +132,14 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         <Link href={`/admin/nichos/${slug}/modelo`}>{t.verModelo}</Link>
       </div>
 
-      <PainelNicho nicho={nicho} jobsColeta={jobsColeta} resumoLeitura={resumoLeitura} />
+      <PainelNicho
+        nicho={nicho}
+        jobsColeta={jobsColeta}
+        resumoLeitura={resumoLeitura}
+        contasSemente={contasSemente}
+        ultimaPesquisa={ultimaPesquisa}
+        passo={passo}
+      />
 
       <section className={styles.secao}>
         <h2>{t.estatisticasTitulo}</h2>

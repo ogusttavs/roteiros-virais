@@ -401,9 +401,12 @@ export const contas = pgTable(
     /**
      * "coleta" veio do motor (upsertConta durante uma coleta), "seed" e
      * exemplo de desenvolvimento, "curadoria" foi acrescentada pelo admin
-     * como conta semente (etapa 24, parte 1). Mesma forma de videos.origem.
+     * como conta semente (etapa 24, parte 1), "pesquisa" foi achada e
+     * conferida pelo job `pesquisa-de-setor` (M2): mesmo tratamento de
+     * semente que "curadoria" na vigilância, só que descoberta pela
+     * máquina em vez de colada pela pessoa. Mesma forma de videos.origem.
      */
-    origem: text("origem").$type<"coleta" | "seed" | "curadoria">().notNull().default("coleta"),
+    origem: text("origem").$type<"coleta" | "seed" | "curadoria" | "pesquisa">().notNull().default("coleta"),
     /**
      * Coleta por perfil falhou de um jeito conhecido e nao vale gastar cota
      * tentando de novo na mesma hora (rodada de acabamento de 06/09, item 2:
@@ -443,10 +446,47 @@ export const contas = pgTable(
      * quando ha pelo menos 3 videos com idioma conhecido; nulo ate la.
      */
     idiomaPrincipal: text("idioma_principal"),
+    /**
+     * "Tirar" uma conta semente no admin do setor (M2, item 3): marca em vez
+     * de apagar, para o histórico de vídeo já coletado continuar valendo.
+     * `pesquisa-de-setor` nunca propõe de novo um handle com `removidaEm`
+     * preenchido, e a vigilância para de marcar `vigiada` para ela.
+     */
+    removidaEm: timestamp("removida_em", { withTimezone: true }),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("contas_plataforma_handle").on(t.plataforma, t.handle)],
 );
+
+/**
+ * Uma linha por rodada do job `pesquisa-de-setor` (M2): quando o setor nasce
+ * pesquisado, quando o admin pede "Pesquisar o mercado de novo", e uma vez
+ * por mês para os setores ativos. `resumo` é a prestação de contas que a
+ * regra do projeto exige (nada entra por memória do modelo, toda conta
+ * proposta é conferida): quantas foram sugeridas, quantas confirmadas na
+ * API, quantas descartadas e por quê, quanto custou, mais os termos e
+ * hashtags extras que a sugestão trouxe, para o admin aceitar com um toque.
+ */
+export const pesquisasSetor = pgTable("pesquisas_setor", {
+  id: id(),
+  nichoId: integer("nicho_id")
+    .notNull()
+    .references(() => nichos.id),
+  resumo: jsonb("resumo").$type<ResumoPesquisaSetor>().notNull(),
+  criadoEm: criadoEm(),
+});
+
+export type ResumoPesquisaSetor = {
+  sugeridas: { youtube: number; instagram: number; tiktok: number };
+  confirmadas: { youtube: number; instagram: number; tiktok: number };
+  /** "sugerido e nao existe", "fora do setor", "nao brasileiro", "video longo demais", "sem alcance", etc, com a contagem. */
+  descartadas: Record<string, number>;
+  contasNovas: number;
+  contasAtualizadas: number;
+  termosSugeridos: string[];
+  hashtagsSugeridas: string[];
+  custo: { unidadesYoutube: number; chamadasMeta: number; resultadosApify: number; custoIaUsd: number };
+};
 
 /**
  * O tipo de abertura de um vídeo (V4, roteiro sem vício, escopo 5.12, item

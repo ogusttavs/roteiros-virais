@@ -1023,6 +1023,25 @@ describe("estatisticasDoSetor", () => {
     expect(estatisticas.acimaDoPiso30Dias).toBe(2);
   });
 
+  it("M2, item 0a: video pontuado mas ainda sem analise nao conta acima do piso", async () => {
+    // fora_da_curva e views ja preenchidos pelo pontuar, mas a extracao ainda nao rodou (analise nulo):
+    // a primeira versao de acimaDoPiso contava este video (PERTENCE_AO_NICHO trata analise nulo como
+    // "nao e false"), porque so exigia foraDaCurva nao nulo, nunca isNotNull(analise).
+    await criarVideo("estat-sem-analise-com-fora-da-curva", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(3),
+      views: config.regras.pisoViewsReferencia + 1,
+      nichoId: nichoEstreitoId,
+      contaId: contaEstreitaId,
+    });
+
+    const estatisticas = await estatisticasDoSetor(nichoEstreitoId);
+    // mesma base do teste anterior: videosAnalisados nao muda (este video nao tem analise),
+    // e acimaDoPiso30Dias tambem nao muda (o video sem analise fica de fora).
+    expect(estatisticas.videosAnalisados).toBe(5);
+    expect(estatisticas.acimaDoPiso30Dias).toBe(2);
+  });
+
   it("com 10 ou mais acima do piso em 30 dias, deixa de ser setor estreito", async () => {
     for (let i = 0; i < 10; i++) {
       await criarVideo(`estat-fartura-${i}`, {

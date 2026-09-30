@@ -114,3 +114,29 @@
   border-top: 1px solid var(--cor-borda);
   margin: 0;
 }
+
+/** M2, item 6: o resumo da última pesquisa de setor, abaixo do botão "pesquisar o mercado de novo". */
+.resumoPesquisa {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-3);
+}
+
+.termosSugeridosLista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  margin: var(--espaco-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/** M2, item 3: cada conta semente com o botão "tirar" ao lado. */
+.linhaContaSemente {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}

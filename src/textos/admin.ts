@@ -126,6 +126,29 @@ export const textosAdmin = {
     botaoAdicionarContas: "adicionar",
     adicionandoContas: "adicionando",
     sucessoContas: (n: number) => (n === 1 ? "1 conta semente adicionada" : `${n} contas semente adicionadas`),
+    /** M2, item 1: "Pesquisar o mercado de novo" enfileira o job pesquisa-de-setor para este setor. */
+    pesquisarMercadoTitulo: "pesquisa de mercado",
+    pesquisarMercadoAjuda: "acha as maiores contas do setor nas redes, confere cada uma de verdade e já traz os primeiros vídeos",
+    pesquisarMercado: "pesquisar o mercado de novo",
+    pesquisando: "pedindo a pesquisa",
+    sucessoPesquisar: "pedido; a pesquisa começa em instantes",
+    ultimaPesquisaEm: (quando: string) => `última pesquisa em ${quando}`,
+    resumoPesquisaConfirmadas: (confirmadas: number, sugeridas: number) =>
+      `${confirmadas} de ${sugeridas} contas sugeridas existiam de verdade e passaram no filtro`,
+    resumoPesquisaContas: (novas: number, atualizadas: number) =>
+      `${novas} conta${novas === 1 ? "" : "s"} nova${novas === 1 ? "" : "s"}, ${atualizadas} já conhecida${atualizadas === 1 ? "" : "s"}`,
+    termosSugeridosAjuda: "termos e hashtags que a pesquisa sugeriu; toque para aceitar",
+    aceitarTermo: "aceitar",
+    contasSementeAtuaisTitulo: "contas semente de hoje",
+    vazioContasSemente: "nenhuma conta semente ainda; adicione uma acima ou espere a pesquisa de mercado.",
+    origemPesquisa: "achada pela pesquisa",
+    origemCuradoria: "cadastrada a mão",
+    tirarConta: "tirar",
+    /** M2, item 4: em que passo o setor está, ao lado de ativo/inativo no topo do painel. */
+    passoPesquisandoContas: "pesquisando contas",
+    passoColetando: "coletando",
+    passoLendo: "lendo",
+    passoPronto: "pronto",
     coletarAgoraTitulo: "coleta deste nicho",
     coletarAgora: "rodar a primeira coleta agora",
     /** M1, item 4: o botão dispara coleta, transcrição e análise imediata em sequência, para o setor novo ficar pronto em minutos. */

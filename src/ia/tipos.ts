@@ -8,8 +8,11 @@ export type { NivelIA };
  * analise ja existente, sem ler transcricao de novo), `lerMomento` (V9a,
  * item 3: separa os campos do momento a partir da transcricao ou do texto
  * digitado na folha "Gravar agora"), `lerAgenda` (V9b, item 1: separa a
- * agenda colada ou falada em dias) e `planejarDia` (V9b, item 2: sugere de
- * 1 a 3 gravacoes por dia do plano).
+ * agenda colada ou falada em dias), `planejarDia` (V9b, item 2: sugere de
+ * 1 a 3 gravacoes por dia do plano), `sugerirContasDoSetor` (M2, item 1c: ate
+ * 30 perfis brasileiros por rede, sempre conferidos na API antes de entrar) e
+ * `classificarContaDoSetor` (M2, item 2: "este perfil e deste setor?", pelos
+ * ultimos titulos/legendas, mesmo criterio do `pertenceAoNicho` por video).
  */
 export type TarefaIA =
   | "avaliarResposta"
@@ -26,7 +29,9 @@ export type TarefaIA =
   | "classificarAbertura"
   | "lerMomento"
   | "lerAgenda"
-  | "planejarDia";
+  | "planejarDia"
+  | "sugerirContasDoSetor"
+  | "classificarContaDoSetor";
 
 export type ImagemEntrada = {
   base64: string;

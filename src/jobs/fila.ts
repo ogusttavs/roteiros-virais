@@ -36,6 +36,8 @@ export const FILAS = {
   analisarVisual: "analisar-visual",
   modeloNicho: "modelo-nicho",
   temasDoDia: "temas-do-dia",
+  /** M2: o setor nasce pesquisado (ao criar, "Pesquisar o mercado de novo" no admin, e mensal para os ativos). */
+  pesquisaDeSetor: "pesquisa-de-setor",
   lembrete: "lembrete",
   curvaCliente: "curva-cliente",
   /** V10, item 4: e-mail diario para o Fable com o acompanhamento da viagem. */

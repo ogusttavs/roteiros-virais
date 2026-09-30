@@ -85,6 +85,19 @@ export async function criarNicho(dados: {
     .insert(nichos)
     .values({ slug, nome, descricao: dados.descricao?.trim() || null, termos, ativo: true })
     .returning();
+
+  /**
+   * M2, item 1: "o próprio agente tem que fazer uma pesquisa antes de começar o setor" (decisão
+   * do Gustavo em 30/09/2026). A fila nunca derruba a criação do setor (mesma regra de
+   * `enfileirarLeituraDoDia`, acima): se o pg-boss estiver fora do ar, o erro fica só no log.
+   */
+  try {
+    await garantirBossPronto();
+    await boss().send(FILAS.pesquisaDeSetor, { nichoId: nicho.id });
+  } catch (erro) {
+    logger.error({ err: erro, nichoId: nicho.id }, "nao foi possivel enfileirar a pesquisa de setor do nicho novo");
+  }
+
   return nicho;
 }
 
@@ -106,6 +119,30 @@ export async function atualizarNicho(
     .returning();
   if (!nicho) throw new ErroNicho("nicho nao encontrado.");
   return nicho;
+}
+
+/**
+ * Aceita um termo ou hashtag sugerido pela pesquisa de setor (M2, item 6: "termo muda a busca de
+ * todo dia, então esse o Gustavo confirma", um toque no admin). Ignora se já existe (mesma
+ * normalização de `normalizarTermos`) ou se o nicho já está no teto de termos.
+ */
+export async function aceitarTermoSugerido(id: number, termo: string): Promise<Nicho> {
+  const [nicho] = await db().select().from(nichos).where(eq(nichos.id, id));
+  if (!nicho) throw new ErroNicho("nicho nao encontrado.");
+
+  const chave = termo.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const jaTem = nicho.termos.some((t) => t.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase() === chave);
+  if (jaTem) return nicho;
+  if (nicho.termos.length >= TERMOS_MAX) {
+    throw new ErroNicho(`no maximo ${TERMOS_MAX} termos de busca; remova um antes de aceitar este.`);
+  }
+
+  const [atualizado] = await db()
+    .update(nichos)
+    .set({ termos: [...nicho.termos, termo.trim()] })
+    .where(eq(nichos.id, id))
+    .returning();
+  return atualizado;
 }
 
 /** Desativar tira o nicho de /comecar e das coletas; reativar volta. Nunca apaga nada. */
@@ -236,4 +273,13 @@ async function enfileirarLeituraDoDia(nichoId: number, contasCriadas: Conta[]): 
   } catch (erro) {
     logger.error({ err: erro, nichoId }, "nao foi possivel enfileirar a leitura do mesmo dia das contas semente");
   }
+}
+
+/**
+ * "Tirar" uma conta semente no admin do setor (M2, item 3): marca `removida_em` em vez de apagar,
+ * para o histórico de vídeo já coletado continuar valendo; `pesquisa-de-setor` nunca propõe de
+ * novo um handle com essa marca, e a vigilância para de tratar a conta como semente sempre vigiada.
+ */
+export async function tirarConta(contaId: number): Promise<void> {
+  await db().update(contas).set({ removidaEm: new Date(), vigiada: false }).where(eq(contas.id, contaId));
 }

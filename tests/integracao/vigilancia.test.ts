@@ -272,6 +272,41 @@ describe("rodarVigilancia", () => {
     expect(c.vigiada).toBe(false);
   });
 
+  /** M2: conta semente por pesquisa (origem "pesquisa") tem o mesmo tratamento de "curadoria". */
+  it("semente por pesquisa sem nenhum video continua vigiada", async () => {
+    const [semente] = await db()
+      .insert(contas)
+      .values({ plataforma: "youtube", handle: "semente-pesquisa-sem-video", nichoId, vigiada: true, origem: "pesquisa" })
+      .returning({ id: contas.id });
+
+    await rodarVigilancia();
+
+    const [c] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, semente.id));
+    expect(c.vigiada).toBe(true);
+  });
+
+  /** M2, item 3: "tirar" uma conta semente (removida_em preenchido) tira o tratamento especial, mesmo sendo origem "pesquisa". */
+  it("semente tirada (removida_em preenchido) perde o tratamento de sempre vigiada e volta a disputar o ranking", async () => {
+    const [tirada] = await db()
+      .insert(contas)
+      .values({
+        plataforma: "youtube",
+        handle: "semente-tirada",
+        nichoId,
+        vigiada: true,
+        origem: "pesquisa",
+        removidaEm: new Date(),
+      })
+      .returning({ id: contas.id });
+    // Poucos videos (abaixo do minimo de 8), entao nao qualifica pelo ranking normal.
+    await criarVideos(tirada.id, 3);
+
+    await rodarVigilancia();
+
+    const [c] = await db().select({ vigiada: contas.vigiada }).from(contas).where(eq(contas.id, tirada.id));
+    expect(c.vigiada).toBe(false);
+  });
+
   /** V2b, item 7: a semente continua sempre vigiada, mesmo com idioma "outro" (e escolha de gente). */
   it("semente com idioma outro continua sempre vigiada", async () => {
     const [semente] = await db()

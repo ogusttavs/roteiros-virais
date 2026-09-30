@@ -37,7 +37,7 @@
  * coleta, não a leitura (77 "transcritos hoje" contra 8 de verdade).
  * `atualizadoEm` volta a ser só da coleta.
  */
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
@@ -247,8 +247,16 @@ async function transcreverUm(
  */
 const MAX_FALHAS_SEGUIDAS_FREIO = 10;
 
-export async function rodarTranscrever(): Promise<Record<string, unknown>> {
-  const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
+/**
+ * M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor, sem esperar o `for` percorrer
+ * todo o resto dos nichos ativos antes de chegar nele (a "cadeia de verdade" da primeira carga,
+ * item 4: o teto diário já é por nicho dentro do laço, nunca compartilhado entre eles; o que faltava
+ * era poder pular direto para um setor só). Sem `nichoId`, o comportamento de sempre.
+ */
+export async function rodarTranscrever(nichoId?: number): Promise<Record<string, unknown>> {
+  const condicoes = [eq(nichos.ativo, true)];
+  if (nichoId !== undefined) condicoes.push(eq(nichos.id, nichoId));
+  const nichosAtivos = await db().select().from(nichos).where(and(...condicoes));
 
   let porLegenda = 0;
   let porGroq = 0;

@@ -3,14 +3,22 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
-import type { Nicho } from "@/db/schema";
-import type { ExecucaoResumo, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
+import type { Nicho, ResumoPesquisaSetor } from "@/db/schema";
+import type { ContaSemente, ExecucaoResumo, PassoSetor, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
 import { textosAdmin } from "@/textos/admin";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
 
-import { adicionarContasSementeAction, alternarAtivoNichoAction, atualizarNichoAction, coletarAgoraAction } from "../acoes";
+import {
+  aceitarTermoSugeridoAction,
+  adicionarContasSementeAction,
+  alternarAtivoNichoAction,
+  atualizarNichoAction,
+  coletarAgoraAction,
+  pesquisarMercadoAction,
+  tirarContaAction,
+} from "../acoes";
 
 import styles from "./PainelNicho.module.css";
 
@@ -24,6 +32,12 @@ type Props = {
   jobsColeta: { nome: string; execucao: ExecucaoResumo | null }[];
   /** Um por plataforma, sempre as tres (V2a, item 5: a conferencia enxerga). */
   resumoLeitura: ResumoLeituraPlataforma[];
+  /** M2, item 3: as contas semente (curadoria e pesquisa), para mostrar de onde vieram e "tirar" uma. */
+  contasSemente: ContaSemente[];
+  /** M2, item 6: a rodada mais recente do pesquisa-de-setor, para o resumo e os termos/hashtags sugeridos. */
+  ultimaPesquisa: { criadoEm: Date; resumo: ResumoPesquisaSetor } | null;
+  /** M2, item 4: em que passo o setor está (pesquisando contas, coletando, lendo, pronto). */
+  passo: PassoSetor;
 };
 
 function formatarQuando(data: Date | undefined): string {
@@ -31,7 +45,14 @@ function formatarQuando(data: Date | undefined): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
 }
 
-export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
+const ROTULO_PASSO: Record<PassoSetor, string> = {
+  pesquisando_contas: t.passoPesquisandoContas,
+  coletando: t.passoColetando,
+  lendo: t.passoLendo,
+  pronto: t.passoPronto,
+};
+
+export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, ultimaPesquisa, passo }: Props) {
   const router = useRouter();
 
   const [editando, setEditando] = useState(false);
@@ -49,6 +70,12 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
 
   const [coletando, setColetando] = useState(false);
   const [mensagemColeta, setMensagemColeta] = useState<Mensagem | null>(null);
+
+  const [pesquisando, setPesquisando] = useState(false);
+  const [mensagemPesquisa, setMensagemPesquisa] = useState<Mensagem | null>(null);
+
+  const [tirandoId, setTirandoId] = useState<number | null>(null);
+  const [aceitandoTermo, setAceitandoTermo] = useState<string | null>(null);
 
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
@@ -105,6 +132,29 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
     router.refresh();
   }
 
+  async function pesquisarMercado() {
+    setPesquisando(true);
+    setMensagemPesquisa(null);
+    const resultado = await pesquisarMercadoAction(nicho.id);
+    setPesquisando(false);
+    setMensagemPesquisa({ tipo: resultado.ok ? "sucesso" : "erro", texto: resultado.ok ? t.sucessoPesquisar : (resultado.mensagem ?? "") });
+    router.refresh();
+  }
+
+  async function tirarContaSemente(contaId: number) {
+    setTirandoId(contaId);
+    await tirarContaAction(contaId, nicho.slug);
+    setTirandoId(null);
+    router.refresh();
+  }
+
+  async function aceitarTermo(termo: string) {
+    setAceitandoTermo(termo);
+    await aceitarTermoSugeridoAction(nicho.id, nicho.slug, termo);
+    setAceitandoTermo(null);
+    router.refresh();
+  }
+
   return (
     <div className={styles.painel}>
       <div className={styles.linhaTitulo}>
@@ -114,7 +164,7 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
             className={[styles.ponto, nicho.ativo ? styles.pontoPositivo : styles.pontoErro].join(" ")}
             aria-hidden="true"
           />
-          {nicho.ativo ? t.ativo : t.inativo}
+          {nicho.ativo ? t.ativo : t.inativo}, {ROTULO_PASSO[passo]}
         </span>
       </div>
 
@@ -199,6 +249,96 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
             </Botao>
           </div>
         </form>
+      </div>
+
+      <hr className={styles.divisor} />
+
+      <div>
+        <h2>{t.pesquisarMercadoTitulo}</h2>
+        <p className={styles.ajuda}>{t.pesquisarMercadoAjuda}</p>
+        <div className={styles.botoes}>
+          <Botao variante="secundario" carregando={pesquisando} onClick={pesquisarMercado}>
+            {pesquisando ? t.pesquisando : t.pesquisarMercado}
+          </Botao>
+        </div>
+        {mensagemPesquisa ? (
+          <p
+            className={[
+              styles.mensagem,
+              mensagemPesquisa.tipo === "erro" ? styles.mensagemErro : styles.mensagemSucesso,
+            ].join(" ")}
+            role="status"
+          >
+            {mensagemPesquisa.texto}
+          </p>
+        ) : null}
+
+        {ultimaPesquisa ? (
+          <div className={styles.resumoPesquisa}>
+            <p className={styles.ajuda}>
+              {t.ultimaPesquisaEm(new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(ultimaPesquisa.criadoEm))}
+            </p>
+            <ul className={styles.execucoesLista}>
+              <li>
+                {t.resumoPesquisaConfirmadas(
+                  ultimaPesquisa.resumo.confirmadas.youtube +
+                    ultimaPesquisa.resumo.confirmadas.tiktok +
+                    ultimaPesquisa.resumo.confirmadas.instagram,
+                  ultimaPesquisa.resumo.sugeridas.youtube + ultimaPesquisa.resumo.sugeridas.tiktok + ultimaPesquisa.resumo.sugeridas.instagram,
+                )}
+              </li>
+              <li>{t.resumoPesquisaContas(ultimaPesquisa.resumo.contasNovas, ultimaPesquisa.resumo.contasAtualizadas)}</li>
+            </ul>
+
+            {ultimaPesquisa.resumo.termosSugeridos.length > 0 || ultimaPesquisa.resumo.hashtagsSugeridas.length > 0 ? (
+              <div>
+                <p className={styles.ajuda}>{t.termosSugeridosAjuda}</p>
+                <ul className={styles.termosSugeridosLista}>
+                  {[...ultimaPesquisa.resumo.termosSugeridos, ...ultimaPesquisa.resumo.hashtagsSugeridas]
+                    .filter((termo) => !nicho.termos.includes(termo))
+                    .map((termo) => (
+                      <li key={termo}>
+                        <Botao
+                          variante="secundario"
+                          carregando={aceitandoTermo === termo}
+                          onClick={() => aceitarTermo(termo)}
+                        >
+                          {termo}, {t.aceitarTermo}
+                        </Botao>
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <hr className={styles.divisor} />
+
+      <div>
+        <h2>{t.contasSementeAtuaisTitulo}</h2>
+        {contasSemente.length === 0 ? (
+          <p className={styles.ajuda}>{t.vazioContasSemente}</p>
+        ) : (
+          <ul className={styles.execucoesLista}>
+            {contasSemente.map((conta) => (
+              <li key={conta.id} className={styles.linhaContaSemente}>
+                <span>
+                  {conta.plataforma} · {conta.nome ?? conta.handle} ·{" "}
+                  {conta.origem === "pesquisa" ? t.origemPesquisa : t.origemCuradoria}
+                </span>
+                <Botao
+                  variante="secundario"
+                  carregando={tirandoId === conta.id}
+                  onClick={() => tirarContaSemente(conta.id)}
+                >
+                  {t.tirarConta}
+                </Botao>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <hr className={styles.divisor} />

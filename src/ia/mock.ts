@@ -58,6 +58,10 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockLerAgenda(entrada);
     case "planejarDia":
       return mockPlanejarDia(entrada);
+    case "sugerirContasDoSetor":
+      return mockSugerirContasDoSetor(entrada);
+    case "classificarContaDoSetor":
+      return mockClassificarContaDoSetor(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -569,6 +573,38 @@ const IDS_MOTIVO_VALIDOS = new Set([
  * soma é o código, não o mock). Uma reprovação só com texto livre (sem
  * motivo estruturado) vira uma regra a mais, com `motivoOrigem` nulo.
  */
+/** M2, item 1c: uma sugestão por rede, com o handle derivado do nome do setor, para o teste distinguir setores. */
+function mockSugerirContasDoSetor(entrada: string) {
+  const setor = extrairCampo(entrada, "Setor:") || "setor simulado";
+  const slug = setor.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "setor";
+  return {
+    contas: [
+      { rede: "youtube" as const, handle: `@${slug}-youtube`, porQue: `canal simulado do setor ${setor}` },
+      { rede: "tiktok" as const, handle: `${slug}-tiktok`, porQue: `perfil simulado do setor ${setor}` },
+      { rede: "instagram" as const, handle: `${slug}.instagram`, porQue: `perfil simulado do setor ${setor}` },
+    ],
+    termos: [`${setor} dica`, `${setor} tutorial`],
+    hashtags: [slug, `${slug}dicas`],
+  };
+}
+
+/** M2, item 2: mesma ideia de mockExtrairVideo/pertenceAoNicho, aplicada aos titulos do perfil em vez de a um video. */
+function mockClassificarContaDoSetor(entrada: string) {
+  const setorLinha = extrairCampo(entrada, "Setor:");
+  const termos = (setorLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  const textoBusca = entrada.toLowerCase();
+  const pertenceAoSetor = termos.length === 0 || termos.some((termo) => textoBusca.includes(termo));
+  return {
+    pertenceAoSetor,
+    motivo: pertenceAoSetor
+      ? "os titulos ou legendas citam termo do setor"
+      : "os titulos ou legendas nao citam nenhum termo do setor",
+  };
+}
+
 function mockAprenderCliente(entrada: string) {
   const blocoReprovacoes = entrada.split("\n\nRegras já ativas hoje")[0] ?? entrada;
 
