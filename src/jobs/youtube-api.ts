@@ -82,6 +82,30 @@ export async function buscarPorTermo(
   });
 }
 
+export type YoutubeSearchChannelItem = {
+  id: { channelId?: string };
+  snippet: { channelTitle: string };
+};
+
+export type YoutubeSearchChannelResponse = { items?: YoutubeSearchChannelItem[] };
+
+/**
+ * `type=channel` (M2, item 1a): nenhuma busca existente no motor usa este tipo (só `type=video`,
+ * `buscarPorTermo` acima); o job `pesquisa-de-setor` é o primeiro a precisar de "quais canais mais
+ * aparecem para este termo", não "quais vídeos". Sem `videoDuration`/`order=viewCount` (não fazem
+ * sentido para canal); `relevanceLanguage`/`regionCode` continuam, mesmo raciocínio de `buscarPorTermo`.
+ */
+export async function buscarCanaisPorTermo(termo: string): Promise<YoutubeSearchChannelResponse> {
+  return chamar<YoutubeSearchChannelResponse>("search", {
+    part: "snippet",
+    q: termo,
+    type: "channel",
+    maxResults: "50",
+    relevanceLanguage: "pt",
+    regionCode: "BR",
+  });
+}
+
 export type YoutubeVideoItem = {
   id: string;
   snippet: {

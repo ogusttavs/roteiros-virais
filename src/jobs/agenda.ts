@@ -175,6 +175,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "curva de viralizacao dos videos postados, a cada hora cheia (as :05)",
   },
   {
+    fila: FILAS.pesquisaDeSetor,
+    cron: "0 2 1 * *",
+    descricao: "pesquisa dos maiores do mercado por setor (M2), todo dia 1 do mes as 02:00, para os setores ativos",
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",

@@ -25,6 +25,7 @@ import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
+import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTranscrever } from "./transcrever";
@@ -53,7 +54,10 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.descobertaInstagram]: () => rodarDescobertaInstagram(),
   [FILAS.pontuar]: () => rodarPontuar(),
   [FILAS.vigilancia]: () => rodarVigilancia(),
-  [FILAS.transcrever]: () => rodarTranscrever(),
+  [FILAS.transcrever]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarTranscrever(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.extrair]: () => rodarExtrair(),
   [FILAS.extrairColeta]: () => rodarExtrairColeta(),
   /**
@@ -69,6 +73,10 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
   [FILAS.modeloNicho]: () => rodarModeloNicho(),
   [FILAS.temasDoDia]: () => rodarTemasDoDia(),
+  [FILAS.pesquisaDeSetor]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarPesquisaDeSetor(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.lembrete]: () => rodarLembrete(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),

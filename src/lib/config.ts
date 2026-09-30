@@ -161,6 +161,14 @@ export const config = {
      * (`DENTRO_DO_TETO_DE_DURACAO`, `servicos/pesquisa.ts`). `TETO_DURACAO_REFERENCIA_S` ajusta.
      */
     tetoDuracaoReferenciaS: envNumero("TETO_DURACAO_REFERENCIA_S", 180),
+    /**
+     * M2, item 2: filtro de "tem alcance" do job `pesquisa-de-setor`, mediana de views dos
+     * últimos vídeos do candidato. Bem mais baixo que `pisoViewsReferencia` (o piso de um vídeo
+     * VIRAR referência): aqui é só "essa conta tem audiência de verdade", não "todo vídeo dela
+     * estoura"; uma conta pode valer a pena como semente mesmo sem nenhum vídeo individual acima
+     * de 50 mil. `ALCANCE_MINIMO_CONTA_SETOR` ajusta sem mexer em código.
+     */
+    alcanceMinimoContaSetor: envNumero("ALCANCE_MINIMO_CONTA_SETOR", 5_000),
   },
 };
 

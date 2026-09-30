@@ -36,6 +36,7 @@ import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
+import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTranscrever } from "./transcrever";
@@ -100,8 +101,9 @@ async function main(): Promise<void> {
   await boss().work(FILAS.vigilancia, async () => {
     await executarComRegistro(FILAS.vigilancia, rodarVigilancia);
   });
-  await boss().work(FILAS.transcrever, async () => {
-    await executarComRegistro(FILAS.transcrever, rodarTranscrever);
+  /** M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor (a cadeia da primeira carga). */
+  await boss().work<{ nichoId?: number }>(FILAS.transcrever, async (job) => {
+    await executarComRegistro(FILAS.transcrever, () => rodarTranscrever(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.extrair, async () => {
     await executarComRegistro(FILAS.extrair, rodarExtrair);
@@ -122,6 +124,10 @@ async function main(): Promise<void> {
   /** M1, item 2: com `nichoId`, só aquele setor, e só se ele ainda não tem tema hoje; sem, comportamento de sempre. */
   await boss().work<{ nichoId?: number }>(FILAS.temasDoDia, async (job) => {
     await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId));
+  });
+  /** M2: sem `nichoId`, roda para todos os nichos ativos (o cron mensal); com, só aquele setor (criação ou "Pesquisar de novo"). */
+  await boss().work<{ nichoId?: number }>(FILAS.pesquisaDeSetor, async (job) => {
+    await executarComRegistro(FILAS.pesquisaDeSetor, () => rodarPesquisaDeSetor(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.lembrete, async () => {
     await executarComRegistro(FILAS.lembrete, () => rodarLembrete());
