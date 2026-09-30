@@ -236,7 +236,8 @@ type MotivoDescarte =
   | "nao_brasileiro"
   | "inativo"
   | "sem_alcance"
-  | "fora_do_setor";
+  | "fora_do_setor"
+  | "erro_na_classificacao";
 
 /** Item 2, o filtro por código (tudo antes da IA, que é mais cara). */
 function passaNoFiltroDeCodigo(candidato: ContaConfirmada): MotivoDescarte | null {
@@ -448,8 +449,19 @@ async function pesquisarUmSetor(nichoId: number): Promise<Record<string, unknown
         continue;
       }
 
-      const { pertence, custoUsd } = await passaNoFiltroDeSetor(confirmado, nicho.nome, nicho.termos);
-      custoIaUsd += custoUsd;
+      // Hotfix de 30/09/2026: a classificação de um candidato falhava (400 da API por um título com
+      // metade de emoji) e derrubava a pesquisa do setor inteiro, sem gravar nada. O erro de um
+      // candidato é descarte dele, contado no resumo, e a rodada segue.
+      let pertence: boolean;
+      try {
+        const filtro = await passaNoFiltroDeSetor(confirmado, nicho.nome, nicho.termos);
+        custoIaUsd += filtro.custoUsd;
+        pertence = filtro.pertence;
+      } catch (erro) {
+        logger.error({ err: erro, rede, handle: confirmado.handle }, "pesquisa-de-setor: falha classificando candidato");
+        registrarDescarte("erro_na_classificacao");
+        continue;
+      }
       if (!pertence) {
         registrarDescarte("fora_do_setor");
         continue;
