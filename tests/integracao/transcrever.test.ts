@@ -153,12 +153,26 @@ describe("rodarTranscrever", () => {
     expect(linha.atualizadoEm.getTime()).toBe(atualizadoAntes.getTime());
   });
 
+  it("video longo (acima do teto de duracao) nunca entra na fila de transcricao (hotfix de 30/09/2026)", async () => {
+    await criarVideo("yt-longo-demais", { velocidadeRelativa: 50, publicadoEm: diasAtras(3), duracaoS: 600 });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+
+    await rodarTranscrever();
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-longo-demais"));
+    expect(linha.transcricao).toBeNull();
+    expect(linha.transcritoEm).toBeNull();
+  });
+
   it("video do YouTube sem legenda cai para audio mais Groq, e o resumo acumula o custo", async () => {
     const atualizadoAntes = diasAtras(5);
     await criarVideo("yt-sem-legenda", {
       velocidadeRelativa: 3,
       publicadoEm: diasAtras(3),
-      duracaoS: 600,
+      // 120 s, dentro do teto de duração (hotfix de 30/09/2026); eram 600 s, que hoje nem entram na fila.
+      duracaoS: 120,
       atualizadoEm: atualizadoAntes,
     });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
@@ -168,8 +182,8 @@ describe("rodarTranscrever", () => {
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorGroq).toBe(1);
     expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-fake.mp3");
-    expect(resumo.segundosAudioGroq).toBe(600);
-    expect(resumo.custoEstimadoGroqUsd).toBeCloseTo((600 / 3600) * 0.04, 4);
+    expect(resumo.segundosAudioGroq).toBe(120);
+    expect(resumo.custoEstimadoGroqUsd).toBeCloseTo((120 / 3600) * 0.04, 4);
 
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-legenda"));
     expect(linha.transcricao).toBe("texto transcrito pela groq");
