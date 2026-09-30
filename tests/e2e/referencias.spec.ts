@@ -66,6 +66,13 @@ function analiseExemplo(assunto: string, formato: "fala_para_camera" | "podcast"
 
 test.describe("/referencias no design v2", () => {
   test.beforeAll(async () => {
+    // Seguro para a repeticao automatica do Playwright (item 0c, 29/09/2026): com `retries: 1` em CI, a
+    // segunda tentativa roda este `beforeAll` de novo no mesmo worker e batia na chave unica do usuario,
+    // e assim a tentativa que poderia deixar o rastro da corrida morria antes de comecar. Se a pessoa de
+    // teste ja existe, tudo o que ela precisa ja foi criado pela primeira passada; nada a fazer.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-referencias"));
+    if (jaExiste) return;
+
     const [nichoUm] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
     const [nichoDois] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 

@@ -55,7 +55,10 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL,
-    trace: "on-first-retry",
+    // Em CI, o rastro de toda tentativa que falha (item 0c, 29/09/2026): "on-first-retry" so gravava
+    // a segunda tentativa, e a corrida de referencias.spec.ts que estamos cacando as vezes passa na
+    // segunda, levando o rastro da primeira embora. Localmente continua leve.
+    trace: process.env.CI ? "retain-on-failure" : "on-first-retry",
   },
   webServer: {
     /**
