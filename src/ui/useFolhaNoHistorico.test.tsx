@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useFolhaNoHistorico } from "./useFolhaNoHistorico";
 
@@ -10,10 +10,27 @@ import { useFolhaNoHistorico } from "./useFolhaNoHistorico";
  * restaurar a árvore da URL anterior, e quando essa restauração termina
  * depois do `router.push`/`replace` de `acao`, a tela volta para onde
  * estava. `fecharENavegar` nunca chama `history.back()`: fecha pelo estado
- * (`aoFechar`) e roda `navegar` na hora, sem nenhum `popstate` para competir.
+ * (`aoFechar`) e roda `navegar` dois quadros depois, sem nenhum `popstate`
+ * para competir (F1, item 2a: nunca no mesmo tique do fechamento).
+ *
+ * `requestAnimationFrame` roda de verdade fora de um navegador (um
+ * `setTimeout` disfarçado, em jsdom); o stub abaixo (mesmo padrão de
+ * `useRecalcularAoFecharTeclado.test.tsx`) o faz rodar na hora, só para os
+ * testes serem determinísticos.
  */
 describe("useFolhaNoHistorico, fecharENavegar", () => {
-  it("nunca chama history.back(): fecha pelo estado e navega na hora, sem passar pelo popstate", () => {
+  beforeEach(() => {
+    vi.stubGlobal("requestAnimationFrame", (retorno: FrameRequestCallback) => {
+      retorno(0);
+      return 0;
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("nunca chama history.back(): fecha pelo estado e navega dois quadros depois, sem passar pelo popstate", () => {
     const aoFechar = vi.fn();
     const historyBack = vi.spyOn(window.history, "back");
     const { result } = renderHook(({ aberto }) => useFolhaNoHistorico(aberto, aoFechar), {

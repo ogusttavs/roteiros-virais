@@ -307,6 +307,76 @@ test.describe("/referencias no design v2", () => {
   });
 
   /**
+   * F1, item 2: o achado que apareceu testando o item 3. Reabrir "Filtrar" antes de uma navegação
+   * anterior voltar do servidor fazia a folha nascer com `plataformasAtivas`/`formatosAtivos`
+   * desatualizados; corrigido com valores otimistas na folha e o botão "Filtrar" desabilitado
+   * enquanto `navegando` (modo B, achado do CI: `referencias.spec.ts:316`, volta 4, pediu tiktok,
+   * ficou todas). Sob freio de CPU e um atraso aleatório no `_rsc` de cada navegação, esse ajuste
+   * sozinho não bastou: o `router.replace` às vezes busca a página nova, recebe 200, e nunca termina
+   * de aplicar (confirmado lendo `history.pushState`/`replaceState` e o log do próprio App Router; não
+   * reproduz sem freio nem sem atraso, então não é corrida desta tela, é uma corrida mais funda dentro
+   * do próprio roteador do Next). Sem a causa exata, a rede de segurança do item 2 (`navegar`, em
+   * `ReferenciasTela.tsx`: se a URL pedida não chegar em 6 s, força `window.location.assign`) fecha o
+   * caso: com ela este teste fica verde mesmo sob o atraso que antes travava.
+   */
+  test("filtrar e limpar repetido sob atraso de rede nunca trava numa URL antiga (F1, itens 2 e 3)", async ({ page }) => {
+    // Generoso de propósito: sob o freio de CPU, algumas voltas podem esbarrar na rede de segurança de
+    // 6s do item 2 (recarrega a página inteira); no pior caso (as 12 chamadas de `navegar` do laço
+    // caindo nela), ainda cabe dentro do prazo.
+    test.setTimeout(150_000);
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send("Emulation.setCPUThrottlingRate", { rate: 6 });
+    await page.route(
+      (url) => url.pathname === "/referencias" && url.searchParams.has("_rsc"),
+      async (route) => {
+        await new Promise((r) => setTimeout(r, 50 + Math.random() * 350));
+        await route.continue();
+      },
+    );
+
+    for (let volta = 0; volta < 6; volta++) {
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      const folha = page.getByRole("dialog", { name: "Filtrar" });
+      await expect(folha).toBeVisible();
+      await folha.getByRole("button", { name: "TikTok", exact: false }).click();
+      await folha.getByRole("button", { name: /Ver os \d+ vídeos?/ }).click();
+      await expect(folha).not.toBeVisible();
+      await expect(page, `volta ${volta}: aplicar nao mudou a URL`).toHaveURL(/plataforma=tiktok/, { timeout: 10_000 });
+
+      await page.getByRole("button", { name: "Filtrar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).toBeVisible();
+      await page.getByRole("dialog", { name: "Filtrar" }).getByRole("button", { name: "Limpar" }).click();
+      await expect(page.getByRole("dialog", { name: "Filtrar" })).not.toBeVisible();
+      await expect(page, `volta ${volta}: limpar nao mudou a URL`).toHaveURL(/plataforma=todas/, { timeout: 10_000 });
+    }
+  });
+
+  /**
+   * F1, ajuste A da revisão do PR #71 (a sonda do Fable, virou teste): a rede de segurança de `navegar`
+   * (item 2, acima) nunca era desarmada. Aplicar um filtro que dá certo, sair de Referências antes dos
+   * 6s, e o temporizador disparava do mesmo jeito, achava que o endereço atual (agora outra tela) não
+   * era o pedido, e puxava a pessoa de volta com `window.location.assign`. Prova: sai para Hoje antes
+   * dos 6s, espera passar dos 6s, continua em Hoje.
+   */
+  test("aplicar um filtro e sair da tela antes de 6s não puxa a pessoa de volta (F1, ajuste A)", async ({ page }) => {
+    test.setTimeout(20_000);
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+
+    await page.getByLabel("Período").selectOption("30");
+    await expect(page).toHaveURL(/periodo=30/);
+
+    await page.getByRole("link", { name: "Hoje" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.waitForTimeout(8_000);
+    await expect(page, "a rede de seguranca de Referencias puxou a pessoa de volta").toHaveURL(/\/hoje/);
+  });
+
+  /**
    * Ajuste A do PR #66: a mesma interação de "filtrar por plataforma pela folha", repetida várias vezes
    * na mesma página (sem recarregar, sem passar pelo `beforeAll` de novo). É a prova de robustez que a
    * revisão do Fable pediu com `--repeat-each=20`: o `--repeat-each` do Playwright recria o `beforeAll` a
@@ -484,6 +554,11 @@ test.describe("/referencias, 'Limpar os filtros' com rede principal (item 8, V12
   const EMAIL_LIMPAR = "e2e-referencias-limpar@exemplo.teste";
 
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4, mesmo padrão do describe principal
+    // deste arquivo): se a pessoa de teste já existe, a primeira passada já criou tudo o que ela precisa.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-referencias-limpar"));
+    if (jaExiste) return;
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-referencias-limpar", nome: "[teste] Referências Limpar" })

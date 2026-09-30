@@ -45,16 +45,18 @@ async function abrirPlanejarDias(page: Page) {
 test.describe("colar a agenda e o plano de gravações", () => {
   test.beforeAll(async () => {
     /**
-     * Seguro para repetição (revisão do PR #62, item 4): a CI reprovou uma vez (tempo de resposta da
-     * máquina) e a repetição automática do Playwright rodou este `beforeAll` de novo no mesmo worker,
-     * batendo na chave única do nicho. `onConflictDoNothing` mais uma leitura de volta faz uma segunda
-     * passada reaproveitar a linha em vez de tentar inserir de novo (nicho por `slug`, `user` e
-     * `account` por `id`, todos fixos neste arquivo).
+     * Seguro para repetição (revisão do PR #62, item 4; achado do F1, item 4: o `onConflictDoNothing`
+     * sozinho não bastava, `clientes`, `membrosMarca` e `briefings` não têm chave única contra o
+     * `usuarioId` e uma segunda passada criava uma marca duplicada em silêncio, sem erro nenhum, em vez
+     * de travar e avisar). Se a pessoa de teste já existe, a primeira passada já criou tudo.
      */
-    await db().insert(nichos).values({ slug: "e2e-plano", nome: "[teste] Plano" }).onConflictDoNothing();
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-plano"));
+    if (jaExiste) return;
+
+    await db().insert(nichos).values({ slug: "e2e-plano", nome: "[teste] Plano" });
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "e2e-plano"));
 
-    await db().insert(user).values({ id: "e2e-plano", name: "[teste] Plano", email: EMAIL }).onConflictDoNothing();
+    await db().insert(user).values({ id: "e2e-plano", name: "[teste] Plano", email: EMAIL });
     await db()
       .insert(account)
       .values({
@@ -64,12 +66,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
         providerId: "credential",
         userId: "e2e-plano",
         password: await hashPassword(SENHA),
-      })
-      .onConflictDoNothing();
-    await db()
-      .insert(preferenciasUsuario)
-      .values({ usuarioId: "e2e-plano", aceitouTermosEm: new Date() })
-      .onConflictDoNothing();
+      });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-plano", aceitouTermosEm: new Date() });
 
     const [marca] = await db()
       .insert(clientes)

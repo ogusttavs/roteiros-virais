@@ -55,6 +55,14 @@ function contarPaginasPdf(bytes: Buffer): number {
 
 test.describe("roteiro pela tela", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): a primeira passada já criou tudo;
+    // só falta `clienteId`, que não sobrevive entre tentativas (cada uma é um processo novo).
+    const [clienteExistente] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-roteiro"));
+    if (clienteExistente) {
+      clienteId = clienteExistente.id;
+      return;
+    }
+
     const [nicho] = await db()
       .select()
       .from(nichos)

@@ -27,6 +27,11 @@ async function entrar(page: Page, email: string) {
 
 test.describe("aceite dos termos no primeiro acesso", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): se a pessoa de teste já existe, a
+    // primeira passada já criou tudo o que ela precisa.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-aceite-termos"));
+    if (jaExiste) return;
+
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
 
     await db().insert(user).values({ id: "e2e-aceite-termos", name: "[teste] Aceite Termos", email: EMAIL });

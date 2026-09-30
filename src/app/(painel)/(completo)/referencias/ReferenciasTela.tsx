@@ -148,7 +148,55 @@ export function ReferenciasTela({
   // Aba e período mostram a escolha na hora; o valor de verdade chega com a página nova e a tela volta a ele sozinha.
   const [segmentoExibido, setSegmentoOtimista] = useOptimistic(segmento);
   const [periodoExibido, setPeriodoOtimista] = useOptimistic(periodoDias);
+  /**
+   * F1, item 3 (modo B): a folha "Filtrar" nasce de `plataformasAtivas`/`formatosAtivos`, as props
+   * confirmadas pelo servidor. Se ela reabrir enquanto uma navegação anterior ainda não voltou (o
+   * "Limpar" de uma volta anterior, por exemplo), essas props continuam com o valor de ANTES daquela
+   * navegação, e a folha nasce marcada com o que já foi pedido, não com o que está na tela. A pessoa
+   * então desmarca o que já estava pedindo para sumir, "Ver os N vídeos" monta a mesma URL que já está
+   * pendente, e a chamada nova é descartada (`navegar` só bloqueia URL igual à pendente) ou, pior, as
+   * duas chamadas ficam em voo e a que volta por último decide a URL final, não a mais recente (achado
+   * do CI, `referencias.spec.ts:316`, volta 4: pediu tiktok, ficou todas). Otimista junto de
+   * `segmentoOtimista` e `periodoOtimista`: a folha sempre nasce do que foi pedido, nunca do que ainda
+   * não voltou.
+   */
+  const [plataformasExibidas, setPlataformasOtimista] = useOptimistic(plataformasAtivas);
+  const [formatosExibidos, setFormatosOtimista] = useOptimistic(formatosAtivos);
   const urlPendente = useRef<string | null>(null);
+  /**
+   * F1, ajuste A da revisão do PR #71: a rede de segurança do item 2 (mais abaixo, em `navegar`) nunca
+   * era desarmada. Provado pelo Fable: entrar em Referências, aplicar um filtro, sair para outra tela
+   * em menos de 6s, e a pessoa era puxada de volta sozinha, porque o temporizador disparava do mesmo
+   * jeito e `urlPendente` continuava com a última URL pedida, ainda que a navegação tivesse dado certo
+   * havia tempo. Os dois refs guardam o temporizador da rede de segurança e o do aviso de demora
+   * (`demorando`), para os dois poderem ser desarmados por três caminhos: a URL pedida chegar (o efeito
+   * abaixo, que olha as props confirmadas pelo servidor, não o estado otimista), outra navegação ser
+   * pedida (limpos no começo de `navegar`), ou a tela desmontar.
+   */
+  const redeDeSegurancaRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const avisoDemoraRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [demorando, setDemorando] = useState(false);
+  const limparRedeDeSeguranca = useCallback(() => {
+    if (redeDeSegurancaRef.current) {
+      clearTimeout(redeDeSegurancaRef.current);
+      redeDeSegurancaRef.current = null;
+    }
+    if (avisoDemoraRef.current) {
+      clearTimeout(avisoDemoraRef.current);
+      avisoDemoraRef.current = null;
+    }
+    setDemorando(false);
+  }, []);
+  // Desarma quando desmonta (a pessoa saiu de Referências antes da URL chegar ou antes dos 6s).
+  useEffect(() => limparRedeDeSeguranca, [limparRedeDeSeguranca]);
+  // Desarma quando a URL pedida chega de verdade: as props abaixo só mudam com o servidor confirmando.
+  useEffect(() => {
+    const urlConfirmada = montarUrl({ segmento, periodoDias, busca, plataformas: plataformasAtivas, formatos: formatosAtivos });
+    if (urlPendente.current === urlConfirmada) {
+      urlPendente.current = null;
+      limparRedeDeSeguranca();
+    }
+  }, [segmento, periodoDias, busca, plataformasAtivas, formatosAtivos, limparRedeDeSeguranca]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
   const detalheAtual = useRef<number | null>(null);
   useEffect(() => {
@@ -164,7 +212,7 @@ export function ReferenciasTela({
   const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
   const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
-  const quantosFiltrosAtivos = plataformasAtivas.length + formatosAtivos.length;
+  const quantosFiltrosAtivos = plataformasExibidas.length + formatosExibidos.length;
 
   /**
    * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
@@ -193,23 +241,61 @@ export function ReferenciasTela({
       segmento,
       periodoDias,
       busca: campoBusca,
-      plataformas: plataformasAtivas,
-      formatos: formatosAtivos,
+      // Otimista, não a prop (F1, item 3, modo B): uma mudança que não mexe em plataforma ou formato
+      // (período, busca) não pode reverter um filtro que a pessoa acabou de pedir e ainda não voltou
+      // do servidor.
+      plataformas: plataformasExibidas,
+      formatos: formatosExibidos,
       ...mudanca,
     };
     const url = montarUrl(filtros);
     // Toque duplo, ou Enter seguido do onBlur, enquanto o mesmo pedido ainda não chegou: um pedido só.
     if (navegando && urlPendente.current === url) return;
     urlPendente.current = url;
+    // Uma navegação nova cancela a rede de segurança da anterior (item abaixo): a de agora arma a dela.
+    limparRedeDeSeguranca();
     iniciarNavegacao(() => {
       setSegmentoOtimista(filtros.segmento);
       setPeriodoOtimista(filtros.periodoDias);
+      setPlataformasOtimista(filtros.plataformas);
+      setFormatosOtimista(filtros.formatos);
       // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
       // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
       // navegação da pessoa e continua entrando no histórico como sempre.
       if (opcoes.substituir) router.replace(url);
       else router.push(url);
     });
+    /**
+     * F1, item 2 (modo A e o achado que apareceu testando o modo B): o `router.replace`/`push` do App
+     * Router às vezes busca a página nova (o pedido chega no servidor, a resposta volta 200) e nunca
+     * termina de aplicar, sem erro nenhum, sem `navegando` voltar a `false`; reproduzido com freio de
+     * CPU e um atraso no `_rsc`, mas não com repetição rápida sem nenhum dos dois, e continua
+     * acontecendo com a folha sem disputar o histórico (item 3) e com `fecharENavegar` nunca no mesmo
+     * tique (item 2a), então não é esta tela que decide errado, é a navegação que não termina. Sem saber
+     * a causa exata dentro do App Router, a rede de segurança: se depois de um tempo generoso a URL
+     * ainda não é a que foi pedida (e ninguém pediu outra coisa depois), força uma navegação de
+     * verdade. É o último recurso, não o primeiro: só dispara quando o caminho normal já deveria ter
+     * terminado.
+     *
+     * Ajuste A da revisão do PR #71: os dois temporizadores só existem enquanto ESTA navegação continua
+     * sendo a última pedida (o efeito que olha as props confirmadas, mais acima, desarma os dois assim
+     * que a URL chega) e enquanto a pessoa continua em Referências (`window.location.pathname`, não
+     * `url`: é o endereço atual que importa, não o de destino). Sem as duas checagens, sair da tela
+     * antes dos 6s, ou os 6s passarem com a navegação já tendo dado certo havia tempo, puxava a pessoa
+     * de volta para uma URL que já não fazia sentido mais (achado do Fable, provado contra `next start`).
+     */
+    avisoDemoraRef.current = setTimeout(() => {
+      avisoDemoraRef.current = null;
+      if (urlPendente.current === url) setDemorando(true);
+    }, 2500);
+    redeDeSegurancaRef.current = setTimeout(() => {
+      redeDeSegurancaRef.current = null;
+      if (urlPendente.current !== url) return;
+      if (window.location.pathname !== "/referencias") return;
+      const atual = window.location.pathname + window.location.search;
+      if (atual === url) return;
+      window.location.assign(url);
+    }, 6000);
   }
 
   /**
@@ -340,6 +426,10 @@ export function ReferenciasTela({
             variante="secundario"
             tamanho="md"
             aria-busy={navegando || undefined}
+            // F1, item 3 (modo B): sem isto, a folha podia abrir de novo antes de uma navegação
+            // anterior voltar, nascendo com plataformasAtivas/formatosAtivos ainda desatualizados e
+            // as duas chamadas de `navegar` ficando em voo ao mesmo tempo (achado do CI).
+            disabled={navegando}
             onClick={() => setFolhaFiltrarAberta(true)}
             className={styles.botaoFiltrar}
           >
@@ -358,7 +448,7 @@ export function ReferenciasTela({
 
       {navegando ? (
         <p className={styles.contagem} role="status">
-          {textosReferencias.buscando}
+          {demorando ? textosReferencias.demorandoMaisQueNormal : textosReferencias.buscando}
         </p>
       ) : null}
 
@@ -432,8 +522,8 @@ export function ReferenciasTela({
         <FolhaFiltrarReferencias
           aberto
           aoFechar={filtrar.fechar}
-          plataformasAtivas={plataformasAtivas}
-          formatosAtivos={formatosAtivos}
+          plataformasAtivas={plataformasExibidas}
+          formatosAtivos={formatosExibidos}
           contagens={contagensFiltro}
           totalAtual={total}
           onAplicar={aplicarFiltros}

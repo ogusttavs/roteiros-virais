@@ -7,6 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -20,7 +21,8 @@ import {
   user,
   type TemaDoDia,
 } from "../../src/db/schema";
-import { hojeISO } from "../../src/lib/config";
+import { hojeISO, horaMinutoAtualISO } from "../../src/lib/config";
+import { textosHoje } from "../../src/textos/hoje";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-momento@exemplo.teste";
@@ -41,6 +43,10 @@ async function abrirPortaReels(page: Page) {
 
 test.describe("gravar agora, o caminho por texto", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-momento"));
+    if (jaExiste) return;
+
     const [nicho] = await db().insert(nichos).values({ slug: "e2e-momento", nome: "[teste] Momento" }).returning();
 
     await db().insert(user).values({ id: "e2e-momento", name: "[teste] Momento", email: EMAIL });
@@ -189,6 +195,10 @@ test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
   const EMAIL_SEM_TEMA = "e2e-momento-sem-tema@exemplo.teste";
 
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-momento-sem-tema"));
+    if (jaExiste) return;
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-momento-sem-tema", nome: "[teste] Momento sem tema" })
@@ -248,9 +258,19 @@ test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
     await expect(page.getByText("Sua semana")).toBeVisible();
     await expect(page.getByText("O que você quer gravar agora?")).toBeVisible();
 
+    /**
+     * F1, ajuste B: o texto muda com a hora real (`aviso-sem-tema.ts`, H3, item 1). Antes das 6h30 de
+     * Brasília ainda pode ser só cedo demais ("Os temas de hoje saem até as 6h30"); depois, o tema já
+     * devia ter saído e não saiu ("Hoje não saiu tema..."). Mesma função que a tela usa, para o teste
+     * nunca reprovar de madrugada só por rodar antes do corte.
+     */
+    const jaPassouDoCorte = horaMinutoAtualISO() >= "06:30";
+    const tituloEsperado = jaPassouDoCorte ? textosHoje.semTemaDepoisTitulo : textosHoje.vazioTitulo;
+    const textoEsperado = jaPassouDoCorte ? textosHoje.semTemaDepois : textosHoje.vazio;
+
     await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
-    await expect(page.getByText("Hoje não saiu tema para o seu setor")).toBeVisible();
-    await expect(page.getByText("Dá para gravar do mesmo jeito")).toBeVisible();
+    await expect(page.getByText(tituloEsperado)).toBeVisible();
+    await expect(page.getByText(textoEsperado, { exact: false })).toBeVisible();
     // "Quer outro assunto?" e "Gravar agora" continuam, mesmo sem tema nenhum.
     await expect(page.getByRole("heading", { name: "Quer outro assunto?" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Gravar agora" })).toBeVisible();

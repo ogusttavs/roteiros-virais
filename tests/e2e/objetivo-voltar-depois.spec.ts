@@ -10,6 +10,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -38,6 +39,10 @@ async function entrar(page: Page) {
 
 test.describe("revisão do PR #62, item 2: Voltar depois no caminho do tema não navega depois", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-objetivo-voltar-depois"));
+    if (jaExiste) return;
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-objetivo-voltar-depois", nome: "[teste] Objetivo voltar depois" })

@@ -22,6 +22,10 @@ async function entrar(page: Page, email: string) {
 
 test.describe("barra lateral do painel", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-barra-lateral"));
+    if (jaExiste) return;
+
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
 
     await db().insert(user).values({ id: "e2e-barra-lateral", name: "[teste] Barra Lateral", email: EMAIL });

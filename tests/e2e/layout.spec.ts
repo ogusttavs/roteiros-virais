@@ -15,6 +15,7 @@
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -192,6 +193,11 @@ async function conferirFolhaFecha(
 
 test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): se a pessoa de teste já existe, a
+    // primeira passada já criou tudo o que ela precisa (mesmo padrão de `marcas.spec.ts`, PR #47).
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-layout"));
+    if (jaExiste) return;
+
     // Nicho proprio, nao um dos dois do seed: roteiro.spec.ts ja usa
     // "limpeza-e-organizacao-da-casa" e temas-do-dia.spec.ts ja usa
     // "dentistas" para a linha de hoje de temas_dia (uma por nicho por dia,
@@ -882,6 +888,10 @@ const LARGURAS_V6 = [
 
 test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): ver o describe acima.
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-layout-referencias"));
+    if (jaExiste) return;
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-layout-referencias", nome: "[teste] Layout Referências" })
@@ -1044,6 +1054,16 @@ let nichoComecarDesktopId: number;
 
 test.describe("layout: /comecar no desktop (item 9, V12b)", () => {
   test.beforeAll(async () => {
+    // Seguro para a repetição automática do Playwright (F1, item 4): a primeira passada já criou tudo;
+    // só falta o id do nicho, que esta rodada não guardou em nenhuma variável de módulo (`nichoComecarDesktopId`
+    // não sobrevive entre tentativas do Playwright, cada uma é um processo novo).
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-layout-comecar-desktop"));
+    if (jaExiste) {
+      const [nichoExistente] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.slug, "e2e-layout-comecar-desktop"));
+      nichoComecarDesktopId = nichoExistente.id;
+      return;
+    }
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-layout-comecar-desktop", nome: NOME_RAMO_COMPRIDO })

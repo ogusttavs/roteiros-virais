@@ -396,17 +396,29 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
  * uma resposta de um tipo nunca pode ficar pareada com a avaliação do
  * outro. O admin já avisa antes de chamar isto; aqui a troca sempre apaga o
  * briefing, sem checar se havia resposta de verdade.
+ *
+ * F1, item 5 (resto da revisão do PR #70): pedir o tipo que a marca já tem
+ * não apaga o briefing à toa (salvar duas vezes seguidas no admin sem trocar
+ * nada não pode custar o briefing da pessoa); e as duas escritas, marca e
+ * briefing, andam juntas numa transação, para nunca sobrar uma marca com o
+ * tipo novo e o briefing do tipo antigo se a segunda escrita falhar.
  */
 export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promise<Cliente> {
-  const [cliente] = await db().update(clientes).set({ tipo }).where(eq(clientes.id, clienteId)).returning();
-  if (!cliente) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
+  return db().transaction(async (tx) => {
+    const [clienteAtual] = await tx.select().from(clientes).where(eq(clientes.id, clienteId)).for("update");
+    if (!clienteAtual) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
+    if (clienteAtual.tipo === tipo) return clienteAtual;
 
-  await db()
-    .update(briefings)
-    .set({ respostas: {}, avaliacoes: {}, notaGeral: null, completo: false, perfil: null })
-    .where(eq(briefings.clienteId, clienteId));
+    const [cliente] = await tx.update(clientes).set({ tipo }).where(eq(clientes.id, clienteId)).returning();
+    if (!cliente) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
 
-  return cliente;
+    await tx
+      .update(briefings)
+      .set({ respostas: {}, avaliacoes: {}, notaGeral: null, completo: false, perfil: null })
+      .where(eq(briefings.clienteId, clienteId));
+
+    return cliente;
+  });
 }
 
 export type ResultadoDarAcesso = { tipo: "jaTinhaLogin"; nome: string } | { tipo: "convite"; senha: string };

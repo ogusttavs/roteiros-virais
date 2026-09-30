@@ -334,6 +334,21 @@ test.describe("briefing pela tela", () => {
   test("no cartao 'o que a gente aprendeu com voce', desativar uma regra mostra 'Desfazer', que reativa de novo", async ({
     page,
   }) => {
+    /**
+     * Seguro para a repetição automática do Playwright (F1, item 4b): este teste grava a própria pessoa
+     * direto no corpo (não num `beforeAll`), então uma repetição dele sozinho, não só do arquivo inteiro,
+     * batia na chave única do usuário. Apagar e recriar (mesmo padrão de `marcas.spec.ts`, PR #47), não
+     * "se já existe, pular": o teste interage com as regras (desativa, reativa), então uma repetição que
+     * reaproveitasse o que a tentativa anterior deixou herdaria um estado no meio do caminho, não o ponto
+     * de partida que as asserções esperam.
+     */
+    const [clienteExistente] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-briefing-aprendizado"));
+    if (clienteExistente) {
+      await db().delete(aprendizadoCliente).where(eq(aprendizadoCliente.clienteId, clienteExistente.id));
+      await db().delete(briefings).where(eq(briefings.clienteId, clienteExistente.id));
+    }
+    await db().delete(user).where(eq(user.id, "e2e-briefing-aprendizado"));
+
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
 
     await db().insert(user).values({
@@ -420,6 +435,15 @@ test.describe("briefing pela tela", () => {
     await botaoDesfazer.click();
     await expect(cartao.getByText("desativada")).toBeHidden();
     await expect(cartao.getByText("De 1 roteiro que você reprovou")).toBeVisible();
+
+    /**
+     * F1, item 4b (achado da CI): a régua acima é otimista (`alternar`, `AprendizadoCard.tsx`), a linha
+     * muda na hora, antes de `reativarRegraAction` terminar. Recarregar direto podia pegar o banco antes
+     * de a action gravar e mostrar a regra desativada de novo. `idsPendentes` desabilita o botão da linha
+     * enquanto a action está em voo e libera no `finally`, sucesso ou erro: o botão "Não é bem assim"
+     * (a linha virou "ativa" de novo) ficar habilitado é o sinal de que gravou de verdade.
+     */
+    await expect(linhaDesativar.getByRole("button", { name: "Não é bem assim" })).toBeEnabled();
 
     // recarregar confirma que a acao gravou de verdade no banco, nao so no estado otimista da tela.
     await page.reload();
