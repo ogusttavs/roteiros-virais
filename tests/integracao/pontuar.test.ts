@@ -426,3 +426,48 @@ describe("rodarPontuar, idioma principal e pais da conta", () => {
     expect(c.pais).toBe("US");
   });
 });
+
+describe("M3: a regua por setor no passo5 (taxa_fora_da_curva por conta)", () => {
+  it("conta de um nicho com piso de views proprio usa esse piso, nao o global, para contar acima da curva", async () => {
+    const [nichoComPiso] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-piso-proprio", nome: "Pontuar piso proprio", termos: [], pisoViews: 500 })
+      .returning();
+
+    const conta = await criarConta("piso-proprio", null, nichoComPiso.id);
+    for (let i = 0; i < 5; i += 1) {
+      await criarVideo(conta, `piso-proprio-base-${i}`, 100, diasAtras(10), nichoComPiso.id);
+    }
+    // multiplo 4x, mas abaixo do piso do setor (500): nao conta como "acima" para este nicho.
+    await criarVideo(conta, "piso-proprio-abaixo-do-piso", 400, diasAtras(10), nichoComPiso.id);
+    // multiplo 6x, acima do piso do setor: conta.
+    await criarVideo(conta, "piso-proprio-acima-do-piso", 600, diasAtras(10), nichoComPiso.id);
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    // mediana = 100 (sete videos, mediana no quarto valor ordenado); fora_da_curva 4x e 6x, os dois
+    // acima do limiar padrao (3x), mas so o de 600 views passa do piso proprio do setor (500).
+    expect(Number(c.taxaForaDaCurva)).toBeCloseTo(1 / 7, 3);
+  });
+
+  it("conta de um nicho sem piso proprio (nulo) usa o padrao do produto (zero nos testes), contando os dois", async () => {
+    const [nichoSemPiso] = await db()
+      .insert(nichos)
+      .values({ slug: "pontuar-piso-padrao", nome: "Pontuar piso padrao", termos: [] })
+      .returning();
+
+    const conta = await criarConta("piso-padrao", null, nichoSemPiso.id);
+    for (let i = 0; i < 5; i += 1) {
+      await criarVideo(conta, `piso-padrao-base-${i}`, 100, diasAtras(10), nichoSemPiso.id);
+    }
+    await criarVideo(conta, "piso-padrao-abaixo", 400, diasAtras(10), nichoSemPiso.id);
+    await criarVideo(conta, "piso-padrao-acima", 600, diasAtras(10), nichoSemPiso.id);
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    // piso do produto nos testes e zero (vitest.config.mts): os dois videos (400 e 600) contam.
+    expect(Number(c.taxaForaDaCurva)).toBeCloseTo(2 / 7, 3);
+  });
+});

@@ -60,6 +60,14 @@
   color: var(--cor-texto-suave);
 }
 
+/** M3: o campo "vídeo sem fala vale" da régua por setor. */
+.linhaCheckbox {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin-top: var(--espaco-3);
+}
+
 .termosLista {
   display: flex;
   flex-wrap: wrap;

@@ -46,7 +46,7 @@ import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
-import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
+import { foraDaCurvaDoNicho, reguaDoSetor, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
@@ -102,6 +102,7 @@ function comMidiaFrescaComoDesempate<T extends { id: number }>(
 }
 
 async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
+  const regua = await reguaDoSetor(nichoId);
   const tamanhoFila = tetoDiario * FATOR_FILA;
   // V2b, item 10: o teto por conta entra aqui, na consulta, antes do LIMIT
   // (`maxPorConta`), não só depois em `limitarPorConta`; sem isso, quando as
@@ -162,7 +163,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     candidatos,
     tamanhoFila,
     agora,
-    config.regras.proporcaoBrasil,
+    regua.proporcaoBrasil,
   );
 
   const porId = new Map(

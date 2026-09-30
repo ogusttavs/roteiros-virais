@@ -198,6 +198,13 @@ async function passo4VelocidadeRelativa() {
   `);
 }
 
+/**
+ * M3: o piso é do setor (`nichos.piso_views`), não mais global; esta é a única consulta de
+ * `pesquisa.ts`/`pontuar.ts`/`transcrever.ts` que não pode passar por `reguaDoSetor` (uma função
+ * em JS, por nicho), porque o UPDATE cobre todas as contas de todos os nichos numa passada só,
+ * pelo custo de rodar isto vigilância a vigilância. O `LEFT JOIN nichos` resolve o piso de cada
+ * conta por linha, com o mesmo padrão de "nulo usa o padrão" de `reguaDoSetor`.
+ */
 async function passo5TaxaForaDaCurvaPorConta() {
   return db().execute(sql`
     UPDATE contas c
@@ -213,9 +220,10 @@ async function passo5TaxaForaDaCurvaPorConta() {
         -- esta taxa); um vídeo abaixo do piso nunca conta como "acima" da curva.
         count(v.id) FILTER (
           WHERE v.fora_da_curva >= ${config.regras.limiarForaDaCurva}
-            AND v.views >= ${config.regras.pisoViewsReferencia}
+            AND v.views >= COALESCE(n.piso_views, ${config.regras.pisoViewsReferencia})
         ) AS acima
       FROM contas c2
+      LEFT JOIN nichos n ON n.id = c2.nicho_id
       LEFT JOIN videos v ON v.conta_id = c2.id
         AND v.publicado_em >= now() - interval '90 days'
         AND v.fora_da_curva IS NOT NULL

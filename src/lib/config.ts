@@ -175,6 +175,13 @@ export const config = {
      * de 50 mil. `ALCANCE_MINIMO_CONTA_SETOR` ajusta sem mexer em código.
      */
     alcanceMinimoContaSetor: envNumero("ALCANCE_MINIMO_CONTA_SETOR", 5_000),
+    /**
+     * M3, item 2: teto diário próprio da análise de vídeo sem fala (quadros + legenda), separado
+     * de `visuaisPorSemana` (que é semanal e exige transcrição e análise já prontas). Só roda para
+     * setor com `nichos.video_sem_fala_vale` true (`reguaDoSetor`); mais caro que a extração por
+     * transcrição (baixa o vídeo e chama o modelo forte com imagem), por isso um teto conservador.
+     */
+    analiseSemFalaPorDia: envNumero("ANALISE_SEM_FALA_POR_DIA", 15),
   },
 };
 

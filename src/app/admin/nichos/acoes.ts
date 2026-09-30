@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { contagemElegivelSemFala, type EfeitoVideoSemFala } from "@/jobs/extrair-sem-fala";
 import { FILAS } from "@/jobs/fila";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirSessaoAdmin } from "@/servicos/clientes";
@@ -10,10 +11,13 @@ import {
   adicionarContasSemente,
   alternarAtivoNicho,
   atualizarNicho,
+  atualizarRegua,
   criarNicho,
+  type DadosRegua,
   ErroNicho,
   tirarConta,
 } from "@/servicos/nichos";
+import { efeitoPiso, type EfeitoPiso } from "@/servicos/pesquisa";
 
 import { dispararJobAction } from "../_jobs/acoes";
 
@@ -145,4 +149,33 @@ export async function aceitarTermoSugeridoAction(nichoId: number, slug: string, 
   } catch (erro) {
     return { ok: false, mensagem: mensagemDeErro(erro) };
   }
+}
+
+/** M3: os três ajustes por setor, no admin do setor. "voltar ao padrão" manda o campo como `null`. */
+export async function atualizarReguaAction(nichoId: number, slug: string, dados: DadosRegua): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await atualizarRegua(nichoId, dados);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, mensagem: mensagemDeErro(erro) };
+  }
+}
+
+/**
+ * M3, item 3: "ao mexer num dos três, a tela diz quantos vídeos do setor passariam nos últimos 7
+ * e 30 dias com o valor novo". Só o piso muda uma contagem de referências de verdade; "vídeo sem
+ * fala vale" muda uma contagem de elegíveis para a leitura por imagem (não é a mesma pergunta: a
+ * proporção de vídeo brasileiro não tem uma contagem própria, ela só redistribui o que já passa).
+ */
+export async function preverEfeitoReguaAction(
+  nichoId: number,
+  pisoViews: number,
+): Promise<EfeitoPiso & EfeitoVideoSemFala> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  const [piso, semFala] = await Promise.all([efeitoPiso(nichoId, pisoViews), contagemElegivelSemFala(nichoId, pisoViews)]);
+  return { ...piso, ...semFala };
 }

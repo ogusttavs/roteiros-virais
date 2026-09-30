@@ -68,6 +68,27 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
     page.getByRole("row").filter({ hasText: "exemplo-e2e-conta-instagram" }),
   ).toContainText("apify");
 
+  // M3: a regua deste setor (piso de views, proporcao de video brasileiro, video sem fala vale),
+  // com o efeito ("quantos vídeos passariam") recalculado ao digitar, e "voltar ao padrão".
+  await expect(page.getByRole("heading", { name: "régua deste setor" })).toBeVisible();
+  const campoPiso = page.getByLabel("piso de views", { exact: true });
+  await campoPiso.fill("500");
+  await expect(page.getByText(/vídeo.* passariam nos últimos 7 dias/)).toBeVisible();
+  await page.getByRole("checkbox", { name: "vídeo sem fala vale" }).check();
+  await page.getByRole("button", { name: "salvar régua" }).click();
+  await expect(page.getByText("régua salva")).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByLabel("piso de views", { exact: true })).toHaveValue("500");
+  await expect(page.getByRole("checkbox", { name: "vídeo sem fala vale" })).toBeChecked();
+
+  await page.getByRole("button", { name: "voltar ao padrão" }).first().click();
+  await expect(page.getByLabel("piso de views", { exact: true })).toHaveValue("");
+  await page.getByRole("button", { name: "salvar régua" }).click();
+  await expect(page.getByText("régua salva")).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("piso de views", { exact: true })).toHaveValue("");
+
   await page.goto("/admin/clientes");
   await page.getByRole("button", { name: "nova marca" }).click();
   const modalNovaMarca = page.getByRole("dialog", { name: "Nova marca" });

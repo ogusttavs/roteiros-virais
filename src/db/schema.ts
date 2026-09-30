@@ -116,6 +116,18 @@ export const nichos = pgTable("nichos", {
   termos: jsonb("termos").$type<string[]>().notNull().default([]),
   ativo: boolean("ativo").notNull().default(true),
   criadoEm: criadoEm(),
+  /**
+   * M3, a régua por setor: os três ajustes que hoje são globais
+   * (`config.regras`) passam a poder ser mudados por setor no admin, sem
+   * mexer em `.env` nem em código. Nulo usa o padrão de `config.regras`
+   * (`reguaDoSetor`, `servicos/pesquisa.ts`); "voltar ao padrão" só grava
+   * nulo de novo.
+   */
+  pisoViews: integer("piso_views"),
+  /** Fração de 0 a 1 (`config.regras.proporcaoBrasil` é 0.7). */
+  proporcaoBrasil: numeric("proporcao_brasil", { precision: 4, scale: 3 }),
+  /** Vídeo sem fala (transcrição curta) vale como referência via análise visual. Padrão: não. */
+  videoSemFalaVale: boolean("video_sem_fala_vale"),
 });
 
 /** Quem grava os videos do cliente (briefing-e-rubricas.md, secao 1). */

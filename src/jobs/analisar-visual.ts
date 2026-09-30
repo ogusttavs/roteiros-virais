@@ -31,7 +31,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
-import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
+import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO, reguaDoSetor } from "@/servicos/pesquisa";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { temposDeQuadro } from "@/servicos/quadros";
 
@@ -58,13 +58,14 @@ type CandidatoVisual = {
 };
 
 async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
+  const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, new Date(Date.now() - SETE_DIAS_MS)),
     // V9d, item 0b: o piso vem antes do múltiplo, também na seleção de leitura: ler primeiro o
     // que passa do piso (a análise visual é cara, 10 por semana, nunca vale gastar num vídeo que
-    // nunca vai virar referência nem evidência de qualquer jeito).
-    gte(videos.views, config.regras.pisoViewsReferencia),
+    // nunca vai virar referência nem evidência de qualquer jeito). M3: piso do setor.
+    gte(videos.views, regua.pisoViews),
     isNotNull(videos.foraDaCurva),
     isNotNull(videos.transcricao),
     isNotNull(videos.analise),
@@ -99,7 +100,7 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     linhas,
     config.regras.visuaisPorSemana,
     (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
-    config.regras.proporcaoBrasil,
+    regua.proporcaoBrasil,
   );
 }
 

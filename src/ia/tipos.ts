@@ -12,12 +12,15 @@ export type { NivelIA };
  * 1 a 3 gravacoes por dia do plano), `sugerirContasDoSetor` (M2, item 1c: ate
  * 30 perfis brasileiros por rede, sempre conferidos na API antes de entrar) e
  * `classificarContaDoSetor` (M2, item 2: "este perfil e deste setor?", pelos
- * ultimos titulos/legendas, mesmo criterio do `pertenceAoNicho` por video).
+ * ultimos titulos/legendas, mesmo criterio do `pertenceAoNicho` por video) e
+ * `extrairVideoSemFala` (M3, item 2: a ficha fixa pelos quadros e pela legenda,
+ * para o setor que aceita "video sem fala vale").
  */
 export type TarefaIA =
   | "avaliarResposta"
   | "compilarPerfil"
   | "extrairVideo"
+  | "extrairVideoSemFala"
   | "analisarVisual"
   | "modeloNicho"
   | "filtrarNoticias"

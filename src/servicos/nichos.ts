@@ -145,6 +145,40 @@ export async function aceitarTermoSugerido(id: number, termo: string): Promise<N
   return atualizado;
 }
 
+/**
+ * M3: a régua por setor (`nichos.piso_views`, `proporcao_brasil`, `video_sem_fala_vale`).
+ * `null` em qualquer campo volta ao padrão de `config.regras` (`reguaDoSetor`); "voltar ao
+ * padrão" no admin chama isto com o campo em `null`. Mesmas faixas que fazem sentido para um
+ * número de views e uma proporção, para o campo nunca gravar um valor sem sentido (visão errada
+ * de dedo, por exemplo, piso negativo ou proporção de 200%).
+ */
+export type DadosRegua = {
+  pisoViews: number | null;
+  proporcaoBrasil: number | null;
+  videoSemFalaVale: boolean | null;
+};
+
+export async function atualizarRegua(id: number, dados: DadosRegua): Promise<Nicho> {
+  if (dados.pisoViews !== null && (!Number.isFinite(dados.pisoViews) || dados.pisoViews < 0)) {
+    throw new ErroNicho("o piso de views precisa ser um numero de zero para cima.");
+  }
+  if (dados.proporcaoBrasil !== null && (!Number.isFinite(dados.proporcaoBrasil) || dados.proporcaoBrasil < 0 || dados.proporcaoBrasil > 1)) {
+    throw new ErroNicho("a proporcao de video brasileiro precisa ser de 0% a 100%.");
+  }
+
+  const [nicho] = await db()
+    .update(nichos)
+    .set({
+      pisoViews: dados.pisoViews,
+      proporcaoBrasil: dados.proporcaoBrasil === null ? null : dados.proporcaoBrasil.toFixed(3),
+      videoSemFalaVale: dados.videoSemFalaVale,
+    })
+    .where(eq(nichos.id, id))
+    .returning();
+  if (!nicho) throw new ErroNicho("nicho nao encontrado.");
+  return nicho;
+}
+
 /** Desativar tira o nicho de /comecar e das coletas; reativar volta. Nunca apaga nada. */
 export async function alternarAtivoNicho(id: number, ativo: boolean): Promise<Nicho> {
   const [nicho] = await db().update(nichos).set({ ativo }).where(eq(nichos.id, id)).returning();

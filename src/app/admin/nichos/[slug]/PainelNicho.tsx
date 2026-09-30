@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { Nicho, ResumoPesquisaSetor } from "@/db/schema";
 import type { ContaSemente, ExecucaoResumo, PassoSetor, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
@@ -15,8 +15,10 @@ import {
   adicionarContasSementeAction,
   alternarAtivoNichoAction,
   atualizarNichoAction,
+  atualizarReguaAction,
   coletarAgoraAction,
   pesquisarMercadoAction,
+  preverEfeitoReguaAction,
   tirarContaAction,
 } from "../acoes";
 
@@ -38,6 +40,9 @@ type Props = {
   ultimaPesquisa: { criadoEm: Date; resumo: ResumoPesquisaSetor } | null;
   /** M2, item 4: em que passo o setor está (pesquisando contas, coletando, lendo, pronto). */
   passo: PassoSetor;
+  /** M3: o padrão de `config.regras`, para a tela mostrar ao lado de cada campo da régua (o número, não só "padrão"). */
+  padraoPisoViews: number;
+  padraoProporcaoBrasil: number;
 };
 
 function formatarQuando(data: Date | undefined): string {
@@ -52,7 +57,16 @@ const ROTULO_PASSO: Record<PassoSetor, string> = {
   pronto: t.passoPronto,
 };
 
-export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, ultimaPesquisa, passo }: Props) {
+export function PainelNicho({
+  nicho,
+  jobsColeta,
+  resumoLeitura,
+  contasSemente,
+  ultimaPesquisa,
+  passo,
+  padraoPisoViews,
+  padraoProporcaoBrasil,
+}: Props) {
   const router = useRouter();
 
   const [editando, setEditando] = useState(false);
@@ -76,6 +90,36 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, u
 
   const [tirandoId, setTirandoId] = useState<number | null>(null);
   const [aceitandoTermo, setAceitandoTermo] = useState<string | null>(null);
+
+  /** M3: a régua por setor. Percentual em texto (0 a 100) porque é assim que a pessoa digita; vira fração só ao salvar. */
+  const [pisoViewsInput, setPisoViewsInput] = useState(nicho.pisoViews === null ? "" : String(nicho.pisoViews));
+  const [proporcaoBrasilInput, setProporcaoBrasilInput] = useState(
+    nicho.proporcaoBrasil === null ? "" : String(Math.round(Number(nicho.proporcaoBrasil) * 100)),
+  );
+  const [videoSemFalaVale, setVideoSemFalaVale] = useState(nicho.videoSemFalaVale ?? false);
+  const [salvandoRegua, setSalvandoRegua] = useState(false);
+  const [mensagemRegua, setMensagemRegua] = useState<Mensagem | null>(null);
+  const [efeito, setEfeito] = useState<{ acima7Dias: number; acima30Dias: number; elegiveis7Dias: number; elegiveis30Dias: number } | null>(null);
+  const [calculandoEfeito, setCalculandoEfeito] = useState(false);
+  const efeitoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const pisoViews = pisoViewsInput.trim() === "" ? padraoPisoViews : Number(pisoViewsInput);
+    if (!Number.isFinite(pisoViews) || pisoViews < 0) {
+      setEfeito(null);
+      return;
+    }
+    if (efeitoTimerRef.current) clearTimeout(efeitoTimerRef.current);
+    setCalculandoEfeito(true);
+    efeitoTimerRef.current = setTimeout(() => {
+      preverEfeitoReguaAction(nicho.id, pisoViews)
+        .then(setEfeito)
+        .finally(() => setCalculandoEfeito(false));
+    }, 500);
+    return () => {
+      if (efeitoTimerRef.current) clearTimeout(efeitoTimerRef.current);
+    };
+  }, [pisoViewsInput, nicho.id, padraoPisoViews]);
 
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
@@ -155,6 +199,35 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, u
     router.refresh();
   }
 
+  async function salvarRegua() {
+    setSalvandoRegua(true);
+    setMensagemRegua(null);
+    const resultado = await atualizarReguaAction(nicho.id, nicho.slug, {
+      pisoViews: pisoViewsInput.trim() === "" ? null : Number(pisoViewsInput),
+      proporcaoBrasil: proporcaoBrasilInput.trim() === "" ? null : Number(proporcaoBrasilInput) / 100,
+      videoSemFalaVale,
+    });
+    setSalvandoRegua(false);
+    if (!resultado.ok) {
+      setMensagemRegua({ tipo: "erro", texto: resultado.mensagem ?? "" });
+      return;
+    }
+    setMensagemRegua({ tipo: "sucesso", texto: t.sucessoRegua });
+    router.refresh();
+  }
+
+  function voltarAoPadraoPiso() {
+    setPisoViewsInput("");
+  }
+
+  function voltarAoPadraoProporcao() {
+    setProporcaoBrasilInput("");
+  }
+
+  function voltarAoPadraoSemFala() {
+    setVideoSemFalaVale(false);
+  }
+
   return (
     <div className={styles.painel}>
       <div className={styles.linhaTitulo}>
@@ -218,6 +291,81 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura, contasSemente, u
           </div>
         </>
       )}
+
+      <hr className={styles.divisor} />
+
+      <div>
+        <h2>{t.reguaTitulo}</h2>
+        <p className={styles.ajuda}>{t.reguaAjuda}</p>
+
+        <Campo
+          rotulo={t.campoPisoViews}
+          ajuda={t.ajudaPisoViews}
+          type="number"
+          min={0}
+          step={1000}
+          placeholder={String(padraoPisoViews)}
+          value={pisoViewsInput}
+          onChange={(e) => setPisoViewsInput(e.target.value)}
+        />
+        <div className={styles.botoes}>
+          <span className={styles.ajuda}>{t.padraoPisoViews(padraoPisoViews.toLocaleString("pt-BR"))}</span>
+          <Botao type="button" variante="ghost" onClick={voltarAoPadraoPiso} disabled={pisoViewsInput.trim() === ""}>
+            {t.botaoVoltarPadrao}
+          </Botao>
+        </div>
+        {calculandoEfeito ? (
+          <p className={styles.ajuda}>{t.calculandoEfeito}</p>
+        ) : efeito ? (
+          <p className={styles.ajuda}>
+            {t.efeitoPisoFrase(efeito.acima7Dias, efeito.acima30Dias)} {t.efeitoSemFalaFrase(efeito.elegiveis7Dias, efeito.elegiveis30Dias)}
+          </p>
+        ) : null}
+
+        <Campo
+          rotulo={t.campoProporcaoBrasil}
+          ajuda={t.ajudaProporcaoBrasil}
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          placeholder={String(Math.round(padraoProporcaoBrasil * 100))}
+          value={proporcaoBrasilInput}
+          onChange={(e) => setProporcaoBrasilInput(e.target.value)}
+        />
+        <div className={styles.botoes}>
+          <span className={styles.ajuda}>{t.padraoProporcaoBrasil(`${Math.round(padraoProporcaoBrasil * 100)}%`)}</span>
+          <Botao type="button" variante="ghost" onClick={voltarAoPadraoProporcao} disabled={proporcaoBrasilInput.trim() === ""}>
+            {t.botaoVoltarPadrao}
+          </Botao>
+        </div>
+
+        <label className={styles.linhaCheckbox}>
+          <input type="checkbox" checked={videoSemFalaVale} onChange={(e) => setVideoSemFalaVale(e.target.checked)} />
+          {t.campoVideoSemFalaVale}
+        </label>
+        <p className={styles.ajuda}>{t.ajudaVideoSemFalaVale}</p>
+        <div className={styles.botoes}>
+          <span className={styles.ajuda}>{t.padraoVideoSemFalaVale}</span>
+          <Botao type="button" variante="ghost" onClick={voltarAoPadraoSemFala} disabled={!videoSemFalaVale}>
+            {t.botaoVoltarPadrao}
+          </Botao>
+        </div>
+
+        {mensagemRegua ? (
+          <p
+            className={[styles.mensagem, mensagemRegua.tipo === "erro" ? styles.mensagemErro : styles.mensagemSucesso].join(" ")}
+            role="status"
+          >
+            {mensagemRegua.texto}
+          </p>
+        ) : null}
+        <div className={styles.botoes}>
+          <Botao type="button" carregando={salvandoRegua} onClick={salvarRegua}>
+            {salvandoRegua ? t.salvandoRegua : t.salvarRegua}
+          </Botao>
+        </div>
+      </div>
 
       <hr className={styles.divisor} />
 

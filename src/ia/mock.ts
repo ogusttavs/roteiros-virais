@@ -42,6 +42,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockTemasDoDia(entrada);
     case "extrairVideo":
       return mockExtrairVideo(entrada);
+    case "extrairVideoSemFala":
+      return mockExtrairVideoSemFala(entrada);
     case "analisarVisual":
       return mockAnalisarVisual();
     case "modeloNicho":
@@ -438,6 +440,35 @@ function mockExtrairVideo(entrada: string) {
       : "a transcricao nao cita nenhum termo do nicho",
     idioma: "pt-BR" as const,
     tipoAbertura: "outro" as const,
+  };
+}
+
+/** M3, item 2: mesma ideia de mockExtrairVideo, sem os campos de fala (`idioma`, `tipoAbertura`). */
+function mockExtrairVideoSemFala(entrada: string) {
+  const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
+  const nichoLinha = extrairCampo(entrada, "Nicho:");
+  const termos = (nichoLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")
+    .split(",")
+    .map((t) => t.trim().toLowerCase())
+    .filter(Boolean);
+  const textoBusca = entrada.toLowerCase();
+  const pertenceAoNicho = termos.length === 0 || termos.some((termo) => textoBusca.includes(termo));
+
+  return {
+    assunto: titulo,
+    gancho: `o que aparece na tela sobre ${titulo}`,
+    estrutura: "cena, demonstracao, fechamento",
+    fechamento: "resumo do que foi mostrado",
+    chamadaFinal: "comenta se voce ja passou por isso",
+    formato: "esquete" as const,
+    porQueFuncionou: "mostra o problema acontecendo de verdade",
+    etiquetas: titulo
+      .toLowerCase()
+      .split(" ")
+      .filter((palavra) => palavra.length > 3)
+      .slice(0, 4),
+    pertenceAoNicho,
+    motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda nao cita nenhum termo do nicho",
   };
 }
 
