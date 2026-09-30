@@ -23,7 +23,10 @@ const FORMATAR_DATA = new Intl.DateTimeFormat("pt-BR", {
  */
 export function tituloDeVideo(descricao: string | null, handle: string, publicadoEm: Date | null): string {
   const primeiraLinha = descricao?.split("\n")[0]?.trim();
-  if (primeiraLinha) return primeiraLinha.slice(0, MAX_CARACTERES_TITULO);
+  // Corta por caractere de verdade (code point), nao por unidade UTF-16: `slice` partia um emoji
+  // que cruzasse o limite e a metade solta derrubava a chamada de IA com o titulo dentro
+  // (hotfix de 30/09/2026, achado na primeira pesquisa de setor em producao).
+  if (primeiraLinha) return Array.from(primeiraLinha).slice(0, MAX_CARACTERES_TITULO).join("");
   if (publicadoEm) return `vídeo de @${handle}, ${FORMATAR_DATA.format(publicadoEm)}`;
   return `vídeo de @${handle}`;
 }

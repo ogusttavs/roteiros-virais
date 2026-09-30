@@ -31,6 +31,18 @@ vi.mock("@/jobs/apify-api", async (importarOriginal) => {
  */
 vi.mock("@/jobs/transcrever", () => ({ rodarTranscrever: vi.fn().mockResolvedValue({}) }));
 
+/**
+ * O cliente de IA continua o de sempre (mock por `AI_PROVIDER`), embrulhado num `vi.fn` para um
+ * teste conseguir derrubar uma chamada só (hotfix de 30/09/2026: a classificação de um candidato
+ * falhando não pode matar a pesquisa do setor).
+ */
+vi.mock("@/ia/cliente", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/ia/cliente")>();
+  return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
+});
+
+import { ErroIA } from "@/ia/erro";
+import { gerarEstruturado } from "@/ia/cliente";
 import { buscarTiktokVigilancia } from "@/jobs/apify-api";
 import { rodarPesquisaDeSetor } from "@/jobs/pesquisa-de-setor";
 
@@ -142,6 +154,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   vi.mocked(buscarTiktokVigilancia).mockResolvedValue({ itens: [], devolvidos: 0 });
+  vi.mocked(gerarEstruturado).mockClear();
   mockFetch.mockReset();
 });
 
@@ -263,6 +276,32 @@ describe("rodarPesquisaDeSetor", () => {
     const [linhaPesquisa] = await db().select().from(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nichoId));
     expect(linhaPesquisa).toBeDefined();
     expect(linhaPesquisa.resumo.contasNovas).toBe(1);
+  }, 30_000);
+
+  it("classificacao por IA de um candidato falhando vira descarte contado, a rodada segue e grava o resumo (hotfix de 30/09)", async () => {
+    const nome = "Pesquisa Setor Erro IA";
+    const nichoId = await criarNicho(nome);
+    const handle = handleSugerido(nome);
+    const canal: Canal = { id: "canal-erro-ia", country: "BR", playlistId: "UUerroia" };
+    mockYoutube({ [handle]: canal }, { "canal-erro-ia": videosBonsPadrao("canal-erro-ia") });
+
+    const original = vi.mocked(gerarEstruturado).getMockImplementation()!;
+    vi.mocked(gerarEstruturado).mockImplementation(async (params) => {
+      if (params.tarefa === "classificarContaDoSetor") throw new ErroIA('erro da API (400) na tarefa "classificarContaDoSetor"');
+      return original(params);
+    });
+    try {
+      const resumo = (await rodarPesquisaDeSetor(nichoId)) as { contasNovas: number; descartadas: Record<string, number> };
+
+      expect(resumo.contasNovas).toBe(0);
+      expect(resumo.descartadas.erro_na_classificacao).toBe(1);
+      const contasDoNicho = await db().select().from(contas).where(eq(contas.nichoId, nichoId));
+      expect(contasDoNicho).toHaveLength(0);
+      const [linhaPesquisa] = await db().select().from(pesquisasSetor).where(eq(pesquisasSetor.nichoId, nichoId));
+      expect(linhaPesquisa).toBeDefined();
+    } finally {
+      vi.mocked(gerarEstruturado).mockImplementation(original);
+    }
   }, 30_000);
 
   it("conta que ja e curadoria nunca e rebaixada, mesmo sendo achada de novo pela pesquisa", async () => {
