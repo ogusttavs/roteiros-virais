@@ -80,6 +80,16 @@ export function incluirSeed(): boolean {
  */
 export const PERTENCE_AO_NICHO = sql`(${videos.analise} ->> 'pertenceAoNicho') is distinct from 'false'`;
 
+/**
+ * O teto de duração (hotfix de 30/09/2026, achado do Gustavo na Overtake Pro: das três
+ * Referências, duas eram vídeos longos, um de dez minutos). O produto é vídeo curto; um vídeo
+ * longo não é referência, tema nem evidência, por mais views que tenha, e também não gasta
+ * vaga de transcrição (`transcrever.ts` escolhe por `foraDaCurvaDoNicho`). Vídeo sem duração
+ * guardada passa: hoje é o caso de boa parte do Instagram pela API da Meta, que é Reels.
+ * `TETO_DURACAO_REFERENCIA_S` ajusta sem mexer em código (`config.regras`).
+ */
+export const DENTRO_DO_TETO_DE_DURACAO = sql`(${videos.duracaoS} is null or ${videos.duracaoS} <= ${config.regras.tetoDuracaoReferenciaS})`;
+
 function mapear(linha: {
   id: number;
   plataforma: Plataforma;
@@ -207,6 +217,7 @@ export async function foraDaCurvaDoNicho(
     gte(videos.views, config.regras.pisoViewsReferencia),
     isNotNull(videos.foraDaCurva),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -237,6 +248,7 @@ export async function subindoHoje(nichoId: number, limite?: number, maxPorConta?
     gte(videos.publicadoEm, diasAtras(7)),
     isNotNull(videos.velocidadeRelativa),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -270,6 +282,7 @@ export async function subindoHojeComAnalise(nichoId: number, limite = 30): Promi
     isNotNull(videos.velocidadeRelativa),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -310,6 +323,7 @@ export async function semDonoComAnalise(nichoId: number): Promise<VideoSemDonoCo
     gte(videos.publicadoEm, diasAtras(7)),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
@@ -366,6 +380,7 @@ function condicoesEvidencia(nichoId: number, texto: string) {
     gte(videos.views, config.regras.pisoViewsReferencia),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
     sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${texto}) or exists (
       select 1 from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor)
       where lower(etiqueta.valor) like any (${padroesSql})
@@ -672,6 +687,7 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias) {
     gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (filtros.apenasIds) condicoes.push(inArray(videos.id, filtros.apenasIds.length > 0 ? filtros.apenasIds : [-1]));

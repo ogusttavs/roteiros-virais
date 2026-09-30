@@ -31,7 +31,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
-import { incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
+import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO } from "@/servicos/pesquisa";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { temposDeQuadro } from "@/servicos/quadros";
 
@@ -70,6 +70,8 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     isNotNull(videos.analise),
     isNull(videos.analiseVisual),
     PERTENCE_AO_NICHO,
+    // Hotfix de 30/09/2026: a análise visual, a mais cara, nunca num vídeo longo (`pesquisa.ts`).
+    DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 

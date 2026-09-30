@@ -154,6 +154,13 @@ export const config = {
      * fixa; `PISO_VIEWS_REFERENCIA` (variável de ambiente) ajusta sem mexer em código.
      */
     pisoViewsReferencia: envNumero("PISO_VIEWS_REFERENCIA", 50_000),
+    /**
+     * Hotfix de 30/09/2026 (achado do Gustavo): vídeo longo não é referência de vídeo curto. 180
+     * segundos é o limite do Shorts e do Reels gravado no aplicativo; acima disso o vídeo fica fora
+     * de Referências, dos temas, da evidência do roteiro e da fila de transcrição
+     * (`DENTRO_DO_TETO_DE_DURACAO`, `servicos/pesquisa.ts`). `TETO_DURACAO_REFERENCIA_S` ajusta.
+     */
+    tetoDuracaoReferenciaS: envNumero("TETO_DURACAO_REFERENCIA_S", 180),
   },
 };
 
