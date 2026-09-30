@@ -22,6 +22,16 @@ describe("tituloDeVideo", () => {
     expect(titulo).toBe("a".repeat(90));
   });
 
+  it("emoji cruzando o limite de 90 nao e partido ao meio (hotfix de 30/09/2026)", () => {
+    // 89 letras mais um emoji de duas unidades UTF-16: o `slice(0, 90)` antigo deixava a metade
+    // solta, que virava um escape invalido no JSON da chamada de IA e derrubava a pesquisa de setor.
+    const descricao = "a".repeat(89) + "\u{1F60D}" + " resto da legenda";
+    const titulo = tituloDeVideo(descricao, "conta", null);
+    expect(titulo.isWellFormed()).toBe(true);
+    expect(titulo).toBe("a".repeat(89) + "\u{1F60D}");
+    expect(Array.from(titulo)).toHaveLength(90);
+  });
+
   it("sem descricao, mas com data: vídeo de @conta e a data por extenso, sem hora", () => {
     expect(tituloDeVideo(null, "sorrisoemdia", new Date("2026-09-05T23:50:00Z"))).toBe(
       "vídeo de @sorrisoemdia, 5 de setembro",

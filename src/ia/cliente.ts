@@ -50,22 +50,27 @@ async function gerarReal<T>(params: ParametrosGeracao<T>): Promise<ResultadoGera
   const modelo = params.nivel === "forte" ? config.ia.modeloForte : config.ia.modeloBarato;
   const maxTokens = params.maxTokens ?? MAX_TOKENS_PADRAO;
 
+  // Hotfix de 30/09/2026 (achado em produção na primeira pesquisa de setor): um texto com metade
+  // de emoji solta (par substituto partido por um `slice`) vira `\ud83d` no JSON e o servidor
+  // rejeita o corpo inteiro com 400 ("unexpected end of hex escape"). `toWellFormed` troca a
+  // metade solta por U+FFFD; texto bem formado passa igual.
   const system: Anthropic.TextBlockParam[] = [
-    { type: "text", text: params.sistemaEstavel, cache_control: { type: "ephemeral" } },
+    { type: "text", text: params.sistemaEstavel.toWellFormed(), cache_control: { type: "ephemeral" } },
   ];
   if (params.sistemaVariavel) {
-    system.push({ type: "text", text: params.sistemaVariavel });
+    system.push({ type: "text", text: params.sistemaVariavel.toWellFormed() });
   }
 
+  const entrada = params.entrada.toWellFormed();
   const content: Anthropic.MessageParam["content"] = params.imagens?.length
     ? [
         ...params.imagens.map((imagem): Anthropic.ImageBlockParam => ({
           type: "image",
           source: { type: "base64", media_type: imagem.mediaType, data: imagem.base64 },
         })),
-        { type: "text", text: params.entrada },
+        { type: "text", text: entrada },
       ]
-    : params.entrada;
+    : entrada;
 
   const outputConfig: Anthropic.OutputConfig = { format: zodOutputFormat(params.schema) };
   if (params.effort && params.nivel === "forte") {
