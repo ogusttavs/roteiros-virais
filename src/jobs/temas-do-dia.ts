@@ -273,8 +273,29 @@ async function gerarTemasDoNicho(
   return { status: "gerado", temasSemProva };
 }
 
-export async function rodarTemasDoDia(): Promise<Record<string, unknown>> {
-  const nichosAtivos = await db().select().from(nichos).where(eq(nichos.ativo, true));
+/**
+ * M1, item 2: os temas nascem quando a análise chega, não só às 06:30. Sem `nichoId`, o
+ * comportamento de sempre (o cron das 06:30): todo nicho ativo, sempre substituindo. Com
+ * `nichoId` (chamado por `extrairColeta` ou `extrairAgora` depois de analisar vídeo novo), só
+ * aquele setor, e só se ele ainda não tem tema hoje: nunca regenera o tema de quem já escolheu.
+ */
+export async function rodarTemasDoDia(nichoId?: number): Promise<Record<string, unknown>> {
+  if (nichoId !== undefined) {
+    const [jaTemHoje] = await db()
+      .select({ id: temasDia.id })
+      .from(temasDia)
+      .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
+    if (jaTemHoje) {
+      return { nichos: 1, gerados: 0, semEvidencia: 0, semProva: 0, temasSemProva: 0, falhas: 0, jaTinhaTemaHoje: true };
+    }
+  }
+
+  const condicoes = [eq(nichos.ativo, true)];
+  if (nichoId !== undefined) condicoes.push(eq(nichos.id, nichoId));
+  const nichosAtivos = await db()
+    .select()
+    .from(nichos)
+    .where(and(...condicoes));
 
   let gerados = 0;
   let semEvidencia = 0;

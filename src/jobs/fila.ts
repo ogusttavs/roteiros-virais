@@ -31,6 +31,8 @@ export const FILAS = {
   transcrever: "transcrever",
   extrair: "extrair",
   extrairColeta: "extrair-coleta",
+  /** M1, item 1: setor com menos de 20 vídeos analisados não espera o lote. */
+  extrairAgora: "extrair-agora",
   analisarVisual: "analisar-visual",
   modeloNicho: "modelo-nicho",
   temasDoDia: "temas-do-dia",
