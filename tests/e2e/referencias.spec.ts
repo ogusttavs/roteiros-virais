@@ -355,6 +355,28 @@ test.describe("/referencias no design v2", () => {
   });
 
   /**
+   * F1, ajuste A da revisão do PR #71 (a sonda do Fable, virou teste): a rede de segurança de `navegar`
+   * (item 2, acima) nunca era desarmada. Aplicar um filtro que dá certo, sair de Referências antes dos
+   * 6s, e o temporizador disparava do mesmo jeito, achava que o endereço atual (agora outra tela) não
+   * era o pedido, e puxava a pessoa de volta com `window.location.assign`. Prova: sai para Hoje antes
+   * dos 6s, espera passar dos 6s, continua em Hoje.
+   */
+  test("aplicar um filtro e sair da tela antes de 6s não puxa a pessoa de volta (F1, ajuste A)", async ({ page }) => {
+    test.setTimeout(20_000);
+    await entrar(page, EMAIL);
+    await page.goto("/referencias");
+
+    await page.getByLabel("Período").selectOption("30");
+    await expect(page).toHaveURL(/periodo=30/);
+
+    await page.getByRole("link", { name: "Hoje" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.waitForTimeout(8_000);
+    await expect(page, "a rede de seguranca de Referencias puxou a pessoa de volta").toHaveURL(/\/hoje/);
+  });
+
+  /**
    * Ajuste A do PR #66: a mesma interação de "filtrar por plataforma pela folha", repetida várias vezes
    * na mesma página (sem recarregar, sem passar pelo `beforeAll` de novo). É a prova de robustez que a
    * revisão do Fable pediu com `--repeat-each=20`: o `--repeat-each` do Playwright recria o `beforeAll` a

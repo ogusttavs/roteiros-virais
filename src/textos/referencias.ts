@@ -51,6 +51,8 @@ export const textosReferencias = {
   semConexaoParaBuscar: "Busca e filtros precisam de conexão.",
   /** No lugar da contagem, enquanto a busca nova não chegou. */
   buscando: "buscando os vídeos",
+  /** F1, ajuste A: aparece depois de um tempo, enquanto a rede de segurança de `navegar` está armada, em vez de seis segundos mudos e uma recarga. */
+  demorandoMaisQueNormal: "Está demorando mais que o normal.",
   contaNaoIdentificada: "conta não identificada",
 
   // A folha de detalhes ("Por que esse funcionou")
