@@ -354,6 +354,13 @@ export const briefings = pgTable("briefings", {
   respostas: jsonb("respostas").$type<Record<string, string>>().notNull().default({}),
   /** perguntaId -> avaliacao em quatro partes */
   avaliacoes: jsonb("avaliacoes").$type<Record<string, AvaliacaoResposta>>().notNull().default({}),
+  /**
+   * P2, item 3: perguntaId -> a fala tal como veio da transcrição, antes de `organizarFalaBriefing`
+   * tirar as muletas de fala. Opcional, para análise e auditoria; só existe quando a resposta veio
+   * pelo microfone. Coluna nova (não um campo dentro de `respostas[id]`, que já é `string` em
+   * produção com respostas reais de cliente: trocar a forma quebraria toda leitura existente).
+   */
+  transcricoesBrutas: jsonb("transcricoes_brutas").$type<Record<string, string>>().notNull().default({}),
   notaGeral: numeric("nota_geral", { precision: 4, scale: 2 }),
   /** true quando a nota geral chegou a 8 (gate da plataforma) */
   completo: boolean("completo").notNull().default(false),

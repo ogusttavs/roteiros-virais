@@ -64,6 +64,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockSugerirContasDoSetor(entrada);
     case "classificarContaDoSetor":
       return mockClassificarContaDoSetor(entrada);
+    case "organizarFalaBriefing":
+      return mockOrganizarFalaBriefing(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -497,6 +499,19 @@ function mockLerMomento(entrada: string) {
     oQueEstaAcontecendo: frases[1] || texto,
     oQueDaParaMostrar: frases[2] || frases[1] || texto,
   };
+}
+
+/**
+ * P2, item 3: tira algumas muletas de fala comuns, por regex, e junta os espaços que sobram. Um
+ * mock de verdade nunca faria isso perfeitamente (é IA), mas é o bastante para o teste provar que
+ * o texto que chega na tela não é a fala crua.
+ */
+const MULETAS_DE_FALA = /\b(é|tipo|né|então assim|daí|enfim)\b,?/gi;
+
+function mockOrganizarFalaBriefing(entrada: string): { textoOrganizado: string } {
+  const textoFalado = entrada.split("O que a pessoa falou:\n")[1]?.trim() ?? entrada.trim();
+  const semMuletas = textoFalado.replace(MULETAS_DE_FALA, "").replace(/\s{2,}/g, " ").trim();
+  return { textoOrganizado: semMuletas || textoFalado };
 }
 
 /**

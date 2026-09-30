@@ -15,8 +15,11 @@ import {
   type PerfilCompilado,
   type TipoMarca,
 } from "@/db/schema";
+import { gerarEstruturado } from "@/ia/cliente";
 import * as avaliarRespostaIA from "@/ia/prompts/avaliarResposta";
 import * as compilarPerfilIA from "@/ia/prompts/compilarPerfil";
+import * as organizarFalaBriefingIA from "@/ia/prompts/organizarFalaBriefing";
+import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
 
@@ -76,12 +79,19 @@ export async function perfilDoCliente(clienteId: number): Promise<PerfilCompilad
  * que so olha para a nota) ficava com o valor de antes da edicao ate a
  * proxima chamada a `avaliarResposta`, e a tela podia mostrar uma nota mais
  * alta do que a soma das avaliacoes guardadas de verdade sustenta.
+ *
+ * `transcricaoBruta` (P2, item 3): so quando a resposta veio pelo microfone,
+ * o texto tal como a Groq devolveu, antes de `organizarFalaBriefing` tirar
+ * as muletas de fala. Guardado em `transcricoesBrutas[perguntaId]` so quando
+ * o texto de fato mudou (mesma regra de `avaliacoes`, para nunca guardar uma
+ * transcricao de uma resposta que a pessoa ja reescreveu por cima).
  */
 export async function salvarRascunho(
   clienteId: number,
   perguntaId: string,
   resposta: string,
   tipo: TipoMarca,
+  transcricaoBruta?: string,
 ): Promise<void> {
   if (!perguntaPorId(perguntaId, tipo)) {
     throw new ErroBriefing(`pergunta desconhecida: ${perguntaId}`);
@@ -102,12 +112,15 @@ export async function salvarRascunho(
       ? Object.fromEntries(Object.entries(linha.avaliacoes).filter(([id]) => id !== perguntaId))
       : linha.avaliacoes;
     const notaGeral = textoMudou ? calcularNotaGeral(avaliacoes, tipo) : Number(linha.notaGeral ?? 0);
+    const transcricoesBrutas =
+      textoMudou && transcricaoBruta ? { ...linha.transcricoesBrutas, [perguntaId]: transcricaoBruta } : linha.transcricoesBrutas;
 
     await tx
       .update(briefings)
       .set({
         respostas,
         avaliacoes,
+        transcricoesBrutas,
         notaGeral: notaGeral.toFixed(2),
         atualizadoEm: new Date(),
       })
@@ -331,4 +344,37 @@ export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
     linhas.push(`Vídeos que ele guardou como referência: ${perfil.referencias.join("; ")}`);
   }
   return linhas.join("\n");
+}
+
+/**
+ * P2, item 3: organiza a fala transcrita antes de entrar no campo como a resposta da pessoa. Sem
+ * verificador (mesmo espírito de `lerMomento`, etapa 8): a saída é o que a pessoa já disse, só
+ * reorganizada; ela vê e edita antes de confirmar.
+ */
+export async function organizarFalaBriefing(pergunta: string, textoFalado: string): Promise<string> {
+  const resultado = await gerarEstruturado({
+    tarefa: "organizarFalaBriefing",
+    nivel: organizarFalaBriefingIA.nivel,
+    effort: organizarFalaBriefingIA.esforco,
+    schema: organizarFalaBriefingIA.schema,
+    sistemaEstavel: organizarFalaBriefingIA.montarSistemaEstavel(),
+    entrada: organizarFalaBriefingIA.montarEntrada({ pergunta, textoFalado }),
+  });
+
+  await registrarGeracao({
+    tarefa: "organizarFalaBriefing",
+    versaoPrompt: organizarFalaBriefingIA.versao,
+    modelo: resultado.modelo,
+    nivel: organizarFalaBriefingIA.nivel,
+    entradas: { pergunta },
+    saida: resultado.dados,
+    uso: {
+      tokensEntrada: resultado.tokensEntrada,
+      tokensSaida: resultado.tokensSaida,
+      tokensCacheLeitura: resultado.tokensCacheLeitura,
+      tokensCacheEscrita: resultado.tokensCacheEscrita,
+    },
+  });
+
+  return resultado.dados.textoOrganizado;
 }

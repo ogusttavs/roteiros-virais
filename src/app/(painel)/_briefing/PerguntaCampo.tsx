@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert } from "lucide-react";
+import { CircleAlert, Mic } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { PerguntaBriefing } from "@/config/briefing";
@@ -14,8 +14,10 @@ import { Nota } from "@/ui/componentes/Nota";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Toast } from "@/ui/componentes/Toast";
+import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
+import { organizarFalaBriefingAction } from "./acoes";
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
 
 import styles from "./PerguntaCampo.module.css";
@@ -31,8 +33,11 @@ type Props = {
   pergunta: PerguntaBriefing;
   resposta: string;
   avaliacao: AvaliacaoResposta | null;
-  /** Precisa ter identidade estavel (a action do servidor, ou um useCallback): o salvamento depende dela. */
-  onSalvarRascunho: (perguntaId: string, resposta: string) => Promise<void>;
+  /**
+   * Precisa ter identidade estavel (a action do servidor, ou um useCallback): o salvamento depende
+   * dela. `transcricaoBruta` (P2, item 3): só quando a resposta veio pelo microfone.
+   */
+  onSalvarRascunho: (perguntaId: string, resposta: string, transcricaoBruta?: string) => Promise<void>;
   onAvaliar: (perguntaId: string, resposta: string) => Promise<ResultadoAcaoBriefing>;
   onAtualizado: (perguntaId: string, resposta: string, resultado: ResultadoAcaoBriefing) => void;
   /**

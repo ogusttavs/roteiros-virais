@@ -131,8 +131,8 @@ export function ComecarWizard({
    * atualizava `respostas`, e o texto digitado e nao avaliado voltava vazio ou antigo (V7, item 4 do
    * PROXIMO.md). So depois de o servidor confirmar, para nunca mostrar como salvo o que nao foi.
    */
-  const salvarRascunho = useCallback(async (perguntaId: string, texto: string) => {
-    await salvarRascunhoAction(perguntaId, texto);
+  const salvarRascunho = useCallback(async (perguntaId: string, texto: string, transcricaoBruta?: string) => {
+    await salvarRascunhoAction(perguntaId, texto, transcricaoBruta);
     setRespostas((atual) => (atual[perguntaId] === texto ? atual : { ...atual, [perguntaId]: texto }));
   }, []);
 
