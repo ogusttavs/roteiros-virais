@@ -41,8 +41,8 @@ vi.mock("@/ia/cliente", async (importarOriginal) => {
   return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
 });
 
-import { ErroIA } from "@/ia/erro";
 import { gerarEstruturado } from "@/ia/cliente";
+import { ErroIA } from "@/ia/erro";
 import { buscarTiktokVigilancia } from "@/jobs/apify-api";
 import { rodarPesquisaDeSetor } from "@/jobs/pesquisa-de-setor";
 
