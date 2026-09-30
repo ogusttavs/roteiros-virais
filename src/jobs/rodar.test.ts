@@ -20,7 +20,7 @@ import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
-import { FILAS } from "./fila";
+import { FILAS, FILAS_POR_EVENTO } from "./fila";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { TAREFAS } from "./rodar";
@@ -50,5 +50,19 @@ describe("TAREFAS (rodar.ts)", () => {
 
     expect(rodarColetaApify).toHaveBeenCalledWith(undefined, idDaExecucao);
     expect(rodarColetaMeioDia).toHaveBeenCalledWith(idDaExecucao);
+  });
+
+  /**
+   * M2, item 0a2 da revisão do PR #73: `extrair-agora` estava em `FILAS`, no worker e na rota do
+   * admin, mas faltava aqui, então `npm run job -- extrair-agora` respondia "job desconhecido"
+   * (achado do Fable em produção, no deploy da M1). Este teste prova que isso nunca mais acontece
+   * para nenhuma fila que não seja por evento (as por evento, como `aprender-cliente`, precisam de
+   * um dado que só quem enfileira sabe, então não fazem sentido no `npm run job` direto).
+   */
+  it("todo nome de FILAS que nao e de evento existe em TAREFAS", () => {
+    for (const nome of Object.values(FILAS)) {
+      if (FILAS_POR_EVENTO.has(nome)) continue;
+      expect(TAREFAS[nome], `TAREFAS nao tem a fila "${nome}"`).toBeDefined();
+    }
   });
 });

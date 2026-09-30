@@ -253,6 +253,13 @@
       "when": 1790690071875,
       "tag": "0035_marca-sem-dono",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790788874603,
+      "tag": "0036_pesquisa-de-setor",
+      "breakpoints": true
     }
   ]
 }

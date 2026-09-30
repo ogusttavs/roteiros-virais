@@ -1020,11 +1020,16 @@ export type EstatisticasSetor = {
  * foram julgados fora do setor e só 3 passam do piso. Sem esta linha, o admin só via "48
  * transcritos" e não enxergava que a matéria-prima de verdade era pouca. Só leitura; a decisão
  * sobre o piso é do Gustavo (`config.regras.pisoViewsReferencia`).
+ *
+ * M2, item 0a da revisão do PR #73: a primeira versão de `acimaDoPiso` só exigia `foraDaCurva`
+ * não nulo, sem o limiar de 1,5x nem `isNotNull(analise)`, então contava todo vídeo pontuado do
+ * setor, não só o que `referenciasDoNicho` mostraria (medido em produção: Overtake Pro 33 contra
+ * 2, perfil do Bruno 89 contra 10, Dr.Wash 1.043 contra 71). Corrigido reaproveitando
+ * `condicoesReferencias`, as mesmas condições que a tela usa, para a contagem nunca divergir de
+ * novo.
  */
 export async function estatisticasDoSetor(nichoId: number): Promise<EstatisticasSetor> {
-  const piso = config.regras.pisoViewsReferencia;
-  const acimaDoPiso = (dias: number) =>
-    sql`(${PERTENCE_AO_NICHO} and ${videos.views} >= ${piso} and ${isNotNull(videos.foraDaCurva)} and ${videos.publicadoEm} >= ${diasAtras(dias)} and ${DENTRO_DO_TETO_DE_DURACAO})`;
+  const acimaDoPiso = (dias: number) => and(...condicoesReferencias(nichoId, { periodoDias: dias }));
 
   // `count(...)` do Postgres devolve bigint, que o driver le como string em JS; ::int converte
   // na propria consulta (a contagem nunca chega perto de estourar um int de verdade aqui).

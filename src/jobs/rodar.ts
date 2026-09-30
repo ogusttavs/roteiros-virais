@@ -18,6 +18,7 @@ import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
+import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { FILAS } from "./fila";
 import { rodarLembrete } from "./lembrete";
@@ -55,6 +56,16 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.transcrever]: () => rodarTranscrever(),
   [FILAS.extrair]: () => rodarExtrair(),
   [FILAS.extrairColeta]: () => rodarExtrairColeta(),
+  /**
+   * M2, item 0a2 da revisão do PR #73: faltava aqui, então `npm run job -- extrair-agora`
+   * respondia "job desconhecido" (achado do Fable em produção, no deploy da M1). `nichoId`
+   * opcional na linha de comando, mesma ideia do `clienteId` de `aprender-cliente`: sem
+   * argumento, roda para todo setor novo; com um número, só aquele setor.
+   */
+  [FILAS.extrairAgora]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarExtrairAgora(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
   [FILAS.modeloNicho]: () => rodarModeloNicho(),
   [FILAS.temasDoDia]: () => rodarTemasDoDia(),
