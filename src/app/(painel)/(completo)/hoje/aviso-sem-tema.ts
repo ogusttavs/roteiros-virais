@@ -16,11 +16,22 @@ const HORA_TEMAS_PRONTOS = "06:30";
  * Fora de `page.tsx` de propósito: um arquivo de rota do App Router só pode exportar as poucas
  * chaves especiais do Next (`default`, `metadata`, etc.); qualquer export a mais reprova o build
  * (achado desta rodada, `next build`, "Type 'avisoSemTema' is incompatible with index signature").
+ *
+ * `aindaLendo` (M1, item 5): o setor já tem vídeo coletado mas a análise ainda não rodou. Vale
+ * mais que "cedo demais" ou "não saiu": explica por que, e por isso vence os dois, a qualquer
+ * hora, sempre que `temasParaCliente` devolveu `sem_tema` com um nicho de verdade por trás.
  */
-export function avisoSemTema(resultado: ResultadoTemasHoje | { status: "erro" }, agora: Date): AvisoSemTema | null {
+export function avisoSemTema(
+  resultado: ResultadoTemasHoje | { status: "erro" },
+  agora: Date,
+  aindaLendo = false,
+): AvisoSemTema | null {
   if (resultado.status === "ok") return null;
   if (resultado.status === "erro") {
     return { titulo: textosHoje.erroTitulo, texto: textosHoje.erro };
+  }
+  if (aindaLendo) {
+    return { titulo: textosHoje.aindaLendoTitulo, texto: textosHoje.aindaLendo };
   }
   return horaMinutoAtualISO(agora) >= HORA_TEMAS_PRONTOS
     ? { titulo: textosHoje.semTemaDepoisTitulo, texto: textosHoje.semTemaDepois }

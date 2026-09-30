@@ -35,6 +35,12 @@ function blocoQuebradoAgora(resumo: ResumoQuebradoAgora): string {
       ? `Geracao reprovada duas vezes: tarefa "${resumo.geracaoReprovadaDuasVezes.tarefa}", motivo: ${resumo.geracaoReprovadaDuasVezes.motivo}`
       : "Geracao reprovada duas vezes: nenhuma",
   );
+  // M1, item 3: o lote de analise que passou de 2 horas parado no provedor.
+  linhas.push(
+    resumo.lotePendente
+      ? `Lote de analise: pendente ha ${resumo.lotePendente.horasPendente} hora${resumo.lotePendente.horasPendente === 1 ? "" : "s"} (tarefa "${resumo.lotePendente.tarefa}")`
+      : "Lote de analise: em dia",
+  );
   return `<p><strong>O que esta quebrado agora</strong></p><p>${linhas.join("<br>")}</p>`;
 }
 

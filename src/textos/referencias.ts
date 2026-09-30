@@ -80,6 +80,10 @@ export const textosReferencias = {
 
   vazioSemNicho: "Os vídeos que estão funcionando no seu setor aparecem aqui depois da primeira leitura, que roda de madrugada.",
 
+  /** M1, item 5: o setor já tem vídeo coletado, mas a análise ainda não rodou; diferente de "nenhum filtro encontrou nada". */
+  aindaLendoTitulo: "Estamos lendo os vídeos do seu setor",
+  aindaLendoTexto: "As primeiras referências aparecem em algumas horas.",
+
   /** V12b, item 8: a rede principal escolhida em "Onde você posta mais?" não tem vídeo no período; mostra todas em vez de abrir vazio. */
   semVideoRedePrincipal: (rede: string) => `Sem vídeo do ${rede} neste período; mostrando as outras redes.`,
 };

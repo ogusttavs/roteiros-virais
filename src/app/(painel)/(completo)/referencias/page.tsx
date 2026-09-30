@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import type { AnaliseVideo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { contagensPorFiltroReferencias, referenciasDoNicho, resolverPlataformasReferencias } from "@/servicos/pesquisa";
+import {
+  contagensPorFiltroReferencias,
+  referenciasDoNicho,
+  resolverPlataformasReferencias,
+  setorAindaLendo,
+} from "@/servicos/pesquisa";
 import { favoritosDoCliente } from "@/servicos/referencias";
 import { textosReferencias } from "@/textos/referencias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -75,6 +80,13 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
 
   const resultado = await referenciasDoNicho(cliente.nichoId, filtrosBase);
 
+  /**
+   * M1, item 5: só consulta quando o resultado já está vazio, e só na aba "Fora da curva" (a de
+   * "Salvos" fica vazia por não ter favorito nenhum, o que não tem relação com a análise do setor).
+   */
+  const aindaLendo =
+    segmento === "foradacurva" && resultado.total === 0 ? await setorAindaLendo(cliente.nichoId) : false;
+
   return (
     <ReferenciasTela
       videos={resultado.videos}
@@ -87,6 +99,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       formatosAtivos={formatosAtivos}
       contagensFiltro={contagensFiltro}
       redePrincipalSemVideo={redePrincipalSemVideo}
+      aindaLendo={aindaLendo}
     />
   );
 }

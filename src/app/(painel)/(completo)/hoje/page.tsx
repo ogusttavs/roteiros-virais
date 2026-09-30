@@ -13,7 +13,7 @@ import {
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { ultimoVideoParaAparte, videoSubindoParaAviso } from "@/servicos/curva";
-import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
+import { evidenciaResumoPorIds, setorAindaLendo, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { planoDoDia, planoQueVem } from "@/servicos/plano";
 import { corpoDoRoteiro, roteiroDeHoje, roteirosDeHoje, type RoteiroLinha } from "@/servicos/roteiro";
 import { resumoHistorico, temasParaCliente, type EstadoDia, type ResultadoTemasHoje } from "@/servicos/temas";
@@ -137,7 +137,10 @@ export default async function Hoje() {
   const evidenciasRoteirosDeHoje = await Promise.all(
     roteirosDeHojeBrutos.map((r) => evidenciaResumoPorIds(corpoDoRoteiro(r).evidencias).then(paraEvidenciaTema)),
   );
-  const avisoSemTemaValor = temRoteiroHoje ? null : avisoSemTema(resultado, new Date());
+  /** M1, item 5: só consulta quando o aviso realmente pode aparecer, e só existe nicho para checar sem `sem_tema` por falta dele. */
+  const aindaLendo =
+    !temRoteiroHoje && resultado.status === "sem_tema" && cliente.nichoId ? await setorAindaLendo(cliente.nichoId) : false;
+  const avisoSemTemaValor = temRoteiroHoje ? null : avisoSemTema(resultado, new Date(), aindaLendo);
 
   return (
     <HojeTela

@@ -222,6 +222,7 @@ export function PainelNicho({ nicho, jobsColeta, resumoLeitura }: Props) {
             </li>
           ))}
         </ul>
+        <p className={styles.ajuda}>{t.coletarAgoraAjuda}</p>
         <div className={styles.botoes}>
           <Botao variante="secundario" carregando={coletando} onClick={coletarAgora}>
             {coletando ? t.coletando : t.coletarAgora}

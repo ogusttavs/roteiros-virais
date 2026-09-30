@@ -29,6 +29,7 @@ import { desligarComGraca } from "./desligamento";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
+import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
@@ -105,6 +106,10 @@ async function main(): Promise<void> {
   await boss().work(FILAS.extrair, async () => {
     await executarComRegistro(FILAS.extrair, rodarExtrair);
   });
+  /** M1, item 1 e 4: sem `nichoId`, roda para todo setor novo (o cron não manda nada); com, só aquele setor ("rodar a primeira coleta agora" do admin). */
+  await boss().work<{ nichoId?: number }>(FILAS.extrairAgora, async (job) => {
+    await executarComRegistro(FILAS.extrairAgora, () => rodarExtrairAgora(job[0]?.data?.nichoId));
+  });
   await boss().work(FILAS.extrairColeta, async () => {
     await executarComRegistro(FILAS.extrairColeta, rodarExtrairColeta);
   });
@@ -114,8 +119,9 @@ async function main(): Promise<void> {
   await boss().work(FILAS.modeloNicho, async () => {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);
   });
-  await boss().work(FILAS.temasDoDia, async () => {
-    await executarComRegistro(FILAS.temasDoDia, rodarTemasDoDia);
+  /** M1, item 2: com `nichoId`, só aquele setor, e só se ele ainda não tem tema hoje; sem, comportamento de sempre. */
+  await boss().work<{ nichoId?: number }>(FILAS.temasDoDia, async (job) => {
+    await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId));
   });
   await boss().work(FILAS.lembrete, async () => {
     await executarComRegistro(FILAS.lembrete, () => rodarLembrete());

@@ -5,11 +5,12 @@
  * o mock de `extrairVideo` ainda passa pelo schema Zod real.
  */
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { lotesIa, nichos, videos } from "@/db/schema";
 import { rodarExtrair } from "@/jobs/extrair";
+import { LIMITE_ANALISADOS_SETOR_NOVO } from "@/jobs/extrair-agora";
 import { rodarExtrairColeta } from "@/jobs/extrair-coleta";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -18,6 +19,16 @@ let nichoId: number;
 
 const TRANSCRICAO_BOA =
   "falou sobre o produto principal, contando com detalhe o que ele resolve e para quem serve.";
+
+const ANALISE_EXEMPLO = {
+  assunto: "ja analisado",
+  gancho: "x",
+  estrutura: "x",
+  fechamento: "x",
+  chamadaFinal: "x",
+  formato: "outro",
+  porQueFuncionou: "x",
+};
 
 async function criarVideo(
   idExterno: string,
@@ -39,6 +50,26 @@ async function criarVideo(
   return v;
 }
 
+/**
+ * M1, item 1: `rodarExtrair` agora chama `rodarExtrairAgora` antes de montar o lote, e um setor
+ * com menos de `LIMITE_ANALISADOS_SETOR_NOVO` vídeos analisados vai pelo caminho imediato, não
+ * pelo lote. Este arquivo testa o lote especificamente (o caminho imediato tem o próprio arquivo,
+ * `extrair-agora.test.ts`), então cada teste começa com o setor já "estabelecido".
+ */
+async function tornarSetorEstabelecido() {
+  const linhas = Array.from({ length: LIMITE_ANALISADOS_SETOR_NOVO }, (_, i) => ({
+    plataforma: "youtube" as const,
+    idExterno: `ja-estabelecido-${i}`,
+    url: `https://exemplo.invalido/ja-estabelecido-${i}`,
+    nichoId,
+    titulo: `[exemplo] ja estabelecido ${i}`,
+    views: 100,
+    transcricao: "video ja analisado, so para o setor nao contar como novo",
+    analise: ANALISE_EXEMPLO as never,
+  }));
+  await db().insert(videos).values(linhas);
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db()
@@ -50,6 +81,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await getPool().end();
+});
+
+beforeEach(async () => {
+  await tornarSetorEstabelecido();
 });
 
 afterEach(async () => {

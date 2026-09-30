@@ -4,6 +4,11 @@
  * video com `transcricao` e sem `analise`. A API de lote e assincrona (ate
  * 24h); `extrairColeta` (job separado) e quem busca o resultado quando
  * pronto.
+ *
+ * M1, item 1: antes de montar o lote, `rodarExtrairAgora()` analisa na hora
+ * os setores com menos de 20 vídeos analisados (sem lote, um a um). Um
+ * vídeo nunca vai pelos dois caminhos: os que ganham `analise` ali somem
+ * desta consulta, que já filtra `isNull(videos.analise)`.
  */
 import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
@@ -12,17 +17,14 @@ import { lotesIa, nichos, videos } from "@/db/schema";
 import { criarLote, type ItemLote } from "@/ia/lote";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 
+import { TAMANHO_MINIMO_TRANSCRICAO } from "./extracao-comum";
+import { rodarExtrairAgora } from "./extrair-agora";
+
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 
-/**
- * Transcricao curta demais nao carrega informacao o bastante para o
- * extrator acertar (achado da revisao da etapa 8): esses videos nao entram
- * no lote e ganham uma proxima tentativa de transcricao, para o job
- * `transcrever` tentar de novo pelo audio se a legenda foi o problema.
- */
-const TAMANHO_MINIMO_TRANSCRICAO = 80;
-
 export async function rodarExtrair(): Promise<Record<string, unknown>> {
+  const imediato = await rodarExtrairAgora();
+
   const candidatos = await db()
     .select({
       id: videos.id,
@@ -51,7 +53,7 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
   }
 
   if (prontos.length === 0) {
-    return { videosNoLote: 0, transcricaoCurtaDemais: curtos.length };
+    return { videosNoLote: 0, transcricaoCurtaDemais: curtos.length, imediato };
   }
 
   const itens: ItemLote<extrairVideo.SaidaExtrairVideo>[] = prontos.map((v) => ({
@@ -79,5 +81,5 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
       status: "em_andamento",
     });
 
-  return { videosNoLote: prontos.length, transcricaoCurtaDemais: curtos.length, loteIdExterno };
+  return { videosNoLote: prontos.length, transcricaoCurtaDemais: curtos.length, loteIdExterno, imediato };
 }

@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { db, getPool } from "@/db";
 import { contas, geracoesIA, nichos, noticias, temasDia, videos } from "@/db/schema";
 import { rodarTemasDoDia } from "@/jobs/temas-do-dia";
+import { hojeISO } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -340,4 +341,57 @@ describe("rodarTemasDoDia", () => {
    * conseguiria diferenciar janela de 7 de janela de 14 sem também mudar
    * essas duas consultas, fora do escopo deste item.
    */
+});
+
+/**
+ * M1, item 2: os temas nascem quando a análise chega, não só às 06:30. `extrairColeta` e
+ * `extrairAgora` enfileiram `temasDoDia` com `nichoId` depois de analisar vídeo novo; o job
+ * confere sozinho se o setor já tem tema hoje e nunca regenera o de quem já escolheu.
+ */
+describe("rodarTemasDoDia com nichoId (M1, item 2)", () => {
+  it("setor que ja tem tema hoje: pula, nao chama a IA de novo", async () => {
+    await db()
+      .insert(temasDia)
+      .values({
+        nichoId,
+        data: hojeISO(),
+        temas: [{ titulo: "tema de ontem", descricao: "x", porQue: "x", evidencias: [], puxaPara: "conversao" }],
+      });
+    await criarVideosComProva("assunto que chegou depois do tema de hoje");
+
+    const resumo = await rodarTemasDoDia(nichoId);
+    expect(resumo.jaTinhaTemaHoje).toBe(true);
+    expect(resumo.gerados).toBe(0);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas[0]?.titulo).toBe("tema de ontem");
+  });
+
+  it("setor sem tema hoje, com nichoId: gera so para aquele setor", async () => {
+    await criarVideosComProva("assunto do setor unico");
+
+    const resumo = await rodarTemasDoDia(nichoId);
+    expect(resumo.nichos).toBe(1);
+    expect(resumo.gerados).toBe(1);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas.length).toBeGreaterThan(0);
+  });
+
+  it("sem nichoId, continua substituindo o tema de quem ja tem (comportamento de sempre)", async () => {
+    await db()
+      .insert(temasDia)
+      .values({
+        nichoId,
+        data: hojeISO(),
+        temas: [{ titulo: "tema velho", descricao: "x", porQue: "x", evidencias: [], puxaPara: "conversao" }],
+      });
+    await criarVideosComProva("assunto novo que substitui o tema velho");
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(1);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas[0]?.titulo).not.toBe("tema velho");
+  });
 });

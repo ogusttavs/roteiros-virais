@@ -6,7 +6,7 @@
  * titulo do video (`src/ia/mock.ts`, `mockExtrairVideo`).
  */
 import { eq } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/ia/cliente", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/ia/cliente")>();
@@ -17,6 +17,7 @@ import { db, getPool } from "@/db";
 import { lotesIa, nichos, videos } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { rodarExtrair } from "@/jobs/extrair";
+import { LIMITE_ANALISADOS_SETOR_NOVO } from "@/jobs/extrair-agora";
 import { rodarExtrairColeta } from "@/jobs/extrair-coleta";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -41,6 +42,36 @@ async function criarVideo(idExterno: string, titulo: string) {
   return v;
 }
 
+/**
+ * M1, item 1: `rodarExtrair` chama `rodarExtrairAgora` antes do lote, e setor com menos de
+ * `LIMITE_ANALISADOS_SETOR_NOVO` vídeos analisados vai pelo caminho imediato, não pelo lote.
+ * Este arquivo testa a checagem de idioma do lote especificamente, então cada teste começa com
+ * o setor já "estabelecido" (os vídeos aqui já nascem com `analise`, fora da consulta do
+ * caminho imediato, que só olha `analise is null`).
+ */
+async function tornarSetorEstabelecido() {
+  const analiseExemplo = {
+    assunto: "ja analisado",
+    gancho: "x",
+    estrutura: "x",
+    fechamento: "x",
+    chamadaFinal: "x",
+    formato: "outro" as const,
+    porQueFuncionou: "x",
+  };
+  const linhas = Array.from({ length: LIMITE_ANALISADOS_SETOR_NOVO }, (_, i) => ({
+    plataforma: "youtube" as const,
+    idExterno: `ja-estabelecido-${i}`,
+    url: `https://exemplo.invalido/ja-estabelecido-${i}`,
+    nichoId,
+    titulo: `[exemplo] ja estabelecido ${i}`,
+    views: 100,
+    transcricao: "video ja analisado, so para o setor nao contar como novo",
+    analise: analiseExemplo as never,
+  }));
+  await db().insert(videos).values(linhas);
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db()
@@ -52,6 +83,10 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await getPool().end();
+});
+
+beforeEach(async () => {
+  await tornarSetorEstabelecido();
 });
 
 afterEach(async () => {

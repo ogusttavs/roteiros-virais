@@ -33,6 +33,8 @@ type Props = {
   contagensFiltro: ContagensFiltroReferencias;
   /** V12b, item 8: a rede principal da marca não tinha vídeo no período, então a tela mostrou todas em vez dela. */
   redePrincipalSemVideo?: Plataforma;
+  /** M1, item 5: o setor tem vídeo coletado mas a análise ainda não rodou; troca o "vazio" de sempre por essa explicação. */
+  aindaLendo?: boolean;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -124,6 +126,7 @@ export function ReferenciasTela({
   formatosAtivos,
   contagensFiltro,
   redePrincipalSemVideo,
+  aindaLendo,
 }: Props) {
   const router = useRouter();
   const { semConexao, avisarRedeOk } = useConexao();
@@ -457,6 +460,11 @@ export function ReferenciasTela({
           <div className={styles.blocoVazio}>
             <h3>{textosReferencias.vazioTituloSalvos}</h3>
             <p>{textosReferencias.vazioTextoSalvos}</p>
+          </div>
+        ) : aindaLendo ? (
+          <div className={styles.blocoVazio}>
+            <h3>{textosReferencias.aindaLendoTitulo}</h3>
+            <p>{textosReferencias.aindaLendoTexto}</p>
           </div>
         ) : (
           <div className={styles.blocoVazio}>

@@ -9,6 +9,7 @@ import {
   type EstadoAgregado,
   type LinhaAcompanhamentoDia,
 } from "@/servicos/admin-acompanhamento";
+import { estatisticasDoSetor } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -87,6 +88,16 @@ export default async function AdminViagem({ searchParams }: { searchParams: Prom
     resumoQuebradoAgora(),
   ]);
 
+  /**
+   * M1, item 5b: o mesmo aviso de `/admin/nichos/[slug]`, aqui por marca (um setor pode ter mais
+   * de uma marca). Uma consulta por setor distinto, não por marca, para não repetir a mesma conta
+   * várias vezes quando duas marcas dividem o mesmo setor.
+   */
+  const nichosDistintos = [...new Set(marcas.map((m) => m.nichoId).filter((id): id is number => id !== null))];
+  const setorEstreitoPorNicho = new Map(
+    await Promise.all(nichosDistintos.map(async (id) => [id, (await estatisticasDoSetor(id)).setorEstreito] as const)),
+  );
+
   return (
     <div className={styles.pagina}>
       <div className={styles.cabecalhoLista}>
@@ -122,6 +133,12 @@ export default async function AdminViagem({ searchParams }: { searchParams: Prom
               {resumo.geracaoReprovadaDuasVezes
                 ? t.geracaoReprovadaComMotivo(resumo.geracaoReprovadaDuasVezes.tarefa, resumo.geracaoReprovadaDuasVezes.motivo)
                 : t.geracaoReprovadaVazio}
+            </span>
+          </div>
+          <div className={styles.cartao}>
+            <span className={styles.cartaoRotulo}>{t.lotePendenteRotulo}</span>
+            <span className={styles.cartaoValor}>
+              {resumo.lotePendente ? t.lotePendenteComHoras(resumo.lotePendente.horasPendente) : t.lotePendenteVazio}
             </span>
           </div>
         </div>
@@ -162,6 +179,9 @@ export default async function AdminViagem({ searchParams }: { searchParams: Prom
                     <div className={styles.cabecalhoMarca}>
                       <span>{marca.nome}</span>
                       <span className={styles.ultimoAcesso}>{formatarUltimoAcesso(marca.ultimoAcessoEm)}</span>
+                      {marca.nichoId !== null && setorEstreitoPorNicho.get(marca.nichoId) ? (
+                        <span className={styles.aviso}>{t.setorEstreitoAviso}</span>
+                      ) : null}
                     </div>
                   </th>
                 ))}
