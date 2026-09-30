@@ -110,6 +110,12 @@ export const config = {
      * nem inscreve (mesmo mecanismo `condicao` de `metaAtivo`).
      */
     coletaMeioDia: env("COLETA_MEIO_DIA") === "1",
+    /**
+     * P2, item 0b da revisão do PR #74: cada termo custa 200 unidades do YouTube (duas buscas,
+     * `pesquisa-de-setor.ts`); com 9.000 por dia e uma pesquisa por setor por mês, cabem 8 a 10.
+     * Os termos mais curtos entram primeiro (são os mais genéricos, acham mais candidato).
+     */
+    termosPesquisaSetor: envNumero("TERMOS_PESQUISA_SETOR", 8),
   },
   email: {
     resendKey: env("RESEND_API_KEY"),
