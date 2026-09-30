@@ -17,10 +17,10 @@ export async function salvarDadosFixosAction(dadosBrutos: unknown) {
 
 export async function salvarRascunhoAction(perguntaId: string, resposta: string) {
   const cliente = await clienteDaSessaoAtual();
-  await salvarRascunho(cliente.id, perguntaId, resposta);
+  await salvarRascunho(cliente.id, perguntaId, resposta, cliente.tipo);
 }
 
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {
   const cliente = await clienteDaSessaoAtual();
-  return avaliarResposta(cliente.id, perguntaId, resposta);
+  return avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo);
 }

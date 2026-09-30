@@ -1,14 +1,43 @@
 /**
- * Dados fixos (secao 1) e as doze perguntas do briefing (secao 2), copiados
- * literalmente de estrategia/briefing-e-rubricas.md. As telas de /comecar e
- * /briefing leem daqui; nunca reescrever o enunciado ou o "o que a IA
- * procura" na tela ou no servico.
+ * Dados fixos (secao 1 e 1b) e as doze perguntas do briefing (secao 2 e 2b),
+ * copiados literalmente de estrategia/briefing-e-rubricas.md. As telas de
+ * /comecar e /briefing leem daqui; nunca reescrever o enunciado ou o "o que
+ * a IA procura" na tela ou no servico.
+ *
+ * P1 (briefing-e-rubricas.md, secao 2b): a marca do tipo pessoa tem as
+ * proprias doze perguntas, com os mesmos ids, blocos e pesos do negocio (a
+ * lista de notas, a barra de blocos e as avaliacoes guardadas por id
+ * continuam iguais); so o enunciado, o "o que a IA procura" e o rotulo curto
+ * mudam. `perguntasDoBriefing(tipo)` decide qual das duas listas usar.
  */
+import type { Persona, QuemGrava, TipoMarca } from "@/db/schema";
 
-export type PersonaOpcao = { valor: "negocio" | "criador"; rotulo: string };
-export type QuemGravaOpcao = { valor: "propria_pessoa" | "pessoa_e_equipe"; rotulo: string };
+export type PersonaOpcao = { valor: Persona; rotulo: string };
+export type QuemGravaOpcao = { valor: QuemGrava; rotulo: string };
 
-export const DADOS_FIXOS = {
+export type DadosFixosConfig = {
+  nome: { rotulo: string };
+  cidade: { rotulo: string };
+  bairro: { rotulo: string };
+  ramo: {
+    rotulo: string;
+    ajuda: string;
+    opcaoOutro: string;
+  };
+  persona: {
+    rotulo: string;
+    opcoes: PersonaOpcao[];
+  };
+  perfis: { rotulo: string };
+  quemGrava: {
+    rotulo: string;
+    /** Pessoa (P1, item 2): a pergunta nem aparece na tela, sempre "propria_pessoa". */
+    opcoes: QuemGravaOpcao[];
+    fixoEmPropriaPessoa?: boolean;
+  };
+};
+
+const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
   nome: { rotulo: "Nome do negócio" },
   cidade: { rotulo: "Cidade" },
   bairro: { rotulo: "Bairro" },
@@ -22,7 +51,7 @@ export const DADOS_FIXOS = {
     opcoes: [
       { valor: "negocio", rotulo: "Vender o meu produto ou serviço" },
       { valor: "criador", rotulo: "Virar criador e atrair marcas" },
-    ] satisfies PersonaOpcao[],
+    ],
   },
   perfis: { rotulo: "Perfis nas redes" },
   quemGrava: {
@@ -30,9 +59,39 @@ export const DADOS_FIXOS = {
     opcoes: [
       { valor: "propria_pessoa", rotulo: "Eu mesmo" },
       { valor: "pessoa_e_equipe", rotulo: "Eu e a equipe" },
-    ] satisfies QuemGravaOpcao[],
+    ],
   },
 };
+
+/** Secao 1b: mesma mecanica do negocio, so muda o rotulo e as opcoes ("sem mudar de mecanica", texto da secao). */
+const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
+  nome: { rotulo: "Nome" },
+  cidade: { rotulo: "Onde está o seu público" },
+  bairro: { rotulo: "Bairro" },
+  ramo: {
+    rotulo: "Ramo",
+    ajuda: "O ramo do seu assunto principal. Se não achar, escolha \"outro\".",
+    opcaoOutro: "outro",
+  },
+  persona: {
+    rotulo: "O que você quer com os vídeos",
+    opcoes: [
+      { valor: "conhecido", rotulo: "Ficar conhecido no que eu faço" },
+      { valor: "criador", rotulo: "Virar criador e atrair marcas" },
+      { valor: "negocios", rotulo: "Levar gente para os meus negócios" },
+    ],
+  },
+  perfis: { rotulo: "Perfis nas redes" },
+  quemGrava: {
+    rotulo: "Quem aparece nos vídeos",
+    opcoes: [{ valor: "propria_pessoa", rotulo: "Eu mesmo" }],
+    fixoEmPropriaPessoa: true,
+  },
+};
+
+export function dadosFixosDoBriefing(tipo: TipoMarca): DadosFixosConfig {
+  return tipo === "pessoa" ? DADOS_FIXOS_PESSOA : DADOS_FIXOS_NEGOCIO;
+}
 
 export type PerguntaBriefing = {
   id: string;
@@ -50,9 +109,10 @@ export type PerguntaBriefing = {
   rotuloCurto: string;
 };
 
-const AJUDA_PADRAO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
+const AJUDA_PADRAO_NEGOCIO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
+const AJUDA_PADRAO_PESSOA = "Escreva como se fosse para alguém que nunca ouviu falar de você.";
 
-export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
+const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
   {
     id: "p1",
     rotuloCurto: "o que você faz",
@@ -61,7 +121,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 2,
     enunciado:
       "Em poucas palavras, o que o seu negócio faz hoje? Explique como se estivesse falando com alguém que nunca ouviu falar do seu ramo.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "O que é feito, para quem, e o resultado final na vida da pessoa. Nota alta quando um leigo consegue visualizar a cena.",
   },
@@ -73,7 +133,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Qual é o produto ou serviço que mais vende, e quanto custa em média? Se puder, diga também o que a pessoa leva junto: o que ela resolve, sente ou evita.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura: "Um item nomeado, um valor ou faixa, e o benefício em linguagem de cliente.",
   },
   {
@@ -84,7 +144,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "O que você faz diferente de quem oferece a mesma coisa perto de você? Conte um caso real em que isso apareceu.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       'Uma diferença que só ele poderia dizer, com história ou número. "Qualidade" e "atendimento humanizado" sem exemplo valem nota média.',
   },
@@ -96,7 +156,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Descreva o cliente que você mais gosta de atender: idade, onde mora, o que faz, e em que momento da vida está quando te procura.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura: "Uma pessoa, não um segmento. Momento de vida é o que mais ajuda o gancho.",
   },
   {
@@ -107,7 +167,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 2,
     enunciado:
       "Qual é a dúvida, o medo ou a desculpa que essa pessoa tem antes de fechar com você? Escreva com as palavras que ela usa.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Frases em primeira pessoa do cliente. É a matéria-prima do gancho e do vídeo que vende.",
   },
@@ -119,7 +179,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Quais perguntas seus clientes mais repetem no balcão, no WhatsApp ou na consulta? Liste pelo menos cinco.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura: "Perguntas literais. Cada uma vira um tema com chance de gerar cliente.",
   },
   {
@@ -130,7 +190,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Quando alguém assiste um vídeo seu, o que você quer que aconteça em seguida? Te chamar, agendar, comprar, guardar o seu contato, indicar para alguém?",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Uma ação principal e uma secundária. Define a chamada final padrão e a mistura da linha editorial (seção 5).",
   },
@@ -142,7 +202,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Onde você posta hoje, com que frequência, e o que já aconteceu de bom ou de ruim quando postou?",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Rede, ritmo real e um episódio. Um vídeo que já deu certo é evidência de nível conta antes mesmo da primeira coleta.",
   },
@@ -154,7 +214,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 2,
     enunciado:
       "Como você fala com o cliente no dia a dia? Escreva três frases que você diz de verdade, do jeito que saem.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Frases literais, com gíria e ritmo da pessoa. É o que faz o roteiro soar como ele e não como texto de IA.",
   },
@@ -165,7 +225,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     blocoNome: "Sobre a sua fala",
     peso: 1,
     enunciado: "O que você nunca diria ou faria num vídeo? Promessa, palavra, tom, assunto, pessoa.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Limites explícitos. Entram como proibição dura em todo roteiro e derrubam a nota de encaixe de um tema que os fira.",
   },
@@ -177,7 +237,7 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 2,
     enunciado:
       "O que a câmera pode mostrar no seu dia a dia? Local, equipe, equipamento, produto sendo usado, antes e depois, bastidor, cliente (com autorização). Diga o que pode e o que não pode aparecer.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Uma lista de cenas filmáveis. É a pergunta que liga o briefing à tese do produto: os roteiros empurram o que um clone não consegue fazer, e isso só funciona se a IA souber o que existe para mostrar.",
   },
@@ -189,18 +249,167 @@ export const PERGUNTAS_BRIEFING: PerguntaBriefing[] = [
     peso: 1,
     enunciado:
       "Cite dois ou três perfis que você admira (com @) e dois ou três concorrentes diretos (nome ou @). Em uma frase, por que cada um.",
-    ajuda: AJUDA_PADRAO,
+    ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Handles válidos. Perfis admirados viram referência de tom; concorrentes entram na camada exclusiva de pesquisa (escopo 5.6).",
   },
 ];
 
-export const TOTAL_BLOCOS = 5;
+/** Secao 2b: mesmos ids, blocos e pesos do negocio; so enunciado, o que a IA procura e o rotulo curto mudam. */
+const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
+  {
+    id: "p1",
+    rotuloCurto: "quem você é",
+    bloco: 1,
+    blocoNome: "Sobre você",
+    peso: 2,
+    enunciado:
+      "Quem é você e o que você faz hoje? Conte como se fosse para alguém que nunca ouviu falar de você: o que você faz de verdade no dia, há quanto tempo, de onde você vem.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      'Uma linha de vida concreta (o que a pessoa faz com as mãos e com o tempo dela, não o cargo), com um número ou um lugar. "Empresário e criador de conteúdo" sem o que faz no dia vale nota média.',
+  },
+  {
+    id: "p2",
+    rotuloCurto: "do que quer ser lembrado",
+    bloco: 1,
+    blocoNome: "Sobre você",
+    peso: 1,
+    enunciado:
+      "Do que você quer que as pessoas lembrem quando pensarem em você? Um ou dois assuntos, no máximo três, e por que você tem propriedade para falar deles (o que já fez, quanto tempo, o que construiu, o que vive).",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "O território: assuntos nomeados e a prova de que ela vive aquilo (o que já fez, quanto tempo, o que construiu). É o que decide de que assunto os temas do dia saem.",
+  },
+  {
+    id: "p3",
+    rotuloCurto: "a sua virada",
+    bloco: 1,
+    blocoNome: "Sobre você",
+    peso: 1,
+    enunciado: "Qual é a sua história: como você chegou onde está, e qual foi a virada? Conte um episódio, com época e lugar.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Um episódio que dê para contar em 30 segundos, com o antes, a virada e o depois. É matéria de gancho pessoal e do vídeo de apresentação.",
+  },
+  {
+    id: "p4",
+    rotuloCurto: "quem te segue",
+    bloco: 2,
+    blocoNome: "Sobre quem te acompanha",
+    peso: 1,
+    enunciado:
+      "Quem você quer que te siga? Descreva o tipo de pessoa: o que ela faz, em que momento da vida está, o que ela quer que ainda não tem.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Um retrato de tipo que dê para enxergar (nunca nome de pessoa real, a mesma regra do negócio). O momento de vida é o que mais ajuda o gancho.",
+  },
+  {
+    id: "p5",
+    rotuloCurto: "o que querem ver",
+    bloco: 2,
+    blocoNome: "Sobre quem te acompanha",
+    peso: 2,
+    enunciado:
+      "O que essa pessoa quer ver, aprender ou sentir quando abre um vídeo seu? E o que ela te pergunta ou comenta? Escreva com as palavras dela.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      'Frases em primeira pessoa do público ("como você faz para...", "queria ter coragem de..."). É a matéria-prima do gancho e do vídeo que segura quem chegou.',
+  },
+  {
+    id: "p6",
+    rotuloCurto: "suas opiniões",
+    bloco: 2,
+    blocoNome: "Sobre quem te acompanha",
+    peso: 1,
+    enunciado:
+      "Que opiniões suas geram conversa? Algo em que você acredita e muita gente do seu meio discorda, ou uma verdade que você diz e ninguém fala. Liste pelo menos três, com uma frase de porquê em cada.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      'Posicionamentos literais com o motivo. Cada um vira um tema com chance de gerar conversa, e entram no perfil como "posicionamentos".',
+  },
+  {
+    id: "p7",
+    rotuloCurto: "o que quer que aconteça",
+    bloco: 3,
+    blocoNome: "Sobre o que você quer que aconteça",
+    peso: 1,
+    enunciado:
+      "Quando alguém assiste um vídeo seu, o que você quer que aconteça? Te seguir, te mandar mensagem, te chamar para conversar, te indicar, conhecer um dos seus negócios, ou uma marca te chamar para uma parceria? Se você tem negócios, inclusive os que ainda está montando, diga qual deles quer que apareça mais nos seus vídeos e de que jeito. Se você vive de parcerias, diga que tipo de marca quer atrair e o que já fez com marcas.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Uma ação principal e uma secundária, e como a pessoa ganha com isso: pelos negócios dela (quem fala é a pessoa, o negócio aparece como parte da vida, a fábrica, o produto na mão, o cliente, nunca como anúncio) ou pela influência (as marcas que quer atrair, o que já fez com marcas). Define a chamada final padrão e a linha editorial.",
+  },
+  {
+    id: "p8",
+    rotuloCurto: "onde posta hoje",
+    bloco: 3,
+    blocoNome: "Sobre o que você quer que aconteça",
+    peso: 1,
+    enunciado: "Onde você posta hoje, com que frequência, e qual vídeo seu mais deu certo até agora? Por que você acha que deu certo?",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Rede, ritmo real e um episódio com o motivo. Um vídeo que já deu certo é evidência de nível conta antes da primeira coleta.",
+  },
+  {
+    id: "p9",
+    rotuloCurto: "suas frases e o tom",
+    bloco: 4,
+    blocoNome: "Sobre a sua fala",
+    peso: 2,
+    enunciado:
+      "Como você fala de verdade? Escreva três frases que você diz sempre, do jeito que saem, e diga o seu tom: brincalhão, direto, sério, provocador, calmo.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura: "Frases literais com gíria e ritmo, mais o tom nomeado. É o que faz o roteiro soar como ela.",
+  },
+  {
+    id: "p10",
+    rotuloCurto: "o que fica fora",
+    bloco: 4,
+    blocoNome: "Sobre a sua fala",
+    peso: 1,
+    enunciado:
+      "O que você nunca diria, faria ou mostraria num vídeo? Assunto, pessoa, lugar, palavra, e o que da sua vida fica fora da câmera (família, casa, dinheiro, o que for).",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Limites explícitos. Numa pessoa eles pesam mais que num negócio, porque a vida dela é o conteúdo: entram como proibição dura em todo roteiro.",
+  },
+  {
+    id: "p11",
+    rotuloCurto: "a sua semana na câmera",
+    bloco: 5,
+    blocoNome: "O seu dia na câmera, referências",
+    peso: 2,
+    enunciado:
+      "Como é a sua semana, e o que dela dá para filmar? Os lugares por onde você passa, com quem trabalha, o que faz com as mãos, viagens, reuniões, treino, o bastidor dos seus negócios ou das suas parcerias. Diga o que pode e o que não pode aparecer.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Uma lista de cenas filmáveis da vida real dela. É a pergunta que liga o briefing à tese: o roteiro da pessoa empurra o que um clone nunca faz, o lugar de verdade e a pessoa de verdade nele.",
+  },
+  {
+    id: "p12",
+    rotuloCurto: "referências",
+    bloco: 5,
+    blocoNome: "O seu dia na câmera, referências",
+    peso: 1,
+    enunciado:
+      "Cite dois ou três perfis que você admira (com @) e dois ou três que fazem algo parecido com o que você quer fazer (com @). Em uma frase, por que cada um.",
+    ajuda: AJUDA_PADRAO_PESSOA,
+    oQueAIAProcura:
+      "Handles válidos. Admirados viram referência de tom; os parecidos entram na camada exclusiva de pesquisa no lugar dos concorrentes (uma pessoa não tem concorrente, tem vizinho de assunto).",
+  },
+];
 
-export function perguntaPorId(id: string): PerguntaBriefing | undefined {
-  return PERGUNTAS_BRIEFING.find((p) => p.id === id);
+export function perguntasDoBriefing(tipo: TipoMarca): PerguntaBriefing[] {
+  return tipo === "pessoa" ? PERGUNTAS_PESSOA : PERGUNTAS_NEGOCIO;
 }
 
-export function perguntasDoBloco(bloco: number): PerguntaBriefing[] {
-  return PERGUNTAS_BRIEFING.filter((p) => p.bloco === bloco);
+export const TOTAL_BLOCOS = 5;
+
+export function perguntaPorId(id: string, tipo: TipoMarca): PerguntaBriefing | undefined {
+  return perguntasDoBriefing(tipo).find((p) => p.id === id);
+}
+
+export function perguntasDoBloco(bloco: number, tipo: TipoMarca): PerguntaBriefing[] {
+  return perguntasDoBriefing(tipo).filter((p) => p.bloco === bloco);
 }

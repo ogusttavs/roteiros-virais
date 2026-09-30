@@ -101,7 +101,7 @@ async function main() {
       nivel: compilarPerfil.nivel,
       effort: compilarPerfil.esforco,
       schema: compilarPerfil.schema,
-      sistemaEstavel: compilarPerfil.montarSistemaEstavel(),
+      sistemaEstavel: compilarPerfil.montarSistemaEstavel("negocio"),
       entrada: compilarPerfil.montarEntrada({
         respostas: {
           "O que voce vende e por quanto?":

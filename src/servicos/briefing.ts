@@ -7,13 +7,20 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { briefings, clientes, type AvaliacaoResposta, type Briefing, type PerfilCompilado } from "@/db/schema";
+import {
+  briefings,
+  clientes,
+  type AvaliacaoResposta,
+  type Briefing,
+  type PerfilCompilado,
+  type TipoMarca,
+} from "@/db/schema";
 import * as avaliarRespostaIA from "@/ia/prompts/avaliarResposta";
 import * as compilarPerfilIA from "@/ia/prompts/compilarPerfil";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
 
-import { perguntaPorId, PERGUNTAS_BRIEFING } from "../config/briefing";
+import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
 import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
@@ -74,8 +81,9 @@ export async function salvarRascunho(
   clienteId: number,
   perguntaId: string,
   resposta: string,
+  tipo: TipoMarca,
 ): Promise<void> {
-  if (!perguntaPorId(perguntaId)) {
+  if (!perguntaPorId(perguntaId, tipo)) {
     throw new ErroBriefing(`pergunta desconhecida: ${perguntaId}`);
   }
   const briefing = await garantirBriefing(clienteId);
@@ -93,7 +101,7 @@ export async function salvarRascunho(
     const avaliacoes = textoMudou
       ? Object.fromEntries(Object.entries(linha.avaliacoes).filter(([id]) => id !== perguntaId))
       : linha.avaliacoes;
-    const notaGeral = textoMudou ? calcularNotaGeral(avaliacoes) : Number(linha.notaGeral ?? 0);
+    const notaGeral = textoMudou ? calcularNotaGeral(avaliacoes, tipo) : Number(linha.notaGeral ?? 0);
 
     await tx
       .update(briefings)
@@ -147,8 +155,9 @@ export async function avaliarResposta(
   clienteId: number,
   perguntaId: string,
   resposta: string,
+  tipo: TipoMarca,
 ): Promise<ResultadoAvaliarResposta> {
-  const pergunta = perguntaPorId(perguntaId);
+  const pergunta = perguntaPorId(perguntaId, tipo);
   if (!pergunta) {
     throw new ErroBriefing(`pergunta desconhecida: ${perguntaId}`);
   }
@@ -176,6 +185,7 @@ export async function avaliarResposta(
         pergunta: pergunta.enunciado,
         oQueAIAProcura: pergunta.oQueAIAProcura,
         resposta,
+        tipo,
       }),
       generoTexto: "analise",
       extrairCampos: (d) => ({
@@ -208,7 +218,7 @@ export async function avaliarResposta(
       ? { ...linha.avaliacoes, [perguntaId]: avaliacao }
       : linha.avaliacoes;
 
-    const notaGeral = calcularNotaGeral(avaliacoes);
+    const notaGeral = calcularNotaGeral(avaliacoes, tipo);
     const completoAntes = linha.completo;
     const completo = completoAntes || notaGeral >= config.regras.notaMinimaBriefing;
     /** Nao recompila so por causa de uma reavaliacao reusada que nao mudou nada. */
@@ -235,7 +245,7 @@ export async function avaliarResposta(
   });
 
   if (deveCompilarPerfil) {
-    await compilarEGravarPerfil(clienteId, briefing.id, respostas);
+    await compilarEGravarPerfil(clienteId, briefing.id, respostas, tipo);
   }
 
   return { avaliacao: avaliacaoFinal, notaGeral, completo, reusada };
@@ -250,9 +260,10 @@ async function compilarEGravarPerfil(
   clienteId: number,
   briefingId: number,
   respostas: Record<string, string>,
+  tipo: TipoMarca,
 ): Promise<void> {
   const respostasPorEnunciado: Record<string, string> = {};
-  for (const pergunta of PERGUNTAS_BRIEFING) {
+  for (const pergunta of perguntasDoBriefing(tipo)) {
     respostasPorEnunciado[pergunta.enunciado] = respostas[pergunta.id] ?? "";
   }
 
@@ -263,7 +274,7 @@ async function compilarEGravarPerfil(
     versaoPrompt: compilarPerfilIA.versao,
     clienteId,
     schema: compilarPerfilIA.schema,
-    sistemaEstavel: compilarPerfilIA.montarSistemaEstavel(),
+    sistemaEstavel: compilarPerfilIA.montarSistemaEstavel(tipo),
     entrada: compilarPerfilIA.montarEntrada({ respostas: respostasPorEnunciado }),
     extrairCampos: (d) => ({ resumo: d.resumo }),
   });
@@ -309,6 +320,11 @@ export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
   if (perfil.fatos.proibicoes.length > 0) linhas.push(`Nunca diria ou faria: ${perfil.fatos.proibicoes.join("; ")}`);
   if (perfil.fatos.cenasFilmaveis.length > 0) {
     linhas.push(`Cenas que dá para filmar: ${perfil.fatos.cenasFilmaveis.join("; ")}`);
+  }
+  /** So marca do tipo pessoa (P1, item 4): o episodio da virada e as opinioes que geram conversa. */
+  if (perfil.fatos.historia) linhas.push(`A virada: ${perfil.fatos.historia}`);
+  if ((perfil.fatos.posicionamentos ?? []).length > 0) {
+    linhas.push(`No que acredita: ${perfil.fatos.posicionamentos!.join("; ")}`);
   }
   /** `?? []`: perfil compilado antes da etapa 12 não tem este campo. */
   if ((perfil.referencias ?? []).length > 0) {

@@ -9,6 +9,7 @@
  * `PROXIMO.md`, D2 parte 2, item 4), com as palavras do design onde ele
  * escreveu diferente do painel atual.
  */
+import type { TipoMarca } from "@/db/schema";
 
 function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -25,8 +26,14 @@ export const textosBriefing = {
   comecar: {
     passoUm: "Primeiro passo",
     titulo: "Antes de escrever, a gente precisa te conhecer",
-    introducao:
-      "São doze perguntas sobre o seu negócio e sobre quem você atende. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um.",
+    /**
+     * P1, item 5: a marca do tipo pessoa nunca lê "negócio" no começo do
+     * briefing (briefing-e-rubricas.md, secao 2b).
+     */
+    introducao: (tipo: TipoMarca) =>
+      tipo === "pessoa"
+        ? "São doze perguntas sobre você e sobre quem te acompanha. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um."
+        : "São doze perguntas sobre o seu negócio e sobre quem você atende. É com elas que a gente escreve roteiro do seu jeito, e não um texto que serviria para qualquer um.",
     promessas: [
       {
         titulo: "Leva cerca de 20 minutos",
@@ -47,7 +54,8 @@ export const textosBriefing = {
   },
   dadosFixos: {
     passoUm: "Passo 1 de 6",
-    titulo: "Sobre o seu negócio",
+    /** P1, item 5: o passo 1 nunca lê "negócio" para a marca do tipo pessoa. */
+    titulo: (tipo: TipoMarca) => (tipo === "pessoa" ? "Sobre você" : "Sobre o seu negócio"),
     introducao: "Isso a gente pergunta uma vez só.",
     campoRamoOutro: "Qual é o seu ramo",
     ajudaRamoOutro: "Escreva em poucas palavras.",
@@ -76,6 +84,16 @@ export const textosBriefing = {
     avaliando: "Lendo a sua resposta. Costuma levar menos de 10 segundos.",
     botaoAjustarResposta: "ajustar resposta",
     fraseAjuste: "Você pode ajustar agora ou seguir assim.",
+    /**
+     * P1, item 8 (achado do Gustavo: o Bruno leu o exemplo de "como
+     * melhorar" como se fosse a própria resposta dele, e nunca desceu para
+     * editar o campo). O rótulo do exemplo, o botão que copia para o campo,
+     * e o aviso com desfazer.
+     */
+    rotuloSugestao: "Uma sugestão de como escrever",
+    usarEstaSugestao: "Usar esta sugestão",
+    sugestaoAplicada: "Resposta substituída pela sugestão",
+    desfazerSugestao: "Desfazer",
     erroAviso: "Não deu para avaliar agora",
     erroExplicacao: "A sua resposta está salva. A falha foi nossa e você não precisa escrever de novo.",
     /**
@@ -147,6 +165,9 @@ export const textosBriefing = {
     perfilMedos: "O medo dela, nas palavras dela",
     perfilProibicoes: "O que nunca entra no seu vídeo",
     perfilCenas: "Cenas que dá para gravar",
+    /** So marca do tipo pessoa (P1, item 4, briefing-e-rubricas.md, secao 2b). */
+    perfilHistoria: "A virada",
+    perfilPosicionamentos: "No que acredita",
   },
   /** "O que a gente aprendeu com você" (E27 parte 2, item 4, Briefing.dc.html). */
   aprendizado: {

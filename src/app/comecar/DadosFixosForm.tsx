@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 
-import { DADOS_FIXOS } from "@/config/briefing";
-import type { PerfisCliente, Persona, QuemGrava } from "@/db/schema";
+import { dadosFixosDoBriefing } from "@/config/briefing";
+import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
@@ -29,12 +29,18 @@ type Props = {
   inicial: DadosFixosIniciais;
   onSalvar: (dados: unknown) => Promise<void>;
   onVoltar: () => void;
+  tipo: TipoMarca;
 };
 
 const t = textosBriefing.dadosFixos;
 const OUTRO = "outro" as const;
 
-export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
+export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Props) {
+  const dadosFixos = dadosFixosDoBriefing(tipo);
+  const personaInicial = dadosFixos.persona.opcoes.some((opcao) => opcao.valor === inicial.persona)
+    ? inicial.persona
+    : dadosFixos.persona.opcoes[0].valor;
+
   const [nome, setNome] = useState(inicial.nome);
   const [cidade, setCidade] = useState(inicial.cidade ?? "");
   const [bairro, setBairro] = useState(inicial.bairro ?? "");
@@ -50,11 +56,14 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
     inicial.nichoId ?? OUTRO,
   );
   const [ramoOutro, setRamoOutro] = useState(inicial.ramoOutro ?? "");
-  const [persona, setPersona] = useState<Persona>(inicial.persona);
+  const [persona, setPersona] = useState<Persona>(personaInicial);
   const [instagram, setInstagram] = useState(inicial.perfis?.instagram ?? "");
   const [tiktok, setTiktok] = useState(inicial.perfis?.tiktok ?? "");
   const [youtube, setYoutube] = useState(inicial.perfis?.youtube ?? "");
-  const [quemGrava, setQuemGrava] = useState<QuemGrava | "">(inicial.quemGrava ?? "");
+  /** Pessoa (P1, item 2): "quem aparece" e fixo, o campo nem aparece na tela. */
+  const [quemGrava, setQuemGrava] = useState<QuemGrava | "">(
+    dadosFixos.quemGrava.fixoEmPropriaPessoa ? "propria_pessoa" : (inicial.quemGrava ?? ""),
+  );
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -110,10 +119,10 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
   return (
     <form className={styles.forma} onSubmit={enviar}>
       <Cartao className={styles.dois}>
-        <Campo rotulo={DADOS_FIXOS.nome.rotulo} value={nome} onChange={(evento) => setNome(evento.target.value)} />
+        <Campo rotulo={dadosFixos.nome.rotulo} value={nome} onChange={(evento) => setNome(evento.target.value)} />
         <label className={styles.campoSelect} htmlFor="ramo">
-          {DADOS_FIXOS.ramo.rotulo}
-          <span className={styles.ajuda}>{DADOS_FIXOS.ramo.ajuda}</span>
+          {dadosFixos.ramo.rotulo}
+          <span className={styles.ajuda}>{dadosFixos.ramo.ajuda}</span>
           <select
             id="ramo"
             className={styles.select}
@@ -127,7 +136,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
                 {nicho.nome}
               </option>
             ))}
-            <option value={OUTRO}>{DADOS_FIXOS.ramo.opcaoOutro}</option>
+            <option value={OUTRO}>{dadosFixos.ramo.opcaoOutro}</option>
           </select>
         </label>
         {nichoId === OUTRO ? (
@@ -140,12 +149,12 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
           />
         ) : null}
         <Campo
-          rotulo={DADOS_FIXOS.cidade.rotulo}
+          rotulo={dadosFixos.cidade.rotulo}
           value={cidade}
           onChange={(evento) => setCidade(evento.target.value)}
           erro={tentouEnviar && cidade.trim().length === 0 ? t.cidadeObrigatoria : undefined}
         />
-        <Campo rotulo={DADOS_FIXOS.bairro.rotulo} value={bairro} onChange={(evento) => setBairro(evento.target.value)} />
+        <Campo rotulo={dadosFixos.bairro.rotulo} value={bairro} onChange={(evento) => setBairro(evento.target.value)} />
       </Cartao>
 
       <Cartao className={styles.grupo}>
@@ -153,8 +162,8 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
           <h3 className={styles.tituloGrupo}>{t.tituloObjetivo}</h3>
           <p className={styles.ajudaGrupo}>{t.ajudaObjetivo}</p>
         </div>
-        <div className={styles.opcoes} role="radiogroup" aria-label={DADOS_FIXOS.persona.rotulo}>
-          {DADOS_FIXOS.persona.opcoes.map((opcao) => (
+        <div className={styles.opcoes} role="radiogroup" aria-label={dadosFixos.persona.rotulo}>
+          {dadosFixos.persona.opcoes.map((opcao) => (
             <OpcaoObjetivo
               key={opcao.valor}
               titulo={opcao.rotulo}
@@ -165,22 +174,24 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar }: Props) {
         </div>
       </Cartao>
 
-      <Cartao className={styles.grupo}>
-        <div>
-          <h3 className={styles.tituloGrupo}>{t.tituloQuemGrava}</h3>
-          <p className={styles.ajudaGrupo}>{t.ajudaQuemGrava}</p>
-        </div>
-        <div className={styles.opcoes} role="radiogroup" aria-label={DADOS_FIXOS.quemGrava.rotulo}>
-          {DADOS_FIXOS.quemGrava.opcoes.map((opcao) => (
-            <OpcaoObjetivo
-              key={opcao.valor}
-              titulo={opcao.rotulo}
-              marcada={quemGrava === opcao.valor}
-              onEscolher={() => setQuemGrava(opcao.valor)}
-            />
-          ))}
-        </div>
-      </Cartao>
+      {dadosFixos.quemGrava.fixoEmPropriaPessoa ? null : (
+        <Cartao className={styles.grupo}>
+          <div>
+            <h3 className={styles.tituloGrupo}>{t.tituloQuemGrava}</h3>
+            <p className={styles.ajudaGrupo}>{t.ajudaQuemGrava}</p>
+          </div>
+          <div className={styles.opcoes} role="radiogroup" aria-label={dadosFixos.quemGrava.rotulo}>
+            {dadosFixos.quemGrava.opcoes.map((opcao) => (
+              <OpcaoObjetivo
+                key={opcao.valor}
+                titulo={opcao.rotulo}
+                marcada={quemGrava === opcao.valor}
+                onEscolher={() => setQuemGrava(opcao.valor)}
+              />
+            ))}
+          </div>
+        </Cartao>
+      )}
 
       <Cartao className={styles.grupo}>
         <h3 className={styles.tituloGrupo}>{t.tituloRedes}</h3>

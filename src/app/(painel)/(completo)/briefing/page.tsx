@@ -30,6 +30,7 @@ export default async function Briefing() {
       perfil={briefing.perfil}
       regrasIniciais={regras}
       meta={config.regras.notaMinimaBriefing}
+      tipo={cliente.tipo}
     />
   );
 }

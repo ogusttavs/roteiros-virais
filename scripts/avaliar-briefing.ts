@@ -15,9 +15,11 @@ import path from "node:path";
 import { z } from "zod";
 
 import { perguntaPorId } from "../src/config/briefing";
+import type { TipoMarca } from "../src/db/schema";
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as avaliarRespostaIA from "../src/ia/prompts/avaliarResposta";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
+import { calcularCustoUsd } from "../src/ia/registro";
 import { verificarLocalmente } from "../src/ia/verificador";
 
 const casoSchema = z.object({
@@ -28,14 +30,17 @@ const casoSchema = z.object({
 });
 const conjuntoSchema = z.array(casoSchema);
 
-function caminhoDoConjunto(): { caminho: string; ehExemplo: boolean } {
+/** P1, item 6: golden set proprio da pessoa, mesmo formato do negocio. */
+function caminhoDoConjunto(tipo: TipoMarca): { caminho: string; ehExemplo: boolean } {
   const dir = process.env.GOLDEN_SET_DIR ?? "../avaliacoes-privadas";
-  const caminhoReal = path.resolve(process.cwd(), dir, "briefing.json");
+  const nomeArquivo = tipo === "pessoa" ? "briefing-pessoa.json" : "briefing.json";
+  const nomeExemplo = tipo === "pessoa" ? "briefing-pessoa.exemplo.json" : "briefing.exemplo.json";
+  const caminhoReal = path.resolve(process.cwd(), dir, nomeArquivo);
   if (existsSync(caminhoReal)) {
     return { caminho: caminhoReal, ehExemplo: false };
   }
   return {
-    caminho: path.resolve(process.cwd(), "avaliacoes/briefing.exemplo.json"),
+    caminho: path.resolve(process.cwd(), `avaliacoes/${nomeExemplo}`),
     ehExemplo: true,
   };
 }
@@ -52,6 +57,8 @@ export type ResultadoAvaliarBriefing = {
    * tentativa (rodada de acabamento de 06/09, item 1: meta e zero).
    */
   reprovadosNoVerificador: number;
+  /** Soma do custo de todas as chamadas (avaliarResposta e verificarTexto), em dolares. */
+  custoTotalUsd: number;
 };
 
 const META_DIFERENCA = 1.0;
@@ -61,8 +68,8 @@ const META_DIFERENCA = 1.0;
  * devolve o resumo numerico, para `avaliar-tudo.ts` gravar num JSON so
  * (etapa 18, decisao 4 do `PROXIMO.md`) sem precisar reler o stdout.
  */
-export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
-  const { caminho, ehExemplo } = caminhoDoConjunto();
+export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<ResultadoAvaliarBriefing> {
+  const { caminho, ehExemplo } = caminhoDoConjunto(tipo);
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
@@ -71,9 +78,10 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
   let somaDiferencas = 0;
   let casosAvaliados = 0;
   let reprovadosNoVerificador = 0;
+  let custoTotalUsd = 0;
 
   for (const caso of conjunto) {
-    const pergunta = perguntaPorId(caso.perguntaId);
+    const pergunta = perguntaPorId(caso.perguntaId, tipo);
     if (!pergunta) {
       console.log(`${caso.perguntaId}: pergunta desconhecida, pulando`);
       continue;
@@ -95,12 +103,14 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
           pergunta: pergunta.enunciado,
           oQueAIAProcura: pergunta.oQueAIAProcura,
           resposta: caso.resposta,
+          tipo,
         }),
       });
 
       const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
       somaDiferencas += diferenca;
       casosAvaliados += 1;
+      custoTotalUsd += calcularCustoUsd(avaliarRespostaIA.nivel, resultado);
 
       /**
        * O mesmo verificador de producao (checagem local mais verificarTexto,
@@ -127,6 +137,7 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
           sistemaEstavel: verificarTextoIA.montarSistemaEstavel("analise"),
           entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
         });
+        custoTotalUsd += calcularCustoUsd(verificarTextoIA.nivel, saida);
         verificacao = {
           aprovado: saida.dados.aprovado,
           motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"],
@@ -151,6 +162,7 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
     console.log("acima da meta de 1,0 (plano de execucao, etapa 5).");
   }
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${casosAvaliados}`);
+  console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
   return {
     conjunto: caminho,
@@ -159,6 +171,7 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
     diferencaMedia,
     acimaDaMeta,
     reprovadosNoVerificador,
+    custoTotalUsd,
   };
 }
 
@@ -168,9 +181,14 @@ export async function avaliarBriefing(): Promise<ResultadoAvaliarBriefing> {
  * dois rodam no mesmo processo CommonJS do tsx, entao `require.main` e o
  * script que foi chamado na linha de comando, nao este arquivo, quando e
  * so um import.
+ *
+ * P1, item 6: `npm run avaliar:briefing -- pessoa` roda o golden set da
+ * pessoa; sem argumento, roda o do negocio, como sempre.
  */
 if (require.main === module) {
-  avaliarBriefing().catch((erro: unknown) => {
+  const tipoArgumento = process.argv[2];
+  const tipo: TipoMarca = tipoArgumento === "pessoa" ? "pessoa" : "negocio";
+  avaliarBriefing(tipo).catch((erro: unknown) => {
     console.error(erro);
     process.exitCode = 1;
   });

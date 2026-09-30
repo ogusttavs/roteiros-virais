@@ -31,6 +31,7 @@ import {
   ErroAcessoNegado,
   garantirClientePermitido,
   garantirMembroDaMarca,
+  marcasDoUsuario,
 } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -273,5 +274,53 @@ describe("marcaPadrao prefere briefing completo (V12b, item 0)", () => {
     const marcaResolvida = await clienteAtivoDoUsuario("marca-padrao-c");
 
     expect(marcaResolvida?.id).toBe(acessoRecente.id);
+  });
+});
+
+/** P1, item 7 (achado do Fable em 29/09, desativando Velura e Hiduck em producao). */
+describe("marca desativada some para quem e membro dela (P1, item 7)", () => {
+  let nichoId: number;
+  let marcaAtiva: { id: number };
+  let marcaDesativada: { id: number };
+
+  beforeAll(async () => {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug: "marca-desativada-teste", nome: "Marca desativada teste" })
+      .returning();
+    nichoId = nicho.id;
+
+    await db().insert(user).values({ id: "marca-desativada-d", name: "[teste] Usuario D", email: "d@marca-desativada.teste" });
+
+    [marcaAtiva] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "marca-desativada-d", nome: "[teste] Marca ativa", nichoId })
+      .returning();
+    [marcaDesativada] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "marca-desativada-d", nome: "[teste] Marca desativada", nichoId, ativo: false })
+      .returning();
+    await db()
+      .insert(membrosMarca)
+      .values([
+        { usuarioId: "marca-desativada-d", clienteId: marcaAtiva.id, papel: "dono" },
+        { usuarioId: "marca-desativada-d", clienteId: marcaDesativada.id, papel: "dono" },
+      ]);
+  }, 30_000);
+
+  it("marcasDoUsuario nao lista a marca desativada", async () => {
+    const marcas = await marcasDoUsuario("marca-desativada-d");
+    expect(marcas.map((m) => m.id)).toContain(marcaAtiva.id);
+    expect(marcas.map((m) => m.id)).not.toContain(marcaDesativada.id);
+  });
+
+  it("cookie apontando para a marca desativada nao a abre: cai na marca padrao", async () => {
+    cookieJar.clear();
+    cookieJar.set("marca_ativa", valorCookieMarcaAtiva(marcaDesativada.id));
+
+    const marcaResolvida = await clienteAtivoDoUsuario("marca-desativada-d");
+
+    expect(marcaResolvida?.id).toBe(marcaAtiva.id);
+    expect(marcaResolvida?.id).not.toBe(marcaDesativada.id);
   });
 });

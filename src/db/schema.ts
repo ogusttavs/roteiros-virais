@@ -128,8 +128,15 @@ export type PerfisCliente = {
   youtube: string | null;
 };
 
-/** "negocio" vende o proprio produto ou servico; "criador" quer atrair marca. */
-export type Persona = "negocio" | "criador";
+/**
+ * "negocio" vende o proprio produto ou servico; "criador" quer atrair marca.
+ * "conhecido" e "negocios" (P1, item 2, marca do tipo pessoa): quer ficar
+ * conhecido no que faz, ou levar gente para os proprios negocios (quando ela
+ * tem); "vender o meu produto ou servico" nao existe para pessoa, por isso
+ * nao reusa "negocio". Sao valores de texto (`$type`, nunca `pgEnum`, ver
+ * `clientes.persona` abaixo), entao nao pedem migracao para crescer.
+ */
+export type Persona = "negocio" | "criador" | "conhecido" | "negocios";
 
 /**
  * "negocio" fala como a marca ("a gente", "nossa loja"); "pessoa" fala em
@@ -140,8 +147,9 @@ export type Persona = "negocio" | "criador";
  * `tipo` diz so a voz gramatical do roteiro. Uma marca "criador" pode muito
  * bem ser "negocio" (vende o proprio curso, por exemplo) ou "pessoa" (o
  * criador fala de si). As doze perguntas de briefing proprias de pessoa
- * ficam para a E33, depois da viagem; por enquanto uma marca de tipo pessoa
- * passa pelo briefing de hoje.
+ * (P1, briefing-e-rubricas.md, secao 2b) usam os mesmos ids, blocos e pesos
+ * do negocio; so o enunciado, o que a IA procura e o rotulo curto mudam,
+ * por `perguntasDoBriefing(tipo)` em `config/briefing.ts`.
  */
 export type TipoMarca = "negocio" | "pessoa";
 
@@ -305,6 +313,14 @@ export type PerfilCompilado = {
     cenasFilmaveis: string[];
     concorrentes: string[];
     perfisAdmirados: string[];
+    /**
+     * Só marca do tipo pessoa (P1, item 4, briefing-e-rubricas.md, secao 2b):
+     * o episódio da virada (P3) e as opiniões que geram conversa (P6), com o
+     * porquê de cada uma. Ausentes (ou `undefined`) no negócio; opcionais
+     * também num perfil de pessoa compilado antes desta versão do prompt.
+     */
+    historia?: string;
+    posicionamentos?: string[];
   };
   resumo: string;
   /**

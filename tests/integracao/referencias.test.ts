@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PERGUNTAS_BRIEFING } from "@/config/briefing";
+import { perguntasDoBriefing } from "@/config/briefing";
 import { db, getPool } from "@/db";
 import { clientes, nichos, user, videos } from "@/db/schema";
 import { avaliarResposta, perfilDoCliente } from "@/servicos/briefing";
@@ -83,8 +83,8 @@ describe("favoritar e desfavoritar", () => {
 
 describe("favorito entra no perfil compilado na proxima recompilacao", () => {
   it("perfil compilado sem favorito nenhum comeca com referencias vazias", async () => {
-    for (const pergunta of PERGUNTAS_BRIEFING) {
-      await avaliarResposta(clienteId, pergunta.id, respostaConcreta(pergunta.id));
+    for (const pergunta of perguntasDoBriefing("negocio")) {
+      await avaliarResposta(clienteId, pergunta.id, respostaConcreta(pergunta.id), "negocio");
     }
 
     const perfil = await perfilDoCliente(clienteId);
@@ -99,6 +99,7 @@ describe("favorito entra no perfil compilado na proxima recompilacao", () => {
       clienteId,
       "p1",
       'Resposta atualizada so deste teste, com o numero 7 e a fala "atualizei agora", bairro de Realengo.',
+      "negocio",
     );
 
     const perfil = await perfilDoCliente(clienteId);

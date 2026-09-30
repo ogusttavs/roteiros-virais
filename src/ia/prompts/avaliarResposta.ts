@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { TipoMarca } from "@/db/schema";
 import { JARGAO } from "@/lib/regras-de-texto";
 
 import type { EsforcoIA, NivelIA } from "../tipos";
@@ -14,8 +15,15 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Agora a instrucao vem da lista inteira, montada em tempo de execucao (ver
  * `montarSistemaEstavel`), entao uma palavra nova na lista de regras ja
  * entra no prompt sem precisar mexer aqui.
+ *
+ * 1.5.0 (P1, item 3, briefing-e-rubricas.md, secao 2b): a marca do tipo
+ * pessoa ganha uma linha em `montarEntrada` (nao no sistema estavel, para o
+ * cache de prompt continuar valendo entre chamadas do negocio) dizendo que
+ * o critério "Específico" pergunta "só você poderia ter escrito isso?", sem
+ * pedir diferencial de produto de quem nao tem produto (achado do Gustavo
+ * fazendo o briefing da pessoa).
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -79,10 +87,17 @@ export function montarEntrada(dados: {
   pergunta: string;
   oQueAIAProcura: string;
   resposta: string;
+  tipo?: TipoMarca;
 }): string {
-  return [
+  const linhas = [
     `Pergunta: ${dados.pergunta}`,
     `O que procurar na resposta: ${dados.oQueAIAProcura}`,
     `Resposta do cliente: ${dados.resposta}`,
-  ].join("\n");
+  ];
+  if (dados.tipo === "pessoa") {
+    linhas.push(
+      'Esta marca é uma pessoa, não um negócio: no critério Específico, a pergunta certa é "só você poderia ter escrito isso?", nunca peça diferencial de produto para quem não tem produto para vender.',
+    );
+  }
+  return linhas.join("\n");
 }

@@ -60,8 +60,9 @@ export default async function Comecar() {
           respostasIniciais={briefing.respostas}
           avaliacoesIniciais={briefing.avaliacoes}
           notaGeralInicial={Number(briefing.notaGeral ?? 0)}
-          blocoInicial={blocoInicial(briefing.avaliacoes)}
+          blocoInicial={blocoInicial(briefing.avaliacoes, cliente.tipo)}
           meta={config.regras.notaMinimaBriefing}
+          tipo={cliente.tipo}
         />
       </TrocaMarcaProvider>
     </ConexaoDaTela>

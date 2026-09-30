@@ -7,10 +7,11 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { PERGUNTAS_BRIEFING } from "@/config/briefing";
+import { perguntasDoBriefing } from "@/config/briefing";
 import { db, getPool } from "@/db";
 import { clientes, nichos, user } from "@/db/schema";
-import { avaliarResposta, garantirBriefing, salvarRascunho } from "@/servicos/briefing";
+import { avaliarResposta, formatarPerfilCompilado, garantirBriefing, salvarRascunho } from "@/servicos/briefing";
+import { mudarTipoMarca } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -61,8 +62,8 @@ afterAll(async () => {
 
 describe("briefing: nota geral e gate de liberacao (mock)", () => {
   it("doze respostas curtas nao chegam ao gate", async () => {
-    for (const pergunta of PERGUNTAS_BRIEFING) {
-      await avaliarResposta(clienteId, pergunta.id, respostaCurta());
+    for (const pergunta of perguntasDoBriefing("negocio")) {
+      await avaliarResposta(clienteId, pergunta.id, respostaCurta(), "negocio");
     }
 
     const briefing = await garantirBriefing(clienteId);
@@ -73,8 +74,8 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
 
   it("doze respostas concretas liberam e geram o perfil", async () => {
     let ultimoResultado;
-    for (const pergunta of PERGUNTAS_BRIEFING) {
-      ultimoResultado = await avaliarResposta(clienteId, pergunta.id, respostaConcreta(pergunta.id));
+    for (const pergunta of perguntasDoBriefing("negocio")) {
+      ultimoResultado = await avaliarResposta(clienteId, pergunta.id, respostaConcreta(pergunta.id), "negocio");
     }
 
     expect(ultimoResultado?.completo).toBe(true);
@@ -94,7 +95,7 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
     expect(antes.completo).toBe(true);
 
     // p1 pesa 2; trocar por uma resposta curta derruba a nota geral para baixo de 8.
-    const resultado = await avaliarResposta(clienteId, "p1", respostaCurta());
+    const resultado = await avaliarResposta(clienteId, "p1", respostaCurta(), "negocio");
     expect(resultado.notaGeral).toBeLessThan(8);
     expect(resultado.completo).toBe(true);
 
@@ -103,19 +104,90 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
     expect(Number(depois.notaGeral)).toBeLessThan(8);
 
     // devolve a resposta concreta, para nao atrapalhar os testes seguintes deste arquivo.
-    await avaliarResposta(clienteId, "p1", respostaConcreta("p1"));
+    await avaliarResposta(clienteId, "p1", respostaConcreta("p1"), "negocio");
   });
 
   it("reavaliar a mesma resposta reusa a avaliacao guardada, sem chamar a IA de novo", async () => {
     const resposta =
       'Resposta unica so deste teste, com o numero 7 na frase e a fala "isso e novidade", mencionando o bairro de Realengo.';
 
-    const primeira = await avaliarResposta(clienteId, "p3", resposta);
+    const primeira = await avaliarResposta(clienteId, "p3", resposta, "negocio");
     expect(primeira.reusada).toBe(false);
 
-    const segunda = await avaliarResposta(clienteId, "p3", resposta);
+    const segunda = await avaliarResposta(clienteId, "p3", resposta, "negocio");
     expect(segunda.reusada).toBe(true);
     expect(segunda.avaliacao).toEqual(primeira.avaliacao);
+  });
+});
+
+/** P1: avaliarResposta e compilarPerfil (via avaliarResposta, que compila ao liberar) com marca pessoa. */
+describe("briefing: marca do tipo pessoa (mock)", () => {
+  it("as doze respostas da pessoa liberam e o perfil ganha historia e posicionamentos", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-pessoa", name: "[teste] Pessoa", email: "pessoa@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Pessoa", nichoId, tipo: "pessoa", persona: "conhecido" })
+      .returning();
+
+    let ultimoResultado;
+    for (const pergunta of perguntasDoBriefing("pessoa")) {
+      ultimoResultado = await avaliarResposta(cliente.id, pergunta.id, respostaConcreta(pergunta.id), "pessoa");
+    }
+
+    expect(ultimoResultado?.completo).toBe(true);
+    expect(ultimoResultado?.notaGeral).toBeGreaterThanOrEqual(8);
+
+    const briefing = await garantirBriefing(cliente.id);
+    expect(briefing.completo).toBe(true);
+    expect(briefing.perfil).not.toBeNull();
+    expect(briefing.perfil?.fatos.historia).toBeTruthy();
+    expect(briefing.perfil?.fatos.posicionamentos?.length).toBeGreaterThan(0);
+
+    const texto = formatarPerfilCompilado(briefing.perfil!);
+    expect(texto).toContain("A virada:");
+    expect(texto).toContain("No que acredita:");
+  });
+
+  it("o perfil do negocio nao ganha historia nem posicionamentos", async () => {
+    const briefing = await garantirBriefing(clienteId);
+    expect(briefing.perfil?.fatos.historia).toBeUndefined();
+    const texto = formatarPerfilCompilado(briefing.perfil!);
+    expect(texto).not.toContain("A virada:");
+    expect(texto).not.toContain("No que acredita:");
+  });
+});
+
+/** P1, item 1: trocar o tipo apaga o briefing, para nunca casar resposta de um tipo com pergunta do outro. */
+describe("mudarTipoMarca apaga o briefing (P1, item 1)", () => {
+  it("respostas, avaliacoes, nota, completo e perfil voltam ao estado inicial", async () => {
+    const [usuario] = await db()
+      .insert(user)
+      .values({ id: "briefing-troca-tipo", name: "[teste] Troca de tipo", email: "trocatipo@briefing.teste" })
+      .returning();
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: usuario.id, nome: "[teste] Troca de tipo", nichoId, tipo: "negocio" })
+      .returning();
+
+    for (const pergunta of perguntasDoBriefing("negocio")) {
+      await avaliarResposta(cliente.id, pergunta.id, respostaConcreta(pergunta.id), "negocio");
+    }
+    const antes = await garantirBriefing(cliente.id);
+    expect(antes.completo).toBe(true);
+    expect(antes.perfil).not.toBeNull();
+
+    const clienteTrocado = await mudarTipoMarca(cliente.id, "pessoa");
+    expect(clienteTrocado.tipo).toBe("pessoa");
+
+    const depois = await garantirBriefing(cliente.id);
+    expect(depois.respostas).toEqual({});
+    expect(depois.avaliacoes).toEqual({});
+    expect(depois.notaGeral).toBeNull();
+    expect(depois.completo).toBe(false);
+    expect(depois.perfil).toBeNull();
   });
 });
 
@@ -140,8 +212,8 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
       .returning();
 
     await Promise.all([
-      avaliarResposta(cliente.id, "p1", respostaConcreta("p1")),
-      avaliarResposta(cliente.id, "p2", respostaConcreta("p2")),
+      avaliarResposta(cliente.id, "p1", respostaConcreta("p1"), "negocio"),
+      avaliarResposta(cliente.id, "p2", respostaConcreta("p2"), "negocio"),
     ]);
 
     const briefing = await garantirBriefing(cliente.id);
@@ -161,18 +233,18 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
       .values({ usuarioId: usuario.id, nome: "[teste] Invalida", nichoId })
       .returning();
 
-    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"));
+    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"), "negocio");
     expect(primeira.reusada).toBe(false);
 
     // rascunho troca o texto sem passar por avaliarResposta (o que a tela faz a cada 800ms de digitacao).
-    await salvarRascunho(cliente.id, "p1", "bom atendimento");
+    await salvarRascunho(cliente.id, "p1", "bom atendimento", "negocio");
 
     const depoisDoRascunho = await garantirBriefing(cliente.id);
     expect(depoisDoRascunho.respostas.p1).toBe("bom atendimento");
     expect(depoisDoRascunho.avaliacoes.p1).toBeUndefined();
 
     // avaliar o texto novo nao pode reusar a avaliacao da resposta concreta anterior.
-    const segunda = await avaliarResposta(cliente.id, "p1", "bom atendimento");
+    const segunda = await avaliarResposta(cliente.id, "p1", "bom atendimento", "negocio");
     expect(segunda.reusada).toBe(false);
     expect(segunda.avaliacao).not.toEqual(primeira.avaliacao);
   });
@@ -188,9 +260,9 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
       .returning();
 
     const resposta = respostaConcreta("p1");
-    const primeira = await avaliarResposta(cliente.id, "p1", resposta);
+    const primeira = await avaliarResposta(cliente.id, "p1", resposta, "negocio");
 
-    await salvarRascunho(cliente.id, "p1", resposta);
+    await salvarRascunho(cliente.id, "p1", resposta, "negocio");
 
     const briefing = await garantirBriefing(cliente.id);
     expect(briefing.avaliacoes.p1).toEqual(primeira.avaliacao);
@@ -207,8 +279,8 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
       .returning();
 
     await Promise.all([
-      salvarRascunho(cliente.id, "p1", "rascunho da p1"),
-      salvarRascunho(cliente.id, "p2", "rascunho da p2"),
+      salvarRascunho(cliente.id, "p1", "rascunho da p1", "negocio"),
+      salvarRascunho(cliente.id, "p2", "rascunho da p2", "negocio"),
     ]);
 
     const briefing = await garantirBriefing(cliente.id);
@@ -228,11 +300,11 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
 
     // p1 pesa 2 de 16; uma nota alta so em p1 nao chega perto de 8, mas
     // deixa a nota geral bem acima de zero, o que basta para o teste.
-    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"));
+    const primeira = await avaliarResposta(cliente.id, "p1", respostaConcreta("p1"), "negocio");
     expect(primeira.notaGeral).toBeGreaterThan(0);
 
     // rascunho troca o texto de p1 sem reavaliar: so um salvarRascunho, nunca avaliarResposta.
-    await salvarRascunho(cliente.id, "p1", "bom atendimento");
+    await salvarRascunho(cliente.id, "p1", "bom atendimento", "negocio");
 
     const briefing = await garantirBriefing(cliente.id);
     expect(briefing.avaliacoes.p1).toBeUndefined();
@@ -260,8 +332,8 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
     const textoB = respostaConcreta("corrida-b");
 
     const [resultadoA, resultadoB] = await Promise.all([
-      avaliarResposta(cliente.id, "p1", textoA),
-      avaliarResposta(cliente.id, "p1", textoB),
+      avaliarResposta(cliente.id, "p1", textoA, "negocio"),
+      avaliarResposta(cliente.id, "p1", textoB, "negocio"),
     ]);
 
     const briefing = await garantirBriefing(cliente.id);

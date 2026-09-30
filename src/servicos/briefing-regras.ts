@@ -9,11 +9,11 @@
  * Anthropic para o bundle do navegador. `briefing.ts` reexporta estas tres
  * funcoes para quem so precisa da API de servico.
  */
-import type { AvaliacaoResposta } from "@/db/schema";
+import type { AvaliacaoResposta, TipoMarca } from "@/db/schema";
 
 import {
   perguntasDoBloco,
-  PERGUNTAS_BRIEFING,
+  perguntasDoBriefing,
   TOTAL_BLOCOS,
   type PerguntaBriefing,
 } from "../config/briefing";
@@ -22,9 +22,10 @@ import {
  * Nota geral ponderada (secao 4): media ponderada das doze notas, P1, P5,
  * P9 e P11 pesam 2. Pergunta sem avaliacao ainda conta nota 0 na media.
  */
-export function calcularNotaGeral(avaliacoes: Record<string, AvaliacaoResposta>): number {
-  const somaPesos = PERGUNTAS_BRIEFING.reduce((soma, p) => soma + p.peso, 0);
-  const somaPonderada = PERGUNTAS_BRIEFING.reduce(
+export function calcularNotaGeral(avaliacoes: Record<string, AvaliacaoResposta>, tipo: TipoMarca): number {
+  const perguntas = perguntasDoBriefing(tipo);
+  const somaPesos = perguntas.reduce((soma, p) => soma + p.peso, 0);
+  const somaPonderada = perguntas.reduce(
     (soma, p) => soma + p.peso * (avaliacoes[p.id]?.nota ?? 0),
     0,
   );
@@ -38,12 +39,14 @@ export function calcularNotaGeral(avaliacoes: Record<string, AvaliacaoResposta>)
  */
 export function perguntaQueMaisAjuda(
   avaliacoes: Record<string, AvaliacaoResposta>,
+  tipo: TipoMarca,
 ): PerguntaBriefing | null {
-  if (PERGUNTAS_BRIEFING.length === 0) return null;
+  const perguntas = perguntasDoBriefing(tipo);
+  if (perguntas.length === 0) return null;
 
   const notaDe = (p: PerguntaBriefing) => avaliacoes[p.id]?.nota ?? 0;
-  const menorNota = Math.min(...PERGUNTAS_BRIEFING.map(notaDe));
-  const candidatas = PERGUNTAS_BRIEFING.filter((p) => notaDe(p) === menorNota);
+  const menorNota = Math.min(...perguntas.map(notaDe));
+  const candidatas = perguntas.filter((p) => notaDe(p) === menorNota);
 
   return candidatas.reduce((maior, atual) => (atual.peso > maior.peso ? atual : maior));
 }
@@ -54,9 +57,9 @@ export function perguntaQueMaisAjuda(
  * bloco com alguma pergunta ainda sem avaliacao, ou o ultimo bloco se todas
  * ja tem nota. Sem coluna nova no banco, so deriva do que ja esta salvo.
  */
-export function blocoInicial(avaliacoes: Record<string, AvaliacaoResposta>): number {
+export function blocoInicial(avaliacoes: Record<string, AvaliacaoResposta>, tipo: TipoMarca): number {
   for (let bloco = 1; bloco <= TOTAL_BLOCOS; bloco++) {
-    const pendente = perguntasDoBloco(bloco).some((p) => !avaliacoes[p.id]);
+    const pendente = perguntasDoBloco(bloco, tipo).some((p) => !avaliacoes[p.id]);
     if (pendente) return bloco;
   }
   return TOTAL_BLOCOS;

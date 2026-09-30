@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useId, type TextareaHTMLAttributes } from "react";
+import { useId, type Ref, type TextareaHTMLAttributes } from "react";
 
 import styles from "./AreaTexto.module.css";
 
@@ -22,6 +22,12 @@ type Props = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "rows"> & {
    * continuam com `linhasMin` mais `field-sizing: content`.
    */
   caixaAlta?: "padrao" | "longa";
+  /**
+   * P1, item 8: "Usar esta sugestão" precisa levar o foco para o campo
+   * depois de copiar o texto. React 19 aceita `ref` como prop comum em
+   * componente de funcao, sem `forwardRef`.
+   */
+  ref?: Ref<HTMLTextAreaElement>;
 };
 
 /** Igual a Campo, mas cresce com o texto (`field-sizing: content`, entrega/README.md), a menos que `caixaAlta`. */
@@ -34,6 +40,7 @@ export function AreaTexto({
   linhasMin = 3,
   caixaAlta,
   className,
+  ref,
   ...props
 }: Props) {
   const id = useId();
@@ -52,6 +59,7 @@ export function AreaTexto({
       ) : null}
       <textarea
         id={id}
+        ref={ref}
         rows={caixaAlta ? undefined : linhasMin}
         className={[
           styles.area,

@@ -55,8 +55,17 @@ const TITULO_LIBERACAO = "Seu painel está aberto.";
  * avaliar. A nota geral so precisa chegar a 8,0 (briefing-e-rubricas.md,
  * secao 4); com respostas concretas isso pode acontecer antes da ultima
  * pergunta, e a tela de liberacao substitui o assistente inteiro nesse
- * instante. Por isso espera por dois estados possiveis (o campo fechar, ou a
- * liberacao aparecer) em vez de so um, e devolve se liberou.
+ * instante. Por isso espera por estados possiveis (o campo fechar, o
+ * "ajustar resposta" aparecer, ou a liberacao aparecer) em vez de so um, e
+ * devolve se liberou.
+ *
+ * P1, item 8: no vivo (`/briefing`), avaliar fecha o campo de verdade (some
+ * da tela, vira o resumo em botao, sem rotulo). No wizard (`/comecar`), o
+ * campo continua visivel, so leitura, com a analise abaixo (a resposta nunca
+ * mais desaparece, e e isso que o item 8 corrige) — o sinal la e "ajustar
+ * resposta" aparecer DENTRO do cartao desta pergunta (sem escopo, o
+ * `.first()` podia travar no botao de outra pergunta ja fechada, escondida
+ * noutro bloco, que nunca fica visivel).
  */
 async function responderEAvaliar(page: Page, rotulo: string, texto: string): Promise<boolean> {
   await page.getByLabel(rotulo).fill(texto);
@@ -64,9 +73,14 @@ async function responderEAvaliar(page: Page, rotulo: string, texto: string): Pro
   await page.getByRole("button", { name: /^avaliar/i }).first().click();
   const liberado = page.getByRole("heading", { name: TITULO_LIBERACAO });
   const campoFechado = page.getByLabel(rotulo);
+  const cartaoDestaPergunta = campoFechado.locator(
+    "xpath=ancestor::div[contains(@class, 'cartaoAberto') or contains(@class, 'cartaoFechado')][1]",
+  );
+  const ajustarRespostaDestaPergunta = cartaoDestaPergunta.getByRole("button", { name: "ajustar resposta" });
   await Promise.race([
     liberado.waitFor({ state: "visible" }),
     campoFechado.waitFor({ state: "hidden" }),
+    ajustarRespostaDestaPergunta.waitFor({ state: "visible" }),
   ]);
   return liberado.isVisible();
 }

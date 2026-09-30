@@ -13,6 +13,7 @@ import { Botao } from "@/ui/componentes/Botao";
 import { Nota } from "@/ui/componentes/Nota";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
+import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
@@ -104,6 +105,9 @@ export function PerguntaCampo({
   const [erro, setErro] = useState<ErroDeAvaliacao | null>(null);
   const [rascunhoSalvo, setRascunhoSalvo] = useState(true);
   const [rascunhoComErro, setRascunhoComErro] = useState(false);
+  /** P1, item 8: guarda o texto de antes de "Usar esta sugestão", para o "desfazer" do toast. */
+  const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string } | null>(null);
+  const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
    * O texto de agora e o ultimo que o servidor confirmou (V7, item 4 do PROXIMO.md). Em ref porque quem
@@ -187,6 +191,26 @@ export function PerguntaCampo({
     setErro(null);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => void salvarPendente(), 800);
+  }
+
+  /**
+   * "Usar esta sugestão" (P1, item 8): copia o exemplo de "como melhorar"
+   * para o campo, substituindo o que estava, abre a edição (o cartão fechado
+   * só mostra a resposta, só leitura) e leva o foco para lá, para a pessoa
+   * editar em cima em vez de ler o exemplo como se fosse a resposta dela.
+   * Guarda o texto de antes para o "desfazer" do toast.
+   */
+  function usarSugestaoEAbrirEdicao(exemplo: string) {
+    setSugestaoAplicada({ anterior: textoRef.current });
+    aoMudarTexto(exemplo);
+    setEditando(true);
+    requestAnimationFrame(() => areaRef.current?.focus());
+  }
+
+  function desfazerSugestao() {
+    if (!sugestaoAplicada) return;
+    aoMudarTexto(sugestaoAplicada.anterior);
+    setSugestaoAplicada(null);
   }
 
   async function avaliar() {
@@ -314,20 +338,52 @@ export function PerguntaCampo({
     );
   }
 
+  /** Variavel local para o closure de `onUsar` abaixo nao perder o estreitamento de tipo do optional. */
+  const exemploDaAvaliacao = avaliacao?.exemplo;
+  const sugestaoDaAnalise = exemploDaAvaliacao
+    ? {
+        rotulo: t.rotuloSugestao,
+        botaoUsar: t.usarEstaSugestao,
+        onUsar: () => usarSugestaoEAbrirEdicao(exemploDaAvaliacao),
+      }
+    : undefined;
+
+  /**
+   * P1, item 8 (achado do Gustavo: o Bruno leu o exemplo de "como melhorar"
+   * como se fosse a própria resposta dele, porque o cartão fechado nunca
+   * mostrava a resposta de verdade, só o enunciado e a análise): a resposta
+   * vem sempre primeiro, no mesmo campo usado para editar (aqui, só leitura,
+   * até "ajustar resposta"); a análise em quatro partes, com a nota no
+   * próprio topo dela, vem abaixo do campo, nunca acima.
+   */
   if (!editando && avaliacao) {
     return (
       <div className={styles.cartaoFechado}>
         <Chip pergunta={pergunta} />
+        <AreaTexto
+          rotulo={pergunta.enunciado}
+          rotuloOculto
+          value={textoAvaliado ?? resposta}
+          readOnly
+          caixaAlta={caixaAlta}
+        />
         <AnaliseQuatroPartes
           avaliacao={avaliacao}
           rotulos={textosBriefing.analiseRotulos}
           meta={meta}
           rotulosFaixa={textosBriefing.faixaMeta}
+          sugestao={sugestaoDaAnalise}
         />
         <p className={styles.fraseAjuste}>{t.fraseAjuste}</p>
         <Botao variante="ghost" onClick={() => setEditando(true)}>
           {t.botaoAjustarResposta}
         </Botao>
+        <Toast
+          texto={t.sugestaoAplicada}
+          aberto={sugestaoAplicada !== null}
+          onFechar={() => setSugestaoAplicada(null)}
+          acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}
+        />
       </div>
     );
   }
@@ -348,6 +404,7 @@ export function PerguntaCampo({
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
       <AreaTexto
+        ref={areaRef}
         rotulo={pergunta.enunciado}
         rotuloOculto
         value={texto}
@@ -378,6 +435,12 @@ export function PerguntaCampo({
           {t.botaoAvaliar}
         </Botao>
       )}
+      <Toast
+        texto={t.sugestaoAplicada}
+        aberto={sugestaoAplicada !== null}
+        onFechar={() => setSugestaoAplicada(null)}
+        acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}
+      />
     </div>
   );
 }

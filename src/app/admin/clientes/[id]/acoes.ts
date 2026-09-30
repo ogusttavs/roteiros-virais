@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { Cliente, PlanoMarca } from "@/db/schema";
+import type { Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import {
   darAcesso,
@@ -10,6 +10,7 @@ import {
   ErroCliente,
   garantirSessaoAdmin,
   gerarSenhaNova,
+  mudarTipoMarca,
   renomearCliente,
   renomearPessoa,
   tirarAcesso,
@@ -67,6 +68,20 @@ export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): 
   garantirSessaoAdmin(await sessaoAtual());
   await definirPlano(clienteId, plano);
   revalidatePath(`/admin/clientes/${clienteId}`);
+}
+
+/** P1, item 1: trocar o tipo de conteúdo em `/admin/clientes/[id]`; apaga o briefing (a tela já confirmou). */
+export async function mudarTipoMarcaAction(clienteId: number, tipo: TipoMarca): Promise<ResultadoAcao<Cliente>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    const cliente = await mudarTipoMarca(clienteId, tipo);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    revalidatePath("/admin/clientes");
+    return { ok: true, dado: cliente };
+  } catch (erro) {
+    if (erro instanceof ErroCliente) return { ok: false, erro: erro.message };
+    throw erro;
+  }
 }
 
 /** V12b, item 3: editar o nome da marca, ao lado do título. */

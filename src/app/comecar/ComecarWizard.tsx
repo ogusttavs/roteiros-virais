@@ -8,8 +8,8 @@ import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
 import { SeletorMarcaCelular, type MarcaResumo } from "@/app/(painel)/_casca/SeletorMarcaCelular";
 import { SeletorMarcaDesktop } from "@/app/(painel)/_casca/SeletorMarcaDesktop";
-import { PERGUNTAS_BRIEFING, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
-import type { AvaliacaoResposta } from "@/db/schema";
+import { perguntasDoBriefing, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
+import type { AvaliacaoResposta, TipoMarca } from "@/db/schema";
 import { config } from "@/lib/config";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
@@ -37,6 +37,7 @@ type Props = {
   notaGeralInicial: number;
   blocoInicial: number;
   meta: number;
+  tipo: TipoMarca;
 };
 
 type Etapa = "intro" | "dadosFixos" | "blocos" | "liberado";
@@ -100,6 +101,7 @@ export function ComecarWizard({
   notaGeralInicial,
   blocoInicial,
   meta,
+  tipo,
 }: Props) {
   const router = useRouter();
   const [etapa, setEtapa] = useState<Etapa>(dadosFixosCompletos ? "blocos" : "intro");
@@ -176,7 +178,7 @@ export function ComecarWizard({
             <span className={styles.data}>{textosBriefing.comecar.passoUm}</span>
             <h1>{textosBriefing.comecar.titulo}</h1>
           </div>
-          <p className={styles.introducao}>{textosBriefing.comecar.introducao}</p>
+          <p className={styles.introducao}>{textosBriefing.comecar.introducao(tipo)}</p>
           <div className={styles.promessas}>
             {textosBriefing.comecar.promessas.map((promessa, indice) => {
               const Icone = ICONES_PROMESSA[indice];
@@ -205,7 +207,7 @@ export function ComecarWizard({
         <div className={styles.corpo}>
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.dadosFixos.passoUm}</span>
-            <h1 className={styles.tituloSecao}>{textosBriefing.dadosFixos.titulo}</h1>
+            <h1 className={styles.tituloSecao}>{textosBriefing.dadosFixos.titulo(tipo)}</h1>
             <p className={styles.introducao}>{textosBriefing.dadosFixos.introducao}</p>
           </div>
           <DadosFixosForm
@@ -213,6 +215,7 @@ export function ComecarWizard({
             inicial={dadosFixosIniciais}
             onSalvar={aoSalvarDadosFixos}
             onVoltar={() => setEtapa("intro")}
+            tipo={tipo}
           />
         </div>
       </div>
@@ -243,8 +246,8 @@ export function ComecarWizard({
     );
   }
 
-  const perguntas = perguntasDoBloco(bloco);
-  const dica = perguntaQueMaisAjuda(avaliacoes);
+  const perguntas = perguntasDoBloco(bloco, tipo);
+  const dica = perguntaQueMaisAjuda(avaliacoes, tipo);
 
   /**
    * Os cinco blocos ficam montados o tempo todo, so escondidos (V7, item 4 do PROXIMO.md): com um bloco
@@ -253,11 +256,11 @@ export function ComecarWizard({
    * campo sobrevive. Sair de um bloco com uma resposta ainda pendente nao descarta nada, mas avisa.
    */
   function avisarSeHouverPendencia() {
-    if (perguntasDoBloco(bloco).some((pergunta) => pendentes.has(pergunta.id))) setAvisoDeSaida(true);
+    if (perguntasDoBloco(bloco, tipo).some((pergunta) => pendentes.has(pergunta.id))) setAvisoDeSaida(true);
   }
 
   function aoSelecionarPergunta(perguntaId: string) {
-    const pergunta = perguntaPorId(perguntaId);
+    const pergunta = perguntaPorId(perguntaId, tipo);
     if (!pergunta) return;
     if (pergunta.bloco !== bloco) {
       avisarSeHouverPendencia();
@@ -279,7 +282,7 @@ export function ComecarWizard({
           semNota={textosBriefing.barraNotaGeral.semNota}
           tituloFolha={textosBriefing.barraNotaGeral.tituloFolha}
           aoTocarItem={aoSelecionarPergunta}
-          notas={PERGUNTAS_BRIEFING.map((p) => ({
+          notas={perguntasDoBriefing(tipo).map((p) => ({
             id: p.id,
             rotulo: textosBriefing.barraNotaGeral.rotuloPergunta(p.id, p.rotuloCurto),
             nota: avaliacoes[p.id]?.nota ?? null,
@@ -296,13 +299,13 @@ export function ComecarWizard({
             <span className={styles.data}>{textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}</span>
             <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
             <Progresso
-              rotulo={textosBriefing.progresso.respondidas(Object.keys(avaliacoes).length, PERGUNTAS_BRIEFING.length)}
+              rotulo={textosBriefing.progresso.respondidas(Object.keys(avaliacoes).length, perguntasDoBriefing(tipo).length)}
               atual={Object.keys(avaliacoes).length}
-              total={PERGUNTAS_BRIEFING.length}
+              total={perguntasDoBriefing(tipo).length}
             />
           </div>
           {/* `hidden` num div sem classe: uma classe com `display` valeria mais que o atributo. */}
-          {PERGUNTAS_BRIEFING.map((pergunta) => (
+          {perguntasDoBriefing(tipo).map((pergunta) => (
             <div key={pergunta.id} id={`pergunta-${pergunta.id}`} hidden={pergunta.bloco !== bloco}>
               <PerguntaCampo
                 pergunta={pergunta}

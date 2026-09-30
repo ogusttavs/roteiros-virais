@@ -234,6 +234,17 @@ export const textosAdmin = {
     planoSemLimite: "sem limite",
     planoSalvo: "salvo",
     planoErro: "não conseguimos salvar; tente de novo",
+    /**
+     * P1, item 1: trocar o tipo de conteúdo apaga o briefing, porque as doze
+     * perguntas são outras; por isso pede confirmação, diferente do plano.
+     */
+    campoTipoMarca: "tipo de conteúdo",
+    confirmarTrocarTipo:
+      "Trocar o tipo de conteúdo apaga o briefing desta marca: as doze respostas, as notas e o perfil. Quem tem acesso vai precisar responder tudo de novo, com as perguntas do tipo novo.",
+    trocarTipo: "trocar mesmo assim",
+    cancelar: "cancelar",
+    tipoSalvo: "salvo; o briefing foi apagado",
+    tipoErro: "não conseguimos trocar; tente de novo",
     /** V12b, item 3: editar o nome da marca, ao lado do título (mesmo padrão de Nichos). */
     editarNome: "editar",
     salvarNome: "salvar",

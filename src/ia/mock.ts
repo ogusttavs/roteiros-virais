@@ -31,7 +31,7 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
     case "avaliarResposta":
       return mockAvaliarResposta(entrada);
     case "compilarPerfil":
-      return mockCompilarPerfil(entrada);
+      return mockCompilarPerfil(entrada, sistemaEstavel);
     case "avaliarTema":
       return mockAvaliarTema(entrada);
     case "roteiro":
@@ -103,19 +103,29 @@ function mockAvaliarResposta(entrada: string) {
   };
 }
 
-function mockCompilarPerfil(entrada: string) {
+/**
+ * P1, item 4: `montarSistemaEstavel(tipo)` tem um texto proprio para pessoa
+ * ("uma pessoa que vai gravar", nunca "um dono de pequeno negocio"); o mock
+ * le isso do mesmo jeito que `mockRoteiro` le "R-IG-STORY-01" no sistema
+ * estavel para saber o formato, sem precisar de outro parametro na tarefa.
+ */
+function mockCompilarPerfil(entrada: string, sistemaEstavel: string) {
   const primeiraLinha = entrada.split("\n")[0] ?? "";
+  const ehPessoa = sistemaEstavel.includes("uma pessoa que vai gravar");
   return {
     fatos: {
-      oQueVende: primeiraLinha || "servico principal do negocio",
-      preco: "faixa de preco informada no briefing",
-      clienteIdeal: "pessoa descrita no briefing",
-      medos: ["medo ou duvida antes de comprar"],
+      oQueVende: primeiraLinha || (ehPessoa ? "do que ela quer ser lembrada" : "servico principal do negocio"),
+      preco: ehPessoa ? "os negocios ou parcerias que ela oferece" : "faixa de preco informada no briefing",
+      clienteIdeal: ehPessoa ? "tipo de pessoa que ela quer que a siga" : "pessoa descrita no briefing",
+      medos: [ehPessoa ? "o que o publico quer ver ou perguntar" : "medo ou duvida antes de comprar"],
       frasesDaFala: ["frase real que o cliente disse que fala"],
       proibicoes: [],
-      cenasFilmaveis: ["cena do dia a dia do negocio"],
+      cenasFilmaveis: [ehPessoa ? "cena da semana dela" : "cena do dia a dia do negocio"],
       concorrentes: [],
       perfisAdmirados: [],
+      ...(ehPessoa
+        ? { historia: "episodio da virada simulado", posicionamentos: ["opiniao simulada que gera conversa"] }
+        : {}),
     },
     resumo: `Perfil compilado a partir do briefing. ${primeiraLinha}`.trim(),
   };
