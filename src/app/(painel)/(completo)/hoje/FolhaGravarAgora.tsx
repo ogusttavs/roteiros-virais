@@ -124,7 +124,16 @@ export function FolhaGravarAgora({
     setFormato(sugerirFormatoPeloObjetivo(objetivo));
   }, [objetivo, formatoTocado]);
 
-  const { fase: faseAudio, segundos, semMicrofone, erro: erroGravador, iniciarGravacao, pararGravacao } = useGravadorDeAudio({
+  const {
+    fase: faseAudio,
+    segundos,
+    semMicrofone,
+    erro: erroGravador,
+    previa,
+    previaPorReconhecimentoDoAparelho,
+    iniciarGravacao,
+    pararGravacao,
+  } = useGravadorDeAudio({
     nomeArquivo: "momento",
     async onTranscrito(texto) {
       // V9b, item 1: a rota só transcreve; separar em campos é uma chamada à parte (a mesma rota serve a agenda).
@@ -217,6 +226,8 @@ export function FolhaGravarAgora({
               rotuloParar={textosMomento.botaoParar}
               rotuloTranscrevendo={textosMomento.transcrevendo}
               formatarGravando={textosMomento.gravando}
+              previa={previa}
+              previaPorReconhecimentoDoAparelho={previaPorReconhecimentoDoAparelho}
             />
             {erroAudio ? (
               <p className={styles.erro} role="alert">

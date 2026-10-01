@@ -183,6 +183,8 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
               rotuloParar={textosPlano.pararGravacaoAgenda}
               rotuloTranscrevendo={textosPlano.botaoGravarAgenda}
               formatarGravando={textosPlano.gravandoAgenda}
+              previa={gravador.previa}
+              previaPorReconhecimentoDoAparelho={gravador.previaPorReconhecimentoDoAparelho}
             />
           )}
 

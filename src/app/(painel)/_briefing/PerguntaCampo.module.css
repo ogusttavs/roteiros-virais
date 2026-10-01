@@ -185,6 +185,27 @@
   color: var(--cor-texto-dica);
 }
 
+/**
+ * P2b, item 3: a prévia ao vivo, abaixo do campo, tom de apoio, texto corrido sem desenho novo (o
+ * Opus desenha o estado definitivo depois). Rolagem própria depois de quatro linhas, para a prévia
+ * nunca empurrar o resto da tela enquanto a pessoa fala bastante.
+ */
+.previaFala {
+  margin: 0;
+  max-height: 4.8em;
+  overflow-y: auto;
+  font-size: var(--tamanho-legenda);
+  line-height: 1.2;
+  color: var(--cor-texto-dica);
+}
+
+.previaAviso {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+  opacity: 0.8;
+}
+
 /* ---------- Briefing vivo: linha fechada (Briefing.dc.html, ".resposta") ---------- */
 
 .resposta {

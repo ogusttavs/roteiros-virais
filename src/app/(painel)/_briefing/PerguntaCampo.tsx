@@ -7,6 +7,7 @@ import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { ehFalhaDeRede } from "@/lib/offline";
 import { textosBriefing } from "@/textos/briefing";
+import { textosComuns } from "@/textos/comuns";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -14,7 +15,7 @@ import { Nota } from "@/ui/componentes/Nota";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Toast } from "@/ui/componentes/Toast";
-import { useGravadorDeAudio, type ResultadoUseGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
+import { LIMITE_SEGUNDOS_PADRAO, useGravadorDeAudio, type ResultadoUseGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
@@ -98,6 +99,15 @@ function CampoComMicrofone({
           type="button"
           className={[styles.botaoFalar, gravando ? styles.botaoFalarGravando : ""].filter(Boolean).join(" ")}
           onClick={() => (gravando ? gravador.pararGravacao() : void gravador.iniciarGravacao())}
+          /**
+           * Sem isto, tocar o microfone com o campo em foco (uma segunda gravação, por exemplo)
+           * desfoca a área de texto antes do clique, o que dispara `aoSairDoCampo` e avalia a
+           * resposta em paralelo com a gravação nova; se a avaliação terminar primeiro, o cartão
+           * fecha e o botão "Parar" some com a gravação ainda rodando (achado nesta rodada,
+           * `briefing-audio.spec.ts` intermitente). `preventDefault` no `mousedown` mantém o foco
+           * no campo; o `onClick` continua disparando normalmente.
+           */
+          onMouseDown={(evento) => evento.preventDefault()}
           disabled={gravador.fase === "transcrevendo"}
           aria-label={rotulo}
           title={rotulo}
@@ -105,7 +115,9 @@ function CampoComMicrofone({
           {gravando ? <Square size={18} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={18} strokeWidth={1.75} aria-hidden="true" />}
         </button>
       </div>
-      {gravador.fase === "transcrevendo" ? (
+      {gravando ? (
+        <p className={styles.dicaFalar}>{t.contagemGravando(gravador.segundos, LIMITE_SEGUNDOS_PADRAO)}</p>
+      ) : gravador.fase === "transcrevendo" ? (
         <p className={styles.dicaFalar}>{t.organizandoFala}</p>
       ) : erroFala ? (
         <p className={styles.erroInline} role="alert">
@@ -115,6 +127,15 @@ function CampoComMicrofone({
       ) : (
         <p className={styles.dicaFalar}>{t.dicaResponderFalando}</p>
       )}
+      {/* P2b, item 1 e 3: a prévia ao vivo, abaixo do campo, enquanto grava ou enquanto organiza a fala. */}
+      {(gravando || gravador.fase === "transcrevendo") && gravador.previa.trim().length > 0 ? (
+        <p className={styles.previaFala} aria-live="polite">
+          {gravador.previa}
+        </p>
+      ) : null}
+      {gravando && gravador.previaPorReconhecimentoDoAparelho ? (
+        <p className={styles.previaAviso}>{textosComuns.previaUsaReconhecimentoDoAparelho}</p>
+      ) : null}
     </>
   );
 }
@@ -159,7 +180,7 @@ export function PerguntaCampo({
    * P1, item 8: guarda o texto de antes de "Usar esta sugestão" ou de "Responder falando", para o
    * "desfazer" do toast. `tipo` escolhe o texto do toast (a sugestão e a fala usam frases diferentes).
    */
-  const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string; tipo: "sugestao" | "fala" } | null>(null);
+  const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string; tipo: "sugestao" | "fala" | "falaSomada" } | null>(null);
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
@@ -284,14 +305,23 @@ export function PerguntaCampo({
   }
 
   /**
-   * "Responder falando" (P2, item 2): a transcrição organizada (`organizarFalaBriefing`) substitui
-   * o campo, editável, com "desfazer" pelo toast, igual à "Usar esta sugestão". Ao contrário da
-   * sugestão, o campo já está aberto quando o microfone aparece (nas duas variantes), então não
-   * precisa de `setEditando(true)`. O texto falado bruto vai junto do rascunho (item 3).
+   * "Responder falando" (P2, item 2; M4, item 0a da revisão do PR #77): a transcrição organizada
+   * (`organizarFalaBriefing`) entra no campo, editável, com "desfazer" pelo toast, igual à "Usar
+   * esta sugestão". Campo vazio: substitui. Campo com texto: a fala entra numa linha nova, depois
+   * do que já estava (a pessoa gravou em duas partes, por exemplo, pelo limite de 2 minutos); a
+   * fala bruta pendente acumula do mesmo jeito, para `transcricoes_brutas` guardar as duas. Ao
+   * contrário da sugestão, o campo já está aberto quando o microfone aparece (nas duas variantes),
+   * então não precisa de `setEditando(true)`.
    */
   function aplicarFalaOrganizada(textoOrganizado: string, textoFalado: string) {
-    setSugestaoAplicada({ anterior: textoRef.current, tipo: "fala" });
-    aoMudarTexto(textoOrganizado, textoFalado);
+    const anterior = textoRef.current;
+    const somando = anterior.trim().length > 0;
+    const novoTexto = somando ? `${anterior}\n${textoOrganizado}` : textoOrganizado;
+    const novaTranscricaoBruta = transcricaoBrutaPendenteRef.current
+      ? `${transcricaoBrutaPendenteRef.current}\n${textoFalado}`
+      : textoFalado;
+    setSugestaoAplicada({ anterior, tipo: somando ? "falaSomada" : "fala" });
+    aoMudarTexto(novoTexto, novaTranscricaoBruta);
     requestAnimationFrame(() => areaRef.current?.focus());
   }
 
@@ -370,6 +400,14 @@ export function PerguntaCampo({
       {rascunhoComErro ? t.rascunhoComErro : rascunhoSalvo ? t.rascunhoSalvo : t.rascunhoAindaNao}
     </span>
   );
+
+  /** M4, item 0a: texto do toast por tipo (a sugestão, a fala que substituiu, a fala que somou). */
+  const textoToast =
+    sugestaoAplicada?.tipo === "falaSomada"
+      ? t.respostaFaladaSomada
+      : sugestaoAplicada?.tipo === "fala"
+        ? t.respostaFaladaAplicada
+        : t.sugestaoAplicada;
 
   if (variante === "vivo" && avaliacao) {
     if (editando) {
@@ -478,7 +516,7 @@ export function PerguntaCampo({
           {t.botaoAjustarResposta}
         </Botao>
         <Toast
-          texto={sugestaoAplicada?.tipo === "fala" ? t.respostaFaladaAplicada : t.sugestaoAplicada}
+          texto={textoToast}
           aberto={sugestaoAplicada !== null}
           onFechar={() => setSugestaoAplicada(null)}
           acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}
@@ -537,7 +575,7 @@ export function PerguntaCampo({
         </Botao>
       )}
       <Toast
-        texto={sugestaoAplicada?.tipo === "fala" ? t.respostaFaladaAplicada : t.sugestaoAplicada}
+        texto={textoToast}
         aberto={sugestaoAplicada !== null}
         onFechar={() => setSugestaoAplicada(null)}
         acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}

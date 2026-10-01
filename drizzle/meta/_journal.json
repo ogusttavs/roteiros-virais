@@ -274,6 +274,13 @@
       "when": 1790811114998,
       "tag": "0038_briefing-transcricoes-brutas",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1790816395525,
+      "tag": "0039_video-proxima-tentativa-sem-fala",
+      "breakpoints": true
     }
   ]
 }

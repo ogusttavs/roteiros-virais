@@ -9,6 +9,16 @@ import { useEffect, useRef, useState } from "react";
  * falando" do briefing) usarem o mesmo mecanismo. Devolve só o texto transcrito; separar esse
  * texto em campos, dias de agenda ou organizar a fala é responsabilidade de quem chama, via
  * `onTranscrito`.
+ *
+ * P2b: enquanto grava, uma prévia ao vivo (`previa`) vai aparecendo, em duas camadas, nunca por
+ * nome de navegador (decisão do Gustavo em 01/10/2026, "hoje espera falar tudo para depois
+ * aparecer o texto embaixo; isso é ruim"). (a) O reconhecimento de fala do próprio navegador
+ * (`SpeechRecognition`/`webkitSpeechRecognition`), quando existir: roda junto do gravador
+ * principal, nunca interfere nele. Erro, parada sozinha ou silêncio por 5s sem nenhum resultado
+ * cai para (b) sem avisar (a gravação de verdade nunca dependeu dele). (b) Sem reconhecimento do
+ * navegador: um segundo `MediaRecorder`, na mesma faixa de áudio, reiniciado a cada 5 segundos,
+ * manda cada pedaço para `/api/transcrever` e a prévia soma os pedaços em ordem. A prévia nunca é
+ * gravada nem vira resposta: só o texto definitivo, do áudio inteiro, ao parar.
  */
 
 /** webm/opus no Chrome e no Android, mp4/aac no Safari (`MediaRecorder.isTypeSupported`). */
@@ -19,10 +29,42 @@ function tipoMimeSuportado(): string | null {
   return null;
 }
 
+/**
+ * Tipos mínimos da Web Speech API (não padronizada em todo navegador, por isso nunca em
+ * `lib.dom.d.ts`): só o que a prévia usa. Detecção por recurso (`window.SpeechRecognition` ou o
+ * prefixo `webkit`), nunca por nome de navegador.
+ */
+type ResultadoReconhecimento = { 0: { transcript: string }; isFinal: boolean };
+type EventoReconhecimento = { results: ArrayLike<ResultadoReconhecimento> };
+type ReconhecimentoDeFala = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((evento: EventoReconhecimento) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+};
+
+function construtorDeReconhecimento(): (new () => ReconhecimentoDeFala) | null {
+  const janela = window as unknown as {
+    SpeechRecognition?: new () => ReconhecimentoDeFala;
+    webkitSpeechRecognition?: new () => ReconhecimentoDeFala;
+  };
+  return janela.SpeechRecognition ?? janela.webkitSpeechRecognition ?? null;
+}
+
+/** Item 0c: sem resultado nenhum do reconhecimento do aparelho nesse tempo, cai para os pedaços. */
+const ESPERA_RECONHECIMENTO_MS = 5_000;
+/** Item 2b: tamanho do pedaço que vai para `/api/transcrever` enquanto grava. */
+const DURACAO_PEDACO_MS = 5_000;
+
 export type FaseGravador = "inicial" | "gravando" | "transcrevendo";
 export type ErroGravador = "audioVazio" | "falhaTranscricao" | null;
 
-const LIMITE_SEGUNDOS_PADRAO = 120;
+export const LIMITE_SEGUNDOS_PADRAO = 120;
 
 type Props = {
   /** Vira o nome do arquivo enviado ("momento.webm", "agenda.webm", "briefing.webm"). */
@@ -38,6 +80,10 @@ export type ResultadoUseGravadorDeAudio = {
   segundos: number;
   semMicrofone: boolean;
   erro: ErroGravador;
+  /** P2b: o texto ao vivo, nunca o definitivo; vazio fora da gravação. */
+  previa: string;
+  /** P2b, item 4: só true quando a prévia vem do reconhecimento do navegador (camada a). */
+  previaPorReconhecimentoDoAparelho: boolean;
   iniciarGravacao: () => Promise<void>;
   pararGravacao: () => void;
 };
@@ -47,6 +93,8 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
   const [segundos, setSegundos] = useState(0);
   const [semMicrofone, setSemMicrofone] = useState(false);
   const [erro, setErro] = useState<ErroGravador>(null);
+  const [previa, setPrevia] = useState("");
+  const [previaPorReconhecimentoDoAparelho, setPreviaPorReconhecimentoDoAparelho] = useState(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const gravadorRef = useRef<MediaRecorder | null>(null);
@@ -59,14 +107,170 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     onTranscritoRef.current = onTranscrito;
   });
 
+  // P2b, camada (a): reconhecimento de fala do navegador.
+  const reconhecimentoRef = useRef<ReconhecimentoDeFala | null>(null);
+  const semResultadoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const trocouParaPedacosRef = useRef(false);
+
+  // P2b, camada (b): segundo MediaRecorder, por pedaços de 5s, na mesma faixa de áudio.
+  const pedacoGravadorRef = useRef<MediaRecorder | null>(null);
+  const pedacoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pedacoPararTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pedacoIndiceRef = useRef(0);
+  const pedacoTextosRef = useRef<string[]>([]);
+
+  function limparPrevia() {
+    if (semResultadoTimerRef.current) {
+      clearTimeout(semResultadoTimerRef.current);
+      semResultadoTimerRef.current = null;
+    }
+    if (reconhecimentoRef.current) {
+      const reconhecimento = reconhecimentoRef.current;
+      reconhecimento.onresult = null;
+      reconhecimento.onerror = null;
+      reconhecimento.onend = null;
+      reconhecimento.abort();
+      reconhecimentoRef.current = null;
+    }
+    if (pedacoIntervalRef.current) {
+      clearInterval(pedacoIntervalRef.current);
+      pedacoIntervalRef.current = null;
+    }
+    if (pedacoPararTimerRef.current) {
+      clearTimeout(pedacoPararTimerRef.current);
+      pedacoPararTimerRef.current = null;
+    }
+    if (pedacoGravadorRef.current && pedacoGravadorRef.current.state !== "inactive") {
+      pedacoGravadorRef.current.ondataavailable = null;
+      pedacoGravadorRef.current.stop();
+    }
+    pedacoGravadorRef.current = null;
+  }
+
+  function enviarPedaco(blob: Blob, tipoMime: string, indice: number) {
+    if (blob.size === 0) return;
+    const forma = new FormData();
+    forma.append("audio", blob, `previa.${tipoMime.includes("mp4") ? "mp4" : "webm"}`);
+    forma.append("duracaoS", String(Math.max(1, Math.round(DURACAO_PEDACO_MS / 1000))));
+    fetch("/api/transcrever", { method: "POST", body: forma })
+      .then((resposta) => resposta.json().catch(() => null))
+      .then((dados: { transcricao: string } | { erro: string } | null) => {
+        if (!dados || "erro" in dados || !dados.transcricao) return;
+        pedacoTextosRef.current[indice] = dados.transcricao;
+        setPrevia(pedacoTextosRef.current.filter(Boolean).join(" "));
+      })
+      .catch(() => {
+        // Pedaço perdido: a prévia segue sem ele, o áudio definitivo não depende disto.
+      });
+  }
+
+  function gravarProximoPedaco(stream: MediaStream, tipoMime: string) {
+    if (pedacoPararTimerRef.current) {
+      clearTimeout(pedacoPararTimerRef.current);
+      pedacoPararTimerRef.current = null;
+    }
+    // Rede de segurança contra deriva do timer (o pedaço anterior ainda não se fechou sozinho): o
+    // `ondataavailable` continua de pé, para o pedaço ainda mandar o que gravou antes de trocar.
+    if (pedacoGravadorRef.current && pedacoGravadorRef.current.state !== "inactive") {
+      pedacoGravadorRef.current.stop();
+    }
+    const indice = pedacoIndiceRef.current;
+    pedacoIndiceRef.current += 1;
+    const gravadorDoPedaco = new MediaRecorder(stream, { mimeType: tipoMime });
+    gravadorDoPedaco.ondataavailable = (evento) => {
+      if (evento.data.size > 0) enviarPedaco(evento.data, tipoMime, indice);
+    };
+    gravadorDoPedaco.start();
+    pedacoGravadorRef.current = gravadorDoPedaco;
+    pedacoPararTimerRef.current = setTimeout(() => {
+      if (gravadorDoPedaco.state !== "inactive") gravadorDoPedaco.stop();
+    }, DURACAO_PEDACO_MS);
+  }
+
+  function iniciarPreviaPorPedacos(stream: MediaStream, tipoMime: string) {
+    pedacoIndiceRef.current = 0;
+    pedacoTextosRef.current = [];
+    gravarProximoPedaco(stream, tipoMime);
+    pedacoIntervalRef.current = setInterval(() => gravarProximoPedaco(stream, tipoMime), DURACAO_PEDACO_MS);
+  }
+
+  function trocarParaPedacos(stream: MediaStream, tipoMime: string) {
+    if (trocouParaPedacosRef.current) return;
+    trocouParaPedacosRef.current = true;
+    if (semResultadoTimerRef.current) {
+      clearTimeout(semResultadoTimerRef.current);
+      semResultadoTimerRef.current = null;
+    }
+    if (reconhecimentoRef.current) {
+      const reconhecimento = reconhecimentoRef.current;
+      reconhecimento.onresult = null;
+      reconhecimento.onerror = null;
+      reconhecimento.onend = null;
+      reconhecimento.abort();
+      reconhecimentoRef.current = null;
+    }
+    setPreviaPorReconhecimentoDoAparelho(false);
+    iniciarPreviaPorPedacos(stream, tipoMime);
+  }
+
+  function iniciarPrevia(stream: MediaStream, tipoMime: string) {
+    trocouParaPedacosRef.current = false;
+    const Construtor = construtorDeReconhecimento();
+    if (!Construtor) {
+      iniciarPreviaPorPedacos(stream, tipoMime);
+      return;
+    }
+    const reconhecimento = new Construtor();
+    reconhecimento.continuous = true;
+    reconhecimento.interimResults = true;
+    reconhecimento.lang = "pt-BR";
+    let recebeuResultado = false;
+    reconhecimento.onresult = (evento) => {
+      recebeuResultado = true;
+      if (semResultadoTimerRef.current) {
+        clearTimeout(semResultadoTimerRef.current);
+        semResultadoTimerRef.current = null;
+      }
+      setPreviaPorReconhecimentoDoAparelho(true);
+      let texto = "";
+      for (let i = 0; i < evento.results.length; i += 1) {
+        texto += `${evento.results[i][0].transcript} `;
+      }
+      setPrevia(texto.trim());
+    };
+    reconhecimento.onerror = () => {
+      if (!recebeuResultado) trocarParaPedacos(stream, tipoMime);
+    };
+    reconhecimento.onend = () => {
+      if (!recebeuResultado) trocarParaPedacos(stream, tipoMime);
+    };
+    reconhecimentoRef.current = reconhecimento;
+    semResultadoTimerRef.current = setTimeout(() => {
+      if (!recebeuResultado) trocarParaPedacos(stream, tipoMime);
+    }, ESPERA_RECONHECIMENTO_MS);
+    try {
+      reconhecimento.start();
+    } catch {
+      trocarParaPedacos(stream, tipoMime);
+    }
+  }
+
   // Sai gravando (troca de tela, fechar a folha) sem deixar o microfone ligado no fundo.
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
+      limparPrevia();
       streamRef.current?.getTracks().forEach((faixa) => faixa.stop());
     };
   }, []);
 
+  /**
+   * M4, item 0b da revisão do PR #77: `setFase("inicial")` saía antes de `onTranscrito` terminar,
+   * então no briefing (onde `onTranscrito` ainda chama `organizarFalaBriefingAction`, alguns
+   * segundos de IA) o campo e o microfone ficavam liberados durante essa espera, e o texto chegava
+   * por cima do que a pessoa tivesse digitado nesse meio tempo. A fase só volta para "inicial"
+   * depois que `onTranscrito` resolve, com `finally` para o erro também sair do estado "transcrevendo".
+   */
   async function transcrever(blob: Blob, tipoMime: string) {
     setFase("transcrevendo");
     setErro(null);
@@ -79,19 +283,20 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
       const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
       if (!resposta.ok || !dados || "erro" in dados) {
         setErro("falhaTranscricao");
-        setFase("inicial");
         return;
       }
-      setFase("inicial");
       await onTranscritoRef.current(dados.transcricao, segundosRef.current);
     } catch {
       setErro("falhaTranscricao");
+    } finally {
       setFase("inicial");
     }
   }
 
   async function iniciarGravacao() {
     setErro(null);
+    setPrevia("");
+    setPreviaPorReconhecimentoDoAparelho(false);
     const tipoMime = tipoMimeSuportado();
     if (!navigator.mediaDevices?.getUserMedia || !tipoMime) {
       setSemMicrofone(true);
@@ -121,6 +326,7 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
       setSegundos(0);
       gravador.start();
       setFase("gravando");
+      iniciarPrevia(stream, tipoMime);
       timerRef.current = setInterval(() => {
         segundosRef.current += 1;
         setSegundos(segundosRef.current);
@@ -133,8 +339,18 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
 
   function pararGravacao() {
     if (timerRef.current) clearInterval(timerRef.current);
+    limparPrevia();
     gravadorRef.current?.stop();
   }
 
-  return { fase, segundos, semMicrofone, erro, iniciarGravacao, pararGravacao };
+  return {
+    fase,
+    segundos,
+    semMicrofone,
+    erro,
+    previa,
+    previaPorReconhecimentoDoAparelho,
+    iniciarGravacao,
+    pararGravacao,
+  };
 }

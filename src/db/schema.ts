@@ -611,6 +611,14 @@ export const videos = pgTable(
      * nunca seleciona video com essa data no futuro.
      */
     proximaTentativaTranscricao: timestamp("proxima_tentativa_transcricao", { withTimezone: true }),
+    /**
+     * M4/P2b, item 0e: o download ou a leitura falhou no caminho sem fala (`extrair-sem-fala.ts`);
+     * preenchida com "agora + 7 dias", mesmo raciocínio de `proximaTentativaTranscricao`. Sem isto,
+     * o mesmo vídeo que sempre falha (um link morto, por exemplo) ocupava vaga do teto diário em
+     * toda rodada, achado em produção em 30/09 no setor da Overtake (7 das 15 vagas, três rodadas
+     * seguidas).
+     */
+    proximaTentativaSemFala: timestamp("proxima_tentativa_sem_fala", { withTimezone: true }),
     /** titulo + descricao + transcricao + analise.assunto, para busca de evidencia. */
     busca: tsvector("busca").generatedAlwaysAs(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
