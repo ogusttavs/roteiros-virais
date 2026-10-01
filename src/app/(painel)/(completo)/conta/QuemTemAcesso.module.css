@@ -6,6 +6,15 @@
   gap: var(--espaco-4);
 }
 
+/** V15, item 6b (design v2, dúvida 6 do passo 8): vira o lado fixo a partir de 1024px. */
+@media (min-width: 1024px) {
+  .acessos {
+    grid-column: 2;
+    position: sticky;
+    top: calc(3rem + var(--espaco-6));
+  }
+}
+
 .cabeca {
   display: flex;
   align-items: center;
