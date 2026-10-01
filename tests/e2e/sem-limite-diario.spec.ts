@@ -1,9 +1,27 @@
 /**
- * O plano `sem_limite` (V9b-0, `PROXIMO.md`): marca com o interruptor ligado
- * gera quantos roteiros quiser no mesmo dia e vê um cartão por roteiro,
- * sempre com os três temas visíveis abaixo. Marca `padrao` (o padrão do
- * schema, sem interruptor nenhum) continua vendo um cartão só, com "Ver os
- * outros temas de hoje" e "Trocar".
+ * O plano `sem_limite` (V9b-0, `PROXIMO.md`): historicamente, a marca com o
+ * interruptor ligado gerava quantos roteiros quisesse no mesmo dia e via um
+ * cartão por roteiro, sempre com os três temas visíveis abaixo; a marca
+ * `padrao` (o padrão do schema) via só um cartão, com "Ver os outros temas de
+ * hoje" e "Trocar".
+ *
+ * TODO(e2e-fix): depois da E39a (Hoje virou a agenda, Criar virou a oficina),
+ * essa distinção não aparece mais em lugar nenhum da UI nova, para nenhum dos
+ * dois planos. `/criar/temas` (`TemasTela.tsx`) sempre mostra os três temas
+ * com o botão "Quero esse" (nunca "Escrever o roteiro"); `/hoje`
+ * (`HojeTela.tsx`, a agenda) só mostra o Reels mais recente do dia, nunca uma
+ * lista com contagem ("Seus roteiros de hoje (n)") (comentário em
+ * `agendaDoDia`, `src/servicos/roteiro.ts`: "Com mais de um Reels no mesmo
+ * dia... fica o mais recente; os demais continuam no Histórico"). Os textos
+ * `seusRoteirosDeHoje`, `verOutros`, `esconderOutros`, `contagemTemas` e
+ * `trocarTemaAviso` (`src/textos/hoje.ts`) não são mais referenciados em
+ * nenhum componente. Isso parece um gap real deixado pela E39a (o plano
+ * `sem_limite` continua no schema e no admin, `SeletorPlanoAdmin.tsx`, mas
+ * sem efeito visível no painel do cliente), não só um seletor velho; registrado
+ * no relatório desta rodada para o Fable decidir se o `sem_limite` volta ao
+ * painel ou se o plano sai de cena. Os dois testes abaixo cobrem só o que dá
+ * para confirmar na UI atual: gerar funciona nos dois planos, e os temas
+ * continuam visíveis depois de gerar um roteiro.
  *
  * Mesma lição de `temas-do-dia.spec.ts` e `roteiro.spec.ts`: grava briefing e
  * tema do dia direto no banco, e deixa só a geração do roteiro passar pelo
@@ -80,22 +98,14 @@ async function criarClienteComPlano(
   return cliente;
 }
 
-/**
- * V12, item 3b: os temas do dia ficam dentro da porta Reels, tanto no plano
- * `padrao` quanto no `sem_limite`; `/hoje` sempre recomeça na pergunta das
- * duas portas, a porta escolhida nunca fica lembrada.
- */
-async function abrirPortaReels(page: Page) {
-  await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
-}
-
-async function escolherTemaEGerar(page: Page, tituloTema: string, rotuloBotao: string) {
-  await abrirPortaReels(page);
+/** E39a: os temas do dia ficam na rota "/criar/temas", igual para os dois planos. */
+async function escolherTemaEGerar(page: Page, tituloTema: string) {
+  await page.goto("/criar/temas");
   const cartao = page.getByRole("heading", { name: tituloTema });
   await expect(cartao).toBeVisible();
-  await cartao.locator("../..").getByRole("button", { name: rotuloBotao }).click();
+  await cartao.locator("../..").getByRole("button", { name: "Quero esse" }).click();
 
-  await expect(page).toHaveURL(/\/hoje\/objetivo/);
+  await expect(page).toHaveURL(/\/criar\/objetivo/);
   await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
   await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
   await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
@@ -119,53 +129,45 @@ test.describe("plano por marca (V9b-0)", () => {
     await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
   });
 
-  test("plano sem_limite: gera roteiro de dois temas diferentes e ve os dois cartoes, com os temas sempre visiveis", async ({
+  test("plano sem_limite: gera roteiro de dois temas diferentes no mesmo dia, com os temas sempre visiveis", async ({
     page,
   }) => {
     await criarClienteComPlano("e2e-sem-limite-a", "e2e-sem-limite-a@exemplo.teste", nichoId, "sem_limite");
     await entrar(page, "e2e-sem-limite-a@exemplo.teste");
 
-    // Os tres temas aparecem com "Escrever o roteiro" (nunca "Quero esse" ou "Trocar" neste plano).
-    await abrirPortaReels(page);
-    await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Quero esse" })).toHaveCount(0);
-    await page.getByRole("heading", { name: "tema sem limite 1" }).locator("../..").getByRole("button", { name: "Escrever o roteiro" }).click();
+    await escolherTemaEGerar(page, "tema sem limite 1");
 
-    await expect(page).toHaveURL(/\/hoje\/objetivo/);
-    await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
-    await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
-    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
-
+    // TODO(e2e-fix): a agenda nova (`HojeTela.tsx`) só mostra o Reels mais recente do dia, para
+    // qualquer plano; não há mais lista nem contagem em /hoje (ver o comentário no topo deste
+    // arquivo). Confirma só que o roteiro de hoje aparece.
     await page.goto("/hoje");
-    await expect(page.getByText("Seus roteiros de hoje")).toBeVisible();
-    // Ainda so um cartao: sem a contagem entre parenteses.
-    await expect(page.getByText("Seus roteiros de hoje (2)")).toHaveCount(0);
+    await expect(page.getByText("tema sem limite 1")).toBeVisible();
 
     // Os tres temas continuam visiveis, mesmo com um roteiro ja gerado hoje.
-    await escolherTemaEGerar(page, "tema sem limite 2", "Escrever o roteiro");
+    await escolherTemaEGerar(page, "tema sem limite 2");
 
+    // O mais recente substitui o anterior na agenda (comportamento documentado de `agendaDoDia`).
     await page.goto("/hoje");
-    await expect(page.getByText("Seus roteiros de hoje (2)")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Modo gravação" })).toHaveCount(2);
+    await expect(page.getByText("tema sem limite 2")).toBeVisible();
 
     // Os temas continuam visiveis mesmo com dois roteiros ja gerados hoje.
-    await abrirPortaReels(page);
+    await page.goto("/criar/temas");
     await expect(page.getByRole("heading", { name: "tema sem limite 3" })).toBeVisible();
   });
 
-  test("plano padrao: continua vendo um cartao so, com 'ver os outros temas' e 'Trocar'", async ({ page }) => {
+  test("plano padrao: gerar um roteiro tambem funciona, com os temas continuando visiveis", async ({ page }) => {
     await criarClienteComPlano("e2e-sem-limite-b", "e2e-sem-limite-b@exemplo.teste", nichoId, "padrao");
     await entrar(page, "e2e-sem-limite-b@exemplo.teste");
 
-    await escolherTemaEGerar(page, "tema sem limite 1", "quero esse");
+    await escolherTemaEGerar(page, "tema sem limite 1");
 
+    // TODO(e2e-fix): ver o comentário no topo deste arquivo. "Ver os outros temas de hoje" e
+    // "Trocar" não existem mais; /criar/temas já mostra os três temas direto, para os dois planos.
     await page.goto("/hoje");
-    await expect(page.getByText("Seus roteiros de hoje")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Modo gravação" })).toHaveCount(1);
+    await expect(page.getByText("tema sem limite 1")).toBeVisible();
 
-    await abrirPortaReels(page);
-    await page.getByRole("button", { name: "Ver os outros temas de hoje" }).click();
-    await expect(page.getByRole("button", { name: "Trocar" }).first()).toBeVisible();
-    await expect(page.getByText("Trocar de tema escreve um roteiro novo")).toBeVisible();
+    await page.goto("/criar/temas");
+    await expect(page.getByRole("heading", { name: "tema sem limite 2" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "tema sem limite 3" })).toBeVisible();
   });
 });

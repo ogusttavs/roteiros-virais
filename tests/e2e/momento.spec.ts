@@ -35,10 +35,10 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** V12, item 2: "Gravar agora" agora fica dentro da porta Reels (a porta em si não importa para estes testes). */
-async function abrirPortaReels(page: Page) {
-  await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
-  await expect(page.getByText("Reels ou vídeo curto", { exact: true })).toBeVisible();
+/** E39a: "Contar o momento", em `/criar`, abre a folha "Gravar agora" direto. */
+async function abrirGravarAgora(page: Page) {
+  await page.goto("/criar");
+  await page.getByRole("button", { name: "Contar o momento" }).click();
 }
 
 test.describe("gravar agora, o caminho por texto", () => {
@@ -87,8 +87,6 @@ test.describe("gravar agora, o caminho por texto", () => {
       },
     });
 
-    // O botao "Gravar agora" fica dentro da porta Reels (V12, item 3d): sem uma
-    // linha em temas_dia para hoje, /hoje cai no estado "sem_tema", que nao usa HojeTela.
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
@@ -97,12 +95,9 @@ test.describe("gravar agora, o caminho por texto", () => {
     await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
-  test("pelo Hoje: preenche os tres campos, escolhe o objetivo, e o roteiro sai com origem momento", async ({ page }) => {
+  test("pelo Criar: preenche os tres campos, escolhe o objetivo, e o roteiro sai com origem momento", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje");
-
-    await abrirPortaReels(page);
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    await abrirGravarAgora(page);
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
 
@@ -122,10 +117,7 @@ test.describe("gravar agora, o caminho por texto", () => {
 
   test("campo vazio: nao envia e mostra o aviso", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje");
-
-    await abrirPortaReels(page);
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    await abrirGravarAgora(page);
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
 
@@ -142,13 +134,14 @@ test.describe("gravar agora, o caminho por texto", () => {
   });
 
   /**
-   * V11, item 2 e item 3a: a tela de espera com a claquete cobre o Hoje
-   * enquanto o servidor escreve. Com `AI_PROVIDER=mock` a resposta é rápida
-   * demais para pegar a tela por sorte; atrasa o pedido da Server Action um
-   * pouco (mesma técnica de `sem-rede.spec.ts`, `next-action` no cabeçalho)
-   * só para este teste ter uma janela confiável de asserção.
+   * V11, item 2 e item 3a: a tela de espera com a claquete cobre a tela
+   * enquanto o servidor escreve (E39a: agora a partir de `/criar`, não mais
+   * `/hoje`). Com `AI_PROVIDER=mock` a resposta é rápida demais para pegar a
+   * tela por sorte; atrasa o pedido da Server Action um pouco (mesma técnica
+   * de `sem-rede.spec.ts`, `next-action` no cabeçalho) só para este teste ter
+   * uma janela confiável de asserção.
    */
-  test("a tela de espera com a claquete cobre o Hoje enquanto o roteiro escreve", async ({ page }) => {
+  test("a tela de espera com a claquete cobre a tela enquanto o roteiro escreve", async ({ page }) => {
     let atrasou = false;
     await page.route("**/*", async (rota) => {
       const pedido = rota.request();
@@ -160,10 +153,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     });
 
     await entrar(page);
-    await page.goto("/hoje");
-
-    await abrirPortaReels(page);
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    await abrirGravarAgora(page);
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
 
@@ -174,7 +164,7 @@ test.describe("gravar agora, o caminho por texto", () => {
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
 
-    // A folha fecha na hora e a tela de espera cobre o Hoje, sem barra de abas (item 2 e 3a).
+    // A folha fecha na hora e a tela de espera cobre a tela, sem barra de abas (item 2 e 3a).
     await expect(folha).toHaveCount(0);
     await expect(page.getByRole("status")).toBeVisible();
     await expect(page.getByText("Escrevendo o seu roteiro")).toBeVisible();
@@ -187,11 +177,11 @@ test.describe("gravar agora, o caminho por texto", () => {
 
 /**
  * H3, item 1: antes, uma marca sem tema de hoje (nenhuma linha em
- * `temas_dia` ainda) caía num estado à parte, sem a semana, sem "Gravar
- * agora", sem a porta Story, sem o plano. Agora `/hoje` é sempre o Hoje das
- * portas: o aviso substitui só os três temas, dentro da porta Reels.
+ * `temas_dia` ainda) caía num estado à parte. Hoje (E39a) o aviso substitui
+ * só os três temas em `/criar/temas`; as outras portas de `/criar`, como
+ * "Contar o momento", continuam funcionando normalmente mesmo sem tema.
  */
-test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
+test.describe("marca sem tema, as portas de Criar continuam funcionando", () => {
   const EMAIL_SEM_TEMA = "e2e-momento-sem-tema@exemplo.teste";
 
   test.beforeAll(async () => {
@@ -244,7 +234,7 @@ test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
     // De propósito, nenhuma linha em temas_dia: o nicho nunca teve coleta.
   });
 
-  test("a 390px: a porta Reels mostra o aviso no lugar dos temas, e a porta Story gera um roteiro normalmente", async ({
+  test("a 390px: /criar/temas mostra o aviso no lugar dos temas, e 'Contar o momento' gera um roteiro normalmente", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -253,10 +243,6 @@ test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
     await page.getByLabel("Senha").fill(SENHA);
     await page.getByRole("button", { name: "entrar", exact: true }).click();
     await expect(page).toHaveURL(/\/hoje/);
-
-    // A semana e o restante da tela continuam ali, mesmo sem tema (não é o estado à parte de antes).
-    await expect(page.getByText("Sua semana")).toBeVisible();
-    await expect(page.getByText("O que você quer gravar agora?")).toBeVisible();
 
     /**
      * F1, ajuste B: o texto muda com a hora real (`aviso-sem-tema.ts`, H3, item 1). Antes das 6h30 de
@@ -268,18 +254,15 @@ test.describe("marca sem tema, o Hoje continua com as duas portas", () => {
     const tituloEsperado = jaPassouDoCorte ? textosHoje.semTemaDepoisTitulo : textosHoje.vazioTitulo;
     const textoEsperado = jaPassouDoCorte ? textosHoje.semTemaDepois : textosHoje.vazio;
 
-    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    await page.goto("/criar/temas");
     await expect(page.getByText(tituloEsperado)).toBeVisible();
     await expect(page.getByText(textoEsperado, { exact: false })).toBeVisible();
-    // "Quer outro assunto?" e "Gravar agora" continuam, mesmo sem tema nenhum.
-    await expect(page.getByRole("heading", { name: "Quer outro assunto?" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Gravar agora" })).toBeVisible();
+    // "Escrever o meu assunto" continua, mesmo sem tema nenhum.
+    await expect(page.getByRole("button", { name: "Escrever o meu assunto" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Trocar" }).click();
-    await page.getByRole("button", { name: /^Story/ }).click();
-    await expect(page.getByText("O que você quer gravar agora?")).not.toBeVisible();
-
-    await page.getByRole("button", { name: "Gravar agora" }).click();
+    // "Contar o momento", em /criar, gera um roteiro normalmente mesmo sem tema do dia.
+    await page.goto("/criar");
+    await page.getByRole("button", { name: "Contar o momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
 

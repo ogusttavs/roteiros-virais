@@ -240,7 +240,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await expect(botaoEscrever).toBeVisible();
 
     await botaoEscrever.click();
-    await expect(page).toHaveURL(/\/hoje\/objetivo\?livre=/);
+    await expect(page).toHaveURL(/\/criar\/objetivo\?livre=/);
   });
 
   test("erro na avaliação: mostra o aviso, o texto continua guardado, e tentar de novo funciona", async ({ page }) => {

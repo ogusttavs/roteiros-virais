@@ -238,26 +238,30 @@ test.describe("trocar de marca pela tela", () => {
     // Marca Um e a ativa no primeiro login (criadoEm desc, sem cookie ainda).
     const pilula = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) });
     await expect(pilula).toBeVisible();
-    // V12, item 3: os temas do dia ficam dentro da porta Reels; a URL com `?porta=reels` continua
-    // valendo depois da troca de marca e do recarregar, então basta abrir a porta uma vez.
-    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    // E39a: os temas do dia ficam em /criar/temas, que não tem a pílula (só o botão Voltar); a
+    // troca de marca continua pela pílula, em /hoje.
+    await page.goto("/criar/temas");
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).toBeVisible();
 
+    await page.goto("/hoje");
     await pilula.click();
     const folha = page.getByRole("dialog", { name: textosNav.suasMarcas });
     await expect(folha).toBeVisible();
     await expect(folha.getByText(NOME_MARCA_UM)).toBeVisible();
 
     await folha.getByRole("button", { name: NOME_MARCA_DOIS }).click();
+    await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
-    // O Hoje da outra marca: o tema exclusivo da Um some, o da Dois aparece.
+    // O tema exclusivo da marca nova: a Um some, a Dois aparece.
+    await page.goto("/criar/temas");
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca um" })).not.toBeVisible();
-    await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
     // Recarrega e continua na marca trocada (cookie assinado, nao estado de tela).
     await page.reload();
     await expect(page.getByRole("heading", { name: "tema exclusivo da marca dois" })).toBeVisible();
+
+    await page.goto("/hoje");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
   });
 

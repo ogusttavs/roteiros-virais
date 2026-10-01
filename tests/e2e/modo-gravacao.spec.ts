@@ -37,10 +37,9 @@ async function entrar(page: Page) {
 
 /** Gera um roteiro pelo caminho "Gravar agora" (não depende de tema do dia, mesma lição de `momento.spec.ts`). */
 async function escreverRoteiroDeTeste(page: Page) {
-  await page.goto("/hoje");
-  // V12, item 3d: "Gravar agora" fica dentro da porta Reels.
-  await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
-  await page.getByRole("button", { name: "Gravar agora" }).click();
+  await page.goto("/criar");
+  // E39a: "Contar o momento" abre a folha "Gravar agora" direto, sem porta intermediária.
+  await page.getByRole("button", { name: "Contar o momento" }).click();
   const folha = page.getByRole("dialog", { name: "Gravar agora" });
   await expect(folha).toBeVisible();
 
@@ -99,8 +98,6 @@ test.describe("V11, item 5: o fim do modo gravação", () => {
       },
     });
 
-    // O botao "Gravar agora" fica dentro da porta Reels (V12, mesma licao de momento.spec.ts):
-    // sem uma linha em temas_dia para hoje, /hoje nao renderiza HojeTela.
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },

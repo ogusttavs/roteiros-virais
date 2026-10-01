@@ -172,8 +172,8 @@ test.describe("roteiro pela tela", () => {
     await page.getByRole("button", { name: "entrar", exact: true }).click();
     await expect(page).toHaveURL(/\/hoje/);
 
-    // V12, item 3b: os temas do dia ficam dentro da porta Reels.
-    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    // E39a: os temas do dia viraram a rota própria "/criar/temas".
+    await page.goto("/criar/temas");
 
     const cartaoDoTema = page.getByRole("heading", {
       name: "o erro que faz a mancha de vinho no sofa espalhar em vez de sair",
@@ -181,7 +181,7 @@ test.describe("roteiro pela tela", () => {
     await expect(cartaoDoTema).toBeVisible();
     await cartaoDoTema.locator("../..").getByRole("button", { name: "quero esse" }).click();
 
-    await expect(page).toHaveURL(/\/hoje\/objetivo/);
+    await expect(page).toHaveURL(/\/criar\/objetivo/);
     await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
     // V9c, item 1: esse objetivo sugere Story por padrao (R-IG-STORY-10); este teste cobre o
     // fluxo classico de Reels (reprovar, versoes, PDF), Story tem o proprio em story.spec.ts.
