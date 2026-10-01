@@ -31,4 +31,9 @@ export const textosObjetivo = {
     falado: "No seu setor, os vídeos que mais rendem sobre isso têm alguém falando.",
     sem_fala: "No seu setor, os vídeos que mais rendem sobre isso não têm fala.",
   },
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */
+  objetivoDoVideo: "O que este vídeo precisa comunicar?",
+  objetivoDoVideoOpcional: "(opcional)",
+  objetivoDoVideoAjuda: "É o recado deste vídeo, não o objetivo da marca. Vai no alto do roteiro.",
+  objetivoDoVideoPlaceholder: "Ex.: avisar que o horário de atendimento mudou nesta semana",
 };

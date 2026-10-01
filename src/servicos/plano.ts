@@ -314,6 +314,8 @@ export async function aceitar(
     /** M4, item 2: o que a pessoa confirmou na folha; sem isto, cai em "falado" (sem evidência no momento para sugerir). */
     estilo?: EstiloRoteiro;
     marcaId?: number;
+    /** E40, item 2: "o que este vídeo precisa comunicar?", confirmado na folha. */
+    objetivoDoVideo?: string;
   },
 ): Promise<RoteiroLinha> {
   const item = await itemPorId(itemId, cliente.id);
@@ -324,11 +326,13 @@ export async function aceitar(
 
   const formato = dados.formato ?? sugerirFormatoPeloObjetivo(dados.objetivo);
   const estilo = dados.estilo ?? "falado";
+  const objetivoDoVideo = dados.objetivoDoVideo?.trim() || undefined;
   const momento: Momento = {
     onde: dados.onde,
     oQueEstaAcontecendo: dados.oQueEstaAcontecendo,
     oQueDaParaMostrar: dados.oQueDaParaMostrar,
     marcaId: dados.marcaId,
+    objetivoDoVideo,
   };
   const roteiro = await gerarRoteiro(cliente.id, {
     origem: "momento",
@@ -340,7 +344,13 @@ export async function aceitar(
 
   await db()
     .update(planoGravacoes)
-    .set({ roteiroId: roteiro.id, estado: "aceito", marcaId: dados.marcaId ?? null, formato })
+    .set({
+      roteiroId: roteiro.id,
+      estado: "aceito",
+      marcaId: dados.marcaId ?? null,
+      formato,
+      objetivoDoVideo: objetivoDoVideo ?? null,
+    })
     .where(eq(planoGravacoes.id, itemId));
 
   return roteiro;

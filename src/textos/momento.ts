@@ -44,4 +44,9 @@ export const textosMomento = {
   },
   /** M4, item 2: o segundo controle segmentado, Falando/Sem fala; sem sugestão aqui (o momento não busca evidência). */
   estilo: "Como você aparece",
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */
+  objetivoDoVideo: "O que este vídeo precisa comunicar?",
+  objetivoDoVideoOpcional: "(opcional)",
+  objetivoDoVideoAjuda: "É o recado deste vídeo, não o objetivo da marca. Vai no alto do roteiro.",
+  objetivoDoVideoPlaceholder: "Ex.: avisar que estou na feira escolhendo o produto novo da loja",
 };

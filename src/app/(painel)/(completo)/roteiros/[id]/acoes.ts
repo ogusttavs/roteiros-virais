@@ -7,10 +7,12 @@ import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
   avaliarRoteiro,
+  editarRoteiro,
   marcarGravado,
   marcarPostado,
   reprovarERescrever,
   roteiroPorId,
+  type CamposEditaveisRoteiro,
 } from "@/servicos/roteiro";
 
 /**
@@ -52,4 +54,14 @@ export async function avaliarRoteiroAction(
 ): Promise<void> {
   await roteiroDoClienteOuFalha(roteiroId);
   await avaliarRoteiro(roteiroId, avaliacao);
+}
+
+/** E40, item 1: salva a edição manual da pessoa, sem chamar IA. */
+export async function salvarEdicaoAction(
+  roteiroId: number,
+  campos: CamposEditaveisRoteiro,
+): Promise<{ id: number }> {
+  await roteiroDoClienteOuFalha(roteiroId);
+  const atualizado = await editarRoteiro(roteiroId, campos);
+  return { id: atualizado.id };
 }

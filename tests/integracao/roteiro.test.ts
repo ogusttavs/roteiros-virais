@@ -44,11 +44,13 @@ import { boss, FILAS } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaRoteiro, evidenciaPorIds } from "@/servicos/pesquisa";
 import {
+  editarRoteiro,
   ErroRoteiro,
   gerarRoteiro,
   marcarGravado,
   marcarPostado,
   reprovarERescrever,
+  roteiroPorId,
   roteirosDeHoje,
 } from "@/servicos/roteiro";
 
@@ -1148,5 +1150,99 @@ describe("roteirosDeHoje (V9b-0, plano sem_limite)", () => {
 
     expect(lista.map((r) => r.origem).sort()).toEqual(["momento", "sugerido"]);
     expect(lista.map((r) => r.id).sort()).toEqual([doMomento.id, doTema.id].sort());
+  });
+});
+
+describe("editarRoteiro (E40, item 1)", () => {
+  it("salva a edicao sem chamar IA, marca editadoPelaPessoa e guarda o conteudoOriginal so na primeira edicao", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-editar-1", "mancha de vinho no estofado");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+    });
+    const ganchoOriginal = roteiro.conteudo.gancho;
+    const chamadasAntes = gerarEstruturadoMock.mock.calls.length;
+
+    const primeiraEdicao = await editarRoteiro(roteiro.id, { gancho: "um gancho diferente, escrito por mim" });
+
+    // Sem IA nenhuma: o mock nao foi chamado de novo so por causa da edicao.
+    expect(gerarEstruturadoMock.mock.calls.length).toBe(chamadasAntes);
+    expect(primeiraEdicao.editadoPelaPessoa).toBe(true);
+    expect(primeiraEdicao.editadoEm).not.toBeNull();
+    expect(primeiraEdicao.conteudo.gancho).toBe("um gancho diferente, escrito por mim");
+    expect(primeiraEdicao.conteudoOriginal?.gancho).toBe(ganchoOriginal);
+    // Os outros campos do conteudo, intocados, continuam os mesmos da versao que a IA escreveu.
+    expect(primeiraEdicao.conteudo.corpo).toBe(roteiro.conteudo.corpo);
+
+    const segundaEdicao = await editarRoteiro(roteiro.id, { gancho: "mudei de novo, segunda vez" });
+
+    // conteudoOriginal nunca muda depois da primeira edicao: continua sendo o que a IA escreveu.
+    expect(segundaEdicao.conteudoOriginal?.gancho).toBe(ganchoOriginal);
+    expect(segundaEdicao.conteudo.gancho).toBe("mudei de novo, segunda vez");
+  });
+
+  it("edita os cartoes de um Story por indice, preservando a figurinha (nao editavel)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-editar-story", "risco no carro depois da lavagem");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "risco no carro depois da lavagem",
+      objetivo: "engajamento",
+      formato: "story",
+    });
+    const cartoesOriginais = roteiro.conteudo.cartoes!;
+    expect(cartoesOriginais.length).toBeGreaterThan(0);
+
+    const editado = await editarRoteiro(roteiro.id, {
+      cartoes: cartoesOriginais.map((c, i) => (i === 0 ? { ...c, oQueFalar: "o que eu quero falar de verdade" } : c)),
+    });
+
+    expect(editado.conteudo.cartoes![0].oQueFalar).toBe("o que eu quero falar de verdade");
+    expect(editado.conteudo.cartoes![0].figurinha).toBe(cartoesOriginais[0].figurinha);
+    if (cartoesOriginais.length > 1) {
+      expect(editado.conteudo.cartoes![1]).toEqual(cartoesOriginais[1]);
+    }
+  });
+
+  it("isolado por cliente: roteiroPorId de outro cliente nao acha o roteiro editado (guarda da Server Action)", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    await criarVideoEvidencia("ev-editar-isolamento", "cheiro de bicho de estimacao no sofa");
+    const roteiro = await gerarRoteiro(clienteA, {
+      origem: "livre",
+      textoTema: "cheiro de bicho de estimacao no sofa",
+      objetivo: "engajamento",
+    });
+    await editarRoteiro(roteiro.id, { gancho: "editado pelo cliente A" });
+
+    expect(await roteiroPorId(roteiro.id, clienteA)).not.toBeNull();
+    expect(await roteiroPorId(roteiro.id, clienteB)).toBeNull();
+  });
+
+  it("enfileira aprender-cliente com o clienteId certo", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-editar-enfileira", "erro comum ao limpar estofado");
+    await db().execute(sql`
+      delete from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+    `);
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "erro comum ao limpar estofado",
+      objetivo: "engajamento",
+    });
+
+    await editarRoteiro(roteiro.id, { gancho: "editado, deve enfileirar" });
+
+    const jobs = await db().execute(sql`
+      select 1 from pgboss.job
+      where name = ${FILAS.aprenderCliente}
+        and (data ->> 'clienteId')::int = ${clienteId}
+      limit 1
+    `);
+    expect(jobs.rows.length).toBe(1);
   });
 });

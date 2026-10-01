@@ -57,6 +57,8 @@ export type DadosAceitarPlano = {
   /** M4, item 2: o que a pessoa escolheu no segundo controle segmentado da folha; falado se ausente. */
   estilo?: string;
   marcaId?: number;
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
+  objetivoDoVideo?: string;
 };
 
 /**
@@ -91,6 +93,7 @@ export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlan
     formato: validarFormato(dados.formato),
     estilo: validarEstilo(dados.estilo),
     marcaId: dados.marcaId,
+    objetivoDoVideo: dados.objetivoDoVideo,
   });
   return { id: roteiro.id };
 }

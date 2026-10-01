@@ -56,6 +56,20 @@ describe("montarEntrada", () => {
     expect(entrada).toContain("O cliente reprovou a versão anterior por: Já falei disso.");
     expect(entrada).not.toContain("O que ele escreveu");
   });
+
+  // E40, item 2: "o que este vídeo precisa comunicar?", instrução de primeira ordem, acima do tema.
+  it("com objetivoDoVideo, entra como a primeira linha, acima do tema", () => {
+    const entrada = montarEntrada({ ...BASE, objetivoDoVideo: "avisar que o horário mudou essa semana" });
+
+    expect(entrada.startsWith("O que este vídeo precisa comunicar")).toBe(true);
+    expect(entrada).toContain("avisar que o horário mudou essa semana");
+    expect(entrada.indexOf("O que este vídeo precisa comunicar")).toBeLessThan(entrada.indexOf("Tema escolhido"));
+  });
+
+  it("sem objetivoDoVideo, nao menciona nada sobre o recado do video", () => {
+    const entrada = montarEntrada(BASE);
+    expect(entrada).not.toContain("precisa comunicar");
+  });
 });
 
 // V4, item 3: a instrução de abertura que o serviço decidiu, formatada na entrada.
@@ -247,9 +261,9 @@ describe("montarSistemaEstavel, formato story", () => {
     regrasCliente: [],
   };
 
-  it("troca a estrutura de reels por cartoes numerados", () => {
+  it("troca a estrutura de reels por stories numerados", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
-    expect(sistema).toContain("cartões numerados");
+    expect(sistema).toContain("stories numerados");
     expect(sistema).not.toContain("gancho nos primeiros segundos, corpo, fechamento, chamada final");
   });
 
@@ -282,7 +296,7 @@ describe("montarSistemaEstavel, formato story", () => {
   // o numero de palavras direto (o modelo conta palavras, nao segundos).
   it("regra 5 e o bloco de estrutura dizem o numero de palavras direto", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
-    expect(sistema).toContain("no máximo 35 palavras de fala");
+    expect(sistema).toContain("no máximo 150 palavras de fala");
   });
 
   it("porQueAssim so aceita regra R-IG-STORY, nunca as regras duras numeradas de 1 a 12", () => {

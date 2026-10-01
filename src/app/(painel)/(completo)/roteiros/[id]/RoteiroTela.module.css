@@ -5,8 +5,7 @@
  * própria `BarraTopo`.
  */
 .pagina {
-  margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6)))
-    calc(-1 * var(--margem-celular))
+  margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6))) calc(-1 * var(--margem-celular))
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
   /* Onde o Toast pousa: acima da barra de ações fixa (altura do botão mais o respiro dela, mais uma folga, mais a linha do motivo sem rede), V7, item 4 do PROXIMO.md. */
   --toast-base: calc(var(--altura-toque-lg) + var(--espaco-8) + var(--folga-motivo, 0px));
@@ -60,7 +59,10 @@
 /* Sem o `+ 64px` de antes: eram da cápsula das abas, que some nesta tela (a barra de ações fica em `bottom: 0`), V7, item 2 do PROXIMO.md. */
 .miolo {
   padding: var(--espaco-5) var(--margem-celular)
-    calc(var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px) + env(safe-area-inset-bottom, 0px));
+    calc(
+      var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px) +
+        env(safe-area-inset-bottom, 0px)
+    );
   display: grid;
   gap: var(--espaco-8);
   max-width: var(--largura-leitura);
@@ -189,6 +191,78 @@
   margin: 0;
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
+}
+
+/** E40, item 2: "o que este vídeo precisa comunicar", no alto, quando a pessoa escreveu (design v2, `.recado`). */
+.recado {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.recado .rotulo {
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  color: var(--cor-texto-suave);
+}
+
+/** E40, item 1: o título e o botão "Editar" na mesma linha, acima do roteiro. */
+.topoRoteiro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.botaoEditar {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  background: transparent;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-acao);
+  cursor: pointer;
+}
+
+.botaoEditar:hover {
+  text-decoration: underline;
+}
+
+.botaoEditar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/** E40, item 1: um campo por bloco editável, a mesma ordem de leitura. */
+.camposEdicao {
+  display: grid;
+  gap: var(--espaco-5);
+}
+
+.avisoOriginal {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.grupoCartaoEdicao {
+  display: grid;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-3);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.grupoCartaoEdicao h3 {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
 }
 
 /**

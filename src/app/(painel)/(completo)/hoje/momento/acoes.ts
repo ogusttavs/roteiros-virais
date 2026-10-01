@@ -37,6 +37,8 @@ export type DadosMomento = {
   formato?: string;
   /** M4, item 2: o segundo controle segmentado da folha (Falando/Sem fala); falado se ausente. */
   estilo?: string;
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
+  objetivoDoVideo?: string;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -77,6 +79,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ 
       oQueDaParaMostrar,
       marcaId: dados.marcaId,
       transcricao: dados.transcricao?.trim() || undefined,
+      objetivoDoVideo: dados.objetivoDoVideo?.trim() || undefined,
     },
     objetivo: dados.objetivo,
     formato: validarFormato(dados.formato),

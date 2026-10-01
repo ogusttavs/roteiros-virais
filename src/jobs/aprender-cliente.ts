@@ -17,6 +17,7 @@ import { db } from "@/db";
 import { aprendizadoCliente, geracoesIA, roteiros } from "@/db/schema";
 import * as aprenderClienteIA from "@/ia/prompts/aprenderCliente";
 import { gerarComVerificacao } from "@/ia/verificador";
+import { textoNarrativo } from "@/servicos/roteiro";
 
 import { ErroColeta } from "./execucoes";
 
@@ -44,7 +45,11 @@ type RegraComMotivo = { regra: string; motivoOrigem: string | null };
 
 /** Palavras com 4 letras ou mais da frase normalizada (item 4 do acabamento da E27: raizes curtas como "com" ou "nao" nao contam para a semelhanca). */
 function palavrasRelevantes(frase: string): Set<string> {
-  return new Set(normalizarFrase(frase).split(" ").filter((palavra) => palavra.length >= 4));
+  return new Set(
+    normalizarFrase(frase)
+      .split(" ")
+      .filter((palavra) => palavra.length >= 4),
+  );
 }
 
 /** Indice de Jaccard sobre dois conjuntos de palavras; 0 quando a uniao e vazia, nunca NaN. */
@@ -67,10 +72,14 @@ function jaccard(a: Set<string>, b: Set<string>): number {
  * mais (Jaccard >= 0,5); com `motivoOrigem` nulo, so a frase conta, mesmo limiar, sem exigir
  * motivo igual (a proposta pode nao ter motivo estruturado nenhum para citar).
  */
-export function pareceRegraDesativada(proposta: RegraComMotivo, desativadas: RegraComMotivo[]): boolean {
+export function pareceRegraDesativada(
+  proposta: RegraComMotivo,
+  desativadas: RegraComMotivo[],
+): boolean {
   const palavrasProposta = palavrasRelevantes(proposta.regra);
   for (const desativada of desativadas) {
-    if (proposta.motivoOrigem !== null && desativada.motivoOrigem !== proposta.motivoOrigem) continue;
+    if (proposta.motivoOrigem !== null && desativada.motivoOrigem !== proposta.motivoOrigem)
+      continue;
     if (jaccard(palavrasProposta, palavrasRelevantes(desativada.regra)) >= 0.5) return true;
   }
   return false;
@@ -121,6 +130,43 @@ async function reprovacoesDoCliente(clienteId: number): Promise<ReprovacaoBruta[
   }));
 }
 
+type EdicaoBruta = { original: string; editado: string };
+
+/**
+ * E40, item 1: as edições manuais dos últimos 90 dias (mesma janela das reprovações, por
+ * `editadoEm`), o texto que a IA escreveu contra o que a pessoa deixou. `textoNarrativo`
+ * (`servicos/roteiro.ts`) achata `conteudo`/`conteudoOriginal` do jeito certo para cada
+ * formato e estilo, a mesma lógica de `blocosParaLeitura`.
+ */
+async function edicoesDoCliente(clienteId: number): Promise<EdicaoBruta[]> {
+  const desde = new Date(Date.now() - JANELA_DIAS * DIA_MS);
+  const linhas = await db()
+    .select({
+      conteudo: roteiros.conteudo,
+      conteudoOriginal: roteiros.conteudoOriginal,
+      formato: roteiros.formato,
+      estilo: roteiros.estilo,
+    })
+    .from(roteiros)
+    .where(
+      and(
+        eq(roteiros.clienteId, clienteId),
+        eq(roteiros.editadoPelaPessoa, true),
+        isNotNull(roteiros.conteudoOriginal),
+        isNotNull(roteiros.editadoEm),
+        gte(roteiros.editadoEm, desde),
+      ),
+    );
+
+  return linhas
+    .filter((l) => l.conteudoOriginal !== null)
+    .map((l) => ({
+      original: textoNarrativo(l.conteudoOriginal!, l.formato, l.estilo),
+      editado: textoNarrativo(l.conteudo, l.formato, l.estilo),
+    }))
+    .filter((e) => e.original !== e.editado);
+}
+
 /**
  * Quantas reprovações citam este motivo (item 2 do `PROXIMO.md`: "motivo
  * com uma reprovação só vira regra com contagem 1; a partir de duas,
@@ -139,17 +185,29 @@ function contarPorMotivo(reprovacoes: ReprovacaoBruta[], motivoOrigem: string | 
  * `reprovadoEm` das reprovações que a sustentam, mesmo filtro por motivo de
  * `contarPorMotivo` (as que citam o motivo; sem motivo, todas da janela).
  */
-function datasPorMotivo(reprovacoes: ReprovacaoBruta[], motivoOrigem: string | null): { primeiraEm: Date; ultimaEm: Date } {
-  const relevantes = motivoOrigem === null ? reprovacoes : reprovacoes.filter((r) => r.motivos.includes(motivoOrigem));
+function datasPorMotivo(
+  reprovacoes: ReprovacaoBruta[],
+  motivoOrigem: string | null,
+): { primeiraEm: Date; ultimaEm: Date } {
+  const relevantes =
+    motivoOrigem === null
+      ? reprovacoes
+      : reprovacoes.filter((r) => r.motivos.includes(motivoOrigem));
   const base = relevantes.length > 0 ? relevantes : reprovacoes;
   const tempos = base.map((r) => r.reprovadoEm.getTime());
   return { primeiraEm: new Date(Math.min(...tempos)), ultimaEm: new Date(Math.max(...tempos)) };
 }
 
 export async function rodarAprenderCliente(clienteId: number): Promise<Record<string, unknown>> {
-  const reprovacoes = await reprovacoesDoCliente(clienteId);
-  if (reprovacoes.length === 0) {
-    throw new ErroColeta(`cliente ${clienteId} sem reprovacao nos ultimos ${JANELA_DIAS} dias`, false);
+  const [reprovacoes, edicoes] = await Promise.all([
+    reprovacoesDoCliente(clienteId),
+    edicoesDoCliente(clienteId),
+  ]);
+  if (reprovacoes.length === 0 && edicoes.length === 0) {
+    throw new ErroColeta(
+      `cliente ${clienteId} sem reprovacao nem edicao nos ultimos ${JANELA_DIAS} dias`,
+      false,
+    );
   }
 
   const existentes = await db()
@@ -170,6 +228,7 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
     generoTexto: "regra",
     entrada: aprenderClienteIA.montarEntrada({
       reprovacoes,
+      edicoes,
       regrasAtivas: ativasExistentes.map((r) => ({ regra: r.regra, motivoOrigem: r.motivoOrigem })),
       regrasDesativadas: desativadas.map((r) => ({ regra: r.regra, motivoOrigem: r.motivoOrigem })),
     }),
@@ -186,6 +245,7 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
   if (dados.regras.length === 0) {
     return {
       reprovacoesConsideradas: reprovacoes.length,
+      edicoesConsideradas: edicoes.length,
       regrasPropostas: 0,
       regrasNovas: 0,
       regrasMantidas: 0,
@@ -199,7 +259,9 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
     .slice(0, LIMITE_REGRAS)
     .filter((p) => !pareceRegraDesativada(p, desativadas));
 
-  const chaveParaExistente = new Map(ativasExistentes.map((r) => [chaveRegra(r.regra, r.motivoOrigem), r]));
+  const chaveParaExistente = new Map(
+    ativasExistentes.map((r) => [chaveRegra(r.regra, r.motivoOrigem), r]),
+  );
   const chavesMantidas = new Set<string>();
 
   let regrasNovas = 0;
@@ -222,17 +284,28 @@ export async function rodarAprenderCliente(clienteId: number): Promise<Record<st
       regrasNovas += 1;
       await db()
         .insert(aprendizadoCliente)
-        .values({ clienteId, regra: proposta.regra, motivoOrigem: proposta.motivoOrigem, contagem, primeiraEm, ultimaEm, origem: "reprovacao" });
+        .values({
+          clienteId,
+          regra: proposta.regra,
+          motivoOrigem: proposta.motivoOrigem,
+          contagem,
+          primeiraEm,
+          ultimaEm,
+          origem: "reprovacao",
+        });
     }
   }
 
-  const paraRemover = ativasExistentes.filter((r) => !chavesMantidas.has(chaveRegra(r.regra, r.motivoOrigem)));
+  const paraRemover = ativasExistentes.filter(
+    (r) => !chavesMantidas.has(chaveRegra(r.regra, r.motivoOrigem)),
+  );
   for (const regra of paraRemover) {
     await db().delete(aprendizadoCliente).where(eq(aprendizadoCliente.id, regra.id));
   }
 
   return {
     reprovacoesConsideradas: reprovacoes.length,
+    edicoesConsideradas: edicoes.length,
     regrasPropostas: dados.regras.length,
     regrasNovas,
     regrasMantidas,

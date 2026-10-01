@@ -17,6 +17,8 @@ export async function gerarRoteiroAction(
   objetivo: Objetivo,
   formato?: string,
   estilo?: string,
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */
+  objetivoDoVideo?: string,
 ): Promise<{ id: number }> {
   const cliente = await clienteDaSessaoAtual();
   const roteiro = await gerarRoteiro(cliente.id, {
@@ -24,6 +26,7 @@ export async function gerarRoteiroAction(
     objetivo,
     formato: validarFormato(formato),
     estilo: validarEstilo(estilo),
+    objetivoDoVideo: objetivoDoVideo?.trim() || undefined,
   });
   return { id: roteiro.id };
 }

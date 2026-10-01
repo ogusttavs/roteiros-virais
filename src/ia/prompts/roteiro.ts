@@ -154,8 +154,19 @@ import { textoRegrasStory } from "./regras-formato";
  * numeradas de plataforma para este estilo ainda (a base da seção 9 não cobre sem fala; fica para a
  * R1, fila do Sonnet), então `porQueAssim` continua vazio, como em Reels falado hoje. `tipoAbertura`
  * fica nulo (não existe "jeito de começar a falar" quando não há fala). Versao 2.1.0.
+ *
+ * E40, o roteiro na mão da pessoa (reunião do Gustavo com o Bruno em 01/10/2026). **Um**, novo
+ * parâmetro opcional `objetivoDoVideo` em `montarEntrada` ("o que este vídeo precisa comunicar?"):
+ * quando presente, entra como a primeira linha da entrada, acima do tema, como instrução de
+ * primeira ordem ("o vídeo existe para comunicar isto"). **Dois**, `R-IG-STORY-03` mudou (decisão
+ * do Gustavo): de 1 a 5 stories (era de 2 a 5, coisa rápida agora cabe num story só) e até 60
+ * segundos de fala por story (era 15s, número nosso sem base; 60 é o teto real da Central de
+ * Ajuda). A regra 5, o bloco de estrutura e `regras-formato.ts` trocam "cartão"/"cartões" por
+ * "story"/"stories" (decisão do Gustavo: é a palavra que a tela e o prompt usam agora); o schema
+ * solta o limite para 1 a 5 (`cartoes`), e `ia/verificador.ts` confere o número exato por estilo
+ * (Story: 1 a 5; sem fala: 2 a 5, sem mudança). Versao 2.2.0.
  */
-export const versao = "2.1.0";
+export const versao = "2.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -186,8 +197,13 @@ export const schema = z.object({
   corpo: z.string().nullable(),
   fechamento: z.string().nullable(),
   chamadaFinal: z.string().nullable(),
-  /** Só em Story, de 2 a 5 (`R-IG-STORY-03`); nulo em Reels (V9c, item 2). */
-  cartoes: z.array(cartaoStory).min(2).max(5).nullable(),
+  /**
+   * Em Story, de 1 a 5 (`R-IG-STORY-03`, E40: era de 2 a 5); em sem fala, de 2 a 5 (M4, sem
+   * mudança); nulo em Reels falado (V9c, item 2). O limite solto aqui (1 a 5) cobre os dois
+   * casos; `verificarCartoesStory` e `verificarCartoesSemFala` conferem o número exato de cada
+   * estilo.
+   */
+  cartoes: z.array(cartaoStory).min(1).max(5).nullable(),
   /** As regras que o modelo seguiu de fato, com o motivo em português de gente; vazio em Reels nesta rodada. */
   porQueAssim: z.array(porQueAssimItem),
   cenas: z.array(cena),
@@ -272,12 +288,12 @@ export function montarSistemaEstavel(dados: {
    * verificador); 35 é a folga de dois abaixo do teto.
    */
   const regra5 = ehSemFala
-    ? `5. Este roteiro é sem fala: o vídeo sai em cenas curtas (de 2 a 5, cada uma um cartão), nenhum ` +
-      `bloco tem fala nenhuma, só o que filmar e o texto curto que entra na tela (no máximo 8 palavras ` +
-      `por vez, pode trocar mais de uma vez dentro do mesmo cartão).`
+    ? `5. Este roteiro é sem fala: o vídeo sai em cenas curtas (de 2 a 5), nenhum bloco tem fala ` +
+      `nenhuma, só o que filmar e o texto curto que entra na tela (no máximo 8 palavras por vez, ` +
+      `pode trocar mais de uma vez dentro da mesma cena).`
     : ehStory
-      ? `5. Formato Story: o vídeo sai em cartões curtos (de 2 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
-        `gancho, corpo, fechamento e chamada; cada cartão tem no máximo 35 palavras de fala, nunca mais.`
+      ? `5. Formato Story: o vídeo sai em stories curtos (de 1 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
+        `gancho, corpo, fechamento e chamada; cada story tem no máximo 150 palavras de fala, nunca mais.`
       : `5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do\n   nicho.`;
 
   /**
@@ -310,19 +326,22 @@ export function montarSistemaEstavel(dados: {
    * os campos de texto de tela.
    */
   const blocoEstrutura = ehSemFala
-    ? `Estrutura do roteiro sem fala: cartões numerados, de 2 a 5, uma cena por cartão. Nenhum cartão
-tem fala, em campo nenhum: deixe oQueFalar sempre como string vazia. Cada cartão tem o que mostrar
-(a cena, o que filmar) e o texto curto que entra na tela (no máximo 8 palavras por vez; pode trocar
-mais de uma vez dentro do mesmo cartão, descreva as trocas em oQueMostrar). A figurinha de interação
-é opcional, use "nenhuma" quando o cartão não pedir interação. A chamada para ação vai no texto da
-última cena e também pronta no campo legenda, com a chamada para ação dentro dela; não deixe
-legenda vazia. Como não há regras numeradas de plataforma para este estilo ainda, deixe porQueAssim
-como lista vazia.`
+    ? `Estrutura do roteiro sem fala: cenas numeradas, de 2 a 5. Nenhuma cena tem fala, em campo
+nenhum: deixe oQueFalar sempre como string vazia. Cada cena tem o que mostrar (a cena, o que
+filmar) e o texto curto que entra na tela (no máximo 8 palavras por vez; pode trocar mais de uma
+vez dentro da mesma cena, descreva as trocas em oQueMostrar). A figurinha de interação é opcional,
+use "nenhuma" quando a cena não pedir interação. A chamada para ação vai no texto da última cena
+e também pronta no campo legenda, com a chamada para ação dentro dela; não deixe legenda vazia.
+Como não há regras numeradas de plataforma para este estilo ainda, deixe porQueAssim como lista
+vazia.`
     : ehStory
-      ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão, cada um com no
-máximo 35 palavras de fala; cada cartão tem o que falar, o que mostrar, o texto curto que fica fixo na
-tela, e a figurinha de interação quando fizer sentido (ou "nenhuma" quando não pedir interação
-nenhuma). Siga as regras do Story à risca:
+      ? `Estrutura do roteiro em Story: stories numerados, de 1 a 5 (coisa rápida cabe em um story só;
+o que não cabe num story vai para o seguinte), um assunto por story, cada um com no máximo 150
+palavras de fala; cada story tem o que falar, o que mostrar, o texto curto que fica fixo na tela, e
+a figurinha de interação quando fizer sentido (ou "nenhuma" quando não pedir interação nenhuma).
+Com um story só, ele é o primeiro e o último ao mesmo tempo, e as regras dos dois valem juntas. Se
+o assunto pedir mais de 5 stories, corte o que sobra em vez de passar do limite. Siga as regras do
+Story à risca:
 
 ${textoRegrasStory()}
 
@@ -434,6 +453,12 @@ function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
 export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
+  /**
+   * E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto que a pessoa
+   * escreve no tema livre, na folha do momento ou no dia do plano. Quando presente, vira a
+   * primeira linha da entrada, acima do tema, como instrução de primeira ordem.
+   */
+  objetivoDoVideo?: string;
   /** V9c, item 2: com "story", a linha "Tipo de abertura" nunca entra (regra dura 9). */
   formato: FormatoRoteiro;
   /** M4: sem fala também nunca traz a linha "Tipo de abertura" (regra dura 9). */
@@ -503,7 +528,9 @@ export function montarEntrada(dados: {
   const listaRecentes =
     dados.roteirosRecentes.length > 0
       ? dados.roteirosRecentes
-          .map((r) => `"${r.tema}" (${NOME_OBJETIVO[r.objetivo]}, ${r.status}), gancho: "${r.gancho}"`)
+          .map(
+            (r) => `"${r.tema}" (${NOME_OBJETIVO[r.objetivo]}, ${r.status}), gancho: "${r.gancho}"`,
+          )
           .join("; ")
       : "nenhum roteiro anterior";
 
@@ -525,6 +552,9 @@ export function montarEntrada(dados: {
     : null;
 
   const partes = [
+    dados.objetivoDoVideo
+      ? `O que este vídeo precisa comunicar (acima de tudo o mais): ${dados.objetivoDoVideo}`
+      : null,
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
@@ -542,7 +572,9 @@ export function montarEntrada(dados: {
     blocoMarcaCitada,
     dados.momento ? null : blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
-    dados.formato === "reels" && dados.estilo === "falado" ? formatarInstrucaoAbertura(dados.instrucaoAbertura) : null,
+    dados.formato === "reels" && dados.estilo === "falado"
+      ? formatarInstrucaoAbertura(dados.instrucaoAbertura)
+      : null,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

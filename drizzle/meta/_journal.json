@@ -288,6 +288,20 @@
       "when": 1790823805775,
       "tag": "0040_m4-roteiro-sem-fala",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1790833971448,
+      "tag": "0041_e40-roteiro-na-mao",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1790834037872,
+      "tag": "0042_e40-editado-em",
+      "breakpoints": true
     }
   ]
 }
