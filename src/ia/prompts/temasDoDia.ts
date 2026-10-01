@@ -3,6 +3,8 @@ import { z } from "zod";
 import { puxaParaEnum } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { REGRAS_REEL, REGRAS_SHORT, REGRAS_STORY, REGRAS_TIKTOK, textoRegras } from "./regras-formato";
+
 /**
  * Os tres temas do dia (escopo 5.2, camada rapida; usado a partir da etapa
  * 10). puxaParaEnum vem de src/ia/enums.ts para o valor interno nao aparecer
@@ -18,8 +20,17 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * mesma lista "subindo hoje", mas sem numero de velocidade, so com o texto
  * "assunto em alta na hashtag": nao ha conta para comparar, entao pesa "na
  * media", nunca como se fosse mais fora da curva que os demais.
+ *
+ * 1.4.0 (R1, item 3, pedido do Gustavo em 29/09/2026): `porQue` pode citar a regra numerada de
+ * plataforma que explica por que o vídeo passou do normal (ex. "os três primeiros segundos
+ * mostram o resultado"), sem o número da regra (revisão do Fable no PR #89: `porQue` é lido
+ * pelo cliente, e o código "R-IG-REEL-03" é jargão, regra 6 do projeto; a ordem original do
+ * Fable pedia o número, erro dele), só quando a regra de fato explica a evidência; nunca uma
+ * lista solta de regras. O tema é do nicho inteiro, não de um cliente com uma rede escolhida, por
+ * isso a referência inclui as quatro bases curtas (Reels, TikTok, Short, Story) juntas; vídeo
+ * longo (`R-YT-VIDEO`) fica de fora, não é o formato deste produto.
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -46,7 +57,22 @@ nunca sugira um tema sem pelo menos um id de evidência, de vídeo ou de notíci
 
 Para cada tema, diga em duas linhas por que ele está funcionando agora, e classifique qual
 efeito ele mais puxa: mais gente conhecer o negócio, as pessoas lembrarem dele quando
-precisarem, ou gente ser chamado para comprar.
+precisarem, ou gente ser chamado para comprar. Quando uma das regras numeradas abaixo explicar
+de verdade por que a evidência passou do normal (o gancho, a duração, a chamada final, o jeito
+de editar), use a ideia dela dentro da própria frase, em português de gente (ex. "os três
+primeiros segundos já mostram o resultado"); nunca escreva o número da regra (R-IG-REEL-03 e
+parecidos): quem lê é o dono do negócio, e o código não diz nada para ele. Nunca force uma
+explicação quando nenhuma regra explica o porquê, e nunca liste regras soltas fora da frase.
+
+Regras de plataforma, para usar quando couber (os números servem só para você se localizar):
+
+${textoRegras(REGRAS_REEL)}
+
+${textoRegras(REGRAS_TIKTOK)}
+
+${textoRegras(REGRAS_SHORT)}
+
+${textoRegras(REGRAS_STORY)}
 
 Sem travessão, sem emoji, sem jargão em título nem em descrição.
 

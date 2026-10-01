@@ -916,9 +916,13 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
    * "Como editar" (`.ladoGrudado`) logo abaixo de "De onde veio" (`.ladoDeOndeVeio`), sem
    * sobrepor e sem vazio grande: é o próprio defeito que a revisão achou (os dois caindo na
    * mesma posição, sobrepostos, quando `.ladoGrudado` não atravessava a linha certa).
+   *
+   * R1, acabamento (achado do Gustavo, repassado pela Fable): os dois ficavam colados, sem
+   * respiro nenhum; o vazio certo é `--espaco-6` (1.5rem), não zero nem o `VAZIO_MAXIMO_COLUNA_PX`
+   * de folga geral da coluna.
    */
   for (const largura of [1024, 1280, 1920]) {
-    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", sem sobrepor, em ${largura}px`, async ({
+    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", com o respiro de --espaco-6, em ${largura}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width: largura, height: 900 });
@@ -934,6 +938,11 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       expect(vazio, `vazio de ${vazio}px entre "De onde veio" e "Como editar"`).toBeLessThanOrEqual(
         VAZIO_MAXIMO_COLUNA_PX,
       );
+      const ESPACO_6_PX = 24;
+      expect(
+        Math.abs(vazio - ESPACO_6_PX),
+        `vazio de ${vazio}px, esperado perto de --espaco-6 (${ESPACO_6_PX}px)`,
+      ).toBeLessThanOrEqual(2);
     });
   }
 

@@ -193,6 +193,11 @@ test.describe("roteiro pela tela", () => {
     await expect(page.getByText("Onde gravar e o que mostrar")).toBeVisible();
     await expect(page.getByText("Como editar")).toBeVisible();
     await expect(page.getByText("Para te chamarem para comprar")).toBeVisible();
+    // R1, item 2 e 4: o Reels falado agora também segue regra de plataforma (antes só Story), e a
+    // mesma peça "Por que assim" do Story mostra o número da regra, aqui sem rede principal
+    // escolhida, a padrão do produto (R-IG-REEL).
+    await expect(page.getByRole("heading", { name: "Por que assim" })).toBeVisible();
+    await expect(page.getByText(/^R-IG-REEL-\d{2}$/)).toBeVisible();
 
     const urlDaV1 = page.url();
 

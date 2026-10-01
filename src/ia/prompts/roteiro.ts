@@ -16,7 +16,7 @@ import { JARGAO } from "@/lib/regras-de-texto";
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
-import { textoRegrasStory } from "./regras-formato";
+import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
 
 /**
  * O roteiro (briefing-e-rubricas.md, secao 7, regras duras, texto literal:
@@ -193,8 +193,27 @@ import { textoRegrasStory } from "./regras-formato";
  * própria referência entre a evidência disponível, ou deixar nula quando nenhuma serviu de
  * modelo de verdade; `servicos/roteiro.ts` só confere que o id devolvido pertence à evidência
  * fornecida (`validarReferenciaDoModelo`), nunca escolhe por conta própria. Versão 2.6.0.
+ *
+ * R1, item 2 (pedido do Gustavo em 29/09/2026: todo roteiro saindo baseado nas boas práticas
+ * documentadas das plataformas): o Reels falado ganha o bloco "Siga as regras do <rede> à risca"
+ * e o `porQueAssim`, igual ao Story (antes só R-IG-STORY existia). A rede vem de
+ * `clientes.redePrincipal` (`regrasDoReels`, `regras-formato.ts`); sem rede escolhida, Instagram.
+ * Corrigido de passagem: a instrução de `porQueAssim` dizia "regras duras numeradas de 1 a 12",
+ * desatualizada desde que a H4 renumerou para 15. Versão 2.7.0.
+ *
+ * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026): o lembrete de
+ * acentuação se repete no fim da entrada (`LEMBRETE_ACENTUACAO`), mesma correção de
+ * `avaliarResposta` 1.6.1. Versão 2.7.1.
+ *
+ * R1, achado da prova com chave real (01/10/2026, caso 6 de 9 do golden set de exemplo): a
+ * R-IG-REEL-11 sugere gravar um Story junto quando o objetivo é vender ou ser lembrado, e o
+ * modelo, uma vez em nove, entendeu isso como "produza cartões de Story aqui dentro": saiu um
+ * Reels com `cartoes` preenchido e a narrativa confusa, reprovado por `verificarTexto` ("bloco de
+ * instruções técnicas misturado com fala, não um roteiro claro"). Frase nova deixa explícito que
+ * a sugestão de Story vira texto no bloco de edição, nunca estrutura própria; a estrutura deste
+ * roteiro continua sendo Reels sempre. Versão 2.7.2.
  */
-export const versao = "2.6.0";
+export const versao = "2.7.2";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -305,9 +324,18 @@ export function montarSistemaEstavel(dados: {
   formato: FormatoRoteiro;
   /** M4: sem fala troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cenas sem fala, igual em Reels e em Story. */
   estilo: EstiloRoteiro;
+  /**
+   * R1, item 2: a rede principal da marca (`clientes.redePrincipal`) escolhe o conjunto de
+   * regras de plataforma que o Reels falado segue; ausente ou nula usa Instagram, o padrão do
+   * produto. Sem efeito em Story (que sempre usa `R-IG-STORY`) nem em sem fala.
+   */
+  redePrincipal?: "youtube" | "tiktok" | "instagram" | null;
+  /** R1, item 2: `modeloNicho.duracaoTipicaS.max`, para o YouTube somar as regras de vídeo longo às de Short acima de 60s. */
+  duracaoTipicaMaxS?: number;
 }): string {
   const ehStory = dados.formato === "story";
   const ehSemFala = dados.estilo === "sem_fala";
+  const redeReels = regrasDoReels(dados.redePrincipal, dados.duracaoTipicaMaxS);
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
       ? `\n\nO que este cliente já reprovou (siga a regra 8: a firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
@@ -408,16 +436,27 @@ Story à risca:
 ${textoRegrasStory()}
 
 Depois de escrever, preencha também porQueAssim: uma entrada só para cada regra com número
-R-IG-STORY-nn da lista acima que você de fato seguiu (nunca as regras duras numeradas de 1 a 12 do
+R-IG-STORY-nn da lista acima que você de fato seguiu (nunca as regras duras numeradas de 1 a 15 do
 começo deste texto, mesmo sendo numeradas), com o número (ex. "R-IG-STORY-04") e o motivo em
 português de gente, sem jargão no motivo (${montarInstrucaoJargaoPorQueAssim()}), sem citar o número
 dentro do motivo. Nunca cite uma regra que não está na lista das R-IG-STORY acima.`
       : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
 Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
 (quando, o quê, onde), o ritmo de corte, os recursos e o áudio quando houver (a referência é a
-regra 12 acima, vale para qualquer formato). Deixe porQueAssim como lista vazia: neste formato
-ainda não há regras numeradas de plataforma, e as regras duras deste texto nunca entram nesse
-campo.`;
+regra 12 acima, vale para qualquer formato). Siga as regras do ${redeReels.nome} à risca:
+
+${textoRegras(redeReels.regras)}
+
+Mesmo quando uma regra da lista sugerir gravar também um Story, ESTE roteiro continua sendo um
+Reels: gancho, corpo, fechamento e chamada final continuam preenchidos, e cartoes continua nulo
+(nunca escreva cartões de Story aqui). Uma sugestão de Story vira uma frase no bloco de edição
+(recursos ou áudio), nunca estrutura própria.
+
+Depois de escrever, preencha também porQueAssim: uma entrada só para cada regra da lista acima
+que você de fato seguiu (nunca as regras duras numeradas de 1 a 15 do começo deste texto, mesmo
+sendo numeradas), com o número dela e o motivo em português de gente, sem jargão no motivo
+(${montarInstrucaoJargaoPorQueAssim()}), sem citar o número dentro do motivo. Nunca cite uma regra
+que não está na lista acima.`;
 
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
@@ -520,6 +559,16 @@ function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
     : "";
   return `Tipo de abertura: ${instrucao.tipo}, ${INSTRUCAO_TIPO_ABERTURA[instrucao.tipo]}.${exemplo}`;
 }
+
+/**
+ * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026: o roteiro sem
+ * fala reprovou por dez campos sem acentuação, a mesma causa raiz de `avaliarResposta` 1.6.1):
+ * a instrução de acentuação só no sistema estável não bastou; repetida aqui, no fim da entrada,
+ * é onde o modelo de fato lê por último antes de escrever. Última linha, mesma posição de
+ * `avaliarResposta.ts`, onde a instrução pegou (9 de 18 reprovados virou 0 de 18 lá).
+ */
+const LEMBRETE_ACENTUACAO =
+  "Escreva o roteiro inteiro com a acentuação correta do português (você, não, já, também, é, está), mesmo que o tema ou o perfil do cliente estejam sem acento.";
 
 export function montarEntrada(dados: {
   tema: string;
@@ -646,6 +695,7 @@ export function montarEntrada(dados: {
     dados.formato === "reels" && dados.estilo === "falado"
       ? formatarInstrucaoAbertura(dados.instrucaoAbertura)
       : null,
+    LEMBRETE_ACENTUACAO,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

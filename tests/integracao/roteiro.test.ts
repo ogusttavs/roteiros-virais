@@ -458,7 +458,12 @@ describe("gerarRoteiro", () => {
 });
 
 describe("V9c, formato (Story)", () => {
-  it("sem formato, gera reels: coluna formato e narrativa classica, sem cartoes", async () => {
+  /**
+   * R1, item 2: Reels falado agora também segue regras de plataforma (antes só Story); sem
+   * `redePrincipal` definida, a rede padrão do produto é Instagram, então o modelo cita
+   * `R-IG-REEL-nn`.
+   */
+  it("sem formato, gera reels: coluna formato e narrativa classica, sem cartoes, com porQueAssim da rede padrao (Instagram)", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-1", "mancha de vinho no estofado");
 
@@ -471,10 +476,24 @@ describe("V9c, formato (Story)", () => {
     expect(roteiro.formato).toBe("reels");
     expect(roteiro.conteudo.gancho).toBeTruthy();
     expect(roteiro.conteudo.cartoes).toBeNull();
-    expect(roteiro.conteudo.porQueAssim).toEqual([]);
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-IG-REEL-\d{2}$/);
+    }
   });
 
-  it("em reels falado, porQueAssim preenchido pelo modelo com regra em texto livre e descartado, nao reprova (hotfix de 01/10/2026)", async () => {
+  /**
+   * R1, item 2: antes desta etapa, Reels falado não tinha regra de plataforma nenhuma para
+   * validar contra, então o hotfix de 01/10/2026 descartava `porQueAssim` inteiro fora de Story
+   * falado (nunca reprovava por isso). Agora que o Reels tem a rede principal da marca
+   * (`regrasDoReels`), uma regra inventada ou em texto livre reprova de verdade, como já
+   * acontecia em Story: a validação substitui o descarte, não convive com ele.
+   */
+  /**
+   * Revisão do Fable no PR #89: a citação inválida é descartada, nunca reprova o roteiro (o campo
+   * explica o roteiro, não é o roteiro; foi ele que deixou o Gustavo sem Reels em 01/10/2026).
+   */
+  it("em reels falado, porQueAssim com regra que nao existe na lista e descartado e o roteiro sai", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-pqa", "mancha de vinho no estofado");
 
@@ -499,9 +518,51 @@ describe("V9c, formato (Story)", () => {
       });
 
       expect(roteiro.formato).toBe("reels");
+      expect(roteiro.conteudo.gancho).toBeTruthy();
       expect(roteiro.conteudo.porQueAssim).toEqual([]);
     } finally {
       gerarEstruturadoMock.mockImplementation(implementacaoOriginal);
+    }
+  });
+
+  /** R1, item 2: a rede principal da marca escolhe o conjunto de regras que o Reels falado segue. */
+  it("com rede principal tiktok, porQueAssim cita regra R-TT-VIDEO", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ redePrincipal: "tiktok" }).where(eq(clientes.id, clienteId));
+    await criarVideoEvidencia("ev-formato-tiktok", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-TT-VIDEO-\d{2}$/);
+    }
+  });
+
+  /**
+   * R1, item 2: sem a duracao tipica do nicho passar de 60s (o modelo deste arquivo usa 20 a
+   * 30s, `MODELO_PADRAO`), YouTube so cita R-YT-SHORT; a soma com R-YT-VIDEO acima de 60s já
+   * tem prova própria em `regras-formato.test.ts` e `roteiro.test.ts` (unitário), sem precisar
+   * mexer no modelo do nicho compartilhado por todo este arquivo.
+   */
+  it("com rede principal youtube, porQueAssim cita regra R-YT-SHORT", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ redePrincipal: "youtube" }).where(eq(clientes.id, clienteId));
+    await criarVideoEvidencia("ev-formato-youtube", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-YT-SHORT-\d{2}$/);
     }
   });
 
