@@ -56,6 +56,14 @@ function rotuloEstado(item: ItemAgendaDoDia, ehHoje: boolean): string {
   return ehHoje ? textosHoje.agenda.estadoReels.gerado : textosHoje.agenda.estadoOutroDia;
 }
 
+const FORMATAR_DIA_DA_SEMANA_COMPLETO = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
+
+function diaDaSemanaCompleto(dataISO: string): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const texto = FORMATAR_DIA_DA_SEMANA_COMPLETO.format(new Date(ano, mes - 1, dia, 12));
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 function EstadoItem({ item, ehHoje }: { item: ItemAgendaDoDia; ehHoje: boolean }) {
   const feito = item.status === "gravado" || item.status === "postado";
   const marcado = !ehHoje && item.status === "gerado";
@@ -175,6 +183,12 @@ export function HojeTela({
                   type="button"
                   disabled={ocupado}
                   aria-pressed={dia.data === diaVisualizado}
+                  aria-label={textosHoje.agenda.diaAgendaRotulo(
+                    diaDaSemanaCompleto(dia.data),
+                    dia.diaDoMes,
+                    dia.marca.temReels,
+                    dia.marca.qtdStories,
+                  )}
                   className={[styles.diaAgenda, dia.hoje ? styles.diaAgendaHoje : ""].filter(Boolean).join(" ")}
                   onClick={() => ir(`dia-${dia.data}`, dia.hoje ? "/hoje" : `/hoje?dia=${dia.data}`)}
                 >

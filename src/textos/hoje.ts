@@ -146,6 +146,15 @@ export const textosHoje = {
     /** O título de cada coluna do dia: muda só quando o dia aberto não é hoje (dúvida 2). */
     reels: { hoje: "Reels de hoje", outroDia: "Reels" },
     stories: { hoje: "Stories de hoje", outroDia: "Stories" },
+    /** `aria-label` de cada dia da semana (dúvida, ícones da semana): dia mais o que tem marcado, sempre lido por extenso. */
+    diaAgendaRotulo: (diaDaSemanaCompleto: string, diaDoMes: number, temReels: boolean, qtdStories: number) => {
+      const marcas: string[] = [];
+      if (temReels) marcas.push("1 Reels");
+      if (qtdStories === 1) marcas.push("1 Story");
+      if (qtdStories > 1) marcas.push(`${qtdStories} Stories`);
+      const oQueTem = marcas.length > 0 ? marcas.join(" e ") : "nada marcado";
+      return `${diaDaSemanaCompleto}, dia ${diaDoMes}: ${oQueTem}`;
+    },
     estadoReels: { gerado: "a gravar", gravado: "gravado", postado: "postado" },
     /** Dúvida 5: num dia que não é hoje, o que ainda não foi gravado diz "marcado", não "a gravar". */
     estadoOutroDia: "marcado",
