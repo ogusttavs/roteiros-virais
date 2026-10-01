@@ -197,8 +197,8 @@ export async function semear(db: Db): Promise<ResumoSeed> {
     {
       usuarioId: string;
       nome: string;
-      cidade: string;
-      bairro: string;
+      /** V12c, item 1: substitui cidade e bairro na tela (ficam só no banco, sem uso aqui). */
+      regiao: string;
       perfil: string;
       quemGrava: "propria_pessoa" | "pessoa_e_equipe";
       perfilCompilado: PerfilCompilado;
@@ -207,8 +207,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
     dentistas: {
       usuarioId: "seed-cliente-dentistas",
       nome: "[exemplo] Sorriso Novo",
-      cidade: "São Paulo",
-      bairro: "Pinheiros",
+      regiao: "São Paulo, Pinheiros",
       perfil: "exemplo_sorriso_novo",
       quemGrava: "propria_pessoa",
       perfilCompilado: {
@@ -234,8 +233,7 @@ export async function semear(db: Db): Promise<ResumoSeed> {
     "limpeza-e-organizacao-da-casa": {
       usuarioId: "seed-cliente-limpeza",
       nome: "[exemplo] Casa em Ordem",
-      cidade: "Curitiba",
-      bairro: "Batel",
+      regiao: "Curitiba, Batel",
       perfil: "exemplo_casa_em_ordem",
       quemGrava: "pessoa_e_equipe",
       perfilCompilado: {
@@ -286,8 +284,8 @@ export async function semear(db: Db): Promise<ResumoSeed> {
         usuarioId: clienteSeed.usuarioId,
         nome: clienteSeed.nome,
         nichoId: nicho.id,
-        cidade: clienteSeed.cidade,
-        bairro: clienteSeed.bairro,
+        alcance: "local",
+        regiao: clienteSeed.regiao,
         persona: "negocio",
         perfis: { instagram: `@${clienteSeed.perfil}`, tiktok: null, youtube: null },
         quemGrava: clienteSeed.quemGrava,

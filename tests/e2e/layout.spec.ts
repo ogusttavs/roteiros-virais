@@ -380,7 +380,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       .values({
         usuarioId: "e2e-layout-comecar",
         nome: "[teste] Layout Comecar",
-        cidade: "Sao Paulo",
+        alcance: "brasil",
         nichoId: nicho.id,
       })
       .returning();
