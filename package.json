@@ -33,6 +33,7 @@
     "preencher:tipo-abertura": "tsx scripts/preencher-tipo-abertura.ts",
     "preencher:capas": "tsx scripts/preencher-capas.ts",
     "corrigir:titulos": "tsx scripts/corrigir-titulos.ts",
+    "migrar:perfis-citados": "tsx scripts/migrar-perfis-citados.ts",
     "ia:fumaca": "tsx scripts/ia-fumaca.ts",
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",

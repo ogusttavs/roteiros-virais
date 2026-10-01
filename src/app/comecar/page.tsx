@@ -4,7 +4,13 @@ import { TrocaMarcaProvider } from "@/app/(painel)/_casca/TrocaMarcaContext";
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { blocoInicial, garantirBriefing } from "@/servicos/briefing";
-import { clienteAtivoDoUsuario, listarNichosAtivos, marcasDoUsuario } from "@/servicos/clientes";
+import {
+  clienteAtivoDoUsuario,
+  clienteTemOndeEscolhido,
+  dadosOndeIniciais,
+  listarNichosAtivos,
+  marcasDoUsuario,
+} from "@/servicos/clientes";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 
 import { ComecarWizard } from "./ComecarWizard";
@@ -36,7 +42,7 @@ export default async function Comecar() {
     redirect("/hoje");
   }
 
-  const dadosFixosCompletos = Boolean(cliente.cidade) && Boolean(cliente.nichoId || cliente.ramoOutro);
+  const dadosFixosCompletos = clienteTemOndeEscolhido(cliente) && Boolean(cliente.nichoId || cliente.ramoOutro);
 
   return (
     <ConexaoDaTela>
@@ -49,8 +55,8 @@ export default async function Comecar() {
           dadosFixosCompletos={dadosFixosCompletos}
           dadosFixosIniciais={{
             nome: cliente.nome,
-            cidade: cliente.cidade,
-            bairro: cliente.bairro,
+            ...dadosOndeIniciais(cliente),
+            site: cliente.site,
             nichoId: cliente.nichoId,
             ramoOutro: cliente.ramoOutro,
             persona: cliente.persona,

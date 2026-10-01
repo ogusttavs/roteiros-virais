@@ -22,6 +22,7 @@ import {
   type FormatoRoteiro,
   type Momento,
   type Objetivo,
+  type QuemGrava,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { sugerirFormatoPeloObjetivo } from "@/ia/enums";
@@ -316,6 +317,8 @@ export async function aceitar(
     marcaId?: number;
     /** E40, item 2: "o que este vídeo precisa comunicar?", confirmado na folha. */
     objetivoDoVideo?: string;
+    /** V12c, item 3, a E37b: troca só deste vídeo, confirmada na folha. */
+    quemAparece?: QuemGrava;
   },
 ): Promise<RoteiroLinha> {
   const item = await itemPorId(itemId, cliente.id);
@@ -340,6 +343,7 @@ export async function aceitar(
     objetivo: dados.objetivo,
     formato,
     estilo,
+    quemAparece: dados.quemAparece,
   });
 
   await db()

@@ -328,6 +328,103 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByText(/a sua nota caiu para/i).last()).toBeVisible();
   });
 
+  /**
+   * V12c, item 7, a E37b: no celular, sem tocar em "editar" (não existe mais), "Copiar para a
+   * sua IA" leva o enunciado e as instruções fixas para a área de transferência, e os dois
+   * concorrentes de P12 entram pelos chips de rede (um digitado, um colado como link inteiro).
+   */
+  test("no celular, Copiar para a sua IA e os dois concorrentes de P12 pelos chips de rede", async ({
+    page,
+    context,
+  }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+
+    await db().insert(user).values({
+      id: "e2e-briefing-perfis-citados",
+      name: "[teste] Briefing Perfis Citados",
+      email: "e2e-briefing-perfis-citados@exemplo.teste",
+    });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-briefing-perfis-citados-credential",
+        issuer: "local:credential",
+        accountId: "e2e-briefing-perfis-citados",
+        providerId: "credential",
+        userId: "e2e-briefing-perfis-citados",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-briefing-perfis-citados", nome: "[teste] Briefing Perfis Citados", nichoId: nicho.id })
+      .returning();
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-briefing-perfis-citados", clienteId: cliente.id, papel: "dono" });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-briefing-perfis-citados", aceitouTermosEm: new Date() });
+
+    const avaliacaoNota9 = (id: string): AvaliacaoResposta => ({
+      nota: 9,
+      bom: `A resposta de ${id} tem exemplo concreto.`,
+      melhorar: "Poderia trazer mais um numero ou exemplo.",
+      como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
+      impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+    });
+    const respostas: Record<string, string> = {};
+    const avaliacoes: Record<string, AvaliacaoResposta> = {};
+    for (const id of ["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8", "p9", "p10", "p11", "p12"]) {
+      respostas[id] = `Resposta concreta para ${id}, com o numero 42 na frase.`;
+      avaliacoes[id] = avaliacaoNota9(id);
+    }
+    await db()
+      .insert(briefings)
+      .values({ clienteId: cliente.id, respostas, avaliacoes, notaGeral: "9.00", completo: true });
+
+    await entrar(page, "e2e-briefing-perfis-citados@exemplo.teste");
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto("/briefing");
+    await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
+
+    // "Copiar para a sua IA" existe em toda pergunta; P12 é a última do documento.
+    await page.getByRole("button", { name: "Copiar para a sua IA" }).last().click();
+    await expect(page.getByText("Copiado. Cole na sua IA e traga a resposta para cá.").last()).toBeVisible();
+    const copiado = await page.evaluate(() => navigator.clipboard.readText());
+    expect(copiado).toContain("Cite os concorrentes e os perfis que você admira");
+    expect(copiado).toContain("Responda como se fosse eu");
+
+    // os dois editores de P12, pelo titulo de cada lista.
+    const listaConcorrentes = page.getByRole("heading", { name: "Concorrentes", level: 4 }).locator("..");
+    const listaAdmira = page.getByRole("heading", { name: "Perfis que você admira", level: 4 }).locator("..");
+
+    // primeiro concorrente: digitado, no Instagram.
+    await listaConcorrentes.getByRole("button", { name: "Instagram" }).click();
+    await listaConcorrentes.getByLabel("Perfil no Instagram").fill("limpatudoexpress");
+    await listaConcorrentes.getByLabel("Perfil no Instagram").blur();
+    await expect(listaConcorrentes.getByText("instagram.com/limpatudoexpress")).toBeVisible();
+
+    // segundo concorrente: colado como link inteiro, no TikTok; o campo extrai o nome sozinho.
+    await listaConcorrentes.getByRole("button", { name: "TikTok" }).click();
+    await listaConcorrentes.getByLabel("Perfil no TikTok").fill("https://www.tiktok.com/@oficinaderro");
+    await listaConcorrentes.getByLabel("Perfil no TikTok").blur();
+    await expect(listaConcorrentes.getByText("tiktok.com/@oficinaderro")).toBeVisible();
+
+    // um perfil admirado, para confirmar que as duas listas são independentes.
+    await listaAdmira.getByRole("button", { name: "YouTube" }).click();
+    await listaAdmira.getByLabel("Perfil no YouTube").fill("https://www.youtube.com/@canalreferencia");
+    await listaAdmira.getByLabel("Perfil no YouTube").blur();
+    await expect(listaAdmira.getByText("youtube.com/@canalreferencia")).toBeVisible();
+
+    // sobrevive a uma recarga (confirma que salvou no servidor, não só em estado local).
+    await page.reload();
+    await expect(page.getByText("instagram.com/limpatudoexpress")).toBeVisible();
+    await expect(page.getByText("tiktok.com/@oficinaderro")).toBeVisible();
+    await expect(page.getByText("youtube.com/@canalreferencia")).toBeVisible();
+  });
+
   /** E27 parte 2, item 4: "O que a gente aprendeu com você" (`Briefing.dc.html`). */
   test("no cartao 'o que a gente aprendeu com voce', desativar uma regra mostra 'Desfazer', que reativa de novo", async ({
     page,
@@ -473,7 +570,7 @@ test.describe("briefing pela tela", () => {
       .values({
         usuarioId: "e2e-cartao-notas",
         nome: "[teste] Cartao de Notas",
-        cidade: "Sao Paulo",
+        alcance: "brasil",
         nichoId: nicho.id,
       })
       .returning();
@@ -708,14 +805,14 @@ test.describe("trocar de marca a partir do /comecar (V12b, item 0)", () => {
       });
     await db().insert(preferenciasUsuario).values({ usuarioId: idUsuario, aceitouTermosEm: new Date() });
 
-    // Cidade e nicho ja preenchidos: cai direto no bloco 1, sem passar pela
+    // Onde e nicho ja preenchidos: cai direto no bloco 1, sem passar pela
     // tela de dados fixos (nao e o que este teste verifica).
     const [marcaSemBriefing] = await db()
       .insert(clientes)
       .values({
         usuarioId: idUsuario,
         nome: "[teste] Marca Sem Briefing",
-        cidade: "Sao Paulo",
+        alcance: "brasil",
         nichoId: nicho.id,
       })
       .returning();

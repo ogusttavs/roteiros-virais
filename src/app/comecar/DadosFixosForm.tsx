@@ -4,19 +4,24 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import { montarCampoOnde } from "@/lib/onde";
+import { siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
+import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./DadosFixosForm.module.css";
 
+/** `onde` usa os mesmos dois valores da coluna de "onde estão os clientes" (nota em `config/briefing.ts`, `OndeOpcao`). */
 export type DadosFixosIniciais = {
   nome: string;
-  cidade: string | null;
-  bairro: string | null;
+  onde: "brasil" | "local" | null;
+  regiao: string | null;
+  site: string | null;
   nichoId: number | null;
   ramoOutro: string | null;
   persona: Persona;
@@ -42,8 +47,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     : dadosFixos.persona.opcoes[0].valor;
 
   const [nome, setNome] = useState(inicial.nome);
-  const [cidade, setCidade] = useState(inicial.cidade ?? "");
-  const [bairro, setBairro] = useState(inicial.bairro ?? "");
+  const [onde, setOnde] = useState<"brasil" | "local" | "">(inicial.onde ?? "");
+  const [regiao, setRegiao] = useState(inicial.regiao ?? "");
+  const [site, setSite] = useState(inicial.site ?? "");
   /**
    * Sem ramo escolhido ainda (cliente novo, sem nichoId nem ramoOutro), o
    * select comeca em "outro" em vez do primeiro nicho da lista (achado no
@@ -81,7 +87,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
 
   const podeContinuar =
     nome.trim().length > 0 &&
-    cidade.trim().length > 0 &&
+    onde.length > 0 &&
+    (onde !== "local" || regiao.trim().length > 0) &&
+    (site.trim().length === 0 || siteValido(site.trim())) &&
     (nichoId !== OUTRO || ramoOutro.trim().length > 0);
 
   async function enviar(evento: FormEvent) {
@@ -96,8 +104,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     try {
       await onSalvar({
         nome,
-        cidade,
-        bairro: bairro.trim() || undefined,
+        // `podeContinuar`, checado acima, já garante `onde` preenchido.
+        ...montarCampoOnde(onde as "brasil" | "local", regiao.trim()),
+        site: site.trim() || undefined,
         nichoId: nichoId === OUTRO ? undefined : nichoId,
         ramoOutro: nichoId === OUTRO ? ramoOutro : undefined,
         persona,
@@ -149,12 +158,37 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
           />
         ) : null}
         <Campo
-          rotulo={dadosFixos.cidade.rotulo}
-          value={cidade}
-          onChange={(evento) => setCidade(evento.target.value)}
-          erro={tentouEnviar && cidade.trim().length === 0 ? t.cidadeObrigatoria : undefined}
+          rotulo={dadosFixos.site.rotulo}
+          ajuda={dadosFixos.site.ajuda}
+          value={site}
+          onChange={(evento) => setSite(evento.target.value)}
+          erro={tentouEnviar && site.trim().length > 0 && !siteValido(site.trim()) ? t.siteInvalido : undefined}
         />
-        <Campo rotulo={dadosFixos.bairro.rotulo} value={bairro} onChange={(evento) => setBairro(evento.target.value)} />
+      </Cartao>
+
+      <Cartao className={styles.grupo}>
+        <div>
+          <h3 className={styles.tituloGrupo}>{dadosFixos.onde.rotulo}</h3>
+        </div>
+        <div className={styles.opcoes} role="radiogroup" aria-label={dadosFixos.onde.rotulo}>
+          {dadosFixos.onde.opcoes.map((opcao) => (
+            <OpcaoObjetivo
+              key={opcao.valor}
+              titulo={opcao.rotulo}
+              marcada={onde === opcao.valor}
+              onEscolher={() => setOnde(opcao.valor)}
+            />
+          ))}
+        </div>
+        {onde === "local" ? (
+          <Campo
+            rotulo={dadosFixos.onde.campoRegiao.rotulo}
+            ajuda={dadosFixos.onde.campoRegiao.ajuda}
+            value={regiao}
+            onChange={(evento) => setRegiao(evento.target.value)}
+            erro={tentouEnviar && regiao.trim().length === 0 ? t.regiaoObrigatoria : undefined}
+          />
+        ) : null}
       </Cartao>
 
       <Cartao className={styles.grupo}>
@@ -177,8 +211,8 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
       {dadosFixos.quemGrava.fixoEmPropriaPessoa ? null : (
         <Cartao className={styles.grupo}>
           <div>
-            <h3 className={styles.tituloGrupo}>{t.tituloQuemGrava}</h3>
-            <p className={styles.ajudaGrupo}>{t.ajudaQuemGrava}</p>
+            <h3 className={styles.tituloGrupo}>{dadosFixos.quemGrava.rotulo}</h3>
+            <p className={styles.ajudaGrupo}>{dadosFixos.quemGrava.ajuda}</p>
           </div>
           <div className={styles.opcoes} role="radiogroup" aria-label={dadosFixos.quemGrava.rotulo}>
             {dadosFixos.quemGrava.opcoes.map((opcao) => (
@@ -195,9 +229,27 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
 
       <Cartao className={styles.grupo}>
         <h3 className={styles.tituloGrupo}>{t.tituloRedes}</h3>
-        <Campo rotulo={t.campoInstagram} value={instagram} onChange={(evento) => setInstagram(evento.target.value)} />
-        <Campo rotulo={t.campoTiktok} value={tiktok} onChange={(evento) => setTiktok(evento.target.value)} />
-        <Campo rotulo={t.campoYoutube} value={youtube} onChange={(evento) => setYoutube(evento.target.value)} />
+        <CampoPerfilRede
+          plataforma="instagram"
+          rotulo={t.campoInstagram}
+          valor={instagram}
+          onMudar={setInstagram}
+          avisoInvalido={t.perfilInvalido}
+        />
+        <CampoPerfilRede
+          plataforma="tiktok"
+          rotulo={t.campoTiktok}
+          valor={tiktok}
+          onMudar={setTiktok}
+          avisoInvalido={t.perfilInvalido}
+        />
+        <CampoPerfilRede
+          plataforma="youtube"
+          rotulo={t.campoYoutube}
+          valor={youtube}
+          onMudar={setYoutube}
+          avisoInvalido={t.perfilInvalido}
+        />
       </Cartao>
 
       {erro ? (

@@ -4,7 +4,7 @@ import { ArrowLeft, CircleAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-import type { Objetivo } from "@/db/schema";
+import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
 import { textosMomento } from "@/textos/momento";
@@ -69,6 +69,9 @@ type Props = {
   /** V9a, item 3: "Estou num momento" abre a mesma folha "Gravar agora" de `/hoje`. */
   objetivoRecomendado: Objetivo | null;
   outrasMarcas: MarcaResumo[];
+  /** V12c, item 3, a E37b: para a folha "Gravar agora" saber se mostra "quem aparece" e com qual padrão. */
+  tipo: TipoMarca;
+  quemGravaPadrao: QuemGrava | null;
 };
 
 /**
@@ -78,7 +81,7 @@ type Props = {
  * (item 2) só existe para sobreviver a troca de tela, de aparelho ou queda
  * de rede antes de avaliar.
  */
-export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendado, outrasMarcas }: Props) {
+export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendado, outrasMarcas, tipo, quemGravaPadrao }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
@@ -397,6 +400,8 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
           fecharENavegar={fecharFolhaMomentoENavegar}
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
+          tipo={tipo}
+          quemGravaPadrao={quemGravaPadrao}
         />
       ) : null}
     </div>

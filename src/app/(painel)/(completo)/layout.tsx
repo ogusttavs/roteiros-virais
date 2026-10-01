@@ -9,6 +9,7 @@ import {
   preferenciasDoUsuario,
   registrarAcessoHoje,
 } from "@/servicos/clientes";
+import { VERSAO_TERMOS_EM } from "@/textos/termos";
 
 import { FolhaAceiteTermos } from "../_casca/FolhaAceiteTermos";
 
@@ -22,6 +23,11 @@ import { FolhaAceiteTermos } from "../_casca/FolhaAceiteTermos";
  * aceitar, em qualquer marca. `ultimo_acesso_em` e gravado no maximo uma vez
  * por dia por marca, antes dessa checagem (o job `lembrete` usa esse campo,
  * e quem esta preso na folha ainda assim "abriu o painel hoje").
+ *
+ * E37b, item 9: versao nova dos termos pede aceite de novo, mesmo de quem
+ * ja tinha aceitado uma versao anterior (`aceitouTermosEm` mais antigo que
+ * `VERSAO_TERMOS_EM`). Aceitar de novo so atualiza a data, nunca duplica a
+ * linha (`aceitarTermos`, servicos/clientes.ts).
  */
 export default async function LayoutCompleto({ children }: { children: ReactNode }) {
   const sessao = await sessaoAtual();
@@ -39,7 +45,7 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  if (!preferencias?.aceitouTermosEm) {
+  if (!preferencias?.aceitouTermosEm || preferencias.aceitouTermosEm < VERSAO_TERMOS_EM) {
     return <FolhaAceiteTermos />;
   }
 

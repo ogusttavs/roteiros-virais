@@ -1,10 +1,13 @@
 /**
  * Dados fixos do briefing (briefing-e-rubricas.md, secao 1; brief-frontend.md,
- * 6.2): salvarDadosFixos grava nome, cidade, bairro, ramo (nichoId ou
- * ramoOutro, nunca os dois), persona, perfis e quem grava. listarNichosAtivos
- * alimenta a lista de ramo da tela.
+ * 6.2): salvarDadosFixos grava nome, alcance (brasil ou local, com regiao),
+ * site, ramo (nichoId ou ramoOutro, nunca os dois), persona, perfis e quem
+ * grava. listarNichosAtivos alimenta a lista de ramo da tela.
+ *
+ * V12c, item 1 (a E37b): cidade e bairro saem da validacao, alcance e regiao
+ * entram no lugar.
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -71,11 +74,12 @@ describe("listarNichosAtivos", () => {
 });
 
 describe("salvarDadosFixos", () => {
-  it("grava nome, cidade, bairro, ramo (nichoId), persona, perfis e quem grava", async () => {
+  it("grava nome, alcance local com regiao, site, ramo (nichoId), persona, perfis e quem grava", async () => {
     const cliente = await salvarDadosFixos(clienteId, {
       nome: "Sorriso Novo",
-      cidade: "Belo Horizonte",
-      bairro: "Savassi",
+      alcance: "local",
+      regiao: "Belo Horizonte, Savassi",
+      site: "https://sorrisonovo.com.br",
       nichoId: nichoAtivoId,
       persona: "negocio",
       perfis: { instagram: "@sorrisonovo" },
@@ -83,8 +87,9 @@ describe("salvarDadosFixos", () => {
     });
 
     expect(cliente.nome).toBe("Sorriso Novo");
-    expect(cliente.cidade).toBe("Belo Horizonte");
-    expect(cliente.bairro).toBe("Savassi");
+    expect(cliente.alcance).toBe("local");
+    expect(cliente.regiao).toBe("Belo Horizonte, Savassi");
+    expect(cliente.site).toBe("https://sorrisonovo.com.br");
     expect(cliente.nichoId).toBe(nichoAtivoId);
     expect(cliente.ramoOutro).toBeNull();
     expect(cliente.persona).toBe("negocio");
@@ -92,10 +97,56 @@ describe("salvarDadosFixos", () => {
     expect(cliente.quemGrava).toBe("propria_pessoa");
   });
 
+  it("alcance brasil nao exige regiao, e regiao antiga some", async () => {
+    await salvarDadosFixos(clienteId, {
+      nome: "Sorriso Novo",
+      alcance: "local",
+      regiao: "Belo Horizonte",
+      nichoId: nichoAtivoId,
+      persona: "negocio",
+    });
+    const cliente = await salvarDadosFixos(clienteId, {
+      nome: "Sorriso Novo",
+      alcance: "brasil",
+      nichoId: nichoAtivoId,
+      persona: "negocio",
+    });
+
+    expect(cliente.alcance).toBe("brasil");
+    expect(cliente.regiao).toBeNull();
+  });
+
+  it("recusa alcance local sem regiao", async () => {
+    await expect(
+      salvarDadosFixos(clienteId, { nome: "Sorriso Novo", alcance: "local", nichoId: nichoAtivoId, persona: "negocio" }),
+    ).rejects.toThrow();
+  });
+
+  it("recusa um site que nao e https ou nao tem dominio", async () => {
+    await expect(
+      salvarDadosFixos(clienteId, {
+        nome: "Sorriso Novo",
+        alcance: "brasil",
+        site: "http://sorrisonovo.com.br",
+        nichoId: nichoAtivoId,
+        persona: "negocio",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      salvarDadosFixos(clienteId, {
+        nome: "Sorriso Novo",
+        alcance: "brasil",
+        site: "https://localhost:3000",
+        nichoId: nichoAtivoId,
+        persona: "negocio",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("ramo por texto livre grava ramoOutro e limpa nichoId", async () => {
     const cliente = await salvarDadosFixos(clienteId, {
       nome: "Sorriso Novo",
-      cidade: "Belo Horizonte",
+      alcance: "brasil",
       ramoOutro: "clinica veterinaria",
       persona: "negocio",
     });
@@ -106,21 +157,79 @@ describe("salvarDadosFixos", () => {
 
   it("recusa sem nichoId e sem ramoOutro", async () => {
     await expect(
-      salvarDadosFixos(clienteId, { nome: "Sorriso Novo", cidade: "Belo Horizonte", persona: "negocio" }),
+      salvarDadosFixos(clienteId, { nome: "Sorriso Novo", alcance: "brasil", persona: "negocio" }),
     ).rejects.toThrow();
   });
 
   it("salvar os dados fixos de um cliente nao muda os de outro", async () => {
     await salvarDadosFixos(clienteId, {
       nome: "Sorriso Novo",
-      cidade: "Belo Horizonte",
+      alcance: "brasil",
       nichoId: nichoAtivoId,
       persona: "negocio",
     });
 
     const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
-    expect(outroCliente?.cidade).toBeNull();
+    expect(outroCliente?.alcance).toBeNull();
     expect(outroCliente?.nome).toBe("[teste] Negocio B");
+  });
+});
+
+/**
+ * A migracao 0043 preenche `alcance`/`regiao` a partir de `cidade`/`bairro`
+ * para cliente antigo, sem esperar ele passar pela tela de novo (V12c, item
+ * 1). Repete aqui o mesmo UPDATE do arquivo de migracao, contra um cliente
+ * inserido direto (sem passar por salvarDadosFixos, que ja grava so na forma
+ * nova), para provar a logica do preenchimento isolada da aplicacao da
+ * migracao inteira (que ja roda no `beforeAll`, via `resetarSchema`).
+ */
+describe("preenchimento da migracao 0043 (cidade e bairro viram alcance local)", () => {
+  async function rodarPreenchimento(clienteId: number) {
+    await db().execute(sql`
+      UPDATE clientes
+      SET alcance = 'local',
+          regiao = CASE WHEN bairro IS NOT NULL AND bairro <> '' THEN cidade || ', ' || bairro ELSE cidade END
+      WHERE id = ${clienteId} AND cidade IS NOT NULL AND cidade <> ''
+    `);
+  }
+
+  it("cidade com bairro vira local, regiao com os dois juntos", async () => {
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId, nome: "[teste] Migrado com bairro", cidade: "Campinas", bairro: "Taquaral" })
+      .returning();
+
+    await rodarPreenchimento(cliente.id);
+
+    const [depois] = await db().select().from(clientes).where(eq(clientes.id, cliente.id));
+    expect(depois?.alcance).toBe("local");
+    expect(depois?.regiao).toBe("Campinas, Taquaral");
+  });
+
+  it("cidade sem bairro vira local, regiao so com a cidade", async () => {
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId, nome: "[teste] Migrado sem bairro", cidade: "Campinas" })
+      .returning();
+
+    await rodarPreenchimento(cliente.id);
+
+    const [depois] = await db().select().from(clientes).where(eq(clientes.id, cliente.id));
+    expect(depois?.alcance).toBe("local");
+    expect(depois?.regiao).toBe("Campinas");
+  });
+
+  it("sem cidade, alcance e regiao continuam nulos (a pessoa escolhe na tela)", async () => {
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({ usuarioId, nome: "[teste] Sem cidade nenhuma" })
+      .returning();
+
+    await rodarPreenchimento(cliente.id);
+
+    const [depois] = await db().select().from(clientes).where(eq(clientes.id, cliente.id));
+    expect(depois?.alcance).toBeNull();
+    expect(depois?.regiao).toBeNull();
   });
 });
 

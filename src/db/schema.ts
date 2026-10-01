@@ -130,8 +130,17 @@ export const nichos = pgTable("nichos", {
   videoSemFalaVale: boolean("video_sem_fala_vale"),
 });
 
-/** Quem grava os videos do cliente (briefing-e-rubricas.md, secao 1). */
-export type QuemGrava = "propria_pessoa" | "pessoa_e_equipe";
+/**
+ * Quem grava os videos do cliente (briefing-e-rubricas.md, secao 1). V12c,
+ * item 3: "equipe" (so a equipe, o dono nao aparece) e "outra_pessoa" (um
+ * apresentador, criador ou cliente) sao valores novos; a pergunta deixou de
+ * dizer que e fixo ("pode mudar a cada video. aqui e so o mais comum").
+ */
+export type QuemGrava = "propria_pessoa" | "pessoa_e_equipe" | "equipe" | "outra_pessoa";
+export const VALORES_QUEM_GRAVA = ["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"] as const;
+
+/** V12c, item 1: onde estao os clientes do negocio, substitui cidade/bairro na tela. */
+export type Alcance = "brasil" | "local";
 
 /** Perfis do cliente nas redes, coletados no briefing (secao 1). */
 export type PerfisCliente = {
@@ -189,8 +198,20 @@ export const clientes = pgTable("clientes", {
   usuarioId: text("usuario_id").references(() => user.id, { onDelete: "cascade" }),
   nome: text("nome").notNull(),
   nichoId: integer("nicho_id").references(() => nichos.id),
+  /** V12c, item 1: ficam no banco, sem uso na tela desde que `alcance` existe. */
   cidade: text("cidade"),
   bairro: text("bairro"),
+  /**
+   * V12c, item 1 (decisao do Gustavo em 29/09): cidade e bairro nao
+   * importam para quem vende para o Brasil inteiro; o que importa e saber
+   * se a venda e nacional ou local. Nulo em cliente criado antes desta
+   * coluna (a migracao preenche a partir de `cidade`).
+   */
+  alcance: text("alcance").$type<Alcance>(),
+  /** Texto livre ("Campinas e regiao"), so usado quando `alcance = "local"`. */
+  regiao: text("regiao"),
+  /** V12c, item 6, a E37b: endereco publico da marca, opcional. Validado como URL publica. */
+  site: text("site"),
   /** Texto do ramo quando o cliente escolheu "outro" na lista (briefing-e-rubricas.md, secao 1). */
   ramoOutro: text("ramo_outro"),
   persona: text("persona").$type<Persona>().notNull().default("negocio"),
@@ -342,6 +363,15 @@ export type PerfilCompilado = {
    * desta etapa; `formatarPerfilCompilado` trata como lista vazia.
    */
   referencias: string[];
+  /**
+   * Concorrentes e perfis admirados citados pelo cliente nas duas listas de
+   * @ da P12 (`perfis_citados`, V12c, item 8, a E37b), preenchido por
+   * código depois da chamada de IA, mesma lógica de `referencias` acima.
+   * Nesta etapa só guarda e mostra; conferir na API, analisar e levar ao
+   * setor é a E38. Ausente em perfil compilado antes desta etapa;
+   * `formatarPerfilCompilado` trata como listas vazias.
+   */
+  perfisCitados?: { concorrentes: string[]; admira: string[] };
 };
 
 export const briefings = pgTable("briefings", {
@@ -371,6 +401,32 @@ export const briefings = pgTable("briefings", {
   perfil: jsonb("perfil").$type<PerfilCompilado>(),
   atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** "concorrente" ou perfil que o cliente admira, citado na P12 (V12c, item 7, a E37b). */
+export type TipoPerfilCitado = "concorrente" | "admira";
+
+/**
+ * Concorrentes e perfis admirados citados pelo cliente, em campos de @ (V12c,
+ * item 7, a E37b): substitui o texto solto que a pessoa digitava na P12.
+ * Nesta etapa só guarda e mostra (sem conferir na API nem analisar, isso é a
+ * E38). `migrar-perfis-citados.ts` preenche a partir das respostas antigas de
+ * P12, sem duplicar numa segunda rodada (único por cliente, tipo, rede e
+ * handle).
+ */
+export const perfisCitados = pgTable(
+  "perfis_citados",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    tipo: text("tipo").$type<TipoPerfilCitado>().notNull(),
+    rede: text("rede").$type<Plataforma>().notNull(),
+    handle: text("handle").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("perfis_citados_cliente_tipo_rede_handle").on(t.clienteId, t.tipo, t.rede, t.handle)],
+);
 
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
@@ -1028,6 +1084,13 @@ export const roteiros = pgTable(
      * topo da tela do roteiro. Nulo quando a pessoa não escreveu nada.
      */
     objetivoDoVideo: text("objetivo_do_video"),
+    /**
+     * V12c, item 3, a E37b: quem aparece neste vídeo, só quando a pessoa
+     * trocou na folha "Gravar agora" ou no passo do objetivo; nulo usa o
+     * `quemGrava` do briefing (`resolverQuemAparece`, `servicos/roteiro.ts`).
+     * Troca só vale para este roteiro, o briefing não muda.
+     */
+    quemAparece: text("quem_aparece").$type<QuemGrava>(),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     /**
      * E40, item 1: a versão original, preservada só na primeira edição da pessoa (edições

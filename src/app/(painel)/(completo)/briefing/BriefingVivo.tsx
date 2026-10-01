@@ -47,6 +47,9 @@ function itensDoPerfil(perfil: PerfilCompilado) {
       titulo: textosBriefing.briefing.perfilPosicionamentos,
       texto: (perfil.fatos.posicionamentos ?? []).join(" "),
     },
+    /** V12c, item 8: os perfis citados nas duas listas da P12 (`?? []`: perfil compilado antes desta etapa não tem). */
+    { titulo: textosBriefing.briefing.perfilConcorrentes, texto: (perfil.perfisCitados?.concorrentes ?? []).join(", ") },
+    { titulo: textosBriefing.briefing.perfilAdmira, texto: (perfil.perfisCitados?.admira ?? []).join(", ") },
   ].filter((item) => item.texto.trim().length > 0);
 }
 

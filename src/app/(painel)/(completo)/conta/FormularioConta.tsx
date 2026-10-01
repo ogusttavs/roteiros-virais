@@ -6,6 +6,7 @@ import type { TemaPreferido } from "@/db/schema";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
+import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Chips } from "@/ui/componentes/Chips";
 import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -127,9 +128,27 @@ export function FormularioConta({
         <div className={styles.grupo}>
           <span className={styles.rotuloGrupo}>{textosConta.redes}</span>
           <p className={styles.subGrupo}>{textosConta.redesSub(nomeMarca)}</p>
-          <Campo rotulo="Instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} />
-          <Campo rotulo="TikTok" value={tiktok} onChange={(e) => setTiktok(e.target.value)} />
-          <Campo rotulo="YouTube" value={youtube} onChange={(e) => setYoutube(e.target.value)} />
+          <CampoPerfilRede
+            plataforma="instagram"
+            rotulo="Instagram"
+            valor={instagram}
+            onMudar={setInstagram}
+            avisoInvalido={textosConta.perfilInvalido}
+          />
+          <CampoPerfilRede
+            plataforma="tiktok"
+            rotulo="TikTok"
+            valor={tiktok}
+            onMudar={setTiktok}
+            avisoInvalido={textosConta.perfilInvalido}
+          />
+          <CampoPerfilRede
+            plataforma="youtube"
+            rotulo="YouTube"
+            valor={youtube}
+            onMudar={setYoutube}
+            avisoInvalido={textosConta.perfilInvalido}
+          />
         </div>
 
         <Campo

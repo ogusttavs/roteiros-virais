@@ -47,6 +47,12 @@ export default async function Objetivo({ searchParams }: Props) {
   }
 
   return (
-    <ObjetivoTela origem={origem} temaEscolhidoTexto={temaEscolhidoTexto} objetivoRecomendado={objetivoRecomendado} />
+    <ObjetivoTela
+      origem={origem}
+      temaEscolhidoTexto={temaEscolhidoTexto}
+      objetivoRecomendado={objetivoRecomendado}
+      tipo={cliente.tipo}
+      quemGravaPadrao={cliente.quemGrava}
+    />
   );
 }

@@ -30,8 +30,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * reescrever); regra dura nova proíbe pedir nome, bairro, endereço ou
  * telefone que identifique um cliente de verdade, com o que um retrato bem
  * descrito já cumpre; o exemplo de "como melhorar" segue a mesma regra.
+ *
+ * 1.6.1 (medição do Fable na prova do PR #83, 01/10/2026, 18 casos do conjunto de exemplo): a
+ * instrução de acentuação só no sistema deixava 9 de 18 análises saírem sem acento na primeira
+ * tentativa (o verificador barrava e a segunda consertava, com uma chamada a mais); a mesma
+ * instrução repetida no fim da entrada, depois da resposta do cliente, zerou: 0 de 18.
  */
-export const versao = "1.6.0";
+export const versao = "1.6.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -99,6 +104,10 @@ Escreva em português do Brasil, com acentuação correta. A resposta do cliente
 acento nenhum; a sua análise sai sempre acentuada, mesmo assim.`;
 }
 
+/** Última linha da entrada, depois da resposta do cliente (1.6.1): é onde a instrução pega. */
+const LEMBRETE_ACENTUACAO =
+  "\nEscreva a análise inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que a resposta do cliente esteja sem acento.";
+
 export function montarEntrada(dados: {
   pergunta: string;
   oQueAIAProcura: string;
@@ -115,5 +124,6 @@ export function montarEntrada(dados: {
       'Esta marca é uma pessoa, não um negócio: no critério Específico, a pergunta certa é "só você poderia ter escrito isso?", nunca peça diferencial de produto para quem não tem produto para vender.',
     );
   }
+  linhas.push(LEMBRETE_ACENTUACAO);
   return linhas.join("\n");
 }

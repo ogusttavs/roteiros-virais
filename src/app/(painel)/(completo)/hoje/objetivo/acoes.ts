@@ -4,13 +4,13 @@ import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
-import { gerarRoteiro, validarEstilo, validarFormato, type OrigemRoteiro } from "@/servicos/roteiro";
+import { gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece, type OrigemRoteiro } from "@/servicos/roteiro";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
- * o segundo controle). O cliente sempre vem da sessão. `formato` e `estilo` chegam como texto livre
- * do navegador (V9d, item 2): `validarFormato`/`validarEstilo` conferem contra a lista antes de
- * chegar ao banco.
+ * o segundo controle). O cliente sempre vem da sessão. `formato`, `estilo` e `quemAparece` chegam
+ * como texto livre do navegador (V9d, item 2): `validarFormato`/`validarEstilo`/`validarQuemAparece`
+ * conferem contra a lista antes de chegar ao banco.
  */
 export async function gerarRoteiroAction(
   origem: OrigemRoteiro,
@@ -19,6 +19,8 @@ export async function gerarRoteiroAction(
   estilo?: string,
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */
   objetivoDoVideo?: string,
+  /** V12c, item 3, a E37b: troca só deste vídeo; sem valor, usa o quemGrava do cliente. */
+  quemAparece?: string,
 ): Promise<{ id: number }> {
   const cliente = await clienteDaSessaoAtual();
   const roteiro = await gerarRoteiro(cliente.id, {
@@ -27,6 +29,7 @@ export async function gerarRoteiroAction(
     formato: validarFormato(formato),
     estilo: validarEstilo(estilo),
     objetivoDoVideo: objetivoDoVideo?.trim() || undefined,
+    quemAparece: validarQuemAparece(quemAparece),
   });
   return { id: roteiro.id };
 }

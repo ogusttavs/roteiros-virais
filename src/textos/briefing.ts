@@ -33,6 +33,15 @@ function formatarDiaMesPorExtenso(data: Date): string {
 export const textosBriefing = {
   /** E37a, item 3: no topo do briefing e do /comecar, acima das perguntas. */
   tresJeitos: "Três jeitos de responder: escrever, falar no microfone ou levar a pergunta para a IA que você já usa.",
+  /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`): as duas listas da P12. */
+  perfisCitados: {
+    concorrentes: "Concorrentes",
+    ajudaConcorrentes: "Só o nome do perfil. Se colar o link, a gente tira o nome dele.",
+    admira: "Perfis que você admira",
+    adicionarOutro: "Adicionar outro:",
+    tirar: (endereco: string) => `Tirar ${endereco}`,
+    perfilInvalido: "Confira o nome do perfil",
+  },
   comecar: {
     passoUm: "Primeiro passo",
     titulo: "Antes de escrever, a gente precisa te conhecer",
@@ -71,13 +80,14 @@ export const textosBriefing = {
     ajudaRamoOutro: "Escreva em poucas palavras.",
     tituloObjetivo: "O que você quer que aconteça",
     ajudaObjetivo: "Pode mudar isso a cada vídeo. Aqui é só o mais comum para você.",
-    tituloQuemGrava: "Quem aparece nos vídeos",
-    ajudaQuemGrava: "Alguém precisa aparecer. É isso que faz o vídeo funcionar.",
     tituloRedes: "Perfis nas redes (opcional)",
     campoInstagram: "Instagram",
     campoTiktok: "TikTok",
     campoYoutube: "YouTube",
-    cidadeObrigatoria: "Diga a sua cidade",
+    regiaoObrigatoria: "Diga a cidade ou região",
+    siteInvalido: "esse endereço não parece um site válido",
+    /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
+    perfilInvalido: "Confira o nome do perfil",
     ramoObrigatorio: "Escreva o seu ramo",
     botaoContinuar: "Continuar",
     salvando: "Salvando",
@@ -206,6 +216,9 @@ export const textosBriefing = {
     /** So marca do tipo pessoa (P1, item 4, briefing-e-rubricas.md, secao 2b). */
     perfilHistoria: "A virada",
     perfilPosicionamentos: "No que acredita",
+    /** V12c, item 8, a E37b: os perfis citados nas duas listas da P12, só guardados e mostrados (a conferência é a E38). */
+    perfilConcorrentes: "Concorrentes",
+    perfilAdmira: "Perfis que você admira",
   },
   /** "O que a gente aprendeu com você" (E27 parte 2, item 4, Briefing.dc.html). */
   aprendizado: {

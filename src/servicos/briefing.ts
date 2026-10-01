@@ -27,6 +27,7 @@ import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
 import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
+import { formatarPerfilComArroba, perfisCitadosDoCliente } from "./perfis-citados";
 import { referenciasParaPerfil } from "./referencias";
 
 export { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial };
@@ -266,8 +267,9 @@ export async function avaliarResposta(
 
 /**
  * Perfil compilado (secao 4) e camada exclusiva (concorrentes e perfis
- * admirados de secao 5.9.1, mais cidade, bairro e o que vende como termos
- * de busca, escopo 5.6). Roda na liberacao e a cada edicao posterior.
+ * admirados de secao 5.9.1, mais a regiao (so quando o alcance e local,
+ * V12c item 1) e o que vende como termos de busca, escopo 5.6). Roda na
+ * liberacao e a cada edicao posterior.
  */
 async function compilarEGravarPerfil(
   clienteId: number,
@@ -293,14 +295,21 @@ async function compilarEGravarPerfil(
   });
 
   const referencias = await referenciasParaPerfil(clienteId);
-  const perfilCompleto: PerfilCompilado = { ...perfil, referencias };
+  const { concorrentes: concorrentesCitados, admira: admiraCitados } = await perfisCitadosDoCliente(clienteId);
+  const perfilCompleto: PerfilCompilado = {
+    ...perfil,
+    referencias,
+    perfisCitados: {
+      concorrentes: concorrentesCitados.map(formatarPerfilComArroba),
+      admira: admiraCitados.map(formatarPerfilComArroba),
+    },
+  };
 
   await db().update(briefings).set({ perfil: perfilCompleto }).where(eq(briefings.id, briefingId));
 
   const cliente = await clientePorId(clienteId);
-  const termos = [cliente?.cidade, cliente?.bairro, perfil.fatos.oQueVende].filter(
-    (termo): termo is string => Boolean(termo?.trim()),
-  );
+  const regiaoComoTermo = cliente?.alcance === "local" ? cliente.regiao : undefined;
+  const termos = [regiaoComoTermo, perfil.fatos.oQueVende].filter((termo): termo is string => Boolean(termo?.trim()));
 
   await db()
     .update(clientes)

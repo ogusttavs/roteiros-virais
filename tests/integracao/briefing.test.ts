@@ -19,6 +19,7 @@ import {
   salvarRascunho,
 } from "@/servicos/briefing";
 import { mudarTipoMarca } from "@/servicos/clientes";
+import { adicionarPerfilCitado } from "@/servicos/perfis-citados";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -124,6 +125,20 @@ describe("briefing: nota geral e gate de liberacao (mock)", () => {
     const segunda = await avaliarResposta(clienteId, "p3", resposta, "negocio");
     expect(segunda.reusada).toBe(true);
     expect(segunda.avaliacao).toEqual(primeira.avaliacao);
+  });
+
+  /** V12c, item 8, a E37b: so guarda e mostra (sem analisar, isso e a E38). */
+  it("o perfil compilado passa a listar os perfis citados por tipo, na proxima recompilacao", async () => {
+    await adicionarPerfilCitado(clienteId, "concorrente", { rede: "instagram", handle: "limpatudoexpress" });
+    await adicionarPerfilCitado(clienteId, "admira", { rede: "tiktok", handle: "@arrumadeiraprofissional" });
+
+    // qualquer edicao recompila o perfil (compilarEGravarPerfil roda a cada edicao posterior).
+    await avaliarResposta(clienteId, "p1", respostaConcreta("p1 de novo"), "negocio");
+    await avaliarResposta(clienteId, "p1", respostaConcreta("p1"), "negocio");
+
+    const briefing = await garantirBriefing(clienteId);
+    expect(briefing.perfil?.perfisCitados?.concorrentes).toEqual(["@limpatudoexpress (instagram)"]);
+    expect(briefing.perfil?.perfisCitados?.admira).toEqual(["@arrumadeiraprofissional (tiktok)"]);
   });
 });
 

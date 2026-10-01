@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import type { ConteudoRoteiro, FormatoRoteiro, Objetivo, Plataforma, PlanoMarca, TemaDoDia } from "@/db/schema";
+import type { ConteudoRoteiro, FormatoRoteiro, Objetivo, Plataforma, PlanoMarca, QuemGrava, TemaDoDia, TipoMarca } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { ItemPlano } from "@/servicos/plano";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
@@ -99,6 +99,9 @@ type Props = {
   planoQueVem: ItemPlano[];
   /** V12, item 3a: a rede principal da marca ativa, nula até a pessoa responder na porta Reels. */
   redePrincipal: Plataforma | null;
+  /** V12c, item 3, a E37b: para a folha "Gravar agora" saber se mostra "quem aparece" e com qual padrão. */
+  tipo: TipoMarca;
+  quemGravaPadrao: QuemGrava | null;
 };
 
 function classesDia(dia: SemanaDia): string {
@@ -260,6 +263,8 @@ export function HojeTela({
   planoDeHoje: planoDeHojeInicial,
   planoQueVem,
   redePrincipal,
+  tipo,
+  quemGravaPadrao,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -711,6 +716,8 @@ export function HojeTela({
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
           planoItemId={itemPlanoParaFolha?.id}
+          tipo={tipo}
+          quemGravaPadrao={quemGravaPadrao}
           formatoInicial={itemPlanoParaFolha ? undefined : (porta === "story" ? "story" : "reels") satisfies FormatoRoteiro}
           valoresIniciais={
             itemPlanoParaFolha

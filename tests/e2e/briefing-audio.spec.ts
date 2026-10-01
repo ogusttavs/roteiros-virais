@@ -40,7 +40,7 @@ async function prepararCliente(id: string) {
     });
   const [cliente] = await db()
     .insert(clientes)
-    .values({ usuarioId: id, nome: "[teste] Marca Responder Falando", cidade: "Sao Paulo", nichoId: nicho.id })
+    .values({ usuarioId: id, nome: "[teste] Marca Responder Falando", alcance: "brasil", nichoId: nicho.id })
     .returning();
   await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
   await db().insert(preferenciasUsuario).values({ usuarioId: id, aceitouTermosEm: new Date() });

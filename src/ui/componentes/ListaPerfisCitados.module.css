@@ -1,0 +1,87 @@
+/**
+ * V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`,
+ * `.lista-perfis`, `.perfil-citado`, `.adicionar-por-rede`).
+ */
+.lista {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-forte);
+}
+
+.ajuda {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.item > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.endereco {
+  display: block;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-secundario);
+  overflow-wrap: anywhere;
+}
+
+.tirar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tirar:hover {
+  background: var(--cor-superficie-recuada);
+}
+
+.adicionarPorRede {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.chip {
+  /* alvo de toque de 44 px (layout.spec.ts reprovava na CI com 29 px de altura) */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: var(--espaco-1) var(--espaco-3);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  font-size: var(--tamanho-legenda);
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--cor-superficie-recuada);
+}

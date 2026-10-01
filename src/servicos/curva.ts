@@ -11,6 +11,7 @@ import { and, desc, eq, gte, inArray, isNotNull, ne } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clientes, contas, metricasVideoCliente, videosCliente, type FonteMedida, type Plataforma } from "@/db/schema";
+import { normalizarHandle } from "@/lib/perfil-redes";
 
 const HORA_MS = 60 * 60 * 1000;
 const LIMITE_DIAS = 30;
@@ -101,17 +102,8 @@ export function shortcodeDoPermalink(permalink: string): string | null {
 
 export type MedianaConta = { mediana: number | null; aprendendo: boolean };
 
-/**
- * A coleta grava `contas.handle` sem "@" no TikTok e no Instagram, e com
- * "@" no YouTube (`src/servicos/nichos.ts`, `analisarUrlPerfil`); o
- * cliente digita o perfil dele no briefing do jeito que quiser. Sem
- * normalizar os dois lados da mesma forma, a comparação nunca batia
- * (rodada de acabamento de 06/09, item 4).
- */
-export function normalizarHandle(handle: string, plataforma: Plataforma): string {
-  const limpo = handle.replace(/\s+/g, "").replace(/^@+/, "");
-  return plataforma === "youtube" ? `@${limpo}` : limpo;
-}
+/** `normalizarHandle` mudou para `src/lib/perfil-redes.ts` (V12c, item 3b, a E37b): precisa rodar no cliente também. Reexportada aqui para nenhum import existente quebrar. */
+export { normalizarHandle };
 
 /**
  * "Normal da conta" (decisão 3 do `PROXIMO.md`). Quando a conta do cliente

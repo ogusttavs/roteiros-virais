@@ -6,6 +6,8 @@ import {
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Objetivo,
+  type Persona,
+  type QuemGrava,
   type TipoAbertura,
   type TipoMarca,
 } from "@/db/schema";
@@ -169,8 +171,17 @@ import { textoRegrasStory } from "./regras-formato";
  * H2 (achado do Gustavo em 29/09/2026, mesma causa de avaliarResposta): o que o cliente
  * escreveu no perfil ou no tema pode vir sem acento, o roteiro que a IA escreve nunca pode.
  * Versao 2.3.0.
+ *
+ * V12c, item 2 (a E37b): `montarSistemaEstavel` ganha `persona`; quem escolheu "ficar
+ * conhecido" ganha a regra 14 (renumerada do item 3, abaixo), a chamada final nunca fecha em
+ * preco ou compra. Versao 2.4.0.
+ *
+ * V12c, item 3 (a E37b): `montarSistemaEstavel` ganha `quemAparece` (ja resolvido pelo
+ * servico); quando e a equipe sem o dono, ou outra pessoa, a regra 13 troca a voz da regra 12
+ * (nunca "eu testei" de quem nao aparece; texto para quem apresenta, nunca "eu, dono"). Versao
+ * 2.5.0.
  */
-export const versao = "2.3.0";
+export const versao = "2.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -264,6 +275,19 @@ export function montarSistemaEstavel(dados: {
   regrasCliente: { regra: string; contagem: number }[];
   /** V9a, item 4: "negocio" (padrão) fala como a marca; "pessoa" fala em primeira pessoa do singular. */
   tipo: TipoMarca;
+  /**
+   * V12c, item 2, a E37b: "conhecido" nunca fecha a chamada final em preço ou compra. Opcional
+   * (ao contrário de `tipo`, que todo chamador já tinha) para não forçar os scripts de golden
+   * set e os testes existentes a passar um valor que não muda o resultado deles; ausente se
+   * comporta como qualquer persona que não seja "conhecido".
+   */
+  persona?: Persona;
+  /**
+   * V12c, item 3, a E37b: quem aparece NESTE vídeo (já resolvido pelo serviço: o valor do
+   * roteiro quando a pessoa trocou, senão o `quemGrava` do briefing). Opcional pelo mesmo
+   * motivo de `persona`; ausente ou "propria_pessoa" não muda a regra 12.
+   */
+  quemAparece?: QuemGrava;
   /** V9c, item 2: troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cartões e as regras R-IG-STORY. */
   formato: FormatoRoteiro;
   /** M4: sem fala troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cenas sem fala, igual em Reels e em Story. */
@@ -277,6 +301,13 @@ export function montarSistemaEstavel(dados: {
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";
+  /** V12c, item 2, a E37b: quem escolheu "ficar conhecido" nunca fecha vendendo. */
+  const regraPersonaConhecido =
+    dados.persona === "conhecido"
+      ? "\n14. Este cliente quer ficar conhecido no que faz, não vender agora: a chamada final " +
+        "nunca é preço, comprar ou agendar, mesmo que o objetivo do vídeo pareça pedir isso; é " +
+        "sempre seguir, comentar, salvar ou indicar para alguém."
+      : "";
   const regraVoz =
     dados.tipo === "pessoa"
       ? `12. Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira ` +
@@ -284,6 +315,20 @@ export function montarSistemaEstavel(dados: {
       : `12. Este cliente é um negócio: a voz é a da marca ("a gente", "nossa loja") quando fala do ` +
         `negócio, e a primeira pessoa do singular é bem-vinda quando quem grava conta a própria ` +
         `experiência ("eu testei", "eu uso"); nunca invente um "nós" que não existe.`;
+  /**
+   * V12c, item 3, a E37b: a regra 12 pressupõe o dono contando a própria experiência; quando
+   * quem aparece neste vídeo é a equipe (sem o dono) ou outra pessoa, isso muda.
+   */
+  const regraQuemAparece =
+    dados.tipo === "negocio" && dados.quemAparece === "equipe"
+      ? "\n13. Quem aparece neste vídeo é a equipe, o dono não aparece: nunca escreva experiência " +
+        'pessoal do dono ("eu testei", "eu uso"); fale sempre como a equipe ou a marca ("a gente", ' +
+        '"aqui na loja").'
+      : dados.tipo === "negocio" && dados.quemAparece === "outra_pessoa"
+        ? "\n13. Quem aparece neste vídeo é outra pessoa (um apresentador, um criador ou um " +
+          'cliente), não o dono: escreva o texto para essa pessoa falar, nunca em primeira pessoa ' +
+          'do dono ("eu, dono"); ela fala sobre a marca de fora, como quem apresenta ou recomenda.'
+        : "";
 
   /**
    * V9c, item 2: Reels continua "fala direta, vertical, curto"; Story troca para "cartões, sem gancho de
@@ -406,7 +451,7 @@ ${regra9}
     grava, nunca como anúncio ou propaganda; se o objetivo for as pessoas comprarem, a
     chamada final aponta para a marca citada, não para a marca deste roteiro. A chamada final
     sempre cita uma marca só, nunca as duas.
-${regraVoz}
+${regraVoz}${regraQuemAparece}${regraPersonaConhecido}
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou

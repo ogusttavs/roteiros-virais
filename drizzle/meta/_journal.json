@@ -302,6 +302,13 @@
       "when": 1790834037872,
       "tag": "0042_e40-editado-em",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1790843205327,
+      "tag": "0043_e37b-comeco-e-perfis",
+      "breakpoints": true
     }
   ]
 }

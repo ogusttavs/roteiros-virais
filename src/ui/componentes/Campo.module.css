@@ -69,6 +69,14 @@
 .envoltorioPrefixo {
   display: flex;
   align-items: center;
+  /**
+   * content-box, não o border-box global (base.css): os filhos usam
+   * height: 100% esperando os 44px inteiros de --altura-toque; com
+   * border-box, a borda de 1px em cima e embaixo tirava 2px disso, e o
+   * campo (role=input, o alvo de toque de verdade) media 42px, abaixo do
+   * mínimo de 44px que conferirLayout exige (achado do e2e, V12c item 3b).
+   */
+  box-sizing: content-box;
   height: var(--altura-toque);
   border: 1px solid var(--cor-borda-forte);
   border-radius: var(--raio-md);
