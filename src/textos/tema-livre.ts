@@ -32,6 +32,8 @@ export const textosTemaLivre = {
   avaliar: "Avaliar o tema",
   rodapeProposta:
     "A gente compara o seu assunto com o que já está guardado do seu setor e dá uma nota de 0 a 10 em cinco pontos. Leva alguns segundos.",
+  /** V15, item 3 (design v2, dúvida 3 do passo 7): título do lado na proposta, a partir de 1024px. */
+  cincoPontosTitulo: "Os cinco pontos que a gente olha",
 
   oQueEscreveu: "O que você escreveu",
   editarTexto: "Editar o texto",

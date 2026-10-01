@@ -63,6 +63,97 @@
   }
 }
 
+/**
+ * V15, item 3 (design v2, passo 7): do tablet deitado para cima, "O que você
+ * escreveu" (ou, na proposta, "Os cinco pontos que a gente olha") vira o
+ * lado fixo, e a coluna com a pergunta fica mais estreita que a largura de
+ * leitura cheia. `margin: 0 auto` acima já centraliza `.miolo`; falta só
+ * parar de crescer acima de 1280 (item 6), senão a largura da grade passava
+ * dos 944px do "monitor largo" e sobrava espaço para `margin: auto` centrar
+ * de mais.
+ */
+@media (min-width: 1024px) {
+  .miolo {
+    max-width: none;
+    grid-template-columns: minmax(0, var(--largura-leitura)) 18rem;
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .cabecalhoTela {
+    grid-column: 1;
+  }
+
+  .colunaPrincipal {
+    display: grid;
+    gap: inherit;
+    grid-column: 1;
+  }
+
+  .temaProposto,
+  .cincoPontos {
+    grid-column: 2;
+    position: sticky;
+    top: calc(3rem + var(--espaco-6));
+  }
+}
+
+@media (min-width: 1180px) {
+  .miolo {
+    grid-template-columns: minmax(0, var(--largura-leitura)) 20rem;
+    column-gap: var(--espaco-10);
+  }
+}
+
+@media (min-width: 1281px) {
+  .miolo {
+    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+  }
+}
+
+.colunaPrincipal {
+  display: contents;
+}
+
+/** V15, item 3: só a partir de 1024px (a frase equivalente no celular é `.notaRodapeMobile`, dentro da coluna). */
+.cincoPontos {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .cincoPontos {
+    display: grid;
+    gap: var(--espaco-3);
+    background: var(--cor-superficie);
+    border: var(--largura-borda) solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    padding: var(--espaco-5);
+  }
+}
+
+.cincoPontosLista {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+/** A mesma frase de `.cincoPontos` continua no rodapé do campo abaixo de 1024px; some dali para cima. */
+.notaRodapeMobile {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+@media (min-width: 1024px) {
+  .notaRodapeMobile {
+    display: none;
+  }
+}
+
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-2);

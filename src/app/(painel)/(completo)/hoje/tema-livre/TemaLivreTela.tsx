@@ -230,6 +230,46 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
           <p className={styles.subtitulo}>{SUBTITULO[fase]}</p>
         </div>
 
+        {/*
+          V15, item 3 (design v2, dúvida 3 do passo 7): "O que você escreveu" é o lado nas fases
+          depois da proposta. Mesma posição no DOM de sempre (logo após o título), só a largura
+          muda a partir de 1024px (`.ladoTema`, `TemaLivreTela.module.css`).
+        */}
+        {fase !== "proposta" ? (
+          <section className={[styles.cartao, styles.temaProposto].join(" ")} aria-label={textosTemaLivre.oQueEscreveu}>
+            <span className={styles.rotulo}>{textosTemaLivre.oQueEscreveu}</span>
+            <p className={styles.textoProposto}>{texto}</p>
+            {fase !== "esperando" ? (
+              <Botao
+                variante="ghost"
+                tamanho="md"
+                disabled={abrindo}
+                onClick={() => setFase("proposta")}
+                className={styles.botaoEditar}
+              >
+                {textosTemaLivre.editarTexto}
+              </Botao>
+            ) : null}
+          </section>
+        ) : null}
+
+        {/*
+          V15, item 3: "Os cinco pontos que a gente olha", só na proposta e só a partir de 1024px
+          (`display: none` abaixo disso); o celular continua só com a frase no rodapé do campo.
+        */}
+        {fase === "proposta" ? (
+          <section className={styles.cincoPontos} aria-label={textosTemaLivre.cincoPontosTitulo}>
+            <span className={styles.rotulo}>{textosTemaLivre.cincoPontosTitulo}</span>
+            <ul className={styles.cincoPontosLista}>
+              {textosTemaLivre.pilares.map((nome) => (
+                <li key={nome}>{nome}</li>
+              ))}
+            </ul>
+            <p className={styles.notaRodape}>{textosTemaLivre.rodapeProposta}</p>
+          </section>
+        ) : null}
+
+        <div className={styles.colunaPrincipal}>
         {fase === "proposta" ? (
           <>
             <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
@@ -257,26 +297,8 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
                 </Botao>
               </div>
             </section>
-            <p className={styles.notaRodape}>{textosTemaLivre.rodapeProposta}</p>
+            <p className={styles.notaRodapeMobile}>{textosTemaLivre.rodapeProposta}</p>
           </>
-        ) : null}
-
-        {fase !== "proposta" ? (
-          <section className={[styles.cartao, styles.temaProposto].join(" ")} aria-label={textosTemaLivre.oQueEscreveu}>
-            <span className={styles.rotulo}>{textosTemaLivre.oQueEscreveu}</span>
-            <p className={styles.textoProposto}>{texto}</p>
-            {fase !== "esperando" ? (
-              <Botao
-                variante="ghost"
-                tamanho="md"
-                disabled={abrindo}
-                onClick={() => setFase("proposta")}
-                className={styles.botaoEditar}
-              >
-                {textosTemaLivre.editarTexto}
-              </Botao>
-            ) : null}
-          </section>
         ) : null}
 
         {fase === "esperando" ? (
@@ -392,6 +414,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
             </div>
           </div>
         ) : null}
+        </div>
       </div>
 
       {folhaMomentoAberta ? (
