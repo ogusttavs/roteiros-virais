@@ -1,0 +1,147 @@
+/**
+ * `/criar/temas` (E39a, migrado da antiga porta Reels de `/hoje`). Mesmo truque de
+ * `TemaLivreTela.module.css`: cancela o padding de `(painel)/layout.module.css` porque esta tela
+ * tem a própria `BarraTopo`.
+ */
+.pagina {
+  margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6)))
+    calc(-1 * var(--margem-celular))
+    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
+}
+
+@media (min-width: 768px) {
+  .pagina {
+    margin: calc(-1 * var(--espaco-10));
+  }
+}
+
+.botaoVoltar {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+.botaoVoltar:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoVoltar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoVoltar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.miolo {
+  padding: var(--espaco-5) var(--margem-celular) calc(var(--espaco-8) + env(safe-area-inset-bottom, 0px));
+  max-width: var(--largura-leitura);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (min-width: 768px) {
+  .miolo {
+    padding: var(--espaco-8) var(--espaco-10) var(--espaco-10);
+  }
+}
+
+.aviso {
+  margin: 0;
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+}
+
+.grupoRede {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.perguntaRede {
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+.dicaRede {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.temasTres {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espaco-4);
+}
+
+@media (min-width: 1024px) {
+  .temasTres {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.estadoVazio {
+  display: grid;
+  gap: var(--espaco-4);
+  justify-items: start;
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.estadoVazio h2 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+}
+
+.estadoVazio p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.botaoSecundario {
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-corpo);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botaoSecundario:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoSecundario:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoSecundario:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

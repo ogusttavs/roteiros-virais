@@ -1611,6 +1611,8 @@ export type ItemAgendaDoDia = {
   titulo: string;
   status: "gerado" | "gravado" | "postado";
   momentoDoDia: MomentoDoDia | null;
+  objetivo: Objetivo;
+  duracaoS: number;
 };
 export type AgendaDoDia = { reels: ItemAgendaDoDia | null; stories: ItemAgendaDoDia[] };
 
@@ -1634,6 +1636,8 @@ export async function agendaDoDia(clienteId: number, data: string): Promise<Agen
     titulo: corpoDoRoteiro(linha).titulo,
     status: linha.status,
     momentoDoDia: linha.momentoDoDia,
+    objetivo: linha.objetivo,
+    duracaoS: corpoDoRoteiro(linha).duracaoS,
   });
 
   const reelsLinha = linhas.find((linha) => linha.formato === "reels") ?? null;

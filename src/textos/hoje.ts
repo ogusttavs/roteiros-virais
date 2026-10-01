@@ -133,22 +133,27 @@ export const textosHoje = {
   /**
    * E39a: Hoje vira a agenda (desenho do Opus, passo 10, `Hoje.dc.html`, estados `agenda`,
    * `agendaVazia`, `agendaOutroDia`, `agendaBriefingIncompleto`). Nada se cria aqui; "Criar
-   * roteiro" sempre leva para `/criar`.
+   * roteiro" sempre leva para `/criar`. Os estados da E39b (ainda vale, atrasado, calendário)
+   * ficam fora de propósito.
    */
   agenda: {
-    tituloNormal: "O que gravar hoje",
+    estaSemana: "Esta semana",
     marcadoPara: "Marcado para",
     voltarParaHoje: "Voltar para hoje",
-    legendaMarcas: "um ponto é Reels, um anel é Story",
+    /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
+    legendaReels: "Reels",
+    legendaStory: "Story",
+    /** O título de cada coluna do dia: muda só quando o dia aberto não é hoje (dúvida 2). */
+    reels: { hoje: "Reels de hoje", outroDia: "Reels" },
+    stories: { hoje: "Stories de hoje", outroDia: "Stories" },
     estadoReels: { gerado: "a gravar", gravado: "gravado", postado: "postado" },
+    /** Dúvida 5: num dia que não é hoje, o que ainda não foi gravado diz "marcado", não "a gravar". */
     estadoOutroDia: "marcado",
     nadaMarcadoTitulo: "Nada marcado para hoje",
     nadaMarcado: "Crie um roteiro para hoje ou deixe os próximos dias prontos.",
     proximoMarcado: (quando: string, formato: string) => `O próximo marcado é ${quando}: um ${formato}.`,
     criarRoteiro: "Criar roteiro",
     abrirRoteiro: "Abrir o roteiro",
-    modoGravacao: "Modo gravação",
-    seusStories: "Os seus Stories",
     briefingPodeRenderMais: "O seu briefing pode render mais",
     briefingNotaEMeta: (nota: string, meta: string) =>
       `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`,

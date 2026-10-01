@@ -1,9 +1,12 @@
 /**
- * `/hoje` (design v2, `entrega/telas/Hoje.dc.html`; `PROXIMO.md`, D2 parte 1,
- * item 5). `.pagina` cancela o padding de `(painel)/layout.module.css`
- * (`.corpo`), porque esta tela tem a própria `BarraTopo` colada no topo,
- * sem o cabeçalho genérico do celular por baixo (`CascaCabecalhoCelular`); e
- * o próprio `.miolo` abaixo devolve o espaçamento do design.
+ * `/hoje` vira a agenda (E39a, design v2, `entrega/telas/Hoje.dc.html`, "Hoje vira a agenda",
+ * passo 10). `.pagina` cancela o padding de `(painel)/layout.module.css` (`.corpo`), porque esta
+ * tela tem a própria `BarraTopo` colada no topo, sem o cabeçalho genérico do celular por baixo
+ * (`CascaCabecalhoCelular`); o próprio `.miolo` abaixo devolve o espaçamento do design.
+ *
+ * `.pagina`, `.botaoBarra`, `.girando` e `.miolo` são usados também por `loading.tsx` e
+ * `error.tsx`; `.cabecalhoTela`, `.data`, `.fraseEstado` e `.avisoVideo` por `HojeCabecalho.tsx`
+ * (os três arquivos continuam com os estados genéricos de carregando/erro/trocando).
  */
 .pagina {
   margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6))) calc(-1 * var(--margem-celular))
@@ -43,7 +46,6 @@
   box-shadow: var(--sombra-foco);
 }
 
-/* Atualizar em andamento (V7, item 4): desabilitado e o ícone gira; desabilitado por outro toque, só esmaece. */
 .botaoBarra:disabled {
   opacity: var(--opacidade-desabilitado);
   cursor: not-allowed;
@@ -91,14 +93,13 @@
   }
 }
 
-/** V15, item 6: o Hoje é uma lista de decisão, fica em uma coluna (design v2, dúvida 4 do passo 8); só o teto do "monitor largo", sem lado. */
 @media (min-width: 1281px) {
   .miolo {
     padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
   }
 }
 
-/* ---------- Cabeçalho da tela (HojeCabecalho) ---------- */
+/* ---------- Cabeçalho (HojeCabecalho.tsx, estados carregando/erro/trocando) ---------- */
 
 .cabecalhoTela {
   display: grid;
@@ -110,26 +111,6 @@
   color: var(--cor-texto-dica);
   text-transform: uppercase;
   letter-spacing: var(--espacamento-legenda);
-}
-
-.linhaConstancia {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--espaco-2);
-  align-items: start;
-  margin-top: var(--espaco-2);
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-}
-
-.iconePositivo {
-  color: var(--cor-positivo);
-  margin-top: 0.15rem;
-}
-
-.linhaConstancia b {
-  color: var(--cor-titulo);
-  font-weight: var(--peso-semibold);
 }
 
 .fraseEstado {
@@ -144,134 +125,64 @@
   color: var(--cor-titulo);
 }
 
-.aviso {
-  margin: 0;
-  padding: var(--espaco-4);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie-recuada);
-  color: var(--cor-texto);
-  font-size: var(--tamanho-secundario);
-  line-height: var(--altura-corpo);
-}
+/* ---------- O cabeçalho do dia aberto, quando não é hoje ---------- */
 
-/* ---------- O seu plano de hoje (V9b) ---------- */
-
-.planoHoje {
+.cabecalhoOutroDia {
   display: grid;
-  gap: var(--espaco-3);
-  padding: var(--espaco-5);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie);
+  gap: var(--espaco-1);
 }
 
-.planoHojeCabecalho {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-3);
-}
-
-/* ---------- Os três temas do dia (dentro da porta Reels) ---------- */
-
-.temasTres {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--espaco-4);
-}
-
-/* ---------- Cartão do roteiro de hoje ---------- */
-
-.cartaoRoteiro {
-  display: grid;
-  gap: var(--espaco-4);
-  padding: var(--espaco-5);
-  background: var(--cor-superficie);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-}
-
-.marcaRecomendado {
+.botaoVoltarHoje {
+  justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: var(--espaco-2);
-  align-self: start;
-  padding: var(--espaco-1) var(--espaco-3);
-  border-radius: var(--raio-pill);
-  background: var(--cor-selecao-suave);
-  border: var(--largura-borda) solid var(--cor-selecao-borda);
-  color: var(--cor-destaque);
+  gap: var(--espaco-1);
+  padding: var(--espaco-1) 0;
+  min-height: var(--altura-toque);
+  border: 0;
+  background: transparent;
+  color: var(--cor-acao);
   font-size: var(--tamanho-rodape);
-  font-weight: var(--peso-semibold);
+  font-weight: var(--peso-medio);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
 }
 
-.tituloArea {
+.botaoVoltarHoje:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/* ---------- O aviso do briefing (passo 10, segunda entrega) ---------- */
+
+.avisoBriefing {
   display: grid;
-  gap: var(--espaco-2);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie-recuada);
 }
 
-.rotulo {
-  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
-  letter-spacing: var(--espacamento-legenda);
-  text-transform: uppercase;
-  color: var(--cor-texto-dica);
-}
-
-.temaTitulo {
+.avisoBriefing h2 {
   margin: 0;
-  font-size: var(--tamanho-titulo-2);
-  line-height: var(--altura-titulo);
-  color: var(--cor-titulo);
+  font-size: var(--tamanho-cabecalho);
 }
 
-.porque {
-  margin: 0;
+.avisoBriefing p {
+  margin: var(--espaco-1) 0 0;
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
-}
-
-.evidencia {
-  display: grid;
-  gap: var(--espaco-2);
-  padding: var(--espaco-3) var(--espaco-4);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie-recuada);
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-suave);
-}
-
-.evidenciaLinha {
-  display: block;
-  min-width: 0;
-}
-
-.evidenciaLinha b {
-  font-family: var(--fonte-mono);
-  font-weight: var(--peso-semibold);
-  color: var(--cor-titulo);
-}
-
-.conta {
-  display: block;
-  font-family: var(--fonte-mono);
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.acoes {
-  display: grid;
-  gap: var(--espaco-3);
 }
 
 @media (min-width: 768px) {
-  .acoes {
-    display: flex;
-    flex-wrap: wrap;
+  .avisoBriefing {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
   }
 }
+
+/* ---------- Botões ---------- */
 
 .botaoPrimario,
 .botaoSecundario {
@@ -294,269 +205,375 @@
 .botaoPrimario {
   background: var(--cor-acao);
   color: var(--cor-acao-texto);
+  justify-self: start;
 }
 
 .botaoPrimario:hover:not(:disabled) {
   background: var(--cor-acao-hover);
 }
 
-.botaoSecundario {
-  background: transparent;
-  color: var(--cor-titulo);
-  border-color: var(--cor-borda-forte);
-  font-weight: var(--peso-medio);
+.botaoPrimario:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
 }
 
-.botaoSecundario:hover:not(:disabled) {
+.botaoPrimario:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoPrimario[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.botaoSecundarioSm {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid transparent;
+  background: transparent;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  border-color: var(--cor-borda-forte);
+  cursor: pointer;
+  justify-self: start;
+}
+
+.botaoSecundarioSm:hover {
   background: var(--cor-superficie-hover);
 }
 
-.botaoPrimario:focus-visible,
-.botaoSecundario:focus-visible {
+.botaoSecundarioSm:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-/* Desabilitado (V7, itens 4 e 8): outra tela já está abrindo, ou sem conexão. O toque em andamento ("Abrindo") fica inteiro. */
-.botaoPrimario:disabled,
-.botaoSecundario:disabled {
-  opacity: var(--opacidade-desabilitado);
-  cursor: not-allowed;
-}
+/* ---------- A semana (dúvida 4: segunda a domingo, nunca uma janela corrida a partir de hoje) ---------- */
 
-.botaoPrimario[aria-busy="true"]:disabled,
-.botaoSecundario[aria-busy="true"]:disabled {
-  opacity: 1;
-  cursor: progress;
-}
-
-/* ---------- Recolhidos: os outros temas ---------- */
-
-.recolhidos {
-  display: grid;
-  gap: var(--espaco-4);
-}
-
-.abrirTemas {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-3);
-  width: 100%;
-  min-height: var(--altura-toque-lg);
-  padding: var(--espaco-3) var(--espaco-5);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie);
-  color: var(--cor-titulo);
-  font-weight: var(--peso-semibold);
-  font-size: var(--tamanho-corpo);
-  font-family: var(--fonte-texto);
-  text-align: left;
-  cursor: pointer;
-}
-
-.abrirTemas:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-.contaTemas {
-  color: var(--cor-acao);
-  font-weight: var(--peso-semibold);
-  font-size: var(--tamanho-secundario);
-}
-
-.avisoTrocarTema {
-  margin: 0;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-suave);
-}
-
-.listaOutros {
-  display: grid;
-}
-
-.linhaOutro {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-4);
-  padding: var(--espaco-4) 0;
-  border-top: var(--largura-borda) solid var(--cor-divisor);
-}
-
-.blocoOutro {
-  display: grid;
-  gap: var(--espaco-1);
-  min-width: 0;
-}
-
-.rotuloOutro {
-  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
-  letter-spacing: var(--espacamento-legenda);
-  text-transform: uppercase;
-  color: var(--cor-texto-dica);
-}
-
-.temaOutro {
-  font-size: var(--tamanho-secundario);
-  font-weight: var(--peso-medio);
-  color: var(--cor-titulo);
-}
-
-/* "Trocar" e, sem conexão, o motivo embaixo dele (V7, item 8); os dois alinhados à direita da linha. */
-.acaoOutro {
-  flex: none;
-  display: grid;
-  justify-items: end;
-  gap: var(--espaco-1);
-}
-
-.trocar {
-  flex: none;
-  /* Alvo de toque de 44 px (V7, item 1): antes era só a altura da linha de texto. */
-  min-width: var(--altura-toque);
-  min-height: var(--altura-toque);
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: var(--tamanho-secundario);
-  font-weight: var(--peso-medio);
-  color: var(--cor-titulo);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  cursor: pointer;
-}
-
-.trocar:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-.trocar:disabled {
-  opacity: var(--opacidade-desabilitado);
-  cursor: not-allowed;
-}
-
-.trocar[aria-busy="true"]:disabled {
-  opacity: 1;
-  cursor: progress;
-}
-
-/* ---------- Prefere um assunto seu ---------- */
-
-.proprio {
+.semanaAgenda {
   display: grid;
   gap: var(--espaco-3);
-  justify-items: start;
   padding: var(--espaco-5);
-  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border: var(--largura-borda) solid var(--cor-borda);
   border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
 }
 
-.proprio p {
-  margin: 0;
-  color: var(--cor-texto-suave);
-  font-size: var(--tamanho-secundario);
-}
-
-/* ---------- Sua semana e seu último vídeo (V12: `.semanaTopo`/`.cartaoUltimoVideo` acima; classes reaproveitadas aqui) ---------- */
-
-.semana {
+.cabecaSemana {
   display: flex;
-  gap: var(--espaco-2);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
 }
 
-.dia {
-  flex: 1;
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+  font-weight: var(--peso-medio);
+}
+
+.diasAgenda {
   display: grid;
-  gap: var(--espaco-2);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--espaco-1);
+}
+
+.diaAgenda {
+  display: grid;
   justify-items: center;
+  align-content: center;
+  gap: var(--espaco-1);
+  justify-self: center;
+  width: 100%;
+  max-width: 4.5rem;
+  min-width: 0;
+  min-height: 4.25rem;
+  padding: var(--espaco-2) 0;
+  border: var(--largura-borda) solid transparent;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+.diaAgenda:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.diaAgenda:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.nomeDia {
   font-size: var(--tamanho-legenda);
   color: var(--cor-texto-dica);
 }
 
-.dia i {
-  display: block;
-  width: 100%;
-  height: 2rem;
-  border-radius: var(--raio-sm);
-  border: var(--largura-borda) solid var(--cor-borda);
-  background: var(--cor-superficie);
+.numero {
+  font: var(--peso-semibold) var(--tamanho-cabecalho) / 1 var(--fonte-mono);
 }
 
-.diaGravou i {
+.marcas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 0.5rem;
+}
+
+.marcaReels,
+.marcaStory {
+  display: block;
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: var(--raio-pill);
+}
+
+.marcaReels {
   background: var(--cor-acao);
+}
+
+.marcaStory {
+  border: 1.5px solid var(--cor-acao);
+}
+
+.diaAgendaHoje {
   border-color: var(--cor-acao);
 }
 
-.diaHoje i {
-  border: 2px solid var(--cor-acao);
-  background: var(--cor-selecao-suave);
-}
-
-.diaHoje.diaGravou i {
+.diaAgenda[aria-pressed="true"] {
   background: var(--cor-acao);
+  border-color: var(--cor-acao);
+  color: var(--cor-acao-texto);
 }
 
-/* V12, item 1: o terceiro estado do dia, "postou" (ganha de "gravou" no mesmo dia, `resumoHistorico`). */
-.diaPostou i {
-  border: 2px solid var(--cor-borda-forte);
+.diaAgenda[aria-pressed="true"] .nomeDia {
+  color: var(--cor-acao-texto);
+}
+
+.diaAgenda[aria-pressed="true"] .marcaReels {
+  background: var(--cor-acao-texto);
+}
+
+.diaAgenda[aria-pressed="true"] .marcaStory {
+  border-color: var(--cor-acao-texto);
+}
+
+.contaStory {
+  font: var(--peso-semibold) var(--tamanho-legenda) / 1 var(--fonte-mono);
+  color: var(--cor-acao);
+}
+
+.diaAgenda[aria-pressed="true"] .contaStory {
+  color: var(--cor-acao-texto);
+}
+
+.legendaMarcas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.legendaMarcas span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+/* ---------- Nada marcado para o dia ---------- */
+
+.diaLivre {
+  display: grid;
+  gap: var(--espaco-4);
+  justify-items: start;
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
   background: var(--cor-superficie);
 }
 
-.diaHoje.diaPostou i {
-  border: 2px solid var(--cor-acao);
-  background: var(--cor-selecao-suave);
+.diaLivre h3 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
 }
 
-.curva {
+.diaLivre p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+/* ---------- O dia: Reels em destaque, Stories na ordem do momento ---------- */
+
+.diaColunas {
   display: grid;
-  gap: var(--espaco-2);
+  gap: var(--espaco-6);
+  align-items: start;
 }
 
-.curvaValor {
-  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
-  color: var(--cor-titulo);
+@media (min-width: 1024px) {
+  .diaColunas {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
 }
 
-.curvaLegenda {
-  font-size: var(--tamanho-rodape);
+.secaoDia {
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+}
+
+.secaoDia > h2 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+}
+
+.semItemNaColuna {
+  margin: 0;
+  padding: var(--espaco-4);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  border: var(--largura-borda) dashed var(--cor-borda);
+  border-radius: var(--raio-md);
+}
+
+/* O estado de cada roteiro: palavra escrita, sempre. A gravar é neutro; gravado e postado ganham
+   o visto e a cor de "feito"; marcado (um dia que ainda vai chegar), o texto de dica. */
+.estado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1) var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.estado svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.estadoFeito {
+  background: var(--cor-selecao-suave);
+  border-color: var(--cor-selecao-borda);
+  color: var(--cor-destaque);
+}
+
+.estadoMarcado {
+  border-style: dashed;
+  color: var(--cor-texto-dica);
+}
+
+.reelsDia {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.linhaTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.objetivoDoDia {
+  font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
 }
 
-.curvaAcima {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-  color: var(--cor-positivo);
-  font-weight: var(--peso-semibold);
-  font-size: var(--tamanho-secundario);
+.reelsDia h3 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
 }
 
-.verComoFoi {
-  justify-self: start;
-  /* Alvo de toque de 44 px (V7, item 1 do PROXIMO.md): o link sozinho tinha uns 22 px de altura. */
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--altura-toque);
+/* Os Stories do dia: uma lista, o momento em cima, o título embaixo, o estado à direita. A linha
+   inteira abre o roteiro. */
+.listaAgendaCartao {
+  padding: 0 var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.listaAgenda {
+  display: grid;
+  margin: 0;
   padding: 0;
-  background: none;
-  border: none;
-  color: var(--cor-acao);
-  font-size: var(--tamanho-secundario);
-  font-weight: var(--peso-medio);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  list-style: none;
 }
 
-.verComoFoi:focus-visible {
+.listaAgenda > li + li {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.itemAgenda {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-3);
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-3) 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemAgenda:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }
 
-/* ---------- Estados vazio e erro (design v2, `.vazio`/`.erro` de base.css) ---------- */
+.momento {
+  grid-column: 1;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.tituloItem {
+  grid-column: 1;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+}
+
+.itemAgenda .estado {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.itemAgenda > svg {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cor-texto-dica);
+}
+
+/* ---------- Estado de erro (error.tsx) ---------- */
 
 .estadoCartao {
   display: grid;
@@ -600,345 +617,4 @@
     justify-content: start;
     width: auto;
   }
-}
-
-/* ---------- Carregando ---------- */
-
-.temaCarregando {
-  display: grid;
-  gap: var(--espaco-4);
-  padding: var(--espaco-5);
-  background: var(--cor-superficie);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-}
-
-.esperando {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-3);
-  color: var(--cor-texto-suave);
-  font-size: var(--tamanho-secundario);
-}
-
-/* ---------- V12: o Hoje em duas portas ---------- */
-
-.telaPortas {
-  display: grid;
-  gap: var(--espaco-6);
-  max-width: var(--largura-comparacao);
-  margin: 0 auto;
-}
-
-/* ---------- Sua semana, no topo ---------- */
-
-.semanaTopo {
-  display: grid;
-  gap: var(--espaco-4);
-  padding: var(--espaco-5);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie);
-}
-
-.semanaTopoTitulo {
-  margin: 0;
-  color: var(--cor-texto-dica);
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rodape);
-  text-transform: uppercase;
-  letter-spacing: var(--espacamento-legenda);
-  font-weight: var(--peso-medio);
-}
-
-.semanaTopo .linhaConstancia {
-  margin-top: 0;
-}
-
-.legendaSemana {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--espaco-2) var(--espaco-4);
-  margin: 0;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
-}
-
-.legendaSemana span {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--espaco-2);
-}
-
-.legendaSemana i {
-  width: 1rem;
-  height: 1rem;
-  border-radius: 0.25rem;
-  border: var(--largura-borda) solid var(--cor-borda);
-  background: var(--cor-superficie);
-}
-
-/* Revisão do PR #63 (Fable): `.legendaSemana i` acima tem um elemento a mais na especificidade e vencia
-   estas duas classes; na captura os três quadrinhos da legenda saíam iguais, vazios. O seletor repete o
-   pai para empatar em especificidade e ganhar pela ordem, como `.diaGravou i` já faz nos dias. */
-.legendaSemana i.legendaGravou {
-  background: var(--cor-acao);
-  border-color: var(--cor-acao);
-}
-
-.legendaSemana i.legendaPostou {
-  border: 2px solid var(--cor-borda-forte);
-}
-
-/* ---------- Seu último vídeo, abaixo da semana (V8; ajuste (c) da revisão do Fable) ---------- */
-
-.cartaoUltimoVideo {
-  display: grid;
-  gap: var(--espaco-2);
-  padding: var(--espaco-5);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie);
-}
-
-.cartaoUltimoVideoTitulo {
-  margin: 0 0 var(--espaco-1);
-  color: var(--cor-texto-dica);
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rodape);
-  text-transform: uppercase;
-  letter-spacing: var(--espacamento-legenda);
-  font-weight: var(--peso-medio);
-}
-
-/* ---------- Seus roteiros de hoje ---------- */
-
-.roteirosHoje {
-  display: grid;
-  gap: var(--espaco-4);
-}
-
-.roteirosHojeTitulo {
-  margin: 0;
-  font-size: var(--tamanho-titulo-2);
-  color: var(--cor-titulo);
-}
-
-/* Ajuste (d) da revisão do Fable: com dois ou mais roteiros de hoje, título e as duas ações numa linha só. */
-.cartaoRoteiroCompacto {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--espaco-3);
-  padding: var(--espaco-4) var(--espaco-5);
-  background: var(--cor-superficie);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-}
-
-.temaTituloCompacto {
-  margin: 0;
-  font-size: var(--tamanho-corpo);
-  font-weight: var(--peso-semibold);
-  line-height: var(--altura-titulo);
-  color: var(--cor-titulo);
-}
-
-.acoesCompactas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--espaco-3);
-  flex: none;
-}
-
-.botaoPrimarioSm,
-.botaoSecundarioSm {
-  min-height: var(--altura-toque);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--espaco-2);
-  padding: 0 var(--espaco-4);
-  border-radius: var(--raio-pill);
-  border: var(--largura-borda) solid transparent;
-  font-weight: var(--peso-semibold);
-  font-size: var(--tamanho-rodape);
-  font-family: var(--fonte-texto);
-  text-decoration: none;
-  text-align: center;
-  cursor: pointer;
-}
-
-.botaoPrimarioSm {
-  background: var(--cor-acao);
-  color: var(--cor-acao-texto);
-}
-
-.botaoPrimarioSm:hover {
-  background: var(--cor-acao-hover);
-}
-
-.botaoSecundarioSm {
-  background: transparent;
-  color: var(--cor-titulo);
-  border-color: var(--cor-borda-forte);
-  font-weight: var(--peso-medio);
-}
-
-.botaoSecundarioSm:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.botaoPrimarioSm:focus-visible,
-.botaoSecundarioSm:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-/* ---------- A pergunta e as duas portas ---------- */
-
-.blocoPortas {
-  display: grid;
-  gap: var(--espaco-4);
-}
-
-.perguntaPortas {
-  margin: 0;
-  font-size: var(--tamanho-titulo-2);
-  font-weight: var(--peso-forte);
-  font-stretch: var(--largura-titulo);
-  letter-spacing: -0.02em;
-  color: var(--cor-titulo);
-}
-
-.portasGrandes {
-  display: grid;
-  gap: var(--espaco-4);
-}
-
-@media (min-width: 768px) {
-  .portasGrandes {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.porta {
-  display: grid;
-  gap: var(--espaco-3);
-  align-content: start;
-  min-height: 9rem;
-  padding: var(--espaco-6);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-lg);
-  background: var(--cor-superficie);
-  text-align: left;
-  color: inherit;
-  font-family: var(--fonte-texto);
-  box-shadow: var(--sombra-controle);
-  cursor: pointer;
-}
-
-.porta:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.porta:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-.portaMarca {
-  display: grid;
-  place-items: center;
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: var(--raio-pill);
-  background: var(--cor-superficie-recuada);
-  border: var(--largura-borda) solid var(--cor-borda);
-  color: var(--cor-titulo);
-}
-
-.portaTitulo {
-  font-size: var(--tamanho-titulo-2);
-  color: var(--cor-titulo);
-  font-weight: var(--peso-semibold);
-}
-
-.portaAjuda {
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-}
-
-.portaSeta {
-  justify-self: end;
-  margin-top: auto;
-  color: var(--cor-texto-dica);
-}
-
-/* Porta escolhida: uma linha, com o nome dela e a troca. */
-.blocoPorta {
-  display: grid;
-  gap: var(--espaco-6);
-}
-
-.portaEscolhida {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-3);
-  padding: var(--espaco-3) var(--espaco-3) var(--espaco-3) var(--espaco-4);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-pill);
-  background: var(--cor-superficie-recuada);
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-titulo);
-  font-weight: var(--peso-semibold);
-}
-
-.portaEscolhida svg {
-  color: var(--cor-texto-suave);
-}
-
-.portaEscolhidaBtn {
-  margin-left: auto;
-}
-
-.grupoRede {
-  display: grid;
-  gap: var(--espaco-3);
-}
-
-.perguntaRede {
-  font-size: var(--tamanho-corpo);
-  color: var(--cor-titulo);
-  font-weight: var(--peso-medio);
-}
-
-.dicaRede {
-  margin: 0;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
-}
-
-/* Os dois cartões lado a lado, tanto na porta Reels quanto na Story. */
-.duasCartas {
-  display: grid;
-  gap: var(--espaco-4);
-}
-
-@media (min-width: 768px) {
-  .duasCartas {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-}
-
-.cartaoAcaoStory {
-  display: grid;
-  gap: var(--espaco-4);
-  align-content: start;
-  padding: var(--espaco-5);
-  background: var(--cor-superficie);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-lg);
 }
