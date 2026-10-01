@@ -104,6 +104,75 @@
   text-underline-offset: 3px;
 }
 
+/**
+ * V15, item 4 (design v2, passo 7): do tablet deitado para cima, "De onde
+ * veio" e o cartão de trabalho ("Como editar"; no Story, "Por que assim")
+ * saem da coluna e viram um lado (`.lado`) ao lado dela, começando no alto,
+ * junto do título. Até 1023px as duas são `display: contents`: tudo flui na
+ * ordem de sempre, sem nenhuma mudança visual.
+ *
+ * Diferente de Objetivo e Tema livre (lado curto, gruda inteiro): aqui o
+ * lado é mais alto que a tela, então só o cartão de trabalho gruda
+ * (`.ladoGrudado`), e "De onde veio" sobe com a página junto do resto do
+ * lado, sem posição fixa própria.
+ */
+.corpoComLado {
+  display: contents;
+}
+
+.colunaPrincipal {
+  display: contents;
+}
+
+.lado {
+  display: contents;
+}
+
+@media (min-width: 1024px) {
+  .corpoComLado {
+    display: grid;
+    grid-template-columns: minmax(0, var(--largura-leitura)) 18rem;
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .colunaPrincipal {
+    display: grid;
+    gap: inherit;
+    grid-column: 1;
+  }
+
+  .lado {
+    display: grid;
+    gap: var(--espaco-6);
+    grid-column: 2;
+  }
+
+  .ladoGrudado {
+    position: sticky;
+    top: calc(3rem + var(--espaco-6));
+  }
+}
+
+@media (min-width: 1180px) {
+  .corpoComLado {
+    grid-template-columns: minmax(0, var(--largura-leitura)) 20rem;
+    column-gap: var(--espaco-10);
+  }
+}
+
+/**
+ * V15, item 6: acima de 1280 as duas colunas não crescem mais (o teto do
+ * "monitor largo"), e o `.miolo` fica bem mais largo que elas; sem isto, o
+ * roteiro ficava preso à esquerda com um vazio enorme à direita, o mesmo
+ * defeito que o item 6 corrige em tudo mais, só que dentro da grade daqui.
+ */
+@media (min-width: 1281px) {
+  .corpoComLado {
+    justify-content: center;
+  }
+}
+
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-1);
@@ -178,6 +247,18 @@
   padding: var(--espaco-5);
   border: var(--largura-borda) dashed var(--cor-borda-forte);
   border-radius: var(--raio-lg);
+}
+
+/**
+ * V15, item 4: "Outras versões" fica fora do lado (abaixo das duas colunas,
+ * na largura da coluna de leitura), e depois dele no DOM, para a ordem no
+ * celular continuar a de sempre; `grid-column: 1` o devolve para debaixo do
+ * texto, não ao lado dele.
+ */
+@media (min-width: 1024px) {
+  .corpoComLado > .versoesVazio {
+    grid-column: 1;
+  }
 }
 
 .versoesVazio h2 {
@@ -372,6 +453,20 @@
   .barraAcoes {
     left: var(--largura-barra-lateral);
     padding-inline: var(--espaco-10);
+  }
+}
+
+/**
+ * V15, item 4 (design v2, dúvida 8 do passo 7): acima de 1280 o conteúdo centra
+ * (o teto do "monitor largo"), mas a barra de ações é fixa, então alinha à mão:
+ * o porcentual dela é da tela inteira, não só do espaço ao lado da barra lateral.
+ */
+@media (min-width: 1281px) {
+  .barraAcoes {
+    padding-left: max(
+      var(--espaco-10),
+      calc((100% - var(--largura-barra-lateral) - var(--largura-painel)) / 2)
+    );
   }
 }
 
