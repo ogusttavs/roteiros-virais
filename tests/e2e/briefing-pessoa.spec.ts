@@ -84,7 +84,8 @@ test.describe("briefing da pessoa (P1)", () => {
     await expect(page.getByText("Vender o meu produto ou serviço")).toBeHidden();
     await expect(page.getByText("Ficar conhecido no que eu faço")).toBeVisible();
 
-    await page.getByLabel("Onde está o seu público", { exact: true }).fill("Brasil inteiro");
+    // V12c, item 1, a E37b: "Onde está o seu público" virou as duas opções (nunca mais um campo de texto).
+    await page.getByRole("radio", { name: "No Brasil inteiro" }).click();
     await page.getByRole("button", { name: "Continuar", exact: true }).click();
 
     // Bloco 1: a pergunta e o rotulo do bloco sao os da pessoa (secao 2b), nunca os do negocio.
