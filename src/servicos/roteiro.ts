@@ -869,6 +869,16 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   const numerosRegrasValidas =
     dados.formato === "story" ? NUMEROS_REGRAS_STORY : new Set(redeReels.regras.map((r) => r.numero));
 
+  /**
+   * Revisão do Fable no PR #89: `porQueAssim` explica o roteiro, não é o roteiro. Uma citação de
+   * regra que não está na lista válida deste formato e desta rede é descartada aqui, antes do
+   * verificador e do que se grava, em vez de reprovar a geração inteira: foi esse campo, citando
+   * regra em texto livre, que deixou o Gustavo sem Reels em produção em 01/10 (quatro gerações
+   * reprovadas seguidas). O que sobra é só citação de regra que existe.
+   */
+  const porQueAssimValido = (itens: { regra: string; motivo: string }[]) =>
+    usaPorQueAssim ? itens.filter((item) => numerosRegrasValidas.has(item.regra)) : [];
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -959,9 +969,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     estilo: dados.estilo,
     extrairCartoes: (d) => d.cartoes,
     extrairLegenda: (d) => d.legenda,
-    extrairPorQueAssim: (d) => (usaPorQueAssim ? d.porQueAssim : []),
+    extrairPorQueAssim: (d) => porQueAssimValido(d.porQueAssim),
     extrairNarrativa: (d) => ({ gancho: d.gancho, corpo: d.corpo, chamadaFinal: d.chamadaFinal }),
-    extrairCampos: (d) => extrairCamposRoteiro(usaPorQueAssim ? d : { ...d, porQueAssim: [] }),
+    extrairCampos: (d) => extrairCamposRoteiro({ ...d, porQueAssim: porQueAssimValido(d.porQueAssim) }),
     extrairEvidencias: (d) => d.evidencias,
   });
 
@@ -977,7 +987,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     fechamento: saida.fechamento ?? "",
     chamadaFinal: saida.chamadaFinal ?? "",
     cartoes: saida.cartoes,
-    porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
+    porQueAssim: porQueAssimValido(saida.porQueAssim),
     cenas: saida.cenas,
     ondeGravar: saida.ondeGravar,
     edicao: {

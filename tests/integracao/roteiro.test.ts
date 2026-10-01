@@ -489,7 +489,11 @@ describe("V9c, formato (Story)", () => {
    * (`regrasDoReels`), uma regra inventada ou em texto livre reprova de verdade, como já
    * acontecia em Story: a validação substitui o descarte, não convive com ele.
    */
-  it("em reels falado, porQueAssim com regra que nao existe na lista reprova (nao e mais descartado, R1 substitui o hotfix de 01/10/2026)", async () => {
+  /**
+   * Revisão do Fable no PR #89: a citação inválida é descartada, nunca reprova o roteiro (o campo
+   * explica o roteiro, não é o roteiro; foi ele que deixou o Gustavo sem Reels em 01/10/2026).
+   */
+  it("em reels falado, porQueAssim com regra que nao existe na lista e descartado e o roteiro sai", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-pqa", "mancha de vinho no estofado");
 
@@ -507,13 +511,15 @@ describe("V9c, formato (Story)", () => {
     });
 
     try {
-      await expect(
-        gerarRoteiro(clienteId, {
-          origem: "livre",
-          textoTema: "mancha de vinho no estofado",
-          objetivo: "conversao",
-        }),
-      ).rejects.toThrow(/porQueAssim cita regra que nao existe na lista/);
+      const roteiro = await gerarRoteiro(clienteId, {
+        origem: "livre",
+        textoTema: "mancha de vinho no estofado",
+        objetivo: "conversao",
+      });
+
+      expect(roteiro.formato).toBe("reels");
+      expect(roteiro.conteudo.gancho).toBeTruthy();
+      expect(roteiro.conteudo.porQueAssim).toEqual([]);
     } finally {
       gerarEstruturadoMock.mockImplementation(implementacaoOriginal);
     }
