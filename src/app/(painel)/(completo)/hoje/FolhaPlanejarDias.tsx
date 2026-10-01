@@ -1,34 +1,24 @@
 "use client";
 
-import { Mic, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { DiaAgenda, DiaNaoEntendido } from "@/servicos/plano";
 import { textosPlano } from "@/textos/plano";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
+import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
+import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./FolhaPlanejarDias.module.css";
 import { criarPlanoAction, lerAgendaAction } from "./plano/acoes";
 
-/** Mesmo limite do momento (V9a, item 3; V9b, item 1, "mesmo botão de áudio, mesma rota, mesmo limite"). */
-const LIMITE_SEGUNDOS_AUDIO = 120;
-
 type Fase = "entrada" | "gravando" | "transcrevendo" | "lendo" | "revisao" | "confirmando";
 
 /** V9d, item 4: um dia não entendido, mais a data que a pessoa escolheu (vazia até ela preencher). */
 type DiaNaoEntendidoComEscolha = DiaNaoEntendido & { dataEscolhida: string };
-
-/** webm/opus no Chrome e no Android, mp4/aac no Safari (`MediaRecorder.isTypeSupported`). */
-function tipoMimeSuportado(): string | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
-  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
-  return null;
-}
 
 const FORMATAR_DATA = new Intl.DateTimeFormat("pt-BR", {
   weekday: "long",
@@ -71,25 +61,10 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
 
   const [fase, setFase] = useState<Fase>("entrada");
   const [texto, setTexto] = useState("");
-  const [segundos, setSegundos] = useState(0);
-  const [semMicrofone, setSemMicrofone] = useState(false);
   const [dias, setDias] = useState<DiaAgenda[]>([]);
   const [diasNaoEntendidos, setDiasNaoEntendidos] = useState<DiaNaoEntendidoComEscolha[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [camposFaltando, setCamposFaltando] = useState(false);
-
-  const streamRef = useRef<MediaStream | null>(null);
-  const gravadorRef = useRef<MediaRecorder | null>(null);
-  const pedacosRef = useRef<Blob[]>([]);
-  const segundosRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((faixa) => faixa.stop());
-    };
-  }, []);
 
   async function lerAgenda(textoParaLer: string) {
     const limpo = textoParaLer.trim();
@@ -126,68 +101,23 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
     setDiasNaoEntendidos((atual) => atual.filter((_, i) => i !== indice));
   }
 
-  async function transcrever(blob: Blob, tipoMime: string) {
-    setFase("transcrevendo");
-    const forma = new FormData();
-    forma.append("audio", blob, `agenda.${tipoMime.includes("mp4") ? "mp4" : "webm"}`);
-    forma.append("duracaoS", String(segundosRef.current));
-
-    try {
-      const resposta = await fetch("/api/momento/transcrever", { method: "POST", body: forma });
-      const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
-      if (!resposta.ok || !dados || "erro" in dados) {
-        setErro(textosPlano.erroLerAgenda);
-        setFase("entrada");
-        return;
-      }
-      setTexto(dados.transcricao);
-      await lerAgenda(dados.transcricao);
-    } catch {
+  const gravador = useGravadorDeAudio({
+    nomeArquivo: "agenda",
+    async onTranscrito(texto) {
+      setTexto(texto);
+      await lerAgenda(texto);
+    },
+  });
+  /**
+   * `audioVazio` fica fora de propósito (comportamento de sempre: gravar e soltar sem falar nada
+   * só volta para "entrada", sem aviso nenhum); só a falha de transcrição mostra o erro de sempre.
+   */
+  useEffect(() => {
+    if (gravador.erro === "falhaTranscricao") {
       setErro(textosPlano.erroLerAgenda);
       setFase("entrada");
     }
-  }
-
-  async function iniciarGravacao() {
-    setErro(null);
-    const tipoMime = tipoMimeSuportado();
-    if (!navigator.mediaDevices?.getUserMedia || !tipoMime) {
-      setSemMicrofone(true);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const gravador = new MediaRecorder(stream, { mimeType: tipoMime });
-      pedacosRef.current = [];
-      gravador.ondataavailable = (evento) => {
-        if (evento.data.size > 0) pedacosRef.current.push(evento.data);
-      };
-      gravador.onstop = () => {
-        stream.getTracks().forEach((faixa) => faixa.stop());
-        const blob = new Blob(pedacosRef.current, { type: tipoMime });
-        if (blob.size > 0) void transcrever(blob, tipoMime);
-        else setFase("entrada");
-      };
-      gravadorRef.current = gravador;
-      segundosRef.current = 0;
-      setSegundos(0);
-      gravador.start();
-      setFase("gravando");
-      timerRef.current = setInterval(() => {
-        segundosRef.current += 1;
-        setSegundos(segundosRef.current);
-        if (segundosRef.current >= LIMITE_SEGUNDOS_AUDIO) pararGravacao();
-      }, 1000);
-    } catch {
-      setSemMicrofone(true);
-    }
-  }
-
-  function pararGravacao() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    gravadorRef.current?.stop();
-  }
+  }, [gravador.erro]);
 
   async function confirmar() {
     setErro(null);
@@ -207,7 +137,8 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
     }
   }
 
-  const naEntrada = fase === "entrada" || fase === "gravando" || fase === "transcrevendo" || fase === "lendo";
+  const naEntrada = fase === "entrada" || fase === "lendo";
+  const gravandoOuTranscrevendo = gravador.fase === "gravando" || gravador.fase === "transcrevendo";
 
   return (
     <Folha
@@ -220,7 +151,7 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
             variante="primario"
             tamanho="lg"
             precisaDeRede
-            disabled={fase === "gravando" || fase === "transcrevendo"}
+            disabled={gravandoOuTranscrevendo}
             carregando={fase === "lendo"}
             onClick={() => lerAgenda(texto)}
           >
@@ -242,32 +173,17 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
         <>
           <p className={styles.instrucao}>{textosPlano.instrucaoAgenda}</p>
 
-          {semMicrofone ? null : (
-            <div className={styles.blocoAudio}>
-              {fase === "gravando" ? (
-                <Botao variante="secundario" tamanho="lg" onClick={pararGravacao}>
-                  <Square size={18} strokeWidth={1.75} aria-hidden="true" />
-                  {textosPlano.pararGravacaoAgenda}
-                </Botao>
-              ) : (
-                <Botao
-                  variante="secundario"
-                  tamanho="lg"
-                  precisaDeRede
-                  disabled={fase === "transcrevendo"}
-                  carregando={fase === "transcrevendo"}
-                  onClick={iniciarGravacao}
-                >
-                  <Mic size={18} strokeWidth={1.75} aria-hidden="true" />
-                  {textosPlano.botaoGravarAgenda}
-                </Botao>
-              )}
-              {fase === "gravando" ? (
-                <span className={[styles.status, styles.gravando].join(" ")} aria-live="polite">
-                  {textosPlano.gravandoAgenda(segundos)}
-                </span>
-              ) : null}
-            </div>
+          {gravador.semMicrofone ? null : (
+            <GravadorDeAudio
+              fase={gravador.fase}
+              segundos={gravador.segundos}
+              onIniciar={() => void gravador.iniciarGravacao()}
+              onParar={gravador.pararGravacao}
+              rotuloGravar={textosPlano.botaoGravarAgenda}
+              rotuloParar={textosPlano.pararGravacaoAgenda}
+              rotuloTranscrevendo={textosPlano.botaoGravarAgenda}
+              formatarGravando={textosPlano.gravandoAgenda}
+            />
           )}
 
           <div className={styles.divisor}>{textosPlano.ouEscrevaAgenda}</div>

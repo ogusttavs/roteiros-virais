@@ -13,7 +13,7 @@
  * para julgar (o vídeo mantém o valor detectado na coleta por título e descrição) nem sinal
  * confiável de tipo de abertura só com quadros e legenda.
  */
-import { and, asc, desc, eq, gte, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nichos, videos, type AnaliseVideo, type Plataforma } from "@/db/schema";
@@ -40,12 +40,31 @@ type CandidatoSemFala = {
   duracaoS: number | null;
 };
 
+const NOVENTA_DIAS_MS = 90 * 24 * 60 * 60 * 1000;
+
+/**
+ * Item 0a da revisão dos PRs #74/#76: elegível só depois de a transcrição ter sido tentada, nunca
+ * antes. `transcricao IS NULL` sozinho incluía o vídeo que só está esperando a vez na fila do
+ * `transcrever` (teto e pausa); como a ordem dos dois jobs é por views, os dois competiam pelos
+ * mesmos vídeos, e o `extrair-sem-fala` às vezes vencia a corrida com um vídeo que tinha fala de
+ * verdade. Duas formas de "já tentou": a transcrição saiu curta demais (`transcricao` preenchida,
+ * mas abaixo do mínimo) ou a tentativa falhou de verdade e `transcrever.ts`/`extrair-agora.ts` já
+ * marcaram `proximaTentativaTranscricao`.
+ */
 function condicoesElegivelSemFala(nichoId: number, pisoViews: number) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.views, pisoViews),
+    // Item 0b: a mesma janela de 90 dias da evidência, e só vídeo que já foi pontuado
+    // (`fora_da_curva` não nulo); sem isso a leitura mais cara do produto podia gastar o teto
+    // diário num vídeo velho ou na média da própria conta, que nunca vira referência.
+    gte(videos.publicadoEm, new Date(Date.now() - NOVENTA_DIAS_MS)),
+    isNotNull(videos.foraDaCurva),
     isNull(videos.analise),
-    or(isNull(videos.transcricao), sql`char_length(trim(${videos.transcricao})) < ${TAMANHO_MINIMO_TRANSCRICAO}`),
+    or(
+      and(isNotNull(videos.transcricao), sql`char_length(trim(${videos.transcricao})) < ${TAMANHO_MINIMO_TRANSCRICAO}`),
+      isNotNull(videos.proximaTentativaTranscricao),
+    ),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
   ];
@@ -70,7 +89,7 @@ async function candidatosDoNicho(nichoId: number, teto: number): Promise<Candida
     })
     .from(videos)
     .where(and(...condicoesElegivelSemFala(nichoId, regua.pisoViews)))
-    .orderBy(desc(videos.views), asc(videos.id))
+    .orderBy(sql`${videos.foraDaCurva} desc nulls last`, desc(videos.views), asc(videos.id))
     .limit(teto);
 }
 

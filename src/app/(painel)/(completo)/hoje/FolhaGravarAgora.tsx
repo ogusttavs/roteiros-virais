@@ -1,6 +1,5 @@
 "use client";
 
-import { Mic, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
@@ -18,29 +17,18 @@ import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Chips } from "@/ui/componentes/Chips";
 import { Folha } from "@/ui/componentes/Folha";
+import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
+import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./FolhaGravarAgora.module.css";
 import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "./momento/acoes";
 import { aceitarPlanoAction } from "./plano/acoes";
 
-/** O `MediaRecorder` do navegador para aqui (PROXIMO.md, V9a, item 3); a rota recusa áudio mais longo. */
-const LIMITE_SEGUNDOS_AUDIO = 120;
-
-type FaseAudio = "inicial" | "gravando" | "transcrevendo" | "erro";
-
 function primeiraMaiuscula(texto: string): string {
   return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
-
-/** webm/opus no Chrome e no Android, mp4/aac no Safari (`MediaRecorder.isTypeSupported`). */
-function tipoMimeSuportado(): string | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  if (MediaRecorder.isTypeSupported("audio/webm")) return "audio/webm";
-  if (MediaRecorder.isTypeSupported("audio/mp4")) return "audio/mp4";
-  return null;
 }
 
 type MarcaResumo = { id: number; nome: string };
@@ -101,10 +89,6 @@ export function FolhaGravarAgora({
   const router = useRouter();
   const tratarFalha = useTratarFalha();
 
-  const [faseAudio, setFaseAudio] = useState<FaseAudio>("inicial");
-  const [segundos, setSegundos] = useState(0);
-  const [semMicrofone, setSemMicrofone] = useState(false);
-  const [erroAudio, setErroAudio] = useState<string | null>(null);
   const [transcricao, setTranscricao] = useState<string | null>(null);
 
   const [onde, setOnde] = useState(valoresIniciais?.onde ?? "");
@@ -135,97 +119,23 @@ export function FolhaGravarAgora({
    */
   const saiuRef = useRef(false);
 
-  const streamRef = useRef<MediaStream | null>(null);
-  const gravadorRef = useRef<MediaRecorder | null>(null);
-  const pedacosRef = useRef<Blob[]>([]);
-  const segundosRef = useRef(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Sai gravando (troca de tela, fechar a folha) sem deixar o microfone ligado no fundo.
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      streamRef.current?.getTracks().forEach((faixa) => faixa.stop());
-    };
-  }, []);
-
   useEffect(() => {
     if (formatoTocado || !objetivo) return;
     setFormato(sugerirFormatoPeloObjetivo(objetivo));
   }, [objetivo, formatoTocado]);
 
-  async function transcrever(blob: Blob, tipoMime: string) {
-    setFaseAudio("transcrevendo");
-    const forma = new FormData();
-    forma.append("audio", blob, `momento.${tipoMime.includes("mp4") ? "mp4" : "webm"}`);
-    forma.append("duracaoS", String(segundosRef.current));
-
-    try {
-      const resposta = await fetch("/api/momento/transcrever", { method: "POST", body: forma });
-      const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
-      if (!resposta.ok || !dados || "erro" in dados) {
-        setFaseAudio("erro");
-        setErroAudio(textosMomento.erroTranscricao);
-        return;
-      }
+  const { fase: faseAudio, segundos, semMicrofone, erro: erroGravador, iniciarGravacao, pararGravacao } = useGravadorDeAudio({
+    nomeArquivo: "momento",
+    async onTranscrito(texto) {
       // V9b, item 1: a rota só transcreve; separar em campos é uma chamada à parte (a mesma rota serve a agenda).
-      const campos = await lerMomentoDeTextoAction(dados.transcricao);
+      const campos = await lerMomentoDeTextoAction(texto);
       setOnde(campos.onde);
       setOQueEstaAcontecendo(campos.oQueEstaAcontecendo);
       setOQueDaParaMostrar(campos.oQueDaParaMostrar);
-      setTranscricao(dados.transcricao);
-      setFaseAudio("inicial");
-    } catch {
-      setFaseAudio("erro");
-      setErroAudio(textosMomento.erroTranscricao);
-    }
-  }
-
-  async function iniciarGravacao() {
-    setErroAudio(null);
-    const tipoMime = tipoMimeSuportado();
-    if (!navigator.mediaDevices?.getUserMedia || !tipoMime) {
-      setSemMicrofone(true);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const gravador = new MediaRecorder(stream, { mimeType: tipoMime });
-      pedacosRef.current = [];
-      gravador.ondataavailable = (evento) => {
-        if (evento.data.size > 0) pedacosRef.current.push(evento.data);
-      };
-      gravador.onstop = () => {
-        stream.getTracks().forEach((faixa) => faixa.stop());
-        const blob = new Blob(pedacosRef.current, { type: tipoMime });
-        if (blob.size === 0) {
-          setFaseAudio("erro");
-          setErroAudio(textosMomento.audioVazio);
-          return;
-        }
-        void transcrever(blob, tipoMime);
-      };
-      gravadorRef.current = gravador;
-      segundosRef.current = 0;
-      setSegundos(0);
-      gravador.start();
-      setFaseAudio("gravando");
-      timerRef.current = setInterval(() => {
-        segundosRef.current += 1;
-        setSegundos(segundosRef.current);
-        if (segundosRef.current >= LIMITE_SEGUNDOS_AUDIO) pararGravacao();
-      }, 1000);
-    } catch {
-      setSemMicrofone(true);
-    }
-  }
-
-  function pararGravacao() {
-    if (timerRef.current) clearInterval(timerRef.current);
-    gravadorRef.current?.stop();
-  }
+      setTranscricao(texto);
+    },
+  });
+  const erroAudio = erroGravador === "audioVazio" ? textosMomento.audioVazio : erroGravador === "falhaTranscricao" ? textosMomento.erroTranscricao : null;
 
   function validarCampos(): boolean {
     return onde.trim().length > 0 && oQueEstaAcontecendo.trim().length > 0 && oQueDaParaMostrar.trim().length > 0;
@@ -297,36 +207,23 @@ export function FolhaGravarAgora({
         {semMicrofone ? (
           <p className={styles.avisoAudio}>{textosMomento.semMicrofone}</p>
         ) : (
-          <div className={styles.blocoAudio}>
-            {faseAudio === "gravando" ? (
-              <Botao variante="secundario" tamanho="lg" onClick={pararGravacao}>
-                <Square size={18} strokeWidth={1.75} aria-hidden="true" />
-                {textosMomento.botaoParar}
-              </Botao>
-            ) : (
-              <Botao
-                variante="secundario"
-                tamanho="lg"
-                precisaDeRede
-                disabled={faseAudio === "transcrevendo"}
-                carregando={faseAudio === "transcrevendo"}
-                onClick={iniciarGravacao}
-              >
-                <Mic size={18} strokeWidth={1.75} aria-hidden="true" />
-                {faseAudio === "transcrevendo" ? textosMomento.transcrevendo : textosMomento.botaoGravar}
-              </Botao>
-            )}
-            {faseAudio === "gravando" ? (
-              <span className={[styles.status, styles.gravando].join(" ")} aria-live="polite">
-                {textosMomento.gravando(segundos)}
-              </span>
-            ) : null}
+          <>
+            <GravadorDeAudio
+              fase={faseAudio}
+              segundos={segundos}
+              onIniciar={() => void iniciarGravacao()}
+              onParar={pararGravacao}
+              rotuloGravar={textosMomento.botaoGravar}
+              rotuloParar={textosMomento.botaoParar}
+              rotuloTranscrevendo={textosMomento.transcrevendo}
+              formatarGravando={textosMomento.gravando}
+            />
             {erroAudio ? (
               <p className={styles.erro} role="alert">
                 {erroAudio}
               </p>
             ) : null}
-          </div>
+          </>
         )}
 
         {transcricao ? (

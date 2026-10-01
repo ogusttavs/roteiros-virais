@@ -1,0 +1,16 @@
+.blocoAudio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: center;
+  text-align: center;
+}
+
+.status {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.gravando {
+  color: var(--cor-erro);
+}

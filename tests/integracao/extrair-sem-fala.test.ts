@@ -43,12 +43,19 @@ async function criarNicho(slug: string, videoSemFalaVale: boolean | null) {
   return nicho;
 }
 
+/**
+ * `transcricao` por padrão "muito curta" (não `null`): item 0a da revisão dos PRs #74/#76, elegível
+ * só depois da tentativa de transcrição. Um teste que precisa do caso "nunca tentou" passa
+ * `transcricao: null` explícito, sem `proximaTentativaTranscricao`.
+ */
 async function criarVideo(
   nichoId: number,
   idExterno: string,
   opcoes: {
     views: number;
+    foraDaCurva?: number;
     transcricao?: string | null;
+    proximaTentativaTranscricao?: Date;
     analise?: unknown;
     duracaoS?: number;
     publicadoEm?: Date;
@@ -65,8 +72,10 @@ async function criarVideo(
       titulo: `[exemplo] video ${idExterno}`,
       descricao: "legenda do post de exemplo",
       views: opcoes.views,
+      foraDaCurva: opcoes.foraDaCurva === undefined ? "5" : String(opcoes.foraDaCurva),
       publicadoEm: opcoes.publicadoEm ?? diasAtras(2),
-      transcricao: opcoes.transcricao === undefined ? null : opcoes.transcricao,
+      transcricao: opcoes.transcricao === undefined ? "muito curta" : opcoes.transcricao,
+      proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
       analise: opcoes.analise as never,
       duracaoS: opcoes.duracaoS,
       idioma: opcoes.idioma === undefined ? null : opcoes.idioma,
@@ -93,7 +102,7 @@ beforeEach(() => {
 describe("rodarExtrairSemFala", () => {
   it("analisa o video sem fala do setor que aceita e grava analise e etiquetas, sem tocar idioma nem tipoAbertura", async () => {
     const nicho = await criarNicho("extrair-sem-fala-aceita", true);
-    const v = await criarVideo(nicho.id, "extrair-sem-fala-candidato", { views: 100_000, transcricao: null, idioma: "en" });
+    const v = await criarVideo(nicho.id, "extrair-sem-fala-candidato", { views: 100_000, idioma: "en" });
 
     const resumo = await rodarExtrairSemFala(nicho.id);
     expect(resumo.analisados).toBe(1);
@@ -114,7 +123,7 @@ describe("rodarExtrairSemFala", () => {
 
   it("setor que nao aceita video sem fala (padrao) nunca analisa, mesmo com candidato elegivel", async () => {
     const nicho = await criarNicho("extrair-sem-fala-recusa", false);
-    await criarVideo(nicho.id, "extrair-sem-fala-recusado", { views: 100_000, transcricao: null });
+    await criarVideo(nicho.id, "extrair-sem-fala-recusado", { views: 100_000 });
 
     const resumo = await rodarExtrairSemFala(nicho.id);
     expect(resumo.analisados).toBe(0);
@@ -140,7 +149,7 @@ describe("rodarExtrairSemFala", () => {
 
   it("video abaixo do piso do setor nao entra", async () => {
     const nicho = await criarNicho("extrair-sem-fala-abaixo-do-piso", true);
-    await criarVideo(nicho.id, "extrair-sem-fala-abaixo-do-piso-video", { views: 1_000, transcricao: null });
+    await criarVideo(nicho.id, "extrair-sem-fala-abaixo-do-piso-video", { views: 1_000 });
 
     const resumo = await rodarExtrairSemFala(nicho.id);
     expect(resumo.analisados).toBe(0);
@@ -153,7 +162,6 @@ describe("rodarExtrairSemFala", () => {
     const nicho = await criarNicho("extrair-sem-fala-ja-analisado", true);
     await criarVideo(nicho.id, "extrair-sem-fala-ja-analisado-video", {
       views: 100_000,
-      transcricao: null,
       analise: {
         assunto: "ja lido",
         gancho: "gancho",
@@ -176,11 +184,68 @@ describe("rodarExtrairSemFala", () => {
     const nicho = await criarNicho("extrair-sem-fala-teto", true);
     const total = config.regras.analiseSemFalaPorDia + 3;
     for (let i = 0; i < total; i += 1) {
-      await criarVideo(nicho.id, `extrair-sem-fala-teto-${i}`, { views: 100_000 + i, transcricao: null });
+      await criarVideo(nicho.id, `extrair-sem-fala-teto-${i}`, { views: 100_000 + i });
     }
 
     const resumo = await rodarExtrairSemFala(nicho.id);
     expect(resumo.analisados).toBe(config.regras.analiseSemFalaPorDia);
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0a: video sem transcricao e sem tentativa nunca entra (so esperando a vez do transcrever)", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-sem-tentativa", true);
+    await criarVideo(nicho.id, "extrair-sem-fala-sem-tentativa-video", { views: 100_000, transcricao: null });
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.analisados).toBe(0);
+    expect(baixarVideo480p).not.toHaveBeenCalled();
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0a: sem transcricao mas com proximaTentativaTranscricao (tentou e falhou) entra", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-tentou-falhou", true);
+    const v = await criarVideo(nicho.id, "extrair-sem-fala-tentou-falhou-video", {
+      views: 100_000,
+      transcricao: null,
+      proximaTentativaTranscricao: new Date(Date.now() + 7 * DIA_MS),
+    });
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith(v.url, "youtube");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0b: video fora da janela de 90 dias nao entra, mesmo elegivel no resto", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-video-velho", true);
+    await criarVideo(nicho.id, "extrair-sem-fala-video-velho-video", { views: 100_000, publicadoEm: diasAtras(120) });
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.analisados).toBe(0);
+    expect(baixarVideo480p).not.toHaveBeenCalled();
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0b: com o teto menor que os candidatos, o de maior fora_da_curva entra, o na media da conta fica de fora", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-ordem", true);
+    const bom = await criarVideo(nicho.id, "extrair-sem-fala-ordem-bom", { views: 100_000, foraDaCurva: 8 });
+    const naMedia = await criarVideo(nicho.id, "extrair-sem-fala-ordem-na-media", { views: 100_000, foraDaCurva: 1.1 });
+
+    // Os dois cabem no teto de 15 desta rodada (o corte em si já tem teste próprio, acima); a
+    // prova aqui é a ordem: o de maior fora_da_curva é baixado primeiro, para quando o teto
+    // apertar (setor com muito candidato) o vídeo na média da conta ser o que fica de fora.
+    await rodarExtrairSemFala(nicho.id);
+
+    const chamadas = vi.mocked(baixarVideo480p).mock.calls.map((args) => args[0]);
+    const posicaoBom = chamadas.indexOf(bom.url);
+    const posicaoNaMedia = chamadas.indexOf(naMedia.url);
+    expect(posicaoBom).toBeGreaterThanOrEqual(0);
+    expect(posicaoNaMedia).toBeGreaterThanOrEqual(0);
+    expect(posicaoBom).toBeLessThan(posicaoNaMedia);
 
     await db().delete(videos).where(eq(videos.nichoId, nicho.id));
   });

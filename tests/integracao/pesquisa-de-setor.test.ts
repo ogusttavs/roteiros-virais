@@ -45,6 +45,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { buscarTiktokVigilancia } from "@/jobs/apify-api";
 import { rodarPesquisaDeSetor } from "@/jobs/pesquisa-de-setor";
+import { logger } from "@/lib/log";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -228,6 +229,57 @@ describe("rodarPesquisaDeSetor", () => {
     expect((resumo as { descartadas: Record<string, number> }).descartadas.video_longo_demais).toBeGreaterThanOrEqual(1);
     const contasCriadas = await db().select().from(contas).where(eq(contas.nichoId, nichoId));
     expect(contasCriadas).toHaveLength(0);
+  }, 30_000);
+
+  it("item 0c: canal do youtube sem playlist de uploads (playlistNotFound) e descartado como sem_videos, avisado, nao como erro", async () => {
+    const nome = "Pesquisa Setor Sem Videos";
+    const nichoId = await criarNicho(nome);
+    const handle = handleSugerido(nome);
+    const canal: Canal = { id: "canal-sem-videos", country: "BR", playlistId: "UUsemvideos" };
+
+    mockFetch.mockImplementation(async (url: URL) => {
+      const texto = url.toString();
+      if (texto.includes("/search")) return respostaJson({ items: [] });
+      if (texto.includes("/channels")) {
+        const handleDaChamada = url.searchParams.get("forHandle") ?? url.searchParams.get("id") ?? "";
+        if (handleDaChamada !== handle) return respostaJson({ items: [] });
+        return respostaJson({
+          items: [
+            {
+              id: canal.id,
+              snippet: { title: `[exemplo] canal ${canal.id}`, country: canal.country },
+              contentDetails: { relatedPlaylists: { uploads: canal.playlistId } },
+            },
+          ],
+        });
+      }
+      if (texto.includes("/playlistItems")) {
+        // Resposta real da API quando o canal existe mas nunca teve a playlist de uploads criada
+        // (achado da revisão do item 0c: canal sem nenhum vídeo publicado).
+        return new Response(
+          JSON.stringify({ error: { code: 404, message: "The playlist identified with the request's playlistId parameter cannot be found.", errors: [{ reason: "playlistNotFound" }] } }),
+          { status: 404, headers: { "content-type": "application/json" } },
+        );
+      }
+      throw new Error(`chamada inesperada nesta fixture: ${texto}`);
+    });
+
+    const espiaoWarn = vi.spyOn(logger, "warn");
+    const espiaoError = vi.spyOn(logger, "error");
+    try {
+      const resumo = await rodarPesquisaDeSetor(nichoId);
+
+      expect((resumo as { confirmadas: { youtube: number } }).confirmadas.youtube).toBe(0);
+      // Nao e mais contado junto de "sugerido e nao existe": o canal existe, so nao tem video (o
+      // TikTok e o Instagram sugeridos por padrao continuam caindo em sugerido_e_nao_existe, sem
+      // relacao com este teste; so o YouTube importa aqui).
+      expect((resumo as { descartadas: Record<string, number> }).descartadas.sem_videos).toBe(1);
+      expect(espiaoWarn).toHaveBeenCalledWith(expect.objectContaining({ rede: "youtube", handle }), expect.stringContaining("sem_videos"));
+      expect(espiaoError).not.toHaveBeenCalledWith(expect.anything(), expect.stringContaining("falha conferindo candidato"));
+    } finally {
+      espiaoWarn.mockRestore();
+      espiaoError.mockRestore();
+    }
   }, 30_000);
 
   it("conta ja tirada (removida_em preenchido) nunca volta a ser proposta pela pesquisa", async () => {

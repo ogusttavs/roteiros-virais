@@ -94,6 +94,20 @@ export const textosBriefing = {
     usarEstaSugestao: "Usar esta sugestão",
     sugestaoAplicada: "Resposta substituída pela sugestão",
     desfazerSugestao: "Desfazer",
+    /**
+     * P2, item 2: "Responder falando" ao lado do campo. O rótulo muda com a fase do gravador
+     * (`useGravadorDeAudio`); o mesmo texto de `textosMomento` para o aparelho sem microfone,
+     * para a pessoa reconhecer o aviso.
+     */
+    botaoResponderFalando: "Responder falando",
+    botaoPararDeFalar: "Parar",
+    organizandoFala: "Organizando o que você falou",
+    semMicrofone: "Não conseguimos usar o microfone deste aparelho. Pode escrever direto.",
+    audioVazioFala: "Não deu para entender o áudio. Tente de novo ou escreva direto.",
+    erroTranscricaoFala: "Não conseguimos ouvir o áudio agora. Tente de novo ou escreva direto.",
+    /** Item 5: a linha que avisa que dá para responder falando, perto do botão. */
+    dicaResponderFalando: "Pode responder falando: toque no microfone e conte como se fosse para um amigo.",
+    respostaFaladaAplicada: "Resposta substituída pelo que você falou",
     erroAviso: "Não deu para avaliar agora",
     erroExplicacao: "A sua resposta está salva. A falha foi nossa e você não precisa escrever de novo.",
     /**

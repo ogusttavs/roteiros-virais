@@ -15,9 +15,9 @@ export async function salvarDadosFixosAction(dadosBrutos: unknown) {
   return salvarDadosFixos(cliente.id, dadosBrutos);
 }
 
-export async function salvarRascunhoAction(perguntaId: string, resposta: string) {
+export async function salvarRascunhoAction(perguntaId: string, resposta: string, transcricaoBruta?: string) {
   const cliente = await clienteDaSessaoAtual();
-  await salvarRascunho(cliente.id, perguntaId, resposta, cliente.tipo);
+  await salvarRascunho(cliente.id, perguntaId, resposta, cliente.tipo, transcricaoBruta);
 }
 
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {

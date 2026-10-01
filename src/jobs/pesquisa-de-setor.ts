@@ -30,7 +30,7 @@ import { gerarEstruturado } from "@/ia/cliente";
 import * as classificarContaDoSetor from "@/ia/prompts/classificarContaDoSetor";
 import * as sugerirContasDoSetor from "@/ia/prompts/sugerirContasDoSetor";
 import { calcularCustoUsd, registrarGeracao } from "@/ia/registro";
-import { buscarBusinessDiscovery, buscarIdDaHashtag, buscarRecentMediaDaHashtag, chamadasDesde } from "@/jobs/meta-api";
+import { buscarBusinessDiscovery, buscarIdDaHashtag, buscarRecentMediaDaHashtag, chamadasDesde, ErroMetaApi, erroMetaEhDaConta } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
@@ -52,6 +52,7 @@ import {
   buscarVideosPorId,
   CUSTO_LISTA,
   CUSTO_SEARCH,
+  ErroYoutubeApi,
 } from "./youtube-api";
 
 /** Até 30 por rede (item 3), nunca mais. */
@@ -232,6 +233,8 @@ async function confirmarTiktok(handle: string, apifyCabe: () => boolean): Promis
 
 type MotivoDescarte =
   | "sugerido_e_nao_existe"
+  /** Item 0c da revisão dos PRs #74/#76: canal do YouTube existe mas não tem playlist de uploads. */
+  | "sem_videos"
   | "video_longo_demais"
   | "nao_brasileiro"
   | "inativo"
@@ -423,6 +426,14 @@ async function pesquisarUmSetor(nichoId: number): Promise<Record<string, unknown
       vistos.add(chaveDeduplicacao);
 
       let confirmado: ContaConfirmada | null;
+      /**
+       * Item 0c da revisão dos PRs #74/#76 (achado na primeira rodada em produção, 30/09): handle
+       * inexistente (`ErroMetaApi` de código 100/110, "Invalid user id") e canal do YouTube sem
+       * playlist de uploads (`ErroYoutubeApi` com "playlistNotFound" no corpo) são casos esperados
+       * da conferência, não falha de verdade; viravam erro (nível 50) e o segundo entrava junto de
+       * "sugerido e não existe", quando na verdade o canal existe, só não tem vídeo.
+       */
+      let motivoDoErro: "sem_videos" | null = null;
       try {
         if (rede === "youtube") confirmado = await confirmarYoutube(handleOuId);
         else if (rede === "instagram") confirmado = await confirmarInstagram(handleOuId);
@@ -431,12 +442,19 @@ async function pesquisarUmSetor(nichoId: number): Promise<Record<string, unknown
           if (confirmado) apifyGastoNestaRodada += confirmado.videos.length;
         }
       } catch (erro) {
-        logger.error({ err: erro, rede, handle: handleOuId }, "pesquisa-de-setor: falha conferindo candidato");
+        if (erro instanceof ErroYoutubeApi && erro.message.includes("playlistNotFound")) {
+          logger.warn({ rede, handle: handleOuId }, "pesquisa-de-setor: canal sem playlist de uploads (sem_videos)");
+          motivoDoErro = "sem_videos";
+        } else if (erro instanceof ErroMetaApi && erroMetaEhDaConta(erro)) {
+          logger.warn({ rede, handle: handleOuId, motivo: erro.message }, "pesquisa-de-setor: handle sugerido nao existe");
+        } else {
+          logger.error({ err: erro, rede, handle: handleOuId }, "pesquisa-de-setor: falha conferindo candidato");
+        }
         confirmado = null;
       }
 
       if (!confirmado) {
-        registrarDescarte("sugerido_e_nao_existe");
+        registrarDescarte(motivoDoErro ?? "sugerido_e_nao_existe");
         continue;
       }
       const chaveFinal = `${confirmado.plataforma}:${confirmado.handle.toLowerCase()}`;

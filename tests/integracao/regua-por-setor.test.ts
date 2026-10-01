@@ -53,6 +53,7 @@ async function criarVideo(
     foraDaCurva?: number;
     velocidadeRelativa?: number;
     transcricao?: string | null;
+    proximaTentativaTranscricao?: Date;
     analise?: boolean;
     publicadoEm?: Date;
   },
@@ -70,6 +71,7 @@ async function criarVideo(
       foraDaCurva: opcoes.foraDaCurva === undefined ? null : String(opcoes.foraDaCurva),
       velocidadeRelativa: opcoes.velocidadeRelativa === undefined ? null : String(opcoes.velocidadeRelativa),
       transcricao: opcoes.transcricao === undefined ? null : opcoes.transcricao,
+      proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
       idioma: "pt",
       analise: opcoes.analise === false ? null : ({ ...ANALISE_EXEMPLO, assunto: idExterno } as never),
     })
@@ -215,12 +217,28 @@ describe("efeitoPiso (M3, item 3: o admin mostra o efeito antes de salvar)", () 
 });
 
 describe("contagemElegivelSemFala (M3, item 3, e a elegibilidade do job extrair-sem-fala)", () => {
-  it("video sem transcricao, acima do piso e sem analise conta como elegivel", async () => {
-    const nicho = await criarNicho("elegivel-sem-fala");
-    const conta = await criarConta(nicho.id, "elegivel-sem-fala-conta");
-    await criarVideo(nicho.id, conta, "elegivel-sem-fala-video", {
+  it("item 0a: video sem transcricao e sem tentativa nao conta (so espera a vez na fila do transcrever)", async () => {
+    const nicho = await criarNicho("elegivel-sem-fala-sem-tentativa");
+    const conta = await criarConta(nicho.id, "elegivel-sem-fala-sem-tentativa-conta");
+    await criarVideo(nicho.id, conta, "elegivel-sem-fala-sem-tentativa-video", {
       views: 100_000,
+      foraDaCurva: 5,
       transcricao: null,
+      analise: false,
+      publicadoEm: diasAtras(2),
+    });
+
+    const efeito = await contagemElegivelSemFala(nicho.id, 50_000);
+    expect(efeito.elegiveis7Dias).toBe(0);
+  });
+
+  it("item 0a: transcricao curta demais (ja tentou) conta como elegivel", async () => {
+    const nicho = await criarNicho("elegivel-sem-fala-curta");
+    const conta = await criarConta(nicho.id, "elegivel-sem-fala-curta-conta");
+    await criarVideo(nicho.id, conta, "elegivel-sem-fala-curta-video", {
+      views: 100_000,
+      foraDaCurva: 5,
+      transcricao: "muito curta",
       analise: false,
       publicadoEm: diasAtras(2),
     });
@@ -230,11 +248,28 @@ describe("contagemElegivelSemFala (M3, item 3, e a elegibilidade do job extrair-
     expect(efeito.elegiveis30Dias).toBe(1);
   });
 
+  it("item 0a: sem transcricao mas com proximaTentativaTranscricao (tentou e falhou) conta como elegivel", async () => {
+    const nicho = await criarNicho("elegivel-sem-fala-tentou-falhou");
+    const conta = await criarConta(nicho.id, "elegivel-sem-fala-tentou-falhou-conta");
+    await criarVideo(nicho.id, conta, "elegivel-sem-fala-tentou-falhou-video", {
+      views: 100_000,
+      foraDaCurva: 5,
+      transcricao: null,
+      proximaTentativaTranscricao: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      analise: false,
+      publicadoEm: diasAtras(2),
+    });
+
+    const efeito = await contagemElegivelSemFala(nicho.id, 50_000);
+    expect(efeito.elegiveis7Dias).toBe(1);
+  });
+
   it("video com transcricao longa o bastante nao conta (o caminho normal de extracao ja serve)", async () => {
     const nicho = await criarNicho("elegivel-sem-fala-com-transcricao");
     const conta = await criarConta(nicho.id, "elegivel-sem-fala-com-transcricao-conta");
     await criarVideo(nicho.id, conta, "elegivel-sem-fala-com-transcricao-video", {
       views: 100_000,
+      foraDaCurva: 5,
       transcricao: "uma transcricao bem mais longa do que o minimo de oitenta caracteres exigido pelo extrator de video comum",
       analise: false,
       publicadoEm: diasAtras(2),
@@ -249,7 +284,9 @@ describe("contagemElegivelSemFala (M3, item 3, e a elegibilidade do job extrair-
     const conta = await criarConta(nicho.id, "elegivel-sem-fala-ja-analisado-conta");
     await criarVideo(nicho.id, conta, "elegivel-sem-fala-ja-analisado-video", {
       views: 100_000,
+      foraDaCurva: 5,
       transcricao: null,
+      proximaTentativaTranscricao: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       analise: true,
       publicadoEm: diasAtras(2),
     });
@@ -258,17 +295,47 @@ describe("contagemElegivelSemFala (M3, item 3, e a elegibilidade do job extrair-
     expect(efeito.elegiveis7Dias).toBe(0);
   });
 
-  it("video abaixo do piso proposto nao conta, mesmo sem transcricao e sem analise", async () => {
+  it("video abaixo do piso proposto nao conta, mesmo ja tentado e sem analise", async () => {
     const nicho = await criarNicho("elegivel-sem-fala-abaixo-do-piso");
     const conta = await criarConta(nicho.id, "elegivel-sem-fala-abaixo-do-piso-conta");
     await criarVideo(nicho.id, conta, "elegivel-sem-fala-abaixo-do-piso-video", {
       views: 1_000,
-      transcricao: null,
+      foraDaCurva: 5,
+      transcricao: "muito curta",
       analise: false,
       publicadoEm: diasAtras(2),
     });
 
     const efeito = await contagemElegivelSemFala(nicho.id, 50_000);
     expect(efeito.elegiveis7Dias).toBe(0);
+  });
+
+  it("item 0b: sem fora_da_curva (ainda nao pontuado) nao conta, mesmo com o resto elegivel", async () => {
+    const nicho = await criarNicho("elegivel-sem-fala-sem-fora-da-curva");
+    const conta = await criarConta(nicho.id, "elegivel-sem-fala-sem-fora-da-curva-conta");
+    await criarVideo(nicho.id, conta, "elegivel-sem-fala-sem-fora-da-curva-video", {
+      views: 100_000,
+      transcricao: "muito curta",
+      analise: false,
+      publicadoEm: diasAtras(2),
+    });
+
+    const efeito = await contagemElegivelSemFala(nicho.id, 50_000);
+    expect(efeito.elegiveis7Dias).toBe(0);
+  });
+
+  it("item 0b: video fora da janela de 90 dias nao conta, mesmo com o resto elegivel", async () => {
+    const nicho = await criarNicho("elegivel-sem-fala-video-velho");
+    const conta = await criarConta(nicho.id, "elegivel-sem-fala-video-velho-conta");
+    await criarVideo(nicho.id, conta, "elegivel-sem-fala-video-velho-video", {
+      views: 100_000,
+      foraDaCurva: 5,
+      transcricao: "muito curta",
+      analise: false,
+      publicadoEm: diasAtras(120),
+    });
+
+    const efeito = await contagemElegivelSemFala(nicho.id, 50_000);
+    expect(efeito.elegiveis30Dias).toBe(0);
   });
 });

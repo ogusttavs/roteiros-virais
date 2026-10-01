@@ -12,9 +12,11 @@ export type { NivelIA };
  * 1 a 3 gravacoes por dia do plano), `sugerirContasDoSetor` (M2, item 1c: ate
  * 30 perfis brasileiros por rede, sempre conferidos na API antes de entrar) e
  * `classificarContaDoSetor` (M2, item 2: "este perfil e deste setor?", pelos
- * ultimos titulos/legendas, mesmo criterio do `pertenceAoNicho` por video) e
+ * ultimos titulos/legendas, mesmo criterio do `pertenceAoNicho` por video),
  * `extrairVideoSemFala` (M3, item 2: a ficha fixa pelos quadros e pela legenda,
- * para o setor que aceita "video sem fala vale").
+ * para o setor que aceita "video sem fala vale") e `organizarFalaBriefing`
+ * (P2, item 3: tira as muletas de fala de uma resposta de briefing gravada,
+ * sem acrescentar fato nem resumir).
  */
 export type TarefaIA =
   | "avaliarResposta"
@@ -34,7 +36,8 @@ export type TarefaIA =
   | "lerAgenda"
   | "planejarDia"
   | "sugerirContasDoSetor"
-  | "classificarContaDoSetor";
+  | "classificarContaDoSetor"
+  | "organizarFalaBriefing";
 
 export type ImagemEntrada = {
   base64: string;
