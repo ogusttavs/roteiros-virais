@@ -32,6 +32,7 @@ import {
 import { gerarEstruturado } from "@/ia/cliente";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
+import { NUMEROS_REGRAS_STORY, regrasDoReels } from "@/ia/prompts/regras-formato";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { registrarGeracao } from "@/ia/registro";
@@ -848,13 +849,16 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   const quemApareceResolvido = resolverQuemAparece(dados.quemAparece, dados.cliente);
 
   /**
-   * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existe em Story falado,
-   * o único formato com regras numeradas de plataforma no prompt. Fora dele o campo é descartado
-   * antes do verificador e do que se grava: o modelo às vezes o enchia com as regras duras em texto
-   * livre, o verificador reprovava duas vezes e a pessoa ficava sem roteiro por um campo que nem
-   * aparece para ela.
+   * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existia em Story
+   * falado, o único formato com regras numeradas de plataforma no prompt. R1, item 2: o Reels
+   * falado passa a ter regras de plataforma também (a rede principal da marca), então `usaPorQueAssim`
+   * passa a valer para os dois; sem fala continua de fora (nenhuma regra numerada ainda).
    */
-  const usaPorQueAssim = dados.formato === "story" && dados.estilo !== "sem_fala";
+  const usaPorQueAssim = dados.estilo !== "sem_fala";
+  /** R1, item 2: a rede principal da marca escolhe o conjunto de regras que o Reels falado segue. */
+  const redeReels = regrasDoReels(dados.cliente.redePrincipal, modeloNichoLinha?.modelo.duracaoTipicaS.max);
+  const numerosRegrasValidas =
+    dados.formato === "story" ? NUMEROS_REGRAS_STORY : new Set(redeReels.regras.map((r) => r.numero));
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -863,10 +867,13 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     versaoPrompt: roteiroIA.versao,
     clienteId: dados.clienteId,
     schema: roteiroIA.schema,
+    numerosRegrasPlataforma: numerosRegrasValidas,
     sistemaEstavel: roteiroIA.montarSistemaEstavel({
       perfilCompilado,
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
+      redePrincipal: dados.cliente.redePrincipal,
+      duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS.max,
       regrasCliente,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,

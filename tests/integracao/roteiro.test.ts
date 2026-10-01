@@ -458,7 +458,12 @@ describe("gerarRoteiro", () => {
 });
 
 describe("V9c, formato (Story)", () => {
-  it("sem formato, gera reels: coluna formato e narrativa classica, sem cartoes", async () => {
+  /**
+   * R1, item 2: Reels falado agora também segue regras de plataforma (antes só Story); sem
+   * `redePrincipal` definida, a rede padrão do produto é Instagram, então o modelo cita
+   * `R-IG-REEL-nn`.
+   */
+  it("sem formato, gera reels: coluna formato e narrativa classica, sem cartoes, com porQueAssim da rede padrao (Instagram)", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-1", "mancha de vinho no estofado");
 
@@ -471,10 +476,20 @@ describe("V9c, formato (Story)", () => {
     expect(roteiro.formato).toBe("reels");
     expect(roteiro.conteudo.gancho).toBeTruthy();
     expect(roteiro.conteudo.cartoes).toBeNull();
-    expect(roteiro.conteudo.porQueAssim).toEqual([]);
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-IG-REEL-\d{2}$/);
+    }
   });
 
-  it("em reels falado, porQueAssim preenchido pelo modelo com regra em texto livre e descartado, nao reprova (hotfix de 01/10/2026)", async () => {
+  /**
+   * R1, item 2: antes desta etapa, Reels falado não tinha regra de plataforma nenhuma para
+   * validar contra, então o hotfix de 01/10/2026 descartava `porQueAssim` inteiro fora de Story
+   * falado (nunca reprovava por isso). Agora que o Reels tem a rede principal da marca
+   * (`regrasDoReels`), uma regra inventada ou em texto livre reprova de verdade, como já
+   * acontecia em Story: a validação substitui o descarte, não convive com ele.
+   */
+  it("em reels falado, porQueAssim com regra que nao existe na lista reprova (nao e mais descartado, R1 substitui o hotfix de 01/10/2026)", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-pqa", "mancha de vinho no estofado");
 
@@ -492,14 +507,13 @@ describe("V9c, formato (Story)", () => {
     });
 
     try {
-      const roteiro = await gerarRoteiro(clienteId, {
-        origem: "livre",
-        textoTema: "mancha de vinho no estofado",
-        objetivo: "conversao",
-      });
-
-      expect(roteiro.formato).toBe("reels");
-      expect(roteiro.conteudo.porQueAssim).toEqual([]);
+      await expect(
+        gerarRoteiro(clienteId, {
+          origem: "livre",
+          textoTema: "mancha de vinho no estofado",
+          objetivo: "conversao",
+        }),
+      ).rejects.toThrow(/porQueAssim cita regra que nao existe na lista/);
     } finally {
       gerarEstruturadoMock.mockImplementation(implementacaoOriginal);
     }

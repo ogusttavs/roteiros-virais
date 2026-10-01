@@ -116,6 +116,12 @@ export function verificarLocalmente(
     legenda?: string | null;
     porQueAssim?: { regra: string; motivo: string }[];
     /**
+     * R1, item 2: os números válidos para `porQueAssim`, pelo formato e pela rede de verdade deste
+     * roteiro (Story sempre usa `R-IG-STORY`; Reels falado usa a rede principal da marca,
+     * `regrasDoReels`). Sem valor, usa `R-IG-STORY` (o único conjunto que existia antes da R1).
+     */
+    numerosRegrasPlataforma?: Set<string>;
+    /**
      * V9d, item 1: os valores brutos de `gancho`, `corpo` e `chamadaFinal`, antes do filtro de
      * `extrairCamposRoteiro` (que já tira do `campos` qualquer um vazio ou nulo, em qualquer
      * formato). Sem isto, um roteiro em Reels que saísse com `gancho` nulo (o schema 2.0.0 aceita,
@@ -259,9 +265,10 @@ export function verificarLocalmente(
   }
 
   if (opcoes.porQueAssim && opcoes.porQueAssim.length > 0) {
+    const numerosValidos = opcoes.numerosRegrasPlataforma ?? NUMEROS_REGRAS_STORY;
     const invalidas = opcoes.porQueAssim
       .map((item) => item.regra)
-      .filter((regra) => !NUMEROS_REGRAS_STORY.has(regra));
+      .filter((regra) => !numerosValidos.has(regra));
     if (invalidas.length > 0) {
       motivos.push(`porQueAssim cita regra que nao existe na lista: ${invalidas.join(", ")}`);
     }
@@ -559,6 +566,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   estilo?: EstiloRoteiro;
   extrairCartoes?: (dados: T) => CartaoStory[] | null;
   extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
+  /** R1, item 2: os números válidos para `porQueAssim` deste roteiro específico (ver `verificarLocalmente`). */
+  numerosRegrasPlataforma?: Set<string>;
   /** M4, item 4: a legenda do post, só no estilo sem fala. */
   extrairLegenda?: (dados: T) => string | null;
   /** V9d, item 1: gancho, corpo e chamadaFinal brutos, para `verificarLocalmente` reprovar um Reels vazio (ver lá). */
@@ -641,6 +650,7 @@ async function tentarGerarEVerificar<T>(
     cartoes: params.extrairCartoes?.(resultado.dados),
     legenda: params.extrairLegenda?.(resultado.dados),
     porQueAssim: params.extrairPorQueAssim?.(resultado.dados),
+    numerosRegrasPlataforma: params.numerosRegrasPlataforma,
     narrativa: params.extrairNarrativa?.(resultado.dados),
   });
 

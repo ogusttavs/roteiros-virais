@@ -341,9 +341,9 @@ describe("montarSistemaEstavel, formato story", () => {
     expect(sistema).toContain("no máximo 150 palavras de fala");
   });
 
-  it("porQueAssim so aceita regra R-IG-STORY, nunca as regras duras numeradas de 1 a 12", () => {
+  it("porQueAssim so aceita regra R-IG-STORY, nunca as regras duras numeradas de 1 a 15", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story" });
-    expect(sistema).toContain("nunca as regras duras numeradas de 1 a 12");
+    expect(sistema).toContain("nunca as regras duras numeradas de 1 a 15");
   });
 
   it("porQueAssim proibe cada palavra do catalogo de jargao, montado em tempo de execucao", () => {
@@ -351,5 +351,64 @@ describe("montarSistemaEstavel, formato story", () => {
     for (const item of JARGAO) {
       expect(sistema).toContain(`nunca "${item.palavra}"`);
     }
+  });
+});
+
+/**
+ * R1, item 2 (pedido do Gustavo em 29/09/2026): o Reels falado passa a seguir as regras da rede
+ * principal da marca, igual ao Story já faz com `R-IG-STORY`.
+ */
+describe("montarSistemaEstavel, regras de plataforma no Reels falado (R1, item 2)", () => {
+  const BASE_SISTEMA = {
+    perfilCompilado: "perfil do cliente",
+    modeloNicho: "modelo do nicho",
+    camadaExclusiva: "camada exclusiva",
+    tipo: "negocio" as const,
+    formato: "reels" as const,
+    estilo: "falado" as const,
+    regrasCliente: [],
+  };
+
+  it("sem rede principal, usa Instagram (o padrao do produto)", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA });
+    expect(sistema).toContain("Siga as regras do Instagram à risca");
+    expect(sistema).toContain("R-IG-REEL-01");
+    expect(sistema).toContain("R-IG-REEL-11");
+    expect(sistema).not.toContain("R-TT-VIDEO-01");
+    expect(sistema).not.toContain("R-YT-SHORT-01");
+  });
+
+  it("rede principal tiktok usa as regras R-TT-VIDEO", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, redePrincipal: "tiktok" });
+    expect(sistema).toContain("Siga as regras do TikTok à risca");
+    expect(sistema).toContain("R-TT-VIDEO-01");
+    expect(sistema).toContain("R-TT-VIDEO-12");
+    expect(sistema).not.toContain("R-IG-REEL-01");
+  });
+
+  it("rede principal youtube, sem duracao tipica acima de 60s, usa so R-YT-SHORT", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, redePrincipal: "youtube" });
+    expect(sistema).toContain("Siga as regras do YouTube à risca");
+    expect(sistema).toContain("R-YT-SHORT-01");
+    expect(sistema).not.toContain("R-YT-VIDEO-01");
+  });
+
+  it("rede principal youtube, com duracao tipica acima de 60s, soma R-YT-VIDEO ao R-YT-SHORT", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, redePrincipal: "youtube", duracaoTipicaMaxS: 90 });
+    expect(sistema).toContain("R-YT-SHORT-01");
+    expect(sistema).toContain("R-YT-VIDEO-01");
+    expect(sistema).toContain("R-YT-VIDEO-04");
+  });
+
+  it("story ignora a rede principal: sempre R-IG-STORY, nunca as regras de Reels", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, formato: "story", redePrincipal: "tiktok" });
+    expect(sistema).toContain("R-IG-STORY-01");
+    expect(sistema).not.toContain("R-TT-VIDEO-01");
+  });
+
+  it("pede porQueAssim tambem no Reels falado, sem mais dizer que nao ha regra de plataforma", () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA });
+    expect(sistema).toContain("porQueAssim");
+    expect(sistema).not.toContain("ainda não há regras numeradas de plataforma");
   });
 });

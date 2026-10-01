@@ -313,6 +313,24 @@ function mockCenasSemFala(tema: string, reprovado: boolean) {
   };
 }
 
+/**
+ * R1, item 2: o Reels falado também cita regra de plataforma agora, como o Story já fazia; a
+ * rede vem do bloco "Siga as regras do <rede> à risca" que `montarSistemaEstavel` monta, achada
+ * aqui pela marca única da primeira regra de cada conjunto (mesma técnica de `ehStory` abaixo).
+ */
+function mockPorQueAssimReels(sistemaEstavel: string): { regra: string; motivo: string }[] {
+  if (sistemaEstavel.includes("R-TT-VIDEO-01")) {
+    return [{ regra: "R-TT-VIDEO-01", motivo: "o vídeo já mostra o problema nos primeiros segundos" }];
+  }
+  if (sistemaEstavel.includes("R-YT-SHORT-01")) {
+    return [{ regra: "R-YT-SHORT-01", motivo: "o vídeo fica dentro do tempo curto que este nicho pede" }];
+  }
+  if (sistemaEstavel.includes("R-IG-REEL-01")) {
+    return [{ regra: "R-IG-REEL-01", motivo: "o gancho já mostra o assunto nos primeiros segundos" }];
+  }
+  return [];
+}
+
 function mockRoteiro(entrada: string, sistemaEstavel: string) {
   const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
   const tema = ehMomento
@@ -343,7 +361,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
           fechamento: "resumo do que foi mostrado",
           chamadaFinal: "comenta se você já passou por isso",
           cartoes: null,
-          porQueAssim: [],
+          porQueAssim: mockPorQueAssimReels(sistemaEstavel),
           legenda: null,
         };
 

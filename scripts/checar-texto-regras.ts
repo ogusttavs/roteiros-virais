@@ -24,6 +24,17 @@ export const PADROES = ["src/**/*.tsx", "src/textos/**/*.ts", "src/ia/prompts/**
  */
 const CAMINHO_ADMIN = /^src\/(app\/admin\/|textos\/admin\.ts$)/;
 
+/**
+ * R1, item 1: `regras-formato.ts` copia, sem reescrever, o texto das regras de plataforma da
+ * seção 9 das rubricas (o próprio cabeçalho do arquivo diz: "trocar uma regra aqui sem trocar a
+ * seção 9 primeiro quebra a fonte da verdade"); `regras-formato.test.ts` confere a cópia exata
+ * contra o documento. Uma das regras oficiais usa a palavra "conteúdo" (R-YT-SHORT-04); o cliente
+ * nunca lê esse texto, é instrução que o modelo recebe no sistema estável, então regra 6 do
+ * `CLAUDE.md` ("nada de jargão no que o cliente lê") não se aplica aqui, mesmo raciocínio de
+ * `CAMINHO_ADMIN` acima.
+ */
+const CAMINHO_REGRAS_PLATAFORMA = /^src\/ia\/prompts\/regras-formato\.ts$/;
+
 export type Problema = { arquivo: string; linha: number; motivo: string };
 
 export function verificarLinha(linha: string): string[] {
@@ -32,10 +43,11 @@ export function verificarLinha(linha: string): string[] {
 
 export function verificarArquivo(caminho: string): Problema[] {
   const conteudo = readFileSync(caminho, "utf8");
-  const ehAdmin = CAMINHO_ADMIN.test(caminho.replace(/\\/g, "/"));
+  const caminhoNormalizado = caminho.replace(/\\/g, "/");
+  const semJargao = CAMINHO_ADMIN.test(caminhoNormalizado) || CAMINHO_REGRAS_PLATAFORMA.test(caminhoNormalizado);
   return conteudo.split("\n").flatMap((linha, i) =>
     verificarLinha(linha)
-      .filter((motivo) => !ehAdmin || !motivo.startsWith("jargao"))
+      .filter((motivo) => !semJargao || !motivo.startsWith("jargao"))
       .map((motivo) => ({ arquivo: caminho, linha: i + 1, motivo })),
   );
 }
