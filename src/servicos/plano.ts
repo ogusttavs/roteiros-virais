@@ -21,6 +21,7 @@ import {
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
+  type MomentoDoDia,
   type Objetivo,
   type QuemGrava,
 } from "@/db/schema";
@@ -319,6 +320,8 @@ export async function aceitar(
     objetivoDoVideo?: string;
     /** V12c, item 3, a E37b: troca só deste vídeo, confirmada na folha. */
     quemAparece?: QuemGrava;
+    /** E39a: "em que momento do dia?", só quando o formato é Story. */
+    momentoDoDia?: MomentoDoDia;
   },
 ): Promise<RoteiroLinha> {
   const item = await itemPorId(itemId, cliente.id);
@@ -344,6 +347,9 @@ export async function aceitar(
     formato,
     estilo,
     quemAparece: dados.quemAparece,
+    // E39a: o dia já vem do próprio item do plano, nunca hoje por padrão.
+    data: item.dia,
+    momentoDoDia: formato === "story" ? dados.momentoDoDia : undefined,
   });
 
   await db()

@@ -129,4 +129,29 @@ export const textosHoje = {
 
   /** V12, ajuste (d): o botão do cartão de roteiro compacto, quando há dois ou mais roteiros de hoje. */
   abrir: "Abrir",
+
+  /**
+   * E39a: Hoje vira a agenda (desenho do Opus, passo 10, `Hoje.dc.html`, estados `agenda`,
+   * `agendaVazia`, `agendaOutroDia`, `agendaBriefingIncompleto`). Nada se cria aqui; "Criar
+   * roteiro" sempre leva para `/criar`.
+   */
+  agenda: {
+    tituloNormal: "O que gravar hoje",
+    marcadoPara: "Marcado para",
+    voltarParaHoje: "Voltar para hoje",
+    legendaMarcas: "um ponto é Reels, um anel é Story",
+    estadoReels: { gerado: "a gravar", gravado: "gravado", postado: "postado" },
+    estadoOutroDia: "marcado",
+    nadaMarcadoTitulo: "Nada marcado para hoje",
+    nadaMarcado: "Crie um roteiro para hoje ou deixe os próximos dias prontos.",
+    proximoMarcado: (quando: string, formato: string) => `O próximo marcado é ${quando}: um ${formato}.`,
+    criarRoteiro: "Criar roteiro",
+    abrirRoteiro: "Abrir o roteiro",
+    modoGravacao: "Modo gravação",
+    seusStories: "Os seus Stories",
+    briefingPodeRenderMais: "O seu briefing pode render mais",
+    briefingNotaEMeta: (nota: string, meta: string) =>
+      `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`,
+    abrirBriefing: "Abrir o briefing",
+  },
 };
