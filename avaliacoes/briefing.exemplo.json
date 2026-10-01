@@ -36,6 +36,24 @@
     "pontoPrincipal": "frase generica classica sem prova nenhuma"
   },
   {
+    "perguntaId": "p4",
+    "resposta": "O cliente que mais gosto de atender mora de apartamento, tem bicho de estimacao e trabalha o dia inteiro fora de casa. Costuma me procurar na sexta a noite, querendo o sofa limpo antes de receber visita no fim de semana.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "H2: retrato por tipo de cliente, sem nome de pessoa real, continua nota alta (a rubrica nova nunca exige nome)"
+  },
+  {
+    "perguntaId": "p4",
+    "resposta": "Atendo escritorios de contabilidade e consultorios medicos que precisam limpar o estofado da sala de espera sem fechar para o publico. Quem decide a compra e sempre o socio administrativo, que fecha o contrato direto comigo.",
+    "notaEsperada": 9,
+    "pontoPrincipal": "H2: quem vende para empresa descreve quem decide a compra la dentro, sem precisar de uma pessoa fisica"
+  },
+  {
+    "perguntaId": "p4",
+    "resposta": "Atendo todo mundo que tem carro.",
+    "notaEsperada": 5,
+    "pontoPrincipal": "H2: generico mesmo sem pedir nome, a regua nao afrouxou so porque nome deixou de ser exigido"
+  },
+  {
     "perguntaId": "p5",
     "resposta": "A pessoa sempre pergunta se o produto vai estragar o tecido, porque ja mandou fazer em outro lugar e o sofa ficou manchado.",
     "notaEsperada": 9,
