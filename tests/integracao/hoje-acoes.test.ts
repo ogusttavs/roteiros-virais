@@ -5,17 +5,51 @@
  * `clientes-rede-principal.test.ts`; aqui e so a Server Action.
  */
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { clientes, membrosMarca, user } from "@/db/schema";
+import { clientes, membrosMarca, roteiros, user } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { salvarRedePrincipalAction } from "../../src/app/(painel)/(completo)/hoje/acoes";
+import { roteiroRecenteDesdeAction, salvarRedePrincipalAction } from "../../src/app/(painel)/(completo)/hoje/acoes";
+
+const CONTEUDO_ROTEIRO_MINIMO = {
+  titulo: "titulo",
+  duracaoS: 40,
+  gancho: "gancho",
+  corpo: "corpo",
+  fechamento: "fechamento",
+  chamadaFinal: "chamada final",
+  cartoes: null,
+  porQueAssim: [],
+  cenas: [],
+  ondeGravar: "no local do negocio",
+  edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+  evidencias: [],
+  semEvidencia: false,
+  forcaEvidencia: null,
+};
+
+async function criarRoteiro(clienteId: number, tema: string, criadoEm: Date) {
+  const [roteiro] = await db()
+    .insert(roteiros)
+    .values({
+      clienteId,
+      data: "2026-01-01",
+      tema,
+      origem: "sugerido",
+      objetivo: "alcance",
+      conteudo: CONTEUDO_ROTEIRO_MINIMO,
+      status: "gerado",
+      criadoEm,
+    })
+    .returning();
+  return roteiro;
+}
 
 function sessaoDe(usuarioId: string) {
   return { user: { id: usuarioId, role: "cliente" } } as never;
@@ -63,5 +97,62 @@ describe("salvarRedePrincipalAction", () => {
 
     const [linhaB] = await db().select().from(clientes).where(eq(clientes.id, marcaB.id));
     expect(linhaB.redePrincipal).toBeNull();
+  });
+});
+
+/**
+ * R1, item 0c: a base da recuperação da tela de espera quando a conexão parece ter caído, mas o
+ * servidor pode ter terminado (geração não depende da aba continuar aberta).
+ */
+describe("roteiroRecenteDesdeAction", () => {
+  // Cada teste insere o seu proprio roteiro com `criadoEm` controlado; sem isolar, o roteiro de
+  // um teste anterior (ainda dentro da margem de relogio) poderia ser o "mais recente" errado.
+  beforeEach(async () => {
+    await db().delete(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    await db().delete(roteiros).where(eq(roteiros.clienteId, marcaB.id));
+  });
+
+  it("sem sessao, recusa", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(null);
+    await expect(roteiroRecenteDesdeAction(Date.now())).rejects.toThrow(ErroAcessoNegado);
+  });
+
+  it("sem roteiro novo desde o inicio da espera, devolve nulo", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const desdeMs = Date.now();
+    const achado = await roteiroRecenteDesdeAction(desdeMs);
+    expect(achado).toBeNull();
+  });
+
+  it("com um roteiro criado depois do inicio da espera, acha e devolve o id, isolado da outra marca", async () => {
+    const desdeMs = Date.now();
+    const roteiro = await criarRoteiro(marcaA.id, "tema criado durante a espera", new Date(desdeMs + 2000));
+
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const achadoDeA = await roteiroRecenteDesdeAction(desdeMs);
+    expect(achadoDeA).toEqual({ id: roteiro.id });
+
+    // Isolamento: a mesma busca na sessao de B nunca acha o roteiro de A.
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaB.usuarioId));
+    const achadoDeB = await roteiroRecenteDesdeAction(desdeMs);
+    expect(achadoDeB).toBeNull();
+  });
+
+  it("um roteiro criado pouco antes do inicio da espera ainda conta (margem do relogio)", async () => {
+    const desdeMs = Date.now();
+    const roteiro = await criarRoteiro(marcaA.id, "tema na margem do relogio", new Date(desdeMs - 5000));
+
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const achado = await roteiroRecenteDesdeAction(desdeMs);
+    expect(achado).toEqual({ id: roteiro.id });
+  });
+
+  it("um roteiro de muito antes do inicio da espera (fora da margem) nao conta", async () => {
+    const desdeMs = Date.now();
+    await criarRoteiro(marcaA.id, "tema de muito antes", new Date(desdeMs - 60_000));
+
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const achado = await roteiroRecenteDesdeAction(desdeMs);
+    expect(achado).toBeNull();
   });
 });

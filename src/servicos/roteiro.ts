@@ -1476,6 +1476,23 @@ export async function roteirosDeHoje(clienteId: number): Promise<RoteiroLinha[]>
 }
 
 /**
+ * R1, item 0c: a base da recuperação quando a tela de espera acha que a conexão caiu, mas o
+ * servidor pode ter terminado de gerar mesmo assim (geração não depende da aba continuar
+ * aberta, `momento-continua-sem-espera.test.ts`). Em vez de mostrar erro na hora, a tela confere
+ * se já existe um roteiro desta marca criado depois do início da espera; se existe, é o que
+ * acabou de ser gerado, e a tela abre ele em vez do erro.
+ */
+export async function roteiroMaisRecenteDesde(clienteId: number, desde: Date): Promise<{ id: number } | null> {
+  const [roteiro] = await db()
+    .select({ id: roteiros.id })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.criadoEm, desde)))
+    .orderBy(desc(roteiros.criadoEm))
+    .limit(1);
+  return roteiro ?? null;
+}
+
+/**
  * Um roteiro pelo id, só se pertencer ao cliente pedido (isolamento no
  * nível de rota, mesmo padrão do briefing): dado de um cliente nunca
  * aparece para outro.

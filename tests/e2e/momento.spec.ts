@@ -178,7 +178,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     await expect(folha).toHaveCount(0);
     await expect(page.getByRole("status")).toBeVisible();
     await expect(page.getByText("Escrevendo o seu roteiro")).toBeVisible();
-    await expect(page.getByText("Costuma levar de 30 segundos a 3 minutos")).toBeVisible();
+    await expect(page.getByText("Pode levar até 3 minutos")).toBeVisible();
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
     await page.unroute("**/*");

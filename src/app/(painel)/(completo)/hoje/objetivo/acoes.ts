@@ -2,15 +2,21 @@
 
 import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
+import { ErroIA } from "@/ia/erro";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
-import { gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece, type OrigemRoteiro } from "@/servicos/roteiro";
+import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece, type OrigemRoteiro } from "@/servicos/roteiro";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
  * o segundo controle). O cliente sempre vem da sessão. `formato`, `estilo` e `quemAparece` chegam
  * como texto livre do navegador (V9d, item 2): `validarFormato`/`validarEstilo`/`validarQuemAparece`
  * conferem contra a lista antes de chegar ao banco.
+ *
+ * R1, item 0c: `ErroIA.mensagemCliente` e `ErroRoteiro.message` vêm como resultado, não lançados
+ * (Next.js troca a mensagem de uma exceção por um texto genérico em produção); erro de outra
+ * natureza (rede, bug) continua subindo, para a tela de espera cair no caminho de sempre.
  */
 export async function gerarRoteiroAction(
   origem: OrigemRoteiro,
@@ -21,17 +27,23 @@ export async function gerarRoteiroAction(
   objetivoDoVideo?: string,
   /** V12c, item 3, a E37b: troca só deste vídeo; sem valor, usa o quemGrava do cliente. */
   quemAparece?: string,
-): Promise<{ id: number }> {
+): Promise<ResultadoAcao<{ id: number }>> {
   const cliente = await clienteDaSessaoAtual();
-  const roteiro = await gerarRoteiro(cliente.id, {
-    ...origem,
-    objetivo,
-    formato: validarFormato(formato),
-    estilo: validarEstilo(estilo),
-    objetivoDoVideo: objetivoDoVideo?.trim() || undefined,
-    quemAparece: validarQuemAparece(quemAparece),
-  });
-  return { id: roteiro.id };
+  try {
+    const roteiro = await gerarRoteiro(cliente.id, {
+      ...origem,
+      objetivo,
+      formato: validarFormato(formato),
+      estilo: validarEstilo(estilo),
+      objetivoDoVideo: objetivoDoVideo?.trim() || undefined,
+      quemAparece: validarQuemAparece(quemAparece),
+    });
+    return { ok: true, dado: { id: roteiro.id } };
+  } catch (falha) {
+    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
+    throw falha;
+  }
 }
 
 /**

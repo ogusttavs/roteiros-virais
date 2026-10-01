@@ -59,6 +59,7 @@
   {
     "tema": "mito ou verdade: aparelho dentário atrasa o crescimento do dente",
     "objetivo": "alcance",
+    "formato": "story",
     "perfilCompilado": "Clínica odontológica de bairro. Vende avaliação de ortodontia gratuita. Cliente ideal é pai ou mãe de criança de 8 a 14 anos. Medo do cliente: ouviu um mito de alguém e não sabe se é verdade. Frase que fala: aqui a gente explica com calma antes de indicar qualquer coisa.",
     "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso.",
     "modeloNicho": "Duração típica: 20 a 40 segundos. Assuntos quentes: aparelho, mito ou verdade, dor de dente. Ganchos que funcionam: pergunta direta seguida da resposta (média frequência). Estruturas comuns: pergunta, resposta curta, explicação. Fechamentos comuns: resumo em uma frase. Chamadas finais comuns: comenta sua duvida aqui embaixo.",
@@ -107,6 +108,7 @@
   {
     "tema": "a rotina de 10 minutos que faço todo dia depois de fechar o consultório",
     "objetivo": "engajamento",
+    "estilo": "sem_fala",
     "perfilCompilado": "Clínica odontológica de bairro. Quem grava é só a própria pessoa, sem equipe. Autoridade: doze anos de consultório. Frase que fala: aqui a gente explica tudo antes de fazer.",
     "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
     "modeloNicho": "Duração típica: 30 a 50 segundos. Assuntos quentes: bastidor do consultório, rotina do dia a dia. Ganchos que funcionam: rotina cronometrada (média frequência). Estruturas comuns: passo a passo curto. Fechamentos comuns: resultado final sem falar. Chamadas finais comuns: comenta se voce faz igual.",

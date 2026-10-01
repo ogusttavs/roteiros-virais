@@ -40,7 +40,7 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * sobrescreve `videos.tipoAbertura`, fora do jsonb `analise` (mesmo caminho
  * de `idioma`).
  *
- * Tipo de conteudo (1.6.0, H4, achado do Gustavo em producao em 01/10, o
+ * Tipo de video (1.6.0, H4, achado do Gustavo em producao em 01/10, o
  * caso do roteiro 12: a referencia escolhida foi um meme repostado por um
  * canal pequeno de contabilidade, "a referencia e um meme e o Bruno nunca
  * faria um video desse"): `tipoConteudo` e `serveDeModelo` dizem se este

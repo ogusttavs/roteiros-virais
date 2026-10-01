@@ -16,6 +16,7 @@ import {
   ROTULO_FORMATO_ROTEIRO,
   sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
+import { ehFalhaDeRede } from "@/lib/offline";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
@@ -25,6 +26,8 @@ import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+
+import { roteiroRecenteDesdeAction } from "../acoes";
 
 import { gerarRoteiroAction, sugerirEstiloAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
@@ -105,9 +108,10 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
   function escrever() {
     if (!escolhido) return;
     setErro(null);
+    const desdeMs = Date.now();
     iniciarTransicao(async () => {
       try {
-        const { id } = await gerarRoteiroAction(
+        const resultado = await gerarRoteiroAction(
           origem,
           escolhido,
           formato,
@@ -116,9 +120,33 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
           quemAparece || undefined,
         );
         if (saiuRef.current) return;
+        if (!resultado.ok) {
+          setErro(resultado.erro);
+          return;
+        }
         avisarRedeOk();
-        router.push(`/roteiros/${id}`);
+        router.push(`/roteiros/${resultado.dado.id}`);
       } catch (falha) {
+        if (saiuRef.current) return;
+        /**
+         * R1, item 0c: a geração não depende da aba continuar aberta (o servidor termina mesmo
+         * sem ninguém esperando). Uma falha que parece de rede pode ser só a resposta que não
+         * voltou, não a geração que não aconteceu: antes de assumir que precisa repetir, confere
+         * se já existe um roteiro novo desta marca criado desde que a espera começou.
+         */
+        if (ehFalhaDeRede(falha)) {
+          try {
+            const recuperado = await roteiroRecenteDesdeAction(desdeMs);
+            if (saiuRef.current) return;
+            if (recuperado) {
+              avisarRedeOk();
+              router.push(`/roteiros/${recuperado.id}`);
+              return;
+            }
+          } catch {
+            // Sem resposta nem na recuperação: segue para a frase de rede de sempre, abaixo.
+          }
+        }
         if (saiuRef.current) return;
         // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir cria outro roteiro,
         // então a frase de rede manda olhar o Histórico primeiro (V7, item 4 do PROXIMO.md).
