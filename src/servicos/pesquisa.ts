@@ -401,7 +401,13 @@ export function palavrasChave(texto: string): string[] {
  * `TODO.md`), só `lower()`: "não" buscado não casa "nao" numa etiqueta, e
  * vice versa.
  */
-function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor) {
+/**
+ * `exigirServeDeModelo` (H4, item 2): só a evidência do roteiro (nunca a do tema, que continua
+ * usando recorte e meme como sinal de assunto) exige `serveDeModelo`. `is not false` em vez de
+ * `= true`: nulo (vídeo analisado antes deste campo existir, até a reclassificação em lote
+ * rodar) não exclui, só `false` explícito exclui.
+ */
+function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor, exigirServeDeModelo: boolean) {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
   // "text[]" pede um array de verdade; um array JS interpolado direto vira
@@ -429,6 +435,7 @@ function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor) {
     ))`,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  if (exigirServeDeModelo) condicoes.push(sql`${videos.serveDeModelo} is not false`);
   return condicoes;
 }
 
@@ -444,6 +451,11 @@ export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; 
  * `transcrever`, sem isso o corte de tamanho do SQL já teria truncado a
  * lista antes de a proporção ter candidato brasileiro suficiente para
  * escolher).
+ *
+ * H4, item 2: esta é "a prova do tema" (único uso, `avaliarTema`, a nota dos cinco pilares) e
+ * exige `serveDeModelo`, igual à evidência do roteiro; o sinal de assunto que descobre os temas
+ * do dia (`subindoHojeComAnalise`, `temas-do-dia.ts`) é outra função, que continua sem filtrar
+ * (recorte e meme continuam valendo para saber do que o nicho está falando).
  */
 export async function evidenciaParaTema(
   nichoId: number,
@@ -464,7 +476,7 @@ export async function evidenciaParaTema(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto, regua)))
+    .where(and(...condicoesEvidencia(nichoId, texto, regua, true)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
@@ -579,7 +591,7 @@ export async function evidenciaParaRoteiro(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto, regua)))
+    .where(and(...condicoesEvidencia(nichoId, texto, regua, true)))
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
@@ -591,7 +603,10 @@ export async function evidenciaParaRoteiro(
  * ids já conhecidos (etapa 11): usada para os ids que `temasDoDia` já
  * validou como evidência de um tema sugerido, que podem não bater na busca
  * textual do próprio título do tema (a busca da evidência do dia usa
- * `subindoHojeComAnalise`, um caminho diferente).
+ * `subindoHojeComAnalise`, um caminho diferente). `temasDoDia` valida pela
+ * evidência do tema (`evidenciaParaTema`), que não filtra `serveDeModelo`
+ * (recorte e meme contam como sinal de assunto ali); aqui, que é evidência do
+ * roteiro, filtra, mesma regra de `evidenciaParaRoteiro` (H4, item 2).
  */
 export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRoteiro[]> {
   if (ids.length === 0) return [];
@@ -612,7 +627,7 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(inArray(videos.id, ids));
+    .where(and(inArray(videos.id, ids), sql`${videos.serveDeModelo} is not false`));
 
   return mapearEvidenciaRoteiro(linhas);
 }
@@ -729,7 +744,11 @@ export type ResultadoReferencias = {
   total: number;
 };
 
-/** As condições que a lista e a contagem de `referenciasDoNicho` compartilham (V6, item 1). */
+/**
+ * As condições que a lista e a contagem de `referenciasDoNicho` compartilham (V6, item 1).
+ * `serveDeModelo` (H4, item 2): a biblioteca de referências é "o que imitar", igual à evidência
+ * do roteiro; recorte e meme não entram, mesma regra de `condicoesEvidencia`.
+ */
 function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regua: ReguaSetor) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -741,6 +760,7 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
+    sql`${videos.serveDeModelo} is not false`,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (filtros.apenasIds) condicoes.push(inArray(videos.id, filtros.apenasIds.length > 0 ? filtros.apenasIds : [-1]));

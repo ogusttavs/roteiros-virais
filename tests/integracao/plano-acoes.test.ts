@@ -13,7 +13,6 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, membrosMarca, nichos, planoGravacoes, roteiros, user, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
-import { ErroRoteiro } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import {
@@ -126,49 +125,56 @@ describe("aceitarPlanoAction e pularPlanoAction", () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const [item] = await criarPlanoAction([{ data: hojeMais(2), lugar: "fabrica", compromissos: ["visita ao fornecedor"] }]);
 
-    const { id } = await aceitarPlanoAction(item.id, {
+    const resultado = await aceitarPlanoAction(item.id, {
       onde: "na fabrica",
       oQueEstaAcontecendo: "visita ao fornecedor",
       oQueDaParaMostrar: "a linha de producao",
       objetivo: "engajamento",
     });
 
-    expect(typeof id).toBe("number");
+    if (!resultado.ok) throw new Error(resultado.erro);
+    expect(typeof resultado.dado.id).toBe("number");
   });
 
-  it("campo vazio: erro nomeado, sem gerar", async () => {
+  /**
+   * R1, item 0c: o erro chega como resultado (`ok: false`), nao lancado, para a tela mostrar o
+   * texto exato em producao (`ErroRoteiro.message` ja e uma mensagem segura para o cliente).
+   */
+  it("campo vazio: erro como resultado, sem gerar", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const [item] = await criarPlanoAction([{ data: hojeMais(3), lugar: "hotel", compromissos: ["revendo amostras"] }]);
 
-    await expect(
-      aceitarPlanoAction(item.id, {
-        onde: "  ",
-        oQueEstaAcontecendo: "revendo amostras",
-        oQueDaParaMostrar: "as amostras na cama",
-        objetivo: "engajamento",
-      }),
-    ).rejects.toThrow(ErroRoteiro);
+    const resultado = await aceitarPlanoAction(item.id, {
+      onde: "  ",
+      oQueEstaAcontecendo: "revendo amostras",
+      oQueDaParaMostrar: "as amostras na cama",
+      objetivo: "engajamento",
+    });
+
+    expect(resultado).toEqual({
+      ok: false,
+      erro: "conte onde voce esta, o que esta acontecendo e o que da para mostrar.",
+    });
   });
 
   // V9d, item 2: `formato` chega como texto livre do navegador; um valor fora de "reels"/"story"
   // precisa ser recusado antes de gerar, nunca chegar ao banco.
-  it("formato invalido: erro nomeado, sem gerar", async () => {
+  it("formato invalido: erro como resultado, sem gerar", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const [item] = await criarPlanoAction([
       { data: hojeMais(5), lugar: "escritorio", compromissos: ["reuniao de fornecedor"] },
     ]);
     const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
 
-    await expect(
-      aceitarPlanoAction(item.id, {
-        onde: "no escritorio",
-        oQueEstaAcontecendo: "reuniao de fornecedor",
-        oQueDaParaMostrar: "a mesa de reuniao",
-        objetivo: "engajamento",
-        formato: "carrossel",
-      }),
-    ).rejects.toThrow(ErroRoteiro);
+    const resultado = await aceitarPlanoAction(item.id, {
+      onde: "no escritorio",
+      oQueEstaAcontecendo: "reuniao de fornecedor",
+      oQueDaParaMostrar: "a mesa de reuniao",
+      objetivo: "engajamento",
+      formato: "carrossel",
+    });
 
+    expect(resultado).toEqual({ ok: false, erro: "formato de roteiro invalido." });
     const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
     expect(depois.length).toBe(antes.length);
   });

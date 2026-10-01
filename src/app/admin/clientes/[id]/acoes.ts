@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import type { Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import {
   darAcesso,
@@ -16,16 +17,6 @@ import {
   tirarAcesso,
   type ResultadoDarAcesso,
 } from "@/servicos/clientes";
-
-/**
- * "Essa pessoa já tem acesso a esta marca." e "O dono não pode ter o acesso
- * tirado." (V3, item 5) precisam chegar com o texto exato na tela: Next.js
- * troca a mensagem de erro de uma Server Action por um texto generico em
- * producao, entao o erro esperado vem como resultado, nao lançado
- * (`erro instanceof ErroCliente` cobre so os dois casos conhecidos; erro de
- * outra natureza continua subindo, para nao esconder bug de verdade).
- */
-export type ResultadoAcao<T> = { ok: true; dado: T } | { ok: false; erro: string };
 
 /** V12b, item 4: a folha "Dar acesso" pede o nome também, não só o e-mail. */
 export async function darAcessoAction(

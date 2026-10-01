@@ -95,9 +95,9 @@ test.describe("revisão do PR #62, item 2: Voltar depois no caminho do tema não
   });
 
   test("depois de 'Voltar depois', a geração terminar não navega para o roteiro", async ({ page }) => {
-    // "Voltar depois" só aparece depois do limiar de demora (10 s, `TelaEscrevendo.LIMIAR_DEMORANDO_MS`):
-    // o atraso artificial da Server Action precisa passar desse limiar, senão a geração termina e navega
-    // antes de o botão sequer existir na tela.
+    // R1, item 0b: "Voltar depois" aparece desde o início (não espera mais o limiar de demora, hoje
+    // em 3 min, `TelaEscrevendo.LIMIAR_DEMORANDO_MS`); o atraso artificial da Server Action só
+    // precisa dar tempo de clicar nele antes de a geração terminar de verdade.
     test.setTimeout(60_000);
     let atrasou = false;
     await page.route("**/*", async (rota) => {

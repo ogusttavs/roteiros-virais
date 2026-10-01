@@ -37,7 +37,8 @@ export type TarefaIA =
   | "planejarDia"
   | "sugerirContasDoSetor"
   | "classificarContaDoSetor"
-  | "organizarFalaBriefing";
+  | "organizarFalaBriefing"
+  | "filtrarEvidenciaPorMarca";
 
 export type ImagemEntrada = {
   base64: string;

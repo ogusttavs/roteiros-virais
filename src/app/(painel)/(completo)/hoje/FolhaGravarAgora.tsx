@@ -16,6 +16,7 @@ import {
   ROTULO_FORMATO_ROTEIRO,
   sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
+import { ehFalhaDeRede } from "@/lib/offline";
 import { textosMomento } from "@/textos/momento";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -25,8 +26,9 @@ import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
-import { useTratarFalha } from "@/ui/ConexaoContext";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
+import { roteiroRecenteDesdeAction } from "./acoes";
 import styles from "./FolhaGravarAgora.module.css";
 import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "./momento/acoes";
 import { aceitarPlanoAction } from "./plano/acoes";
@@ -100,6 +102,7 @@ export function FolhaGravarAgora({
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
+  const { avisarRedeOk } = useConexao();
   // V12c, item 3: pessoa tem "quem aparece" fixo; o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
 
@@ -183,10 +186,11 @@ export function FolhaGravarAgora({
     setCamposFaltando(false);
     setErroEnvio(null);
     setEnviando(true);
+    const desdeMs = Date.now();
     try {
       const marcaId =
         marcaIndice !== null && marcaIndice > 0 ? marcas[marcaIndice - 1]?.id : undefined;
-      const { id } =
+      const resultado =
         planoItemId !== undefined
           ? await aceitarPlanoAction(planoItemId, {
               onde,
@@ -214,8 +218,31 @@ export function FolhaGravarAgora({
       // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
       // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
       if (saiuRef.current) return;
-      fecharENavegar(() => router.replace(`/roteiros/${id}`));
+      if (!resultado.ok) {
+        setErroEnvio(resultado.erro);
+        return;
+      }
+      fecharENavegar(() => router.replace(`/roteiros/${resultado.dado.id}`));
     } catch (falha) {
+      if (saiuRef.current) return;
+      /**
+       * R1, item 0c: a geração não depende da aba continuar aberta. Uma falha que parece de rede
+       * pode ser só a resposta que não voltou, não a geração que não aconteceu: confere se já
+       * existe um roteiro novo desta marca criado desde que a espera começou antes de mostrar erro.
+       */
+      if (ehFalhaDeRede(falha)) {
+        try {
+          const recuperado = await roteiroRecenteDesdeAction(desdeMs);
+          if (saiuRef.current) return;
+          if (recuperado) {
+            avisarRedeOk();
+            fecharENavegar(() => router.replace(`/roteiros/${recuperado.id}`));
+            return;
+          }
+        } catch {
+          // Sem resposta nem na recuperação: segue para a frase de rede de sempre, abaixo.
+        }
+      }
       if (saiuRef.current) return;
       setErroEnvio(tratarFalha(falha, textosMomento.erroGerar));
     } finally {

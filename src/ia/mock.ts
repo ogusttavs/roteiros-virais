@@ -66,6 +66,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockClassificarContaDoSetor(entrada);
     case "organizarFalaBriefing":
       return mockOrganizarFalaBriefing(entrada);
+    case "filtrarEvidenciaPorMarca":
+      return mockFiltrarEvidenciaPorMarca(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -345,6 +347,18 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
           legenda: null,
         };
 
+  /**
+   * H4, item 1: por padrão o mock simula o modelo escolhendo o primeiro id da evidência
+   * recebida como referência (o id existe de verdade, então passa em `validarReferenciaDoModelo`).
+   * Este marcador simula o modelo alucinando um id fora da evidência, para o teste de
+   * integração confirmar que o código rejeita (vira "sem referência"), nunca um id trocado.
+   */
+  const referencia = tema.includes("simule um id de referencia fora da lista de evidencia")
+    ? { videoId: 999999, segundo: 9, oQueOlhar: "video fora da evidencia disponivel" }
+    : ids[0] !== undefined
+      ? { videoId: ids[0], segundo: 4, oQueOlhar: "o gancho" }
+      : null;
+
   return {
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
     titulo: tema,
@@ -357,8 +371,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       ritmoDeCorte: "moderado",
       recursos: [],
       audio: null,
-      referencia:
-        ids[0] !== undefined ? { videoId: ids[0], segundo: 4, oQueOlhar: "o gancho" } : null,
+      referencia,
     },
     evidencias: ids,
     tipoAbertura,
@@ -436,6 +449,16 @@ function mockTemasDoDia(entrada: string) {
   };
 }
 
+/**
+ * H4, item 2: título com "pov" ou "meme simulado" marca o vídeo como meme (recorte/notícia não
+ * têm marcador de teste próprio ainda, "original" é o padrão); `serveDeModelo` segue direto de
+ * `tipoConteudo`, mesma regra do prompt de verdade.
+ */
+function tipoConteudoMock(titulo: string): { tipoConteudo: "original" | "meme"; serveDeModelo: boolean } {
+  const ehMeme = /\bpov\b|meme simulado/i.test(titulo);
+  return { tipoConteudo: ehMeme ? "meme" : "original", serveDeModelo: !ehMeme };
+}
+
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
   const nichoLinha = extrairCampo(entrada, "Nicho:");
@@ -465,6 +488,7 @@ function mockExtrairVideo(entrada: string) {
       : "a transcricao não cita nenhum termo do nicho",
     idioma: "pt-BR" as const,
     tipoAbertura: "outro" as const,
+    ...tipoConteudoMock(titulo),
   };
 }
 
@@ -672,6 +696,21 @@ function mockClassificarContaDoSetor(entrada: string) {
       ? "os titulos ou legendas citam termo do setor"
       : "os titulos ou legendas não citam nenhum termo do setor",
   };
+}
+
+/**
+ * H4, item 3: aprova todos os ids por padrão (o filtro de marca só reprova quando o teste pede,
+ * com este marcador no perfil compilado); sem isso, todo teste existente que já usa evidência
+ * precisaria saber deste filtro novo só para continuar passando como antes.
+ */
+const MARCADOR_REPROVA_EVIDENCIA_POR_MARCA = "reprove toda a evidencia por nao combinar com a marca";
+
+function mockFiltrarEvidenciaPorMarca(entrada: string) {
+  const ids = extrairIds(entrada);
+  if (entrada.includes(MARCADOR_REPROVA_EVIDENCIA_POR_MARCA)) {
+    return { aprovados: [] };
+  }
+  return { aprovados: ids };
 }
 
 function mockAprenderCliente(entrada: string) {

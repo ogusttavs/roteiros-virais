@@ -11,6 +11,7 @@ import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { config } from "@/lib/config";
 import {
   estatisticasDoSetor,
+  evidenciaParaRoteiro,
   evidenciaParaTema,
   foraDaCurvaDoNicho,
   referenciasDoNicho,
@@ -49,6 +50,8 @@ async function criarVideo(
     views?: number;
     /** Hotfix de 30/09/2026 (teto de duração): nulo por padrão, como boa parte do Instagram pela Meta. */
     duracaoS?: number | null;
+    /** H4, item 2: `undefined` (padrão) deixa nulo, como todo vídeo analisado antes desta coluna existir. */
+    serveDeModelo?: boolean;
   },
 ) {
   const [v] = await db()
@@ -70,6 +73,7 @@ async function criarVideo(
       etiquetas: opcoes.etiquetas,
       semDono: opcoes.semDono ?? false,
       idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
+      serveDeModelo: opcoes.serveDeModelo,
     })
     .returning();
   return v;
@@ -385,6 +389,121 @@ describe("evidenciaParaTema", () => {
     const resultado = await evidenciaParaTema(nichoId, "assunto so internacional", 10);
 
     expect(resultado).toEqual([]);
+  });
+
+  /**
+   * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12): esta é "a prova
+   * do tema" (a nota dos cinco pilares usa esta função), então recorte e meme não entram, mesma
+   * regra da evidência do roteiro; `serveDeModelo` nulo (todo vídeo analisado antes do campo
+   * existir) continua entrando.
+   */
+  it("video com serveDeModelo falso (meme ou recorte) nao entra na prova do tema", async () => {
+    await criarVideo("ev-tema-meme", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(10),
+      titulo: "video que bate a busca mas e meme",
+      analise: { assunto: "assunto exclusivo da prova do tema" },
+      serveDeModelo: false,
+    });
+    await criarVideo("ev-tema-nulo", {
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      titulo: "video analisado antes do campo existir",
+      analise: { assunto: "assunto exclusivo da prova do tema" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da prova do tema", 10);
+
+    expect(resultado.map((v) => v.assunto)).toEqual(["assunto exclusivo da prova do tema"]);
+    expect(resultado).toHaveLength(1);
+  });
+});
+
+describe("evidenciaParaRoteiro", () => {
+  /**
+   * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12: a referência saiu
+   * um meme repostado por um canal pequeno, "a referência é um meme e o Bruno nunca faria um
+   * vídeo desse"): `serveDeModelo = false` tira o vídeo da evidência do roteiro, mesmo com
+   * múltiplo alto; `serveDeModelo` nulo (vídeo analisado antes do campo existir) continua
+   * entrando, para a reclassificação em lote não ser obrigatória antes do roteiro voltar a
+   * funcionar.
+   */
+  it("video com serveDeModelo falso nao entra na evidencia do roteiro, mesmo com multiplo maior", async () => {
+    await criarVideo("ev-roteiro-meme-alto", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(10),
+      titulo: "meme com multiplo alto",
+      analise: {
+        assunto: "assunto exclusivo da evidencia do roteiro",
+        gancho: "gancho do meme",
+        estrutura: "estrutura do meme",
+        fechamento: "fechamento do meme",
+        chamadaFinal: "chamada do meme",
+      },
+      serveDeModelo: false,
+    });
+    const original = await criarVideo("ev-roteiro-original-baixo", {
+      foraDaCurva: 3,
+      publicadoEm: diasAtras(10),
+      titulo: "original com multiplo baixo",
+      analise: {
+        assunto: "assunto exclusivo da evidencia do roteiro",
+        gancho: "gancho do original",
+        estrutura: "estrutura do original",
+        fechamento: "fechamento do original",
+        chamadaFinal: "chamada do original",
+      },
+      serveDeModelo: true,
+    });
+
+    const resultado = await evidenciaParaRoteiro(nichoId, "assunto exclusivo da evidencia do roteiro", 10);
+
+    expect(resultado.map((v) => v.id)).toEqual([original.id]);
+  });
+});
+
+describe("referenciasDoNicho, serveDeModelo (H4, item 2)", () => {
+  /**
+   * Achado do Gustavo em produção em 01/10, o caso do roteiro 12: a biblioteca de Referências é
+   * "o que imitar", igual à evidência do roteiro; meme e recorte não entram, mesmo com múltiplo
+   * acima do limiar.
+   */
+  it("video com serveDeModelo falso nao aparece na biblioteca de referencias", async () => {
+    const [contaPropria] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-referencias-serve-de-modelo", nichoId })
+      .returning();
+
+    await criarVideo("ref-meme-serve-de-modelo-falso", {
+      foraDaCurva: 9,
+      publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
+      analise: {
+        assunto: "assunto exclusivo das referencias com meme",
+        gancho: "gancho do meme",
+        estrutura: "estrutura do meme",
+        porQueFuncionou: "funcionou por isso",
+        formato: "outro",
+      },
+      serveDeModelo: false,
+    });
+    const original = await criarVideo("ref-original-serve-de-modelo-true", {
+      foraDaCurva: 9,
+      publicadoEm: diasAtras(1),
+      contaId: contaPropria.id,
+      analise: {
+        assunto: "assunto exclusivo das referencias com meme",
+        gancho: "gancho do original",
+        estrutura: "estrutura do original",
+        porQueFuncionou: "funcionou por isso tambem",
+        formato: "fala_para_camera",
+      },
+      serveDeModelo: true,
+    });
+
+    const resultado = await referenciasDoNicho(nichoId, { busca: "assunto exclusivo das referencias com meme" });
+
+    expect(resultado.videos.map((v) => v.id)).toEqual([original.id]);
   });
 });
 

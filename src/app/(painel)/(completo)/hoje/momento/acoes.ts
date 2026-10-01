@@ -1,6 +1,8 @@
 "use server";
 
 import type { Objetivo } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
@@ -54,40 +56,49 @@ function textoObrigatorio(valor: string): string {
  * gastar uma geração com ela (`garantirMembroDaMarca`, isolamento entre
  * marcas). `origem: "momento"` faz `gerarRoteiro` pular a busca de
  * evidência (`servicos/roteiro.ts`).
+ *
+ * R1, item 0c: `ErroIA.mensagemCliente` e `ErroRoteiro.message` vêm como resultado, não
+ * lançados; sessão ausente continua lançando `ErroAcessoNegado` (raro, pede entrar de novo).
  */
-export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ id: number }> {
+export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<ResultadoAcao<{ id: number }>> {
   const sessao = await sessaoAtual();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
 
-  const onde = textoObrigatorio(dados.onde);
-  const oQueEstaAcontecendo = textoObrigatorio(dados.oQueEstaAcontecendo);
-  const oQueDaParaMostrar = textoObrigatorio(dados.oQueDaParaMostrar);
-  if (!onde || !oQueEstaAcontecendo || !oQueDaParaMostrar) {
-    throw new ErroRoteiro("conte onde voce esta, o que esta acontecendo e o que da para mostrar.");
+  try {
+    const onde = textoObrigatorio(dados.onde);
+    const oQueEstaAcontecendo = textoObrigatorio(dados.oQueEstaAcontecendo);
+    const oQueDaParaMostrar = textoObrigatorio(dados.oQueDaParaMostrar);
+    if (!onde || !oQueEstaAcontecendo || !oQueDaParaMostrar) {
+      throw new ErroRoteiro("conte onde voce esta, o que esta acontecendo e o que da para mostrar.");
+    }
+
+    if (dados.marcaId !== undefined) {
+      await garantirMembroDaMarca(sessao.user.id, dados.marcaId);
+    }
+
+    const cliente = await clienteDaSessaoAtual();
+    const roteiro = await gerarRoteiro(cliente.id, {
+      origem: "momento",
+      momento: {
+        onde,
+        oQueEstaAcontecendo,
+        oQueDaParaMostrar,
+        marcaId: dados.marcaId,
+        transcricao: dados.transcricao?.trim() || undefined,
+        objetivoDoVideo: dados.objetivoDoVideo?.trim() || undefined,
+      },
+      objetivo: dados.objetivo,
+      formato: validarFormato(dados.formato),
+      estilo: validarEstilo(dados.estilo),
+      quemAparece: validarQuemAparece(dados.quemAparece),
+    });
+
+    return { ok: true, dado: { id: roteiro.id } };
+  } catch (falha) {
+    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
+    throw falha;
   }
-
-  if (dados.marcaId !== undefined) {
-    await garantirMembroDaMarca(sessao.user.id, dados.marcaId);
-  }
-
-  const cliente = await clienteDaSessaoAtual();
-  const roteiro = await gerarRoteiro(cliente.id, {
-    origem: "momento",
-    momento: {
-      onde,
-      oQueEstaAcontecendo,
-      oQueDaParaMostrar,
-      marcaId: dados.marcaId,
-      transcricao: dados.transcricao?.trim() || undefined,
-      objetivoDoVideo: dados.objetivoDoVideo?.trim() || undefined,
-    },
-    objetivo: dados.objetivo,
-    formato: validarFormato(dados.formato),
-    estilo: validarEstilo(dados.estilo),
-    quemAparece: validarQuemAparece(dados.quemAparece),
-  });
-
-  return { id: roteiro.id };
 }

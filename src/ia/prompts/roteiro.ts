@@ -186,8 +186,15 @@ import { textoRegrasStory } from "./regras-formato";
  * Reels falado não dizia nada sobre `porQueAssim`, o schema exige a lista, e o modelo a enchia
  * com as regras duras em texto livre. Agora o bloco manda deixar vazio, e o serviço descarta o
  * campo fora de Story falado antes do verificador (`servicos/roteiro.ts`).
+ *
+ * H4, item 1 (achado do Gustavo em produção em 01/10/2026, o caso do roteiro 12: a referência
+ * escolhida em código, pelo maior múltiplo, saiu um meme sem nada a ver com o roteiro): a
+ * regra nova 12 (as antigas 12, 13 e 14 viram 13, 14 e 15) diz ao modelo para escolher a
+ * própria referência entre a evidência disponível, ou deixar nula quando nenhuma serviu de
+ * modelo de verdade; `servicos/roteiro.ts` só confere que o id devolvido pertence à evidência
+ * fornecida (`validarReferenciaDoModelo`), nunca escolhe por conta própria. Versão 2.6.0.
  */
-export const versao = "2.5.1";
+export const versao = "2.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -291,7 +298,7 @@ export function montarSistemaEstavel(dados: {
   /**
    * V12c, item 3, a E37b: quem aparece NESTE vídeo (já resolvido pelo serviço: o valor do
    * roteiro quando a pessoa trocou, senão o `quemGrava` do briefing). Opcional pelo mesmo
-   * motivo de `persona`; ausente ou "propria_pessoa" não muda a regra 12.
+   * motivo de `persona`; ausente ou "propria_pessoa" não muda a regra 14.
    */
   quemAparece?: QuemGrava;
   /** V9c, item 2: troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cartões e as regras R-IG-STORY. */
@@ -310,28 +317,28 @@ export function montarSistemaEstavel(dados: {
   /** V12c, item 2, a E37b: quem escolheu "ficar conhecido" nunca fecha vendendo. */
   const regraPersonaConhecido =
     dados.persona === "conhecido"
-      ? "\n14. Este cliente quer ficar conhecido no que faz, não vender agora: a chamada final " +
+      ? "\n15. Este cliente quer ficar conhecido no que faz, não vender agora: a chamada final " +
         "nunca é preço, comprar ou agendar, mesmo que o objetivo do vídeo pareça pedir isso; é " +
         "sempre seguir, comentar, salvar ou indicar para alguém."
       : "";
   const regraVoz =
     dados.tipo === "pessoa"
-      ? `12. Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira ` +
+      ? `13. Este cliente é uma pessoa falando de si, não um negócio: escreva sempre em primeira ` +
         `pessoa do singular ("eu", "meu", "minha"), nunca "a gente" ou "nosso".`
-      : `12. Este cliente é um negócio: a voz é a da marca ("a gente", "nossa loja") quando fala do ` +
+      : `13. Este cliente é um negócio: a voz é a da marca ("a gente", "nossa loja") quando fala do ` +
         `negócio, e a primeira pessoa do singular é bem-vinda quando quem grava conta a própria ` +
         `experiência ("eu testei", "eu uso"); nunca invente um "nós" que não existe.`;
   /**
-   * V12c, item 3, a E37b: a regra 12 pressupõe o dono contando a própria experiência; quando
+   * V12c, item 3, a E37b: a regra 13 pressupõe o dono contando a própria experiência; quando
    * quem aparece neste vídeo é a equipe (sem o dono) ou outra pessoa, isso muda.
    */
   const regraQuemAparece =
     dados.tipo === "negocio" && dados.quemAparece === "equipe"
-      ? "\n13. Quem aparece neste vídeo é a equipe, o dono não aparece: nunca escreva experiência " +
+      ? "\n14. Quem aparece neste vídeo é a equipe, o dono não aparece: nunca escreva experiência " +
         'pessoal do dono ("eu testei", "eu uso"); fale sempre como a equipe ou a marca ("a gente", ' +
         '"aqui na loja").'
       : dados.tipo === "negocio" && dados.quemAparece === "outra_pessoa"
-        ? "\n13. Quem aparece neste vídeo é outra pessoa (um apresentador, um criador ou um " +
+        ? "\n14. Quem aparece neste vídeo é outra pessoa (um apresentador, um criador ou um " +
           'cliente), não o dono: escreva o texto para essa pessoa falar, nunca em primeira pessoa ' +
           'do dono ("eu, dono"); ela fala sobre a marca de fora, como quem apresenta ou recomenda.'
         : "";
@@ -407,10 +414,10 @@ português de gente, sem jargão no motivo (${montarInstrucaoJargaoPorQueAssim()
 dentro do motivo. Nunca cite uma regra que não está na lista das R-IG-STORY acima.`
       : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
 Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
-(quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
-(o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
-visual. Deixe porQueAssim como lista vazia: neste formato ainda não há regras numeradas de
-plataforma, e as regras duras deste texto nunca entram nesse campo.`;
+(quando, o quê, onde), o ritmo de corte, os recursos e o áudio quando houver (a referência é a
+regra 12 acima, vale para qualquer formato). Deixe porQueAssim como lista vazia: neste formato
+ainda não há regras numeradas de plataforma, e as regras duras deste texto nunca entram nesse
+campo.`;
 
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:
@@ -458,6 +465,13 @@ ${regra9}
     grava, nunca como anúncio ou propaganda; se o objetivo for as pessoas comprarem, a
     chamada final aponta para a marca citada, não para a marca deste roteiro. A chamada final
     sempre cita uma marca só, nunca as duas.
+12. A referência (edicao.referencia), em qualquer formato: escolha, entre os vídeos de
+    evidência disponíveis, UM que você de fato usou como modelo de estrutura (a forma de
+    contar essa história, não só o assunto); devolva o id dele em videoId, o segundo exato
+    quando a evidência trouxer um "momento chave" para esse vídeo (senão, 0) em segundo, e uma
+    frase curta do que vale a pena olhar nele em oQueOlhar. Se nenhum vídeo da evidência de
+    fato serviu de modelo, deixe edicao.referencia nulo inteiro; nunca force uma referência só
+    porque existe evidência disponível. Referência errada é pior que referência nenhuma.
 ${regraVoz}${regraQuemAparece}${regraPersonaConhecido}
 
 O objetivo escolhido muda o roteiro:

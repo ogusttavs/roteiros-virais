@@ -615,7 +615,9 @@ export async function gerarComVerificacao<T>(
 async function tentarGerarEVerificar<T>(
   params: ParametrosGeracaoVerificada<T>,
 ): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number }> {
+  const inicio = Date.now();
   const resultado = await gerarEstruturado(params);
+  const duracaoMs = Date.now() - inicio;
   const campos = params.extrairCampos(resultado.dados);
   const evidencias = params.extrairEvidencias?.(resultado.dados) ?? [];
 
@@ -702,6 +704,7 @@ async function tentarGerarEVerificar<T>(
       tokensCacheEscrita: resultado.tokensCacheEscrita,
     },
     motivoAvaliacao: motivos.length > 0 ? motivos.join("; ") : undefined,
+    duracaoMs,
   });
 
   return { aprovado, dados: resultado.dados, motivos, geracaoId };

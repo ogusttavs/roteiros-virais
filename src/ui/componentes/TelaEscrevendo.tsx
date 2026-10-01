@@ -8,9 +8,21 @@ import { textosComuns } from "@/textos/comuns";
 import { ClaqueteAnimada } from "./ClaqueteAnimada";
 import styles from "./TelaEscrevendo.module.css";
 
-/** Depois de quanto tempo avisa que ainda está trabalhando (V11, item 3: um só lugar para os três caminhos). */
-export const LIMIAR_DEMORANDO_MS = 10000;
+/**
+ * Depois de quanto tempo avisa que ainda está trabalhando (V11, item 3: um só lugar para os três
+ * caminhos). R1, item 0b (pedido do Gustavo em 01/10): 3 minutos, não 10 segundos; quase todo
+ * roteiro passa dos 10 segundos (dado real, `geracoesIA.duracaoMs`), e a frase "está demorando
+ * mais que o normal" cedo demais virava regra, não exceção.
+ */
+export const LIMIAR_DEMORANDO_MS = 180000;
 const INTERVALO_FRASE_MS = 4000;
+
+/** "0:00" subindo de segundo em segundo, nunca "00:00" (R1, item 0b). */
+function formatarDuracaoDecorrida(segundos: number): string {
+  const minutos = Math.floor(segundos / 60);
+  const resto = segundos % 60;
+  return `${minutos}:${String(resto).padStart(2, "0")}`;
+}
 
 type Props = {
   /** Cobre a tela inteira enquanto true; some (sem nada no DOM) quando false, do jeito que `Folha` já faz. */
@@ -45,6 +57,7 @@ export function ConteudoTelaEscrevendo({
   aoVoltarDepois,
   demorando,
   frase,
+  segundosDecorridos,
 }: {
   fraseDemorando: string;
   erro: string | null;
@@ -52,6 +65,7 @@ export function ConteudoTelaEscrevendo({
   aoVoltarDepois?: () => void;
   demorando: boolean;
   frase: string;
+  segundosDecorridos: number;
 }) {
   return (
     <div className={styles.tela} role="status" aria-live="polite">
@@ -71,8 +85,17 @@ export function ConteudoTelaEscrevendo({
             <h2 className={styles.titulo}>{textosComuns.esperaTitulo}</h2>
             <p className={styles.frase}>{frase}</p>
             <p className={styles.duracao}>{textosComuns.esperaDuracao}</p>
+            {/*
+              R1, item 0b: o contador não é anunciado a cada segundo (o `role="status"` da tela
+              inteira já é `aria-live="polite"`; `aria-live="off"` aqui, mais específico, sobrepõe
+              para este elemento). Só texto mudando, sem animação: `prefers-reduced-motion` não
+              se aplica.
+            */}
+            <p className={styles.contador} aria-live="off">
+              {formatarDuracaoDecorrida(segundosDecorridos)}
+            </p>
             {demorando ? <p className={styles.demorando}>{fraseDemorando}</p> : null}
-            {demorando && aoVoltarDepois ? (
+            {aoVoltarDepois ? (
               <button type="button" className={styles.botaoTexto} onClick={aoVoltarDepois}>
                 {textosComuns.esperaVoltarDepois}
               </button>
@@ -93,6 +116,7 @@ export function ConteudoTelaEscrevendo({
 export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDeNovo, aoVoltarDepois }: Props) {
   const [indiceFrase, setIndiceFrase] = useState(0);
   const [demorando, setDemorando] = useState(false);
+  const [segundosDecorridos, setSegundosDecorridos] = useState(0);
 
   useEffect(() => {
     if (!aberto || erro !== null) {
@@ -112,6 +136,20 @@ export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDe
     return () => clearInterval(id);
   }, [aberto, erro]);
 
+  /**
+   * R1, item 0b: `Date.now()` a cada marcação, não só "+1" por disparo do `setInterval`; uma aba
+   * em segundo plano atrasa o timer, e contar só disparos subestimaria o tempo de verdade.
+   */
+  useEffect(() => {
+    if (!aberto || erro !== null) {
+      setSegundosDecorridos(0);
+      return;
+    }
+    const inicio = Date.now();
+    const id = setInterval(() => setSegundosDecorridos(Math.floor((Date.now() - inicio) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [aberto, erro]);
+
   if (!aberto) return null;
 
   return createPortal(
@@ -122,6 +160,7 @@ export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDe
       aoVoltarDepois={aoVoltarDepois}
       demorando={demorando}
       frase={textosComuns.espera[indiceFrase]}
+      segundosDecorridos={segundosDecorridos}
     />,
     document.body,
   );

@@ -1,7 +1,9 @@
 "use server";
 
 import type { Objetivo } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
 import { hojeISO } from "@/lib/config";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
@@ -68,37 +70,49 @@ export type DadosAceitarPlano = {
  * pré-preenchida pode ter sido editada, então os campos vêm da folha, não
  * direto do que `planejarDia` sugeriu. Confere `garantirMembroDaMarca`
  * antes de gerar, mesmo isolamento do momento (V9a, item 4).
+ *
+ * R1, item 0c: `ErroIA.mensagemCliente` e `ErroRoteiro.message` vêm como resultado, não
+ * lançados; sessão ausente continua lançando `ErroAcessoNegado` (raro, pede entrar de novo).
  */
-export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlano): Promise<{ id: number }> {
+export async function aceitarPlanoAction(
+  itemId: number,
+  dados: DadosAceitarPlano,
+): Promise<ResultadoAcao<{ id: number }>> {
   const sessao = await sessaoAtual();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
 
-  const onde = dados.onde.trim();
-  const oQueEstaAcontecendo = dados.oQueEstaAcontecendo.trim();
-  const oQueDaParaMostrar = dados.oQueDaParaMostrar.trim();
-  if (!onde || !oQueEstaAcontecendo || !oQueDaParaMostrar) {
-    throw new ErroRoteiro("conte onde voce esta, o que esta acontecendo e o que da para mostrar.");
-  }
+  try {
+    const onde = dados.onde.trim();
+    const oQueEstaAcontecendo = dados.oQueEstaAcontecendo.trim();
+    const oQueDaParaMostrar = dados.oQueDaParaMostrar.trim();
+    if (!onde || !oQueEstaAcontecendo || !oQueDaParaMostrar) {
+      throw new ErroRoteiro("conte onde voce esta, o que esta acontecendo e o que da para mostrar.");
+    }
 
-  if (dados.marcaId !== undefined) {
-    await garantirMembroDaMarca(sessao.user.id, dados.marcaId);
-  }
+    if (dados.marcaId !== undefined) {
+      await garantirMembroDaMarca(sessao.user.id, dados.marcaId);
+    }
 
-  const cliente = await clienteDaSessaoAtual();
-  const roteiro = await aceitar(itemId, cliente, {
-    onde,
-    oQueEstaAcontecendo,
-    oQueDaParaMostrar,
-    objetivo: dados.objetivo,
-    formato: validarFormato(dados.formato),
-    estilo: validarEstilo(dados.estilo),
-    marcaId: dados.marcaId,
-    objetivoDoVideo: dados.objetivoDoVideo,
-    quemAparece: validarQuemAparece(dados.quemAparece),
-  });
-  return { id: roteiro.id };
+    const cliente = await clienteDaSessaoAtual();
+    const roteiro = await aceitar(itemId, cliente, {
+      onde,
+      oQueEstaAcontecendo,
+      oQueDaParaMostrar,
+      objetivo: dados.objetivo,
+      formato: validarFormato(dados.formato),
+      estilo: validarEstilo(dados.estilo),
+      marcaId: dados.marcaId,
+      objetivoDoVideo: dados.objetivoDoVideo,
+      quemAparece: validarQuemAparece(dados.quemAparece),
+    });
+    return { ok: true, dado: { id: roteiro.id } };
+  } catch (falha) {
+    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
+    throw falha;
+  }
 }
 
 /** "Pular" um item do plano (item 3): some do bloco, sem gerar roteiro. */

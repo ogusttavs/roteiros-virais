@@ -114,13 +114,26 @@ export async function resolverIdioma(
 }
 
 /**
- * Grava a analise, etiquetas, idioma da fala e tipo de abertura no video (o mesmo caminho para
- * lote e imediato: a extracao le a transcricao inteira, mais confiavel que titulo/descricao
- * para idioma e mais precisa que so o gancho ja extraido para tipo de abertura).
+ * Grava a analise, etiquetas, idioma da fala, tipo de abertura e tipo de conteudo no video (o
+ * mesmo caminho para lote e imediato: a extracao le a transcricao inteira, mais confiavel que
+ * titulo/descricao para idioma e mais precisa que so o gancho ja extraido para tipo de
+ * abertura). `tipoConteudo`/`serveDeModelo` (H4, item 2) ficam tanto no jsonb `analise` (registro
+ * completo) quanto em colunas proprias (`evidenciaParaRoteiro` filtra por SQL).
  */
 export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
   const { etiquetas, idioma, tipoAbertura, ...analise } = dados;
   const analiseVideo: AnaliseVideo = analise;
   // M4, item 1: este caminho sempre lê a transcrição, nunca é o caminho sem fala.
-  await db().update(videos).set({ analise: analiseVideo, etiquetas, idioma, tipoAbertura, semFala: false }).where(eq(videos.id, videoId));
+  await db()
+    .update(videos)
+    .set({
+      analise: analiseVideo,
+      etiquetas,
+      idioma,
+      tipoAbertura,
+      tipoConteudo: dados.tipoConteudo,
+      serveDeModelo: dados.serveDeModelo,
+      semFala: false,
+    })
+    .where(eq(videos.id, videoId));
 }

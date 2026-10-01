@@ -26,7 +26,12 @@ export const textosComuns = {
   ],
   /** V11, item 2: `TelaEscrevendo`, a mesma tela de espera para tema, tema livre e momento. */
   esperaTitulo: "Escrevendo o seu roteiro",
-  esperaDuracao: "Costuma levar de 30 segundos a 3 minutos",
+  /**
+   * R1, item 0b (pedido do Gustavo em 01/10, captura do celular: "sempre demora mais; vamos
+   * colocar como pode levar até 3 minutos e colocar um contador"): a frase antiga prometia 30
+   * segundos, e quase todo roteiro passa bem disso (`geracoesIA.duracaoMs`, dado real).
+   */
+  esperaDuracao: "Pode levar até 3 minutos",
   esperaVoltarDepois: "Voltar depois",
   /**
    * P2b, item 4: só aparece quando a prévia ao vivo usa o reconhecimento de fala do navegador

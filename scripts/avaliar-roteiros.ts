@@ -15,7 +15,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { TIPOS_ABERTURA } from "../src/db/schema";
+import { ESTILOS_ROTEIRO, FORMATOS_ROTEIRO, TIPOS_ABERTURA } from "../src/db/schema";
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
@@ -69,6 +69,14 @@ const casoSchema = z.object({
   regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
   /** V9a, item 4: ausente (todo caso gravado antes desta etapa) vira "negocio", o mesmo padrão da coluna. */
   tipo: z.enum(["negocio", "pessoa"]).default("negocio"),
+  /**
+   * R1, item 0c: ausente vira "reels"/"falado" (todo caso gravado antes desta etapa é Reels
+   * falado). O golden set precisa de pelo menos um caso de cada combinação para valer como prova
+   * "um roteiro de cada formato": foi exatamente a falta disso (só Story testado entre 30/09 e
+   * 01/10) que deixou o bug do hotfix `fdac7ea` chegar em produção sem ninguém notar.
+   */
+  formato: z.enum(FORMATOS_ROTEIRO).default("reels"),
+  estilo: z.enum(ESTILOS_ROTEIRO).default("falado"),
   /**
    * V4, item 7b: o que `escolherTipoAbertura` decidiu para este caso.
    * Ausente (todo caso do golden set gravado antes desta etapa) vira "livre,
@@ -150,14 +158,14 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         modeloNicho: caso.modeloNicho,
         regrasCliente: caso.regrasCliente,
         tipo: caso.tipo,
-        formato: "reels",
-        estilo: "falado",
+        formato: caso.formato,
+        estilo: caso.estilo,
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,
         objetivo: caso.objetivo,
-        formato: "reels",
-        estilo: "falado",
+        formato: caso.formato,
+        estilo: caso.estilo,
         evidencias: caso.evidencias,
         roteirosRecentes: caso.roteirosRecentes,
         instrucaoAbertura: caso.instrucaoAbertura,
@@ -198,19 +206,36 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     }
 
     /** V4, item 7b: o tipo instruído e o que o modelo de fato declarou, lado a lado, para a leitura do golden set. */
+    console.log(`formato: ${caso.formato}, estilo: ${caso.estilo}`);
     console.log(
       `tipo de abertura: instruido ${caso.instrucaoAbertura.tipo ?? "livre"}, declarado ${saida.tipoAbertura}`,
     );
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s\n`);
-    console.log("OS 3 PRIMEIROS SEGUNDOS");
-    console.log(`  ${saida.gancho}\n`);
-    console.log("O MEIO");
-    console.log(`  ${saida.corpo}\n`);
-    console.log("O FECHAMENTO");
-    console.log(`  ${saida.fechamento}\n`);
-    console.log("A CHAMADA FINAL");
-    console.log(`  ${saida.chamadaFinal}\n`);
+    if (saida.cartoes) {
+      /** Story e sem fala usam `cartoes`, nunca gancho/corpo/fechamento (nulos nesses dois, V9c/M4). */
+      console.log(`OS CARTOES (${saida.cartoes.length})`);
+      saida.cartoes.forEach((cartao, i) => {
+        console.log(`  ${i + 1}. ${cartao.oQueFalar || "(sem fala)"}`);
+        console.log(`     mostra: ${cartao.oQueMostrar}; texto na tela: "${cartao.textoNaTela}"; figurinha: ${cartao.figurinha}`);
+      });
+      console.log();
+      if (saida.legenda) console.log(`LEGENDA DO POST\n  ${saida.legenda}\n`);
+      if (saida.porQueAssim.length > 0) {
+        console.log("POR QUE ASSIM (regras numeradas seguidas de fato)");
+        for (const item of saida.porQueAssim) console.log(linha(item.regra, item.motivo));
+        console.log();
+      }
+    } else {
+      console.log("OS 3 PRIMEIROS SEGUNDOS");
+      console.log(`  ${saida.gancho}\n`);
+      console.log("O MEIO");
+      console.log(`  ${saida.corpo}\n`);
+      console.log("O FECHAMENTO");
+      console.log(`  ${saida.fechamento}\n`);
+      console.log("A CHAMADA FINAL");
+      console.log(`  ${saida.chamadaFinal}\n`);
+    }
     console.log("ONDE GRAVAR E O QUE MOSTRAR");
     console.log(`  ${saida.ondeGravar}`);
     for (const cena of saida.cenas) {
@@ -242,6 +267,14 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
      * bug que motivou este item so aparece nesta segunda camada, nunca na
      * leitura humana do roteiro em si.
      */
+    /**
+     * R1, item 0c: `formato`/`estilo`/`cartoes`/`legenda`/`porQueAssim`/`narrativa` espelham
+     * exatamente o que `servicos/roteiro.ts` passa para `gerarComVerificacao` em produção
+     * (inclusive a regra de `porQueAssim` só valer fora de Story falado); sem isto, este script
+     * nunca reprovaria o que reprovou em produção no hotfix `fdac7ea` (Reels com `porQueAssim`
+     * preenchido por engano), porque a checagem de formato simplesmente não rodava aqui.
+     */
+    const usaPorQueAssim = caso.formato === "story" && caso.estilo !== "sem_fala";
     const campos = extrairCamposRoteiro(saida);
     const local = verificarLocalmente(campos, {
       // O gancho reprovado entra junto (mesmo raciocinio de `servicos/roteiro.ts`,
@@ -253,6 +286,12 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         caso.anguloParaEvitar?.duracaoAnteriorS !== undefined
           ? { anteriorS: caso.anguloParaEvitar.duracaoAnteriorS, novaS: saida.duracaoS }
           : undefined,
+      formato: caso.formato,
+      estilo: caso.estilo,
+      cartoes: saida.cartoes,
+      legenda: saida.legenda,
+      porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
+      narrativa: { gancho: saida.gancho, corpo: saida.corpo, chamadaFinal: saida.chamadaFinal },
     });
     let verificacao = local;
     if (local.aprovado) {

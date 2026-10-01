@@ -8,8 +8,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { contas, geracoesIA, nichos, noticias, temasDia, videos } from "@/db/schema";
-import { rodarTemasDoDia } from "@/jobs/temas-do-dia";
+import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, user, videos } from "@/db/schema";
+import { podeSobrescreverTemasDoDia, rodarTemasDoDia } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -367,6 +367,29 @@ describe("rodarTemasDoDia com nichoId (M1, item 2)", () => {
     expect(linha.temas[0]?.titulo).toBe("tema de ontem");
   });
 
+  /**
+   * R1, item 0: `opts.forcar` ("npm run job -- temas-do-dia <nichoId> --refazer") pula o "já tem
+   * hoje, não regenera"; a segurança de não piorar (`podeSobrescreverTemasDoDia`) continua valendo
+   * na escrita, então com evidência boa (3+ temas) a sobrescrita acontece normalmente.
+   */
+  it("com forcar, refaz mesmo que o setor ja tenha tema hoje", async () => {
+    await db()
+      .insert(temasDia)
+      .values({
+        nichoId,
+        data: hojeISO(),
+        temas: [{ titulo: "tema de antes do refazer", descricao: "x", porQue: "x", evidencias: [], puxaPara: "conversao" }],
+      });
+    await criarVideosComProva("assunto que chegou depois, pedindo refazer");
+
+    const resumo = await rodarTemasDoDia(nichoId, { forcar: true });
+    expect(resumo.jaTinhaTemaHoje).toBeUndefined();
+    expect(resumo.gerados).toBe(1);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas[0]?.titulo).not.toBe("tema de antes do refazer");
+  });
+
   it("setor sem tema hoje, com nichoId: gera so para aquele setor", async () => {
     await criarVideosComProva("assunto do setor unico");
 
@@ -393,5 +416,121 @@ describe("rodarTemasDoDia com nichoId (M1, item 2)", () => {
 
     const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
     expect(linha.temas[0]?.titulo).not.toBe("tema velho");
+  });
+});
+
+/**
+ * R1, item 0 (achado de produção em 01/10): rodar o job de novo no mesmo dia não pode piorar o
+ * que já está lá. `podeSobrescreverTemasDoDia` testada direto (não pelo pipeline inteiro): o mock
+ * de `temasDoDia` sempre gera os mesmos três temas candidatos a partir da mesma evidência, então
+ * "o conjunto novo tem menos temas com prova" não dá para simular variando só a evidência de
+ * entrada; testar a função de decisão direto prova a regra sem depender de como o mock gera.
+ */
+describe("podeSobrescreverTemasDoDia (R1, item 0)", () => {
+  const temaA = { titulo: "tema A", descricao: "x", porQue: "x", evidencias: [], puxaPara: "conversao" as const };
+  const temaB = { titulo: "tema B", descricao: "x", porQue: "x", evidencias: [], puxaPara: "alcance" as const };
+
+  it("sem tema existente hoje, pode sobrescrever (primeira geração do dia)", async () => {
+    expect(await podeSobrescreverTemasDoDia(nichoId, [temaA])).toBe(true);
+  });
+
+  it("o conjunto novo tem menos temas que o existente: não sobrescreve (o setor 5 caiu de 2 para 1)", async () => {
+    await db()
+      .insert(temasDia)
+      .values({ nichoId, data: hojeISO(), temas: [temaA, temaB] });
+
+    expect(await podeSobrescreverTemasDoDia(nichoId, [temaA])).toBe(false);
+  });
+
+  it("o conjunto novo tem o mesmo tanto ou mais: sobrescreve", async () => {
+    await db()
+      .insert(temasDia)
+      .values({ nichoId, data: hojeISO(), temas: [temaA] });
+
+    expect(await podeSobrescreverTemasDoDia(nichoId, [temaA, temaB])).toBe(true);
+  });
+
+  it("um roteiro de hoje já nasceu de um dos temas existentes: não sobrescreve, mesmo com o mesmo tanto de temas", async () => {
+    await db()
+      .insert(temasDia)
+      .values({ nichoId, data: hojeISO(), temas: [temaA] });
+
+    const usuarioId = "temas-do-dia-teste-roteiro-usou";
+    await db().insert(user).values({ id: usuarioId, name: "[teste] roteiro ja usou", email: `${usuarioId}@temas.teste` });
+    const [cliente] = await db().insert(clientes).values({ usuarioId, nome: "[teste] roteiro ja usou", nichoId }).returning();
+    await db()
+      .insert(roteiros)
+      .values({
+        clienteId: cliente.id,
+        data: hojeISO(),
+        tema: temaA.titulo,
+        origem: "sugerido",
+        objetivo: "alcance",
+        conteudo: {
+          titulo: temaA.titulo,
+          duracaoS: 30,
+          gancho: "x",
+          corpo: "x",
+          fechamento: "x",
+          chamadaFinal: "x",
+          cartoes: null,
+          porQueAssim: [],
+          cenas: [],
+          ondeGravar: "x",
+          edicao: { textoNaTela: [], ritmoDeCorte: "x", recursos: [], audio: null, referencia: null },
+          evidencias: [],
+          semEvidencia: true,
+          tipoAbertura: null,
+          legenda: null,
+        } as never,
+      });
+
+    expect(await podeSobrescreverTemasDoDia(nichoId, [temaA, temaB])).toBe(false);
+
+    await db().delete(roteiros).where(eq(roteiros.clienteId, cliente.id));
+    await db().delete(clientes).where(eq(clientes.id, cliente.id));
+    await db().delete(user).where(eq(user.id, usuarioId));
+  });
+
+  it("um roteiro de hoje de OUTRO tema (nao um dos existentes): sobrescreve normalmente", async () => {
+    await db()
+      .insert(temasDia)
+      .values({ nichoId, data: hojeISO(), temas: [temaA] });
+
+    const usuarioId = "temas-do-dia-teste-roteiro-outro-tema";
+    await db().insert(user).values({ id: usuarioId, name: "[teste] roteiro outro tema", email: `${usuarioId}@temas.teste` });
+    const [cliente] = await db().insert(clientes).values({ usuarioId, nome: "[teste] roteiro outro tema", nichoId }).returning();
+    await db()
+      .insert(roteiros)
+      .values({
+        clienteId: cliente.id,
+        data: hojeISO(),
+        tema: "um tema qualquer, nao o tema A",
+        origem: "livre",
+        objetivo: "alcance",
+        conteudo: {
+          titulo: "x",
+          duracaoS: 30,
+          gancho: "x",
+          corpo: "x",
+          fechamento: "x",
+          chamadaFinal: "x",
+          cartoes: null,
+          porQueAssim: [],
+          cenas: [],
+          ondeGravar: "x",
+          edicao: { textoNaTela: [], ritmoDeCorte: "x", recursos: [], audio: null, referencia: null },
+          evidencias: [],
+          semEvidencia: true,
+          tipoAbertura: null,
+          legenda: null,
+        } as never,
+      });
+
+    expect(await podeSobrescreverTemasDoDia(nichoId, [temaA, temaB])).toBe(true);
+
+    await db().delete(roteiros).where(eq(roteiros.clienteId, cliente.id));
+    await db().delete(clientes).where(eq(clientes.id, cliente.id));
+    await db().delete(user).where(eq(user.id, usuarioId));
   });
 });

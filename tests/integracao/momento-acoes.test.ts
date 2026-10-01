@@ -14,7 +14,6 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, membrosMarca, nichos, roteiros, user, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
-import { ErroRoteiro } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { gerarRoteiroMomentoAction } from "../../src/app/(painel)/(completo)/hoje/momento/acoes";
@@ -87,9 +86,10 @@ describe("gerarRoteiroMomentoAction", () => {
   it("com a sessao de A, gera o roteiro na marca de A, com origem momento", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
 
-    const { id } = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento" });
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento" });
 
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
     expect(roteiro.clienteId).toBe(marcaA.id);
     expect(roteiro.origem).toBe("momento");
     expect(roteiro.momento).toEqual(MOMENTO);
@@ -111,9 +111,10 @@ describe("gerarRoteiroMomentoAction", () => {
   it("com marcaId da propria marca ativa (sempre membro dela), gera normalmente", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaB.usuarioId));
 
-    const { id } = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "alcance", marcaId: marcaB.id });
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "alcance", marcaId: marcaB.id });
 
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
     expect(roteiro.momento?.marcaId).toBe(marcaB.id);
   });
 
@@ -122,23 +123,36 @@ describe("gerarRoteiroMomentoAction", () => {
     await expect(gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento" })).rejects.toThrow(ErroAcessoNegado);
   });
 
-  it("com um dos tres campos vazio, erro nomeado, sem gerar", async () => {
+  /**
+   * R1, item 0c: o erro chega como resultado (`ok: false`), nao lancado, para a tela mostrar o
+   * texto exato em producao (`ErroRoteiro.message` ja e uma mensagem segura para o cliente).
+   */
+  it("com um dos tres campos vazio, erro como resultado, sem gerar", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
-    await expect(
-      gerarRoteiroMomentoAction({ ...MOMENTO, oQueDaParaMostrar: "   ", objetivo: "engajamento" }),
-    ).rejects.toThrow(ErroRoteiro);
+    const resultado = await gerarRoteiroMomentoAction({
+      ...MOMENTO,
+      oQueDaParaMostrar: "   ",
+      objetivo: "engajamento",
+    });
+    expect(resultado).toEqual({
+      ok: false,
+      erro: "conte onde voce esta, o que esta acontecendo e o que da para mostrar.",
+    });
   });
 
   // V9d, item 2: `formato` chega como texto livre do navegador; um valor fora de "reels"/"story"
   // precisa ser recusado antes de gerar, nunca chegar ao banco.
-  it("com formato invalido, erro nomeado, sem gerar", async () => {
+  it("com formato invalido, erro como resultado, sem gerar", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
 
-    await expect(
-      gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", formato: "carrossel" }),
-    ).rejects.toThrow(ErroRoteiro);
+    const resultado = await gerarRoteiroMomentoAction({
+      ...MOMENTO,
+      objetivo: "engajamento",
+      formato: "carrossel",
+    });
 
+    expect(resultado).toEqual({ ok: false, erro: "formato de roteiro invalido." });
     const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
     expect(depois.length).toBe(antes.length);
   });

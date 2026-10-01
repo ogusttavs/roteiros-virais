@@ -32,10 +32,10 @@
  * ela. Tema que não passa é descartado, não corrigido: o nicho fecha o dia
  * com menos de três temas quando for o caso.
  */
-import { and, eq, gte, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, noticias, temasDia, type TemaDoDia } from "@/db/schema";
+import { clientes, nichos, noticias, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
@@ -212,9 +212,46 @@ async function filtrarTemasComProva(
   return { temasComProva, temasSemProva: temas.length - temasComProva.length };
 }
 
+/**
+ * R1, item 0 (achado de produção em 01/10, `temas-do-dia`): rodar o job de novo no mesmo dia
+ * não pode piorar o que já está lá. Duas condições, qualquer uma basta para não sobrescrever:
+ * (1) o conjunto novo tem menos temas com prova que o que já existe (o setor 5 caiu de 2 para 1,
+ * o Fable restaurou à mão); (2) algum roteiro de hoje já nasceu de um dos temas que estão lá
+ * agora (sobrescrever trocaria a evidência debaixo de um roteiro que a pessoa já recebeu).
+ */
+/** Exportada para o teste de integração exercitar as duas condições direto, sem depender de como o mock gera candidatos. */
+export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: TemaDoDia[]): Promise<boolean> {
+  const [existente] = await db()
+    .select({ temas: temasDia.temas })
+    .from(temasDia)
+    .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
+  if (!existente) return true;
+
+  if (temasNovos.length < existente.temas.length) return false;
+
+  const titulosExistentes = existente.temas.map((t) => t.titulo);
+  if (titulosExistentes.length === 0) return true;
+
+  const [roteiroJaUsou] = await db()
+    .select({ id: roteiros.id })
+    .from(roteiros)
+    .innerJoin(clientes, eq(clientes.id, roteiros.clienteId))
+    .where(
+      and(
+        eq(clientes.nichoId, nichoId),
+        eq(roteiros.data, hojeISO()),
+        eq(roteiros.origem, "sugerido"),
+        inArray(roteiros.tema, titulosExistentes),
+      ),
+    )
+    .limit(1);
+
+  return !roteiroJaUsou;
+}
+
 async function gerarTemasDoNicho(
   nicho: NichoAtivo,
-): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova"; temasSemProva: number }> {
+): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "mantido"; temasSemProva: number }> {
   const [subindo, semDono, candidatasNoticias] = await Promise.all([
     subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO),
     semDonoComAnalise(nicho.id),
@@ -262,6 +299,10 @@ async function gerarTemasDoNicho(
     return { status: "sem_prova", temasSemProva };
   }
 
+  if (!(await podeSobrescreverTemasDoDia(nicho.id, temasComProva))) {
+    return { status: "mantido", temasSemProva };
+  }
+
   await db()
     .insert(temasDia)
     .values({ nichoId: nicho.id, data: hojeISO(), temas: temasComProva })
@@ -275,18 +316,36 @@ async function gerarTemasDoNicho(
 
 /**
  * M1, item 2: os temas nascem quando a análise chega, não só às 06:30. Sem `nichoId`, o
- * comportamento de sempre (o cron das 06:30): todo nicho ativo, sempre substituindo. Com
- * `nichoId` (chamado por `extrairColeta` ou `extrairAgora` depois de analisar vídeo novo), só
- * aquele setor, e só se ele ainda não tem tema hoje: nunca regenera o tema de quem já escolheu.
+ * comportamento de sempre (o cron das 06:30): todo nicho ativo, sempre tentando (a escrita em si
+ * respeita `podeSobrescreverTemasDoDia`, item 0 da R1). Com `nichoId` (chamado por
+ * `extrairColeta` ou `extrairAgora` depois de analisar vídeo novo), só aquele setor, e só se ele
+ * ainda não tem tema hoje: nunca regenera o tema de quem já escolheu.
+ *
+ * R1, item 0: `opts.forcar` pula esse "já tem hoje, não regenera" (`npm run job --
+ * temas-do-dia <nichoId> --refazer`, `rodar.ts`), para refazer um setor só sob pedido; a
+ * segurança de não piorar o que já está lá continua em `podeSobrescreverTemasDoDia`, que roda
+ * de qualquer jeito na escrita.
  */
-export async function rodarTemasDoDia(nichoId?: number): Promise<Record<string, unknown>> {
-  if (nichoId !== undefined) {
+export async function rodarTemasDoDia(
+  nichoId?: number,
+  opts?: { forcar?: boolean },
+): Promise<Record<string, unknown>> {
+  if (nichoId !== undefined && !opts?.forcar) {
     const [jaTemHoje] = await db()
       .select({ id: temasDia.id })
       .from(temasDia)
       .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
     if (jaTemHoje) {
-      return { nichos: 1, gerados: 0, semEvidencia: 0, semProva: 0, temasSemProva: 0, falhas: 0, jaTinhaTemaHoje: true };
+      return {
+        nichos: 1,
+        gerados: 0,
+        mantidos: 0,
+        semEvidencia: 0,
+        semProva: 0,
+        temasSemProva: 0,
+        falhas: 0,
+        jaTinhaTemaHoje: true,
+      };
     }
   }
 
@@ -298,6 +357,7 @@ export async function rodarTemasDoDia(nichoId?: number): Promise<Record<string, 
     .where(and(...condicoes));
 
   let gerados = 0;
+  let mantidos = 0;
   let semEvidencia = 0;
   let semProva = 0;
   let temasSemProva = 0;
@@ -309,6 +369,7 @@ export async function rodarTemasDoDia(nichoId?: number): Promise<Record<string, 
       const resultado = await gerarTemasDoNicho(nicho);
       temasSemProva += resultado.temasSemProva;
       if (resultado.status === "gerado") gerados += 1;
+      else if (resultado.status === "mantido") mantidos += 1;
       else if (resultado.status === "sem_prova") semProva += 1;
       else semEvidencia += 1;
     } catch (erro) {
@@ -320,6 +381,7 @@ export async function rodarTemasDoDia(nichoId?: number): Promise<Record<string, 
   return {
     nichos: nichosAtivos.length,
     gerados,
+    mantidos,
     semEvidencia,
     semProva,
     temasSemProva,
