@@ -26,6 +26,7 @@ import {
   contas,
   membrosMarca,
   nichos,
+  planoGravacoes,
   preferenciasUsuario,
   roteiros,
   temasDia,
@@ -36,6 +37,7 @@ import {
   type TemaDoDia,
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
+import { somarDiasISO } from "../../src/servicos/roteiro";
 import { textosConexao } from "../../src/textos/conexao";
 
 const SENHA = "ExemploSenha123";
@@ -54,6 +56,8 @@ const LARGURAS_COM_FOLHA = LARGURAS.filter((l) => l.largura < 1180);
 const ALTURA_TOQUE_MINIMA = 44;
 
 let roteiroId: number;
+/** E39c, parte 1: um dia com um item do plano ainda sugerido, sem roteiro, para medir o cartão novo em `/hoje/mes`. */
+let diaComPlano: string;
 
 function avaliacaoExemplo(nota: number): AvaliacaoResposta {
   return {
@@ -224,6 +228,23 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       const [cliente] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-layout"));
       const [roteiro] = await db().select({ id: roteiros.id }).from(roteiros).where(eq(roteiros.clienteId, cliente.id));
       roteiroId = roteiro.id;
+      const [planoExistente] = await db().select({ dia: planoGravacoes.dia }).from(planoGravacoes).where(eq(planoGravacoes.clienteId, cliente.id));
+      if (planoExistente) {
+        diaComPlano = planoExistente.dia;
+      } else {
+        diaComPlano = somarDiasISO(hojeISO(), 10);
+        await db().insert(planoGravacoes).values({
+          clienteId: cliente.id,
+          dia: diaComPlano,
+          ordem: 1,
+          lugar: "oficina",
+          situacao: "trocando o oleo do carro do cliente",
+          oQueMostrar: "o carro no elevador",
+          objetivo: "alcance",
+          formato: "story",
+          estado: "sugerido",
+        });
+      }
       return;
     }
 
@@ -373,6 +394,19 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       })
       .returning();
     roteiroId = roteiro.id;
+
+    diaComPlano = somarDiasISO(hojeISO(), 10);
+    await db().insert(planoGravacoes).values({
+      clienteId: cliente.id,
+      dia: diaComPlano,
+      ordem: 1,
+      lugar: "oficina",
+      situacao: "trocando o oleo do carro do cliente",
+      oQueMostrar: "o carro no elevador",
+      objetivo: "alcance",
+      formato: "story",
+      estado: "sugerido",
+    });
 
     /**
      * Cliente proprio para Comecar (estados "perguntas" e "folha", item 5 do
@@ -560,6 +594,34 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await entrar(page);
       await expect(page).toHaveURL(/\/hoje/);
       await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    // E39c, parte 1: as portas de /criar (a de "Planejar os próximos dias" com o texto novo).
+    test(`Criar em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/criar");
+      await expect(page.getByRole("button", { name: "Planejar os próximos dias" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    // E39c, parte 1: o calendário do mês, as setas de semana (herdadas de Hoje) e "Contar a minha agenda".
+    test(`O calendário do mês em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto("/hoje/mes");
+      await expect(page.getByRole("button", { name: "Contar a minha agenda" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    // E39c, parte 1: um dia com plano ainda sugerido (o cartão novo, tracejado) e "Criar roteiro" no mesmo dia.
+    test(`O calendário do mês, um dia só com plano, em ${rotulo}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: altura });
+      await entrar(page);
+      await page.goto(`/hoje/mes?dia=${diaComPlano}`);
+      await expect(page.getByText("Planejado")).toBeVisible();
+      await expect(page.getByRole("button", { name: "Criar roteiro" })).toBeVisible();
       await conferirLayout(page);
     });
 

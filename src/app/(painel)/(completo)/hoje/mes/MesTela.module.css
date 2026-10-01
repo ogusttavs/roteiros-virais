@@ -39,10 +39,18 @@
   gap: var(--espaco-3);
 }
 
+/*
+ * Sete colunas iguais num celular estreito (360 a 390px) não sobram espaço para o alvo de toque
+ * de 44px com o padding do cartão por cima (achado do e2e desta etapa, `layout.spec.ts`, medido
+ * em 37px de largura): a grade sangra até a borda do cartão, cancelando o padding de
+ * `hojeStyles.semanaAgenda` só aqui, mesma correção que `.diasAgenda` (`HojeTela.module.css`) já
+ * tinha para a semana.
+ */
 .gradeMes {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--espaco-1);
+  gap: 2px;
+  margin: 0 calc(-1 * var(--espaco-5));
 }
 
 .nomeSemana {
