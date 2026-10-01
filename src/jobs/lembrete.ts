@@ -46,7 +46,7 @@ import { hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { acessouHoje } from "@/servicos/clientes";
 import { planoDoDia } from "@/servicos/plano";
-import { agendaDoDia } from "@/servicos/roteiro";
+import { agendaDoDia, atrasados } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
 import { textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
 
@@ -97,13 +97,18 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       if (!marca.ativo) continue;
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
       if (!marca.nichoId || !(await temasDoDiaOuRecente(marca.nichoId, hoje))) continue;
-      const [planoHoje, agendaHoje] = await Promise.all([planoDoDia(marca.id, hoje), agendaDoDia(marca.id, hoje)]);
+      const [planoHoje, agendaHoje, atrasadosDaMarca] = await Promise.all([
+        planoDoDia(marca.id, hoje),
+        agendaDoDia(marca.id, hoje),
+        atrasados(marca.id, hoje),
+      ]);
       const itensAgenda: ItemAgendaPendente[] = [...agendaHoje.reels, ...agendaHoje.stories].map((item) => ({
         titulo: item.titulo,
         status: item.status,
       }));
       nomesPendentes.push({
         nome: marca.nome,
+        atrasados: atrasadosDaMarca.map((item) => item.titulo),
         planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),
         agendaHoje: itensAgenda,
       });

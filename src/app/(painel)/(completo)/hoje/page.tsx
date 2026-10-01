@@ -1,15 +1,37 @@
 import { redirect } from "next/navigation";
 
 import { config, hojeISO } from "@/lib/config";
-import { formatarMultiplo } from "@/lib/formatarNumero";
+import {
+  classificarMultiplo,
+  diasDesde,
+  formatarMultiplo,
+  formatarViewsCompacto,
+  fraseDiasAtras,
+  rotuloMultiploConta,
+} from "@/lib/formatarNumero";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
-import { agendaDoDia, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
+import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
+import { agendaDoDia, atrasados, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
+import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
-import { HojeTela, type AvisoBriefingAgenda, type ProximoMarcado } from "./HojeTela";
+import { HojeTela, type AindaValeAgenda, type AvisoBriefingAgenda, type ProximoMarcado } from "./HojeTela";
+
+function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null {
+  if (!resumo) return null;
+  const faixa = classificarMultiplo(resumo.multiplicador);
+  return {
+    conta: resumo.contaNome ?? resumo.contaHandle,
+    multiplo: formatarMultiplo(resumo.multiplicador),
+    rotulo: rotuloMultiploConta(faixa, resumo.contaMedianaOrigem),
+    views: formatarViewsCompacto(resumo.views),
+    quando: resumo.publicadoEm ? fraseDiasAtras(diasDesde(resumo.publicadoEm)) : fraseDiasAtras(0),
+    parecidos: resumo.quantidadeParecidos,
+  };
+}
 
 const FORMATAR_DIA = new Intl.DateTimeFormat("pt-BR", { weekday: "long", timeZone: "America/Sao_Paulo" });
 const FORMATAR_DIA_POR_EXTENSO = new Intl.DateTimeFormat("pt-BR", {
@@ -67,11 +89,12 @@ export default async function Hoje({ searchParams }: Props) {
   const diaVisualizado = validarDiaDaUrl(dia, hoje);
   const ehHoje = diaVisualizado === hoje;
 
-  const [semana, agenda, videoSubindo, briefing] = await Promise.all([
+  const [semana, agenda, videoSubindo, briefing, atrasadosDoDia] = await Promise.all([
     semanaDaAgenda(cliente.id, diaVisualizado),
     agendaDoDia(cliente.id, diaVisualizado),
     videoSubindoParaAviso(cliente.id),
     garantirBriefing(cliente.id),
+    ehHoje ? atrasados(cliente.id, hoje) : Promise.resolve([]),
   ]);
 
   const proximoBruto =
@@ -81,6 +104,32 @@ export default async function Hoje({ searchParams }: Props) {
   const proximoMarcado: ProximoMarcado | null = proximoBruto
     ? { quando: quandoEhIsso(proximoBruto.data, hoje), rotuloFormato: ROTULO_FORMATO[proximoBruto.formato] }
     : null;
+
+  /**
+   * E39b, item (a): "ainda vale?", só no Reels em destaque de hoje, quando foi escrito antes de
+   * hoje e continua "a gravar". A formatação da evidência (quando a resposta é "novo") precisa do
+   * banco (`evidenciaResumoPorIds`), por isso acontece aqui, não no cliente.
+   */
+  const reelsDestaque = agenda.reels[0];
+  const feitoAntes =
+    ehHoje && reelsDestaque !== undefined && reelsDestaque.status === "gerado" && hojeISO(reelsDestaque.criadoEm) !== hoje;
+  let aindaVale: AindaValeAgenda = null;
+  if (feitoAntes) {
+    const quando = diaDaSemana(hojeISO(reelsDestaque.criadoEm));
+    if (!reelsDestaque.aindaValeResultado) {
+      aindaVale = { status: "naoConferido", feitoHaDias: diasDesde(reelsDestaque.criadoEm), quando };
+    } else if (reelsDestaque.aindaValeResultado.vale) {
+      aindaVale = { status: "vale", quando };
+    } else {
+      const resumo = await evidenciaResumoPorIds([reelsDestaque.aindaValeResultado.videoId]);
+      aindaVale = {
+        status: "novo",
+        quando,
+        assunto: reelsDestaque.aindaValeResultado.assunto,
+        evidencia: paraEvidenciaTema(resumo),
+      };
+    }
+  }
 
   const notaBriefing = Number(briefing.notaGeral);
   const avisoBriefing: AvisoBriefingAgenda | null =
@@ -105,6 +154,8 @@ export default async function Hoje({ searchParams }: Props) {
       ehHoje={ehHoje}
       diaVisualizadoExtenso={dataPorExtenso(diaVisualizado)}
       agenda={agenda}
+      atrasados={atrasadosDoDia}
+      aindaVale={aindaVale}
       proximoMarcado={proximoMarcado}
       avisoBriefing={avisoBriefing}
       avisoVideoSubindo={avisoVideoSubindo}

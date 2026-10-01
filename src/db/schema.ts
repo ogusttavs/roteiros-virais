@@ -1098,6 +1098,14 @@ export type Momento = {
   objetivoDoVideo?: string;
 };
 
+/**
+ * E39b, item (a): a resposta guardada de "ainda vale?", para não repetir a chamada de IA a cada
+ * abertura da tela (`conferirAindaVale`, `servicos/roteiro.ts`). `videoId` aponta para `videos.id`,
+ * a evidência nova citada; `assunto` vem da própria análise do vídeo, para o botão "Criar um novo
+ * sobre isso" já ter o texto do tema livre pronto, sem precisar buscar de novo.
+ */
+export type AindaValeResultado = { vale: true } | { vale: false; videoId: number; assunto: string };
+
 export const roteiros = pgTable(
   "roteiros",
   {
@@ -1190,6 +1198,14 @@ export const roteiros = pgTable(
     reprovadoEm: timestamp("reprovado_em", { withTimezone: true }),
     urlPostado: text("url_postado"),
     postadoEm: timestamp("postado_em", { withTimezone: true }),
+    /**
+     * E39b, item (b): quando a pessoa tirou um roteiro atrasado da Agenda sem gravar. Continua
+     * existindo (e aparece no Histórico), só sai da lista de atrasados e da agenda do dia dele.
+     */
+    arquivadoEm: timestamp("arquivado_em", { withTimezone: true }),
+    /** E39b, item (a): quando `conferirAindaVale` checou pela última vez; nulo até a pessoa tocar em "Conferir". */
+    aindaValeChecadoEm: timestamp("ainda_vale_checado_em", { withTimezone: true }),
+    aindaValeResultado: jsonb("ainda_vale_resultado").$type<AindaValeResultado>(),
     criadoEm: criadoEm(),
   },
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],

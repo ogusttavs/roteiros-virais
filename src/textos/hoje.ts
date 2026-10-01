@@ -173,5 +173,60 @@ export const textosHoje = {
     briefingNotaEMeta: (nota: string, meta: string) =>
       `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`,
     abrirBriefing: "Abrir o briefing",
+
+    /**
+     * E39b, item (b): o atrasado (desenho do Opus, passo 10, `Hoje.dc.html`, estados
+     * `agendaComAtraso` e `agendaComAtrasoSozinho`). "Gravar hoje" só existe quando hoje está
+     * livre; no outro caso, `porQueNaoGravarHoje` explica o porquê.
+     */
+    atrasado: {
+      titulo: "Atrasado",
+      eraPara: (quando: string) => `Era para ${quando}`,
+      mudarODia: "Mudar o dia",
+      arquivar: "Arquivar",
+      gravarHoje: "Gravar hoje",
+      porQueNaoGravarHoje: "Hoje já tem roteiro marcado. Escolha outro dia para este.",
+      foraOAtrasadoNadaMarcado: "Fora o atrasado, nada marcado para hoje.",
+      salvar: "Salvar",
+      salvando: "Salvando",
+      erroSalvar: "Não foi possível salvar. Tente de novo.",
+    },
+
+    /**
+     * E39b, item (a): "ainda vale?", só no Reels em destaque feito com antecedência. Um toque
+     * ("Conferir"), nunca automático; a resposta fica no próprio cartão.
+     */
+    aindaVale: {
+      feitoHaDias: (dias: number) => `Feito há ${dias} dia${dias === 1 ? "" : "s"}.`,
+      pergunta: "Ainda vale?",
+      conferir: "Conferir",
+      conferindo: "Conferindo",
+      continuaValendo: "Este roteiro continua valendo",
+      continuaValendoDescricao: (quando: string) => `Nada mais forte apareceu no seu setor desde ${quando}, quando ele foi feito.`,
+      saiuAlgoMelhor: "Saiu algo hoje que pode render mais",
+      saiuAlgoMelhorDescricao: (quando: string) =>
+        `Desde ${quando}, quando este roteiro foi feito, um vídeo do seu setor passou muito do normal:`,
+      criarNovoSobreIsso: "Criar um novo sobre isso",
+      manterOQueTinha: "Manter o que eu tinha",
+    },
+
+    /** E39b, item (e): o calendário do mês, navegável sem limite (design v2, estado `calendario`). */
+    calendario: {
+      verOMes: "Ver o mês",
+      hoje: (diaPorExtenso: string) => `Hoje, ${diaPorExtenso}`,
+      mesAnterior: "Mês anterior",
+      proximoMes: "Próximo mês",
+      legendaAtrasado: "atrasado",
+      aviso: "Planeje com a antecedência que quiser: o calendário segue para a frente sem fim.",
+      diaMesRotulo: (diaPorExtenso: string, qtdReels: number, qtdStories: number, atrasado: boolean) => {
+        const marcas: string[] = [];
+        if (qtdReels === 1) marcas.push("1 Reels");
+        if (qtdReels > 1) marcas.push(`${qtdReels} Reels`);
+        if (qtdStories === 1) marcas.push("1 Story");
+        if (qtdStories > 1) marcas.push(`${qtdStories} Stories`);
+        const oQueTem = marcas.length > 0 ? marcas.join(" e ") : "nada marcado";
+        return atrasado ? `${diaPorExtenso}: ${oQueTem}, atrasado` : `${diaPorExtenso}: ${oQueTem}`;
+      },
+    },
   },
 };
