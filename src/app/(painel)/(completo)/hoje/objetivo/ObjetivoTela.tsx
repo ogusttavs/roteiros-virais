@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import type { EstiloRoteiro, FormatoRoteiro, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import type { EstiloRoteiro, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
@@ -16,6 +16,7 @@ import {
   ROTULO_FORMATO_ROTEIRO,
   sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
+import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
@@ -24,6 +25,7 @@ import { textosObjetivo } from "@/textos/objetivo";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
+import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
@@ -66,6 +68,9 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
   const [objetivoDoVideo, setObjetivoDoVideo] = useState("");
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
   const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
+  /** E39a: "para quando é?" (dúvida 10: nos temas de hoje e no assunto seu, depois do tema escolhido). */
+  const [data, setData] = useState(() => hojeISO());
+  const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
@@ -118,6 +123,8 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
           estilo,
           objetivoDoVideo.trim() || undefined,
           quemAparece || undefined,
+          data,
+          formato === "story" ? (momentoDoDia ?? undefined) : undefined,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {
@@ -272,6 +279,9 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
         </div>
         {!estiloTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.estiloAjuda[estilo]}</p> : null}
       </div>
+
+      <PerguntaParaQuando data={data} onChange={setData} />
+      {formato === "story" ? <PerguntaMomentoDoDia valor={momentoDoDia} onChange={setMomentoDoDia} /> : null}
 
       {opcoesQuemAparece.fixoEmPropriaPessoa ? null : (
         <div className={styles.grupoFormato}>
