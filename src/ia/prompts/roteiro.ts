@@ -180,8 +180,14 @@ import { textoRegrasStory } from "./regras-formato";
  * servico); quando e a equipe sem o dono, ou outra pessoa, a regra 13 troca a voz da regra 12
  * (nunca "eu testei" de quem nao aparece; texto para quem apresenta, nunca "eu, dono"). Versao
  * 2.5.0.
+ *
+ * 2.5.1 (hotfix do Fable em 01/10/2026, achado do Gustavo em produção: quatro roteiros de Reels
+ * falado reprovados seguidos com "porQueAssim cita regra que nao existe na lista"): o bloco de
+ * Reels falado não dizia nada sobre `porQueAssim`, o schema exige a lista, e o modelo a enchia
+ * com as regras duras em texto livre. Agora o bloco manda deixar vazio, e o serviço descarta o
+ * campo fora de Story falado antes do verificador (`servicos/roteiro.ts`).
  */
-export const versao = "2.5.0";
+export const versao = "2.5.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -403,7 +409,8 @@ dentro do motivo. Nunca cite uma regra que não está na lista das R-IG-STORY ac
 Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
 (quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
 (o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
-visual.`;
+visual. Deixe porQueAssim como lista vazia: neste formato ainda não há regras numeradas de
+plataforma, e as regras duras deste texto nunca entram nesse campo.`;
 
   return `Você escreve o roteiro de um vídeo curto e vertical para um dono de pequeno negócio
 gravar com a própria cara no celular. Regras duras:

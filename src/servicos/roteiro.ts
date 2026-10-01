@@ -794,6 +794,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
 
   const quemApareceResolvido = resolverQuemAparece(dados.quemAparece, dados.cliente);
 
+  /**
+   * Hotfix de 01/10/2026 (achado do Gustavo em produção): `porQueAssim` só existe em Story falado,
+   * o único formato com regras numeradas de plataforma no prompt. Fora dele o campo é descartado
+   * antes do verificador e do que se grava: o modelo às vezes o enchia com as regras duras em texto
+   * livre, o verificador reprovava duas vezes e a pessoa ficava sem roteiro por um campo que nem
+   * aparece para ela.
+   */
+  const usaPorQueAssim = dados.formato === "story" && dados.estilo !== "sem_fala";
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -881,9 +890,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     estilo: dados.estilo,
     extrairCartoes: (d) => d.cartoes,
     extrairLegenda: (d) => d.legenda,
-    extrairPorQueAssim: (d) => d.porQueAssim,
+    extrairPorQueAssim: (d) => (usaPorQueAssim ? d.porQueAssim : []),
     extrairNarrativa: (d) => ({ gancho: d.gancho, corpo: d.corpo, chamadaFinal: d.chamadaFinal }),
-    extrairCampos: extrairCamposRoteiro,
+    extrairCampos: (d) => extrairCamposRoteiro(usaPorQueAssim ? d : { ...d, porQueAssim: [] }),
     extrairEvidencias: (d) => d.evidencias,
   });
 
@@ -898,7 +907,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     fechamento: saida.fechamento ?? "",
     chamadaFinal: saida.chamadaFinal ?? "",
     cartoes: saida.cartoes,
-    porQueAssim: saida.porQueAssim,
+    porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
     cenas: saida.cenas,
     ondeGravar: saida.ondeGravar,
     edicao: {
