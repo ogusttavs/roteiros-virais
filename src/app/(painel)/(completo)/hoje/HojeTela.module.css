@@ -282,10 +282,17 @@
   font-weight: var(--peso-medio);
 }
 
+/**
+ * Sete colunas iguais num celular estreito (360 a 390px) não sobram espaço para o alvo de toque
+ * de 44px com o padding do cartão por cima (achado do e2e desta etapa, layout.spec.ts): a faixa
+ * sangra até a borda do cartão, cancelando o padding de `.semanaAgenda` só aqui, com um respiro
+ * menor entre os dias (o resto do cartão mantém o padding normal).
+ */
 .diasAgenda {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--espaco-1);
+  gap: 2px;
+  margin: 0 calc(-1 * var(--espaco-5));
 }
 
 .diaAgenda {
