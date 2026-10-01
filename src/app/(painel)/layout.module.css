@@ -190,3 +190,18 @@
     display: none;
   }
 }
+
+/**
+ * V15, item 6 (design v2, passo 8): acima de 1280 o conteudo para de crescer e fica
+ * centrado no espaco a direita da barra lateral, em vez de uma coluna colada nela com
+ * o resto vazio (achado do Gustavo, foto do roteiro espremido num monitor largo). As
+ * telas com `BarraTopo` propria (Hoje, Tema livre, Roteiro) cancelam este padding e
+ * repetem a mesma conta no proprio modulo, porque a propria tela define o padding ali.
+ * Referencias e a excecao (ReferenciasTela.module.css, .painelLargo): a grade ganha
+ * largura, nao margem.
+ */
+@media (min-width: 1281px) {
+  .corpo {
+    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+  }
+}
