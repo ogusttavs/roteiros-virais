@@ -77,15 +77,49 @@ export function boss(): PgBoss {
 }
 
 /**
- * Cria as filas se ainda nao existirem (idempotente). Repeticao: 2
- * tentativas com espera crescente para erro de rede (`retryBackoff`); o
- * handler de cada fila decide se um erro especifico deve mesmo repetir
- * (`src/jobs/execucoes.ts`, `ErroColeta`).
+ * Filas de job curto (segundos): continuam com 2 repeticoes para erro de rede. Todas as outras sao
+ * job longo (coleta, pontuacao, transcricao, extracao, pesquisa de setor, temas), que nao repete.
+ */
+const FILAS_CURTAS = new Set<string>([
+  FILAS.lembrete,
+  FILAS.curvaCliente,
+  FILAS.emailAcompanhamento,
+  FILAS.aprenderCliente,
+]);
+
+const QUATRO_HORAS_S = 4 * 60 * 60;
+
+export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSeconds: number };
+
+/**
+ * As opcoes de cada fila (hotfix de 01/10/2026). O prazo padrao do pg-boss para um job ativo e de
+ * 15 minutos (`expireInSeconds`): passou disso, o job e dado como vencido e, com `retryLimit: 2`,
+ * roda de novo por cima do que ainda esta rodando. Achado em producao: o `transcrever` (25 a 70
+ * minutos) vinha rodando tres vezes toda madrugada (04:00, 04:15, 04:30), e a `pesquisa-de-setor`
+ * mensal rodou tres vezes em 01/10, estourou a cota de busca do YouTube e gastou o resto do saldo
+ * da API de IA. Job longo ganha 4 horas de prazo e nenhuma repeticao automatica (a rodada seguinte
+ * do cron ja e a nova tentativa, e os jobs retomam de onde o banco parou); job curto continua com
+ * 2 repeticoes e espera crescente.
+ */
+export function opcoesDaFila(nome: string): OpcoesFila {
+  if (FILAS_CURTAS.has(nome)) {
+    return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60 };
+  }
+  return { retryLimit: 0, retryBackoff: false, expireInSeconds: QUATRO_HORAS_S };
+}
+
+/**
+ * Cria as filas se ainda nao existirem e aplica as opcoes de `opcoesDaFila` (idempotente).
+ * `createQueue` nao mexe numa fila que ja existe, entao o `updateQueue` em seguida e o que corrige
+ * as filas criadas antes do hotfix de 01/10/2026 (producao). O handler de cada fila continua
+ * decidindo se um erro especifico deve repetir (`src/jobs/execucoes.ts`, `ErroColeta`).
  */
 export async function garantirFilas(): Promise<void> {
   const b = boss();
   for (const nome of Object.values(FILAS)) {
-    await b.createQueue(nome, { retryLimit: 2, retryBackoff: true });
+    const opcoes = opcoesDaFila(nome);
+    await b.createQueue(nome, opcoes);
+    await b.updateQueue(nome, opcoes);
   }
 }
 

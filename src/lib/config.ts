@@ -112,10 +112,12 @@ export const config = {
     coletaMeioDia: env("COLETA_MEIO_DIA") === "1",
     /**
      * P2, item 0b da revisão do PR #74: cada termo custa 200 unidades do YouTube (duas buscas,
-     * `pesquisa-de-setor.ts`); com 9.000 por dia e uma pesquisa por setor por mês, cabem 8 a 10.
+     * `pesquisa-de-setor.ts`). Hotfix de 01/10/2026: eram 8, e a conta estava errada: a rodada mensal
+     * passa por todos os setores ativos no mesmo dia (3 setores x 8 termos x 200 = 4.800 unidades,
+     * mais da metade da cota diaria de 9.000, antes da coleta). Com 4 sao 2.400 para tres setores.
      * Os termos mais curtos entram primeiro (são os mais genéricos, acham mais candidato).
      */
-    termosPesquisaSetor: envNumero("TERMOS_PESQUISA_SETOR", 8),
+    termosPesquisaSetor: envNumero("TERMOS_PESQUISA_SETOR", 4),
   },
   email: {
     resendKey: env("RESEND_API_KEY"),
