@@ -3,6 +3,7 @@
  * de um dia da nova Agenda, contra o Postgres real. E39b: `atrasados`, `arquivarRoteiro`,
  * `mudarDataRoteiro`, `conferirAindaVale` e `mesDaAgenda`, mesma suíte.
  */
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -316,6 +317,24 @@ describe("conferirAindaVale", () => {
     const atual = await roteiroPorId(roteiro.id, marcaA.id);
     expect(atual?.aindaValeChecadoEm).not.toBeNull();
     expect(atual?.aindaValeResultado).toEqual({ vale: true });
+  });
+
+  /** Revisão do Fable no PR #91: a resposta guardada só vale no dia em que foi conferida. */
+  it("resposta conferida ontem nao vale hoje: confere de novo e regrava a data", async () => {
+    const hoje = hojeISO();
+    const roteiro = await criarRoteiro(marcaA.id, hoje, { formato: "reels", titulo: "conferido ontem", criadoEm: diasAtras(3) });
+    const ontem = diasAtras(1);
+    await db()
+      .update(roteiros)
+      .set({ aindaValeChecadoEm: ontem, aindaValeResultado: { vale: false, videoId: 999999, assunto: "resposta velha" } })
+      .where(eq(roteiros.id, roteiro.id));
+
+    const resultado = await conferirAindaVale(roteiro.id);
+
+    expect(resultado).toEqual({ vale: true });
+    const atual = await roteiroPorId(roteiro.id, marcaA.id);
+    expect(atual?.aindaValeResultado).toEqual({ vale: true });
+    expect(hojeISO(atual!.aindaValeChecadoEm!)).toBe(hoje);
   });
 
   it("com algo subindo mais forte (mock: 3x ou mais): troca, guarda o id e o assunto do candidato", async () => {
