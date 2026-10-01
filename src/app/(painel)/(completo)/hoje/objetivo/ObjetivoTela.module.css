@@ -46,12 +46,32 @@
     grid-column: 1;
   }
 
-  /* Primeiro no DOM (a ordem no celular não muda), mas a coluna 2 na grade (design v2, dúvida 1 do passo 7). */
+  /*
+   * Primeiro no DOM (a ordem no celular não muda), mas a coluna 2 na grade
+   * (design v2, dúvida 1 do passo 7). `grid-row: 1 / span 20` (achado da
+   * revisão seguinte do Fable): sem isso, por vir primeiro no DOM, este
+   * bloco ficava sozinho na linha 1 e `.colunaPrincipal` (a pergunta, as
+   * escolhas) caía sozinha na linha 2, com o topo dela desalinhado do topo
+   * deste. Atravessar bem além da última linha tira este bloco da disputa
+   * por linha, e `.colunaPrincipal` volta a nascer na linha 1, igual ao
+   * topo deste. `span 20`, não `-1`: `-1` conta a partir do fim da grade
+   * EXPLÍCITA, e `.pagina` só tem linhas implícitas; sem grade explícita
+   * "-1" não aponta para a última linha de verdade (achado medindo no
+   * navegador no Roteiro, mesma pegadinha, `RoteiroTela.module.css`).
+   */
   .temaEscolhido,
   .escolha {
     grid-column: 2;
+    grid-row: 1 / span 20;
     position: sticky;
-    top: var(--topo-lado-fixo);
+    /*
+     * `--topo-lado-fixo-padrao`, não `--topo-lado-fixo` (achado medindo, não só
+     * olhando): esta tela usa o padding padrão do `.corpo`, mais baixo que a
+     * BarraTopo própria do Roteiro e do Tema livre; com o valor maior, o sticky
+     * já grudava na carga da página (scroll 0) e empurrava o lado 32px abaixo
+     * do topo da coluna antes mesmo de rolar (`tokens.css`).
+     */
+    top: var(--topo-lado-fixo-padrao);
   }
 }
 

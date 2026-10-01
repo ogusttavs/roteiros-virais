@@ -104,9 +104,24 @@
     grid-column: 1;
   }
 
+  /*
+   * Achado da revisão seguinte do Fable: sem `grid-row` explícito, a colocação
+   * automática às vezes põe o lado na mesma linha do `.cabecalhoTela` (o
+   * título), e como essa linha estica para caber o mais alto dos dois, um
+   * lado mais alto que o título empurrava `.colunaPrincipal` (a pergunta, o
+   * campo) para baixo, com um vazio enorme no meio. `grid-row: 1 / span 20`
+   * atravessa da primeira linha até bem além da última (o lado é curto e
+   * gruda inteiro aqui, ao contrário do Roteiro), então o topo sempre alinha
+   * com o título sem competir pela linha dele. `span 20`, não `-1`: `-1`
+   * conta a partir do fim da grade EXPLÍCITA, e `.miolo` só tem linhas
+   * implícitas (sem `grid-template-rows`); sem grade explícita "-1" não
+   * aponta para a última linha de verdade (achado medindo no navegador no
+   * Roteiro, mesma pegadinha, `RoteiroTela.module.css`).
+   */
   .temaProposto,
   .cincoPontos {
     grid-column: 2;
+    grid-row: 1 / span 20;
     position: sticky;
     top: var(--topo-lado-fixo);
   }

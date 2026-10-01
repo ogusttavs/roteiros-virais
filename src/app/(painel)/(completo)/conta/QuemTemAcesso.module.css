@@ -6,12 +6,32 @@
   gap: var(--espaco-4);
 }
 
-/** V15, item 6b (design v2, dúvida 6 do passo 8): vira o lado fixo a partir de 1024px. */
+/**
+ * V15, item 6b (design v2, dúvida 6 do passo 8): vira o lado fixo a partir de
+ * 1024px. `grid-row: 1 / span 20` (achado da revisão seguinte do Fable, mesmo
+ * defeito do Roteiro e do Tema livre): sem isso, por ficar entre os dois
+ * `.colunaPrincipal` no DOM, este bloco cairia na mesma linha do primeiro
+ * deles e esticaria essa linha se fosse mais alto, empurrando o segundo
+ * `.colunaPrincipal` para baixo. Hoje o formulário já é mais alto que isto, o
+ * que escondia o defeito, mas não há garantia disso continuar. `span 20`, não
+ * `-1`: `-1` conta a partir do fim da grade EXPLÍCITA, e `.pagina` só tem
+ * linhas implícitas; sem grade explícita "-1" não aponta para a última linha
+ * de verdade (achado medindo no navegador no Roteiro, mesma pegadinha,
+ * `RoteiroTela.module.css`).
+ */
 @media (min-width: 1024px) {
   .acessos {
     grid-column: 2;
+    grid-row: 1 / span 20;
     position: sticky;
-    top: var(--topo-lado-fixo);
+    /*
+     * `--topo-lado-fixo-padrao`, não `--topo-lado-fixo` (achado medindo, não só
+     * olhando): esta tela usa o padding padrão do `.corpo`, mais baixo que a
+     * BarraTopo própria do Roteiro e do Tema livre; com o valor maior, o sticky
+     * já grudava na carga da página (scroll 0) e empurrava o lado 32px abaixo
+     * do topo da coluna antes mesmo de rolar (`tokens.css`).
+     */
+    top: var(--topo-lado-fixo-padrao);
   }
 }
 

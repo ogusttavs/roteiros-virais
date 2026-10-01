@@ -802,6 +802,9 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       esperar: (page: Page) => page.getByText("Tema escolhido", { exact: false }).waitFor(),
       seletorColuna: '[class*="colunaPrincipal"]',
       seletorLado: '[class*="temaEscolhido"]',
+      // Sem `.cabecalhoTela` próprio: `.colunaPrincipal` já começa com o título, é o próprio topo da coluna.
+      seletorTopoColuna: '[class*="colunaPrincipal"]',
+      seletorTopoLado: '[class*="temaEscolhido"]',
     },
     {
       tela: "Tema livre",
@@ -809,6 +812,8 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       esperar: (page: Page) => page.getByText("Os cinco pontos que a gente olha").waitFor(),
       seletorColuna: '[class*="colunaPrincipal"]',
       seletorLado: '[class*="cincoPontos"]',
+      seletorTopoColuna: '[class*="cabecalhoTela"]',
+      seletorTopoLado: '[class*="cincoPontos"]',
     },
     {
       tela: "Roteiro",
@@ -816,6 +821,10 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       esperar: (page: Page) => page.getByRole("heading", { name: "Como editar" }).waitFor(),
       seletorColuna: '[class*="blocos"]',
       seletorLado: '[class*="ladoGrudado"]',
+      seletorTopoColuna: '[class*="cabecalhoTela"]',
+      // "De onde veio", não "Como editar": é o bloco do lado que fica na primeira linha,
+      // ao lado do título (item 4 do plano); "Como editar" gruda abaixo dele de propósito.
+      seletorTopoLado: '[class*="ladoDeOndeVeio"]',
     },
     {
       tela: "Conta",
@@ -823,6 +832,9 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       esperar: (page: Page) => page.getByText("Quem tem acesso a esta marca").waitFor(),
       seletorColuna: '[class*="colunaPrincipal"]',
       seletorLado: '[class*="acessos"]',
+      // Sem `.cabecalhoTela` próprio: o primeiro `.colunaPrincipal` já começa com o título.
+      seletorTopoColuna: '[class*="colunaPrincipal"]',
+      seletorTopoLado: '[class*="acessos"]',
     },
   ];
 
@@ -837,6 +849,92 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
         await conferirLayout(page);
       });
     }
+  }
+
+  /**
+   * Revisão seguinte do Fable, achado lendo o diff com as próprias capturas
+   * (`.revisao/fotos-pr86b/`): a colocação automática da grade compartilhava
+   * linha entre coluna e lado, e um bloco alto de um lado esticava a linha do
+   * outro. Corrigido dando linha explícita aos blocos do lado
+   * (`RoteiroTela.module.css`, `TemaLivreTela.module.css`,
+   * `ObjetivoTela.module.css`, `QuemTemAcesso.module.css`); estes três testes
+   * provam por medida, não só olhando a tela.
+   */
+  const TOLERANCIA_ALINHAMENTO_PX = 8;
+  const VAZIO_MAXIMO_COLUNA_PX = 64;
+
+  for (const largura of [1024, 1280, 1920]) {
+    for (const { tela, ir, esperar, seletorTopoColuna, seletorTopoLado } of TELAS_COM_LADO) {
+      test(`${tela}: o topo da coluna e o topo do lado alinham (até 8px), em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        const topoColuna = await page.locator(seletorTopoColuna).first().boundingBox();
+        const topoLado = await page.locator(seletorTopoLado).first().boundingBox();
+        expect(topoColuna, `topo da coluna (${seletorTopoColuna}) não encontrado`).not.toBeNull();
+        expect(topoLado, `topo do lado (${seletorTopoLado}) não encontrado`).not.toBeNull();
+        expect(
+          Math.abs(topoColuna!.y - topoLado!.y),
+          `coluna no y=${topoColuna!.y}, lado no y=${topoLado!.y}`,
+        ).toBeLessThanOrEqual(TOLERANCIA_ALINHAMENTO_PX);
+      });
+    }
+
+    for (const { tela, ir, esperar, seletorColuna } of TELAS_COM_LADO) {
+      test(`${tela}: nenhum vazio maior que 64px entre os blocos da coluna, em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        const vazios = await page.evaluate((sel) => {
+          const referencia = document.querySelector(sel);
+          if (!referencia) return null;
+          const container = referencia.parentElement;
+          if (!container) return null;
+          const blocosDaColuna = Array.from(container.children)
+            .filter((el) => getComputedStyle(el).gridColumnStart === "1")
+            .map((el) => el.getBoundingClientRect())
+            .sort((a, b) => a.top - b.top);
+          const vazios: number[] = [];
+          for (let i = 1; i < blocosDaColuna.length; i++) {
+            vazios.push(blocosDaColuna[i].top - blocosDaColuna[i - 1].bottom);
+          }
+          return vazios;
+        }, seletorColuna);
+        expect(vazios, `coluna (${seletorColuna}) ou o pai dela não encontrados`).not.toBeNull();
+        for (const vazio of vazios!) {
+          expect(vazio, `vazios entre blocos da coluna: ${JSON.stringify(vazios)}`).toBeLessThanOrEqual(
+            VAZIO_MAXIMO_COLUNA_PX,
+          );
+        }
+      });
+    }
+  }
+
+  /**
+   * "Como editar" (`.ladoGrudado`) logo abaixo de "De onde veio" (`.ladoDeOndeVeio`), sem
+   * sobrepor e sem vazio grande: é o próprio defeito que a revisão achou (os dois caindo na
+   * mesma posição, sobrepostos, quando `.ladoGrudado` não atravessava a linha certa).
+   */
+  for (const largura of [1024, 1280, 1920]) {
+    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", sem sobrepor, em ${largura}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await page.getByRole("heading", { name: "Como editar" }).waitFor();
+      const deOndeVeio = await page.locator('[class*="ladoDeOndeVeio"]').first().boundingBox();
+      const comoEditar = await page.locator('[class*="ladoGrudado"]').first().boundingBox();
+      expect(deOndeVeio, '"De onde veio" não encontrado').not.toBeNull();
+      expect(comoEditar, '"Como editar" não encontrado').not.toBeNull();
+      const vazio = comoEditar!.y - (deOndeVeio!.y + deOndeVeio!.height);
+      expect(vazio, `sobrepõe "De onde veio" em ${-vazio}px`).toBeGreaterThanOrEqual(0);
+      expect(vazio, `vazio de ${vazio}px entre "De onde veio" e "Como editar"`).toBeLessThanOrEqual(
+        VAZIO_MAXIMO_COLUNA_PX,
+      );
+    });
   }
 
   /**

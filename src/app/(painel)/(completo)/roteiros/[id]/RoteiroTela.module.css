@@ -119,21 +119,54 @@
 }
 
 /**
- * V15, item 4 (design v2, passo 7; corrigido na revisão do Fable: a primeira
- * versão movia "De onde veio" e o cartão de trabalho para depois de tudo no
- * DOM, e isso mudava a ordem no celular). "De onde veio" e o cartão de
- * trabalho ("Como editar"; em Story e sem fala, "Por que assim") ficam
- * exatamente onde sempre estiveram no documento; só a partir de 1024px, por
- * CSS, é que viram a segunda coluna (`grid-column: 2`). Até 1023px
- * `.corpoComLado` nem é grade (os filhos fluem na ordem de sempre).
+ * V15, item 4 (design v2, passo 7; corrigido na revisão do Fable três vezes):
+ * primeiro porque a versão com wrapper movia "De onde veio" e o cartão de
+ * trabalho para depois de tudo no DOM, mudando a ordem no celular; depois
+ * porque a colocação automática compartilhava linha da grade entre coluna e
+ * lado, e um bloco alto de um lado esticava a linha do outro, criando um
+ * vazio enorme entre o título e o resto da coluna; depois porque, com os dois
+ * blocos do lado (`.ladoDeOndeVeio` e `.ladoGrudado`) atravessando linhas para
+ * não esticar a coluna, nenhum dos dois sabe a altura do outro: ou a coluna
+ * espera "De onde veio" terminar (o defeito original), ou "Como editar"
+ * sobrepõe "De onde veio" (tentado e medido, os dois têm o mesmo tamanho,
+ * ~178px). Não existe solução só de CSS Grid para "dois blocos empilhados
+ * numa coluna, cada um com altura própria, sem acoplar a altura da coluna ao
+ * lado": é o problema de layout que o `masonry` do CSS resolveria, sem
+ * suporte confiável ainda. "De onde veio" e o cartão de trabalho ("Como
+ * editar"; em Story e sem fala, "Por que assim") ficam exatamente onde
+ * sempre estiveram no documento; só a partir de 1024px, por CSS, é que viram
+ * a segunda coluna. Até 1023px `.corpoComLado` nem é grade (os filhos fluem
+ * na ordem de sempre).
  *
  * Diferente de Objetivo e Tema livre (lado curto, gruda inteiro): aqui o
  * lado é mais alto que a tela, então só o cartão de trabalho gruda
  * (`.ladoGrudado`), e "De onde veio" (`.ladoDeOndeVeio`) sobe com a página,
  * sem posição fixa própria.
+ *
+ * A saída: "De onde veio" sai da grade (`position: absolute`, mas com
+ * `grid-column`/`grid-row` ainda dizendo onde: o próprio CSS Grid usa a área
+ * como bloco de posicionamento quando o item absoluto está dentro da grade,
+ * então a largura e o centro do "monitor largo" continuam certos sem repetir
+ * nada). Fora da grade, ele não estica mais nenhuma linha. `RoteiroTela.tsx`
+ * mede a altura real dele (`ResizeObserver`) e escreve
+ * `--altura-de-onde-veio` em `.corpoComLado`; "Como editar" usa isso como
+ * `margin-top`, começando exatamente onde "De onde veio" termina, nem
+ * sobrepondo nem deixando vazio. Os blocos da coluna (`grid-row: auto`)
+ * formam a própria sequência de linhas sem nenhum bloco do lado competindo
+ * por elas.
+ *
+ * `span 20` em vez de `-1` para "até a última linha": pegadinha achada
+ * medindo no navegador (`getBoundingClientRect`, não só lendo o CSS
+ * computado, que mostrava "2 / -1" e parecia certo): linha negativa conta a
+ * partir do fim da grade EXPLÍCITA, e `.corpoComLado` não declara
+ * `grid-template-rows`, só tem linhas implícitas; sem grade explícita, "-1"
+ * não aponta para a última linha de verdade. Vinte é generoso de propósito
+ * (a coluna nunca chega perto disso); linhas implícitas a mais que ninguém
+ * usa não ocupam espaço.
  */
 @media (min-width: 1024px) {
   .corpoComLado {
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
     column-gap: var(--espaco-8);
@@ -145,24 +178,21 @@
     grid-column: 1;
   }
 
-  /*
-   * "De onde veio" fica antes do cartão de trabalho na coluna visual (item 4:
-   * "De onde veio em cima"), mesmo vindo depois dele no documento: a grade
-   * (colocação automática) usa a ordem modificada por `order`, não a ordem
-   * do DOM, só para decidir em que linha cada um cai. O DOM em si não muda.
-   */
-  .corpoComLado > .ladoDeOndeVeio {
-    order: -1;
-  }
-
-  .corpoComLado > .ladoGrudado,
   .corpoComLado > .ladoDeOndeVeio {
     grid-column: 2;
+    grid-row: 1;
+    position: absolute;
+  }
+
+  .corpoComLado > .ladoGrudado {
+    grid-column: 2;
+    grid-row: 1 / span 20;
   }
 
   .ladoGrudado {
     position: sticky;
     top: var(--topo-lado-fixo);
+    margin-top: var(--altura-de-onde-veio, 0px);
   }
 }
 

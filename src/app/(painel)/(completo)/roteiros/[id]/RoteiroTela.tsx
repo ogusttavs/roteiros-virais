@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -283,6 +284,39 @@ export function RoteiroTela({
   const painelAbertoRef = useRef<Painel>(null);
   useEffect(() => {
     painelAbertoRef.current = painel;
+  });
+
+  /**
+   * V15, achado da revisão do Fable: "De onde veio" e "Como editar" são dois blocos do
+   * lado com altura própria, cada um; a grade de CSS tem um único cursor de linha
+   * compartilhado entre coluna e lado (`RoteiroTela.module.css`, comentário de
+   * `.corpoComLado`), e não existe jeito puro de CSS de empilhar os dois sem acoplar a
+   * altura de um deles à coluna de leitura (testado e medido: ou a coluna espera "De
+   * onde veio" terminar antes do primeiro parágrafo, ou "Como editar" sobrepõe "De onde
+   * veio"). Mede a altura real de "De onde veio" para "Como editar" começar exatamente
+   * ali, nem sobrepondo nem deixando vazio; `ResizeObserver`, não só no primeiro render,
+   * porque o texto de "De onde veio" pode mudar de altura (reescrever, trocar versão).
+   */
+  // Callback, não objeto: o bloco de "De onde veio" é uma <div> (o cartão) ou uma <section>
+  // (sem evidência), e os dois tipos de ref do React não se misturam num RefObject só.
+  const refDeOndeVeio = useRef<HTMLElement | null>(null);
+  const definirRefDeOndeVeio = useCallback((elemento: HTMLElement | null) => {
+    refDeOndeVeio.current = elemento;
+  }, []);
+  const refCorpoComLado = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const corpo = refCorpoComLado.current;
+    const elemento = refDeOndeVeio.current;
+    if (!corpo) return;
+    if (!elemento) {
+      corpo.style.setProperty("--altura-de-onde-veio", "0px");
+      return;
+    }
+    const observador = new ResizeObserver(([entrada]) => {
+      corpo.style.setProperty("--altura-de-onde-veio", `${entrada.contentRect.height}px`);
+    });
+    observador.observe(elemento);
+    return () => observador.disconnect();
   });
 
   /**
@@ -602,7 +636,7 @@ export function RoteiroTela({
           </div>
         ) : null}
 
-        <div className={styles.corpoComLado}>
+        <div className={styles.corpoComLado} ref={refCorpoComLado}>
         <div className={styles.cabecalhoTela}>
           <div className={styles.topoRoteiro}>
             <h1>{corpo.titulo}</h1>
@@ -824,7 +858,7 @@ export function RoteiroTela({
         ) : null}
 
         {referencia && video ? (
-          <div className={styles.ladoDeOndeVeio}>
+          <div className={styles.ladoDeOndeVeio} ref={definirRefDeOndeVeio}>
             <CartaoDeOndeVeio
               titulo={textosRoteiro.referencia}
               conta={video.contaNome ?? video.contaHandle}
@@ -840,7 +874,10 @@ export function RoteiroTela({
             />
           </div>
         ) : corpo.semEvidencia ? (
-          <section className={[styles.referenciaVazia, styles.ladoDeOndeVeio].join(" ")}>
+          <section
+            className={[styles.referenciaVazia, styles.ladoDeOndeVeio].join(" ")}
+            ref={definirRefDeOndeVeio}
+          >
             <h2>{textosRoteiro.referencia}</h2>
             <p>
               {roteiro.origem === "momento" ? textosRoteiro.semEvidenciaMomento : textosRoteiro.semEvidencia}
