@@ -83,8 +83,24 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** Nenhuma rolagem horizontal e nenhum alvo de toque abaixo de 44 px, na largura atual. */
+/**
+ * Nenhuma rolagem horizontal e nenhum alvo de toque abaixo de 44 px, na largura atual.
+ *
+ * Achado investigando por que a CI reprovou os chips de rede de `ListaPerfisCitados` (29 px) no
+ * PR #85 e o mesmo teste passou local, duas vezes (duas pessoas): `BlocoPerfisCitados` busca a
+ * lista de perfis citados numa Server Action, dentro de um `useEffect`, e devolve `null` até ela
+ * chegar. Sem esperar isso, `conferirLayout` mede a tela ANTES de esses chips existirem no DOM, e
+ * uma corrida vazia nunca acusa alvo pequeno (a lista de achados fica vazia por não ter achado
+ * nada, não por estar tudo certo). Reproduzido: com `waitForLoadState("networkidle")antes, o
+ * mesmo teste reprova com os mesmos 29 px que a CI relatou; sem a espera, zero chips medidos. A
+ * diferença não era local vs CI (fonte, SO, dado do seed): era essa corrida, que calha de ter mais
+ * chance de perder (os chips não chegam a tempo) numa maquina rapida que builda e sobe o servidor
+ * de producao local, e mais chance de ganhar numa CI mais lenta. `networkidle` aqui, uma vez só,
+ * cobre qualquer tela com busca assíncrona parecida, não só esta.
+ */
 async function conferirLayout(page: Page) {
+  await page.waitForLoadState("networkidle");
+
   const semRolagemHorizontal = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   );
