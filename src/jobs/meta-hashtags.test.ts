@@ -62,6 +62,16 @@ describe("termosDaSemana, o rodizio do ponto de partida (V12b, item 5)", () => {
     expect(termosDaSemana(poucosTermos, 30, 1)).toEqual(["unico-termo"]);
   });
 
+  it("a fatia da semana impar da a volta no fim da lista: sempre `quantidade` termos, sem repetir (hotfix de 01/10/2026)", () => {
+    const trintaECinco = Array.from({ length: 35 }, (_, i) => `termo-${i}`);
+    const impar = termosDaSemana(trintaECinco, 30, 1);
+    expect(impar).toHaveLength(30);
+    expect(new Set(impar).size).toBe(30);
+    expect(impar.slice(0, 5)).toEqual(["termo-30", "termo-31", "termo-32", "termo-33", "termo-34"]);
+    expect(impar[5]).toBe("termo-0");
+    expect(termosDaSemana(trintaECinco, 30, 0)).toHaveLength(30);
+  });
+
   it("nicho sem termo nenhum devolve lista vazia, nas duas paridades", () => {
     expect(termosDaSemana([], 30, 0)).toEqual([]);
     expect(termosDaSemana([], 30, 1)).toEqual([]);
