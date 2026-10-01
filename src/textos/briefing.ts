@@ -216,6 +216,9 @@ export const textosBriefing = {
     /** So marca do tipo pessoa (P1, item 4, briefing-e-rubricas.md, secao 2b). */
     perfilHistoria: "A virada",
     perfilPosicionamentos: "No que acredita",
+    /** V12c, item 8, a E37b: os perfis citados nas duas listas da P12, só guardados e mostrados (a conferência é a E38). */
+    perfilConcorrentes: "Concorrentes",
+    perfilAdmira: "Perfis que você admira",
   },
   /** "O que a gente aprendeu com você" (E27 parte 2, item 4, Briefing.dc.html). */
   aprendizado: {

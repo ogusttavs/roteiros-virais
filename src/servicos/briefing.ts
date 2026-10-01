@@ -27,6 +27,7 @@ import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
 import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
+import { formatarPerfilComArroba, perfisCitadosDoCliente } from "./perfis-citados";
 import { referenciasParaPerfil } from "./referencias";
 
 export { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial };
@@ -294,7 +295,15 @@ async function compilarEGravarPerfil(
   });
 
   const referencias = await referenciasParaPerfil(clienteId);
-  const perfilCompleto: PerfilCompilado = { ...perfil, referencias };
+  const { concorrentes: concorrentesCitados, admira: admiraCitados } = await perfisCitadosDoCliente(clienteId);
+  const perfilCompleto: PerfilCompilado = {
+    ...perfil,
+    referencias,
+    perfisCitados: {
+      concorrentes: concorrentesCitados.map(formatarPerfilComArroba),
+      admira: admiraCitados.map(formatarPerfilComArroba),
+    },
+  };
 
   await db().update(briefings).set({ perfil: perfilCompleto }).where(eq(briefings.id, briefingId));
 

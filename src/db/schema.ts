@@ -363,6 +363,15 @@ export type PerfilCompilado = {
    * desta etapa; `formatarPerfilCompilado` trata como lista vazia.
    */
   referencias: string[];
+  /**
+   * Concorrentes e perfis admirados citados pelo cliente nas duas listas de
+   * @ da P12 (`perfis_citados`, V12c, item 8, a E37b), preenchido por
+   * código depois da chamada de IA, mesma lógica de `referencias` acima.
+   * Nesta etapa só guarda e mostra; conferir na API, analisar e levar ao
+   * setor é a E38. Ausente em perfil compilado antes desta etapa;
+   * `formatarPerfilCompilado` trata como listas vazias.
+   */
+  perfisCitados?: { concorrentes: string[]; admira: string[] };
 };
 
 export const briefings = pgTable("briefings", {
