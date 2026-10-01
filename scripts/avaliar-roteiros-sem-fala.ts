@@ -1,17 +1,13 @@
 /**
- * Conjunto de referência do Story (golden set, V9c, item 5, `PROXIMO.md`):
- * mesmo raciocínio de `avaliar-roteiros.ts` ("o Gustavo leria isso e
- * gravaria?"), mais a checagem por regra do verificador (`R-IG-STORY-03` a
- * `07`) e a conferência de `porQueAssim` contra a lista de regras válidas.
- * Cada caso é origem "tema" (como `avaliar-roteiros.ts`) ou origem
- * "momento" (como `avaliar-momentos.ts`), nunca os dois: um caso do
- * conjunto é a viagem do Bruno como pessoa citando a marca, que só existe
- * com `momento`.
+ * Conjunto de referência do roteiro sem fala (golden set, M4, item 6): mesmo raciocínio de
+ * `avaliar-stories.ts` ("o Gustavo leria isso e gravaria?"), com a checagem do verificador
+ * (`estilo: "sem_fala"`, nenhum cartão com fala, texto na tela dentro do limite, legenda
+ * presente). Cada caso é origem "tema" ou origem "momento", nunca os dois, mesmo padrão de
+ * `avaliar-stories.ts`.
  *
- * O arquivo real fica fora do repositório público (`avaliacoes/README.md`
- * explica o porquê). `GOLDEN_SET_DIR` aponta para a pasta que tem
- * `stories.json`; sem o arquivo real lá, roda com
- * `avaliacoes/stories.exemplo.json` e avisa que é exemplo.
+ * O arquivo real fica fora do repositório público (`avaliacoes/README.md` explica o porquê).
+ * `GOLDEN_SET_DIR` aponta para a pasta que tem `roteiros-sem-fala.json`; sem o arquivo real lá,
+ * roda com `avaliacoes/roteiros-sem-fala.exemplo.json` e avisa que é exemplo.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -36,6 +32,7 @@ const evidenciaSchema = z.object({
   chamadaFinal: z.string(),
   foraDaCurva: z.number(),
   momentoChave: z.string().optional(),
+  semFala: z.boolean().optional(),
 });
 
 const momentoSchema = z.object({
@@ -60,10 +57,8 @@ const casoSchema = z
       .default([]),
     regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
     tipo: z.enum(["negocio", "pessoa"]).default("negocio"),
-    /** Só com `momento`: os momentos anteriores da mesma viagem. */
-    contextoDeSerie: z.array(z.object({ tema: z.string(), gancho: z.string() })).default([]),
-    /** Só com `momento`: quando a pessoa citou outra marca dela durante o momento. */
-    marcaCitada: z.object({ nome: z.string(), perfilCompilado: z.string() }).optional(),
+    /** "reels" (padrão) ou "story": sem fala vale nos dois (M4, item 2). */
+    formato: z.enum(["reels", "story"]).default("reels"),
     pontoPrincipal: z.string(),
   })
   .refine((caso) => Boolean(caso.tema) !== Boolean(caso.momento), {
@@ -73,27 +68,27 @@ const conjuntoSchema = z.array(casoSchema);
 
 function caminhoDoConjunto(): { caminho: string; ehExemplo: boolean } {
   const dir = process.env.GOLDEN_SET_DIR ?? "../avaliacoes-privadas";
-  const caminhoReal = path.resolve(process.cwd(), dir, "stories.json");
+  const caminhoReal = path.resolve(process.cwd(), dir, "roteiros-sem-fala.json");
   if (existsSync(caminhoReal)) {
     return { caminho: caminhoReal, ehExemplo: false };
   }
   return {
-    caminho: path.resolve(process.cwd(), "avaliacoes/stories.exemplo.json"),
+    caminho: path.resolve(process.cwd(), "avaliacoes/roteiros-sem-fala.exemplo.json"),
     ehExemplo: true,
   };
 }
 
-export type ResultadoAvaliarStories = {
+export type ResultadoAvaliarRoteirosSemFala = {
   conjunto: string;
   ehExemplo: boolean;
   casos: number;
   titulos: string[];
-  /** Reprovado no verificador de produção: checagem local (por regra R-IG-STORY) mais verificarTexto. */
+  /** Reprovado no verificador de produção: checagem local (`estilo: "sem_fala"`) mais verificarTexto. */
   reprovadosNoVerificador: number;
   custoTotalUsd: number;
 };
 
-export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
+export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteirosSemFala> {
   const { caminho, ehExemplo } = caminhoDoConjunto();
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   const titulos: string[] = [];
@@ -105,7 +100,7 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
 
   for (const [indice, caso] of conjunto.entries()) {
     console.log(`${"=".repeat(70)}`);
-    console.log(`caso ${indice + 1}/${conjunto.length}: "${caso.tema ?? caso.momento?.onde}"`);
+    console.log(`caso ${indice + 1}/${conjunto.length}: "${caso.tema ?? caso.momento?.onde}" (${caso.formato})`);
     console.log(`ponto principal: ${caso.pontoPrincipal}`);
     console.log(`${"-".repeat(70)}\n`);
 
@@ -120,20 +115,18 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
         modeloNicho: caso.modeloNicho,
         regrasCliente: caso.regrasCliente,
         tipo: caso.tipo,
-        formato: "story",
-        estilo: "falado",
+        formato: caso.formato,
+        estilo: "sem_fala",
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema ?? "",
         objetivo: caso.objetivo,
-        formato: "story",
-        estilo: "falado",
+        formato: caso.formato,
+        estilo: "sem_fala",
         evidencias: caso.evidencias,
         roteirosRecentes: caso.roteirosRecentes,
         instrucaoAbertura: { tipo: null, tiposProibidos: [] },
         momento: caso.momento,
-        contextoDeSerie: caso.contextoDeSerie,
-        marcaCitada: caso.marcaCitada,
       }),
     });
 
@@ -146,28 +139,22 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
     console.log(`tema curto: ${saida.temaCurto ?? "(nulo)"}\n`);
 
     (saida.cartoes ?? []).forEach((cartao, i) => {
-      console.log(`CARTAO ${i + 1} (figurinha: ${cartao.figurinha})`);
-      console.log(`  o que falar: ${cartao.oQueFalar}`);
+      console.log(`CENA ${i + 1}`);
+      console.log(`  o que falar (precisa ficar vazio): "${cartao.oQueFalar}"`);
       console.log(`  o que mostrar: ${cartao.oQueMostrar}`);
       console.log(`  texto na tela: ${cartao.textoNaTela}\n`);
     });
 
-    console.log("POR QUE ASSIM");
-    for (const item of saida.porQueAssim) {
-      console.log(`  ${item.regra}: ${item.motivo}`);
-    }
-    if (caso.marcaCitada) {
-      console.log(`\nmarca citada no caso: ${caso.marcaCitada.nome} (confira se nao virou anuncio dela)`);
-    }
+    console.log(`LEGENDA DO POST\n  ${saida.legenda ?? "(nula, deveria estar preenchida)"}\n`);
 
     const campos = extrairCamposRoteiro(saida);
     const palavrasDoMomento = caso.momento
       ? palavrasDeConteudo(`${caso.momento.onde} ${caso.momento.oQueEstaAcontecendo}`)
       : undefined;
     const local = verificarLocalmente(campos, {
-      formato: "story",
+      estilo: "sem_fala",
       cartoes: saida.cartoes,
-      porQueAssim: saida.porQueAssim,
+      legenda: saida.legenda,
       palavrasDoMomento,
     });
     let verificacao = local;
@@ -188,7 +175,7 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
     }
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
-      console.log(`\n[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`);
+      console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`);
     }
 
     custoTotalUsd += custoDoCasoUsd;
@@ -202,7 +189,7 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
 }
 
 if (require.main === module) {
-  avaliarStories().catch((erro: unknown) => {
+  avaliarRoteirosSemFala().catch((erro: unknown) => {
     console.error(erro);
     process.exitCode = 1;
   });

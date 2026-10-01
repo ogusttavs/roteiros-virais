@@ -121,6 +121,8 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
     expect(videoAtualizado.analise).not.toBeNull();
     expect(videoAtualizado.analise!.assunto).toBeTruthy();
     expect(videoAtualizado.etiquetas.length).toBeGreaterThan(0);
+    // M4, item 1: este caminho sempre le a transcricao, nunca e o caminho sem fala.
+    expect(videoAtualizado.semFala).toBe(false);
 
     const [loteAtualizado] = await db().select().from(lotesIa);
     expect(loteAtualizado.status).toBe("concluido");

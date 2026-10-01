@@ -14,7 +14,7 @@ import {
   type ItemPlano,
   type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro, validarFormato } from "@/servicos/roteiro";
+import { ErroRoteiro, validarEstilo, validarFormato } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
@@ -54,6 +54,8 @@ export type DadosAceitarPlano = {
    * como texto livre do navegador (V9d, item 2): `validarFormato` confere antes de chegar ao banco.
    */
   formato?: string;
+  /** M4, item 2: o que a pessoa escolheu no segundo controle segmentado da folha; falado se ausente. */
+  estilo?: string;
   marcaId?: number;
 };
 
@@ -87,6 +89,7 @@ export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlan
     oQueDaParaMostrar,
     objetivo: dados.objetivo,
     formato: validarFormato(dados.formato),
+    estilo: validarEstilo(dados.estilo),
     marcaId: dados.marcaId,
   });
   return { id: roteiro.id };

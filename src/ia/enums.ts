@@ -1,6 +1,15 @@
 import { z } from "zod";
 
-import { FORMATOS_ROTEIRO, type AnaliseVideo, type FigurinhaStory, type FormatoRoteiro, type Objetivo, type TipoAbertura } from "@/db/schema";
+import {
+  ESTILOS_ROTEIRO,
+  FORMATOS_ROTEIRO,
+  type AnaliseVideo,
+  type EstiloRoteiro,
+  type FigurinhaStory,
+  type FormatoRoteiro,
+  type Objetivo,
+  type TipoAbertura,
+} from "@/db/schema";
 
 /**
  * Enums Zod usados nos schemas de saida das tarefas, e a traducao do
@@ -115,6 +124,36 @@ export const FORMATOS_ROTEIRO_EM_ORDEM: FormatoRoteiro[] = [...FORMATOS_ROTEIRO]
  * resposta e conversa, o que o Story faz melhor. Decisão por código, não
  * pelo modelo: a pessoa troca se quiser, o controle só já vem marcado.
  */
+/** M4, item 2: o rótulo do segundo controle segmentado da mesma folha (Falando / Sem fala). */
+export const ROTULO_ESTILO_ROTEIRO: Record<EstiloRoteiro, string> = {
+  falado: "Falando",
+  sem_fala: "Sem fala",
+};
+
+/**
+ * M4, item 2: o detalhe que não cabe no rótulo curto do controle segmentado (achado rodando
+ * `layout.spec.ts` em 390px: "Sem fala (imagem, texto na tela e música)" como rótulo visível
+ * estourava a largura da tela). Vira `title` do botão; o rótulo curto é o que aparece.
+ */
+export const DESCRICAO_ESTILO_ROTEIRO: Record<EstiloRoteiro, string> = {
+  falado: "Você aparece falando para a câmera.",
+  sem_fala: "Sem fala: imagem, texto na tela e música.",
+};
+
+/** Falando antes de sem fala, mesma ordem do controle segmentado. */
+export const ESTILOS_ROTEIRO_EM_ORDEM: EstiloRoteiro[] = [...ESTILOS_ROTEIRO];
+
+/**
+ * M4, item 2: ao contrário do formato (decidido pelo objetivo, por código), o estilo nasce da
+ * evidência do tema: mais da metade dela sem fala sugere sem fala; empate (ou sem evidência
+ * nenhuma) vale falado. A pessoa troca se quiser, o controle só já vem marcado.
+ */
+export function sugerirEstiloPelaEvidencia(evidencias: { semFala?: boolean | null }[]): EstiloRoteiro {
+  if (evidencias.length === 0) return "falado";
+  const contagemSemFala = evidencias.filter((video) => video.semFala === true).length;
+  return contagemSemFala > evidencias.length / 2 ? "sem_fala" : "falado";
+}
+
 export function sugerirFormatoPeloObjetivo(objetivo: Objetivo): FormatoRoteiro {
   return objetivo === "alcance" ? "reels" : "story";
 }

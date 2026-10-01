@@ -63,6 +63,14 @@ function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdic
   return porQueAssim.map((item) => ({ icone: HelpCircle, rotulo: "", texto: item.motivo, mono: item.regra }));
 }
 
+/** Mesma composição de `RoteiroTela.tsx`, item a item (M4, item 5): nunca "o que falar" nem figurinha. */
+function itensCartaoSemFala(cartao: CartaoStory): ItemEdicao[] {
+  return [
+    { icone: Eye, rotulo: textosRoteiro.cartaoSemFala.oQueMostrar, texto: cartao.oQueMostrar },
+    { icone: Type, rotulo: textosRoteiro.cartaoSemFala.textoNaTela, texto: cartao.textoNaTela },
+  ];
+}
+
 /**
  * A página que o Playwright abre para virar PDF (rota `/api/roteiros/[id]/pdf`,
  * achado do primeiro uso no iPad, item 5): fora de `(painel)/`, sem sidebar
@@ -106,7 +114,15 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
 
       <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
 
-      {roteiro.formato === "story" && corpo.cartoes ? (
+      {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
+        corpo.cartoes.map((cartao, indice) => (
+          <BlocoEdicao
+            key={indice}
+            titulo={textosRoteiro.blocos.cartao(indice + 1)}
+            itens={itensCartaoSemFala(cartao)}
+          />
+        ))
+      ) : roteiro.formato === "story" && corpo.cartoes ? (
         corpo.cartoes.map((cartao, indice) => (
           <BlocoEdicao
             key={indice}
@@ -117,6 +133,10 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
       ) : (
         <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
       )}
+
+      {corpo.legenda ? (
+        <BlocoEdicao titulo={textosRoteiro.legenda} itens={[{ icone: Type, rotulo: "", texto: corpo.legenda }]} />
+      ) : null}
 
       {corpo.porQueAssim.length > 0 ? (
         <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />

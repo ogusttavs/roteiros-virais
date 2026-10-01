@@ -42,4 +42,6 @@ export const textosMomento = {
     reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
     story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
   },
+  /** M4, item 2: o segundo controle segmentado, Falando/Sem fala; sem sugestão aqui (o momento não busca evidência). */
+  estilo: "Como você aparece",
 };

@@ -43,6 +43,13 @@ export const textosRoteiro = {
     figurinha: "Figurinha",
     semFigurinha: "Sem figurinha neste cartão",
   },
+  /** M4, item 5: o detalhe de cada cena de um roteiro sem fala; sem "o que falar" nem figurinha. */
+  cartaoSemFala: {
+    oQueMostrar: "O que mostrar",
+    textoNaTela: "Texto na tela",
+  },
+  /** M4, item 5: a legenda do post, como último cartão, com copiar; só existe no estilo sem fala. */
+  legenda: "Legenda do post",
   /**
    * V11, item 6: o que mostrar em cada bloco do modo gravação, junto da fala
    * (`blocosParaLeitura`, `servicos/roteiro.ts`). Story usa as três linhas;

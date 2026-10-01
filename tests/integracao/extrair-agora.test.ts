@@ -104,6 +104,8 @@ describe("rodarExtrairAgora", () => {
     expect(atualizado.analise).not.toBeNull();
     expect(atualizado.analise!.assunto).toBeTruthy();
     expect(atualizado.etiquetas.length).toBeGreaterThan(0);
+    // M4, item 1: este caminho sempre le a transcricao, nunca e o caminho sem fala.
+    expect(atualizado.semFala).toBe(false);
 
     const lotes = await db().select().from(lotesIa);
     expect(lotes).toHaveLength(0);

@@ -135,7 +135,8 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
 
     const { etiquetas, ...analise } = resultado.dados;
     const analiseVideo: AnaliseVideo = analise;
-    await db().update(videos).set({ analise: analiseVideo, etiquetas }).where(eq(videos.id, video.id));
+    // M4, item 1: este é o caminho sem fala, por definição.
+    await db().update(videos).set({ analise: analiseVideo, etiquetas, semFala: true }).where(eq(videos.id, video.id));
 
     await registrarGeracao({
       tarefa: "extrairVideoSemFala",

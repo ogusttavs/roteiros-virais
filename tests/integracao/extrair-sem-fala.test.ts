@@ -117,6 +117,8 @@ describe("rodarExtrairSemFala", () => {
     // sem fala nao tem idioma falado para julgar: o valor detectado na coleta continua o mesmo.
     expect(linha.idioma).toBe("en");
     expect(linha.tipoAbertura).toBeNull();
+    // M4, item 1: este e o caminho sem fala, por definicao.
+    expect(linha.semFala).toBe(true);
 
     await db().delete(videos).where(eq(videos.nichoId, nicho.id));
   });

@@ -537,6 +537,15 @@ export type TipoAbertura = (typeof TIPOS_ABERTURA)[number];
 export const FORMATOS_ROTEIRO = ["reels", "story"] as const;
 export type FormatoRoteiro = (typeof FORMATOS_ROTEIRO)[number];
 
+/**
+ * M4: o estilo do roteiro, ortogonal ao formato (um Reels ou um Story podem ser `falado` ou
+ * `sem_fala`). "sem_fala" usa a mesma estrutura de cartões do Story (`ConteudoRoteiro.cartoes`),
+ * com `oQueFalar` sempre vazio: cada cartão é uma cena (o que mostrar, texto na tela), nunca fala.
+ * Decisão do Gustavo em 30/09/2026 ("a gente não pode pensar em apenas vídeos falando").
+ */
+export const ESTILOS_ROTEIRO = ["falado", "sem_fala"] as const;
+export type EstiloRoteiro = (typeof ESTILOS_ROTEIRO)[number];
+
 export type AnaliseVideo = {
   assunto: string;
   gancho: string;
@@ -619,6 +628,14 @@ export const videos = pgTable(
      * seguidas).
      */
     proximaTentativaSemFala: timestamp("proxima_tentativa_sem_fala", { withTimezone: true }),
+    /**
+     * M4, item 1: `true` quando a análise veio do caminho sem fala (`extrair-sem-fala`, quadros e
+     * legenda, sem transcrição); `false` quando veio do caminho normal (`extrair`, `extrair-agora`,
+     * `extrair-coleta`, com transcrição). Nulo no que já estava analisado antes desta coluna existir
+     * (conta como falado: é a leitura de longe mais comum). Usado para sugerir o estilo do roteiro
+     * pela evidência (`sugerirEstiloPelaEvidencia`) e para a etiqueta "sem fala" em Referências.
+     */
+    semFala: boolean("sem_fala"),
     /** titulo + descricao + transcricao + analise.assunto, para busca de evidencia. */
     busca: tsvector("busca").generatedAlwaysAs(
       sql`to_tsvector('portuguese', coalesce(titulo, '') || ' ' || coalesce(descricao, '') || ' ' || coalesce(transcricao, '') || ' ' || coalesce(analise ->> 'assunto', ''))`,
@@ -937,6 +954,15 @@ export type ConteudoRoteiro = {
    * cartão "de onde veio", fraca escrita sem esconder.
    */
   forcaEvidencia: ForcaEvidencia | null;
+  /**
+   * M4: a legenda do post, pronta para copiar, com a chamada para ação dentro dela. Só existe no
+   * estilo sem fala (o falado já entrega a chamada final como fala); ausente ou nula no estilo
+   * falado e em todo roteiro gravado antes desta coluna existir. Opcional (e não `null` obrigatório
+   * como `cartoes`) de propósito: evita reescrever toda fixture de teste que monta um
+   * `ConteudoRoteiro` de exemplo sem saber deste campo novo. A tela mostra como o último cartão,
+   * com copiar (item 5).
+   */
+  legenda?: string | null;
 };
 
 /**
@@ -974,6 +1000,8 @@ export const roteiros = pgTable(
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
     /** V9c, item 1: "reels" (padrão) ou "story"; reescrever mantém o formato da versão anterior. */
     formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
+    /** M4, item 2: "falado" (padrão) ou "sem_fala", ortogonal ao formato; reescrever mantém o estilo da versão anterior. */
+    estilo: text("estilo").$type<EstiloRoteiro>().notNull().default("falado"),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     /**
      * O tipo de abertura que o modelo declarou ter usado (V4, item 3): o

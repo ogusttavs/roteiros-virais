@@ -18,6 +18,7 @@ import {
   planoGravacoes,
   type Cliente,
   type EstadoPlano,
+  type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
   type Objetivo,
@@ -310,6 +311,8 @@ export async function aceitar(
     objetivo: Objetivo;
     /** V9c, item 1: o que a pessoa confirmou na folha; sem isto, cai no mesmo sugerido pelo objetivo. */
     formato?: FormatoRoteiro;
+    /** M4, item 2: o que a pessoa confirmou na folha; sem isto, cai em "falado" (sem evidência no momento para sugerir). */
+    estilo?: EstiloRoteiro;
     marcaId?: number;
   },
 ): Promise<RoteiroLinha> {
@@ -320,6 +323,7 @@ export async function aceitar(
   }
 
   const formato = dados.formato ?? sugerirFormatoPeloObjetivo(dados.objetivo);
+  const estilo = dados.estilo ?? "falado";
   const momento: Momento = {
     onde: dados.onde,
     oQueEstaAcontecendo: dados.oQueEstaAcontecendo,
@@ -331,6 +335,7 @@ export async function aceitar(
     momento,
     objetivo: dados.objetivo,
     formato,
+    estilo,
   });
 
   await db()

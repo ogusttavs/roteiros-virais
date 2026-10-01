@@ -293,6 +293,24 @@ function mockCartoesStory(tema: string, reprovado: boolean) {
   };
 }
 
+/** M4, item 4: cenas sem fala, mesma estrutura de `mockCartoesStory`, com `oQueFalar` sempre vazio e legenda do post. */
+function mockCenasSemFala(tema: string, reprovado: boolean) {
+  return {
+    cartoes: [
+      { oQueFalar: "", oQueMostrar: "o local do negocio de verdade, sem ninguem falando", textoNaTela: tema, figurinha: "nenhuma" as const },
+      {
+        oQueFalar: "",
+        oQueMostrar: reprovado ? "outro angulo do processo acontecendo" : "o processo acontecendo",
+        textoNaTela: "e voce, ja passou por isso",
+        figurinha: "nenhuma" as const,
+      },
+      { oQueFalar: "", oQueMostrar: "o resultado final em destaque", textoNaTela: "chama no direct", figurinha: "nenhuma" as const },
+    ],
+    porQueAssim: [],
+    legenda: `${tema}. Manda a sua duvida aqui na legenda ou no direct.`,
+  };
+}
+
 function mockRoteiro(entrada: string, sistemaEstavel: string) {
   const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
   const tema = ehMomento
@@ -304,23 +322,28 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
   // V9c, item 2: so o sistema estavel diz o formato (a entrada nunca cita "story"); a marca
   // do bloco de estrutura de Story e o numero da primeira regra da lista.
   const ehStory = sistemaEstavel.includes("R-IG-STORY-01");
-  const tipoAbertura = ehStory ? null : tipoAberturaEscolhidoPeloMock(entrada);
+  // M4, item 4: idem para o estilo sem fala, marca unica do bloco de estrutura dele.
+  const ehSemFala = sistemaEstavel.includes("Estrutura do roteiro sem fala:");
+  const tipoAbertura = ehStory || ehSemFala ? null : tipoAberturaEscolhidoPeloMock(entrada);
   const primeiraPalavra = tipoAbertura ? PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura] : "";
 
-  const narrativa = ehStory
-    ? { gancho: null, corpo: null, fechamento: null, chamadaFinal: null, ...mockCartoesStory(tema, reprovado) }
-    : {
-        gancho: reprovado
-          ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
-          : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
-        corpo: reprovado
-          ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
-          : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
-        fechamento: "resumo do que foi mostrado",
-        chamadaFinal: "comenta se voce ja passou por isso",
-        cartoes: null,
-        porQueAssim: [],
-      };
+  const narrativa = ehSemFala
+    ? { gancho: null, corpo: null, fechamento: null, chamadaFinal: null, ...mockCenasSemFala(tema, reprovado) }
+    : ehStory
+      ? { gancho: null, corpo: null, fechamento: null, chamadaFinal: null, legenda: null, ...mockCartoesStory(tema, reprovado) }
+      : {
+          gancho: reprovado
+            ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
+            : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
+          corpo: reprovado
+            ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
+            : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
+          fechamento: "resumo do que foi mostrado",
+          chamadaFinal: "comenta se voce ja passou por isso",
+          cartoes: null,
+          porQueAssim: [],
+          legenda: null,
+        };
 
   return {
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,

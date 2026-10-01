@@ -5,7 +5,7 @@
  * Reprovou, refaz uma vez com o motivo anexado a entrada; reprovou de novo,
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
-import type { CartaoStory, FormatoRoteiro, TipoAbertura } from "@/db/schema";
+import type { CartaoStory, EstiloRoteiro, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 
 
@@ -106,7 +106,15 @@ export function verificarLocalmente(
      * a checagem não encontra nada para reprovar).
      */
     formato?: FormatoRoteiro;
+    /**
+     * M4, item 4: sem fala sempre usa `cartoes` (a mesma estrutura de Story), nos dois formatos;
+     * tem prioridade sobre o `formato === "story"` abaixo, que checa fala e figurinha, coisas que
+     * não existem aqui. Nenhum `oQueFalar` preenchido, texto na tela dentro do limite, `legenda`
+     * presente.
+     */
+    estilo?: EstiloRoteiro;
     cartoes?: CartaoStory[] | null;
+    legenda?: string | null;
     porQueAssim?: { regra: string; motivo: string }[];
     /**
      * V9d, item 1: os valores brutos de `gancho`, `corpo` e `chamadaFinal`, antes do filtro de
@@ -211,7 +219,13 @@ export function verificarLocalmente(
     }
   }
 
-  if (opcoes.formato === "story") {
+  if (opcoes.estilo === "sem_fala") {
+    if (!opcoes.cartoes || opcoes.cartoes.length === 0) {
+      motivos.push("cartoes: nulo ou vazio, um roteiro sem fala precisa de cenas (M4, item 4)");
+    } else {
+      motivos.push(...verificarCartoesSemFala(opcoes.cartoes, opcoes.legenda));
+    }
+  } else if (opcoes.formato === "story") {
     if (!opcoes.cartoes || opcoes.cartoes.length === 0) {
       motivos.push("cartoes: nulo ou vazio, um roteiro em story precisa de cartões (V9d, item 1)");
     } else {
@@ -219,7 +233,7 @@ export function verificarLocalmente(
     }
   }
 
-  if (opcoes.formato === "reels" && opcoes.narrativa) {
+  if (opcoes.estilo !== "sem_fala" && opcoes.formato === "reels" && opcoes.narrativa) {
     const { gancho, corpo, chamadaFinal } = opcoes.narrativa;
     if (!gancho?.trim()) {
       motivos.push("gancho: nulo ou vazio, um roteiro em reels precisa de gancho (V9d, item 1)");
@@ -395,6 +409,50 @@ function verificarCartoesStory(cartoes: CartaoStory[]): string[] {
   return motivos;
 }
 
+/**
+ * M4, item 4: "o texto que entra na tela (curto, no máximo 8 palavras por vez)" do prompt é por
+ * troca de texto, não por cartão inteiro (um cartão pode trocar o texto mais de uma vez); o teto
+ * aqui é generoso o bastante para caber três trocas de 8 palavras num só cartão, sem abrir espaço
+ * para um parágrafo inteiro disfarçado de "texto na tela".
+ */
+const PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA = 24;
+
+/**
+ * As checagens conferíveis por código do roteiro sem fala (M4, item 4): nenhum cartão com fala
+ * preenchida, texto na tela presente e dentro do limite, o que mostrar presente, e a legenda do
+ * post presente (o roteiro falado não precisa dela, a chamada final já é fala).
+ */
+function verificarCartoesSemFala(cartoes: CartaoStory[], legenda: string | null | undefined): string[] {
+  const motivos: string[] = [];
+
+  if (cartoes.length < 2 || cartoes.length > 5) {
+    motivos.push(`cartoes: ${cartoes.length} cena(s), um roteiro sem fala precisa de 2 a 5`);
+  }
+
+  cartoes.forEach((cartao, indice) => {
+    if (cartao.oQueFalar.trim()) {
+      motivos.push(`cena ${indice + 1}: tem fala preenchida, um roteiro sem fala não pode ter fala em bloco nenhum`);
+    }
+    if (!cartao.oQueMostrar.trim()) {
+      motivos.push(`cena ${indice + 1}: sem o que mostrar`);
+    }
+    if (!cartao.textoNaTela.trim()) {
+      motivos.push(`cena ${indice + 1}: sem texto na tela`);
+    } else {
+      const palavras = contarPalavras(cartao.textoNaTela);
+      if (palavras > PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA) {
+        motivos.push(`cena ${indice + 1}: ${palavras} palavras de texto na tela passam de ${PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA}`);
+      }
+    }
+  });
+
+  if (!legenda || !legenda.trim()) {
+    motivos.push("legenda: nula ou vazia, um roteiro sem fala precisa da legenda do post pronta");
+  }
+
+  return motivos;
+}
+
 export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   versaoPrompt: string;
   clienteId?: number;
@@ -429,8 +487,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   palavrasDoMomento?: string[];
   /** V9c, item 3: o formato do roteiro, e como extrair os cartões e o "por que assim" da saída, quando houver. */
   formato?: FormatoRoteiro;
+  /** M4, item 4: o estilo do roteiro; sem fala troca a checagem de cartões (ver `verificarLocalmente`). */
+  estilo?: EstiloRoteiro;
   extrairCartoes?: (dados: T) => CartaoStory[] | null;
   extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
+  /** M4, item 4: a legenda do post, só no estilo sem fala. */
+  extrairLegenda?: (dados: T) => string | null;
   /** V9d, item 1: gancho, corpo e chamadaFinal brutos, para `verificarLocalmente` reprovar um Reels vazio (ver lá). */
   extrairNarrativa?: (dados: T) => { gancho: string | null; corpo: string | null; chamadaFinal: string | null };
   extrairCampos: (dados: T) => Record<string, string>;
@@ -501,7 +563,9 @@ async function tentarGerarEVerificar<T>(
         : undefined,
     palavrasDoMomento: params.palavrasDoMomento,
     formato: params.formato,
+    estilo: params.estilo,
     cartoes: params.extrairCartoes?.(resultado.dados),
+    legenda: params.extrairLegenda?.(resultado.dados),
     porQueAssim: params.extrairPorQueAssim?.(resultado.dados),
     narrativa: params.extrairNarrativa?.(resultado.dados),
   });

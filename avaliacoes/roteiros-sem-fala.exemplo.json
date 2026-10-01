@@ -1,0 +1,72 @@
+[
+  {
+    "tema": "o antes e depois de um capo envelopado que para o trânsito de tão brilhante",
+    "objetivo": "alcance",
+    "perfilCompilado": "Oficina de envelopamento e película automotiva. Vende envelopamento completo por R$ 2.500, película por R$ 400. Cliente ideal é dono de carro que gosta de deixar o carro diferente. Medo do cliente: pagar caro e o vinil bolhar ou descascar em poucos meses. Frase que fala: aqui a gente aplica igual fábrica, sem bolha. Cenas filmáveis: o box de aplicação, o carro entrando fosco e saindo brilhando.",
+    "camadaExclusiva": "Cidade: Campinas, bairro Jardim Chapadão. Concorrente citado pelo cliente: oficina que aplica mais barato e descola em um mês.",
+    "modeloNicho": "Duração típica: 15 a 30 segundos. Assuntos quentes: antes e depois, aplicação em time-lapse, cor que muda com a luz. Ganchos que funcionam: antes e depois lado a lado (alta frequência). Estruturas comuns: carro fosco, aplicação em time-lapse, resultado brilhando. Fechamentos comuns: carro pronto girando devagar, sem fala. Chamadas finais comuns: legenda com o convite para orçar.",
+    "evidencias": [
+      {
+        "id": 701,
+        "assunto": "envelopamento em time-lapse do fosco ao brilhante",
+        "gancho": "carro entra fosco, sai brilhando",
+        "estrutura": "time-lapse da aplicacao do vinil, sem fala, so musica",
+        "fechamento": "carro pronto girando devagar sob a luz",
+        "chamadaFinal": "legenda chama para orcar o envelopamento",
+        "foraDaCurva": 9.1,
+        "momentoChave": "aos 6s, o vinil esticando sem nenhuma bolha",
+        "semFala": true
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "evidencia sem fala forte (9.1x); conferir que nenhuma cena tem fala, que o texto na tela e curto e que a legenda chama para orcar"
+  },
+  {
+    "tema": "o detalhe que faz a diferença entre um envelopamento barato e um que dura",
+    "objetivo": "conversao",
+    "perfilCompilado": "Oficina de envelopamento e película automotiva. Vende envelopamento completo por R$ 2.500. Cliente ideal já levou um orçamento mais barato em outro lugar e está em dúvida. Medo do cliente: o vinil descolar nas bordas depois de alguns meses, como já aconteceu com um amigo. Frase que fala: a diferença esta na borda, onde ninguem olha.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 15 a 30 segundos. Assuntos quentes: comparação de acabamento, borda do vinil, detalhe que ninguém repara. Ganchos que funcionam: zoom num detalhe que o olho comum não vê (alta frequência). Estruturas comuns: mostrar o problema do concorrente, mostrar o detalhe certo, resultado fechado. Fechamentos comuns: mão passando na borda sem pegar, sem fala. Chamadas finais comuns: legenda convida a marcar uma avaliação.",
+    "evidencias": [
+      {
+        "id": 702,
+        "assunto": "zoom na borda mal acabada de um envelopamento barato",
+        "gancho": "zoom na borda que ja esta descolando depois de um mes",
+        "estrutura": "mostra a borda ruim, depois a borda bem feita, lado a lado",
+        "fechamento": "mao passando na borda bem feita sem pegar em nada",
+        "chamadaFinal": "legenda convida a marcar uma avaliacao gratis",
+        "foraDaCurva": 5.4,
+        "semFala": true
+      },
+      {
+        "id": 703,
+        "assunto": "cliente reagindo ao resultado do envelopamento completo",
+        "gancho": "reacao real do dono vendo o carro pronto pela primeira vez",
+        "estrutura": "reacao gravada na saida do box",
+        "fechamento": "cliente sorrindo para o carro, sem falar",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 3.0,
+        "semFala": false
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "duas evidencias, uma sem fala forte e uma falada fraca; o estilo pedido e sem_fala mesmo assim (a pessoa escolheu no controle), conferir que o roteiro usa o angulo da borda mal acabada sem inventar numero"
+  },
+  {
+    "tema": "o som do vinil esticando que todo mundo que aplica reconhece",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Oficina de envelopamento e película automotiva. Quem grava é só a própria pessoa, sem equipe. Autoridade: oito anos aplicando vinil. Frase que fala: quem aplica reconhece esse som de longe.",
+    "camadaExclusiva": "nenhum dado exclusivo deste cliente registrado ainda.",
+    "modeloNicho": "Duração típica: 15 a 25 segundos. Assuntos quentes: bastidor da aplicação, som e textura do vinil, ferramentas do ofício. Ganchos que funcionam: close no momento exato do esticamento (média frequência). Estruturas comuns: close na ferramenta, aplicação em si, resultado esticado sem ruga. Fechamentos comuns: mão deslizando no vinil esticado. Chamadas finais comuns: legenda pergunta se quem assiste já aplicou alguma vez.",
+    "evidencias": [],
+    "roteirosRecentes": [
+      {
+        "tema": "ferramentas que uso todo dia na oficina",
+        "objetivo": "engajamento",
+        "status": "postado",
+        "gancho": "essas sao as ferramentas que eu mais uso aqui na oficina"
+      }
+    ],
+    "pontoPrincipal": "sem nenhuma evidencia do banco; a regra dura diz para dizer isso e nao inventar numero, e para nao repetir o angulo de 'ferramentas' do roteiro recente"
+  }
+]

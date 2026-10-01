@@ -13,12 +13,14 @@ import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
+  ESTILOS_ROTEIRO,
   FORMATOS_ROTEIRO,
   geracoesIA,
   roteiros,
   videosCliente,
   type Cliente,
   type ConteudoRoteiro,
+  type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
   type Objetivo,
@@ -61,6 +63,15 @@ export function validarFormato(valor: string | undefined): FormatoRoteiro | unde
     throw new ErroRoteiro("formato de roteiro invalido.");
   }
   return valor as FormatoRoteiro;
+}
+
+/** M4, item 2: mesmo cuidado de `validarFormato`, para o estilo que chega como texto livre do navegador. */
+export function validarEstilo(valor: string | undefined): EstiloRoteiro | undefined {
+  if (valor === undefined) return undefined;
+  if (!(ESTILOS_ROTEIRO as readonly string[]).includes(valor)) {
+    throw new ErroRoteiro("estilo de roteiro invalido.");
+  }
+  return valor as EstiloRoteiro;
 }
 
 const LIMITE_EVIDENCIA = 8;
@@ -162,6 +173,19 @@ export function blocosParaLeitura(
   roteiro: RoteiroLinha,
 ): { rotulo: string; paragrafos: string[]; mostrar?: string[] }[] {
   const corpo = corpoDoRoteiro(roteiro);
+  /**
+   * M4, item 5: sem fala sempre usa `cartoes` (a mesma estrutura de Story), nos dois formatos, por
+   * isso o estilo decide antes do formato. Sem fala não tem campo de fala: `paragrafos` fica vazio
+   * (o modo de leitura mostra só o que tem; `mostrarNoCartao` já junta o que mostrar e o texto na
+   * tela, as duas coisas que existem aqui).
+   */
+  if (roteiro.estilo === "sem_fala" && corpo.cartoes) {
+    return corpo.cartoes.map((cartao, indice) => ({
+      rotulo: textosRoteiro.blocos.cartao(indice + 1),
+      paragrafos: [],
+      mostrar: mostrarNoCartao(cartao),
+    }));
+  }
   if (roteiro.formato === "story" && corpo.cartoes) {
     return corpo.cartoes.map((cartao, indice) => ({
       rotulo: textosRoteiro.blocos.cartao(indice + 1),
@@ -212,6 +236,8 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
   objetivo: Objetivo;
   observacao?: string;
   formato?: FormatoRoteiro;
+  /** M4, item 2: "falado" (padrão) se ausente. */
+  estilo?: EstiloRoteiro;
 };
 
 /**
@@ -376,12 +402,21 @@ export function escolherTipoAbertura(
  * proporção poderia ter preferido no lugar de um internacional que "chegou
  * primeiro" na lista prevista.
  */
+/** M4, item 3: "preferência por referência sem fala", mesmo espírito de `preferirRedePrincipal`. */
+function preferirSemFala(itens: VideoEvidenciaRoteiro[]): VideoEvidenciaRoteiro[] {
+  const preferidos = itens.filter((v) => v.semFala === true);
+  const outros = itens.filter((v) => v.semFala !== true);
+  return [...preferidos, ...outros];
+}
+
 function combinarEvidencias(
   prevista: VideoEvidenciaRoteiro[],
   daBusca: VideoEvidenciaRoteiro[],
   limite: number,
   proporcaoBrasil: number,
   redePrincipal: Plataforma | null,
+  /** M4, item 3: evidência obrigatória igual ao falado, com preferência por referência sem fala. */
+  estilo: EstiloRoteiro,
 ): VideoEvidenciaRoteiro[] {
   const combinado = [...prevista];
   const idsJaIncluidos = new Set(prevista.map((v) => v.id));
@@ -390,7 +425,11 @@ function combinarEvidencias(
     combinado.push(video);
     idsJaIncluidos.add(video.id);
   }
-  const preferido = preferirRedePrincipal(combinado, redePrincipal, (v) => v.plataforma);
+  const preferido = preferirRedePrincipal(
+    estilo === "sem_fala" ? preferirSemFala(combinado) : combinado,
+    redePrincipal,
+    (v) => v.plataforma,
+  );
   return aplicarProporcaoBrasil(preferido, limite, (v) => classificarBrasil(v.idioma, v.contaBrasileira), proporcaoBrasil);
 }
 
@@ -542,6 +581,8 @@ export function extrairCamposRoteiro(dados: roteiroIA.SaidaRoteiro): Record<stri
   if (dados.edicao.audio) campos.audio = dados.edicao.audio;
   if (dados.edicao.referencia) campos.referenciaOQueOlhar = dados.edicao.referencia.oQueOlhar;
   if (dados.temaCurto) campos.temaCurto = dados.temaCurto;
+  // M4: só no estilo sem fala (o verificador de texto confere jargão, emoji e travessão aqui também).
+  if (dados.legenda) campos.legenda = dados.legenda;
   return campos;
 }
 
@@ -552,6 +593,8 @@ type MontarERoteiroDados = {
   objetivo: Objetivo;
   /** V9c, item 1: "reels" ou "story"; troca o bloco de estrutura do prompt e o verificador por regra. */
   formato: FormatoRoteiro;
+  /** M4, item 2: "falado" ou "sem_fala", ortogonal ao formato; troca o bloco de estrutura e o verificador. */
+  estilo: EstiloRoteiro;
   observacao?: string;
   evidenciasPrevistas: number[];
   /**
@@ -614,7 +657,7 @@ async function gerarConteudo(
 
   const evidencias = ehMomento
     ? []
-    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil, dados.cliente.redePrincipal);
+    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil, dados.cliente.redePrincipal, dados.estilo);
   const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
@@ -666,11 +709,13 @@ async function gerarConteudo(
       regrasCliente,
       tipo: dados.cliente.tipo,
       formato: dados.formato,
+      estilo: dados.estilo,
     }),
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
       objetivo: dados.objetivo,
       formato: dados.formato,
+      estilo: dados.estilo,
       observacao: dados.observacao,
       evidencias: evidencias.map((v) => ({
         id: v.id,
@@ -683,6 +728,7 @@ async function gerarConteudo(
         momentoChave: v.analiseVisual?.momentoChave
           ? `aos ${v.analiseVisual.momentoChave.segundo}s, ${v.analiseVisual.momentoChave.oQue}`
           : undefined,
+        semFala: v.semFala ?? undefined,
       })),
       roteirosRecentes,
       instrucaoAbertura,
@@ -730,7 +776,9 @@ async function gerarConteudo(
     extrairDuracaoS: (d) => d.duracaoS,
     generoTexto: "roteiro",
     formato: dados.formato,
+    estilo: dados.estilo,
     extrairCartoes: (d) => d.cartoes,
+    extrairLegenda: (d) => d.legenda,
     extrairPorQueAssim: (d) => d.porQueAssim,
     extrairNarrativa: (d) => ({ gancho: d.gancho, corpo: d.corpo, chamadaFinal: d.chamadaFinal }),
     extrairCampos: extrairCamposRoteiro,
@@ -775,6 +823,7 @@ async function gerarConteudo(
      * confirmando), então fica no meio.
      */
     forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidencias),
+    legenda: saida.legenda,
   };
 
   return {
@@ -801,6 +850,7 @@ export async function gerarRoteiro(
   const { tema, evidenciasPrevistas } = await resolverTema(cliente, params);
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
+  const estilo = params.estilo ?? "falado";
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
@@ -808,6 +858,7 @@ export async function gerarRoteiro(
     tema,
     objetivo: params.objetivo,
     formato,
+    estilo,
     observacao: params.observacao,
     evidenciasPrevistas,
     momento,
@@ -824,6 +875,7 @@ export async function gerarRoteiro(
       momento: momento ?? null,
       objetivo: params.objetivo,
       formato,
+      estilo,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -878,6 +930,8 @@ export async function reprovarERescrever(
     objetivo: atual.objetivo,
     // V9c, item 1: a reescrita mantem o formato da versao anterior, nunca troca sozinha.
     formato: atual.formato,
+    // M4, item 2: idem para o estilo ("mantém o estilo do roteiro de origem").
+    estilo: atual.estilo,
     evidenciasPrevistas: atual.conteudo.evidencias,
     anguloParaEvitar: {
       gancho: atual.conteudo.gancho,
@@ -899,6 +953,7 @@ export async function reprovarERescrever(
       momento: momento ?? null,
       objetivo: atual.objetivo,
       formato: atual.formato,
+      estilo: atual.estilo,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,

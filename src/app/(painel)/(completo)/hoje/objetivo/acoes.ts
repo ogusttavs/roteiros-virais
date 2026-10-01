@@ -1,20 +1,41 @@
 "use server";
 
-import type { Objetivo } from "@/db/schema";
+import type { EstiloRoteiro, Objetivo } from "@/db/schema";
+import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
-import { gerarRoteiro, validarFormato, type OrigemRoteiro } from "@/servicos/roteiro";
+import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
+import { gerarRoteiro, validarEstilo, validarFormato, type OrigemRoteiro } from "@/servicos/roteiro";
 
 /**
- * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado). O cliente sempre vem
- * da sessão. `formato` chega como texto livre do navegador (V9d, item 2): `validarFormato` confere
- * contra `FORMATOS_ROTEIRO` antes de chegar ao banco.
+ * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
+ * o segundo controle). O cliente sempre vem da sessão. `formato` e `estilo` chegam como texto livre
+ * do navegador (V9d, item 2): `validarFormato`/`validarEstilo` conferem contra a lista antes de
+ * chegar ao banco.
  */
 export async function gerarRoteiroAction(
   origem: OrigemRoteiro,
   objetivo: Objetivo,
   formato?: string,
+  estilo?: string,
 ): Promise<{ id: number }> {
   const cliente = await clienteDaSessaoAtual();
-  const roteiro = await gerarRoteiro(cliente.id, { ...origem, objetivo, formato: validarFormato(formato) });
+  const roteiro = await gerarRoteiro(cliente.id, {
+    ...origem,
+    objetivo,
+    formato: validarFormato(formato),
+    estilo: validarEstilo(estilo),
+  });
   return { id: roteiro.id };
+}
+
+/**
+ * M4, item 2: a sugestão de estilo pela evidência do tema (mais da metade sem fala sugere sem
+ * fala; empate ou sem evidência vale falado). Chamada quando a tela de objetivo monta, para o
+ * controle já vir marcado; a pessoa troca se quiser.
+ */
+export async function sugerirEstiloAction(tema: string): Promise<EstiloRoteiro> {
+  const cliente = await clienteDaSessaoAtual();
+  if (!cliente.nichoId) return "falado";
+  const evidencias = await evidenciaParaRoteiro(cliente.nichoId, tema);
+  return sugerirEstiloPelaEvidencia(evidencias);
 }

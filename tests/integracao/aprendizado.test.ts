@@ -222,6 +222,7 @@ describe("isolamento entre clientes ate o texto do prompt do roteiro (segunda ro
       regrasCliente: regrasA,
       tipo: "negocio",
       formato: "reels",
+      estilo: "falado",
     });
     const sistemaB = montarSistemaEstavel({
       perfilCompilado: "perfil",
@@ -230,6 +231,7 @@ describe("isolamento entre clientes ate o texto do prompt do roteiro (segunda ro
       regrasCliente: regrasB,
       tipo: "negocio",
       formato: "reels",
+      estilo: "falado",
     });
 
     expect(sistemaA).toContain("regra exclusiva do cliente a");

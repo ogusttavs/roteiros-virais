@@ -503,6 +503,8 @@ export type VideoEvidenciaRoteiro = {
   publicadoEm: Date | null;
   /** V12, item 3a: para `combinarEvidencias` (roteiro.ts) preferir a rede principal da marca, sem excluir as outras. */
   plataforma: Plataforma;
+  /** M4: para `sugerirEstiloPelaEvidencia` (ia/enums.ts) e para a preferência por evidência sem fala. */
+  semFala: boolean | null;
 };
 
 /**
@@ -524,6 +526,7 @@ function mapearEvidenciaRoteiro(
     contaId: number | null;
     publicadoEm: Date | null;
     plataforma: Plataforma;
+    semFala: boolean | null;
   }[],
 ): VideoEvidenciaRoteiro[] {
   return linhas
@@ -543,6 +546,7 @@ function mapearEvidenciaRoteiro(
       contaId: l.contaId,
       publicadoEm: l.publicadoEm,
       plataforma: l.plataforma,
+      semFala: l.semFala,
     }));
 }
 
@@ -571,6 +575,7 @@ export async function evidenciaParaRoteiro(
       contaId: videos.contaId,
       publicadoEm: videos.publicadoEm,
       plataforma: videos.plataforma,
+      semFala: videos.semFala,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -603,6 +608,7 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
       contaId: videos.contaId,
       publicadoEm: videos.publicadoEm,
       plataforma: videos.plataforma,
+      semFala: videos.semFala,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -691,6 +697,8 @@ export type VideoReferencia = {
   formato: AnaliseVideo["formato"];
   /** `null` quando a plataforma não trouxe (Hashtag Search da Meta, TikTok ainda suspenso); a tela cai no retângulo neutro. */
   capaUrl: string | null;
+  /** M4, item 1: etiqueta "sem fala" no cartão quando `true`; nulo (lido antes desta coluna existir) conta como falado. */
+  semFala: boolean | null;
 };
 
 /**
@@ -802,6 +810,7 @@ export async function referenciasDoNicho(
         contaPais: contas.pais,
         contaIdiomaPrincipal: contas.idiomaPrincipal,
         capaUrl: videos.capaUrl,
+        semFala: videos.semFala,
       })
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -855,6 +864,7 @@ export async function referenciasDoNicho(
       porQueFuncionou: l.analise.porQueFuncionou,
       formato: l.analise.formato,
       capaUrl: l.capaUrl,
+      semFala: l.semFala,
     })),
   };
 }

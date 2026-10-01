@@ -20,6 +20,16 @@
   font-family: var(--fonte-mono);
 }
 
+/* M4, item 1: mesmo tom discreto de `.quando`, sem desenho novo. */
+.semFala {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  border: 1px solid var(--cor-borda);
+  border-radius: 999px;
+  padding: 0 var(--espaco-2);
+  white-space: nowrap;
+}
+
 .tituloVideo {
   margin: 0;
   font-size: var(--tamanho-secundario);

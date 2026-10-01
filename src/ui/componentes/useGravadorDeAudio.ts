@@ -84,6 +84,12 @@ export type ResultadoUseGravadorDeAudio = {
   previa: string;
   /** P2b, item 4: só true quando a prévia vem do reconhecimento do navegador (camada a). */
   previaPorReconhecimentoDoAparelho: boolean;
+  /**
+   * M4, item 0c: true quando o áudio definitivo voltou vazio ou com erro e a prévia virou a
+   * resposta no lugar dele (a única situação em que isso acontece). Quem chama mostra um aviso
+   * curto e deixa a pessoa conferir.
+   */
+  avisoPreviaComoReserva: boolean;
   iniciarGravacao: () => Promise<void>;
   pararGravacao: () => void;
 };
@@ -95,6 +101,10 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
   const [erro, setErro] = useState<ErroGravador>(null);
   const [previa, setPrevia] = useState("");
   const [previaPorReconhecimentoDoAparelho, setPreviaPorReconhecimentoDoAparelho] = useState(false);
+  const [avisoPreviaComoReserva, setAvisoPreviaComoReserva] = useState(false);
+  // Espelha `previa` para `transcrever` ler o valor mais recente (a função é recriada a cada
+  // render, mas `onstop` guarda a referência de quando a gravação começou).
+  const previaRef = useRef("");
 
   const streamRef = useRef<MediaStream | null>(null);
   const gravadorRef = useRef<MediaRecorder | null>(null);
@@ -111,6 +121,12 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
   const reconhecimentoRef = useRef<ReconhecimentoDeFala | null>(null);
   const semResultadoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trocouParaPedacosRef = useRef(false);
+  /**
+   * M4, item 0a: o que já apareceu em sessões anteriores do reconhecimento, antes de um "parou
+   * sozinho e recomeçou" (ou de uma troca para os pedaços no meio do caminho). Prefixo estável,
+   * nunca apagado por uma sessão nova.
+   */
+  const previaConfirmadaRef = useRef("");
 
   // P2b, camada (b): segundo MediaRecorder, por pedaços de 5s, na mesma faixa de áudio.
   const pedacoGravadorRef = useRef<MediaRecorder | null>(null);
@@ -118,6 +134,19 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
   const pedacoPararTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pedacoIndiceRef = useRef(0);
   const pedacoTextosRef = useRef<string[]>([]);
+
+  function atualizarPrevia(texto: string) {
+    previaRef.current = texto;
+    setPrevia(texto);
+  }
+
+  /** Soma o prefixo confirmado (sessões de reconhecimento anteriores) ao texto da camada ativa. */
+  function previaMontada(textoDaCamada: string): string {
+    const prefixo = previaConfirmadaRef.current;
+    if (!prefixo) return textoDaCamada;
+    if (!textoDaCamada) return prefixo;
+    return `${prefixo} ${textoDaCamada}`;
+  }
 
   function limparPrevia() {
     if (semResultadoTimerRef.current) {
@@ -152,12 +181,16 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     const forma = new FormData();
     forma.append("audio", blob, `previa.${tipoMime.includes("mp4") ? "mp4" : "webm"}`);
     forma.append("duracaoS", String(Math.max(1, Math.round(DURACAO_PEDACO_MS / 1000))));
+    // M4, item 0b: marca o pedaço de prévia, para a rota contar isto num limite de taxa à parte do
+    // áudio definitivo (sem isto, duas pessoas gravando na mesma conta podem fazer a chamada
+    // definitiva tomar o 429 no lugar de um pedaço, perdendo a fala).
+    forma.append("previa", "1");
     fetch("/api/transcrever", { method: "POST", body: forma })
       .then((resposta) => resposta.json().catch(() => null))
       .then((dados: { transcricao: string } | { erro: string } | null) => {
         if (!dados || "erro" in dados || !dados.transcricao) return;
         pedacoTextosRef.current[indice] = dados.transcricao;
-        setPrevia(pedacoTextosRef.current.filter(Boolean).join(" "));
+        atualizarPrevia(previaMontada(pedacoTextosRef.current.filter(Boolean).join(" ")));
       })
       .catch(() => {
         // Pedaço perdido: a prévia segue sem ele, o áudio definitivo não depende disto.
@@ -210,14 +243,15 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
       reconhecimentoRef.current = null;
     }
     setPreviaPorReconhecimentoDoAparelho(false);
+    // O que já tinha aparecido no reconhecimento não some ao trocar de camada.
+    atualizarPrevia(previaConfirmadaRef.current);
     iniciarPreviaPorPedacos(stream, tipoMime);
   }
 
-  function iniciarPrevia(stream: MediaStream, tipoMime: string) {
-    trocouParaPedacosRef.current = false;
+  function iniciarReconhecimento(stream: MediaStream, tipoMime: string) {
     const Construtor = construtorDeReconhecimento();
     if (!Construtor) {
-      iniciarPreviaPorPedacos(stream, tipoMime);
+      trocarParaPedacos(stream, tipoMime);
       return;
     }
     const reconhecimento = new Construtor();
@@ -225,6 +259,7 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     reconhecimento.interimResults = true;
     reconhecimento.lang = "pt-BR";
     let recebeuResultado = false;
+    let textoDaSessao = "";
     reconhecimento.onresult = (evento) => {
       recebeuResultado = true;
       if (semResultadoTimerRef.current) {
@@ -236,13 +271,28 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
       for (let i = 0; i < evento.results.length; i += 1) {
         texto += `${evento.results[i][0].transcript} `;
       }
-      setPrevia(texto.trim());
+      textoDaSessao = texto.trim();
+      atualizarPrevia(previaMontada(textoDaSessao));
     };
     reconhecimento.onerror = () => {
       if (!recebeuResultado) trocarParaPedacos(stream, tipoMime);
     };
+    /**
+     * M4, item 0a: no celular, o reconhecimento costuma parar sozinho depois de uma pausa na fala,
+     * mesmo com `continuous`. Antes disto, a prévia congelava ali (a gravação de verdade seguia,
+     * mas o `onend` não fazia nada quando já tinha chegado algum resultado). Agora, se já tinha
+     * resultado, o texto da sessão vira prefixo confirmado e o reconhecimento recomeça; se o
+     * recomeço falhar (sem `Construtor` ou `.start()` erra), cai para os pedaços sem perder o que
+     * já apareceu (`previaConfirmadaRef` já está atualizado antes da troca).
+     */
     reconhecimento.onend = () => {
-      if (!recebeuResultado) trocarParaPedacos(stream, tipoMime);
+      if (!recebeuResultado) {
+        trocarParaPedacos(stream, tipoMime);
+        return;
+      }
+      previaConfirmadaRef.current = previaMontada(textoDaSessao);
+      reconhecimentoRef.current = null;
+      iniciarReconhecimento(stream, tipoMime);
     };
     reconhecimentoRef.current = reconhecimento;
     semResultadoTimerRef.current = setTimeout(() => {
@@ -253,6 +303,16 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     } catch {
       trocarParaPedacos(stream, tipoMime);
     }
+  }
+
+  function iniciarPrevia(stream: MediaStream, tipoMime: string) {
+    trocouParaPedacosRef.current = false;
+    previaConfirmadaRef.current = "";
+    if (!construtorDeReconhecimento()) {
+      iniciarPreviaPorPedacos(stream, tipoMime);
+      return;
+    }
+    iniciarReconhecimento(stream, tipoMime);
   }
 
   // Sai gravando (troca de tela, fechar a folha) sem deixar o microfone ligado no fundo.
@@ -271,6 +331,14 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
    * por cima do que a pessoa tivesse digitado nesse meio tempo. A fase só volta para "inicial"
    * depois que `onTranscrito` resolve, com `finally` para o erro também sair do estado "transcrevendo".
    */
+  /**
+   * M4, item 0c: em alguns celulares o reconhecimento do navegador e o `MediaRecorder` disputam o
+   * microfone e um fica mudo; se for o gravador, a transcrição definitiva volta vazia (ou falha) e
+   * a pessoa perde o que falou, com o texto já na tela. Nesse caso, e só nesse caso, a prévia
+   * (`previaRef`, o valor mais recente, não o da renderização em que a gravação começou) vale como
+   * transcrição e segue o caminho normal; `avisoPreviaComoReserva` avisa quem chama para mostrar um
+   * aviso curto e deixar a pessoa conferir.
+   */
   async function transcrever(blob: Blob, tipoMime: string) {
     setFase("transcrevendo");
     setErro(null);
@@ -281,13 +349,26 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     try {
       const resposta = await fetch("/api/transcrever", { method: "POST", body: forma });
       const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
-      if (!resposta.ok || !dados || "erro" in dados) {
+      const transcricao = resposta.ok && dados && "transcricao" in dados ? dados.transcricao.trim() : "";
+      if (!transcricao) {
+        const previaDeReserva = previaRef.current.trim();
+        if (previaDeReserva) {
+          setAvisoPreviaComoReserva(true);
+          await onTranscritoRef.current(previaDeReserva, segundosRef.current);
+          return;
+        }
         setErro("falhaTranscricao");
         return;
       }
-      await onTranscritoRef.current(dados.transcricao, segundosRef.current);
+      await onTranscritoRef.current(transcricao, segundosRef.current);
     } catch {
-      setErro("falhaTranscricao");
+      const previaDeReserva = previaRef.current.trim();
+      if (previaDeReserva) {
+        setAvisoPreviaComoReserva(true);
+        await onTranscritoRef.current(previaDeReserva, segundosRef.current);
+      } else {
+        setErro("falhaTranscricao");
+      }
     } finally {
       setFase("inicial");
     }
@@ -295,7 +376,8 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
 
   async function iniciarGravacao() {
     setErro(null);
-    setPrevia("");
+    setAvisoPreviaComoReserva(false);
+    atualizarPrevia("");
     setPreviaPorReconhecimentoDoAparelho(false);
     const tipoMime = tipoMimeSuportado();
     if (!navigator.mediaDevices?.getUserMedia || !tipoMime) {
@@ -350,6 +432,7 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     erro,
     previa,
     previaPorReconhecimentoDoAparelho,
+    avisoPreviaComoReserva,
     iniciarGravacao,
     pararGravacao,
   };

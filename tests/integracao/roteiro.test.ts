@@ -130,7 +130,14 @@ async function criarCliente(): Promise<number> {
 async function criarVideoEvidencia(
   idExterno: string,
   assunto: string,
-  opcoes: { idioma?: string | null; foraDaCurva?: number; tipoAbertura?: TipoAbertura; plataforma?: Plataforma } = {},
+  opcoes: {
+    idioma?: string | null;
+    foraDaCurva?: number;
+    tipoAbertura?: TipoAbertura;
+    plataforma?: Plataforma;
+    /** M4: `undefined` (padrão) deixa nulo, como todo vídeo analisado antes desta coluna existir. */
+    semFala?: boolean;
+  } = {},
 ): Promise<number> {
   const [video] = await db()
     .insert(videos)
@@ -146,6 +153,7 @@ async function criarVideoEvidencia(
       idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
       // V4, item 3: nulo por padrao (o caso "nicho novo" de escolherTipoAbertura), a nao ser que o teste peca um tipo especifico.
       tipoAbertura: opcoes.tipoAbertura,
+      semFala: opcoes.semFala,
       analise: {
         assunto,
         gancho: "olha essa mancha saindo do estofado",
@@ -438,6 +446,111 @@ describe("V9c, formato (Story)", () => {
 
     expect(v2.formato).toBe("story");
     expect(v2.conteudo.cartoes).not.toBeNull();
+  });
+});
+
+describe("M4, estilo (sem fala)", () => {
+  it("sem estilo, gera falado: coluna estilo e narrativa classica, sem legenda", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-estilo-1", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.estilo).toBe("falado");
+    expect(roteiro.conteudo.gancho).toBeTruthy();
+    expect(roteiro.conteudo.cartoes).toBeNull();
+    expect(roteiro.conteudo.legenda).toBeFalsy();
+  });
+
+  it("com estilo sem_fala, grava a coluna e o conteudo em cenas sem fala, com legenda", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-estilo-2", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+      estilo: "sem_fala",
+    });
+
+    expect(roteiro.estilo).toBe("sem_fala");
+    expect(roteiro.conteudo.gancho).toBe("");
+    expect(roteiro.conteudo.corpo).toBe("");
+    expect(roteiro.conteudo.fechamento).toBe("");
+    expect(roteiro.conteudo.chamadaFinal).toBe("");
+    expect(roteiro.tipoAbertura).toBeNull();
+    expect(roteiro.conteudo.cartoes).not.toBeNull();
+    expect(roteiro.conteudo.cartoes!.length).toBeGreaterThanOrEqual(2);
+    expect(roteiro.conteudo.cartoes!.length).toBeLessThanOrEqual(5);
+    for (const cartao of roteiro.conteudo.cartoes!) {
+      expect(cartao.oQueFalar).toBe("");
+      expect(cartao.textoNaTela).toBeTruthy();
+    }
+    expect(roteiro.conteudo.legenda).toBeTruthy();
+  });
+
+  it("sem_fala com formato story: usa cenas sem fala, nunca a estrutura de cartoes com fala do Story", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-estilo-3", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+      formato: "story",
+      estilo: "sem_fala",
+    });
+
+    expect(roteiro.formato).toBe("story");
+    expect(roteiro.estilo).toBe("sem_fala");
+    for (const cartao of roteiro.conteudo.cartoes!) {
+      expect(cartao.oQueFalar).toBe("");
+    }
+    expect(roteiro.conteudo.legenda).toBeTruthy();
+  });
+
+  it("reprovarERescrever preserva o estilo da versao anterior", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-estilo-4", "mancha de vinho no estofado");
+
+    const v1 = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+      estilo: "sem_fala",
+    });
+
+    const v2 = await reprovarERescrever(v1.id, ["ja_falei_disso"]);
+
+    expect(v2.estilo).toBe("sem_fala");
+    expect(v2.conteudo.cartoes).not.toBeNull();
+    expect(v2.conteudo.legenda).toBeTruthy();
+  });
+
+  it("isolamento: o estilo sem_fala de um cliente nunca aparece no roteiro falado de outro", async () => {
+    const clienteA = await criarCliente();
+    const clienteB = await criarCliente();
+    await criarVideoEvidencia("ev-estilo-isolamento", "mancha de vinho no estofado");
+
+    const roteiroA = await gerarRoteiro(clienteA, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+      estilo: "sem_fala",
+    });
+    const roteiroB = await gerarRoteiro(clienteB, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiroA.estilo).toBe("sem_fala");
+    expect(roteiroB.estilo).toBe("falado");
+    expect(roteiroB.conteudo.cartoes).toBeNull();
   });
 });
 

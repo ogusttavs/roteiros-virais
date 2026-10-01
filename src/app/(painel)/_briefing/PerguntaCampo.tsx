@@ -127,14 +127,23 @@ function CampoComMicrofone({
       ) : (
         <p className={styles.dicaFalar}>{t.dicaResponderFalando}</p>
       )}
-      {/* P2b, item 1 e 3: a prévia ao vivo, abaixo do campo, enquanto grava ou enquanto organiza a fala. */}
+      {/*
+        P2b, item 1 e 3: a prévia ao vivo, abaixo do campo, enquanto grava ou enquanto organiza a
+        fala. M4, item 0d: "polite" fazia o leitor de tela repetir o texto a cada atualização.
+      */}
       {(gravando || gravador.fase === "transcrevendo") && gravador.previa.trim().length > 0 ? (
-        <p className={styles.previaFala} aria-live="polite">
+        <p className={styles.previaFala} aria-live="off">
           {gravador.previa}
         </p>
       ) : null}
       {gravando && gravador.previaPorReconhecimentoDoAparelho ? (
         <p className={styles.previaAviso}>{textosComuns.previaUsaReconhecimentoDoAparelho}</p>
+      ) : null}
+      {/* M4, item 0c: a prévia virou a resposta porque o áudio definitivo veio vazio ou com erro. */}
+      {gravador.avisoPreviaComoReserva ? (
+        <p className={styles.previaAviso} role="status">
+          {textosComuns.previaUsadaComoResposta}
+        </p>
       ) : null}
     </>
   );

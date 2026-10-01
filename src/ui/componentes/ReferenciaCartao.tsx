@@ -31,6 +31,8 @@ export type VideoFormatado = {
   estrutura: string;
   porQueFuncionou: string;
   capaUrl: string | null;
+  /** M4, item 1: etiqueta "sem fala" quando `true`. */
+  semFala: boolean;
 };
 
 type Props = {
@@ -105,6 +107,7 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
       <div className={styles.videoConta}>
         <span className={styles.nome}>{video.contaNome}</span>
         <span className={styles.quando}>{video.plataformaData}</span>
+        {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
       </div>
 
       {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}

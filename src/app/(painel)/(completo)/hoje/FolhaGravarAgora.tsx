@@ -3,12 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import type { FormatoRoteiro, Objetivo } from "@/db/schema";
+import type { EstiloRoteiro, FormatoRoteiro, Objetivo } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
+  DESCRICAO_ESTILO_ROTEIRO,
+  ESTILOS_ROTEIRO_EM_ORDEM,
   FORMATOS_ROTEIRO_EM_ORDEM,
   NOME_OBJETIVO,
   OBJETIVOS_EM_ORDEM,
+  ROTULO_ESTILO_ROTEIRO,
   ROTULO_FORMATO_ROTEIRO,
   sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
@@ -102,6 +105,12 @@ export function FolhaGravarAgora({
     valoresIniciais?.formato ?? formatoInicial ?? (objetivo ? sugerirFormatoPeloObjetivo(objetivo) : "reels"),
   );
   const [formatoTocado, setFormatoTocado] = useState(valoresIniciais?.formato !== undefined || formatoInicial !== undefined);
+  /**
+   * M4, item 2: o segundo controle segmentado da folha. Sem sugestão automática aqui (o momento
+   * nunca busca evidência no banco, `gerarRoteiro` pula essa busca de propósito para esta origem);
+   * começa em "falado" e a pessoa troca se quiser.
+   */
+  const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
@@ -131,6 +140,7 @@ export function FolhaGravarAgora({
     erro: erroGravador,
     previa,
     previaPorReconhecimentoDoAparelho,
+    avisoPreviaComoReserva,
     iniciarGravacao,
     pararGravacao,
   } = useGravadorDeAudio({
@@ -169,6 +179,7 @@ export function FolhaGravarAgora({
               oQueDaParaMostrar,
               objetivo,
               formato,
+              estilo,
               marcaId,
             })
           : await gerarRoteiroMomentoAction({
@@ -177,6 +188,7 @@ export function FolhaGravarAgora({
               oQueDaParaMostrar,
               objetivo,
               formato,
+              estilo,
               marcaId,
               transcricao: transcricao ?? undefined,
             });
@@ -228,6 +240,7 @@ export function FolhaGravarAgora({
               formatarGravando={textosMomento.gravando}
               previa={previa}
               previaPorReconhecimentoDoAparelho={previaPorReconhecimentoDoAparelho}
+              avisoPreviaComoReserva={avisoPreviaComoReserva}
             />
             {erroAudio ? (
               <p className={styles.erro} role="alert">
@@ -304,6 +317,27 @@ export function FolhaGravarAgora({
             ))}
           </div>
           {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
+        </div>
+
+        <div className={styles.grupoFormato}>
+          <span className={styles.rotuloGrupo}>{textosMomento.estilo}</span>
+          <div role="tablist" aria-label={textosMomento.estilo} className={styles.segmentado}>
+            {ESTILOS_ROTEIRO_EM_ORDEM.map((opcao) => (
+              <button
+                key={opcao}
+                type="button"
+                role="tab"
+                aria-selected={estilo === opcao}
+                className={[styles.segmentoBotao, estilo === opcao ? styles.segmentoAtivo : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+                title={DESCRICAO_ESTILO_ROTEIRO[opcao]}
+                onClick={() => setEstilo(opcao)}
+              >
+                {ROTULO_ESTILO_ROTEIRO[opcao]}
+              </button>
+            ))}
+          </div>
         </div>
 
         {marcas.length > 0 ? (
