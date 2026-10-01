@@ -146,6 +146,11 @@ export type PerguntaBriefing = {
    * `oQueAIAProcura`, que continua sendo o critério da nota.
    */
   oQueUmaBoaRespostaTem: string;
+  /**
+   * V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.campo-pergunta` de cima do campo de
+   * texto): só a P12 tem, logo acima do campo, depois das duas listas de perfis citados.
+   */
+  enunciadoCampo?: string;
 };
 
 const AJUDA_PADRAO_NEGOCIO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
@@ -312,13 +317,15 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     bloco: 5,
     blocoNome: "O que dá para mostrar, referências e concorrentes",
     peso: 1,
-    enunciado:
-      "Cite dois ou três perfis que você admira (com @) e dois ou três concorrentes diretos (nome ou @). Em uma frase, por que cada um.",
+    /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`): os @ saíram daqui para as duas listas acima do campo. */
+    enunciado: "Cite os concorrentes e os perfis que você admira, e em uma frase o que gosta em cada um.",
+    enunciadoCampo:
+      "Em uma frase, o que você gosta em cada perfil que admira e o que os concorrentes fazem que você faria diferente.",
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Handles válidos. Perfis admirados viram referência de tom; concorrentes entram na camada exclusiva de pesquisa (escopo 5.6).",
     oQueUmaBoaRespostaTem:
-      "Uma frase por perfil: o que você gosta em cada um que admira e o que os concorrentes fazem que você faria diferente. Os @ vão nos campos acima.",
+      "Uma frase por perfil: o que você gosta em cada um que admira e o que os concorrentes fazem que você faria diferente. Os @ vão nas listas acima.",
   },
 ];
 
@@ -481,13 +488,15 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     bloco: 5,
     blocoNome: "O seu dia na câmera, referências",
     peso: 1,
-    enunciado:
-      "Cite dois ou três perfis que você admira (com @) e dois ou três que fazem algo parecido com o que você quer fazer (com @). Em uma frase, por que cada um.",
+    /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`): os @ saíram daqui para as duas listas acima do campo. */
+    enunciado: "Cite os perfis parecidos e os perfis que você admira, e em uma frase o que gosta em cada um.",
+    enunciadoCampo:
+      "Em uma frase, o que você gosta em cada perfil que admira e o que os parecidos com você fazem que você faria diferente.",
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Handles válidos. Admirados viram referência de tom; os parecidos entram na camada exclusiva de pesquisa no lugar dos concorrentes (uma pessoa não tem concorrente, tem vizinho de assunto).",
     oQueUmaBoaRespostaTem:
-      "Uma frase por perfil: o que você gosta em cada um que admira e o que os parecidos com você fazem que você faria diferente. Os @ vão nos campos acima.",
+      "Uma frase por perfil: o que você gosta em cada um que admira e o que os parecidos com você fazem que você faria diferente. Os @ vão nas listas acima.",
   },
 ];
 

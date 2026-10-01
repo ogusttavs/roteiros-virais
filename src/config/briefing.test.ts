@@ -101,7 +101,7 @@ describe("perguntasDoBriefing", () => {
       "Quem é você e o que você faz hoje? Conte como se fosse para alguém que nunca ouviu falar de você: o que você faz de verdade no dia, há quanto tempo, de onde você vem.",
     );
     expect(enunciados.p12).toBe(
-      "Cite dois ou três perfis que você admira (com @) e dois ou três que fazem algo parecido com o que você quer fazer (com @). Em uma frase, por que cada um.",
+      "Cite os perfis parecidos e os perfis que você admira, e em uma frase o que gosta em cada um.",
     );
   });
 

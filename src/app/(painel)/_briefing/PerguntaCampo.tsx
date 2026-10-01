@@ -21,6 +21,7 @@ import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useTrocaMarcaOpcional } from "../_casca/TrocaMarcaContext";
 
 import { organizarFalaBriefingAction } from "./acoes";
+import { BlocoPerfisCitados } from "./BlocoPerfisCitados";
 import styles from "./PerguntaCampo.module.css";
 
 export type ResultadoAcaoBriefing = {
@@ -467,6 +468,12 @@ export function PerguntaCampo({
     return (
       <div className={styles.linhaVivo}>
         <p className={styles.enunciado}>{pergunta.enunciado}</p>
+        {pergunta.id === "p12" ? (
+          <>
+            <BlocoPerfisCitados />
+            {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
+          </>
+        ) : null}
         <CampoComMicrofone gravador={gravador} erroFala={erroFala} aoCopiarParaIA={() => void copiarParaIA()} copiado={copiado}>
           <AreaTexto
             ref={areaRef}
@@ -579,6 +586,12 @@ export function PerguntaCampo({
     <div className={styles.cartaoAberto}>
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
+      {pergunta.id === "p12" ? (
+        <>
+          <BlocoPerfisCitados />
+          {pergunta.enunciadoCampo ? <p className={styles.campoDica}>{pergunta.enunciadoCampo}</p> : null}
+        </>
+      ) : null}
       <CampoComMicrofone gravador={gravador} erroFala={erroFala} aoCopiarParaIA={() => void copiarParaIA()} copiado={copiado}>
         <AreaTexto
           ref={areaRef}

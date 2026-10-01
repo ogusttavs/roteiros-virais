@@ -33,6 +33,15 @@ function formatarDiaMesPorExtenso(data: Date): string {
 export const textosBriefing = {
   /** E37a, item 3: no topo do briefing e do /comecar, acima das perguntas. */
   tresJeitos: "Três jeitos de responder: escrever, falar no microfone ou levar a pergunta para a IA que você já usa.",
+  /** V12c, item 7, a E37b (design v2, `Briefing.dc.html`, `.perfis-citados`): as duas listas da P12. */
+  perfisCitados: {
+    concorrentes: "Concorrentes",
+    ajudaConcorrentes: "Só o nome do perfil. Se colar o link, a gente tira o nome dele.",
+    admira: "Perfis que você admira",
+    adicionarOutro: "Adicionar outro:",
+    tirar: (endereco: string) => `Tirar ${endereco}`,
+    perfilInvalido: "Confira o nome do perfil",
+  },
   comecar: {
     passoUm: "Primeiro passo",
     titulo: "Antes de escrever, a gente precisa te conhecer",
