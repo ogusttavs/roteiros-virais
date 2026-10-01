@@ -672,6 +672,39 @@ describe("verificarLocalmente", () => {
       const r = verificarLocalmente({ corpo: curto });
       expect(r.aprovado).toBe(true);
     });
+
+    /**
+     * Revisão do PR #83 (achado do Fable): a P5 e a P9 pedem a frase literal do cliente, que
+     * pode vir sem acento; a IA cita entre aspas, e isso não é "a IA escreveu sem acento".
+     */
+    it("nao reprova palavra sem acento que esta dentro de aspas (retas, curvas ou simples)", () => {
+      expect(
+        verificarLocalmente({ corpo: 'Você sempre ouve do cliente: "nao sei se vai resolver".' }).aprovado,
+      ).toBe(true);
+      expect(
+        verificarLocalmente({ corpo: "Você sempre ouve do cliente: “nao sei se vai resolver”." }).aprovado,
+      ).toBe(true);
+      expect(
+        verificarLocalmente({ corpo: "Você sempre ouve do cliente: 'nao sei se vai resolver'." }).aprovado,
+      ).toBe(true);
+    });
+
+    it("nao reprova sigla ou nome proprio em maiusculas que bate por acaso ('JA Envelopamentos')", () => {
+      const r = verificarLocalmente({ corpo: "Grave na oficina da JA Envelopamentos, com o carro na frente." });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("comeco de frase com so a inicial maiuscula continua reprovando (nao e sigla)", () => {
+      const r = verificarLocalmente({ corpo: "Ja virou rotina pedir orcamento antes de fechar o servico." });
+      expect(r.aprovado).toBe(false);
+    });
+
+    it("palavra sem acento fora de aspas continua reprovando, mesmo com uma aspa acentuada no mesmo texto", () => {
+      const r = verificarLocalmente({
+        corpo: 'Isso voce resolve rapido. O cliente disse: "ótimo, ficou ótimo".',
+      });
+      expect(r.aprovado).toBe(false);
+    });
   });
 });
 
