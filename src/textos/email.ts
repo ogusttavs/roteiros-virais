@@ -23,10 +23,14 @@ import { envolverEmail, linkEmail } from "./casca-email";
  * E39a, item 7: quando uma marca já tem algo marcado na Agenda de hoje
  * (reels ou story, de qualquer um dos quatro caminhos de Criar, não só do
  * plano colado), a lista entra entre o plano e o texto de sempre.
+ *
+ * E39b, item (c): quando a marca tem algo atrasado (marcado para um dia que já passou e continua
+ * "a gravar"), a lista entra antes de tudo, por ser o mais urgente.
  */
 export type ItemAgendaPendente = { titulo: string; status: "gerado" | "gravado" | "postado" };
 export type MarcaPendente = {
   nome: string;
+  atrasados: string[];
   planoHoje: { lugar: string; situacao: string }[];
   agendaHoje: ItemAgendaPendente[];
 };
@@ -56,6 +60,18 @@ function blocoPlano(marcas: MarcaPendente[]): string {
     .join("");
 }
 
+function blocoAtrasado(marcas: MarcaPendente[]): string {
+  const comAtrasado = marcas.filter((marca) => marca.atrasados.length > 0);
+  if (comAtrasado.length === 0) return "";
+  return comAtrasado
+    .map((marca) => {
+      const itens = marca.atrasados.join("<br>");
+      const titulo = marcas.length > 1 ? `<p><strong>${marca.nome}: atrasado</strong></p>` : "<p><strong>Atrasado</strong></p>";
+      return `${titulo}<p>${itens}</p>`;
+    })
+    .join("");
+}
+
 function blocoAgenda(marcas: MarcaPendente[]): string {
   const comAgenda = marcas.filter((marca) => marca.agendaHoje.length > 0);
   if (comAgenda.length === 0) return "";
@@ -79,7 +95,7 @@ export const textosEmail = {
         ? `<p>O tema de <strong>${nomes[0]}</strong> está pronto para gravar.</p>`
         : `<p>O tema está pronto para gravar em ${listaMarcas(nomes)}.</p>`;
     return envolverEmail(
-      `${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
+      `${blocoAtrasado(marcas)}${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
     );
   },
 };

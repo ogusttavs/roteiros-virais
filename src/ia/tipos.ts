@@ -16,7 +16,9 @@ export type { NivelIA };
  * `extrairVideoSemFala` (M3, item 2: a ficha fixa pelos quadros e pela legenda,
  * para o setor que aceita "video sem fala vale") e `organizarFalaBriefing`
  * (P2, item 3: tira as muletas de fala de uma resposta de briefing gravada,
- * sem acrescentar fato nem resumir).
+ * sem acrescentar fato nem resumir). `aindaValeRoteiro` (E39b, item a):
+ * confere se um roteiro feito com antecedencia ainda vale ou se algo mais
+ * forte subiu no setor hoje.
  */
 export type TarefaIA =
   | "avaliarResposta"
@@ -38,7 +40,8 @@ export type TarefaIA =
   | "sugerirContasDoSetor"
   | "classificarContaDoSetor"
   | "organizarFalaBriefing"
-  | "filtrarEvidenciaPorMarca";
+  | "filtrarEvidenciaPorMarca"
+  | "aindaValeRoteiro";
 
 export type ImagemEntrada = {
   base64: string;

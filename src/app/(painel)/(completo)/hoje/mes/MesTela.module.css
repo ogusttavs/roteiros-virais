@@ -1,0 +1,128 @@
+/**
+ * `/hoje/mes` (E39b, item e, design v2, `entrega/telas/Hoje.dc.html`, estado `calendario`).
+ * Reaproveita boa parte das classes de `HojeTela.module.css` (`hojeStyles` no `.tsx`): só o que é
+ * só do calendário mora aqui.
+ */
+
+.agendaMes {
+  display: grid;
+  gap: var(--espaco-6);
+  align-items: start;
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .agendaMes {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  }
+}
+
+.colunaMes {
+  display: grid;
+  gap: var(--espaco-4);
+  min-width: 0;
+}
+
+.cabecaMes {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.cabecaMes h1 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+}
+
+.cartaoMes {
+  gap: var(--espaco-3);
+}
+
+.gradeMes {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--espaco-1);
+}
+
+.nomeSemana {
+  text-align: center;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+  padding-bottom: var(--espaco-1);
+}
+
+.diaMes {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--espaco-1);
+  min-width: 0;
+  min-height: var(--altura-toque-lg);
+  border: var(--largura-borda) solid transparent;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-titulo);
+  font: var(--peso-medio) var(--tamanho-secundario) / 1 var(--fonte-mono);
+  cursor: pointer;
+}
+
+.diaMes:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.diaMes:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.diaMesFora {
+  color: var(--cor-texto-dica);
+  opacity: 0.5;
+}
+
+.diaMesPassado {
+  color: var(--cor-texto-dica);
+}
+
+.diaMesAtrasado {
+  color: var(--cor-atencao);
+  border-color: var(--cor-atencao);
+  border-style: dashed;
+}
+
+.diaMesHoje {
+  border-color: var(--cor-acao);
+}
+
+.diaMes[aria-pressed="true"] {
+  background: var(--cor-acao);
+  border-color: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
+.legendaAtrasado {
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 0.25rem;
+  border: var(--largura-borda) dashed var(--cor-atencao);
+}
+
+.peMes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  padding-top: var(--espaco-4);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.peMes p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  flex: 1 1 14rem;
+}

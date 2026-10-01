@@ -68,6 +68,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockOrganizarFalaBriefing(entrada);
     case "filtrarEvidenciaPorMarca":
       return mockFiltrarEvidenciaPorMarca(entrada);
+    case "aindaValeRoteiro":
+      return mockAindaValeRoteiro(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -729,6 +731,30 @@ function mockFiltrarEvidenciaPorMarca(entrada: string) {
     return { aprovados: [] };
   }
   return { aprovados: ids };
+}
+
+/**
+ * E39b, item (a): o candidato mais forte entre os que chegam da velocidade (o mesmo "Xx a
+ * velocidade normal da conta" que `aindaValeRoteiro.montarEntrada` escreve), determinístico por
+ * entrada, sem chave real. Abaixo do limiar, "continua valendo"; a partir dele, troca pelo mais
+ * forte dos candidatos (maior velocidade primeiro).
+ */
+const LIMIAR_MOCK_AINDA_VALE = 3;
+
+function mockAindaValeRoteiro(entrada: string) {
+  const candidatos = [...entrada.matchAll(/id (\d+): ([^(\n]+)\(([\d.]+)x/g)].map((m) => ({
+    id: Number(m[1]),
+    assunto: m[2].trim(),
+    velocidade: Number(m[3]),
+  }));
+  const maisForte = candidatos
+    .filter((c) => c.velocidade >= LIMIAR_MOCK_AINDA_VALE)
+    .sort((a, b) => b.velocidade - a.velocidade)[0];
+
+  if (!maisForte) {
+    return { valeAinda: true, videoId: null, motivo: "nada mais forte apareceu desde que o roteiro foi escrito" };
+  }
+  return { valeAinda: false, videoId: maisForte.id, motivo: `${maisForte.assunto} esta subindo mais forte agora` };
 }
 
 function mockAprenderCliente(entrada: string) {

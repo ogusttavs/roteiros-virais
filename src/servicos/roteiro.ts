@@ -7,7 +7,7 @@
  * versão seguinte com a instrução de resolver o motivo da reprovação sem
  * mudar o objetivo; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
@@ -20,6 +20,7 @@ import {
   roteiros,
   VALORES_QUEM_GRAVA,
   videosCliente,
+  type AindaValeResultado,
   type Cliente,
   type ConteudoRoteiro,
   type EstiloRoteiro,
@@ -33,6 +34,7 @@ import {
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import * as aindaValeIA from "@/ia/prompts/aindaValeRoteiro";
 import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
 import { NUMEROS_REGRAS_STORY, regrasDoReels } from "@/ia/prompts/regras-formato";
 import * as roteiroIA from "@/ia/prompts/roteiro";
@@ -53,6 +55,7 @@ import {
   formatarModeloNicho,
   modeloNichoAtual,
   reguaDoSetor,
+  subindoHojeComAnalise,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
 import {
@@ -1564,7 +1567,8 @@ export type DiaDaSemanaAgenda = {
  * (um ponto por Reels, um anel por Story, com a contagem de cada um quando há mais de um; revisão
  * do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então o Reels
  * também pode ter mais de um, como o Story já tinha). Só conta a ponta de cada série (reescrever
- * um roteiro não soma uma marca a mais no mesmo dia).
+ * um roteiro não soma uma marca a mais no mesmo dia). E39b, item (b): um atrasado arquivado sai
+ * da marca do dia dele, "sai da agenda" vale aqui também, não só na lista de atrasados.
  */
 export async function semanaDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaDaSemanaAgenda[]> {
   const segunda = segundaDaSemanaISO(dataReferencia);
@@ -1579,6 +1583,7 @@ export async function semanaDaAgenda(clienteId: number, dataReferencia: string):
         eq(roteiros.clienteId, clienteId),
         gte(roteiros.data, segunda),
         lte(roteiros.data, domingo),
+        isNull(roteiros.arquivadoEm),
         SEM_VERSAO_MAIS_NOVA,
       ),
     );
@@ -1625,27 +1630,17 @@ export type ItemAgendaDoDia = {
   momentoDoDia: MomentoDoDia | null;
   objetivo: Objetivo;
   duracaoS: number;
+  criadoEm: Date;
+  /** E39b, item (a): nulo até a pessoa tocar em "Conferir" (só preenchido no destaque do Reels). */
+  aindaValeResultado: AindaValeResultado | null;
 };
 export type AgendaDoDia = { reels: ItemAgendaDoDia[]; stories: ItemAgendaDoDia[] };
 
 const ORDEM_MOMENTO_DO_DIA: Record<MomentoDoDia, number> = { manha: 0, meio_dia: 1, fim_tarde: 2, noite: 3 };
 const ORDEM_STATUS_AGENDA: Record<ItemAgendaDoDia["status"], number> = { gerado: 0, gravado: 1, postado: 2 };
 
-/**
- * E39a, item 3: o que está marcado para um dia (o Reels e os Stories, na ordem da parte do dia).
- * Revisão do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então
- * `reels` é uma lista, como `stories` já era; o primeiro (a gravar antes de gravado antes de
- * postado, e dentro do mesmo estado o mais antigo primeiro) é o destaque da tela, os demais
- * entram embaixo dele, nas mesmas linhas que os Stories usam.
- */
-export async function agendaDoDia(clienteId: number, data: string): Promise<AgendaDoDia> {
-  const linhas = await db()
-    .select()
-    .from(roteiros)
-    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, data), SEM_VERSAO_MAIS_NOVA))
-    .orderBy(desc(roteiros.criadoEm));
-
-  const paraItem = (linha: RoteiroLinha): ItemAgendaDoDia => ({
+function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
+  return {
     id: linha.id,
     tema: linha.tema,
     titulo: corpoDoRoteiro(linha).titulo,
@@ -1653,7 +1648,27 @@ export async function agendaDoDia(clienteId: number, data: string): Promise<Agen
     momentoDoDia: linha.momentoDoDia,
     objetivo: linha.objetivo,
     duracaoS: corpoDoRoteiro(linha).duracaoS,
-  });
+    criadoEm: linha.criadoEm,
+    aindaValeResultado: aindaValeDeHoje(linha),
+  };
+}
+
+/**
+ * E39a, item 3: o que está marcado para um dia (o Reels e os Stories, na ordem da parte do dia).
+ * Revisão do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então
+ * `reels` é uma lista, como `stories` já era; o primeiro (a gravar antes de gravado antes de
+ * postado, e dentro do mesmo estado o mais antigo primeiro) é o destaque da tela, os demais
+ * entram embaixo dele, nas mesmas linhas que os Stories usam. E39b, item (b): um atrasado
+ * arquivado não aparece mais aqui, nem no dia que era dele (só continua no Histórico).
+ */
+export async function agendaDoDia(clienteId: number, data: string): Promise<AgendaDoDia> {
+  const linhas = await db()
+    .select()
+    .from(roteiros)
+    .where(
+      and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, data), isNull(roteiros.arquivadoEm), SEM_VERSAO_MAIS_NOVA),
+    )
+    .orderBy(desc(roteiros.criadoEm));
 
   const reelsOrdenados = linhas
     .filter((linha) => linha.formato === "reels")
@@ -1667,9 +1682,206 @@ export async function agendaDoDia(clienteId: number, data: string): Promise<Agen
     });
 
   return {
-    reels: reelsOrdenados.map(paraItem),
-    stories: storiesOrdenados.map(paraItem),
+    reels: reelsOrdenados.map(linhaParaItemAgenda),
+    stories: storiesOrdenados.map(linhaParaItemAgenda),
   };
+}
+
+export type ItemAtrasado = ItemAgendaDoDia & { data: string };
+
+/**
+ * E39b, item (b): o que estava marcado para um dia que já passou e continua "a gravar" (nunca
+ * gravado nem arquivado). Mais antigo primeiro, para o cartão mostrar o mais urgente no alto.
+ */
+export async function atrasados(clienteId: number, hoje: string): Promise<ItemAtrasado[]> {
+  const linhas = await db()
+    .select()
+    .from(roteiros)
+    .where(
+      and(
+        eq(roteiros.clienteId, clienteId),
+        eq(roteiros.status, "gerado"),
+        lt(roteiros.data, hoje),
+        isNull(roteiros.arquivadoEm),
+        SEM_VERSAO_MAIS_NOVA,
+      ),
+    )
+    .orderBy(roteiros.data);
+  return linhas.map((linha) => ({ ...linhaParaItemAgenda(linha), data: linha.data }));
+}
+
+/**
+ * E39b, item (b): "Arquivar" num atrasado. O roteiro continua existindo (aparece no Histórico),
+ * só sai da lista de atrasados e da agenda do dia que ele tinha.
+ */
+export async function arquivarRoteiro(roteiroId: number): Promise<void> {
+  await db().update(roteiros).set({ arquivadoEm: new Date() }).where(eq(roteiros.id, roteiroId));
+}
+
+/**
+ * E39b, item (b): "Mudar o dia" e "Gravar hoje" num atrasado usam a mesma troca, só muda qual
+ * data chega (a de hoje, no segundo caso). `validarData` já garante que não é no passado.
+ */
+export async function mudarDataRoteiro(roteiroId: number, novaData: string): Promise<void> {
+  const validada = validarData(novaData);
+  if (!validada) throw new ErroRoteiro("data invalida.");
+  await db().update(roteiros).set({ data: validada }).where(eq(roteiros.id, roteiroId));
+}
+
+/**
+ * Revisão do Fable no PR #91: a resposta de "ainda vale?" só vale no dia em que foi conferida. O
+ * que está subindo muda todo dia, e um roteiro remarcado para outro dia (ou conferido ontem e
+ * ainda não gravado) tem de poder ser conferido de novo; sem isto a primeira resposta ficava
+ * guardada para sempre.
+ */
+function aindaValeDeHoje(linha: {
+  aindaValeChecadoEm: Date | null;
+  aindaValeResultado: AindaValeResultado | null;
+}): AindaValeResultado | null {
+  if (!linha.aindaValeChecadoEm || !linha.aindaValeResultado) return null;
+  return hojeISO(linha.aindaValeChecadoEm) === hojeISO() ? linha.aindaValeResultado : null;
+}
+
+/** Quantos candidatos de "o que está subindo hoje" entram na checagem de "ainda vale?" (E39b, item a). */
+const LIMITE_CANDIDATOS_AINDA_VALE = 15;
+
+/**
+ * E39b, item (a): "ainda vale?", só para o Reels em destaque da Agenda, quando ele foi escrito
+ * antes de hoje e continua "a gravar". Um toque, nunca automático; o resultado fica guardado em
+ * `roteiros.aindaValeChecadoEm`/`aindaValeResultado`, então abrir a tela de novo no mesmo dia não
+ * repete a chamada de IA, só mostra o que já foi respondido.
+ */
+export async function conferirAindaVale(roteiroId: number): Promise<AindaValeResultado> {
+  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+  if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
+  const jaConferidoHoje = aindaValeDeHoje(atual);
+  if (jaConferidoHoje) return jaConferidoHoje;
+
+  const cliente = await clientePorId(atual.clienteId);
+  const candidatos = cliente?.nichoId
+    ? await subindoHojeComAnalise(cliente.nichoId, LIMITE_CANDIDATOS_AINDA_VALE)
+    : [];
+  const diasAtras = Math.max(1, Math.round((Date.now() - atual.criadoEm.getTime()) / DIA_MS));
+
+  let resultado: AindaValeResultado = { vale: true };
+  if (candidatos.length > 0) {
+    const geracaoInicio = Date.now();
+    const saida = await gerarEstruturado({
+      tarefa: "aindaValeRoteiro",
+      nivel: aindaValeIA.nivel,
+      effort: aindaValeIA.esforco,
+      schema: aindaValeIA.schema,
+      sistemaEstavel: aindaValeIA.montarSistemaEstavel(),
+      entrada: aindaValeIA.montarEntrada({
+        tema: atual.tema,
+        diasAtras,
+        candidatos: candidatos.map((c) => ({ id: c.id, assunto: c.assunto, velocidadeRelativa: c.velocidadeRelativa })),
+      }),
+    });
+
+    await registrarGeracao({
+      tarefa: "aindaValeRoteiro",
+      versaoPrompt: aindaValeIA.versao,
+      modelo: saida.modelo,
+      nivel: aindaValeIA.nivel,
+      clienteId: atual.clienteId,
+      entradas: { roteiroId, candidatosIds: candidatos.map((c) => c.id), diasAtras },
+      saida: saida.dados,
+      uso: {
+        tokensEntrada: saida.tokensEntrada,
+        tokensSaida: saida.tokensSaida,
+        tokensCacheLeitura: saida.tokensCacheLeitura,
+        tokensCacheEscrita: saida.tokensCacheEscrita,
+      },
+      duracaoMs: Date.now() - geracaoInicio,
+    });
+
+    // Nunca confia num id fora da lista oferecida (mesma defesa de `validarReferenciaDoModelo`).
+    const candidatoEscolhido =
+      !saida.dados.valeAinda && saida.dados.videoId !== null
+        ? candidatos.find((c) => c.id === saida.dados.videoId)
+        : undefined;
+    resultado = candidatoEscolhido
+      ? { vale: false, videoId: candidatoEscolhido.id, assunto: candidatoEscolhido.assunto }
+      : { vale: true };
+  }
+
+  await db()
+    .update(roteiros)
+    .set({ aindaValeChecadoEm: new Date(), aindaValeResultado: resultado })
+    .where(eq(roteiros.id, roteiroId));
+
+  return resultado;
+}
+
+export type DiaDoMes = {
+  data: string;
+  diaDoMes: number;
+  foraDoMes: boolean;
+  passado: boolean;
+  hoje: boolean;
+  atrasado: boolean;
+  marca: MarcaDiaAgenda;
+};
+
+function ultimoDiaDoMesISO(anoMes: string): string {
+  const [ano, mes] = anoMes.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes, 0, 12)).toISOString().slice(0, 10);
+}
+
+/**
+ * E39b, item (e), o calendário: o mês inteiro de `anoMes` ("AAAA-MM"), em semanas completas (os
+ * dias do mês vizinho que completam a primeira e a última semana entram marcados como
+ * `foraDoMes`, para a grade de 7 colunas nunca ficar com buraco). `atrasado` é por dia, não por
+ * item: um dia com qualquer roteiro "a gravar" de data passada (sem arquivar) entra marcado.
+ */
+export async function mesDaAgenda(clienteId: number, anoMes: string): Promise<DiaDoMes[]> {
+  const hoje = hojeISO();
+  const primeiroDiaDoMes = `${anoMes}-01`;
+  const ultimoDiaDoMes = ultimoDiaDoMesISO(anoMes);
+  const inicioGrade = segundaDaSemanaISO(primeiroDiaDoMes);
+  const fimGrade = somarDiasISO(segundaDaSemanaISO(ultimoDiaDoMes), 6);
+
+  const linhas = await db()
+    .select({
+      data: roteiros.data,
+      formato: roteiros.formato,
+      status: roteiros.status,
+    })
+    .from(roteiros)
+    .where(
+      and(
+        eq(roteiros.clienteId, clienteId),
+        gte(roteiros.data, inicioGrade),
+        lte(roteiros.data, fimGrade),
+        isNull(roteiros.arquivadoEm),
+        SEM_VERSAO_MAIS_NOVA,
+      ),
+    );
+
+  const porDia = new Map<string, { marca: MarcaDiaAgenda; atrasado: boolean }>();
+  for (const linha of linhas) {
+    const atual = porDia.get(linha.data) ?? { marca: { qtdReels: 0, qtdStories: 0 }, atrasado: false };
+    if (linha.formato === "reels") atual.marca.qtdReels += 1;
+    else atual.marca.qtdStories += 1;
+    if (linha.status === "gerado" && linha.data < hoje) atual.atrasado = true;
+    porDia.set(linha.data, atual);
+  }
+
+  const dias: DiaDoMes[] = [];
+  for (let data = inicioGrade; data <= fimGrade; data = somarDiasISO(data, 1)) {
+    const info = porDia.get(data);
+    dias.push({
+      data,
+      diaDoMes: Number(data.split("-")[2]),
+      foraDoMes: data < primeiroDiaDoMes || data > ultimoDiaDoMes,
+      passado: data < hoje,
+      hoje: data === hoje,
+      atrasado: info?.atrasado ?? false,
+      marca: info?.marca ?? { qtdReels: 0, qtdStories: 0 },
+    });
+  }
+  return dias;
 }
 
 /**

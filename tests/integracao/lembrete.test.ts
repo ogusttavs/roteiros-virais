@@ -451,6 +451,41 @@ describe("rodarLembrete", () => {
     expect(html).not.toContain("(a gravar)");
   });
 
+  it("marca com algo atrasado (E39b, item c): o e-mail traz o titulo antes de tudo", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarRoteiroDaAgenda(marca.id, "2026-09-01", { titulo: "ficou para tras", formato: "reels" });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain("ficou para tras");
+    expect(html.indexOf("ficou para tras")).toBeLessThan(html.indexOf("está pronto para gravar"));
+  });
+
+  it("marca sem nada atrasado: o e-mail nao tem bloco de atrasado", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain(`O tema de <strong>${marca.nome}</strong> está pronto para gravar.`);
+    expect(html).not.toContain("atrasado");
+  });
+
+  it("roteiro atrasado e arquivado nao entra no e-mail", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarRoteiroDaAgenda(marca.id, "2026-09-01", { titulo: "ficou para tras mas foi arquivado", formato: "reels" });
+    await db().update(roteiros).set({ arquivadoEm: AGORA }).where(eq(roteiros.clienteId, marca.id));
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).not.toContain("ficou para tras mas foi arquivado");
+  });
+
   it("roteiro marcado para outro dia nao entra no e-mail de hoje", async () => {
     const pessoa = await criarPessoa("11:00");
     const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
