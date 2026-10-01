@@ -191,6 +191,8 @@ afterEach(async () => {
   await db().delete(roteiros);
   await db().delete(videos).where(eq(videos.nichoId, nichoId));
   await db().delete(modelosNicho).where(eq(modelosNicho.nichoId, nichoId));
+  // E40, item 0: volta a regua do setor ao padrao (nulo), pro teste da regua nao vazar pros outros.
+  await db().update(nichos).set({ proporcaoBrasil: null }).where(eq(nichos.id, nichoId));
   evidenciaParaRoteiroMock.mockClear();
   evidenciaPorIdsMock.mockClear();
 });
@@ -365,6 +367,39 @@ describe("gerarRoteiro", () => {
 
     expect(roteiro.conteudo.evidencias).toEqual([]);
     expect(roteiro.conteudo.semEvidencia).toBe(true);
+  });
+
+  /** E40, item 0 (resto da revisao do PR #80): a evidencia do roteiro lia config.regras.proporcaoBrasil
+   * direto, nunca a regua do setor (M3); um setor com a proporcao ajustada no admin via Referencias, mas
+   * nao no roteiro. */
+  it("com a proporcao ajustada no setor (admin, M3), a evidencia do roteiro segue a regua do setor, nao o padrao global", async () => {
+    await db().update(nichos).set({ proporcaoBrasil: "0.100" }).where(eq(nichos.id, nichoId));
+    const clienteId = await criarCliente();
+    const idPt = await criarVideoEvidencia("regua-pt", "goteira depois da chuva forte", {
+      idioma: "pt",
+      foraDaCurva: 1,
+    });
+    const idsEn: number[] = [];
+    for (let i = 1; i <= 5; i += 1) {
+      idsEn.push(
+        await criarVideoEvidencia(`regua-en-${i}`, "goteira depois da chuva forte", {
+          idioma: "en",
+          foraDaCurva: 20 - i,
+        }),
+      );
+    }
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "goteira depois da chuva forte",
+      objetivo: "conversao",
+    });
+
+    // com o padrao global (0.7) o teto seria so 1 internacional (igual ao teste de cima, mesma
+    // forma de base); com a regua do setor em 0.1 (bem mais tolerante), os 5 entram todos.
+    const evidenciasEn = roteiro.conteudo.evidencias.filter((id) => idsEn.includes(id));
+    expect(evidenciasEn.length).toBeGreaterThan(1);
+    expect(roteiro.conteudo.evidencias).toContain(idPt);
   });
 
   it("tema livre sem nenhuma evidência no banco: roteiro honesto, sem referência e sem citar id (ajuste 2 da revisão do PR #17)", async () => {

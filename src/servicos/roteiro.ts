@@ -32,7 +32,7 @@ import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
-import { config, hojeISO } from "@/lib/config";
+import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -44,6 +44,7 @@ import {
   evidenciaPorIds,
   formatarModeloNicho,
   modeloNichoAtual,
+  reguaDoSetor,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
 import { aplicarProporcaoBrasil, classificarBrasil, preferirRedePrincipal } from "./proporcao-brasil";
@@ -655,9 +656,10 @@ async function gerarConteudo(
       marcaCitadaPorId(dados.momento?.marcaId),
     ]);
 
+  const { proporcaoBrasil } = await reguaDoSetor(nichoId);
   const evidencias = ehMomento
     ? []
-    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil, dados.cliente.redePrincipal, dados.estilo);
+    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, proporcaoBrasil, dados.cliente.redePrincipal, dados.estilo);
   const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
