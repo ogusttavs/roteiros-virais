@@ -438,6 +438,37 @@ describe("V9c, formato (Story)", () => {
     expect(roteiro.conteudo.porQueAssim).toEqual([]);
   });
 
+  it("em reels falado, porQueAssim preenchido pelo modelo com regra em texto livre e descartado, nao reprova (hotfix de 01/10/2026)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-formato-pqa", "mancha de vinho no estofado");
+
+    const implementacaoOriginal = gerarEstruturadoMock.getMockImplementation()!;
+    gerarEstruturadoMock.mockImplementation(async (params) => {
+      const resultado = await implementacaoOriginal(params);
+      if (params.tarefa !== "roteiro") return resultado;
+      return {
+        ...resultado,
+        dados: {
+          ...(resultado.dados as Record<string, unknown>),
+          porQueAssim: [{ regra: "Regra 1: todo roteiro diz onde gravar", motivo: "a cena e real" }],
+        },
+      } as typeof resultado;
+    });
+
+    try {
+      const roteiro = await gerarRoteiro(clienteId, {
+        origem: "livre",
+        textoTema: "mancha de vinho no estofado",
+        objetivo: "conversao",
+      });
+
+      expect(roteiro.formato).toBe("reels");
+      expect(roteiro.conteudo.porQueAssim).toEqual([]);
+    } finally {
+      gerarEstruturadoMock.mockImplementation(implementacaoOriginal);
+    }
+  });
+
   it("com formato story, grava a coluna e o conteudo em cartoes, com porQueAssim preenchido", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-2", "mancha de vinho no estofado");
