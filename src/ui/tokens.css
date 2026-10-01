@@ -379,6 +379,17 @@
   /** V15, item 6: a largura que o painel tem a 1280px; acima disso o conteudo para de
    * crescer e fica centrado no espaco a direita da barra lateral (design v2, passo 8). */
   --largura-painel: 59rem;
+  /**
+   * V15, itens 2, 3, 4 e 6b (design v2, passo 7): a largura do lado fixo ao lado da
+   * coluna de leitura, em Objetivo, Tema livre, Roteiro e Conta. Muda a partir de
+   * 1180px (o mesmo ponto em que a barra lateral nasce aberta por padrao,
+   * `(painel)/layout.module.css`; nao vale repetir como variavel porque `@media` nao
+   * le `var()`), e o sticky do bloco que gruda (Roteiro) comeca sempre no mesmo lugar,
+   * logo abaixo da barra de topo.
+   */
+  --largura-lado: 18rem;
+  --largura-lado-larga: 20rem;
+  --topo-lado-fixo: calc(3rem + var(--espaco-6));
   --largura-barra-lateral: 16rem;
   --largura-barra-recolhida: 4.5rem;
   --largura-folha: 38rem;

@@ -75,7 +75,7 @@
 @media (min-width: 1024px) {
   .miolo {
     max-width: none;
-    grid-template-columns: minmax(0, var(--largura-leitura)) 18rem;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
     column-gap: var(--espaco-8);
     align-items: start;
   }
@@ -94,13 +94,13 @@
   .cincoPontos {
     grid-column: 2;
     position: sticky;
-    top: calc(3rem + var(--espaco-6));
+    top: var(--topo-lado-fixo);
   }
 }
 
 @media (min-width: 1180px) {
   .miolo {
-    grid-template-columns: minmax(0, var(--largura-leitura)) 20rem;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado-larga);
     column-gap: var(--espaco-10);
   }
 }

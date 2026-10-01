@@ -14,7 +14,7 @@
   .pagina {
     max-width: none;
     display: grid;
-    grid-template-columns: minmax(0, var(--largura-leitura)) 18rem;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
     column-gap: var(--espaco-8);
     align-items: start;
   }
@@ -27,7 +27,7 @@
 
 @media (min-width: 1180px) {
   .pagina {
-    grid-template-columns: minmax(0, var(--largura-leitura)) 20rem;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado-larga);
     column-gap: var(--espaco-10);
   }
 }

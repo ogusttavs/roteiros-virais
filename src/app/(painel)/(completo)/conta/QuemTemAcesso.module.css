@@ -11,7 +11,7 @@
   .acessos {
     grid-column: 2;
     position: sticky;
-    top: calc(3rem + var(--espaco-6));
+    top: var(--topo-lado-fixo);
   }
 }
 
