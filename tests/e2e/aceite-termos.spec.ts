@@ -13,7 +13,7 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, membrosMarca, nichos, user } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-aceite-termos@exemplo.teste";
@@ -89,6 +89,57 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
 
     // Recarregar confirma que o aceite ficou gravado, nao so no estado da pagina.
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+  });
+
+  /** E37b, item 9: versao nova dos termos pede aceite de novo, mesmo de quem ja tinha aceitado uma versao anterior. */
+  test("versao nova dos termos mostra a folha de novo, mesmo para quem ja aceitou uma versao antiga", async ({
+    page,
+  }) => {
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+
+    await db().insert(user).values({
+      id: "e2e-aceite-termos-versao-antiga",
+      name: "[teste] Aceite Termos Versao Antiga",
+      email: "e2e-aceite-termos-versao-antiga@exemplo.teste",
+    });
+    await db()
+      .insert(account)
+      .values({
+        id: "e2e-aceite-termos-versao-antiga-credential",
+        issuer: "local:credential",
+        accountId: "e2e-aceite-termos-versao-antiga",
+        providerId: "credential",
+        userId: "e2e-aceite-termos-versao-antiga",
+        password: await hashPassword(SENHA),
+      });
+    const [cliente] = await db()
+      .insert(clientes)
+      .values({
+        usuarioId: "e2e-aceite-termos-versao-antiga",
+        nome: "[teste] Aceite Termos Versao Antiga",
+        nichoId: nicho.id,
+      })
+      .returning();
+    await db()
+      .insert(membrosMarca)
+      .values({ usuarioId: "e2e-aceite-termos-versao-antiga", clienteId: cliente.id, papel: "dono" });
+    await db()
+      .insert(briefings)
+      .values({ clienteId: cliente.id, completo: true });
+    // Aceitou uma versao bem antiga dos termos, de proposito: e exatamente o estado que este teste cobre.
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: "e2e-aceite-termos-versao-antiga", aceitouTermosEm: new Date("2026-01-01T00:00:00Z") });
+
+    await entrar(page, "e2e-aceite-termos-versao-antiga@exemplo.teste");
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).toBeVisible();
+    await page.getByRole("button", { name: "li e aceito" }).click();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+
     await page.reload();
     await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
   });

@@ -10,9 +10,18 @@ import { config } from "@/lib/config";
  * esta por extenso nas duas paginas, escrita sem a palavra generica que o
  * checar-texto reprova como jargao (regras-de-texto.ts, JARGAO).
  */
+/**
+ * E37b, item 9 (pendência desde a P2b, liberada pelo Gustavo em 01/10/2026):
+ * versão nova, com a linha sobre a prévia por reconhecimento de voz. Quem já
+ * tinha aceitado uma versão anterior (`aceitouTermosEm` mais antigo que
+ * esta data) vê a folha de aceite de novo no próximo acesso, como a regra
+ * dos termos já previa (`LayoutCompleto`, `(painel)/layout.tsx`).
+ */
+export const VERSAO_TERMOS_EM = new Date("2026-10-01T00:00:00Z");
+
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 4 de setembro de 2026",
+  atualizadoEm: "atualizado em 1 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -29,6 +38,7 @@ export const textosTermos = {
         titulo: "2. As suas respostas e os seus dados",
         paragrafos: [
           "O que você escreve no briefing é usado para escrever os seus roteiros e para acompanhar o seu negócio. Você pode editar as respostas quando quiser, em Briefing e em Conta.",
+          "Quando você responde falando, a prévia do texto que aparece na tela pode usar o reconhecimento de voz do seu aparelho ou navegador, que é um serviço do fabricante. O texto definitivo é sempre feito pela nossa transcrição.",
         ],
       },
       {
