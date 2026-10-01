@@ -3,7 +3,7 @@
 import { CalendarDays, ChevronRight, Mic, Pencil, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -63,6 +63,16 @@ export function CriarTela({
 
   const [planoDeHoje, setPlanoDeHoje] = useState(planoDeHojeInicial);
   const [pulandoId, setPulandoId] = useState<number | null>(null);
+
+  /**
+   * `useState(planoDeHojeInicial)` acima só lê a prop na primeira montagem: sem este efeito, o
+   * plano recém colado (`FolhaPlanejarDias`, `router.refresh()` sem navegação) nunca aparecia,
+   * porque Criar não desmonta nesse refresh (achado do e2e desta etapa, `plano.spec.ts`; mesma
+   * correção que `HojeTela.tsx` já tinha antes do bloco se mudar para cá).
+   */
+  useEffect(() => {
+    setPlanoDeHoje(planoDeHojeInicial);
+  }, [planoDeHojeInicial]);
 
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const [itemPlanoParaFolha, setItemPlanoParaFolha] = useState<ItemPlano | null>(null);
