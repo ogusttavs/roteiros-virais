@@ -75,7 +75,7 @@ export default async function Hoje({ searchParams }: Props) {
   ]);
 
   const proximoBruto =
-    agenda.reels === null && agenda.stories.length === 0 && ehHoje
+    agenda.reels.length === 0 && agenda.stories.length === 0 && ehHoje
       ? await proximoDiaMarcado(cliente.id, somarDiasISO(hoje, 1))
       : null;
   const proximoMarcado: ProximoMarcado | null = proximoBruto

@@ -158,6 +158,18 @@ test.describe("/hoje, a Agenda", () => {
     await expect(page).toHaveURL(new RegExp(`/criar\\?data=${hoje}$`));
   });
 
+  test("dia vazio com algo marcado para amanhã: o aviso 'o próximo marcado é amanhã' aparece (achado da revisão do PR #90, decisão 7: agenda.reels virou lista e o aviso nunca mais aparecia)", async ({
+    page,
+  }) => {
+    const { marcaId, email } = await criarMarca();
+    await criarRoteiro(marcaId, somarDias(hojeISO(), 1), { formato: "story", momentoDoDia: "manha", titulo: "story de amanha" });
+
+    await entrar(page, email);
+
+    await expect(page.getByRole("heading", { name: "Nada marcado para hoje" })).toBeVisible();
+    await expect(page.getByText("O próximo marcado é amanhã: um Story.")).toBeVisible();
+  });
+
   test("dia vazio que não é hoje: 'Criar roteiro' leva a data daquele dia, até o roteiro criado (decisão 5, PR #90)", async ({
     page,
   }) => {
