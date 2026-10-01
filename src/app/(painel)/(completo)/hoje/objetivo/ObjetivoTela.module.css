@@ -10,10 +10,20 @@
   padding-bottom: var(--espaco-10);
 }
 
+/**
+ * Achado comparando com a origin/main pixel a pixel: `.pagina` era o próprio
+ * `display: flex` com `gap: var(--espaco-1)` entre TODOS os filhos, incluindo
+ * entre `.temaEscolhido` e o resto; virando `display: contents` mais dois
+ * irmãos separados (este e `.colunaPrincipal`, cada um com o próprio `gap`
+ * interno), esse respiro entre os dois sumiu. `margin-bottom` devolve o
+ * mesmo espaço de sempre abaixo de 1024px (acima disso não faz diferença,
+ * o cartão vira sticky sozinho no lado).
+ */
 .temaEscolhido {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-1);
+  margin-bottom: var(--espaco-1);
 }
 
 /**
@@ -107,11 +117,19 @@
   color: var(--cor-texto);
 }
 
-/* Tela de erro: o tema e o objetivo escolhidos, um sobre o outro, acima da frase. */
+/**
+ * Tela de erro: o tema e o objetivo escolhidos, um sobre o outro, acima da frase.
+ * Mesmo achado do `.temaEscolhido` acima: na main `.escolha` vivia dentro de `.espera`
+ * (gap: var(--espaco-6) entre ele e a frase de erro); virando irmão separado por causa
+ * do lado (V15, item 2), esse respiro sumiu. `margin-bottom` devolve o espaço de sempre
+ * abaixo de 1024px (acima disso `.escolha` vira o lado sticky, sozinho, e a margem não
+ * aparece porque não há nada depois dela na mesma coluna).
+ */
 .escolha {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-4);
+  margin-bottom: var(--espaco-6);
 }
 
 /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (mesmo padrão de `ReferenciasTela.module.css`). */
