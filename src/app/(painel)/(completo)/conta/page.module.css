@@ -2,6 +2,36 @@
   max-width: var(--largura-leitura);
 }
 
+/**
+ * V15, item 6b (design v2, passo 8): do tablet deitado para cima, "Quem tem
+ * acesso" (QuemTemAcesso.module.css, `.acessos`) vira o lado; os dados, os
+ * perfis, o lembrete, o tema e o pé ficam na coluna (`.colunaPrincipal`, dois
+ * blocos porque "Quem tem acesso" fica entre eles no DOM). `.corpo`
+ * ((painel)/layout.module.css) já centra e para de crescer acima de 1280
+ * (item 6); aqui só falta soltar o teto de 42rem para a grade usar o espaço.
+ */
+@media (min-width: 1024px) {
+  .pagina {
+    max-width: none;
+    display: grid;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .colunaPrincipal {
+    grid-column: 1;
+    display: grid;
+  }
+}
+
+@media (min-width: 1180px) {
+  .pagina {
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado-larga);
+    column-gap: var(--espaco-10);
+  }
+}
+
 .titulo {
   margin: 0;
 }

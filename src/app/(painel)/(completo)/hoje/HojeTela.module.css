@@ -91,6 +91,13 @@
   }
 }
 
+/** V15, item 6: o Hoje é uma lista de decisão, fica em uma coluna (design v2, dúvida 4 do passo 8); só o teto do "monitor largo", sem lado. */
+@media (min-width: 1281px) {
+  .miolo {
+    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+  }
+}
+
 /* ---------- Cabeçalho da tela (HojeCabecalho) ---------- */
 
 .cabecalhoTela {

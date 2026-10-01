@@ -27,23 +27,33 @@ export default async function Conta() {
 
   return (
     <div className={styles.pagina}>
-      <h1 className={styles.titulo}>{textosConta.titulo}</h1>
-      <FormularioConta
-        nomeInicial={sessao.user.name}
-        email={sessao.user.email}
-        instagramInicial={perfis?.instagram ?? ""}
-        tiktokInicial={perfis?.tiktok ?? ""}
-        youtubeInicial={perfis?.youtube ?? ""}
-        temaInicial={cliente?.tema ?? "sistema"}
-        horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
-        nomeMarca={cliente?.nome ?? ""}
-      />
+      {/*
+        V15, item 6b (design v2, passo 8): "Quem tem acesso a esta marca" é o lado fixo a partir
+        de 1024px, começando no alto; os dados, os perfis, o lembrete, o tema e o pé (instalar,
+        informações do aparelho, sair) ficam na coluna. Mesma posição no DOM de sempre: nada muda
+        abaixo de 1024px.
+      */}
+      <div className={styles.colunaPrincipal}>
+        <h1 className={styles.titulo}>{textosConta.titulo}</h1>
+        <FormularioConta
+          nomeInicial={sessao.user.name}
+          email={sessao.user.email}
+          instagramInicial={perfis?.instagram ?? ""}
+          tiktokInicial={perfis?.tiktok ?? ""}
+          youtubeInicial={perfis?.youtube ?? ""}
+          temaInicial={cliente?.tema ?? "sistema"}
+          horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
+          nomeMarca={cliente?.nome ?? ""}
+        />
+      </div>
       {cliente ? (
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
       ) : null}
-      <InstalarNoCelular />
-      <InformacoesDoAparelho versaoPainel={config.gitSha} />
-      <BotaoSair />
+      <div className={styles.colunaPrincipal}>
+        <InstalarNoCelular />
+        <InformacoesDoAparelho versaoPainel={config.gitSha} />
+        <BotaoSair />
+      </div>
     </div>
   );
 }

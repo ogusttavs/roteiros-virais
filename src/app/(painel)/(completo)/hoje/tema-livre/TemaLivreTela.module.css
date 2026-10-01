@@ -63,6 +63,122 @@
   }
 }
 
+/**
+ * V15, item 3 (design v2, passo 7): do tablet deitado para cima, "O que você
+ * escreveu" (ou, na proposta, "Os cinco pontos que a gente olha") vira o
+ * lado fixo, e a coluna com a pergunta fica mais estreita que a largura de
+ * leitura cheia. `margin: 0 auto` acima já centraliza `.miolo`; falta só
+ * parar de crescer acima de 1280 (item 6), senão a largura da grade passava
+ * dos 944px do "monitor largo" e sobrava espaço para `margin: auto` centrar
+ * de mais.
+ */
+.colunaPrincipal {
+  display: contents;
+}
+
+/**
+ * Achado do Fable na revisão: o `display: contents` de baixo (sem `@media`)
+ * vinha DEPOIS deste bloco no arquivo, então ganhava a cascata mesmo acima
+ * de 1024px (mesma especificidade, ordem de origem decide) e desfazia o
+ * `display: grid` daqui; sem virar uma caixa própria, os filhos de
+ * `.colunaPrincipal` (o botão, o campo, o rodapé) ficavam soltos na grade
+ * de `.miolo`, sem `grid-column` nenhum, e a colocação automática jogava
+ * alguns deles na coluna do lado por acidente. A declaração sem `@media`
+ * agora vem antes, então esta aqui é que vence a partir de 1024px.
+ */
+@media (min-width: 1024px) {
+  .miolo {
+    max-width: none;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .cabecalhoTela {
+    grid-column: 1;
+  }
+
+  .colunaPrincipal {
+    display: grid;
+    gap: inherit;
+    grid-column: 1;
+  }
+
+  /*
+   * Achado da revisão seguinte do Fable: sem `grid-row` explícito, a colocação
+   * automática às vezes põe o lado na mesma linha do `.cabecalhoTela` (o
+   * título), e como essa linha estica para caber o mais alto dos dois, um
+   * lado mais alto que o título empurrava `.colunaPrincipal` (a pergunta, o
+   * campo) para baixo, com um vazio enorme no meio. `grid-row: 1 / span 20`
+   * atravessa da primeira linha até bem além da última (o lado é curto e
+   * gruda inteiro aqui, ao contrário do Roteiro), então o topo sempre alinha
+   * com o título sem competir pela linha dele. `span 20`, não `-1`: `-1`
+   * conta a partir do fim da grade EXPLÍCITA, e `.miolo` só tem linhas
+   * implícitas (sem `grid-template-rows`); sem grade explícita "-1" não
+   * aponta para a última linha de verdade (achado medindo no navegador no
+   * Roteiro, mesma pegadinha, `RoteiroTela.module.css`).
+   */
+  .temaProposto,
+  .cincoPontos {
+    grid-column: 2;
+    grid-row: 1 / span 20;
+    position: sticky;
+    top: var(--topo-lado-fixo);
+  }
+}
+
+@media (min-width: 1180px) {
+  .miolo {
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado-larga);
+    column-gap: var(--espaco-10);
+  }
+}
+
+@media (min-width: 1281px) {
+  .miolo {
+    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+  }
+}
+
+/** V15, item 3: só a partir de 1024px (a frase equivalente no celular é `.notaRodapeMobile`, dentro da coluna). */
+.cincoPontos {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .cincoPontos {
+    display: grid;
+    gap: var(--espaco-3);
+    background: var(--cor-superficie);
+    border: var(--largura-borda) solid var(--cor-borda);
+    border-radius: var(--raio-lg);
+    padding: var(--espaco-5);
+  }
+}
+
+.cincoPontosLista {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+/** A mesma frase de `.cincoPontos` continua no rodapé do campo abaixo de 1024px; some dali para cima. */
+.notaRodapeMobile {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+@media (min-width: 1024px) {
+  .notaRodapeMobile {
+    display: none;
+  }
+}
+
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-2);

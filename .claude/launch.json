@@ -78,6 +78,15 @@
         "AI_PROVIDER=mock PORT=3439 BETTER_AUTH_URL=http://localhost:3439 APP_URL=http://localhost:3439 DATABASE_URL=postgres://roteiros:roteiros@localhost:5432/roteiros_dev npm run dev"
       ],
       "port": 3439
+    },
+    {
+      "name": "dev-mock-v15",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "AI_PROVIDER=mock PORT=3450 BETTER_AUTH_URL=http://localhost:3450 APP_URL=http://localhost:3450 DATABASE_URL=postgres://roteiros:roteiros@localhost:5432/roteiros_dev npm run dev"
+      ],
+      "port": 3450
     }
   ]
 }

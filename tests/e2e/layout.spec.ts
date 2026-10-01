@@ -83,8 +83,24 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** Nenhuma rolagem horizontal e nenhum alvo de toque abaixo de 44 px, na largura atual. */
+/**
+ * Nenhuma rolagem horizontal e nenhum alvo de toque abaixo de 44 px, na largura atual.
+ *
+ * Achado investigando por que a CI reprovou os chips de rede de `ListaPerfisCitados` (29 px) no
+ * PR #85 e o mesmo teste passou local, duas vezes (duas pessoas): `BlocoPerfisCitados` busca a
+ * lista de perfis citados numa Server Action, dentro de um `useEffect`, e devolve `null` até ela
+ * chegar. Sem esperar isso, `conferirLayout` mede a tela ANTES de esses chips existirem no DOM, e
+ * uma corrida vazia nunca acusa alvo pequeno (a lista de achados fica vazia por não ter achado
+ * nada, não por estar tudo certo). Reproduzido: com `waitForLoadState("networkidle")antes, o
+ * mesmo teste reprova com os mesmos 29 px que a CI relatou; sem a espera, zero chips medidos. A
+ * diferença não era local vs CI (fonte, SO, dado do seed): era essa corrida, que calha de ter mais
+ * chance de perder (os chips não chegam a tempo) numa maquina rapida que builda e sobe o servidor
+ * de producao local, e mais chance de ganhar numa CI mais lenta. `networkidle` aqui, uma vez só,
+ * cobre qualquer tela com busca assíncrona parecida, não só esta.
+ */
 async function conferirLayout(page: Page) {
+  await page.waitForLoadState("networkidle");
+
   const semRolagemHorizontal = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
   );
@@ -747,6 +763,202 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       await page.goto("/conta");
       await expect(page.getByRole("heading", { name: "Conta" })).toBeVisible();
       await conferirLayout(page);
+    });
+  }
+
+  /**
+   * V15, item 7, com a correção pedida pelo Fable na revisão (os testes anteriores passaram com
+   * três telas quebradas: só conferiam "sem rolagem horizontal", que não pega a coluna de leitura
+   * espremida nem o lado sobrepondo nada). Mede de verdade: a coluna de leitura tem pelo menos
+   * 30rem (achado da revisão: `.miolo` do Roteiro ainda limitava tudo a `--largura-leitura`,
+   * deixando a coluna com uns 230px); o lado nunca sobrepõe a coluna (achado: um `display: contents`
+   * sem `@media` depois do bloco de 1024px, no Tema livre, desfazia o `display: grid` da coluna
+   * principal, e o campo caía na coluna do lado); e a largura do conteúdo a 1920 é a mesma de 1280
+   * (achado: `padding-inline` com porcentagem resolve contra a barra inteira, barra lateral
+   * incluída, não contra o que sobra depois dela — `.corpo` encolhia para uns 690px em vez de
+   * ficar nos 944 do "monitor largo"; a correção trocou para `max-width` mais `margin-inline: auto`).
+   */
+  const MINIMO_COLUNA_LEITURA = 480; // 30rem
+
+  async function medirColunaELado(page: Page, seletorColuna: string, seletorLado: string) {
+    const coluna = await page.locator(seletorColuna).first().boundingBox();
+    const lado = await page.locator(seletorLado).first().boundingBox();
+    expect(coluna, `coluna de leitura (${seletorColuna}) não encontrada`).not.toBeNull();
+    expect(lado, `lado (${seletorLado}) não encontrado`).not.toBeNull();
+    expect(coluna!.width, "coluna de leitura abaixo de 30rem (480px)").toBeGreaterThanOrEqual(
+      MINIMO_COLUNA_LEITURA,
+    );
+    expect(lado!.x, "o lado sobrepõe a coluna de leitura").toBeGreaterThanOrEqual(
+      coluna!.x + coluna!.width,
+    );
+    return coluna!.width;
+  }
+
+  const TELAS_COM_LADO = [
+    {
+      tela: "Objetivo",
+      ir: async (page: Page) =>
+        page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`),
+      esperar: (page: Page) => page.getByText("Tema escolhido", { exact: false }).waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="temaEscolhido"]',
+      // Sem `.cabecalhoTela` próprio: `.colunaPrincipal` já começa com o título, é o próprio topo da coluna.
+      seletorTopoColuna: '[class*="colunaPrincipal"]',
+      seletorTopoLado: '[class*="temaEscolhido"]',
+    },
+    {
+      tela: "Tema livre",
+      ir: async (page: Page) => page.goto("/hoje/tema-livre"),
+      esperar: (page: Page) => page.getByText("Os cinco pontos que a gente olha").waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="cincoPontos"]',
+      seletorTopoColuna: '[class*="cabecalhoTela"]',
+      seletorTopoLado: '[class*="cincoPontos"]',
+    },
+    {
+      tela: "Roteiro",
+      ir: async (page: Page) => page.goto(`/roteiros/${roteiroId}`),
+      esperar: (page: Page) => page.getByRole("heading", { name: "Como editar" }).waitFor(),
+      seletorColuna: '[class*="blocos"]',
+      seletorLado: '[class*="ladoGrudado"]',
+      seletorTopoColuna: '[class*="cabecalhoTela"]',
+      // "De onde veio", não "Como editar": é o bloco do lado que fica na primeira linha,
+      // ao lado do título (item 4 do plano); "Como editar" gruda abaixo dele de propósito.
+      seletorTopoLado: '[class*="ladoDeOndeVeio"]',
+    },
+    {
+      tela: "Conta",
+      ir: async (page: Page) => page.goto("/conta"),
+      esperar: (page: Page) => page.getByText("Quem tem acesso a esta marca").waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="acessos"]',
+      // Sem `.cabecalhoTela` próprio: o primeiro `.colunaPrincipal` já começa com o título.
+      seletorTopoColuna: '[class*="colunaPrincipal"]',
+      seletorTopoLado: '[class*="acessos"]',
+    },
+  ];
+
+  for (const largura of [1024, 1280, 1920]) {
+    for (const { tela, ir, esperar, seletorColuna, seletorLado } of TELAS_COM_LADO) {
+      test(`${tela}, a coluna tem 30rem e o lado não sobrepõe, em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        await medirColunaELado(page, seletorColuna, seletorLado);
+        await conferirLayout(page);
+      });
+    }
+  }
+
+  /**
+   * Revisão seguinte do Fable, achado lendo o diff com as próprias capturas
+   * (`.revisao/fotos-pr86b/`): a colocação automática da grade compartilhava
+   * linha entre coluna e lado, e um bloco alto de um lado esticava a linha do
+   * outro. Corrigido dando linha explícita aos blocos do lado
+   * (`RoteiroTela.module.css`, `TemaLivreTela.module.css`,
+   * `ObjetivoTela.module.css`, `QuemTemAcesso.module.css`); estes três testes
+   * provam por medida, não só olhando a tela.
+   */
+  const TOLERANCIA_ALINHAMENTO_PX = 8;
+  const VAZIO_MAXIMO_COLUNA_PX = 64;
+
+  for (const largura of [1024, 1280, 1920]) {
+    for (const { tela, ir, esperar, seletorTopoColuna, seletorTopoLado } of TELAS_COM_LADO) {
+      test(`${tela}: o topo da coluna e o topo do lado alinham (até 8px), em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        const topoColuna = await page.locator(seletorTopoColuna).first().boundingBox();
+        const topoLado = await page.locator(seletorTopoLado).first().boundingBox();
+        expect(topoColuna, `topo da coluna (${seletorTopoColuna}) não encontrado`).not.toBeNull();
+        expect(topoLado, `topo do lado (${seletorTopoLado}) não encontrado`).not.toBeNull();
+        expect(
+          Math.abs(topoColuna!.y - topoLado!.y),
+          `coluna no y=${topoColuna!.y}, lado no y=${topoLado!.y}`,
+        ).toBeLessThanOrEqual(TOLERANCIA_ALINHAMENTO_PX);
+      });
+    }
+
+    for (const { tela, ir, esperar, seletorColuna } of TELAS_COM_LADO) {
+      test(`${tela}: nenhum vazio maior que 64px entre os blocos da coluna, em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        const vazios = await page.evaluate((sel) => {
+          const referencia = document.querySelector(sel);
+          if (!referencia) return null;
+          const container = referencia.parentElement;
+          if (!container) return null;
+          const blocosDaColuna = Array.from(container.children)
+            .filter((el) => getComputedStyle(el).gridColumnStart === "1")
+            .map((el) => el.getBoundingClientRect())
+            .sort((a, b) => a.top - b.top);
+          const vazios: number[] = [];
+          for (let i = 1; i < blocosDaColuna.length; i++) {
+            vazios.push(blocosDaColuna[i].top - blocosDaColuna[i - 1].bottom);
+          }
+          return vazios;
+        }, seletorColuna);
+        expect(vazios, `coluna (${seletorColuna}) ou o pai dela não encontrados`).not.toBeNull();
+        for (const vazio of vazios!) {
+          expect(vazio, `vazios entre blocos da coluna: ${JSON.stringify(vazios)}`).toBeLessThanOrEqual(
+            VAZIO_MAXIMO_COLUNA_PX,
+          );
+        }
+      });
+    }
+  }
+
+  /**
+   * "Como editar" (`.ladoGrudado`) logo abaixo de "De onde veio" (`.ladoDeOndeVeio`), sem
+   * sobrepor e sem vazio grande: é o próprio defeito que a revisão achou (os dois caindo na
+   * mesma posição, sobrepostos, quando `.ladoGrudado` não atravessava a linha certa).
+   */
+  for (const largura of [1024, 1280, 1920]) {
+    test(`Roteiro: "Como editar" vem logo abaixo de "De onde veio", sem sobrepor, em ${largura}px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await page.getByRole("heading", { name: "Como editar" }).waitFor();
+      const deOndeVeio = await page.locator('[class*="ladoDeOndeVeio"]').first().boundingBox();
+      const comoEditar = await page.locator('[class*="ladoGrudado"]').first().boundingBox();
+      expect(deOndeVeio, '"De onde veio" não encontrado').not.toBeNull();
+      expect(comoEditar, '"Como editar" não encontrado').not.toBeNull();
+      const vazio = comoEditar!.y - (deOndeVeio!.y + deOndeVeio!.height);
+      expect(vazio, `sobrepõe "De onde veio" em ${-vazio}px`).toBeGreaterThanOrEqual(0);
+      expect(vazio, `vazio de ${vazio}px entre "De onde veio" e "Como editar"`).toBeLessThanOrEqual(
+        VAZIO_MAXIMO_COLUNA_PX,
+      );
+    });
+  }
+
+  /**
+   * "A largura do conteúdo a 1920 é igual à de 1280" (achado 2 da revisão): mede a mesma coluna nas
+   * duas larguras e confere que a diferença é só arredondamento de viewport, não a grade encolhendo.
+   */
+  const TOLERANCIA_PX = 20;
+  for (const { tela, ir, esperar, seletorColuna } of TELAS_COM_LADO) {
+    test(`${tela}: a coluna de leitura a 1920px tem a mesma largura que a 1280px`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
+      await entrar(page);
+      await ir(page);
+      await esperar(page);
+      const coluna1280 = await page.locator(seletorColuna).first().boundingBox();
+      expect(coluna1280, `coluna de leitura (${seletorColuna}) não encontrada a 1280px`).not.toBeNull();
+
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await page.waitForTimeout(100);
+      const coluna1920 = await page.locator(seletorColuna).first().boundingBox();
+      expect(coluna1920, `coluna de leitura (${seletorColuna}) não encontrada a 1920px`).not.toBeNull();
+      expect(
+        Math.abs(coluna1920!.width - coluna1280!.width),
+        `coluna de leitura mudou de largura entre 1280px (${coluna1280!.width}) e 1920px (${coluna1920!.width})`,
+      ).toBeLessThanOrEqual(TOLERANCIA_PX);
     });
   }
 
