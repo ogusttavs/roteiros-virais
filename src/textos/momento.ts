@@ -49,4 +49,6 @@ export const textosMomento = {
   objetivoDoVideoOpcional: "(opcional)",
   objetivoDoVideoAjuda: "É o recado deste vídeo, não o objetivo da marca. Vai no alto do roteiro.",
   objetivoDoVideoPlaceholder: "Ex.: avisar que estou na feira escolhendo o produto novo da loja",
+  /** V12c, item 3, a E37b: troca só deste vídeo, sem mudar o briefing; as opções vêm de `config/briefing.ts`. */
+  quemAparece: "Quem aparece neste vídeo",
 };

@@ -14,7 +14,7 @@ import {
   type ItemPlano,
   type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro, validarEstilo, validarFormato } from "@/servicos/roteiro";
+import { ErroRoteiro, validarEstilo, validarFormato, validarQuemAparece } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
@@ -59,6 +59,8 @@ export type DadosAceitarPlano = {
   marcaId?: number;
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
   objetivoDoVideo?: string;
+  /** V12c, item 3, a E37b: troca só deste vídeo; chega como texto livre, `validarQuemAparece` confere. */
+  quemAparece?: string;
 };
 
 /**
@@ -94,6 +96,7 @@ export async function aceitarPlanoAction(itemId: number, dados: DadosAceitarPlan
     estilo: validarEstilo(dados.estilo),
     marcaId: dados.marcaId,
     objetivoDoVideo: dados.objetivoDoVideo,
+    quemAparece: validarQuemAparece(dados.quemAparece),
   });
   return { id: roteiro.id };
 }

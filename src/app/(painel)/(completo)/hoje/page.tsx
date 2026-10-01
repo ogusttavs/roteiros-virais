@@ -179,6 +179,8 @@ export default async function Hoje() {
       planoDeHoje={planoDeHoje}
       planoQueVem={planoOsDiasQueVem}
       redePrincipal={cliente.redePrincipal}
+      tipo={cliente.tipo}
+      quemGravaPadrao={cliente.quemGrava}
     />
   );
 }

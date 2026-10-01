@@ -17,6 +17,7 @@ import {
   FORMATOS_ROTEIRO,
   geracoesIA,
   roteiros,
+  VALORES_QUEM_GRAVA,
   videosCliente,
   type Cliente,
   type ConteudoRoteiro,
@@ -25,6 +26,7 @@ import {
   type Momento,
   type Objetivo,
   type Plataforma,
+  type QuemGrava,
   type TipoAbertura,
 } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
@@ -77,6 +79,15 @@ export function validarEstilo(valor: string | undefined): EstiloRoteiro | undefi
     throw new ErroRoteiro("estilo de roteiro invalido.");
   }
   return valor as EstiloRoteiro;
+}
+
+/** V12c, item 3: mesmo cuidado de `validarFormato`, para quem aparece que chega como texto livre do navegador. */
+export function validarQuemAparece(valor: string | undefined): QuemGrava | undefined {
+  if (valor === undefined || valor === "") return undefined;
+  if (!(VALORES_QUEM_GRAVA as readonly string[]).includes(valor)) {
+    throw new ErroRoteiro("quem aparece invalido.");
+  }
+  return valor as QuemGrava;
 }
 
 const LIMITE_EVIDENCIA = 8;
@@ -273,7 +284,21 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * juntos); este só serve a origem `sugerido` e `livre`.
    */
   objetivoDoVideo?: string;
+  /**
+   * V12c, item 3, a E37b: quem aparece NESTE vídeo, só quando a pessoa trocou na folha
+   * "Gravar agora" ou no passo do objetivo. Ausente usa o `quemGrava` do briefing
+   * (`resolverQuemAparece`, abaixo); a troca vale só para este roteiro, o briefing não muda.
+   */
+  quemAparece?: QuemGrava;
 };
+
+/**
+ * V12c, item 3: o valor efetivo para ESTE roteiro, nunca escrito no cliente. `undefined` quando
+ * nem o roteiro nem o briefing têm um valor (cliente nunca passou pela tela de dados fixos).
+ */
+function resolverQuemAparece(override: QuemGrava | undefined, cliente: Cliente): QuemGrava | undefined {
+  return override ?? cliente.quemGrava ?? undefined;
+}
 
 /**
  * A camada exclusiva do cliente (alcance, região, concorrentes, perfis
@@ -650,6 +675,8 @@ type MontarERoteiroDados = {
   estilo: EstiloRoteiro;
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional; entra no prompt acima do tema. */
   objetivoDoVideo?: string;
+  /** V12c, item 3, a E37b: override deste roteiro; `undefined` usa o `quemGrava` do cliente. */
+  quemAparece?: QuemGrava;
   observacao?: string;
   evidenciasPrevistas: number[];
   /**
@@ -684,6 +711,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   tipoAbertura: TipoAbertura | null;
   /** V9a, item 1: o `temaCurto` que o modelo devolveu, só com `momento`; `gerarRoteiro` usa para regravar `tema`. */
   temaCurto: string | null;
+  /** V12c, item 3: o valor efetivo (override deste roteiro, ou o `quemGrava` do cliente), para `gerarRoteiro` gravar. */
+  quemAparece: QuemGrava | undefined;
 }> {
   if (!dados.cliente.nichoId) {
     throw new ErroRoteiro("este cliente ainda nao tem um nicho definido.");
@@ -763,6 +792,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       ? null
       : tipoAberturaAnterior;
 
+  const quemApareceResolvido = resolverQuemAparece(dados.quemAparece, dados.cliente);
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -777,6 +808,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       regrasCliente,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,
+      quemAparece: quemApareceResolvido,
       formato: dados.formato,
       estilo: dados.estilo,
     }),
@@ -902,6 +934,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     referenciaVideoId: referenciaEscolhida?.videoId ?? null,
     tipoAbertura: saida.tipoAbertura,
     temaCurto: saida.temaCurto,
+    quemAparece: quemApareceResolvido,
   };
 }
 
@@ -930,6 +963,7 @@ export async function gerarRoteiro(
     formato,
     estilo,
     objetivoDoVideo: params.objetivoDoVideo,
+    quemAparece: params.quemAparece,
     observacao: params.observacao,
     evidenciasPrevistas,
     momento,
@@ -949,6 +983,8 @@ export async function gerarRoteiro(
       estilo,
       // E40, item 2: da origem momento, o mesmo campo que já está dentro de `momento`.
       objetivoDoVideo: params.objetivoDoVideo ?? momento?.objetivoDoVideo,
+      // V12c, item 3: só grava quando é diferente do padrão do cliente, para a troca por vídeo nunca sobrescrever o briefing.
+      quemAparece: params.quemAparece ?? null,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -1007,6 +1043,8 @@ export async function reprovarERescrever(
     estilo: atual.estilo,
     // E40, item 2: idem, a reescrita mantém o recado do vídeo da versão anterior.
     objetivoDoVideo: atual.objetivoDoVideo ?? undefined,
+    // V12c, item 3: idem, a reescrita mantém quem aparece da versão anterior.
+    quemAparece: atual.quemAparece ?? undefined,
     evidenciasPrevistas: atual.conteudo.evidencias,
     anguloParaEvitar: {
       gancho: atual.conteudo.gancho,
@@ -1030,6 +1068,7 @@ export async function reprovarERescrever(
       formato: atual.formato,
       estilo: atual.estilo,
       objetivoDoVideo: atual.objetivoDoVideo,
+      quemAparece: atual.quemAparece,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,

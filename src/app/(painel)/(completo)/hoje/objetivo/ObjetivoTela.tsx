@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import type { EstiloRoteiro, FormatoRoteiro, Objetivo } from "@/db/schema";
+import { dadosFixosDoBriefing } from "@/config/briefing";
+import type { EstiloRoteiro, FormatoRoteiro, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
@@ -36,10 +37,15 @@ type Props = {
   origem: OrigemRoteiro;
   temaEscolhidoTexto: string;
   objetivoRecomendado: Objetivo | null;
+  tipo: TipoMarca;
+  /** V12c, item 3, a E37b: o `quemGrava` do briefing, para o controle já nascer marcado nele. */
+  quemGravaPadrao: QuemGrava | null;
 };
 
 /** `/hoje/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
-export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }: Props) {
+export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, tipo, quemGravaPadrao }: Props) {
+  // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
+  const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
   const router = useRouter();
   const [escolhido, setEscolhido] = useState<Objetivo | null>(null);
   // V9c, item 1: enquanto a pessoa nao mexe no controle, o formato segue o objetivo escolhido
@@ -55,6 +61,8 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
   const [estiloTocado, setEstiloTocado] = useState(false);
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
   const [objetivoDoVideo, setObjetivoDoVideo] = useState("");
+  /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
+  const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
@@ -99,7 +107,14 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        const { id } = await gerarRoteiroAction(origem, escolhido, formato, estilo, objetivoDoVideo.trim() || undefined);
+        const { id } = await gerarRoteiroAction(
+          origem,
+          escolhido,
+          formato,
+          estilo,
+          objetivoDoVideo.trim() || undefined,
+          quemAparece || undefined,
+        );
         if (saiuRef.current) return;
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
@@ -223,6 +238,22 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
         </div>
         {!estiloTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.estiloAjuda[estilo]}</p> : null}
       </div>
+
+      {opcoesQuemAparece.fixoEmPropriaPessoa ? null : (
+        <div className={styles.grupoFormato}>
+          <span className={styles.rotulo}>{textosObjetivo.quemAparece}</span>
+          <div role="radiogroup" aria-label={textosObjetivo.quemAparece} className={styles.opcoes}>
+            {opcoesQuemAparece.opcoes.map((opcao) => (
+              <OpcaoObjetivo
+                key={opcao.valor}
+                titulo={opcao.rotulo}
+                marcada={quemAparece === opcao.valor}
+                onEscolher={() => setQuemAparece(opcao.valor)}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <AreaTexto
         rotulo={`${textosObjetivo.objetivoDoVideo} ${textosObjetivo.objetivoDoVideoOpcional}`}

@@ -39,6 +39,8 @@ export default async function TemaLivre({ searchParams }: Props) {
       temaInicial={tema ?? rascunho ?? ""}
       objetivoRecomendado={objetivoRecomendado}
       outrasMarcas={outrasMarcas}
+      tipo={cliente.tipo}
+      quemGravaPadrao={cliente.quemGrava}
     />
   );
 }

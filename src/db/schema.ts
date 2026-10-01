@@ -137,6 +137,7 @@ export const nichos = pgTable("nichos", {
  * dizer que e fixo ("pode mudar a cada video. aqui e so o mais comum").
  */
 export type QuemGrava = "propria_pessoa" | "pessoa_e_equipe" | "equipe" | "outra_pessoa";
+export const VALORES_QUEM_GRAVA = ["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"] as const;
 
 /** V12c, item 1: onde estao os clientes do negocio, substitui cidade/bairro na tela. */
 export type Alcance = "brasil" | "local";

@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { CartaoStory, ConteudoRoteiro, TipoAbertura } from "@/db/schema";
 
-import { blocosParaLeitura, escolherTipoAbertura, formatarCamadaExclusiva, type RoteiroLinha } from "./roteiro";
+import {
+  blocosParaLeitura,
+  ErroRoteiro,
+  escolherTipoAbertura,
+  formatarCamadaExclusiva,
+  validarQuemAparece,
+  type RoteiroLinha,
+} from "./roteiro";
 
 const CAMADA_VAZIA = { concorrentes: [], termos: [], perfisAdmirados: [] };
 
@@ -242,5 +249,23 @@ describe("blocosParaLeitura, o campo mostrar", () => {
     for (const bloco of blocosParaLeitura(roteiro)) {
       expect(bloco.mostrar).toEqual([]);
     }
+  });
+});
+
+/** V12c, item 3, a E37b: mesmo cuidado de validarFormato/validarEstilo para o valor vindo do navegador. */
+describe("validarQuemAparece", () => {
+  it("undefined ou vazio voltam undefined (usa o quemGrava do cliente)", () => {
+    expect(validarQuemAparece(undefined)).toBeUndefined();
+    expect(validarQuemAparece("")).toBeUndefined();
+  });
+
+  it("aceita os quatro valores", () => {
+    for (const valor of ["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]) {
+      expect(validarQuemAparece(valor)).toBe(valor);
+    }
+  });
+
+  it("recusa valor fora da lista", () => {
+    expect(() => validarQuemAparece("dono-disfarcado")).toThrow(ErroRoteiro);
   });
 });

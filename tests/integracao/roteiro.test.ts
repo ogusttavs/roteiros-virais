@@ -1292,3 +1292,52 @@ describe("editarRoteiro (E40, item 1)", () => {
     expect(jobs.rows.length).toBe(1);
   });
 });
+
+/** V12c, item 3, a E37b: quem aparece neste vídeo, trocável por roteiro sem mudar o briefing. */
+describe("gerarRoteiro e reprovarERescrever, quemAparece (V12c, item 3)", () => {
+  it("sem override, a coluna do roteiro fica nula (o prompt usa o quemGrava do cliente, sem gravar nele)", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ quemGrava: "equipe" }).where(eq(clientes.id, clienteId));
+    await criarVideoEvidencia("ev-quem-aparece-sem-override", "mancha de graxa no carpete");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de graxa no carpete",
+      objetivo: "engajamento",
+    });
+
+    expect(roteiro.quemAparece).toBeNull();
+  });
+
+  it("com override, a coluna do roteiro grava o valor deste video, sem tocar no cliente", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-quem-aparece-override", "cheiro de mofo no estofado do carro");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo no estofado do carro",
+      objetivo: "engajamento",
+      quemAparece: "outra_pessoa",
+    });
+
+    expect(roteiro.quemAparece).toBe("outra_pessoa");
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    expect(cliente?.quemGrava).toBeNull();
+  });
+
+  it("reprovarERescrever mantem o quemAparece da versao anterior", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-quem-aparece-reescrita", "sofa amassado depois da limpeza");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "sofa amassado depois da limpeza",
+      objetivo: "engajamento",
+      quemAparece: "equipe",
+    });
+
+    const reescrito = await reprovarERescrever(roteiro.id, ["gancho_fraco"]);
+
+    expect(reescrito.quemAparece).toBe("equipe");
+  });
+});

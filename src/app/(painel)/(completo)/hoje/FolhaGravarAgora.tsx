@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import type { EstiloRoteiro, FormatoRoteiro, Objetivo } from "@/db/schema";
+import { dadosFixosDoBriefing } from "@/config/briefing";
+import type { EstiloRoteiro, FormatoRoteiro, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
@@ -72,6 +73,10 @@ type Props = {
    * `valoresIniciais` existe (o item do plano manda).
    */
   formatoInicial?: FormatoRoteiro;
+  /** V12c, item 3, a E37b: pessoa tem "quem aparece" fixo (config/briefing.ts), o controle nem aparece. */
+  tipo: TipoMarca;
+  /** O `quemGrava` do briefing, para o controle já nascer marcado nele. */
+  quemGravaPadrao: QuemGrava | null;
 };
 
 /**
@@ -90,9 +95,13 @@ export function FolhaGravarAgora({
   planoItemId,
   valoresIniciais,
   formatoInicial,
+  tipo,
+  quemGravaPadrao,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
+  // V12c, item 3: pessoa tem "quem aparece" fixo; o controle nem aparece.
+  const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
 
   const [transcricao, setTranscricao] = useState<string | null>(null);
 
@@ -115,6 +124,8 @@ export function FolhaGravarAgora({
   const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
   const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? "");
+  /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
+  const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
@@ -186,6 +197,7 @@ export function FolhaGravarAgora({
               estilo,
               marcaId,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
+              quemAparece: quemAparece || undefined,
             })
           : await gerarRoteiroMomentoAction({
               onde,
@@ -197,6 +209,7 @@ export function FolhaGravarAgora({
               marcaId,
               transcricao: transcricao ?? undefined,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
+              quemAparece: quemAparece || undefined,
             });
       // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
       // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
@@ -324,6 +337,22 @@ export function FolhaGravarAgora({
           </div>
           {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
         </div>
+
+        {opcoesQuemAparece.fixoEmPropriaPessoa ? null : (
+          <div className={styles.grupoFormato}>
+            <span className={styles.rotuloGrupo}>{textosMomento.quemAparece}</span>
+            <div role="radiogroup" aria-label={textosMomento.quemAparece} className={styles.opcoesObjetivo}>
+              {opcoesQuemAparece.opcoes.map((opcao) => (
+                <OpcaoObjetivo
+                  key={opcao.valor}
+                  titulo={opcao.rotulo}
+                  marcada={quemAparece === opcao.valor}
+                  onEscolher={() => setQuemAparece(opcao.valor)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className={styles.grupoFormato}>
           <span className={styles.rotuloGrupo}>{textosMomento.estilo}</span>

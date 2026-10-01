@@ -248,18 +248,44 @@ describe("montarSistemaEstavel", () => {
     expect(sistema).toContain("sempre cita uma marca só, nunca as duas.");
   });
 
-  // V12c, item 2, a E37b: persona "conhecido" ganha a regra 13, chamada final nunca vende.
-  it('persona "conhecido": regra 13 proibe a chamada final em preco ou compra', () => {
+  // V12c, item 2, a E37b: persona "conhecido" ganha a regra 14, chamada final nunca vende.
+  it('persona "conhecido": regra 14 proibe a chamada final em preco ou compra', () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], persona: "conhecido" });
-    expect(sistema).toContain("13. Este cliente quer ficar conhecido");
+    expect(sistema).toContain("14. Este cliente quer ficar conhecido");
     expect(sistema).toContain("nunca é preço, comprar ou agendar");
   });
 
-  it("sem persona, ou com outra persona, a regra 13 nao aparece", () => {
+  it("sem persona, ou com outra persona, a regra 14 nao aparece", () => {
     const semPersona = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [] });
     const negocio = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], persona: "negocio" });
-    expect(semPersona).not.toContain("13. Este cliente quer ficar conhecido");
-    expect(negocio).not.toContain("13. Este cliente quer ficar conhecido");
+    expect(semPersona).not.toContain("14. Este cliente quer ficar conhecido");
+    expect(negocio).not.toContain("14. Este cliente quer ficar conhecido");
+  });
+
+  // V12c, item 3, a E37b: quem aparece no video (resolvido por roteiro) muda a regra de voz.
+  it('quemAparece "equipe": regra 13 proibe experiencia pessoal do dono', () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], quemAparece: "equipe" });
+    expect(sistema).toContain("13. Quem aparece neste vídeo é a equipe, o dono não aparece");
+    expect(sistema).toContain('nunca escreva experiência pessoal do dono ("eu testei", "eu uso")');
+  });
+
+  it('quemAparece "outra_pessoa": regra 13 escreve para quem apresenta, nunca "eu, dono"', () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], quemAparece: "outra_pessoa" });
+    expect(sistema).toContain("13. Quem aparece neste vídeo é outra pessoa");
+    expect(sistema).toContain('nunca em primeira pessoa do dono ("eu, dono")');
+  });
+
+  it('quemAparece "propria_pessoa", "pessoa_e_equipe", ausente, ou tipo pessoa: regra 13 nao aparece', () => {
+    expect(montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [] })).not.toContain("13. Quem aparece");
+    expect(
+      montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], quemAparece: "propria_pessoa" }),
+    ).not.toContain("13. Quem aparece");
+    expect(
+      montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], quemAparece: "pessoa_e_equipe" }),
+    ).not.toContain("13. Quem aparece");
+    expect(
+      montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "pessoa", quemAparece: "equipe" }),
+    ).not.toContain("13. Quem aparece");
   });
 });
 

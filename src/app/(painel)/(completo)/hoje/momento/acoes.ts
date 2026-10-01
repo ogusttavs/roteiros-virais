@@ -4,7 +4,7 @@ import type { Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
-import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato } from "@/servicos/roteiro";
+import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece } from "@/servicos/roteiro";
 
 /**
  * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
@@ -39,6 +39,8 @@ export type DadosMomento = {
   estilo?: string;
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
   objetivoDoVideo?: string;
+  /** V12c, item 3, a E37b: troca só deste vídeo; chega como texto livre, `validarQuemAparece` confere. */
+  quemAparece?: string;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -84,6 +86,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ 
     objetivo: dados.objetivo,
     formato: validarFormato(dados.formato),
     estilo: validarEstilo(dados.estilo),
+    quemAparece: validarQuemAparece(dados.quemAparece),
   });
 
   return { id: roteiro.id };
