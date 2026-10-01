@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, Clock, Pencil } from "lucide-react";
+import { CircleCheck, Clock, Mic, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -298,6 +298,12 @@ export function ComecarWizard({
           <div className={styles.cabecalhoTela}>
             <span className={styles.data}>{textosBriefing.progresso.bloco(bloco, TOTAL_BLOCOS)}</span>
             <h1 className={styles.tituloSecao}>{perguntas[0]?.blocoNome}</h1>
+            {bloco === 1 ? (
+              <p className={styles.tresJeitos}>
+                <Mic aria-hidden="true" size={18} />
+                <span>{textosBriefing.tresJeitos}</span>
+              </p>
+            ) : null}
             <Progresso
               rotulo={textosBriefing.progresso.respondidas(Object.keys(avaliacoes).length, perguntasDoBriefing(tipo).length)}
               atual={Object.keys(avaliacoes).length}
