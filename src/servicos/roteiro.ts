@@ -7,7 +7,7 @@
  * versão seguinte com a instrução de resolver o motivo da reprovação sem
  * mudar o objetivo; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
@@ -24,6 +24,7 @@ import {
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
+  type MomentoDoDia,
   type Objetivo,
   type Plataforma,
   type QuemGrava,
@@ -1489,6 +1490,119 @@ export async function roteirosDeHoje(clienteId: number): Promise<RoteiroLinha[]>
       and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO()), SEM_VERSAO_MAIS_NOVA),
     )
     .orderBy(desc(roteiros.criadoEm));
+}
+
+/** A data no formato "YYYY-MM-DD" somada de `dias` (positivo ou negativo), sem depender do fuso do servidor. */
+function somarDiasISO(dataISO: string, dias: number): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia + dias, 12)).toISOString().slice(0, 10);
+}
+
+/** E39a, dúvida 4 do desenho: a semana do calendário, segunda a domingo, nunca uma janela corrida a partir de hoje. */
+function segundaDaSemanaISO(dataISO: string): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const diaDaSemana = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay(); // 0 domingo .. 6 sabado
+  const voltarAteSegunda = diaDaSemana === 0 ? 6 : diaDaSemana - 1;
+  return somarDiasISO(dataISO, -voltarAteSegunda);
+}
+
+const DIAS_DA_SEMANA_CURTO = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+
+export type MarcaDiaAgenda = { temReels: boolean; qtdStories: number };
+export type DiaDaSemanaAgenda = {
+  data: string;
+  diaDoMes: number;
+  diaDaSemanaCurto: string;
+  hoje: boolean;
+  marca: MarcaDiaAgenda;
+};
+
+/**
+ * E39a, item 3: a semana (segunda a domingo) que contém `dataReferencia`, com uma marca por dia
+ * (um ponto se há Reels, um anel com a contagem de Stories), para a tira do alto da Agenda. Só
+ * conta a ponta de cada série (reescrever um roteiro não soma uma marca a mais no mesmo dia).
+ */
+export async function semanaDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaDaSemanaAgenda[]> {
+  const segunda = segundaDaSemanaISO(dataReferencia);
+  const domingo = somarDiasISO(segunda, 6);
+  const hoje = hojeISO();
+
+  const linhas = await db()
+    .select({ data: roteiros.data, formato: roteiros.formato })
+    .from(roteiros)
+    .where(
+      and(
+        eq(roteiros.clienteId, clienteId),
+        gte(roteiros.data, segunda),
+        lte(roteiros.data, domingo),
+        SEM_VERSAO_MAIS_NOVA,
+      ),
+    );
+
+  const porDia = new Map<string, MarcaDiaAgenda>();
+  for (const linha of linhas) {
+    const atual = porDia.get(linha.data) ?? { temReels: false, qtdStories: 0 };
+    if (linha.formato === "reels") atual.temReels = true;
+    else atual.qtdStories += 1;
+    porDia.set(linha.data, atual);
+  }
+
+  return Array.from({ length: 7 }, (_, indice) => {
+    const data = somarDiasISO(segunda, indice);
+    return {
+      data,
+      diaDoMes: Number(data.split("-")[2]),
+      diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
+      hoje: data === hoje,
+      marca: porDia.get(data) ?? { temReels: false, qtdStories: 0 },
+    };
+  });
+}
+
+export type ItemAgendaDoDia = {
+  id: number;
+  tema: string;
+  titulo: string;
+  status: "gerado" | "gravado" | "postado";
+  momentoDoDia: MomentoDoDia | null;
+};
+export type AgendaDoDia = { reels: ItemAgendaDoDia | null; stories: ItemAgendaDoDia[] };
+
+const ORDEM_MOMENTO_DO_DIA: Record<MomentoDoDia, number> = { manha: 0, meio_dia: 1, fim_tarde: 2, noite: 3 };
+
+/**
+ * E39a, item 3: o que está marcado para um dia (o Reels e os Stories, na ordem da parte do dia).
+ * Com mais de um Reels no mesmo dia (plano `sem_limite`, raro neste caso porque o Reels é um por
+ * dia na Agenda), fica o mais recente; os demais continuam no Histórico, não desaparecem.
+ */
+export async function agendaDoDia(clienteId: number, data: string): Promise<AgendaDoDia> {
+  const linhas = await db()
+    .select()
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, data), SEM_VERSAO_MAIS_NOVA))
+    .orderBy(desc(roteiros.criadoEm));
+
+  const paraItem = (linha: RoteiroLinha): ItemAgendaDoDia => ({
+    id: linha.id,
+    tema: linha.tema,
+    titulo: corpoDoRoteiro(linha).titulo,
+    status: linha.status,
+    momentoDoDia: linha.momentoDoDia,
+  });
+
+  const reelsLinha = linhas.find((linha) => linha.formato === "reels") ?? null;
+  const storiesOrdenados = linhas
+    .filter((linha) => linha.formato === "story")
+    .sort((a, b) => {
+      const ordemA = a.momentoDoDia ? ORDEM_MOMENTO_DO_DIA[a.momentoDoDia] : 99;
+      const ordemB = b.momentoDoDia ? ORDEM_MOMENTO_DO_DIA[b.momentoDoDia] : 99;
+      return ordemA - ordemB;
+    });
+
+  return {
+    reels: reelsLinha ? paraItem(reelsLinha) : null,
+    stories: storiesOrdenados.map(paraItem),
+  };
 }
 
 /**
