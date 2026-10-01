@@ -2,7 +2,43 @@ import { describe, expect, it } from "vitest";
 
 import type { CartaoStory, ConteudoRoteiro, TipoAbertura } from "@/db/schema";
 
-import { blocosParaLeitura, escolherTipoAbertura, type RoteiroLinha } from "./roteiro";
+import { blocosParaLeitura, escolherTipoAbertura, formatarCamadaExclusiva, type RoteiroLinha } from "./roteiro";
+
+const CAMADA_VAZIA = { concorrentes: [], termos: [], perfisAdmirados: [] };
+
+/** V12c, item 1 (a E37b): cidade/bairro saíram, alcance/regiao entraram no lugar. */
+describe("formatarCamadaExclusiva", () => {
+  it("brasil: diz para nao citar cidade nem bairro", () => {
+    const texto = formatarCamadaExclusiva({ alcance: "brasil", regiao: null, camadaExclusiva: CAMADA_VAZIA });
+    expect(texto).toContain("Brasil inteiro");
+    expect(texto).toContain("não cite cidade nem bairro");
+  });
+
+  it("local: cita a regiao escrita pelo cliente", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: "local",
+      regiao: "Campinas e região",
+      camadaExclusiva: CAMADA_VAZIA,
+    });
+    expect(texto).toContain("Campinas e região");
+  });
+
+  it("local sem regiao (dado incompleto): nao quebra, so nao cita nada de local", () => {
+    const texto = formatarCamadaExclusiva({ alcance: "local", regiao: null, camadaExclusiva: CAMADA_VAZIA });
+    expect(texto).not.toContain("Região:");
+  });
+
+  it("sem alcance (cliente nunca passou pela tela nova): segue so com o resto da camada", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: null,
+      regiao: null,
+      camadaExclusiva: { ...CAMADA_VAZIA, concorrentes: ["Clínica Popular"] },
+    });
+    expect(texto).not.toContain("Brasil inteiro");
+    expect(texto).not.toContain("Região:");
+    expect(texto).toContain("Clínica Popular");
+  });
+});
 
 function evidencia(
   tipoAbertura: TipoAbertura | null,

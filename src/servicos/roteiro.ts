@@ -276,19 +276,23 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
 };
 
 /**
- * A camada exclusiva do cliente (cidade, bairro, concorrentes, perfis
+ * A camada exclusiva do cliente (alcance, região, concorrentes, perfis
  * admirados) para o bloco estável do prompt (etapa 11, decisão 1): decisão
- * adiada na etapa 10 porque, ali, só o tema e a nota importam; aqui, cidade
+ * adiada na etapa 10 porque, ali, só o tema e a nota importam; aqui, região
  * e concorrente mudam de verdade a cena e o gancho.
+ *
+ * V12c, item 1, a E37b: cidade e bairro saíram da tela; `alcance` e `regiao`
+ * mandam agora. Cliente sem `alcance` (nunca passou pela tela nova, ou
+ * migrado sem cidade) não entra na camada, como antes.
  */
-function formatarCamadaExclusiva(cliente: Cliente): string {
+export function formatarCamadaExclusiva(
+  cliente: Pick<Cliente, "alcance" | "regiao" | "camadaExclusiva">,
+): string {
   const linhas: string[] = [];
-  if (cliente.cidade) {
-    linhas.push(
-      cliente.bairro
-        ? `Cidade: ${cliente.cidade}, bairro ${cliente.bairro}.`
-        : `Cidade: ${cliente.cidade}.`,
-    );
+  if (cliente.alcance === "local" && cliente.regiao) {
+    linhas.push(`Região: ${cliente.regiao}.`);
+  } else if (cliente.alcance === "brasil") {
+    linhas.push("Vende para o Brasil inteiro: não cite cidade nem bairro, nem fale como negócio de bairro.");
   }
   if (cliente.camadaExclusiva.concorrentes.length > 0) {
     linhas.push(

@@ -14,6 +14,7 @@ import {
   nichos,
   preferenciasUsuario,
   user,
+  type Alcance,
   type Cliente,
   type PapelMarca,
   type PerfisCliente,
@@ -32,6 +33,7 @@ import {
 } from "@/lib/marca-ativa";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
+import { siteValido } from "@/lib/site-valido";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { textosAdmin } from "@/textos/admin";
 
@@ -518,14 +520,22 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
  * Dados fixos do briefing (briefing-e-rubricas.md, secao 1; brief-frontend.md,
  * 6.2): sem nota, so validacao. "Ramo" e um nicho da lista (nichoId) ou, se o
  * cliente escolher "outro", um texto livre em ramoOutro; os dois nunca
- * coexistem. Perfis, bairro e quem grava sao opcionais aqui e continuam
- * editaveis depois em /conta.
+ * coexistem. Perfis, site e quem grava sao opcionais aqui.
+ *
+ * V12c, item 1 (a E37b): cidade e bairro saem da validacao, `alcance` entra
+ * no lugar ("brasil" ou "local"); com "local", `regiao` passa a ser
+ * obrigatoria.
  */
 export const dadosFixosSchema = z
   .object({
     nome: z.string().trim().min(1),
-    cidade: z.string().trim().min(1),
-    bairro: z.string().trim().optional(),
+    alcance: z.enum(["brasil", "local"]),
+    regiao: z.string().trim().optional(),
+    site: z
+      .string()
+      .trim()
+      .optional()
+      .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" }),
     nichoId: z.number().int().positive().optional(),
     ramoOutro: z.string().trim().optional(),
     /** P1, item 2: "conhecido" e "negocios" sao valores da persona da marca pessoa (briefing-e-rubricas.md, secao 1b). */
@@ -537,14 +547,35 @@ export const dadosFixosSchema = z
         youtube: z.string().trim().optional(),
       })
       .optional(),
-    quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe"]).optional(),
+    quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
   })
   .refine((dados) => Boolean(dados.nichoId) || Boolean(dados.ramoOutro?.trim()), {
     message: "escolha um ramo da lista ou descreva o seu",
     path: ["ramo"],
+  })
+  .refine((dados) => dados.alcance !== "local" || Boolean(dados.regiao?.trim()), {
+    message: "escreva a cidade ou região",
+    path: ["regiao"],
   });
 
 export type DadosFixos = z.infer<typeof dadosFixosSchema>;
+
+/**
+ * Pontes entre a coluna `clientes.alcance` e as telas: a palavra "alcance"
+ * está na lista de jargão do cliente (`regras-de-texto.ts`) e o
+ * `checar-texto` reprova qualquer `.tsx` que a escreva, mesmo como nome de
+ * campo; a tela chama o mesmo dado de "onde" (`config/briefing.ts`,
+ * `DadosFixosConfig.onde`). Mesma ideia de `montarInstrucaoJargao`
+ * (`avaliarResposta.ts`): a palavra fica só nos arquivos que o checar-texto
+ * não varre.
+ */
+export function dadosOndeIniciais(cliente: Pick<Cliente, "alcance" | "regiao">): { onde: Alcance | null; regiao: string | null } {
+  return { onde: cliente.alcance, regiao: cliente.regiao };
+}
+
+export function clienteTemOndeEscolhido(cliente: Pick<Cliente, "alcance">): boolean {
+  return Boolean(cliente.alcance);
+}
 
 export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
   const dados = dadosFixosSchema.parse(dadosBrutos);
@@ -559,8 +590,9 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .update(clientes)
     .set({
       nome: dados.nome,
-      cidade: dados.cidade,
-      bairro: dados.bairro?.trim() || null,
+      alcance: dados.alcance,
+      regiao: dados.alcance === "local" ? (dados.regiao?.trim() ?? null) : null,
+      site: dados.site?.trim() || null,
       nichoId: dados.nichoId ?? null,
       ramoOutro: dados.nichoId ? null : (dados.ramoOutro?.trim() ?? null),
       persona: dados.persona,

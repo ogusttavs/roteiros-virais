@@ -266,8 +266,9 @@ export async function avaliarResposta(
 
 /**
  * Perfil compilado (secao 4) e camada exclusiva (concorrentes e perfis
- * admirados de secao 5.9.1, mais cidade, bairro e o que vende como termos
- * de busca, escopo 5.6). Roda na liberacao e a cada edicao posterior.
+ * admirados de secao 5.9.1, mais a regiao (so quando o alcance e local,
+ * V12c item 1) e o que vende como termos de busca, escopo 5.6). Roda na
+ * liberacao e a cada edicao posterior.
  */
 async function compilarEGravarPerfil(
   clienteId: number,
@@ -298,9 +299,8 @@ async function compilarEGravarPerfil(
   await db().update(briefings).set({ perfil: perfilCompleto }).where(eq(briefings.id, briefingId));
 
   const cliente = await clientePorId(clienteId);
-  const termos = [cliente?.cidade, cliente?.bairro, perfil.fatos.oQueVende].filter(
-    (termo): termo is string => Boolean(termo?.trim()),
-  );
+  const regiaoComoTermo = cliente?.alcance === "local" ? cliente.regiao : undefined;
+  const termos = [regiaoComoTermo, perfil.fatos.oQueVende].filter((termo): termo is string => Boolean(termo?.trim()));
 
   await db()
     .update(clientes)

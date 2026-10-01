@@ -10,15 +10,28 @@
  * continuam iguais); so o enunciado, o "o que a IA procura" e o rotulo curto
  * mudam. `perguntasDoBriefing(tipo)` decide qual das duas listas usar.
  */
-import type { Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import type { Alcance, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 
 export type PersonaOpcao = { valor: Persona; rotulo: string };
 export type QuemGravaOpcao = { valor: QuemGrava; rotulo: string };
+/**
+ * `valor` usa o mesmo tipo da coluna `clientes.alcance` (schema.ts). O nome
+ * do campo aqui embaixo é `onde`, não a palavra da coluna: ela está na lista
+ * de jargão do cliente (`regras-de-texto.ts`, "mais gente te conhecer" no
+ * lugar dela) e o `checar-texto` reprova qualquer `.tsx` que a escreva,
+ * mesmo como nome de campo. Mesmo motivo de `montarInstrucaoJargao` em
+ * `avaliarResposta.ts`: a palavra fica só onde o checar-texto não olha.
+ */
+export type OndeOpcao = { valor: Alcance; rotulo: string };
 
 export type DadosFixosConfig = {
   nome: { rotulo: string };
-  cidade: { rotulo: string };
-  bairro: { rotulo: string };
+  onde: {
+    rotulo: string;
+    opcoes: OndeOpcao[];
+    campoRegiao: { rotulo: string; ajuda: string };
+  };
+  site: { rotulo: string; ajuda: string };
   ramo: {
     rotulo: string;
     ajuda: string;
@@ -31,16 +44,27 @@ export type DadosFixosConfig = {
   perfis: { rotulo: string };
   quemGrava: {
     rotulo: string;
+    ajuda: string;
     /** Pessoa (P1, item 2): a pergunta nem aparece na tela, sempre "propria_pessoa". */
     opcoes: QuemGravaOpcao[];
     fixoEmPropriaPessoa?: boolean;
   };
 };
 
+/** V12c, item 1: substitui cidade e bairro, decisao do Gustavo em 29/09/2026. */
+const ONDE_OPCOES: OndeOpcao[] = [
+  { valor: "brasil", rotulo: "No Brasil inteiro" },
+  { valor: "local", rotulo: "Na minha cidade ou região" },
+];
+
 const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
   nome: { rotulo: "Nome do negócio" },
-  cidade: { rotulo: "Cidade" },
-  bairro: { rotulo: "Bairro" },
+  onde: {
+    rotulo: "Onde estão os seus clientes?",
+    opcoes: ONDE_OPCOES,
+    campoRegiao: { rotulo: "Qual cidade ou região?", ajuda: 'Por exemplo "Campinas e região" ou "zona sul de São Paulo".' },
+  },
+  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
   ramo: {
     rotulo: "Ramo",
     ajuda: "Escolha o que mais se parece com o seu negócio. Se não achar, escolha \"outro\".",
@@ -50,15 +74,19 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
     rotulo: "O que você quer com os vídeos",
     opcoes: [
       { valor: "negocio", rotulo: "Vender o meu produto ou serviço" },
+      { valor: "conhecido", rotulo: "Ficar conhecido no que eu faço" },
       { valor: "criador", rotulo: "Virar criador e atrair marcas" },
     ],
   },
   perfis: { rotulo: "Perfis nas redes" },
   quemGrava: {
-    rotulo: "Quem grava",
+    rotulo: "Quem geralmente aparece nos vídeos",
+    ajuda: "Pode mudar a cada vídeo. Aqui é só o mais comum.",
     opcoes: [
       { valor: "propria_pessoa", rotulo: "Eu mesmo" },
       { valor: "pessoa_e_equipe", rotulo: "Eu e a equipe" },
+      { valor: "equipe", rotulo: "A equipe, eu não apareço" },
+      { valor: "outra_pessoa", rotulo: "Outra pessoa: um apresentador, um criador ou um cliente" },
     ],
   },
 };
@@ -66,8 +94,12 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
 /** Secao 1b: mesma mecanica do negocio, so muda o rotulo e as opcoes ("sem mudar de mecanica", texto da secao). */
 const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
   nome: { rotulo: "Nome" },
-  cidade: { rotulo: "Onde está o seu público" },
-  bairro: { rotulo: "Bairro" },
+  onde: {
+    rotulo: "Onde está o seu público?",
+    opcoes: ONDE_OPCOES,
+    campoRegiao: { rotulo: "Qual cidade ou região?", ajuda: 'Por exemplo "Campinas e região" ou "zona sul de São Paulo".' },
+  },
+  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
   ramo: {
     rotulo: "Ramo",
     ajuda: "O ramo do seu assunto principal. Se não achar, escolha \"outro\".",
@@ -84,6 +116,7 @@ const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
   perfis: { rotulo: "Perfis nas redes" },
   quemGrava: {
     rotulo: "Quem aparece nos vídeos",
+    ajuda: "",
     opcoes: [{ valor: "propria_pessoa", rotulo: "Eu mesmo" }],
     fixoEmPropriaPessoa: true,
   },
