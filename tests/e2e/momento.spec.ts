@@ -135,7 +135,7 @@ test.describe("gravar agora, o caminho por texto", () => {
 
   test("pelo Tema livre: 'Estou num momento' abre a mesma folha", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     await expect(page.getByRole("dialog", { name: "Gravar agora" })).toBeVisible();

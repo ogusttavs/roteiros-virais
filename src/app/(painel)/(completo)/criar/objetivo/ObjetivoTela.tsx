@@ -29,7 +29,7 @@ import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/Pergu
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { roteiroRecenteDesdeAction } from "../acoes";
+import { roteiroRecenteDesdeAction } from "../../hoje/acoes";
 
 import { gerarRoteiroAction, sugerirEstiloAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
@@ -164,7 +164,7 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
 
   function voltarDepois() {
     saiuRef.current = true;
-    router.push("/hoje");
+    router.push("/criar");
   }
 
   if (pendente) {

@@ -1,7 +1,8 @@
 /**
- * O que a tela `/hoje` e `/hoje/tema-livre` precisam (etapa 10, decisões 3,
- * 4 e 5 do `PROXIMO.md`): os temas do dia com a regra de estabilidade e o
- * aviso da linha editorial, e a nota em cinco pilares de um tema livre.
+ * O que `/criar/temas` e `/criar/tema-livre` precisam (etapa 10, decisões 3,
+ * 4 e 5 do `PROXIMO.md`; E39a: migrado de `/hoje`, a agenda não escolhe
+ * tema): os temas do dia com a regra de estabilidade e o aviso da linha
+ * editorial, e a nota em cinco pilares de um tema livre.
  */
 import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
@@ -267,7 +268,7 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
 }
 
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2; ajuste do item 0 da V6,
+ * O rascunho de `/criar/tema-livre` (V5b, item 2; ajuste do item 0 da V6,
  * resto da revisão do PR #50): uma linha por pessoa e por marca, sem
  * prazo. `salvarRascunhoTemaLivre` faz upsert (o índice único `usuarioId`
  * + `clienteId` decide), ou apaga a linha quando o texto fica vazio. Não

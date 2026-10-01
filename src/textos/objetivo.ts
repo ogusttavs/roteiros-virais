@@ -1,5 +1,5 @@
 /**
- * Texto de tela de `/hoje/objetivo` (etapa 11, brief-frontend.md, seção
+ * Texto de tela de `/criar/objetivo` (etapa 11, brief-frontend.md, seção
  * 6.5, passo intermediário; `ObjetivoFluxo.dc.html`;
  * `entrega/textos.ts`, bloco `objetivo`).
  *

@@ -110,7 +110,7 @@ test.describe("revisão do PR #62, item 2: Voltar depois no caminho do tema não
     });
 
     await entrar(page);
-    await page.goto("/hoje/objetivo?tema=0");
+    await page.goto("/criar/objetivo?tema=0");
 
     await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
     await page.getByRole("button", { name: "escrever o roteiro" }).click();

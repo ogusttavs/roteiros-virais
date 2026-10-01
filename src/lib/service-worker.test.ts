@@ -228,7 +228,8 @@ describe("o que guarda (lista fechada) e onde", () => {
       "/roteiros/5/imprimir",
       "/roteiros/abc",
       "/roteiros/5/outra",
-      "/hoje/tema-livre",
+      "/criar",
+      "/criar/tema-livre",
     ]) {
       await sw.pedir(caminho);
     }

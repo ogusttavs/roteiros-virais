@@ -477,7 +477,7 @@ test.describe("painel sem rede", () => {
   test("avaliar o tema: a rede cai no meio, o texto continua, e tentar de novo funciona", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-d");
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     const assunto = "Uma cliente perguntou se o produto serve em sofa de camurca";
     const campo = page.getByRole("textbox");
@@ -502,7 +502,7 @@ test.describe("painel sem rede", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-c");
-    await page.goto("/hoje/objetivo?tema=0");
+    await page.goto("/criar/objetivo?tema=0");
     await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
 
     await cortarRedeNaProximaAcao(page);

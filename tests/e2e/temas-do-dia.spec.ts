@@ -1,5 +1,5 @@
 /**
- * `/hoje` e `/hoje/tema-livre` pela tela (etapa 10, criterio de aceite do
+ * `/hoje` e `/criar/tema-livre` pela tela (etapa 10, criterio de aceite do
  * plano de execucao): cliente abre `/hoje`, ve os tres temas do dia, e
  * avalia um tema livre, vendo os cinco pilares.
  *

@@ -18,7 +18,7 @@ import { NotasLinha } from "@/ui/componentes/NotaLinha";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
-import { FolhaGravarAgora } from "../FolhaGravarAgora";
+import { FolhaGravarAgora } from "../../hoje/FolhaGravarAgora";
 
 import { avaliarTemaAction, salvarRascunhoAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
@@ -107,7 +107,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
   const [abrindo, iniciarTransicao] = useTransition();
   const [destino, setDestino] = useState<string | null>(null);
   const abrindoEste = (chave: string) => abrindo && destino === chave;
-  const urlObjetivo = `/hoje/objetivo?livre=${encodeURIComponent(texto)}`;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -217,7 +217,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
             aria-busy={abrindoEste("voltar") || undefined}
             disabled={abrindo}
             className={styles.botaoBarra}
-            onClick={() => abrir("voltar", "/hoje")}
+            onClick={() => abrir("voltar", "/criar")}
           >
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -407,9 +407,9 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
                 variante="secundario"
                 tamanho="lg"
                 disabled={abrindo}
-                onClick={() => abrir("hoje", "/hoje")}
+                onClick={() => abrir("temas", "/criar/temas")}
               >
-                {abrindoEste("hoje") ? textosTemaLivre.abrindo : textosTemaLivre.escolherTemaDoDia}
+                {abrindoEste("temas") ? textosTemaLivre.abrindo : textosTemaLivre.escolherTemaDoDia}
               </Botao>
             </div>
           </div>

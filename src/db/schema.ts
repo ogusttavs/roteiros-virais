@@ -960,7 +960,7 @@ export const avaliacoesTema = pgTable("avaliacoes_tema", {
 });
 
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2, `PROXIMO.md`): o que a
+ * O rascunho de `/criar/tema-livre` (V5b, item 2, `PROXIMO.md`): o que a
  * pessoa digitou e ainda não avaliou. Uma linha por pessoa e por marca
  * (`usuarioId` + `clienteId` único), porque duas pessoas na mesma marca
  * podem estar escrevendo assuntos diferentes ao mesmo tempo. Sem prazo;

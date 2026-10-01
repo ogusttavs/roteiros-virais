@@ -46,7 +46,7 @@ export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
 };
 
 /**
- * A frase de ajuda de cada opção em `/hoje/objetivo` (etapa 11,
+ * A frase de ajuda de cada opção em `/criar/objetivo` (etapa 11,
  * `ObjetivoFluxo.dc.html`): mesma razão de `NOME_OBJETIVO` estar aqui.
  */
 export const AJUDA_OBJETIVO: Record<Objetivo, string> = {

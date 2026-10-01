@@ -1,5 +1,5 @@
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2 do `PROXIMO.md`; item 0 da
+ * O rascunho de `/criar/tema-livre` (V5b, item 2 do `PROXIMO.md`; item 0 da
  * V6, resto da revisão do PR #50): uma linha por pessoa e por marca, sem
  * prazo, que **não** some quando a avaliação termina com sucesso (decisão
  * do Fable, `entregaveis/design-v2/BRIEF.md`, Tema livre, ponto 3); só
@@ -19,7 +19,7 @@ import { briefings, clientes, membrosMarca, nichos, rascunhosTemaLivre, user, ty
 import { sessaoAtual } from "@/lib/sessao";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { avaliarTemaAction, salvarRascunhoAction } from "../../src/app/(painel)/(completo)/hoje/tema-livre/acoes";
+import { avaliarTemaAction, salvarRascunhoAction } from "../../src/app/(painel)/(completo)/criar/tema-livre/acoes";
 
 const PERFIL_PADRAO: PerfilCompilado = {
   fatos: {
