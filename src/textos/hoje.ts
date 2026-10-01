@@ -151,7 +151,12 @@ export const textosHoje = {
     estadoOutroDia: "marcado",
     nadaMarcadoTitulo: "Nada marcado para hoje",
     nadaMarcado: "Crie um roteiro para hoje ou deixe os próximos dias prontos.",
+    /** O mesmo cartão vazio, num dia que não é hoje: "para hoje" seria falso (achado da prova manual da E39a). */
+    nadaMarcadoOutroDiaTitulo: "Nada marcado",
+    nadaMarcadoOutroDia: "Crie um roteiro para este dia ou veja outro na semana.",
     proximoMarcado: (quando: string, formato: string) => `O próximo marcado é ${quando}: um ${formato}.`,
+    /** O lugar reservado de uma coluna (Reels ou Stories) sem nada, com a outra coluna preenchida; nunca "para hoje", vale em qualquer dia. */
+    semNadaNaColuna: "Nada marcado",
     criarRoteiro: "Criar roteiro",
     abrirRoteiro: "Abrir o roteiro",
     briefingPodeRenderMais: "O seu briefing pode render mais",

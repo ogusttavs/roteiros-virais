@@ -202,10 +202,12 @@ export function HojeTela({
 
           {diaVazio ? (
             <section className={styles.diaLivre}>
-              <h3>{textosHoje.agenda.nadaMarcadoTitulo}</h3>
+              <h3>{ehHoje ? textosHoje.agenda.nadaMarcadoTitulo : textosHoje.agenda.nadaMarcadoOutroDiaTitulo}</h3>
               <p>
-                {textosHoje.agenda.nadaMarcado}
-                {proximoMarcado ? ` ${textosHoje.agenda.proximoMarcado(proximoMarcado.quando, proximoMarcado.rotuloFormato)}` : ""}
+                {ehHoje ? textosHoje.agenda.nadaMarcado : textosHoje.agenda.nadaMarcadoOutroDia}
+                {ehHoje && proximoMarcado
+                  ? ` ${textosHoje.agenda.proximoMarcado(proximoMarcado.quando, proximoMarcado.rotuloFormato)}`
+                  : ""}
               </p>
               <button type="button" className={styles.botaoPrimario} onClick={() => ir("criar", "/criar")}>
                 {textosHoje.agenda.criarRoteiro}
@@ -234,7 +236,7 @@ export function HojeTela({
                     </button>
                   </article>
                 ) : (
-                  <p className={styles.semItemNaColuna}>{textosHoje.agenda.nadaMarcadoTitulo}</p>
+                  <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
                 )}
               </section>
 
@@ -263,7 +265,7 @@ export function HojeTela({
                     </ol>
                   </div>
                 ) : (
-                  <p className={styles.semItemNaColuna}>{textosHoje.agenda.nadaMarcadoTitulo}</p>
+                  <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
                 )}
               </section>
             </div>

@@ -160,6 +160,44 @@
   cursor: pointer;
 }
 
+/**
+ * No celular os quatro caminhos viram linhas (Criar.dc.html): o ícone, o nome e a explicação, e a
+ * seta ao lado. Como cartões altos, a lista passava de 900 px e o último caminho ficava longe; em
+ * linha, os quatro cabem numa tela.
+ */
+@media (max-width: 767px) {
+  .porta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--espaco-1) var(--espaco-4);
+    min-height: 0;
+    padding: var(--espaco-4) var(--espaco-5);
+  }
+
+  .porta .marcaPorta {
+    grid-row: 1 / span 2;
+  }
+
+  .porta strong {
+    grid-column: 2;
+    font-size: var(--tamanho-cabecalho);
+  }
+
+  .porta .ajuda {
+    grid-column: 2;
+  }
+
+  .porta .seta {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    margin-top: 0;
+  }
+
+  .porta .motivoNaPorta {
+    grid-column: 2;
+  }
+}
+
 .porta:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
@@ -190,6 +228,12 @@
 .porta .ajuda {
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
+}
+
+.seta {
+  justify-self: end;
+  margin-top: auto;
+  color: var(--cor-texto-dica);
 }
 
 .motivoNaPorta {

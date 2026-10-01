@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import type { MomentoDoDia } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import { textosCriar } from "@/textos/criar";
@@ -43,13 +45,20 @@ type PropsParaQuando = {
 export function PerguntaParaQuando({ data, onChange }: PropsParaQuando) {
   const hoje = hojeISO();
   const amanha = somarDiasISO(hoje, 1);
-  const outraData = data !== hoje && data !== amanha;
-  const selecionado = outraData ? 2 : data === amanha ? 1 : 0;
+  const outraDataInicial = data !== hoje && data !== amanha;
+  /**
+   * O modo é estado próprio, não deduzido só de `data`: tocar em "Escolher a data" tem que marcar
+   * o terceiro chip na hora, mesmo que a data ainda não tenha mudado (achado da prova manual desta
+   * etapa: sem isto, tocar o chip com `data` já em "amanhã" não tirava a marca de "Amanhã").
+   */
+  const [modo, setModo] = useState<0 | 1 | 2>(outraDataInicial ? 2 : data === amanha ? 1 : 0);
 
   function escolher(indice: number) {
-    if (indice === 0) onChange(hoje);
-    else if (indice === 1) onChange(amanha);
-    else onChange(outraData ? data : amanha);
+    const indiceValido = indice === 1 ? 1 : indice === 2 ? 2 : 0;
+    setModo(indiceValido);
+    if (indiceValido === 0) onChange(hoje);
+    else if (indiceValido === 1) onChange(amanha);
+    else if (data === hoje || data === amanha) onChange(somarDiasISO(hoje, 2));
   }
 
   return (
@@ -58,10 +67,10 @@ export function PerguntaParaQuando({ data, onChange }: PropsParaQuando) {
         rotuloGrupo={textosCriar.paraQuando}
         rotuloVisivel={textosCriar.paraQuando}
         opcoes={[textosCriar.hoje, textosCriar.amanha, textosCriar.escolherData]}
-        selecionado={selecionado}
+        selecionado={modo}
         onChange={escolher}
       />
-      {selecionado === 2 ? (
+      {modo === 2 ? (
         <label className={styles.campoData}>
           <span>{textosCriar.escolherData}</span>
           <input

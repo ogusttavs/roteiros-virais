@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, Mic, Pencil, Zap } from "lucide-react";
+import { CalendarDays, ChevronRight, Mic, Pencil, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -185,6 +185,9 @@ export function CriarTela({
               </span>
               <strong>{textosCriar.caminhoTemas.titulo}</strong>
               <span className={styles.ajuda}>{textosCriar.caminhoTemas.ajuda}</span>
+              <span className={styles.seta} aria-hidden="true">
+                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+              </span>
             </button>
 
             <button
@@ -199,6 +202,9 @@ export function CriarTela({
               </span>
               <strong>{textosCriar.caminhoAssuntoSeu.titulo}</strong>
               <span className={styles.ajuda}>{textosCriar.caminhoAssuntoSeu.ajuda}</span>
+              <span className={styles.seta} aria-hidden="true">
+                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+              </span>
             </button>
 
             <button
@@ -213,6 +219,9 @@ export function CriarTela({
               </span>
               <strong>{textosCriar.caminhoMomento.titulo}</strong>
               <span className={styles.ajuda}>{textosCriar.caminhoMomento.ajuda}</span>
+              <span className={styles.seta} aria-hidden="true">
+                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+              </span>
               <MotivoSemRede className={styles.motivoNaPorta} />
             </button>
 
@@ -228,6 +237,9 @@ export function CriarTela({
               </span>
               <strong>{textosCriar.caminhoPlano.titulo}</strong>
               <span className={styles.ajuda}>{textosCriar.caminhoPlano.ajuda}</span>
+              <span className={styles.seta} aria-hidden="true">
+                <ChevronRight size={20} strokeWidth={1.75} aria-hidden="true" />
+              </span>
               <MotivoSemRede className={styles.motivoNaPorta} />
             </button>
           </div>
