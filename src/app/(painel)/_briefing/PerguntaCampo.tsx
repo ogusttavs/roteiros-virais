@@ -1,19 +1,19 @@
 "use client";
 
-import { CircleAlert, Mic, Square } from "lucide-react";
+import { CircleAlert, Copy, Mic, Square } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { ehFalhaDeRede } from "@/lib/offline";
-import { textosBriefing } from "@/textos/briefing";
+import { montarTextoParaIA, textosBriefing } from "@/textos/briefing";
 import { textosComuns } from "@/textos/comuns";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Nota } from "@/ui/componentes/Nota";
-import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { Progresso } from "@/ui/componentes/Progresso";
+import { SugestaoResposta } from "@/ui/componentes/SugestaoResposta";
 import { Toast } from "@/ui/componentes/Toast";
 import { LIMITE_SEGUNDOS_PADRAO, useGravadorDeAudio, type ResultadoUseGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -77,27 +77,31 @@ function Chip({ pergunta }: { pergunta: PerguntaBriefing }) {
 
 /**
  * P2, item 2: "Responder falando" ao lado do campo, nas duas variantes (vivo e wizard, as duas já
- * editando quando o botão aparece). Alvo redondo provisório: o desenho definitivo é do Opus (mesmo
- * espírito da nota da P1, item 8, quando o `Briefing.dc.html` não tinha o estado ainda).
+ * editando quando o botão aparece). E37a, item 3: "Copiar para a sua IA" entra como um segundo
+ * botão na mesma linha, com o desenho definitivo do Opus (`Briefing.dc.html`, `.acoes-campo`).
  */
 function CampoComMicrofone({
   gravador,
   erroFala,
+  aoCopiarParaIA,
+  copiado,
   children,
 }: {
   gravador: ResultadoUseGravadorDeAudio;
   erroFala: string | null;
+  aoCopiarParaIA: () => void;
+  copiado: boolean;
   children: ReactNode;
 }) {
   const gravando = gravador.fase === "gravando";
-  const rotulo = gravando ? t.botaoPararDeFalar : t.botaoResponderFalando;
+  const rotuloFalar = gravando ? t.botaoPararDeFalar : t.botaoResponderFalando;
   return (
     <>
-      <div className={styles.linhaComMicrofone}>
-        {children}
+      <div className={styles.linhaComMicrofone}>{children}</div>
+      <div className={styles.acoesCampo}>
         <button
           type="button"
-          className={[styles.botaoFalar, gravando ? styles.botaoFalarGravando : ""].filter(Boolean).join(" ")}
+          className={[styles.botaoAcaoCampo, gravando ? styles.botaoFalarGravando : ""].filter(Boolean).join(" ")}
           onClick={() => (gravando ? gravador.pararGravacao() : void gravador.iniciarGravacao())}
           /**
            * Sem isto, tocar o microfone com o campo em foco (uma segunda gravação, por exemplo)
@@ -109,11 +113,22 @@ function CampoComMicrofone({
            */
           onMouseDown={(evento) => evento.preventDefault()}
           disabled={gravador.fase === "transcrevendo"}
-          aria-label={rotulo}
-          title={rotulo}
         >
-          {gravando ? <Square size={18} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={18} strokeWidth={1.75} aria-hidden="true" />}
+          {gravando ? <Square size={16} strokeWidth={1.75} aria-hidden="true" /> : <Mic size={16} strokeWidth={1.75} aria-hidden="true" />}
+          {rotuloFalar}
         </button>
+        {!gravando ? (
+          <button
+            type="button"
+            className={styles.botaoAcaoCampo}
+            onClick={aoCopiarParaIA}
+            onMouseDown={(evento) => evento.preventDefault()}
+            disabled={gravador.fase === "transcrevendo"}
+          >
+            <Copy size={16} strokeWidth={1.75} aria-hidden="true" />
+            {t.botaoCopiarParaIA}
+          </button>
+        ) : null}
       </div>
       {gravando ? (
         <p className={styles.dicaFalar}>{t.contagemGravando(gravador.segundos, LIMITE_SEGUNDOS_PADRAO)}</p>
@@ -123,6 +138,10 @@ function CampoComMicrofone({
         <p className={styles.erroInline} role="alert">
           <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
           {erroFala}
+        </p>
+      ) : copiado ? (
+        <p className={styles.copiado} role="status">
+          {t.copiadoParaIA}
         </p>
       ) : (
         <p className={styles.dicaFalar}>{t.dicaResponderFalando}</p>
@@ -190,6 +209,9 @@ export function PerguntaCampo({
    * "desfazer" do toast. `tipo` escolhe o texto do toast (a sugestão e a fala usam frases diferentes).
    */
   const [sugestaoAplicada, setSugestaoAplicada] = useState<{ anterior: string; tipo: "sugestao" | "fala" | "falaSomada" } | null>(null);
+  /** E37a, item 3: "Copiado" embaixo dos botões, até a pessoa mexer no campo ou gravar de novo. */
+  const [copiado, setCopiado] = useState(false);
+  const [erroCopia, setErroCopia] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /**
@@ -289,8 +311,24 @@ export function PerguntaCampo({
     setRascunhoSalvo(false);
     setRascunhoComErro(false);
     setErro(null);
+    setCopiado(false);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => void salvarPendente(), 800);
+  }
+
+  /**
+   * "Copiar para a sua IA" (E37a, item 3): monta o texto por código (`montarTextoParaIA`, sem
+   * chamar IA) e copia para a área de transferência. "Copiado" fica embaixo dos botões até a
+   * pessoa mudar o texto ou gravar de novo (design v2: nunca um aviso que some sozinho).
+   */
+  async function copiarParaIA() {
+    setErroCopia(null);
+    try {
+      await navigator.clipboard.writeText(montarTextoParaIA(pergunta));
+      setCopiado(true);
+    } catch {
+      setErroCopia(t.erroCopiarParaIA);
+    }
   }
 
   /**
@@ -347,7 +385,7 @@ export function PerguntaCampo({
       ? t.audioVazioFala
       : gravador.erro === "falhaTranscricao"
         ? t.erroTranscricaoFala
-        : null;
+        : erroCopia;
 
   async function avaliar() {
     /**
@@ -393,17 +431,6 @@ export function PerguntaCampo({
     void avaliar();
   }
 
-  function cancelarEdicao() {
-    const anterior = textoAvaliado ?? resposta;
-    textoRef.current = anterior;
-    setTexto(anterior);
-    setErro(null);
-    setEditando(false);
-    // Fecha o que ficou pendente: se um rascunho da edicao ja tinha ido para o servidor, o texto de
-    // antes volta para la; se nao, so acerta o indicador.
-    void salvarPendente();
-  }
-
   const indicadorRascunho = (
     <span className={rascunhoComErro ? styles.rascunhoComErro : styles.indicadorSalvo}>
       {rascunhoComErro ? t.rascunhoComErro : rascunhoSalvo ? t.rascunhoSalvo : t.rascunhoAindaNao}
@@ -418,72 +445,6 @@ export function PerguntaCampo({
         ? t.respostaFaladaAplicada
         : t.sugestaoAplicada;
 
-  if (variante === "vivo" && avaliacao) {
-    if (editando) {
-      return (
-        <div className={styles.linhaVivo}>
-          <p className={styles.enunciado}>{pergunta.enunciado}</p>
-          <CampoComMicrofone gravador={gravador} erroFala={erroFala}>
-            <AreaTexto
-              rotulo={pergunta.enunciado}
-              rotuloOculto
-              value={texto}
-              onChange={(evento) => aoMudarTexto(evento.target.value)}
-              caixaAlta={caixaAlta}
-              erro={erro?.frase}
-              disabled={avaliando || gravador.fase !== "inicial"}
-            />
-          </CampoComMicrofone>
-          <div className={styles.rodapeAberto}>{indicadorRascunho}</div>
-          <div className={styles.acoesVivo}>
-            <Botao
-              variante="secundario"
-              onClick={() => void avaliar()}
-              carregando={avaliando}
-              disabled={avaliando || texto.trim().length === 0}
-              precisaDeRede
-            >
-              {t.botaoAvaliarDeNovo}
-            </Botao>
-            <Botao variante="ghost" onClick={cancelarEdicao} disabled={avaliando}>
-              {t.botaoCancelar}
-            </Botao>
-          </div>
-          {avaliando ? <Progresso mensagem={t.avaliando} /> : null}
-        </div>
-      );
-    }
-
-    if (erro) {
-      return (
-        <div className={styles.linhaVivo}>
-          <p className={styles.enunciado}>{pergunta.enunciado}</p>
-          <p className={styles.respostaEsmaecida}>{texto}</p>
-          <p className={styles.erroInline} role="alert">
-            <CircleAlert size={16} strokeWidth={1.5} aria-hidden="true" />
-            {erro.frase}
-          </p>
-          <Botao variante="secundario" onClick={() => void avaliar()} precisaDeRede>
-            {t.botaoTentarDeNovo}
-          </Botao>
-        </div>
-      );
-    }
-
-    const legenda = textosBriefing.faixaMeta[faixaMeta(avaliacao.nota, meta)];
-    return (
-      <button type="button" className={styles.resposta} onClick={() => setEditando(true)}>
-        <span className={styles.pergunta}>{pergunta.enunciado}</span>
-        <Nota valor={avaliacao.nota} tamanho="lista" meta={meta} />
-        <span className={styles.textoResposta}>{textoAvaliado ?? resposta}</span>
-        <span className={styles.faixaVivo}>
-          {legenda}
-          <span className={styles.editarAfordancia}>{t.botaoEditar}</span>
-        </span>
-      </button>
-    );
-  }
-
   /** Variavel local para o closure de `onUsar` abaixo nao perder o estreitamento de tipo do optional. */
   const exemploDaAvaliacao = avaliacao?.exemplo;
   const sugestaoDaAnalise = exemploDaAvaliacao
@@ -493,6 +454,72 @@ export function PerguntaCampo({
         onUsar: () => usarSugestaoEAbrirEdicao(exemploDaAvaliacao),
       }
     : undefined;
+
+  /**
+   * E37a, item 1 (achado do Gustavo e do Bruno: o campo que precisa de um botão para ser editado):
+   * o campo do briefing vivo é sempre editável, sem card fechado nem botão "editar". Sair do
+   * campo com o texto mudado só salva o rascunho (nunca avalia sozinho, diferente do wizard
+   * abaixo); a nota antiga fica marcada "de antes da edição" até a pessoa tocar em "Avaliar de
+   * novo". Erro de avaliação aparece embutido no campo (`erro?.frase`), sem um estado à parte.
+   */
+  if (variante === "vivo" && avaliacao) {
+    const textoMudouDesdeAUltimaAvaliacao = texto !== (textoAvaliado ?? resposta);
+    return (
+      <div className={styles.linhaVivo}>
+        <p className={styles.enunciado}>{pergunta.enunciado}</p>
+        <CampoComMicrofone gravador={gravador} erroFala={erroFala} aoCopiarParaIA={() => void copiarParaIA()} copiado={copiado}>
+          <AreaTexto
+            ref={areaRef}
+            rotulo={pergunta.enunciado}
+            rotuloOculto
+            value={texto}
+            onChange={(evento) => aoMudarTexto(evento.target.value)}
+            caixaAlta={caixaAlta}
+            erro={erro?.frase}
+            disabled={avaliando || gravador.fase !== "inicial"}
+          />
+        </CampoComMicrofone>
+        <div className={styles.rodapeAberto}>{indicadorRascunho}</div>
+        {textoMudouDesdeAUltimaAvaliacao ? (
+          <div className={styles.notaAntiga}>
+            <Nota valor={avaliacao.nota} tamanho="lista" meta={meta} />
+            <span>{t.notaAntigaAviso}</span>
+          </div>
+        ) : (
+          <>
+            <AnaliseQuatroPartes avaliacao={avaliacao} rotulos={textosBriefing.analiseRotulos} meta={meta} rotulosFaixa={textosBriefing.faixaMeta} />
+            {sugestaoDaAnalise ? (
+              <SugestaoResposta
+                rotulo={sugestaoDaAnalise.rotulo}
+                exemplo={exemploDaAvaliacao!}
+                aviso={t.avisoSugestao}
+                botaoUsar={sugestaoDaAnalise.botaoUsar}
+                onUsar={sugestaoDaAnalise.onUsar}
+              />
+            ) : null}
+          </>
+        )}
+        <div className={styles.acoesVivo}>
+          <Botao
+            variante="secundario"
+            onClick={() => void avaliar()}
+            carregando={avaliando}
+            disabled={avaliando || texto.trim().length === 0}
+            precisaDeRede
+          >
+            {t.botaoAvaliarDeNovo}
+          </Botao>
+        </div>
+        {avaliando ? <Progresso mensagem={t.avaliando} /> : null}
+        <Toast
+          texto={textoToast}
+          aberto={sugestaoAplicada !== null}
+          onFechar={() => setSugestaoAplicada(null)}
+          acao={{ rotulo: t.desfazerSugestao, onClique: desfazerSugestao }}
+        />
+      </div>
+    );
+  }
 
   /**
    * P1, item 8 (achado do Gustavo: o Bruno leu o exemplo de "como melhorar"
@@ -513,13 +540,16 @@ export function PerguntaCampo({
           readOnly
           caixaAlta={caixaAlta}
         />
-        <AnaliseQuatroPartes
-          avaliacao={avaliacao}
-          rotulos={textosBriefing.analiseRotulos}
-          meta={meta}
-          rotulosFaixa={textosBriefing.faixaMeta}
-          sugestao={sugestaoDaAnalise}
-        />
+        <AnaliseQuatroPartes avaliacao={avaliacao} rotulos={textosBriefing.analiseRotulos} meta={meta} rotulosFaixa={textosBriefing.faixaMeta} />
+        {sugestaoDaAnalise ? (
+          <SugestaoResposta
+            rotulo={sugestaoDaAnalise.rotulo}
+            exemplo={exemploDaAvaliacao!}
+            aviso={t.avisoSugestao}
+            botaoUsar={sugestaoDaAnalise.botaoUsar}
+            onUsar={sugestaoDaAnalise.onUsar}
+          />
+        ) : null}
         <p className={styles.fraseAjuste}>{t.fraseAjuste}</p>
         <Botao variante="ghost" onClick={() => setEditando(true)}>
           {t.botaoAjustarResposta}
@@ -549,7 +579,7 @@ export function PerguntaCampo({
     <div className={styles.cartaoAberto}>
       <Chip pergunta={pergunta} />
       {pergunta.ajuda ? <p className={styles.campoDica}>{pergunta.ajuda}</p> : null}
-      <CampoComMicrofone gravador={gravador} erroFala={erroFala}>
+      <CampoComMicrofone gravador={gravador} erroFala={erroFala} aoCopiarParaIA={() => void copiarParaIA()} copiado={copiado}>
         <AreaTexto
           ref={areaRef}
           rotulo={pergunta.enunciado}

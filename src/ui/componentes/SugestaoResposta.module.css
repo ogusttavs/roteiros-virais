@@ -1,0 +1,34 @@
+/**
+ * E37a, item 2 (design v2, `Briefing.dc.html`, `.sugestao`): borda tracejada, fundo de apoio
+ * (`--cor-fundo`, nunca `--cor-superficie` nem `--cor-superficie-recuada`, que são os fundos de
+ * campo e de cartão), sem nada que lembre um campo de resposta.
+ */
+.sugestao {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-fundo);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+  color: var(--cor-texto-suave);
+}
+
+.texto {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
+.aviso {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}

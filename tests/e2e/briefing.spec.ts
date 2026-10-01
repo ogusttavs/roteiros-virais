@@ -67,21 +67,19 @@ const TITULO_LIBERACAO = "Seu painel está aberto.";
  * `.first()` podia travar no botao de outra pergunta ja fechada, escondida
  * noutro bloco, que nunca fica visivel).
  */
+/**
+ * E37a, item 1: o briefing vivo deixou de fechar o campo depois de avaliar (ele é sempre
+ * editável, sem card fechado nem "ajustar resposta"). O sinal de "terminou", certo nos dois
+ * lugares (wizard em /comecar e vivo em /briefing), é o indicador "Lendo a sua resposta" sumir;
+ * `toBeHidden` do Playwright já resolve na hora quando ele nem chegou a aparecer (avaliação
+ * rápida demais para o teste pegar o estado intermediário).
+ */
 async function responderEAvaliar(page: Page, rotulo: string, texto: string): Promise<boolean> {
   await page.getByLabel(rotulo).fill(texto);
-  // "Avaliar esta resposta" no wizard (/comecar), "Avaliar de novo" no vivo (/briefing, editando).
+  // "Avaliar esta resposta" no wizard (/comecar), "Avaliar de novo" no vivo (/briefing).
   await page.getByRole("button", { name: /^avaliar/i }).first().click();
+  await expect(page.getByText("Lendo a sua resposta", { exact: false })).toBeHidden({ timeout: 15_000 });
   const liberado = page.getByRole("heading", { name: TITULO_LIBERACAO });
-  const campoFechado = page.getByLabel(rotulo);
-  const cartaoDestaPergunta = campoFechado.locator(
-    "xpath=ancestor::div[contains(@class, 'cartaoAberto') or contains(@class, 'cartaoFechado')][1]",
-  );
-  const ajustarRespostaDestaPergunta = cartaoDestaPergunta.getByRole("button", { name: "ajustar resposta" });
-  await Promise.race([
-    liberado.waitFor({ state: "visible" }),
-    campoFechado.waitFor({ state: "hidden" }),
-    ajustarRespostaDestaPergunta.waitFor({ state: "visible" }),
-  ]);
   return liberado.isVisible();
 }
 
@@ -314,7 +312,7 @@ test.describe("briefing pela tela", () => {
     await expect(page.getByRole("heading", { name: "O seu briefing" })).toBeVisible();
     await expect(page.getByText("como o sistema te entende")).toBeVisible();
 
-    await page.getByRole("button", { name: "editar" }).first().click();
+    // E37a, item 1: o campo do briefing vivo é sempre editável, sem botão "editar" para abrir.
     const primeiraPergunta = "Em poucas palavras, o que o seu negócio faz hoje";
     await responderEAvaliar(page, primeiraPergunta, "atendimento bom");
 

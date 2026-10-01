@@ -107,6 +107,12 @@ export type PerguntaBriefing = {
    * "P2 · 9,5"). Texto exato do brief, um por pergunta.
    */
   rotuloCurto: string;
+  /**
+   * E37a, item 3 (textos escritos pelo Fable em 01/10/2026, `PROXIMO.md`): entra no prompt que
+   * "Copiar para a sua IA" monta, na linha "Uma boa resposta tem:". Não substitui
+   * `oQueAIAProcura`, que continua sendo o critério da nota.
+   */
+  oQueUmaBoaRespostaTem: string;
 };
 
 const AJUDA_PADRAO_NEGOCIO = "Escreva como se fosse para alguém que nunca ouviu falar do seu ramo.";
@@ -124,6 +130,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "O que é feito, para quem, e o resultado final na vida da pessoa. Nota alta quando um leigo consegue visualizar a cena.",
+    oQueUmaBoaRespostaTem:
+      "O que você faz, para quem, e o que muda na vida de quem compra, dito de um jeito que alguém de fora do ramo consiga imaginar a cena.",
   },
   {
     id: "p2",
@@ -135,6 +143,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
       "Qual é o produto ou serviço que mais vende, e quanto custa em média? Se puder, diga também o que a pessoa leva junto: o que ela resolve, sente ou evita.",
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura: "Um item nomeado, um valor ou faixa, e o benefício em linguagem de cliente.",
+    oQueUmaBoaRespostaTem:
+      "O nome do produto ou serviço que mais sai, o preço ou a faixa de preço, e o que a pessoa ganha com ele nas palavras que um cliente usaria.",
   },
   {
     id: "p3",
@@ -147,6 +157,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       'Uma diferença que só ele poderia dizer, com história ou número. "Qualidade" e "atendimento humanizado" sem exemplo valem nota média.',
+    oQueUmaBoaRespostaTem:
+      'Uma diferença que só você poderia contar, com um caso que aconteceu de verdade ou um número. "Qualidade" e "bom atendimento" sem exemplo não contam.',
   },
   {
     id: "p4",
@@ -157,7 +169,14 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     enunciado:
       "Descreva o cliente que você mais gosta de atender: idade, onde mora, o que faz, e em que momento da vida está quando te procura.",
     ajuda: AJUDA_PADRAO_NEGOCIO,
-    oQueAIAProcura: "Uma pessoa, não um segmento. Momento de vida é o que mais ajuda o gancho.",
+    /**
+     * H2 (achado do Gustavo em 29/09/2026, no briefing da Overtake Pro): a rubrica pedia pessoa
+     * com nome; passa a pedir retrato. Copiado de `estrategia/briefing-e-rubricas.md`, seção 2, P4.
+     */
+    oQueAIAProcura:
+      "Um retrato que dê para enxergar, não um segmento: quem é, o que faz, em que situação está quando procura o negócio. Pode ser um tipo de cliente, não precisa ser uma pessoa real com nome. Momento de vida é o que mais ajuda o gancho.",
+    oQueUmaBoaRespostaTem:
+      "O retrato de um tipo de cliente que dê para enxergar: idade aproximada, onde mora, o que faz e o que está acontecendo na vida dele quando te procura. Sem nome de pessoa real.",
   },
   {
     id: "p5",
@@ -170,6 +189,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Frases em primeira pessoa do cliente. É a matéria-prima do gancho e do vídeo que vende.",
+    oQueUmaBoaRespostaTem:
+      "As frases que o cliente diz antes de fechar, do jeito que ele fala: a dúvida, o medo ou a desculpa. Entre aspas, se lembrar das palavras.",
   },
   {
     id: "p6",
@@ -181,6 +202,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
       "Quais perguntas seus clientes mais repetem no balcão, no WhatsApp ou na consulta? Liste pelo menos cinco.",
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura: "Perguntas literais. Cada uma vira um tema com chance de gerar cliente.",
+    oQueUmaBoaRespostaTem:
+      "Pelo menos cinco perguntas que os clientes repetem, escritas como eles perguntam, no balcão, no WhatsApp ou no atendimento.",
   },
   {
     id: "p7",
@@ -193,6 +216,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Uma ação principal e uma secundária. Define a chamada final padrão e a mistura da linha editorial (seção 5).",
+    oQueUmaBoaRespostaTem:
+      "Uma coisa principal que você quer que a pessoa faça depois do vídeo e uma segunda opção. Por exemplo: chamar no WhatsApp, e se não chamar, guardar o contato.",
   },
   {
     id: "p8",
@@ -205,6 +230,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Rede, ritmo real e um episódio. Um vídeo que já deu certo é evidência de nível conta antes mesmo da primeira coleta.",
+    oQueUmaBoaRespostaTem:
+      "Em que rede você posta, de quanto em quanto tempo de verdade, e um episódio: um vídeo que deu certo ou que deu errado e o que aconteceu.",
   },
   {
     id: "p9",
@@ -217,6 +244,7 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Frases literais, com gíria e ritmo da pessoa. É o que faz o roteiro soar como ele e não como texto de IA.",
+    oQueUmaBoaRespostaTem: "Três frases que você diz no dia a dia para o cliente, exatamente como saem, com a gíria e o jeito.",
   },
   {
     id: "p10",
@@ -228,6 +256,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Limites explícitos. Entram como proibição dura em todo roteiro e derrubam a nota de encaixe de um tema que os fira.",
+    oQueUmaBoaRespostaTem:
+      "O que nunca pode aparecer num vídeo seu: promessa que você não faz, palavra que não usa, assunto, tom ou pessoa que fica de fora.",
   },
   {
     id: "p11",
@@ -240,6 +270,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Uma lista de cenas filmáveis. É a pergunta que liga o briefing à tese do produto: os roteiros empurram o que um clone não consegue fazer, e isso só funciona se a IA souber o que existe para mostrar.",
+    oQueUmaBoaRespostaTem:
+      "Uma lista do que dá para filmar no seu dia: o lugar, a equipe, o equipamento, o produto sendo usado, o antes e depois, o bastidor. E o que não pode aparecer.",
   },
   {
     id: "p12",
@@ -252,6 +284,8 @@ const PERGUNTAS_NEGOCIO: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_NEGOCIO,
     oQueAIAProcura:
       "Handles válidos. Perfis admirados viram referência de tom; concorrentes entram na camada exclusiva de pesquisa (escopo 5.6).",
+    oQueUmaBoaRespostaTem:
+      "Uma frase por perfil: o que você gosta em cada um que admira e o que os concorrentes fazem que você faria diferente. Os @ vão nos campos acima.",
   },
 ];
 
@@ -268,6 +302,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       'Uma linha de vida concreta (o que a pessoa faz com as mãos e com o tempo dela, não o cargo), com um número ou um lugar. "Empresário e criador de conteúdo" sem o que faz no dia vale nota média.',
+    oQueUmaBoaRespostaTem:
+      "O que você faz no seu dia de verdade, há quanto tempo e de onde vem, com um número ou um lugar. Não o cargo: o que você faz com o seu tempo.",
   },
   {
     id: "p2",
@@ -280,6 +316,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "O território: assuntos nomeados e a prova de que ela vive aquilo (o que já fez, quanto tempo, o que construiu). É o que decide de que assunto os temas do dia saem.",
+    oQueUmaBoaRespostaTem:
+      "Um, dois ou no máximo três assuntos pelos quais você quer ser lembrado, e a prova de que vive cada um: o que já fez, por quanto tempo, o que construiu.",
   },
   {
     id: "p3",
@@ -291,6 +329,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Um episódio que dê para contar em 30 segundos, com o antes, a virada e o depois. É matéria de gancho pessoal e do vídeo de apresentação.",
+    oQueUmaBoaRespostaTem:
+      "Um episódio da sua história que dê para contar em meio minuto, com época e lugar: como era antes, o que virou, como ficou depois.",
   },
   {
     id: "p4",
@@ -303,6 +343,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Um retrato de tipo que dê para enxergar (nunca nome de pessoa real, a mesma regra do negócio). O momento de vida é o que mais ajuda o gancho.",
+    oQueUmaBoaRespostaTem:
+      "O retrato do tipo de pessoa que você quer que te siga: o que ela faz, em que momento da vida está e o que ela quer e ainda não tem. Sem nome de pessoa real.",
   },
   {
     id: "p5",
@@ -315,6 +357,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       'Frases em primeira pessoa do público ("como você faz para...", "queria ter coragem de..."). É a matéria-prima do gancho e do vídeo que segura quem chegou.',
+    oQueUmaBoaRespostaTem:
+      "O que essa pessoa quer ver, aprender ou sentir, e as perguntas e comentários que ela te manda, com as palavras dela.",
   },
   {
     id: "p6",
@@ -327,6 +371,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       'Posicionamentos literais com o motivo. Cada um vira um tema com chance de gerar conversa, e entram no perfil como "posicionamentos".',
+    oQueUmaBoaRespostaTem:
+      "Pelo menos três opiniões suas que geram conversa, cada uma com o motivo em uma frase. Aquilo em que você acredita e muita gente do seu meio discorda.",
   },
   {
     id: "p7",
@@ -339,6 +385,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Uma ação principal e uma secundária, e como a pessoa ganha com isso: pelos negócios dela (quem fala é a pessoa, o negócio aparece como parte da vida, a fábrica, o produto na mão, o cliente, nunca como anúncio) ou pela influência (as marcas que quer atrair, o que já fez com marcas). Define a chamada final padrão e a linha editorial.",
+    oQueUmaBoaRespostaTem:
+      "O que você quer que aconteça depois do vídeo (uma coisa principal e uma segunda), e como isso te traz resultado: qual negócio seu deve aparecer mais, ou que tipo de marca você quer atrair.",
   },
   {
     id: "p8",
@@ -350,6 +398,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Rede, ritmo real e um episódio com o motivo. Um vídeo que já deu certo é evidência de nível conta antes da primeira coleta.",
+    oQueUmaBoaRespostaTem:
+      "Em que rede você posta, de quanto em quanto tempo de verdade, o vídeo que mais deu certo e por que você acha que deu.",
   },
   {
     id: "p9",
@@ -361,6 +411,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
       "Como você fala de verdade? Escreva três frases que você diz sempre, do jeito que saem, e diga o seu tom: brincalhão, direto, sério, provocador, calmo.",
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura: "Frases literais com gíria e ritmo, mais o tom nomeado. É o que faz o roteiro soar como ela.",
+    oQueUmaBoaRespostaTem:
+      "Três frases que você diz sempre, do jeito que saem, e o seu tom em uma palavra: brincalhão, direto, sério, provocador, calmo.",
   },
   {
     id: "p10",
@@ -373,6 +425,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Limites explícitos. Numa pessoa eles pesam mais que num negócio, porque a vida dela é o conteúdo: entram como proibição dura em todo roteiro.",
+    oQueUmaBoaRespostaTem:
+      "O que fica fora da câmera: assunto, pessoa, lugar, palavra, e o que da sua vida você não mostra (família, casa, dinheiro, o que for).",
   },
   {
     id: "p11",
@@ -385,6 +439,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Uma lista de cenas filmáveis da vida real dela. É a pergunta que liga o briefing à tese: o roteiro da pessoa empurra o que um clone nunca faz, o lugar de verdade e a pessoa de verdade nele.",
+    oQueUmaBoaRespostaTem:
+      "Como é a sua semana e o que dela dá para filmar: lugares, pessoas com quem trabalha, o que você faz com as mãos, viagens, treino, bastidor. E o que não pode aparecer.",
   },
   {
     id: "p12",
@@ -397,6 +453,8 @@ const PERGUNTAS_PESSOA: PerguntaBriefing[] = [
     ajuda: AJUDA_PADRAO_PESSOA,
     oQueAIAProcura:
       "Handles válidos. Admirados viram referência de tom; os parecidos entram na camada exclusiva de pesquisa no lugar dos concorrentes (uma pessoa não tem concorrente, tem vizinho de assunto).",
+    oQueUmaBoaRespostaTem:
+      "Uma frase por perfil: o que você gosta em cada um que admira e o que os parecidos com você fazem que você faria diferente. Os @ vão nos campos acima.",
   },
 ];
 

@@ -101,10 +101,20 @@
   background: var(--cor-superficie);
 }
 
-.linhaVivo + .linhaVivo,
-.linhaVivo + .resposta,
-.resposta + .linhaVivo {
+.linhaVivo + .linhaVivo {
   margin-top: var(--espaco-4);
+}
+
+/** E37a, item 1: a nota de antes da edição, até a pessoa avaliar de novo (design v2, ".nota-antiga"). */
+.notaAntiga {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
 }
 
 .enunciado {
@@ -112,11 +122,6 @@
   font-size: var(--tamanho-secundario);
   font-weight: 500;
   color: var(--cor-titulo);
-}
-
-.respostaEsmaecida {
-  margin: 0;
-  color: var(--cor-texto-suave);
 }
 
 .acoesVivo {
@@ -135,11 +140,6 @@
   color: var(--cor-erro);
 }
 
-/**
- * P2, item 2: "Responder falando" ao lado do campo. Alvo redondo provisório (o Opus desenha o
- * estado definitivo depois, mesmo espírito da nota em `AnaliseQuatroPartes`/P1, item 8); por
- * enquanto, o mesmo tamanho de alvo de toque dos botões do painel (2,75rem).
- */
 .linhaComMicrofone {
   display: flex;
   align-items: flex-start;
@@ -151,25 +151,37 @@
   min-width: 0;
 }
 
-.botaoFalar {
+/**
+ * P2, item 2, com o desenho definitivo do Opus (E37a, item 3, `Briefing.dc.html`, ".acoes-campo"):
+ * "Responder falando" e "Copiar para a sua IA" lado a lado, com texto e ícone, sem o alvo redondo
+ * provisório de antes.
+ */
+.acoesCampo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+}
+
+.botaoAcaoCampo {
   display: inline-flex;
-  flex-shrink: 0;
   align-items: center;
-  justify-content: center;
-  width: 2.75rem;
-  height: 2.75rem;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
   border: 1px solid var(--cor-borda);
-  border-radius: 999px;
+  border-radius: var(--raio-pill);
   background: var(--cor-superficie);
   color: var(--cor-acao);
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
   cursor: pointer;
 }
 
-.botaoFalar:hover {
+.botaoAcaoCampo:hover {
   background: var(--cor-superficie-hover);
 }
 
-.botaoFalar:disabled {
+.botaoAcaoCampo:disabled {
   opacity: 0.6;
   cursor: default;
 }
@@ -183,6 +195,17 @@
   margin: 0;
   font-size: var(--tamanho-legenda);
   color: var(--cor-texto-dica);
+}
+
+/** E37a, item 3: "Copiado..." embaixo dos botões (design v2: nunca um aviso que some sozinho). */
+.copiado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  color: var(--cor-positivo);
 }
 
 /**
@@ -206,59 +229,3 @@
   opacity: 0.8;
 }
 
-/* ---------- Briefing vivo: linha fechada (Briefing.dc.html, ".resposta") ---------- */
-
-.resposta {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: var(--espaco-2) var(--espaco-4);
-  align-items: start;
-  width: 100%;
-  padding: var(--espaco-5);
-  border: 1px solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-  background: var(--cor-superficie);
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
-}
-
-.resposta:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.resposta:focus-visible {
-  outline: none;
-  box-shadow: var(--sombra-foco);
-}
-
-.resposta + .resposta {
-  margin-top: var(--espaco-4);
-}
-
-.pergunta {
-  font-size: var(--tamanho-secundario);
-  font-weight: 500;
-  color: var(--cor-titulo);
-}
-
-.textoResposta {
-  grid-column: 1;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-}
-
-.faixaVivo {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--espaco-3);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-texto-dica);
-}
-
-.editarAfordancia {
-  color: var(--cor-acao);
-  font-weight: 500;
-}
