@@ -70,6 +70,10 @@
 }
 
 .chip {
+  /* alvo de toque de 44 px (layout.spec.ts reprovava na CI com 29 px de altura) */
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
   padding: var(--espaco-1) var(--espaco-3);
   border: var(--largura-borda) solid var(--cor-borda);
   border-radius: var(--raio-pill);
