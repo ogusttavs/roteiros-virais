@@ -540,17 +540,6 @@ export function RoteiroTela({
   }
 
   const referencia = corpo.edicao.referencia;
-  /**
-   * V15, item 4: do tablet deitado para cima, "De onde veio" e o cartão de
-   * trabalho (Como editar; no Story, Por que assim) saem da coluna e viram o
-   * lado (`styles.lado`, `RoteiroTela.module.css`). Cartões (Story ou sem
-   * fala) já são o próprio texto a seguir e ficam na coluna; só Reels
-   * falado tem "Como editar" à parte.
-   */
-  const ehCartoes = Boolean((roteiro.estilo === "sem_fala" || roteiro.formato === "story") && corpo.cartoes);
-  const temBlocoGrudado = !ehCartoes || (roteiro.formato === "story" && corpo.porQueAssim.length > 0);
-  const temDeOndeVeio = Boolean((referencia && video) || corpo.semEvidencia);
-  const temLado = !editando && (temDeOndeVeio || temBlocoGrudado);
 
   return (
     <div className={[styles.pagina, semConexao ? styles.semRede : ""].filter(Boolean).join(" ")}>
@@ -614,7 +603,6 @@ export function RoteiroTela({
         ) : null}
 
         <div className={styles.corpoComLado}>
-        <div className={styles.colunaPrincipal}>
         <div className={styles.cabecalhoTela}>
           <div className={styles.topoRoteiro}>
             <h1>{corpo.titulo}</h1>
@@ -799,81 +787,69 @@ export function RoteiroTela({
                   itens={itensCartaoStory(cartao)}
                 />
               ))
-            ) : null}
-
-            {!editando && corpo.legenda ? (
-              <section className={styles.referenciaVazia}>
-                <h2>{textosRoteiro.legenda}</h2>
-                <p>{corpo.legenda}</p>
-                <button
-                  type="button"
-                  onClick={() => void copiarLegenda()}
-                  className={styles.linkReprovar}
-                >
-                  <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
-                  {textosRoteiro.menu.copiar}
-                </button>
-              </section>
-            ) : null}
+            ) : (
+              /*
+               * V15, item 4 (correção pedida pelo Fable): mesma posição de sempre no DOM, logo
+               * depois de "Onde gravar" (a ordem no celular não muda); `.ladoGrudado` só move isto
+               * visualmente a partir de 1024px, por CSS.
+               */
+              <div className={styles.ladoGrudado}>
+                <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+              </div>
+            )}
           </>
         )}
-        </div>
 
-        {/*
-          V15, item 4: "De onde veio" sobe com a página (sem sticky, o lado
-          inteiro é mais alto que a tela); "Como editar" (no Story, "Por que
-          assim") gruda no alto sozinho, porque é o que a pessoa consulta
-          enquanto lê (`.ladoGrudado`, `RoteiroTela.module.css`).
-        */}
-        {temLado ? (
-          <div className={styles.lado}>
-            {referencia && video ? (
-              <CartaoDeOndeVeio
-                titulo={textosRoteiro.referencia}
-                conta={video.contaNome ?? video.contaHandle}
-                multiplo={formatarMultiplo(video.foraDaCurva)}
-                texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva), video.contaMedianaOrigem)}. ${textosRoteiro.oQueFuncionouAli} ${comInicialMinuscula(video.porQueFuncionou ?? "")}`.trim()}
-                segundoFormatado={
-                  referencia.segundo !== null && referencia.segundo > 0
-                    ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo))
-                    : null
-                }
-                botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
-                forca={
-                  corpo.forcaEvidencia ? textosRoteiro.forcaEvidencia[corpo.forcaEvidencia] : null
-                }
-              />
-            ) : corpo.semEvidencia ? (
-              <section className={styles.referenciaVazia}>
-                <h2>{textosRoteiro.referencia}</h2>
-                <p>
-                  {roteiro.origem === "momento"
-                    ? textosRoteiro.semEvidenciaMomento
-                    : textosRoteiro.semEvidencia}
-                </p>
-              </section>
-            ) : null}
+        {!editando && corpo.legenda ? (
+          <section className={styles.referenciaVazia}>
+            <h2>{textosRoteiro.legenda}</h2>
+            <p>{corpo.legenda}</p>
+            <button
+              type="button"
+              onClick={() => void copiarLegenda()}
+              className={styles.linkReprovar}
+            >
+              <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
+              {textosRoteiro.menu.copiar}
+            </button>
+          </section>
+        ) : null}
 
-            {temBlocoGrudado ? (
-              <div className={styles.ladoGrudado}>
-                {ehCartoes ? (
-                  corpo.porQueAssim.length > 0 ? (
-                    <BlocoEdicao
-                      titulo={textosRoteiro.porQueAssim}
-                      itens={itensPorQueAssim(corpo.porQueAssim)}
-                    />
-                  ) : null
-                ) : (
-                  <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
-                )}
-              </div>
-            ) : null}
+        {/* V15, item 4: mesma posição de sempre (depois da legenda); sempre que a lista tiver
+            item, em qualquer formato e estilo (Reels sem fala com cartões também pode ter). */}
+        {corpo.porQueAssim.length > 0 ? (
+          <div className={styles.ladoGrudado}>
+            <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
           </div>
         ) : null}
 
+        {referencia && video ? (
+          <div className={styles.ladoDeOndeVeio}>
+            <CartaoDeOndeVeio
+              titulo={textosRoteiro.referencia}
+              conta={video.contaNome ?? video.contaHandle}
+              multiplo={formatarMultiplo(video.foraDaCurva)}
+              texto={`${rotuloMultiploConta(classificarMultiplo(video.foraDaCurva), video.contaMedianaOrigem)}. ${textosRoteiro.oQueFuncionouAli} ${comInicialMinuscula(video.porQueFuncionou ?? "")}`.trim()}
+              segundoFormatado={
+                referencia.segundo !== null && referencia.segundo > 0
+                  ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo))
+                  : null
+              }
+              botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
+              forca={corpo.forcaEvidencia ? textosRoteiro.forcaEvidencia[corpo.forcaEvidencia] : null}
+            />
+          </div>
+        ) : corpo.semEvidencia ? (
+          <section className={[styles.referenciaVazia, styles.ladoDeOndeVeio].join(" ")}>
+            <h2>{textosRoteiro.referencia}</h2>
+            <p>
+              {roteiro.origem === "momento" ? textosRoteiro.semEvidenciaMomento : textosRoteiro.semEvidencia}
+            </p>
+          </section>
+        ) : null}
+
         {/* Outras versões deste tema (design v2): a comparação com nota é a E26, ainda não construída.
-            Só a marcação, no estado vazio (PROXIMO.md, D2 parte 1, item 6). Fora do lado e depois
-            dele no DOM, para a ordem no celular continuar a de sempre (achado da revisão visual). */}
+            Só a marcação, no estado vazio (PROXIMO.md, D2 parte 1, item 6). */}
         <section className={styles.versoesVazio}>
           <h2>{textosRoteiro.outrasVersoes}</h2>
           <p>{textosRoteiro.outrasVersoesEmBreve}</p>

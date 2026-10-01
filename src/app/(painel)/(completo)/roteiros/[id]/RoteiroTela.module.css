@@ -105,29 +105,19 @@
 }
 
 /**
- * V15, item 4 (design v2, passo 7): do tablet deitado para cima, "De onde
- * veio" e o cartão de trabalho ("Como editar"; no Story, "Por que assim")
- * saem da coluna e viram um lado (`.lado`) ao lado dela, começando no alto,
- * junto do título. Até 1023px as duas são `display: contents`: tudo flui na
- * ordem de sempre, sem nenhuma mudança visual.
+ * V15, item 4 (design v2, passo 7; corrigido na revisão do Fable: a primeira
+ * versão movia "De onde veio" e o cartão de trabalho para depois de tudo no
+ * DOM, e isso mudava a ordem no celular). "De onde veio" e o cartão de
+ * trabalho ("Como editar"; em Story e sem fala, "Por que assim") ficam
+ * exatamente onde sempre estiveram no documento; só a partir de 1024px, por
+ * CSS, é que viram a segunda coluna (`grid-column: 2`). Até 1023px
+ * `.corpoComLado` nem é grade (os filhos fluem na ordem de sempre).
  *
  * Diferente de Objetivo e Tema livre (lado curto, gruda inteiro): aqui o
  * lado é mais alto que a tela, então só o cartão de trabalho gruda
- * (`.ladoGrudado`), e "De onde veio" sobe com a página junto do resto do
- * lado, sem posição fixa própria.
+ * (`.ladoGrudado`), e "De onde veio" (`.ladoDeOndeVeio`) sobe com a página,
+ * sem posição fixa própria.
  */
-.corpoComLado {
-  display: contents;
-}
-
-.colunaPrincipal {
-  display: contents;
-}
-
-.lado {
-  display: contents;
-}
-
 @media (min-width: 1024px) {
   .corpoComLado {
     display: grid;
@@ -136,15 +126,23 @@
     align-items: start;
   }
 
-  .colunaPrincipal {
-    display: grid;
-    gap: inherit;
+  /* Tudo que não é marcado como lado cai na coluna de leitura, na ordem em que já está no DOM. */
+  .corpoComLado > *:not(.ladoGrudado):not(.ladoDeOndeVeio) {
     grid-column: 1;
   }
 
-  .lado {
-    display: grid;
-    gap: var(--espaco-6);
+  /*
+   * "De onde veio" fica antes do cartão de trabalho na coluna visual (item 4:
+   * "De onde veio em cima"), mesmo vindo depois dele no documento: a grade
+   * (colocação automática) usa a ordem modificada por `order`, não a ordem
+   * do DOM, só para decidir em que linha cada um cai. O DOM em si não muda.
+   */
+  .corpoComLado > .ladoDeOndeVeio {
+    order: -1;
+  }
+
+  .corpoComLado > .ladoGrudado,
+  .corpoComLado > .ladoDeOndeVeio {
     grid-column: 2;
   }
 
@@ -247,18 +245,6 @@
   padding: var(--espaco-5);
   border: var(--largura-borda) dashed var(--cor-borda-forte);
   border-radius: var(--raio-lg);
-}
-
-/**
- * V15, item 4: "Outras versões" fica fora do lado (abaixo das duas colunas,
- * na largura da coluna de leitura), e depois dele no DOM, para a ordem no
- * celular continuar a de sempre; `grid-column: 1` o devolve para debaixo do
- * texto, não ao lado dele.
- */
-@media (min-width: 1024px) {
-  .corpoComLado > .versoesVazio {
-    grid-column: 1;
-  }
 }
 
 .versoesVazio h2 {
