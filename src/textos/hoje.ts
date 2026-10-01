@@ -147,9 +147,10 @@ export const textosHoje = {
     reels: { hoje: "Reels de hoje", outroDia: "Reels" },
     stories: { hoje: "Stories de hoje", outroDia: "Stories" },
     /** `aria-label` de cada dia da semana (dúvida, ícones da semana): dia mais o que tem marcado, sempre lido por extenso. */
-    diaAgendaRotulo: (diaDaSemanaCompleto: string, diaDoMes: number, temReels: boolean, qtdStories: number) => {
+    diaAgendaRotulo: (diaDaSemanaCompleto: string, diaDoMes: number, qtdReels: number, qtdStories: number) => {
       const marcas: string[] = [];
-      if (temReels) marcas.push("1 Reels");
+      if (qtdReels === 1) marcas.push("1 Reels");
+      if (qtdReels > 1) marcas.push(`${qtdReels} Reels`);
       if (qtdStories === 1) marcas.push("1 Story");
       if (qtdStories > 1) marcas.push(`${qtdStories} Stories`);
       const oQueTem = marcas.length > 0 ? marcas.join(" e ") : "nada marcado";

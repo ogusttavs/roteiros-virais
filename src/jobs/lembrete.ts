@@ -98,10 +98,10 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
       if (!marca.nichoId || !(await temasDoDiaOuRecente(marca.nichoId, hoje))) continue;
       const [planoHoje, agendaHoje] = await Promise.all([planoDoDia(marca.id, hoje), agendaDoDia(marca.id, hoje)]);
-      const itensAgenda: ItemAgendaPendente[] = [
-        ...(agendaHoje.reels ? [{ titulo: agendaHoje.reels.titulo, status: agendaHoje.reels.status }] : []),
-        ...agendaHoje.stories.map((item) => ({ titulo: item.titulo, status: item.status })),
-      ];
+      const itensAgenda: ItemAgendaPendente[] = [...agendaHoje.reels, ...agendaHoje.stories].map((item) => ({
+        titulo: item.titulo,
+        status: item.status,
+      }));
       nomesPendentes.push({
         nome: marca.nome,
         planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),

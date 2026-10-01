@@ -1,36 +1,20 @@
 /**
- * O plano `sem_limite` (V9b-0, `PROXIMO.md`): historicamente, a marca com o
- * interruptor ligado gerava quantos roteiros quisesse no mesmo dia e via um
- * cartão por roteiro, sempre com os três temas visíveis abaixo; a marca
- * `padrao` (o padrão do schema) via só um cartão, com "Ver os outros temas de
- * hoje" e "Trocar".
+ * O plano é "quantos roteiros quiser por dia", para toda marca hoje (decisão do Gustavo de
+ * 25/09/2026 e de 01/10/2026; revisão do Fable no PR #90: esconder o Reels mais antigo do dia era
+ * regressão, quem prepara dois vídeos para o mesmo dia perdia um de vista). A Agenda (`/hoje`)
+ * mostra todos os Reels do dia: o primeiro a gravar em destaque, os outros logo abaixo, em linhas
+ * como as dos Stories. `clientes.plano` (`padrao`/`sem_limite`) não muda mais nada visível na
+ * tela, nos dois planos: estes dois testes confirmam isso, gerando dois roteiros no mesmo dia e
+ * vendo os dois na Agenda, com cada um dos dois valores do campo.
  *
- * TODO(e2e-fix): depois da E39a (Hoje virou a agenda, Criar virou a oficina),
- * essa distinção não aparece mais em lugar nenhum da UI nova, para nenhum dos
- * dois planos. `/criar/temas` (`TemasTela.tsx`) sempre mostra os três temas
- * com o botão "Quero esse" (nunca "Escrever o roteiro"); `/hoje`
- * (`HojeTela.tsx`, a agenda) só mostra o Reels mais recente do dia, nunca uma
- * lista com contagem ("Seus roteiros de hoje (n)") (comentário em
- * `agendaDoDia`, `src/servicos/roteiro.ts`: "Com mais de um Reels no mesmo
- * dia... fica o mais recente; os demais continuam no Histórico"). Os textos
- * `seusRoteirosDeHoje`, `verOutros`, `esconderOutros`, `contagemTemas` e
- * `trocarTemaAviso` (`src/textos/hoje.ts`) não são mais referenciados em
- * nenhum componente. Isso parece um gap real deixado pela E39a (o plano
- * `sem_limite` continua no schema e no admin, `SeletorPlanoAdmin.tsx`, mas
- * sem efeito visível no painel do cliente), não só um seletor velho; registrado
- * no relatório desta rodada para o Fable decidir se o `sem_limite` volta ao
- * painel ou se o plano sai de cena. Os dois testes abaixo cobrem só o que dá
- * para confirmar na UI atual: gerar funciona nos dois planos, e os temas
- * continuam visíveis depois de gerar um roteiro.
- *
- * Mesma lição de `temas-do-dia.spec.ts` e `roteiro.spec.ts`: grava briefing e
- * tema do dia direto no banco, e deixa só a geração do roteiro passar pelo
- * navegador, contra o `AI_PROVIDER=mock` do servidor. Nicho próprio
- * ("e2e-sem-limite"), sem `resetarSchema` (o seed roda uma vez só, no
+ * Mesma lição de `temas-do-dia.spec.ts` e `roteiro.spec.ts`: grava briefing e tema do dia direto
+ * no banco, e deixa só a geração do roteiro passar pelo navegador, contra o `AI_PROVIDER=mock` do
+ * servidor. Nicho próprio ("e2e-sem-limite"), sem `resetarSchema` (o seed roda uma vez só, no
  * globalSetup).
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
+import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -106,7 +90,9 @@ async function escolherTemaEGerar(page: Page, tituloTema: string) {
   await cartao.locator("../..").getByRole("button", { name: "Quero esse" }).click();
 
   await expect(page).toHaveURL(/\/criar\/objetivo/);
-  await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
+  // "Mais gente me conhecer" (alcance) é o único objetivo que sugere Reels
+  // (`sugerirFormatoPeloObjetivo`); este teste prova o destaque de Reels da Agenda.
+  await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
   await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
   await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 }
@@ -115,6 +101,14 @@ test.describe("plano por marca (V9b-0)", () => {
   let nichoId: number;
 
   test.beforeAll(async () => {
+    // Seguro para dois testes do mesmo describe caindo em workers diferentes (beforeAll roda por
+    // worker, não uma vez só por arquivo; achado desta prova): ver `aceite-termos.spec.ts`.
+    const [jaExiste] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.slug, "e2e-sem-limite"));
+    if (jaExiste) {
+      nichoId = jaExiste.id;
+      return;
+    }
+
     const [nicho] = await db()
       .insert(nichos)
       .values({ slug: "e2e-sem-limite", nome: "[teste] Sem limite" })
@@ -126,10 +120,10 @@ test.describe("plano por marca (V9b-0)", () => {
       { titulo: "tema sem limite 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
       { titulo: "tema sem limite 3", descricao: "descricao 3", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
     ];
-    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas }).onConflictDoNothing();
   });
 
-  test("plano sem_limite: gera roteiro de dois temas diferentes no mesmo dia, com os temas sempre visiveis", async ({
+  test("plano sem_limite: gera roteiro de dois temas diferentes no mesmo dia, os dois visiveis no Hoje", async ({
     page,
   }) => {
     await criarClienteComPlano("e2e-sem-limite-a", "e2e-sem-limite-a@exemplo.teste", nichoId, "sem_limite");
@@ -137,17 +131,17 @@ test.describe("plano por marca (V9b-0)", () => {
 
     await escolherTemaEGerar(page, "tema sem limite 1");
 
-    // TODO(e2e-fix): a agenda nova (`HojeTela.tsx`) só mostra o Reels mais recente do dia, para
-    // qualquer plano; não há mais lista nem contagem em /hoje (ver o comentário no topo deste
-    // arquivo). Confirma só que o roteiro de hoje aparece.
+    // Primeiro Reels do dia: o destaque da Agenda.
     await page.goto("/hoje");
-    await expect(page.getByText("tema sem limite 1")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
 
     // Os tres temas continuam visiveis, mesmo com um roteiro ja gerado hoje.
     await escolherTemaEGerar(page, "tema sem limite 2");
 
-    // O mais recente substitui o anterior na agenda (comportamento documentado de `agendaDoDia`).
+    // Revisão do Fable no PR #90: os dois Reels do dia ficam visiveis, o segundo numa linha
+    // abaixo do destaque (nunca escondendo o primeiro).
     await page.goto("/hoje");
+    await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
     await expect(page.getByText("tema sem limite 2")).toBeVisible();
 
     // Os temas continuam visiveis mesmo com dois roteiros ja gerados hoje.
@@ -155,19 +149,22 @@ test.describe("plano por marca (V9b-0)", () => {
     await expect(page.getByRole("heading", { name: "tema sem limite 3" })).toBeVisible();
   });
 
-  test("plano padrao: gerar um roteiro tambem funciona, com os temas continuando visiveis", async ({ page }) => {
+  test("plano padrao: gerar dois roteiros no mesmo dia tambem mostra os dois no Hoje", async ({ page }) => {
     await criarClienteComPlano("e2e-sem-limite-b", "e2e-sem-limite-b@exemplo.teste", nichoId, "padrao");
     await entrar(page, "e2e-sem-limite-b@exemplo.teste");
 
     await escolherTemaEGerar(page, "tema sem limite 1");
-
-    // TODO(e2e-fix): ver o comentário no topo deste arquivo. "Ver os outros temas de hoje" e
-    // "Trocar" não existem mais; /criar/temas já mostra os três temas direto, para os dois planos.
     await page.goto("/hoje");
-    await expect(page.getByText("tema sem limite 1")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
+
+    // O plano "padrao" nao limita mais quantos Reels aparecem no mesmo dia (so o campo no banco
+    // continua existindo; revisão do Fable no PR #90).
+    await escolherTemaEGerar(page, "tema sem limite 2");
+    await page.goto("/hoje");
+    await expect(page.getByRole("heading", { name: "tema sem limite 1" })).toBeVisible();
+    await expect(page.getByText("tema sem limite 2")).toBeVisible();
 
     await page.goto("/criar/temas");
-    await expect(page.getByRole("heading", { name: "tema sem limite 2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema sem limite 3" })).toBeVisible();
   });
 });

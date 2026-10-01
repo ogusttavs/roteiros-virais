@@ -117,7 +117,7 @@ export function HojeTela({
     iniciarTransicao(() => router.refresh());
   }
 
-  const diaVazio = agenda.reels === null && agenda.stories.length === 0;
+  const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0;
 
   return (
     <div className={styles.pagina}>
@@ -186,7 +186,7 @@ export function HojeTela({
                   aria-label={textosHoje.agenda.diaAgendaRotulo(
                     diaDaSemanaCompleto(dia.data),
                     dia.diaDoMes,
-                    dia.marca.temReels,
+                    dia.marca.qtdReels,
                     dia.marca.qtdStories,
                   )}
                   className={[styles.diaAgenda, dia.hoje ? styles.diaAgendaHoje : ""].filter(Boolean).join(" ")}
@@ -195,7 +195,8 @@ export function HojeTela({
                   <span className={styles.nomeDia}>{dia.diaDaSemanaCurto}</span>
                   <span className={styles.numero}>{dia.diaDoMes}</span>
                   <span className={styles.marcas}>
-                    {dia.marca.temReels ? <i className={styles.marcaReels} aria-hidden="true" /> : null}
+                    {dia.marca.qtdReels > 0 ? <i className={styles.marcaReels} aria-hidden="true" /> : null}
+                    {dia.marca.qtdReels > 1 ? <b className={styles.contaStory}>{dia.marca.qtdReels}</b> : null}
                     {dia.marca.qtdStories > 0 ? <i className={styles.marcaStory} aria-hidden="true" /> : null}
                     {dia.marca.qtdStories > 1 ? <b className={styles.contaStory}>{dia.marca.qtdStories}</b> : null}
                   </span>
@@ -231,24 +232,47 @@ export function HojeTela({
             <div className={styles.diaColunas}>
               <section className={styles.secaoDia} aria-labelledby="t-reels">
                 <h2 id="t-reels">{ehHoje ? textosHoje.agenda.reels.hoje : textosHoje.agenda.reels.outroDia}</h2>
-                {agenda.reels ? (
-                  <article className={styles.reelsDia}>
-                    <div className={styles.linhaTopo}>
-                      <span className={styles.objetivoDoDia}>
-                        {ROTULO_TEMA_CARTAO[agenda.reels.objetivo]} · {agenda.reels.duracaoS} segundos
-                      </span>
-                      <EstadoItem item={agenda.reels} ehHoje={ehHoje} />
-                    </div>
-                    <h3>{agenda.reels.titulo}</h3>
-                    <button
-                      type="button"
-                      className={styles.botaoPrimario}
-                      aria-busy={acao === `item-${agenda.reels.id}` || undefined}
-                      onClick={() => ir(`item-${agenda.reels!.id}`, `/roteiros/${agenda.reels!.id}`)}
-                    >
-                      {textosHoje.agenda.abrirRoteiro}
-                    </button>
-                  </article>
+                {agenda.reels.length > 0 ? (
+                  <>
+                    <article className={styles.reelsDia}>
+                      <div className={styles.linhaTopo}>
+                        <span className={styles.objetivoDoDia}>
+                          {ROTULO_TEMA_CARTAO[agenda.reels[0].objetivo]} · {agenda.reels[0].duracaoS} segundos
+                        </span>
+                        <EstadoItem item={agenda.reels[0]} ehHoje={ehHoje} />
+                      </div>
+                      <h3>{agenda.reels[0].titulo}</h3>
+                      <button
+                        type="button"
+                        className={styles.botaoPrimario}
+                        aria-busy={acao === `item-${agenda.reels[0].id}` || undefined}
+                        onClick={() => ir(`item-${agenda.reels[0].id}`, `/roteiros/${agenda.reels[0].id}`)}
+                      >
+                        {textosHoje.agenda.abrirRoteiro}
+                      </button>
+                    </article>
+                    {agenda.reels.length > 1 ? (
+                      <div className={styles.listaAgendaCartao}>
+                        <ol className={styles.listaAgenda}>
+                          {agenda.reels.slice(1).map((item) => (
+                            <li key={item.id}>
+                              <button
+                                type="button"
+                                className={styles.itemAgenda}
+                                aria-busy={acao === `item-${item.id}` || undefined}
+                                onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
+                              >
+                                <span className={styles.momento}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                                <span className={styles.tituloItem}>{item.titulo}</span>
+                                <EstadoItem item={item} ehHoje={ehHoje} />
+                                <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
+                              </button>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    ) : null}
+                  </>
                 ) : (
                   <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
                 )}

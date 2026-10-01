@@ -1550,7 +1550,7 @@ function segundaDaSemanaISO(dataISO: string): string {
 
 const DIAS_DA_SEMANA_CURTO = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
 
-export type MarcaDiaAgenda = { temReels: boolean; qtdStories: number };
+export type MarcaDiaAgenda = { qtdReels: number; qtdStories: number };
 export type DiaDaSemanaAgenda = {
   data: string;
   diaDoMes: number;
@@ -1561,8 +1561,10 @@ export type DiaDaSemanaAgenda = {
 
 /**
  * E39a, item 3: a semana (segunda a domingo) que contém `dataReferencia`, com uma marca por dia
- * (um ponto se há Reels, um anel com a contagem de Stories), para a tira do alto da Agenda. Só
- * conta a ponta de cada série (reescrever um roteiro não soma uma marca a mais no mesmo dia).
+ * (um ponto por Reels, um anel por Story, com a contagem de cada um quando há mais de um; revisão
+ * do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então o Reels
+ * também pode ter mais de um, como o Story já tinha). Só conta a ponta de cada série (reescrever
+ * um roteiro não soma uma marca a mais no mesmo dia).
  */
 export async function semanaDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaDaSemanaAgenda[]> {
   const segunda = segundaDaSemanaISO(dataReferencia);
@@ -1583,8 +1585,8 @@ export async function semanaDaAgenda(clienteId: number, dataReferencia: string):
 
   const porDia = new Map<string, MarcaDiaAgenda>();
   for (const linha of linhas) {
-    const atual = porDia.get(linha.data) ?? { temReels: false, qtdStories: 0 };
-    if (linha.formato === "reels") atual.temReels = true;
+    const atual = porDia.get(linha.data) ?? { qtdReels: 0, qtdStories: 0 };
+    if (linha.formato === "reels") atual.qtdReels += 1;
     else atual.qtdStories += 1;
     porDia.set(linha.data, atual);
   }
@@ -1596,7 +1598,7 @@ export async function semanaDaAgenda(clienteId: number, dataReferencia: string):
       diaDoMes: Number(data.split("-")[2]),
       diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
       hoje: data === hoje,
-      marca: porDia.get(data) ?? { temReels: false, qtdStories: 0 },
+      marca: porDia.get(data) ?? { qtdReels: 0, qtdStories: 0 },
     };
   });
 }
@@ -1624,14 +1626,17 @@ export type ItemAgendaDoDia = {
   objetivo: Objetivo;
   duracaoS: number;
 };
-export type AgendaDoDia = { reels: ItemAgendaDoDia | null; stories: ItemAgendaDoDia[] };
+export type AgendaDoDia = { reels: ItemAgendaDoDia[]; stories: ItemAgendaDoDia[] };
 
 const ORDEM_MOMENTO_DO_DIA: Record<MomentoDoDia, number> = { manha: 0, meio_dia: 1, fim_tarde: 2, noite: 3 };
+const ORDEM_STATUS_AGENDA: Record<ItemAgendaDoDia["status"], number> = { gerado: 0, gravado: 1, postado: 2 };
 
 /**
  * E39a, item 3: o que está marcado para um dia (o Reels e os Stories, na ordem da parte do dia).
- * Com mais de um Reels no mesmo dia (plano `sem_limite`, raro neste caso porque o Reels é um por
- * dia na Agenda), fica o mais recente; os demais continuam no Histórico, não desaparecem.
+ * Revisão do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então
+ * `reels` é uma lista, como `stories` já era; o primeiro (a gravar antes de gravado antes de
+ * postado, e dentro do mesmo estado o mais antigo primeiro) é o destaque da tela, os demais
+ * entram embaixo dele, nas mesmas linhas que os Stories usam.
  */
 export async function agendaDoDia(clienteId: number, data: string): Promise<AgendaDoDia> {
   const linhas = await db()
@@ -1650,7 +1655,9 @@ export async function agendaDoDia(clienteId: number, data: string): Promise<Agen
     duracaoS: corpoDoRoteiro(linha).duracaoS,
   });
 
-  const reelsLinha = linhas.find((linha) => linha.formato === "reels") ?? null;
+  const reelsOrdenados = linhas
+    .filter((linha) => linha.formato === "reels")
+    .sort((a, b) => ORDEM_STATUS_AGENDA[a.status] - ORDEM_STATUS_AGENDA[b.status] || a.criadoEm.getTime() - b.criadoEm.getTime());
   const storiesOrdenados = linhas
     .filter((linha) => linha.formato === "story")
     .sort((a, b) => {
@@ -1660,7 +1667,7 @@ export async function agendaDoDia(clienteId: number, data: string): Promise<Agen
     });
 
   return {
-    reels: reelsLinha ? paraItem(reelsLinha) : null,
+    reels: reelsOrdenados.map(paraItem),
     stories: storiesOrdenados.map(paraItem),
   };
 }

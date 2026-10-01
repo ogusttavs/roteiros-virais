@@ -32,6 +32,7 @@ type OpcoesRoteiro = {
   formato: "reels" | "story";
   momentoDoDia?: "manha" | "meio_dia" | "fim_tarde" | "noite";
   titulo?: string;
+  status?: "gerado" | "gravado" | "postado";
 };
 
 async function criarRoteiro(clienteId: number, data: string, opcoes: OpcoesRoteiro) {
@@ -46,7 +47,7 @@ async function criarRoteiro(clienteId: number, data: string, opcoes: OpcoesRotei
       formato: opcoes.formato,
       momentoDoDia: opcoes.momentoDoDia,
       conteudo: { ...CONTEUDO_ROTEIRO_MINIMO, titulo: opcoes.titulo ?? `titulo de ${data}` },
-      status: "gerado",
+      status: opcoes.status ?? "gerado",
     })
     .returning();
   return roteiro;
@@ -101,7 +102,7 @@ describe("semanaDaAgenda", () => {
     expect(semana[6].data).toBe("2026-09-20");
   });
 
-  it("marca reels e conta stories por dia, isolado por marca, so a ponta de cada serie", async () => {
+  it("conta reels e stories por dia, isolado por marca, so a ponta de cada serie", async () => {
     await criarRoteiro(marcaA.id, "2026-09-15", { formato: "reels" });
     await criarRoteiro(marcaA.id, "2026-09-17", { formato: "story", momentoDoDia: "manha" });
     await criarRoteiro(marcaA.id, "2026-09-17", { formato: "story", momentoDoDia: "noite" });
@@ -113,9 +114,18 @@ describe("semanaDaAgenda", () => {
     const terca = semana.find((d) => d.data === "2026-09-15")!;
     const quinta = semana.find((d) => d.data === "2026-09-17")!;
 
-    expect(segunda.marca).toEqual({ temReels: false, qtdStories: 0 });
-    expect(terca.marca).toEqual({ temReels: true, qtdStories: 0 });
-    expect(quinta.marca).toEqual({ temReels: false, qtdStories: 2 });
+    expect(segunda.marca).toEqual({ qtdReels: 0, qtdStories: 0 });
+    expect(terca.marca).toEqual({ qtdReels: 1, qtdStories: 0 });
+    expect(quinta.marca).toEqual({ qtdReels: 0, qtdStories: 2 });
+  });
+
+  it("o plano e quantos roteiros quiser por dia: dois Reels no mesmo dia contam os dois (revisao do Fable no PR #90)", async () => {
+    await criarRoteiro(marcaA.id, "2026-09-18", { formato: "reels", titulo: "primeiro reels do dia" });
+    await criarRoteiro(marcaA.id, "2026-09-18", { formato: "reels", titulo: "segundo reels do dia" });
+
+    const semana = await semanaDaAgenda(marcaA.id, "2026-09-16");
+    const sexta = semana.find((d) => d.data === "2026-09-18")!;
+    expect(sexta.marca).toEqual({ qtdReels: 2, qtdStories: 0 });
   });
 
   it("o campo hoje e true so no dia de hoje de verdade", async () => {
@@ -128,7 +138,7 @@ describe("semanaDaAgenda", () => {
 });
 
 describe("agendaDoDia", () => {
-  it("devolve o reels e os stories ordenados pela parte do dia, nulo por ultimo", async () => {
+  it("devolve o reels e os stories ordenados pela parte do dia", async () => {
     await criarRoteiro(marcaA.id, "2026-09-21", { formato: "reels", titulo: "o reels do dia" });
     await criarRoteiro(marcaA.id, "2026-09-21", { formato: "story", momentoDoDia: "noite", titulo: "story da noite" });
     await criarRoteiro(marcaA.id, "2026-09-21", { formato: "story", momentoDoDia: "manha", titulo: "story da manha" });
@@ -136,7 +146,7 @@ describe("agendaDoDia", () => {
 
     const agenda = await agendaDoDia(marcaA.id, "2026-09-21");
 
-    expect(agenda.reels?.titulo).toBe("o reels do dia");
+    expect(agenda.reels.map((r) => r.titulo)).toEqual(["o reels do dia"]);
     expect(agenda.stories.map((s) => s.titulo)).toEqual([
       "story da manha",
       "story da noite",
@@ -144,15 +154,36 @@ describe("agendaDoDia", () => {
     ]);
   });
 
-  it("dia sem nada marcado devolve reels nulo e lista vazia", async () => {
+  it("dia sem nada marcado devolve as duas listas vazias", async () => {
     const agenda = await agendaDoDia(marcaA.id, "2026-09-22");
-    expect(agenda.reels).toBeNull();
+    expect(agenda.reels).toEqual([]);
     expect(agenda.stories).toEqual([]);
   });
 
   it("e isolado por marca", async () => {
     await criarRoteiro(marcaB.id, "2026-09-23", { formato: "reels", titulo: "reels da marca B" });
     const agendaDeA = await agendaDoDia(marcaA.id, "2026-09-23");
-    expect(agendaDeA.reels).toBeNull();
+    expect(agendaDeA.reels).toEqual([]);
+  });
+
+  /**
+   * Revisão do Fable no PR #90: o plano é "quantos roteiros quiser por dia", nunca só um Reels
+   * escondendo os outros. Ordem: a gravar antes de gravado antes de postado; dentro do mesmo
+   * estado, o mais antigo primeiro (o primeiro a gravar é o destaque da tela).
+   */
+  it("mais de um Reels no mesmo dia: a gravar antes de gravado antes de postado, o mais antigo primeiro dentro do mesmo estado", async () => {
+    await criarRoteiro(marcaA.id, "2026-09-24", { formato: "reels", titulo: "postado ontem", status: "postado" });
+    await criarRoteiro(marcaA.id, "2026-09-24", { formato: "reels", titulo: "a gravar, criado primeiro" });
+    await criarRoteiro(marcaA.id, "2026-09-24", { formato: "reels", titulo: "gravado" , status: "gravado" });
+    await criarRoteiro(marcaA.id, "2026-09-24", { formato: "reels", titulo: "a gravar, criado depois" });
+
+    const agenda = await agendaDoDia(marcaA.id, "2026-09-24");
+
+    expect(agenda.reels.map((r) => r.titulo)).toEqual([
+      "a gravar, criado primeiro",
+      "a gravar, criado depois",
+      "gravado",
+      "postado ontem",
+    ]);
   });
 });
