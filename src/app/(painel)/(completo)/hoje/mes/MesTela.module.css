@@ -117,6 +117,54 @@
   justify-items: start;
 }
 
+/*
+ * E39c, parte 1: o que "Contar a minha agenda" gerou para o dia, ainda sem roteiro (só leitura,
+ * mesmo espírito de "Meu plano"; virar roteiro continua pelas portas de sempre).
+ */
+.planoDoDia {
+  display: grid;
+  gap: var(--espaco-2);
+  margin-bottom: var(--espaco-4);
+}
+
+.itemPlanoMes {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) dashed var(--cor-borda);
+  border-radius: var(--raio-md);
+}
+
+.itemPlanoCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.itemPlanoLugar {
+  font-weight: var(--peso-medio);
+}
+
+.itemPlanoEstado {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.itemPlanoSituacao {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.itemPlanoObjetivo {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
 .peMes {
   display: flex;
   flex-wrap: wrap;

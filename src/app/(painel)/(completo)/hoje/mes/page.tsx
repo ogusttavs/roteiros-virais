@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { hojeISO } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
+import { planoDoDia } from "@/servicos/plano";
 import { agendaDoDia, mesDaAgenda } from "@/servicos/roteiro";
 
 import { MesTela } from "./MesTela";
@@ -50,10 +51,16 @@ export default async function Mes({ searchParams }: Props) {
   const anoMes = anoMesValido(mes, dia, hoje);
   const diaSelecionado = diaValido(dia, anoMes, hoje);
 
-  const [dias, agendaDoDiaSelecionado] = await Promise.all([
+  const [dias, agendaDoDiaSelecionado, planoDoDiaSelecionado] = await Promise.all([
     mesDaAgenda(cliente.id, anoMes),
     agendaDoDia(cliente.id, diaSelecionado),
+    planoDoDia(cliente.id, diaSelecionado),
   ]);
+  /**
+   * E39c, parte 1: um item "aceito" ou "gravado" já tem roteiro próprio e já aparece na lista de
+   * cima (`agendaDoDiaSelecionado`); só o "sugerido" é dado novo aqui, ainda sem roteiro.
+   */
+  const planoSugeridoDoDia = planoDoDiaSelecionado.filter((item) => item.estado === "sugerido");
 
   return (
     <MesTela
@@ -61,6 +68,7 @@ export default async function Mes({ searchParams }: Props) {
       dias={dias}
       diaSelecionado={diaSelecionado}
       agendaDoDiaSelecionado={agendaDoDiaSelecionado}
+      planoSugeridoDoDia={planoSugeridoDoDia}
       hoje={hoje}
       marcaAtiva={cliente}
       marcas={marcas}

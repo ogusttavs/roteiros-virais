@@ -17,6 +17,7 @@ import {
   FORMATOS_ROTEIRO,
   geracoesIA,
   MOMENTOS_DO_DIA,
+  planoGravacoes,
   roteiros,
   VALORES_QUEM_GRAVA,
   videosCliente,
@@ -1821,6 +1822,11 @@ function ultimoDiaDoMesISO(anoMes: string): string {
  * dias do mês vizinho que completam a primeira e a última semana entram marcados como
  * `foraDoMes`, para a grade de 7 colunas nunca ficar com buraco). `atrasado` é por dia, não por
  * item: um dia com qualquer roteiro "a gravar" de data passada (sem arquivar) entra marcado.
+ *
+ * E39c, parte 1: "Contar a minha agenda" pode marcar um dia só com um item do plano ainda
+ * "sugerido", sem roteiro nenhum; a marca do dia conta os dois juntos (sem inventar um terceiro
+ * símbolo na grade, que é desenho, não código), por isso o dia pode mostrar uma marca mesmo sem
+ * nenhum roteiro na lista de baixo.
  */
 export async function mesDaAgenda(clienteId: number, anoMes: string): Promise<DiaDoMes[]> {
   const hoje = hojeISO();
@@ -1829,22 +1835,40 @@ export async function mesDaAgenda(clienteId: number, anoMes: string): Promise<Di
   const inicioGrade = segundaDaSemanaISO(primeiroDiaDoMes);
   const fimGrade = somarDiasISO(segundaDaSemanaISO(ultimoDiaDoMes), 6);
 
-  const linhas = await db()
-    .select({
-      data: roteiros.data,
-      formato: roteiros.formato,
-      status: roteiros.status,
-    })
-    .from(roteiros)
-    .where(
-      and(
-        eq(roteiros.clienteId, clienteId),
-        gte(roteiros.data, inicioGrade),
-        lte(roteiros.data, fimGrade),
-        isNull(roteiros.arquivadoEm),
-        SEM_VERSAO_MAIS_NOVA,
+  const [linhas, linhasPlano] = await Promise.all([
+    db()
+      .select({
+        data: roteiros.data,
+        formato: roteiros.formato,
+        status: roteiros.status,
+      })
+      .from(roteiros)
+      .where(
+        and(
+          eq(roteiros.clienteId, clienteId),
+          gte(roteiros.data, inicioGrade),
+          lte(roteiros.data, fimGrade),
+          isNull(roteiros.arquivadoEm),
+          SEM_VERSAO_MAIS_NOVA,
+        ),
       ),
-    );
+    /**
+     * E39c, parte 1: um item do plano ainda "sugerido" (sem roteiro próprio) também marca o dia na
+     * grade, do mesmo jeito que um roteiro já escrito; "aceito" e "gravado" já têm `roteiroId` e já
+     * contam pela consulta de cima, então contar os dois juntos duplicaria a marca.
+     */
+    db()
+      .select({ dia: planoGravacoes.dia, formato: planoGravacoes.formato })
+      .from(planoGravacoes)
+      .where(
+        and(
+          eq(planoGravacoes.clienteId, clienteId),
+          eq(planoGravacoes.estado, "sugerido"),
+          gte(planoGravacoes.dia, inicioGrade),
+          lte(planoGravacoes.dia, fimGrade),
+        ),
+      ),
+  ]);
 
   const porDia = new Map<string, { marca: MarcaDiaAgenda; atrasado: boolean }>();
   for (const linha of linhas) {
@@ -1853,6 +1877,12 @@ export async function mesDaAgenda(clienteId: number, anoMes: string): Promise<Di
     else atual.marca.qtdStories += 1;
     if (linha.status === "gerado" && linha.data < hoje) atual.atrasado = true;
     porDia.set(linha.data, atual);
+  }
+  for (const linha of linhasPlano) {
+    const atual = porDia.get(linha.dia) ?? { marca: { qtdReels: 0, qtdStories: 0 }, atrasado: false };
+    if (linha.formato === "reels") atual.marca.qtdReels += 1;
+    else atual.marca.qtdStories += 1;
+    porDia.set(linha.dia, atual);
   }
 
   const dias: DiaDoMes[] = [];

@@ -37,10 +37,16 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`. */
+/**
+ * E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`.
+ * E39c, parte 1: a porta leva ao calendário, não direto para a folha; "Contar a minha agenda",
+ * dentro do calendário, é quem abre a folha de texto ou voz.
+ */
 async function abrirPlanejarDias(page: Page) {
   await page.goto("/criar");
   await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
+  await expect(page).toHaveURL(/\/hoje\/mes/);
+  await page.getByRole("button", { name: "Contar a minha agenda" }).click();
 }
 
 test.describe("colar a agenda e o plano de gravações", () => {
