@@ -20,6 +20,9 @@ const eslintConfig = [
       "test-results/**",
       "coverage/**",
       "next-env.d.ts",
+      // M4, item 0d: pasta das árvores de revisão do Fable (cópias do repositório para comparar
+      // commits); nunca é código deste repositório, não entra no lint de ninguém.
+      ".revisao/**",
     ],
   },
   ...compat.extends("next/core-web-vitals", "next/typescript"),

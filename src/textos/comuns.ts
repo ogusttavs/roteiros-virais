@@ -33,4 +33,9 @@ export const textosComuns = {
    * (camada a). Compartilhado entre o briefing, o momento e o plano, que usam o mesmo gancho.
    */
   previaUsaReconhecimentoDoAparelho: "A prévia usa o reconhecimento de voz do seu aparelho.",
+  /**
+   * M4, item 0c: a única situação em que a prévia vira a resposta por conta própria (o áudio
+   * definitivo voltou vazio ou com erro). Compartilhado pelos três lugares que gravam.
+   */
+  previaUsadaComoResposta: "Usamos o texto que apareceu enquanto você falava. Confira antes de seguir.",
 };

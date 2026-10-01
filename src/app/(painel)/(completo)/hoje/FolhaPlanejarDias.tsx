@@ -185,6 +185,7 @@ export function FolhaPlanejarDias({ aoFechar }: Props) {
               formatarGravando={textosPlano.gravandoAgenda}
               previa={gravador.previa}
               previaPorReconhecimentoDoAparelho={gravador.previaPorReconhecimentoDoAparelho}
+              avisoPreviaComoReserva={gravador.avisoPreviaComoReserva}
             />
           )}
 

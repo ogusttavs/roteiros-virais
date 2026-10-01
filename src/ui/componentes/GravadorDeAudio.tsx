@@ -28,6 +28,8 @@ type Props = {
   formatarGravando: (segundos: number) => string;
   previa: string;
   previaPorReconhecimentoDoAparelho: boolean;
+  /** M4, item 0c: avisa que a prévia virou a resposta porque o áudio definitivo veio vazio ou com erro. */
+  avisoPreviaComoReserva: boolean;
 };
 
 export function GravadorDeAudio({
@@ -41,6 +43,7 @@ export function GravadorDeAudio({
   formatarGravando,
   previa,
   previaPorReconhecimentoDoAparelho,
+  avisoPreviaComoReserva,
 }: Props) {
   const gravandoOuTranscrevendo = fase === "gravando" || fase === "transcrevendo";
   return (
@@ -68,12 +71,18 @@ export function GravadorDeAudio({
           {formatarGravando(segundos)}
         </span>
       ) : null}
+      {/* M4, item 0d: "polite" fazia o leitor de tela repetir o texto a cada atualização da prévia. */}
       {gravandoOuTranscrevendo && previa.trim().length > 0 ? (
-        <p className={styles.previa} aria-live="polite">
+        <p className={styles.previa} aria-live="off">
           {previa}
         </p>
       ) : null}
       {fase === "gravando" && previaPorReconhecimentoDoAparelho ? <p className={styles.previaAviso}>{textosComuns.previaUsaReconhecimentoDoAparelho}</p> : null}
+      {avisoPreviaComoReserva ? (
+        <p className={styles.previaAviso} role="status">
+          {textosComuns.previaUsadaComoResposta}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -9,22 +9,30 @@ import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverAudioEnviado } from
  * P2b, item 2b: a prévia ao vivo sem reconhecimento do navegador manda um pedaço de 5 segundos a
  * cada 5 segundos, até 24 vezes numa gravação de 2 minutos (o teto do gravador). Em memória, por
  * usuário: reinicia a cada deploy, e é só para abuso óbvio, não uma trava de cota paga (a Groq já
- * cobra por segundo de áudio enviado, não por chamada). 40 chamadas numa janela de 2 minutos dá
- * folga sobre as 24 esperadas sem abrir para um script mandando centenas de requisições.
+ * cobra por segundo de áudio enviado, não por chamada).
+ *
+ * M4, item 0b da revisão do PR #79: um limite só contava tudo junto, e duas pessoas gravando na
+ * mesma conta ao mesmo tempo (o caso da viagem) passavam dos 40 em 2 minutos; quem tomava o 429
+ * podia ser a chamada definitiva, perdendo a fala inteira. Agora são dois limites, por usuário e
+ * independentes: os pedaços de prévia (`previa=1` no formulário, até 24 esperados, 40 de folga) e
+ * a chamada definitiva, que manda o áudio inteiro uma vez por gravação (10 em 2 minutos é folgado
+ * mesmo com duas gravações simultâneas na mesma conta).
  */
 const JANELA_LIMITE_MS = 2 * 60 * 1000;
-const CHAMADAS_MAXIMAS_NA_JANELA = 40;
-const chamadasPorUsuario = new Map<string, number[]>();
+const CHAMADAS_MAXIMAS_PREVIA_NA_JANELA = 40;
+const CHAMADAS_MAXIMAS_DEFINITIVA_NA_JANELA = 10;
+const chamadasPreviaPorUsuario = new Map<string, number[]>();
+const chamadasDefinitivaPorUsuario = new Map<string, number[]>();
 
-function dentroDoLimite(usuarioId: string): boolean {
+function dentroDoLimite(mapa: Map<string, number[]>, usuarioId: string, maximoNaJanela: number): boolean {
   const agora = Date.now();
-  const historico = (chamadasPorUsuario.get(usuarioId) ?? []).filter((quando) => agora - quando < JANELA_LIMITE_MS);
-  if (historico.length >= CHAMADAS_MAXIMAS_NA_JANELA) {
-    chamadasPorUsuario.set(usuarioId, historico);
+  const historico = (mapa.get(usuarioId) ?? []).filter((quando) => agora - quando < JANELA_LIMITE_MS);
+  if (historico.length >= maximoNaJanela) {
+    mapa.set(usuarioId, historico);
     return false;
   }
   historico.push(agora);
-  chamadasPorUsuario.set(usuarioId, historico);
+  mapa.set(usuarioId, historico);
   return true;
 }
 
@@ -46,15 +54,20 @@ export async function POST(request: Request) {
   if (!cliente) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }
-  if (!dentroDoLimite(sessao.user.id)) {
-    return NextResponse.json({ erro: "muitos pedidos de transcricao em pouco tempo; espere um instante." }, { status: 429 });
-  }
 
   let forma: FormData;
   try {
     forma = await request.formData();
   } catch {
     return NextResponse.json({ erro: "corpo da requisicao invalido" }, { status: 400 });
+  }
+
+  const ehPedacoDePrevia = forma.get("previa") === "1";
+  const limiteOk = ehPedacoDePrevia
+    ? dentroDoLimite(chamadasPreviaPorUsuario, sessao.user.id, CHAMADAS_MAXIMAS_PREVIA_NA_JANELA)
+    : dentroDoLimite(chamadasDefinitivaPorUsuario, sessao.user.id, CHAMADAS_MAXIMAS_DEFINITIVA_NA_JANELA);
+  if (!limiteOk) {
+    return NextResponse.json({ erro: "muitos pedidos de transcricao em pouco tempo; espere um instante." }, { status: 429 });
   }
 
   const audio = forma.get("audio");

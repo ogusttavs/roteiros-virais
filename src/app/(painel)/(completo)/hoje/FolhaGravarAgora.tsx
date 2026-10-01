@@ -131,6 +131,7 @@ export function FolhaGravarAgora({
     erro: erroGravador,
     previa,
     previaPorReconhecimentoDoAparelho,
+    avisoPreviaComoReserva,
     iniciarGravacao,
     pararGravacao,
   } = useGravadorDeAudio({
@@ -228,6 +229,7 @@ export function FolhaGravarAgora({
               formatarGravando={textosMomento.gravando}
               previa={previa}
               previaPorReconhecimentoDoAparelho={previaPorReconhecimentoDoAparelho}
+              avisoPreviaComoReserva={avisoPreviaComoReserva}
             />
             {erroAudio ? (
               <p className={styles.erro} role="alert">

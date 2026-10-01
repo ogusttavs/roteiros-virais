@@ -43,12 +43,19 @@ function formaComAudio(duracaoS = "12"): FormData {
   return forma;
 }
 
+/** M4, item 0b: um usuario novo por teste de limite, para nunca herdar chamada de outro teste. */
+async function criarUsuarioDeTeste(id: string, nichoId: number) {
+  await db().insert(user).values({ id, name: `[teste] ${id}`, email: `${id}@teste.invalido` });
+  const [cliente] = await db().insert(clientes).values({ usuarioId: id, nome: "[teste] marca", nichoId }).returning();
+  await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db().insert(nichos).values({ slug: "transcrever-rota-teste", nome: "Transcrever rota teste" }).returning();
-  await db().insert(user).values({ id: "transcrever-rota", name: "[teste] transcrever rota", email: "transcrever-rota@teste.invalido" });
-  const [cliente] = await db().insert(clientes).values({ usuarioId: "transcrever-rota", nome: "[teste] marca", nichoId: nicho.id }).returning();
-  await db().insert(membrosMarca).values({ usuarioId: "transcrever-rota", clienteId: cliente.id, papel: "dono" });
+  await criarUsuarioDeTeste("transcrever-rota", nicho.id);
+  await criarUsuarioDeTeste("transcrever-rota-limite-previa", nicho.id);
+  await criarUsuarioDeTeste("transcrever-rota-limite-definitiva", nicho.id);
 }, 30_000);
 
 afterAll(async () => {
@@ -109,5 +116,47 @@ describe("POST /api/transcrever", () => {
     const corpo = (await resposta.json()) as { erro: string };
     expect(resposta.status).toBe(502);
     expect(corpo.erro).not.toMatch(/ECONNREFUSED/);
+  });
+
+  describe("M4, item 0b: previa e definitiva tem limites de taxa independentes", () => {
+    function formaDePrevia(duracaoS = "5"): FormData {
+      const forma = formaComAudio(duracaoS);
+      forma.append("previa", "1");
+      return forma;
+    }
+
+    it("estourar o limite da previa (40 na janela) nao bloqueia a chamada definitiva do mesmo usuario", async () => {
+      vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("transcrever-rota-limite-previa"));
+      transcreverAudioMock.mockResolvedValue("texto qualquer");
+      const { POST } = await import("@/app/api/transcrever/route");
+
+      for (let i = 0; i < 40; i += 1) {
+        const resposta = await POST(requisicao(formaDePrevia()));
+        expect(resposta.status).toBe(200);
+      }
+      const resposta41 = await POST(requisicao(formaDePrevia()));
+      expect(resposta41.status).toBe(429);
+
+      // A chamada definitiva (sem "previa") do mesmo usuario: limite a parte, continua liberada.
+      const respostaDefinitiva = await POST(requisicao(formaComAudio("5")));
+      expect(respostaDefinitiva.status).toBe(200);
+    });
+
+    it("a chamada definitiva tem o seu proprio limite, mais apertado (10 na janela)", async () => {
+      vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("transcrever-rota-limite-definitiva"));
+      transcreverAudioMock.mockResolvedValue("texto qualquer");
+      const { POST } = await import("@/app/api/transcrever/route");
+
+      for (let i = 0; i < 10; i += 1) {
+        const resposta = await POST(requisicao(formaComAudio("5")));
+        expect(resposta.status).toBe(200);
+      }
+      const resposta11 = await POST(requisicao(formaComAudio("5")));
+      expect(resposta11.status).toBe(429);
+
+      // Um pedaco de previa do mesmo usuario: limite a parte, continua liberado.
+      const respostaPrevia = await POST(requisicao(formaDePrevia()));
+      expect(respostaPrevia.status).toBe(200);
+    });
   });
 });

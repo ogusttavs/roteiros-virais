@@ -81,6 +81,7 @@ afterEach(() => {
   vi.useRealTimers();
   delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
   delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition;
+  ReconhecimentoFalsoDeFala.proximaFalhaNoStart = false;
 });
 
 /**
@@ -89,18 +90,28 @@ afterEach(() => {
  */
 class ReconhecimentoFalsoDeFala {
   static ultimo: ReconhecimentoFalsoDeFala | null = null;
+  /** M4, item 0a: a proxima instancia criada falha ao chamar `.start()` (simula o recomeco falhando). */
+  static proximaFalhaNoStart = false;
   continuous = false;
   interimResults = false;
   lang = "";
   onresult: ((evento: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null = null;
   onerror: (() => void) | null = null;
   onend: (() => void) | null = null;
-  start = vi.fn();
   stop = vi.fn();
   abort = vi.fn();
+  start: () => void;
 
   constructor() {
     ReconhecimentoFalsoDeFala.ultimo = this;
+    if (ReconhecimentoFalsoDeFala.proximaFalhaNoStart) {
+      ReconhecimentoFalsoDeFala.proximaFalhaNoStart = false;
+      this.start = vi.fn(() => {
+        throw new Error("start falhou de proposito, so no teste");
+      });
+    } else {
+      this.start = vi.fn();
+    }
   }
 }
 
@@ -464,5 +475,200 @@ describe("previa ao vivo (P2b)", () => {
 
     expect(pedaco.state).toBe("inactive");
     expect(pedaco.ondataavailable).toBeNull();
+  });
+});
+
+describe("M4, item 0a: o reconhecimento que para sozinho recomeca sem perder o texto", () => {
+  it("resultado, fim (sem erro), novo resultado: a previa tem os dois", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    const primeiro = ReconhecimentoFalsoDeFala.ultimo!;
+    act(() => {
+      primeiro.onresult?.(eventoDeFala("primeira parte"));
+    });
+    expect(result.current.previa).toBe("primeira parte");
+
+    // O reconhecimento para sozinho (pausa na fala); a gravacao continua rodando.
+    act(() => {
+      primeiro.onend?.();
+    });
+
+    // Recomecou: uma instancia nova, sem cair para os pedacos.
+    const segundo = ReconhecimentoFalsoDeFala.ultimo!;
+    expect(segundo).not.toBe(primeiro);
+    expect(gravadoresCriados).toHaveLength(1);
+    expect(segundo.start).toHaveBeenCalled();
+
+    act(() => {
+      segundo.onresult?.(eventoDeFala("segunda parte"));
+    });
+
+    expect(result.current.previa).toBe("primeira parte segunda parte");
+  });
+
+  it("recomeca de novo depois de um segundo fim: a previa acumula as tres partes", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("um"));
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onend?.();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("dois"));
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onend?.();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("tres"));
+    });
+
+    expect(result.current.previa).toBe("um dois tres");
+    // So o principal (nenhum pedaco criado: o reconhecimento recomecou as duas vezes sem cair para a camada b).
+    expect(gravadoresCriados).toHaveLength(1);
+  });
+
+  it("se o recomeco falhar (.start() erra na segunda vez), cai para pedacos sem perder o texto", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    const primeiro = ReconhecimentoFalsoDeFala.ultimo!;
+    act(() => {
+      primeiro.onresult?.(eventoDeFala("o que ja apareceu"));
+    });
+
+    // A proxima instancia (o recomeco disparado pelo onend) falha ao chamar .start().
+    ReconhecimentoFalsoDeFala.proximaFalhaNoStart = true;
+    act(() => {
+      primeiro.onend?.();
+    });
+
+    // Cai para os pedacos (o principal mais o primeiro pedaco), mas o texto que ja tinha aparecido fica.
+    expect(gravadoresCriados).toHaveLength(2);
+    expect(result.current.previa).toBe("o que ja apareceu");
+    expect(result.current.previaPorReconhecimentoDoAparelho).toBe(false);
+  });
+});
+
+describe("M4, item 0c: a previa vale como transcricao quando a definitiva vem vazia ou com erro", () => {
+  it("audio definitivo vazio e previa com texto: usa a previa, avisa, sem erro", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("o que a pessoa falou de verdade"));
+    });
+
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ transcricao: "" }) });
+    act(() => {
+      result.current.pararGravacao();
+    });
+
+    await waitFor(() => expect(onTranscrito).toHaveBeenCalledWith("o que a pessoa falou de verdade", expect.any(Number)));
+    expect(result.current.avisoPreviaComoReserva).toBe(true);
+    expect(result.current.erro).toBeNull();
+  });
+
+  it("a rota falha (erro) e a previa tem texto: usa a previa do mesmo jeito", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("reserva por erro de rede"));
+    });
+
+    fetchMock.mockRejectedValueOnce(new Error("ECONNREFUSED simulado"));
+    act(() => {
+      result.current.pararGravacao();
+    });
+
+    await waitFor(() => expect(onTranscrito).toHaveBeenCalledWith("reserva por erro de rede", expect.any(Number)));
+    expect(result.current.avisoPreviaComoReserva).toBe(true);
+    expect(result.current.erro).toBeNull();
+  });
+
+  it("audio definitivo vazio e sem previa nenhuma: continua caindo em falhaTranscricao", async () => {
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ transcricao: "" }) });
+    act(() => {
+      result.current.pararGravacao();
+    });
+
+    await waitFor(() => expect(result.current.erro).toBe("falhaTranscricao"));
+    expect(result.current.avisoPreviaComoReserva).toBe(false);
+    expect(onTranscrito).not.toHaveBeenCalled();
+  });
+
+  it("audio definitivo com texto de verdade: usa o definitivo, nunca a previa, sem aviso", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("previa qualquer"));
+    });
+
+    act(() => {
+      result.current.pararGravacao();
+    });
+
+    await waitFor(() => expect(onTranscrito).toHaveBeenCalledWith("o texto que a pessoa falou", expect.any(Number)));
+    expect(result.current.avisoPreviaComoReserva).toBe(false);
+  });
+
+  it("nova gravacao limpa o aviso da tentativa anterior", async () => {
+    (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = ReconhecimentoFalsoDeFala;
+    const onTranscrito = vi.fn();
+    const { result } = renderHook(() => useGravadorDeAudio({ onTranscrito }));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+    act(() => {
+      ReconhecimentoFalsoDeFala.ultimo!.onresult?.(eventoDeFala("reserva"));
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ transcricao: "" }) });
+    act(() => {
+      result.current.pararGravacao();
+    });
+    await waitFor(() => expect(result.current.avisoPreviaComoReserva).toBe(true));
+
+    await act(async () => {
+      await result.current.iniciarGravacao();
+    });
+
+    expect(result.current.avisoPreviaComoReserva).toBe(false);
   });
 });
