@@ -148,13 +148,62 @@ test.describe("/hoje, a Agenda", () => {
     nichoId = nicho.id;
   });
 
-  test("dia vazio: 'Criar roteiro' leva para /criar", async ({ page }) => {
+  test("dia vazio: 'Criar roteiro' leva para /criar com a data do dia", async ({ page }) => {
     const { email } = await criarMarca();
+    const hoje = hojeISO();
     await entrar(page, email);
 
     await expect(page.getByRole("heading", { name: "Nada marcado para hoje" })).toBeVisible();
     await page.getByRole("button", { name: "Criar roteiro" }).click();
-    await expect(page).toHaveURL(/\/criar$/);
+    await expect(page).toHaveURL(new RegExp(`/criar\\?data=${hoje}$`));
+  });
+
+  test("dia vazio que não é hoje: 'Criar roteiro' leva a data daquele dia, até o roteiro criado (decisão 5, PR #90)", async ({
+    page,
+  }) => {
+    const { marcaId, email } = await criarMarca();
+    const hoje = hojeISO();
+    const amanha = somarDias(hoje, 1);
+    const semana = segundaDaSemana(hoje);
+    // `/criar` recusa data passada (decisão 5: `data >= hoje`); precisa ser um dia futuro dentro
+    // da semana visível em /hoje (fora da semana atual cai em hoje, calendário é a E39b, fora do
+    // escopo). Sábado ou domingo podem não sobrar dia válido; se não sobrar, o teste falha claro.
+    const outroDia = Array.from({ length: 7 }, (_, indice) => somarDias(semana, indice)).find(
+      (data) => data !== hoje && data !== amanha && data > hoje,
+    )!;
+    const temas: TemaDoDia[] = [
+      { titulo: "tema do dia marcado", descricao: "descricao", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
+    ];
+    // onConflictDoNothing: este nicho é compartilhado com o teste "escolher 'Amanhã'" acima, que
+    // também grava temas do dia para hoje; o conteúdo exato não importa aqui, só que exista um tema.
+    await db().insert(temasDia).values({ nichoId, data: hoje, temas }).onConflictDoNothing();
+
+    await entrar(page, email);
+
+    await page.goto(`/hoje?dia=${outroDia}`);
+    await page.getByRole("button", { name: "Criar roteiro" }).click();
+    await expect(page).toHaveURL(new RegExp(`/criar\\?data=${outroDia}$`));
+
+    await page.getByRole("button", { name: "Os temas de hoje" }).click();
+    await expect(page).toHaveURL(new RegExp(`/criar/temas\\?data=${outroDia}$`));
+
+    await page
+      .getByRole("button", { name: "Quero esse" })
+      .first()
+      .click();
+    await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&data=${outroDia}$`));
+
+    await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+
+    // A pessoa tocou em "Criar roteiro" no dia outroDia: "para quando é" já nasce marcado nele,
+    // sem precisar escolher a data de novo (decisão 5 do Fable no PR #90).
+    await expect(page.getByLabel("Escolher a data")).toHaveValue(outroDia);
+
+    await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/);
+
+    const [roteiroCriado] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaId));
+    expect(roteiroCriado.data).toBe(outroDia);
   });
 
   test("o Reels de hoje em destaque e os Stories na ordem do momento, manhã antes de meio do dia antes de noite", async ({
@@ -204,7 +253,9 @@ test.describe("/hoje, a Agenda", () => {
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste amanha", descricao: "descricao", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
     ];
-    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas });
+    // onConflictDoNothing: este nicho é compartilhado com outro teste deste arquivo que também
+    // grava temas do dia para hoje; o conteúdo exato não importa, só que exista um tema em `?tema=0`.
+    await db().insert(temasDia).values({ nichoId, data: hojeISO(), temas }).onConflictDoNothing();
 
     await entrar(page, email);
 

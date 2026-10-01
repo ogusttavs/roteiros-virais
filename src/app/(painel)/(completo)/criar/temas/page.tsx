@@ -23,12 +23,17 @@ function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null
   };
 }
 
+type Props = { searchParams: Promise<{ data?: string }> };
+
 /**
  * `/criar/temas` (E39a, a porta "Os temas de hoje"; migrado da antiga porta Reels de `/hoje`, que
  * virou agenda). H3, item 1: a tela sempre abre, com ou sem tema, com ou sem falha na busca;
  * `avisoSemTema` substitui os cartões quando não há tema de verdade.
+ *
+ * `?data=`, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio; repassada ao
+ * escolher um tema, para `/criar/objetivo` já nascer com aquele dia marcado.
  */
-export default async function Temas() {
+export default async function Temas({ searchParams }: Props) {
   const sessao = await sessaoAtual();
   if (!sessao) {
     redirect("/entrar");
@@ -38,6 +43,9 @@ export default async function Temas() {
   if (!cliente) {
     redirect("/entrar");
   }
+
+  const { data } = await searchParams;
+  const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
 
   const resultado = await temasParaCliente(cliente).catch((): ResultadoTemasHoje | { status: "erro" } => ({
     status: "erro",
@@ -58,6 +66,7 @@ export default async function Temas() {
       avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
       aviso={aviso}
       redePrincipal={cliente.redePrincipal}
+      dataInicial={dataInicial}
     />
   );
 }

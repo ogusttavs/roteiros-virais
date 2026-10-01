@@ -45,10 +45,20 @@ type Props = {
   tipo: TipoMarca;
   /** V12c, item 3, a E37b: o `quemGrava` do briefing, para o controle já nascer marcado nele. */
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
+   * é hoje; "para quando é" já nasce marcado naquele dia, em vez de hoje. */
+  dataInicial?: string;
 };
 
-/** `/hoje/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
-export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, tipo, quemGravaPadrao }: Props) {
+/** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
+export function ObjetivoTela({
+  origem,
+  temaEscolhidoTexto,
+  objetivoRecomendado,
+  tipo,
+  quemGravaPadrao,
+  dataInicial,
+}: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
   const router = useRouter();
@@ -69,7 +79,7 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
   const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
   /** E39a: "para quando é?" (dúvida 10: nos temas de hoje e no assunto seu, depois do tema escolhido). */
-  const [data, setData] = useState(() => hojeISO());
+  const [data, setData] = useState(() => dataInicial ?? hojeISO());
   const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);

@@ -7,7 +7,7 @@ import { temasParaCliente } from "@/servicos/temas";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string }> };
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -27,9 +27,11 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre } = await searchParams;
+  const { tema, livre, data } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
+  // Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio.
+  const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
 
   let origem: OrigemRoteiro;
   let temaEscolhidoTexto: string;
@@ -54,6 +56,7 @@ export default async function Objetivo({ searchParams }: Props) {
       objetivoRecomendado={objetivoRecomendado}
       tipo={cliente.tipo}
       quemGravaPadrao={cliente.quemGrava}
+      dataInicial={dataInicial}
     />
   );
 }

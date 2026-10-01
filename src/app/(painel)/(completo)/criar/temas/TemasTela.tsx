@@ -30,6 +30,8 @@ type Props = {
   avisoLinhaEditorial: string | null;
   aviso: AvisoSemTema | null;
   redePrincipal: Plataforma | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
+  dataInicial?: string;
 };
 
 /**
@@ -38,11 +40,13 @@ type Props = {
  * portas de Criar (assunto seu, contar o momento, planejar) viraram rotas à parte: esta tela cuida
  * só de escolher um tema.
  */
-export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, redePrincipal }: Props) {
+export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, redePrincipal, dataInicial }: Props) {
   const router = useRouter();
   const [redeAtual, setRedeAtual] = useState(redePrincipal);
   const [destino, setDestino] = useState<string | null>(null);
   const [abrindo, iniciarTransicao] = useTransition();
+
+  const comData = (url: string) => (dataInicial ? `${url}${url.includes("?") ? "&" : "?"}data=${dataInicial}` : url);
 
   const redeSelecionadaIndice = redeAtual ? REDES_PRINCIPAIS.findIndex((r) => r.valor === redeAtual) : null;
 
@@ -66,7 +70,7 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
             type="button"
             aria-label={textosCriar.titulo}
             className={styles.botaoVoltar}
-            onClick={() => abrir("voltar", "/criar")}
+            onClick={() => abrir("voltar", comData("/criar"))}
           >
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -96,7 +100,7 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
               className={styles.botaoSecundario}
               disabled={abrindo}
               aria-busy={destino === "tema-livre" || undefined}
-              onClick={() => abrir("tema-livre", "/criar/tema-livre")}
+              onClick={() => abrir("tema-livre", comData("/criar/tema-livre"))}
             >
               {destino === "tema-livre" && abrindo ? textosHoje.abrindo : textosHoje.escreverMeuAssunto}
             </button>
@@ -115,7 +119,7 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
                 abrindo={destino === `tema-${indice}` && abrindo}
                 desabilitado={abrindo}
                 precisaDeRede
-                onEscolher={() => abrir(`tema-${indice}`, `/criar/objetivo?tema=${indice}`)}
+                onEscolher={() => abrir(`tema-${indice}`, comData(`/criar/objetivo?tema=${indice}`))}
               />
             ))}
           </div>

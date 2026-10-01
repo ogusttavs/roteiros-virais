@@ -81,6 +81,9 @@ type Props = {
   tipo: TipoMarca;
   /** O `quemGrava` do briefing, para o controle já nascer marcado nele. */
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
+   * é hoje; ignorado quando `planoItemId` existe (o dia do item do plano manda). */
+  dataInicial?: string;
 };
 
 /**
@@ -101,6 +104,7 @@ export function FolhaGravarAgora({
   formatoInicial,
   tipo,
   quemGravaPadrao,
+  dataInicial,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -135,7 +139,7 @@ export function FolhaGravarAgora({
    * E39a: "para quando é?" só aparece vindo de "Contar o momento" (`planoItemId` ausente); vindo
    * de um item do plano o dia já é o do próprio item (dúvida 10, "cada dia já vem com a data").
    */
-  const [data, setData] = useState(() => hojeISO());
+  const [data, setData] = useState(() => dataInicial ?? hojeISO());
   const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;

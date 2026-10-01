@@ -36,6 +36,9 @@ type Props = {
   planoQueVem: ItemPlano[];
   tipo: TipoMarca;
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
+   * é hoje; repassada aos caminhos que levam a "para quando é" (temas, assunto seu, momento). */
+  dataInicial?: string;
 };
 
 /**
@@ -54,6 +57,7 @@ export function CriarTela({
   planoQueVem,
   tipo,
   quemGravaPadrao,
+  dataInicial,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -188,7 +192,7 @@ export function CriarTela({
               className={styles.porta}
               disabled={ocupado}
               aria-busy={acao === "temas" || undefined}
-              onClick={() => ir("temas", "/criar/temas")}
+              onClick={() => ir("temas", dataInicial ? `/criar/temas?data=${dataInicial}` : "/criar/temas")}
             >
               <span className={styles.marcaPorta} aria-hidden="true">
                 <Zap size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -205,7 +209,7 @@ export function CriarTela({
               className={styles.porta}
               disabled={ocupado}
               aria-busy={acao === "tema-livre" || undefined}
-              onClick={() => ir("tema-livre", "/criar/tema-livre")}
+              onClick={() => ir("tema-livre", dataInicial ? `/criar/tema-livre?data=${dataInicial}` : "/criar/tema-livre")}
             >
               <span className={styles.marcaPorta} aria-hidden="true">
                 <Pencil size={20} strokeWidth={1.75} aria-hidden="true" />
@@ -265,6 +269,7 @@ export function CriarTela({
           objetivoRecomendado={objetivoRecomendado}
           marcas={outrasMarcas}
           planoItemId={itemPlanoParaFolha?.id}
+          dataInicial={itemPlanoParaFolha ? undefined : dataInicial}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
           valoresIniciais={

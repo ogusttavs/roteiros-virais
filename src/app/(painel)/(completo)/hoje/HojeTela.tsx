@@ -224,7 +224,11 @@ export function HojeTela({
                   ? ` ${textosHoje.agenda.proximoMarcado(proximoMarcado.quando, proximoMarcado.rotuloFormato)}`
                   : ""}
               </p>
-              <button type="button" className={styles.botaoPrimario} onClick={() => ir("criar", "/criar")}>
+              <button
+                type="button"
+                className={styles.botaoPrimario}
+                onClick={() => ir("criar", `/criar?data=${diaVisualizado}`)}
+              >
                 {textosHoje.agenda.criarRoteiro}
               </button>
             </section>

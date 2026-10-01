@@ -72,6 +72,8 @@ type Props = {
   /** V12c, item 3, a E37b: para a folha "Gravar agora" saber se mostra "quem aparece" e com qual padrão. */
   tipo: TipoMarca;
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
+  dataInicial?: string;
 };
 
 /**
@@ -81,7 +83,15 @@ type Props = {
  * (item 2) só existe para sobreviver a troca de tela, de aparelho ou queda
  * de rede antes de avaliar.
  */
-export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendado, outrasMarcas, tipo, quemGravaPadrao }: Props) {
+export function TemaLivreTela({
+  notaMinima,
+  temaInicial = "",
+  objetivoRecomendado,
+  outrasMarcas,
+  tipo,
+  quemGravaPadrao,
+  dataInicial,
+}: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
@@ -107,7 +117,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
   const [abrindo, iniciarTransicao] = useTransition();
   const [destino, setDestino] = useState<string | null>(null);
   const abrindoEste = (chave: string) => abrindo && destino === chave;
-  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}`;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -425,6 +435,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
           marcas={outrasMarcas}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
+          dataInicial={dataInicial}
         />
       ) : null}
     </div>
