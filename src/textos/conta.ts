@@ -6,6 +6,8 @@ export const textosConta = {
   redes: "perfis nas redes",
   /** V3, item 4: o grupo ganha o nome da marca ativa no subtítulo (dúvida 5 do BRIEF.md). */
   redesSub: (nomeMarca: string) => `É por eles que a gente compara os vídeos de ${nomeMarca} com o normal da conta.`,
+  /** V12c, item 3b, a E37b: sem travar o salvar, o bloco de perfis é opcional. */
+  perfilInvalido: "Confira o nome do perfil",
   lembrete: "a que horas você quer o lembrete de gravar?",
   erroHoraForaDaFaixa: "escolha uma hora entre 6h e 22h",
   tema: "tema",

@@ -77,6 +77,8 @@ export const textosBriefing = {
     campoYoutube: "YouTube",
     regiaoObrigatoria: "Diga a cidade ou região",
     siteInvalido: "esse endereço não parece um site válido",
+    /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
+    perfilInvalido: "Confira o nome do perfil",
     ramoObrigatorio: "Escreva o seu ramo",
     botaoContinuar: "Continuar",
     salvando: "Salvando",

@@ -9,6 +9,7 @@ import { siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
+import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { useTratarFalha } from "@/ui/ConexaoContext";
@@ -228,9 +229,27 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
 
       <Cartao className={styles.grupo}>
         <h3 className={styles.tituloGrupo}>{t.tituloRedes}</h3>
-        <Campo rotulo={t.campoInstagram} value={instagram} onChange={(evento) => setInstagram(evento.target.value)} />
-        <Campo rotulo={t.campoTiktok} value={tiktok} onChange={(evento) => setTiktok(evento.target.value)} />
-        <Campo rotulo={t.campoYoutube} value={youtube} onChange={(evento) => setYoutube(evento.target.value)} />
+        <CampoPerfilRede
+          plataforma="instagram"
+          rotulo={t.campoInstagram}
+          valor={instagram}
+          onMudar={setInstagram}
+          avisoInvalido={t.perfilInvalido}
+        />
+        <CampoPerfilRede
+          plataforma="tiktok"
+          rotulo={t.campoTiktok}
+          valor={tiktok}
+          onMudar={setTiktok}
+          avisoInvalido={t.perfilInvalido}
+        />
+        <CampoPerfilRede
+          plataforma="youtube"
+          rotulo={t.campoYoutube}
+          valor={youtube}
+          onMudar={setYoutube}
+          avisoInvalido={t.perfilInvalido}
+        />
       </Cartao>
 
       {erro ? (

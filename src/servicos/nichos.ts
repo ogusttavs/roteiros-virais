@@ -6,10 +6,11 @@
 import { and, count, eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { contas, nichos, type Conta, type Nicho, type Plataforma } from "@/db/schema";
+import { contas, nichos, type Conta, type Nicho } from "@/db/schema";
 import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { analisarUrlPerfil } from "@/lib/perfil-redes";
 
 /** Nome com mensagem para a tela (plataforma/CLAUDE.md, convencao de erros). */
 export class ErroNicho extends Error {}
@@ -187,47 +188,10 @@ export async function alternarAtivoNicho(id: number, ativo: boolean): Promise<Ni
 }
 
 /**
- * So a forma da URL (sem consultar a plataforma na hora de salvar, decisao 2
- * do PROXIMO.md). O handle guardado bate com o formato que a coleta de
- * verdade grava em `contas.handle` para cada plataforma (upsertConta,
- * normalizadores/*), para uma conta semente e a mesma conta descoberta pela
- * coleta nunca virarem duas linhas: YouTube guarda com "@" (ou o id do canal
- * em /channel/), TikTok e Instagram guardam sem "@".
+ * `analisarUrlPerfil` mudou para `src/lib/perfil-redes.ts` (V12c, item 3b, a E37b): precisa
+ * rodar no cliente também. Reexportada aqui para nenhum import existente quebrar.
  */
-export function analisarUrlPerfil(bruta: string): { plataforma: Plataforma; handle: string } | null {
-  let url: URL;
-  try {
-    url = new URL(bruta.trim());
-  } catch {
-    return null;
-  }
-
-  const host = url.hostname.toLowerCase().replace(/^(www\.|m\.)/, "");
-  const segmentos = url.pathname.split("/").filter(Boolean);
-
-  if (host === "youtube.com") {
-    if (segmentos.length === 1 && segmentos[0].startsWith("@")) {
-      return { plataforma: "youtube", handle: segmentos[0] };
-    }
-    if (segmentos[0] === "channel" && segmentos[1]) {
-      return { plataforma: "youtube", handle: segmentos[1] };
-    }
-    return null;
-  }
-  if (host === "tiktok.com") {
-    if (segmentos.length === 1 && segmentos[0].startsWith("@")) {
-      return { plataforma: "tiktok", handle: segmentos[0].slice(1) };
-    }
-    return null;
-  }
-  if (host === "instagram.com") {
-    if (segmentos.length === 1) {
-      return { plataforma: "instagram", handle: segmentos[0] };
-    }
-    return null;
-  }
-  return null;
-}
+export { analisarUrlPerfil } from "@/lib/perfil-redes";
 
 /**
  * Ate `CONTAS_SEMENTE_MAX` URLs por linha (decisao 2 do PROXIMO.md; teto
