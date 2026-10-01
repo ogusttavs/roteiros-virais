@@ -449,6 +449,95 @@ describe("verificarLocalmente", () => {
     });
   });
 
+  describe("cartoes sem fala (M4, item 4)", () => {
+    const CENA_OK: CartaoStory = {
+      oQueFalar: "",
+      oQueMostrar: "o balcao de atendimento com o produto em cima",
+      textoNaTela: "como resolver isso",
+      figurinha: "nenhuma",
+    };
+
+    function cenas(...extra: CartaoStory[]): CartaoStory[] {
+      return [CENA_OK, ...extra, CENA_OK];
+    }
+
+    it("aprova de 2 a 5 cenas, sem fala, com texto na tela e legenda", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: cenas(), legenda: "a legenda pronta" });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("reprova com 1 cena so", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: [CENA_OK], legenda: "a legenda" });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("2 a 5");
+    });
+
+    it("reprova com 6 cenas", () => {
+      const r = verificarLocalmente(
+        {},
+        { estilo: "sem_fala", cartoes: cenas(CENA_OK, CENA_OK, CENA_OK, CENA_OK), legenda: "a legenda" },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("2 a 5");
+    });
+
+    it("reprova cena com fala preenchida", () => {
+      const r = verificarLocalmente(
+        {},
+        { estilo: "sem_fala", cartoes: cenas({ ...CENA_OK, oQueFalar: "oi gente, tudo bem" }), legenda: "a legenda" },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("tem fala preenchida");
+    });
+
+    it("reprova cena sem texto na tela", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: cenas({ ...CENA_OK, textoNaTela: "" }), legenda: "a legenda" });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("sem texto na tela");
+    });
+
+    it("reprova cena sem o que mostrar", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: cenas({ ...CENA_OK, oQueMostrar: "" }), legenda: "a legenda" });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("sem o que mostrar");
+    });
+
+    it("reprova texto na tela longo demais", () => {
+      const textoLongo = Array.from({ length: 30 }, () => "palavra").join(" ");
+      const r = verificarLocalmente(
+        {},
+        { estilo: "sem_fala", cartoes: cenas({ ...CENA_OK, textoNaTela: textoLongo }), legenda: "a legenda" },
+      );
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("palavras de texto na tela passam de");
+    });
+
+    it("reprova sem legenda", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: cenas(), legenda: null });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("legenda");
+    });
+
+    it("reprova cartoes nulo", () => {
+      const r = verificarLocalmente({}, { estilo: "sem_fala", cartoes: null, legenda: "a legenda" });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("cenas");
+    });
+
+    it("sem fala tem prioridade sobre o formato story: nao exige figurinha nem fecha pedindo resposta", () => {
+      const r = verificarLocalmente(
+        {},
+        { estilo: "sem_fala", formato: "story", cartoes: cenas(), legenda: "a legenda" },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("em falado (sem estilo sem_fala), nao roda checagem de cena nenhuma mesmo com cartoes preenchido", () => {
+      const r = verificarLocalmente({}, { cartoes: [{ ...CENA_OK, oQueFalar: "fala qualquer" }] });
+      expect(r.aprovado).toBe(true);
+    });
+  });
+
   // V9d, item 1: o schema 2.0.0 aceita nulo nos quatro campos de reels e em cartoes, pensado para o
   // outro formato; sem esta checagem, um roteiro em branco (o formato errado devolvendo nulo) passava
   // sem ninguem reprovar.

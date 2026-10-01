@@ -131,6 +131,14 @@ function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
   ];
 }
 
+/** M4, item 5: o que mostrar e o texto na tela de uma cena sem fala; nunca "o que falar" nem figurinha. */
+function itensCartaoSemFala(cartao: CartaoStory): ItemEdicao[] {
+  return [
+    { icone: Eye, rotulo: textosRoteiro.cartaoSemFala.oQueMostrar, texto: cartao.oQueMostrar },
+    { icone: Type, rotulo: textosRoteiro.cartaoSemFala.textoNaTela, texto: cartao.textoNaTela },
+  ];
+}
+
 /** V9c, item 4: "Por que assim", uma linha por regra que o modelo seguiu (`corpo.porQueAssim`). */
 function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdicao[] {
   return porQueAssim.map((item) => ({
@@ -386,6 +394,17 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
     }
   }
 
+  /** M4, item 5: copia só a legenda do post (o cartão próprio, fora do menu); mesmo toast de `copiarTexto`. */
+  async function copiarLegenda() {
+    if (!corpo.legenda) return;
+    try {
+      await navigator.clipboard.writeText(corpo.legenda);
+      setToast(true);
+    } catch {
+      setErroToast(textosRoteiro.erroCopiar);
+    }
+  }
+
   async function baixarPdf() {
     if (baixandoPdf || semConexao) return;
     setBaixandoPdf(true);
@@ -520,7 +539,15 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
 
         <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
 
-        {roteiro.formato === "story" && corpo.cartoes ? (
+        {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
+          corpo.cartoes.map((cartao, indice) => (
+            <BlocoEdicao
+              key={indice}
+              titulo={textosRoteiro.blocos.cartao(indice + 1)}
+              itens={itensCartaoSemFala(cartao)}
+            />
+          ))
+        ) : roteiro.formato === "story" && corpo.cartoes ? (
           corpo.cartoes.map((cartao, indice) => (
             <BlocoEdicao
               key={indice}
@@ -531,6 +558,17 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         ) : (
           <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
         )}
+
+        {corpo.legenda ? (
+          <section className={styles.referenciaVazia}>
+            <h2>{textosRoteiro.legenda}</h2>
+            <p>{corpo.legenda}</p>
+            <button type="button" onClick={() => void copiarLegenda()} className={styles.linkReprovar}>
+              <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
+              {textosRoteiro.menu.copiar}
+            </button>
+          </section>
+        ) : null}
 
         {corpo.porQueAssim.length > 0 ? (
           <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />

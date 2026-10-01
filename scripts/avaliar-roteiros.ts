@@ -151,11 +151,13 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
         regrasCliente: caso.regrasCliente,
         tipo: caso.tipo,
         formato: "reels",
+        estilo: "falado",
       }),
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,
         objetivo: caso.objetivo,
         formato: "reels",
+        estilo: "falado",
         evidencias: caso.evidencias,
         roteirosRecentes: caso.roteirosRecentes,
         instrucaoAbertura: caso.instrucaoAbertura,

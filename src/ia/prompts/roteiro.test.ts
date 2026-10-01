@@ -17,6 +17,7 @@ const BASE = {
   tema: "o erro que faz a mancha voltar",
   objetivo: OBJETIVOS_EM_ORDEM[2],
   formato: "reels" as const,
+  estilo: "falado" as const,
   evidencias: [],
   roteirosRecentes: [],
   instrucaoAbertura: SEM_INSTRUCAO_ABERTURA,
@@ -191,6 +192,7 @@ describe("montarSistemaEstavel", () => {
     camadaExclusiva: "camada exclusiva",
     tipo: "negocio" as const,
     formato: "reels" as const,
+    estilo: "falado" as const,
   };
 
   it("sem regrasCliente, nao monta o bloco da memoria", () => {
@@ -241,6 +243,7 @@ describe("montarSistemaEstavel, formato story", () => {
     modeloNicho: "modelo do nicho",
     camadaExclusiva: "camada exclusiva",
     tipo: "negocio" as const,
+    estilo: "falado" as const,
     regrasCliente: [],
   };
 

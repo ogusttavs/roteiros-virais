@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   FIGURINHAS_STORY,
   TIPOS_ABERTURA,
+  type EstiloRoteiro,
   type FormatoRoteiro,
   type Objetivo,
   type TipoAbertura,
@@ -143,8 +144,18 @@ import { textoRegrasStory } from "./regras-formato";
  * escrever a palavra proibida por extenso). O verificador não mudou
  * (`ia/verificador.ts` já cobria os três casos; o
  * problema era só o modelo não saber a regra certa). Versao 2.0.1.
+ *
+ * M4, o roteiro do vídeo sem fala (decisão do Gustavo em 30/09/2026, "a gente não pode pensar em
+ * apenas vídeos falando"): novo `estilo`, ortogonal ao `formato` (um Reels ou um Story podem ser
+ * `falado` ou `sem_fala`). Sem fala sempre usa a estrutura de cartões (a mesma de Story, `cartoes`),
+ * com `oQueFalar` sempre vazio: cada cartão é uma cena (o que filmar) e o texto curto que entra na
+ * tela (no máximo 8 palavras por vez), nunca fala; a chamada para ação vai no texto da última cena e
+ * na legenda do post, novo campo `legenda` do schema (só preenchido quando sem fala). Sem regras
+ * numeradas de plataforma para este estilo ainda (a base da seção 9 não cobre sem fala; fica para a
+ * R1, fila do Sonnet), então `porQueAssim` continua vazio, como em Reels falado hoje. `tipoAbertura`
+ * fica nulo (não existe "jeito de começar a falar" quando não há fala). Versao 2.1.0.
  */
-export const versao = "2.0.1";
+export const versao = "2.1.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -205,6 +216,12 @@ export const schema = z.object({
    * demais casos (sugerido e livre já têm o tema antes de gerar).
    */
   temaCurto: z.string().nullable(),
+  /**
+   * M4: a legenda do post, pronta para copiar, com a chamada para ação dentro dela. Só preenchida
+   * quando o estilo é sem fala (o roteiro falado já entrega a chamada final como fala, no corpo do
+   * vídeo); nula no estilo falado. O verificador confere presença quando sem fala.
+   */
+  legenda: z.string().nullable(),
 });
 
 export type SaidaRoteiro = z.infer<typeof schema>;
@@ -229,8 +246,11 @@ export function montarSistemaEstavel(dados: {
   tipo: TipoMarca;
   /** V9c, item 2: troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cartões e as regras R-IG-STORY. */
   formato: FormatoRoteiro;
+  /** M4: sem fala troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cenas sem fala, igual em Reels e em Story. */
+  estilo: EstiloRoteiro;
 }): string {
   const ehStory = dados.formato === "story";
+  const ehSemFala = dados.estilo === "sem_fala";
   const blocoRegrasCliente =
     dados.regrasCliente.length > 0
       ? `\n\nO que este cliente já reprovou (siga a regra 8: a firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
@@ -251,20 +271,28 @@ export function montarSistemaEstavel(dados: {
    * conta segundos, conta palavras (o golden set achou cartões de até 48 palavras contra o teto de 37 do
    * verificador); 35 é a folga de dois abaixo do teto.
    */
-  const regra5 = ehStory
-    ? `5. Formato Story: o vídeo sai em cartões curtos (de 2 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
-      `gancho, corpo, fechamento e chamada; cada cartão tem no máximo 35 palavras de fala, nunca mais.`
-    : `5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do\n   nicho.`;
+  const regra5 = ehSemFala
+    ? `5. Este roteiro é sem fala: o vídeo sai em cenas curtas (de 2 a 5, cada uma um cartão), nenhum ` +
+      `bloco tem fala nenhuma, só o que filmar e o texto curto que entra na tela (no máximo 8 palavras ` +
+      `por vez, pode trocar mais de uma vez dentro do mesmo cartão).`
+    : ehStory
+      ? `5. Formato Story: o vídeo sai em cartões curtos (de 2 a 5, regra R-IG-STORY-03 abaixo), nunca em ` +
+        `gancho, corpo, fechamento e chamada; cada cartão tem no máximo 35 palavras de fala, nunca mais.`
+      : `5. Formato do MVP: fala direta para câmera, vertical, curto. A duração vem do modelo do\n   nicho.`;
 
   /**
    * V9c, item 2: em Story, o primeiro cartão tem regra própria (R-IG-STORY-02); `escolherTipoAbertura`
    * (V4) não se aplica, e a entrada nunca traz a linha "Tipo de abertura" para este formato
    * (`montarEntrada`). Deixe `tipoAbertura` nulo na saída.
    */
-  const regra9 = ehStory
-    ? `9. Este roteiro é um Story: não existe "tipo de abertura" (isso é coisa de Reels, regra R-IG-STORY-02
+  const regra9 = ehSemFala
+    ? `9. Este roteiro é sem fala: não existe "tipo de abertura" (isso é sobre como a pessoa começa a
+   falar). Deixe o campo tipoAbertura da saída nulo. O gancho é o que aparece na tela, imagem ou
+   texto, nos 3 primeiros segundos.`
+    : ehStory
+      ? `9. Este roteiro é um Story: não existe "tipo de abertura" (isso é coisa de Reels, regra R-IG-STORY-02
    cuida do primeiro cartão). Deixe o campo tipoAbertura da saída nulo.`
-    : `9. A entrada diz o tipo de abertura deste roteiro (o serviço escolhe, a partir da evidência
+      : `9. A entrada diz o tipo de abertura deste roteiro (o serviço escolhe, a partir da evidência
    de hoje, sem repetir os últimos roteiros do cliente), às vezes com um vídeo de exemplo:
    inspire-se no estilo dele, nunca copie a frase. Quando a entrada só trouxer uma lista de
    tipos a evitar, escolha livremente qualquer outro tipo. Declare no campo tipoAbertura da
@@ -281,8 +309,17 @@ export function montarSistemaEstavel(dados: {
    * juntas); e o motivo proíbe o mesmo jargão da regra dura 4, para o campo `porQueAssim` em si, não só
    * os campos de texto de tela.
    */
-  const blocoEstrutura = ehStory
-    ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão, cada um com no
+  const blocoEstrutura = ehSemFala
+    ? `Estrutura do roteiro sem fala: cartões numerados, de 2 a 5, uma cena por cartão. Nenhum cartão
+tem fala, em campo nenhum: deixe oQueFalar sempre como string vazia. Cada cartão tem o que mostrar
+(a cena, o que filmar) e o texto curto que entra na tela (no máximo 8 palavras por vez; pode trocar
+mais de uma vez dentro do mesmo cartão, descreva as trocas em oQueMostrar). A figurinha de interação
+é opcional, use "nenhuma" quando o cartão não pedir interação. A chamada para ação vai no texto da
+última cena e também pronta no campo legenda, com a chamada para ação dentro dela; não deixe
+legenda vazia. Como não há regras numeradas de plataforma para este estilo ainda, deixe porQueAssim
+como lista vazia.`
+    : ehStory
+      ? `Estrutura do roteiro em Story: cartões numerados, de 2 a 5, um assunto por cartão, cada um com no
 máximo 35 palavras de fala; cada cartão tem o que falar, o que mostrar, o texto curto que fica fixo na
 tela, e a figurinha de interação quando fizer sentido (ou "nenhuma" quando não pedir interação
 nenhuma). Siga as regras do Story à risca:
@@ -294,7 +331,7 @@ R-IG-STORY-nn da lista acima que você de fato seguiu (nunca as regras duras num
 começo deste texto, mesmo sendo numeradas), com o número (ex. "R-IG-STORY-04") e o motivo em
 português de gente, sem jargão no motivo (${montarInstrucaoJargaoPorQueAssim()}), sem citar o número
 dentro do motivo. Nunca cite uma regra que não está na lista das R-IG-STORY acima.`
-    : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
+      : `Estrutura do roteiro: gancho nos primeiros segundos, corpo, fechamento, chamada final.
 Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na tela
 (quando, o quê, onde), o ritmo de corte, os recursos, o áudio quando houver, e a referência
 (o vídeo, o segundo exato e o que olhar) quando existir um vídeo de evidência com análise
@@ -399,6 +436,8 @@ export function montarEntrada(dados: {
   objetivo: Objetivo;
   /** V9c, item 2: com "story", a linha "Tipo de abertura" nunca entra (regra dura 9). */
   formato: FormatoRoteiro;
+  /** M4: sem fala também nunca traz a linha "Tipo de abertura" (regra dura 9). */
+  estilo: EstiloRoteiro;
   observacao?: string;
   evidencias: {
     id: number;
@@ -409,6 +448,8 @@ export function montarEntrada(dados: {
     chamadaFinal: string;
     foraDaCurva: number;
     momentoChave?: string;
+    /** M4: marca o vídeo de evidência que é ele próprio sem fala, útil de inspiração para este estilo. */
+    semFala?: boolean;
   }[];
   /** Dos ultimos 10 dias (`servicos/roteiro.ts`, `historicoDeRoteiros`), com o gancho de cada um. */
   roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
@@ -446,7 +487,7 @@ export function montarEntrada(dados: {
       ? `Evidencia disponivel:\n${dados.evidencias
           .map(
             (v) =>
-              `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)\n` +
+              `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)${v.semFala ? " (sem fala)" : ""}\n` +
               `  gancho que funcionou: ${v.gancho}\n` +
               `  estrutura: ${v.estrutura}\n` +
               `  fechamento: ${v.fechamento}\n` +
@@ -501,7 +542,7 @@ export function montarEntrada(dados: {
     blocoMarcaCitada,
     dados.momento ? null : blocoEvidencia,
     `Roteiros recentes deste cliente, para nao repetir angulo:\n${listaRecentes}`,
-    dados.formato === "reels" ? formatarInstrucaoAbertura(dados.instrucaoAbertura) : null,
+    dados.formato === "reels" && dados.estilo === "falado" ? formatarInstrucaoAbertura(dados.instrucaoAbertura) : null,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

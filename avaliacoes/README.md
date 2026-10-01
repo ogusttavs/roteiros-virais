@@ -98,3 +98,20 @@ npm run avaliar:stories
 Imprime cada cartão gerado (o que falar, o que mostrar, o texto na tela, a figurinha), o
 "por que assim", e quantos casos o verificador de produção (checagem por regra `R-IG-STORY`
 mais `verificarTexto`) reprovaria.
+
+## Formato de `roteiros-sem-fala.json` e `roteiros-sem-fala.exemplo.json` (M4)
+
+O roteiro sem fala também não tem nota de 0 a 10, mesmo raciocínio de `stories.exemplo.json`.
+Cada caso é origem "tema" ou origem "momento", nunca os dois, e `formato` ("reels" ou "story",
+padrão "reels") escolhe o formato; o estilo é sempre "sem_fala" neste conjunto, não precisa
+declarar. `GOLDEN_SET_DIR/roteiros-sem-fala.json` é o real; sem ele, roda com
+`roteiros-sem-fala.exemplo.json`, três casos fictícios de uma oficina de envelopamento
+automotivo.
+
+```bash
+npm run avaliar:roteiros-sem-fala
+```
+
+Imprime cada cena gerada (o que falar, que precisa sair vazio, o que mostrar, o texto na
+tela), a legenda do post, e quantos casos o verificador de produção (checagem com
+`estilo: "sem_fala"` mais `verificarTexto`) reprovaria.

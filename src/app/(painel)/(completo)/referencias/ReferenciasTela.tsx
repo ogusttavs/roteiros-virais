@@ -70,6 +70,7 @@ function formatarVideo(v: VideoReferencia): VideoFormatado {
     estrutura: v.estrutura,
     porQueFuncionou: v.porQueFuncionou,
     capaUrl: v.capaUrl,
+    semFala: v.semFala === true,
   };
 }
 

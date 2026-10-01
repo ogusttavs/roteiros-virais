@@ -287,6 +287,7 @@ export default function Fundacao() {
               estrutura: "Aplica o produto sem cortar o vídeo, falando o tempo de espera em voz alta.",
               porQueFuncionou: "Todo mundo se reconhece no erro e fica para ver o certo.",
               capaUrl: null,
+              semFala: false,
             }}
             salvo={false}
             onVerDetalhes={() => undefined}

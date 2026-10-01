@@ -281,6 +281,13 @@
       "when": 1790816395525,
       "tag": "0039_video-proxima-tentativa-sem-fala",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1790823805775,
+      "tag": "0040_m4-roteiro-sem-fala",
+      "breakpoints": true
     }
   ]
 }

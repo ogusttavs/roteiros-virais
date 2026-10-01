@@ -3,8 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import type { FormatoRoteiro, Objetivo } from "@/db/schema";
-import { AJUDA_OBJETIVO, FORMATOS_ROTEIRO_EM_ORDEM, NOME_OBJETIVO, OBJETIVOS_EM_ORDEM, ROTULO_FORMATO_ROTEIRO, sugerirFormatoPeloObjetivo } from "@/ia/enums";
+import type { EstiloRoteiro, FormatoRoteiro, Objetivo } from "@/db/schema";
+import {
+  AJUDA_OBJETIVO,
+  ESTILOS_ROTEIRO_EM_ORDEM,
+  FORMATOS_ROTEIRO_EM_ORDEM,
+  NOME_OBJETIVO,
+  OBJETIVOS_EM_ORDEM,
+  ROTULO_ESTILO_ROTEIRO,
+  ROTULO_FORMATO_ROTEIRO,
+  sugerirFormatoPeloObjetivo,
+} from "@/ia/enums";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
@@ -14,7 +23,7 @@ import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { gerarRoteiroAction } from "./acoes";
+import { gerarRoteiroAction, sugerirEstiloAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
 
 function primeiraMaiuscula(texto: string): string {
@@ -35,6 +44,15 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
   // (`sugerirFormatoPeloObjetivo`); depois do primeiro toque, a escolha dela e que manda.
   const [formato, setFormato] = useState<FormatoRoteiro>("reels");
   const [formatoTocado, setFormatoTocado] = useState(false);
+  /**
+   * M4, item 2: o segundo controle segmentado, Falando/Sem fala. Ao contrário do formato (decidido
+   * pelo objetivo, por código, sem round-trip), o estilo nasce da evidência do tema, então a
+   * sugestão chega por uma Server Action (`sugerirEstiloAction`) assim que a tela monta.
+   */
+  const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
+  const [estiloTocado, setEstiloTocado] = useState(false);
+  // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
+  const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciarTransicao] = useTransition();
@@ -53,12 +71,31 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     setFormato(sugerirFormatoPeloObjetivo(escolhido));
   }, [escolhido, formatoTocado]);
 
+  /**
+   * M4, item 2: busca a sugestão assim que a tela monta (o tema já está escolhido antes de chegar
+   * aqui, ao contrário do objetivo). `cancelado` evita aplicar uma resposta que chegou depois de a
+   * pessoa já ter tocado no controle ou de a tela ter saído.
+   */
+  useEffect(() => {
+    let cancelado = false;
+    sugerirEstiloAction(temaEscolhidoTexto)
+      .then((sugestao) => {
+        if (!cancelado && !estiloTocadoRef.current) setEstilo(sugestao);
+      })
+      .catch(() => {
+        // Sem sugestão por falha de rede: o controle fica em "falado", a pessoa troca se quiser.
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [temaEscolhidoTexto]);
+
   function escrever() {
     if (!escolhido) return;
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        const { id } = await gerarRoteiroAction(origem, escolhido, formato);
+        const { id } = await gerarRoteiroAction(origem, escolhido, formato, estilo);
         if (saiuRef.current) return;
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
@@ -155,6 +192,31 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
           ))}
         </div>
         {!formatoTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.formatoAjuda[formato]}</p> : null}
+      </div>
+
+      <div className={styles.grupoFormato}>
+        <span className={styles.rotulo}>{textosObjetivo.estilo}</span>
+        <div role="tablist" aria-label={textosObjetivo.estilo} className={styles.segmentado}>
+          {ESTILOS_ROTEIRO_EM_ORDEM.map((opcao) => (
+            <button
+              key={opcao}
+              type="button"
+              role="tab"
+              aria-selected={estilo === opcao}
+              className={[styles.segmentoBotao, estilo === opcao ? styles.segmentoAtivo : ""]
+                .filter(Boolean)
+                .join(" ")}
+              onClick={() => {
+                estiloTocadoRef.current = true;
+                setEstiloTocado(true);
+                setEstilo(opcao);
+              }}
+            >
+              {ROTULO_ESTILO_ROTEIRO[opcao]}
+            </button>
+          ))}
+        </div>
+        {!estiloTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.estiloAjuda[estilo]}</p> : null}
       </div>
 
       <BarraAcao

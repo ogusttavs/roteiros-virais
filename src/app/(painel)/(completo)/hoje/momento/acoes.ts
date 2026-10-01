@@ -4,7 +4,7 @@ import type { Objetivo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
-import { ErroRoteiro, gerarRoteiro, validarFormato } from "@/servicos/roteiro";
+import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato } from "@/servicos/roteiro";
 
 /**
  * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
@@ -35,6 +35,8 @@ export type DadosMomento = {
    * como texto livre do navegador (V9d, item 2): `validarFormato` confere antes de chegar ao banco.
    */
   formato?: string;
+  /** M4, item 2: o segundo controle segmentado da folha (Falando/Sem fala); falado se ausente. */
+  estilo?: string;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -78,6 +80,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<{ 
     },
     objetivo: dados.objetivo,
     formato: validarFormato(dados.formato),
+    estilo: validarEstilo(dados.estilo),
   });
 
   return { id: roteiro.id };

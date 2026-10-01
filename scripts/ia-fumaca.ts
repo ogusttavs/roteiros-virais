@@ -294,11 +294,13 @@ async function main() {
         regrasCliente: [],
         tipo: "negocio",
         formato: "reels",
+        estilo: "falado",
       }),
       entrada: roteiro.montarEntrada({
         tema: "como tirar mancha de vinho tinto do sofa sem estragar o tecido",
         objetivo: "conversao",
         formato: "reels",
+        estilo: "falado",
         evidencias: [
           {
             id: 2,

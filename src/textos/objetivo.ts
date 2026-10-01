@@ -25,4 +25,10 @@ export const textosObjetivo = {
     reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
     story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
   },
+  /** M4, item 2: o segundo controle segmentado, Falando/Sem fala (`sugerirEstiloPelaEvidencia`). */
+  estilo: "Como você aparece",
+  estiloAjuda: {
+    falado: "No seu setor, os vídeos que mais rendem sobre isso têm alguém falando.",
+    sem_fala: "No seu setor, os vídeos que mais rendem sobre isso não têm fala.",
+  },
 };

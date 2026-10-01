@@ -86,6 +86,7 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
       <div className={styles.videoConta}>
         <span className={styles.nome}>{video.contaNome}</span>
         <span className={styles.quando}>{video.plataformaData}</span>
+        {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
       </div>
       {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}
 

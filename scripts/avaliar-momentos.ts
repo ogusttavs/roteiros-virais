@@ -93,11 +93,13 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
         regrasCliente: [],
         tipo: caso.tipo,
         formato: "reels",
+        estilo: "falado",
       }),
       entrada: roteiroIA.montarEntrada({
         tema: "",
         objetivo: caso.objetivo,
         formato: "reels",
+        estilo: "falado",
         evidencias: [],
         roteirosRecentes: [],
         instrucaoAbertura: { tipo: null, tiposProibidos: [] },

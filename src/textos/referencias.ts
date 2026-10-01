@@ -54,6 +54,8 @@ export const textosReferencias = {
   /** F1, ajuste A: aparece depois de um tempo, enquanto a rede de segurança de `navegar` está armada, em vez de seis segundos mudos e uma recarga. */
   demorandoMaisQueNormal: "Está demorando mais que o normal.",
   contaNaoIdentificada: "conta não identificada",
+  /** M4, item 1: etiqueta no cartão e na folha de detalhes, quando o vídeo foi lido sem fala. */
+  semFala: "Sem fala",
 
   // A folha de detalhes ("Por que esse funcionou")
   folhaDetalhesTitulo: "Por que esse funcionou",

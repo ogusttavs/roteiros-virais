@@ -121,5 +121,6 @@ export async function resolverIdioma(
 export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
   const { etiquetas, idioma, tipoAbertura, ...analise } = dados;
   const analiseVideo: AnaliseVideo = analise;
-  await db().update(videos).set({ analise: analiseVideo, etiquetas, idioma, tipoAbertura }).where(eq(videos.id, videoId));
+  // M4, item 1: este caminho sempre lê a transcrição, nunca é o caminho sem fala.
+  await db().update(videos).set({ analise: analiseVideo, etiquetas, idioma, tipoAbertura, semFala: false }).where(eq(videos.id, videoId));
 }
