@@ -184,6 +184,26 @@ test.describe("Atrasado (E39b, item b)", () => {
     expect(atual.data).toBe(somarDias(hoje, 1));
   });
 
+  // E39c, parte 1, item 1: o X no cabeçalho fecha a folha (`Folha.tsx`), igual ao véu e ao Escape.
+  test("o X fecha a folha de 'Mudar o dia' sem salvar nada", async ({ page }) => {
+    const { marcaId, email } = await criarMarca();
+    const hoje = hojeISO();
+    await criarRoteiro(marcaId, somarDias(hoje, -3), { titulo: "nao muda de dia" });
+
+    await entrar(page, email);
+
+    await page.getByRole("button", { name: "Mudar o dia" }).click();
+    const folha = page.getByRole("dialog", { name: "Mudar o dia" });
+    await expect(folha).toBeVisible();
+
+    await folha.getByRole("button", { name: "Fechar" }).click();
+    await expect(folha).toBeHidden();
+    await expect(page.getByRole("heading", { name: "Atrasado" })).toBeVisible();
+
+    const [atual] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaId));
+    expect(atual.data).toBe(somarDias(hoje, -3));
+  });
+
   test("'Arquivar' tira da lista de atrasados; o roteiro continua existindo, marcado", async ({ page }) => {
     const { marcaId, email } = await criarMarca();
     const hoje = hojeISO();

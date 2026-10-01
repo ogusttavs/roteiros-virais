@@ -115,6 +115,17 @@ test.describe("gravar agora, o caminho por texto", () => {
     await expect(page.getByText("Este roteiro veio do momento que você descreveu")).toBeVisible();
   });
 
+  // E39c, parte 1, item 1: o X no cabeçalho fecha a folha (`Folha.tsx`), igual ao véu e ao Escape.
+  test("o X fecha a folha de 'Gravar agora'", async ({ page }) => {
+    await entrar(page);
+    await abrirGravarAgora(page);
+    const folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folha).toBeVisible();
+
+    await folha.getByRole("button", { name: "Fechar" }).click();
+    await expect(folha).toBeHidden();
+  });
+
   test("campo vazio: nao envia e mostra o aviso", async ({ page }) => {
     await entrar(page);
     await abrirGravarAgora(page);
