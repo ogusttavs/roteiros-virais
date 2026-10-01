@@ -31,6 +31,12 @@
  * itens do plano (lugar e situação, `planoDoDia` já exclui pulado) acima do
  * texto de sempre. `nomesPendentes` virou `MarcaPendente[]` para carregar
  * esses itens junto do nome.
+ *
+ * E39a, item 7: o e-mail também lista o que já está marcado na Agenda daquele
+ * dia (`agendaDoDia`), reels e stories, com o estado de cada um. É uma lista
+ * a mais, não troca o texto de sempre nem o gatilho de quem recebe (a marca
+ * continua "pendente" por não ter sido aberta hoje com tema pronto, do jeito
+ * que já era antes da agenda existir).
  */
 import { eq } from "drizzle-orm";
 
@@ -40,8 +46,9 @@ import { hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
 import { acessouHoje } from "@/servicos/clientes";
 import { planoDoDia } from "@/servicos/plano";
+import { agendaDoDia } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
-import { textosEmail, type MarcaPendente } from "@/textos/email";
+import { textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
 
 /**
  * `agora` é injetável (hora real por padrão) para o teste de integração
@@ -90,10 +97,15 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       if (!marca.ativo) continue;
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
       if (!marca.nichoId || !(await temasDoDiaOuRecente(marca.nichoId, hoje))) continue;
-      const planoHoje = await planoDoDia(marca.id, hoje);
+      const [planoHoje, agendaHoje] = await Promise.all([planoDoDia(marca.id, hoje), agendaDoDia(marca.id, hoje)]);
+      const itensAgenda: ItemAgendaPendente[] = [
+        ...(agendaHoje.reels ? [{ titulo: agendaHoje.reels.titulo, status: agendaHoje.reels.status }] : []),
+        ...agendaHoje.stories.map((item) => ({ titulo: item.titulo, status: item.status })),
+      ];
       nomesPendentes.push({
         nome: marca.nome,
         planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),
+        agendaHoje: itensAgenda,
       });
     }
 

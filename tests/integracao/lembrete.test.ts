@@ -23,6 +23,7 @@ import {
   type PapelMarca,
   planoGravacoes,
   preferenciasUsuario,
+  roteiros,
   temasDia,
   user,
 } from "@/db/schema";
@@ -81,6 +82,43 @@ async function criarItemPlano(clienteId: number, dia: string, dados: { lugar: st
       situacao: dados.situacao,
       oQueMostrar: `a cena de ${dados.lugar}`,
       objetivo: "engajamento",
+    });
+}
+
+const CONTEUDO_MINIMO = {
+  titulo: "titulo do roteiro",
+  duracaoS: 40,
+  gancho: "gancho",
+  corpo: "corpo",
+  fechamento: "fechamento",
+  chamadaFinal: "chamada final",
+  cartoes: null,
+  porQueAssim: [],
+  cenas: [],
+  ondeGravar: "no local do negocio",
+  edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+  evidencias: [],
+  semEvidencia: true,
+  forcaEvidencia: null,
+};
+
+/** E39a, item 7: um roteiro já marcado na Agenda de hoje, fora do plano colado (os quatro caminhos de Criar). */
+async function criarRoteiroDaAgenda(
+  clienteId: number,
+  dia: string,
+  dados: { titulo: string; formato: "reels" | "story"; status?: "gerado" | "gravado" | "postado" },
+) {
+  await db()
+    .insert(roteiros)
+    .values({
+      clienteId,
+      data: dia,
+      tema: `tema de ${dados.titulo}`,
+      origem: "sugerido",
+      objetivo: "engajamento",
+      formato: dados.formato,
+      conteudo: { ...CONTEUDO_MINIMO, titulo: dados.titulo },
+      status: dados.status ?? "gerado",
     });
 }
 
@@ -144,8 +182,9 @@ afterAll(async () => {
 });
 
 afterEach(async () => {
-  // plano_gravacoes nao tem cascade a partir de clientes (schema.ts); precisa ir antes.
+  // plano_gravacoes e roteiros nao tem cascade a partir de clientes (schema.ts); precisam ir antes.
   await db().delete(planoGravacoes);
+  await db().delete(roteiros);
   // cascade cuida de clientes, membrosMarca e preferenciasUsuario (schema.ts).
   await db().delete(user);
   vi.mocked(enviarEmail).mockClear();
@@ -380,6 +419,47 @@ describe("rodarLembrete", () => {
     expect(resumo.enviados).toBe(1);
     const [html] = htmlsEnviados();
     expect(html).not.toContain("ver a linha");
+  });
+
+  it("marca com algo marcado na Agenda de hoje: o e-mail traz o titulo e o estado de cada item", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarRoteiroDaAgenda(marca.id, "2026-09-03", { titulo: "o erro que estraga a mancha", formato: "reels" });
+    await criarRoteiroDaAgenda(marca.id, "2026-09-03", {
+      titulo: "a mala pronta para a feira",
+      formato: "story",
+      status: "postado",
+    });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain("o erro que estraga a mancha (a gravar)");
+    expect(html).toContain("a mala pronta para a feira (postado)");
+    expect(html).toContain(`O tema de <strong>${marca.nome}</strong> está pronto para gravar.`);
+    expect(html.indexOf("o erro que estraga a mancha")).toBeLessThan(html.indexOf("está pronto para gravar"));
+  });
+
+  it("marca sem nada marcado na Agenda de hoje: o e-mail nao tem bloco de agenda", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).toContain(`O tema de <strong>${marca.nome}</strong> está pronto para gravar.`);
+    expect(html).not.toContain("(a gravar)");
+  });
+
+  it("roteiro marcado para outro dia nao entra no e-mail de hoje", async () => {
+    const pessoa = await criarPessoa("11:00");
+    const marca = await criarMarca(pessoa, { nichoId: nichoComTemaId });
+    await criarRoteiroDaAgenda(marca.id, "2026-09-04", { titulo: "amanha, nao hoje", formato: "reels" });
+
+    const resumo = await rodarLembrete(AGORA);
+    expect(resumo.enviados).toBe(1);
+    const [html] = htmlsEnviados();
+    expect(html).not.toContain("amanha, nao hoje");
   });
 
   it("se o envio falhar, desfaz o ultimo_lembrete_em da pessoa (nao perde o lembrete do dia por falha do provedor)", async () => {
