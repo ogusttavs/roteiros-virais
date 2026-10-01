@@ -304,6 +304,23 @@ export function RoteiroTela({
     refDeOndeVeio.current = elemento;
   }, []);
   const refCorpoComLado = useRef<HTMLDivElement>(null);
+  /**
+   * R1, acabamento (achado do Gustavo, repassado pela Fable): "Como editar" começava rente a "De
+   * onde veio", sem respiro nenhum entre os dois. `margin-top` aqui é sempre a altura medida de
+   * "De onde veio" (nunca a margem de verdade, que não entra em nenhuma medida de caixa); o
+   * espaço do design, `--espaco-6`, soma na altura só quando "De onde veio" de fato existe, senão
+   * "Como editar" ganharia um respiro do nada no caso sem referência nenhuma
+   * (`corpo.semEvidencia` falso e `edicao.referencia` nulo, mais comum desde a H4).
+   * `getComputedStyle` devolve o texto do token ("1.5rem"), não o pixel resolvido: o cálculo lê
+   * o tamanho de fonte da raiz e transforma rem em pixel, o jeito padrão de resolver isso em
+   * tempo de execução.
+   */
+  const espacoLadoPx = useCallback(() => {
+    const remPx = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const espacamento = getComputedStyle(document.documentElement).getPropertyValue("--espaco-6");
+    const emRem = parseFloat(espacamento);
+    return Number.isFinite(emRem) ? emRem * remPx : 0;
+  }, []);
   useLayoutEffect(() => {
     const corpo = refCorpoComLado.current;
     const elemento = refDeOndeVeio.current;
@@ -313,7 +330,7 @@ export function RoteiroTela({
       return;
     }
     const observador = new ResizeObserver(([entrada]) => {
-      corpo.style.setProperty("--altura-de-onde-veio", `${entrada.contentRect.height}px`);
+      corpo.style.setProperty("--altura-de-onde-veio", `${entrada.contentRect.height + espacoLadoPx()}px`);
     });
     observador.observe(elemento);
     return () => observador.disconnect();

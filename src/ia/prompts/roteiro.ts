@@ -200,8 +200,12 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * `clientes.redePrincipal` (`regrasDoReels`, `regras-formato.ts`); sem rede escolhida, Instagram.
  * Corrigido de passagem: a instrução de `porQueAssim` dizia "regras duras numeradas de 1 a 12",
  * desatualizada desde que a H4 renumerou para 15. Versão 2.7.0.
+ *
+ * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026): o lembrete de
+ * acentuação se repete no fim da entrada (`LEMBRETE_ACENTUACAO`), mesma correção de
+ * `avaliarResposta` 1.6.1. Versão 2.7.1.
  */
-export const versao = "2.7.0";
+export const versao = "2.7.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -543,6 +547,16 @@ function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
   return `Tipo de abertura: ${instrucao.tipo}, ${INSTRUCAO_TIPO_ABERTURA[instrucao.tipo]}.${exemplo}`;
 }
 
+/**
+ * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026: o roteiro sem
+ * fala reprovou por dez campos sem acentuação, a mesma causa raiz de `avaliarResposta` 1.6.1):
+ * a instrução de acentuação só no sistema estável não bastou; repetida aqui, no fim da entrada,
+ * é onde o modelo de fato lê por último antes de escrever. Última linha, mesma posição de
+ * `avaliarResposta.ts`, onde a instrução pegou (9 de 18 reprovados virou 0 de 18 lá).
+ */
+const LEMBRETE_ACENTUACAO =
+  "Escreva o roteiro inteiro com a acentuação correta do português (você, não, já, também, é, está), mesmo que o tema ou o perfil do cliente estejam sem acento.";
+
 export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
@@ -668,6 +682,7 @@ export function montarEntrada(dados: {
     dados.formato === "reels" && dados.estilo === "falado"
       ? formatarInstrucaoAbertura(dados.instrucaoAbertura)
       : null,
+    LEMBRETE_ACENTUACAO,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");
