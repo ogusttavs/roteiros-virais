@@ -330,6 +330,13 @@
       "when": 1790888629211,
       "tag": "0046_e39b-atrasado-ainda-vale",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1790894257042,
+      "tag": "0047_e43-roteiro-noticia-origem",
+      "breakpoints": true
     }
   ]
 }

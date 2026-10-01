@@ -35,8 +35,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * vende (antes so existia para marca do tipo pessoa). `textoPersona` ganha um caso proprio, e
  * o pilar "gerar cliente" ganha uma terceira clausula (procurado, seguido ou indicado, no
  * lugar de comprar ou virar candidato a parceria). Versao 1.4.0.
+ *
+ * E43: quando o tema nasce de "Criar conteúdo com esta notícia", o título, o resumo e o ângulo
+ * sugerido da notícia entram na entrada, para o modelo avaliar com esse contexto. Versao 1.5.0.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -131,6 +134,8 @@ sem acento nenhum; a sua justificativa sai sempre acentuada, mesmo assim.`;
 export function montarEntrada(dados: {
   tema: string;
   evidencias: { id: number; assunto: string; gancho: string; foraDaCurva: number }[];
+  /** E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia". */
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null };
 }): string {
   const listaEvidencias =
     dados.evidencias.length > 0
@@ -139,5 +144,9 @@ export function montarEntrada(dados: {
           .join("\n")
       : "nenhuma evidencia encontrada nos ultimos 90 dias";
 
-  return `Tema proposto: ${dados.tema}\n\nEvidencia disponivel:\n${listaEvidencias}`;
+  const blocoNoticia = dados.noticia
+    ? `\n\nNoticia que deu origem a este tema:\nTitulo: ${dados.noticia.titulo}${dados.noticia.resumo ? `\nResumo: ${dados.noticia.resumo}` : ""}${dados.noticia.angulo ? `\nAngulo sugerido: ${dados.noticia.angulo}` : ""}`
+    : "";
+
+  return `Tema proposto: ${dados.tema}${blocoNoticia}\n\nEvidencia disponivel:\n${listaEvidencias}`;
 }
