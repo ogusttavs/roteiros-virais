@@ -9,6 +9,7 @@
  * `PROXIMO.md`, D2 parte 2, item 4), com as palavras do design onde ele
  * escreveu diferente do painel atual.
  */
+import type { PerguntaBriefing } from "@/config/briefing";
 import type { TipoMarca } from "@/db/schema";
 
 function formatarNota(valor: number): string {
@@ -30,6 +31,8 @@ function formatarDiaMesPorExtenso(data: Date): string {
 }
 
 export const textosBriefing = {
+  /** E37a, item 3: no topo do briefing e do /comecar, acima das perguntas. */
+  tresJeitos: "Três jeitos de responder: escrever, falar no microfone ou levar a pergunta para a IA que você já usa.",
   comecar: {
     passoUm: "Primeiro passo",
     titulo: "Antes de escrever, a gente precisa te conhecer",
@@ -95,9 +98,11 @@ export const textosBriefing = {
      * P1, item 8 (achado do Gustavo: o Bruno leu o exemplo de "como
      * melhorar" como se fosse a própria resposta dele, e nunca desceu para
      * editar o campo). O rótulo do exemplo, o botão que copia para o campo,
-     * e o aviso com desfazer.
+     * e o aviso com desfazer. E37a, item 2: o rótulo e o aviso fixo mudam
+     * para a sugestão nunca ter cara de campo (`SugestaoResposta.tsx`).
      */
-    rotuloSugestao: "Uma sugestão de como escrever",
+    rotuloSugestao: "Sugestão de resposta",
+    avisoSugestao: "É um exemplo escrito pela IA com o que você contou. Só vale se for verdade.",
     usarEstaSugestao: "Usar esta sugestão",
     sugestaoAplicada: "Resposta substituída pela sugestão",
     desfazerSugestao: "Desfazer",
@@ -130,9 +135,17 @@ export const textosBriefing = {
     rascunhoSalvo: "salvo",
     rascunhoAindaNao: "ainda não salvo",
     rascunhoComErro: "não conseguimos salvar; o texto ainda está só nesta tela",
-    botaoEditar: "editar",
     botaoAvaliarDeNovo: "Avaliar de novo",
     botaoCancelar: "Cancelar",
+    /**
+     * E37a, item 1: o campo do briefing vivo é sempre editável; quando o texto muda, a nota
+     * antiga fica marcada assim até a pessoa avaliar de novo.
+     */
+    notaAntigaAviso: "de antes da edição. A nota nova vem quando você avaliar.",
+    /** E37a, item 3: "Copiar para a sua IA", ao lado do microfone. */
+    botaoCopiarParaIA: "Copiar para a sua IA",
+    copiadoParaIA: "Copiado. Cole na sua IA e traga a resposta para cá.",
+    erroCopiarParaIA: "Não conseguimos copiar agora. Tente de novo.",
   },
   navegacaoBlocos: {
     botaoVoltar: "Voltar",
@@ -220,3 +233,21 @@ export const textosBriefing = {
     semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
   },
 };
+
+/**
+ * E37a, item 3: "Copiar para a sua IA" monta este texto por código, sem chamar IA nenhuma, a
+ * partir da pergunta (`enunciado`), do que uma boa resposta tem (`oQueUmaBoaRespostaTem`, um por
+ * pergunta) e das instruções fixas abaixo. A pessoa cola na IA que já usa e traz a resposta dela
+ * de volta para o campo.
+ */
+const INSTRUCOES_TEXTO_PARA_IA =
+  "Responda como se fosse eu, em primeira pessoa, só com fatos reais que você já sabe sobre mim " +
+  "e o meu negócio. Dê exemplos, números e nomes de lugares e produtos quando souber. Se não " +
+  "souber alguma coisa, diga o que falta em vez de inventar. Sem lista de tópicos: um texto " +
+  "corrido de 5 a 10 linhas.";
+
+export function montarTextoParaIA(pergunta: PerguntaBriefing): string {
+  return [pergunta.enunciado, `Uma boa resposta tem: ${pergunta.oQueUmaBoaRespostaTem}`, INSTRUCOES_TEXTO_PARA_IA].join(
+    "\n\n",
+  );
+}

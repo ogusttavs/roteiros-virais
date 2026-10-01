@@ -107,8 +107,9 @@ test.describe("briefing da pessoa (P1)", () => {
     // A resposta continua no campo (vem primeiro, acima da analise), nao foi substituida por nada.
     await expect(campoP1).toHaveValue(resposta);
 
-    // O exemplo de "como melhorar" tem rotulo visivel de sugestao, nunca parece a resposta da pessoa.
-    await expect(page.getByText("Uma sugestão de como escrever")).toBeVisible();
+    // O exemplo de "como melhorar" tem rotulo visivel de sugestao, nunca parece a resposta da pessoa
+    // (E37a, item 2: a sugestao saiu para um componente proprio, com cara de sugestao, nao de campo).
+    await expect(page.getByText("Sugestão de resposta")).toBeVisible();
     const botaoUsarSugestao = page.getByRole("button", { name: "Usar esta sugestão" });
     await expect(botaoUsarSugestao).toBeVisible();
 

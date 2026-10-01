@@ -1,5 +1,6 @@
 "use client";
 
+import { Mic } from "lucide-react";
 import { useState } from "react";
 
 import { perguntasDoBriefing, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
@@ -103,6 +104,10 @@ export function BriefingVivo({
         <div className={styles.corpo}>
           <h1>{textosBriefing.briefing.titulo}</h1>
           <p className={styles.introducao}>{textosBriefing.briefing.introducao}</p>
+          <p className={styles.tresJeitos}>
+            <Mic aria-hidden="true" size={18} />
+            <span>{textosBriefing.tresJeitos}</span>
+          </p>
 
           {itensPerfil.length > 0 ? (
             <Cartao variante="recuado" className={styles.cartaoPerfil}>

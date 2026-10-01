@@ -131,6 +131,10 @@ export function verificarLocalmente(
     for (const problema of encontrarProblemas(valor)) {
       motivos.push(`${nomeCampo}: ${problema}`);
     }
+    const semAcento = problemaDeAcentuacao(valor);
+    if (semAcento) {
+      motivos.push(`${nomeCampo}: ${semAcento}`);
+    }
   }
 
   const textoJunto = normalizar(Object.values(campos).join(" "));
@@ -268,6 +272,50 @@ export function verificarLocalmente(
 
 function normalizar(texto: string): string {
   return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+/**
+ * H2, item 2 (achado do Gustavo em 29/09/2026: a análise de uma resposta saiu sem acento
+ * nenhum, "voce", "nao", "ja", "tambem", apesar de o prompt pedir acentuação; reproduzido em
+ * local com uma resposta do cliente digitada sem acento, o modelo imitou o jeito de escrever
+ * dela). A resposta do cliente pode vir sem acento; o texto que a IA escreve para o cliente ler
+ * nunca pode. Duas checagens, nunca aplicadas ao que o cliente escreveu (`campos` aqui é sempre
+ * saída da IA, nunca entrada: `extrairCampos` de cada tarefa já filtra isso antes de chegar
+ * aqui). `voce`/`nao`/`tambem`/`ja` como palavra inteira reprova em qualquer tamanho, sinal
+ * forte demais para esperar 200 caracteres; nenhum caractere acentuado só reprova a partir de
+ * 200, porque um texto curto pode não ter nenhuma vogal acentuável por acaso.
+ *
+ * Revisão do PR #83 (achado do Fable): a checagem de palavra inteira reprovava texto legítimo
+ * em dois casos. Primeiro, quando a IA cita entre aspas uma frase literal do cliente (a P5 e a
+ * P9 pedem isso; a frase do cliente pode vir sem acento, a checagem não sabia separar "a IA
+ * escreveu" de "a IA citou"). Segundo, sigla ou nome próprio em maiúsculas ("JA Envelopamentos")
+ * batia na mesma palavra por acaso, sem ser o advérbio "já". Duas defesas: tira do texto o que
+ * está entre aspas (retas, curvas e simples) antes de testar; e ignora o bater quando a palavra
+ * inteira encontrada está toda em maiúsculas (sigla), nunca quando é só a inicial maiúscula
+ * (começo de frase, "Ja virou rotina", continua reprovando).
+ */
+const ENTRE_ASPAS = /"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’/g;
+const PALAVRAS_SEM_ACENTO = /\b(voce|nao|tambem|ja)\b/gi;
+const TEM_CARACTERE_ACENTUADO = /[áàâãéèêíïóôõöúüçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇ]/;
+const MINIMO_CARACTERES_PARA_EXIGIR_ACENTO = 200;
+
+function temPalavraSemAcento(texto: string): boolean {
+  for (const encontrada of texto.matchAll(PALAVRAS_SEM_ACENTO)) {
+    const palavra = encontrada[0];
+    if (palavra !== palavra.toUpperCase()) return true;
+  }
+  return false;
+}
+
+function problemaDeAcentuacao(texto: string): string | null {
+  const semAspas = texto.replace(ENTRE_ASPAS, "");
+  if (temPalavraSemAcento(semAspas)) {
+    return 'sem acentuacao: tem "voce", "nao", "tambem" ou "ja" sem o acento (H2, achado de 29/09/2026)';
+  }
+  if (semAspas.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(semAspas)) {
+    return `sem acentuacao: mais de ${MINIMO_CARACTERES_PARA_EXIGIR_ACENTO} caracteres sem nenhum acento (H2, achado de 29/09/2026)`;
+  }
+  return null;
 }
 
 const PALAVRAS_INICIO_GANCHO = 6;

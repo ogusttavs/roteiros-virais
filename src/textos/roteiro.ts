@@ -39,6 +39,9 @@ export const textosRoteiro = {
     cancelar: "Cancelar",
     erro: "Não conseguimos salvar agora. O que você escreveu continua aqui; tente de novo.",
     salvo: "Edição salva",
+    /** E37a, item 0: teto por campo da edição manual (2.000 caracteres). */
+    textoMuitoLongo: (limite: number) => `Esse texto passou de ${limite} caracteres. Encurte um pouco e tente de novo.`,
+    listaMaiorQueOriginal: "Não deu para salvar: a lista veio com mais itens do que o roteiro tinha. Recarregue a tela e tente de novo.",
   },
   /** E40, item 2: "o que este vídeo precisa comunicar?", no topo da tela quando a pessoa escreveu algo. */
   recado: "O recado deste vídeo",

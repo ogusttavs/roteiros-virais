@@ -5,7 +5,7 @@
  * `useGravadorDeAudio.test.tsx`; aqui o que importa é só o que `PerguntaCampo` faz com o
  * `onTranscrito` que o gancho chama).
  */
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { PerguntaBriefing } from "@/config/briefing";
@@ -44,6 +44,7 @@ const PERGUNTA: PerguntaBriefing = {
   ajuda: "",
   oQueAIAProcura: "",
   rotuloCurto: "o que o negócio faz",
+  oQueUmaBoaRespostaTem: "o que você faz, para quem, e o que muda na vida de quem compra",
 };
 
 afterEach(() => {
@@ -127,5 +128,65 @@ describe("PerguntaCampo, Responder falando", () => {
       screen.getByRole("button", { name: "Desfazer" }).click();
     });
     expect(campo.value).toBe("Primeira parte.");
+  });
+});
+
+describe("PerguntaCampo, sugestão de resposta (E37a, item 2)", () => {
+  const AVALIACAO = {
+    nota: 7,
+    bom: "Conta o que o negócio faz.",
+    melhorar: "Falta um exemplo real.",
+    como: "Dê um caso concreto.",
+    impacto: "Ajuda o roteiro a soar real.",
+    exemplo: "Semana passada um cliente chegou com uma mancha de vinho e saiu com o sofá limpo.",
+  };
+
+  it("nunca tem textarea nem papel de campo: só o rótulo, o texto, o aviso fixo e o botão", () => {
+    render(
+      <PerguntaCampo
+        pergunta={PERGUNTA}
+        resposta="O que o negócio faz."
+        avaliacao={AVALIACAO}
+        onSalvarRascunho={vi.fn()}
+        onAvaliar={vi.fn()}
+        onAtualizado={vi.fn()}
+        meta={9}
+        variante="wizard"
+      />,
+    );
+
+    // Só o campo de resposta é textarea; a sugestão nunca é um segundo campo.
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+
+    expect(screen.getByText("Sugestão de resposta")).toBeTruthy();
+    expect(screen.getByText(AVALIACAO.exemplo)).toBeTruthy();
+    expect(screen.getByText("É um exemplo escrito pela IA com o que você contou. Só vale se for verdade.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Usar esta sugestão" })).toBeTruthy();
+  });
+
+  it("no briefing vivo, o campo já está editável (sem botão 'editar'), e mudar o texto troca a análise pela nota antiga", () => {
+    render(
+      <PerguntaCampo
+        pergunta={PERGUNTA}
+        resposta="O que o negócio faz."
+        avaliacao={AVALIACAO}
+        onSalvarRascunho={vi.fn().mockResolvedValue(undefined)}
+        onAvaliar={vi.fn()}
+        onAtualizado={vi.fn()}
+        meta={9}
+        variante="vivo"
+      />,
+    );
+
+    // E37a, item 1: nunca existe um botão "editar" nem um card fechado; o campo já está aberto.
+    expect(screen.queryByRole("button", { name: "editar" })).toBeNull();
+    expect(screen.getByText("Sugestão de resposta")).toBeTruthy();
+
+    const campo = screen.getByLabelText(PERGUNTA.enunciado) as HTMLTextAreaElement;
+    fireEvent.change(campo, { target: { value: "O que o negócio faz, agora editado." } });
+
+    expect(screen.getByText("de antes da edição. A nota nova vem quando você avaliar.")).toBeTruthy();
+    expect(screen.queryByText("Sugestão de resposta")).toBeNull();
+    expect(screen.getByRole("button", { name: "Avaliar de novo" })).toBeTruthy();
   });
 });

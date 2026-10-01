@@ -3,7 +3,7 @@
  * sem chamar a API (custo zero). Todo teste automatizado roda em mock;
  * so scripts/ia-fumaca.ts chama a API de verdade. A saida passa pelo
  * mesmo schema Zod que a chamada real usaria, entao um mock mal formado
- * quebra o teste que o usa, nao passa disfarcado.
+ * quebra o teste que o usa, não passa disfarcado.
  */
 import type { ParametrosGeracao } from "./cliente";
 import type { ResultadoGeracao, TarefaIA } from "./tipos";
@@ -24,7 +24,7 @@ export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<Result
  * Exportada para src/ia/lote.ts reusar o mesmo mock por tarefa no lote,
  * em vez de um objeto generico que so passaria em schema com tudo opcional.
  * `sistemaEstavel` e opcional (so "roteiro" usa, para saber o formato,
- * V9c, item 2: a entrada nao diz "story" em lugar nenhum, so o sistema).
+ * V9c, item 2: a entrada não diz "story" em lugar nenhum, so o sistema).
  */
 export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEstavel = ""): unknown {
   switch (tarefa) {
@@ -107,7 +107,7 @@ function mockAvaliarResposta(entrada: string) {
     como: "Escreva como se fosse para alguem que nunca ouviu falar do seu ramo, com um caso real.",
     exemplo:
       "Eu vendo o meu produto principal por um preco fixo, e mostro para o cliente exatamente o que ele leva junto, com um exemplo real de quem comprou essa semana.",
-    impacto: "Uma resposta mais concreta gera um roteiro mais parecido com voce.",
+    impacto: "Uma resposta mais concreta gera um roteiro mais parecido com você.",
   };
 }
 
@@ -143,18 +143,18 @@ const PILAR_PADRAO = { nota: 6, justificativa: "avaliacao simulada, sem chamada 
 
 /**
  * Gatilho de teste (revisao do PR #17, etapa 12, ajuste 1): o mock sempre
- * ecoa os ids que recebeu, entao nao ha jeito natural de simular a IA
+ * ecoa os ids que recebeu, entao não ha jeito natural de simular a IA
  * inventando evidencia (o defeito que o Fable achou rodando com chave
  * real). Um tema com esta frase faz o mock devolver um id que nunca
  * existiu na entrada, para o teste de integracao confirmar que
- * `evidenciasFornecidas` (agora tambem em `avaliarTema`) reprova isso.
+ * `evidenciasFornecidas` (agora também em `avaliarTema`) reprova isso.
  */
-const MARCADOR_EVIDENCIA_INVENTADA = "invente uma evidencia que nao existe";
+const MARCADOR_EVIDENCIA_INVENTADA = "invente uma evidencia que não existe";
 
 /**
  * Gatilho de teste (V5b, item 4): com `PILAR_PADRAO` fixo em 6, a media dos
  * cinco pilares nunca passa de 6,6 mesmo com evidencia forte (9 em
- * "viralizar"), entao nao ha texto natural que leve o mock ao estado
+ * "viralizar"), entao não ha texto natural que leve o mock ao estado
  * "naMeta" (nota >= 9). Um tema com esta frase faz todos os pilares
  * pontuarem alto, para o e2e de Tema livre exercitar esse estado de verdade.
  */
@@ -274,9 +274,9 @@ function mockCartoesStory(tema: string, reprovado: boolean) {
         figurinha: "nenhuma" as const,
       },
       {
-        oQueFalar: "aqui a gente lida com isso toda semana, e voce ja deve ter passado por isso tambem",
+        oQueFalar: "aqui a gente lida com isso toda semana, e você já deve ter passado por isso também",
         oQueMostrar: "o processo acontecendo",
-        textoNaTela: "e voce, ja passou por isso",
+        textoNaTela: "e você, já passou por isso",
         figurinha: "perguntas" as const,
       },
       {
@@ -287,7 +287,7 @@ function mockCartoesStory(tema: string, reprovado: boolean) {
       },
     ],
     porQueAssim: [
-      { regra: "R-IG-STORY-02", motivo: "o primeiro cartao ja cita o assunto para quem ja segue continuar vendo" },
+      { regra: "R-IG-STORY-02", motivo: "o primeiro cartao já cita o assunto para quem já segue continuar vendo" },
       { regra: "R-IG-STORY-04", motivo: "a caixinha de perguntas pede interacao de quem esta vendo" },
     ],
   };
@@ -301,7 +301,7 @@ function mockCenasSemFala(tema: string, reprovado: boolean) {
       {
         oQueFalar: "",
         oQueMostrar: reprovado ? "outro angulo do processo acontecendo" : "o processo acontecendo",
-        textoNaTela: "e voce, ja passou por isso",
+        textoNaTela: "e você, já passou por isso",
         figurinha: "nenhuma" as const,
       },
       { oQueFalar: "", oQueMostrar: "o resultado final em destaque", textoNaTela: "chama no direct", figurinha: "nenhuma" as const },
@@ -339,7 +339,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
             ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
             : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
           fechamento: "resumo do que foi mostrado",
-          chamadaFinal: "comenta se voce ja passou por isso",
+          chamadaFinal: "comenta se você já passou por isso",
           cartoes: null,
           porQueAssim: [],
           legenda: null,
@@ -400,7 +400,7 @@ function extrairIdsNoticias(entrada: string): number[] {
  * `evidenciaValida` reprova as duas tentativas e as duas ficam registradas
  * (correcao do dia 1 da etapa 14, `PROXIMO.md`).
  */
-const MARCADOR_EVIDENCIA_INVENTADA_TEMA = "invente um id de evidencia que nao existe";
+const MARCADOR_EVIDENCIA_INVENTADA_TEMA = "invente um id de evidencia que não existe";
 
 function mockTemasDoDia(entrada: string) {
   const ids = extrairIds(entrada);
@@ -421,7 +421,7 @@ function mockTemasDoDia(entrada: string) {
   }
 
   return {
-    // V2b, item 8: cada tema cita todos os ids de video disponiveis (nao so
+    // V2b, item 8: cada tema cita todos os ids de video disponiveis (não so
     // um por rodizio), para o mock simular uma prova de verdade quando o
     // teste cria video suficiente (3+ de 2+ contas); sem isso, nenhum tema
     // simulado passaria na checagem de prova por codigo.
@@ -451,7 +451,7 @@ function mockExtrairVideo(entrada: string) {
     gancho: `abertura sobre ${titulo}`,
     estrutura: "gancho, explicacao, demonstracao, fechamento",
     fechamento: "resumo do que foi mostrado",
-    chamadaFinal: "comenta se voce ja passou por isso",
+    chamadaFinal: "comenta se você já passou por isso",
     formato: "fala_para_camera" as const,
     porQueFuncionou: "mostra o problema acontecendo de verdade",
     etiquetas: titulo
@@ -462,7 +462,7 @@ function mockExtrairVideo(entrada: string) {
     pertenceAoNicho,
     motivoNicho: pertenceAoNicho
       ? "a transcricao cita termo do nicho"
-      : "a transcricao nao cita nenhum termo do nicho",
+      : "a transcricao não cita nenhum termo do nicho",
     idioma: "pt-BR" as const,
     tipoAbertura: "outro" as const,
   };
@@ -484,7 +484,7 @@ function mockExtrairVideoSemFala(entrada: string) {
     gancho: `o que aparece na tela sobre ${titulo}`,
     estrutura: "cena, demonstracao, fechamento",
     fechamento: "resumo do que foi mostrado",
-    chamadaFinal: "comenta se voce ja passou por isso",
+    chamadaFinal: "comenta se você já passou por isso",
     formato: "esquete" as const,
     porQueFuncionou: "mostra o problema acontecendo de verdade",
     etiquetas: titulo
@@ -493,7 +493,7 @@ function mockExtrairVideoSemFala(entrada: string) {
       .filter((palavra) => palavra.length > 3)
       .slice(0, 4),
     pertenceAoNicho,
-    motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda nao cita nenhum termo do nicho",
+    motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda não cita nenhum termo do nicho",
   };
 }
 
@@ -607,12 +607,12 @@ function mockModeloNicho(entrada: string) {
   return {
     resumo: `Modelo simulado a partir de ${videos} video(s) de evidencia.`,
     ganchos: [
-      { tipo: "pergunta direta", exemplo: "voce ja passou por isso", frequencia: "frequente" },
+      { tipo: "pergunta direta", exemplo: "você já passou por isso", frequencia: "frequente" },
     ],
     duracaoTipicaS: { min: 20, max: 60 },
     estruturas: ["gancho, explicacao, demonstracao, fechamento"],
     fechamentos: ["resumo do que foi mostrado"],
-    chamadasFinais: ["comenta se voce ja passou por isso"],
+    chamadasFinais: ["comenta se você já passou por isso"],
     formatos: [{ formato: "fala_para_camera", participacao: "maioria" }],
     edicao: {
       textoNaTela: "titulo curto no topo",
@@ -670,7 +670,7 @@ function mockClassificarContaDoSetor(entrada: string) {
     pertenceAoSetor,
     motivo: pertenceAoSetor
       ? "os titulos ou legendas citam termo do setor"
-      : "os titulos ou legendas nao citam nenhum termo do setor",
+      : "os titulos ou legendas não citam nenhum termo do setor",
   };
 }
 

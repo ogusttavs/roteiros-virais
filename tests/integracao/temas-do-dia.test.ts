@@ -245,7 +245,7 @@ describe("rodarTemasDoDia", () => {
   it("resposta com id de evidencia inventado nas duas tentativas registra duas geracoes reprovadas e falhas: 1", async () => {
     await criarVideo("video-evidencia-inventada", {
       velocidadeRelativa: 5,
-      assunto: "invente um id de evidencia que nao existe",
+      assunto: "invente um id de evidencia que não existe",
     });
 
     const resumo = await rodarTemasDoDia();

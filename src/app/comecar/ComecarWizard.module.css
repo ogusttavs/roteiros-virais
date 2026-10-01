@@ -132,6 +132,21 @@
   font-size: var(--tamanho-titulo-sm);
 }
 
+/** As três formas de responder, no primeiro bloco de perguntas (E37a, item 3). */
+.tresJeitos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.tresJeitos svg {
+  margin-top: 0.15rem;
+  color: var(--cor-texto-suave);
+}
+
 .introducao {
   color: var(--cor-texto);
 }

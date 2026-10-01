@@ -1091,12 +1091,32 @@ export type CamposEditaveisRoteiro = {
   legenda?: string;
 };
 
+/** E37a, item 0 (resto da revisão do PR #82): teto por campo da edição manual, sem exceção. */
+const LIMITE_CARACTERES_EDICAO = 2000;
+
+function campoEditadoOuAtual(novo: string | undefined, atual: string): string {
+  if (novo === undefined) return atual;
+  const aparado = novo.trim();
+  if (aparado.length > LIMITE_CARACTERES_EDICAO) {
+    throw new ErroRoteiro(textosRoteiro.editando.textoMuitoLongo(LIMITE_CARACTERES_EDICAO));
+  }
+  return aparado;
+}
+
 /**
  * E40, item 1: salva a edição manual da pessoa, sem chamar IA. Na primeira edição deste
  * roteiro, `conteudoOriginal` guarda a versão que a IA escreveu (edições seguintes não
  * sobrescrevem: o original é sempre o que a IA de fato gerou). Enfileira `aprender-cliente`
  * (E27, parte 2) com o mesmo padrão de `reprovarERescrever`, para a diferença entre o texto
  * original e o editado virar mais um sinal de aprendizado.
+ *
+ * E37a, item 0 (resto da revisão do PR #82): sem teto, um texto enorme ia para o banco e depois
+ * para o prompt do `aprender-cliente` (custo de IA). Cada campo de texto (`gancho`, `corpo`,
+ * `fechamento`, `chamadaFinal`, `legenda`, e os três campos de cada cartão) passa por
+ * `campoEditadoOuAtual`: `trim`, teto de 2.000 caracteres, erro nomeado acima do teto. A lista
+ * de cartões editada nunca fica maior que a original: índice além do que já existia é um erro,
+ * não uma inserção silenciosa (o `.map` abaixo já não cresceria o array sozinho, mas uma lista
+ * maior enviada pela tela precisa avisar, não ser ignorada calada).
  */
 export async function editarRoteiro(
   roteiroId: number,
@@ -1106,24 +1126,29 @@ export async function editarRoteiro(
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
 
   const conteudoAtual = atual.conteudo;
+
+  if (campos.cartoes && campos.cartoes.length > (conteudoAtual.cartoes?.length ?? 0)) {
+    throw new ErroRoteiro(textosRoteiro.editando.listaMaiorQueOriginal);
+  }
+
   const novoConteudo: ConteudoRoteiro = {
     ...conteudoAtual,
-    gancho: campos.gancho ?? conteudoAtual.gancho,
-    corpo: campos.corpo ?? conteudoAtual.corpo,
-    fechamento: campos.fechamento ?? conteudoAtual.fechamento,
-    chamadaFinal: campos.chamadaFinal ?? conteudoAtual.chamadaFinal,
+    gancho: campoEditadoOuAtual(campos.gancho, conteudoAtual.gancho),
+    corpo: campoEditadoOuAtual(campos.corpo, conteudoAtual.corpo),
+    fechamento: campoEditadoOuAtual(campos.fechamento, conteudoAtual.fechamento),
+    chamadaFinal: campoEditadoOuAtual(campos.chamadaFinal, conteudoAtual.chamadaFinal),
     // A figurinha nao se edita (e escolha da IA, nao um campo de texto); so os tres campos de
     // texto do cartao trocam, por indice, a mesma ordem que a tela recebeu.
     cartoes:
       campos.cartoes && conteudoAtual.cartoes
         ? conteudoAtual.cartoes.map((cartao, indice) => ({
             ...cartao,
-            oQueFalar: campos.cartoes![indice]?.oQueFalar ?? cartao.oQueFalar,
-            oQueMostrar: campos.cartoes![indice]?.oQueMostrar ?? cartao.oQueMostrar,
-            textoNaTela: campos.cartoes![indice]?.textoNaTela ?? cartao.textoNaTela,
+            oQueFalar: campoEditadoOuAtual(campos.cartoes![indice]?.oQueFalar, cartao.oQueFalar),
+            oQueMostrar: campoEditadoOuAtual(campos.cartoes![indice]?.oQueMostrar, cartao.oQueMostrar),
+            textoNaTela: campoEditadoOuAtual(campos.cartoes![indice]?.textoNaTela, cartao.textoNaTela),
           }))
         : conteudoAtual.cartoes,
-    legenda: campos.legenda ?? conteudoAtual.legenda,
+    legenda: campos.legenda !== undefined ? campoEditadoOuAtual(campos.legenda, conteudoAtual.legenda ?? "") : conteudoAtual.legenda,
   };
 
   const [roteiro] = await db()

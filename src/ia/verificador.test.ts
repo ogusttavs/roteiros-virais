@@ -117,7 +117,7 @@ describe("verificarLocalmente", () => {
 
     it("aprova gancho que comeca diferente, mesmo tema", () => {
       const r = verificarLocalmente(
-        { gancho: "isso aqui muda a forma como voce limpa o estofado", corpo: "texto" },
+        { gancho: "isso aqui muda a forma como você limpa o estofado", corpo: "texto" },
         { ganchosRecentes: ["voce ja tentou tirar mancha de vinho e nao conseguiu"] },
       );
       expect(r.aprovado).toBe(true);
@@ -280,7 +280,7 @@ describe("verificarLocalmente", () => {
 
     it("cita uma palavra do momento no gancho: aprova", () => {
       const r = verificarLocalmente(
-        { gancho: "aqui no aeroporto, cinco da manha, ja com a mala pronta" },
+        { gancho: "aqui no aeroporto, cinco da manha, já com a mala pronta" },
         { palavrasDoMomento: PALAVRAS },
       );
       expect(r.aprovado).toBe(true);
@@ -288,7 +288,7 @@ describe("verificarLocalmente", () => {
 
     it("nao cita nenhuma palavra do momento no gancho: reprova", () => {
       const r = verificarLocalmente(
-        { gancho: "olha essa novidade que eu trouxe para voce hoje" },
+        { gancho: "olha essa novidade que eu trouxe para você hoje" },
         { palavrasDoMomento: PALAVRAS },
       );
       expect(r.aprovado).toBe(false);
@@ -298,7 +298,7 @@ describe("verificarLocalmente", () => {
     it("cita a palavra so no corpo, nunca no gancho: reprova (a regra e sobre os primeiros segundos)", () => {
       const r = verificarLocalmente(
         {
-          gancho: "olha essa novidade que eu trouxe para voce hoje",
+          gancho: "olha essa novidade que eu trouxe para você hoje",
           corpo: "estou aqui no aeroporto esperando o embarque para a feira de fornecedores",
         },
         { palavrasDoMomento: PALAVRAS },
@@ -308,7 +308,7 @@ describe("verificarLocalmente", () => {
     });
 
     it("sem palavrasDoMomento (fora da origem momento), nao aplica a checagem", () => {
-      const r = verificarLocalmente({ gancho: "olha essa novidade que eu trouxe para voce hoje" });
+      const r = verificarLocalmente({ gancho: "olha essa novidade que eu trouxe para você hoje" });
       expect(r.aprovado).toBe(true);
     });
   });
@@ -630,6 +630,80 @@ describe("verificarLocalmente", () => {
     it("porQueAssim vazio (Reels nesta rodada), nao reprova nada", () => {
       const r = verificarLocalmente({}, { porQueAssim: [] });
       expect(r.aprovado).toBe(true);
+    });
+  });
+
+  /**
+   * H2 (achado do Gustavo em 29/09/2026, no briefing da Overtake Pro): a analise saiu sem
+   * acento nenhum, apesar de o prompt pedir acentuacao. A resposta do cliente pode vir sem
+   * acento; o texto que a IA escreve para o cliente ler nunca pode.
+   */
+  describe("acentuacao (H2, achado de 29/09/2026)", () => {
+    it("reprova 'voce', 'nao', 'tambem' ou 'ja' como palavra inteira, mesmo num campo curto", () => {
+      expect(verificarLocalmente({ corpo: "voce ja pensou nisso?" }).aprovado).toBe(false);
+      expect(verificarLocalmente({ corpo: "isso nao e dificil" }).aprovado).toBe(false);
+      expect(verificarLocalmente({ corpo: "tambem funciona para voce" }).aprovado).toBe(false);
+    });
+
+    it("aprova a mesma frase com o acento certo", () => {
+      const r = verificarLocalmente({ corpo: "você já pensou nisso? Também não é difícil." });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("nao reprova so por 'ja' ou 'nao' dentro de outra palavra (limite de palavra inteira)", () => {
+      const r = verificarLocalmente({ corpo: "a janela da sala mostra o jardim e a nação inteira" });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("mais de 200 caracteres sem nenhum acento reprova, mesmo sem as quatro palavras do gatilho", () => {
+      const semAcentoNenhum =
+        "isso resolve o problema de quem precisa de uma resposta rapida sem complicacao, com exemplo " +
+        "real, numero concreto e um caso que aconteceu de verdade dentro do negocio para mostrar, " +
+        "exatamente como um cliente contaria para outro cliente numa conversa de verdade no balcao.";
+      expect(semAcentoNenhum.length).toBeGreaterThan(200);
+      const r = verificarLocalmente({ corpo: semAcentoNenhum });
+      expect(r.aprovado).toBe(false);
+      expect(r.motivos.join(" ")).toContain("sem acentuacao");
+    });
+
+    it("ate 200 caracteres sem nenhum acento nao reprova (pode ser so uma coincidencia do texto curto)", () => {
+      const curto = "isso resolve o problema de quem precisa de uma resposta rapida sem complicacao.";
+      expect(curto.length).toBeLessThanOrEqual(200);
+      const r = verificarLocalmente({ corpo: curto });
+      expect(r.aprovado).toBe(true);
+    });
+
+    /**
+     * Revisão do PR #83 (achado do Fable): a P5 e a P9 pedem a frase literal do cliente, que
+     * pode vir sem acento; a IA cita entre aspas, e isso não é "a IA escreveu sem acento".
+     */
+    it("nao reprova palavra sem acento que esta dentro de aspas (retas, curvas ou simples)", () => {
+      expect(
+        verificarLocalmente({ corpo: 'Você sempre ouve do cliente: "nao sei se vai resolver".' }).aprovado,
+      ).toBe(true);
+      expect(
+        verificarLocalmente({ corpo: "Você sempre ouve do cliente: “nao sei se vai resolver”." }).aprovado,
+      ).toBe(true);
+      expect(
+        verificarLocalmente({ corpo: "Você sempre ouve do cliente: 'nao sei se vai resolver'." }).aprovado,
+      ).toBe(true);
+    });
+
+    it("nao reprova sigla ou nome proprio em maiusculas que bate por acaso ('JA Envelopamentos')", () => {
+      const r = verificarLocalmente({ corpo: "Grave na oficina da JA Envelopamentos, com o carro na frente." });
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("comeco de frase com so a inicial maiuscula continua reprovando (nao e sigla)", () => {
+      const r = verificarLocalmente({ corpo: "Ja virou rotina pedir orcamento antes de fechar o servico." });
+      expect(r.aprovado).toBe(false);
+    });
+
+    it("palavra sem acento fora de aspas continua reprovando, mesmo com uma aspa acentuada no mesmo texto", () => {
+      const r = verificarLocalmente({
+        corpo: 'Isso voce resolve rapido. O cliente disse: "ótimo, ficou ótimo".',
+      });
+      expect(r.aprovado).toBe(false);
     });
   });
 });
