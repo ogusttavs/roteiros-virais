@@ -369,11 +369,20 @@ async function marcaCitadaPorId(
  */
 function validarReferenciaDoModelo(
   referencia: roteiroIA.SaidaRoteiro["edicao"]["referencia"],
-  evidenciasFornecidas: number[],
+  evidencias: VideoEvidenciaRoteiro[],
 ): { videoId: number; segundo: number; oQueOlhar: string } | null {
   if (!referencia || referencia.videoId === null) return null;
-  if (!evidenciasFornecidas.includes(referencia.videoId)) return null;
-  return { videoId: referencia.videoId, segundo: referencia.segundo ?? 0, oQueOlhar: referencia.oQueOlhar };
+  const video = evidencias.find((e) => e.id === referencia.videoId);
+  if (!video) return null;
+  /**
+   * Revisão do Fable no PR #88: o modelo escolhe QUAL vídeo, nunca o segundo. O segundo só existe
+   * quando a análise visual do vídeo tem um momento chave (medido no vídeo de verdade); sem isso é
+   * 0, e a tela não mostra "o trecho começa em". Um segundo inventado mandaria a pessoa para um
+   * ponto do vídeo que não tem nada.
+   */
+  const momento = video.analiseVisual?.momentoChave;
+  if (momento) return { videoId: video.id, segundo: momento.segundo, oQueOlhar: momento.oQue };
+  return { videoId: video.id, segundo: 0, oQueOlhar: referencia.oQueOlhar || video.gancho };
 }
 
 /**
@@ -956,7 +965,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     extrairEvidencias: (d) => d.evidencias,
   });
 
-  const referenciaEscolhida = validarReferenciaDoModelo(saida.edicao.referencia, evidenciasFornecidas);
+  const referenciaEscolhida = validarReferenciaDoModelo(saida.edicao.referencia, evidencias);
   const duracaoS = respeitarDuracaoDoNicho(saida.duracaoS, modeloNichoLinha?.modelo.duracaoTipicaS);
 
   const conteudo: ConteudoRoteiro = {

@@ -84,7 +84,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
    * é da própria `rodarTemasDoDia`/`podeSobrescreverTemasDoDia`, não deste despacho.
    */
   [FILAS.temasDoDia]: () => {
-    const nichoIdArg = process.argv[3];
+    const nichoIdArg = process.argv.slice(3).find((arg) => /^\d+$/.test(arg));
     const forcar = process.argv.includes("--refazer");
     return rodarTemasDoDia(nichoIdArg === undefined ? undefined : Number(nichoIdArg), { forcar });
   },
