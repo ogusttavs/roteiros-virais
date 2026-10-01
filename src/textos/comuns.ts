@@ -28,4 +28,9 @@ export const textosComuns = {
   esperaTitulo: "Escrevendo o seu roteiro",
   esperaDuracao: "Costuma levar de 30 segundos a 3 minutos",
   esperaVoltarDepois: "Voltar depois",
+  /**
+   * P2b, item 4: só aparece quando a prévia ao vivo usa o reconhecimento de fala do navegador
+   * (camada a). Compartilhado entre o briefing, o momento e o plano, que usam o mesmo gancho.
+   */
+  previaUsaReconhecimentoDoAparelho: "A prévia usa o reconhecimento de voz do seu aparelho.",
 };

@@ -124,4 +124,47 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     await campo.fill("atendimento bom, escrito direto");
     await expect(campo).toHaveValue("atendimento bom, escrito direto");
   });
+
+  test("a previa aparece enquanto grava, antes do texto definitivo (P2b, camada b por pedacos)", async ({ page }) => {
+    const id = "e2e-previa-ao-vivo";
+    await prepararCliente(id);
+
+    // Sem o reconhecimento de fala do navegador, de proposito: a previa cai direto para a camada b
+    // (o segundo MediaRecorder por pedacos), sem depender de rede externa nem do fabricante do navegador.
+    await page.addInitScript(() => {
+      // @ts-expect-error -- apagar de proposito, so nesta pagina de teste.
+      delete window.SpeechRecognition;
+      // @ts-expect-error -- apagar de proposito, so nesta pagina de teste.
+      delete window.webkitSpeechRecognition;
+    });
+
+    let chamadas = 0;
+    await page.route("**/api/transcrever", async (rota) => {
+      chamadas += 1;
+      const transcricao = chamadas === 1 ? "aqui vai aparecendo o que você está falando" : "então assim isso ficou sendo o texto definitivo depois de organizar";
+      await rota.fulfill({ json: { transcricao } });
+    });
+
+    await entrar(page, `${id}@exemplo.teste`);
+    await expect(page).toHaveURL(/\/comecar/);
+    await expect(page.getByText("bloco 1 de 5")).toBeVisible();
+
+    const cartaoP1 = page.locator("#pergunta-p1");
+    const campo = page.getByLabel("o que o seu negócio faz hoje");
+
+    await cartaoP1.getByRole("button", { name: "Responder falando" }).click();
+    await expect(cartaoP1.getByRole("button", { name: "Parar" })).toBeVisible();
+
+    // O primeiro pedaco de 5s se fecha sozinho e manda a previa; ela aparece ANTES de parar a
+    // gravacao, e o campo continua vazio (a previa nunca vira a resposta por conta propria).
+    await expect(cartaoP1.getByText("aqui vai aparecendo o que você está falando")).toBeVisible({ timeout: 8_000 });
+    await expect(campo).toHaveValue("");
+
+    await cartaoP1.getByRole("button", { name: "Parar" }).click();
+
+    // O texto definitivo (organizado, sem a muleta "então assim") troca a previa.
+    await expect(campo).toHaveValue(/isso ficou sendo o texto definitivo depois de organizar/i);
+    await expect(campo).not.toHaveValue(/então assim/i);
+    await expect(campo).not.toHaveValue(/aqui vai aparecendo/i);
+  });
 });

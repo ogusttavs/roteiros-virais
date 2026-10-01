@@ -14,3 +14,25 @@
 .gravando {
   color: var(--cor-erro);
 }
+
+/**
+ * P2b, item 3: a prévia ao vivo, no lugar da espera muda entre gravar e o texto definitivo
+ * chegar. Texto corrido, tom de apoio, rolagem própria depois de quatro linhas.
+ */
+.previa {
+  margin: 0;
+  max-width: 32rem;
+  max-height: 4.8em;
+  overflow-y: auto;
+  font-size: var(--tamanho-legenda);
+  line-height: 1.2;
+  color: var(--cor-texto-suave);
+  text-align: left;
+}
+
+.previaAviso {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  opacity: 0.8;
+}

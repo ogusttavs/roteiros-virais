@@ -7,6 +7,7 @@ import type { PerguntaBriefing } from "@/config/briefing";
 import type { AvaliacaoResposta } from "@/db/schema";
 import { ehFalhaDeRede } from "@/lib/offline";
 import { textosBriefing } from "@/textos/briefing";
+import { textosComuns } from "@/textos/comuns";
 import { AnaliseQuatroPartes } from "@/ui/componentes/AnaliseQuatroPartes";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -98,6 +99,15 @@ function CampoComMicrofone({
           type="button"
           className={[styles.botaoFalar, gravando ? styles.botaoFalarGravando : ""].filter(Boolean).join(" ")}
           onClick={() => (gravando ? gravador.pararGravacao() : void gravador.iniciarGravacao())}
+          /**
+           * Sem isto, tocar o microfone com o campo em foco (uma segunda gravação, por exemplo)
+           * desfoca a área de texto antes do clique, o que dispara `aoSairDoCampo` e avalia a
+           * resposta em paralelo com a gravação nova; se a avaliação terminar primeiro, o cartão
+           * fecha e o botão "Parar" some com a gravação ainda rodando (achado nesta rodada,
+           * `briefing-audio.spec.ts` intermitente). `preventDefault` no `mousedown` mantém o foco
+           * no campo; o `onClick` continua disparando normalmente.
+           */
+          onMouseDown={(evento) => evento.preventDefault()}
           disabled={gravador.fase === "transcrevendo"}
           aria-label={rotulo}
           title={rotulo}
@@ -117,6 +127,15 @@ function CampoComMicrofone({
       ) : (
         <p className={styles.dicaFalar}>{t.dicaResponderFalando}</p>
       )}
+      {/* P2b, item 1 e 3: a prévia ao vivo, abaixo do campo, enquanto grava ou enquanto organiza a fala. */}
+      {(gravando || gravador.fase === "transcrevendo") && gravador.previa.trim().length > 0 ? (
+        <p className={styles.previaFala} aria-live="polite">
+          {gravador.previa}
+        </p>
+      ) : null}
+      {gravando && gravador.previaPorReconhecimentoDoAparelho ? (
+        <p className={styles.previaAviso}>{textosComuns.previaUsaReconhecimentoDoAparelho}</p>
+      ) : null}
     </>
   );
 }

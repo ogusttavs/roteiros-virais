@@ -6,6 +6,29 @@ import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverAudioEnviado } from "@/servicos/momento";
 
 /**
+ * P2b, item 2b: a prévia ao vivo sem reconhecimento do navegador manda um pedaço de 5 segundos a
+ * cada 5 segundos, até 24 vezes numa gravação de 2 minutos (o teto do gravador). Em memória, por
+ * usuário: reinicia a cada deploy, e é só para abuso óbvio, não uma trava de cota paga (a Groq já
+ * cobra por segundo de áudio enviado, não por chamada). 40 chamadas numa janela de 2 minutos dá
+ * folga sobre as 24 esperadas sem abrir para um script mandando centenas de requisições.
+ */
+const JANELA_LIMITE_MS = 2 * 60 * 1000;
+const CHAMADAS_MAXIMAS_NA_JANELA = 40;
+const chamadasPorUsuario = new Map<string, number[]>();
+
+function dentroDoLimite(usuarioId: string): boolean {
+  const agora = Date.now();
+  const historico = (chamadasPorUsuario.get(usuarioId) ?? []).filter((quando) => agora - quando < JANELA_LIMITE_MS);
+  if (historico.length >= CHAMADAS_MAXIMAS_NA_JANELA) {
+    chamadasPorUsuario.set(usuarioId, historico);
+    return false;
+  }
+  historico.push(agora);
+  chamadasPorUsuario.set(usuarioId, historico);
+  return true;
+}
+
+/**
  * `/api/transcrever` (P2, item 1: deixou de ser "do momento", `/api/momento/transcrever` agora só
  * chama esta mesma função, para nada quebrar no ar). Recebe o áudio gravado no navegador
  * (`MediaRecorder`) por `multipart/form-data` e devolve só o texto transcrito pela Groq. Rota, não
@@ -22,6 +45,9 @@ export async function POST(request: Request) {
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
+  }
+  if (!dentroDoLimite(sessao.user.id)) {
+    return NextResponse.json({ erro: "muitos pedidos de transcricao em pouco tempo; espere um instante." }, { status: 429 });
   }
 
   let forma: FormData;
