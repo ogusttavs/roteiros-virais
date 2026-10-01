@@ -75,6 +75,20 @@
   }
 }
 
+/**
+ * Achado do Fable na revisão: faltava soltar o teto de 42rem aqui (diferente
+ * de Objetivo/Tema livre/Conta, o `.miolo` do Roteiro não é a própria grade,
+ * `.corpoComLado` é; mas herdava o `max-width` do pai do mesmo jeito, e a
+ * grade de duas colunas tentava caber dentro de 42rem inteiros, deixando a
+ * coluna de leitura com uns 230px, o título quebrando de duas em duas
+ * palavras).
+ */
+@media (min-width: 1024px) {
+  .miolo {
+    max-width: none;
+  }
+}
+
 @media (min-width: 1180px) {
   .miolo {
     padding-inline: var(--espaco-10);

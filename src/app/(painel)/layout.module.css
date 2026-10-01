@@ -199,9 +199,20 @@
  * repetem a mesma conta no proprio modulo, porque a propria tela define o padding ali.
  * Referencias e a excecao (ReferenciasTela.module.css, .painelLargo): a grade ganha
  * largura, nao margem.
+ *
+ * Achado do Fable na revisao: a primeira versao usava `padding-inline` com
+ * `calc((100% - painel) / 2)`, e "100%" numa porcentagem de padding resolve contra a
+ * largura do bloco continente (`.pagina`, a linha inteira, barra lateral incluida, aqui
+ * 1905px a 1920px de tela), nao contra a largura que `.corpo` de fato tem depois da
+ * barra lateral (1649px). O resultado era um padding grande demais, que sobrava menos
+ * de 59rem de conteudo (os ~690px que ela mediu, nao os 944). `max-width` mais
+ * `margin-inline: auto` nao tem essa pegadinha: os dois se resolvem contra a largura
+ * que `.corpo` de fato tem (`flex: 1`, ja sem a barra lateral), entao centralizam
+ * certo dentro dela.
  */
 @media (min-width: 1281px) {
   .corpo {
-    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+    max-width: calc(var(--largura-painel) + 2 * var(--espaco-10));
+    margin-inline: auto;
   }
 }

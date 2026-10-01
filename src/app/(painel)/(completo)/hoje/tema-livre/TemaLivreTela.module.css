@@ -72,6 +72,20 @@
  * dos 944px do "monitor largo" e sobrava espaço para `margin: auto` centrar
  * de mais.
  */
+.colunaPrincipal {
+  display: contents;
+}
+
+/**
+ * Achado do Fable na revisão: o `display: contents` de baixo (sem `@media`)
+ * vinha DEPOIS deste bloco no arquivo, então ganhava a cascata mesmo acima
+ * de 1024px (mesma especificidade, ordem de origem decide) e desfazia o
+ * `display: grid` daqui; sem virar uma caixa própria, os filhos de
+ * `.colunaPrincipal` (o botão, o campo, o rodapé) ficavam soltos na grade
+ * de `.miolo`, sem `grid-column` nenhum, e a colocação automática jogava
+ * alguns deles na coluna do lado por acidente. A declaração sem `@media`
+ * agora vem antes, então esta aqui é que vence a partir de 1024px.
+ */
 @media (min-width: 1024px) {
   .miolo {
     max-width: none;
@@ -109,10 +123,6 @@
   .miolo {
     padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
   }
-}
-
-.colunaPrincipal {
-  display: contents;
 }
 
 /** V15, item 3: só a partir de 1024px (a frase equivalente no celular é `.notaRodapeMobile`, dentro da coluna). */

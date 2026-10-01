@@ -767,40 +767,100 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
   }
 
   /**
-   * V15, item 7: do tablet deitado para cima, o lado fixo de cada tela fica visível ao lado da
-   * coluna, sem estourar na horizontal, a 1024, 1280 e 1920 (o teto do "monitor largo", item 6).
+   * V15, item 7, com a correção pedida pelo Fable na revisão (os testes anteriores passaram com
+   * três telas quebradas: só conferiam "sem rolagem horizontal", que não pega a coluna de leitura
+   * espremida nem o lado sobrepondo nada). Mede de verdade: a coluna de leitura tem pelo menos
+   * 30rem (achado da revisão: `.miolo` do Roteiro ainda limitava tudo a `--largura-leitura`,
+   * deixando a coluna com uns 230px); o lado nunca sobrepõe a coluna (achado: um `display: contents`
+   * sem `@media` depois do bloco de 1024px, no Tema livre, desfazia o `display: grid` da coluna
+   * principal, e o campo caía na coluna do lado); e a largura do conteúdo a 1920 é a mesma de 1280
+   * (achado: `padding-inline` com porcentagem resolve contra a barra inteira, barra lateral
+   * incluída, não contra o que sobra depois dela — `.corpo` encolhia para uns 690px em vez de
+   * ficar nos 944 do "monitor largo"; a correção trocou para `max-width` mais `margin-inline: auto`).
    */
+  const MINIMO_COLUNA_LEITURA = 480; // 30rem
+
+  async function medirColunaELado(page: Page, seletorColuna: string, seletorLado: string) {
+    const coluna = await page.locator(seletorColuna).first().boundingBox();
+    const lado = await page.locator(seletorLado).first().boundingBox();
+    expect(coluna, `coluna de leitura (${seletorColuna}) não encontrada`).not.toBeNull();
+    expect(lado, `lado (${seletorLado}) não encontrado`).not.toBeNull();
+    expect(coluna!.width, "coluna de leitura abaixo de 30rem (480px)").toBeGreaterThanOrEqual(
+      MINIMO_COLUNA_LEITURA,
+    );
+    expect(lado!.x, "o lado sobrepõe a coluna de leitura").toBeGreaterThanOrEqual(
+      coluna!.x + coluna!.width,
+    );
+    return coluna!.width;
+  }
+
+  const TELAS_COM_LADO = [
+    {
+      tela: "Objetivo",
+      ir: async (page: Page) =>
+        page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`),
+      esperar: (page: Page) => page.getByText("Tema escolhido", { exact: false }).waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="temaEscolhido"]',
+    },
+    {
+      tela: "Tema livre",
+      ir: async (page: Page) => page.goto("/hoje/tema-livre"),
+      esperar: (page: Page) => page.getByText("Os cinco pontos que a gente olha").waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="cincoPontos"]',
+    },
+    {
+      tela: "Roteiro",
+      ir: async (page: Page) => page.goto(`/roteiros/${roteiroId}`),
+      esperar: (page: Page) => page.getByRole("heading", { name: "Como editar" }).waitFor(),
+      seletorColuna: '[class*="blocos"]',
+      seletorLado: '[class*="ladoGrudado"]',
+    },
+    {
+      tela: "Conta",
+      ir: async (page: Page) => page.goto("/conta"),
+      esperar: (page: Page) => page.getByText("Quem tem acesso a esta marca").waitFor(),
+      seletorColuna: '[class*="colunaPrincipal"]',
+      seletorLado: '[class*="acessos"]',
+    },
+  ];
+
   for (const largura of [1024, 1280, 1920]) {
-    test(`Objetivo, o lado (tema escolhido) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
-      await page.setViewportSize({ width: largura, height: 900 });
-      await entrar(page);
-      await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
-      await expect(page.getByText("Tema escolhido", { exact: false })).toBeVisible();
-      await conferirLayout(page);
-    });
+    for (const { tela, ir, esperar, seletorColuna, seletorLado } of TELAS_COM_LADO) {
+      test(`${tela}, a coluna tem 30rem e o lado não sobrepõe, em ${largura}px`, async ({ page }) => {
+        await page.setViewportSize({ width: largura, height: 900 });
+        await entrar(page);
+        await ir(page);
+        await esperar(page);
+        await medirColunaELado(page, seletorColuna, seletorLado);
+        await conferirLayout(page);
+      });
+    }
+  }
 
-    test(`Tema livre, o lado (os cinco pontos) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
-      await page.setViewportSize({ width: largura, height: 900 });
+  /**
+   * "A largura do conteúdo a 1920 é igual à de 1280" (achado 2 da revisão): mede a mesma coluna nas
+   * duas larguras e confere que a diferença é só arredondamento de viewport, não a grade encolhendo.
+   */
+  const TOLERANCIA_PX = 20;
+  for (const { tela, ir, esperar, seletorColuna } of TELAS_COM_LADO) {
+    test(`${tela}: a coluna de leitura a 1920px tem a mesma largura que a 1280px`, async ({ page }) => {
+      await page.setViewportSize({ width: 1280, height: 900 });
       await entrar(page);
-      await page.goto("/hoje/tema-livre");
-      await expect(page.getByText("Os cinco pontos que a gente olha")).toBeVisible();
-      await conferirLayout(page);
-    });
+      await ir(page);
+      await esperar(page);
+      const coluna1280 = await page.locator(seletorColuna).first().boundingBox();
+      expect(coluna1280, `coluna de leitura (${seletorColuna}) não encontrada a 1280px`).not.toBeNull();
 
-    test(`Roteiro, o lado (como editar) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
-      await page.setViewportSize({ width: largura, height: 900 });
-      await entrar(page);
-      await page.goto(`/roteiros/${roteiroId}`);
-      await expect(page.getByRole("heading", { name: "Como editar" })).toBeVisible();
-      await conferirLayout(page);
-    });
-
-    test(`Conta, o lado (quem tem acesso) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
-      await page.setViewportSize({ width: largura, height: 900 });
-      await entrar(page);
-      await page.goto("/conta");
-      await expect(page.getByText("Quem tem acesso a esta marca")).toBeVisible();
-      await conferirLayout(page);
+      await page.setViewportSize({ width: 1920, height: 900 });
+      await page.waitForTimeout(100);
+      const coluna1920 = await page.locator(seletorColuna).first().boundingBox();
+      expect(coluna1920, `coluna de leitura (${seletorColuna}) não encontrada a 1920px`).not.toBeNull();
+      expect(
+        Math.abs(coluna1920!.width - coluna1280!.width),
+        `coluna de leitura mudou de largura entre 1280px (${coluna1280!.width}) e 1920px (${coluna1920!.width})`,
+      ).toBeLessThanOrEqual(TOLERANCIA_PX);
     });
   }
 
