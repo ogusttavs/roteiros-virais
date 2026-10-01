@@ -1,5 +1,14 @@
 export const textosConta = {
   titulo: "Conta",
+  /**
+   * E39a (desenho do Opus, dúvida 2): Briefing saiu da navegação principal e virou esta linha,
+   * no topo de Conta, com a nota de agora e uma seta para abrir.
+   */
+  briefingLinha: {
+    rotulo: "Briefing",
+    nota: (nota: number) => `Nota ${nota.toFixed(1).replace(".", ",")}`,
+    semNota: "Ainda sem nota",
+  },
   nome: "nome",
   email: "e-mail",
   soLeitura: "(só leitura)",

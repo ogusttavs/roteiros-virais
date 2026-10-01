@@ -36,6 +36,31 @@
   margin: 0;
 }
 
+/** E39a: a linha do Briefing, topo de Conta (desenho do Opus, dúvida 2). */
+.linhaBriefing {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-4) var(--espaco-5);
+  margin-bottom: var(--espaco-6);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  text-decoration: none;
+  min-height: var(--altura-toque);
+}
+
+.linhaBriefingTitulo {
+  font-weight: var(--peso-semibold);
+}
+
+.linhaBriefingNota {
+  margin-left: auto;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
 .forma {
   display: flex;
   flex-direction: column;

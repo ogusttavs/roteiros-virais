@@ -1,7 +1,10 @@
 export const textosNav = {
   hoje: "Hoje",
+  /** E39a: a nova aba, a oficina onde todo roteiro nasce (antes morava dentro de Hoje). */
+  criar: "Criar",
   referencias: "Referências",
   historico: "Histórico",
+  /** E39a: Briefing sai da navegação e vira uma linha dentro de Conta (desenho do Opus, dúvida 2). */
   briefing: "Briefing",
   conta: "Conta",
   navegacaoPrincipal: "Navegação principal",
