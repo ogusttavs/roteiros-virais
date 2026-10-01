@@ -196,7 +196,20 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     // Seguro para a repetição automática do Playwright (F1, item 4): se a pessoa de teste já existe, a
     // primeira passada já criou tudo o que ela precisa (mesmo padrão de `marcas.spec.ts`, PR #47).
     const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-layout"));
-    if (jaExiste) return;
+    if (jaExiste) {
+      /**
+       * M4, achado rodando a suíte várias vezes seguidas localmente sem resetar o banco: o cedo
+       * demais aqui saía sem nunca atribuir `roteiroId` (só acontecia na primeira passada, dentro
+       * do bloco abaixo), e toda rodada seguinte navegava para `/roteiros/undefined`, que redireciona
+       * para `/hoje` (a guarda de `roteiroPorId` em `src/app/roteiros/[id]/gravar/page.tsx` e
+       * `src/app/(painel)/(completo)/roteiros/[id]/page.tsx`). Os testes de Roteiro, Gravação e da
+       * folha reprovar dependem de `roteiroId`; busca o roteiro já existente antes de sair.
+       */
+      const [cliente] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, "e2e-layout"));
+      const [roteiro] = await db().select({ id: roteiros.id }).from(roteiros).where(eq(roteiros.clienteId, cliente.id));
+      roteiroId = roteiro.id;
+      return;
+    }
 
     // Nicho proprio, nao um dos dois do seed: roteiro.spec.ts ja usa
     // "limpeza-e-organizacao-da-casa" e temas-do-dia.spec.ts ja usa

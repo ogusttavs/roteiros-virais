@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import type { EstiloRoteiro, FormatoRoteiro, Objetivo } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
+  DESCRICAO_ESTILO_ROTEIRO,
   ESTILOS_ROTEIRO_EM_ORDEM,
   FORMATOS_ROTEIRO_EM_ORDEM,
   NOME_OBJETIVO,
@@ -330,6 +331,7 @@ export function FolhaGravarAgora({
                 className={[styles.segmentoBotao, estilo === opcao ? styles.segmentoAtivo : ""]
                   .filter(Boolean)
                   .join(" ")}
+                title={DESCRICAO_ESTILO_ROTEIRO[opcao]}
                 onClick={() => setEstilo(opcao)}
               >
                 {ROTULO_ESTILO_ROTEIRO[opcao]}

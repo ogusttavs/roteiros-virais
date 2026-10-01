@@ -127,7 +127,17 @@ export const FORMATOS_ROTEIRO_EM_ORDEM: FormatoRoteiro[] = [...FORMATOS_ROTEIRO]
 /** M4, item 2: o rótulo do segundo controle segmentado da mesma folha (Falando / Sem fala). */
 export const ROTULO_ESTILO_ROTEIRO: Record<EstiloRoteiro, string> = {
   falado: "Falando",
-  sem_fala: "Sem fala (imagem, texto na tela e música)",
+  sem_fala: "Sem fala",
+};
+
+/**
+ * M4, item 2: o detalhe que não cabe no rótulo curto do controle segmentado (achado rodando
+ * `layout.spec.ts` em 390px: "Sem fala (imagem, texto na tela e música)" como rótulo visível
+ * estourava a largura da tela). Vira `title` do botão; o rótulo curto é o que aparece.
+ */
+export const DESCRICAO_ESTILO_ROTEIRO: Record<EstiloRoteiro, string> = {
+  falado: "Você aparece falando para a câmera.",
+  sem_fala: "Sem fala: imagem, texto na tela e música.",
 };
 
 /** Falando antes de sem fala, mesma ordem do controle segmentado. */
