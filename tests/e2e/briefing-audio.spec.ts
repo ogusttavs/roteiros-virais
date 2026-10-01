@@ -66,15 +66,18 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     await expect(page).toHaveURL(/\/comecar/);
     await expect(page.getByText("bloco 1 de 5")).toBeVisible();
 
+    // Os doze campos ficam montados e escondidos por bloco (mesmo achado de `briefing.spec.ts`);
+    // escopar pela pergunta P1 evita casar com o botao/dica das outras onze.
+    const cartaoP1 = page.locator("#pergunta-p1");
     const campo = page.getByLabel("o que o seu negócio faz hoje");
-    await expect(page.getByText("Pode responder falando")).toBeVisible();
+    await expect(cartaoP1.getByText("Pode responder falando")).toBeVisible();
 
-    await page.getByRole("button", { name: "Responder falando" }).click();
-    await expect(page.getByRole("button", { name: "Parar" })).toBeVisible();
+    await cartaoP1.getByRole("button", { name: "Responder falando" }).click();
+    await expect(cartaoP1.getByRole("button", { name: "Parar" })).toBeVisible();
     // Um instante gravando de verdade (o dispositivo sintetico do Chromium produz audio continuo,
     // nunca silencio puro), para o blob nao sair vazio.
     await page.waitForTimeout(500);
-    await page.getByRole("button", { name: "Parar" }).click();
+    await cartaoP1.getByRole("button", { name: "Parar" }).click();
 
     // A tarefa organizarFalaBriefing (mock) tira "então assim", "é" e "né"; o resto da fala fica.
     await expect(campo).toHaveValue(/atendo bastante gente/i);
@@ -101,8 +104,9 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     });
     await page.reload();
 
-    await page.getByRole("button", { name: "Responder falando" }).click();
-    await expect(page.getByText("Não conseguimos usar o microfone deste aparelho. Pode escrever direto.")).toBeVisible();
+    const cartaoP1 = page.locator("#pergunta-p1");
+    await cartaoP1.getByRole("button", { name: "Responder falando" }).click();
+    await expect(cartaoP1.getByText("Não conseguimos usar o microfone deste aparelho. Pode escrever direto.")).toBeVisible();
 
     const campo = page.getByLabel("o que o seu negócio faz hoje");
     await campo.fill("atendimento bom, escrito direto");
