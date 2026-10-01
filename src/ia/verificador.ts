@@ -8,7 +8,6 @@
 import type { CartaoStory, EstiloRoteiro, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 
-
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
 import { NUMEROS_REGRAS_STORY } from "./prompts/regras-formato";
@@ -169,7 +168,9 @@ export function verificarLocalmente(
     opcoes.tipoAberturaAnterior &&
     opcoes.tipoAberturaAtual === opcoes.tipoAberturaAnterior
   ) {
-    motivos.push(`tipoAbertura: repete o tipo de abertura do roteiro anterior ("${opcoes.tipoAberturaAtual}")`);
+    motivos.push(
+      `tipoAbertura: repete o tipo de abertura do roteiro anterior ("${opcoes.tipoAberturaAtual}")`,
+    );
   }
 
   if (opcoes.tipoAberturaAtual && opcoes.instrucaoAbertura) {
@@ -178,7 +179,10 @@ export function verificarLocalmente(
       motivos.push(
         `tipoAbertura: o serviço instruiu "${instrucao.tipo}" e o modelo declarou "${opcoes.tipoAberturaAtual}"`,
       );
-    } else if (instrucao.tipo === null && instrucao.tiposProibidos.includes(opcoes.tipoAberturaAtual)) {
+    } else if (
+      instrucao.tipo === null &&
+      instrucao.tiposProibidos.includes(opcoes.tipoAberturaAtual)
+    ) {
       motivos.push(
         `tipoAbertura: a instrução era livre, evitando ${instrucao.tiposProibidos.join(", ")}, e o modelo declarou "${opcoes.tipoAberturaAtual}", um dos proibidos`,
       );
@@ -187,7 +191,9 @@ export function verificarLocalmente(
 
   if (campos.gancho && opcoes.palavrasDoMomento && opcoes.palavrasDoMomento.length > 0) {
     const ganchoNormalizado = normalizar(campos.gancho);
-    const citaAlguma = opcoes.palavrasDoMomento.some((palavra) => ganchoNormalizado.includes(palavra));
+    const citaAlguma = opcoes.palavrasDoMomento.some((palavra) =>
+      ganchoNormalizado.includes(palavra),
+    );
     if (!citaAlguma) {
       motivos.push(
         "gancho: não cita nenhum elemento concreto do momento descrito (onde ou o que está acontecendo) nos primeiros segundos",
@@ -242,7 +248,9 @@ export function verificarLocalmente(
       motivos.push("corpo: nulo ou vazio, um roteiro em reels precisa de corpo (V9d, item 1)");
     }
     if (!chamadaFinal?.trim()) {
-      motivos.push("chamadaFinal: nula ou vazia, um roteiro em reels precisa de chamada final (V9d, item 1)");
+      motivos.push(
+        "chamadaFinal: nula ou vazia, um roteiro em reels precisa de chamada final (V9d, item 1)",
+      );
     }
   }
 
@@ -337,9 +345,13 @@ export function palavrasDeConteudo(texto: string): string[] {
   return [...new Set(palavras)];
 }
 
-/** 2,5 palavras por segundo, até 15 segundos por cartão (`R-IG-STORY-03`, decisão nossa, `estudo-stories.md`). */
+/**
+ * 2,5 palavras por segundo, até 60 segundos por story (`R-IG-STORY-03`, decisão do Gustavo em
+ * 01/10/2026, E40: era 15s, número nosso sem base; 60 é o teto que a documentação da Central de
+ * Ajuda dá, acima disso o aplicativo oferece o cortador).
+ */
 const PALAVRAS_POR_SEGUNDO_STORY = 2.5;
-const SEGUNDOS_MAX_POR_CARTAO = 15;
+const SEGUNDOS_MAX_POR_CARTAO = 60;
 const PALAVRAS_MAX_POR_CARTAO = Math.floor(PALAVRAS_POR_SEGUNDO_STORY * SEGUNDOS_MAX_POR_CARTAO);
 
 /** Verbo que fecha a conversa no último cartão (`R-IG-STORY-07`): "me chama" e "no direct" contam como duas palavras. */
@@ -354,38 +366,39 @@ const VERBOS_RESPOSTA_STORY = ["responde", "vota", "manda", "toca", "chama", "co
  * "contar") entrou na lista.
  */
 function fechaPedindoResposta(ultimoCartaoFalar: string): boolean {
-  return VERBOS_RESPOSTA_STORY.some((verbo) => ultimoCartaoFalar.includes(verbo)) || ultimoCartaoFalar.includes("?");
+  return (
+    VERBOS_RESPOSTA_STORY.some((verbo) => ultimoCartaoFalar.includes(verbo)) ||
+    ultimoCartaoFalar.includes("?")
+  );
 }
 
 function contarPalavras(texto: string): number {
-  return normalizar(texto)
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+  return normalizar(texto).trim().split(/\s+/).filter(Boolean).length;
 }
 
 /**
  * O que a seção 9.1 marca como "sim" (conferível por código) para Story
- * (V9c, item 3): número de cartões entre 2 e 5 e até 15 segundos de fala por
- * cartão (`R-IG-STORY-03`, o schema já garante 2 a 5, esta é a segunda
- * camada, mesmo espírito do resto do verificador); algum cartão com
- * figurinha (`R-IG-STORY-04`); texto na tela em todo cartão (`R-IG-STORY-05`,
- * já que todo cartão tem fala, `oQueFalar` é obrigatório no schema); o
- * último cartão com verbo de resposta e sem "segue" (`R-IG-STORY-01` e
- * `R-IG-STORY-07`).
+ * (V9c, item 3; contagem ajustada na E40): número de stories entre 1 e 5 e
+ * até 60 segundos de fala por story (`R-IG-STORY-03`, o schema permite 1 a
+ * 5, esta é a segunda camada, mesmo espírito do resto do verificador);
+ * algum story com figurinha (`R-IG-STORY-04`); texto na tela em todo story
+ * (`R-IG-STORY-05`, já que todo story tem fala, `oQueFalar` é obrigatório
+ * no schema); o último story com verbo de resposta e sem "segue"
+ * (`R-IG-STORY-01` e `R-IG-STORY-07`; com um story só, ele é o primeiro e o
+ * último ao mesmo tempo, e o índice `cartoes.length - 1` já cobre os dois).
  */
 function verificarCartoesStory(cartoes: CartaoStory[]): string[] {
   const motivos: string[] = [];
 
-  if (cartoes.length < 2 || cartoes.length > 5) {
-    motivos.push(`cartoes: ${cartoes.length} cartao(oes), a regra R-IG-STORY-03 pede de 2 a 5`);
+  if (cartoes.length < 1 || cartoes.length > 5) {
+    motivos.push(`cartoes: ${cartoes.length} story(ies), a regra R-IG-STORY-03 pede de 1 a 5`);
   }
 
   cartoes.forEach((cartao, indice) => {
     const palavras = contarPalavras(cartao.oQueFalar);
     if (palavras > PALAVRAS_MAX_POR_CARTAO) {
       motivos.push(
-        `cartao ${indice + 1}: ${palavras} palavras passam de ${PALAVRAS_MAX_POR_CARTAO} (R-IG-STORY-03, ate 15s de fala)`,
+        `cartao ${indice + 1}: ${palavras} palavras passam de ${PALAVRAS_MAX_POR_CARTAO} (R-IG-STORY-03, ate 60s de fala)`,
       );
     }
     if (!cartao.textoNaTela.trim()) {
@@ -422,7 +435,10 @@ const PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA = 24;
  * preenchida, texto na tela presente e dentro do limite, o que mostrar presente, e a legenda do
  * post presente (o roteiro falado não precisa dela, a chamada final já é fala).
  */
-function verificarCartoesSemFala(cartoes: CartaoStory[], legenda: string | null | undefined): string[] {
+function verificarCartoesSemFala(
+  cartoes: CartaoStory[],
+  legenda: string | null | undefined,
+): string[] {
   const motivos: string[] = [];
 
   if (cartoes.length < 2 || cartoes.length > 5) {
@@ -431,7 +447,9 @@ function verificarCartoesSemFala(cartoes: CartaoStory[], legenda: string | null 
 
   cartoes.forEach((cartao, indice) => {
     if (cartao.oQueFalar.trim()) {
-      motivos.push(`cena ${indice + 1}: tem fala preenchida, um roteiro sem fala não pode ter fala em bloco nenhum`);
+      motivos.push(
+        `cena ${indice + 1}: tem fala preenchida, um roteiro sem fala não pode ter fala em bloco nenhum`,
+      );
     }
     if (!cartao.oQueMostrar.trim()) {
       motivos.push(`cena ${indice + 1}: sem o que mostrar`);
@@ -441,7 +459,9 @@ function verificarCartoesSemFala(cartoes: CartaoStory[], legenda: string | null 
     } else {
       const palavras = contarPalavras(cartao.textoNaTela);
       if (palavras > PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA) {
-        motivos.push(`cena ${indice + 1}: ${palavras} palavras de texto na tela passam de ${PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA}`);
+        motivos.push(
+          `cena ${indice + 1}: ${palavras} palavras de texto na tela passam de ${PALAVRAS_MAX_TEXTO_NA_TELA_SEM_FALA}`,
+        );
       }
     }
   });
@@ -494,7 +514,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   /** M4, item 4: a legenda do post, só no estilo sem fala. */
   extrairLegenda?: (dados: T) => string | null;
   /** V9d, item 1: gancho, corpo e chamadaFinal brutos, para `verificarLocalmente` reprovar um Reels vazio (ver lá). */
-  extrairNarrativa?: (dados: T) => { gancho: string | null; corpo: string | null; chamadaFinal: string | null };
+  extrairNarrativa?: (dados: T) => {
+    gancho: string | null;
+    corpo: string | null;
+    chamadaFinal: string | null;
+  };
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
 };

@@ -53,7 +53,12 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../../_casca/SeletorMarcaCelular";
 
-import { marcarGravadoAction, marcarPostadoAction, reprovarERescreverAction } from "./acoes";
+import {
+  marcarGravadoAction,
+  marcarPostadoAction,
+  reprovarERescreverAction,
+  salvarEdicaoAction,
+} from "./acoes";
 import styles from "./RoteiroTela.module.css";
 
 function formatarData(dataISO: string): string {
@@ -126,7 +131,9 @@ function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
       icone: Sparkles,
       rotulo: textosRoteiro.cartaoStory.figurinha,
       texto:
-        cartao.figurinha === "nenhuma" ? textosRoteiro.cartaoStory.semFigurinha : ROTULO_FIGURINHA[cartao.figurinha],
+        cartao.figurinha === "nenhuma"
+          ? textosRoteiro.cartaoStory.semFigurinha
+          : ROTULO_FIGURINHA[cartao.figurinha],
     },
   ];
 }
@@ -152,6 +159,31 @@ function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdic
 /** "O que funcionou ali:" mais a análise, que vem de um campo com maiúscula (design v2, achado do iPad, item 2). */
 function comInicialMinuscula(texto: string): string {
   return texto.length > 0 ? texto[0].toLowerCase() + texto.slice(1) : texto;
+}
+
+/** E40, item 1: o rascunho de edição, um campo por bloco; `cartoes` fica vazio em Reels falado. */
+type DraftEdicao = {
+  gancho: string;
+  corpo: string;
+  fechamento: string;
+  chamadaFinal: string;
+  cartoes: { oQueFalar: string; oQueMostrar: string; textoNaTela: string }[];
+  legenda: string;
+};
+
+function draftDoConteudo(corpo: ConteudoRoteiro): DraftEdicao {
+  return {
+    gancho: corpo.gancho,
+    corpo: corpo.corpo,
+    fechamento: corpo.fechamento,
+    chamadaFinal: corpo.chamadaFinal,
+    cartoes: (corpo.cartoes ?? []).map((cartao) => ({
+      oQueFalar: cartao.oQueFalar,
+      oQueMostrar: cartao.oQueMostrar,
+      textoNaTela: cartao.textoNaTela,
+    })),
+    legenda: corpo.legenda ?? "",
+  };
 }
 
 /**
@@ -198,7 +230,16 @@ type Props = {
  * D2 parte 1, item 6). Modo gravação virou rota própria
  * (`/roteiros/[id]/gravar`, item 7): o botão daqui só navega.
  */
-export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva, marcas, nomePessoa }: Props) {
+export function RoteiroTela({
+  roteiro,
+  corpo,
+  blocos,
+  video,
+  versoes,
+  marcaAtiva,
+  marcas,
+  nomePessoa,
+}: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
   const [postado, setPostado] = useState(roteiro.status === "postado");
@@ -207,7 +248,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
   const botaoMenuRef = useRef<HTMLButtonElement>(null);
   const [urlDigitada, setUrlDigitada] = useState("");
   const [erroPostei, setErroPostei] = useState<string | null>(null);
-  const [motivosSelecionados, setMotivosSelecionados] = useState<Set<IdMotivoReprovacao>>(new Set());
+  const [motivosSelecionados, setMotivosSelecionados] = useState<Set<IdMotivoReprovacao>>(
+    new Set(),
+  );
   const [motivoTexto, setMotivoTexto] = useState("");
   const [erroReprovar, setErroReprovar] = useState<string | null>(null);
   const [demorando, setDemorando] = useState(false);
@@ -215,16 +258,23 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
   const [toast, setToast] = useState(false);
   /** V11, item 5: "Terminei de gravar" no modo gravação manda para cá com `?gravado=1` (o roteiro já vem gravado do servidor; isto é só o toast). */
   const [toastGravado, setToastGravado] = useState(false);
+  /** E40, item 1: depois de salvar uma edição manual. */
+  const [toastSalvo, setToastSalvo] = useState(false);
   /** A frase de falha de uma ação sem painel aberto ("Já gravei", o PDF da barra do tablet): sai num Toast de erro. */
   const [erroToast, setErroToast] = useState<string | null>(null);
   /** A frase de falha de "Copiar texto" e "Baixar em PDF" quando o menu está aberto: sai dentro dele. */
   const [erroMenu, setErroMenu] = useState<string | null>(null);
   const [baixandoPdf, setBaixandoPdf] = useState(false);
+  /** E40, item 1: liga o modo de edição; `draft` só existe enquanto ele está ligado. */
+  const [editando, setEditando] = useState(false);
+  const [draft, setDraft] = useState<DraftEdicao | null>(null);
+  const [erroEdicao, setErroEdicao] = useState<string | null>(null);
   // Uma transição por ação (V7, item 4 do PROXIMO.md): com uma só, "Já gravei" ficava morto e sem motivo
   // durante os até 3 minutos de uma reescrita, e o rótulo "Salvando" aparecia nele sem ser dele.
   const [gravando, iniciarGravacao] = useTransition();
   const [salvandoLink, iniciarSalvarLink] = useTransition();
   const [reescrevendo, iniciarReescrita] = useTransition();
+  const [salvandoEdicao, iniciarSalvarEdicao] = useTransition();
   const { semConexao, avisarRedeOk } = useConexao();
   const tratarFalha = useTratarFalha();
   /** Igual a `reescrevendo`, mas lido na hora nos fechamentos e solto antes de navegar (o estado só solta no fim). */
@@ -301,7 +351,13 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         setGravadoEm(new Date());
         avisarRedeOk();
       } catch (erro) {
-        setErroToast(tratarFalha(erro, textosRoteiro.erroMarcarGravado, textosRoteiro.erroMarcarGravadoSemRede));
+        setErroToast(
+          tratarFalha(
+            erro,
+            textosRoteiro.erroMarcarGravado,
+            textosRoteiro.erroMarcarGravadoSemRede,
+          ),
+        );
       }
     });
   }
@@ -331,7 +387,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         if (painelAbertoRef.current === "postei") fechar();
       } catch (erro) {
         // Salvar CRIA a linha do vídeo: se a conexão caiu, o servidor pode ter gravado antes de a resposta chegar.
-        setErroPostei(tratarFalha(erro, textosRoteiro.erroSalvarLink, textosConexao.conexaoCaiuNoMeio));
+        setErroPostei(
+          tratarFalha(erro, textosRoteiro.erroSalvarLink, textosConexao.conexaoCaiuNoMeio),
+        );
       }
     });
   }
@@ -362,13 +420,55 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         // histórico, sem `history.back()` competindo com o `router.replace`), e só se a pessoa ainda está neste
         // roteiro: se ela saiu enquanto a reescrita rodava, o roteiro novo está na lista de versões e no Histórico.
         fecharENavegar(() => {
-          if (window.location.pathname === `/roteiros/${roteiro.id}`) router.replace(`/roteiros/${id}`);
+          if (window.location.pathname === `/roteiros/${roteiro.id}`)
+            router.replace(`/roteiros/${id}`);
         });
       } catch (erro) {
         reescritaEmCursoRef.current = false;
         // Reescrever CRIA a versão nova: se a conexão caiu, ela pode já existir.
-        setErroReprovar(tratarFalha(erro, textosRoteiro.reprovar.erro, textosConexao.conexaoCaiuNoMeio));
+        setErroReprovar(
+          tratarFalha(erro, textosRoteiro.reprovar.erro, textosConexao.conexaoCaiuNoMeio),
+        );
         if (ehFalhaDeRede(erro)) setVersoesDesatualizadas(true);
+      }
+    });
+  }
+
+  /** E40, item 1: libera o texto de cada bloco para edição, sem chamar IA. */
+  function iniciarEdicao() {
+    setDraft(draftDoConteudo(corpo));
+    setErroEdicao(null);
+    setEditando(true);
+  }
+
+  function cancelarEdicao() {
+    setEditando(false);
+    setDraft(null);
+    setErroEdicao(null);
+  }
+
+  function salvarEdicao() {
+    if (!draft || salvandoEdicao || semConexao) return;
+    setErroEdicao(null);
+    iniciarSalvarEdicao(async () => {
+      try {
+        await salvarEdicaoAction(roteiro.id, {
+          gancho: draft.gancho,
+          corpo: draft.corpo,
+          fechamento: draft.fechamento,
+          chamadaFinal: draft.chamadaFinal,
+          cartoes: corpo.cartoes ? draft.cartoes : undefined,
+          legenda: corpo.legenda !== undefined ? draft.legenda : undefined,
+        });
+        avisarRedeOk();
+        setEditando(false);
+        setDraft(null);
+        setToastSalvo(true);
+        router.refresh();
+      } catch (erro) {
+        setErroEdicao(
+          tratarFalha(erro, textosRoteiro.editando.erro, textosConexao.conexaoCaiuNoMeio),
+        );
       }
     });
   }
@@ -376,7 +476,8 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
   /** A lista de versões navega para outro roteiro: fecha o painel antes, para o Voltar não pedir dois toques. */
   function irParaVersao(evento: EventoMouse<HTMLAnchorElement>, id: number) {
     // Com Ctrl, Cmd, Shift, Alt ou o botão do meio a pessoa quer outra aba: deixa o navegador fazer.
-    if (evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey || evento.button !== 0) return;
+    if (evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey || evento.button !== 0)
+      return;
     evento.preventDefault();
     fecharENavegar(() => router.replace(`/roteiros/${id}`));
   }
@@ -502,7 +603,14 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         ) : null}
 
         <div className={styles.cabecalhoTela}>
-          <h1>{corpo.titulo}</h1>
+          <div className={styles.topoRoteiro}>
+            <h1>{corpo.titulo}</h1>
+            {!editando ? (
+              <button type="button" onClick={iniciarEdicao} className={styles.botaoEditar}>
+                {textosRoteiro.editar}
+              </button>
+            ) : null}
+          </div>
           <p className={styles.metaRoteiro}>
             <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
             <span className={styles.num}>{corpo.duracaoS} s</span>
@@ -519,51 +627,180 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
           </p>
         </div>
 
-        <article className={styles.blocos}>
-          <RoteiroTexto blocos={blocos} />
-          {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
-          <p className={styles.julgar}>
-            {textosRoteiro.reprovar.naoFicouBom}{" "}
-            <button
-              type="button"
-              onClick={() => setPainel("reprovar")}
-              disabled={semConexao}
-              aria-describedby={descricaoSemRede}
-              className={styles.linkReprovar}
-            >
-              {textosRoteiro.menu.reprovar}
-            </button>
-            <MotivoSemRede className={styles.motivoJulgar} />
+        {roteiro.objetivoDoVideo ? (
+          <p className={styles.recado}>
+            <span className={styles.rotulo}>{textosRoteiro.recado}</span>
+            {roteiro.objetivoDoVideo}
           </p>
-        </article>
+        ) : null}
 
-        <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
-
-        {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
-          corpo.cartoes.map((cartao, indice) => (
-            <BlocoEdicao
-              key={indice}
-              titulo={textosRoteiro.blocos.cartao(indice + 1)}
-              itens={itensCartaoSemFala(cartao)}
-            />
-          ))
-        ) : roteiro.formato === "story" && corpo.cartoes ? (
-          corpo.cartoes.map((cartao, indice) => (
-            <BlocoEdicao
-              key={indice}
-              titulo={textosRoteiro.blocos.cartao(indice + 1)}
-              itens={itensCartaoStory(cartao)}
-            />
-          ))
+        {editando && draft ? (
+          <div className={styles.camposEdicao}>
+            <span className={styles.avisoOriginal}>{textosRoteiro.editando.avisoOriginal}</span>
+            {blocos.map((bloco, indice) =>
+              corpo.cartoes ? null : (
+                <AreaTexto
+                  key={bloco.rotulo}
+                  rotulo={bloco.rotulo}
+                  value={
+                    indice === 0
+                      ? draft.gancho
+                      : indice === 1
+                        ? draft.corpo
+                        : indice === 2
+                          ? draft.fechamento
+                          : draft.chamadaFinal
+                  }
+                  onChange={(evento) => {
+                    const valor = evento.target.value;
+                    setDraft((atual) =>
+                      atual
+                        ? {
+                            ...atual,
+                            ...(indice === 0
+                              ? { gancho: valor }
+                              : indice === 1
+                                ? { corpo: valor }
+                                : indice === 2
+                                  ? { fechamento: valor }
+                                  : { chamadaFinal: valor }),
+                          }
+                        : atual,
+                    );
+                  }}
+                />
+              ),
+            )}
+            {corpo.cartoes
+              ? draft.cartoes.map((cartao, indice) => (
+                  <div key={indice} className={styles.grupoCartaoEdicao}>
+                    <h3>
+                      {roteiro.estilo === "sem_fala"
+                        ? textosRoteiro.blocos.cena(indice + 1, draft.cartoes.length)
+                        : textosRoteiro.blocos.story(indice + 1, draft.cartoes.length)}
+                    </h3>
+                    {roteiro.estilo === "sem_fala" ? null : (
+                      <AreaTexto
+                        rotulo={textosRoteiro.blocos.story(indice + 1, draft.cartoes.length)}
+                        rotuloOculto
+                        value={cartao.oQueFalar}
+                        onChange={(evento) =>
+                          setDraft((atual) =>
+                            atual
+                              ? {
+                                  ...atual,
+                                  cartoes: atual.cartoes.map((c, i) =>
+                                    i === indice ? { ...c, oQueFalar: evento.target.value } : c,
+                                  ),
+                                }
+                              : atual,
+                          )
+                        }
+                      />
+                    )}
+                    <AreaTexto
+                      rotulo={textosRoteiro.cartaoStory.oQueMostrar}
+                      value={cartao.oQueMostrar}
+                      onChange={(evento) =>
+                        setDraft((atual) =>
+                          atual
+                            ? {
+                                ...atual,
+                                cartoes: atual.cartoes.map((c, i) =>
+                                  i === indice ? { ...c, oQueMostrar: evento.target.value } : c,
+                                ),
+                              }
+                            : atual,
+                        )
+                      }
+                    />
+                    <AreaTexto
+                      rotulo={textosRoteiro.cartaoStory.textoNaTela}
+                      value={cartao.textoNaTela}
+                      onChange={(evento) =>
+                        setDraft((atual) =>
+                          atual
+                            ? {
+                                ...atual,
+                                cartoes: atual.cartoes.map((c, i) =>
+                                  i === indice ? { ...c, textoNaTela: evento.target.value } : c,
+                                ),
+                              }
+                            : atual,
+                        )
+                      }
+                    />
+                  </div>
+                ))
+              : null}
+            {corpo.legenda !== undefined ? (
+              <AreaTexto
+                rotulo={textosRoteiro.legenda}
+                value={draft.legenda}
+                onChange={(evento) =>
+                  setDraft((atual) => (atual ? { ...atual, legenda: evento.target.value } : atual))
+                }
+              />
+            ) : null}
+            {erroEdicao ? (
+              <p role="alert" className={styles.fraseErroPainel}>
+                {erroEdicao}
+              </p>
+            ) : null}
+          </div>
         ) : (
-          <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+          <>
+            <article className={styles.blocos}>
+              <RoteiroTexto blocos={blocos} />
+              {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
+              <p className={styles.julgar}>
+                {textosRoteiro.reprovar.naoFicouBom}{" "}
+                <button
+                  type="button"
+                  onClick={() => setPainel("reprovar")}
+                  disabled={semConexao}
+                  aria-describedby={descricaoSemRede}
+                  className={styles.linkReprovar}
+                >
+                  {textosRoteiro.menu.reprovar}
+                </button>
+                <MotivoSemRede className={styles.motivoJulgar} />
+              </p>
+            </article>
+
+            <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
+
+            {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
+              corpo.cartoes.map((cartao, indice) => (
+                <BlocoEdicao
+                  key={indice}
+                  titulo={textosRoteiro.blocos.cena(indice + 1, corpo.cartoes!.length)}
+                  itens={itensCartaoSemFala(cartao)}
+                />
+              ))
+            ) : roteiro.formato === "story" && corpo.cartoes ? (
+              corpo.cartoes.map((cartao, indice) => (
+                <BlocoEdicao
+                  key={indice}
+                  titulo={textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length)}
+                  itens={itensCartaoStory(cartao)}
+                />
+              ))
+            ) : (
+              <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+            )}
+          </>
         )}
 
-        {corpo.legenda ? (
+        {!editando && corpo.legenda ? (
           <section className={styles.referenciaVazia}>
             <h2>{textosRoteiro.legenda}</h2>
             <p>{corpo.legenda}</p>
-            <button type="button" onClick={() => void copiarLegenda()} className={styles.linkReprovar}>
+            <button
+              type="button"
+              onClick={() => void copiarLegenda()}
+              className={styles.linkReprovar}
+            >
               <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
               {textosRoteiro.menu.copiar}
             </button>
@@ -571,7 +808,10 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         ) : null}
 
         {corpo.porQueAssim.length > 0 ? (
-          <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
+          <BlocoEdicao
+            titulo={textosRoteiro.porQueAssim}
+            itens={itensPorQueAssim(corpo.porQueAssim)}
+          />
         ) : null}
 
         {referencia && video ? (
@@ -591,7 +831,11 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
         ) : corpo.semEvidencia ? (
           <section className={styles.referenciaVazia}>
             <h2>{textosRoteiro.referencia}</h2>
-            <p>{roteiro.origem === "momento" ? textosRoteiro.semEvidenciaMomento : textosRoteiro.semEvidencia}</p>
+            <p>
+              {roteiro.origem === "momento"
+                ? textosRoteiro.semEvidenciaMomento
+                : textosRoteiro.semEvidencia}
+            </p>
           </section>
         ) : null}
 
@@ -605,65 +849,91 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
 
       {/* `data-barra-acoes-propria`, sem valor: o gancho para a cápsula de abas (layout.module.css)
           sumir aqui (V5, item 5, IDENTIDADE.md item 8), para uma não flutuar sobre a outra. */}
-      <div className={styles.barraAcoes} data-barra-acoes-propria="">
-        <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.btn}>
-          <Video size={18} strokeWidth={1.75} aria-hidden="true" />
-          {textosRoteiro.modoGravacao}
-        </Link>
-        {!gravadoEm ? (
+      {editando ? (
+        <div className={styles.barraAcoes} data-barra-acoes-propria="">
           <button
             type="button"
-            onClick={gravei}
-            disabled={gravando || semConexao}
-            aria-busy={gravando || undefined}
+            onClick={salvarEdicao}
+            disabled={salvandoEdicao || semConexao}
+            aria-busy={salvandoEdicao || undefined}
             aria-describedby={descricaoSemRede}
-            className={styles.btnVazio}
+            className={styles.btn}
           >
-            {gravando ? textosRoteiro.salvando : textosRoteiro.jaGravei}
+            {salvandoEdicao ? textosRoteiro.editando.salvando : textosRoteiro.editando.salvar}
           </button>
-        ) : !postado ? (
           <button
             type="button"
-            onClick={() => setPainel("postei")}
+            onClick={cancelarEdicao}
+            disabled={salvandoEdicao}
+            className={styles.btnTextoCancelar}
+          >
+            {textosRoteiro.editando.cancelar}
+          </button>
+          <MotivoSemRede className={styles.motivoBarra} />
+        </div>
+      ) : (
+        <div className={styles.barraAcoes} data-barra-acoes-propria="">
+          <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.btn}>
+            <Video size={18} strokeWidth={1.75} aria-hidden="true" />
+            {textosRoteiro.modoGravacao}
+          </Link>
+          {!gravadoEm ? (
+            <button
+              type="button"
+              onClick={gravei}
+              disabled={gravando || semConexao}
+              aria-busy={gravando || undefined}
+              aria-describedby={descricaoSemRede}
+              className={styles.btnVazio}
+            >
+              {gravando ? textosRoteiro.salvando : textosRoteiro.jaGravei}
+            </button>
+          ) : !postado ? (
+            <button
+              type="button"
+              onClick={() => setPainel("postei")}
+              disabled={semConexao}
+              aria-describedby={descricaoSemRede}
+              className={styles.btnVazio}
+            >
+              {textosRoteiro.postei}
+            </button>
+          ) : (
+            <a href={urlPostado} target="_blank" rel="noreferrer" className={styles.btnVazio}>
+              {textosRoteiro.postado}
+            </a>
+          )}
+          {/* "Reprovar" só do tablet para cima; no celular é a linha .julgar no fim do cartão (design v2). */}
+          <button
+            type="button"
+            onClick={() => setPainel("reprovar")}
             disabled={semConexao}
             aria-describedby={descricaoSemRede}
-            className={styles.btnVazio}
+            className={`${styles.btnVazio} ${styles.somenteTablet}`}
           >
-            {textosRoteiro.postei}
+            {textosRoteiro.menu.reprovar}
           </button>
-        ) : (
-          <a href={urlPostado} target="_blank" rel="noreferrer" className={styles.btnVazio}>
-            {textosRoteiro.postado}
-          </a>
-        )}
-        {/* "Reprovar" só do tablet para cima; no celular é a linha .julgar no fim do cartão (design v2). */}
-        <button
-          type="button"
-          onClick={() => setPainel("reprovar")}
-          disabled={semConexao}
-          aria-describedby={descricaoSemRede}
-          className={`${styles.btnVazio} ${styles.somenteTablet}`}
-        >
-          {textosRoteiro.menu.reprovar}
-        </button>
-        <button
-          type="button"
-          onClick={baixarPdf}
-          disabled={baixandoPdf || semConexao}
-          aria-busy={baixandoPdf || undefined}
-          aria-describedby={descricaoSemRede}
-          aria-label={baixandoPdf ? textosRoteiro.gerandoPdf : textosRoteiro.baixarPdf}
-          className={`${styles.btnVazio} ${styles.btnIcone} ${styles.somenteTablet}`}
-        >
-          <Download size={18} strokeWidth={1.75} aria-hidden="true" />
-        </button>
-        {/* Sem conexão o motivo ocupa uma linha acima dos botões (CSS). No celular só aparece enquanto a barra
+          <button
+            type="button"
+            onClick={baixarPdf}
+            disabled={baixandoPdf || semConexao}
+            aria-busy={baixandoPdf || undefined}
+            aria-describedby={descricaoSemRede}
+            aria-label={baixandoPdf ? textosRoteiro.gerandoPdf : textosRoteiro.baixarPdf}
+            className={`${styles.btnVazio} ${styles.btnIcone} ${styles.somenteTablet}`}
+          >
+            <Download size={18} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+          {/* Sem conexão o motivo ocupa uma linha acima dos botões (CSS). No celular só aparece enquanto a barra
             ainda tem o que precisa de rede ("Já gravei" ou "Postei"); do tablet para cima o PDF e o Reprovar
             estão sempre lá. */}
-        <MotivoSemRede
-          className={[styles.motivoBarra, postado ? styles.motivoSoTablet : ""].filter(Boolean).join(" ")}
-        />
-      </div>
+          <MotivoSemRede
+            className={[styles.motivoBarra, postado ? styles.motivoSoTablet : ""]
+              .filter(Boolean)
+              .join(" ")}
+          />
+        </div>
+      )}
 
       <PainelFlutuante
         titulo={textosRoteiro.maisOpcoes}
@@ -761,7 +1031,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
       </PainelFlutuante>
 
       <PainelFlutuante
-        titulo={reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
+        titulo={
+          reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha
+        }
         aberto={painel === "reprovar"}
         aoFechar={fecharSeLivre}
         rodape={
@@ -779,7 +1051,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
               aria-describedby={descricaoSemRede}
               className={styles.btn}
             >
-              {reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.reescrever}
+              {reescrevendo
+                ? textosRoteiro.reprovar.reescrevendo
+                : textosRoteiro.reprovar.reescrever}
             </button>
             <MotivoSemRede />
             <p className={styles.avisoTempoReprovar} aria-live="polite">
@@ -804,7 +1078,11 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
           {reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
         </h2>
         <p className={styles.ajudaReprovar}>{textosRoteiro.reprovar.ajudaMotivos}</p>
-        <div role="group" aria-label={textosRoteiro.reprovar.rotuloMotivos} className={chipStyles.grupo}>
+        <div
+          role="group"
+          aria-label={textosRoteiro.reprovar.rotuloMotivos}
+          className={chipStyles.grupo}
+        >
           {MOTIVOS_REPROVACAO.map((motivo) => {
             const ativo = motivosSelecionados.has(motivo.id);
             return (
@@ -813,7 +1091,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => alternarMotivo(motivo.id)}
-                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""].filter(Boolean).join(" ")}
+                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {motivo.rotulo}
               </button>
@@ -851,7 +1131,9 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
                   {textosRoteiro.versao(v.versao, Math.max(...versoes.map((x) => x.versao)))}
                   {v.atual ? `, ${textosRoteiro.atual}` : ""}
                   {v.reprovadoEm ? (
-                    <span className={styles.etiquetaReprovada}>{textosRoteiro.reprovar.etiqueta}</span>
+                    <span className={styles.etiquetaReprovada}>
+                      {textosRoteiro.reprovar.etiqueta}
+                    </span>
                   ) : null}
                 </span>
                 {v.reprovadoEm && v.motivos ? (
@@ -871,8 +1153,22 @@ export function RoteiroTela({ roteiro, corpo, blocos, video, versoes, marcaAtiva
       </PainelFlutuante>
 
       <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
-      <Toast texto={erroToast ?? ""} variante="erro" aberto={erroToast !== null} onFechar={fecharToastErro} />
-      <Toast texto={textosGravacao.gravadoToast} aberto={toastGravado} onFechar={() => setToastGravado(false)} />
+      <Toast
+        texto={erroToast ?? ""}
+        variante="erro"
+        aberto={erroToast !== null}
+        onFechar={fecharToastErro}
+      />
+      <Toast
+        texto={textosGravacao.gravadoToast}
+        aberto={toastGravado}
+        onFechar={() => setToastGravado(false)}
+      />
+      <Toast
+        texto={textosRoteiro.editando.salvo}
+        aberto={toastSalvo}
+        onFechar={() => setToastSalvo(false)}
+      />
     </div>
   );
 }

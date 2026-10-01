@@ -19,6 +19,7 @@ import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
+import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
@@ -52,6 +53,8 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
    */
   const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
   const [estiloTocado, setEstiloTocado] = useState(false);
+  /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
+  const [objetivoDoVideo, setObjetivoDoVideo] = useState("");
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
@@ -96,7 +99,7 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        const { id } = await gerarRoteiroAction(origem, escolhido, formato, estilo);
+        const { id } = await gerarRoteiroAction(origem, escolhido, formato, estilo, objetivoDoVideo.trim() || undefined);
         if (saiuRef.current) return;
         avisarRedeOk();
         router.push(`/roteiros/${id}`);
@@ -220,6 +223,16 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado }
         </div>
         {!estiloTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.estiloAjuda[estilo]}</p> : null}
       </div>
+
+      <AreaTexto
+        rotulo={`${textosObjetivo.objetivoDoVideo} ${textosObjetivo.objetivoDoVideoOpcional}`}
+        ajuda={textosObjetivo.objetivoDoVideoAjuda}
+        value={objetivoDoVideo}
+        onChange={(evento) => setObjetivoDoVideo(evento.target.value)}
+        placeholder={textosObjetivo.objetivoDoVideoPlaceholder}
+        maxLength={200}
+        linhasMin={2}
+      />
 
       <BarraAcao
         secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}

@@ -92,7 +92,7 @@ test.describe("M4, o roteiro sem fala", () => {
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
-    await expect(page.getByText("Cartão 1").first()).toBeVisible();
+    await expect(page.getByText(/^Cena 1 de \d+$/).first()).toBeVisible();
     await expect(page.getByText("O que mostrar").first()).toBeVisible();
     await expect(page.getByText("Texto na tela").first()).toBeVisible();
     // Nunca "o que falar": o estilo sem fala não tem bloco de fala nenhum.

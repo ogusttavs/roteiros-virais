@@ -32,7 +32,7 @@ import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
-import { config, hojeISO } from "@/lib/config";
+import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -44,9 +44,14 @@ import {
   evidenciaPorIds,
   formatarModeloNicho,
   modeloNichoAtual,
+  reguaDoSetor,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
-import { aplicarProporcaoBrasil, classificarBrasil, preferirRedePrincipal } from "./proporcao-brasil";
+import {
+  aplicarProporcaoBrasil,
+  classificarBrasil,
+  preferirRedePrincipal,
+} from "./proporcao-brasil";
 import { temasParaCliente } from "./temas";
 
 export class ErroRoteiro extends Error {}
@@ -139,7 +144,11 @@ function blocoDoSegundo(segundo: number, duracaoS: number): BlocoReels {
  * sem número no `quando` sempre cai na abertura, com o `quando` na frente da
  * linha (`textosRoteiro.mostrar.textoNaTela`).
  */
-function mostrarNoBlocoReels(edicao: ConteudoRoteiro["edicao"], duracaoS: number, bloco: BlocoReels): string[] {
+function mostrarNoBlocoReels(
+  edicao: ConteudoRoteiro["edicao"],
+  duracaoS: number,
+  bloco: BlocoReels,
+): string[] {
   return edicao.textoNaTela
     .filter((item) => {
       const segundo = primeiroSegundo(item.quando);
@@ -181,14 +190,14 @@ export function blocosParaLeitura(
    */
   if (roteiro.estilo === "sem_fala" && corpo.cartoes) {
     return corpo.cartoes.map((cartao, indice) => ({
-      rotulo: textosRoteiro.blocos.cartao(indice + 1),
+      rotulo: textosRoteiro.blocos.cena(indice + 1, corpo.cartoes!.length),
       paragrafos: [],
       mostrar: mostrarNoCartao(cartao),
     }));
   }
   if (roteiro.formato === "story" && corpo.cartoes) {
     return corpo.cartoes.map((cartao, indice) => ({
-      rotulo: textosRoteiro.blocos.cartao(indice + 1),
+      rotulo: textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length),
       paragrafos: [cartao.oQueFalar],
       mostrar: mostrarNoCartao(cartao),
     }));
@@ -217,6 +226,26 @@ export function blocosParaLeitura(
   ];
 }
 
+/**
+ * E40, item 1: o texto narrativo de um `ConteudoRoteiro`, achatado numa string só, para comparar
+ * a versão original com a editada (`aprender-cliente`, o sinal de edição). Mesma ordem de
+ * `blocosParaLeitura`, sem o `mostrar` do modo gravação, que não é texto que a pessoa edita.
+ */
+export function textoNarrativo(
+  conteudo: ConteudoRoteiro,
+  formato: FormatoRoteiro,
+  estilo: EstiloRoteiro,
+): string {
+  if (estilo === "sem_fala" && conteudo.cartoes) {
+    const cenas = conteudo.cartoes.map((c) => `${c.oQueMostrar}\n${c.textoNaTela}`).join("\n\n");
+    return conteudo.legenda ? `${cenas}\n\n${conteudo.legenda}` : cenas;
+  }
+  if (formato === "story" && conteudo.cartoes) {
+    return conteudo.cartoes.map((c) => c.oQueFalar).join("\n\n");
+  }
+  return [conteudo.gancho, conteudo.corpo, conteudo.fechamento, conteudo.chamadaFinal].join("\n\n");
+}
+
 export type OrigemRoteiro =
   | { origem: "sugerido"; temaIndice: number }
   | { origem: "livre"; textoTema: string }
@@ -238,6 +267,12 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
   formato?: FormatoRoteiro;
   /** M4, item 2: "falado" (padrão) se ausente. */
   estilo?: EstiloRoteiro;
+  /**
+   * E40, item 2: "o que este vídeo precisa comunicar?", opcional. Com `origem: "momento"`, o
+   * campo vem de `momento.objetivoDoVideo` em vez deste (a folha do momento já guarda os dois
+   * juntos); este só serve a origem `sugerido` e `livre`.
+   */
+  objetivoDoVideo?: string;
 };
 
 /**
@@ -333,7 +368,10 @@ function melhorEvidenciaDoTipo(
 }
 
 /** (c): dos tipos disponíveis, o que tem a evidência mais forte. */
-function melhorTipo(candidatos: readonly TipoAbertura[], evidencias: readonly EvidenciaParaAbertura[]): TipoAbertura {
+function melhorTipo(
+  candidatos: readonly TipoAbertura[],
+  evidencias: readonly EvidenciaParaAbertura[],
+): TipoAbertura {
   const comEvidencia = candidatos
     .map((tipo) => ({ tipo, evidencia: melhorEvidenciaDoTipo(evidencias, tipo)! }))
     .sort((a, b) => compararForcaDeAbertura(a.evidencia, b.evidencia));
@@ -430,7 +468,12 @@ function combinarEvidencias(
     redePrincipal,
     (v) => v.plataforma,
   );
-  return aplicarProporcaoBrasil(preferido, limite, (v) => classificarBrasil(v.idioma, v.contaBrasileira), proporcaoBrasil);
+  return aplicarProporcaoBrasil(
+    preferido,
+    limite,
+    (v) => classificarBrasil(v.idioma, v.contaBrasileira),
+    proporcaoBrasil,
+  );
 }
 
 /**
@@ -478,7 +521,13 @@ async function resolverTema(
  * em vez de contagem fixa, para o histórico crescer com o cliente sem um
  * número escolhido a dedo.
  */
-type RoteiroRecente = { tema: string; objetivo: Objetivo; status: string; gancho: string; origem: OrigemRoteiro["origem"] };
+type RoteiroRecente = {
+  tema: string;
+  objetivo: Objetivo;
+  status: string;
+  gancho: string;
+  origem: OrigemRoteiro["origem"];
+};
 
 async function historicoDeRoteiros(clienteId: number, dias: number): Promise<RoteiroRecente[]> {
   const linhas = await db()
@@ -595,6 +644,8 @@ type MontarERoteiroDados = {
   formato: FormatoRoteiro;
   /** M4, item 2: "falado" ou "sem_fala", ortogonal ao formato; troca o bloco de estrutura e o verificador. */
   estilo: EstiloRoteiro;
+  /** E40, item 2: "o que este vídeo precisa comunicar?", opcional; entra no prompt acima do tema. */
+  objetivoDoVideo?: string;
   observacao?: string;
   evidenciasPrevistas: number[];
   /**
@@ -621,9 +672,7 @@ type MontarERoteiroDados = {
 };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
-async function gerarConteudo(
-  dados: MontarERoteiroDados,
-): Promise<{
+async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   conteudo: ConteudoRoteiro;
   geracaoId: number;
   referenciaVideoId: number | null;
@@ -644,20 +693,35 @@ async function gerarConteudo(
 
   const ehMomento = dados.momento !== undefined;
 
-  const [daBusca, prevista, modeloNichoLinha, roteirosRecentes, regrasCliente, ultimosRoteiros, marcaCitada] =
-    await Promise.all([
-      ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
-      ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas),
-      modeloNichoAtual(nichoId),
-      historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
-      regrasAtivasDoCliente(dados.clienteId),
-      ultimosRoteirosParaAbertura(dados.clienteId),
-      marcaCitadaPorId(dados.momento?.marcaId),
-    ]);
+  const [
+    daBusca,
+    prevista,
+    modeloNichoLinha,
+    roteirosRecentes,
+    regrasCliente,
+    ultimosRoteiros,
+    marcaCitada,
+  ] = await Promise.all([
+    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
+    ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas),
+    modeloNichoAtual(nichoId),
+    historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
+    regrasAtivasDoCliente(dados.clienteId),
+    ultimosRoteirosParaAbertura(dados.clienteId),
+    marcaCitadaPorId(dados.momento?.marcaId),
+  ]);
 
+  const { proporcaoBrasil } = await reguaDoSetor(nichoId);
   const evidencias = ehMomento
     ? []
-    : combinarEvidencias(prevista, daBusca, LIMITE_EVIDENCIA, config.regras.proporcaoBrasil, dados.cliente.redePrincipal, dados.estilo);
+    : combinarEvidencias(
+        prevista,
+        daBusca,
+        LIMITE_EVIDENCIA,
+        proporcaoBrasil,
+        dados.cliente.redePrincipal,
+        dados.estilo,
+      );
   const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
@@ -714,6 +778,7 @@ async function gerarConteudo(
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
       objetivo: dados.objetivo,
+      objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
       formato: dados.formato,
       estilo: dados.estilo,
       observacao: dados.observacao,
@@ -859,6 +924,7 @@ export async function gerarRoteiro(
     objetivo: params.objetivo,
     formato,
     estilo,
+    objetivoDoVideo: params.objetivoDoVideo,
     observacao: params.observacao,
     evidenciasPrevistas,
     momento,
@@ -876,6 +942,8 @@ export async function gerarRoteiro(
       objetivo: params.objetivo,
       formato,
       estilo,
+      // E40, item 2: da origem momento, o mesmo campo que já está dentro de `momento`.
+      objetivoDoVideo: params.objetivoDoVideo ?? momento?.objetivoDoVideo,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -932,6 +1000,8 @@ export async function reprovarERescrever(
     formato: atual.formato,
     // M4, item 2: idem para o estilo ("mantém o estilo do roteiro de origem").
     estilo: atual.estilo,
+    // E40, item 2: idem, a reescrita mantém o recado do vídeo da versão anterior.
+    objetivoDoVideo: atual.objetivoDoVideo ?? undefined,
     evidenciasPrevistas: atual.conteudo.evidencias,
     anguloParaEvitar: {
       gancho: atual.conteudo.gancho,
@@ -954,6 +1024,7 @@ export async function reprovarERescrever(
       objetivo: atual.objetivo,
       formato: atual.formato,
       estilo: atual.estilo,
+      objetivoDoVideo: atual.objetivoDoVideo,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,
@@ -997,10 +1068,91 @@ export async function reprovarERescrever(
       { singletonKey: String(atual.clienteId), singletonSeconds: 60 },
     );
   } catch (erro) {
-    logger.error({ err: erro, clienteId: atual.clienteId, roteiroId }, "nao foi possivel enfileirar aprender-cliente");
+    logger.error(
+      { err: erro, clienteId: atual.clienteId, roteiroId },
+      "nao foi possivel enfileirar aprender-cliente",
+    );
   }
 
   return novaVersao;
+}
+
+/**
+ * E40, item 1: os campos de texto que a pessoa pode editar na tela, sem chamar IA. `cartoes`
+ * chega como a lista inteira, na mesma ordem de `corpo.cartoes` (Story ou sem fala); um cartão
+ * que a pessoa não tocou chega igual ao que já estava, a tela sempre manda a lista inteira.
+ */
+export type CamposEditaveisRoteiro = {
+  gancho?: string;
+  corpo?: string;
+  fechamento?: string;
+  chamadaFinal?: string;
+  cartoes?: { oQueFalar: string; oQueMostrar: string; textoNaTela: string }[];
+  legenda?: string;
+};
+
+/**
+ * E40, item 1: salva a edição manual da pessoa, sem chamar IA. Na primeira edição deste
+ * roteiro, `conteudoOriginal` guarda a versão que a IA escreveu (edições seguintes não
+ * sobrescrevem: o original é sempre o que a IA de fato gerou). Enfileira `aprender-cliente`
+ * (E27, parte 2) com o mesmo padrão de `reprovarERescrever`, para a diferença entre o texto
+ * original e o editado virar mais um sinal de aprendizado.
+ */
+export async function editarRoteiro(
+  roteiroId: number,
+  campos: CamposEditaveisRoteiro,
+): Promise<RoteiroLinha> {
+  const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
+  if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
+
+  const conteudoAtual = atual.conteudo;
+  const novoConteudo: ConteudoRoteiro = {
+    ...conteudoAtual,
+    gancho: campos.gancho ?? conteudoAtual.gancho,
+    corpo: campos.corpo ?? conteudoAtual.corpo,
+    fechamento: campos.fechamento ?? conteudoAtual.fechamento,
+    chamadaFinal: campos.chamadaFinal ?? conteudoAtual.chamadaFinal,
+    // A figurinha nao se edita (e escolha da IA, nao um campo de texto); so os tres campos de
+    // texto do cartao trocam, por indice, a mesma ordem que a tela recebeu.
+    cartoes:
+      campos.cartoes && conteudoAtual.cartoes
+        ? conteudoAtual.cartoes.map((cartao, indice) => ({
+            ...cartao,
+            oQueFalar: campos.cartoes![indice]?.oQueFalar ?? cartao.oQueFalar,
+            oQueMostrar: campos.cartoes![indice]?.oQueMostrar ?? cartao.oQueMostrar,
+            textoNaTela: campos.cartoes![indice]?.textoNaTela ?? cartao.textoNaTela,
+          }))
+        : conteudoAtual.cartoes,
+    legenda: campos.legenda ?? conteudoAtual.legenda,
+  };
+
+  const [roteiro] = await db()
+    .update(roteiros)
+    .set({
+      conteudo: novoConteudo,
+      conteudoOriginal: atual.conteudoOriginal ?? conteudoAtual,
+      editadoPelaPessoa: true,
+      editadoEm: new Date(),
+    })
+    .where(eq(roteiros.id, roteiroId))
+    .returning();
+  if (!roteiro) throw new ErroRoteiro("roteiro nao encontrado.");
+
+  try {
+    await garantirBossPronto();
+    await boss().send(
+      FILAS.aprenderCliente,
+      { clienteId: atual.clienteId },
+      { singletonKey: String(atual.clienteId), singletonSeconds: 60 },
+    );
+  } catch (erro) {
+    logger.error(
+      { err: erro, clienteId: atual.clienteId, roteiroId },
+      "nao foi possivel enfileirar aprender-cliente",
+    );
+  }
+
+  return roteiro;
 }
 
 export async function marcarGravado(roteiroId: number): Promise<RoteiroLinha> {
@@ -1185,7 +1337,9 @@ export async function roteirosDeHoje(clienteId: number): Promise<RoteiroLinha[]>
   return db()
     .select()
     .from(roteiros)
-    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO()), SEM_VERSAO_MAIS_NOVA))
+    .where(
+      and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO()), SEM_VERSAO_MAIS_NOVA),
+    )
     .orderBy(desc(roteiros.criadoEm));
 }
 
@@ -1223,7 +1377,10 @@ export type RoteiroHistoricoLinha = {
  * recente primeiro, só a versão atual de cada série ("outro ângulo" nunca
  * duplica linha no histórico).
  */
-export async function roteirosDoCliente(clienteId: number, limite = 200): Promise<RoteiroHistoricoLinha[]> {
+export async function roteirosDoCliente(
+  clienteId: number,
+  limite = 200,
+): Promise<RoteiroHistoricoLinha[]> {
   return db()
     .select({
       id: roteiros.id,

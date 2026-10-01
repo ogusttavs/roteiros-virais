@@ -54,13 +54,20 @@ function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
       icone: Sparkles,
       rotulo: textosRoteiro.cartaoStory.figurinha,
       texto:
-        cartao.figurinha === "nenhuma" ? textosRoteiro.cartaoStory.semFigurinha : ROTULO_FIGURINHA[cartao.figurinha],
+        cartao.figurinha === "nenhuma"
+          ? textosRoteiro.cartaoStory.semFigurinha
+          : ROTULO_FIGURINHA[cartao.figurinha],
     },
   ];
 }
 
 function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdicao[] {
-  return porQueAssim.map((item) => ({ icone: HelpCircle, rotulo: "", texto: item.motivo, mono: item.regra }));
+  return porQueAssim.map((item) => ({
+    icone: HelpCircle,
+    rotulo: "",
+    texto: item.motivo,
+    mono: item.regra,
+  }));
 }
 
 /** Mesma composição de `RoteiroTela.tsx`, item a item (M4, item 5): nunca "o que falar" nem figurinha. */
@@ -118,7 +125,7 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
         corpo.cartoes.map((cartao, indice) => (
           <BlocoEdicao
             key={indice}
-            titulo={textosRoteiro.blocos.cartao(indice + 1)}
+            titulo={textosRoteiro.blocos.cena(indice + 1, corpo.cartoes!.length)}
             itens={itensCartaoSemFala(cartao)}
           />
         ))
@@ -126,7 +133,7 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
         corpo.cartoes.map((cartao, indice) => (
           <BlocoEdicao
             key={indice}
-            titulo={textosRoteiro.blocos.cartao(indice + 1)}
+            titulo={textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length)}
             itens={itensCartaoStory(cartao)}
           />
         ))
@@ -135,11 +142,17 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
       )}
 
       {corpo.legenda ? (
-        <BlocoEdicao titulo={textosRoteiro.legenda} itens={[{ icone: Type, rotulo: "", texto: corpo.legenda }]} />
+        <BlocoEdicao
+          titulo={textosRoteiro.legenda}
+          itens={[{ icone: Type, rotulo: "", texto: corpo.legenda }]}
+        />
       ) : null}
 
       {corpo.porQueAssim.length > 0 ? (
-        <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
+        <BlocoEdicao
+          titulo={textosRoteiro.porQueAssim}
+          itens={itensPorQueAssim(corpo.porQueAssim)}
+        />
       ) : null}
     </main>
   );

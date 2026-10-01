@@ -14,12 +14,22 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * desativada, mesmo que o modelo a proponha de novo). O modelo só propõe a
  * frase e, quando der, o motivo de origem; a contagem de reprovações que
  * sustentam cada regra é calculada por código, não pelo modelo.
+ *
+ * E40, item 1: segundo sinal, as edições manuais dos últimos 90 dias (o texto que a IA escreveu
+ * contra o texto que a pessoa deixou depois de editar, sem reprovar nada). Entra como mais um
+ * bloco da entrada, junto das reprovações; o modelo lê os dois tipos de sinal juntos e continua
+ * devolvendo uma lista só de regras, consolidada por código do mesmo jeito de sempre (a origem
+ * continua "reprovacao" na tabela, mesmo quando o sinal que sustenta a regra veio de uma edição:
+ * é a mesma memória do cliente, só com mais um tipo de evidência). Versao 1.1.0.
  */
-export const versao = "1.0.0";
+export const versao = "1.1.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = "low";
 
-const IDS_MOTIVO = MOTIVOS_REPROVACAO.map((m) => m.id) as [IdMotivoReprovacao, ...IdMotivoReprovacao[]];
+const IDS_MOTIVO = MOTIVOS_REPROVACAO.map((m) => m.id) as [
+  IdMotivoReprovacao,
+  ...IdMotivoReprovacao[],
+];
 const idMotivoEnum = z.enum(IDS_MOTIVO);
 
 const regraProposta = z.object({
@@ -45,10 +55,11 @@ Regras duras:
    jargão de marketing ou de tecnologia. Escreva do jeito que você diria para alguém, não
    como uma especificação: "não começar com pergunta: comece mostrando", não "otimizar o
    gancho para maior retenção".
-2. Cada regra precisa vir de um padrão real nas reprovações, nunca inventada. Se as
-   reprovações não sustentam nada de específico, devolva uma lista vazia.
+2. Cada regra precisa vir de um padrão real nas reprovações ou nas edições, nunca inventada. Se
+   elas não sustentam nada de específico, devolva uma lista vazia.
 3. Quando um motivo estruturado explica bem a regra, cite esse motivo em "motivoOrigem".
-   Quando a regra vier só do texto livre que o cliente escreveu, deixe "motivoOrigem" nulo.
+   Quando a regra vier só do texto livre que o cliente escreveu, ou de uma edição, deixe
+   "motivoOrigem" nulo (edição não tem motivo estruturado, só os dois textos).
 4. Duas reprovações parecidas viram uma regra só, nunca duas regras quase iguais.
 5. As regras que já estão ativas hoje continuam do jeito que estão, com a mesma frase,
    a não ser que uma reprovação nova mude o que elas dizem; não reescreva uma regra ativa só
@@ -63,6 +74,8 @@ Escreva em português do Brasil, com acentuação correta.`;
 
 export function montarEntrada(dados: {
   reprovacoes: { motivos: string[]; motivoTexto: string | null; gancho: string; corpo: string }[];
+  /** E40, item 1: o texto que a IA escreveu contra o texto que a pessoa deixou, sem reprovar. */
+  edicoes: { original: string; editado: string }[];
   regrasAtivas: { regra: string; motivoOrigem: string | null }[];
   regrasDesativadas: { regra: string; motivoOrigem: string | null }[];
 }): string {
@@ -78,9 +91,21 @@ export function montarEntrada(dados: {
           .join("\n\n")
       : "nenhuma reprovacao nos ultimos 90 dias";
 
+  const listaEdicoes =
+    dados.edicoes.length > 0
+      ? dados.edicoes
+          .map(
+            (e, i) =>
+              `edição ${i + 1}:\n  texto da IA: ${e.original}\n  texto que o cliente deixou: ${e.editado}`,
+          )
+          .join("\n\n")
+      : "nenhuma edicao nos ultimos 90 dias";
+
   const listaAtivas =
     dados.regrasAtivas.length > 0
-      ? dados.regrasAtivas.map((r) => `"${r.regra}"${r.motivoOrigem ? ` (motivo: ${r.motivoOrigem})` : ""}`).join("; ")
+      ? dados.regrasAtivas
+          .map((r) => `"${r.regra}"${r.motivoOrigem ? ` (motivo: ${r.motivoOrigem})` : ""}`)
+          .join("; ")
       : "nenhuma regra ativa ainda";
 
   const listaDesativadas =
@@ -92,6 +117,7 @@ export function montarEntrada(dados: {
 
   return (
     `Reprovações dos últimos 90 dias:\n${listaReprovacoes}\n\n` +
+    `Edições dos últimos 90 dias (a pessoa não reprovou, só mudou o texto antes de gravar):\n${listaEdicoes}\n\n` +
     `Regras já ativas hoje (mantenha a frase, a não ser que precise mudar):\n${listaAtivas}\n\n` +
     `Regras que o cliente desativou (nunca proponha de novo):\n${listaDesativadas}`
   );

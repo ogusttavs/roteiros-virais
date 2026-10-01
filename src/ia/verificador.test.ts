@@ -335,10 +335,19 @@ describe("verificarLocalmente", () => {
       expect(r.aprovado).toBe(true);
     });
 
-    it("reprova com 1 cartao so", () => {
-      const r = verificarLocalmente({}, { formato: "story", cartoes: [ULTIMO_CARTAO_OK] });
+    // E40, item 3: R-IG-STORY-03 mudou de "2 a 5" para "1 a 5" (decisao do Gustavo, coisa rapida cabe num story so).
+    it("aprova com 1 cartao so, quando ele tem figurinha e fecha pedindo resposta", () => {
+      const r = verificarLocalmente(
+        {},
+        { formato: "story", cartoes: [{ ...ULTIMO_CARTAO_OK, figurinha: "perguntas" }] },
+      );
+      expect(r.aprovado).toBe(true);
+    });
+
+    it("reprova com 0 cartoes", () => {
+      const r = verificarLocalmente({}, { formato: "story", cartoes: [] });
       expect(r.aprovado).toBe(false);
-      expect(r.motivos.join(" ")).toContain("R-IG-STORY-03");
+      expect(r.motivos.join(" ")).toContain("precisa de cartões");
     });
 
     it("reprova com 6 cartoes", () => {
@@ -350,14 +359,14 @@ describe("verificarLocalmente", () => {
       expect(r.motivos.join(" ")).toContain("R-IG-STORY-03");
     });
 
-    it("reprova cartao com mais de 15s de fala (2,5 palavras por segundo)", () => {
-      const falaLonga = Array.from({ length: 40 }, () => "palavra").join(" ");
+    it("reprova cartao com mais de 60s de fala (2,5 palavras por segundo)", () => {
+      const falaLonga = Array.from({ length: 160 }, () => "palavra").join(" ");
       const r = verificarLocalmente(
         {},
         { formato: "story", cartoes: cartoes({ ...CARTAO_OK, oQueFalar: falaLonga }) },
       );
       expect(r.aprovado).toBe(false);
-      expect(r.motivos.join(" ")).toContain("ate 15s de fala");
+      expect(r.motivos.join(" ")).toContain("ate 60s de fala");
     });
 
     it("reprova cartao sem texto na tela", () => {

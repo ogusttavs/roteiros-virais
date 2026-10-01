@@ -1,0 +1,1 @@
+ALTER TABLE "roteiros" ADD COLUMN "editado_em" timestamp with time zone;

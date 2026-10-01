@@ -360,7 +360,10 @@ export const briefings = pgTable("briefings", {
    * pelo microfone. Coluna nova (não um campo dentro de `respostas[id]`, que já é `string` em
    * produção com respostas reais de cliente: trocar a forma quebraria toda leitura existente).
    */
-  transcricoesBrutas: jsonb("transcricoes_brutas").$type<Record<string, string>>().notNull().default({}),
+  transcricoesBrutas: jsonb("transcricoes_brutas")
+    .$type<Record<string, string>>()
+    .notNull()
+    .default({}),
   notaGeral: numeric("nota_geral", { precision: 4, scale: 2 }),
   /** true quando a nota geral chegou a 8 (gate da plataforma) */
   completo: boolean("completo").notNull().default(false),
@@ -425,7 +428,10 @@ export const contas = pgTable(
      * semente que "curadoria" na vigilância, só que descoberta pela
      * máquina em vez de colada pela pessoa. Mesma forma de videos.origem.
      */
-    origem: text("origem").$type<"coleta" | "seed" | "curadoria" | "pesquisa">().notNull().default("coleta"),
+    origem: text("origem")
+      .$type<"coleta" | "seed" | "curadoria" | "pesquisa">()
+      .notNull()
+      .default("coleta"),
     /**
      * Coleta por perfil falhou de um jeito conhecido e nao vale gastar cota
      * tentando de novo na mesma hora (rodada de acabamento de 06/09, item 2:
@@ -504,7 +510,12 @@ export type ResumoPesquisaSetor = {
   contasAtualizadas: number;
   termosSugeridos: string[];
   hashtagsSugeridas: string[];
-  custo: { unidadesYoutube: number; chamadasMeta: number; resultadosApify: number; custoIaUsd: number };
+  custo: {
+    unidadesYoutube: number;
+    chamadasMeta: number;
+    resultadosApify: number;
+    custoIaUsd: number;
+  };
 };
 
 /**
@@ -646,7 +657,10 @@ export const videos = pgTable(
      * Business Discovery ou da Hashtag Search da Meta (E6 parte 3, segunda
      * rodada, item 2).
      */
-    origem: text("origem").$type<"coleta" | "seed" | "curadoria" | "meta">().notNull().default("coleta"),
+    origem: text("origem")
+      .$type<"coleta" | "seed" | "curadoria" | "meta">()
+      .notNull()
+      .default("coleta"),
     /**
      * Video da Hashtag Search da Meta (E6 parte 3, segunda rodada, item 3):
      * `contaId` fica nulo (a Hashtag Search nunca devolve a conta dona).
@@ -920,7 +934,10 @@ export type ConteudoRoteiro = {
   corpo: string;
   fechamento: string;
   chamadaFinal: string;
-  /** Só em Story (V9c, item 2): de 2 a 5 cartões (`R-IG-STORY-03`); nulo em Reels. */
+  /**
+   * Em Story (V9c, item 2), de 1 a 5 (E40: era de 2 a 5, `R-IG-STORY-03`); em sem fala (M4, item
+   * 2), de 2 a 5, mesma estrutura; nulo em Reels falado.
+   */
   cartoes: CartaoStory[] | null;
   /**
    * Por que o modelo escreveu do jeito que escreveu (V9c, item 2, E36): uma
@@ -979,6 +996,8 @@ export type Momento = {
   oQueDaParaMostrar: string;
   marcaId?: number;
   transcricao?: string;
+  /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */
+  objetivoDoVideo?: string;
 };
 
 export const roteiros = pgTable(
@@ -1002,7 +1021,28 @@ export const roteiros = pgTable(
     formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
     /** M4, item 2: "falado" (padrão) ou "sem_fala", ortogonal ao formato; reescrever mantém o estilo da versão anterior. */
     estilo: text("estilo").$type<EstiloRoteiro>().notNull().default("falado"),
+    /**
+     * E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto que a pessoa
+     * escreve no tema livre, na folha do momento ou no dia do plano (mesmo nome em
+     * `planoGravacoes`, abaixo). Entra no prompt como instrução de primeira ordem e aparece no
+     * topo da tela do roteiro. Nulo quando a pessoa não escreveu nada.
+     */
+    objetivoDoVideo: text("objetivo_do_video"),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
+    /**
+     * E40, item 1: a versão original, preservada só na primeira edição da pessoa (edições
+     * seguintes não sobrescrevem, `conteudoOriginal` continua sendo a versão que a IA escreveu).
+     * Nulo em todo roteiro nunca editado.
+     */
+    conteudoOriginal: jsonb("conteudo_original").$type<ConteudoRoteiro>(),
+    /**
+     * E40, item 1: verdadeiro a partir da primeira vez que a pessoa salva uma edição manual (sem
+     * chamar a IA). O PDF, o modo de leitura e o Histórico mostram `conteudo`, que já é a versão
+     * editada; esta coluna é só o sinal para a tela e para o aprendizado (E27, parte 2).
+     */
+    editadoPelaPessoa: boolean("editado_pela_pessoa").notNull().default(false),
+    /** E40, item 1: a edição mais recente, para `aprender-cliente` janelar por 90 dias igual à reprovação. */
+    editadoEm: timestamp("editado_em", { withTimezone: true }),
     /**
      * O tipo de abertura que o modelo declarou ter usado (V4, item 3): o
      * serviço lê os últimos 5 roteiros do cliente por esta coluna para não
@@ -1080,6 +1120,8 @@ export const planoGravacoes = pgTable(
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
     /** V9c, item 1: sugerido pelo objetivo (`sugerirFormatoPeloObjetivo`), a folha pré-preenchida respeita. */
     formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
+    /** E40, item 2: mesmo campo de `roteiros.objetivoDoVideo`, preenchido já no dia do plano. */
+    objetivoDoVideo: text("objetivo_do_video"),
     marcaId: integer("marca_id").references(() => clientes.id),
     estado: text("estado").$type<EstadoPlano>().notNull().default("sugerido"),
     /** Nulo até a pessoa aceitar (`servicos/plano.ts`, `aceitar`), gerando o roteiro (origem "momento"). */
@@ -1173,7 +1215,10 @@ export const lotesIa = pgTable("lotes_ia", {
   tarefa: text("tarefa").notNull(),
   loteIdExterno: text("lote_id_externo").notNull().unique(),
   videoIds: jsonb("video_ids").$type<number[]>().notNull().default([]),
-  status: text("status").$type<"em_andamento" | "concluido" | "erro">().notNull().default("em_andamento"),
+  status: text("status")
+    .$type<"em_andamento" | "concluido" | "erro">()
+    .notNull()
+    .default("em_andamento"),
   criadoEm: criadoEm(),
   concluidoEm: timestamp("concluido_em", { withTimezone: true }),
 });

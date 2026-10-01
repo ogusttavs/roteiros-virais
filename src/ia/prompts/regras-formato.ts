@@ -11,7 +11,13 @@
  * aqui vira o próprio módulo porque `roteiro.ts` (2.0.0) usa a lista duas
  * vezes: para montar o bloco do sistema estável e para o verificador
  * conferir que `porQueAssim` só cita números que existem.
+ *
+ * E40, item 3, primeira troca desde que o arquivo existe: `R-IG-STORY-03` mudou (decisão do
+ * Gustavo, 1 a 5 stories em vez de 2 a 5, até 60s de fala em vez de 15s), e as regras 02, 04, 05
+ * e 07 trocam "cartão" por "story" (a mesma troca que o resto do prompt e a tela fazem). Versao
+ * 1.1.0.
  */
+export const versao = "1.1.0";
 
 export type RegraFormato = { numero: string; texto: string };
 
@@ -19,30 +25,30 @@ export type RegraFormato = { numero: string; texto: string };
 export const REGRAS_STORY: RegraFormato[] = [
   {
     numero: "R-IG-STORY-01",
-    texto: "Fale com quem já te segue: nunca se apresente do zero, nunca \"segue a gente\".",
+    texto: 'Fale com quem já te segue: nunca se apresente do zero, nunca "segue a gente".',
   },
   {
     numero: "R-IG-STORY-02",
     texto:
-      "O primeiro cartão dá a quem já segue um motivo para não deslizar: uma pergunta direta, uma cena " +
+      "O primeiro story dá a quem já segue um motivo para não deslizar: uma pergunta direta, uma cena " +
       "inesperada do bastidor, uma continuação do que ele já viu. Não é gancho para desconhecido.",
   },
   {
     numero: "R-IG-STORY-03",
     texto:
-      "Saída em cartões numerados, de 2 a 5, um assunto por cartão, até 15 segundos de fala por cartão; " +
-      "cada cartão traz o que falar, o que mostrar e o texto na tela.",
+      "Saída em sequência de stories numerados, de 1 a 5, um assunto por story, até 60 segundos de fala " +
+      "por story; cada story traz o que falar, o que mostrar e o texto na tela.",
   },
   {
     numero: "R-IG-STORY-04",
     texto:
-      "Pelo menos um cartão pede interação por figurinha, escolhida pelo objetivo: enquete, emoji " +
-      "deslizável ou teste para \"que lembrem de você\"; caixinha de perguntas, link ou \"me responde aqui\" " +
-      "para \"que te chamem para comprar\". Diga qual figurinha e o que escrever nela.",
+      "Pelo menos um story pede interação por figurinha, escolhida pelo objetivo: enquete, emoji " +
+      'deslizável ou teste para "que lembrem de você"; caixinha de perguntas, link ou "me responde aqui" ' +
+      'para "que te chamem para comprar". Diga qual figurinha e o que escrever nela.',
   },
   {
     numero: "R-IG-STORY-05",
-    texto: "Todo cartão com fala tem uma frase curta fixada na tela.",
+    texto: "Todo story com fala tem uma frase curta fixada na tela.",
   },
   {
     numero: "R-IG-STORY-06",
@@ -51,8 +57,8 @@ export const REGRAS_STORY: RegraFormato[] = [
   {
     numero: "R-IG-STORY-07",
     texto:
-      "O último cartão fecha a conversa, não o vídeo: \"me responde aqui\", \"vota\", \"manda no Direct\", " +
-      "\"toca no link\", conforme o objetivo.",
+      'O último story fecha a conversa, não o vídeo: "me responde aqui", "vota", "manda no Direct", ' +
+      '"toca no link", conforme o objetivo.',
   },
   {
     numero: "R-IG-STORY-08",
@@ -60,11 +66,13 @@ export const REGRAS_STORY: RegraFormato[] = [
   },
   {
     numero: "R-IG-STORY-09",
-    texto: "Prefira áudio original a música da biblioteca quando o story vai virar destaque ou ser medido.",
+    texto:
+      "Prefira áudio original a música da biblioteca quando o story vai virar destaque ou ser medido.",
   },
   {
     numero: "R-IG-STORY-10",
-    texto: "Story não serve para ser descoberto: se o objetivo é \"que mais gente te conheça\", sugira Reels.",
+    texto:
+      'Story não serve para ser descoberto: se o objetivo é "que mais gente te conheça", sugira Reels.',
   },
 ];
 

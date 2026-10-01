@@ -117,17 +117,43 @@ test.describe("V9c, Story como formato", () => {
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
-    await expect(page.getByText("Cartão 1").first()).toBeVisible();
+    await expect(page.getByText(/^Story 1 de \d+$/).first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "Por que assim" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Como editar" })).toHaveCount(0);
 
     await page.getByRole("link", { name: "Modo gravação" }).first().click();
     await expect(page).toHaveURL(/\/roteiros\/\d+\/gravar/);
-    await expect(page.getByText("Cartão 1").first()).toBeVisible();
+    await expect(page.getByText(/^Story 1 de \d+$/).first()).toBeVisible();
     await expect(page.getByText(/^\d+ de \d+$/)).toBeVisible();
   });
 
-  test("objetivo 'que mais gente te conheça' continua um Reels normal, sem cartão nenhum", async ({ page }) => {
+  /** E40, item 3 e item 4: R-IG-STORY-03 mudou (1 a 5 stories, 60s cada); o mock sempre devolve
+   * mais de um, aqui confere que a sequência inteira aparece numerada, não só o primeiro. */
+  test("gera um Story e ve a sequencia inteira numerada (mais de um story)", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/hoje/tema-livre");
+
+    await page.getByRole("button", { name: "Estou num momento" }).click();
+    const folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folha).toBeVisible();
+
+    await folha.getByLabel("Onde você está").fill("na loja");
+    await folha.getByLabel("O que está acontecendo").fill("mostrando como tirar uma mancha nova");
+    await folha.getByLabel("O que dá para mostrar").fill("o produto agindo na mancha");
+    await folha.getByRole("radio", { name: "Gente me chamar para comprar" }).click();
+
+    const controleFormato = folha.getByRole("tablist", { name: "Formato" });
+    await expect(controleFormato.getByRole("tab", { name: "Story" })).toHaveAttribute("aria-selected", "true");
+
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
+
+    await expect(page.getByText(/^Story 1 de 3$/).first()).toBeVisible();
+    await expect(page.getByText(/^Story 2 de 3$/).first()).toBeVisible();
+    await expect(page.getByText(/^Story 3 de 3$/).first()).toBeVisible();
+  });
+
+  test("objetivo 'que mais gente te conheça' continua um Reels normal, sem story nenhum", async ({ page }) => {
     await entrar(page);
     await page.goto("/hoje/tema-livre");
 
@@ -147,6 +173,6 @@ test.describe("V9c, Story como formato", () => {
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
     await expect(page.getByRole("heading", { name: "Como editar" })).toBeVisible();
-    await expect(page.getByText("Cartão 1")).toHaveCount(0);
+    await expect(page.getByText(/^Story 1 de \d+$/)).toHaveCount(0);
   });
 });

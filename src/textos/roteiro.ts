@@ -22,11 +22,26 @@ export const textosRoteiro = {
     meio: "O meio",
     fechamento: "O fechamento",
     chamada: "A chamada final",
-    /** V9c, item 4: o rótulo de cada bloco de leitura em Story, um por cartão. */
-    cartao: (n: number) => `Cartão ${n}`,
+    /** E40, item 3: o rótulo de cada bloco de leitura em Story, "a tela e o prompt usam story, não cartão". */
+    story: (n: number, total: number) => `Story ${n} de ${total}`,
+    /** M4, item 5: o rótulo de cada bloco de leitura sem fala; nunca "cartão", a palavra lá é "cena". */
+    cena: (n: number, total: number) => `Cena ${n} de ${total}`,
   },
   ondeGravar: "Onde gravar e o que mostrar",
   comoEditar: "Como editar",
+  /** E40, item 1: o botão que libera o texto de cada bloco para a pessoa editar, sem chamar IA. */
+  editar: "Editar",
+  editando: {
+    titulo: "Editando",
+    avisoOriginal: "O texto original fica guardado.",
+    salvar: "Salvar",
+    salvando: "Salvando",
+    cancelar: "Cancelar",
+    erro: "Não conseguimos salvar agora. O que você escreveu continua aqui; tente de novo.",
+    salvo: "Edição salva",
+  },
+  /** E40, item 2: "o que este vídeo precisa comunicar?", no topo da tela quando a pessoa escreveu algo. */
+  recado: "O recado deste vídeo",
   edicao: {
     texto: "Texto na tela",
     corte: "Ritmo de corte",
@@ -115,9 +130,11 @@ export const textosRoteiro = {
    * falava de escrever quando a pessoa tinha tocado em outra coisa). As de
    * "sem rede" trocam a frase padrão de `textosConexao` quando ela não cabe.
    */
-  erroMarcarGravado: "Não conseguimos marcar como gravado agora. Toque em Já gravei de novo em alguns instantes.",
+  erroMarcarGravado:
+    "Não conseguimos marcar como gravado agora. Toque em Já gravei de novo em alguns instantes.",
   erroMarcarGravadoSemRede: "Sem conexão agora. Toque em Já gravei de novo quando a rede voltar.",
-  erroSalvarLink: "Não conseguimos salvar o link agora. O que você colou continua aqui; tente de novo.",
+  erroSalvarLink:
+    "Não conseguimos salvar o link agora. O que você colou continua aqui; tente de novo.",
   erroCopiar: "Não conseguimos copiar o texto agora. Tente de novo.",
   erroPdf: "Não conseguimos gerar o PDF agora. Tente de novo em alguns instantes.",
   erroPdfSemRede: "Sem conexão agora. Toque em Baixar em PDF de novo quando a rede voltar.",
@@ -144,7 +161,8 @@ export const textosRoteiro = {
      * Depois de uns 10 segundos escrevendo (V7, item 4 do PROXIMO.md): sem dizer "mais que o normal", porque a
      * estimativa acima já vai a 3 minutos.
      */
-    demorando: "Ainda escrevendo. Com conexão fraca pode levar mais; quando terminar, o roteiro novo abre sozinho.",
+    demorando:
+      "Ainda escrevendo. Com conexão fraca pode levar mais; quando terminar, o roteiro novo abre sozinho.",
     erro: "Não deu para reescrever agora. A falha foi nossa; o que você marcou continua aqui.",
     cancelar: "Cancelar",
     etiqueta: "reprovada",

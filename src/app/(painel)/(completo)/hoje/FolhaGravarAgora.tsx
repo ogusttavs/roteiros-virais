@@ -44,6 +44,8 @@ export type ValoresIniciaisMomento = {
   objetivo: Objetivo;
   formato: FormatoRoteiro;
   marcaId: number | null;
+  /** E40, item 2: "o que este vídeo precisa comunicar?", quando o dia do plano já trouxe um. */
+  objetivoDoVideo?: string | null;
 };
 
 type Props = {
@@ -111,6 +113,8 @@ export function FolhaGravarAgora({
    * começa em "falado" e a pessoa troca se quiser.
    */
   const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
+  /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
+  const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? "");
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
@@ -181,6 +185,7 @@ export function FolhaGravarAgora({
               formato,
               estilo,
               marcaId,
+              objetivoDoVideo: objetivoDoVideo.trim() || undefined,
             })
           : await gerarRoteiroMomentoAction({
               onde,
@@ -191,6 +196,7 @@ export function FolhaGravarAgora({
               estilo,
               marcaId,
               transcricao: transcricao ?? undefined,
+              objetivoDoVideo: objetivoDoVideo.trim() || undefined,
             });
       // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
       // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
@@ -339,6 +345,16 @@ export function FolhaGravarAgora({
             ))}
           </div>
         </div>
+
+        <AreaTexto
+          rotulo={`${textosMomento.objetivoDoVideo} ${textosMomento.objetivoDoVideoOpcional}`}
+          ajuda={textosMomento.objetivoDoVideoAjuda}
+          value={objetivoDoVideo}
+          onChange={(evento) => setObjetivoDoVideo(evento.target.value)}
+          placeholder={textosMomento.objetivoDoVideoPlaceholder}
+          maxLength={200}
+          linhasMin={2}
+        />
 
         {marcas.length > 0 ? (
           <div className={styles.grupoFalarDe}>

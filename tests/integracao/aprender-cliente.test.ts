@@ -6,7 +6,7 @@
  * consolidacao (contagem, regra desativada nunca volta) e o isolamento entre
  * clientes (item 6: "circula padrao, nunca conteudo").
  */
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
@@ -27,7 +27,7 @@ import {
 import { rodarAprenderCliente } from "@/jobs/aprender-cliente";
 import { ErroColeta } from "@/jobs/execucoes";
 import { desativarRegra, regrasAtivasDoCliente } from "@/servicos/aprendizado";
-import { gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
+import { editarRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -309,5 +309,39 @@ describe("rodarAprenderCliente", () => {
     const [regra] = await db().select().from(aprendizadoCliente).where(eq(aprendizadoCliente.clienteId, clienteId));
     expect(regra.primeiraEm.getTime()).toBe(antiga.getTime());
     expect(regra.ultimaEm.getTime()).toBe(recente.getTime());
+  });
+
+  /** E40, item 1: a edicao manual (sem reprovar nada) tambem alimenta o aprendizado, com os dois textos. */
+  it("uma edicao manual, sem reprovacao nenhuma, roda o job (o aprendizado recebe os dois textos)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-edicao-aprende", "mancha de vinho no estofado");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+    });
+    const ganchoOriginal = roteiro.conteudo.gancho;
+    await editarRoteiro(roteiro.id, { gancho: "um jeito diferente de abrir, do meu jeito" });
+
+    const resumo = await rodarAprenderCliente(clienteId);
+    expect(resumo).toMatchObject({ reprovacoesConsideradas: 0, edicoesConsideradas: 1 });
+
+    const [geracao] = await db()
+      .select()
+      .from(geracoesIA)
+      .where(and(eq(geracoesIA.clienteId, clienteId), eq(geracoesIA.tarefa, "aprenderCliente")))
+      .orderBy(desc(geracoesIA.id))
+      .limit(1);
+    const entrada = (geracao.entradas as { entrada: string }).entrada;
+    expect(entrada).toContain(ganchoOriginal);
+    expect(entrada).toContain("um jeito diferente de abrir, do meu jeito");
+  });
+
+  it("sem reprovacao nem edicao nos ultimos 90 dias: erro nao retentavel", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-nada-para-aprender", "tema qualquer");
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: "tema qualquer", objetivo: "engajamento" });
+
+    await expect(rodarAprenderCliente(clienteId)).rejects.toThrow(ErroColeta);
   });
 });
