@@ -98,7 +98,11 @@ export function termosDaSemana(termos: string[], quantidade: number, semana: num
   if (termos.length === 0) return [];
   const inicioBruto = semana % 2 === 0 ? 0 : quantidade;
   const inicio = inicioBruto % termos.length;
-  return termos.slice(inicio, inicio + quantidade);
+  // Hotfix de 01/10/2026: a fatia da a volta no fim da lista. Sem isso, um nicho com 35 termos e
+  // fatia de 30 lia so 5 hashtags em toda semana impar (do termo 30 ao 34), e o teste de
+  // integracao "ate 30 termos" passava ou falhava conforme a paridade da semana do relogio.
+  const total = Math.min(quantidade, termos.length);
+  return Array.from({ length: total }, (_, i) => termos[(inicio + i) % termos.length]);
 }
 
 async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefined): Promise<boolean> {
