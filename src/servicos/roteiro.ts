@@ -29,9 +29,12 @@ import {
   type QuemGrava,
   type TipoAbertura,
 } from "@/db/schema";
+import { gerarEstruturado } from "@/ia/cliente";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import * as filtrarEvidenciaPorMarca from "@/ia/prompts/filtrarEvidenciaPorMarca";
 import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
+import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
@@ -353,27 +356,74 @@ async function marcaCitadaPorId(
 }
 
 /**
- * O vídeo de referência (etapa 11, decisão 3): prefere o que tem análise
- * visual com momento chave (a cena exata que funcionou); sem isso, o de
- * maior fora da curva. Decidido em código, não pela IA, para a tela sempre
- * mostrar um segundo e uma frase que existem de verdade.
+ * H4, item 1 (achado do Gustavo em produção em 01/10, o caso do roteiro 12: a referência
+ * escolhida por código, pelo maior múltiplo, saiu um meme sem nada a ver com o roteiro, "a
+ * referência é um meme e o Bruno nunca faria um vídeo desse"). Antes disto, `escolherReferencia`
+ * decidia em código, pelo maior fora da curva; agora o modelo devolve qual vídeo de fato usou
+ * como modelo de estrutura (`edicao.referencia.videoId`), ou nulo quando nenhum serve, e o
+ * código só confere que o id pertence à evidência fornecida, nunca escolhe por conta própria.
+ * Referência errada é pior que referência nenhuma: um id fora da lista (alucinado) ou nenhuma
+ * referência devolvida vira "sem referência" (a tela já tem esse estado), nunca um id trocado
+ * por outro.
  */
-function escolherReferencia(
-  evidencias: VideoEvidenciaRoteiro[],
+function validarReferenciaDoModelo(
+  referencia: roteiroIA.SaidaRoteiro["edicao"]["referencia"],
+  evidenciasFornecidas: number[],
 ): { videoId: number; segundo: number; oQueOlhar: string } | null {
-  if (evidencias.length === 0) return null;
+  if (!referencia || referencia.videoId === null) return null;
+  if (!evidenciasFornecidas.includes(referencia.videoId)) return null;
+  return { videoId: referencia.videoId, segundo: referencia.segundo ?? 0, oQueOlhar: referencia.oQueOlhar };
+}
 
-  const comMomento = evidencias.find((e) => e.analiseVisual?.momentoChave);
-  if (comMomento?.analiseVisual?.momentoChave) {
-    return {
-      videoId: comMomento.id,
-      segundo: comMomento.analiseVisual.momentoChave.segundo,
-      oQueOlhar: comMomento.analiseVisual.momentoChave.oQue,
-    };
+/**
+ * H4, item 3 (achado do Gustavo em produção em 01/10, o mesmo caso do roteiro 12): depois que a
+ * evidência do roteiro já está pronta (`combinarEvidencias`), um filtro barato tira o que fere
+ * uma proibição do briefing ou destoa do tom da pessoa, antes da geração forte usar essa lista
+ * (tema do dia, roteiro e referência, item 1). Falha no filtro nunca derruba a geração: sem o
+ * filtro, o roteiro sai como antes desta etapa (evidência sem o encaixe de marca conferido),
+ * nunca sem roteiro nenhum, mesmo raciocínio de `marcaCitadaPorId`.
+ */
+async function filtrarEvidenciaPelaMarca(
+  evidencias: VideoEvidenciaRoteiro[],
+  perfilCompilado: string,
+  clienteId: number,
+): Promise<VideoEvidenciaRoteiro[]> {
+  if (evidencias.length === 0) return evidencias;
+  try {
+    const resultado = await gerarEstruturado({
+      tarefa: "filtrarEvidenciaPorMarca",
+      nivel: filtrarEvidenciaPorMarca.nivel,
+      effort: filtrarEvidenciaPorMarca.esforco,
+      schema: filtrarEvidenciaPorMarca.schema,
+      sistemaEstavel: filtrarEvidenciaPorMarca.montarSistemaEstavel(),
+      entrada: filtrarEvidenciaPorMarca.montarEntrada({
+        perfilCompilado,
+        evidencias: evidencias.map((v) => ({ id: v.id, assunto: v.assunto, gancho: v.gancho })),
+      }),
+    });
+
+    await registrarGeracao({
+      tarefa: "filtrarEvidenciaPorMarca",
+      versaoPrompt: filtrarEvidenciaPorMarca.versao,
+      modelo: resultado.modelo,
+      nivel: filtrarEvidenciaPorMarca.nivel,
+      clienteId,
+      entradas: { evidenciasIds: evidencias.map((v) => v.id) },
+      saida: resultado.dados,
+      uso: {
+        tokensEntrada: resultado.tokensEntrada,
+        tokensSaida: resultado.tokensSaida,
+        tokensCacheLeitura: resultado.tokensCacheLeitura,
+        tokensCacheEscrita: resultado.tokensCacheEscrita,
+      },
+    });
+
+    const aprovados = new Set(resultado.dados.aprovados);
+    return evidencias.filter((v) => aprovados.has(v.id));
+  } catch (falha) {
+    logger.error({ err: falha, clienteId }, "nao foi possivel filtrar a evidencia pela marca");
+    return evidencias;
   }
-
-  const [maiorForaDaCurva] = [...evidencias].sort((a, b) => b.foraDaCurva - a.foraDaCurva);
-  return { videoId: maiorForaDaCurva.id, segundo: 0, oQueOlhar: maiorForaDaCurva.gancho };
 }
 
 type EvidenciaParaAbertura = {
@@ -745,7 +795,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   ]);
 
   const { proporcaoBrasil } = await reguaDoSetor(nichoId);
-  const evidencias = ehMomento
+  const perfilCompilado = formatarPerfilCompilado(perfil);
+  const evidenciasCombinadas = ehMomento
     ? []
     : combinarEvidencias(
         prevista,
@@ -755,7 +806,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         dados.cliente.redePrincipal,
         dados.estilo,
       );
-  const referenciaEscolhida = ehMomento ? null : escolherReferencia(evidencias);
+  const evidencias = ehMomento
+    ? []
+    : await filtrarEvidenciaPelaMarca(evidenciasCombinadas, perfilCompilado, dados.clienteId);
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
 
@@ -811,7 +864,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     clienteId: dados.clienteId,
     schema: roteiroIA.schema,
     sistemaEstavel: roteiroIA.montarSistemaEstavel({
-      perfilCompilado: formatarPerfilCompilado(perfil),
+      perfilCompilado,
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
       regrasCliente,
@@ -896,6 +949,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     extrairEvidencias: (d) => d.evidencias,
   });
 
+  const referenciaEscolhida = validarReferenciaDoModelo(saida.edicao.referencia, evidenciasFornecidas);
   const duracaoS = respeitarDuracaoDoNicho(saida.duracaoS, modeloNichoLinha?.modelo.duracaoTipicaS);
 
   const conteudo: ConteudoRoteiro = {

@@ -595,6 +595,17 @@ export const TIPOS_ABERTURA = [
 export type TipoAbertura = (typeof TIPOS_ABERTURA)[number];
 
 /**
+ * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12): "original"
+ * quando quem publica é quem aparece e fala; "recorte" quando é trecho de outra pessoa,
+ * programa ou podcast repostado; "meme" quando é humor, POV, dublagem ou montagem;
+ * "noticia" já existia como sinal de assunto, agora classificado junto com o resto. A
+ * extração grava este campo (`extrairVideo.ts`); nulo em todo vídeo extraído antes dele
+ * existir, até a reclassificação em lote rodar.
+ */
+export const TIPOS_CONTEUDO = ["original", "recorte", "meme", "noticia"] as const;
+export type TipoConteudo = (typeof TIPOS_CONTEUDO)[number];
+
+/**
  * O formato do roteiro (V9c, E34 enxuta): "reels" continua a estrutura de
  * gancho, corpo, fechamento e chamada; "story" sai em cartões numerados
  * (`ConteudoRoteiro.cartoes`), a partir das regras `R-IG-STORY`
@@ -630,6 +641,15 @@ export type AnaliseVideo = {
    */
   pertenceAoNicho?: boolean;
   motivoNicho?: string;
+  /**
+   * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12, um meme virando
+   * referência): o que o vídeo é e se serve de modelo de estrutura para um roteiro. Também
+   * gravado nas colunas próprias `videos.tipoConteudo`/`videos.serveDeModelo` (para
+   * `evidenciaParaRoteiro` filtrar por SQL); aqui dentro só para o registro completo da
+   * extração. Ausente em toda análise gravada antes destes campos existirem.
+   */
+  tipoConteudo?: TipoConteudo;
+  serveDeModelo?: boolean;
 };
 
 export type AnaliseVisual = {
@@ -774,6 +794,19 @@ export const videos = pgTable(
      * abertura do próximo roteiro sem repetir os últimos 5 do cliente.
      */
     tipoAbertura: text("tipo_abertura").$type<TipoAbertura>(),
+    /**
+     * H4, item 2 (achado do Gustavo em produção em 01/10, o caso do roteiro 12): o que a
+     * extração classificou este vídeo como, e se ele serve de modelo de estrutura para um
+     * roteiro. `serveDeModelo` é falso para "recorte" e "meme": continuam contando como sinal
+     * de assunto para o tema do dia, nunca como modelo de roteiro nem como "de onde veio"
+     * (`evidenciaParaRoteiro`, `pesquisa.ts`, filtra por esta coluna; `evidenciaParaTema` não
+     * filtra, o sinal de assunto continua valendo para qualquer tipo). Colunas próprias, não só
+     * dentro de `analise`, para o filtro valer em SQL. Nulas em todo vídeo analisado antes
+     * delas existirem, até a reclassificação em lote rodar (`scripts/reclassificar-tipo-conteudo.ts`);
+     * nulo não exclui da evidência do roteiro, só `false` explícito exclui.
+     */
+    tipoConteudo: text("tipo_conteudo").$type<TipoConteudo>(),
+    serveDeModelo: boolean("serve_de_modelo"),
     /**
      * A miniatura do vídeo (V9d, item 0b, migração 0033): o cartão de
      * Referências não tinha prévia nenhuma (lacuna do PR #52), e o Gustavo
@@ -1362,6 +1395,13 @@ export const geracoesIA = pgTable("geracoes_ia", {
   tokensSaida: integer("tokens_saida").notNull().default(0),
   tokensCache: integer("tokens_cache").notNull().default(0),
   custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+  /**
+   * R1, item 0b (pedido do Gustavo em 01/10, captura do celular, "sempre demora mais"): quanto
+   * tempo a chamada à IA levou, do pedido à resposta. Nulo em toda geração registrada antes
+   * desta coluna existir. Fonte de dado real para calibrar a frase de espera (`TelaEscrevendo`,
+   * `esperaDuracao`) em vez de impressão.
+   */
+  duracaoMs: integer("duracao_ms"),
   avaliacao: text("avaliacao").$type<AvaliacaoGeracao>(),
   motivoAvaliacao: text("motivo_avaliacao"),
   /**

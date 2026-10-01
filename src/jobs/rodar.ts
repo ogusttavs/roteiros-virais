@@ -77,7 +77,17 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
     return rodarExtrairSemFala(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
   },
   [FILAS.modeloNicho]: () => rodarModeloNicho(),
-  [FILAS.temasDoDia]: () => rodarTemasDoDia(),
+  /**
+   * R1, item 0: `npm run job -- temas-do-dia <nichoId> --refazer` refaz um setor só, mesmo que
+   * já tenha tema hoje (sem `--refazer`, pula quem já tem, igual a sempre); sem `nichoId`
+   * nenhum, refaz todos (o comportamento do cron). A segurança de nunca piorar o que já está lá
+   * é da própria `rodarTemasDoDia`/`podeSobrescreverTemasDoDia`, não deste despacho.
+   */
+  [FILAS.temasDoDia]: () => {
+    const nichoIdArg = process.argv[3];
+    const forcar = process.argv.includes("--refazer");
+    return rodarTemasDoDia(nichoIdArg === undefined ? undefined : Number(nichoIdArg), { forcar });
+  },
   [FILAS.pesquisaDeSetor]: () => {
     const nichoIdArg = process.argv[3];
     return rodarPesquisaDeSetor(nichoIdArg === undefined ? undefined : Number(nichoIdArg));

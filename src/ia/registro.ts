@@ -54,6 +54,12 @@ export type DadosRegistro = {
   emLote?: boolean;
   avaliacao?: AvaliacaoGeracao;
   motivoAvaliacao?: string;
+  /**
+   * R1, item 0b: quanto levou a chamada que gerou esta linha, do pedido à resposta. Alimenta a
+   * calibração futura da frase de espera (`textosComuns.esperaDuracao`) com dado real em vez de
+   * estimativa; nulo quando quem registra não mediu (a maioria das tarefas, por enquanto).
+   */
+  duracaoMs?: number;
 };
 
 export async function registrarGeracao(dados: DadosRegistro): Promise<number> {
@@ -75,6 +81,7 @@ export async function registrarGeracao(dados: DadosRegistro): Promise<number> {
       custoUsd: custoUsd.toFixed(6),
       avaliacao: dados.avaliacao,
       motivoAvaliacao: dados.motivoAvaliacao,
+      duracaoMs: dados.duracaoMs,
     })
     .returning({ id: geracoesIA.id });
 

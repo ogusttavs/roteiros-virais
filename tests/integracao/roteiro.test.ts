@@ -100,7 +100,7 @@ const MODELO_PADRAO: ModeloNicho = {
 let nichoId: number;
 let contadorUsuario = 0;
 
-async function criarCliente(): Promise<number> {
+async function criarCliente(perfil: PerfilCompilado = PERFIL_PADRAO): Promise<number> {
   contadorUsuario += 1;
   const usuarioId = `roteiro-teste-${contadorUsuario}`;
   await db()
@@ -122,9 +122,7 @@ async function criarCliente(): Promise<number> {
     })
     .returning();
 
-  await db()
-    .insert(briefings)
-    .values({ clienteId: cliente.id, completo: true, perfil: PERFIL_PADRAO });
+  await db().insert(briefings).values({ clienteId: cliente.id, completo: true, perfil });
 
   return cliente.id;
 }
@@ -305,7 +303,13 @@ describe("gerarRoteiro", () => {
     ).rejects.toThrow(ErroIA);
   });
 
-  it("vídeo de referência aponta a evidência sem análise visual, aos 0s, com o gancho dela (revisão do PR #17)", async () => {
+  /**
+   * H4, item 1 (achado do Gustavo em produção em 01/10, o caso do roteiro 12: a referência
+   * escolhida em código, pelo maior múltiplo, saiu um meme sem nada a ver com o roteiro): o
+   * modelo escolhe a referência, o código só confere que o id pertence à evidência fornecida.
+   * Substitui o teste antigo (revisão do PR #17), que verificava a escolha por código.
+   */
+  it("a referência é o vídeo que o modelo escolheu da evidência, validado pelo id (H4, item 1)", async () => {
     const clienteId = await criarCliente();
     const videoId = await criarVideoEvidencia("ev-referencia", "mancha de vinho no estofado");
 
@@ -315,11 +319,43 @@ describe("gerarRoteiro", () => {
       objetivo: "conversao",
     });
 
-    expect(roteiro.conteudo.edicao.referencia).toEqual({
-      videoId,
-      segundo: 0,
-      oQueOlhar: "olha essa mancha saindo do estofado",
+    expect(roteiro.conteudo.edicao.referencia?.videoId).toBe(videoId);
+  });
+
+  it("um id de referência que o modelo alucina, fora da evidência fornecida, vira sem referência (H4, item 1)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-referencia-alucinada", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "simule um id de referencia fora da lista de evidencia",
+      objetivo: "conversao",
     });
+
+    expect(roteiro.conteudo.edicao.referencia).toBeNull();
+  });
+
+  /**
+   * H4, item 3 (achado do Gustavo em produção em 01/10, o mesmo caso do roteiro 12): o filtro
+   * barato de encaixe com a marca tira a evidência que não combina, antes da geração forte; sem
+   * nenhuma sobrando, o roteiro sai `semEvidencia`, mesmo existindo vídeo no banco.
+   */
+  it("evidência reprovada pelo filtro de encaixe com a marca não entra no roteiro (H4, item 3)", async () => {
+    const clienteId = await criarCliente({
+      ...PERFIL_PADRAO,
+      resumo: "reprove toda a evidencia por nao combinar com a marca",
+    });
+    await criarVideoEvidencia("ev-fora-da-marca", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.semEvidencia).toBe(true);
+    expect(roteiro.conteudo.evidencias).toEqual([]);
+    expect(roteiro.conteudo.edicao.referencia).toBeNull();
   });
 
   /** V2b, item 6: a proporcao 70/30 corta o excesso de evidencia internacional. */
@@ -794,6 +830,11 @@ describe("reprovarERescrever", () => {
     });
     const [geracaoV1Antes] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, v1.geracaoId!));
 
+    // H4, item 3: a reescrita agora faz duas chamadas de IA, o filtro de evidência por marca
+    // primeiro (engole falha e segue sem filtrar, nunca derruba a geração por isso) e a geração
+    // do roteiro em si depois; a primeira rejeição cai no filtro (absorvida), a segunda é a que
+    // o teste quer simular como "a IA fora do ar" de verdade.
+    gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: filtro de evidencia fora do ar"));
     gerarEstruturadoMock.mockRejectedValueOnce(new ErroIA("simulado: IA fora do ar"));
     await expect(reprovarERescrever(v1.id, ["gancho_fraco"], "comeca fraco")).rejects.toThrow(ErroIA);
 

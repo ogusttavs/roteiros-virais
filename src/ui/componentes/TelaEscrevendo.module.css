@@ -37,6 +37,14 @@
   color: var(--cor-texto-dica);
 }
 
+/** R1, item 0b: "0:00" subindo de segundo em segundo, logo abaixo da frase de duração. */
+.contador {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
 .demorando {
   margin: var(--espaco-2) 0 0;
   padding-top: var(--espaco-4);

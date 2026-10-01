@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { TIPOS_ABERTURA } from "@/db/schema";
+import { TIPOS_ABERTURA, TIPOS_CONTEUDO } from "@/db/schema";
 
 import type { EsforcoIA, NivelIA } from "../tipos";
 
@@ -39,8 +39,18 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * repetir o TIPO que funcionou sem repetir a FRASE. `extrair-coleta.ts`
  * sobrescreve `videos.tipoAbertura`, fora do jsonb `analise` (mesmo caminho
  * de `idioma`).
+ *
+ * Tipo de conteudo (1.6.0, H4, achado do Gustavo em producao em 01/10, o
+ * caso do roteiro 12: a referencia escolhida foi um meme repostado por um
+ * canal pequeno de contabilidade, "a referencia e um meme e o Bruno nunca
+ * faria um video desse"): `tipoConteudo` e `serveDeModelo` dizem se este
+ * video pode virar modelo de estrutura de um roteiro (original) ou so sinal
+ * de assunto (recorte, meme, noticia). `extrair-coleta.ts` e
+ * `extracao-comum.ts` sobrescrevem `videos.tipoConteudo`/`serveDeModelo`,
+ * fora do jsonb `analise` (mesmo caminho de `idioma` e `tipoAbertura`), para
+ * `evidenciaParaRoteiro` (`servicos/pesquisa.ts`) filtrar por SQL.
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -57,6 +67,8 @@ export const schema = z.object({
   motivoNicho: z.string(),
   idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]),
   tipoAbertura: z.enum(TIPOS_ABERTURA),
+  tipoConteudo: z.enum(TIPOS_CONTEUDO),
+  serveDeModelo: z.boolean(),
 });
 
 export type SaidaExtrairVideo = z.infer<typeof schema>;
@@ -89,6 +101,20 @@ literal e o tom.
 - tipoAbertura: como os primeiros segundos do vídeo começam, um destes oito tipos:
 
 ${definicoesTipoAbertura()}
+
+- tipoConteudo: o que este vídeo é, para quem decide se ele pode virar modelo de estrutura de
+  um roteiro:
+  - "original": quem aparece e fala é quem publicou o vídeo, falando com as próprias palavras.
+  - "recorte": um trecho de outra pessoa, de um programa ou de um podcast, reproduzido por
+    quem publicou (não é a própria fala original de quem publicou).
+  - "meme": humor, dublagem, montagem ou um formato de "POV" (você na pele de alguém ou algo).
+  - "noticia": um fato relatado, sem quem publicou aparecer defendendo um ponto de vista próprio.
+  Sinais de "recorte" ou "meme": o título ou a legenda tem "POV", emoji de riso, uma legenda de
+  outra página sobreposta na tela, ou quem fala se apresenta com um nome ou um papel que não
+  combina com o que se espera do dono de um negócio pequeno falando da própria experiência.
+- serveDeModelo: true só para "original" (a estrutura de como esse vídeo conta algo é um bom
+  exemplo a seguir); false para "recorte", "meme" e "noticia" (o vídeo ainda pode mostrar o que
+  está em alta no assunto, mas a forma como ele é contado não é um modelo de roteiro).
 
 Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
 Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem
