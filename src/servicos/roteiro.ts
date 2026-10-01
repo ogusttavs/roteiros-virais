@@ -7,7 +7,7 @@
  * versão seguinte com a instrução de resolver o motivo da reprovação sem
  * mudar o objetivo; `marcarGravado` e `marcarPostado` avançam o status.
  */
-import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
@@ -16,6 +16,7 @@ import {
   ESTILOS_ROTEIRO,
   FORMATOS_ROTEIRO,
   geracoesIA,
+  MOMENTOS_DO_DIA,
   roteiros,
   VALORES_QUEM_GRAVA,
   videosCliente,
@@ -24,6 +25,7 @@ import {
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
+  type MomentoDoDia,
   type Objetivo,
   type Plataforma,
   type QuemGrava,
@@ -92,6 +94,30 @@ export function validarQuemAparece(valor: string | undefined): QuemGrava | undef
     throw new ErroRoteiro("quem aparece invalido.");
   }
   return valor as QuemGrava;
+}
+
+/** E39a: mesmo cuidado de `validarFormato`, para o momento do dia (só Story) que chega como texto livre do navegador. */
+export function validarMomentoDoDia(valor: string | undefined): MomentoDoDia | undefined {
+  if (valor === undefined || valor === "") return undefined;
+  if (!(MOMENTOS_DO_DIA as readonly string[]).includes(valor)) {
+    throw new ErroRoteiro("momento do dia invalido.");
+  }
+  return valor as MomentoDoDia;
+}
+
+/**
+ * E39a: "para quando é?" chega como ISO (`YYYY-MM-DD`) da tela de Criar. Nunca no passado, para
+ * não marcar um roteiro num dia que já passou; sem teto, "planeje com a antecedência que quiser".
+ */
+export function validarData(valor: string | undefined): string | undefined {
+  if (valor === undefined || valor === "") return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+    throw new ErroRoteiro("data invalida.");
+  }
+  if (valor < hojeISO()) {
+    throw new ErroRoteiro("a data nao pode ser no passado.");
+  }
+  return valor;
 }
 
 const LIMITE_EVIDENCIA = 8;
@@ -282,6 +308,10 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
   formato?: FormatoRoteiro;
   /** M4, item 2: "falado" (padrão) se ausente. */
   estilo?: EstiloRoteiro;
+  /** E39a: para quando é, ISO (hoje, padrão, se ausente). */
+  data?: string;
+  /** E39a: em que momento do dia, só para Story. */
+  momentoDoDia?: MomentoDoDia;
   /**
    * E40, item 2: "o que este vídeo precisa comunicar?", opcional. Com `origem: "momento"`, o
    * campo vem de `momento.objetivoDoVideo` em vez deste (a folha do momento já guarda os dois
@@ -1062,7 +1092,8 @@ export async function gerarRoteiro(
     .insert(roteiros)
     .values({
       clienteId,
-      data: hojeISO(),
+      data: params.data ?? hojeISO(),
+      momentoDoDia: params.momentoDoDia ?? null,
       // V9a, item 1: com momento, o tema de verdade é o que o modelo devolveu (temaCurto), não o provisório.
       tema: momento ? (temaCurto ?? tema) : tema,
       origem: params.origem,
@@ -1149,7 +1180,9 @@ export async function reprovarERescrever(
     .insert(roteiros)
     .values({
       clienteId: atual.clienteId,
-      data: hojeISO(),
+      // E39a: a reescrita é uma nova versão do MESMO item marcado, continua no dia e no momento de origem.
+      data: atual.data,
+      momentoDoDia: atual.momentoDoDia,
       tema: momento ? (temaCurto ?? atual.tema) : atual.tema,
       origem: atual.origem,
       momento: momento ?? null,
@@ -1499,6 +1532,144 @@ export async function roteirosDeHoje(clienteId: number): Promise<RoteiroLinha[]>
       and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hojeISO()), SEM_VERSAO_MAIS_NOVA),
     )
     .orderBy(desc(roteiros.criadoEm));
+}
+
+/** A data no formato "YYYY-MM-DD" somada de `dias` (positivo ou negativo), sem depender do fuso do servidor. */
+export function somarDiasISO(dataISO: string, dias: number): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia + dias, 12)).toISOString().slice(0, 10);
+}
+
+/** E39a, dúvida 4 do desenho: a semana do calendário, segunda a domingo, nunca uma janela corrida a partir de hoje. */
+function segundaDaSemanaISO(dataISO: string): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const diaDaSemana = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay(); // 0 domingo .. 6 sabado
+  const voltarAteSegunda = diaDaSemana === 0 ? 6 : diaDaSemana - 1;
+  return somarDiasISO(dataISO, -voltarAteSegunda);
+}
+
+const DIAS_DA_SEMANA_CURTO = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+
+export type MarcaDiaAgenda = { qtdReels: number; qtdStories: number };
+export type DiaDaSemanaAgenda = {
+  data: string;
+  diaDoMes: number;
+  diaDaSemanaCurto: string;
+  hoje: boolean;
+  marca: MarcaDiaAgenda;
+};
+
+/**
+ * E39a, item 3: a semana (segunda a domingo) que contém `dataReferencia`, com uma marca por dia
+ * (um ponto por Reels, um anel por Story, com a contagem de cada um quando há mais de um; revisão
+ * do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então o Reels
+ * também pode ter mais de um, como o Story já tinha). Só conta a ponta de cada série (reescrever
+ * um roteiro não soma uma marca a mais no mesmo dia).
+ */
+export async function semanaDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaDaSemanaAgenda[]> {
+  const segunda = segundaDaSemanaISO(dataReferencia);
+  const domingo = somarDiasISO(segunda, 6);
+  const hoje = hojeISO();
+
+  const linhas = await db()
+    .select({ data: roteiros.data, formato: roteiros.formato })
+    .from(roteiros)
+    .where(
+      and(
+        eq(roteiros.clienteId, clienteId),
+        gte(roteiros.data, segunda),
+        lte(roteiros.data, domingo),
+        SEM_VERSAO_MAIS_NOVA,
+      ),
+    );
+
+  const porDia = new Map<string, MarcaDiaAgenda>();
+  for (const linha of linhas) {
+    const atual = porDia.get(linha.data) ?? { qtdReels: 0, qtdStories: 0 };
+    if (linha.formato === "reels") atual.qtdReels += 1;
+    else atual.qtdStories += 1;
+    porDia.set(linha.data, atual);
+  }
+
+  return Array.from({ length: 7 }, (_, indice) => {
+    const data = somarDiasISO(segunda, indice);
+    return {
+      data,
+      diaDoMes: Number(data.split("-")[2]),
+      diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
+      hoje: data === hoje,
+      marca: porDia.get(data) ?? { qtdReels: 0, qtdStories: 0 },
+    };
+  });
+}
+
+/**
+ * E39a: o próximo dia com algo marcado, depois de hoje (para o aviso "nada para hoje, o próximo
+ * marcado é X" no dia vazio da Agenda). `null` sem nada planejado à frente.
+ */
+export async function proximoDiaMarcado(clienteId: number, apartirDe: string): Promise<{ data: string; formato: FormatoRoteiro } | null> {
+  const [linha] = await db()
+    .select({ data: roteiros.data, formato: roteiros.formato })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), gte(roteiros.data, apartirDe), SEM_VERSAO_MAIS_NOVA))
+    .orderBy(roteiros.data)
+    .limit(1);
+  return linha ?? null;
+}
+
+export type ItemAgendaDoDia = {
+  id: number;
+  tema: string;
+  titulo: string;
+  status: "gerado" | "gravado" | "postado";
+  momentoDoDia: MomentoDoDia | null;
+  objetivo: Objetivo;
+  duracaoS: number;
+};
+export type AgendaDoDia = { reels: ItemAgendaDoDia[]; stories: ItemAgendaDoDia[] };
+
+const ORDEM_MOMENTO_DO_DIA: Record<MomentoDoDia, number> = { manha: 0, meio_dia: 1, fim_tarde: 2, noite: 3 };
+const ORDEM_STATUS_AGENDA: Record<ItemAgendaDoDia["status"], number> = { gerado: 0, gravado: 1, postado: 2 };
+
+/**
+ * E39a, item 3: o que está marcado para um dia (o Reels e os Stories, na ordem da parte do dia).
+ * Revisão do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então
+ * `reels` é uma lista, como `stories` já era; o primeiro (a gravar antes de gravado antes de
+ * postado, e dentro do mesmo estado o mais antigo primeiro) é o destaque da tela, os demais
+ * entram embaixo dele, nas mesmas linhas que os Stories usam.
+ */
+export async function agendaDoDia(clienteId: number, data: string): Promise<AgendaDoDia> {
+  const linhas = await db()
+    .select()
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, data), SEM_VERSAO_MAIS_NOVA))
+    .orderBy(desc(roteiros.criadoEm));
+
+  const paraItem = (linha: RoteiroLinha): ItemAgendaDoDia => ({
+    id: linha.id,
+    tema: linha.tema,
+    titulo: corpoDoRoteiro(linha).titulo,
+    status: linha.status,
+    momentoDoDia: linha.momentoDoDia,
+    objetivo: linha.objetivo,
+    duracaoS: corpoDoRoteiro(linha).duracaoS,
+  });
+
+  const reelsOrdenados = linhas
+    .filter((linha) => linha.formato === "reels")
+    .sort((a, b) => ORDEM_STATUS_AGENDA[a.status] - ORDEM_STATUS_AGENDA[b.status] || a.criadoEm.getTime() - b.criadoEm.getTime());
+  const storiesOrdenados = linhas
+    .filter((linha) => linha.formato === "story")
+    .sort((a, b) => {
+      const ordemA = a.momentoDoDia ? ORDEM_MOMENTO_DO_DIA[a.momentoDoDia] : 99;
+      const ordemB = b.momentoDoDia ? ORDEM_MOMENTO_DO_DIA[b.momentoDoDia] : 99;
+      return ordemA - ordemB;
+    });
+
+  return {
+    reels: reelsOrdenados.map(paraItem),
+    stories: storiesOrdenados.map(paraItem),
+  };
 }
 
 /**

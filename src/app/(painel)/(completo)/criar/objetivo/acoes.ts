@@ -6,7 +6,16 @@ import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
-import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece, type OrigemRoteiro } from "@/servicos/roteiro";
+import {
+  ErroRoteiro,
+  gerarRoteiro,
+  validarData,
+  validarEstilo,
+  validarFormato,
+  validarMomentoDoDia,
+  validarQuemAparece,
+  type OrigemRoteiro,
+} from "@/servicos/roteiro";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
@@ -27,6 +36,10 @@ export async function gerarRoteiroAction(
   objetivoDoVideo?: string,
   /** V12c, item 3, a E37b: troca só deste vídeo; sem valor, usa o quemGrava do cliente. */
   quemAparece?: string,
+  /** E39a: "para quando é?", ISO; sem valor, hoje. */
+  data?: string,
+  /** E39a: "em que momento do dia?", só quando o formato é Story. */
+  momentoDoDia?: string,
 ): Promise<ResultadoAcao<{ id: number }>> {
   const cliente = await clienteDaSessaoAtual();
   try {
@@ -37,6 +50,8 @@ export async function gerarRoteiroAction(
       estilo: validarEstilo(estilo),
       objetivoDoVideo: objetivoDoVideo?.trim() || undefined,
       quemAparece: validarQuemAparece(quemAparece),
+      data: validarData(data),
+      momentoDoDia: validarMomentoDoDia(momentoDoDia),
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

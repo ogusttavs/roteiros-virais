@@ -73,7 +73,7 @@ test.describe("M4, o roteiro sem fala", () => {
     page,
   }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
@@ -105,7 +105,7 @@ test.describe("M4, o roteiro sem fala", () => {
 
   test("falando (padrão) continua gerando um roteiro normal, sem legenda nenhuma", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });

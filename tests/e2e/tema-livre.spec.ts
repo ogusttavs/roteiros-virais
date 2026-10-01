@@ -1,5 +1,5 @@
 /**
- * `/hoje/tema-livre` pela tela, os cinco estados do design v2
+ * `/criar/tema-livre` pela tela, os cinco estados do design v2
  * (`entregaveis/design-v2/entrega/telas/TemaLivre.dc.html`; `PROXIMO.md`,
  * V5b): proposta, esperando, naMeta, abaixoDaMeta e erro. Mais o item 7 da
  * etapa, o rascunho escopado pela marca ativa (V3): escrever na Marca Um,
@@ -186,14 +186,14 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("proposta: campo vazio reprova antes de avaliar", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
     await expect(page.getByText("escreva um assunto antes de avaliar")).toBeVisible();
   });
 
   test("sem evidencia no banco: cai em 'dá para melhorar' sem o cartão de ângulo", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page.getByLabel("Sobre o que você quer falar?").fill("um assunto qualquer sem nenhuma evidencia no banco");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
@@ -205,7 +205,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("com prova suficiente: o cartão do ângulo sugerido aparece com os dois caminhos", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page
       .getByLabel("Sobre o que você quer falar?")
       .fill("como tirar mancha de sofa de camurca sem estragar o tecido");
@@ -218,7 +218,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("editar o texto volta para a proposta com o texto preservado", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page.getByLabel("Sobre o que você quer falar?").fill("um assunto para editar depois");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
     await expect(page.getByText("Editar o texto")).toBeVisible();
@@ -230,7 +230,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("nota na meta: mostra 'pode gravar esse' e o botão único de escrever o roteiro", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page.getByLabel("Sobre o que você quer falar?").fill(MARCADOR_NOTA_ALTA);
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
@@ -240,14 +240,14 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await expect(botaoEscrever).toBeVisible();
 
     await botaoEscrever.click();
-    await expect(page).toHaveURL(/\/hoje\/objetivo\?livre=/);
+    await expect(page).toHaveURL(/\/criar\/objetivo\?livre=/);
   });
 
   test("erro na avaliação: mostra o aviso, o texto continua guardado, e tentar de novo funciona", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
-    await page.route("**/hoje/tema-livre", async (route) => {
+    await page.route("**/criar/tema-livre", async (route) => {
       if (route.request().method() === "POST") {
         await route.fulfill({ status: 500, body: "erro simulado" });
         return;
@@ -271,7 +271,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     // viagem, com rede ruim, quem recebe uma nota abaixo da meta, sai e volta, precisa achar o
     // texto lá.
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page
       .getByLabel("Sobre o que você quer falar?")
       .fill("assunto avaliado que precisa sobreviver a sair e voltar");
@@ -285,7 +285,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await expect(page.getByText("Editar o texto")).toBeVisible();
 
     await page.goto("/hoje");
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(
       "assunto avaliado que precisa sobreviver a sair e voltar",
     );
@@ -302,7 +302,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await page.goto("/hoje");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();
 
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await page.getByLabel("Sobre o que você quer falar?").fill("rascunho exclusivo da marca ativa");
     await page.waitForTimeout(1200); // debounce de 800ms do salvamento do rascunho
 
@@ -321,10 +321,10 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue("");
 
-    // /hoje/tema-livre tem a propria BarraTopo, sem o seletor de marca: volta para /hoje antes.
+    // /criar/tema-livre tem a propria BarraTopo, sem o seletor de marca: volta para /hoje antes.
     await page.goto("/hoje");
     await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) }).click();
     const folhaDeVolta = page.getByRole("dialog", { name: textosNav.suasMarcas });
@@ -336,7 +336,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();
 
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue("rascunho exclusivo da marca ativa");
   });
 });

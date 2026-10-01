@@ -736,7 +736,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     test(`Tema livre em ${rotulo}px`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
       await entrar(page);
-      await page.goto("/hoje/tema-livre");
+      await page.goto("/criar/tema-livre");
       await expect(page.getByRole("heading", { name: "Sobre o que você quer falar?" })).toBeVisible();
       await conferirLayout(page);
     });
@@ -744,7 +744,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     test(`Objetivo em ${rotulo}px`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
       await entrar(page);
-      await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      await page.goto(`/criar/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
       await expect(page.getByRole("heading", { name: "O que você quer que esse vídeo faça?" })).toBeVisible();
       await conferirLayout(page);
     });
@@ -798,7 +798,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     {
       tela: "Objetivo",
       ir: async (page: Page) =>
-        page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`),
+        page.goto(`/criar/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`),
       esperar: (page: Page) => page.getByText("Tema escolhido", { exact: false }).waitFor(),
       seletorColuna: '[class*="colunaPrincipal"]',
       seletorLado: '[class*="temaEscolhido"]',
@@ -808,7 +808,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     },
     {
       tela: "Tema livre",
-      ir: async (page: Page) => page.goto("/hoje/tema-livre"),
+      ir: async (page: Page) => page.goto("/criar/tema-livre"),
       esperar: (page: Page) => page.getByText("Os cinco pontos que a gente olha").waitFor(),
       seletorColuna: '[class*="colunaPrincipal"]',
       seletorLado: '[class*="cincoPontos"]',
@@ -1011,7 +1011,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       nome: "Avaliar o tema",
       ir: async (page: Page) => {
         await entrar(page);
-        await page.goto("/hoje/tema-livre");
+        await page.goto("/criar/tema-livre");
       },
       botao: "Avaliar o tema",
       // A cápsula das abas some quando o teclado abre (`useTecladoAberto`, item 0c); o Playwright encolhe a
@@ -1024,7 +1024,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
       nome: "escrever o roteiro",
       ir: async (page: Page) => {
         await entrar(page);
-        await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+        await page.goto(`/criar/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
       },
       botao: "escrever o roteiro",
     },

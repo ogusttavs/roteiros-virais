@@ -2,7 +2,8 @@ import { horaMinutoAtualISO } from "@/lib/config";
 import type { ResultadoTemasHoje } from "@/servicos/temas";
 import { textosHoje } from "@/textos/hoje";
 
-import type { AvisoSemTema } from "./HojeTela";
+/** H3, item 1: o aviso que substitui os três temas quando não há tema de hoje. */
+export type AvisoSemTema = { titulo: string; texto: string };
 
 /** "06:30", o horário em que os temas do dia deviam ter saído (job `temas-do-dia`, de madrugada). */
 const HORA_TEMAS_PRONTOS = "06:30";

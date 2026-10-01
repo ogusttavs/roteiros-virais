@@ -1,0 +1,43 @@
+/**
+ * Texto de `/criar` (E39a, design v2, `entregaveis/design-v2/entrega/telas/Criar.dc.html`,
+ * estado `inicio`, e a dúvida 14 da primeira entrega do passo 10) e do bloco "para quando é" e
+ * "em que momento do dia", compartilhado por `ObjetivoTela` e `FolhaGravarAgora` (dúvida 10: o
+ * mesmo bloco, só muda de lugar em cada caminho).
+ */
+
+export const textosCriar = {
+  titulo: "Criar roteiros",
+  subtitulo: "Escolha por onde começar. Para quando é, você diz no caminho.",
+  caminhoTemas: {
+    titulo: "Os temas de hoje",
+    ajuda: "Três assuntos que estão funcionando no seu setor agora.",
+  },
+  caminhoAssuntoSeu: {
+    titulo: "Um assunto seu",
+    ajuda: "Você escreve sobre o que quer falar, e a gente dá a nota antes de escrever.",
+  },
+  caminhoMomento: {
+    titulo: "Contar o momento",
+    ajuda: "Fale ou escreva onde você está, ou onde vai estar, e o que está acontecendo.",
+  },
+  caminhoPlano: {
+    titulo: "Planejar os próximos dias",
+    ajuda: "Conte o que você vai fazer, onde e quando; a gente monta o que gravar em cada dia.",
+  },
+  notaAgenda: "Tudo o que você cria fica marcado no dia, em Hoje.",
+
+  /** O bloco "Para quando é?" (dúvida 12): o momento do dia completa o rótulo que aparece em Hoje. */
+  paraQuando: "Para quando é?",
+  hoje: "Hoje",
+  amanha: "Amanhã",
+  escolherData: "Escolher a data",
+  avisoFrescor: (dia: string) =>
+    `Ele vai ser escrito com o que está subindo hoje. Até ${dia} pode aparecer coisa mais nova.`,
+
+  momentoDoDia: "Em que momento do dia?",
+  momentoDoDiaAjuda: "É a ordem em que os Stories do dia aparecem em Hoje.",
+  manha: "Manhã",
+  meioDia: "Meio do dia",
+  fimDaTarde: "Fim da tarde",
+  noite: "Noite",
+};

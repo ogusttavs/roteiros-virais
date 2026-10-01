@@ -1,5 +1,5 @@
 /**
- * `/hoje` e `/hoje/tema-livre` pela tela (etapa 10, criterio de aceite do
+ * `/hoje` e `/criar/tema-livre` pela tela (etapa 10, criterio de aceite do
  * plano de execucao): cliente abre `/hoje`, ve os tres temas do dia, e
  * avalia um tema livre, vendo os cinco pilares.
  *
@@ -150,15 +150,18 @@ test.describe("temas do dia pela tela", () => {
     await entrar(page, "e2e-temas@exemplo.teste");
     await expect(page).toHaveURL(/\/hoje/);
 
-    // V12, item 3: os temas do dia e "Escrever o meu assunto" ficam dentro da porta Reels.
-    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    // E39a: os temas do dia viraram a rota própria "/criar/temas".
+    await page.goto("/criar/temas");
 
     await expect(page.getByRole("heading", { name: "tema de teste 1" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 2" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "tema de teste 3" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Escrever o meu assunto" }).click();
-    await expect(page).toHaveURL(/\/hoje\/tema-livre/);
+    // "Escrever o meu assunto" só aparece no estado sem tema; com temas, o tema livre é a porta
+    // "Um assunto seu" em /criar.
+    await page.goto("/criar");
+    await page.getByRole("button", { name: "Um assunto seu" }).click();
+    await expect(page).toHaveURL(/\/criar\/tema-livre/);
 
     await page.getByLabel("Sobre o que você quer falar?").fill("clarear os dentes em casa");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();

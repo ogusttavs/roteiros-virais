@@ -624,6 +624,15 @@ export type FormatoRoteiro = (typeof FORMATOS_ROTEIRO)[number];
 export const ESTILOS_ROTEIRO = ["falado", "sem_fala"] as const;
 export type EstiloRoteiro = (typeof ESTILOS_ROTEIRO)[number];
 
+/**
+ * E39a: em que parte do dia um Story acontece, pergunta só para Story (um Reels não tem "quando
+ * no dia", só "quando no calendário"). A pessoa completa o rótulo com as próprias palavras ("Manhã,
+ * saindo de casa"); estas quatro chaves são só a parte fixa, do jeito que o desenho do Opus
+ * (`Hoje.dc.html`, dúvida 12) define. Nulo em Reels, e em Story sem a pergunta respondida ainda.
+ */
+export const MOMENTOS_DO_DIA = ["manha", "meio_dia", "fim_tarde", "noite"] as const;
+export type MomentoDoDia = (typeof MOMENTOS_DO_DIA)[number];
+
 export type AnaliseVideo = {
   assunto: string;
   gancho: string;
@@ -951,7 +960,7 @@ export const avaliacoesTema = pgTable("avaliacoes_tema", {
 });
 
 /**
- * O rascunho de `/hoje/tema-livre` (V5b, item 2, `PROXIMO.md`): o que a
+ * O rascunho de `/criar/tema-livre` (V5b, item 2, `PROXIMO.md`): o que a
  * pessoa digitou e ainda não avaliou. Uma linha por pessoa e por marca
  * (`usuarioId` + `clienteId` único), porque duas pessoas na mesma marca
  * podem estar escrevendo assuntos diferentes ao mesmo tempo. Sem prazo;
@@ -1124,6 +1133,12 @@ export const roteiros = pgTable(
      * Troca só vale para este roteiro, o briefing não muda.
      */
     quemAparece: text("quem_aparece").$type<QuemGrava>(),
+    /**
+     * E39a: a parte do dia deste Story, respondida em "Para quando é?" (Criar, dúvida 12). Nula em
+     * Reels (a pergunta nem aparece) e em todo roteiro de antes desta coluna existir; a Agenda
+     * ordena os Stories do dia por ela, com "livre" (campo nulo) por último.
+     */
+    momentoDoDia: text("momento_do_dia").$type<MomentoDoDia>(),
     conteudo: jsonb("conteudo").$type<ConteudoRoteiro>().notNull(),
     /**
      * E40, item 1: a versão original, preservada só na primeira edição da pessoa (edições

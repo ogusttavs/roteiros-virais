@@ -1,9 +1,10 @@
 /**
  * "Planejar os próximos dias" (V9b, item 3; V12, item 4b: a folha era "Colar
- * a agenda", agora fica dentro da porta Story) e o plano de gravações: cola
- * uma agenda de dois dias, confere a lista, vê o bloco "O seu plano de
- * hoje", aceita um item até o roteiro, pula outro, vê a folha "Meu plano" e
- * "Tirar este plano". O caminho por áudio não tem e2e (mesmo raciocínio de
+ * a agenda"; E39a: agora é uma das quatro portas sempre visíveis em `/criar`)
+ * e o plano de gravações: cola uma agenda de dois dias, confere a lista, vê
+ * o bloco "O seu plano de hoje" (também em `/criar` desde a E39a), aceita um
+ * item até o roteiro, pula outro, vê a folha "Meu plano" e "Tirar este
+ * plano". O caminho por áudio não tem e2e (mesmo raciocínio de
  * `momento.spec.ts`): a rota de transcrição é a mesma, já coberta em
  * `tests/integracao/momento-transcrever-route.test.ts`.
  */
@@ -36,9 +37,9 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** V12, item 4a e 4b: "Planejar os próximos dias" fica dentro da porta Story. */
+/** E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`. */
 async function abrirPlanejarDias(page: Page) {
-  await page.getByRole("button", { name: "Story" }).first().click();
+  await page.goto("/criar");
   await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
 }
 
@@ -94,8 +95,6 @@ test.describe("colar a agenda e o plano de gravações", () => {
       },
     });
 
-    // "Planejar os próximos dias" fica na porta Story (V12, item 4): sem uma linha em temas_dia
-    // para hoje, /hoje cai no estado "sem_tema", que nao usa HojeTela.
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
       { titulo: "tema de teste 2", descricao: "descricao 2", porQue: "esta subindo", evidencias: [], puxaPara: "engajamento" },
@@ -104,12 +103,10 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas }).onConflictDoNothing();
   });
 
-  test("cola uma agenda de dois dias, ve a lista, ve o bloco no Hoje, aceita um item ate o roteiro, pula outro, ve Meu plano", async ({
+  test("cola uma agenda de dois dias, ve a lista, ve o bloco no Criar, aceita um item ate o roteiro, pula outro, ve Meu plano", async ({
     page,
   }) => {
     await entrar(page);
-    await page.goto("/hoje");
-
     await abrirPlanejarDias(page);
     const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
@@ -127,7 +124,7 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
-    // "O seu plano de hoje", so os itens de hoje (o dia de amanha nao aparece aqui). `criarPlanoAction`
+    // "O seu plano de hoje", em /criar, so os itens de hoje (o dia de amanha nao aparece aqui). `criarPlanoAction`
     // só responde depois de gravar; limiar maior (revisão do PR #62, item 4), mesmo valor que os outros
     // pontos desta suíte que esperam uma Server Action terminar (`momento.spec.ts`, `story.spec.ts`).
     await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
@@ -146,8 +143,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("Este roteiro veio do momento que você descreveu")).toBeVisible();
 
-    // Volta para o Hoje e pula "gravar o frasco": o item some da lista.
-    await page.goto("/hoje");
+    // Volta para o Criar e pula "gravar o frasco": o item some da lista.
+    await page.goto("/criar");
     await expect(page.getByText("gravar o frasco")).toBeVisible();
     const linhaPular = page.locator("div").filter({ hasText: "gravar o frasco" }).last();
     await linhaPular.getByRole("button", { name: "Pular" }).click();
@@ -175,8 +172,6 @@ test.describe("colar a agenda e o plano de gravações", () => {
     const dataEscolhidaISO = dataEscolhida.toISOString().slice(0, 10);
 
     await entrar(page);
-    await page.goto("/hoje");
-
     await abrirPlanejarDias(page);
     const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
@@ -203,8 +198,6 @@ test.describe("colar a agenda e o plano de gravações", () => {
   // V9d, item 4: "deixar de fora" some com o cartao, e o dia nunca entra no plano.
   test("'deixar de fora' num dia nao entendido: o item nunca entra no plano", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje");
-
     await abrirPlanejarDias(page);
     const folhaAgenda = page.getByRole("dialog");
     await expect(folhaAgenda).toBeVisible();
@@ -300,7 +293,7 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaGravar.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
 
-    await page.goto("/hoje");
+    await page.goto("/criar");
     await page.getByRole("button", { name: "Meu plano" }).click();
     const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
     await expect(folhaMeuPlano).toBeVisible();
@@ -320,7 +313,7 @@ test.describe("colar a agenda e o plano de gravações", () => {
      * existe la, só a tela é que ficava velha). Achado desta etapa; registrado em `TODO.md`,
      * "Decisões pendentes".
      */
-    await page.goto("/hoje");
+    await page.goto("/criar");
     await page.getByRole("button", { name: "Meu plano" }).click();
     const folhaMeuPlanoDepois = page.getByRole("dialog", { name: "Meu plano" });
     await expect(folhaMeuPlanoDepois).toBeVisible();

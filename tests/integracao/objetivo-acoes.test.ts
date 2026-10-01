@@ -1,6 +1,6 @@
 /**
  * `gerarRoteiroAction` (etapa 11; V9c, item 1: `formato` do controle segmentado): a Server Action
- * de verdade que `/hoje/objetivo` chama, contra o Postgres real e a sessão mockada (mesmo padrão de
+ * de verdade que `/criar/objetivo` chama, contra o Postgres real e a sessão mockada (mesmo padrão de
  * `momento-acoes.test.ts` e `plano-acoes.test.ts`).
  */
 import { eq } from "drizzle-orm";
@@ -13,7 +13,7 @@ import { briefings, clientes, membrosMarca, nichos, roteiros, user, type PerfilC
 import { sessaoAtual } from "@/lib/sessao";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { gerarRoteiroAction } from "../../src/app/(painel)/(completo)/hoje/objetivo/acoes";
+import { gerarRoteiroAction } from "../../src/app/(painel)/(completo)/criar/objetivo/acoes";
 
 const PERFIL: PerfilCompilado = {
   fatos: {

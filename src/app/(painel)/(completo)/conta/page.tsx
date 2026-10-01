@@ -2,10 +2,12 @@ import { redirect } from "next/navigation";
 
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
+import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
+import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
 import { InformacoesDoAparelho } from "./InformacoesDoAparelho";
 import { InstalarNoCelular } from "./InstalarNoCelular";
@@ -24,6 +26,8 @@ export default async function Conta() {
   ]);
   const perfis = cliente?.perfis;
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
+  const briefing = cliente ? await garantirBriefing(cliente.id) : null;
+  const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
 
   return (
     <div className={styles.pagina}>
@@ -34,6 +38,7 @@ export default async function Conta() {
         abaixo de 1024px.
       */}
       <div className={styles.colunaPrincipal}>
+        {cliente ? <BriefingLinha nota={notaBriefing} /> : null}
         <h1 className={styles.titulo}>{textosConta.titulo}</h1>
         <FormularioConta
           nomeInicial={sessao.user.name}

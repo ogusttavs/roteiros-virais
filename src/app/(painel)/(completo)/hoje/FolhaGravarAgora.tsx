@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import type { EstiloRoteiro, FormatoRoteiro, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import type { EstiloRoteiro, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
@@ -16,6 +16,7 @@ import {
   ROTULO_FORMATO_ROTEIRO,
   sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
+import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
 import { textosMomento } from "@/textos/momento";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
@@ -24,6 +25,7 @@ import { Chips } from "@/ui/componentes/Chips";
 import { Folha } from "@/ui/componentes/Folha";
 import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
+import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -79,6 +81,9 @@ type Props = {
   tipo: TipoMarca;
   /** O `quemGrava` do briefing, para o controle já nascer marcado nele. */
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
+   * é hoje; ignorado quando `planoItemId` existe (o dia do item do plano manda). */
+  dataInicial?: string;
 };
 
 /**
@@ -99,6 +104,7 @@ export function FolhaGravarAgora({
   formatoInicial,
   tipo,
   quemGravaPadrao,
+  dataInicial,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -129,6 +135,12 @@ export function FolhaGravarAgora({
   const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? "");
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
   const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
+  /**
+   * E39a: "para quando é?" só aparece vindo de "Contar o momento" (`planoItemId` ausente); vindo
+   * de um item do plano o dia já é o do próprio item (dúvida 10, "cada dia já vem com a data").
+   */
+  const [data, setData] = useState(() => dataInicial ?? hojeISO());
+  const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
   const [marcaIndice, setMarcaIndice] = useState<number | null>(() => {
     if (valoresIniciais?.marcaId == null) return marcas.length > 0 ? 0 : null;
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
@@ -190,6 +202,7 @@ export function FolhaGravarAgora({
     try {
       const marcaId =
         marcaIndice !== null && marcaIndice > 0 ? marcas[marcaIndice - 1]?.id : undefined;
+      const momentoDoDiaEscolhido = formato === "story" ? (momentoDoDia ?? undefined) : undefined;
       const resultado =
         planoItemId !== undefined
           ? await aceitarPlanoAction(planoItemId, {
@@ -202,6 +215,7 @@ export function FolhaGravarAgora({
               marcaId,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
               quemAparece: quemAparece || undefined,
+              momentoDoDia: momentoDoDiaEscolhido,
             })
           : await gerarRoteiroMomentoAction({
               onde,
@@ -214,6 +228,8 @@ export function FolhaGravarAgora({
               transcricao: transcricao ?? undefined,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
               quemAparece: quemAparece || undefined,
+              data,
+              momentoDoDia: momentoDoDiaEscolhido,
             });
       // A pessoa pode ter tocado "Voltar depois" enquanto isto rodava: o roteiro já está gravado
       // (é por isso que o botão existe), mas ninguém está mais olhando esta folha para navegar.
@@ -364,6 +380,9 @@ export function FolhaGravarAgora({
           </div>
           {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
         </div>
+
+        {planoItemId === undefined ? <PerguntaParaQuando data={data} onChange={setData} /> : null}
+        {formato === "story" ? <PerguntaMomentoDoDia valor={momentoDoDia} onChange={setMomentoDoDia} /> : null}
 
         {opcoesQuemAparece.fixoEmPropriaPessoa ? null : (
           <div className={styles.grupoFormato}>

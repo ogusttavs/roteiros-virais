@@ -6,7 +6,15 @@ import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
-import { ErroRoteiro, gerarRoteiro, validarEstilo, validarFormato, validarQuemAparece } from "@/servicos/roteiro";
+import {
+  ErroRoteiro,
+  gerarRoteiro,
+  validarData,
+  validarEstilo,
+  validarFormato,
+  validarMomentoDoDia,
+  validarQuemAparece,
+} from "@/servicos/roteiro";
 
 /**
  * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
@@ -43,6 +51,10 @@ export type DadosMomento = {
   objetivoDoVideo?: string;
   /** V12c, item 3, a E37b: troca só deste vídeo; chega como texto livre, `validarQuemAparece` confere. */
   quemAparece?: string;
+  /** E39a: "para quando é?", ISO; sem valor, hoje. */
+  data?: string;
+  /** E39a: "em que momento do dia?", só quando o formato é Story. */
+  momentoDoDia?: string;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -93,6 +105,8 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
       quemAparece: validarQuemAparece(dados.quemAparece),
+      data: validarData(dados.data),
+      momentoDoDia: validarMomentoDoDia(dados.momentoDoDia),
     });
 
     return { ok: true, dado: { id: roteiro.id } };

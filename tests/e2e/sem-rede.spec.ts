@@ -440,8 +440,13 @@ test.describe("painel sem rede", () => {
       .getByRole("dialog", { name: textosNav.suasMarcas })
       .getByRole("button", { name: NOME_MARCA_DOIS })
       .click();
-    // V12, item 3: os temas do dia ficam dentro da porta Reels.
-    await page.getByRole("button", { name: "Reels ou vídeo curto" }).click();
+    // O nome no botao muda otimista, antes da troca terminar no servidor (useTrocaMarca.ts); espera
+    // o cookie realmente gravar antes de navegar, senao /criar/temas pode carregar com a marca de
+    // antes ainda ativa (mesma licao de marcas.spec.ts).
+    await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
+
+    // E39a: os temas do dia ficam em /criar/temas.
+    await page.goto("/criar/temas");
     await expect(page.getByRole("heading", { name: "tema da marca dois" })).toBeVisible();
 
     // O escopo novo entra e o da Um sai: nenhuma pagina da Um continua guardada.
@@ -477,7 +482,7 @@ test.describe("painel sem rede", () => {
   test("avaliar o tema: a rede cai no meio, o texto continua, e tentar de novo funciona", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-d");
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     const assunto = "Uma cliente perguntou se o produto serve em sofa de camurca";
     const campo = page.getByRole("textbox");
@@ -502,7 +507,7 @@ test.describe("painel sem rede", () => {
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-c");
-    await page.goto("/hoje/objetivo?tema=0");
+    await page.goto("/criar/objetivo?tema=0");
     await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
 
     await cortarRedeNaProximaAcao(page);

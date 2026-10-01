@@ -1,58 +1,16 @@
 import { redirect } from "next/navigation";
 
-import { sessaoAtual } from "@/lib/sessao";
-import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import type { OrigemRoteiro } from "@/servicos/roteiro";
-import { temasParaCliente } from "@/servicos/temas";
-
-import { ObjetivoTela } from "./ObjetivoTela";
-
-type Props = { searchParams: Promise<{ tema?: string; livre?: string }> };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 /**
- * `/hoje/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`): resolve o tema
- * escolhido (`?tema=<índice>`, vindo de `/hoje`) ou proposto (`?livre=<texto>`,
- * vindo de `/hoje/tema-livre`), e o objetivo recomendado hoje, antes de
- * entregar para a tela de cliente escolher o objetivo e escrever o roteiro.
+ * E39a: `/hoje/objetivo` virou `/criar/objetivo` (a agenda não cria mais nada). Link ou atalho
+ * salvo de antes continua abrindo, com os mesmos parâmetros (`?tema=` ou `?livre=`).
  */
-export default async function Objetivo({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
-  if (!sessao) {
-    redirect("/entrar");
+export default async function ObjetivoRedirecionado({ searchParams }: Props) {
+  const parametros = new URLSearchParams();
+  for (const [chave, valor] of Object.entries(await searchParams)) {
+    if (typeof valor === "string") parametros.set(chave, valor);
   }
-
-  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) {
-    redirect("/entrar");
-  }
-
-  const { tema, livre } = await searchParams;
-  const resultado = await temasParaCliente(cliente);
-  const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
-
-  let origem: OrigemRoteiro;
-  let temaEscolhidoTexto: string;
-
-  if (livre) {
-    origem = { origem: "livre", textoTema: livre };
-    temaEscolhidoTexto = livre;
-  } else {
-    const indice = Number(tema);
-    const temaDoDia = resultado.status === "ok" ? resultado.temas[indice] : undefined;
-    if (!temaDoDia) {
-      redirect("/hoje");
-    }
-    origem = { origem: "sugerido", temaIndice: indice };
-    temaEscolhidoTexto = temaDoDia.titulo;
-  }
-
-  return (
-    <ObjetivoTela
-      origem={origem}
-      temaEscolhidoTexto={temaEscolhidoTexto}
-      objetivoRecomendado={objetivoRecomendado}
-      tipo={cliente.tipo}
-      quemGravaPadrao={cliente.quemGrava}
-    />
-  );
+  const consulta = parametros.toString();
+  redirect(consulta ? `/criar/objetivo?${consulta}` : "/criar/objetivo");
 }

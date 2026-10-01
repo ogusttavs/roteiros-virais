@@ -129,4 +129,49 @@ export const textosHoje = {
 
   /** V12, ajuste (d): o botão do cartão de roteiro compacto, quando há dois ou mais roteiros de hoje. */
   abrir: "Abrir",
+
+  /**
+   * E39a: Hoje vira a agenda (desenho do Opus, passo 10, `Hoje.dc.html`, estados `agenda`,
+   * `agendaVazia`, `agendaOutroDia`, `agendaBriefingIncompleto`). Nada se cria aqui; "Criar
+   * roteiro" sempre leva para `/criar`. Os estados da E39b (ainda vale, atrasado, calendário)
+   * ficam fora de propósito.
+   */
+  agenda: {
+    estaSemana: "Esta semana",
+    marcadoPara: "Marcado para",
+    voltarParaHoje: "Voltar para hoje",
+    /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
+    legendaReels: "Reels",
+    legendaStory: "Story",
+    /** O título de cada coluna do dia: muda só quando o dia aberto não é hoje (dúvida 2). */
+    reels: { hoje: "Reels de hoje", outroDia: "Reels" },
+    stories: { hoje: "Stories de hoje", outroDia: "Stories" },
+    /** `aria-label` de cada dia da semana (dúvida, ícones da semana): dia mais o que tem marcado, sempre lido por extenso. */
+    diaAgendaRotulo: (diaDaSemanaCompleto: string, diaDoMes: number, qtdReels: number, qtdStories: number) => {
+      const marcas: string[] = [];
+      if (qtdReels === 1) marcas.push("1 Reels");
+      if (qtdReels > 1) marcas.push(`${qtdReels} Reels`);
+      if (qtdStories === 1) marcas.push("1 Story");
+      if (qtdStories > 1) marcas.push(`${qtdStories} Stories`);
+      const oQueTem = marcas.length > 0 ? marcas.join(" e ") : "nada marcado";
+      return `${diaDaSemanaCompleto}, dia ${diaDoMes}: ${oQueTem}`;
+    },
+    estadoReels: { gerado: "a gravar", gravado: "gravado", postado: "postado" },
+    /** Dúvida 5: num dia que não é hoje, o que ainda não foi gravado diz "marcado", não "a gravar". */
+    estadoOutroDia: "marcado",
+    nadaMarcadoTitulo: "Nada marcado para hoje",
+    nadaMarcado: "Crie um roteiro para hoje ou deixe os próximos dias prontos.",
+    /** O mesmo cartão vazio, num dia que não é hoje: "para hoje" seria falso (achado da prova manual da E39a). */
+    nadaMarcadoOutroDiaTitulo: "Nada marcado",
+    nadaMarcadoOutroDia: "Crie um roteiro para este dia ou veja outro na semana.",
+    proximoMarcado: (quando: string, formato: string) => `O próximo marcado é ${quando}: um ${formato}.`,
+    /** O lugar reservado de uma coluna (Reels ou Stories) sem nada, com a outra coluna preenchida; nunca "para hoje", vale em qualquer dia. */
+    semNadaNaColuna: "Nada marcado",
+    criarRoteiro: "Criar roteiro",
+    abrirRoteiro: "Abrir o roteiro",
+    briefingPodeRenderMais: "O seu briefing pode render mais",
+    briefingNotaEMeta: (nota: string, meta: string) =>
+      `Nota ${nota}, meta ${meta}. Complete para os roteiros saírem mais com a sua cara.`,
+    abrirBriefing: "Abrir o briefing",
+  },
 };

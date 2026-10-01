@@ -86,7 +86,7 @@ test.describe("V9c, Story como formato", () => {
 
     // O botao "Gravar agora" do Hoje (dentro de uma porta, V12) ja chega com o formato
     // preso a porta escolhida; este teste e sobre o formato seguir o objetivo sozinho
-    // (V9c), entao entra por "Estou num momento" em `/hoje/tema-livre`, que abre a mesma
+    // (V9c), entao entra por "Estou num momento" em `/criar/tema-livre`, que abre a mesma
     // folha sem formato nenhum preso (mesma entrada de `momento.spec.ts`, "pelo Tema livre").
     const temas: TemaDoDia[] = [
       { titulo: "tema de teste 1", descricao: "descricao 1", porQue: "esta subindo", evidencias: [], puxaPara: "conversao" },
@@ -100,7 +100,7 @@ test.describe("V9c, Story como formato", () => {
     page,
   }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
@@ -131,7 +131,7 @@ test.describe("V9c, Story como formato", () => {
    * mais de um, aqui confere que a sequência inteira aparece numerada, não só o primeiro. */
   test("gera um Story e ve a sequencia inteira numerada (mais de um story)", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
@@ -155,7 +155,7 @@ test.describe("V9c, Story como formato", () => {
 
   test("objetivo 'que mais gente te conheça' continua um Reels normal, sem story nenhum", async ({ page }) => {
     await entrar(page);
-    await page.goto("/hoje/tema-livre");
+    await page.goto("/criar/tema-livre");
 
     await page.getByRole("button", { name: "Estou num momento" }).click();
     const folha = page.getByRole("dialog", { name: "Gravar agora" });

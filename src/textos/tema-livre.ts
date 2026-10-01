@@ -1,5 +1,5 @@
 /**
- * Texto de tela de `/hoje/tema-livre` (design v2, `entregaveis/design-v2/entrega/telas/TemaLivre.dc.html`,
+ * Texto de tela de `/criar/tema-livre` (design v2, `entregaveis/design-v2/entrega/telas/TemaLivre.dc.html`,
  * cinco estados: `proposta`, `esperando`, `naMeta`, `abaixoDaMeta`, `erro`;
  * `PROXIMO.md`, V5b). Texto literal da entrega onde ela dá um; o resto é
  * redação nova, registrada no `TODO.md` como decisão desta etapa.

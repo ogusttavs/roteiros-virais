@@ -16,7 +16,7 @@ import {
   type ItemPlano,
   type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro, validarEstilo, validarFormato, validarQuemAparece } from "@/servicos/roteiro";
+import { ErroRoteiro, validarEstilo, validarFormato, validarMomentoDoDia, validarQuemAparece } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
@@ -63,6 +63,8 @@ export type DadosAceitarPlano = {
   objetivoDoVideo?: string;
   /** V12c, item 3, a E37b: troca só deste vídeo; chega como texto livre, `validarQuemAparece` confere. */
   quemAparece?: string;
+  /** E39a: "em que momento do dia?", só quando o formato é Story; o dia em si já vem do item do plano. */
+  momentoDoDia?: string;
 };
 
 /**
@@ -106,6 +108,7 @@ export async function aceitarPlanoAction(
       marcaId: dados.marcaId,
       objetivoDoVideo: dados.objetivoDoVideo,
       quemAparece: validarQuemAparece(dados.quemAparece),
+      momentoDoDia: validarMomentoDoDia(dados.momentoDoDia),
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

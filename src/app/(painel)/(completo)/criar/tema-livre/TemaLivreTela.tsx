@@ -18,7 +18,7 @@ import { NotasLinha } from "@/ui/componentes/NotaLinha";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
-import { FolhaGravarAgora } from "../FolhaGravarAgora";
+import { FolhaGravarAgora } from "../../hoje/FolhaGravarAgora";
 
 import { avaliarTemaAction, salvarRascunhoAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
@@ -72,6 +72,8 @@ type Props = {
   /** V12c, item 3, a E37b: para a folha "Gravar agora" saber se mostra "quem aparece" e com qual padrão. */
   tipo: TipoMarca;
   quemGravaPadrao: QuemGrava | null;
+  /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
+  dataInicial?: string;
 };
 
 /**
@@ -81,7 +83,15 @@ type Props = {
  * (item 2) só existe para sobreviver a troca de tela, de aparelho ou queda
  * de rede antes de avaliar.
  */
-export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendado, outrasMarcas, tipo, quemGravaPadrao }: Props) {
+export function TemaLivreTela({
+  notaMinima,
+  temaInicial = "",
+  objetivoRecomendado,
+  outrasMarcas,
+  tipo,
+  quemGravaPadrao,
+  dataInicial,
+}: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
@@ -107,7 +117,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
   const [abrindo, iniciarTransicao] = useTransition();
   const [destino, setDestino] = useState<string | null>(null);
   const abrindoEste = (chave: string) => abrindo && destino === chave;
-  const urlObjetivo = `/hoje/objetivo?livre=${encodeURIComponent(texto)}`;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -217,7 +227,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
             aria-busy={abrindoEste("voltar") || undefined}
             disabled={abrindo}
             className={styles.botaoBarra}
-            onClick={() => abrir("voltar", "/hoje")}
+            onClick={() => abrir("voltar", "/criar")}
           >
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -407,9 +417,9 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
                 variante="secundario"
                 tamanho="lg"
                 disabled={abrindo}
-                onClick={() => abrir("hoje", "/hoje")}
+                onClick={() => abrir("temas", "/criar/temas")}
               >
-                {abrindoEste("hoje") ? textosTemaLivre.abrindo : textosTemaLivre.escolherTemaDoDia}
+                {abrindoEste("temas") ? textosTemaLivre.abrindo : textosTemaLivre.escolherTemaDoDia}
               </Botao>
             </div>
           </div>
@@ -425,6 +435,7 @@ export function TemaLivreTela({ notaMinima, temaInicial = "", objetivoRecomendad
           marcas={outrasMarcas}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
+          dataInicial={dataInicial}
         />
       ) : null}
     </div>

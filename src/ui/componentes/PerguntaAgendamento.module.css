@@ -1,0 +1,50 @@
+.grupo {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.ajuda {
+  margin: calc(var(--espaco-2) * -1) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.campoData {
+  display: grid;
+  gap: var(--espaco-1);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.inputData {
+  height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-md);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  outline: none;
+}
+
+.inputData:focus-visible {
+  box-shadow: var(--sombra-foco);
+}
+
+/** Aviso de frescor (Criar.dc.html, `.aviso-frescor`): informação, nunca alerta. */
+.avisoFrescor {
+  margin: 0;
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
