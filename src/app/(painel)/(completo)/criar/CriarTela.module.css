@@ -1,0 +1,203 @@
+/**
+ * `/criar` (E39a, design v2, `Criar.dc.html`, estado `inicio`). Mesmo truque de `HojeTela.module.css`:
+ * cancela o padding de `(painel)/layout.module.css` porque esta tela tem a própria `BarraTopo`.
+ */
+.pagina {
+  margin: calc(-1 * (56px + var(--area-topo) + var(--espaco-6))) calc(-1 * var(--margem-celular))
+    calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
+}
+
+@media (min-width: 768px) {
+  .pagina {
+    margin: calc(-1 * var(--espaco-10));
+  }
+}
+
+.miolo {
+  padding: var(--espaco-5) var(--margem-celular) calc(64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px));
+  max-width: var(--largura-comparacao);
+  margin: 0 auto;
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (min-width: 768px) {
+  .miolo {
+    padding: var(--espaco-8) var(--espaco-6) var(--espaco-12);
+    gap: var(--espaco-8);
+  }
+}
+
+@media (min-width: 1180px) {
+  .miolo {
+    padding-inline: var(--espaco-10);
+  }
+}
+
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.cabecalhoTela h1 {
+  margin: 0;
+}
+
+.cabecalhoTela p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- O seu plano de hoje (V9b, herdado de Hoje) ---------- */
+
+.planoHoje {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+}
+
+.planoHojeCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.listaPlano {
+  display: grid;
+}
+
+.linhaPlano {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4) 0;
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.linhaPlano:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.blocoPlano {
+  display: grid;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+.rotuloPlano {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.situacaoPlano {
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.acaoPlano {
+  flex: none;
+  display: grid;
+  justify-items: end;
+  gap: var(--espaco-1);
+}
+
+.trocar {
+  flex: none;
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.trocar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+/* ---------- Os quatro caminhos ---------- */
+
+.caminhos {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+@media (min-width: 768px) {
+  .caminhos {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.porta {
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+  min-height: 9rem;
+  padding: var(--espaco-6);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  text-align: left;
+  color: inherit;
+  box-shadow: var(--sombra-controle);
+  cursor: pointer;
+}
+
+.porta:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.porta:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.marcaPorta {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  border: var(--largura-borda) solid var(--cor-borda);
+  color: var(--cor-titulo);
+}
+
+.porta strong {
+  font-size: var(--tamanho-titulo-2);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.porta .ajuda {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.motivoNaPorta {
+  display: block;
+}
+
+.notaAgenda {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
