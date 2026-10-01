@@ -40,3 +40,14 @@
     padding-inline: var(--espaco-10);
   }
 }
+
+/**
+ * V15, item 6: a tela que usa esta barra (Hoje, Tema livre, Roteiro) cancela o padding
+ * de `(painel)/layout.module.css`, então o mesmo teto do "monitor largo" é repetido
+ * aqui, para o título continuar alinhado com o conteúdo centrado abaixo dele.
+ */
+@media (min-width: 1281px) {
+  .barra {
+    padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
+  }
+}

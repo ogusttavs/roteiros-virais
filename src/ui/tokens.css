@@ -376,6 +376,31 @@
 
   --largura-leitura: 42rem;
   --largura-comparacao: 58rem;
+  /** V15, item 6: a largura que o painel tem a 1280px; acima disso o conteudo para de
+   * crescer e fica centrado no espaco a direita da barra lateral (design v2, passo 8). */
+  --largura-painel: 59rem;
+  /**
+   * V15, itens 2, 3, 4 e 6b (design v2, passo 7): a largura do lado fixo ao lado da
+   * coluna de leitura, em Objetivo, Tema livre, Roteiro e Conta. Muda a partir de
+   * 1180px (o mesmo ponto em que a barra lateral nasce aberta por padrao,
+   * `(painel)/layout.module.css`; nao vale repetir como variavel porque `@media` nao
+   * le `var()`), e o sticky do bloco que gruda (Roteiro) comeca sempre no mesmo lugar,
+   * logo abaixo da barra de topo.
+   */
+  --largura-lado: 18rem;
+  --largura-lado-larga: 20rem;
+  /**
+   * Dois valores de topo para o sticky do lado, achado da revisao do Fable (medindo,
+   * nao so olhando): Roteiro e Tema livre tem BarraTopo propria, mais alta, e o lado
+   * so fica sticky de verdade depois que o scroll passa dela; `--topo-lado-fixo`
+   * cobre essas duas. Objetivo e Conta usam o padding padrao do `.corpo`
+   * ((painel)/layout.module.css, `var(--espaco-10)`), mais baixo; usando o mesmo
+   * valor maior ali, o sticky grudava ja na carga da pagina (scroll 0), empurrando o
+   * lado 32px abaixo do topo da coluna antes mesmo de rolar.
+   * `--topo-lado-fixo-padrao` acompanha esse padding em vez de um numero fixo maior.
+   */
+  --topo-lado-fixo: calc(3rem + var(--espaco-6));
+  --topo-lado-fixo-padrao: var(--espaco-10);
   --largura-barra-lateral: 16rem;
   --largura-barra-recolhida: 4.5rem;
   --largura-folha: 38rem;

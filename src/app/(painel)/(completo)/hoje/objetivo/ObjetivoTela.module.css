@@ -1,4 +1,8 @@
 .pagina {
+  display: contents;
+}
+
+.colunaPrincipal {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-1);
@@ -6,10 +10,83 @@
   padding-bottom: var(--espaco-10);
 }
 
+/**
+ * Achado comparando com a origin/main pixel a pixel: `.pagina` era o próprio
+ * `display: flex` com `gap: var(--espaco-1)` entre TODOS os filhos, incluindo
+ * entre `.temaEscolhido` e o resto; virando `display: contents` mais dois
+ * irmãos separados (este e `.colunaPrincipal`, cada um com o próprio `gap`
+ * interno), esse respiro entre os dois sumiu. `margin-bottom` devolve o
+ * mesmo espaço de sempre abaixo de 1024px (acima disso não faz diferença,
+ * o cartão vira sticky sozinho no lado).
+ */
 .temaEscolhido {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-1);
+  margin-bottom: var(--espaco-1);
+}
+
+/**
+ * V15, item 2 (design v2, passo 7): do tablet deitado para cima, o cartão do
+ * tema (e do objetivo, no erro) vira o lado fixo, começando no alto junto do
+ * título; a coluna com a pergunta, as escolhas e o botão fica mais estreita
+ * que a largura de leitura (`.pagina` vira a grade). Até 1023px nada muda:
+ * `.pagina` continua um `display: contents` sem efeito nenhum.
+ */
+@media (min-width: 1024px) {
+  .pagina {
+    display: grid;
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado);
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .colunaPrincipal {
+    max-width: none;
+    grid-column: 1;
+  }
+
+  /*
+   * Primeiro no DOM (a ordem no celular não muda), mas a coluna 2 na grade
+   * (design v2, dúvida 1 do passo 7). `grid-row: 1 / span 20` (achado da
+   * revisão seguinte do Fable): sem isso, por vir primeiro no DOM, este
+   * bloco ficava sozinho na linha 1 e `.colunaPrincipal` (a pergunta, as
+   * escolhas) caía sozinha na linha 2, com o topo dela desalinhado do topo
+   * deste. Atravessar bem além da última linha tira este bloco da disputa
+   * por linha, e `.colunaPrincipal` volta a nascer na linha 1, igual ao
+   * topo deste. `span 20`, não `-1`: `-1` conta a partir do fim da grade
+   * EXPLÍCITA, e `.pagina` só tem linhas implícitas; sem grade explícita
+   * "-1" não aponta para a última linha de verdade (achado medindo no
+   * navegador no Roteiro, mesma pegadinha, `RoteiroTela.module.css`).
+   */
+  .temaEscolhido,
+  .escolha {
+    grid-column: 2;
+    grid-row: 1 / span 20;
+    position: sticky;
+    /*
+     * `--topo-lado-fixo-padrao`, não `--topo-lado-fixo` (achado medindo, não só
+     * olhando): esta tela usa o padding padrão do `.corpo`, mais baixo que a
+     * BarraTopo própria do Roteiro e do Tema livre; com o valor maior, o sticky
+     * já grudava na carga da página (scroll 0) e empurrava o lado 32px abaixo
+     * do topo da coluna antes mesmo de rolar (`tokens.css`).
+     */
+    top: var(--topo-lado-fixo-padrao);
+  }
+}
+
+@media (min-width: 1180px) {
+  .pagina {
+    grid-template-columns: minmax(0, var(--largura-leitura)) var(--largura-lado-larga);
+    column-gap: var(--espaco-10);
+  }
+}
+
+/** V15, item 6: acima de 1280 as duas colunas param de crescer; sem isto ficavam presas à esquerda. */
+@media (min-width: 1281px) {
+  .pagina {
+    justify-content: center;
+  }
 }
 
 .rotulo {
@@ -60,11 +137,19 @@
   color: var(--cor-texto);
 }
 
-/* Tela de erro: o tema e o objetivo escolhidos, um sobre o outro, acima da frase. */
+/**
+ * Tela de erro: o tema e o objetivo escolhidos, um sobre o outro, acima da frase.
+ * Mesmo achado do `.temaEscolhido` acima: na main `.escolha` vivia dentro de `.espera`
+ * (gap: var(--espaco-6) entre ele e a frase de erro); virando irmão separado por causa
+ * do lado (V15, item 2), esse respiro sumiu. `margin-bottom` devolve o espaço de sempre
+ * abaixo de 1024px (acima disso `.escolha` vira o lado sticky, sozinho, e a margem não
+ * aparece porque não há nada depois dela na mesma coluna).
+ */
 .escolha {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-4);
+  margin-bottom: var(--espaco-6);
 }
 
 /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (mesmo padrão de `ReferenciasTela.module.css`). */
