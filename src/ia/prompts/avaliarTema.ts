@@ -30,8 +30,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * H2 (achado do Gustavo em 29/09/2026, mesma causa de avaliarResposta): o tema que o cliente
  * propoe pode vir sem acento, a justificativa que a IA escreve nunca pode. Versao 1.3.2.
+ *
+ * V12c, item 2 (a E37b): "ficar conhecido no que eu faco" vira uma persona tambem para quem
+ * vende (antes so existia para marca do tipo pessoa). `textoPersona` ganha um caso proprio, e
+ * o pilar "gerar cliente" ganha uma terceira clausula (procurado, seguido ou indicado, no
+ * lugar de comprar ou virar candidato a parceria). Versao 1.4.0.
  */
-export const versao = "1.3.2";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -54,9 +59,16 @@ export const schema = z.object({
 export type SaidaAvaliarTema = z.infer<typeof schema>;
 
 function textoPersona(persona: Persona): string {
-  return persona === "criador"
-    ? "Este cliente quer virar criador e atrair marcas, não vender o próprio produto ou serviço."
-    : "Este cliente quer vender o próprio produto ou serviço, não virar criador.";
+  switch (persona) {
+    case "criador":
+      return "Este cliente quer virar criador e atrair marcas, não vender o próprio produto ou serviço.";
+    case "conhecido":
+      return "Este cliente quer ficar conhecido no que faz, não vender nem virar criador agora.";
+    case "negocios":
+      return "Este cliente quer levar gente para os próprios negócios, falando como pessoa, não como a marca.";
+    default:
+      return "Este cliente quer vender o próprio produto ou serviço, não virar criador.";
+  }
 }
 
 export function montarSistemaEstavel(dados: {
@@ -87,7 +99,10 @@ Os cinco pilares:
   Educa sobre o serviço vale 7 a 8. Curiosidade ou entretenimento sem ligação com a compra
   vale 6 ou menos. Para quem escolheu virar criador, gerar cliente significa virar candidato
   a parceria paga: o vídeo que constrói o interesse de uma marca do nicho vale 9 a 10, o que
-  só entretém sem construir esse interesse vale 6 ou menos.
+  só entretém sem construir esse interesse vale 6 ou menos. Para quem escolheu ficar conhecido,
+  gerar cliente significa fazer a pessoa ser procurada, seguida ou indicada: o vídeo que
+  constrói isso vale 9 a 10, o que só entretém sem construir esse reconhecimento vale 6 ou
+  menos.
 - Encaixe com você: usa a autoridade dele, fala com o cliente dele e cabe no tom dele. Fere
   uma proibição do briefing vale 3 ou menos; cai numa regra firme da lista "o que este
   cliente já reprovou" (abaixo, quando houver) vale 4 ou menos, e diga isso na

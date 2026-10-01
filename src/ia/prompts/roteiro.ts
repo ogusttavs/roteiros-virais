@@ -6,6 +6,7 @@ import {
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Objetivo,
+  type Persona,
   type TipoAbertura,
   type TipoMarca,
 } from "@/db/schema";
@@ -169,8 +170,11 @@ import { textoRegrasStory } from "./regras-formato";
  * H2 (achado do Gustavo em 29/09/2026, mesma causa de avaliarResposta): o que o cliente
  * escreveu no perfil ou no tema pode vir sem acento, o roteiro que a IA escreve nunca pode.
  * Versao 2.3.0.
+ *
+ * V12c, item 2 (a E37b): `montarSistemaEstavel` ganha `persona`; quem escolheu "ficar
+ * conhecido" ganha a regra 13, a chamada final nunca fecha em preco ou compra. Versao 2.4.0.
  */
-export const versao = "2.3.0";
+export const versao = "2.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -264,6 +268,13 @@ export function montarSistemaEstavel(dados: {
   regrasCliente: { regra: string; contagem: number }[];
   /** V9a, item 4: "negocio" (padrão) fala como a marca; "pessoa" fala em primeira pessoa do singular. */
   tipo: TipoMarca;
+  /**
+   * V12c, item 2, a E37b: "conhecido" nunca fecha a chamada final em preço ou compra. Opcional
+   * (ao contrário de `tipo`, que todo chamador já tinha) para não forçar os scripts de golden
+   * set e os testes existentes a passar um valor que não muda o resultado deles; ausente se
+   * comporta como qualquer persona que não seja "conhecido".
+   */
+  persona?: Persona;
   /** V9c, item 2: troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cartões e as regras R-IG-STORY. */
   formato: FormatoRoteiro;
   /** M4: sem fala troca a regra 5, a regra 9 e o parágrafo de estrutura pelo bloco de cenas sem fala, igual em Reels e em Story. */
@@ -276,6 +287,13 @@ export function montarSistemaEstavel(dados: {
       ? `\n\nO que este cliente já reprovou (siga a regra 8: a firme vale como proibição, a fraca deve ser evitada):\n${dados.regrasCliente
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
+      : "";
+  /** V12c, item 2, a E37b: quem escolheu "ficar conhecido" nunca fecha vendendo. */
+  const regraPersonaConhecido =
+    dados.persona === "conhecido"
+      ? "\n13. Este cliente quer ficar conhecido no que faz, não vender agora: a chamada final " +
+        "nunca é preço, comprar ou agendar, mesmo que o objetivo do vídeo pareça pedir isso; é " +
+        "sempre seguir, comentar, salvar ou indicar para alguém."
       : "";
   const regraVoz =
     dados.tipo === "pessoa"
@@ -406,7 +424,7 @@ ${regra9}
     grava, nunca como anúncio ou propaganda; se o objetivo for as pessoas comprarem, a
     chamada final aponta para a marca citada, não para a marca deste roteiro. A chamada final
     sempre cita uma marca só, nunca as duas.
-${regraVoz}
+${regraVoz}${regraPersonaConhecido}
 
 O objetivo escolhido muda o roteiro:
 - Mais gente me conhecer: gancho amplo, assunto quente do nicho, chamada final de seguir ou

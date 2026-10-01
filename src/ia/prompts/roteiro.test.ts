@@ -247,6 +247,20 @@ describe("montarSistemaEstavel", () => {
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], tipo: "negocio" });
     expect(sistema).toContain("sempre cita uma marca só, nunca as duas.");
   });
+
+  // V12c, item 2, a E37b: persona "conhecido" ganha a regra 13, chamada final nunca vende.
+  it('persona "conhecido": regra 13 proibe a chamada final em preco ou compra', () => {
+    const sistema = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], persona: "conhecido" });
+    expect(sistema).toContain("13. Este cliente quer ficar conhecido");
+    expect(sistema).toContain("nunca é preço, comprar ou agendar");
+  });
+
+  it("sem persona, ou com outra persona, a regra 13 nao aparece", () => {
+    const semPersona = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [] });
+    const negocio = montarSistemaEstavel({ ...BASE_SISTEMA, regrasCliente: [], persona: "negocio" });
+    expect(semPersona).not.toContain("13. Este cliente quer ficar conhecido");
+    expect(negocio).not.toContain("13. Este cliente quer ficar conhecido");
+  });
 });
 
 // V9c, item 2: formato "story" troca a regra 5, a regra 9 e o paragrafo de estrutura pelo

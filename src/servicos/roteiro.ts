@@ -776,6 +776,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
       regrasCliente,
       tipo: dados.cliente.tipo,
+      persona: dados.cliente.persona,
       formato: dados.formato,
       estilo: dados.estilo,
     }),
