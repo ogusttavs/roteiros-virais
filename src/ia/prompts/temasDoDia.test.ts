@@ -6,8 +6,8 @@ import { montarSistemaEstavel } from "./temasDoDia";
 describe("montarSistemaEstavel, regra de plataforma em porQue (R1, item 3)", () => {
   it("instrui citar a regra só quando ela explica a evidência, nunca em lista solta", () => {
     const sistema = montarSistemaEstavel({ modeloNicho: "modelo do nicho" });
-    expect(sistema).toContain("cite o número dela dentro da própria frase");
-    expect(sistema).toContain("nunca force uma citação quando");
+    expect(sistema).toContain("use a ideia dela dentro da própria frase");
+    expect(sistema).toContain("nunca escreva o número da regra");
     expect(sistema).toContain("nunca liste regras soltas fora da frase");
   });
 
