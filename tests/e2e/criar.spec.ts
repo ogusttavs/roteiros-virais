@@ -134,12 +134,14 @@ test.describe("/criar, os quatro caminhos", () => {
     await expect(page).toHaveURL(/\/criar$/);
   });
 
-  test("'Planejar os próximos dias' abre a folha de planejar direto", async ({ page }) => {
+  // E39c, parte 1, item 3: a porta leva ao calendário, não direto à folha de texto (`plano.spec.ts`
+  // cobre o caminho completo, com "Contar a minha agenda" abrindo a folha a partir de lá).
+  test("'Planejar os próximos dias' leva ao calendário do mês", async ({ page }) => {
     await entrar(page);
     await page.goto("/criar");
     await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
 
-    await expect(page.getByRole("dialog", { name: "Planejar os próximos dias" })).toBeVisible();
+    await expect(page).toHaveURL(/\/hoje\/mes/);
   });
 
   test("rota antiga /hoje/tema-livre continua abrindo, com a consulta preservada", async ({ page }) => {
