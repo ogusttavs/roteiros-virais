@@ -204,8 +204,16 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026): o lembrete de
  * acentuação se repete no fim da entrada (`LEMBRETE_ACENTUACAO`), mesma correção de
  * `avaliarResposta` 1.6.1. Versão 2.7.1.
+ *
+ * R1, achado da prova com chave real (01/10/2026, caso 6 de 9 do golden set de exemplo): a
+ * R-IG-REEL-11 sugere gravar um Story junto quando o objetivo é vender ou ser lembrado, e o
+ * modelo, uma vez em nove, entendeu isso como "produza cartões de Story aqui dentro": saiu um
+ * Reels com `cartoes` preenchido e a narrativa confusa, reprovado por `verificarTexto` ("bloco de
+ * instruções técnicas misturado com fala, não um roteiro claro"). Frase nova deixa explícito que
+ * a sugestão de Story vira texto no bloco de edição, nunca estrutura própria; a estrutura deste
+ * roteiro continua sendo Reels sempre. Versão 2.7.2.
  */
-export const versao = "2.7.1";
+export const versao = "2.7.2";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -438,6 +446,11 @@ Cenas com o momento e o que fazer. Bloco de edição com o texto que entra na te
 regra 12 acima, vale para qualquer formato). Siga as regras do ${redeReels.nome} à risca:
 
 ${textoRegras(redeReels.regras)}
+
+Mesmo quando uma regra da lista sugerir gravar também um Story, ESTE roteiro continua sendo um
+Reels: gancho, corpo, fechamento e chamada final continuam preenchidos, e cartoes continua nulo
+(nunca escreva cartões de Story aqui). Uma sugestão de Story vira uma frase no bloco de edição
+(recursos ou áudio), nunca estrutura própria.
 
 Depois de escrever, preencha também porQueAssim: uma entrada só para cada regra da lista acima
 que você de fato seguiu (nunca as regras duras numeradas de 1 a 15 do começo deste texto, mesmo
