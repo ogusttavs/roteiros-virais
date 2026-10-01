@@ -284,16 +284,35 @@ function normalizar(texto: string): string {
  * aqui). `voce`/`nao`/`tambem`/`ja` como palavra inteira reprova em qualquer tamanho, sinal
  * forte demais para esperar 200 caracteres; nenhum caractere acentuado só reprova a partir de
  * 200, porque um texto curto pode não ter nenhuma vogal acentuável por acaso.
+ *
+ * Revisão do PR #83 (achado do Fable): a checagem de palavra inteira reprovava texto legítimo
+ * em dois casos. Primeiro, quando a IA cita entre aspas uma frase literal do cliente (a P5 e a
+ * P9 pedem isso; a frase do cliente pode vir sem acento, a checagem não sabia separar "a IA
+ * escreveu" de "a IA citou"). Segundo, sigla ou nome próprio em maiúsculas ("JA Envelopamentos")
+ * batia na mesma palavra por acaso, sem ser o advérbio "já". Duas defesas: tira do texto o que
+ * está entre aspas (retas, curvas e simples) antes de testar; e ignora o bater quando a palavra
+ * inteira encontrada está toda em maiúsculas (sigla), nunca quando é só a inicial maiúscula
+ * (começo de frase, "Ja virou rotina", continua reprovando).
  */
-const PALAVRAS_SEM_ACENTO = /\b(voce|nao|tambem|ja)\b/i;
+const ENTRE_ASPAS = /"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’/g;
+const PALAVRAS_SEM_ACENTO = /\b(voce|nao|tambem|ja)\b/gi;
 const TEM_CARACTERE_ACENTUADO = /[áàâãéèêíïóôõöúüçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇ]/;
 const MINIMO_CARACTERES_PARA_EXIGIR_ACENTO = 200;
 
+function temPalavraSemAcento(texto: string): boolean {
+  for (const encontrada of texto.matchAll(PALAVRAS_SEM_ACENTO)) {
+    const palavra = encontrada[0];
+    if (palavra !== palavra.toUpperCase()) return true;
+  }
+  return false;
+}
+
 function problemaDeAcentuacao(texto: string): string | null {
-  if (PALAVRAS_SEM_ACENTO.test(texto)) {
+  const semAspas = texto.replace(ENTRE_ASPAS, "");
+  if (temPalavraSemAcento(semAspas)) {
     return 'sem acentuacao: tem "voce", "nao", "tambem" ou "ja" sem o acento (H2, achado de 29/09/2026)';
   }
-  if (texto.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(texto)) {
+  if (semAspas.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(semAspas)) {
     return `sem acentuacao: mais de ${MINIMO_CARACTERES_PARA_EXIGIR_ACENTO} caracteres sem nenhum acento (H2, achado de 29/09/2026)`;
   }
   return null;
