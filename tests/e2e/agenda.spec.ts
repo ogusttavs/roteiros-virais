@@ -260,6 +260,35 @@ test.describe("/hoje, a Agenda", () => {
     await expect(page.getByText("Marcado para", { exact: true })).toHaveCount(0);
   });
 
+  // E39c, parte 1, item 2: as setas da semana, sem limite, e "Ver o mês" carregando o dia visualizado
+  // (para o mês abrir no lugar certo, não sempre no de hoje).
+  test("as setas da semana andam sem limite, e 'Ver o mês' leva ao mês do dia visualizado", async ({ page }) => {
+    const { email } = await criarMarca();
+    const hoje = hojeISO();
+    const diaDaquiA21Dias = somarDias(hoje, 21);
+
+    await entrar(page, email);
+
+    await page.getByRole("button", { name: "Próxima semana" }).click();
+    await page.getByRole("button", { name: "Próxima semana" }).click();
+    await page.getByRole("button", { name: "Próxima semana" }).click();
+    await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}`));
+
+    await page.getByRole("button", { name: "Ver o mês" }).click();
+    await expect(page).toHaveURL(new RegExp(`/hoje/mes\\?dia=${diaDaquiA21Dias}`));
+
+    const diaDoMes = Number(diaDaquiA21Dias.split("-")[2]);
+    const celulaSelecionada = page.getByRole("button", { name: new RegExp(`, ${diaDoMes} de `) }).and(page.getByRole("button", { pressed: true }));
+    await expect(celulaSelecionada).toBeVisible();
+
+    // Volta para a semana de hoje: as setas também andam para trás, sem limite.
+    await page.goto(`/hoje?dia=${diaDaquiA21Dias}`);
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await expect(page).toHaveURL(new RegExp(`dia=${hoje}$`));
+  });
+
   test("escolher 'Amanhã' em Criar grava o roteiro no dia seguinte, com o aviso de frescor na tela", async ({ page }) => {
     const { marcaId, email } = await criarMarca();
     const temas: TemaDoDia[] = [
