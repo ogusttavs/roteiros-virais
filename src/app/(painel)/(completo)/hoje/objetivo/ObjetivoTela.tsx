@@ -141,26 +141,30 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
     // leva de volta sem perder o tema).
     return (
       <div className={styles.pagina}>
-        <div className={styles.espera}>
-          <div className={styles.escolha}>
-            <div className={styles.temaEscolhido}>
-              <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
-              <span className={styles.tema}>{temaEscolhidoTexto}</span>
-            </div>
-            {escolhido ? (
-              <div className={styles.temaEscolhido}>
-                <span className={styles.rotulo}>{textosObjetivo.objetivoEscolhido}</span>
-                <span className={styles.tema}>{primeiraMaiuscula(NOME_OBJETIVO[escolhido])}</span>
-              </div>
-            ) : null}
+        {/* V15, item 2 (design v2, dúvida 2 do passo 7): no erro, o lado é o tema (e o objetivo, se já
+            escolhido). Primeiro no DOM, para a ordem no celular continuar a de sempre. */}
+        <div className={styles.escolha}>
+          <div className={styles.temaEscolhido}>
+            <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
+            <span className={styles.tema}>{temaEscolhidoTexto}</span>
           </div>
-          <p className={styles.fraseErro} role="alert">
-            {erro}
-          </p>
-          <BarraAcao
-            secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
-            primaria={{ rotulo: textosComuns.tentarDeNovo, onClick: escrever, precisaDeRede: true }}
-          />
+          {escolhido ? (
+            <div className={styles.temaEscolhido}>
+              <span className={styles.rotulo}>{textosObjetivo.objetivoEscolhido}</span>
+              <span className={styles.tema}>{primeiraMaiuscula(NOME_OBJETIVO[escolhido])}</span>
+            </div>
+          ) : null}
+        </div>
+        <div className={styles.colunaPrincipal}>
+          <div className={styles.espera}>
+            <p className={styles.fraseErro} role="alert">
+              {erro}
+            </p>
+            <BarraAcao
+              secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
+              primaria={{ rotulo: textosComuns.tentarDeNovo, onClick: escrever, precisaDeRede: true }}
+            />
+          </div>
         </div>
       </div>
     );
@@ -168,11 +172,13 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
 
   return (
     <div className={styles.pagina}>
+      {/* V15, item 2 (design v2, dúvida 1 do passo 7): o lado começa no alto, ao lado do título;
+          primeiro no DOM, para a ordem no celular continuar a de sempre. */}
       <div className={styles.temaEscolhido}>
         <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
         <span className={styles.tema}>{temaEscolhidoTexto}</span>
       </div>
-
+      <div className={styles.colunaPrincipal}>
       <h1 className={styles.pergunta}>{textosObjetivo.pergunta}</h1>
 
       <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
@@ -269,6 +275,7 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
         secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
         primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: !escolhido, precisaDeRede: true }}
       />
+      </div>
     </div>
   );
 }

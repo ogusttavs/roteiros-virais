@@ -1,4 +1,8 @@
 .pagina {
+  display: contents;
+}
+
+.colunaPrincipal {
   display: flex;
   flex-direction: column;
   gap: var(--espaco-1);
@@ -10,6 +14,49 @@
   display: flex;
   flex-direction: column;
   gap: var(--espaco-1);
+}
+
+/**
+ * V15, item 2 (design v2, passo 7): do tablet deitado para cima, o cartão do
+ * tema (e do objetivo, no erro) vira o lado fixo, começando no alto junto do
+ * título; a coluna com a pergunta, as escolhas e o botão fica mais estreita
+ * que a largura de leitura (`.pagina` vira a grade). Até 1023px nada muda:
+ * `.pagina` continua um `display: contents` sem efeito nenhum.
+ */
+@media (min-width: 1024px) {
+  .pagina {
+    display: grid;
+    grid-template-columns: minmax(0, var(--largura-leitura)) 18rem;
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+
+  .colunaPrincipal {
+    max-width: none;
+    grid-column: 1;
+  }
+
+  /* Primeiro no DOM (a ordem no celular não muda), mas a coluna 2 na grade (design v2, dúvida 1 do passo 7). */
+  .temaEscolhido,
+  .escolha {
+    grid-column: 2;
+    position: sticky;
+    top: calc(3rem + var(--espaco-6));
+  }
+}
+
+@media (min-width: 1180px) {
+  .pagina {
+    grid-template-columns: minmax(0, var(--largura-leitura)) 20rem;
+    column-gap: var(--espaco-10);
+  }
+}
+
+/** V15, item 6: acima de 1280 as duas colunas param de crescer; sem isto ficavam presas à esquerda. */
+@media (min-width: 1281px) {
+  .pagina {
+    justify-content: center;
+  }
 }
 
 .rotulo {
