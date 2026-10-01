@@ -519,6 +519,47 @@ describe("V9c, formato (Story)", () => {
     }
   });
 
+  /** R1, item 2: a rede principal da marca escolhe o conjunto de regras que o Reels falado segue. */
+  it("com rede principal tiktok, porQueAssim cita regra R-TT-VIDEO", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ redePrincipal: "tiktok" }).where(eq(clientes.id, clienteId));
+    await criarVideoEvidencia("ev-formato-tiktok", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-TT-VIDEO-\d{2}$/);
+    }
+  });
+
+  /**
+   * R1, item 2: sem a duracao tipica do nicho passar de 60s (o modelo deste arquivo usa 20 a
+   * 30s, `MODELO_PADRAO`), YouTube so cita R-YT-SHORT; a soma com R-YT-VIDEO acima de 60s já
+   * tem prova própria em `regras-formato.test.ts` e `roteiro.test.ts` (unitário), sem precisar
+   * mexer no modelo do nicho compartilhado por todo este arquivo.
+   */
+  it("com rede principal youtube, porQueAssim cita regra R-YT-SHORT", async () => {
+    const clienteId = await criarCliente();
+    await db().update(clientes).set({ redePrincipal: "youtube" }).where(eq(clientes.id, clienteId));
+    await criarVideoEvidencia("ev-formato-youtube", "mancha de vinho no estofado");
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "conversao",
+    });
+
+    expect(roteiro.conteudo.porQueAssim.length).toBeGreaterThan(0);
+    for (const item of roteiro.conteudo.porQueAssim) {
+      expect(item.regra).toMatch(/^R-YT-SHORT-\d{2}$/);
+    }
+  });
+
   it("com formato story, grava a coluna e o conteudo em cartoes, com porQueAssim preenchido", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-formato-2", "mancha de vinho no estofado");
