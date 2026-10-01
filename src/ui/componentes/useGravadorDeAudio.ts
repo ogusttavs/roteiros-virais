@@ -22,7 +22,7 @@ function tipoMimeSuportado(): string | null {
 export type FaseGravador = "inicial" | "gravando" | "transcrevendo";
 export type ErroGravador = "audioVazio" | "falhaTranscricao" | null;
 
-const LIMITE_SEGUNDOS_PADRAO = 120;
+export const LIMITE_SEGUNDOS_PADRAO = 120;
 
 type Props = {
   /** Vira o nome do arquivo enviado ("momento.webm", "agenda.webm", "briefing.webm"). */
@@ -67,6 +67,13 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
     };
   }, []);
 
+  /**
+   * M4, item 0b da revisão do PR #77: `setFase("inicial")` saía antes de `onTranscrito` terminar,
+   * então no briefing (onde `onTranscrito` ainda chama `organizarFalaBriefingAction`, alguns
+   * segundos de IA) o campo e o microfone ficavam liberados durante essa espera, e o texto chegava
+   * por cima do que a pessoa tivesse digitado nesse meio tempo. A fase só volta para "inicial"
+   * depois que `onTranscrito` resolve, com `finally` para o erro também sair do estado "transcrevendo".
+   */
   async function transcrever(blob: Blob, tipoMime: string) {
     setFase("transcrevendo");
     setErro(null);
@@ -79,13 +86,12 @@ export function useGravadorDeAudio({ nomeArquivo = "audio", limiteSegundos = LIM
       const dados = (await resposta.json().catch(() => null)) as { transcricao: string } | { erro: string } | null;
       if (!resposta.ok || !dados || "erro" in dados) {
         setErro("falhaTranscricao");
-        setFase("inicial");
         return;
       }
-      setFase("inicial");
       await onTranscritoRef.current(dados.transcricao, segundosRef.current);
     } catch {
       setErro("falhaTranscricao");
+    } finally {
       setFase("inicial");
     }
   }

@@ -4,13 +4,20 @@
  * geram o perfil, reavaliar sem mudar o texto reusa a avaliacao guardada, e
  * o briefing de um cliente nunca aparece no de outro.
  */
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { perguntasDoBriefing } from "@/config/briefing";
 import { db, getPool } from "@/db";
-import { clientes, nichos, user } from "@/db/schema";
-import { avaliarResposta, formatarPerfilCompilado, garantirBriefing, salvarRascunho } from "@/servicos/briefing";
+import { clientes, geracoesIA, nichos, user } from "@/db/schema";
+import {
+  avaliarResposta,
+  ErroBriefing,
+  formatarPerfilCompilado,
+  garantirBriefing,
+  organizarFalaBriefing,
+  salvarRascunho,
+} from "@/servicos/briefing";
 import { mudarTipoMarca } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -369,5 +376,31 @@ describe("briefing: escrita atomica (revisao da parte 1)", () => {
     // calculada para um texto sendo gravada ao lado do texto do outro).
     const resultadoVencedor = briefing.respostas.p1 === textoA ? resultadoA : resultadoB;
     expect(briefing.avaliacoes.p1).toEqual(resultadoVencedor.avaliacao);
+  });
+});
+
+describe("organizarFalaBriefing (P2b, item 0d da revisao do PR #77)", () => {
+  it("registra a geracao com a marca de quem gravou", async () => {
+    await organizarFalaBriefing("o que o seu negocio faz hoje", "atendo bastante gente pelo whatsapp", clienteId);
+
+    const [geracao] = await db()
+      .select({ clienteId: geracoesIA.clienteId, tarefa: geracoesIA.tarefa })
+      .from(geracoesIA)
+      .where(eq(geracoesIA.tarefa, "organizarFalaBriefing"))
+      .orderBy(desc(geracoesIA.id))
+      .limit(1);
+
+    expect(geracao.clienteId).toBe(clienteId);
+  });
+
+  it("recusa uma fala maior que o teto, sem chamar a tarefa de IA", async () => {
+    const falaEnorme = "a".repeat(4_001);
+    await expect(organizarFalaBriefing("o que o seu negocio faz hoje", falaEnorme, clienteId)).rejects.toThrow(ErroBriefing);
+  });
+
+  it("aceita uma fala exatamente no teto", async () => {
+    const falaNoLimite = "ótimo atendimento pelo whatsapp, ".repeat(121).slice(0, 4_000);
+    const resultado = await organizarFalaBriefing("o que o seu negocio faz hoje", falaNoLimite, clienteId);
+    expect(resultado).toBeTruthy();
   });
 });

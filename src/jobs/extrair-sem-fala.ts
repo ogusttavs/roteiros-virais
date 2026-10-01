@@ -13,7 +13,7 @@
  * para julgar (o vídeo mantém o valor detectado na coleta por título e descrição) nem sinal
  * confiável de tipo de abertura só com quadros e legenda.
  */
-import { and, asc, desc, eq, gte, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nichos, videos, type AnaliseVideo, type Plataforma } from "@/db/schema";
@@ -41,6 +41,7 @@ type CandidatoSemFala = {
 };
 
 const NOVENTA_DIAS_MS = 90 * 24 * 60 * 60 * 1000;
+const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Item 0a da revisão dos PRs #74/#76: elegível só depois de a transcrição ter sido tentada, nunca
@@ -65,6 +66,9 @@ function condicoesElegivelSemFala(nichoId: number, pisoViews: number) {
       and(isNotNull(videos.transcricao), sql`char_length(trim(${videos.transcricao})) < ${TAMANHO_MINIMO_TRANSCRICAO}`),
       isNotNull(videos.proximaTentativaTranscricao),
     ),
+    // Item 0e: o vídeo que falhou no download ou na leitura por imagem some da consulta por 7
+    // dias (`proximaTentativaSemFala`), para não ocupar vaga do teto diário em toda rodada.
+    or(isNull(videos.proximaTentativaSemFala), lte(videos.proximaTentativaSemFala, new Date())),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
   ];
@@ -177,6 +181,12 @@ export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<stri
       } catch (erro) {
         falhas += 1;
         erros.push(`video ${video.id} / setor "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+        // Item 0e: falha de download ou de leitura some da consulta por 7 dias, para não travar o
+        // teto diário com o mesmo vídeo (um link morto, por exemplo) em toda rodada.
+        await db()
+          .update(videos)
+          .set({ proximaTentativaSemFala: new Date(Date.now() + SETE_DIAS_MS) })
+          .where(eq(videos.id, video.id));
       }
 
       if (ehUrlDoYoutube(video.url)) await pausaEntreVideosYoutube();

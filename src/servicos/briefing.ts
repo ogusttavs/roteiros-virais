@@ -347,11 +347,23 @@ export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
 }
 
 /**
+ * M4, item 0d da revisão do PR #77: 2 minutos de fala, com folga, nunca passa disto em caracteres;
+ * acima, ou a pessoa gravou várias vezes seguidas sem o campo organizar entre uma e outra (item 0a,
+ * a fala soma), ou é uma tentativa de gastar a tarefa com um texto qualquer, não gravado.
+ */
+const TAMANHO_MAXIMO_FALA_BRIEFING = 4_000;
+
+/**
  * P2, item 3: organiza a fala transcrita antes de entrar no campo como a resposta da pessoa. Sem
  * verificador (mesmo espírito de `lerMomento`, etapa 8): a saída é o que a pessoa já disse, só
- * reorganizada; ela vê e edita antes de confirmar.
+ * reorganizada; ela vê e edita antes de confirmar. `clienteId` (item 0d): registra o custo na marca
+ * de quem gravou, em vez de ficar sem dono em `geracoes_ia`.
  */
-export async function organizarFalaBriefing(pergunta: string, textoFalado: string): Promise<string> {
+export async function organizarFalaBriefing(pergunta: string, textoFalado: string, clienteId: number): Promise<string> {
+  if (textoFalado.length > TAMANHO_MAXIMO_FALA_BRIEFING) {
+    throw new ErroBriefing("essa gravação ficou longa demais para organizar; tente falar em partes mais curtas.");
+  }
+
   const resultado = await gerarEstruturado({
     tarefa: "organizarFalaBriefing",
     nivel: organizarFalaBriefingIA.nivel,
@@ -366,6 +378,7 @@ export async function organizarFalaBriefing(pergunta: string, textoFalado: strin
     versaoPrompt: organizarFalaBriefingIA.versao,
     modelo: resultado.modelo,
     nivel: organizarFalaBriefingIA.nivel,
+    clienteId,
     entradas: { pergunta },
     saida: resultado.dados,
     uso: {

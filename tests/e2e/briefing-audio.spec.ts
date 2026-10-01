@@ -53,13 +53,14 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     const id = "e2e-responder-falando";
     await prepararCliente(id);
 
+    let chamadasDeTranscricao = 0;
     await page.route("**/api/transcrever", async (rota) => {
-      await rota.fulfill({
-        json: {
-          transcricao:
-            "Então assim, eu atendo bastante gente que liga perguntando, é, se a gente faz orcamento pelo whatsapp mesmo, e eu falo que sim",
-        },
-      });
+      chamadasDeTranscricao += 1;
+      const transcricao =
+        chamadasDeTranscricao === 1
+          ? "Então assim, eu atendo bastante gente que liga perguntando, é, se a gente faz orcamento pelo whatsapp mesmo, e eu falo que sim"
+          : "e também respondo sempre no mesmo dia";
+      await rota.fulfill({ json: { transcricao } });
     });
 
     await entrar(page, `${id}@exemplo.teste`);
@@ -84,8 +85,19 @@ test.describe("responder o briefing falando (P2, item 2)", () => {
     await expect(campo).not.toHaveValue(/então assim/i);
     await expect(page.getByText("Resposta substituída pelo que você falou")).toBeVisible();
 
+    // M4/P2b, item 0a: uma segunda gravação, com o campo já preenchido, soma numa linha nova em
+    // vez de substituir (antes, a segunda sumia com a primeira).
+    const primeiraResposta = await campo.inputValue();
+    await cartaoP1.getByRole("button", { name: "Responder falando" }).click();
+    await expect(cartaoP1.getByRole("button", { name: "Parar" })).toBeVisible();
+    await page.waitForTimeout(500);
+    await cartaoP1.getByRole("button", { name: "Parar" }).click();
+
+    await expect(campo).toHaveValue(new RegExp(`${primeiraResposta}\\n.*respondo sempre no mesmo dia`));
+    await expect(page.getByText("Acrescentamos o que você falou")).toBeVisible();
+
     await page.getByRole("button", { name: "Desfazer" }).click();
-    await expect(campo).toHaveValue("");
+    await expect(campo).toHaveValue(primeiraResposta);
   });
 
   test("sem microfone (aparelho sem suporte), mostra o aviso e o campo continua utilizavel", async ({ page }) => {

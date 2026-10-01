@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "proxima_tentativa_sem_fala" timestamp with time zone;

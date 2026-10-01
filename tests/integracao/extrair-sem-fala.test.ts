@@ -249,4 +249,26 @@ describe("rodarExtrairSemFala", () => {
 
     await db().delete(videos).where(eq(videos.nichoId, nicho.id));
   });
+
+  it("item 0e: video que falha no download ganha proxima tentativa em 7 dias e nao volta na rodada seguinte", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-falha-download", true);
+    const v = await criarVideo(nicho.id, "extrair-sem-fala-falha-download-video", { views: 100_000 });
+
+    vi.mocked(baixarVideo480p).mockRejectedValueOnce(new Error("download falhou de verdade"));
+    const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.analisados).toBe(0);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.id, v.id));
+    expect(linha.proximaTentativaSemFala).not.toBeNull();
+    expect(linha.proximaTentativaSemFala!.getTime()).toBeGreaterThan(Date.now());
+
+    // Segunda rodada, mesmo dia: mesmo com o download voltando a funcionar, o video nao entra de
+    // novo (a proxima tentativa esta no futuro).
+    const resumo2 = await rodarExtrairSemFala(nicho.id);
+    expect(resumo2.analisados).toBe(0);
+    expect(resumo2.falhas).toBe(0);
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
 });

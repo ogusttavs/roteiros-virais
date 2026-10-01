@@ -15,6 +15,13 @@ function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 }
 
+/** M4, item 0c: "0:42" (minutos:segundos, sem hora: o limite de gravação nunca passa de 2 minutos). */
+function formatarMinutos(segundos: number): string {
+  const min = Math.floor(segundos / 60);
+  const seg = segundos % 60;
+  return `${min}:${String(seg).padStart(2, "0")}`;
+}
+
 /** "6 de setembro" (E27 parte 2, item 4, Briefing.dc.html: dia mais mes por extenso, sem ano). */
 function formatarDiaMesPorExtenso(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(
@@ -108,6 +115,10 @@ export const textosBriefing = {
     /** Item 5: a linha que avisa que dá para responder falando, perto do botão. */
     dicaResponderFalando: "Pode responder falando: toque no microfone e conte como se fosse para um amigo.",
     respostaFaladaAplicada: "Resposta substituída pelo que você falou",
+    /** M4, item 0a: quando o campo já tem texto, a fala entra numa linha nova, não substitui. */
+    respostaFaladaSomada: "Acrescentamos o que você falou",
+    /** M4, item 0c: "0:42 de 2:00" ao lado do botão enquanto grava. */
+    contagemGravando: (segundos: number, limiteSegundos: number) => `${formatarMinutos(segundos)} de ${formatarMinutos(limiteSegundos)}`,
     erroAviso: "Não deu para avaliar agora",
     erroExplicacao: "A sua resposta está salva. A falha foi nossa e você não precisa escrever de novo.",
     /**
