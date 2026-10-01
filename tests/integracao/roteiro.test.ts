@@ -1206,6 +1206,52 @@ describe("editarRoteiro (E40, item 1)", () => {
     }
   });
 
+  it("E37a, item 0: trim no texto e teto de 2000 caracteres por campo, com erro nomeado acima disso", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-editar-teto", "mancha de vinho no estofado");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "mancha de vinho no estofado",
+      objetivo: "engajamento",
+    });
+
+    // trim: espaco nas pontas nao conta para o teto nem fica salvo.
+    const comEspacos = await editarRoteiro(roteiro.id, { gancho: "   um gancho com espaco nas pontas   " });
+    expect(comEspacos.conteudo.gancho).toBe("um gancho com espaco nas pontas");
+
+    const textoNoLimite = "a".repeat(2000);
+    const noLimite = await editarRoteiro(roteiro.id, { gancho: textoNoLimite });
+    expect(noLimite.conteudo.gancho).toHaveLength(2000);
+
+    const textoDemais = "a".repeat(2001);
+    await expect(editarRoteiro(roteiro.id, { gancho: textoDemais })).rejects.toThrow(ErroRoteiro);
+
+    // a falha num campo nao escreve nada: o gancho continua o do ultimo salvamento valido.
+    const [aposFalha] = await db().select().from(roteiros).where(eq(roteiros.id, roteiro.id));
+    expect(aposFalha.conteudo.gancho).toHaveLength(2000);
+  });
+
+  it("E37a, item 0: a lista de cartoes editada nunca pode ficar maior que a original", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-editar-lista-maior", "risco no carro depois da lavagem");
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "risco no carro depois da lavagem",
+      objetivo: "engajamento",
+      formato: "story",
+    });
+    const cartoesOriginais = roteiro.conteudo.cartoes!;
+
+    const cartaoExtra = { oQueFalar: "um cartao a mais", oQueMostrar: "x", textoNaTela: "x", figurinha: "nenhuma" as const };
+    await expect(
+      editarRoteiro(roteiro.id, { cartoes: [...cartoesOriginais, cartaoExtra] }),
+    ).rejects.toThrow(ErroRoteiro);
+
+    // nao escreveu nada: a lista continua do tamanho original.
+    const [aposFalha] = await db().select().from(roteiros).where(eq(roteiros.id, roteiro.id));
+    expect(aposFalha.conteudo.cartoes).toHaveLength(cartoesOriginais.length);
+  });
+
   it("isolado por cliente: roteiroPorId de outro cliente nao acha o roteiro editado (guarda da Server Action)", async () => {
     const clienteA = await criarCliente();
     const clienteB = await criarCliente();
