@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -102,6 +102,16 @@ const FORMATAR_DATA_POR_EXTENSO_MINUSCULA = new Intl.DateTimeFormat("pt-BR", {
   day: "numeric",
   month: "long",
 });
+
+/**
+ * E39c, parte 1: as setas da semana somam ou subtraem 7 dias de `diaVisualizado`, sem limite
+ * (não é a semana de hoje, é a mesma lógica de `mesAdjacente` em `MesTela.tsx`, cada tela com a
+ * sua, nada de puxar `servicos/roteiro.ts` para um componente de cliente).
+ */
+function diaAdjacente(dataISO: string, deltaDias: number): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  return new Date(Date.UTC(ano, mes - 1, dia + deltaDias, 12)).toISOString().slice(0, 10);
+}
 
 /** E39b, item (b): "Era para ontem, domingo, 6 de setembro" quando a data é a de ontem; senão, sem "ontem". */
 function eraParaTexto(dataISO: string, hoje: string): string {
@@ -441,9 +451,29 @@ export function HojeTela({
           <section className={styles.semanaAgenda} aria-label={textosHoje.agenda.estaSemana}>
             <div className={styles.cabecaSemana}>
               <span className={styles.rotulo}>{textosHoje.agenda.estaSemana}</span>
-              <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("mes", "/hoje/mes")}>
-                {textosHoje.agenda.calendario.verOMes}
-              </button>
+              <div className={styles.acoesSemana}>
+                <button
+                  type="button"
+                  className={styles.botaoBarra}
+                  disabled={ocupado}
+                  aria-label={textosHoje.agenda.semanaAnterior}
+                  onClick={() => ir("semana-anterior", `/hoje?dia=${diaAdjacente(diaVisualizado, -7)}`)}
+                >
+                  <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className={styles.botaoBarra}
+                  disabled={ocupado}
+                  aria-label={textosHoje.agenda.proximaSemana}
+                  onClick={() => ir("proxima-semana", `/hoje?dia=${diaAdjacente(diaVisualizado, 7)}`)}
+                >
+                  <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
+                </button>
+                <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("mes", `/hoje/mes?dia=${diaVisualizado}`)}>
+                  {textosHoje.agenda.calendario.verOMes}
+                </button>
+              </div>
             </div>
             <div className={styles.diasAgenda} role="group" aria-label="Os dias da semana">
               {semana.map((dia) => (

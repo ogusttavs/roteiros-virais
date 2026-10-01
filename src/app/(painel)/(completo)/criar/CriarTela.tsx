@@ -242,9 +242,10 @@ export function CriarTela({
             <button
               type="button"
               className={styles.porta}
-              disabled={semConexao}
+              disabled={ocupado || semConexao}
+              aria-busy={acao === "plano" || undefined}
               aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
-              onClick={() => setFolhaPlanejarAberta(true)}
+              onClick={() => ir("plano", dataInicial ? `/hoje/mes?dia=${dataInicial}` : "/hoje/mes")}
             >
               <span className={styles.marcaPorta} aria-hidden="true">
                 <CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" />

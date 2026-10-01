@@ -7,8 +7,14 @@ import { agendaDoDia, mesDaAgenda } from "@/servicos/roteiro";
 
 import { MesTela } from "./MesTela";
 
-function anoMesValido(valor: string | undefined, hoje: string): string {
-  if (valor && /^\d{4}-\d{2}$/.test(valor)) return valor;
+/**
+ * E39c, parte 1: sem `mes` na URL, o mês vem do `dia` pedido (quem chega de "Ver o mês" na semana
+ * de outro mês, ou de "Planejar os próximos dias" com uma data marcada, cai no mês certo, não
+ * sempre no de hoje).
+ */
+function anoMesValido(mes: string | undefined, dia: string | undefined, hoje: string): string {
+  if (mes && /^\d{4}-\d{2}$/.test(mes)) return mes;
+  if (dia && /^\d{4}-\d{2}-\d{2}$/.test(dia)) return dia.slice(0, 7);
   return hoje.slice(0, 7);
 }
 
@@ -41,7 +47,7 @@ export default async function Mes({ searchParams }: Props) {
 
   const hoje = hojeISO();
   const { mes, dia } = await searchParams;
-  const anoMes = anoMesValido(mes, hoje);
+  const anoMes = anoMesValido(mes, dia, hoje);
   const diaSelecionado = diaValido(dia, anoMes, hoje);
 
   const [dias, agendaDoDiaSelecionado] = await Promise.all([

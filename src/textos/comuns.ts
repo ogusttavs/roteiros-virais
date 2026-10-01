@@ -17,6 +17,8 @@ export const textosComuns = {
   salvar: "salvar",
   salvo: "Salvo",
   cancelar: "Cancelar",
+  /** E39c, parte 1: o X no cabeçalho de toda `Folha`. */
+  fechar: "Fechar",
   faixa: { baixa: "Abaixo do esperado", media: "No caminho", alta: "Muito boa" },
   espera: [
     "Juntando o que funcionou no seu setor com o seu briefing",

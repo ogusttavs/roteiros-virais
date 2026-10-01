@@ -273,6 +273,13 @@
   gap: var(--espaco-3);
 }
 
+/* E39c, parte 1: as setas de semana e "Ver o mês" juntos, à direita do rótulo. */
+.acoesSemana {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+}
+
 .rotulo {
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rodape);

@@ -172,7 +172,7 @@ export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, 
               <div className={styles.peMes}>
                 <p>{textosHoje.agenda.calendario.aviso}</p>
                 <button type="button" className={hojeStyles.botaoSecundarioSm} onClick={() => setFolhaPlanejarAberta(true)}>
-                  {textosPlano.botaoPlanejarDias}
+                  {textosPlano.botaoContarAgenda}
                 </button>
               </div>
             </section>
@@ -205,7 +205,17 @@ export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, 
                 </ol>
               </div>
             ) : (
-              <p className={hojeStyles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
+              <div className={styles.diaMesVazio}>
+                <p className={hojeStyles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
+                <button
+                  type="button"
+                  className={hojeStyles.botaoSecundarioSm}
+                  disabled={ocupado}
+                  onClick={() => ir(`/criar?data=${diaSelecionado}`)}
+                >
+                  {textosHoje.agenda.criarRoteiro}
+                </button>
+              </div>
             )}
           </section>
         </div>

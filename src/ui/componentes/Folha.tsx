@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { textosComuns } from "@/textos/comuns";
 import { usePuxarParaFechar } from "@/ui/usePuxarParaFechar";
 
 import styles from "./Folha.module.css";
@@ -30,6 +31,11 @@ type Props = {
  *
  * `data-folha-aberta` no véu e na folha liga a trava de rolagem da página de
  * trás no celular (`base.css`).
+ *
+ * O X (E39c, parte 1, pedido do Gustavo: "abri a parte de planejar os
+ * próximos dias e não tem um X para fechar") fica fora de `.folhaTopo`, que
+ * tem o arrasto (`usePuxarParaFechar`) espalhado por ela; um botão lá dentro
+ * ganharia a captura do ponteiro do arrasto em vez de um clique normal.
  */
 export function Folha({ titulo, aberto, aoFechar, rodape, children }: Props) {
   const { folhaRef, alca } = usePuxarParaFechar(aoFechar);
@@ -66,6 +72,12 @@ export function Folha({ titulo, aberto, aoFechar, rodape, children }: Props) {
         data-folha-aberta=""
         className={styles.folha}
       >
+        <button type="button" className={styles.folhaFechar} onClick={aoFechar} aria-label={textosComuns.fechar}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
         <div className={styles.folhaTopo} {...alca}>
           <span className={styles.folhaAlca} aria-hidden="true" />
           <h3 className={styles.folhaTitulo}>{titulo}</h3>

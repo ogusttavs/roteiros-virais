@@ -110,6 +110,13 @@
   border: var(--largura-borda) dashed var(--cor-atencao);
 }
 
+/* E39c, parte 1: o dia tocado sem nada marcado ganha "Criar roteiro" (antes, só o aviso). */
+.diaMesVazio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+}
+
 .peMes {
   display: flex;
   flex-wrap: wrap;

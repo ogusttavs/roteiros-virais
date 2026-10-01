@@ -9,6 +9,8 @@
  */
 export const textosPlano = {
   botaoPlanejarDias: "Planejar os próximos dias",
+  /** E39c, parte 1: a ação dentro do calendário do mês que abre a folha de contar a agenda. */
+  botaoContarAgenda: "Contar a minha agenda",
   /** V12, item 4b: o título da folha muda com a fase (design v2, `PlanejarDias.dc.html`). */
   tituloFolhaContar: "Planejar os próximos dias",
   tituloFolhaRevisao: "Os dias que a gente entendeu",
