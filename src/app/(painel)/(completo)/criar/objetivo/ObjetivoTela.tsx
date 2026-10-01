@@ -164,7 +164,8 @@ export function ObjetivoTela({ origem, temaEscolhidoTexto, objetivoRecomendado, 
 
   function voltarDepois() {
     saiuRef.current = true;
-    router.push("/criar");
+    // E39a: não /criar; o roteiro, pronto, aparece na Agenda do dia para que ele foi marcado.
+    router.push("/hoje");
   }
 
   if (pendente) {
