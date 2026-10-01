@@ -165,8 +165,12 @@ import { textoRegrasStory } from "./regras-formato";
  * "story"/"stories" (decisão do Gustavo: é a palavra que a tela e o prompt usam agora); o schema
  * solta o limite para 1 a 5 (`cartoes`), e `ia/verificador.ts` confere o número exato por estilo
  * (Story: 1 a 5; sem fala: 2 a 5, sem mudança). Versao 2.2.0.
+ *
+ * H2 (achado do Gustavo em 29/09/2026, mesma causa de avaliarResposta): o que o cliente
+ * escreveu no perfil ou no tema pode vir sem acento, o roteiro que a IA escreve nunca pode.
+ * Versao 2.3.0.
  */
-export const versao = "2.2.0";
+export const versao = "2.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -424,7 +428,8 @@ ${dados.camadaExclusiva}
 Modelo do nicho:
 ${dados.modeloNicho}
 
-Escreva em português do Brasil, com acentuação correta.`;
+Escreva em português do Brasil, com acentuação correta. O que o cliente escreveu no perfil ou
+no tema pode vir sem acento; o roteiro que você escreve sai sempre acentuado, mesmo assim.`;
 }
 
 /**

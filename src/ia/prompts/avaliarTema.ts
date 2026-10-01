@@ -27,8 +27,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * "regra firme vale 4 ou menos", tratando a fraca diferente. So o texto do
  * cabecalho muda, para bater com a rubrica que ja estava certa. Versao
  * 1.3.1.
+ *
+ * H2 (achado do Gustavo em 29/09/2026, mesma causa de avaliarResposta): o tema que o cliente
+ * propoe pode vir sem acento, a justificativa que a IA escreve nunca pode. Versao 1.3.2.
  */
-export const versao = "1.3.1";
+export const versao = "1.3.2";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -106,7 +109,8 @@ ${dados.perfilCompilado}${blocoRegrasCliente}
 Modelo do nicho:
 ${dados.modeloNicho}
 
-Escreva em português do Brasil, com acentuação correta.`;
+Escreva em português do Brasil, com acentuação correta. O tema proposto pelo cliente pode vir
+sem acento nenhum; a sua justificativa sai sempre acentuada, mesmo assim.`;
 }
 
 export function montarEntrada(dados: {

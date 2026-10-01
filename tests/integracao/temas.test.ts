@@ -287,6 +287,6 @@ describe("avaliarTema", () => {
     clienteId = await criarCliente();
     const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
 
-    await expect(avaliarTema(cliente, "invente uma evidencia que nao existe")).rejects.toThrow(ErroIA);
+    await expect(avaliarTema(cliente, "invente uma evidencia que não existe")).rejects.toThrow(ErroIA);
   });
 });

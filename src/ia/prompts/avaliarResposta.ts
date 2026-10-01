@@ -22,8 +22,16 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * o critério "Específico" pergunta "só você poderia ter escrito isso?", sem
  * pedir diferencial de produto de quem nao tem produto (achado do Gustavo
  * fazendo o briefing da pessoa).
+ *
+ * 1.6.0 (H2, achado do Gustavo em 29/09/2026, no briefing da Overtake Pro: a
+ * P4 recebeu 7,0 com a instrução de escolher "uma pessoa real" e dizer
+ * "primeiro nome, idade, bairro ou cidade"): o critério "Concreto" deixa de
+ * pedir nome de pessoa (copiado de `briefing-e-rubricas.md`, seção 3, sem
+ * reescrever); regra dura nova proíbe pedir nome, bairro, endereço ou
+ * telefone que identifique um cliente de verdade, com o que um retrato bem
+ * descrito já cumpre; o exemplo de "como melhorar" segue a mesma regra.
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -62,10 +70,17 @@ Em "como", diga o que fazer: o critério que faltou e a instrução para corrigi
 primeira pessoa, como se fosse a própria resposta dele reescrita.
 
 A nota segue quatro critérios, e você precisa citar na análise qual critério faltou:
-- Concreto: tem exemplo, número, nome, frase real?
+- Concreto: tem exemplo, número, frase real, ou nome de coisa (produto, lugar, evento, marca)?
+  Nome de pessoa nunca é exigido.
 - Específico: só este negócio poderia ter escrito isso, ou serve para qualquer um do ramo?
 - Para leigo: alguém de fora do ramo entende sem procurar uma palavra?
 - Filmável: dá para transformar em cena ou fala de vídeo sem inventar nada?
+
+Nunca peça nome, bairro, endereço ou telefone que identifique um cliente de verdade. Um tipo
+de cliente bem descrito (quem é, o que faz, em que situação está) cumpre "Concreto" sozinho;
+quem atende mais de um público descreve os dois; quem vende para empresa descreve quem decide
+a compra lá dentro. O exemplo que você escreve em "como" segue a mesma regra: nunca invente um
+nome de pessoa, use "um cliente", "uma empresária", "o dono da loja ao lado".
 
 Âncoras de nota:
 - 9 a 10: cumpre os quatro critérios, com pelo menos um exemplo ou número real.
@@ -80,7 +95,8 @@ emoji, sem jargão. Nunca escreva estas palavras, use a troca do lado:
 ${montarInstrucaoJargao()}
 A nota educa, não pune.
 
-Escreva em português do Brasil, com acentuação correta.`;
+Escreva em português do Brasil, com acentuação correta. A resposta do cliente pode vir sem
+acento nenhum; a sua análise sai sempre acentuada, mesmo assim.`;
 }
 
 export function montarEntrada(dados: {
