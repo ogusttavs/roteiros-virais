@@ -750,6 +750,44 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     });
   }
 
+  /**
+   * V15, item 7: do tablet deitado para cima, o lado fixo de cada tela fica visível ao lado da
+   * coluna, sem estourar na horizontal, a 1024, 1280 e 1920 (o teto do "monitor largo", item 6).
+   */
+  for (const largura of [1024, 1280, 1920]) {
+    test(`Objetivo, o lado (tema escolhido) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto(`/hoje/objetivo?livre=${encodeURIComponent("um assunto de teste para o layout")}`);
+      await expect(page.getByText("Tema escolhido", { exact: false })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Tema livre, o lado (os cinco pontos) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto("/hoje/tema-livre");
+      await expect(page.getByText("Os cinco pontos que a gente olha")).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Roteiro, o lado (como editar) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto(`/roteiros/${roteiroId}`);
+      await expect(page.getByRole("heading", { name: "Como editar" })).toBeVisible();
+      await conferirLayout(page);
+    });
+
+    test(`Conta, o lado (quem tem acesso) aparece sem rolagem lateral, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page);
+      await page.goto("/conta");
+      await expect(page.getByText("Quem tem acesso a esta marca")).toBeVisible();
+      await conferirLayout(page);
+    });
+  }
+
   for (const { rotulo, largura, altura } of LARGURAS_COM_FOLHA) {
     test(`Começar, estado folha, em ${rotulo}px`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
