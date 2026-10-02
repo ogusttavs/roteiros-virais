@@ -218,8 +218,13 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * o lembrete para o meio da entrada) e vira exportado; `servicos/roteiro.ts` passa ele para
  * `gerarComVerificacao` como `lembreteFinal`, que garante a posição certa nas duas tentativas.
  * Versão 2.7.3.
+ *
+ * E43: quando o roteiro nasce de "Criar conteúdo com esta notícia" (Tema livre, estado
+ * `comNoticia`), o título, o resumo e o ângulo sugerido da notícia entram como um bloco, logo
+ * depois do tema (a notícia é o que fez a pessoa escrever aquele tema, não o substitui: a busca de
+ * evidência continua normal, ao contrário do momento). Versão 2.8.0.
  */
-export const versao = "2.7.3";
+export const versao = "2.8.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -634,6 +639,12 @@ export function montarEntrada(dados: {
    * escolheu "Falar de" uma diferente da ativa. Ver regra dura 11.
    */
   marcaCitada?: { nome: string; perfilCompilado: string };
+  /**
+   * E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia". Ao contrário do
+   * momento, não substitui `tema` nem o bloco de evidência: a notícia é o que motivou a pessoa a
+   * escrever aquele tema, a busca de evidência no banco continua normal.
+   */
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null };
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -679,11 +690,16 @@ export function montarEntrada(dados: {
     ? `Marca citada por quem está gravando (regra dura 11):\n${dados.marcaCitada.nome}: ${dados.marcaCitada.perfilCompilado}`
     : null;
 
+  const blocoNoticia = dados.noticia
+    ? `Noticia que deu origem a este tema (a pessoa leu e quis fazer um video sobre isso):\nTitulo: ${dados.noticia.titulo}${dados.noticia.resumo ? `\nResumo: ${dados.noticia.resumo}` : ""}${dados.noticia.angulo ? `\nAngulo sugerido: ${dados.noticia.angulo}` : ""}`
+    : null;
+
   const partes = [
     dados.objetivoDoVideo
       ? `O que este vídeo precisa comunicar (acima de tudo o mais): ${dados.objetivoDoVideo}`
       : null,
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
+    blocoNoticia,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
