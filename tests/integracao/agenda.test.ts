@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { clientes, nichos, roteiros, user, videos } from "@/db/schema";
+import { clientes, nichos, planoGravacoes, roteiros, user, videos } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import {
   agendaDoDia,
@@ -392,5 +392,47 @@ describe("mesDaAgenda", () => {
     expect(diaComAtrasado.marca.qtdReels).toBe(1);
     expect(diaComArquivado.atrasado).toBe(false);
     expect(diaComArquivado.marca.qtdStories).toBe(0);
+  });
+
+  it("E39c, parte 1: um item do plano ainda sugerido marca o dia, mas um ja aceito (com roteiro) nao conta em dobro", async () => {
+    const [nicho] = await db().insert(nichos).values({ slug: "agenda-mes-plano-teste", nome: "Agenda mes plano teste" }).returning();
+    const [marca] = await db().insert(clientes).values({ usuarioId: marcaA.usuarioId, nome: "[teste] marca mes plano", nichoId: nicho.id }).returning();
+
+    const hoje = hojeISO();
+    const diaSoSugerido = somarDiasISO(hoje, 2);
+    const diaJaAceito = somarDiasISO(hoje, 3);
+
+    await db().insert(planoGravacoes).values({
+      clienteId: marca.id,
+      dia: diaSoSugerido,
+      ordem: 1,
+      lugar: "oficina",
+      situacao: "trocando o oleo",
+      oQueMostrar: "o carro no elevador",
+      objetivo: "alcance",
+      formato: "story",
+      estado: "sugerido",
+    });
+
+    const roteiroAceito = await criarRoteiro(marca.id, diaJaAceito, { formato: "reels", titulo: "ja aceito" });
+    await db().insert(planoGravacoes).values({
+      clienteId: marca.id,
+      dia: diaJaAceito,
+      ordem: 1,
+      lugar: "oficina",
+      situacao: "entrega ao cliente",
+      oQueMostrar: "a chave na mao",
+      objetivo: "alcance",
+      formato: "reels",
+      estado: "aceito",
+      roteiroId: roteiroAceito.id,
+    });
+
+    const dias = await mesDaAgenda(marca.id, hoje.slice(0, 7));
+    const diaSugerido = dias.find((d) => d.data === diaSoSugerido);
+    const diaAceito = dias.find((d) => d.data === diaJaAceito);
+
+    expect(diaSugerido?.marca.qtdStories).toBe(1);
+    expect(diaAceito?.marca.qtdReels).toBe(1);
   });
 });

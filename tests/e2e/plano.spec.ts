@@ -37,10 +37,16 @@ async function entrar(page: Page) {
   await expect(page).toHaveURL(/\/hoje/);
 }
 
-/** E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`. */
+/**
+ * E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`.
+ * E39c, parte 1: a porta leva ao calendário, não direto para a folha; "Contar a minha agenda",
+ * dentro do calendário, é quem abre a folha de texto ou voz.
+ */
 async function abrirPlanejarDias(page: Page) {
   await page.goto("/criar");
   await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
+  await expect(page).toHaveURL(/\/hoje\/mes/);
+  await page.getByRole("button", { name: "Contar a minha agenda" }).click();
 }
 
 test.describe("colar a agenda e o plano de gravações", () => {
@@ -124,9 +130,12 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
-    // "O seu plano de hoje", em /criar, so os itens de hoje (o dia de amanha nao aparece aqui). `criarPlanoAction`
-    // só responde depois de gravar; limiar maior (revisão do PR #62, item 4), mesmo valor que os outros
-    // pontos desta suíte que esperam uma Server Action terminar (`momento.spec.ts`, `story.spec.ts`).
+    // E39c, parte 1: "Contar a minha agenda" abre a partir do calendario, nao de /criar; "O seu
+    // plano de hoje" continua so em /criar, so os itens de hoje (o dia de amanha nao aparece
+    // aqui). `criarPlanoAction` só responde depois de gravar; limiar maior (revisão do PR #62,
+    // item 4), mesmo valor que os outros pontos desta suíte que esperam uma Server Action
+    // terminar (`momento.spec.ts`, `story.spec.ts`).
+    await page.goto("/criar");
     await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("reuniao de fechamento")).toHaveCount(0);
 
@@ -189,6 +198,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
+    // E39c, parte 1: "Contar a minha agenda" abre a partir do calendario; "Meu plano" so existe em /criar.
+    await page.goto("/criar");
     await page.getByRole("button", { name: "Meu plano" }).click();
     const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
     await expect(folhaMeuPlano).toBeVisible();
@@ -214,6 +225,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
+    // E39c, parte 1: "Contar a minha agenda" abre a partir do calendario; "Meu plano" so existe em /criar.
+    await page.goto("/criar");
     await page.getByRole("button", { name: "Meu plano" }).click();
     const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
     await expect(folhaMeuPlano).toBeVisible();
@@ -285,6 +298,8 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
     await expect(folhaAgenda).toBeHidden();
 
+    // E39c, parte 1: "Contar a minha agenda" abre a partir do calendario, nao de /criar.
+    await page.goto("/criar");
     await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
     const linhaAceitar = page.locator("div").filter({ hasText: "revisando a peça nova" }).last();
     await linhaAceitar.getByRole("button", { name: "Escrever o roteiro" }).click();
@@ -320,5 +335,134 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await expect(folhaMeuPlanoDepois.getByText("revisando a peça nova")).toBeVisible();
     await expect(folhaMeuPlanoDepois.getByText("Roteiro pronto")).toBeVisible();
     await expect(folhaMeuPlanoDepois.getByText("estande novo")).toHaveCount(0);
+  });
+
+  // E39c, parte 1, item 3: a porta "Planejar os próximos dias" leva ao calendário, não direto à
+  // folha de texto; um dia tocado sem nada marcado ganha "Criar roteiro" (a E39a já leva a data).
+  test("a porta 'Planejar os próximos dias' leva ao calendário, e um dia vazio tocado tem 'Criar roteiro'", async ({
+    page,
+  }) => {
+    const email = "e2e-plano-porta-calendario@exemplo.teste";
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "e2e-plano"));
+
+    await db().insert(user).values({ id: "e2e-plano-porta-calendario", name: "[teste] Plano Porta Calendario", email });
+    await db().insert(account).values({
+      id: "e2e-plano-porta-calendario-credential",
+      issuer: "local:credential",
+      accountId: "e2e-plano-porta-calendario",
+      providerId: "credential",
+      userId: "e2e-plano-porta-calendario",
+      password: await hashPassword(SENHA),
+    });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-plano-porta-calendario", aceitouTermosEm: new Date() });
+    const [marcaNova] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-plano-porta-calendario", nome: "[teste] Plano Porta Calendario", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-plano-porta-calendario", clienteId: marcaNova.id, papel: "dono" });
+    await db().insert(briefings).values({
+      clienteId: marcaNova.id,
+      completo: true,
+      perfil: {
+        fatos: {
+          oQueVende: "lavagem de estofados",
+          preco: "sofa de 3 lugares por R$ 180",
+          clienteIdeal: "mora em apartamento",
+          medos: [],
+          frasesDaFala: [],
+          proibicoes: [],
+          cenasFilmaveis: [],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo: "lava estofados em domicilio",
+        referencias: [],
+      },
+    });
+
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    await page.goto("/criar");
+    await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
+    await expect(page).toHaveURL(/\/hoje\/mes$/);
+
+    // A marca é nova: nada marcado hoje, "Criar roteiro" aparece e leva a /criar com a data de hoje.
+    await page.getByRole("button", { name: "Criar roteiro" }).click();
+    await expect(page).toHaveURL(new RegExp(`/criar\\?data=${hojeISO()}`));
+  });
+
+  // E39c, parte 1, item 1: o X no cabeçalho fecha a folha (`Folha.tsx`), igual ao véu e ao Escape.
+  test("o X fecha a folha de planejar e a de Meu plano", async ({ page }) => {
+    const email = "e2e-plano-fechar-x@exemplo.teste";
+    const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "e2e-plano"));
+
+    await db().insert(user).values({ id: "e2e-plano-fechar-x", name: "[teste] Plano Fechar X", email });
+    await db().insert(account).values({
+      id: "e2e-plano-fechar-x-credential",
+      issuer: "local:credential",
+      accountId: "e2e-plano-fechar-x",
+      providerId: "credential",
+      userId: "e2e-plano-fechar-x",
+      password: await hashPassword(SENHA),
+    });
+    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-plano-fechar-x", aceitouTermosEm: new Date() });
+    const [marca] = await db()
+      .insert(clientes)
+      .values({ usuarioId: "e2e-plano-fechar-x", nome: "[teste] Plano Fechar X", nichoId: nicho.id })
+      .returning();
+    await db().insert(membrosMarca).values({ usuarioId: "e2e-plano-fechar-x", clienteId: marca.id, papel: "dono" });
+    await db().insert(briefings).values({
+      clienteId: marca.id,
+      completo: true,
+      perfil: {
+        fatos: {
+          oQueVende: "lavagem de estofados",
+          preco: "sofa de 3 lugares por R$ 180",
+          clienteIdeal: "mora em apartamento",
+          medos: [],
+          frasesDaFala: [],
+          proibicoes: [],
+          cenasFilmaveis: [],
+          concorrentes: [],
+          perfisAdmirados: [],
+        },
+        resumo: "lava estofados em domicilio",
+        referencias: [],
+      },
+    });
+
+    await page.goto("/entrar");
+    await page.getByLabel("E-mail").fill(email);
+    await page.getByLabel("Senha").fill(SENHA);
+    await page.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+
+    // A folha de planejar: o X fecha sem pedir nada, de volta ao calendario de onde ela abriu.
+    await abrirPlanejarDias(page);
+    const folhaPlanejar = page.getByRole("dialog");
+    await expect(folhaPlanejar).toBeVisible();
+    await folhaPlanejar.getByRole("button", { name: "Fechar" }).click();
+    await expect(folhaPlanejar).toBeHidden();
+    await expect(page).toHaveURL(/\/hoje\/mes/);
+
+    // Um plano de hoje, so para "Meu plano" aparecer em /criar.
+    await abrirPlanejarDias(page);
+    const folhaAgenda = page.getByRole("dialog");
+    await folhaAgenda.getByLabel("Os seus próximos dias").fill("hoje: oficina, lavar um sofa de tres lugares");
+    await folhaAgenda.getByRole("button", { name: "Ver os dias" }).click();
+    await folhaAgenda.getByRole("button", { name: "Montar o plano" }).click();
+    await expect(folhaAgenda).toBeHidden();
+
+    await page.goto("/criar");
+    await expect(page.getByText("O seu plano de hoje")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Meu plano" }).click();
+    const folhaMeuPlano = page.getByRole("dialog", { name: "Meu plano" });
+    await expect(folhaMeuPlano).toBeVisible();
+    await folhaMeuPlano.getByRole("button", { name: "Fechar" }).click();
+    await expect(folhaMeuPlano).toBeHidden();
   });
 });

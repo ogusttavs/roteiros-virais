@@ -39,10 +39,18 @@
   gap: var(--espaco-3);
 }
 
+/*
+ * Sete colunas iguais num celular estreito (360 a 390px) não sobram espaço para o alvo de toque
+ * de 44px com o padding do cartão por cima (achado do e2e desta etapa, `layout.spec.ts`, medido
+ * em 37px de largura): a grade sangra até a borda do cartão, cancelando o padding de
+ * `hojeStyles.semanaAgenda` só aqui, mesma correção que `.diasAgenda` (`HojeTela.module.css`) já
+ * tinha para a semana.
+ */
 .gradeMes {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--espaco-1);
+  gap: 2px;
+  margin: 0 calc(-1 * var(--espaco-5));
 }
 
 .nomeSemana {
@@ -108,6 +116,61 @@
   height: 0.875rem;
   border-radius: 0.25rem;
   border: var(--largura-borda) dashed var(--cor-atencao);
+}
+
+/* E39c, parte 1: o dia tocado sem nada marcado ganha "Criar roteiro" (antes, só o aviso). */
+.diaMesVazio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+}
+
+/*
+ * E39c, parte 1: o que "Contar a minha agenda" gerou para o dia, ainda sem roteiro (só leitura,
+ * mesmo espírito de "Meu plano"; virar roteiro continua pelas portas de sempre).
+ */
+.planoDoDia {
+  display: grid;
+  gap: var(--espaco-2);
+  margin-bottom: var(--espaco-4);
+}
+
+.itemPlanoMes {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) dashed var(--cor-borda);
+  border-radius: var(--raio-md);
+}
+
+.itemPlanoCabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.itemPlanoLugar {
+  font-weight: var(--peso-medio);
+}
+
+.itemPlanoEstado {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.itemPlanoSituacao {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.itemPlanoObjetivo {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
 }
 
 .peMes {

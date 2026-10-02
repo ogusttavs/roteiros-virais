@@ -140,6 +140,9 @@ export const textosHoje = {
     estaSemana: "Esta semana",
     marcadoPara: "Marcado para",
     voltarParaHoje: "Voltar para hoje",
+    /** E39c, parte 1: as duas setas ao lado de "Esta semana", sem limite de quanto se pode ir. */
+    semanaAnterior: "Semana anterior",
+    proximaSemana: "Próxima semana",
     /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
     legendaReels: "Reels",
     legendaStory: "Story",

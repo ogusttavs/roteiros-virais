@@ -4,6 +4,8 @@ import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import type { ItemPlano } from "@/servicos/plano";
 import type { AgendaDoDia, DiaDoMes } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
@@ -21,6 +23,8 @@ type Props = {
   dias: DiaDoMes[];
   diaSelecionado: string;
   agendaDoDiaSelecionado: AgendaDoDia;
+  /** E39c, parte 1: o que "Contar a minha agenda" gerou para este dia e ainda não virou roteiro. */
+  planoSugeridoDoDia: ItemPlano[];
   hoje: string;
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
@@ -58,7 +62,17 @@ function diaMesExtenso(dataISO: string): string {
  * `?dia=`, que recarrega a tela com a agenda daquele dia pronta embaixo (mesmo padrão do `/hoje`
  * com `?dia=`, só que aqui o mês inteiro continua visível).
  */
-export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, hoje, marcaAtiva, marcas, nomePessoa }: Props) {
+export function MesTela({
+  anoMes,
+  dias,
+  diaSelecionado,
+  agendaDoDiaSelecionado,
+  planoSugeridoDoDia,
+  hoje,
+  marcaAtiva,
+  marcas,
+  nomePessoa,
+}: Props) {
   const router = useRouter();
   const [ocupado, iniciarTransicao] = useTransition();
   const [folhaPlanejarAberta, setFolhaPlanejarAberta] = useState(false);
@@ -172,7 +186,7 @@ export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, 
               <div className={styles.peMes}>
                 <p>{textosHoje.agenda.calendario.aviso}</p>
                 <button type="button" className={hojeStyles.botaoSecundarioSm} onClick={() => setFolhaPlanejarAberta(true)}>
-                  {textosPlano.botaoPlanejarDias}
+                  {textosPlano.botaoContarAgenda}
                 </button>
               </div>
             </section>
@@ -184,6 +198,20 @@ export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, 
                 ? textosHoje.agenda.calendario.hoje(diaMesExtensoMinusculo(diaSelecionado))
                 : diaMesExtenso(diaSelecionado)}
             </h2>
+            {planoSugeridoDoDia.length > 0 ? (
+              <div className={styles.planoDoDia}>
+                {planoSugeridoDoDia.map((item) => (
+                  <div key={item.id} className={styles.itemPlanoMes}>
+                    <div className={styles.itemPlanoCabecalho}>
+                      <span className={styles.itemPlanoLugar}>{item.lugar.trim() || textosPlano.semLugar}</span>
+                      <span className={styles.itemPlanoEstado}>{textosPlano.rotuloPlanejado}</span>
+                    </div>
+                    <p className={styles.itemPlanoSituacao}>{item.situacao}</p>
+                    <span className={styles.itemPlanoObjetivo}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {itensDoDiaSelecionado.length > 0 ? (
               <div className={hojeStyles.listaAgendaCartao}>
                 <ol className={hojeStyles.listaAgenda}>
@@ -205,7 +233,17 @@ export function MesTela({ anoMes, dias, diaSelecionado, agendaDoDiaSelecionado, 
                 </ol>
               </div>
             ) : (
-              <p className={hojeStyles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
+              <div className={styles.diaMesVazio}>
+                <p className={hojeStyles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
+                <button
+                  type="button"
+                  className={hojeStyles.botaoSecundarioSm}
+                  disabled={ocupado}
+                  onClick={() => ir(`/criar?data=${diaSelecionado}`)}
+                >
+                  {textosHoje.agenda.criarRoteiro}
+                </button>
+              </div>
             )}
           </section>
         </div>

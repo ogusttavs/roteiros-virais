@@ -45,6 +45,28 @@
   }
 }
 
+/* E39c, parte 1: o X, fora da área de arrastar, no canto superior direito. */
+.folhaFechar {
+  position: absolute;
+  top: var(--espaco-2);
+  right: var(--espaco-2);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.folhaFechar:hover {
+  background: var(--cor-superficie-recuada);
+}
+
 /*
  * A alça e o título são a área de arrastar (`usePuxarParaFechar`, V7, item 1 do
  * PROXIMO.md): pelo menos 44px de altura para o dedo acertar, e sem seleção de
@@ -70,6 +92,8 @@
 
 .folhaTitulo {
   justify-self: start;
+  /* Espaço reservado para o X (`.folhaFechar`) não cobrir um título longo. */
+  max-width: calc(100% - var(--altura-toque));
 }
 
 .folhaCorpo {

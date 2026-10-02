@@ -89,9 +89,20 @@
   gap: var(--espaco-4);
 }
 
+/**
+ * Achado do Gustavo em produção (01/10/2026, tablet deitado, marca com dois temas): os cartões
+ * ficavam em três colunas dentro de `--largura-leitura` (42rem), cada um com uns 200 px, o texto
+ * quebrando de duas em duas palavras e metade da tela vazia ao lado. A partir de 1024 o miolo usa
+ * `--largura-painel`, e as colunas se ajustam ao número de temas (dois temas ocupam a largura
+ * inteira em duas colunas), nunca com menos de 16rem cada.
+ */
 @media (min-width: 1024px) {
+  .miolo {
+    max-width: var(--largura-painel);
+  }
+
   .temasTres {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   }
 }
 

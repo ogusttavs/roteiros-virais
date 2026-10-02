@@ -146,6 +146,30 @@ test.describe("temas do dia pela tela", () => {
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
+  /**
+   * Achado do Gustavo em produção (01/10/2026, tablet deitado): os cartões de tema ficavam com uns
+   * 200 px, o título quebrando de duas em duas palavras. O título de cada cartão tem de ter pelo
+   * menos 190 px de largura (cartão de 16rem menos o respiro) do tablet deitado para cima.
+   */
+  for (const largura of [1024, 1180, 1280, 1920]) {
+    test(`os cartoes de tema usam a largura, sem espremer o titulo, em ${largura}px`, async ({ page }) => {
+      await page.setViewportSize({ width: largura, height: 900 });
+      await entrar(page, "e2e-temas@exemplo.teste");
+      await expect(page).toHaveURL(/\/hoje/);
+      await page.goto("/criar/temas");
+
+      for (const nome of ["tema de teste 1", "tema de teste 2", "tema de teste 3"]) {
+        const caixa = await page.getByRole("heading", { name: nome }).boundingBox();
+        expect(caixa, `titulo "${nome}" sem caixa`).not.toBeNull();
+        expect(caixa!.width, `titulo "${nome}" espremido em ${largura}px`).toBeGreaterThanOrEqual(190);
+      }
+      const semRolagem = await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      );
+      expect(semRolagem, "a tela nao pode rolar na horizontal").toBe(true);
+    });
+  }
+
   test("abre /hoje, ve os tres temas, avalia um tema livre e ve os cinco pilares", async ({ page }) => {
     await entrar(page, "e2e-temas@exemplo.teste");
     await expect(page).toHaveURL(/\/hoje/);
