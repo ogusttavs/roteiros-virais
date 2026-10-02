@@ -4,15 +4,10 @@ import { Filter, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
+import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo, Plataforma } from "@/db/schema";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import {
-  TAMANHO_PAGINA_TODOS_PADRAO,
-  type ContagensFiltroReferencias,
-  type OrdemReferencias,
-  type TipoConteudoFiltravel,
-  type VideoReferencia,
-} from "@/servicos/pesquisa";
+import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";

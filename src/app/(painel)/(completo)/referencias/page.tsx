@@ -1,6 +1,7 @@
 import { Bookmark } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -9,7 +10,6 @@ import {
   referenciasDoNicho,
   resolverPlataformasReferencias,
   setorAindaLendo,
-  TAMANHO_PAGINA_TODOS_PADRAO,
   todosOsVideosDoNicho,
   type OrdemReferencias,
   type TipoConteudoFiltravel,
