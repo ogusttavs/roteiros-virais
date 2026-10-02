@@ -7,9 +7,11 @@
  * produto já usa: `LIMIAR_FORA_DA_CURVA` (1,5x) marca "fora da curva de
  * verdade" em `formatarNumero.ts`; o dobro disso (3x) é o que separa uma
  * evidência comum de uma que sustenta uma promessa forte. A proporção
- * brasileira mínima é a mesma da regra 70/30 (`config.regras.proporcaoBrasil`,
- * escopo 5.11), para a força nunca aprovar um roteiro sustentado
- * majoritariamente por vídeo internacional.
+ * brasileira mínima é a régua do setor (`reguaDoSetor`, `proporcaoBrasil`;
+ * `PROPORCAO_BRASIL_MINIMA_FORTE` abaixo é só o padrão do produto, o mesmo
+ * de `config.regras.proporcaoBrasil`, para quem chama sem passar a régua),
+ * para a força nunca aprovar um roteiro sustentado majoritariamente por
+ * vídeo internacional (E42a, item 4, mesmo achado 2 da revisão do motor).
  */
 import type { ForcaEvidencia } from "@/db/schema";
 import { diasDesde, LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
@@ -41,11 +43,14 @@ export type EvidenciaParaForca = {
  * devolve "fraca": quem chama decide se mostra a seção (o roteiro sem
  * evidência nenhuma já troca o cartão por outro aviso, `RoteiroTela.tsx`).
  * `agora` só existe para o teste fixar a data; quem chama de verdade nunca
- * precisa passar.
+ * precisa passar. `proporcaoBrasilMinima` é a régua do setor
+ * (`reguaDoSetor(nichoId).proporcaoBrasil`); quem chama sem passar usa o
+ * padrão do produto (E42a, item 4).
  */
 export function forcaDaEvidencia(
   evidencias: readonly EvidenciaParaForca[],
   agora: Date = new Date(),
+  proporcaoBrasilMinima: number = LIMIARES_FORCA_EVIDENCIA.PROPORCAO_BRASIL_MINIMA_FORTE,
 ): ForcaEvidencia {
   if (evidencias.length === 0) return "fraca";
 
@@ -64,7 +69,7 @@ export function forcaDaEvidencia(
     contasDistintas >= L.MINIMO_CONTAS_FORTE &&
     maiorMultiplo >= L.MULTIPLO_MINIMO_FORTE &&
     idadeDoMaisNovoDias <= L.DIAS_MAX_FORTE &&
-    proporcaoBrasil >= L.PROPORCAO_BRASIL_MINIMA_FORTE;
+    proporcaoBrasil >= proporcaoBrasilMinima;
   if (forte) return "forte";
 
   const media =

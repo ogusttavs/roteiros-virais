@@ -16,7 +16,13 @@ const CAMADA_VAZIA = { concorrentes: [], termos: [], perfisAdmirados: [] };
 /** V12c, item 1 (a E37b): cidade/bairro saíram, alcance/regiao entraram no lugar. */
 describe("formatarCamadaExclusiva", () => {
   it("brasil: diz para nao citar cidade nem bairro", () => {
-    const texto = formatarCamadaExclusiva({ alcance: "brasil", regiao: null, camadaExclusiva: CAMADA_VAZIA });
+    const texto = formatarCamadaExclusiva({
+      alcance: "brasil",
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+    });
     expect(texto).toContain("Brasil inteiro");
     expect(texto).toContain("não cite cidade nem bairro");
   });
@@ -25,20 +31,66 @@ describe("formatarCamadaExclusiva", () => {
     const texto = formatarCamadaExclusiva({
       alcance: "local",
       regiao: "Campinas e região",
+      pais: null,
+      paises: null,
       camadaExclusiva: CAMADA_VAZIA,
     });
     expect(texto).toContain("Campinas e região");
   });
 
   it("local sem regiao (dado incompleto): nao quebra, so nao cita nada de local", () => {
-    const texto = formatarCamadaExclusiva({ alcance: "local", regiao: null, camadaExclusiva: CAMADA_VAZIA });
+    const texto = formatarCamadaExclusiva({
+      alcance: "local",
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+    });
     expect(texto).not.toContain("Região:");
+  });
+
+  /** E42a, item 1: o motor nao muda (a pesquisa continua so no Brasil), so o roteiro sabe o pais. */
+  it("outro_pais: cita o pais escrito, nao cidade nem bairro do Brasil", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: "outro_pais",
+      regiao: null,
+      pais: "Portugal",
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+    });
+    expect(texto).toContain("Portugal");
+    expect(texto).toContain("não cite cidade nem bairro do Brasil");
+  });
+
+  it("outro_pais sem pais (dado incompleto): nao quebra, so nao cita nada de pais", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: "outro_pais",
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+    });
+    expect(texto).not.toContain("Público no exterior");
+  });
+
+  it("mais_de_um_pais: cita os paises escritos, nao cidade nem bairro do Brasil", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: "mais_de_um_pais",
+      regiao: null,
+      pais: null,
+      paises: "Estados Unidos e México",
+      camadaExclusiva: CAMADA_VAZIA,
+    });
+    expect(texto).toContain("Estados Unidos e México");
+    expect(texto).toContain("não cite cidade nem bairro do Brasil");
   });
 
   it("sem alcance (cliente nunca passou pela tela nova): segue so com o resto da camada", () => {
     const texto = formatarCamadaExclusiva({
       alcance: null,
       regiao: null,
+      pais: null,
+      paises: null,
       camadaExclusiva: { ...CAMADA_VAZIA, concorrentes: ["Clínica Popular"] },
     });
     expect(texto).not.toContain("Brasil inteiro");

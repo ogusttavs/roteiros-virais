@@ -85,6 +85,9 @@ export const textosBriefing = {
     campoTiktok: "TikTok",
     campoYoutube: "YouTube",
     regiaoObrigatoria: "Diga a cidade ou região",
+    /** E42a, item 1: as duas opções novas de "onde está o seu público". */
+    paisObrigatorio: "Diga o país",
+    paisesObrigatorio: "Diga quais países",
     siteInvalido: "esse endereço não parece um site válido",
     /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
     perfilInvalido: "Confira o nome do perfil",

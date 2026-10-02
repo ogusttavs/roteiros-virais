@@ -2,10 +2,13 @@
  * A proporção 70/30, num lugar só (V2b, item 6, escopo 5.11: o Brasil
  * primeiro). Recebe uma lista já ordenada por prioridade e devolve até
  * `limite` itens com no máximo 30% de internacional **do que de fato sai**
- * (não de `limite`, achado da revisão do PR #46), nunca "outro", e nunca
- * completa com internacional quando falta brasileiro (a lista final fica
- * menor que `limite`; sem nenhum brasileiro, fica vazia). Usada em cinco
- * lugares: a fila do `transcrever`, a evidência do tema do dia e do
+ * (não de `limite`, achado da revisão do PR #46), nunca "outro". A fatia de
+ * fora é limitada pelo `limite` pedido (`limite × (1 − proporção)`), nunca
+ * por quantos brasileiros existem: setor sem nenhum vídeo brasileiro mostra
+ * os de fora até esse teto, em vez de zerar (E42a, item 3, decisão
+ * delegada pelo Gustavo ao Fable em 02/10, achado 2 da revisão do motor;
+ * antes disso, sem nenhum brasileiro o resultado vinha vazio). Usada em
+ * cinco lugares: a fila do `transcrever`, a evidência do tema do dia e do
  * roteiro, as Referências e os dez da análise visual; cada um passa a
  * própria função `classificar`, porque cada um tem um tipo de item
  * diferente (vídeo de pesquisa, evidência de tema, referência...).
@@ -52,12 +55,15 @@ export function contaEhBrasileira(pais: string | null, idiomaPrincipal: string |
  * confere o resultado dessa primeira passada pela proporção de verdade
  * (sobre os brasileiros que de fato entraram: achado da rodada anterior,
  * `max(1, floor(brasileiros × (1 − proporcaoBrasil) / proporcaoBrasil))`,
- * com pelo menos 1 vaga internacional quando há pelo menos 1 brasileiro, e
- * nenhuma quando não há nenhum) e tira o internacional excedente de menor
- * prioridade. Se sobrar vaga depois do corte, completa com brasileiro que
- * a primeira passada não chegou a examinar (só acontece quando ela parou
- * em `limite` antes do fim da lista). A ordem de prioridade original é
- * preservada em toda montagem; "outro" nunca entra.
+ * com pelo menos 1 vaga internacional quando há pelo menos 1 brasileiro) e
+ * tira o internacional excedente de menor prioridade. **Sem nenhum
+ * brasileiro, a segunda passada não aperta mais o teto** (E42a, item 3,
+ * decisão delegada pelo Gustavo ao Fable em 02/10): continua valendo o teto
+ * fixo da primeira passada, em vez de zerar o internacional que ela já
+ * tinha aceitado. Se sobrar vaga depois do corte, completa com brasileiro
+ * que a primeira passada não chegou a examinar (só acontece quando ela
+ * parou em `limite` antes do fim da lista). A ordem de prioridade original
+ * é preservada em toda montagem; "outro" nunca entra.
  */
 export function aplicarProporcaoBrasil<T>(
   itens: T[],
@@ -88,10 +94,21 @@ export function aplicarProporcaoBrasil<T>(
   }
 
   const brasileirosNoPasse1 = passe1.filter((item) => classificar(item) === "brasileiro").length;
-  const tetoFinal =
+  /**
+   * Revisão do Fable no PR 104 (E42a, item 3). Duas regras, a maior vale:
+   * (1) a proporção de verdade, sobre os brasileiros aceitos (a regra do PR 46: com brasileiro o
+   * bastante, a lista fica na proporção do setor);
+   * (2) o piso de conteúdo: a lista nunca fica menor que `capInternacionalPasse1` quando há vídeo
+   * de fora para completar. Cada brasileiro que entra toma o lugar de um de fora, até a proporção
+   * de verdade assumir. Sem a (2), a primeira correção deste PR soltava só o caso de zero
+   * brasileiros, e um brasileiro a mais fazia a tela mostrar menos do que nenhum (0 brasileiros:
+   * 9 de fora num limite de 30; 2 brasileiros: 2 mais 1).
+   */
+  const tetoProporcional =
     brasileirosNoPasse1 === 0
       ? 0
       : Math.max(1, Math.floor((brasileirosNoPasse1 * (1 - proporcaoBrasil)) / proporcaoBrasil));
+  const tetoFinal = Math.max(tetoProporcional, capInternacionalPasse1 - brasileirosNoPasse1);
 
   const resultado: T[] = [];
   let internacionaisMantidos = 0;
@@ -121,8 +138,10 @@ export function aplicarProporcaoBrasil<T>(
  * proporção do Brasil, que zerava o estrangeiro inteiro quando não havia nenhum brasileiro na
  * janela, qualquer que fosse a régua do setor. "Outro" continua de fora, mesma regra de sempre; a
  * ordem de prioridade e o corte em `limite` continuam os mesmos de `aplicarProporcaoBrasil`. O que
- * aparece nas telas (Referências) e a prova do tema e do roteiro continuam com a proporção, até o
- * Gustavo decidir (`estrategia/revisao-motor-2026-10-01.md`, achado 2).
+ * aparece nas telas (Referências) e a prova do tema e do roteiro continuam com a proporção
+ * (`aplicarProporcaoBrasil`), que por sua vez parou de zerar o estrangeiro sem brasileiro nenhum
+ * (E42a, item 3, decisão delegada pelo Gustavo ao Fable em 02/10,
+ * `estrategia/revisao-motor-2026-10-01.md`, achado 2).
  */
 export function semProporcaoBrasil<T>(itens: T[], limite: number, classificar: (item: T) => ClassificacaoBrasil): T[] {
   return itens.filter((item) => classificar(item) !== "outro").slice(0, limite);

@@ -16,11 +16,13 @@ import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./DadosFixosForm.module.css";
 
-/** `onde` usa os mesmos dois valores da coluna de "onde estão os clientes" (nota em `config/briefing.ts`, `OndeOpcao`). */
+/** `onde` usa os mesmos valores da coluna de "onde estão os clientes" (nota em `config/briefing.ts`, `OndeOpcao`). */
 export type DadosFixosIniciais = {
   nome: string;
-  onde: "brasil" | "local" | null;
+  onde: "brasil" | "local" | "outro_pais" | "mais_de_um_pais" | null;
   regiao: string | null;
+  pais: string | null;
+  paises: string | null;
   site: string | null;
   nichoId: number | null;
   ramoOutro: string | null;
@@ -47,8 +49,10 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     : dadosFixos.persona.opcoes[0].valor;
 
   const [nome, setNome] = useState(inicial.nome);
-  const [onde, setOnde] = useState<"brasil" | "local" | "">(inicial.onde ?? "");
+  const [onde, setOnde] = useState<"brasil" | "local" | "outro_pais" | "mais_de_um_pais" | "">(inicial.onde ?? "");
   const [regiao, setRegiao] = useState(inicial.regiao ?? "");
+  const [pais, setPais] = useState(inicial.pais ?? "");
+  const [paises, setPaises] = useState(inicial.paises ?? "");
   const [site, setSite] = useState(inicial.site ?? "");
   /**
    * Sem ramo escolhido ainda (cliente novo, sem nichoId nem ramoOutro), o
@@ -89,6 +93,8 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     nome.trim().length > 0 &&
     onde.length > 0 &&
     (onde !== "local" || regiao.trim().length > 0) &&
+    (onde !== "outro_pais" || pais.trim().length > 0) &&
+    (onde !== "mais_de_um_pais" || paises.trim().length > 0) &&
     (site.trim().length === 0 || siteValido(site.trim())) &&
     (nichoId !== OUTRO || ramoOutro.trim().length > 0);
 
@@ -105,7 +111,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
       await onSalvar({
         nome,
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
-        ...montarCampoOnde(onde as "brasil" | "local", regiao.trim()),
+        ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
         site: site.trim() || undefined,
         nichoId: nichoId === OUTRO ? undefined : nichoId,
         ramoOutro: nichoId === OUTRO ? ramoOutro : undefined,
@@ -188,6 +194,27 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
             onChange={(evento) => setRegiao(evento.target.value)}
             erro={tentouEnviar && regiao.trim().length === 0 ? t.regiaoObrigatoria : undefined}
           />
+        ) : null}
+        {onde === "outro_pais" ? (
+          <Campo
+            rotulo={dadosFixos.onde.campoPais.rotulo}
+            ajuda={dadosFixos.onde.campoPais.ajuda}
+            value={pais}
+            onChange={(evento) => setPais(evento.target.value)}
+            erro={tentouEnviar && pais.trim().length === 0 ? t.paisObrigatorio : undefined}
+          />
+        ) : null}
+        {onde === "mais_de_um_pais" ? (
+          <Campo
+            rotulo={dadosFixos.onde.campoPaises.rotulo}
+            ajuda={dadosFixos.onde.campoPaises.ajuda}
+            value={paises}
+            onChange={(evento) => setPaises(evento.target.value)}
+            erro={tentouEnviar && paises.trim().length === 0 ? t.paisesObrigatorio : undefined}
+          />
+        ) : null}
+        {onde === "outro_pais" || onde === "mais_de_um_pais" ? (
+          <p className={styles.ajudaGrupo}>{dadosFixos.onde.avisoPesquisaNoBrasil}</p>
         ) : null}
       </Cartao>
 

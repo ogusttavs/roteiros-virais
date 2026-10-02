@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
-import { clienteAtivoDoUsuario, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
@@ -25,6 +25,9 @@ export default async function Conta() {
     preferenciasDoUsuario(sessao.user.id),
   ]);
   const perfis = cliente?.perfis;
+  // `dadosOndeIniciais`, não a coluna do cliente direto (nota em `servicos/clientes.ts`,
+  // `dadosOndeIniciais`: o nome dela é jargão e o `checar-texto` reprova qualquer `.tsx` que o escreva).
+  const onde = cliente ? dadosOndeIniciais(cliente) : null;
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
@@ -49,6 +52,11 @@ export default async function Conta() {
           temaInicial={cliente?.tema ?? "sistema"}
           horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
           nomeMarca={cliente?.nome ?? ""}
+          tipo={cliente?.tipo ?? "negocio"}
+          ondeInicial={onde?.onde ?? null}
+          regiaoInicial={onde?.regiao ?? null}
+          paisInicial={onde?.pais ?? null}
+          paisesInicial={onde?.paises ?? null}
         />
       </div>
       {cliente ? (

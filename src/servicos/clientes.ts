@@ -524,13 +524,16 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
  *
  * V12c, item 1 (a E37b): cidade e bairro saem da validacao, `alcance` entra
  * no lugar ("brasil" ou "local"); com "local", `regiao` passa a ser
- * obrigatoria.
+ * obrigatoria. E42a, item 1 (achado do Gustavo em 02/10): mais dois valores,
+ * "outro_pais" (exige `pais`) e "mais_de_um_pais" (exige `paises`).
  */
 export const dadosFixosSchema = z
   .object({
     nome: z.string().trim().min(1),
-    alcance: z.enum(["brasil", "local"]),
+    alcance: z.enum(["brasil", "local", "outro_pais", "mais_de_um_pais"]),
     regiao: z.string().trim().optional(),
+    pais: z.string().trim().optional(),
+    paises: z.string().trim().optional(),
     site: z
       .string()
       .trim()
@@ -556,6 +559,14 @@ export const dadosFixosSchema = z
   .refine((dados) => dados.alcance !== "local" || Boolean(dados.regiao?.trim()), {
     message: "escreva a cidade ou região",
     path: ["regiao"],
+  })
+  .refine((dados) => dados.alcance !== "outro_pais" || Boolean(dados.pais?.trim()), {
+    message: "escreva o país",
+    path: ["pais"],
+  })
+  .refine((dados) => dados.alcance !== "mais_de_um_pais" || Boolean(dados.paises?.trim()), {
+    message: "escreva quais países",
+    path: ["paises"],
   });
 
 export type DadosFixos = z.infer<typeof dadosFixosSchema>;
@@ -569,8 +580,10 @@ export type DadosFixos = z.infer<typeof dadosFixosSchema>;
  * (`avaliarResposta.ts`): a palavra fica só nos arquivos que o checar-texto
  * não varre.
  */
-export function dadosOndeIniciais(cliente: Pick<Cliente, "alcance" | "regiao">): { onde: Alcance | null; regiao: string | null } {
-  return { onde: cliente.alcance, regiao: cliente.regiao };
+export function dadosOndeIniciais(
+  cliente: Pick<Cliente, "alcance" | "regiao" | "pais" | "paises">,
+): { onde: Alcance | null; regiao: string | null; pais: string | null; paises: string | null } {
+  return { onde: cliente.alcance, regiao: cliente.regiao, pais: cliente.pais, paises: cliente.paises };
 }
 
 export function clienteTemOndeEscolhido(cliente: Pick<Cliente, "alcance">): boolean {
@@ -592,6 +605,8 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
       nome: dados.nome,
       alcance: dados.alcance,
       regiao: dados.alcance === "local" ? (dados.regiao?.trim() ?? null) : null,
+      pais: dados.alcance === "outro_pais" ? (dados.pais?.trim() ?? null) : null,
+      paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
       site: dados.site?.trim() || null,
       nichoId: dados.nichoId ?? null,
       ramoOutro: dados.nichoId ? null : (dados.ramoOutro?.trim() ?? null),
@@ -724,6 +739,51 @@ export async function salvarTema(clienteId: number, tema: string): Promise<Clien
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar o tema; cliente nao encontrado.");
+  return cliente;
+}
+
+/**
+ * "Onde está o seu público?" editável pela Conta (E42a, item 1, achado do Gustavo em 02/10, no
+ * Começar pelo celular: "tá muito limitado ao Brasil"). Mesma validação de `dadosFixosSchema` para
+ * esta fatia, mas sem ramo nem persona: a Conta não mostra esses campos, mesma razão de
+ * `salvarPerfilConta` acima (ler o cliente primeiro para preservar o resto seria uma
+ * leitura-depois-escrita sem necessidade).
+ */
+const ondeContaSchema = z
+  .object({
+    alcance: z.enum(["brasil", "local", "outro_pais", "mais_de_um_pais"]),
+    regiao: z.string().trim().optional(),
+    pais: z.string().trim().optional(),
+    paises: z.string().trim().optional(),
+  })
+  .refine((dados) => dados.alcance !== "local" || Boolean(dados.regiao?.trim()), {
+    message: "escreva a cidade ou região",
+    path: ["regiao"],
+  })
+  .refine((dados) => dados.alcance !== "outro_pais" || Boolean(dados.pais?.trim()), {
+    message: "escreva o país",
+    path: ["pais"],
+  })
+  .refine((dados) => dados.alcance !== "mais_de_um_pais" || Boolean(dados.paises?.trim()), {
+    message: "escreva quais países",
+    path: ["paises"],
+  });
+
+export async function salvarOndeConta(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  const dados = ondeContaSchema.parse(dadosBrutos);
+
+  const [cliente] = await db()
+    .update(clientes)
+    .set({
+      alcance: dados.alcance,
+      regiao: dados.alcance === "local" ? (dados.regiao?.trim() ?? null) : null,
+      pais: dados.alcance === "outro_pais" ? (dados.pais?.trim() ?? null) : null,
+      paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
+    })
+    .where(eq(clientes.id, clienteId))
+    .returning();
+
+  if (!cliente) throw new ErroCliente("nao foi possivel salvar onde esta o publico; cliente nao encontrado.");
   return cliente;
 }
 
