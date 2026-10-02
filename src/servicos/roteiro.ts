@@ -50,6 +50,7 @@ import { textosRoteiro } from "@/textos/roteiro";
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { noticiaPorId } from "./noticias";
 import {
   evidenciaParaRoteiro,
   evidenciaPorIds,
@@ -328,6 +329,13 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * (`resolverQuemAparece`, abaixo); a troca vale só para este roteiro, o briefing não muda.
    */
   quemAparece?: QuemGrava;
+  /**
+   * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia" (Tema livre, estado
+   * `comNoticia`). Resolvida aqui, escopada pelo nicho do cliente, nunca confiando num id de outro
+   * setor vindo do client; `origem` continua `"livre"` (é o mesmo fluxo de tema livre, só com um
+   * ponto de partida), a notícia vira um campo próprio em vez de uma quarta origem.
+   */
+  noticiaId?: number;
 };
 
 /**
@@ -781,6 +789,12 @@ type MontarERoteiroDados = {
    * o bloco do momento e o contexto de série para o prompt.
    */
   momento?: Momento;
+  /**
+   * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". Ao contrário do
+   * momento, não muda a busca de evidência (continua normal, pelo tema); só acrescenta o bloco da
+   * notícia na entrada do prompt.
+   */
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null };
 };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
@@ -960,6 +974,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         : undefined,
       contextoDeSerie,
       marcaCitada,
+      noticia: dados.noticia,
     }),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
@@ -1084,6 +1099,12 @@ export async function gerarRoteiro(
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
   const estilo = params.estilo ?? "falado";
+  // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
+  const noticiaLinha =
+    params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;
+  const noticia = noticiaLinha
+    ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
+    : undefined;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
@@ -1097,6 +1118,7 @@ export async function gerarRoteiro(
     observacao: params.observacao,
     evidenciasPrevistas,
     momento,
+    noticia,
   });
 
   const [roteiro] = await db()
@@ -1116,6 +1138,8 @@ export async function gerarRoteiro(
       objetivoDoVideo: params.objetivoDoVideo ?? momento?.objetivoDoVideo,
       // V12c, item 3: só grava quando é diferente do padrão do cliente, para a troca por vídeo nunca sobrescrever o briefing.
       quemAparece: params.quemAparece ?? null,
+      // E43: só quando a notícia foi de fato encontrada no setor do cliente (nunca um id solto).
+      noticiaId: noticiaLinha?.id ?? null,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -1162,6 +1186,12 @@ export async function reprovarERescrever(
 
   // V9a, item 1: um roteiro de momento reescrito continua sem busca de evidência, com o mesmo bloco na entrada.
   const momento = atual.momento ?? undefined;
+  // E43: idem, a reescrita mantém a notícia de origem da versão anterior.
+  const noticiaLinha =
+    atual.noticiaId && cliente.nichoId ? await noticiaPorId(atual.noticiaId, cliente.nichoId) : null;
+  const noticia = noticiaLinha
+    ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
+    : undefined;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId: atual.clienteId,
@@ -1185,6 +1215,7 @@ export async function reprovarERescrever(
       duracaoAnteriorS: atual.conteudo.duracaoS,
     },
     momento,
+    noticia,
   });
 
   const [novaVersao] = await db()
@@ -1202,6 +1233,8 @@ export async function reprovarERescrever(
       estilo: atual.estilo,
       objetivoDoVideo: atual.objetivoDoVideo,
       quemAparece: atual.quemAparece,
+      // E43: idem, a reescrita mantém a notícia de origem.
+      noticiaId: atual.noticiaId,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,

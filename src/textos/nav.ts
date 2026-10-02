@@ -5,16 +5,19 @@ export const textosNav = {
   /** E39c, parte 2a: a aba do planejador (passo 12 do Opus), decisão do Gustavo de 01/10, 22:15. */
   planejar: "Planejar",
   referencias: "Referências",
+  /** E43: aba própria, entre Referências e Histórico (decisão do Gustavo de 01/10, 22:20). */
+  noticias: "Notícias",
   historico: "Histórico",
   /**
    * Passo 13 do Opus (01/10, 23:50): no celular só Hoje, Criar e Planejar cabem na cápsula (o que
-   * se faz todo dia); "Mais" abre uma folha com o que é para consultar. A aba Notícias entra na
-   * lista só quando a E43 existir.
+   * se faz todo dia); "Mais" abre uma folha com o que é para consultar (Referências, Notícias,
+   * Histórico).
    */
   mais: "Mais",
-  maisAriaLabel: "Mais: Referências e Histórico",
+  maisAriaLabel: "Mais: Referências, Notícias e Histórico",
   maisAriaLabelLista: "Para consultar",
   ajudaReferencias: "Os vídeos que estão funcionando no seu setor",
+  ajudaNoticias: "O que saiu sobre o seu setor, e como virar vídeo",
   ajudaHistorico: "Os seus roteiros e como foram os vídeos",
   /** E39a: Briefing sai da navegação e vira uma linha dentro de Conta (desenho do Opus, dúvida 2). */
   briefing: "Briefing",

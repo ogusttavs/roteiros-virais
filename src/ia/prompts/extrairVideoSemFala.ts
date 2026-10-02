@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { TIPOS_CONTEUDO } from "@/db/schema";
 
+import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
@@ -29,8 +30,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * M5b, item 2 (02/10/2026): `formato` ganha `.catch("outro")`, mesmo conserto e mesmo motivo de
  * `extrairVideo.ts` (um valor fora da lista não pode reprovar a ficha inteira). Versão 1.3.0.
+ *
+ * Tipo de vídeo inválido (1.4.0, E43 item 0, achado da prova com chave real do PR #102, mesmo
+ * conserto de `extrairVideo.ts`): `tipoConteudo` fora da lista vira "original" com `serveDeModelo`
+ * forçado para `false` (`corrigirTipoConteudoInvalido`, `ia/tipo-video-seguro.ts`), em vez de
+ * reprovar a ficha inteira ou confiar num `serveDeModelo` que o modelo escreveu junto de uma
+ * classificação inventada.
  */
-export const versao = "1.3.0";
+export const versao = "1.4.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -38,7 +45,7 @@ export const esforco: EsforcoIA | undefined = "medium";
 const LEMBRETE_ACENTUACAO =
   "Escreva a ficha inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que o título ou a legenda do post estejam sem acento.";
 
-export const schema = z.object({
+const schemaBruto = z.object({
   assunto: z.string(),
   /** M3, item 2: sem fala, o gancho descreve o que aparece na tela, não o que é dito. */
   gancho: z.string(),
@@ -55,6 +62,8 @@ export const schema = z.object({
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
 });
+
+export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
 
 export type SaidaExtrairVideoSemFala = z.infer<typeof schema>;
 

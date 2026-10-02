@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   classificarMultiplo,
   diasDesde,
+  formatarDataHoraPorExtenso,
+  formatarFonteEData,
   formatarMultiplo,
+  formatarTempoRelativo,
   formatarVelocidade,
   formatarViewsCompacto,
   formatarViewsExato,
@@ -110,5 +113,62 @@ describe("classificarMultiplo e rotuloMultiploConta", () => {
     expect(rotuloMultiploConta("acima", "setor")).toBe("acima da média do seu setor");
     expect(rotuloMultiploConta("media", "setor")).toBe("na média do seu setor");
     expect(rotuloMultiploConta("abaixo", "setor")).toBe("abaixo da média do seu setor");
+  });
+});
+
+/** E43, dúvida 3 do passo 11: a lista de notícias usa isto para "há N horas"/"ontem"/"há N dias"/data. */
+describe("formatarTempoRelativo", () => {
+  const AGORA = new Date("2026-10-02T12:00:00-03:00");
+
+  it("menos de uma hora: agora mesmo", () => {
+    expect(formatarTempoRelativo(new Date("2026-10-02T11:40:00-03:00"), AGORA)).toBe("agora mesmo");
+  });
+
+  it("dentro de 24h: ha N horas, singular e plural", () => {
+    expect(formatarTempoRelativo(new Date("2026-10-02T11:00:00-03:00"), AGORA)).toBe("há 1 hora");
+    expect(formatarTempoRelativo(new Date("2026-10-02T09:00:00-03:00"), AGORA)).toBe("há 3 horas");
+  });
+
+  it("um dia inteiro: ontem", () => {
+    expect(formatarTempoRelativo(new Date("2026-10-01T12:00:00-03:00"), AGORA)).toBe("ontem");
+  });
+
+  it("de 2 a 6 dias: ha N dias", () => {
+    expect(formatarTempoRelativo(new Date("2026-09-30T12:00:00-03:00"), AGORA)).toBe("há 2 dias");
+    expect(formatarTempoRelativo(new Date("2026-09-27T12:00:00-03:00"), AGORA)).toBe("há 5 dias");
+  });
+
+  it("uma semana ou mais: a data por extenso, sem hora", () => {
+    expect(formatarTempoRelativo(new Date("2026-09-25T12:00:00-03:00"), AGORA)).toBe("25 de setembro");
+    expect(formatarTempoRelativo(new Date("2026-08-10T12:00:00-03:00"), AGORA)).toBe("10 de agosto");
+  });
+});
+
+describe("formatarFonteEData", () => {
+  const AGORA = new Date("2026-10-02T12:00:00-03:00");
+
+  it("fonte e data: junta com um ponto", () => {
+    expect(formatarFonteEData("Portal do Varejo", new Date("2026-10-02T09:00:00-03:00"), AGORA)).toBe(
+      "Portal do Varejo · há 3 horas",
+    );
+  });
+
+  it("sem fonte: só a data", () => {
+    expect(formatarFonteEData(null, new Date("2026-10-02T09:00:00-03:00"), AGORA)).toBe("há 3 horas");
+  });
+
+  it("sem data: só a fonte", () => {
+    expect(formatarFonteEData("Portal do Varejo", null, AGORA)).toBe("Portal do Varejo");
+  });
+
+  it("sem os dois: string vazia", () => {
+    expect(formatarFonteEData(null, null, AGORA)).toBe("");
+  });
+});
+
+/** E43, dúvida 3 do passo 11: a notícia aberta mostra data e hora exatas. */
+describe("formatarDataHoraPorExtenso", () => {
+  it("dia, mes por extenso e hora, separados por virgula", () => {
+    expect(formatarDataHoraPorExtenso(new Date("2026-09-07T10:10:00Z"))).toBe("7 de setembro, 07:10");
   });
 });

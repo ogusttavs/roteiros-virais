@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Calendar, History, House, SquarePlus } from "lucide-react";
+import { Bookmark, Calendar, History, House, Newspaper, SquarePlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, type ComponentType } from "react";
@@ -24,12 +24,16 @@ import { ehRotaAtiva } from "./navAtivo";
  * faz todo dia de um lado, o que e para consultar do outro). A capsula do celular NAO usa este
  * componente: so tres (Hoje, Criar, Planejar) cabem a 360px com o rotulo inteiro, os outros vao
  * para o botao "Mais" (`CapsulaNav.tsx`, `../../_casca/CapsulaNav.tsx`), que abre uma folha.
+ *
+ * E43 (decisao do Gustavo de 01/10, 22:20; passo 13 do Opus): "Noticias" entra entre Referencias e
+ * Historico, com icone de jornal.
  */
 const ITENS: { href: string; rotulo: string; Icone: ComponentType<{ size?: number; strokeWidth?: number }>; divisorDepois?: boolean }[] = [
   { href: "/hoje", rotulo: textosNav.hoje, Icone: House },
   { href: "/criar", rotulo: textosNav.criar, Icone: SquarePlus },
   { href: "/planejamento", rotulo: textosNav.planejar, Icone: Calendar, divisorDepois: true },
   { href: "/referencias", rotulo: textosNav.referencias, Icone: Bookmark },
+  { href: "/noticias", rotulo: textosNav.noticias, Icone: Newspaper },
   { href: "/historico", rotulo: textosNav.historico, Icone: History },
 ];
 

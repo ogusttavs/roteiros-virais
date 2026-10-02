@@ -43,7 +43,7 @@ describe("montarEntrada", () => {
  * por um valor fora da lista em `formato` ou `tipoAbertura`). O valor desconhecido vira "outro"
  * em vez de perder a ficha inteira do vídeo.
  */
-function fichaExemplo(sobrescreve: Partial<Record<"formato" | "tipoAbertura", unknown>> = {}) {
+function fichaExemplo(sobrescreve: Partial<Record<"formato" | "tipoAbertura" | "idioma" | "tipoConteudo" | "serveDeModelo", unknown>> = {}) {
   return {
     assunto: "assunto",
     gancho: "gancho",
@@ -81,5 +81,31 @@ describe("schema, valor fora da lista em formato/tipoAbertura vira outro (M5b, i
     expect(resultado.success).toBe(true);
     expect(resultado.success && resultado.data.formato).toBe("podcast");
     expect(resultado.success && resultado.data.tipoAbertura).toBe("numero");
+  });
+});
+
+/**
+ * E43, item 0 (achado da prova com chave real do PR #102): `idioma` e `tipoConteudo` fora da
+ * lista também reprovavam a ficha inteira.
+ */
+describe("schema, idioma e tipoConteudo invalidos (E43, item 0)", () => {
+  it("idioma desconhecido vira outro, sem reprovar a ficha inteira", () => {
+    const resultado = schema.safeParse(fichaExemplo({ idioma: "idioma_que_nao_existe" }));
+    expect(resultado.success).toBe(true);
+    expect(resultado.success && resultado.data.idioma).toBe("outro");
+  });
+
+  it("tipoConteudo desconhecido vira original, e serveDeModelo e forcado para false mesmo que tivesse vindo true", () => {
+    const resultado = schema.safeParse(fichaExemplo({ tipoConteudo: "anuncio", serveDeModelo: true }));
+    expect(resultado.success).toBe(true);
+    expect(resultado.success && resultado.data.tipoConteudo).toBe("original");
+    expect(resultado.success && resultado.data.serveDeModelo).toBe(false);
+  });
+
+  it("tipoConteudo valido continua exato, com o serveDeModelo que veio", () => {
+    const resultado = schema.safeParse(fichaExemplo({ tipoConteudo: "meme", serveDeModelo: false }));
+    expect(resultado.success).toBe(true);
+    expect(resultado.success && resultado.data.tipoConteudo).toBe("meme");
+    expect(resultado.success && resultado.data.serveDeModelo).toBe(false);
   });
 });

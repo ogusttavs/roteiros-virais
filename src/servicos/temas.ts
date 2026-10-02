@@ -350,7 +350,12 @@ function mediaCincoPilares(pilares: avaliarTemaIA.SaidaAvaliarTema["pilares"]): 
  * baixa no pilar "viralizar"), mas nenhum id fora do que foi fornecido pode
  * ser citado.
  */
-export async function avaliarTema(cliente: Cliente, texto: string): Promise<ResultadoAvaliarTema> {
+export async function avaliarTema(
+  cliente: Cliente,
+  texto: string,
+  /** E43: já resolvida por quem chama (a ação sabe o `clienteId`, então confere o setor dela ao buscar). */
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null },
+): Promise<ResultadoAvaliarTema> {
   if (!cliente.nichoId) {
     throw new ErroTemas("este cliente ainda nao tem um nicho definido.");
   }
@@ -380,7 +385,7 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
       persona: cliente.persona,
       regrasCliente,
     }),
-    entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias }),
+    entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias, noticia }),
     // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
     // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).
     lembreteFinal: avaliarTemaIA.LEMBRETE_ACENTUACAO,

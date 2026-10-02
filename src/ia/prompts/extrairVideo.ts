@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { TIPOS_ABERTURA, TIPOS_CONTEUDO } from "@/db/schema";
 
+import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
@@ -68,8 +69,15 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * reconhecer "POV" e legenda de outra página sobreposta na tela, sinais que vivem no resto da
  * legenda, fora do título. `montarEntrada` passa a receber a legenda inteira do post
  * (`videos.descricao`, até 400 caracteres) e o @ da conta.
+ *
+ * Idioma e tipo de vídeo inválidos (1.10.0, E43 item 0, achado da prova com chave real do PR
+ * #102): `idioma` fora da lista também reprovava a ficha inteira (`formato`/`tipoAbertura` já
+ * tinham `.catch`, este ficou de fora); ganha `.catch("outro")`. `tipoConteudo` fora da lista
+ * ganha o mesmo tratamento, mas acoplado a `serveDeModelo` (`corrigirTipoConteudoInvalido`,
+ * `ia/tipo-video-seguro.ts`): vira "original" com `serveDeModelo` forçado para `false`, nunca
+ * confiando no que o modelo escreveu para esse campo junto de uma classificação inventada.
  */
-export const versao = "1.9.0";
+export const versao = "1.10.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -77,7 +85,7 @@ export const esforco: EsforcoIA | undefined = undefined;
 const LEMBRETE_ACENTUACAO =
   "Escreva a ficha inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que a transcrição original esteja em outro idioma ou sem acento.";
 
-export const schema = z.object({
+const schemaBruto = z.object({
   assunto: z.string(),
   gancho: z.string(),
   estrutura: z.string(),
@@ -92,11 +100,13 @@ export const schema = z.object({
   etiquetas: z.array(z.string()),
   pertenceAoNicho: z.boolean(),
   motivoNicho: z.string(),
-  idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]),
+  idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]).catch("outro"),
   tipoAbertura: z.enum(TIPOS_ABERTURA).catch("outro"),
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
 });
+
+export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
 
 export type SaidaExtrairVideo = z.infer<typeof schema>;
 

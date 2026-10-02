@@ -220,6 +220,31 @@
   color: var(--cor-texto-dica);
 }
 
+/* ---------- E43, "Criar vídeo com esta notícia": a notícia presa no alto ---------- */
+
+.noticiaPresa {
+  gap: var(--espaco-3);
+}
+
+.topoNoticiaPresa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+}
+
+.tituloNoticiaPresa {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.fonteENoticiaPresa {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
 /* ---------- Estado "proposta": o campo ---------- */
 
 .campo {
