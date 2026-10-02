@@ -2,7 +2,7 @@
 
 import { ArrowLeft, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAgendaDoDia, ItemAtrasado } from "@/servicos/roteiro";
@@ -131,6 +131,7 @@ function AtrasadoCard({
   sozinho,
   hoje,
   aoResolver,
+  aoGravarHoje,
   aoMudouAlgo,
 }: {
   item: ItemAtrasado;
@@ -138,6 +139,12 @@ function AtrasadoCard({
   hoje: string;
   /** Some da lista na hora, sem esperar o `router.refresh()` de `aoMudouAlgo` buscar a tela de novo a tempo. */
   aoResolver: () => void;
+  /**
+   * "Gravar hoje" (achado da revisão do Fable no PR #91: a CI flakou 1 de 257, o item demorava a
+   * reaparecer em "Reels de hoje"): o item some do Atrasado e aparece em "Reels de hoje" na hora,
+   * mesmo raciocínio do `AindaValeBloco`, sem esperar o `router.refresh()` de `aoMudouAlgo`.
+   */
+  aoGravarHoje: (item: ItemAtrasado) => void;
   aoMudouAlgo: () => void;
 }) {
   const tratarFalha = useTratarFalha();
@@ -146,7 +153,7 @@ function AtrasadoCard({
   const [erro, setErro] = useState<string | null>(null);
   const [folhaMudarDiaAberta, setFolhaMudarDiaAberta] = useState(false);
 
-  function executar(chave: string, tarefa: () => Promise<unknown>) {
+  function executar(chave: string, tarefa: () => Promise<unknown>, aposSucesso?: () => void) {
     if (ocupado) return;
     setErro(null);
     setChaveOcupada(chave);
@@ -154,6 +161,7 @@ function AtrasadoCard({
       try {
         await tarefa();
         aoResolver();
+        aposSucesso?.();
         aoMudouAlgo();
       } catch (falha) {
         setErro(tratarFalha(falha, textosHoje.agenda.atrasado.erroSalvar));
@@ -186,7 +194,7 @@ function AtrasadoCard({
             className={styles.botaoPrimario}
             disabled={ocupado}
             aria-busy={chaveOcupada === "gravar" && ocupado}
-            onClick={() => executar("gravar", () => mudarDataAtrasadoAction(item.id, hoje))}
+            onClick={() => executar("gravar", () => mudarDataAtrasadoAction(item.id, hoje), () => aoGravarHoje(item))}
           >
             {textosHoje.agenda.atrasado.gravarHoje}
           </button>
@@ -343,7 +351,7 @@ export function HojeTela({
   diaVisualizado,
   ehHoje,
   diaVisualizadoExtenso,
-  agenda,
+  agenda: agendaInicial,
   atrasados,
   aindaVale,
   proximoMarcado,
@@ -377,9 +385,29 @@ export function HojeTela({
   }
 
   /** E39b: depois de arquivar, mudar o dia ou conferir "ainda vale", a Agenda recarrega do banco
-   * (o estado guardado é sempre a fonte da verdade, nunca um valor otimista no cliente). */
+   * (o estado guardado é sempre a fonte da verdade); `agenda` abaixo é só para "Gravar hoje"
+   * aparecer na hora em "Reels de hoje", sem esperar este `router.refresh()`. */
   function recarregarAgenda() {
     router.refresh();
+  }
+
+  /**
+   * Revisão do Fable no PR #91 (achado de CI, 1 de 257): "Gravar hoje" só tirava o item do
+   * Atrasado; "Reels de hoje" esperava o `router.refresh()` de `recarregarAgenda` buscar a tela de
+   * novo, e sob carga isso corria o risco de não terminar a tempo (mesma classe de corrida já
+   * corrigida para "ainda vale" e "arquivar"). `agenda` vira estado do cliente, com o mesmo
+   * `useEffect` de resincronia que `CriarTela.tsx` usa para `planoDeHoje`: sem ele, o refresh de
+   * fora (sem navegação, como o de `recarregarAgenda`) não reatualiza a tela se este componente
+   * não desmontar.
+   */
+  const [agenda, setAgenda] = useState(agendaInicial);
+  useEffect(() => {
+    setAgenda(agendaInicial);
+  }, [agendaInicial]);
+
+  /** "Gravar hoje" só aparece quando hoje está livre (`sozinho`), então o Reels do dia vira só este item. */
+  function moverParaReelsDeHoje(item: ItemAtrasado) {
+    setAgenda((atual) => ({ ...atual, reels: [item] }));
   }
 
   const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0;
@@ -524,6 +552,7 @@ export function HojeTela({
                   sozinho={diaVazio}
                   hoje={diaVisualizado}
                   aoResolver={() => marcarAtrasadoResolvido(item.id)}
+                  aoGravarHoje={moverParaReelsDeHoje}
                   aoMudouAlgo={recarregarAgenda}
                 />
               ))}
