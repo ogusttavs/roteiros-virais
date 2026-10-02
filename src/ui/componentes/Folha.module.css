@@ -45,37 +45,17 @@
   }
 }
 
-/* E39c, parte 1: o X, fora da área de arrastar, no canto superior direito. */
-.folhaFechar {
-  position: absolute;
-  top: var(--espaco-2);
-  right: var(--espaco-2);
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--altura-toque);
-  height: var(--altura-toque);
-  border: 0;
-  border-radius: var(--raio-md);
-  background: transparent;
-  color: var(--cor-texto-suave);
-  cursor: pointer;
-}
-
-.folhaFechar:hover {
-  background: var(--cor-superficie-recuada);
-}
-
 /*
- * A alça e o título são a área de arrastar (`usePuxarParaFechar`, V7, item 1 do
- * PROXIMO.md): pelo menos 44px de altura para o dedo acertar, e sem seleção de
- * texto para o arrasto (com o dedo parado ou o mouse) não marcar o título.
+ * Passo 12 do Opus, `base.css`, `.folha-topo.com-fechar`: grade de duas colunas, a alça
+ * ocupando as duas no alto (linha 1), o título na primeira coluna e o X na segunda (linha 2).
+ * Toda folha nasce com o X; não existe mais a versão sem ele.
  */
 .folhaTopo {
   display: grid;
-  justify-items: center;
-  gap: var(--espaco-3);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: stretch;
+  column-gap: var(--espaco-3);
   min-height: var(--altura-toque);
   padding: var(--espaco-3) var(--espaco-5) var(--espaco-4);
   border-bottom: var(--largura-borda) solid var(--cor-divisor);
@@ -84,6 +64,8 @@
 }
 
 .folhaAlca {
+  grid-column: 1 / -1;
+  justify-self: center;
   width: 2.25rem;
   height: 0.3125rem;
   border-radius: var(--raio-pill);
@@ -92,8 +74,20 @@
 
 .folhaTitulo {
   justify-self: start;
-  /* Espaço reservado para o X (`.folhaFechar`) não cobrir um título longo. */
-  max-width: calc(100% - var(--altura-toque));
+}
+
+/* `base.css`, `.fechar-folha`: pílula preenchida, não só ao passar o mouse. */
+.folhaFechar {
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  margin-right: calc(var(--espaco-2) * -1);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-suave);
+  cursor: pointer;
 }
 
 .folhaCorpo {
