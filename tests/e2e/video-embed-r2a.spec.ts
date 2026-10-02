@@ -136,7 +136,15 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
 
     const secao = page.locator("section", { hasText: "Referência" });
     await expect(secao.getByText("O trecho que interessa começa em 0:04")).toBeVisible();
-    await expect(secao.locator("iframe")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/jNQXAC9IVRw\?start=4/, {
+    // R2b, item 1: nada carrega sozinho, nem o iframe nem o pedido ao YouTube; só a capa, o nome
+    // da rede e "começa em 0:04", até o toque.
+    const botaoTocar = secao.getByRole("button", { name: /^Tocar / });
+    await expect(botaoTocar).toBeVisible();
+    await expect(botaoTocar).toContainText("YouTube");
+    await expect(botaoTocar).toContainText("começa em 0:04");
+    await expect(secao.locator("iframe")).toHaveCount(0);
+    await botaoTocar.click();
+    await expect(secao.locator("iframe")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/jNQXAC9IVRw\?start=4&autoplay=1/, {
       timeout: 10_000,
     });
   });
@@ -210,6 +218,8 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
+    // R2b, item 1: a capa com o play antes de tocar; só o toque monta o iframe de verdade.
+    await folha.getByRole("button", { name: /^Tocar / }).click();
     await expect(folha.locator("iframe")).toHaveAttribute("src", "https://www.instagram.com/p/e2e-r2a-instagram/embed", {
       timeout: 10_000,
     });
@@ -220,6 +230,7 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
     const cartaoTiktok = page.locator("article", { hasText: "video que a rede nao deixa mostrar" });
     await cartaoTiktok.getByRole("button", { name: "Ver detalhes" }).click();
     await expect(folha).toBeVisible();
+    await folha.getByRole("button", { name: /^Tocar / }).click();
     await expect(folha.getByText("O TikTok não deixa mostrar este vídeo aqui.")).toBeVisible({ timeout: 10_000 });
     await expect(folha.getByRole("link", { name: "Abrir no TikTok" })).toBeVisible();
     // A folha continua com o próprio "Abrir na plataforma" no rodapé, sem relação com o reserva

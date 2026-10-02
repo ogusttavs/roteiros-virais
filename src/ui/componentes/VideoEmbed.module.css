@@ -1,23 +1,8 @@
-.marcador {
-  aspect-ratio: 9 / 16;
-  width: 100%;
-  border-radius: var(--raio-lg);
-  background: repeating-linear-gradient(135deg, var(--cor-superficie-recuada) 0 12px, var(--cor-superficie) 12px 24px);
-  border: 1px solid var(--cor-borda);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: var(--espaco-3);
-  color: var(--cor-titulo);
-}
-
 .rotuloCarregamento {
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rotulo);
   letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
-  color: var(--cor-texto-dica);
   text-align: center;
   padding: 0 var(--espaco-4);
 }
@@ -85,4 +70,86 @@
   font-size: var(--tamanho-secundario);
   font-weight: 500;
   text-decoration: none;
+}
+
+/** Sobre a capa parada (antes do toque) e enquanto carrega: mais escuro que o véu do reserva. */
+.veuForte {
+  background: color-mix(in srgb, var(--cor-video) 78%, transparent);
+}
+
+/**
+ * R2b, item 1: a capa com o play antes de tocar (`.previa-detalhe[data-passo="detalhes"]` do
+ * desenho). Um `<button>`, não um `<div>`: o toque é a única forma de carregar o vídeo de verdade.
+ */
+.capaJogar {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  aspect-ratio: 9 / 16;
+  width: 100%;
+  border: 0;
+  border-radius: var(--raio-lg);
+  background: var(--cor-video);
+  color: var(--cor-video-texto);
+  padding: var(--espaco-4);
+  cursor: pointer;
+}
+
+.redePrevia {
+  justify-self: start;
+  align-self: start;
+  font: var(--peso-medio) var(--tamanho-rodape)/1 var(--fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+}
+
+.comeca {
+  justify-self: start;
+  align-self: end;
+  font-size: var(--tamanho-rodape);
+}
+
+.tocarIcone {
+  justify-self: center;
+  align-self: center;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cor-video-texto) 90%, transparent);
+  color: var(--cor-video);
+  grid-row: 1 / -1;
+  grid-column: 1 / -1;
+}
+
+.carregando {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: var(--espaco-3);
+  color: var(--cor-video-texto);
+}
+
+.carregando .spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: girarEmbed 0.9s linear infinite;
+}
+
+@keyframes girarEmbed {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carregando .spinner {
+    animation-duration: 1.6s;
+  }
 }

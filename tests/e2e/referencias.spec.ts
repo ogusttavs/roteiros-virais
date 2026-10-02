@@ -538,6 +538,8 @@ test.describe("/referencias no design v2", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
+    // R2b, item 1: a capa com o play antes de tocar; só o toque monta o iframe de verdade.
+    await folha.getByRole("button", { name: /^Tocar / }).click();
     await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/jNQXAC9IVRw/);
   });
 });
