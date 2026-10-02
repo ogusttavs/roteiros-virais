@@ -582,8 +582,12 @@ describe("evidenciaParaTema", () => {
     expect(resultado.map((v) => v.assunto)).not.toContain("en-1");
   });
 
-  /** A nova regra: sem nenhum brasileiro na evidencia disponivel, o resultado e vazio. */
-  it("sem nenhum brasileiro disponivel, a evidencia vem vazia mesmo com internacional de sobra", async () => {
+  /**
+   * E42a, item 3 (decisão delegada pelo Gustavo ao Fable em 02/10): sem nenhum brasileiro, o teto
+   * continua o da primeira passada (`floor(limite × (1 − proporção))`, aqui `floor(10 × 0,3) = 3`
+   * com a régua padrão de 70%), nunca zero. Antes desta etapa o resultado vinha vazio.
+   */
+  it("sem nenhum brasileiro disponivel, a evidencia traz os de fora até o teto do limite, nunca vazia", async () => {
     for (let i = 0; i < 4; i += 1) {
       await criarVideo(`ev-sem-brasil-en-${i}`, {
         foraDaCurva: 50 - i,
@@ -596,7 +600,7 @@ describe("evidenciaParaTema", () => {
 
     const resultado = await evidenciaParaTema(nichoId, "assunto so internacional", 10);
 
-    expect(resultado).toEqual([]);
+    expect(resultado.map((v) => v.assunto)).toEqual(["sem-brasil-en-0", "sem-brasil-en-1", "sem-brasil-en-2"]);
   });
 
   /**
@@ -915,15 +919,28 @@ describe("referenciasDoNicho", () => {
     await db().delete(nichos).where(eq(nichos.id, nichoProporcao.id));
   });
 
-  /** A nova regra: sem nenhum brasileiro na base disponivel, o resultado e vazio. */
-  it("sem nenhum brasileiro disponivel, referencias vem vazia mesmo com internacional de sobra", async () => {
+  /**
+   * E42a, item 3 (decisão delegada pelo Gustavo ao Fable em 02/10): sem nenhum brasileiro, o teto
+   * continua o da primeira passada (`floor(10 × 0,3) = 3` com a régua padrão de 70%), nunca zero.
+   * Antes desta etapa o resultado vinha vazio.
+   */
+  it("sem nenhum brasileiro disponivel, referencias traz os de fora até o teto do limite, nunca vazia", async () => {
     const [nichoSemBrasil] = await db()
       .insert(nichos)
       .values({ slug: "pesquisa-sem-brasil-teste", nome: "Pesquisa sem brasil teste", termos: [] })
       .returning();
-    const [contaSemBrasil] = await db()
+    // Uma conta por vídeo (em vez de uma só para os quatro): isola a proporção do Brasil do teto
+    // por conta (`aplicarTetoPorConta`, no máximo 2 seguidos da mesma conta), que entraria depois
+    // e tiraria um vídeo por um motivo diferente do que este teste prova.
+    const contasSemBrasil = await db()
       .insert(contas)
-      .values({ plataforma: "tiktok", handle: "conta-pesquisa-sem-brasil", nichoId: nichoSemBrasil.id })
+      .values(
+        Array.from({ length: 4 }, (_, i) => ({
+          plataforma: "tiktok" as const,
+          handle: `conta-pesquisa-sem-brasil-${i + 1}`,
+          nichoId: nichoSemBrasil.id,
+        })),
+      )
       .returning();
 
     for (let i = 1; i <= 4; i += 1) {
@@ -931,7 +948,7 @@ describe("referenciasDoNicho", () => {
         foraDaCurva: 5,
         publicadoEm: diasAtras(i),
         idioma: "en",
-        contaId: contaSemBrasil.id,
+        contaId: contasSemBrasil[i - 1].id,
         nichoId: nichoSemBrasil.id,
         analise: {
           gancho: "gancho",
@@ -945,7 +962,11 @@ describe("referenciasDoNicho", () => {
 
     const resultado = await referenciasDoNicho(nichoSemBrasil.id, { periodoDias: 90, limite: 10 });
 
-    expect(resultado.videos).toEqual([]);
+    const assuntosSemBrasil = resultado.videos.map((v) => v.assunto);
+    // Com todos empatados em fora_da_curva, o mais recente (menos dias atrás) vem primeiro; só os 3
+    // de maior prioridade cabem no teto (floor(10 × 0,3) = 3), o quarto fica de fora.
+    expect(assuntosSemBrasil).toEqual(["ref-sem-brasil-en-1", "ref-sem-brasil-en-2", "ref-sem-brasil-en-3"]);
+    expect(assuntosSemBrasil).not.toContain("ref-sem-brasil-en-4");
 
     await db().delete(videos).where(eq(videos.nichoId, nichoSemBrasil.id));
     await db().delete(contas).where(eq(contas.nichoId, nichoSemBrasil.id));

@@ -464,14 +464,21 @@ describe("gerarRoteiro", () => {
     expect(roteiro.conteudo.evidencias).toContain(idPt);
   });
 
-  /** Revisao do PR #46: sem nenhum brasileiro na base, a evidencia vem vazia, nunca so internacional. */
-  it("sem nenhum brasileiro disponivel, evidencia do roteiro vem vazia mesmo com internacional de sobra", async () => {
+  /**
+   * E42a, item 3 (decisão delegada pelo Gustavo ao Fable em 02/10): sem nenhum brasileiro, o teto
+   * continua o da primeira passada (`floor(LIMITE_EVIDENCIA × 0,3) = floor(8 × 0,3) = 2` com a régua
+   * padrão de 70%), nunca zero. Antes desta etapa a evidência vinha vazia.
+   */
+  it("sem nenhum brasileiro disponivel, evidencia do roteiro traz os de fora até o teto do limite, nunca vazia", async () => {
     const clienteId = await criarCliente();
+    const idsEn: number[] = [];
     for (let i = 1; i <= 4; i += 1) {
-      await criarVideoEvidencia(`prop-sem-brasil-en-${i}`, "vazamento no telhado do galpao", {
-        idioma: "en",
-        foraDaCurva: 20 - i,
-      });
+      idsEn.push(
+        await criarVideoEvidencia(`prop-sem-brasil-en-${i}`, "vazamento no telhado do galpao", {
+          idioma: "en",
+          foraDaCurva: 20 - i, // i=1 e i=2 (as duas maiores) cabem no teto; i=3 e i=4 ficam de fora.
+        }),
+      );
     }
 
     const roteiro = await gerarRoteiro(clienteId, {
@@ -480,8 +487,8 @@ describe("gerarRoteiro", () => {
       objetivo: "conversao",
     });
 
-    expect(roteiro.conteudo.evidencias).toEqual([]);
-    expect(roteiro.conteudo.semEvidencia).toBe(true);
+    expect(roteiro.conteudo.evidencias).toEqual([idsEn[0], idsEn[1]]);
+    expect(roteiro.conteudo.semEvidencia).toBe(false);
   });
 
   /** E40, item 0 (resto da revisao do PR #80): a evidencia do roteiro lia config.regras.proporcaoBrasil

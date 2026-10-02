@@ -60,8 +60,12 @@ describe("aplicarProporcaoBrasil", () => {
     expect(resultado.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  /** Achado da revisão do PR #46: sem nenhum brasileiro, o resultado é vazio, nunca só internacional. */
-  it("nada brasileiro: resultado vazio", () => {
+  /**
+   * E42a, item 3 (decisão delegada pelo Gustavo ao Fable em 02/10, achado 2 da revisão do motor):
+   * sem nenhum brasileiro, o teto continua o da primeira passada (`floor(limite × (1 − proporção))`,
+   * aqui `floor(10 × 0,3) = 3`), nunca zero. Antes desta etapa o resultado vinha vazio.
+   */
+  it("nada brasileiro: mantém o teto da primeira passada, nunca zera", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "en" },
       { id: 2, idioma: "es" },
@@ -70,7 +74,21 @@ describe("aplicarProporcaoBrasil", () => {
       { id: 5, idioma: "en" },
     ];
     const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
-    expect(resultado).toEqual([]);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3]);
+  });
+
+  /** Mesmo caso, régua em 30% (setor ajustado para mais internacional): o teto sobe para floor(10 × 0,7) = 7. */
+  it("nada brasileiro, régua do setor em 30%: o teto acompanha a régua, não fica preso em 70%", () => {
+    const itens: ItemTeste[] = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, idioma: "en" }));
+    const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.3);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  /** A régua em 70% com mais internacional do que o teto comporta: só os de maior prioridade entram. */
+  it("nada brasileiro, régua em 70%, internacional de sobra: só os de maior prioridade até o teto", () => {
+    const itens: ItemTeste[] = Array.from({ length: 8 }, (_, i) => ({ id: i + 1, idioma: "en" }));
+    const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3]);
   });
 
   /**

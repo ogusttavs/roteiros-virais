@@ -70,4 +70,29 @@ describe("forcaDaEvidencia", () => {
     ];
     expect(forcaDaEvidencia(evidencias, HOJE)).toBe("fraca");
   });
+
+  /**
+   * E42a, item 4 (decisão delegada pelo Gustavo ao Fable em 02/10): a proporção mínima não é mais
+   * fixa em 70%, lê a régua do setor. O mesmo caso de "maioria internacional: nunca forte" acima
+   * (1 de 3 brasileiro, ~33%) vira "forte" com a régua do setor ajustada para 30%.
+   */
+  it("régua do setor em 30%: maioria internacional pode ser forte, quando antes nunca era", () => {
+    const evidencias = [
+      evidencia({ contaId: 1, foraDaCurva: 5, contaBrasileira: false }),
+      evidencia({ contaId: 2, foraDaCurva: 4, contaBrasileira: false }),
+      evidencia({ contaId: 3, foraDaCurva: 6, contaBrasileira: true }),
+    ];
+    expect(forcaDaEvidencia(evidencias, HOJE, 0.3)).toBe("forte");
+  });
+
+  it("régua do setor em 90%: 75% brasileiro é forte no padrão de 70%, mas não a 90%", () => {
+    const evidencias = [
+      evidencia({ contaId: 1, foraDaCurva: 5, contaBrasileira: true }),
+      evidencia({ contaId: 2, foraDaCurva: 4, contaBrasileira: true }),
+      evidencia({ contaId: 3, foraDaCurva: 4, contaBrasileira: true }),
+      evidencia({ contaId: 4, foraDaCurva: 4, contaBrasileira: false }),
+    ];
+    expect(forcaDaEvidencia(evidencias, HOJE)).toBe("forte");
+    expect(forcaDaEvidencia(evidencias, HOJE, 0.9)).toBe("media");
+  });
 });
