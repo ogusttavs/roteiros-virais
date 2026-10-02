@@ -3,6 +3,8 @@
 import { ExternalLink, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { textosComuns } from "@/textos/comuns";
+
 import styles from "./VideoEmbed.module.css";
 
 export type VideoEmbedProps = {
@@ -12,12 +14,24 @@ export type VideoEmbedProps = {
   rotuloCarregamento: string;
   /** Quando o ator/API nao devolve embed oficial para a plataforma (TikTok e Instagram hoje). */
   falhou?: boolean;
-  linkExterno: { rotulo: string; href: string };
+  /** Só o endereço: o texto do botão do reserva ("Abrir no Instagram") vem do nome da rede, que a própria URL já diz. */
+  hrefExterno: string;
   /** O embed já carrega começando neste segundo (RoteiroTela, "olha como ele faz aos X"). */
   segundoInicial?: number;
+  /** R2a: a capa do vídeo, para a moldura escurecida do reserva quando a rede não deixa mostrar o embed. */
+  capaUrl?: string | null;
 };
 
 type Props = VideoEmbedProps;
+
+const t = textosComuns.videoReserva;
+
+function nomeDaRede(idYoutube: string | null, urlInstagram: string | null, eTiktok: boolean): string | null {
+  if (idYoutube) return "YouTube";
+  if (urlInstagram) return "Instagram";
+  if (eTiktok) return "TikTok";
+  return null;
+}
 
 /** Quanto esperar a resposta do TikTok antes de mostrar só o link (V7, item 4 do PROXIMO.md). */
 const TEMPO_LIMITE_OEMBED_MS = 8000;
@@ -55,26 +69,25 @@ function eUrlDoTiktok(url: string): boolean {
 
 /**
  * Embed oficial 9:16, carregamento tardio ao entrar na tela (RoteiroTela,
- * ReferenciasTela). YouTube e Instagram viram iframe só por transformação de
- * URL; o TikTok não expõe o id do vídeo de forma confiável em toda URL
- * (link curto de compartilhamento não traz o número), então o carregamento
- * tardio dispara uma chamada ao oEmbed oficial do TikTok
+ * ReferenciasTela; desenho do passo 14, `entregaveis/design-v2/entrega/telas/base.css`,
+ * `.moldura-video`). O YouTube vira iframe só por transformação de URL
+ * (`youtube-nocookie.com/embed`); o TikTok não expõe o id do vídeo de forma
+ * confiável em toda URL (link curto de compartilhamento não traz o número),
+ * então o carregamento tardio dispara uma chamada ao oEmbed oficial do TikTok
  * (`https://www.tiktok.com/oembed?url=`) só para extrair o id do vídeo, sem
  * injetar o HTML nem o script que a resposta traz: o iframe final
- * (`/embed/v2/<id>`) é montado à mão, mesma regra das outras duas
- * plataformas, sem SDK de terceiro no bundle.
+ * (`/embed/v2/<id>`) é montado à mão. O Instagram cai sempre no reserva (prova
+ * da R2a com vídeo de verdade: o embed carrega em branco para um domínio que
+ * ele não reconhece, com ou sem o `embed.js` oficial), ver o comentário do
+ * temporizador abaixo. A capa com o play antes de tocar (o estado `previa` do
+ * desenho) fica para a R2b; aqui o carregamento continua automático ao
+ * entrar na tela.
  */
-export function VideoEmbed({
-  url,
-  alt,
-  rotuloCarregamento,
-  falhou = false,
-  linkExterno,
-  segundoInicial,
-}: Props) {
+export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefExterno, segundoInicial, capaUrl = null }: Props) {
   const [visivel, setVisivel] = useState(false);
   const [idTiktok, setIdTiktok] = useState<string | null>(null);
   const [falhouTiktok, setFalhouTiktok] = useState(false);
+  const [falhouInstagram, setFalhouInstagram] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const idYoutube = idDoYoutube(url);
   const urlInstagram = urlEmbedInstagram(url);
@@ -97,8 +110,8 @@ export function VideoEmbed({
     if (!visivel || !eTiktok || idTiktok || falhouTiktok) return;
     let cancelado = false;
     // Rede ruim não deixa o bloco 9:16 em "Carregando o vídeo" sem fim (V7, item 4 do PROXIMO.md): sem rede nem
-    // tenta, e com rede lenta desiste em 8 s. Nos dois casos cai no link para a plataforma, pelo mesmo caminho
-    // da falha (assíncrono).
+    // tenta, e com rede lenta desiste em 8 s. Nos dois casos cai no reserva, pelo mesmo caminho da falha
+    // (assíncrono).
     const pedido =
       navigator.onLine === false
         ? Promise.reject(new Error("sem rede"))
@@ -124,34 +137,57 @@ export function VideoEmbed({
     };
   }, [visivel, eTiktok, idTiktok, falhouTiktok, url]);
 
-  if (falhou || falhouTiktok) {
-    return (
-      <a href={linkExterno.href} className={styles.fallback}>
-        {linkExterno.rotulo}
-        <ExternalLink size={16} strokeWidth={1.5} aria-hidden="true" />
-      </a>
-    );
+  useEffect(() => {
+    if (!visivel || !urlInstagram || falhouInstagram) return;
+    /**
+     * O Instagram não devolve erro nenhum para um domínio que ele não reconhece: o iframe carrega
+     * em branco, para sempre (achado da prova com vídeo de verdade da R2a: nos dois jeitos
+     * testados, com `/embed` direto e com o `embed.js` oficial mais a mensagem de redimensionar que
+     * ele espera de volta, nenhum dos dois jamais recebeu essa mensagem). Sem sinal de sucesso para
+     * esperar, o iframe do Instagram nem chega a ser montado (não existe um bloco "visivel &&
+     * urlInstagram" abaixo, de propósito): o mesmo tempo limite do TikTok decide, e cai no reserva
+     * em vez de um retângulo em branco parado para sempre. Se um dia o Instagram passar a mandar essa
+     * mensagem para o nosso domínio, a correção é ouvir `message` aqui, confirmar o sucesso antes do
+     * tempo esgotar e só então montar o iframe de verdade.
+     */
+    const temporizador = setTimeout(() => setFalhouInstagram(true), TEMPO_LIMITE_OEMBED_MS);
+    return () => clearTimeout(temporizador);
+  }, [visivel, urlInstagram, falhouInstagram]);
+
+  if (falhou || falhouTiktok || falhouInstagram) {
+    const rede = nomeDaRede(idYoutube, urlInstagram, eTiktok);
+    // Sempre há uma rede aqui: as três falhas só disparam depois de a URL já ter sido
+    // reconhecida como uma das três (achado próprio é o caso de baixo, `!embedavel`, sem rede
+    // nenhuma reconhecida, que não tem o que escrever no botão).
+    if (rede) {
+      return (
+        <div className={styles.moldura} aria-label={alt}>
+          {capaUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
+            <img src={capaUrl} alt="" className={styles.capa} />
+          ) : null}
+          <span className={styles.veu} aria-hidden="true" />
+          <div className={styles.reserva}>
+            <p>{t.texto(rede)}</p>
+            <a href={hrefExterno} className={styles.botaoReserva}>
+              <ExternalLink size={16} strokeWidth={1.5} aria-hidden="true" />
+              {t.abrir(rede)}
+            </a>
+          </div>
+        </div>
+      );
+    }
   }
 
+  if (!embedavel) return null;
+
   if (visivel && idYoutube) {
-    const src = new URL(`https://www.youtube.com/embed/${idYoutube}`);
+    const src = new URL(`https://www.youtube-nocookie.com/embed/${idYoutube}`);
     if (segundoInicial) src.searchParams.set("start", String(Math.trunc(segundoInicial)));
     return (
       <iframe
         className={styles.iframe}
         src={src.toString()}
-        title={alt}
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-      />
-    );
-  }
-
-  if (visivel && urlInstagram) {
-    return (
-      <iframe
-        className={styles.iframe}
-        src={urlInstagram}
         title={alt}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen

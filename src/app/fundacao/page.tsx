@@ -288,6 +288,7 @@ export default function Fundacao() {
               porQueFuncionou: "Todo mundo se reconhece no erro e fica para ver o certo.",
               capaUrl: null,
               semFala: false,
+              segundoChave: 4,
             }}
             salvo={false}
             onVerDetalhes={() => undefined}

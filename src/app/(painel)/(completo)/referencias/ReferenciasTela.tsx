@@ -71,6 +71,7 @@ function formatarVideo(v: VideoReferencia): VideoFormatado {
     porQueFuncionou: v.porQueFuncionou,
     capaUrl: v.capaUrl,
     semFala: v.semFala === true,
+    segundoChave: v.segundoChave,
   };
 }
 

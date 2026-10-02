@@ -80,7 +80,9 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
         url={url}
         alt={textosReferencias.embedAlt(video.contaNome)}
         rotuloCarregamento={textosReferencias.embedCarregando}
-        linkExterno={{ rotulo: textosReferencias.abrirNaPlataforma, href: url }}
+        hrefExterno={url}
+        segundoInicial={video.segundoChave ?? undefined}
+        capaUrl={video.capaUrl}
       />
 
       <div className={styles.videoConta}>

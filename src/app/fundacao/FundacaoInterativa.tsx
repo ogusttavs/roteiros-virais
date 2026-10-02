@@ -32,7 +32,7 @@ export function FundacaoInterativa() {
               url="https://www.youtube.com/watch?v=dQw4w9WgXcQ"
               alt="Vídeo de referência"
               rotuloCarregamento="Carregando o vídeo"
-              linkExterno={{ rotulo: "abrir o vídeo de referência", href: "https://www.youtube.com" }}
+              hrefExterno="https://www.youtube.com"
             />
           </div>
           <div style={{ width: 180 }}>
@@ -41,7 +41,7 @@ export function FundacaoInterativa() {
               alt="Vídeo de referência"
               rotuloCarregamento="Carregando o vídeo"
               falhou
-              linkExterno={{ rotulo: "abrir o vídeo", href: "https://www.tiktok.com" }}
+              hrefExterno="https://www.tiktok.com"
             />
           </div>
         </div>

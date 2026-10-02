@@ -538,7 +538,7 @@ test.describe("/referencias no design v2", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
-    await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube\.com\/embed\/jNQXAC9IVRw/);
+    await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/jNQXAC9IVRw/);
   });
 });
 
