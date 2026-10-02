@@ -1,30 +1,24 @@
-.marcador {
-  aspect-ratio: 9 / 16;
-  width: 100%;
-  border-radius: var(--raio-lg);
-  background: repeating-linear-gradient(135deg, var(--cor-superficie-recuada) 0 12px, var(--cor-superficie) 12px 24px);
-  border: 1px solid var(--cor-borda);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: var(--espaco-3);
-  color: var(--cor-titulo);
-}
-
 .rotuloCarregamento {
   font-family: var(--fonte-mono);
   font-size: var(--tamanho-rotulo);
   letter-spacing: var(--espacamento-rotulo);
   text-transform: uppercase;
-  color: var(--cor-texto-dica);
   text-align: center;
   padding: 0 var(--espaco-4);
 }
 
+/**
+ * Sem `aspect-ratio` aqui: quem decide o tamanho é sempre quem chama (R2b, revisão do Fable no
+ * PR #100, achado 1 e 3: dentro da folha "Por que esse funcionou" a moldura precisa de uma altura
+ * por faixa de largura, e dentro do "De onde veio" do roteiro precisa da largura do cartão
+ * inteiro; um `aspect-ratio` fixo aqui nunca serviria aos dois ao mesmo tempo). `width`/`height`
+ * preenchem o que o wrapper de cada tela já reserva (`FolhaDetalhesVideo.module.css`,
+ * `CartaoDeOndeVeio.module.css`), que é quem carrega o 9:16 de verdade.
+ */
 .iframe {
-  aspect-ratio: 9 / 16;
+  display: block;
   width: 100%;
+  height: 100%;
   border: 0;
   border-radius: var(--raio-lg);
 }
@@ -41,8 +35,8 @@
   isolation: isolate;
   display: grid;
   place-items: center;
-  aspect-ratio: 9 / 16;
   width: 100%;
+  height: 100%;
   border-radius: var(--raio-lg);
   background: var(--cor-video);
   color: var(--cor-video-texto);
@@ -85,4 +79,100 @@
   font-size: var(--tamanho-secundario);
   font-weight: 500;
   text-decoration: none;
+}
+
+/** Sobre a capa parada (antes do toque) e enquanto carrega: mais escuro que o véu do reserva. */
+.veuForte {
+  background: color-mix(in srgb, var(--cor-video) 78%, transparent);
+}
+
+/**
+ * R2b, item 1: a capa com o play antes de tocar (`.previa-detalhe[data-passo="detalhes"]` do
+ * desenho). Um `<button>`, não um `<div>`: o toque é a única forma de carregar o vídeo de verdade.
+ *
+ * Achado da revisão do Fable no PR #100: as três sobreposições (rede, "começa em", o play) tinham
+ * `justify-self`/`align-self` como se `.capaJogar` fosse uma grade de uma célula só, mas sem
+ * `grid-template-*` cada uma vira a própria linha implícita (o padrão do CSS Grid é uma célula por
+ * item, não todas empilhadas); na tela, a rede ficava solta no meio da moldura em vez do canto. As
+ * três agora são `position: absolute`, a mesma técnica já usada para `.capa`/`.veu` aqui do lado.
+ */
+.capaJogar {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: var(--raio-lg);
+  background: var(--cor-video);
+  color: var(--cor-video-texto);
+  padding: 0;
+  cursor: pointer;
+}
+
+.redePrevia {
+  position: absolute;
+  top: var(--espaco-4);
+  left: var(--espaco-4);
+  z-index: 1;
+  font: var(--peso-medio) var(--tamanho-rodape)/1 var(--fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-rotulo);
+}
+
+.comeca {
+  position: absolute;
+  bottom: var(--espaco-4);
+  left: var(--espaco-4);
+  z-index: 1;
+  font-size: var(--tamanho-rodape);
+}
+
+.tocarIcone {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--cor-video-texto) 90%, transparent);
+  color: var(--cor-video);
+}
+
+.carregando {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: var(--espaco-3);
+  color: var(--cor-video-texto);
+}
+
+.carregando .spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: girarEmbed 0.9s linear infinite;
+}
+
+@keyframes girarEmbed {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carregando .spinner {
+    animation-duration: 1.6s;
+  }
 }

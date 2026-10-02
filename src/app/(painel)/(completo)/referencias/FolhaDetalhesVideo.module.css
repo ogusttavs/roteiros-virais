@@ -1,7 +1,50 @@
 /**
  * Design v2, `Referencias.dc.html`, `.folha-detalhe` (V6, item 5): o corpo
  * vem de `Folha.module.css`; aqui só o que é específico desta folha.
+ *
+ * `.corpo`/`.videoWrapper` (revisão do Fable no PR #100): até 1023px o vídeo fica empilhado, numa
+ * altura por faixa de largura (nunca ocupando a folha inteira); a partir de 1024px vira duas
+ * colunas, o vídeo à esquerda, grudado no topo, o texto à direita, sem precisar rolar para ver a
+ * conta e os números (`Referencias.Previa.1280`).
  */
+.corpo {
+  display: grid;
+  gap: var(--espaco-5);
+}
+
+.videoWrapper {
+  aspect-ratio: 9 / 16;
+  width: auto;
+  height: min(56vh, 30rem);
+  justify-self: center;
+}
+
+@media (min-width: 768px) {
+  .videoWrapper {
+    height: min(44vh, 26rem);
+  }
+}
+
+@media (min-width: 1024px) {
+  .corpo {
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: var(--espaco-8);
+    align-items: start;
+  }
+  .corpo > .videoWrapper {
+    grid-column: 1;
+    grid-row: 1 / span 9;
+    position: sticky;
+    top: 0;
+    justify-self: start;
+    width: auto;
+    height: min(calc(86vh - 12.5rem), 30rem);
+  }
+  .corpo > :not(.videoWrapper) {
+    grid-column: 2;
+  }
+}
+
 .videoConta {
   display: grid;
   gap: var(--espaco-1);

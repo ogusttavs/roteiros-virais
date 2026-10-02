@@ -852,6 +852,13 @@ export const videos = pgTable(
     index("videos_execucao_id").on(t.execucaoId),
     /** Proporcao 70/30 por nicho (V2b, item 6): filtra por idioma dentro do nicho. */
     index("videos_nicho_idioma").on(t.nichoId, t.idioma),
+    /**
+     * R2b, item 1: o segmento "Todos" ordena por views sem o corte do piso nem do múltiplo, então
+     * pode varrer um volume bem maior que "Fora da curva"; sem este índice, `ordem: "views"` cairia
+     * no mesmo plano de `videos_nicho_publicado` (ordena por data, teria que reordenar tudo em
+     * memória). `foraDaCurva` e `velocidadeRelativa` já tinham índice próprio; só `views` faltava.
+     */
+    index("videos_nicho_views").on(t.nichoId, t.views),
   ],
 );
 

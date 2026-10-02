@@ -1,0 +1,1 @@
+CREATE INDEX "videos_nicho_views" ON "videos" USING btree ("nicho_id","views");

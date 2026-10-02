@@ -76,4 +76,14 @@ export const textosComuns = {
     texto: (rede: string) => `O ${rede} não deixa mostrar este vídeo aqui.`,
     abrir: (rede: string) => `Abrir no ${rede}`,
   },
+  /**
+   * R2b, item 1: a capa com o play antes de tocar (desenho do passo 14, `.previa-detalhe`
+   * `data-passo="detalhes"`, `.comeca`/`.rede-previa`/`.tocar`). O vídeo só carrega de verdade
+   * depois do toque; antes disso é só a capa, o nome da rede e, quando a análise visual achou um
+   * momento-chave, "começa em 0:04".
+   */
+  videoPrevia: {
+    tocar: (alt: string) => `Tocar o ${alt}`,
+    comeca: (segundos: number) => `começa em ${Math.floor(segundos / 60)}:${String(Math.floor(segundos) % 60).padStart(2, "0")}`,
+  },
 };

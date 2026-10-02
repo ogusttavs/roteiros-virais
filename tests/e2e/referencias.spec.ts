@@ -299,7 +299,8 @@ test.describe("/referencias no design v2", () => {
 
     await expect(folha).not.toBeVisible();
     await expect(page).toHaveURL(/plataforma=tiktok/);
-    await expect(page.getByRole("button", { name: /Filtrar, 1/ })).toBeVisible();
+    // R2b: o hotfix da vírgula solta ("Filtrar , 2"); a contagem virou um badge com o número, sem vírgula.
+    await expect(page.getByRole("button", { name: /^Filtrar/ })).toContainText("1");
 
     const cartaoTiktok = page.locator("article", { hasText: "organizando o guarda roupa em dez minutos" });
     await expect(cartaoTiktok).toBeVisible();
@@ -538,6 +539,8 @@ test.describe("/referencias no design v2", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
+    // R2b, item 1: a capa com o play antes de tocar; só o toque monta o iframe de verdade.
+    await folha.getByRole("button", { name: /^Tocar / }).click();
     await expect(folha.locator("iframe")).toHaveAttribute("src", /youtube-nocookie\.com\/embed\/jNQXAC9IVRw/);
   });
 });

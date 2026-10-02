@@ -13,6 +13,7 @@
  */
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, type SQL, sql } from "drizzle-orm";
 
+import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import { db } from "@/db";
 import {
   contas,
@@ -25,6 +26,7 @@ import {
   type ModeloNicho,
   type Plataforma,
   type TipoAbertura,
+  type TipoConteudo,
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
@@ -788,6 +790,20 @@ export type VideoReferencia = {
   semFala: boolean | null;
   /** R2a: `analiseVisual.momentoChave.segundo`, para o embed já começar ali; `null` sem análise visual. */
   segundoChave: number | null;
+  /**
+   * R2b, item 2: o que a extração classificou este vídeo como (H4, item 2); `null` em vídeo
+   * analisado antes da coluna existir. "meme"/"recorte" viram o selo no cartão; "original" e
+   * "noticia" não mostram selo nenhum.
+   */
+  tipoConteudo: TipoConteudo | null;
+  /**
+   * R2b, item 3: `true` quando o vídeo não bate a régua do setor (piso de views ou o múltiplo de
+   * 1,5x) que "Fora da curva" exige; só o segmento "Todos" mostra vídeo assim, com o selo
+   * tracejado "abaixo do que a gente usa como prova". Nunca muda o que entra em roteiro ou em
+   * prova de tema (isso continua em `condicoesReferencias`/`evidenciaParaRoteiro`/`evidenciaParaTema`,
+   * intocados).
+   */
+  abaixoDaRegua: boolean;
 };
 
 /**
@@ -798,6 +814,12 @@ export type VideoReferencia = {
  * divergir sem ninguém notar).
  */
 const LIMIAR_FORA_DA_CURVA_CONSULTA = String(LIMIAR_FORA_DA_CURVA);
+
+/** R2b, item 2: as quatro ordens que o banco já sabe calcular; "recentes" é o padrão de sempre. */
+export type OrdemReferencias = "recentes" | "views" | "multiplo" | "velocidade";
+
+/** Tipos de conteúdo que entram como filtro (R2b, item 2): meme e recorte, os dois que `serveDeModelo` tira hoje. */
+export type TipoConteudoFiltravel = Extract<TipoConteudo, "meme" | "recorte">;
 
 export type FiltrosReferencias = {
   /** 7, 30 ou 90; padrão 7, como o design. */
@@ -810,6 +832,16 @@ export type FiltrosReferencias = {
   apenasIds?: number[];
   limite?: number;
   proporcaoBrasil?: number;
+  /** R2b, item 2: "mais de X views" (o piso da faixa); `undefined` é "qualquer número". */
+  viewsMin?: number;
+  /** R2b, item 2: `true` só com fala, `false` só sem fala, `undefined` os dois. */
+  comFala?: boolean;
+  /** R2b, item 2: `true` só Brasil, `false` só de fora, `undefined` os dois. Mesma classificação de `classificarBrasil`/`contaEhBrasileira`, traduzida para SQL em `condicaoBrasil`. */
+  brasil?: boolean;
+  /** R2b, item 2: a parte de "Tipo de vídeo" que não é `formatos` (o campo `analise.formato`); a lista no filtro mistura os dois, cada um na própria coluna. */
+  tiposConteudo?: TipoConteudoFiltravel[];
+  /** R2b, item 2: a ordem escolhida; `undefined` é "recentes", o padrão de sempre. */
+  ordem?: OrdemReferencias;
 };
 
 export type ResultadoReferencias = {
@@ -819,35 +851,94 @@ export type ResultadoReferencias = {
 };
 
 /**
+ * Tradução para SQL de `classificarBrasil`/`contaEhBrasileira` (`proporcao-brasil.ts`), para o
+ * filtro "Brasil ou fora" (R2b, item 2) valer em SQL, não só em JS: `pt`/`pt-BR` é Brasil; `en`,
+ * `es` e `pt-PT` é fora; sem idioma conhecido, decide a conta (`contas.pais = 'BR'` ou
+ * `idioma_principal` em português). Mantenha as duas em sincronia: mudou uma, muda a outra.
+ */
+function condicaoBrasil(brasil: boolean): SQL {
+  const ehBrasil = sql`(
+    ${videos.idioma} in ('pt', 'pt-BR')
+    or (${videos.idioma} is null and (${contas.pais} = 'BR' or ${contas.idiomaPrincipal} in ('pt', 'pt-BR')))
+  )`;
+  return brasil ? ehBrasil : sql`not ${ehBrasil}`;
+}
+
+/** `ORDER BY` de `OrdemReferencias`; sempre com `asc(id)` por último, para a paginação não repetir nem pular linha com empate. */
+function ordenacaoReferencias(ordem: OrdemReferencias | undefined) {
+  switch (ordem) {
+    case "views":
+      return [desc(videos.views), asc(videos.id)];
+    case "multiplo":
+      return [desc(videos.foraDaCurva), asc(videos.id)];
+    case "velocidade":
+      return [desc(videos.velocidade), asc(videos.id)];
+    default:
+      return [desc(videos.publicadoEm), asc(videos.id)];
+  }
+}
+
+/**
  * As condições que a lista e a contagem de `referenciasDoNicho` compartilham (V6, item 1).
  * `serveDeModelo` (H4, item 2): a biblioteca de referências é "o que imitar", igual à evidência
  * do roteiro; recorte e meme não entram, mesma regra de `condicoesEvidencia`.
+ *
+ * `semRegua` (R2b, item 1): o segmento "Todos" quer "todo vídeo do setor que tem análise, sem o
+ * corte do piso nem do múltiplo" (PROXIMO.md); tira também o `serveDeModelo`, porque "Todos"
+ * mostra meme e recorte (com o selo escrito, não escondidos). Nunca muda o que
+ * `evidenciaParaRoteiro`/`evidenciaParaTema` aceitam: só esta função, só para a tela.
  */
-function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regua: ReguaSetor) {
+function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regua: ReguaSetor, semRegua = false) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     gte(videos.publicadoEm, diasAtras(filtros.periodoDias ?? 7)),
-    // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
-    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho. M3: piso do setor.
-    gte(videos.views, regua.pisoViews),
-    gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
-    sql`${videos.serveDeModelo} is not false`,
   ];
+  if (!semRegua) {
+    // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
+    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho. M3: piso do setor.
+    condicoes.push(gte(videos.views, regua.pisoViews));
+    condicoes.push(gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA));
+    condicoes.push(sql`${videos.serveDeModelo} is not false`);
+  }
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (filtros.apenasIds) condicoes.push(inArray(videos.id, filtros.apenasIds.length > 0 ? filtros.apenasIds : [-1]));
   if (filtros.plataformas && filtros.plataformas.length > 0) {
     condicoes.push(inArray(videos.plataforma, filtros.plataformas));
   }
-  if (filtros.formatos && filtros.formatos.length > 0) {
-    const formatosSql = sql.join(
-      filtros.formatos.map((f) => sql`${f}`),
-      sql`, `,
-    );
-    condicoes.push(sql`(${videos.analise} ->> 'formato') = any(array[${formatosSql}]::text[])`);
+  const temFormatos = filtros.formatos && filtros.formatos.length > 0;
+  const temTipos = filtros.tiposConteudo && filtros.tiposConteudo.length > 0;
+  if (temFormatos || temTipos) {
+    // "Tipo de vídeo" (R2b, item 2) é uma lista só na tela, misturando `analise.formato` e
+    // `tipoConteudo`: qualquer valor marcado, de qualquer uma das duas colunas, inclui o vídeo.
+    const partes: SQL[] = [];
+    if (temFormatos) {
+      const formatosSql = sql.join(
+        filtros.formatos!.map((f) => sql`${f}`),
+        sql`, `,
+      );
+      partes.push(sql`(${videos.analise} ->> 'formato') = any(array[${formatosSql}]::text[])`);
+    }
+    if (temTipos) {
+      const tiposSql = sql.join(
+        filtros.tiposConteudo!.map((t) => sql`${t}`),
+        sql`, `,
+      );
+      partes.push(sql`${videos.tipoConteudo} = any(array[${tiposSql}]::text[])`);
+    }
+    condicoes.push(partes.length > 1 ? sql`(${sql.join(partes, sql` or `)})` : partes[0]);
   }
+  if (filtros.viewsMin !== undefined) condicoes.push(gte(videos.views, filtros.viewsMin));
+  if (filtros.comFala !== undefined) {
+    condicoes.push(
+      filtros.comFala
+        ? sql`${videos.semFala} is not true`
+        : eq(videos.semFala, true),
+    );
+  }
+  if (filtros.brasil !== undefined) condicoes.push(condicaoBrasil(filtros.brasil));
   const busca = filtros.busca?.trim();
   if (busca) {
     condicoes.push(sql`(${videos.busca} @@ plainto_tsquery('portuguese', ${busca}) or ${contas.nome} ilike ${`%${busca}%`})`);
@@ -874,6 +965,87 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
  * de uma contagem à parte, com as mesmas condições mas sem `limit` nem a
  * cota: é "quantos vídeos existem", não "quantos a página mostra".
  */
+const CAMPOS_VIDEO_REFERENCIA = {
+  id: videos.id,
+  plataforma: videos.plataforma,
+  url: videos.url,
+  titulo: videos.titulo,
+  contaId: videos.contaId,
+  contaHandle: contas.handle,
+  contaNome: contas.nome,
+  contaMedianaOrigem: contas.medianaOrigem,
+  publicadoEm: videos.publicadoEm,
+  foraDaCurva: videos.foraDaCurva,
+  views: videos.views,
+  medianaConta: contas.medianaViews,
+  velocidade: videos.velocidade,
+  analise: videos.analise,
+  idioma: videos.idioma,
+  contaPais: contas.pais,
+  contaIdiomaPrincipal: contas.idiomaPrincipal,
+  capaUrl: videos.capaUrl,
+  semFala: videos.semFala,
+  analiseVisual: videos.analiseVisual,
+  tipoConteudo: videos.tipoConteudo,
+} as const;
+
+type LinhaVideoReferencia = {
+  id: number;
+  plataforma: Plataforma;
+  url: string;
+  titulo: string | null;
+  contaId: number | null;
+  contaHandle: string | null;
+  contaNome: string | null;
+  contaMedianaOrigem: MedianaOrigem | null;
+  publicadoEm: Date | null;
+  foraDaCurva: string | null;
+  views: number;
+  medianaConta: string | null;
+  velocidade: string | null;
+  analise: AnaliseVideo | null;
+  idioma: string | null;
+  contaPais: string | null;
+  contaIdiomaPrincipal: string | null;
+  capaUrl: string | null;
+  semFala: boolean | null;
+  analiseVisual: AnaliseVisual | null;
+  tipoConteudo: TipoConteudo | null;
+};
+
+/** R2b, item 3: falha a régua do setor quando a tela mostra o selo "abaixo do que a gente usa como prova". */
+function abaixoDaRegua(views: number, foraDaCurva: string | null, regua: ReguaSetor): boolean {
+  return views < regua.pisoViews || (foraDaCurva === null ? 0 : Number(foraDaCurva)) < LIMIAR_FORA_DA_CURVA;
+}
+
+function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor): VideoReferencia | null {
+  if (l.analise === null) return null;
+  return {
+    id: l.id,
+    plataforma: l.plataforma,
+    url: l.url,
+    titulo: l.titulo,
+    contaHandle: l.contaHandle,
+    contaNome: l.contaNome,
+    contaMedianaOrigem: l.contaMedianaOrigem,
+    publicadoEm: l.publicadoEm,
+    foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+    views: l.views,
+    medianaConta: l.medianaConta === null ? null : Number(l.medianaConta),
+    velocidade: l.velocidade === null ? null : Number(l.velocidade),
+    assunto: l.analise.assunto,
+    gancho: l.analise.gancho,
+    estrutura: l.analise.estrutura,
+    porQueFuncionou: l.analise.porQueFuncionou,
+    formato: l.analise.formato,
+    capaUrl: l.capaUrl,
+    semFala: l.semFala,
+    segundoChave: l.analiseVisual?.momentoChave?.segundo ?? null,
+    tipoConteudo: l.tipoConteudo,
+    abaixoDaRegua: abaixoDaRegua(l.views, l.foraDaCurva, regua),
+  };
+}
+
 export async function referenciasDoNicho(
   nichoId: number,
   filtros: FiltrosReferencias = {},
@@ -885,32 +1057,11 @@ export async function referenciasDoNicho(
 
   const [linhas, contagem] = await Promise.all([
     db()
-      .select({
-        id: videos.id,
-        plataforma: videos.plataforma,
-        url: videos.url,
-        titulo: videos.titulo,
-        contaId: videos.contaId,
-        contaHandle: contas.handle,
-        contaNome: contas.nome,
-        contaMedianaOrigem: contas.medianaOrigem,
-        publicadoEm: videos.publicadoEm,
-        foraDaCurva: videos.foraDaCurva,
-        views: videos.views,
-        medianaConta: contas.medianaViews,
-        velocidade: videos.velocidade,
-        analise: videos.analise,
-        idioma: videos.idioma,
-        contaPais: contas.pais,
-        contaIdiomaPrincipal: contas.idiomaPrincipal,
-        capaUrl: videos.capaUrl,
-        semFala: videos.semFala,
-        analiseVisual: videos.analiseVisual,
-      })
+      .select(CAMPOS_VIDEO_REFERENCIA)
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
       .where(and(...condicoes))
-      .orderBy(desc(videos.publicadoEm), asc(videos.id))
+      .orderBy(...ordenacaoReferencias(filtros.ordem))
       .limit(limite * FATOR_POOL_BRASIL),
     db()
       .select({ total: sql<number>`count(*)::int` })
@@ -940,63 +1091,150 @@ export async function referenciasDoNicho(
 
   return {
     total: contagem[0]?.total ?? 0,
-    videos: comTetoPorConta.map((l) => ({
-      id: l.id,
-      plataforma: l.plataforma,
-      url: l.url,
-      titulo: l.titulo,
-      contaHandle: l.contaHandle,
-      contaNome: l.contaNome,
-      contaMedianaOrigem: l.contaMedianaOrigem,
-      publicadoEm: l.publicadoEm,
-      foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
-      views: l.views,
-      medianaConta: l.medianaConta === null ? null : Number(l.medianaConta),
-      velocidade: l.velocidade === null ? null : Number(l.velocidade),
-      assunto: l.analise.assunto,
-      gancho: l.analise.gancho,
-      estrutura: l.analise.estrutura,
-      porQueFuncionou: l.analise.porQueFuncionou,
-      formato: l.analise.formato,
-      capaUrl: l.capaUrl,
-      semFala: l.semFala,
-      segundoChave: l.analiseVisual?.momentoChave?.segundo ?? null,
-    })),
+    videos: comTetoPorConta
+      .map((l) => paraVideoReferencia(l, regua))
+      .filter((v): v is VideoReferencia => v !== null),
+  };
+}
+
+/**
+ * R2b, item 1: o segmento "Todos", "todo vídeo do setor da marca que tem análise, sem o corte do
+ * piso nem do múltiplo" (PROXIMO.md). Diferente de `referenciasDoNicho`: sem a cota de Brasil nem
+ * o teto por conta (heurísticas de curadoria do "o que vale como prova", sem sentido numa visão de
+ * volume "ver tudo"; a proporção do Brasil nas telas continua pendente do Gustavo só para a visão
+ * curada, achado 2 da revisão do motor), então pagina direto em SQL (`limit`/`offset`), com `total`
+ * exato pela mesma contagem em separado de sempre. Precisa de `semRegua: true` em
+ * `condicoesReferencias` para tirar o piso, o múltiplo e o `serveDeModelo`.
+ */
+export async function todosOsVideosDoNicho(
+  nichoId: number,
+  filtros: FiltrosReferencias = {},
+  pagina = 0,
+): Promise<ResultadoReferencias> {
+  const regua = await reguaDoSetor(nichoId);
+  const tamanhoPagina = filtros.limite ?? TAMANHO_PAGINA_TODOS_PADRAO;
+  const condicoes = condicoesReferencias(nichoId, filtros, regua, true);
+
+  const [linhas, contagem] = await Promise.all([
+    db()
+      .select(CAMPOS_VIDEO_REFERENCIA)
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes))
+      .orderBy(...ordenacaoReferencias(filtros.ordem))
+      .limit(tamanhoPagina)
+      .offset(pagina * tamanhoPagina),
+    db()
+      .select({ total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes)),
+  ]);
+
+  return {
+    total: contagem[0]?.total ?? 0,
+    videos: linhas.map((l) => paraVideoReferencia(l, regua)).filter((v): v is VideoReferencia => v !== null),
   };
 }
 
 export type ContagensFiltroReferencias = {
   porPlataforma: Record<Plataforma, number>;
   porFormato: Record<AnaliseVideo["formato"], number>;
+  /** R2b, item 2: as faixas de "mais de X views"; "qualquer" é sem o filtro. */
+  porViewsMin: { qualquer: number; dezMil: number; cinquentaMil: number; cemMil: number; umMilhao: number };
+  porPeriodo: { sete: number; trinta: number; noventa: number };
+  porFala: { comFala: number; semFala: number };
+  porBrasil: { brasil: number; fora: number };
+  /** R2b, item 2: os dois valores de `tipoConteudo` que entram no filtro combinado "Tipo de vídeo". */
+  porTipoConteudo: Record<TipoConteudoFiltravel, number>;
 };
 
+const FAIXAS_VIEWS = [
+  { chave: "dezMil" as const, min: 10_000 },
+  { chave: "cinquentaMil" as const, min: 50_000 },
+  { chave: "cemMil" as const, min: 100_000 },
+  { chave: "umMilhao" as const, min: 1_000_000 },
+];
+
+const TIPOS_CONTEUDO_FILTRAVEIS: TipoConteudoFiltravel[] = ["meme", "recorte"];
+
 /**
- * A contagem que a folha "Filtrar" mostra ao lado de cada opção (V6, item 3):
- * quantos vídeos aquela opção devolveria, contra o período e a busca de
- * agora, mas sem considerar a própria plataforma nem o próprio formato (as
- * duas listas são independentes uma da outra, não uma combinação). Mesmas
- * condições de `referenciasDoNicho`, agrupadas.
+ * A contagem que a folha "Filtrar" mostra ao lado de cada opção (V6, item 3; R2b, item 2): quantos
+ * vídeos aquela opção devolveria, mantendo todos os OUTROS filtros como estão e ignorando só o
+ * próprio eixo (README do passo 14, "Dúvidas", item 7: opção com zero ainda aparece, com "0").
+ * Período, views, fala e Brasil não são colunas categóricas pequenas como plataforma/formato, então
+ * cada opção vira a própria consulta (com o filtro daquele eixo recalculado para aquele valor),
+ * em vez de um `GROUP BY`; mesmas condições de `referenciasDoNicho`/`todosOsVideosDoNicho`,
+ * `semRegua` como a função que está chamando (R2b, item 1: "Todos" conta sem a régua também).
  */
 export async function contagensPorFiltroReferencias(
   nichoId: number,
-  filtros: Pick<FiltrosReferencias, "periodoDias" | "busca" | "apenasIds"> = {},
+  filtros: Omit<FiltrosReferencias, "limite" | "ordem"> = {},
+  semRegua = false,
 ): Promise<ContagensFiltroReferencias> {
   const regua = await reguaDoSetor(nichoId);
-  const condicoes = condicoesReferencias(nichoId, filtros, regua);
 
-  const [porPlataformaLinhas, porFormatoLinhas] = await Promise.all([
+  async function contar(filtrosDaOpcao: Omit<FiltrosReferencias, "limite" | "ordem">): Promise<number> {
+    const condicoes = condicoesReferencias(nichoId, filtrosDaOpcao, regua, semRegua);
+    const [linha] = await db()
+      .select({ total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoes));
+    return linha?.total ?? 0;
+  }
+
+  const [
+    porPlataformaLinhas,
+    porFormatoLinhas,
+    porTipoConteudoLinhas,
+    qualquer,
+    dezMil,
+    cinquentaMil,
+    cemMil,
+    umMilhao,
+    sete,
+    trinta,
+    noventa,
+    comFala,
+    semFala,
+    brasil,
+    fora,
+  ] = await Promise.all([
     db()
       .select({ plataforma: videos.plataforma, total: sql<number>`count(*)::int` })
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
-      .where(and(...condicoes))
+      .where(and(...condicoesReferencias(nichoId, { ...filtros, plataformas: undefined }, regua, semRegua)))
       .groupBy(videos.plataforma),
     db()
       .select({ formato: sql<string>`${videos.analise} ->> 'formato'`, total: sql<number>`count(*)::int` })
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
-      .where(and(...condicoes))
+      .where(
+        and(...condicoesReferencias(nichoId, { ...filtros, formatos: undefined, tiposConteudo: undefined }, regua, semRegua)),
+      )
       .groupBy(sql`${videos.analise} ->> 'formato'`),
+    db()
+      .select({ tipoConteudo: videos.tipoConteudo, total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(
+        and(...condicoesReferencias(nichoId, { ...filtros, formatos: undefined, tiposConteudo: undefined }, regua, semRegua)),
+      )
+      .groupBy(videos.tipoConteudo),
+    contar({ ...filtros, viewsMin: undefined }),
+    contar({ ...filtros, viewsMin: FAIXAS_VIEWS[0].min }),
+    contar({ ...filtros, viewsMin: FAIXAS_VIEWS[1].min }),
+    contar({ ...filtros, viewsMin: FAIXAS_VIEWS[2].min }),
+    contar({ ...filtros, viewsMin: FAIXAS_VIEWS[3].min }),
+    contar({ ...filtros, periodoDias: 7 }),
+    contar({ ...filtros, periodoDias: 30 }),
+    contar({ ...filtros, periodoDias: 90 }),
+    contar({ ...filtros, comFala: true }),
+    contar({ ...filtros, comFala: false }),
+    contar({ ...filtros, brasil: true }),
+    contar({ ...filtros, brasil: false }),
   ]);
 
   const porPlataforma = { youtube: 0, tiktok: 0, instagram: 0 } as Record<Plataforma, number>;
@@ -1013,7 +1251,22 @@ export async function contagensPorFiltroReferencias(
     if (linha.formato in porFormato) porFormato[linha.formato as AnaliseVideo["formato"]] = linha.total;
   }
 
-  return { porPlataforma, porFormato };
+  const porTipoConteudo = { meme: 0, recorte: 0 } as Record<TipoConteudoFiltravel, number>;
+  for (const linha of porTipoConteudoLinhas) {
+    if (linha.tipoConteudo && TIPOS_CONTEUDO_FILTRAVEIS.includes(linha.tipoConteudo as TipoConteudoFiltravel)) {
+      porTipoConteudo[linha.tipoConteudo as TipoConteudoFiltravel] = linha.total;
+    }
+  }
+
+  return {
+    porPlataforma,
+    porFormato,
+    porTipoConteudo,
+    porViewsMin: { qualquer, dezMil, cinquentaMil, cemMil, umMilhao },
+    porPeriodo: { sete, trinta, noventa },
+    porFala: { comFala, semFala },
+    porBrasil: { brasil, fora },
+  };
 }
 
 /**

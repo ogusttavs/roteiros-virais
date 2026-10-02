@@ -289,6 +289,8 @@ export default function Fundacao() {
               capaUrl: null,
               semFala: false,
               segundoChave: 4,
+              abaixoDaRegua: false,
+              tipoConteudo: null,
             }}
             salvo={false}
             onVerDetalhes={() => undefined}

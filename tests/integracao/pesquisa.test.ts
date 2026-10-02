@@ -10,6 +10,7 @@ import { db, getPool } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { config } from "@/lib/config";
 import {
+  contagensPorFiltroReferencias,
   estatisticasDoSetor,
   evidenciaParaRoteiro,
   evidenciaParaTema,
@@ -19,6 +20,7 @@ import {
   setorAindaLendo,
   subindoHoje,
   subindoHojeComAnalise,
+  todosOsVideosDoNicho,
 } from "@/servicos/pesquisa";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -55,6 +57,10 @@ async function criarVideo(
     /** Achado 1 da revisão do motor: vídeo "já lido" para os testes de `soElegivelParaTranscricao`. */
     transcricao?: string | null;
     proximaTentativaTranscricao?: Date | null;
+    /** R2b: `undefined` (padrão) deixa nulo, como falado. */
+    semFala?: boolean;
+    /** R2b: H4, item 2; `undefined` (padrão) deixa nulo, como vídeo analisado antes da coluna existir. */
+    tipoConteudo?: "original" | "recorte" | "meme" | "noticia";
   },
 ) {
   const [v] = await db()
@@ -79,6 +85,8 @@ async function criarVideo(
       serveDeModelo: opcoes.serveDeModelo,
       transcricao: opcoes.transcricao,
       proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
+      semFala: opcoes.semFala,
+      tipoConteudo: opcoes.tipoConteudo,
     })
     .returning();
   return v;
@@ -1120,6 +1128,297 @@ describe("referenciasDoNicho", () => {
       // Os quatro entram: apenasIds (o segmento Salvos) nao tem o teto por conta.
       expect(resultado.videos).toHaveLength(4);
     });
+  });
+});
+
+describe("R2b: todosOsVideosDoNicho, os novos filtros e abaixoDaRegua/tipoConteudo", () => {
+  /**
+   * `PISO_VIEWS_REFERENCIA=0` é forçado no ambiente de teste (`vitest.config.ts`), senão o piso de
+   * views de verdade (50 mil) quebraria as fixtures pequenas do resto do arquivo; aqui, que testa o
+   * próprio piso, o jeito é o mesmo de `regua-por-setor.test.ts`: `pisoViews` direto na linha do
+   * nicho, que `reguaDoSetor` lê antes do padrão do `.env`.
+   */
+  async function nichoIsolado(slug: string, opcoes: { pisoViews?: number } = {}) {
+    const [nicho] = await db()
+      .insert(nichos)
+      .values({ slug, nome: slug, termos: [], pisoViews: opcoes.pisoViews })
+      .returning();
+    const [conta] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: `conta-${slug}`, nichoId: nicho.id })
+      .returning();
+    return { nichoId: nicho.id, contaId: conta.id };
+  }
+
+  const analiseExemplo = {
+    gancho: "gancho",
+    estrutura: "estrutura",
+    porQueFuncionou: "funcionou por isso",
+    formato: "fala_para_camera" as const,
+  };
+
+  it("mostra vídeo abaixo do piso e abaixo do múltiplo, que referenciasDoNicho exclui", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-todos-sem-regua-teste", { pisoViews: 50_000 });
+    await criarVideo("r2b-abaixo-piso", {
+      foraDaCurva: 5,
+      views: 10,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "abaixo do piso de views" },
+    });
+    await criarVideo("r2b-abaixo-multiplo", {
+      foraDaCurva: 1.1,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "abaixo do multiplo" },
+    });
+
+    const comRegua = await referenciasDoNicho(id, { periodoDias: 90 });
+    expect(comRegua.videos).toHaveLength(0);
+
+    const semRegua = await todosOsVideosDoNicho(id, { periodoDias: 90 });
+    expect(semRegua.videos.map((v) => v.assunto).sort()).toEqual(["abaixo do multiplo", "abaixo do piso de views"]);
+    expect(semRegua.videos.every((v) => v.abaixoDaRegua)).toBe(true);
+  });
+
+  it("mostra meme e recorte, que referenciasDoNicho exclui por serveDeModelo", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-todos-meme-recorte-teste");
+    await criarVideo("r2b-meme", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      serveDeModelo: false,
+      tipoConteudo: "meme",
+      analise: { ...analiseExemplo, assunto: "e um meme" },
+    });
+    await criarVideo("r2b-recorte", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      serveDeModelo: false,
+      tipoConteudo: "recorte",
+      analise: { ...analiseExemplo, assunto: "e um recorte" },
+    });
+
+    const comRegua = await referenciasDoNicho(id, { periodoDias: 90 });
+    expect(comRegua.videos).toHaveLength(0);
+
+    const semRegua = await todosOsVideosDoNicho(id, { periodoDias: 90 });
+    expect(semRegua.videos.map((v) => v.tipoConteudo).sort()).toEqual(["meme", "recorte"]);
+    // Nem meme nem recorte ficam abaixo da régua aqui (views e múltiplo altos); o selo delas é só
+    // o tipo, "abaixoDaRegua" fica fora disso (achado de produto não muda, PROXIMO.md item 3).
+    expect(semRegua.videos.every((v) => !v.abaixoDaRegua)).toBe(true);
+  });
+
+  it("pagina em offset/limit, com o total exato sem o corte da página", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-paginacao-teste");
+    for (let i = 1; i <= 5; i += 1) {
+      await criarVideo(`r2b-pagina-${i}`, {
+        foraDaCurva: 5,
+        views: 100_000,
+        publicadoEm: diasAtras(i),
+        contaId: cId,
+        nichoId: id,
+        analise: { ...analiseExemplo, assunto: `video pagina ${i}` },
+      });
+    }
+
+    const pagina0 = await todosOsVideosDoNicho(id, { periodoDias: 90, limite: 2 }, 0);
+    const pagina1 = await todosOsVideosDoNicho(id, { periodoDias: 90, limite: 2 }, 1);
+    const pagina2 = await todosOsVideosDoNicho(id, { periodoDias: 90, limite: 2 }, 2);
+
+    expect(pagina0.total).toBe(5);
+    expect(pagina0.videos).toHaveLength(2);
+    expect(pagina1.videos).toHaveLength(2);
+    expect(pagina2.videos).toHaveLength(1);
+    // As tres paginas juntas cobrem os cinco, sem repetir (ordem padrao: mais recentes primeiro).
+    const todosOsAssuntos = [...pagina0.videos, ...pagina1.videos, ...pagina2.videos].map((v) => v.assunto);
+    expect(new Set(todosOsAssuntos).size).toBe(5);
+  });
+
+  it("viewsMin filtra por 'mais de X views'", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-views-min-teste");
+    await criarVideo("r2b-views-abaixo", {
+      foraDaCurva: 5,
+      views: 5_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "poucas views" },
+    });
+    await criarVideo("r2b-views-acima", {
+      foraDaCurva: 5,
+      views: 60_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "muitas views" },
+    });
+
+    const resultado = await todosOsVideosDoNicho(id, { periodoDias: 90, viewsMin: 10_000 });
+    expect(resultado.videos.map((v) => v.assunto)).toEqual(["muitas views"]);
+  });
+
+  it("comFala filtra por com ou sem fala", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-com-fala-teste");
+    await criarVideo("r2b-com-fala", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      semFala: false,
+      analise: { ...analiseExemplo, assunto: "com fala" },
+    });
+    await criarVideo("r2b-sem-fala", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      semFala: true,
+      analise: { ...analiseExemplo, assunto: "sem fala" },
+    });
+
+    const comFala = await todosOsVideosDoNicho(id, { periodoDias: 90, comFala: true });
+    expect(comFala.videos.map((v) => v.assunto)).toEqual(["com fala"]);
+
+    const semFala = await todosOsVideosDoNicho(id, { periodoDias: 90, comFala: false });
+    expect(semFala.videos.map((v) => v.assunto)).toEqual(["sem fala"]);
+  });
+
+  it("brasil filtra pela mesma classificação de classificarBrasil/contaEhBrasileira", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-brasil-teste");
+    await criarVideo("r2b-brasil-pt", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      idioma: "pt",
+      analise: { ...analiseExemplo, assunto: "video em portugues" },
+    });
+    await criarVideo("r2b-brasil-en", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      idioma: "en",
+      analise: { ...analiseExemplo, assunto: "video em ingles" },
+    });
+
+    const doBrasil = await todosOsVideosDoNicho(id, { periodoDias: 90, brasil: true });
+    expect(doBrasil.videos.map((v) => v.assunto)).toEqual(["video em portugues"]);
+
+    const deFora = await todosOsVideosDoNicho(id, { periodoDias: 90, brasil: false });
+    expect(deFora.videos.map((v) => v.assunto)).toEqual(["video em ingles"]);
+  });
+
+  it("tiposConteudo filtra junto com formatos, um ou outro (Tipo de vídeo combinado)", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-tipo-combinado-teste");
+    await criarVideo("r2b-tipo-podcast", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, formato: "podcast", assunto: "e um podcast" },
+    });
+    await criarVideo("r2b-tipo-meme", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      serveDeModelo: false,
+      tipoConteudo: "meme",
+      analise: { ...analiseExemplo, formato: "esquete", assunto: "e um meme" },
+    });
+    await criarVideo("r2b-tipo-esquete-sozinho", {
+      foraDaCurva: 5,
+      views: 100_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, formato: "esquete", assunto: "esquete comum" },
+    });
+
+    const resultado = await todosOsVideosDoNicho(id, { periodoDias: 90, formatos: ["podcast"], tiposConteudo: ["meme"] });
+    expect(resultado.videos.map((v) => v.assunto).sort()).toEqual(["e um meme", "e um podcast"]);
+  });
+
+  it("ordem ordena por views, múltiplo ou velocidade; padrão é mais recentes", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-ordem-teste");
+    await criarVideo("r2b-ordem-a", {
+      foraDaCurva: 2,
+      views: 300_000,
+      velocidadeRelativa: 1,
+      publicadoEm: diasAtras(3),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "a" },
+    });
+    await criarVideo("r2b-ordem-b", {
+      foraDaCurva: 9,
+      views: 100_000,
+      velocidadeRelativa: 1,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      analise: { ...analiseExemplo, assunto: "b" },
+    });
+
+    const porViews = await todosOsVideosDoNicho(id, { periodoDias: 90, ordem: "views" });
+    expect(porViews.videos.map((v) => v.assunto)).toEqual(["a", "b"]);
+
+    const porMultiplo = await todosOsVideosDoNicho(id, { periodoDias: 90, ordem: "multiplo" });
+    expect(porMultiplo.videos.map((v) => v.assunto)).toEqual(["b", "a"]);
+
+    const porRecentes = await todosOsVideosDoNicho(id, { periodoDias: 90 });
+    expect(porRecentes.videos.map((v) => v.assunto)).toEqual(["b", "a"]);
+  });
+
+  it("contagensPorFiltroReferencias: cada opção conta mantendo os outros filtros, ignorando o próprio eixo", async () => {
+    const { nichoId: id, contaId: cId } = await nichoIsolado("r2b-contagens-teste");
+    await criarVideo("r2b-contagem-1", {
+      foraDaCurva: 5,
+      views: 60_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      idioma: "pt",
+      semFala: false,
+      analise: { ...analiseExemplo, assunto: "video um" },
+    });
+    await criarVideo("r2b-contagem-2", {
+      foraDaCurva: 5,
+      views: 5_000,
+      publicadoEm: diasAtras(1),
+      contaId: cId,
+      nichoId: id,
+      idioma: "en",
+      semFala: true,
+      analise: { ...analiseExemplo, assunto: "video dois" },
+    });
+
+    const contagens = await contagensPorFiltroReferencias(id, { periodoDias: 90 }, true);
+
+    expect(contagens.porViewsMin.qualquer).toBe(2);
+    expect(contagens.porViewsMin.dezMil).toBe(1);
+    expect(contagens.porFala.comFala).toBe(1);
+    expect(contagens.porFala.semFala).toBe(1);
+    expect(contagens.porBrasil.brasil).toBe(1);
+    expect(contagens.porBrasil.fora).toBe(1);
+    expect(contagens.porPeriodo.sete).toBe(2);
+    expect(contagens.porPeriodo.noventa).toBe(2);
   });
 });
 
