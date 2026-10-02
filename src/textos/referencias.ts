@@ -6,6 +6,8 @@ export const textosReferencias = {
   titulo: "O que está funcionando no seu setor",
   linha: "Vídeos que passaram muito do normal da própria conta, e as notícias do seu setor. Os mais recentes primeiro.",
   segmentoForaDaCurva: "Fora da curva",
+  /** R2b, item 1: o segmento novo, entre "Fora da curva" e "Salvos" (ordem do desenho). */
+  segmentoTodos: "Todos",
   segmentoSalvos: "Salvos",
   buscaPlaceholder: "Buscar por assunto ou conta",
   rotuloPeriodo: "Período",
@@ -19,13 +21,42 @@ export const textosReferencias = {
   contagem: (n: number, dias: number) =>
     `${n} ${n === 1 ? "vídeo fora da curva" : "vídeos fora da curva"} nos últimos ${dias} dias`,
   contagemSalvos: (n: number) => (n === 1 ? "1 vídeo salvo" : `${n} vídeos salvos`),
+  /** R2b, item 1: "Todos" não é "fora da curva", é todo vídeo analisado do setor. */
+  contagemTodos: (n: number, dias: number) =>
+    `${n} ${n === 1 ? "vídeo" : "vídeos"} do seu setor nos últimos ${dias} dias`,
+  /** R2b, item 2: o fim da linha de contagem muda com a ordem escolhida (desenho, `.ordem-texto`). */
+  ordemSufixo: {
+    recentes: "os mais recentes primeiro",
+    views: "os com mais views primeiro",
+    multiplo: "os com mais vezes acima do normal da conta primeiro",
+    velocidade: "os com mais views por hora primeiro",
+  } satisfies Record<"recentes" | "views" | "multiplo" | "velocidade", string>,
 
   // A folha "Filtrar"
   folhaFiltrarTitulo: "Filtrar",
   ondeFoiPostado: "Onde foi postado",
-  formato: "Formato",
+  /** R2b, item 2: o grupo combinado, `analise.formato` mais meme/recorte (antes só "Formato"). */
+  tipoDeVideo: "Tipo de vídeo",
   verVideos: (n: number) => `Ver os ${n} ${n === 1 ? "vídeo" : "vídeos"}`,
   limpar: "Limpar",
+  // R2b, item 2: os quatro grupos novos da folha "Filtrar".
+  emQueOrdem: "Em que ordem",
+  views: "Views",
+  qualquerNumeroDeViews: "Qualquer número",
+  /** As quatro faixas que `VIEWS_MIN_VALIDOS` (`page.tsx`) aceita; texto exato do desenho, não um número compacto genérico ("1 milhão", não "1 mi"). */
+  viewsFaixas: [
+    { valor: 10_000, rotulo: "Mais de 10 mil" },
+    { valor: 50_000, rotulo: "Mais de 50 mil" },
+    { valor: 100_000, rotulo: "Mais de 100 mil" },
+    { valor: 1_000_000, rotulo: "Mais de 1 milhão" },
+  ],
+  fala: "Fala",
+  comFala: "Com fala",
+  deOnde: "De onde",
+  doBrasil: "Do Brasil",
+  deFora: "De fora",
+  /** R2b, item 1: quando "Todos" tem mais vídeos do que a página atual mostra. */
+  verMais: "Ver mais",
 
   // O cartão de números
   acimaDoNormal: "acima do normal dessa conta",
@@ -71,9 +102,13 @@ export const textosReferencias = {
 
   // Estados vazio e erro
   vazioTitulo: "Nada fora da curva com esses filtros",
+  /** R2b, item 1: o vazio do segmento "Todos", sem falar em "fora da curva" (o segmento não corta por isso). */
+  vazioTituloTodos: "Nenhum vídeo do seu setor com esses filtros",
   vazioTituloSalvos: "Nenhum vídeo salvo ainda",
   vazioTexto: (dias: number, plataformas: string) =>
     `Nos últimos ${dias} dias${plataformas ? `, ${plataformas}` : ""}, nenhum vídeo do seu setor passou muito do normal da própria conta. Aumentar o período costuma resolver.`,
+  vazioTextoTodos: (dias: number, plataformas: string) =>
+    `Nos últimos ${dias} dias${plataformas ? `, ${plataformas}` : ""}, não achamos vídeo do seu setor com esses filtros. Tirar um filtro ou aumentar o período costuma resolver.`,
   vazioTextoSalvos: "Toque em salvar num vídeo para achar ele aqui depois.",
   ver30Dias: "Ver os últimos 30 dias",
   limparFiltros: "Limpar os filtros",

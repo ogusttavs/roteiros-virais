@@ -1105,13 +1105,16 @@ export async function referenciasDoNicho(
  * exato pela mesma contagem em separado de sempre. Precisa de `semRegua: true` em
  * `condicoesReferencias` para tirar o piso, o múltiplo e o `serveDeModelo`.
  */
+/** R2b, item 1: o tamanho de página padrão de "Todos" quando a chamada não pede outro; `page.tsx`/`ReferenciasTela.tsx` reaproveitam para "Ver mais" somar o mesmo tanto. */
+export const TAMANHO_PAGINA_TODOS_PADRAO = 30;
+
 export async function todosOsVideosDoNicho(
   nichoId: number,
   filtros: FiltrosReferencias = {},
   pagina = 0,
 ): Promise<ResultadoReferencias> {
   const regua = await reguaDoSetor(nichoId);
-  const tamanhoPagina = filtros.limite ?? 30;
+  const tamanhoPagina = filtros.limite ?? TAMANHO_PAGINA_TODOS_PADRAO;
   const condicoes = condicoesReferencias(nichoId, filtros, regua, true);
 
   const [linhas, contagem] = await Promise.all([

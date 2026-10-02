@@ -6,7 +6,13 @@ import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTr
 
 import type { AnaliseVideo, Plataforma } from "@/db/schema";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import type { ContagensFiltroReferencias, VideoReferencia } from "@/servicos/pesquisa";
+import {
+  TAMANHO_PAGINA_TODOS_PADRAO,
+  type ContagensFiltroReferencias,
+  type OrdemReferencias,
+  type TipoConteudoFiltravel,
+  type VideoReferencia,
+} from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
@@ -19,7 +25,7 @@ import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
 import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
 import styles from "./ReferenciasTela.module.css";
 
-export type Segmento = "foradacurva" | "salvos";
+export type Segmento = "foradacurva" | "todos" | "salvos";
 
 type Props = {
   videos: VideoReferencia[];
@@ -30,6 +36,14 @@ type Props = {
   busca: string;
   plataformasAtivas: Plataforma[];
   formatosAtivos: AnaliseVideo["formato"][];
+  /** R2b, item 2: `undefined` é "mais recentes", o padrão de sempre. */
+  ordem?: OrdemReferencias;
+  viewsMin?: number;
+  comFala?: boolean;
+  brasil?: boolean;
+  tiposConteudo: TipoConteudoFiltravel[];
+  /** R2b, item 1: quantos vídeos "Todos" já pediu (cresce de `TAMANHO_PAGINA_TODOS_PADRAO` em `TAMANHO_PAGINA_TODOS_PADRAO`, nunca com offset: ver `page.tsx`). */
+  quantidade: number;
   contagensFiltro: ContagensFiltroReferencias;
   /** V12b, item 8: a rede principal da marca não tinha vídeo no período, então a tela mostrou todas em vez dela. */
   redePrincipalSemVideo?: Plataforma;
@@ -85,16 +99,33 @@ function juntarPlataformas(plataformas: Plataforma[]): string {
   return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
 }
 
-function montarUrl(filtros: {
+type Filtros = {
   segmento: Segmento;
   periodoDias: number;
   busca: string;
   plataformas: Plataforma[];
   formatos: AnaliseVideo["formato"][];
-}): string {
+  ordem: OrdemReferencias | undefined;
+  viewsMin: number | undefined;
+  comFala: boolean | undefined;
+  brasil: boolean | undefined;
+  tiposConteudo: TipoConteudoFiltravel[];
+  /** R2b, item 1: só o segmento "Todos" usa; nas outras duas abas fica sempre no padrão. */
+  quantidade: number;
+};
+
+/** "sim"/"nao" na URL, mesma codificação de `page.tsx`. */
+function paramBooleano(valor: boolean | undefined): string | undefined {
+  if (valor === true) return "sim";
+  if (valor === false) return "nao";
+  return undefined;
+}
+
+function montarUrl(filtros: Filtros): string {
   const params = new URLSearchParams();
   if (filtros.segmento !== "foradacurva") params.set("seg", filtros.segmento);
-  if (filtros.periodoDias !== 7) params.set("periodo", String(filtros.periodoDias));
+  const periodoPadrao = filtros.segmento === "todos" ? 90 : 7;
+  if (filtros.periodoDias !== periodoPadrao) params.set("periodo", String(filtros.periodoDias));
   if (filtros.busca.trim()) params.set("busca", filtros.busca.trim());
   /**
    * `plataforma=todas` explícito quando a lista fica vazia, nunca omitido
@@ -104,6 +135,17 @@ function montarUrl(filtros: {
    */
   params.set("plataforma", filtros.plataformas.length > 0 ? filtros.plataformas.join(",") : "todas");
   if (filtros.formatos.length > 0) params.set("formato", filtros.formatos.join(","));
+  // R2b, item 2: os cinco filtros novos, e a ordem, valem nos três segmentos; "Ver mais" (item 1) só no "Todos".
+  if (filtros.ordem) params.set("ordem", filtros.ordem);
+  if (filtros.viewsMin !== undefined) params.set("views", String(filtros.viewsMin));
+  const fala = paramBooleano(filtros.comFala);
+  if (fala) params.set("fala", fala);
+  const brasil = paramBooleano(filtros.brasil);
+  if (brasil) params.set("brasil", brasil);
+  if (filtros.tiposConteudo.length > 0) params.set("tipo", filtros.tiposConteudo.join(","));
+  if (filtros.segmento === "todos" && filtros.quantidade !== TAMANHO_PAGINA_TODOS_PADRAO) {
+    params.set("quantidade", String(filtros.quantidade));
+  }
   const query = params.toString();
   return query ? `/referencias?${query}` : "/referencias";
 }
@@ -128,6 +170,12 @@ export function ReferenciasTela({
   busca,
   plataformasAtivas,
   formatosAtivos,
+  ordem,
+  viewsMin,
+  comFala,
+  brasil,
+  tiposConteudo,
+  quantidade,
   contagensFiltro,
   redePrincipalSemVideo,
   aindaLendo,
@@ -169,6 +217,13 @@ export function ReferenciasTela({
    */
   const [plataformasExibidas, setPlataformasOtimista] = useOptimistic(plataformasAtivas);
   const [formatosExibidos, setFormatosOtimista] = useOptimistic(formatosAtivos);
+  // R2b, item 2: mesmo raciocínio acima para os cinco filtros novos, e para `quantidade` (item 1, "Ver mais").
+  const [ordemExibida, setOrdemOtimista] = useOptimistic(ordem);
+  const [viewsMinExibido, setViewsMinOtimista] = useOptimistic(viewsMin);
+  const [comFalaExibido, setComFalaOtimista] = useOptimistic(comFala);
+  const [brasilExibido, setBrasilOtimista] = useOptimistic(brasil);
+  const [tiposConteudoExibidos, setTiposConteudoOtimista] = useOptimistic(tiposConteudo);
+  const [quantidadeExibida, setQuantidadeOtimista] = useOptimistic(quantidade);
   const urlPendente = useRef<string | null>(null);
   /**
    * F1, ajuste A da revisão do PR #71: a rede de segurança do item 2 (mais abaixo, em `navegar`) nunca
@@ -198,12 +253,37 @@ export function ReferenciasTela({
   useEffect(() => limparRedeDeSeguranca, [limparRedeDeSeguranca]);
   // Desarma quando a URL pedida chega de verdade: as props abaixo só mudam com o servidor confirmando.
   useEffect(() => {
-    const urlConfirmada = montarUrl({ segmento, periodoDias, busca, plataformas: plataformasAtivas, formatos: formatosAtivos });
+    const urlConfirmada = montarUrl({
+      segmento,
+      periodoDias,
+      busca,
+      plataformas: plataformasAtivas,
+      formatos: formatosAtivos,
+      ordem,
+      viewsMin,
+      comFala,
+      brasil,
+      tiposConteudo,
+      quantidade,
+    });
     if (urlPendente.current === urlConfirmada) {
       urlPendente.current = null;
       limparRedeDeSeguranca();
     }
-  }, [segmento, periodoDias, busca, plataformasAtivas, formatosAtivos, limparRedeDeSeguranca]);
+  }, [
+    segmento,
+    periodoDias,
+    busca,
+    plataformasAtivas,
+    formatosAtivos,
+    ordem,
+    viewsMin,
+    comFala,
+    brasil,
+    tiposConteudo,
+    quantidade,
+    limparRedeDeSeguranca,
+  ]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
   const detalheAtual = useRef<number | null>(null);
   useEffect(() => {
@@ -219,7 +299,17 @@ export function ReferenciasTela({
   const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
   const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
-  const quantosFiltrosAtivos = plataformasExibidas.length + formatosExibidos.length;
+  /**
+   * R2b, item 2: a ordem não conta aqui (não é um filtro, é como a lista é ordenada; o desenho só
+   * conta o que de fato reduz quantos vídeos aparecem).
+   */
+  const quantosFiltrosAtivos =
+    plataformasExibidas.length +
+    formatosExibidos.length +
+    tiposConteudoExibidos.length +
+    (viewsMinExibido !== undefined ? 1 : 0) +
+    (comFalaExibido !== undefined ? 1 : 0) +
+    (brasilExibido !== undefined ? 1 : 0);
 
   /**
    * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
@@ -240,11 +330,11 @@ export function ReferenciasTela({
     return true;
   }
 
-  function navegar(mudanca: Partial<Parameters<typeof montarUrl>[0]>, opcoes: { substituir?: boolean } = {}) {
+  function navegar(mudanca: Partial<Filtros>, opcoes: { substituir?: boolean } = {}) {
     if (semRedeParaBuscar()) return;
     // O que está escrito na busca vai junto de qualquer outra mudança: a busca só vale com Enter ou ao sair do
     // campo, e a troca de aba ou de período pode chegar antes e apagá-la da URL.
-    const filtros = {
+    const filtros: Filtros = {
       segmento,
       periodoDias,
       busca: campoBusca,
@@ -253,6 +343,14 @@ export function ReferenciasTela({
       // do servidor.
       plataformas: plataformasExibidas,
       formatos: formatosExibidos,
+      ordem: ordemExibida,
+      viewsMin: viewsMinExibido,
+      comFala: comFalaExibido,
+      brasil: brasilExibido,
+      tiposConteudo: tiposConteudoExibidos,
+      // R2b, item 1: qualquer navegação volta para a primeira página de "Todos", menos "Ver mais", que
+      // pede a própria quantidade maior explicitamente em `mudanca`.
+      quantidade: TAMANHO_PAGINA_TODOS_PADRAO,
       ...mudanca,
     };
     const url = montarUrl(filtros);
@@ -266,6 +364,12 @@ export function ReferenciasTela({
       setPeriodoOtimista(filtros.periodoDias);
       setPlataformasOtimista(filtros.plataformas);
       setFormatosOtimista(filtros.formatos);
+      setOrdemOtimista(filtros.ordem);
+      setViewsMinOtimista(filtros.viewsMin);
+      setComFalaOtimista(filtros.comFala);
+      setBrasilOtimista(filtros.brasil);
+      setTiposConteudoOtimista(filtros.tiposConteudo);
+      setQuantidadeOtimista(filtros.quantidade);
       // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
       // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
       // navegação da pessoa e continua entrando no histórico como sempre.
@@ -364,11 +468,19 @@ export function ReferenciasTela({
     alternarFavorito(videoDetalheId, { usarComoReferencia: true });
   }
 
-  function aplicarFiltros({ plataformas, formatos }: { plataformas: Plataforma[]; formatos: AnaliseVideo["formato"][] }) {
+  function aplicarFiltros(filtros: {
+    plataformas: Plataforma[];
+    formatos: AnaliseVideo["formato"][];
+    ordem: OrdemReferencias | undefined;
+    viewsMin: number | undefined;
+    comFala: boolean | undefined;
+    brasil: boolean | undefined;
+    tiposConteudo: TipoConteudoFiltravel[];
+  }) {
     // Sem rede a folha continua aberta, com o que foi marcado. Um segundo toque antes de a folha sair é
     // ignorado pelo próprio gancho do histórico (`fecharENavegar` é idempotente).
     if (semRedeParaBuscar()) return;
-    filtrar.fecharENavegar(() => navegar({ plataformas, formatos }, { substituir: true }));
+    filtrar.fecharENavegar(() => navegar(filtros, { substituir: true }));
   }
 
   return (
@@ -387,16 +499,25 @@ export function ReferenciasTela({
             className={[styles.segmentoBotao, segmentoExibido === "foradacurva" ? styles.segmentoAtivo : ""]
               .filter(Boolean)
               .join(" ")}
-            onClick={() => navegar({ segmento: "foradacurva", plataformas: [], formatos: [] })}
+            onClick={() => navegar({ segmento: "foradacurva", periodoDias: 7 })}
           >
             {textosReferencias.segmentoForaDaCurva}
           </button>
           <button
             type="button"
             role="tab"
+            aria-selected={segmentoExibido === "todos"}
+            className={[styles.segmentoBotao, segmentoExibido === "todos" ? styles.segmentoAtivo : ""].filter(Boolean).join(" ")}
+            onClick={() => navegar({ segmento: "todos", periodoDias: 90 })}
+          >
+            {textosReferencias.segmentoTodos}
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={segmentoExibido === "salvos"}
             className={[styles.segmentoBotao, segmentoExibido === "salvos" ? styles.segmentoAtivo : ""].filter(Boolean).join(" ")}
-            onClick={() => navegar({ segmento: "salvos", plataformas: [], formatos: [] })}
+            onClick={() => navegar({ segmento: "salvos", periodoDias: 7 })}
           >
             {textosReferencias.segmentoSalvos}
           </button>
@@ -442,12 +563,13 @@ export function ReferenciasTela({
           >
             <Filter size={16} strokeWidth={1.5} aria-hidden="true" />
             {textosReferencias.filtrar}
-            {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>, {quantosFiltrosAtivos}</span> : null}
+            {/* Hotfix (passo 14): a contagem é só o número, nunca mais ", N" com a vírgula solta. */}
+            {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>{quantosFiltrosAtivos}</span> : null}
           </Botao>
         </div>
       </div>
 
-      {redePrincipalSemVideo && segmento === "foradacurva" && !navegando ? (
+      {redePrincipalSemVideo && segmento !== "salvos" && !navegando ? (
         <p className={styles.avisoRedePrincipal} role="status">
           {textosReferencias.semVideoRedePrincipal(ROTULO_PLATAFORMA[redePrincipalSemVideo])}
         </p>
@@ -472,8 +594,12 @@ export function ReferenciasTela({
           </div>
         ) : (
           <div className={styles.blocoVazio}>
-            <h3>{textosReferencias.vazioTitulo}</h3>
-            <p>{textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}</p>
+            <h3>{segmento === "todos" ? textosReferencias.vazioTituloTodos : textosReferencias.vazioTitulo}</h3>
+            <p>
+              {segmento === "todos"
+                ? textosReferencias.vazioTextoTodos(periodoDias, juntarPlataformas(plataformasAtivas))
+                : textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}
+            </p>
             <div className={styles.blocoVazioAcoes}>
               <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ periodoDias: 30 })}>
                 {textosReferencias.ver30Dias}
@@ -484,7 +610,16 @@ export function ReferenciasTela({
                 carregando={navegando}
                 onClick={() => {
                   setCampoBusca("");
-                  navegar({ busca: "", plataformas: [], formatos: [] });
+                  navegar({
+                    busca: "",
+                    plataformas: [],
+                    formatos: [],
+                    ordem: undefined,
+                    viewsMin: undefined,
+                    comFala: undefined,
+                    brasil: undefined,
+                    tiposConteudo: [],
+                  });
                 }}
               >
                 {textosReferencias.limparFiltros}
@@ -496,7 +631,12 @@ export function ReferenciasTela({
         <>
           {navegando ? null : (
             <p className={styles.contagem}>
-              {segmento === "salvos" ? textosReferencias.contagemSalvos(total) : textosReferencias.contagem(total, periodoDias)}
+              {segmento === "salvos"
+                ? textosReferencias.contagemSalvos(total)
+                : segmento === "todos"
+                  ? textosReferencias.contagemTodos(total, periodoDias)
+                  : textosReferencias.contagem(total, periodoDias)}
+              {segmento !== "salvos" ? `, ${textosReferencias.ordemSufixo[ordemExibida ?? "recentes"]}` : ""}
             </p>
           )}
           <div className={styles.grade}>
@@ -513,6 +653,18 @@ export function ReferenciasTela({
               />
             ))}
           </div>
+          {/* R2b, item 1: "Ver mais" só no "Todos", cresce `quantidade` em vez de paginar por offset (ver TAMANHO_PAGINA_TODOS_PADRAO). */}
+          {segmento === "todos" && !navegando && videos.length < total ? (
+            <Botao
+              variante="secundario"
+              tamanho="lg"
+              className={styles.botaoVerMais}
+              carregando={navegando}
+              onClick={() => navegar({ quantidade: quantidadeExibida + TAMANHO_PAGINA_TODOS_PADRAO })}
+            >
+              {textosReferencias.verMais}
+            </Botao>
+          ) : null}
         </>
       )}
 
@@ -536,6 +688,11 @@ export function ReferenciasTela({
           aoFechar={filtrar.fechar}
           plataformasAtivas={plataformasExibidas}
           formatosAtivos={formatosExibidos}
+          ordem={ordemExibida}
+          viewsMin={viewsMinExibido}
+          comFala={comFalaExibido}
+          brasil={brasilExibido}
+          tiposConteudo={tiposConteudoExibidos}
           contagens={contagensFiltro}
           totalAtual={total}
           onAplicar={aplicarFiltros}

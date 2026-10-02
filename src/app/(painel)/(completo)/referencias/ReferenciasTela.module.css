@@ -151,10 +151,27 @@
   white-space: nowrap;
 }
 
+/**
+ * Hotfix (passo 14, "Filtrar , 2"): a contagem virou um número só, sem a vírgula solta; como
+ * badge pequeno, não como texto corrido, para não parecer um caractere perdido ao lado do rótulo.
+ */
 .quantosAtivos {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
   font-family: var(--fonte-mono);
-  color: var(--cor-acao);
+  font-size: var(--tamanho-rodape);
   font-weight: var(--peso-semibold);
+}
+
+.botaoVerMais {
+  margin-top: var(--espaco-2);
 }
 
 .contagem {
