@@ -13,7 +13,7 @@
 import { and, eq, inArray, isNotNull, isNull, notInArray } from "drizzle-orm";
 
 import { db } from "@/db";
-import { lotesIa, nichos, videos } from "@/db/schema";
+import { contas, lotesIa, nichos, videos } from "@/db/schema";
 import { criarLote, type ItemLote } from "@/ia/lote";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 
@@ -34,6 +34,8 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
     .select({
       id: videos.id,
       titulo: videos.titulo,
+      descricao: videos.descricao,
+      handle: contas.handle,
       transcricao: videos.transcricao,
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
       nomeNicho: nichos.nome,
@@ -41,6 +43,7 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
     })
     .from(videos)
     .innerJoin(nichos, eq(videos.nichoId, nichos.id))
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes));
 
   const curtos = candidatos.filter((v) => (v.transcricao ?? "").trim().length < TAMANHO_MINIMO_TRANSCRICAO);
@@ -72,6 +75,8 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
     sistemaEstavel: extrairVideo.montarSistemaEstavel(),
     entrada: extrairVideo.montarEntrada({
       titulo: v.titulo ?? "",
+      descricao: v.descricao,
+      handle: v.handle,
       transcricao: v.transcricao ?? "",
       nomeNicho: v.nomeNicho,
       termosNicho: v.termosNicho,

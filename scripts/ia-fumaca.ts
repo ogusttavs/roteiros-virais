@@ -127,6 +127,8 @@ async function main() {
       sistemaEstavel: extrairVideo.montarSistemaEstavel(),
       entrada: extrairVideo.montarEntrada({
         titulo: "3 erros que estragam o sofa",
+        descricao: "3 erros que estragam o sofa, o terceiro ninguem sabe #limpezaprofissional",
+        handle: "limpezaemcasa",
         transcricao:
           "Oi gente, hoje eu vou mostrar os 3 erros que quase todo mundo comete limpando o proprio sofa em casa.",
         nomeNicho: "Limpeza de estofados",
@@ -210,6 +212,7 @@ async function main() {
           },
         ],
         analisesVisuais: [{ id: 1, ritmoDeCorte: "rapido", recursos: ["texto na tela", "zoom"] }],
+        duracaoTipicaS: { min: 20, max: 60 },
       }),
     }),
   );

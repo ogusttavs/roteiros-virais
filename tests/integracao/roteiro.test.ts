@@ -3,7 +3,7 @@
  * e `marcarPostado` (etapa 11): ciclo completo contra o Postgres real, em
  * mock (`AI_PROVIDER=mock`, `vitest.config.mts`).
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/ia/cliente", async (importarOriginal) => {
@@ -25,6 +25,7 @@ import { db, getPool } from "@/db";
 import {
   briefings,
   clientes,
+  contas,
   geracoesIA,
   membrosMarca,
   modelosNicho,
@@ -137,6 +138,8 @@ async function criarVideoEvidencia(
     plataforma?: Plataforma;
     /** M4: `undefined` (padrão) deixa nulo, como todo vídeo analisado antes desta coluna existir. */
     semFala?: boolean;
+    /** M5b, achado 6: nulo por padrão (a maioria dos testes deste arquivo não é sobre contas distintas); `forcaDaEvidencia` conta por `contaId`. */
+    contaId?: number;
   } = {},
 ): Promise<number> {
   const [video] = await db()
@@ -154,6 +157,7 @@ async function criarVideoEvidencia(
       // V4, item 3: nulo por padrao (o caso "nicho novo" de escolherTipoAbertura), a nao ser que o teste peca um tipo especifico.
       tipoAbertura: opcoes.tipoAbertura,
       semFala: opcoes.semFala,
+      contaId: opcoes.contaId,
       analise: {
         assunto,
         gancho: "olha essa mancha saindo do estofado",
@@ -168,8 +172,8 @@ async function criarVideoEvidencia(
   return video.id;
 }
 
-async function criarModeloNicho() {
-  await db().insert(modelosNicho).values({ nichoId, semana: "2026-08-31", modelo: MODELO_PADRAO });
+async function criarModeloNicho(modelo: ModeloNicho = MODELO_PADRAO) {
+  await db().insert(modelosNicho).values({ nichoId, semana: "2026-08-31", modelo });
 }
 
 beforeAll(async () => {
@@ -198,10 +202,12 @@ afterEach(async () => {
 });
 
 describe("gerarRoteiro", () => {
-  it("cita evidencia, tem todos os blocos, e respeita a duracao do modelo do nicho", async () => {
+  it("cita evidencia, tem todos os blocos, e sai com a duracao que o modelo escreveu, dentro da faixa do nicho", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-1", "mancha de vinho no estofado");
-    await criarModeloNicho();
+    // M5b, achado 4: faixa larga o bastante para os 40s que o mock sempre devolve (`mock.ts`); a
+    // faixa estreita de `MODELO_PADRAO` (20 a 30) é o caso de reprovação, testado abaixo.
+    await criarModeloNicho({ ...MODELO_PADRAO, duracaoTipicaS: { min: 20, max: 60 } });
 
     const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
     const roteiro = await gerarRoteiro(clienteId, {
@@ -227,10 +233,81 @@ describe("gerarRoteiro", () => {
     expect(c.edicao.textoNaTela.length).toBeGreaterThan(0);
     expect(c.evidencias.length).toBeGreaterThan(0);
 
-    // o mock sempre devolve 40s; o modelo do nicho pede de 20 a 30.
-    expect(c.duracaoS).toBe(30);
+    expect(c.duracaoS).toBe(40);
 
     expect(cliente.nichoId).toBe(nichoId);
+  });
+
+  /**
+   * M5b, achado 4 da revisão do motor (01/10/2026): antes, uma duração fora da faixa do modelo
+   * do nicho era silenciosamente encaixada (`respeitarDuracaoDoNicho`, removida); agora reprova
+   * na primeira tentativa do verificador (o mock sempre devolve 40s, fora dos 20 a 30 de
+   * `MODELO_PADRAO`). Revisão do Fable no PR #102: a faixa nunca derruba a geração sozinha; a
+   * segunda tentativa é aceita com a duração real, sem encaixe, e as duas ficam registradas.
+   */
+  it("duracao fora da faixa do modelo do nicho reprova a primeira tentativa; a segunda sai com a duracao real, sem encaixe", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-duracao-fora-da-faixa", "cheiro de mofo no estofado");
+    await criarModeloNicho();
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo no estofado",
+      objetivo: "conversao",
+    });
+
+    expect((roteiro.conteudo as { duracaoS: number }).duracaoS).toBe(40);
+    const geracoes = await db()
+      .select({ id: geracoesIA.id, entradas: geracoesIA.entradas })
+      .from(geracoesIA)
+      .where(and(eq(geracoesIA.tarefa, "roteiro"), eq(geracoesIA.clienteId, clienteId)));
+    expect(geracoes).toHaveLength(2);
+    expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("fora da faixa tipica do nicho");
+  });
+
+  it("video sem fala nao e reprovado pela faixa de duracao do nicho (a faixa e de video falado)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-duracao-sem-fala", "cheiro de mofo no estofado");
+    await criarModeloNicho();
+
+    await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo no estofado",
+      objetivo: "conversao",
+      estilo: "sem_fala",
+    });
+
+    const geracoes = await db()
+      .select({ id: geracoesIA.id })
+      .from(geracoesIA)
+      .where(and(eq(geracoesIA.tarefa, "roteiro"), eq(geracoesIA.clienteId, clienteId)));
+    expect(geracoes).toHaveLength(1);
+  });
+
+  /**
+   * M5b, achado 6 da revisão do motor (01/10/2026): antes, a força era calculada sobre toda a
+   * evidência oferecida ao modelo (`evidenciaParaRoteiro`, até `LIMITE_EVIDENCIA`), não sobre o
+   * que o roteiro de fato citou. Com 3 vídeos de 2 contas, bem dentro dos critérios de "forte", mas
+   * o roteiro citando só 1 (marcador de teste no mock, achado 6), a força cai para "fraca": 1
+   * conta só não satisfaz nem o piso de "média" (`MINIMO_CONTAS_MEDIA`, 2).
+   */
+  it("forca da evidencia e calculada sobre o que foi citado, nao sobre o que foi oferecido", async () => {
+    const clienteId = await criarCliente();
+    const [contaA] = await db().insert(contas).values({ plataforma: "youtube", handle: "conta-forca-a", nichoId }).returning();
+    const [contaB] = await db().insert(contas).values({ plataforma: "youtube", handle: "conta-forca-b", nichoId }).returning();
+    await criarVideoEvidencia("ev-forca-1", "cheiro de mofo persistente no sofa", { foraDaCurva: 6, contaId: contaA.id });
+    await criarVideoEvidencia("ev-forca-2", "cheiro de mofo persistente no sofa", { foraDaCurva: 5, contaId: contaB.id });
+    await criarVideoEvidencia("ev-forca-3", "cheiro de mofo persistente no sofa", { foraDaCurva: 4, contaId: contaA.id });
+
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo persistente no sofa",
+      objetivo: "conversao",
+      observacao: "m5b: cite so o primeiro id de evidencia",
+    });
+
+    expect(roteiro.conteudo.evidencias).toHaveLength(1);
+    expect(roteiro.conteudo.forcaEvidencia).toBe("fraca");
   });
 
   it("V12, item 3a: prefere a rede principal da marca na ordem das evidencias, sem excluir a outra", async () => {

@@ -52,7 +52,10 @@ const MODELO_PADRAO: ModeloNicho = {
   ganchos: [
     { tipo: "mostrar o produto agindo", exemplo: "olha essa mancha saindo", frequencia: "alta" },
   ],
-  duracaoTipicaS: { min: 20, max: 30 },
+  // M5b, achado 4: nulo de propósito (nenhum teste deste arquivo é sobre duração; o mock sempre
+  // devolve 40s, e uma faixa estreita aqui reprovaria o roteiro antes de chegar no que o arquivo
+  // testa de verdade, o aprendizado de regras a partir de reprovações).
+  duracaoTipicaS: null,
   estruturas: ["gancho, demonstracao, fechamento"],
   fechamentos: ["mostra o resultado sem falar nada"],
   chamadasFinais: ["comenta se voce ja passou por isso"],

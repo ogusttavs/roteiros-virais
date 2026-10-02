@@ -341,7 +341,15 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
     : extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
   const reprovado = entrada.includes("reprovou a versão anterior");
   const reprovadoMuitoLongo = entrada.includes("Muito longo");
-  const ids = extrairIds(entrada);
+  const todosOsIds = extrairIds(entrada);
+  /**
+   * M5b, achado 6 da revisão do motor (01/10/2026): por padrão o mock cita toda a evidência
+   * oferecida, então não dá para testar "a força é calculada sobre o que foi citado, não sobre o
+   * que foi oferecido" sem um jeito de o mock citar só parte. Marcador só para teste de
+   * integração (`roteiro.test.ts`, via `observacao`, que não entra na busca de evidência),
+   * mesmo espírito do `MARCADOR_EVIDENCIA_INVENTADA` de `avaliarTema`.
+   */
+  const ids = entrada.includes("m5b: cite so o primeiro id de evidencia") ? todosOsIds.slice(0, 1) : todosOsIds;
   // V9c, item 2: so o sistema estavel diz o formato (a entrada nunca cita "story"); a marca
   // do bloco de estrutura de Story e o numero da primeira regra da lista.
   const ehStory = sistemaEstavel.includes("R-IG-STORY-01");
@@ -475,13 +483,17 @@ function mockTemasDoDia(entrada: string) {
  * têm marcador de teste próprio ainda, "original" é o padrão); `serveDeModelo` segue direto de
  * `tipoConteudo`, mesma regra do prompt de verdade.
  */
-function tipoConteudoMock(titulo: string): { tipoConteudo: "original" | "meme"; serveDeModelo: boolean } {
-  const ehMeme = /\bpov\b|meme simulado/i.test(titulo);
+function tipoConteudoMock(texto: string): { tipoConteudo: "original" | "meme"; serveDeModelo: boolean } {
+  const ehMeme = /\bpov\b|meme simulado/i.test(texto);
   return { tipoConteudo: ehMeme ? "meme" : "original", serveDeModelo: !ehMeme };
 }
 
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
+  // M5b, achado 7 da revisão do motor (01/10/2026): "POV" e outros sinais de recorte ou meme
+  // podem estar só na legenda, não no título (`extrairVideo.ts`, "o título ou a legenda tem
+  // POV"); o mock simula isso olhando os dois, igual ao sistema estável de verdade pede.
+  const legenda = extrairCampo(entrada, "Legenda do post:") || "";
   const nichoLinha = extrairCampo(entrada, "Nicho:");
   const termos = (nichoLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")
     .split(",")
@@ -509,7 +521,7 @@ function mockExtrairVideo(entrada: string) {
       : "a transcricao não cita nenhum termo do nicho",
     idioma: "pt-BR" as const,
     tipoAbertura: "outro" as const,
-    ...tipoConteudoMock(titulo),
+    ...tipoConteudoMock(`${titulo} ${legenda}`),
   };
 }
 

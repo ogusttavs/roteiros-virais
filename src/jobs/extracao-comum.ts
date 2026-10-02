@@ -7,7 +7,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { lotesIa, nichos, videos, type AnaliseVideo } from "@/db/schema";
+import { contas, lotesIa, nichos, videos, type AnaliseVideo } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 import { registrarGeracao } from "@/ia/registro";
@@ -66,20 +66,33 @@ export function contarCamposEmPortugues(dados: extrairVideo.SaidaExtrairVideo): 
 
 async function buscarDadosParaRetentativa(
   videoId: number,
-): Promise<{ titulo: string; transcricao: string; nomeNicho: string; termosNicho: string[] } | null> {
+): Promise<
+  | { titulo: string; descricao: string | null; handle: string | null; transcricao: string; nomeNicho: string; termosNicho: string[] }
+  | null
+> {
   const [linha] = await db()
     .select({
       titulo: videos.titulo,
+      descricao: videos.descricao,
+      handle: contas.handle,
       transcricao: videos.transcricao,
       nomeNicho: nichos.nome,
       termosNicho: nichos.termos,
     })
     .from(videos)
     .innerJoin(nichos, eq(videos.nichoId, nichos.id))
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(eq(videos.id, videoId));
 
   if (!linha || !linha.transcricao) return null;
-  return { titulo: linha.titulo ?? "", transcricao: linha.transcricao, nomeNicho: linha.nomeNicho, termosNicho: linha.termosNicho };
+  return {
+    titulo: linha.titulo ?? "",
+    descricao: linha.descricao,
+    handle: linha.handle,
+    transcricao: linha.transcricao,
+    nomeNicho: linha.nomeNicho,
+    termosNicho: linha.termosNicho,
+  };
 }
 
 export async function retentarEmPortugues(videoId: number): Promise<extrairVideo.SaidaExtrairVideo | null> {

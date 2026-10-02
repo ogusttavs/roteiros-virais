@@ -705,19 +705,6 @@ async function buscarSerie(raizId: number): Promise<RoteiroLinha[]> {
 }
 
 /**
- * A duração vem do modelo do nicho (regra dura 5, briefing-e-rubricas.md
- * seção 7): o prompt já pede isso, mas nada garante que o modelo obedeça.
- * Sem faixa (nicho sem modelo ainda), aceita a duração que veio.
- */
-function respeitarDuracaoDoNicho(
-  duracaoS: number,
-  faixa: { min: number; max: number } | undefined,
-): number {
-  if (!faixa) return duracaoS;
-  return Math.min(Math.max(duracaoS, faixa.min), faixa.max);
-}
-
-/**
  * Campos de texto do roteiro que passam pelo verificador (regra dura 4: sem
  * jargão, emoji, travessão). Exportada para `scripts/avaliar-roteiros.ts`
  * rodar a mesma checagem que a produção usa (dia 1 da etapa 14, item 5).
@@ -899,7 +886,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
    */
   const usaPorQueAssim = dados.estilo !== "sem_fala";
   /** R1, item 2: a rede principal da marca escolhe o conjunto de regras que o Reels falado segue. */
-  const redeReels = regrasDoReels(dados.cliente.redePrincipal, modeloNichoLinha?.modelo.duracaoTipicaS.max);
+  const redeReels = regrasDoReels(dados.cliente.redePrincipal, modeloNichoLinha?.modelo.duracaoTipicaS?.max);
   const numerosRegrasValidas =
     dados.formato === "story" ? NUMEROS_REGRAS_STORY : new Set(redeReels.regras.map((r) => r.numero));
 
@@ -926,7 +913,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
       camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
       redePrincipal: dados.cliente.redePrincipal,
-      duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS.max,
+      duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS?.max,
       regrasCliente,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,
@@ -1001,6 +988,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       ? dados.anguloParaEvitar.duracaoAnteriorS
       : undefined,
     extrairDuracaoS: (d) => d.duracaoS,
+    // M5b, achado 4: duração fora da faixa real do nicho reprova a primeira tentativa no
+    // verificador, em vez de ser encaixada depois (`respeitarDuracaoDoNicho`, removida junto desta
+    // etapa). Revisão do Fable no PR #102: só o Reels falado; a faixa é medida em vídeo com fala
+    // do feed, e um Story (soma de cartões) ou um vídeo sem fala (8 a 15 s é normal) fora dela é
+    // legítimo.
+    faixaDuracaoNicho:
+      dados.formato === "story" || dados.estilo === "sem_fala"
+        ? undefined
+        : (modeloNichoLinha?.modelo.duracaoTipicaS ?? undefined),
     generoTexto: "roteiro",
     formato: dados.formato,
     estilo: dados.estilo,
@@ -1013,7 +1009,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   });
 
   const referenciaEscolhida = validarReferenciaDoModelo(saida.edicao.referencia, evidencias);
-  const duracaoS = respeitarDuracaoDoNicho(saida.duracaoS, modeloNichoLinha?.modelo.duracaoTipicaS);
+  const duracaoS = saida.duracaoS;
+  /**
+   * M5b, achado 6 da revisão do motor (01/10/2026): a força da evidência precisa refletir o que
+   * o roteiro de fato cita, não o conjunto inteiro oferecido ao modelo (`evidencias`, até
+   * `LIMITE_EVIDENCIA`). Antes, um roteiro que citasse 1 vídeo fraco podia sair com "forte" só
+   * porque o pool oferecido tinha vídeos fortes que ele nem usou.
+   */
+  const idsEvidenciaCitados = new Set(saida.evidencias);
+  const evidenciasCitadas = evidencias.filter((v) => idsEvidenciaCitados.has(v.id));
 
   const conteudo: ConteudoRoteiro = {
     titulo: saida.titulo,
@@ -1050,7 +1054,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
      * (tema novo, pouca prova), mas também não é "forte" (vários vídeos
      * confirmando), então fica no meio.
      */
-    forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidencias),
+    forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidenciasCitadas),
     legenda: saida.legenda,
   };
 

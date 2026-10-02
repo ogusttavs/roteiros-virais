@@ -71,7 +71,9 @@ export default async function AdminNichoModelo({ params }: { params: Promise<{ s
           <section className={styles.secao}>
             <h2>{t.duracaoTitulo}</h2>
             <p className={styles.mono}>
-              {t.duracaoValor(atual.modelo.duracaoTipicaS.min, atual.modelo.duracaoTipicaS.max)}
+              {atual.modelo.duracaoTipicaS
+                ? t.duracaoValor(atual.modelo.duracaoTipicaS.min, atual.modelo.duracaoTipicaS.max)
+                : t.duracaoSemDado}
             </p>
           </section>
 

@@ -8,7 +8,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { lotesIa, nichos, videos } from "@/db/schema";
+import { contas, lotesIa, nichos, videos } from "@/db/schema";
 import { rodarExtrair } from "@/jobs/extrair";
 import { LIMITE_ANALISADOS_SETOR_NOVO } from "@/jobs/extrair-agora";
 import { rodarExtrairColeta } from "@/jobs/extrair-coleta";
@@ -32,7 +32,7 @@ const ANALISE_EXEMPLO = {
 
 async function criarVideo(
   idExterno: string,
-  opcoes: { transcricao?: string; analise?: unknown } = {},
+  opcoes: { transcricao?: string; analise?: unknown; descricao?: string; contaId?: number } = {},
 ) {
   const [v] = await db()
     .insert(videos)
@@ -45,6 +45,8 @@ async function criarVideo(
       views: 100,
       transcricao: opcoes.transcricao,
       analise: opcoes.analise as never,
+      descricao: opcoes.descricao,
+      contaId: opcoes.contaId,
     })
     .returning();
   return v;
@@ -131,6 +133,51 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
     // Video que ja tinha analise nao foi tocado.
     const [videoIntocado] = await db().select().from(videos).where(eq(videos.idExterno, "ja-tem-analise"));
     expect(videoIntocado.analise!.assunto).toBe("ja analisado");
+  });
+
+  /**
+   * M5b, achado 7 da revisão do motor (01/10/2026): a extração não via a legenda do post (só
+   * título e transcrição), mas o prompt pede para reconhecer "POV" e legenda de outra página,
+   * sinais que podem estar só na legenda. Antes desta etapa, `montarEntrada` nem recebia a
+   * legenda: este teste prova que ela chega até o modelo (o mock lê a legenda, não só o título).
+   */
+  it("a legenda do post chega na extracao: POV so na legenda classifica como meme", async () => {
+    await criarVideo("com-pov-na-legenda", {
+      transcricao: TRANSCRICAO_BOA,
+      descricao: "Mais um POV de dono de pequeno negocio #comedia",
+    });
+
+    await rodarExtrair();
+    await rodarExtrairColeta();
+
+    const [videoAtualizado] = await db().select().from(videos).where(eq(videos.idExterno, "com-pov-na-legenda"));
+    expect(videoAtualizado.tipoConteudo).toBe("meme");
+    expect(videoAtualizado.serveDeModelo).toBe(false);
+  });
+
+  /**
+   * M5b, achado 7: o @ da conta também chega na entrada (via `contas.handle`). Prova indireta,
+   * pelo mesmo sinal que `pertenceAoNicho` já usa (`mockExtrairVideo` olha a entrada inteira):
+   * um termo do nicho que só aparece no handle, nunca no título nem na transcrição, só bate se o
+   * handle de fato chegou até o modelo.
+   */
+  it("o @ da conta chega na extracao", async () => {
+    await db().update(nichos).set({ termos: ["nichoexclusivodoteste"] }).where(eq(nichos.id, nichoId));
+    try {
+      const [conta] = await db()
+        .insert(contas)
+        .values({ plataforma: "youtube", handle: "nichoexclusivodoteste", nichoId })
+        .returning();
+      await criarVideo("com-conta-termo-no-handle", { transcricao: TRANSCRICAO_BOA, contaId: conta.id });
+
+      await rodarExtrair();
+      await rodarExtrairColeta();
+
+      const [videoAtualizado] = await db().select().from(videos).where(eq(videos.idExterno, "com-conta-termo-no-handle"));
+      expect(videoAtualizado.analise!.pertenceAoNicho).toBe(true);
+    } finally {
+      await db().update(nichos).set({ termos: [] }).where(eq(nichos.id, nichoId));
+    }
   });
 
   it("transcricao curta demais nao entra no lote e ganha nova tentativa de transcricao", async () => {

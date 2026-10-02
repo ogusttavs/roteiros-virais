@@ -26,7 +26,7 @@
 import { and, avg, count, eq, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "../src/db";
-import { geracoesIA, lotesIa, nichos, videos } from "../src/db/schema";
+import { contas, geracoesIA, lotesIa, nichos, videos } from "../src/db/schema";
 import { criarLote, type ItemLote } from "../src/ia/lote";
 import * as extrairVideo from "../src/ia/prompts/extrairVideo";
 import { TAMANHO_MINIMO_TRANSCRICAO } from "../src/jobs/extracao-comum";
@@ -45,6 +45,8 @@ function diasAtras(dias: number): Date {
 type Candidato = {
   id: number;
   titulo: string | null;
+  descricao: string | null;
+  handle: string | null;
   transcricao: string | null;
   nomeNicho: string;
   termosNicho: string[];
@@ -73,8 +75,9 @@ export async function candidatosDoSetor(nichoId: number, nomeNicho: string, term
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
   const linhas = await db()
-    .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao })
+    .select({ id: videos.id, titulo: videos.titulo, descricao: videos.descricao, handle: contas.handle, transcricao: videos.transcricao })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes));
 
   return linhas.map((v) => ({ ...v, nomeNicho, termosNicho, nichoId }));
@@ -138,6 +141,8 @@ async function main() {
     sistemaEstavel: extrairVideo.montarSistemaEstavel(),
     entrada: extrairVideo.montarEntrada({
       titulo: v.titulo ?? "",
+      descricao: v.descricao,
+      handle: v.handle,
       transcricao: v.transcricao ?? "",
       nomeNicho: v.nomeNicho,
       termosNicho: v.termosNicho,

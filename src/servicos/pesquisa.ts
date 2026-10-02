@@ -30,6 +30,7 @@ import {
 } from "@/db/schema";
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
+import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { aplicarTetoPorConta } from "@/servicos/teto-por-conta";
 
@@ -455,10 +456,14 @@ export async function semDonoComAnalise(nichoId: number): Promise<VideoSemDonoCo
     }));
 }
 
-/** Palavras com 4 ou mais letras do texto do tema, sem repetir (etapa 10). */
+/**
+ * Palavras com 4 ou mais letras do texto do tema, sem repetir (etapa 10), fora da lista de
+ * palavras vazias (M5b, achado 6 da revisão do motor, 01/10/2026: "para", "como" e "mais" casavam
+ * qualquer etiqueta que contivesse a subcadeia, por acaso, mesmo sem relação nenhuma com o tema).
+ */
 export function palavrasChave(texto: string): string[] {
   const encontradas = texto.toLowerCase().match(/\p{L}{4,}/gu) ?? [];
-  return [...new Set(encontradas)];
+  return [...new Set(encontradas)].filter((palavra) => !PALAVRAS_VAZIAS.has(palavra));
 }
 
 /**
@@ -474,14 +479,26 @@ export function palavrasChave(texto: string): string[] {
  * migração própria, sobrevivendo a `resetarSchema`; decisão registrada em
  * `TODO.md`), só `lower()`: "não" buscado não casa "nao" numa etiqueta, e
  * vice versa.
- */
-/**
+ *
  * `exigirServeDeModelo` (H4, item 2): só a evidência do roteiro (nunca a do tema, que continua
  * usando recorte e meme como sinal de assunto) exige `serveDeModelo`. `is not false` em vez de
  * `= true`: nulo (vídeo analisado antes deste campo existir, até a reclassificação em lote
  * rodar) não exclui, só `false` explícito exclui.
+ *
+ * `relevancia` (M5b, achado 6 da revisão do motor, 01/10/2026): devolvida junto para
+ * `evidenciaParaTema`/`evidenciaParaRoteiro` ordenarem por ela antes do múltiplo. Conta quantas
+ * palavras-chave (já sem as vazias) batem na busca textual do vídeo, mais quantas etiquetas
+ * contêm alguma delas; sem isto, a ordenação era só por múltiplo, e um casamento por acaso
+ * (etiqueta que contém a subcadeia de uma palavra comum) entrava com a mesma prioridade de um
+ * casamento de verdade, desde que o vídeo tivesse múltiplo alto: "os 8 maiores do setor", não a
+ * evidência mais parecida com o tema.
  */
-function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor, exigirServeDeModelo: boolean) {
+function condicoesEvidencia(
+  nichoId: number,
+  texto: string,
+  regua: ReguaSetor,
+  exigirServeDeModelo: boolean,
+): { condicoes: SQL[]; relevancia: SQL<number> } {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
   // "text[]" pede um array de verdade; um array JS interpolado direto vira
@@ -491,6 +508,13 @@ function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor, e
     padroes.length > 0
       ? sql`array[${sql.join(
           padroes.map((p) => sql`${p}`),
+          sql`, `,
+        )}]::text[]`
+      : sql`array[]::text[]`;
+  const palavrasSql =
+    palavras.length > 0
+      ? sql`array[${sql.join(
+          palavras.map((p) => sql`${p}`),
           sql`, `,
         )}]::text[]`
       : sql`array[]::text[]`;
@@ -510,7 +534,13 @@ function condicoesEvidencia(nichoId: number, texto: string, regua: ReguaSetor, e
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (exigirServeDeModelo) condicoes.push(sql`${videos.serveDeModelo} is not false`);
-  return condicoes;
+
+  const relevancia = sql<number>`(
+    (select count(*) from unnest(${palavrasSql}) as palavra where ${videos.busca} @@ plainto_tsquery('portuguese', palavra))
+    + (select count(*) from jsonb_array_elements_text(${videos.etiquetas}) as etiqueta(valor) where lower(etiqueta.valor) like any (${padroesSql}))
+  )`;
+
+  return { condicoes, relevancia };
 }
 
 export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number };
@@ -539,6 +569,7 @@ export async function evidenciaParaTema(
 ): Promise<VideoEvidenciaTema[]> {
   const regua = await reguaDoSetor(nichoId);
   const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true);
   const linhas = await db()
     .select({
       id: videos.id,
@@ -550,8 +581,8 @@ export async function evidenciaParaTema(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto, regua, true)))
-    .orderBy(desc(videos.foraDaCurva), asc(videos.id))
+    .where(and(...condicoes))
+    .orderBy(desc(relevancia), desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
   const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
@@ -648,6 +679,7 @@ export async function evidenciaParaRoteiro(
   limite = 8,
 ): Promise<VideoEvidenciaRoteiro[]> {
   const regua = await reguaDoSetor(nichoId);
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true);
   const linhas = await db()
     .select({
       id: videos.id,
@@ -665,8 +697,8 @@ export async function evidenciaParaRoteiro(
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(...condicoesEvidencia(nichoId, texto, regua, true)))
-    .orderBy(desc(videos.foraDaCurva), asc(videos.id))
+    .where(and(...condicoes))
+    .orderBy(desc(relevancia), desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
   return mapearEvidenciaRoteiro(linhas);
@@ -1389,7 +1421,9 @@ export function formatarModeloNicho(modelo: ModeloNicho | null): string {
    * é a primeira tarefa que precisa deles de verdade, para imitar exemplo
    * literal em vez de regra abstrata (escopo 5.9.5).
    */
-  linhas.push(`Duração típica: de ${modelo.duracaoTipicaS.min} a ${modelo.duracaoTipicaS.max} segundos.`);
+  if (modelo.duracaoTipicaS) {
+    linhas.push(`Duração típica: de ${modelo.duracaoTipicaS.min} a ${modelo.duracaoTipicaS.max} segundos.`);
+  }
   if (modelo.estruturas.length > 0) {
     linhas.push(`Estruturas que funcionam: ${modelo.estruturas.join("; ")}`);
   }

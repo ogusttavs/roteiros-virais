@@ -879,7 +879,14 @@ export const noticias = pgTable("noticias", {
 export type ModeloNicho = {
   resumo: string;
   ganchos: { tipo: string; exemplo: string; frequencia: string }[];
-  duracaoTipicaS: { min: number; max: number };
+  /**
+   * M5b, achado 4 da revisão do motor (01/10/2026): percentis 25 a 75 da duração dos vídeos de
+   * referência, calculados por SQL (`faixaDeDuracao`, `jobs/modelo-nicho.ts`), não mais inventados
+   * pelo modelo (o schema exigia o campo, a entrada não tinha a duração de nenhum vídeo). Nulo
+   * quando nenhum vídeo da evidência tem `duracaoS` gravado (comum em setor majoritariamente
+   * Instagram, que não traz duração do ator).
+   */
+  duracaoTipicaS: { min: number; max: number } | null;
   estruturas: string[];
   fechamentos: string[];
   chamadasFinais: string[];

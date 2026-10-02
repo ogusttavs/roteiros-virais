@@ -625,6 +625,53 @@ describe("evidenciaParaTema", () => {
     expect(resultado.map((v) => v.assunto)).toEqual(["assunto exclusivo da prova do tema"]);
     expect(resultado).toHaveLength(1);
   });
+
+  /**
+   * M5b, achado 6 da revisão do motor (01/10/2026): "para", "como" e "mais" casavam qualquer
+   * etiqueta que continha a subcadeia por acaso ("comparativo" contém "para"), sem relação
+   * nenhuma com o tema. Com a lista de palavras vazias, essas três não entram mais na busca por
+   * etiqueta (a busca textual pela frase inteira continua existindo, à parte).
+   */
+  it("palavra vazia (para, como, mais) nao casa etiqueta por acaso", async () => {
+    await criarVideo("ev-palavra-vazia", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(10),
+      titulo: "video generico sem nenhuma relacao com o tema buscado",
+      etiquetas: ["comparativo de precos"],
+      analise: { assunto: "assunto generico sem relacao" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "para quem mais quer saber como comecar", 10);
+
+    expect(resultado).toEqual([]);
+  });
+
+  /**
+   * M5b, achado 6: antes, a ordem era só pelo múltiplo; um vídeo que casava por acaso (uma
+   * palavra genérica em comum) com múltiplo alto vinha antes de um vídeo de verdade parecido com
+   * o tema, só porque o múltiplo dele era menor. Agora a relevância (quantas palavras do tema
+   * batem no texto e na etiqueta) vem primeiro.
+   */
+  it("relevancia de palavra-chave e etiqueta ordena antes do multiplo", async () => {
+    await criarVideo("ev-relevancia-multiplo-alto", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(10),
+      titulo: "video generico sobre almofada decorativa",
+      etiquetas: ["almofada"],
+      analise: { assunto: "assunto generico sobre decoracao" },
+    });
+    await criarVideo("ev-relevancia-multiplo-baixo", {
+      foraDaCurva: 4,
+      publicadoEm: diasAtras(10),
+      titulo: "como tirar mancha teimosa de almofada",
+      etiquetas: ["mancha teimosa", "almofada"],
+      analise: { assunto: "tira a mancha teimosa da almofada" },
+    });
+
+    const resultado = await evidenciaParaTema(nichoId, "mancha teimosa almofada", 10);
+
+    expect(resultado[0]?.assunto).toBe("tira a mancha teimosa da almofada");
+  });
 });
 
 describe("evidenciaParaRoteiro", () => {
