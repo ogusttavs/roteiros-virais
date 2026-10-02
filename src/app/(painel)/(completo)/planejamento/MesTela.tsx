@@ -9,13 +9,13 @@ import type { ItemPlano } from "@/servicos/plano";
 import type { AgendaDoDia, DiaDoMes } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
+import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
 
 import { EstadoItem, ROTULO_MOMENTO } from "../hoje/HojeTela";
 import hojeStyles from "../hoje/HojeTela.module.css";
 import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
 import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
-import { ConfirmarMoverDia } from "./ConfirmarMoverDia";
 import styles from "./MesTela.module.css";
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import { useMoverDeDia } from "./useMoverDeDia";
@@ -50,6 +50,23 @@ function diaMesExtensoMinusculo(dataISO: string): string {
 function diaMesExtenso(dataISO: string): string {
   const texto = diaMesExtensoMinusculo(dataISO);
   return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+/**
+ * Mesma regra do arrasto, para o "Não vou gravar hoje" do menu nunca divergir dele: a grade do
+ * mês cobre bem mais dias que a Semana (o mês inteiro à vista), mas uma data fora dela, digitada
+ * à mão no campo de "escolher a data", ainda salva sem perguntar (mesmo limite da Semana).
+ */
+function perguntaSeConflitoMes(dias: DiaDoMes[], tipo: "reels" | "story", titulo: string, novaData: string): string | null {
+  const diaAlvo = dias.find((d) => d.data === novaData);
+  if (!diaAlvo) return null;
+  const temConflito = tipo === "reels" ? diaAlvo.marca.qtdReels > 0 : diaAlvo.marca.qtdStories > 0;
+  if (!temConflito) return null;
+  return textosHoje.agenda.planejador.confirmarMoverPergunta(
+    titulo,
+    diaMesExtenso(novaData),
+    tipo === "reels" ? textosHoje.agenda.legendaReels : textosHoje.agenda.legendaStory,
+  );
 }
 
 /**
@@ -223,7 +240,13 @@ export function MesConteudo({
                       {!podeArrastar ? <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" /> : null}
                     </button>
                     {podeArrastar ? (
-                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaSelecionado} aoArquivar={arquivarComDesfazer} />
+                      <MenuAcoesAgenda
+                        roteiroId={item.id}
+                        titulo={item.titulo}
+                        data={diaSelecionado}
+                        aoArquivar={arquivarComDesfazer}
+                        perguntaSeConflito={(novaData) => perguntaSeConflitoMes(dias, tipo, item.titulo, novaData)}
+                      />
                     ) : null}
                   </li>
                 );

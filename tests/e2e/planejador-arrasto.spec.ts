@@ -211,4 +211,30 @@ test.describe("planejador, mover de dia por arrasto (E39c, parte 2b)", () => {
     await linha.getByRole("button", { name: /Mais opções/ }).click();
     await expect(page.getByRole("menuitem", { name: "Não vou gravar hoje" })).toBeVisible();
   });
+
+  test("Semana, 390px: o menu também pergunta antes de mover para um dia que já tem o mesmo formato", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 });
+    await entrar(page);
+    await page.goto(`/planejamento?visao=semana&dia=${DIA_ORIGEM}`);
+
+    const linha = page.getByRole("listitem").filter({ hasText: "o item que vai ser arrastado" });
+    await linha.getByRole("button", { name: /Mais opções/ }).click();
+    await page.getByRole("menuitem", { name: "Não vou gravar hoje" }).click();
+
+    const folha = page.getByRole("dialog", { name: "Mudar o dia" });
+    await expect(folha).toBeVisible();
+    await folha.getByRole("button", { name: "Escolher a data", exact: true }).click();
+    await folha.getByLabel("Escolher a data").fill(DIA_COM_REELS);
+    await folha.getByRole("button", { name: "Salvar", exact: true }).click();
+
+    // A folha some e a pergunta aparece no lugar dela, mesmo texto e mesmos botões do arrasto.
+    await expect(folha).toBeHidden();
+    const confirmacao = page.getByRole("alertdialog");
+    await expect(confirmacao).toBeVisible();
+    await expect(confirmacao).toContainText("Reels");
+
+    await confirmacao.getByRole("button", { name: "Mover mesmo assim" }).click();
+    await expect(confirmacao).toBeHidden();
+    await expect(page.getByRole("region", { name: /sexta-feira, 12 de março/i }).getByText("o item que vai ser arrastado")).toBeVisible();
+  });
 });

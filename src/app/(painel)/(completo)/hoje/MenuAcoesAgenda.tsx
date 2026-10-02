@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { textosComuns } from "@/textos/comuns";
 import { textosHoje } from "@/textos/hoje";
+import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
@@ -31,6 +32,16 @@ type Props = {
    * o item (achado desta rodada: o Toast morria antes da pessoa conseguir tocar em "Desfazer").
    */
   aoArquivar: (roteiroId: number) => Promise<void>;
+  /**
+   * E39c, parte 2b: a mesma regra do arrasto ("soltar num dia que já tem um item do mesmo
+   * formato pede confirmação") também pelo "Não vou gravar hoje", para o caminho do teclado e o
+   * do mouse nunca divergirem (achado do Fable na revisão: um barrando e o outro perguntando sem
+   * avisar seria pior que os dois sem aviso nenhum). Quem chama já sabe o formato do item e os
+   * dias que tem carregados (`SemanaTela`/`MesTela`); devolve a pergunta pronta quando há conflito
+   * na data escolhida, `null` quando não há. Sem isto (as chamadas de `HojeTela.tsx`, fora desta
+   * etapa), o "Mudar o dia" salva direto, como sempre foi.
+   */
+  perguntaSeConflito?: (novaData: string) => string | null;
 };
 
 /**
@@ -40,14 +51,16 @@ type Props = {
  * as folhas que já existem (`FolhaMudarDia`, `FolhaReprovarAgenda`) e as ações que já existem
  * (`arquivarAtrasadoAction`, apesar do nome, serve qualquer roteiro, não só atrasado).
  */
-export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", aoArquivar }: Props) {
+export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", aoArquivar, perguntaSeConflito }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
   const [menuAberto, setMenuAberto] = useState(false);
   const { fechar: fecharMenu } = useFolhaNoHistorico(menuAberto, () => setMenuAberto(false));
   const [folhaMudarDiaAberta, setFolhaMudarDiaAberta] = useState(false);
   const [folhaReprovarAberta, setFolhaReprovarAberta] = useState(false);
+  const [confirmarMudarDia, setConfirmarMudarDia] = useState<{ novaData: string; pergunta: string } | null>(null);
   const [ocupado, iniciarTransicao] = useTransition();
+  const [movendo, iniciarMover] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
 
   function naoVouGravarHoje() {
@@ -55,10 +68,21 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
     setFolhaMudarDiaAberta(true);
   }
 
-  async function salvarMudarDia(novaData: string) {
+  async function efetivarMudarDia(novaData: string) {
     await mudarDataAtrasadoAction(roteiroId, novaData);
     setFolhaMudarDiaAberta(false);
+    setConfirmarMudarDia(null);
     router.refresh();
+  }
+
+  async function salvarMudarDia(novaData: string) {
+    const pergunta = novaData !== data ? perguntaSeConflito?.(novaData) : null;
+    if (pergunta) {
+      setFolhaMudarDiaAberta(false);
+      setConfirmarMudarDia({ novaData, pergunta });
+      return;
+    }
+    await efetivarMudarDia(novaData);
   }
 
   function arquivar() {
@@ -83,6 +107,11 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
     const resultado = await reprovarERescreverAction(roteiroId, motivosIds, motivoTexto);
     router.refresh();
     return resultado;
+  }
+
+  function confirmarMoverMesmoAssim() {
+    if (!confirmarMudarDia) return;
+    iniciarMover(() => efetivarMudarDia(confirmarMudarDia.novaData));
   }
 
   return (
@@ -128,6 +157,17 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
 
       {folhaMudarDiaAberta ? (
         <FolhaMudarDia aoFechar={() => setFolhaMudarDiaAberta(false)} dataInicial={data} aoSalvar={salvarMudarDia} />
+      ) : null}
+
+      {confirmarMudarDia ? (
+        <ConfirmarMoverDia
+          pergunta={confirmarMudarDia.pergunta}
+          movendo={movendo}
+          aoConfirmar={confirmarMoverMesmoAssim}
+          aoCancelar={() => setConfirmarMudarDia(null)}
+          confirmarRotulo={textosHoje.agenda.planejador.confirmarMoverBotao}
+          cancelarRotulo={textosHoje.agenda.planejador.cancelarMoverBotao}
+        />
       ) : null}
 
       <FolhaReprovarAgenda

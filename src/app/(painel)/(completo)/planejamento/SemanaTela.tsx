@@ -7,13 +7,13 @@ import { useState, useTransition } from "react";
 import type { DiaSemanaPlano, ItemSemanaPlano } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
+import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
 
 import { ROTULO_MOMENTO } from "../hoje/HojeTela";
 import hojeStyles from "../hoje/HojeTela.module.css";
 import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
 import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
-import { ConfirmarMoverDia } from "./ConfirmarMoverDia";
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import styles from "./SemanaTela.module.css";
 import { useMoverDeDia } from "./useMoverDeDia";
@@ -44,6 +44,22 @@ function rotuloEstadoItem(item: ItemSemanaPlano, dia: DiaSemanaPlano): string {
   if (item.status === "postado") return textosHoje.agenda.estadoReels.postado;
   if (dia.hoje) return textosHoje.agenda.estadoReels.gerado;
   return dia.passado ? textosHoje.agenda.planejador.estadoAtrasado : textosHoje.agenda.estadoOutroDia;
+}
+
+/**
+ * Mesma regra do arrasto (`useMoverDeDia.ts`), para o "Não vou gravar hoje" do menu nunca
+ * divergir dele: só sabe responder pelos sete dias já carregados na Semana; uma data escolhida
+ * fora dela no campo de "escolher a data" da folha (`FolhaMudarDia`) salva sem perguntar, porque
+ * esta visão não tem como saber o que tem lá (limite registrado no TODO.md).
+ */
+function perguntaSeConflitoSemana(dias: DiaSemanaPlano[], item: ItemSemanaPlano, novaData: string): string | null {
+  const diaAlvo = dias.find((d) => d.data === novaData);
+  if (!diaAlvo || !diaAlvo.itens.some((outro) => outro.tipo === item.tipo)) return null;
+  return textosHoje.agenda.planejador.confirmarMoverPergunta(
+    item.titulo,
+    diaPorExtenso(novaData),
+    item.tipo === "reels" ? textosHoje.agenda.legendaReels : textosHoje.agenda.legendaStory,
+  );
 }
 
 /**
@@ -265,7 +281,15 @@ function DiasGrade({
                           {rotuloEstadoItem(item, dia)}
                         </span>
                       </button>
-                      {podeArrastar ? <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={dia.data} aoArquivar={aoArquivar} /> : null}
+                      {podeArrastar ? (
+                        <MenuAcoesAgenda
+                          roteiroId={item.id}
+                          titulo={item.titulo}
+                          data={dia.data}
+                          aoArquivar={aoArquivar}
+                          perguntaSeConflito={(novaData) => perguntaSeConflitoSemana(dias, item, novaData)}
+                        />
+                      ) : null}
                     </li>
                   );
                 })}
