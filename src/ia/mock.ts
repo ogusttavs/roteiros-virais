@@ -512,7 +512,7 @@ function mockExtrairVideo(entrada: string) {
   };
 }
 
-/** M3, item 2: mesma ideia de mockExtrairVideo, sem os campos de fala (`idioma`, `tipoAbertura`). */
+/** M3, item 2: mesma ideia de mockExtrairVideo, sem os campos de fala (`idioma`, `tipoAbertura`); achado 5 da revisão do motor acrescenta `tipoConteudo`/`serveDeModelo`, igual ao caminho com fala. */
 function mockExtrairVideoSemFala(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
   const nichoLinha = extrairCampo(entrada, "Nicho:");
@@ -538,6 +538,7 @@ function mockExtrairVideoSemFala(entrada: string) {
       .slice(0, 4),
     pertenceAoNicho,
     motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda não cita nenhum termo do nicho",
+    ...tipoConteudoMock(titulo),
   };
 }
 
