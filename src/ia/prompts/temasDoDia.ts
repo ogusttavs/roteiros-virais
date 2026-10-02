@@ -34,8 +34,15 @@ import { REGRAS_REEL, REGRAS_SHORT, REGRAS_STORY, REGRAS_TIKTOK, textoRegras } f
  * estável; sem retentativa aqui (esta tarefa não passa por `gerarComVerificacao`), a última linha
  * da entrada já é o lugar definitivo, sem risco de a segunda tentativa empurrar ele para o meio.
  * Versão 1.5.0.
+ *
+ * 1.6.0 (hotfix de 02/10/2026, achado de produção): o gerador não sabia da prova que o código
+ * exige depois (3 vídeos, 2 contas, parte brasileira) nem de onde era cada vídeo, citava três
+ * vídeos quase todos de fora e os três temas eram descartados; Overtake e o perfil do Bruno
+ * fecharam o dia sem tema novo. Agora cada linha da lista diz a conta e se o vídeo é do Brasil, a
+ * regra da prova vai escrita na entrada (com o número de brasileiros que o setor pede), e a
+ * segunda tentativa recebe o motivo de cada tema barrado (`ajuste`).
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -91,14 +98,31 @@ ${dados.modeloNicho}
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
+/** "do Brasil" ou "de fora"; sem a informação (chamada antiga, teste), não escreve nada. */
+function origem(brasileiro: boolean | undefined): string {
+  if (brasileiro === undefined) return "";
+  return brasileiro ? ", do Brasil" : ", de fora";
+}
+
 export function montarEntrada(dados: {
-  subindoHoje: { id: number; assunto: string; velocidadeRelativa: number }[];
+  subindoHoje: { id: number; assunto: string; velocidadeRelativa: number; contaId?: number | null; brasileiro?: boolean }[];
   /** Sem conta dona (Hashtag Search da Meta): sem numero de velocidade, so o assunto. */
-  semDono?: { id: number; assunto: string }[];
+  semDono?: { id: number; assunto: string; brasileiro?: boolean }[];
   noticias: { id: number; titulo: string; resumo: string }[];
+  /** Quantos vídeos do Brasil a prova pede em cada 3 citados (régua do setor); sem isso, a regra da prova não é escrita. */
+  minimoBrasilEmTres?: number;
+  /** Segunda tentativa: o que foi barrado na primeira e por quê. */
+  ajuste?: string;
 }): string {
-  const linhasSubindo = dados.subindoHoje.map((v) => `id ${v.id}: ${v.assunto} (velocidade ${v.velocidadeRelativa.toFixed(1)}x)`);
-  const linhasSemDono = (dados.semDono ?? []).map((v) => `id ${v.id}: ${v.assunto} (assunto em alta na hashtag)`);
+  const linhasSubindo = dados.subindoHoje.map(
+    (v) =>
+      `id ${v.id}: ${v.assunto} (velocidade ${v.velocidadeRelativa.toFixed(1)}x${origem(v.brasileiro)}${
+        v.contaId != null ? `, conta ${v.contaId}` : ""
+      })`,
+  );
+  const linhasSemDono = (dados.semDono ?? []).map(
+    (v) => `id ${v.id}: ${v.assunto} (assunto em alta na hashtag${origem(v.brasileiro)}, sem conta)`,
+  );
   const listaVideos = [...linhasSubindo, ...linhasSemDono].join("\n") || "nenhum video subindo hoje";
 
   const listaNoticias =
@@ -106,5 +130,11 @@ export function montarEntrada(dados: {
       ? dados.noticias.map((n) => `noticia ${n.id}: ${n.titulo}: ${n.resumo}`).join("\n")
       : "nenhuma noticia relevante hoje";
 
-  return `Subindo hoje:\n${listaVideos}\n\nNoticias do nicho:\n${listaNoticias}\n\n${LEMBRETE_ACENTUACAO}`;
+  const regraDaProva =
+    dados.minimoBrasilEmTres === undefined
+      ? ""
+      : `\n\nRegra da prova, conferida por código depois: cada tema precisa citar em "evidencias" pelo menos 3 vídeos da lista acima que tratem do mesmo assunto do tema, de pelo menos 2 contas diferentes (vídeo "sem conta" conta como vídeo, não como conta), com pelo menos ${dados.minimoBrasilEmTres} do Brasil em cada 3 citados. Tema que não cumprir é descartado e o dono do negócio fica sem tema. Monte cada tema a partir de um grupo de vídeos que cumpra a regra; um vídeo de fora pode inspirar o tema, desde que venha acompanhado dos brasileiros que a regra pede. Notícia não conta para a prova.`;
+  const ajuste = dados.ajuste ? `\n\n${dados.ajuste}` : "";
+
+  return `Subindo hoje:\n${listaVideos}\n\nNoticias do nicho:\n${listaNoticias}${regraDaProva}${ajuste}\n\n${LEMBRETE_ACENTUACAO}`;
 }
