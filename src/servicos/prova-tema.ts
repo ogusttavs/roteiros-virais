@@ -9,6 +9,7 @@ import { eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contas, videos } from "@/db/schema";
+import { config } from "@/lib/config";
 import { classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 
 export const MINIMO_VIDEOS_PROVA = 3;
@@ -41,27 +42,64 @@ export function janelaDeProva(nichoCriadoEm: Date, agora: Date): number {
  * diferentes (vídeo sem dono, `contaId` nulo, nunca conta para "contas
  * diferentes", só para a contagem de vídeos), com maioria brasileira entre
  * os vídeos da janela.
+ *
+ * Hotfix de 02/10/2026 (achado de produção: Overtake e o perfil do Bruno fecharam o dia sem tema
+ * novo, com 74 e 47 candidatos na base): a parte brasileira da prova segue a régua do setor
+ * (`nichos.proporcao_brasil`, M3). Passa com maioria brasileira, como sempre, **ou** quando os
+ * brasileiros alcançam a proporção que o Gustavo definiu para aquele setor (a Overtake está em
+ * 30%: 1 brasileiro em 3 basta). No padrão do produto (70%) a maioria continua sendo a regra que
+ * decide, então nada muda para os setores sem régua própria.
  */
 export function temaTemProvaSuficiente(
   idsEvidenciaVideo: number[],
   videosPorId: Map<number, VideoParaProva>,
   agora: Date,
   janelaDias: number,
+  proporcaoBrasil: number = config.regras.proporcaoBrasil,
 ): boolean {
+  return motivoSemProva(idsEvidenciaVideo, videosPorId, agora, janelaDias, proporcaoBrasil) === null;
+}
+
+/** Quantos brasileiros a prova pede entre `total` vídeos, pela régua do setor (nunca mais que a maioria simples). */
+export function minimoBrasileirosNaProva(total: number, proporcaoBrasil: number): number {
+  const pelaMaioria = Math.floor(total / 2) + 1;
+  const pelaRegua = Math.ceil(total * proporcaoBrasil - 1e-9);
+  return Math.max(0, Math.min(pelaMaioria, pelaRegua));
+}
+
+/**
+ * `null` quando a prova basta; senão, a razão em uma frase, que volta para o modelo na segunda
+ * tentativa do `temas-do-dia` (o gerador precisa saber por que o tema dele foi barrado).
+ */
+export function motivoSemProva(
+  idsEvidenciaVideo: number[],
+  videosPorId: Map<number, VideoParaProva>,
+  agora: Date,
+  janelaDias: number,
+  proporcaoBrasil: number = config.regras.proporcaoBrasil,
+): string | null {
   const desde = new Date(agora.getTime() - janelaDias * DIA_MS);
   const naJanela = idsEvidenciaVideo
     .map((id) => videosPorId.get(id))
     .filter((v): v is VideoParaProva => v !== undefined && v.publicadoEm !== null && v.publicadoEm >= desde);
 
-  if (naJanela.length < MINIMO_VIDEOS_PROVA) return false;
+  if (naJanela.length < MINIMO_VIDEOS_PROVA) {
+    return `citou ${naJanela.length} vídeo(s) válidos, precisa de pelo menos ${MINIMO_VIDEOS_PROVA}`;
+  }
 
   const contasDistintas = new Set(naJanela.filter((v) => v.contaId !== null).map((v) => v.contaId));
-  if (contasDistintas.size < MINIMO_CONTAS_PROVA) return false;
+  if (contasDistintas.size < MINIMO_CONTAS_PROVA) {
+    return `os vídeos citados são de ${contasDistintas.size} conta(s), precisa de pelo menos ${MINIMO_CONTAS_PROVA} contas diferentes`;
+  }
 
   const brasileiros = naJanela.filter(
     (v) => classificarBrasil(v.idioma, contaEhBrasileira(v.contaPais, v.contaIdiomaPrincipal)) === "brasileiro",
   ).length;
-  return brasileiros > naJanela.length / 2;
+  const minimo = minimoBrasileirosNaProva(naJanela.length, proporcaoBrasil);
+  if (brasileiros < minimo) {
+    return `só ${brasileiros} de ${naJanela.length} vídeos citados são do Brasil, precisa de pelo menos ${minimo}`;
+  }
+  return null;
 }
 
 /** Busca os campos de `temaTemProvaSuficiente` para uma lista de ids de vídeo, numa consulta só. */

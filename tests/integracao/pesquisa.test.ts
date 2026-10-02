@@ -423,11 +423,41 @@ describe("subindoHojeComAnalise", () => {
 
     expect(ids).toContain(comAnalise.id);
     expect(ids).not.toContain(semAnalise.id);
-    expect(resultado.find((v) => v.id === comAnalise.id)).toEqual({
+    expect(resultado.find((v) => v.id === comAnalise.id)).toMatchObject({
       id: comAnalise.id,
       assunto: "erro comum ao lavar sofa",
       velocidadeRelativa: 5,
     });
+  });
+
+  /**
+   * Hotfix de 02/10/2026: num setor com muita conta de fora, os mais rápidos eram quase todos
+   * internacionais e o tema do dia não tinha como montar a prova. Com `brasilPrimeiro`, o Brasil
+   * tem a cota dele mesmo estando mais abaixo na fila da velocidade.
+   */
+  it("brasilPrimeiro: o brasileiro mais lento entra na frente do internacional mais rápido", async () => {
+    const analise = { assunto: "assunto da cota do brasil" };
+    const fora1 = await criarVideo("bp-fora-1", { velocidadeRelativa: 900, publicadoEm: diasAtras(3), idioma: "en", analise });
+    const fora2 = await criarVideo("bp-fora-2", { velocidadeRelativa: 800, publicadoEm: diasAtras(3), idioma: "en", analise });
+    const fora3 = await criarVideo("bp-fora-3", { velocidadeRelativa: 700, publicadoEm: diasAtras(3), idioma: "es", analise });
+    const br1 = await criarVideo("bp-br-1", { velocidadeRelativa: 600, publicadoEm: diasAtras(3), idioma: "pt-BR", analise });
+    const br2 = await criarVideo("bp-br-2", { velocidadeRelativa: 500, publicadoEm: diasAtras(3), idioma: "pt", analise });
+
+    const semCota = await subindoHojeComAnalise(nichoId, 3);
+    expect(semCota.map((v) => v.id)).toEqual([fora1.id, fora2.id, fora3.id]);
+    expect(semCota.every((v) => v.brasileiro === false)).toBe(true);
+
+    // limite 3 no padrão de 70%: a cota do Brasil é 3, e os dois brasileiros entram mesmo mais lentos.
+    const comCota = await subindoHojeComAnalise(nichoId, 3, { brasilPrimeiro: true });
+    const ids = comCota.map((v) => v.id);
+    expect(ids).toContain(br1.id);
+    expect(ids).toContain(br2.id);
+    expect(comCota.find((v) => v.id === br1.id)?.brasileiro).toBe(true);
+
+    // com folga no limite, o de fora mais rápido continua na lista, e na frente.
+    const comFolga = await subindoHojeComAnalise(nichoId, 4, { brasilPrimeiro: true });
+    expect(comFolga[0]?.id).toBe(fora1.id);
+    expect(comFolga.map((v) => v.id)).toContain(br1.id);
   });
 });
 
@@ -456,7 +486,7 @@ describe("semDonoComAnalise", () => {
     expect(ids).not.toContain(semAnalise.id);
     expect(ids).not.toContain(foraDaJanela.id);
     expect(ids).not.toContain(comDono.id);
-    expect(resultado.find((v) => v.id === comAnalise.id)).toEqual({
+    expect(resultado.find((v) => v.id === comAnalise.id)).toMatchObject({
       id: comAnalise.id,
       assunto: "assunto em alta na hashtag",
     });

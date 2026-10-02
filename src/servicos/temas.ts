@@ -20,7 +20,7 @@ import {
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
-import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual } from "@/servicos/pesquisa";
+import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual, reguaDoSetor } from "@/servicos/pesquisa";
 import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -407,7 +407,14 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
   if (dados.anguloSugerido && dados.evidencias.length > 0 && nicho) {
     const agora = new Date();
     const videosPorId = await buscarVideosParaProva(dados.evidencias);
-    anguloTemProva = temaTemProvaSuficiente(dados.evidencias, videosPorId, agora, janelaDeProva(nicho.criadoEm, agora));
+    const regua = await reguaDoSetor(cliente.nichoId);
+    anguloTemProva = temaTemProvaSuficiente(
+      dados.evidencias,
+      videosPorId,
+      agora,
+      janelaDeProva(nicho.criadoEm, agora),
+      regua.proporcaoBrasil,
+    );
   }
 
   return { ...dados, nota, anguloTemProva };

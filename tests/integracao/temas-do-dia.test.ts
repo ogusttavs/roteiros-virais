@@ -332,6 +332,46 @@ describe("rodarTemasDoDia", () => {
   });
 
   /**
+   * Hotfix de 02/10/2026 (achado de produção): o setor com a régua de Brasil em 30% (a Overtake)
+   * fechou o dia sem tema porque a prova exigia maioria brasileira, mais dura que a régua que o
+   * Gustavo definiu para ele. Com a régua do setor, 1 brasileiro em 3 tem prova.
+   */
+  it("setor com a regua de Brasil em 30%: 1 brasileiro em 3 basta para o tema nascer", async () => {
+    await db().update(nichos).set({ proporcaoBrasil: "0.3" }).where(eq(nichos.id, nichoId));
+    await criarVideo("prova-regua-en-1", { velocidadeRelativa: 5, assunto: "assunto de setor de fora", contaId: contaAId, idioma: "en" });
+    await criarVideo("prova-regua-en-2", { velocidadeRelativa: 5, assunto: "assunto de setor de fora", contaId: contaBId, idioma: "en" });
+    await criarVideo("prova-regua-pt-3", { velocidadeRelativa: 5, assunto: "assunto de setor de fora", contaId: contaCId, idioma: "pt" });
+
+    try {
+      const resumo = await rodarTemasDoDia();
+      expect(resumo.gerados).toBe(1);
+      expect(resumo.semProva).toBe(0);
+    } finally {
+      await db().update(nichos).set({ proporcaoBrasil: null }).where(eq(nichos.id, nichoId));
+    }
+  });
+
+  /**
+   * Hotfix de 02/10/2026: o gerador recebe a origem e a conta de cada vídeo e a regra da prova, e
+   * tema barrado ganha uma segunda tentativa com o motivo. Aqui o mock cita sempre todos os ids,
+   * então a segunda tentativa repete o resultado: o que se prova é que ela acontece (duas gerações
+   * registradas), leva o motivo na entrada, e que o setor continua sem tema inventado.
+   */
+  it("tema barrado na prova: refaz uma vez com o motivo, e as duas geracoes ficam registradas", async () => {
+    await criarVideo("prova-refaz-en-1", { velocidadeRelativa: 5, assunto: "assunto que sera refeito", contaId: contaAId, idioma: "en" });
+    await criarVideo("prova-refaz-en-2", { velocidadeRelativa: 5, assunto: "assunto que sera refeito", contaId: contaBId, idioma: "en" });
+    await criarVideo("prova-refaz-pt-3", { velocidadeRelativa: 5, assunto: "assunto que sera refeito", contaId: contaCId, idioma: "pt" });
+
+    const antes = await db().select({ id: geracoesIA.id }).from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    const resumo = await rodarTemasDoDia();
+    const depois = await db().select({ id: geracoesIA.id }).from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+
+    expect(resumo.gerados).toBe(0);
+    expect(resumo.semProva).toBe(1);
+    expect(depois.length - antes.length).toBe(2);
+  });
+
+  /**
    * V2b, item 8: a janela de 14 dias em nicho novo é testada só
    * unitariamente (`temaTemProvaSuficiente`, `src/jobs/temas-do-dia.test.ts`),
    * não aqui: `subindoHojeComAnalise` e `semDonoComAnalise` (as duas únicas
