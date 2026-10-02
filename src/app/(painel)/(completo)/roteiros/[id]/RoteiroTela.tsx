@@ -43,6 +43,7 @@ import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
+import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
@@ -1164,12 +1165,13 @@ export function RoteiroTela({
             );
           })}
         </div>
-        <AreaTexto
+        <CampoComFala
           rotulo={textosRoteiro.reprovar.rotuloTextoLivre}
           value={motivoTexto}
-          onChange={(evento) => setMotivoTexto(evento.target.value)}
+          onChange={setMotivoTexto}
           placeholder={textosRoteiro.reprovar.textoLivrePlaceholder}
           linhasMin={3}
+          nomeArquivo="reprovar"
         />
         <p className={styles.objetivoTravado}>
           {textosRoteiro.reprovar.objetivoContinua(ROTULO_OBJETIVO_TRAVADO[roteiro.objetivo])}

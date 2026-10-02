@@ -21,6 +21,7 @@ import { ehFalhaDeRede } from "@/lib/offline";
 import { textosMomento } from "@/textos/momento";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
+import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { Chips } from "@/ui/componentes/Chips";
 import { Folha } from "@/ui/componentes/Folha";
 import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
@@ -421,14 +422,15 @@ export function FolhaGravarAgora({
           </div>
         </div>
 
-        <AreaTexto
+        <CampoComFala
           rotulo={`${textosMomento.objetivoDoVideo} ${textosMomento.objetivoDoVideoOpcional}`}
           ajuda={textosMomento.objetivoDoVideoAjuda}
           value={objetivoDoVideo}
-          onChange={(evento) => setObjetivoDoVideo(evento.target.value)}
+          onChange={setObjetivoDoVideo}
           placeholder={textosMomento.objetivoDoVideoPlaceholder}
           maxLength={200}
           linhasMin={2}
+          nomeArquivo="objetivo-do-video"
         />
 
         {marcas.length > 0 ? (

@@ -9,9 +9,9 @@ import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
 import { textosMomento } from "@/textos/momento";
 import { textosTemaLivre } from "@/textos/tema-livre";
-import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Botao } from "@/ui/componentes/Botao";
+import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { EsperaEtapas } from "@/ui/componentes/EsperaEtapas";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { NotasLinha } from "@/ui/componentes/NotaLinha";
@@ -286,14 +286,15 @@ export function TemaLivreTela({
               {textosMomento.botaoAbrirTemaLivre}
             </Botao>
             <section className={[styles.cartao, styles.campo].join(" ")}>
-              <AreaTexto
+              <CampoComFala
                 rotulo={textosTemaLivre.titulo}
                 rotuloOculto
                 placeholder={textosTemaLivre.placeholder}
                 erro={campoVazio ? textosTemaLivre.campoVazio : undefined}
                 value={texto}
-                onChange={(evento) => aoMudarTexto(evento.target.value)}
+                onChange={aoMudarTexto}
                 caixaAlta="longa"
+                nomeArquivo="tema-livre"
               />
               <div className={styles.campoRodape}>
                 <span className={rascunhoComErro ? styles.rascunhoComErro : undefined} aria-live="polite">
