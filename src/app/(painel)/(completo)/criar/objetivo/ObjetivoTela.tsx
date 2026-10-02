@@ -48,6 +48,8 @@ type Props = {
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
    * é hoje; "para quando é" já nasce marcado naquele dia, em vez de hoje. */
   dataInicial?: string;
+  /** E43: presente quando o tema veio de "Criar vídeo com esta notícia". */
+  noticiaId?: number;
 };
 
 /** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
@@ -58,6 +60,7 @@ export function ObjetivoTela({
   tipo,
   quemGravaPadrao,
   dataInicial,
+  noticiaId,
 }: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
@@ -135,6 +138,7 @@ export function ObjetivoTela({
           quemAparece || undefined,
           data,
           formato === "story" ? (momentoDoDia ?? undefined) : undefined,
+          noticiaId,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {

@@ -7,7 +7,7 @@ import { temasParaCliente } from "@/servicos/temas";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string }> };
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -27,11 +27,14 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre, data } = await searchParams;
+  const { tema, livre, data, noticiaId } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio.
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
+  // E43: "Criar vídeo com esta notícia" carrega o id até aqui; `gerarRoteiro` confere de novo contra o setor do cliente.
+  const noticiaIdNumero = Number(noticiaId);
+  const noticiaIdValida = noticiaId && Number.isInteger(noticiaIdNumero) ? noticiaIdNumero : undefined;
 
   let origem: OrigemRoteiro;
   let temaEscolhidoTexto: string;
@@ -57,6 +60,7 @@ export default async function Objetivo({ searchParams }: Props) {
       tipo={cliente.tipo}
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
+      noticiaId={noticiaIdValida}
     />
   );
 }

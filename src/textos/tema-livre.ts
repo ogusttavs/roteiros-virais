@@ -9,6 +9,8 @@ const NUMEROS_POR_EXTENSO = ["zero", "um", "dois", "três", "quatro", "cinco"];
 
 export const textosTemaLivre = {
   voltar: "Voltar para Hoje",
+  /** E43: quando o tema nasceu de uma notícia, o X volta para a aba Notícias, não para Hoje. */
+  voltarParaNoticias: "Voltar para as notícias",
   tituloCompactoProposta: "Seu assunto",
   tituloCompactoEsperandoErro: "Avaliando",
   tituloCompactoResultado: "A nota do seu tema",
@@ -37,6 +39,20 @@ export const textosTemaLivre = {
 
   oQueEscreveu: "O que você escreveu",
   editarTexto: "Editar o texto",
+
+  /**
+   * E43, "Criar vídeo com esta notícia" (design v2, `Noticias.dc.html`/`TemaLivre.dc.html`, estado
+   * `comNoticia`; "conteúdo" virou "vídeo" na palavra, `checar-texto`, regra 6).
+   */
+  tituloComNoticia: "Criar vídeo com esta notícia",
+  subtituloComNoticia:
+    "A notícia é o ponto de partida. O vídeo fica bom quando tem o seu jeito de ver, então conte o que você pensou quando leu.",
+  rotuloANoticia: "A notícia",
+  tirarANoticia: "Tirar a notícia",
+  oQueVocePensou: "O que você pensou?",
+  dicaOQueVocePensou: "Uma opinião, um caso parecido que aconteceu aí ou o que o seu cliente precisa saber. Pode escrever ou falar.",
+  placeholderComNoticia:
+    "Aqui a gente vê isso todo dia: o cliente leva o mais barato e volta na semana seguinte porque não rendeu.",
 
   tituloEsperando: "Avaliando o seu tema",
   subtituloEsperando: "Procurando no que já está guardado do seu setor se esse assunto tem chance.",

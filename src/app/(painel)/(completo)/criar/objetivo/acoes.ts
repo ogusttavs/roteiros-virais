@@ -40,6 +40,8 @@ export async function gerarRoteiroAction(
   data?: string,
   /** E39a: "em que momento do dia?", só quando o formato é Story. */
   momentoDoDia?: string,
+  /** E43: presente quando o tema veio de "Criar vídeo com esta notícia" (Tema livre, `?noticiaId=`). */
+  noticiaId?: number,
 ): Promise<ResultadoAcao<{ id: number }>> {
   const cliente = await clienteDaSessaoAtual();
   try {
@@ -52,6 +54,7 @@ export async function gerarRoteiroAction(
       quemAparece: validarQuemAparece(quemAparece),
       data: validarData(data),
       momentoDoDia: validarMomentoDoDia(momentoDoDia),
+      noticiaId,
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

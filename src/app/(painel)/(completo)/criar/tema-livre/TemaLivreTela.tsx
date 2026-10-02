@@ -63,6 +63,13 @@ function formatarNota(valor: number): string {
 
 type MarcaResumo = { id: number; nome: string };
 
+/**
+ * E43: a notícia de origem, quando a pessoa chegou por "Criar vídeo com esta notícia". `fonteEData`
+ * já vem pronta do servidor (`formatarTempoRelativo`), para o cliente nunca calcular relativo ao
+ * próprio relógio (evita divergir do que o servidor mostrou na lista de Notícias).
+ */
+type NoticiaOrigem = { id: number; titulo: string; fonteEData: string };
+
 type Props = {
   notaMinima: number;
   temaInicial?: string;
@@ -74,6 +81,8 @@ type Props = {
   quemGravaPadrao: QuemGrava | null;
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
   dataInicial?: string;
+  /** E43: presente quando a tela abriu a partir de "Criar vídeo com esta notícia", em `/noticias`. */
+  noticia?: NoticiaOrigem;
 };
 
 /**
@@ -91,10 +100,18 @@ export function TemaLivreTela({
   tipo,
   quemGravaPadrao,
   dataInicial,
+  noticia,
 }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
   const [fase, setFase] = useState<Fase>("proposta");
+  /**
+   * E43, dúvida 7: "Tirar a notícia" devolve o Tema livre comum, com o texto preservado (mesmo
+   * estado `texto`, nunca recarrega a tela). Uma vez tirada, a notícia não entra mais na avaliação
+   * nem no roteiro, mesmo que a pessoa não tenha mudado o texto.
+   */
+  const [noticiaPresa, setNoticiaPresa] = useState(noticia !== undefined);
+  const comNoticia = fase === "proposta" && noticiaPresa && noticia !== undefined;
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
@@ -117,7 +134,10 @@ export function TemaLivreTela({
   const [abrindo, iniciarTransicao] = useTransition();
   const [destino, setDestino] = useState<string | null>(null);
   const abrindoEste = (chave: string) => abrindo && destino === chave;
-  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}`;
+  // E43: a notícia segue até o roteiro só enquanto a pessoa não a tirou (`noticiaPresa`), não `comNoticia`
+  // (que também exige `fase === "proposta"`; aqui a tela já pode estar em "naMeta").
+  const noticiaIdParaEnviar = noticiaPresa ? noticia?.id : undefined;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -179,7 +199,7 @@ export function TemaLivreTela({
     setFase("esperando");
     // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
-    avaliarTemaAction(limpo)
+    avaliarTemaAction(limpo, noticiaIdParaEnviar)
       .then((dados) => {
         avisarRedeOk();
         setTexto(limpo);
@@ -216,6 +236,11 @@ export function TemaLivreTela({
     : [];
   const quantosAbaixo = pilares.filter((p) => faixaMeta(p.valor, p.meta) !== "naMeta").length;
 
+  // E43, dúvida 7: tendo chegado de uma notícia, o X sempre volta para Notícias, mesmo depois de
+  // "Tirar a notícia" (a origem da navegação não muda, só o que entra na avaliação).
+  const voltarPara = noticia ? "/noticias" : "/criar";
+  const voltarRotulo = noticia ? textosTemaLivre.voltarParaNoticias : textosTemaLivre.voltar;
+
   return (
     <div className={styles.pagina}>
       <BarraTopo
@@ -223,11 +248,11 @@ export function TemaLivreTela({
         esquerda={
           <button
             type="button"
-            aria-label={textosTemaLivre.voltar}
+            aria-label={voltarRotulo}
             aria-busy={abrindoEste("voltar") || undefined}
             disabled={abrindo}
             className={styles.botaoBarra}
-            onClick={() => abrir("voltar", "/criar")}
+            onClick={() => abrir("voltar", voltarPara)}
           >
             <ArrowLeft size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
@@ -236,8 +261,8 @@ export function TemaLivreTela({
 
       <div className={styles.miolo}>
         <div className={styles.cabecalhoTela}>
-          <h1 className={styles.titulo}>{TITULO[fase]}</h1>
-          <p className={styles.subtitulo}>{SUBTITULO[fase]}</p>
+          <h1 className={styles.titulo}>{comNoticia ? textosTemaLivre.tituloComNoticia : TITULO[fase]}</h1>
+          <p className={styles.subtitulo}>{comNoticia ? textosTemaLivre.subtituloComNoticia : SUBTITULO[fase]}</p>
         </div>
 
         {/*
@@ -282,19 +307,33 @@ export function TemaLivreTela({
         <div className={styles.colunaPrincipal}>
         {fase === "proposta" ? (
           <>
-            <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
-              {textosMomento.botaoAbrirTemaLivre}
-            </Botao>
+            {comNoticia && noticia ? (
+              <section className={[styles.cartao, styles.cartaoRecuado, styles.noticiaPresa].join(" ")} aria-label={textosTemaLivre.rotuloANoticia}>
+                <div className={styles.topoNoticiaPresa}>
+                  <span className={styles.rotulo}>{textosTemaLivre.rotuloANoticia}</span>
+                  <Botao variante="ghost" tamanho="md" onClick={() => setNoticiaPresa(false)}>
+                    {textosTemaLivre.tirarANoticia}
+                  </Botao>
+                </div>
+                <h3 className={styles.tituloNoticiaPresa}>{noticia.titulo}</h3>
+                <span className={styles.fonteENoticiaPresa}>{noticia.fonteEData}</span>
+              </section>
+            ) : (
+              <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
+                {textosMomento.botaoAbrirTemaLivre}
+              </Botao>
+            )}
             <section className={[styles.cartao, styles.campo].join(" ")}>
               <CampoComFala
-                rotulo={textosTemaLivre.titulo}
-                rotuloOculto
-                placeholder={textosTemaLivre.placeholder}
+                rotulo={comNoticia ? textosTemaLivre.oQueVocePensou : textosTemaLivre.titulo}
+                rotuloOculto={!comNoticia}
+                ajuda={comNoticia ? textosTemaLivre.dicaOQueVocePensou : undefined}
+                placeholder={comNoticia ? textosTemaLivre.placeholderComNoticia : textosTemaLivre.placeholder}
                 erro={campoVazio ? textosTemaLivre.campoVazio : undefined}
                 value={texto}
                 onChange={aoMudarTexto}
                 caixaAlta="longa"
-                nomeArquivo="tema-livre"
+                nomeArquivo={comNoticia ? "tema-livre-noticia" : "tema-livre"}
               />
               <div className={styles.campoRodape}>
                 <span className={rascunhoComErro ? styles.rascunhoComErro : undefined} aria-live="polite">

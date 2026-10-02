@@ -64,6 +64,42 @@ export function fraseDiasAtras(dias: number): string {
   return `em ${dias} dias`;
 }
 
+const FORMATAR_DATA_POR_EXTENSO = new Intl.DateTimeFormat("pt-BR", {
+  day: "numeric",
+  month: "long",
+  timeZone: "America/Sao_Paulo",
+});
+
+/**
+ * E43, dúvida 3 do passo 11 (design v2): a lista de notícias mostra só o tempo relativo ("há 3
+ * horas", "ontem", "há 4 dias"); a partir de uma semana, a data por extenso ("12 de setembro",
+ * mesmo formato de `servicos/normalizadores/titulo.ts`). A hora exata só aparece na notícia
+ * aberta (a folha monta a própria frase com `publicadoEm` direto). Calculado no servidor, uma vez
+ * por carregamento da tela: duas pessoas vendo a mesma lista minutos depois uma da outra podem ler
+ * "há 3 horas" e "há 4 horas" sem problema, mas o cliente nunca calcula sozinho contra o próprio
+ * relógio, que pode estar errado.
+ */
+export function formatarTempoRelativo(data: Date, agora: Date = new Date()): string {
+  const HORA_MS = 60 * 60 * 1000;
+  const horas = Math.floor((agora.getTime() - data.getTime()) / HORA_MS);
+  if (horas < 1) return "agora mesmo";
+  if (horas < 24) return `há ${horas} hora${horas === 1 ? "" : "s"}`;
+  const dias = diasDesde(data, agora);
+  if (dias === 1) return "ontem";
+  if (dias < 7) return `há ${dias} dias`;
+  return FORMATAR_DATA_POR_EXTENSO.format(data);
+}
+
+/**
+ * "Portal do Varejo · há 3 horas" (a lista de notícias e o cartão preso em "Criar vídeo com esta
+ * notícia"): a mesma combinação fonte-e-tempo nos dois lugares, para nunca divergir.
+ */
+export function formatarFonteEData(fonte: string | null, publicadoEm: Date | null, agora: Date = new Date()): string {
+  const tempo = publicadoEm ? formatarTempoRelativo(publicadoEm, agora) : null;
+  if (fonte && tempo) return `${fonte} · ${tempo}`;
+  return fonte ?? tempo ?? "";
+}
+
 export type FaixaMultiplo = "acima" | "media" | "abaixo";
 
 /**
