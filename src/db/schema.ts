@@ -1241,6 +1241,13 @@ export const roteiros = pgTable(
     /** E39b, item (a): quando `conferirAindaVale` checou pela última vez; nulo até a pessoa tocar em "Conferir". */
     aindaValeChecadoEm: timestamp("ainda_vale_checado_em", { withTimezone: true }),
     aindaValeResultado: jsonb("ainda_vale_resultado").$type<AindaValeResultado>(),
+    /**
+     * E43: preenchida quando o roteiro nasceu de "Criar conteúdo com esta notícia" (Tema livre,
+     * estado `comNoticia`). É o que faz a notícia mostrar "virou roteiro" e "Ver o roteiro" para
+     * quem já a transformou, isolado por marca (a mesma notícia pode virar roteiro em mais de uma
+     * marca do mesmo setor).
+     */
+    noticiaId: integer("noticia_id").references(() => noticias.id),
     criadoEm: criadoEm(),
   },
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],
