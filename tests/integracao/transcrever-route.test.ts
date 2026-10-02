@@ -83,9 +83,11 @@ describe("POST /api/transcrever", () => {
 
   it("com sessao e audio validos, transcreve pela Groq (mockada) e devolve so o texto transcrito", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("transcrever-rota"));
-    transcreverAudioMock.mockResolvedValue(
-      "Eu atendo bastante gente que liga perguntando se a gente faz orcamento pelo whatsapp mesmo, e eu falo que sim.",
-    );
+    transcreverAudioMock.mockResolvedValue({
+      texto: "Eu atendo bastante gente que liga perguntando se a gente faz orcamento pelo whatsapp mesmo, e eu falo que sim.",
+      idiomaDetectado: "pt",
+      semFala: false,
+    });
     const { POST } = await import("@/app/api/transcrever/route");
 
     const resposta = await POST(requisicao(formaComAudio("18")));
@@ -127,7 +129,7 @@ describe("POST /api/transcrever", () => {
 
     it("estourar o limite da previa (40 na janela) nao bloqueia a chamada definitiva do mesmo usuario", async () => {
       vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("transcrever-rota-limite-previa"));
-      transcreverAudioMock.mockResolvedValue("texto qualquer");
+      transcreverAudioMock.mockResolvedValue({ texto: "texto qualquer", idiomaDetectado: "pt", semFala: false });
       const { POST } = await import("@/app/api/transcrever/route");
 
       for (let i = 0; i < 40; i += 1) {
@@ -144,7 +146,7 @@ describe("POST /api/transcrever", () => {
 
     it("a chamada definitiva tem o seu proprio limite, mais apertado (10 na janela)", async () => {
       vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("transcrever-rota-limite-definitiva"));
-      transcreverAudioMock.mockResolvedValue("texto qualquer");
+      transcreverAudioMock.mockResolvedValue({ texto: "texto qualquer", idiomaDetectado: "pt", semFala: false });
       const { POST } = await import("@/app/api/transcrever/route");
 
       for (let i = 0; i < 10; i += 1) {

@@ -12,7 +12,7 @@ import { contas, nichos, videos } from "@/db/schema";
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { rodarPontuar, rodarPontuarVelocidade, type TaxaSubstituta } from "../../src/jobs/pontuar";
 
-type OpcoesVideo = { idioma?: string | null; titulo?: string | null; descricao?: string | null };
+type OpcoesVideo = { idioma?: string | null; titulo?: string | null; descricao?: string | null; idiomaConfirmado?: boolean };
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
@@ -51,6 +51,7 @@ async function criarVideo(
       idioma: opcoes.idioma ?? null,
       titulo: opcoes.titulo ?? null,
       descricao: opcoes.descricao ?? null,
+      idiomaConfirmado: opcoes.idiomaConfirmado,
     });
 }
 
@@ -372,6 +373,53 @@ describe("rodarPontuar, idioma principal e pais da conta", () => {
 
     const [c] = await db().select().from(contas).where(eq(contas.id, conta));
     expect(c.idiomaPrincipal).toBe("pt-BR");
+    expect(c.pais).toBe("BR");
+  });
+
+  /**
+   * Achado 3 da revisão do motor (01/10/2026): "pt-BR" dominante (da extração, lendo uma
+   * transcrição que pode ter saído forçada no idioma errado) não confirma Brasil sozinho quando a
+   * própria conta tem vídeo recente com idioma confirmado de verdade (Groq ou YouTube, não a
+   * extração) em outro idioma; antes desta conferência, a conta nunca mais saía de `pais = 'BR'`.
+   */
+  it("idioma_principal pt-BR, mas com video confirmado em ingles na mesma conta: pais continua nulo", async () => {
+    const conta = await criarConta("idioma-pt-br-com-conflito");
+    for (let i = 0; i < 3; i += 1) {
+      await criarVideo(conta, `idioma-pt-br-conflito-${i}`, 100, diasAtras(10), nichoId, {
+        idioma: "pt-BR",
+        titulo: "titulo generico sem nenhum sinal de pais",
+      });
+    }
+    await criarVideo(conta, "idioma-pt-br-conflito-confirmado-en", 100, diasAtras(5), nichoId, {
+      idioma: "en",
+      idiomaConfirmado: true,
+      titulo: "titulo qualquer",
+    });
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
+    expect(c.idiomaPrincipal).toBe("pt-BR");
+    expect(c.pais).toBeNull();
+  });
+
+  it("idioma_principal pt-BR com video confirmado tambem em portugues: Brasil confirma normalmente", async () => {
+    const conta = await criarConta("idioma-pt-br-confirmado-sem-conflito");
+    for (let i = 0; i < 3; i += 1) {
+      await criarVideo(conta, `idioma-pt-br-sem-conflito-${i}`, 100, diasAtras(10), nichoId, {
+        idioma: "pt-BR",
+        titulo: "titulo generico sem nenhum sinal de pais",
+      });
+    }
+    await criarVideo(conta, "idioma-pt-br-sem-conflito-confirmado-pt", 100, diasAtras(5), nichoId, {
+      idioma: "pt",
+      idiomaConfirmado: true,
+      titulo: "titulo qualquer",
+    });
+
+    await rodarPontuar();
+
+    const [c] = await db().select().from(contas).where(eq(contas.id, conta));
     expect(c.pais).toBe("BR");
   });
 

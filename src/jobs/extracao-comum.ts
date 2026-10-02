@@ -4,7 +4,7 @@
  * colunas em `videos`. Extraído nesta rodada para o caminho imediato não duplicar a mesma regra
  * de qualidade (revisão do PR #30: análise nenhuma é pior que uma com um campo em inglês).
  */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nichos, videos, type AnaliseVideo } from "@/db/schema";
@@ -119,6 +119,14 @@ export async function resolverIdioma(
  * titulo/descricao para idioma e mais precisa que so o gancho ja extraido para tipo de
  * abertura). `tipoConteudo`/`serveDeModelo` (H4, item 2) ficam tanto no jsonb `analise` (registro
  * completo) quanto em colunas proprias (`evidenciaParaRoteiro` filtra por SQL).
+ *
+ * Achado 3 da revisao do motor (01/10/2026): quando `idiomaConfirmado` e verdadeiro (a Groq ou a
+ * legenda do YouTube ja confirmaram o idioma na fala de verdade, `transcrever.ts`), so grava o
+ * palpite da extracao se ele concordar na mesma lingua base (os dois primeiros caracteres: "pt"
+ * de "pt-BR"/"pt-PT" continua refinando um "pt" generico). Discordando (por exemplo, confirmado
+ * "en" e a extracao devolveu "pt-BR"), mantem o idioma confirmado: foi exatamente essa
+ * divergencia, de um texto forcado no idioma errado, que fazia a extracao concluir "pt-BR" para
+ * um video em outro idioma e a conta virar `pais = 'BR'` para sempre (`pontuar.ts`).
  */
 export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
   const { etiquetas, idioma, tipoAbertura, ...analise } = dados;
@@ -129,7 +137,11 @@ export async function aplicarResultadoExtracao(videoId: number, dados: extrairVi
     .set({
       analise: analiseVideo,
       etiquetas,
-      idioma,
+      idioma: sql`CASE
+        WHEN ${videos.idiomaConfirmado} AND left(${videos.idioma}, 2) IS DISTINCT FROM left(${idioma}, 2)
+        THEN ${videos.idioma}
+        ELSE ${idioma}
+      END`,
       tipoAbertura,
       tipoConteudo: dados.tipoConteudo,
       serveDeModelo: dados.serveDeModelo,

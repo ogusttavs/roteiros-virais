@@ -795,6 +795,15 @@ export const videos = pgTable(
      */
     idioma: text("idioma"),
     /**
+     * Achado 3 da revisao do motor (01/10/2026): `true` quando `idioma` veio da fala de verdade
+     * (a Groq ou a legenda do YouTube detectaram, `transcrever.ts`), nao so do titulo/descricao
+     * nem do palpite da extracao a partir de um texto que pode ter saido forcado no idioma errado.
+     * `aplicarResultadoExtracao` nao sobrescreve `idioma` quando isto e verdadeiro: a extracao lendo
+     * a transcricao ja correta so repetiria o mesmo palpite, com mais chance de errar num texto
+     * curto do que a deteccao da propria Groq.
+     */
+    idiomaConfirmado: boolean("idioma_confirmado").notNull().default(false),
+    /**
      * O tipo de abertura deste vídeo (V4, escopo 5.12, item 5), gravado pela
      * extração em lote a partir do gancho e do formato (`extrair-coleta.ts`).
      * Nulo em todo vídeo extraído antes desta coluna existir, até

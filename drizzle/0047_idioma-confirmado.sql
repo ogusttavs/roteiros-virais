@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "idioma_confirmado" boolean DEFAULT false NOT NULL;

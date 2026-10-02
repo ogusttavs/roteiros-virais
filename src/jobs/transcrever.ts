@@ -123,7 +123,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   if (idsUnicos.length === 0) {
     return {
       selecionados: [] as number[],
-      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null }>(),
+      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null; idioma: string | null }>(),
     };
   }
 
@@ -176,6 +176,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
         urlParaBaixar: idsComMidiaFresca.has(l.id) ? l.midiaUrl! : l.url,
         plataforma: l.plataforma,
         duracaoS: l.duracaoS,
+        idioma: l.idioma,
       },
     ]),
   );
@@ -197,16 +198,30 @@ type ResultadoVideo =
  */
 const TAMANHO_MINIMO_LEGENDA = 200;
 
+/** "outro" e nulo (nao sei, alfabeto nao latino): so os tres que a Groq e o YouTube sabem buscar/forcar de verdade. */
+function idiomaParaForcar(idioma: string | null): "pt" | "en" | "es" | undefined {
+  return idioma === "pt" || idioma === "en" || idioma === "es" ? idioma : undefined;
+}
+
 async function transcreverUm(
   videoId: number,
   url: string,
   plataforma: Plataforma,
   duracaoS: number | null,
+  idiomaConhecido: string | null,
 ): Promise<ResultadoVideo> {
-  if (plataforma === "youtube") {
-    const legenda = await baixarLegendaYoutube(url);
+  const idiomaParaBuscar = idiomaParaForcar(idiomaConhecido);
+
+  // Achado 3 da revisao do motor (01/10/2026): so pede legenda do YouTube quando ja sabe o
+  // idioma do video (`videos.idioma`, da coleta); sem isso, "--sub-lang" forcado buscava a
+  // traducao automatica do YouTube para quem nao sabia, nunca a fala original.
+  if (plataforma === "youtube" && idiomaParaBuscar) {
+    const legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
-      await db().update(videos).set({ transcricao: legenda, transcritoEm: new Date() }).where(eq(videos.id, videoId));
+      await db()
+        .update(videos)
+        .set({ transcricao: legenda, transcritoEm: new Date(), idiomaConfirmado: true })
+        .where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
   }
@@ -218,8 +233,27 @@ async function transcreverUm(
   let caminhoAudio: string | null = null;
   try {
     caminhoAudio = await baixarAudio(url, plataforma);
-    const texto = await transcreverAudio(caminhoAudio);
-    await db().update(videos).set({ transcricao: texto, transcritoEm: new Date() }).where(eq(videos.id, videoId));
+    const { texto, idiomaDetectado, semFala } = await transcreverAudio(caminhoAudio, idiomaParaBuscar);
+    // Achado 3: `semFala` já deixa `texto` vazio, o suficiente para `extracao-comum.ts` mandar o
+    // vídeo para o caminho sem fala; sem fala de verdade não há sinal de idioma confiável (achado
+    // rodando contra a API de verdade: silêncio puro também "detecta" um idioma qualquer), então
+    // não grava `idioma` nem `idiomaConfirmado` nesse caso. Com fala, o idioma que a Groq detectou
+    // só substitui o que já estava em `videos.idioma` quando esse ainda não era confiável (nulo ou
+    // "outro"); quando já era pt/en/es conhecido, mantém o valor e só confirma.
+    await db()
+      .update(videos)
+      .set({
+        transcricao: texto,
+        transcritoEm: new Date(),
+        ...(semFala
+          ? {}
+          : idiomaParaBuscar
+            ? { idiomaConfirmado: true }
+            : idiomaDetectado && idiomaDetectado !== "outro"
+              ? { idioma: idiomaDetectado, idiomaConfirmado: true }
+              : {}),
+      })
+      .where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {
@@ -296,7 +330,7 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
       tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
 
       try {
-        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS);
+        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma);
         if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
           sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
           sucessosNoNicho += 1;

@@ -148,18 +148,18 @@ export async function transcreverAudioEnviado(
 
   const caminho = await salvarAudioTemporario(bytes, tipoMime);
   try {
-    const transcricao = await transcreverAudio(caminho, "pt");
+    const { texto } = await transcreverAudio(caminho, "pt");
     await registrarConsumoGroq(duracaoS).catch((erro) => {
       // Nunca derruba a transcrição por causa da cota (mesmo espírito de curva-cliente.ts): registrar é
       // um bônus para acompanhar custo, não uma condição para a pessoa conseguir o roteiro.
       logger.error({ err: erro }, "nao foi possivel registrar o consumo da groq (momento)");
     });
 
-    if (!transcricao.trim()) {
+    if (!texto.trim()) {
       throw new ErroMomento("a transcricao veio vazia.");
     }
 
-    return { transcricao };
+    return { transcricao: texto };
   } finally {
     await apagarAudio(caminho);
   }

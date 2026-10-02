@@ -157,7 +157,7 @@ describe("rodarTranscrever", () => {
     await criarVideo("yt-longo-demais", { velocidadeRelativa: 50, publicadoEm: diasAtras(3), duracaoS: 600 });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
 
@@ -177,7 +177,7 @@ describe("rodarTranscrever", () => {
     });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorGroq).toBe(1);
@@ -196,7 +196,7 @@ describe("rodarTranscrever", () => {
     await criarVideo("yt-legenda-curta", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue("E ai, tudo bem com voce hoje?");
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(0);
@@ -322,7 +322,7 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
       if (url.includes("/falha-")) throw new ErroAudio("falha simulada no download");
       return "/tmp/audio-fake.mp3";
     });
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(40);
@@ -486,7 +486,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
       midiaUrlEm: new Date(Date.now() - 1 * HORA_MS),
     });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith(midiaUrl, "instagram");
@@ -502,7 +502,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
       midiaUrlEm: new Date(Date.now() - 21 * HORA_MS),
     });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-vencido", "instagram");
@@ -512,7 +512,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
   it("sem midiaUrl nenhuma, usa a url da pagina normalmente", async () => {
     await criarVideo("insta-sem-midia", { plataforma: "instagram", foraDaCurva: 5, publicadoEm: diasAtras(10) });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia", "instagram");
