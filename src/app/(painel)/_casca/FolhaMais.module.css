@@ -1,0 +1,52 @@
+/**
+ * Passo 13 do Opus (01/10, 23:50), `Casca.dc.html` e `base.css`: `.lista-mais`/`.item-mais`.
+ */
+.listaMais {
+  display: grid;
+  padding-block: var(--espaco-2) var(--espaco-4);
+}
+
+.itemMais {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-4);
+  min-height: 4.25rem;
+  padding: var(--espaco-3) 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.itemMais + .itemMais {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.iconeMais {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+}
+
+.itemMais strong {
+  display: block;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.ajudaMais {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.itemMais > svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cor-texto-dica);
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { ArrowLeft, Calendar, Check, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -500,12 +500,16 @@ export function HojeTela({
                 >
                   <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
+                {/* Nota de integração do Fable (passo 13): "Esta semana" e "Ver o mês" quebravam em
+                    duas linhas a 360px; ícone com rótulo acessível em vez de texto, como ela sugeriu. */}
                 <button
                   type="button"
-                  className={styles.botaoSecundarioSm}
+                  className={styles.botaoBarra}
+                  disabled={ocupado}
+                  aria-label={textosHoje.agenda.calendario.verOMes}
                   onClick={() => ir("mes", `/planejamento?visao=mes&dia=${diaVisualizado}`)}
                 >
-                  {textosHoje.agenda.calendario.verOMes}
+                  <Calendar size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
               </div>
             </div>
