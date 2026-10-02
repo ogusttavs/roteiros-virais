@@ -136,13 +136,20 @@ export function NoticiasTela({ noticias, periodo, contagemSemana, falhaNaColeta 
           <p className={styles.rotuloQuantidade}>{textosNoticias.quantasNestePeriodo(noticias.length, periodo)}</p>
 
           <div className={styles.grade}>
+            {/*
+              Acabamento da E43 (achado de acessibilidade, revisão do Fable em 02/10): um `<button>`
+              não pode conter um `<Link>` (vira `<a>` dentro de `<button>`, HTML inválido e ruim para
+              leitor de tela). O cartão vira `<article>` com um botão cobrindo tudo (só a abertura da
+              folha) e o "Ver o roteiro" como link irmão, por cima, independente, sem mudar a aparência.
+            */}
             {noticias.map((noticia) => (
-              <button
-                key={noticia.id}
-                type="button"
-                className={[styles.cartao, styles.noticia].join(" ")}
-                onClick={() => setNoticiaAbertaId(noticia.id)}
-              >
+              <article key={noticia.id} className={[styles.cartao, styles.noticia].join(" ")}>
+                <button
+                  type="button"
+                  className={styles.coberturaNoticia}
+                  aria-label={noticia.titulo}
+                  onClick={() => setNoticiaAbertaId(noticia.id)}
+                />
                 <div className={styles.fonte}>
                   <span>{noticia.fonteEDataRelativa}</span>
                 </div>
@@ -153,11 +160,7 @@ export function NoticiasTela({ noticias, periodo, contagemSemana, falhaNaColeta 
                   {noticia.virouRoteiro && noticia.roteiroId ? (
                     <>
                       <span className={styles.virouRoteiro}>{textosNoticias.virouRoteiro}</span>
-                      <Link
-                        href={`/roteiros/${noticia.roteiroId}`}
-                        className={styles.verRoteiro}
-                        onClick={(evento) => evento.stopPropagation()}
-                      >
+                      <Link href={`/roteiros/${noticia.roteiroId}`} className={styles.verRoteiro}>
                         {textosNoticias.verORoteiro}
                       </Link>
                     </>
@@ -165,7 +168,7 @@ export function NoticiasTela({ noticias, periodo, contagemSemana, falhaNaColeta 
                     <span className={styles.abrirRotulo}>{textosNoticias.abrir}</span>
                   )}
                 </div>
-              </button>
+              </article>
             ))}
           </div>
         </>

@@ -192,7 +192,9 @@ test.describe("/noticias", () => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByText(TITULO_COM_ANGULO).click();
+    // E42a, item 2: o cartão virou `<article>` com um botão cobrindo (aria-label com o título) em
+    // vez do cartão inteiro ser o botão; o alvo do clique agora é esse botão, não o texto do título.
+    await page.getByRole("button", { name: TITULO_COM_ANGULO }).click();
     const folha = page.getByRole("dialog", { name: TITULO_COM_ANGULO });
     await expect(folha).toBeVisible();
     await expect(folha.getByText("Este é o nosso resumo. A matéria inteira fica no site de quem publicou.")).toBeVisible();
@@ -219,7 +221,7 @@ test.describe("/noticias", () => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByText(TITULO_SEM_RESUMO).click();
+    await page.getByRole("button", { name: TITULO_SEM_RESUMO }).click();
     await page.getByRole("dialog", { name: TITULO_SEM_RESUMO }).getByRole("button", { name: "Criar vídeo com esta notícia" }).click();
 
     await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaId=\d+/);
@@ -245,7 +247,7 @@ test.describe("/noticias", () => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByText(TITULO_COM_ANGULO).click();
+    await page.getByRole("button", { name: TITULO_COM_ANGULO }).click();
     await page.getByRole("dialog", { name: TITULO_COM_ANGULO }).getByRole("button", { name: "Criar vídeo com esta notícia" }).click();
     await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaId=\d+/);
 
@@ -265,7 +267,7 @@ test.describe("/noticias", () => {
 
     // De volta a Notícias, a marca que gerou o roteiro vê "virou roteiro" com o link certo.
     await page.goto("/noticias");
-    const cartao = page.locator("button", { hasText: TITULO_COM_ANGULO });
+    const cartao = page.locator("article", { hasText: TITULO_COM_ANGULO });
     await expect(cartao.getByText("virou roteiro")).toBeVisible();
     const linkRoteiro = cartao.getByRole("link", { name: "Ver o roteiro" });
     await expect(linkRoteiro).toBeVisible();
@@ -275,7 +277,7 @@ test.describe("/noticias", () => {
     // A mesma notícia, para a outra marca do mesmo setor, continua sem "virou roteiro" (isolamento).
     await garantirMarcaDoisAtiva(page);
     await page.goto("/noticias");
-    const cartaoOutraMarca = page.locator("button", { hasText: TITULO_COM_ANGULO });
+    const cartaoOutraMarca = page.locator("article", { hasText: TITULO_COM_ANGULO });
     await expect(cartaoOutraMarca).toBeVisible();
     await expect(cartaoOutraMarca.getByText("virou roteiro")).not.toBeVisible();
     await expect(cartaoOutraMarca.getByText("Abrir")).toBeVisible();

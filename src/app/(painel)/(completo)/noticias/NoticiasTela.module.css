@@ -126,12 +126,26 @@
 
 .noticia {
   width: 100%;
-  cursor: pointer;
+  position: relative;
   transition: border-color var(--duracao-rapida) var(--curva-saida);
 }
 
 .noticia:hover {
   border-color: var(--cor-borda-forte);
+}
+
+/* O botão que cobre o cartão inteiro (só abre a folha); "Ver o roteiro" fica por cima, independente. */
+.coberturaNoticia {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: inherit;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
 }
 
 .fonte {
@@ -204,6 +218,8 @@
 }
 
 .verRoteiro {
+  position: relative;
+  z-index: 2;
   font-size: var(--tamanho-secundario);
   color: var(--cor-titulo);
   font-weight: var(--peso-medio);
