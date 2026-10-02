@@ -1,9 +1,11 @@
 /**
- * Barra de abas do celular e barra lateral do tablet/desktop (base.css,
- * blocos `.abas`/`.aba` e `.lateral`/`.item-lateral`; design v2, `PROXIMO.md`,
- * D2 parte 1, item 3). O item ativo muda de cor no celular (nunca bolha por
- * cima do icone) e ganha um fundo de seleção suave no tablet/desktop, na
- * mesma cor que o resto do painel usa para "isto está selecionado".
+ * Classes compartilhadas por `Nav.tsx` (a barra lateral do tablet/desktop) e
+ * `../../_casca/CapsulaNav.tsx` (a cápsula do celular, só Hoje/Criar/Planejar
+ * mais o botão "Mais") (base.css, blocos `.abas`/`.aba` e
+ * `.lateral`/`.item-lateral`; design v2, `PROXIMO.md`, D2 parte 1, item 3). O
+ * item ativo muda de cor no celular (nunca bolha por cima do icone) e ganha
+ * um fundo de seleção suave no tablet/desktop, na mesma cor que o resto do
+ * painel usa para "isto está selecionado".
  */
 .nav {
   display: grid;
@@ -13,7 +15,9 @@
 
 /* A cápsula encolhida (V5, item 5): colunas de largura fixa, não mais
    proporcionais à barra inteira, para o container (`layout.module.css`,
-   `.barraInferior.encolhida`, `width: auto`) encolher junto com o grid. */
+   `.barraInferior.encolhida`, `width: auto`) encolher junto com o grid.
+   Só `CapsulaNav.tsx` usa isto (quatro lugares: Hoje, Criar, Planejar, Mais);
+   `Nav.tsx`, a barra lateral, nunca encolhe. */
 .navEncolhida {
   grid-template-columns: repeat(4, 3.25rem);
 }
@@ -45,6 +49,12 @@
 }
 
 .traco {
+  display: none;
+}
+
+/* Só existe na barra lateral (abaixo, `@media min-width: 768px`); a cápsula do
+   celular (`CapsulaNav.tsx`) nunca renderiza este elemento. */
+.divisor {
   display: none;
 }
 
@@ -104,6 +114,19 @@
   .ativo .rotulo {
     font-weight: var(--peso-semibold);
   }
+
+  /**
+   * Passo 13 do Opus (01/10, 23:50): o traço entre o que se faz todo dia
+   * (Hoje, Criar, Planejar) e o que é para consultar (Referências,
+   * Histórico), só na barra lateral; `Nav.tsx` é quem decide depois de qual
+   * item ele entra (`divisorDepois`).
+   */
+  .divisor {
+    display: block;
+    height: var(--largura-borda);
+    margin: var(--espaco-2) var(--espaco-3);
+    background: var(--cor-divisor);
+  }
 }
 
 /**
@@ -131,6 +154,11 @@
   .compactavel .rotulo {
     display: none;
   }
+
+  .compactavel .divisor {
+    width: 1.5rem;
+    margin-inline: auto;
+  }
 }
 
 html[data-barra-lateral="recolhida"] .compactavel .item {
@@ -142,6 +170,11 @@ html[data-barra-lateral="recolhida"] .compactavel .item {
 
 html[data-barra-lateral="recolhida"] .compactavel .rotulo {
   display: none;
+}
+
+html[data-barra-lateral="recolhida"] .compactavel .divisor {
+  width: 1.5rem;
+  margin-inline: auto;
 }
 
 html[data-barra-lateral="aberta"] .compactavel .item {

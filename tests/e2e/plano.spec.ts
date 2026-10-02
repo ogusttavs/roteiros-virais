@@ -39,14 +39,21 @@ async function entrar(page: Page) {
 
 /**
  * E39a: "Planejar os próximos dias" é uma das quatro portas sempre visíveis em `/criar`.
- * E39c, parte 1: a porta leva ao calendário, não direto para a folha; "Contar a minha agenda",
- * dentro do calendário, é quem abre a folha de texto ou voz.
+ * E39c, parte 2a: a porta leva à aba Planejar (visão Semana, `/planejamento`), uma aba própria
+ * desde a decisão do Gustavo de 01/10, 22:15 (antes dentro de Hoje); "Contar a minha agenda",
+ * no cabeçalho do planejador, é quem abre a folha de texto ou voz.
  */
 async function abrirPlanejarDias(page: Page) {
   await page.goto("/criar");
   await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
-  await expect(page).toHaveURL(/\/hoje\/mes/);
-  await page.getByRole("button", { name: "Contar a minha agenda" }).click();
+  await expect(page).toHaveURL(/\/planejamento\?visao=semana/);
+  /**
+   * Semana vazia (a marca de teste começa sem nada planejado): o cartão "Nada marcado nesta
+   * semana" tem o próprio "Contar a minha agenda" (`Planejar.dc.html`, estado `semanaVazia`),
+   * além do mesmo botão no cabeçalho do planejador; os dois abrem a mesma folha, `.first()`
+   * só desambigua qual o Playwright clica.
+   */
+  await page.getByRole("button", { name: "Contar a minha agenda" }).first().click();
 }
 
 test.describe("colar a agenda e o plano de gravações", () => {
@@ -388,10 +395,10 @@ test.describe("colar a agenda e o plano de gravações", () => {
 
     await page.goto("/criar");
     await page.getByRole("button", { name: "Planejar os próximos dias" }).click();
-    await expect(page).toHaveURL(/\/hoje\/mes$/);
+    await expect(page).toHaveURL(/\/planejamento\?visao=semana/);
 
-    // A marca é nova: nada marcado hoje, "Criar roteiro" aparece e leva a /criar com a data de hoje.
-    await page.getByRole("button", { name: "Criar roteiro" }).click();
+    // A marca é nova: nada marcado em nenhum dia; o de hoje tem "Criar roteiro" e leva a /criar com a data de hoje.
+    await page.getByRole("region", { name: /, hoje$/ }).getByRole("button", { name: "Criar roteiro" }).click();
     await expect(page).toHaveURL(new RegExp(`/criar\\?data=${hojeISO()}`));
   });
 
@@ -447,7 +454,7 @@ test.describe("colar a agenda e o plano de gravações", () => {
     await expect(folhaPlanejar).toBeVisible();
     await folhaPlanejar.getByRole("button", { name: "Fechar" }).click();
     await expect(folhaPlanejar).toBeHidden();
-    await expect(page).toHaveURL(/\/hoje\/mes/);
+    await expect(page).toHaveURL(/\/planejamento/);
 
     // Um plano de hoje, so para "Meu plano" aparecer em /criar.
     await abrirPlanejarDias(page);

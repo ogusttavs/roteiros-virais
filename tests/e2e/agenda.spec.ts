@@ -275,7 +275,7 @@ test.describe("/hoje, a Agenda", () => {
     await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}`));
 
     await page.getByRole("button", { name: "Ver o mês" }).click();
-    await expect(page).toHaveURL(new RegExp(`/hoje/mes\\?dia=${diaDaquiA21Dias}`));
+    await expect(page).toHaveURL(new RegExp(`/planejamento\\?visao=mes&dia=${diaDaquiA21Dias}`));
 
     const diaDoMes = Number(diaDaquiA21Dias.split("-")[2]);
     const celulaSelecionada = page.getByRole("button", { name: new RegExp(`, ${diaDoMes} de `) }).and(page.getByRole("button", { pressed: true }));
