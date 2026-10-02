@@ -174,3 +174,29 @@
   color: var(--cor-texto-suave);
   flex: 1 1 14rem;
 }
+
+/* E39c, parte 2b: mover de dia por arrasto, do tablet deitado para cima; abaixo disso o arrasto
+ * não começa (`useMoverDeDia.ts`) e estas classes nunca ganham efeito visível. */
+@media (min-width: 1024px) {
+  .diaMesAlvo {
+    background: var(--cor-selecao-suave);
+    border-style: dashed;
+    border-color: var(--cor-acao);
+  }
+  /* `.itemAgenda` é de `HojeTela.module.css` (`hojeStyles`), outro módulo: o seletor aponta pela
+   * tag, não pelo nome da classe (mesmo motivo do `button[aria-haspopup="menu"]` de
+   * `SemanaTela.module.css`). `:first-of-type` pega só o botão do item, nunca o "mais opções"
+   * do `MenuAcoesAgenda` ao lado. */
+  .linhaArrastando > button:first-of-type {
+    background: transparent;
+    border: var(--largura-borda) dashed var(--cor-borda-forte);
+  }
+  .linhaArrastando > button:first-of-type > * {
+    visibility: hidden;
+  }
+}
+
+.erroMover {
+  color: var(--cor-erro);
+  font-size: var(--tamanho-rodape);
+}

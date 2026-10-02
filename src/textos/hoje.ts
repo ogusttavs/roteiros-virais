@@ -178,6 +178,12 @@ export const textosHoje = {
       notaSugeridos: "Os sugeridos vieram da agenda que você contou. Toque num deles para escrever o roteiro.",
       soltarAqui: "Soltar aqui",
       movendoPara: (titulo: string, dia: string) => `Movendo ${titulo} para ${dia}.`,
+      /** E39c, parte 2b: soltar num dia que já tem um item do mesmo formato pede confirmação. */
+      confirmarMoverPergunta: (titulo: string, dia: string, formatoNoDia: string) =>
+        `${dia} já tem um ${formatoNoDia}. Mover "${titulo}" para lá também?`,
+      confirmarMoverBotao: "Mover mesmo assim",
+      cancelarMoverBotao: "Cancelar",
+      erroMover: "Não deu para mover. Tente de novo.",
       semanaVaziaTitulo: "Nada marcado nesta semana",
       semanaVaziaDescricao:
         "Toque num dia para criar um roteiro para ele, ou conte a sua agenda e a gente sugere o que gravar em cada dia.",
