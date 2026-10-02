@@ -35,6 +35,22 @@ function tituloSemana(segunda: string, domingo: string): string {
   return `${diaInicio} a ${diaFim}`;
 }
 
+const FORMATAR_DIA_MES_CURTO = new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "America/Sao_Paulo" });
+/** Igual a `page.tsx`: a forma curta do período, abaixo de 768px (acabamento da E39c, parte 2a). */
+function tituloSemanaCurto(segunda: string, domingo: string): string {
+  const [, mesSegunda] = segunda.split("-");
+  const [, mesDomingo] = domingo.split("-");
+  const [anoS, mesS, diaS] = segunda.split("-").map(Number);
+  const [anoD, mesD, diaD] = domingo.split("-").map(Number);
+  const mesCurto = (data: Date) => FORMATAR_DIA_MES_CURTO.format(data).replace(/\.$/, "");
+  if (mesSegunda === mesDomingo) {
+    return `${diaS} a ${diaD} ${mesCurto(new Date(Date.UTC(anoD, mesD - 1, diaD, 12)))}`;
+  }
+  const inicio = `${diaS} ${mesCurto(new Date(Date.UTC(anoS, mesS - 1, diaS, 12)))}`;
+  const fim = `${diaD} ${mesCurto(new Date(Date.UTC(anoD, mesD - 1, diaD, 12)))}`;
+  return `${inicio} a ${fim}`;
+}
+
 /** Esqueleto da visão Semana (design v2, `Planejar.dc.html`, estado `carregando`): sete dias,
  * cada um com uma a duas linhas em branco, enquanto a semana real carrega. */
 export default function CarregandoPlanejamento() {
@@ -46,7 +62,7 @@ export default function CarregandoPlanejamento() {
     <div className={hojeStyles.pagina}>
       <BarraTopo titulo={textosPlanejamento.titulo} />
       <div className={hojeStyles.miolo}>
-        <CabecaPlanoEstatica tituloPeriodo={tituloSemana(segunda, domingo)} />
+        <CabecaPlanoEstatica tituloPeriodo={tituloSemana(segunda, domingo)} tituloPeriodoCurto={tituloSemanaCurto(segunda, domingo)} />
         <div className={semanaStyles.semanaPlano} aria-busy="true" aria-label={textosHoje.agenda.planejador.carregandoRotulo}>
           {[2, 1, 0, 1, 2, 0, 2].map((qtdLinhas, indice) => (
             <section key={indice} className={semanaStyles.diaPlano}>

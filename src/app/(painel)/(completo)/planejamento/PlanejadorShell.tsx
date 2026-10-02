@@ -21,6 +21,7 @@ import { CabecaPlano, type Visao } from "./CabecaPlano";
 export type PropsCabecaPlano = {
   rotuloPeriodo: string;
   tituloPeriodo: string;
+  tituloPeriodoCurto?: string;
   mostrarHoje: boolean;
   hrefAnterior: string;
   hrefSeguinte: string;

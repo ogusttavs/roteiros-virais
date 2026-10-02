@@ -17,6 +17,8 @@ type Props = {
   rotuloPeriodo: string;
   /** O título grande do período ("O que gravar hoje", "7 a 13 de setembro", "Setembro de 2026"...). */
   tituloPeriodo: string;
+  /** Acabamento da E39c, parte 2a: a forma curta ("28 set a 4 out"), só na visão Semana, abaixo de 768px. */
+  tituloPeriodoCurto?: string;
   /** "Hoje" só aparece fora do período de hoje (dúvida 3 do passo 12). */
   mostrarHoje: boolean;
   hrefAnterior: string;
@@ -37,6 +39,7 @@ export function CabecaPlano({
   visao,
   rotuloPeriodo,
   tituloPeriodo,
+  tituloPeriodoCurto,
   mostrarHoje,
   hrefAnterior,
   hrefSeguinte,
@@ -59,7 +62,16 @@ export function CabecaPlano({
       <div className={styles.cabecalhoTela}>
         <span className={styles.data}>{rotuloPeriodo}</span>
         <div className={styles.periodo}>
-          <h1>{tituloPeriodo}</h1>
+          <h1>
+            {tituloPeriodoCurto ? (
+              <>
+                <span className={styles.tituloCurto}>{tituloPeriodoCurto}</span>
+                <span className={styles.tituloLongo}>{tituloPeriodo}</span>
+              </>
+            ) : (
+              tituloPeriodo
+            )}
+          </h1>
           <button
             type="button"
             className={styles.botaoBarra}
