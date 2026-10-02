@@ -143,3 +143,14 @@
     display: none;
   }
 }
+
+/**
+ * R2b, revisão do Fable no PR #100: a folha "Por que esse funcionou" (`FolhaDetalhesVideo`, prop
+ * `largo`) ganha mais espaço a partir do desktop para caber o vídeo e o texto lado a lado
+ * (`FolhaDetalhesVideo.module.css`, `.corpo`), igual ao desenho (`Referencias.Previa.1280`).
+ */
+@media (min-width: 1024px) {
+  .folhaLarga {
+    width: min(60rem, calc(100vw - var(--espaco-12)));
+  }
+}

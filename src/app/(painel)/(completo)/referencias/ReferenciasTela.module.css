@@ -174,6 +174,61 @@
   margin-top: var(--espaco-2);
 }
 
+/**
+ * R2b, item 4 (revisão do Fable no PR #100, desenho `.fichas-filtro`/`.ficha`): uma ficha por
+ * filtro ligado, removível com um toque, mais "Tirar os filtros". Em qualquer largura de tela
+ * (o desenho esconde isto a partir de 1024px, substituído pelas pílulas da barra; esta rodada não
+ * construiu as pílulas, então as fichas ficam como o único jeito de ver e tirar um filtro sem
+ * reabrir a folha).
+ */
+.fichas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3) 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-acao);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ficha:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoTirarFiltros {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.botaoTirarFiltros:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
 .contagem {
   margin: 0;
   font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);

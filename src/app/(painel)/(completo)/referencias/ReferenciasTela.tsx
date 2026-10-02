@@ -1,11 +1,12 @@
 "use client";
 
-import { Filter, Search } from "lucide-react";
+import { Filter, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo, Plataforma } from "@/db/schema";
+import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
@@ -307,6 +308,62 @@ export function ReferenciasTela({
     (brasilExibido !== undefined ? 1 : 0);
 
   /**
+   * R2b, item 4 (revisão do Fable no PR #100, `.fichas-filtro` do desenho): uma ficha por filtro
+   * ligado, com o próprio toque removendo só aquele filtro. O desenho esconde esta linha a partir
+   * de 1024px (substituída pelas pílulas da barra, que mostram o estado ativo sozinhas); como esta
+   * rodada não construiu as pílulas (documentado no PR), as fichas ficam em qualquer largura de
+   * tela, único jeito de ver e tirar um filtro sem reabrir a folha "Filtrar".
+   */
+  const fichasAtivas = [
+    ...plataformasExibidas.map((p) => ({
+      chave: `plataforma-${p}`,
+      rotulo: ROTULO_PLATAFORMA[p],
+      aoRemover: () => navegar({ plataformas: plataformasExibidas.filter((v) => v !== p) }),
+    })),
+    ...formatosExibidos.map((f) => ({
+      chave: `formato-${f}`,
+      rotulo: ROTULO_FORMATO[f],
+      aoRemover: () => navegar({ formatos: formatosExibidos.filter((v) => v !== f) }),
+    })),
+    ...tiposConteudoExibidos.map((t) => ({
+      chave: `tipo-${t}`,
+      rotulo: ROTULO_TIPO_CONTEUDO_FILTRAVEL[t],
+      aoRemover: () => navegar({ tiposConteudo: tiposConteudoExibidos.filter((v) => v !== t) }),
+    })),
+    ...(viewsMinExibido !== undefined
+      ? [
+          {
+            chave: "views",
+            rotulo: textosReferencias.viewsFaixas.find((f) => f.valor === viewsMinExibido)?.rotulo ?? String(viewsMinExibido),
+            aoRemover: () => navegar({ viewsMin: undefined }),
+          },
+        ]
+      : []),
+    ...(comFalaExibido !== undefined
+      ? [
+          {
+            chave: "fala",
+            rotulo: comFalaExibido ? textosReferencias.comFala : textosReferencias.semFala,
+            aoRemover: () => navegar({ comFala: undefined }),
+          },
+        ]
+      : []),
+    ...(brasilExibido !== undefined
+      ? [
+          {
+            chave: "brasil",
+            rotulo: brasilExibido ? textosReferencias.doBrasil : textosReferencias.deFora,
+            aoRemover: () => navegar({ brasil: undefined }),
+          },
+        ]
+      : []),
+  ];
+
+  function tirarOsFiltros() {
+    navegar({ plataformas: [], formatos: [], ordem: undefined, viewsMin: undefined, comFala: undefined, brasil: undefined, tiposConteudo: [] });
+  }
+
+  /**
    * Busca, período, abas e filtros reconsultam o servidor com `router.push`. Sem rede isso não tem `catch`
    * possível: o navegador troca o aplicativo pela página de erro dele e a tela se perde. Por isso, sem rede,
    * só avisa (V7, item 8 do PROXIMO.md); guardar a busca para depois está fora desta etapa.
@@ -482,7 +539,8 @@ export function ReferenciasTela({
     <div className={styles.pagina}>
       <div className={styles.cabecalhoTela}>
         <h1>{textosReferencias.titulo}</h1>
-        <p>{textosReferencias.linha}</p>
+        {/* R2b, item 5 (revisão do Fable no PR #100): o subtítulo do "Todos" explica o segmento, não fala em "fora da curva". */}
+        <p>{segmento === "todos" ? textosReferencias.linhaTodos : textosReferencias.linha}</p>
       </div>
 
       <div className={styles.filtros}>
@@ -562,6 +620,27 @@ export function ReferenciasTela({
             {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>{quantosFiltrosAtivos}</span> : null}
           </Botao>
         </div>
+
+        {fichasAtivas.length > 0 ? (
+          <div className={styles.fichas} aria-label="Filtros ligados">
+            {fichasAtivas.map((ficha) => (
+              <button
+                key={ficha.chave}
+                type="button"
+                className={styles.ficha}
+                aria-label={textosReferencias.tirarFiltro(ficha.rotulo)}
+                disabled={navegando}
+                onClick={ficha.aoRemover}
+              >
+                {ficha.rotulo}
+                <X size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+            ))}
+            <button type="button" className={styles.botaoTirarFiltros} disabled={navegando} onClick={tirarOsFiltros}>
+              {textosReferencias.tirarOsFiltros}
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {redePrincipalSemVideo && segmento !== "salvos" && !navegando ? (

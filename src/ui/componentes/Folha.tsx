@@ -19,6 +19,12 @@ type Props = {
    */
   aoFechar: () => void;
   rodape?: ReactNode;
+  /**
+   * R2b, revisão do Fable no PR #100: a folha "Por que esse funcionou" precisa de mais largura a
+   * partir de 1024px (o vídeo à esquerda, o texto à direita, sem rolar para ver a conta e os
+   * números). Opcional porque as outras folhas (Filtrar, por exemplo) continuam na largura padrão.
+   */
+  largo?: boolean;
   children: ReactNode;
 };
 
@@ -37,7 +43,7 @@ type Props = {
  * tem o arrasto (`usePuxarParaFechar`) espalhado por ela; um botão lá dentro
  * ganharia a captura do ponteiro do arrasto em vez de um clique normal.
  */
-export function Folha({ titulo, aberto, aoFechar, rodape, children }: Props) {
+export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, children }: Props) {
   const { folhaRef, alca } = usePuxarParaFechar(aoFechar);
 
   // O ouvinte do Escape lê o `aoFechar` mais recente por uma ref: quem passa uma função nova a cada
@@ -70,7 +76,7 @@ export function Folha({ titulo, aberto, aoFechar, rodape, children }: Props) {
         aria-label={titulo}
         tabIndex={-1}
         data-folha-aberta=""
-        className={styles.folha}
+        className={[styles.folha, largo ? styles.folhaLarga : ""].filter(Boolean).join(" ")}
       >
         <button type="button" className={styles.folhaFechar} onClick={aoFechar} aria-label={textosComuns.fechar}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">

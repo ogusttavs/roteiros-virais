@@ -4,20 +4,23 @@
   gap: var(--espaco-3);
 }
 
+/**
+ * Revisão do Fable no PR #100, item 3: a miniatura de 9rem (umas 144px de largura) era pequena
+ * demais para assistir, e a incorporação do Instagram não cabia nela. Virou uma pilha (o vídeo em
+ * cima, na largura do cartão, o texto embaixo), como `Roteiro.Previa` no desenho, em vez do lado a
+ * lado de antes.
+ */
 .linha {
   display: grid;
-  /* R2a: `minmax(0, 9rem)`, não `auto`. Um `<iframe>` de verdade dentro da miniatura (o
-     VideoEmbed) tem um tamanho preferido grande por padrão, que `width: 100%` não corrige
-     numa coluna "auto" (a porcentagem não conta no cálculo do conteúdo intrínseco do grid):
-     sem o teto aqui, a coluna estourava e espremia o botão "Abrir o vídeo de referência" para
-     menos de 44px de alvo de toque (achado da prova desta etapa, layout.spec.ts). */
-  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
   gap: var(--espaco-4);
-  align-items: start;
 }
 
 .miniatura {
   aspect-ratio: 9 / 16;
+  /* Até aqui, a largura é a do cartão (a coluna de leitura ou o lado, RoteiroTela.module.css); o
+     teto evita um vídeo alto demais quando o cartão é largo (achava a mesma falha do item 1 do
+     PR #100 se a altura crescesse livre). */
+  max-width: 22rem;
   width: 100%;
   min-width: 0;
   border-radius: var(--raio-md);

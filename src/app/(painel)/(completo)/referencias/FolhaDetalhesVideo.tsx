@@ -48,6 +48,7 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
       titulo={textosReferencias.folhaDetalhesTitulo}
       aberto={aberto}
       aoFechar={aoFechar}
+      largo
       rodape={
         <>
           {/* Já salvo, o botão só fecha a folha e avisa (sem chamar o servidor), então não precisa de rede. */}
@@ -76,46 +77,50 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
         </>
       }
     >
-      <VideoEmbed
-        url={url}
-        alt={textosReferencias.embedAlt(video.contaNome)}
-        rotuloCarregamento={textosReferencias.embedCarregando}
-        hrefExterno={url}
-        segundoInicial={video.segundoChave ?? undefined}
-        capaUrl={video.capaUrl}
-      />
-
-      <div className={styles.videoConta}>
-        <span className={styles.nome}>{video.contaNome}</span>
-        <span className={styles.quando}>{video.plataformaData}</span>
-        {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
-      </div>
-      {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}
-
-      <div className={styles.numeros}>
-        <span>
-          <b>{video.multiplo}</b> {video.rotuloMultiplo}
-        </span>
-        <span>
-          {video.medianaConta !== null
-            ? textosReferencias.viewsContraNormal(formatarViewsExato(video.views), formatarViewsExato(video.medianaConta))
-            : textosReferencias.viewsRotulo(formatarViewsExato(video.views))}
-        </span>
-        <span>{linhaVelocidade(video.velocidade)}</span>
-      </div>
-
-      <div className={styles.analise}>
-        <div>
-          <strong>{textosReferencias.analise.comecou}</strong>
-          <p>{video.gancho}</p>
+      <div className={styles.corpo}>
+        <div className={styles.videoWrapper}>
+          <VideoEmbed
+            url={url}
+            alt={textosReferencias.embedAlt(video.contaNome)}
+            rotuloCarregamento={textosReferencias.embedCarregando}
+            hrefExterno={url}
+            segundoInicial={video.segundoChave ?? undefined}
+            capaUrl={video.capaUrl}
+          />
         </div>
-        <div>
-          <strong>{textosReferencias.analise.construiu}</strong>
-          <p>{video.estrutura}</p>
+
+        <div className={styles.videoConta}>
+          <span className={styles.nome}>{video.contaNome}</span>
+          <span className={styles.quando}>{video.plataformaData}</span>
+          {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
         </div>
-        <div>
-          <strong>{textosReferencias.analise.funcionou}</strong>
-          <p>{video.porQueFuncionou}</p>
+        {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}
+
+        <div className={styles.numeros}>
+          <span>
+            <b>{video.multiplo}</b> {video.rotuloMultiplo}
+          </span>
+          <span>
+            {video.medianaConta !== null
+              ? textosReferencias.viewsContraNormal(formatarViewsExato(video.views), formatarViewsExato(video.medianaConta))
+              : textosReferencias.viewsRotulo(formatarViewsExato(video.views))}
+          </span>
+          <span>{linhaVelocidade(video.velocidade)}</span>
+        </div>
+
+        <div className={styles.analise}>
+          <div>
+            <strong>{textosReferencias.analise.comecou}</strong>
+            <p>{video.gancho}</p>
+          </div>
+          <div>
+            <strong>{textosReferencias.analise.construiu}</strong>
+            <p>{video.estrutura}</p>
+          </div>
+          <div>
+            <strong>{textosReferencias.analise.funcionou}</strong>
+            <p>{video.porQueFuncionou}</p>
+          </div>
         </div>
       </div>
     </Folha>

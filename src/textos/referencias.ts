@@ -5,6 +5,9 @@
 export const textosReferencias = {
   titulo: "O que está funcionando no seu setor",
   linha: "Vídeos que passaram muito do normal da própria conta, e as notícias do seu setor. Os mais recentes primeiro.",
+  /** R2b, item 5 (revisão do Fable no PR #100): o subtítulo próprio do segmento "Todos", no lugar do de "Fora da curva". */
+  linhaTodos:
+    "Tudo o que a gente analisou no seu setor, não só os fora da curva. O que está abaixo do que a gente usa como prova vem marcado: serve para ver o volume e achar um assunto que ainda não estourou, e não entra nos seus roteiros.",
   segmentoForaDaCurva: "Fora da curva",
   /** R2b, item 1: o segmento novo, entre "Fora da curva" e "Salvos" (ordem do desenho). */
   segmentoTodos: "Todos",
@@ -55,6 +58,12 @@ export const textosReferencias = {
   deOnde: "De onde",
   doBrasil: "Do Brasil",
   deFora: "De fora",
+  /**
+   * R2b, item 4 (revisão do Fable no PR #100): as fichas removíveis logo abaixo da barra de
+   * filtros, uma por filtro ligado, com "Tirar os filtros" ao lado (desenho, `.fichas-filtro`).
+   */
+  tirarFiltro: (rotulo: string) => `Tirar o filtro ${rotulo}`,
+  tirarOsFiltros: "Tirar os filtros",
   /** R2b, item 1: quando "Todos" tem mais vídeos do que a página atual mostra. */
   verMais: "Ver mais",
 

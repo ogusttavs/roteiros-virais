@@ -19,10 +19,22 @@ export function verificarLinha(linha: string): string[] {
   return VALOR_SOLTO.test(linha) ? ["cor solta fora de tokens.css; use var(--cor-...)"] : [];
 }
 
+/**
+ * Achado rodando a regra contra `#100` (revisão do PR #100, 02/10/2026): um comentário citando um
+ * número de PR de três dígitos ou mais sempre bate com o padrão de cor de hexadecimal (todo dígito
+ * decimal também é um dígito hexadecimal válido), um falso positivo que só piora conforme os PRs
+ * passam de 99. Comentário de bloco (`/* ... *\/`) nunca é CSS de verdade, então o conteúdo dele
+ * vira espaço antes de aplicar `VALOR_SOLTO`, preservando as quebras de linha para o número da
+ * linha do problema continuar certo.
+ */
+export function semComentarios(conteudo: string): string {
+  return conteudo.replace(/\/\*[\s\S]*?\*\//g, (bloco) => bloco.replace(/[^\n]/g, " "));
+}
+
 export function verificarArquivo(caminho: string): Problema[] {
   if (ARQUIVOS_PERMITIDOS.includes(caminho)) return [];
   const conteudo = readFileSync(caminho, "utf8");
-  return conteudo
+  return semComentarios(conteudo)
     .split("\n")
     .flatMap((linha, i) => verificarLinha(linha).map((motivo) => ({ arquivo: caminho, linha: i + 1, motivo })));
 }
