@@ -11,7 +11,7 @@
  * (desempate por id), para a mesma consulta não devolver ordens diferentes
  * em execuções iguais.
  */
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, type SQL, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -123,6 +123,21 @@ export const PERTENCE_AO_NICHO = sql`(${videos.analise} ->> 'pertenceAoNicho') i
  * `TETO_DURACAO_REFERENCIA_S` ajusta sem mexer em código (`config.regras`).
  */
 export const DENTRO_DO_TETO_DE_DURACAO = sql`(${videos.duracaoS} is null or ${videos.duracaoS} <= ${config.regras.tetoDuracaoReferenciaS})`;
+
+/**
+ * Achado 1 da revisão do motor (01/10/2026): o teto por conta (`comTetoPorConta`, abaixo) escolhia
+ * os 2 melhores vídeos de cada conta por nota, sem saber se já tinham sido lidos; uma conta com os
+ * 2 melhores já transcritos nunca oferecia o 3º ao `transcrever`, mesmo livre, e o teto diário
+ * ficava ocioso (348 vídeos acima do piso sem análise na Overtake). Exclui aqui, antes do
+ * `row_number` por conta, o que `transcrever.ts` (`soElegivelParaTranscricao`) já não aproveitaria.
+ * Função, não constante: `new Date()` precisa ser "agora" a cada chamada, não "agora" de quando o
+ * processo (de vida longa, o worker) carregou o módulo.
+ */
+function elegivelParaTranscricao(): SQL<unknown> {
+  return sql`${isNull(videos.transcricao)} and ${isNull(videos.analise)} and (${isNull(
+    videos.proximaTentativaTranscricao,
+  )} or ${lte(videos.proximaTentativaTranscricao, new Date())})`;
+}
 
 function mapear(linha: {
   id: number;
@@ -236,12 +251,16 @@ async function comTetoPorConta(
  * `maxPorConta` (V2b, item 10, opcional): aplica o teto por conta dentro
  * da própria consulta, antes do `limite`; sem ele, comportamento igual a
  * antes (usado por quem não corta por conta depois, como `/admin`).
+ * `soElegivelParaTranscricao` (achado 1 da revisão do motor): só o
+ * `transcrever.ts` passa, para o teto por conta não gastar as duas vagas da
+ * conta com vídeo que ele já não aproveitaria.
  */
 export async function foraDaCurvaDoNicho(
   nichoId: number,
   dias = 90,
   limite?: number,
   maxPorConta?: number,
+  soElegivelParaTranscricao = false,
 ): Promise<VideoRankeado[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
@@ -256,6 +275,7 @@ export async function foraDaCurvaDoNicho(
     DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  if (soElegivelParaTranscricao) condicoes.push(elegivelParaTranscricao());
 
   if (maxPorConta !== undefined && limite !== undefined) {
     return comTetoPorConta("fora_da_curva", and(...condicoes)!, limite, maxPorConta);
@@ -275,9 +295,14 @@ export async function foraDaCurvaDoNicho(
 /**
  * O que está subindo hoje no nicho: 2 a 7 dias, por velocidade relativa
  * (escopo 5.1). `maxPorConta` (V2b, item 10, opcional): mesmo raciocínio
- * de `foraDaCurvaDoNicho`.
+ * de `foraDaCurvaDoNicho`. `soElegivelParaTranscricao`: idem.
  */
-export async function subindoHoje(nichoId: number, limite?: number, maxPorConta?: number): Promise<VideoRankeado[]> {
+export async function subindoHoje(
+  nichoId: number,
+  limite?: number,
+  maxPorConta?: number,
+  soElegivelParaTranscricao = false,
+): Promise<VideoRankeado[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -291,6 +316,7 @@ export async function subindoHoje(nichoId: number, limite?: number, maxPorConta?
     DENTRO_DO_TETO_DE_DURACAO,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  if (soElegivelParaTranscricao) condicoes.push(elegivelParaTranscricao());
 
   if (maxPorConta !== undefined && limite !== undefined) {
     return comTetoPorConta("velocidade_relativa", and(...condicoes)!, limite, maxPorConta);

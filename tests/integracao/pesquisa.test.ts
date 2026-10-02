@@ -52,6 +52,9 @@ async function criarVideo(
     duracaoS?: number | null;
     /** H4, item 2: `undefined` (padrão) deixa nulo, como todo vídeo analisado antes desta coluna existir. */
     serveDeModelo?: boolean;
+    /** Achado 1 da revisão do motor: vídeo "já lido" para os testes de `soElegivelParaTranscricao`. */
+    transcricao?: string | null;
+    proximaTentativaTranscricao?: Date | null;
   },
 ) {
   const [v] = await db()
@@ -74,6 +77,8 @@ async function criarVideo(
       semDono: opcoes.semDono ?? false,
       idioma: opcoes.idioma === undefined ? "pt" : opcoes.idioma,
       serveDeModelo: opcoes.serveDeModelo,
+      transcricao: opcoes.transcricao,
+      proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
     })
     .returning();
   return v;
@@ -195,6 +200,122 @@ describe("foraDaCurvaDoNicho", () => {
     await db().delete(contas).where(eq(contas.nichoId, nichoTeto.id));
     await db().delete(nichos).where(eq(nichos.id, nichoTeto.id));
   }, 30_000);
+
+  /**
+   * Achado 1 da revisão do motor (01/10/2026): o teto por conta (`maxPorConta`, acima) escolhia os
+   * 2 melhores vídeos por nota sem saber se já tinham sido lidos; uma conta com os 2 melhores já
+   * transcritos nunca oferecia o 3º, mesmo livre (causa principal dos 348 sem análise na Overtake).
+   * `soElegivelParaTranscricao=true` exclui, antes do teto, quem já tem transcrição, análise ou
+   * tentativa futura marcada. Cenário do `PROXIMO.md`: conta com 6 vídeos acima do piso, 2 já
+   * lidos, oferece os 2 seguintes; e um vídeo de 0 a 1 dia (bem recente) entra normalmente.
+   */
+  it("soElegivelParaTranscricao: pula o que já foi lido e oferece o 3º e 4º melhor da conta, mesmo vídeo de 0 a 1 dia", async () => {
+    const [nichoElegibilidade] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-elegibilidade-teste", nome: "Pesquisa elegibilidade teste", termos: [] })
+      .returning();
+    const [contaElegibilidade] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "elegibilidade-conta", nichoId: nichoElegibilidade.id })
+      .returning();
+
+    const jaLido1 = await criarVideo("eleg-ja-lido-1", {
+      foraDaCurva: 60,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+      transcricao: "ja transcrito, o melhor da conta",
+    });
+    const jaLido2 = await criarVideo("eleg-ja-lido-2", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+      transcricao: "ja transcrito, o segundo melhor da conta",
+    });
+    // Bem recente (0 a 1 dia): nao pode ficar de fora so por ser novo demais.
+    const recenteLivre = await criarVideo("eleg-recente-livre", {
+      foraDaCurva: 40,
+      publicadoEm: diasAtras(0.5),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+    const livre4 = await criarVideo("eleg-livre-4", {
+      foraDaCurva: 30,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+    const livre5 = await criarVideo("eleg-livre-5", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+    const livre6 = await criarVideo("eleg-livre-6", {
+      foraDaCurva: 10,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+
+    // Sem o flag (comportamento de quem não é o `transcrever`, como `/admin`): o teto por conta
+    // continua pegando os 2 melhores por nota, sem saber que já foram lidos.
+    const semFiltro = await foraDaCurvaDoNicho(nichoElegibilidade.id, 90, 10, 2);
+    expect(semFiltro.map((v) => v.id).sort()).toEqual([jaLido1.id, jaLido2.id].sort());
+
+    // Com o flag (`transcrever.ts`): pula os 2 já lidos e oferece os 2 seguintes, incluindo o
+    // vídeo recente (0 a 1 dia).
+    const comFiltro = await foraDaCurvaDoNicho(nichoElegibilidade.id, 90, 10, 2, true);
+    const idsComFiltro = comFiltro.map((v) => v.id).sort((a, b) => a - b);
+    expect(idsComFiltro).toEqual([recenteLivre.id, livre4.id].sort((a, b) => a - b));
+    expect(idsComFiltro).not.toContain(jaLido1.id);
+    expect(idsComFiltro).not.toContain(jaLido2.id);
+    expect(idsComFiltro).not.toContain(livre5.id);
+    expect(idsComFiltro).not.toContain(livre6.id);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoElegibilidade.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoElegibilidade.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoElegibilidade.id));
+  });
+
+  /**
+   * Mesma lógica de `soElegivelParaTranscricao`, mas para o vídeo com tentativa futura marcada
+   * (falhou antes, só tenta de novo depois de 7 dias): sem o flag, a tentativa futura não impede
+   * o teto por conta de escolher o vídeo; com o flag, ele é excluído como se já tivesse sido lido.
+   */
+  it("soElegivelParaTranscricao: pula vídeo com tentativa futura marcada", async () => {
+    const [nichoRetentativa] = await db()
+      .insert(nichos)
+      .values({ slug: "pesquisa-retentativa-teste", nome: "Pesquisa retentativa teste", termos: [] })
+      .returning();
+    const [contaRetentativa] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "retentativa-conta", nichoId: nichoRetentativa.id })
+      .returning();
+
+    const tentativaFutura = await criarVideo("eleg-tentativa-futura", {
+      foraDaCurva: 60,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoRetentativa.id,
+      contaId: contaRetentativa.id,
+      proximaTentativaTranscricao: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    });
+    const livre = await criarVideo("eleg-tentativa-livre", {
+      foraDaCurva: 50,
+      publicadoEm: diasAtras(10),
+      nichoId: nichoRetentativa.id,
+      contaId: contaRetentativa.id,
+    });
+
+    const comFiltro = await foraDaCurvaDoNicho(nichoRetentativa.id, 90, 10, 2, true);
+    expect(comFiltro.map((v) => v.id)).toEqual([livre.id]);
+    expect(comFiltro.map((v) => v.id)).not.toContain(tentativaFutura.id);
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoRetentativa.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoRetentativa.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoRetentativa.id));
+  });
 });
 
 describe("subindoHoje", () => {
@@ -228,6 +349,55 @@ describe("subindoHoje", () => {
 
     expect(resultado.some((v) => v.velocidadeRelativa === 80)).toBe(false);
     expect(resultado.some((v) => v.velocidadeRelativa === 70)).toBe(true);
+  });
+
+  /** Achado 1 da revisão do motor: mesmo raciocínio de `foraDaCurvaDoNicho`, aqui para a janela de 2 a 7 dias. */
+  it("soElegivelParaTranscricao: pula o que já foi lido e oferece o 3º e 4º melhor da conta", async () => {
+    const [nichoElegibilidade] = await db()
+      .insert(nichos)
+      .values({ slug: "subindo-elegibilidade-teste", nome: "Subindo elegibilidade teste", termos: [] })
+      .returning();
+    const [contaElegibilidade] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "subindo-elegibilidade-conta", nichoId: nichoElegibilidade.id })
+      .returning();
+
+    const jaLido1 = await criarVideo("sh-eleg-ja-lido-1", {
+      velocidadeRelativa: 40,
+      publicadoEm: diasAtras(3),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+      transcricao: "ja transcrito",
+    });
+    const jaLido2 = await criarVideo("sh-eleg-ja-lido-2", {
+      velocidadeRelativa: 30,
+      publicadoEm: diasAtras(3),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+      analise: { assunto: "ja analisado pelo caminho sem fala" },
+    });
+    const livre3 = await criarVideo("sh-eleg-livre-3", {
+      velocidadeRelativa: 20,
+      publicadoEm: diasAtras(3),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+    const livre4 = await criarVideo("sh-eleg-livre-4", {
+      velocidadeRelativa: 10,
+      publicadoEm: diasAtras(3),
+      nichoId: nichoElegibilidade.id,
+      contaId: contaElegibilidade.id,
+    });
+
+    const semFiltro = await subindoHoje(nichoElegibilidade.id, 10, 2);
+    expect(semFiltro.map((v) => v.id).sort()).toEqual([jaLido1.id, jaLido2.id].sort());
+
+    const comFiltro = await subindoHoje(nichoElegibilidade.id, 10, 2, true);
+    expect(comFiltro.map((v) => v.id).sort((a, b) => a - b)).toEqual([livre3.id, livre4.id].sort((a, b) => a - b));
+
+    await db().delete(videos).where(eq(videos.nichoId, nichoElegibilidade.id));
+    await db().delete(contas).where(eq(contas.nichoId, nichoElegibilidade.id));
+    await db().delete(nichos).where(eq(nichos.id, nichoElegibilidade.id));
   });
 });
 

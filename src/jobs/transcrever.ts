@@ -111,9 +111,13 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   // encolhe o que sobrou para bem menos que `tetoDiario` (achado da prova em
   // produção, 19/09 à noite: 187 vídeos fora da curva do Instagram, com mídia
   // fresca, nunca chegavam a ser tentados).
+  // Achado 1 da revisão do motor (01/10/2026): o último `true` exclui, antes desse mesmo teto por
+  // conta, o vídeo que já tem transcrição, análise ou tentativa futura marcada; sem isso, as duas
+  // vagas de uma conta podiam ir inteiras para vídeo que `selecionarParaTranscrever` já descartava,
+  // e a conta nunca oferecia um 3º vídeo livre.
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA),
-    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA),
+    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA, true),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA, true),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
