@@ -212,8 +212,14 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * instruções técnicas misturado com fala, não um roteiro claro"). Frase nova deixa explícito que
  * a sugestão de Story vira texto no bloco de edição, nunca estrutura própria; a estrutura deste
  * roteiro continua sendo Reels sempre. Versão 2.7.2.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): `LEMBRETE_ACENTUACAO` sai de dentro de
+ * `montarEntrada` (onde a segunda tentativa colava o motivo da reprovação depois dele, empurrando
+ * o lembrete para o meio da entrada) e vira exportado; `servicos/roteiro.ts` passa ele para
+ * `gerarComVerificacao` como `lembreteFinal`, que garante a posição certa nas duas tentativas.
+ * Versão 2.7.3.
  */
-export const versao = "2.7.2";
+export const versao = "2.7.3";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -563,11 +569,13 @@ function formatarInstrucaoAbertura(instrucao: InstrucaoAbertura): string {
 /**
  * R1, acabamento (achado do Sonnet na prova com chave real da H4, 01/10/2026: o roteiro sem
  * fala reprovou por dez campos sem acentuação, a mesma causa raiz de `avaliarResposta` 1.6.1):
- * a instrução de acentuação só no sistema estável não bastou; repetida aqui, no fim da entrada,
- * é onde o modelo de fato lê por último antes de escrever. Última linha, mesma posição de
- * `avaliarResposta.ts`, onde a instrução pegou (9 de 18 reprovados virou 0 de 18 lá).
+ * a instrução de acentuação só no sistema estável não bastou; o modelo lê por último, antes de
+ * escrever, o que vem no fim da entrada, mesma posição de `avaliarResposta.ts`, onde a instrução
+ * pegou (9 de 18 reprovados virou 0 de 18 lá). Achado 11 da revisão do motor: `gerarComVerificacao`
+ * é quem garante a posição (`lembreteFinal`, `servicos/roteiro.ts`), não mais `montarEntrada`
+ * diretamente, para a segunda tentativa não empurrar isto para o meio do texto.
  */
-const LEMBRETE_ACENTUACAO =
+export const LEMBRETE_ACENTUACAO =
   "Escreva o roteiro inteiro com a acentuação correta do português (você, não, já, também, é, está), mesmo que o tema ou o perfil do cliente estejam sem acento.";
 
 export function montarEntrada(dados: {
@@ -695,7 +703,6 @@ export function montarEntrada(dados: {
     dados.formato === "reels" && dados.estilo === "falado"
       ? formatarInstrucaoAbertura(dados.instrucaoAbertura)
       : null,
-    LEMBRETE_ACENTUACAO,
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");

@@ -271,12 +271,11 @@ describe("rodarAnalisarVisual", () => {
   });
 
   /**
-   * Revisao do PR #46: o teto de internacional e sobre quantos brasileiros
-   * de fato entraram, nao sobre o limite. Com 2 "pt" disponiveis,
-   * maxInternacional = max(1, floor(2*0,3/0,7)) = 1: so o "en" de maior
-   * prioridade cabe, mesmo com seis "en" competindo.
+   * Achado 2 da revisão do motor (01/10/2026): a análise visual é leitura, não tela, e deixou de
+   * aplicar a proporção do Brasil (decisão do Gustavo, pendente, só vale nas telas). Os seis "en"
+   * entram normalmente, só o teto de `visuaisPorSemana` (10) limita, igual a qualquer outro vídeo.
    */
-  it("video internacional em excesso nunca entra, mesmo com prioridade maior que o brasileiro que entrou", async () => {
+  it("video internacional nao e mais limitado pela proporcao do Brasil", async () => {
     const urlsEn: { id: number; url: string }[] = [];
     for (let i = 1; i <= 6; i += 1) {
       const v = await criarVideo(`prop-en-${i}`, {
@@ -302,20 +301,18 @@ describe("rodarAnalisarVisual", () => {
       urlsPt.push(v.url);
     }
 
-    await rodarAnalisarVisual();
+    const resumo = await rodarAnalisarVisual();
 
+    expect(resumo.analisados).toBe(8);
     const chamadas = vi.mocked(baixarVideo480p).mock.calls.map(([url]) => url);
-    expect(chamadas).toContain(urlsEn[0].url);
-    expect(chamadas).not.toContain(urlsEn[1].url);
-    expect(chamadas).not.toContain(urlsEn[2].url);
-    expect(chamadas).not.toContain(urlsEn[3].url);
-    expect(chamadas).not.toContain(urlsEn[4].url);
-    expect(chamadas).not.toContain(urlsEn[5].url);
+    for (const { url } of urlsEn) {
+      expect(chamadas).toContain(url);
+    }
     expect(chamadas).toEqual(expect.arrayContaining(urlsPt));
   });
 
-  /** A nova regra: sem nenhum brasileiro disponivel, nenhum video (nem internacional) entra na analise visual. */
-  it("sem nenhum brasileiro disponivel, nenhum video entra na analise visual", async () => {
+  /** Achado 2: sem nenhum brasileiro disponivel, o internacional entra normalmente agora. */
+  it("sem nenhum brasileiro disponivel, o internacional entra normalmente na analise visual", async () => {
     const urlsEn: string[] = [];
     for (let i = 1; i <= 4; i += 1) {
       const v = await criarVideo(`prop-sem-brasil-en-${i}`, {
@@ -331,11 +328,37 @@ describe("rodarAnalisarVisual", () => {
 
     const resumo = await rodarAnalisarVisual();
 
-    expect(resumo.analisados).toBe(0);
+    expect(resumo.analisados).toBe(4);
     const chamadas = vi.mocked(baixarVideo480p).mock.calls.map(([url]) => url);
     for (const url of urlsEn) {
-      expect(chamadas).not.toContain(url);
+      expect(chamadas).toContain(url);
     }
+  });
+
+  /** Achado 2: sem a proporcao, "outro" continua de fora, mesma regra de sempre. */
+  it("video com idioma outro nunca entra na analise visual", async () => {
+    const outro = await criarVideo("prop-idioma-outro", {
+      foraDaCurva: 20,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      idioma: "outro",
+    });
+    const pt = await criarVideo("prop-idioma-pt-contraste", {
+      foraDaCurva: 1,
+      publicadoEm: diasAtras(2),
+      transcricao: "transcricao qualquer",
+      duracaoS: 30,
+      analise: ANALISE_PADRAO,
+      idioma: "pt",
+    });
+
+    await rodarAnalisarVisual();
+
+    const chamadas = vi.mocked(baixarVideo480p).mock.calls.map(([url]) => url);
+    expect(chamadas).not.toContain(outro.url);
+    expect(chamadas).toContain(pt.url);
   });
 
   it("video sem analise, ou marcado como fora do nicho, fica de fora (ajuste da revisao da etapa 9)", async () => {

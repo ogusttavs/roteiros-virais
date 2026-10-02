@@ -157,7 +157,7 @@ describe("rodarTranscrever", () => {
     await criarVideo("yt-longo-demais", { velocidadeRelativa: 50, publicadoEm: diasAtras(3), duracaoS: 600 });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
 
@@ -177,7 +177,7 @@ describe("rodarTranscrever", () => {
     });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorGroq).toBe(1);
@@ -196,7 +196,7 @@ describe("rodarTranscrever", () => {
     await criarVideo("yt-legenda-curta", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue("E ai, tudo bem com voce hoje?");
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(0);
@@ -266,6 +266,47 @@ describe("rodarTranscrever", () => {
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
   });
 
+  /**
+   * Achado 13 da revisão do motor (01/10/2026): transcrição vazia sem a Groq confirmar ausência de
+   * fala (no_speech_prob baixo) vira falha de verdade, com nova tentativa em 7 dias; sem isto,
+   * `transcricao` virava uma string vazia permanente, e o achado 1 (`isNull(videos.transcricao)`)
+   * nunca mais oferecia o vídeo de novo, mesmo com a data de nova tentativa já vencida.
+   */
+  it("transcricao vazia sem semFala conta como falha, com nova tentativa em 7 dias, nunca grava transcricao vazia", async () => {
+    await criarVideo("yt-transcricao-vazia", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.transcritosPorGroq).toBe(0);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-transcricao-vazia"));
+    expect(linha.transcricao).toBeNull();
+    expect(linha.transcritoEm).toBeNull();
+    expect(linha.proximaTentativaTranscricao).not.toBeNull();
+    const emSeteDias = Date.now() + 6 * DIA_MS;
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
+  });
+
+  /** Achado 3: transcricao vazia COM semFala (a Groq confirmou ausencia de fala) e sucesso, nao falha. */
+  it("transcricao vazia com semFala conta como sucesso, grava transcricao vazia, sem nova tentativa", async () => {
+    await criarVideo("yt-sem-fala-confirmado", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "", idiomaDetectado: "pt", semFala: true });
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(0);
+    expect(resumo.transcritosPorGroq).toBe(1);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-fala-confirmado"));
+    expect(linha.transcricao).toBe("");
+    expect(linha.transcritoEm).not.toBeNull();
+    expect(linha.proximaTentativaTranscricao).toBeNull();
+  });
+
   it("video ja com transcricao nao e selecionado de novo", async () => {
     await criarVideo("ja-transcrito", {
       velocidadeRelativa: 3,
@@ -322,7 +363,7 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
       if (url.includes("/falha-")) throw new ErroAudio("falha simulada no download");
       return "/tmp/audio-fake.mp3";
     });
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito pela groq");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
 
     const resumo = await rodarTranscrever();
     expect(resumo.transcritosPorLegenda).toBe(40);
@@ -374,14 +415,12 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
  * internacional da fila com base em quantos brasileiros de fato entraram,
  * não no tamanho da fila.
  */
-describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
-  it("video internacional em excesso nunca entra na fila, mesmo com prioridade maior que o brasileiro que entrou", async () => {
-    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 5 => tamanhoFila = 20.
-    // Cinco "pt" disponiveis => brasileirosAceitos = 5; maxInternacional =
-    // floor(5*0,3/0,7) = 2 (nao mais um calculo sobre a fila de 20). Dez "en"
-    // com prioridade maior (foraDaCurva mais alto) que os cinco "pt": so os
-    // 2 primeiros "en" cabem na fila, os outros oito ficam de fora, mesmo
-    // tendo prioridade maior que qualquer "pt".
+describe("rodarTranscrever, achado 2 da revisao do motor: sem proporcao do Brasil na fila de leitura", () => {
+  it("sem a proporcao, os cinco de maior prioridade entram, mesmo todos internacionais", async () => {
+    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 5 => tamanhoFila = 20. Dez "en" com
+    // prioridade maior (foraDaCurva mais alto) que os cinco "pt": antes da M5a, a proporcao 70/30
+    // cortava o "en" em 2; agora a ordem de prioridade manda sozinha, e os cinco primeiros "en"
+    // fecham o teto diario antes de qualquer "pt" ou "en" de prioridade menor ser tentado.
     config.regras.transcricoesPorDia = 5;
 
     const urlsEn: string[] = [];
@@ -435,19 +474,15 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
     await rodarTranscrever();
 
     const chamadas = vi.mocked(baixarLegendaYoutube).mock.calls.map(([url]) => url);
-    // Os dois "en" de maior prioridade entraram (cabem no teto de 2 internacionais).
-    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 2)));
-    // Do terceiro "en" em diante, nenhum entrou na fila, mesmo com prioridade
-    // maior que qualquer "pt": a proporcao cortou antes deles.
-    for (const url of urlsEn.slice(2)) {
+    // Os cinco "en" de maior prioridade fecham o teto diario, nenhum "pt" e tentado.
+    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 5)));
+    for (const url of [...urlsEn.slice(5), ...urlsPt]) {
       expect(chamadas).not.toContain(url);
     }
-    // Os "pt" completam o teto de 5 sucessos (2 en + 3 pt primeiros).
-    expect(chamadas).toEqual(expect.arrayContaining(urlsPt.slice(0, 3)));
   });
 
-  /** A nova regra: sem nenhum brasileiro disponivel, a fila fica vazia, nunca so internacional. */
-  it("sem nenhum brasileiro disponivel, a fila fica vazia: nenhum internacional e tentado", async () => {
+  /** Achado 2: sem nenhum brasileiro disponivel, o internacional entra normalmente na fila agora. */
+  it("sem nenhum brasileiro disponivel, o internacional entra normalmente na fila", async () => {
     config.regras.transcricoesPorDia = 5;
 
     for (let i = 1; i <= 5; i += 1) {
@@ -474,8 +509,8 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
 
     const resumo = await rodarTranscrever();
 
-    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
-    expect((resumo.tentativas as Record<string, number>).youtube).toBe(0);
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(5);
+    expect((resumo.tentativas as Record<string, number>).youtube).toBe(5);
   });
 });
 
@@ -492,7 +527,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
       midiaUrlEm: new Date(Date.now() - 1 * HORA_MS),
     });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith(midiaUrl, "instagram");
@@ -508,7 +543,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
       midiaUrlEm: new Date(Date.now() - 21 * HORA_MS),
     });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-vencido", "instagram");
@@ -518,7 +553,7 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
   it("sem midiaUrl nenhuma, usa a url da pagina normalmente", async () => {
     await criarVideo("insta-sem-midia", { plataforma: "instagram", foraDaCurva: 5, publicadoEm: diasAtras(10) });
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
-    vi.mocked(transcreverAudio).mockResolvedValue("texto transcrito");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito", idiomaDetectado: "pt", semFala: false });
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia", "instagram");

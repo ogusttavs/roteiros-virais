@@ -149,6 +149,58 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
     expect(videoCurto.analise).toBeNull();
   });
 
+  /**
+   * Achado 13 da revisão do motor (01/10/2026): a API de lote é assíncrona, até 24h; sem isto, o
+   * mesmo vídeo entrava num segundo lote enquanto o primeiro ainda não tinha voltado, gastando em
+   * dobro.
+   */
+  it("video ja num lote de extrairVideo em andamento nunca entra em outro lote", async () => {
+    const jaEmLote = await criarVideo("ja-em-lote-pendente", { transcricao: TRANSCRICAO_BOA });
+    const livre = await criarVideo("livre-para-o-lote", { transcricao: TRANSCRICAO_BOA });
+    await db().insert(lotesIa).values({
+      tarefa: "extrairVideo",
+      loteIdExterno: "lote-externo-pendente-de-ontem",
+      videoIds: [jaEmLote.id],
+      status: "em_andamento",
+    });
+
+    const resumo = await rodarExtrair();
+
+    expect(resumo.videosNoLote).toBe(1);
+    const [loteNovo] = await db()
+      .select()
+      .from(lotesIa)
+      .where(eq(lotesIa.loteIdExterno, resumo.loteIdExterno as string));
+    expect(loteNovo.videoIds).toEqual([livre.id]);
+  });
+
+  /**
+   * Achado 13 da revisão do motor: sem isto, `rodarExtrair` reagendava TODO vídeo curto para daqui
+   * a 7 dias em toda rodada (roda todo dia), empurrando a data de vencimento antes dela chegar a
+   * passar; a transcrição "vazia" (ou curta) nunca voltava de fato à fila.
+   */
+  it("video curto com tentativa ja agendada no futuro nao tem a data empurrada de novo", async () => {
+    const video = await criarVideo("curto-ja-agendado", { transcricao: "E ai" });
+    const dataOriginal = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000); // 2 dias, nao os 7 do reagendamento
+    await db().update(videos).set({ proximaTentativaTranscricao: dataOriginal }).where(eq(videos.id, video.id));
+
+    await rodarExtrair();
+
+    const [videoDepois] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(videoDepois.proximaTentativaTranscricao?.getTime()).toBe(dataOriginal.getTime());
+  });
+
+  it("video curto cuja tentativa ja venceu ganha uma nova data, 7 dias a frente", async () => {
+    const video = await criarVideo("curto-tentativa-vencida", { transcricao: "E ai" });
+    const dataVencida = new Date(Date.now() - 24 * 60 * 60 * 1000); // ja passou
+    await db().update(videos).set({ proximaTentativaTranscricao: dataVencida }).where(eq(videos.id, video.id));
+
+    await rodarExtrair();
+
+    const [videoDepois] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(videoDepois.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(dataVencida.getTime());
+  });
+
   it("sem nenhum video candidato, nao cria lote", async () => {
     const resumo = await rodarExtrair();
     expect(resumo.videosNoLote).toBe(0);

@@ -29,10 +29,19 @@ import { REGRAS_REEL, REGRAS_SHORT, REGRAS_STORY, REGRAS_TIKTOK, textoRegras } f
  * lista solta de regras. O tema é do nicho inteiro, não de um cliente com uma rede escolhida, por
  * isso a referência inclui as quatro bases curtas (Reels, TikTok, Short, Story) juntas; vídeo
  * longo (`R-YT-VIDEO`) fica de fora, não é o formato deste produto.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação só existia no sistema
+ * estável; sem retentativa aqui (esta tarefa não passa por `gerarComVerificacao`), a última linha
+ * da entrada já é o lugar definitivo, sem risco de a segunda tentativa empurrar ele para o meio.
+ * Versão 1.5.0.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
+
+/** Mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`. */
+const LEMBRETE_ACENTUACAO =
+  "Escreva os três temas inteiros com a acentuação correta do português (você, não, já, também, é, está).";
 
 const temaDoDia = z.object({
   titulo: z.string(),
@@ -97,5 +106,5 @@ export function montarEntrada(dados: {
       ? dados.noticias.map((n) => `noticia ${n.id}: ${n.titulo}: ${n.resumo}`).join("\n")
       : "nenhuma noticia relevante hoje";
 
-  return `Subindo hoje:\n${listaVideos}\n\nNoticias do nicho:\n${listaNoticias}`;
+  return `Subindo hoje:\n${listaVideos}\n\nNoticias do nicho:\n${listaNoticias}\n\n${LEMBRETE_ACENTUACAO}`;
 }

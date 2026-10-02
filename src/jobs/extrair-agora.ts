@@ -17,7 +17,7 @@
  * (ou sem duração guardada) é lido e analisado, para não gastar a análise imediata, mais cara,
  * num vídeo que a tela nunca mostraria de qualquer jeito.
  */
-import { and, count, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nichos, videos } from "@/db/schema";
@@ -28,7 +28,7 @@ import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { logger } from "@/lib/log";
 import { DENTRO_DO_TETO_DE_DURACAO } from "@/servicos/pesquisa";
 
-import { aplicarResultadoExtracao, resolverIdioma, TAMANHO_MINIMO_TRANSCRICAO } from "./extracao-comum";
+import { aplicarResultadoExtracao, idsEmLotePendente, precisaAgendarNovaTentativa, resolverIdioma, TAMANHO_MINIMO_TRANSCRICAO } from "./extracao-comum";
 
 /** Setor com menos que isto de vídeos analisados é "novo": não espera o lote. */
 export const LIMITE_ANALISADOS_SETOR_NOVO = 20;
@@ -55,19 +55,23 @@ async function nichosParaAnaliseImediata(nichoId?: number): Promise<{ id: number
   return candidatos.filter((n) => (analisadosPorNicho.get(n.id) ?? 0) < LIMITE_ANALISADOS_SETOR_NOVO);
 }
 
-type CandidatoImediato = { id: number; titulo: string | null; transcricao: string | null };
+type CandidatoImediato = { id: number; titulo: string | null; transcricao: string | null; proximaTentativaTranscricao: Date | null };
 
 /**
  * `contasIds` (P2, item 0a): escopa aos vídeos dessas contas, em vez de todo o setor. Usado pela
  * primeira carga do `pesquisa-de-setor.ts`, que quer analisar só as contas que acabou de
  * cadastrar, mesmo num setor já estabelecido (com 20 ou mais vídeos analisados no total).
+ *
+ * Achado 13 da revisão do motor (01/10/2026): `idsPendentes` (vídeo já num lote de `extrairVideo`
+ * ainda em andamento) nunca entra aqui também, mesmo caminho mais caro que o lote.
  */
-async function candidatosDoSetor(nichoId: number, contasIds?: number[]): Promise<CandidatoImediato[]> {
+async function candidatosDoSetor(nichoId: number, idsPendentes: Set<number>, contasIds?: number[]): Promise<CandidatoImediato[]> {
   const condicoes = [eq(videos.nichoId, nichoId), isNotNull(videos.transcricao), isNull(videos.analise), DENTRO_DO_TETO_DE_DURACAO];
+  if (idsPendentes.size > 0) condicoes.push(notInArray(videos.id, [...idsPendentes]));
   if (contasIds && contasIds.length > 0) condicoes.push(inArray(videos.contaId, contasIds));
 
   return db()
-    .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao })
+    .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao, proximaTentativaTranscricao: videos.proximaTentativaTranscricao })
     .from(videos)
     .where(and(...condicoes))
     .orderBy(sql`${videos.foraDaCurva} desc nulls last`, desc(videos.views))
@@ -129,15 +133,19 @@ async function processarNicho(nicho: { id: number; slug: string }, candidatos: C
   const resultado: ResultadoNicho = { videosAnalisados: 0, transcricaoCurtaDemais: 0, reprovadosPorIdioma: 0, temaEnfileirado: false, erros: [] };
 
   if (curtos.length > 0) {
-    await db()
-      .update(videos)
-      .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
-      .where(
-        inArray(
-          videos.id,
-          curtos.map((v) => v.id),
-        ),
-      );
+    const agora = new Date();
+    const curtosParaAgendar = curtos.filter((v) => precisaAgendarNovaTentativa(v.proximaTentativaTranscricao, agora));
+    if (curtosParaAgendar.length > 0) {
+      await db()
+        .update(videos)
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+        .where(
+          inArray(
+            videos.id,
+            curtosParaAgendar.map((v) => v.id),
+          ),
+        );
+    }
     resultado.transcricaoCurtaDemais = curtos.length;
   }
 
@@ -187,12 +195,14 @@ async function processarNicho(nicho: { id: number; slug: string }, candidatos: C
  * leitura imediata, sem esperar o lote da madrugada. Exige `nichoId`.
  */
 export async function rodarExtrairAgora(nichoId?: number, opts?: { contasIds?: number[] }): Promise<Record<string, unknown>> {
+  const idsPendentes = await idsEmLotePendente("extrairVideo");
+
   if (opts?.contasIds && opts.contasIds.length > 0) {
     if (nichoId === undefined) throw new Error("rodarExtrairAgora: contasIds precisa de nichoId");
     const [nicho] = await db().select({ id: nichos.id, slug: nichos.slug }).from(nichos).where(eq(nichos.id, nichoId));
     if (!nicho) return { setoresNovos: 0, videosAnalisados: 0, transcricaoCurtaDemais: 0, reprovadosPorIdioma: 0, setoresComTemaEnfileirado: 0 };
 
-    const candidatos = await candidatosDoSetor(nichoId, opts.contasIds);
+    const candidatos = await candidatosDoSetor(nichoId, idsPendentes, opts.contasIds);
     const resultado = await processarNicho(nicho, candidatos);
     return {
       setoresNovos: 1,
@@ -213,7 +223,7 @@ export async function rodarExtrairAgora(nichoId?: number, opts?: { contasIds?: n
   const erros: string[] = [];
 
   for (const nicho of nichosNovos) {
-    const candidatos = await candidatosDoSetor(nicho.id);
+    const candidatos = await candidatosDoSetor(nicho.id, idsPendentes);
     const resultado = await processarNicho(nicho, candidatos);
     videosAnalisados += resultado.videosAnalisados;
     transcricaoCurtaDemais += resultado.transcricaoCurtaDemais;

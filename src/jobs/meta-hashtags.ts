@@ -111,11 +111,18 @@ async function transcreverVideoNovo(idExterno: string, mediaUrl: string | undefi
   let caminhoAudio: string | null = null;
   try {
     caminhoAudio = await baixarAudio(mediaUrl, "instagram");
-    const texto = await transcreverAudio(caminhoAudio);
+    // Achado 3 da revisao do motor (01/10/2026): sem idioma conhecido pra forcar, a Groq detecta
+    // sozinha (`idiomaDetectado`); video sem dono (Hashtag Search) so tem o idioma da legenda, que
+    // ja e so um palpite, entao o idioma detectado na fala de verdade e quem confirma.
+    const { texto, idiomaDetectado } = await transcreverAudio(caminhoAudio);
     // `transcritoEm` (ajuste 1 da revisão do PR #45): é uma transcrição de verdade, entra em "lidos hoje".
     await db()
       .update(videos)
-      .set({ transcricao: texto, transcritoEm: new Date() })
+      .set({
+        transcricao: texto,
+        transcritoEm: new Date(),
+        ...(idiomaDetectado && idiomaDetectado !== "outro" ? { idioma: idiomaDetectado, idiomaConfirmado: true } : {}),
+      })
       .where(and(eq(videos.plataforma, "instagram"), eq(videos.idExterno, idExterno)));
     return true;
   } finally {

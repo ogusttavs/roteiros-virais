@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 import { limitarPorConta, selecionarParaTranscrever, type VideoParaSelecionar } from "./selecionar-transcricao";
 
 const AGORA = new Date("2026-09-03T12:00:00Z");
-/** Sem restricao de verdade nestes testes (todo candidato default e "pt"): so passa o parametro adiante. */
-const PROPORCAO_PADRAO = 0.7;
 
 function candidato(id: number, opcoes: Partial<VideoParaSelecionar> = {}): VideoParaSelecionar {
   return {
@@ -21,25 +19,25 @@ function candidato(id: number, opcoes: Partial<VideoParaSelecionar> = {}): Video
 describe("selecionarParaTranscrever", () => {
   it("prioriza subindo hoje sobre fora da curva", () => {
     const candidatos = [candidato(1), candidato(2), candidato(3)];
-    const selecionados = selecionarParaTranscrever([2], [1, 3], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([2], [1, 3], candidatos, 10, AGORA);
     expect(selecionados).toEqual([2, 1, 3]);
   });
 
   it("nao duplica video que aparece nas duas listas", () => {
     const candidatos = [candidato(1), candidato(2)];
-    const selecionados = selecionarParaTranscrever([1, 2], [1], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2], [1], candidatos, 10, AGORA);
     expect(selecionados).toEqual([1, 2]);
   });
 
   it("respeita o limite", () => {
     const candidatos = [candidato(1), candidato(2), candidato(3)];
-    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 2, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 2, AGORA);
     expect(selecionados).toEqual([1, 2]);
   });
 
   it("pula video que ja tem transcricao", () => {
     const candidatos = [candidato(1, { temTranscricao: true }), candidato(2)];
-    const selecionados = selecionarParaTranscrever([1, 2], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2], [], candidatos, 10, AGORA);
     expect(selecionados).toEqual([2]);
   });
 
@@ -50,18 +48,18 @@ describe("selecionarParaTranscrever", () => {
       candidato(1, { proximaTentativaTranscricao: futuro }),
       candidato(2, { proximaTentativaTranscricao: passado }),
     ];
-    const selecionados = selecionarParaTranscrever([1, 2], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2], [], candidatos, 10, AGORA);
     expect(selecionados).toEqual([2]);
   });
 
   it("ignora id que nao esta na lista de candidatos (sem metadado, nao seleciona)", () => {
     const candidatos = [candidato(1)];
-    const selecionados = selecionarParaTranscrever([1, 99], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 99], [], candidatos, 10, AGORA);
     expect(selecionados).toEqual([1]);
   });
 
   it("sem candidato nenhum, devolve lista vazia", () => {
-    expect(selecionarParaTranscrever([], [], [], 10, AGORA, PROPORCAO_PADRAO)).toEqual([]);
+    expect(selecionarParaTranscrever([], [], [], 10, AGORA)).toEqual([]);
   });
 
   /** V2a, item 2: nunca mais de 2 vídeos da mesma conta na fila final. */
@@ -72,7 +70,7 @@ describe("selecionarParaTranscrever", () => {
       candidato(3, { contaId: 100 }),
       candidato(4, { contaId: 200 }),
     ];
-    const selecionados = selecionarParaTranscrever([1, 2, 3, 4], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2, 3, 4], [], candidatos, 10, AGORA);
     expect(selecionados).toEqual([1, 2, 4]);
   });
 
@@ -82,38 +80,37 @@ describe("selecionarParaTranscrever", () => {
       candidato(2, { contaId: null }),
       candidato(3, { contaId: null }),
     ];
-    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
+    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA);
     expect(selecionados).toEqual([1, 2, 3]);
   });
 
   /**
-   * V2b, item 6, revisão do PR #46: o teto de internacional é sobre quantos
-   * brasileiros de fato entraram, não sobre o limite. Com 1 "pt" só
-   * (candidato 2), maxInternacional = max(1, floor(1*0,3/0,7)) = 1: so o
-   * "en" de maior prioridade (candidato 1) cabe, os outros dois "en"
-   * excedentes ficam de fora.
+   * Achado 2 da revisão do motor (01/10/2026): a seleção de leitura não aplica mais a proporção do
+   * Brasil (é decisão do Gustavo nas telas, não aqui); "outro" continua de fora, mesma regra de
+   * sempre. Antes desta mudança, só o candidato 1 ("en" de maior prioridade) entraria; agora os
+   * quatro com idioma válido entram, na mesma ordem de prioridade.
    */
-  it("aplica a proporcao 70/30, cortando so o internacional excedente", () => {
+  it("nao aplica mais a proporcao do Brasil, mas outro continua de fora", () => {
     const candidatos = [
       candidato(1, { idioma: "en" }),
       candidato(2, { idioma: "pt" }),
-      candidato(3, { idioma: "en" }), // excedente: so 1 internacional cabe
-      candidato(4, { idioma: "en" }), // excedente tambem
+      candidato(3, { idioma: "en" }),
+      candidato(4, { idioma: "en" }),
       candidato(5, { idioma: "outro" }), // nunca entra
     ];
-    const selecionados = selecionarParaTranscrever([1, 2, 3, 4, 5], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
-    expect(selecionados).toEqual([1, 2]);
+    const selecionados = selecionarParaTranscrever([1, 2, 3, 4, 5], [], candidatos, 10, AGORA);
+    expect(selecionados).toEqual([1, 2, 3, 4]);
   });
 
-  /** A nova regra: sem nenhum brasileiro entre os candidatos, a selecao fica vazia. */
-  it("sem nenhum candidato brasileiro, a selecao fica vazia mesmo com internacional de sobra", () => {
+  /** Achado 2: sem nenhum brasileiro entre os candidatos, o internacional entra normalmente agora. */
+  it("sem nenhum candidato brasileiro, o internacional entra normalmente", () => {
     const candidatos = [
       candidato(1, { idioma: "en" }),
       candidato(2, { idioma: "en" }),
       candidato(3, { idioma: "en" }),
     ];
-    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA, PROPORCAO_PADRAO);
-    expect(selecionados).toEqual([]);
+    const selecionados = selecionarParaTranscrever([1, 2, 3], [], candidatos, 10, AGORA);
+    expect(selecionados).toEqual([1, 2, 3]);
   });
 });
 

@@ -21,6 +21,7 @@ import {
   type PerfilCompilado,
 } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { hojeISO } from "@/lib/config";
 import { avaliarTema, ErroTemas, temasParaCliente } from "@/servicos/temas";
 
@@ -274,6 +275,26 @@ describe("avaliarTema", () => {
 
     expect(resultado.pilares.viralizar.nota).toBeGreaterThanOrEqual(9);
     expect(resultado.evidencias.length).toBeGreaterThan(0);
+  });
+
+  /**
+   * Achado 8 da revisão do motor (01/10/2026): a nota final é a média dos cinco pilares
+   * calculada no código (`mediaCincoPilares`), não mais um valor que o próprio schema pedia para
+   * o modelo somar e dividir por 5; o schema de `avaliarTema` nem tem mais o campo `nota`.
+   */
+  it("a nota final é a média dos cinco pilares, calculada no código, e é o que fica gravado", async () => {
+    clienteId = await criarCliente();
+    const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
+
+    const resultado = await avaliarTema(cliente, "assunto sem nenhum video parecido no banco");
+
+    const { viralizar, gerarCliente, encaixe, novidade, facilidade } = resultado.pilares;
+    const mediaEsperada = (viralizar.nota + gerarCliente.nota + encaixe.nota + novidade.nota + facilidade.nota) / 5;
+    expect(resultado.nota).toBeCloseTo(mediaEsperada, 10);
+    expect("nota" in avaliarTemaIA.schema.shape).toBe(false);
+
+    const [linha] = await db().select().from(avaliacoesTema).where(eq(avaliacoesTema.clienteId, clienteId));
+    expect(Number(linha.nota)).toBeCloseTo(mediaEsperada, 10);
   });
 
   it("cliente sem briefing compilado: erro nomeado", async () => {

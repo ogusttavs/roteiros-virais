@@ -64,7 +64,9 @@ beforeEach(() => {
   vi.mocked(buscarRecentMediaDaHashtag).mockReset();
   vi.mocked(baixarAudio).mockReset().mockResolvedValue("/tmp/audio-fake.mp3");
   vi.mocked(apagarAudio).mockReset().mockResolvedValue(undefined);
-  vi.mocked(transcreverAudio).mockReset().mockResolvedValue("[exemplo] transcricao fake");
+  vi.mocked(transcreverAudio)
+    .mockReset()
+    .mockResolvedValue({ texto: "[exemplo] transcricao fake", idiomaDetectado: "pt", semFala: false });
 });
 
 afterEach(async () => {

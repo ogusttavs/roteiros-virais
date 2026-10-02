@@ -273,12 +273,28 @@ export async function passo6IdiomaPrincipalPorConta() {
  * (não SQL puro como o resto do arquivo): `temIndicioDeBrasil` é lógica de
  * texto, não uma expressão simples de traduzir para SQL, e o universo de
  * contas candidatas (idioma "pt" e pais ainda desconhecido) é pequeno.
+ *
+ * Achado 3 da revisão do motor (01/10/2026): "pt-BR" sozinho não confirma mais quando há
+ * conflito com o idioma detectado de verdade (`idioma_confirmado`, `transcrever.ts`): antes do
+ * conserto do idioma forçado na transcrição, um vídeo estrangeiro podia virar "pt-BR" na
+ * extração (lendo uma transcrição forçada em português) mesmo com a Groq ou o YouTube tendo
+ * detectado outro idioma na fala de verdade; essa conta nunca mais saía de `pais = 'BR'`. Agora
+ * a conta com pelo menos um vídeo recente confirmado em outro idioma não confirma Brasil pelo
+ * "pt-BR" dominante sozinho (fica para a conferência, não vira internacional por código).
  */
 /** Exportado para `scripts/preencher-idioma.ts` (V2b, item 5) reaproveitar sem duplicar a query. */
 export async function passo7PaisPorIdiomaPrincipal(): Promise<number> {
   const direto = await db().execute(sql`
-    UPDATE contas SET pais = 'BR'
-    WHERE pais IS NULL AND idioma_principal = 'pt-BR'
+    UPDATE contas c SET pais = 'BR'
+    WHERE pais IS NULL
+      AND idioma_principal = 'pt-BR'
+      AND NOT EXISTS (
+        SELECT 1 FROM videos v
+        WHERE v.conta_id = c.id
+          AND v.idioma_confirmado = true
+          AND v.idioma IN ('en', 'es')
+          AND v.publicado_em >= now() - interval '90 days'
+      )
   `);
 
   const candidatas = await db()

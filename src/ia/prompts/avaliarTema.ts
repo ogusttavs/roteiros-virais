@@ -35,8 +35,18 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * vende (antes so existia para marca do tipo pessoa). `textoPersona` ganha um caso proprio, e
  * o pilar "gerar cliente" ganha uma terceira clausula (procurado, seguido ou indicado, no
  * lugar de comprar ou virar candidato a parceria). Versao 1.4.0.
+ *
+ * Achado 8 da revisão do motor (01/10/2026): o schema para de pedir a nota final (antes, o
+ * próprio modelo somava os cinco pilares e dividia por 5, uma conta simples demais para arriscar
+ * errar); `servicos/temas.ts` calcula a média no código a partir das cinco notas por pilar.
+ * Versão 1.5.0.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): `LEMBRETE_ACENTUACAO`, igual a `roteiro.ts`, exportado
+ * para `servicos/temas.ts` passar como `lembreteFinal` de `gerarComVerificacao`, a última linha da
+ * entrada nas duas tentativas (o lembrete do sistema estável, abaixo, continua, mas sozinho não
+ * bastou em outras tarefas, `roteiro.ts`). Versão 1.6.0.
  */
-export const versao = "1.4.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -50,13 +60,16 @@ export const schema = z.object({
     novidade: notaPilar,
     facilidade: notaPilar,
   }),
-  nota: z.number().min(0).max(10),
   recomendacao: z.string(),
   anguloSugerido: z.string().nullable(),
   evidencias: z.array(z.number()),
 });
 
 export type SaidaAvaliarTema = z.infer<typeof schema>;
+
+/** Achado 11 da revisão do motor: mesma posição e mesmo texto-base de `roteiro.ts`/`avaliarResposta.ts`. */
+export const LEMBRETE_ACENTUACAO =
+  "Escreva a sua avaliação inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que o tema que o cliente propôs esteja sem acento nenhum.";
 
 function textoPersona(persona: Persona): string {
   switch (persona) {
@@ -86,10 +99,10 @@ export function montarSistemaEstavel(dados: {
       : "";
 
   return `Você avalia um tema de vídeo proposto por um dono de pequeno negócio, em cinco
-pilares de 0 a 10, cada um com uma frase de justificativa. A nota final é a média simples
-dos cinco. Abaixo de 9,0 recomende ajustar e sugira o ângulo mais próximo que tem evidência
-no banco. Só cite evidência (ids de vídeo) que estiver na lista que você recebeu; sem
-evidência, diga isso com clareza e sugira o vizinho mais perto.
+pilares de 0 a 10, cada um com uma frase de justificativa (a nota final é a média dos cinco,
+calculada por código, não por você). Abaixo de 9,0 recomende ajustar e sugira o ângulo mais
+próximo que tem evidência no banco. Só cite evidência (ids de vídeo) que estiver na lista que
+você recebeu; sem evidência, diga isso com clareza e sugira o vizinho mais perto.
 
 Os cinco pilares:
 - Chance de viralizar: três ou mais vídeos fora da curva (3x a mediana da conta ou mais)
