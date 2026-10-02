@@ -234,6 +234,20 @@ async function transcreverUm(
   try {
     caminhoAudio = await baixarAudio(url, plataforma);
     const { texto, idiomaDetectado, semFala } = await transcreverAudio(caminhoAudio, idiomaParaBuscar);
+
+    // Achado 13 da revisão do motor (01/10/2026): vazia sem a Groq confirmar ausência de fala
+    // (no_speech_prob baixo) é tratada como falha de verdade, com nova tentativa em 7 dias; sem
+    // isto, `transcricao` virava uma string vazia permanente (nunca mais null), e a elegibilidade
+    // de `pesquisa.ts` (achado 1, `isNull(videos.transcricao)`) nunca mais oferecia o vídeo de
+    // novo, mesmo com a data de nova tentativa já vencida.
+    if (!semFala && !texto.trim()) {
+      await db()
+        .update(videos)
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+        .where(eq(videos.id, videoId));
+      return { tipo: "falhou", motivo: "transcricao da Groq veio vazia, sem confirmar ausencia de fala" };
+    }
+
     // Achado 3: `semFala` já deixa `texto` vazio, o suficiente para `extracao-comum.ts` mandar o
     // vídeo para o caminho sem fala; sem fala de verdade não há sinal de idioma confiável (achado
     // rodando contra a API de verdade: silêncio puro também "detecta" um idioma qualquer), então

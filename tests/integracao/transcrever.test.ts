@@ -266,6 +266,47 @@ describe("rodarTranscrever", () => {
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
   });
 
+  /**
+   * Achado 13 da revisão do motor (01/10/2026): transcrição vazia sem a Groq confirmar ausência de
+   * fala (no_speech_prob baixo) vira falha de verdade, com nova tentativa em 7 dias; sem isto,
+   * `transcricao` virava uma string vazia permanente, e o achado 1 (`isNull(videos.transcricao)`)
+   * nunca mais oferecia o vídeo de novo, mesmo com a data de nova tentativa já vencida.
+   */
+  it("transcricao vazia sem semFala conta como falha, com nova tentativa em 7 dias, nunca grava transcricao vazia", async () => {
+    await criarVideo("yt-transcricao-vazia", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.transcritosPorGroq).toBe(0);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-transcricao-vazia"));
+    expect(linha.transcricao).toBeNull();
+    expect(linha.transcritoEm).toBeNull();
+    expect(linha.proximaTentativaTranscricao).not.toBeNull();
+    const emSeteDias = Date.now() + 6 * DIA_MS;
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
+  });
+
+  /** Achado 3: transcricao vazia COM semFala (a Groq confirmou ausencia de fala) e sucesso, nao falha. */
+  it("transcricao vazia com semFala conta como sucesso, grava transcricao vazia, sem nova tentativa", async () => {
+    await criarVideo("yt-sem-fala-confirmado", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "", idiomaDetectado: "pt", semFala: true });
+
+    const resumo = await rodarTranscrever();
+    expect(resumo.falhas).toBe(0);
+    expect(resumo.transcritosPorGroq).toBe(1);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-sem-fala-confirmado"));
+    expect(linha.transcricao).toBe("");
+    expect(linha.transcritoEm).not.toBeNull();
+    expect(linha.proximaTentativaTranscricao).toBeNull();
+  });
+
   it("video ja com transcricao nao e selecionado de novo", async () => {
     await criarVideo("ja-transcrito", {
       velocidadeRelativa: 3,

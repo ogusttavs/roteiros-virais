@@ -4,10 +4,10 @@
  * colunas em `videos`. Extraído nesta rodada para o caminho imediato não duplicar a mesma regra
  * de qualidade (revisão do PR #30: análise nenhuma é pior que uma com um campo em inglês).
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos, type AnaliseVideo } from "@/db/schema";
+import { lotesIa, nichos, videos, type AnaliseVideo } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 import { registrarGeracao } from "@/ia/registro";
@@ -21,6 +21,30 @@ import { pareceTextoEmPortugues } from "@/lib/idioma";
  * legenda foi o problema.
  */
 export const TAMANHO_MINIMO_TRANSCRICAO = 80;
+
+/**
+ * Achado 13 da revisão do motor (01/10/2026): vídeo já num lote da mesma tarefa ainda em
+ * andamento (a API de lote é assíncrona, até 24h) nunca entra em outro lote nem no caminho
+ * imediato (`extrair-agora.ts`); sem isto, o mesmo vídeo podia ser analisado duas vezes (gasto em
+ * dobro) enquanto o lote de ontem ainda não tinha voltado.
+ */
+export async function idsEmLotePendente(tarefa: string): Promise<Set<number>> {
+  const lotes = await db()
+    .select({ videoIds: lotesIa.videoIds })
+    .from(lotesIa)
+    .where(and(eq(lotesIa.tarefa, tarefa), eq(lotesIa.status, "em_andamento")));
+  return new Set(lotes.flatMap((l) => l.videoIds));
+}
+
+/**
+ * Achado 13 da revisão do motor (01/10/2026): sem isto, todo vídeo "curto" era reagendado para
+ * daqui a 7 dias EM TODA RODADA (`extrair`/`extrairAgora` rodam todo dia), mesmo quando já tinha
+ * uma tentativa futura pendente; a data nunca chegava a passar, porque era empurrada de novo
+ * antes de vencer. Só reagenda quem está sem tentativa marcada ou já passou da marcada.
+ */
+export function precisaAgendarNovaTentativa(proximaTentativaTranscricao: Date | null, agora: Date): boolean {
+  return !proximaTentativaTranscricao || proximaTentativaTranscricao <= agora;
+}
 
 /**
  * So os campos que o cliente le (o gancho pode vir sozinho no idioma
