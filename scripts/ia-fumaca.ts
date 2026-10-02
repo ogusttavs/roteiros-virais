@@ -257,7 +257,13 @@ async function main() {
   await chamar(
     "avaliarTema",
     avaliarTema.nivel,
-    (d) => `nota ${d.nota}: ${d.recomendacao.slice(0, 80)}`,
+    // Achado 8 da revisao do motor: a nota final nao vem mais do schema, e media dos cinco
+    // pilares calculada por codigo (mesma conta de `servicos/temas.ts`).
+    (d) => {
+      const { viralizar, gerarCliente, encaixe, novidade, facilidade } = d.pilares;
+      const nota = (viralizar.nota + gerarCliente.nota + encaixe.nota + novidade.nota + facilidade.nota) / 5;
+      return `nota ${nota}: ${d.recomendacao.slice(0, 80)}`;
+    },
     gerarEstruturado({
       tarefa: "avaliarTema",
       nivel: avaliarTema.nivel,

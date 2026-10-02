@@ -315,7 +315,23 @@ export async function apagarRascunhoTemaLivre(usuarioId: string, clienteId: numb
  * mesmo assim", nunca o ângulo (regra do `PROXIMO.md`: nada de número ou
  * recomendação sem evidência de verdade por trás).
  */
-export type ResultadoAvaliarTema = avaliarTemaIA.SaidaAvaliarTema & { anguloTemProva: boolean };
+export type ResultadoAvaliarTema = avaliarTemaIA.SaidaAvaliarTema & { nota: number; anguloTemProva: boolean };
+
+/**
+ * Achado 8 da revisão do motor (01/10/2026): média simples dos cinco pilares, calculada aqui em
+ * vez de pedir para o modelo somar e dividir por 5 (uma conta simples demais para arriscar errar,
+ * e código nunca erra uma média). Mesmos cinco pilares de `avaliarTemaIA.schema`.
+ */
+function mediaCincoPilares(pilares: avaliarTemaIA.SaidaAvaliarTema["pilares"]): number {
+  const notas = [
+    pilares.viralizar.nota,
+    pilares.gerarCliente.nota,
+    pilares.encaixe.nota,
+    pilares.novidade.nota,
+    pilares.facilidade.nota,
+  ];
+  return notas.reduce((soma, nota) => soma + nota, 0) / notas.length;
+}
 
 /**
  * Nota em cinco pilares de um tema proposto pelo cliente (etapa 10, decisão
@@ -370,13 +386,15 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
     extrairEvidencias: (d) => d.evidencias,
   });
 
+  const nota = mediaCincoPilares(dados.pilares);
+
   await db()
     .insert(avaliacoesTema)
     .values({
       clienteId: cliente.id,
       tema: texto,
       pilares: dados.pilares,
-      nota: String(dados.nota),
+      nota: String(nota),
       recomendacao: dados.recomendacao,
       anguloSugerido: dados.anguloSugerido,
       evidencias: dados.evidencias,
@@ -389,5 +407,5 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
     anguloTemProva = temaTemProvaSuficiente(dados.evidencias, videosPorId, agora, janelaDeProva(nicho.criadoEm, agora));
   }
 
-  return { ...dados, anguloTemProva };
+  return { ...dados, nota, anguloTemProva };
 }
