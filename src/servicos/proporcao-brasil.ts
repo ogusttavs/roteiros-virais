@@ -94,12 +94,21 @@ export function aplicarProporcaoBrasil<T>(
   }
 
   const brasileirosNoPasse1 = passe1.filter((item) => classificar(item) === "brasileiro").length;
-  // E42a, item 3: sem nenhum brasileiro, o teto continua o da primeira passada (sobre o limite
-  // pedido), nunca zero; só com pelo menos 1 brasileiro a proporção de verdade aperta o teto.
-  const tetoFinal =
+  /**
+   * Revisão do Fable no PR 104 (E42a, item 3). Duas regras, a maior vale:
+   * (1) a proporção de verdade, sobre os brasileiros aceitos (a regra do PR 46: com brasileiro o
+   * bastante, a lista fica na proporção do setor);
+   * (2) o piso de conteúdo: a lista nunca fica menor que `capInternacionalPasse1` quando há vídeo
+   * de fora para completar. Cada brasileiro que entra toma o lugar de um de fora, até a proporção
+   * de verdade assumir. Sem a (2), a primeira correção deste PR soltava só o caso de zero
+   * brasileiros, e um brasileiro a mais fazia a tela mostrar menos do que nenhum (0 brasileiros:
+   * 9 de fora num limite de 30; 2 brasileiros: 2 mais 1).
+   */
+  const tetoProporcional =
     brasileirosNoPasse1 === 0
-      ? capInternacionalPasse1
+      ? 0
       : Math.max(1, Math.floor((brasileirosNoPasse1 * (1 - proporcaoBrasil)) / proporcaoBrasil));
+  const tetoFinal = Math.max(tetoProporcional, capInternacionalPasse1 - brasileirosNoPasse1);
 
   const resultado: T[] = [];
   let internacionaisMantidos = 0;

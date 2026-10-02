@@ -547,13 +547,11 @@ describe("evidenciaParaTema", () => {
   });
 
   /**
-   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
-   * internacional com base em quantos brasileiros de fato entraram, nao no
-   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
-   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
-   * maior competindo e um limite bem maior que 2.
+   * V2b, item 6 (revisão do PR #46), refeito na revisão do PR #104: com 1 brasileiro disponível e
+   * limite 10, o piso de conteúdo é 3 (floor(10 × 0,3)); o brasileiro entra sempre e 2 de fora
+   * completam, nunca os 4 de prioridade maior.
    */
-  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
+  it("com um so brasileiro disponivel e limite 10, entram ele e 2 de fora, o piso de conteudo", async () => {
     const idsEn: string[] = [];
     for (let i = 0; i < 4; i += 1) {
       await criarVideo(`ev-prop-en-${i}`, {
@@ -575,11 +573,12 @@ describe("evidenciaParaTema", () => {
 
     const resultado = await evidenciaParaTema(nichoId, "assunto exclusivo da proporcao internacional", 10);
 
-    expect(resultado).toHaveLength(2);
+    expect(resultado).toHaveLength(3);
     expect(resultado.map((v) => v.assunto)).toContain("pt-0");
-    // So o "en" de maior prioridade (en-0) entra; en-1, en-2 e en-3 ficam de fora.
+    // Os dois "en" de maior prioridade entram; en-2 e en-3 ficam de fora.
     expect(resultado.map((v) => v.assunto)).toContain("en-0");
-    expect(resultado.map((v) => v.assunto)).not.toContain("en-1");
+    expect(resultado.map((v) => v.assunto)).toContain("en-1");
+    expect(resultado.map((v) => v.assunto)).not.toContain("en-2");
   });
 
   /**
@@ -858,13 +857,12 @@ describe("referenciasDoNicho", () => {
   });
 
   /**
-   * V2b, item 6 (revisão do PR #46): a proporcao 70/30 corta o excesso
-   * internacional com base em quantos brasileiros de fato entraram, nao no
-   * `limite`. Com 1 brasileiro disponivel, so 1 internacional cabe (a
-   * excecao "pelo menos 1"), mesmo com 4 internacionais de prioridade
-   * maior (mais recentes) competindo e um limite bem maior que 2.
+   * V2b, item 6 (revisão do PR #46), refeito na revisão do PR #104: com 1 brasileiro disponível e
+   * limite 10, o piso de conteúdo é 3; o brasileiro entra sempre e 2 de fora completam. O
+   * brasileiro fica numa conta própria: o teto de 2 por conta de Referências vem depois da
+   * proporção e, com todos na mesma conta, tiraria justamente ele.
    */
-  it("com um so brasileiro disponivel, so 1 internacional cabe, mesmo com limite grande", async () => {
+  it("com um so brasileiro disponivel e limite 10, entram ele e 2 de fora, o piso de conteudo", async () => {
     // Nicho proprio, isolado dos videos que os describes acima ja gravaram
     // no nicho compartilhado (referenciasDoNicho nao filtra por assunto,
     // so por nicho): sem isso o corte de proporcao competiria com dado de
@@ -894,23 +892,27 @@ describe("referenciasDoNicho", () => {
         analise: { ...analiseExemplo, assunto: `ref-en-${i}` },
       });
     }
+    const [contaBrasileira] = await db()
+      .insert(contas)
+      .values({ plataforma: "tiktok", handle: "conta-pesquisa-proporcao-br", nichoId: nichoProporcao.id })
+      .returning();
     await criarVideo("ref-prop-pt", {
       foraDaCurva: 5,
       publicadoEm: diasAtras(10),
       idioma: "pt",
-      contaId: contaProporcao.id,
+      contaId: contaBrasileira.id,
       nichoId: nichoProporcao.id,
       analise: { ...analiseExemplo, assunto: "ref-pt-0" },
     });
 
     const resultado = await referenciasDoNicho(nichoProporcao.id, { periodoDias: 90, limite: 10 });
 
-    expect(resultado.videos).toHaveLength(2);
+    expect(resultado.videos).toHaveLength(3);
     const assuntos = resultado.videos.map((v) => v.assunto);
     expect(assuntos).toContain("ref-pt-0");
-    // So o "en" de maior prioridade (mais recente, ref-en-1) entra.
+    // Os dois "en" de maior prioridade (mais recentes) entram.
     expect(assuntos).toContain("ref-en-1");
-    expect(assuntos).not.toContain("ref-en-2");
+    expect(assuntos).toContain("ref-en-2");
     expect(assuntos).not.toContain("ref-en-3");
     expect(assuntos).not.toContain("ref-en-4");
 

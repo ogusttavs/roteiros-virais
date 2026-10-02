@@ -92,20 +92,41 @@ describe("aplicarProporcaoBrasil", () => {
   });
 
   /**
-   * Exemplo exato da revisão do PR #46: com 5 brasileiros e limite 40, o
-   * teto de internacional é sobre os 5 aceitos (floor(5*0,3/0,7)=2), não
-   * sobre o limite (que daria 12, o bug corrigido nesta rodada).
+   * Exemplo da revisão do PR #46, refeito na revisão do PR #104 (E42a, item 3): com 5 brasileiros
+   * e limite 40, a proporção de verdade daria 2 de fora (floor(5*0,3/0,7)), mas o piso de conteúdo
+   * garante 12 no total (floor(40*0,3)): cada brasileiro toma o lugar de um de fora, então são 5
+   * mais 7. Nunca 5 mais 12 (o teto solto sobre o limite), nem 5 mais 2 (a lista murcha).
    */
-  it("5 brasileiros e 20 internacionais, limite 40: devolve 5 mais 2, nao 5 mais 12", () => {
+  it("5 brasileiros e 20 internacionais, limite 40: devolve 5 mais 7, o piso de conteudo", () => {
     const brasileiros: ItemTeste[] = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, idioma: "pt" }));
     const internacionais: ItemTeste[] = Array.from({ length: 20 }, (_, i) => ({ id: 100 + i, idioma: "en" }));
     const itens = [...brasileiros, ...internacionais];
 
     const resultado = aplicarProporcaoBrasil(itens, 40, classificar, 0.7);
 
-    expect(resultado).toHaveLength(7);
+    expect(resultado).toHaveLength(12);
     expect(resultado.filter((i) => i.id < 100)).toHaveLength(5);
-    expect(resultado.filter((i) => i.id >= 100)).toHaveLength(2);
+    expect(resultado.filter((i) => i.id >= 100)).toHaveLength(7);
+  });
+
+  /**
+   * Revisão do PR #104: a lista não pode encolher quando entra um brasileiro. Com o mesmo limite
+   * e de fora sobrando, o total com 0, 1, 2 e 5 brasileiros é sempre o piso; com brasileiro o
+   * bastante, vale a proporção de verdade.
+   */
+  it("o total nunca encolhe quando entra brasileiro: 0, 1, 2 e 5 brasileiros dao o mesmo piso", () => {
+    const deFora: ItemTeste[] = Array.from({ length: 30 }, (_, i) => ({ id: 100 + i, idioma: "en" }));
+    for (const quantos of [0, 1, 2, 5]) {
+      const brasileiros: ItemTeste[] = Array.from({ length: quantos }, (_, i) => ({ id: i + 1, idioma: "pt" }));
+      const resultado = aplicarProporcaoBrasil([...deFora, ...brasileiros], 30, classificar, 0.7);
+      expect(resultado).toHaveLength(9);
+      expect(resultado.filter((i) => i.id < 100)).toHaveLength(quantos);
+    }
+
+    const muitos: ItemTeste[] = Array.from({ length: 21 }, (_, i) => ({ id: i + 1, idioma: "pt" }));
+    const cheio = aplicarProporcaoBrasil([...deFora, ...muitos], 30, classificar, 0.7);
+    expect(cheio.filter((i) => i.id < 100)).toHaveLength(21);
+    expect(cheio.filter((i) => i.id >= 100)).toHaveLength(9);
   });
 
   /**
@@ -160,14 +181,15 @@ describe("aplicarProporcaoBrasil", () => {
   });
 
   /** A exceção: com pelo menos 1 brasileiro aceito, cabe pelo menos 1 internacional, mesmo quando floor() daria 0. */
-  it("excecao: 1 brasileiro aceito ja abre 1 vaga internacional, mesmo com floor(1*0,3/0,7) = 0", () => {
+  it("1 brasileiro aceito, limite 10: o piso de conteudo (3) deixa 2 de fora ao lado dele", () => {
     const itens: ItemTeste[] = [
       { id: 1, idioma: "pt" },
       { id: 2, idioma: "en" },
-      { id: 3, idioma: "en" }, // excedente: so 1 internacional cabe
+      { id: 3, idioma: "en" },
+      { id: 4, idioma: "en" }, // excedente: o piso e 3 no total
     ];
     const resultado = aplicarProporcaoBrasil(itens, 10, classificar, 0.7);
-    expect(resultado.map((i) => i.id)).toEqual([1, 2]);
+    expect(resultado.map((i) => i.id)).toEqual([1, 2, 3]);
   });
 
   it("outro no topo da prioridade e sempre pulado, mesmo em primeiro lugar", () => {
