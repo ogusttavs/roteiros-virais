@@ -72,6 +72,8 @@ function formatarVideo(v: VideoReferencia): VideoFormatado {
     capaUrl: v.capaUrl,
     semFala: v.semFala === true,
     segundoChave: v.segundoChave,
+    abaixoDaRegua: v.abaixoDaRegua,
+    tipoConteudo: v.tipoConteudo,
   };
 }
 

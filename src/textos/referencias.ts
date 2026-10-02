@@ -40,6 +40,8 @@ export const textosReferencias = {
   viewsPorHora: (velocidade: { texto: string; singular: boolean }) =>
     `${velocidade.texto} view${velocidade.singular ? "" : "s"} por hora`,
   passouDas72Horas: "já passou das 72 horas de medição",
+  /** R2b, item 3: o selo do cartão no segmento "Todos", quando o vídeo não bate o piso nem o múltiplo que "Fora da curva" exige. */
+  abaixoDaRegua: "abaixo do que a gente usa como prova",
   verDetalhes: "Ver detalhes",
   salvar: "Salvar",
   salvando: "salvando",

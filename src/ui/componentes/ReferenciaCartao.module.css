@@ -116,6 +116,29 @@
   text-overflow: ellipsis;
 }
 
+/** R2b, item 2 e 3: o que o vídeo é, quando importa (`.selos-video`/`.selo-video`/`.selo-video.prova` do desenho). */
+.selos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+}
+
+.seloProva {
+  border-style: dashed;
+  color: var(--cor-texto-dica);
+}
+
 .tituloVideo {
   margin: 0;
   font-size: var(--tamanho-secundario);

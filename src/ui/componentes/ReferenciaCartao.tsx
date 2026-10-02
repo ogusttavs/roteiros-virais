@@ -3,6 +3,8 @@
 import { Bookmark, Play } from "lucide-react";
 import { useState } from "react";
 
+import type { TipoConteudo } from "@/db/schema";
+import { ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
 import type { FaixaMultiplo } from "@/lib/formatarNumero";
 import { formatarVelocidade, formatarViewsExato } from "@/lib/formatarNumero";
 import { textosConexao } from "@/textos/conexao";
@@ -35,6 +37,10 @@ export type VideoFormatado = {
   semFala: boolean;
   /** R2a: o embed já começa aqui quando a análise visual achou o momento chave. */
   segundoChave: number | null;
+  /** R2b, item 3: o selo "abaixo do que a gente usa como prova", só aparece de verdade no segmento "Todos". */
+  abaixoDaRegua: boolean;
+  /** R2b, item 2: "meme"/"recorte" viram o selo do tipo; `null` e os demais valores não mostram nada. */
+  tipoConteudo: TipoConteudo | null;
 };
 
 type Props = {
@@ -57,6 +63,12 @@ function linhaVelocidade(velocidade: number | null): string {
   return textosReferencias.viewsPorHora(formatarVelocidade(velocidade));
 }
 
+/** `null` e os tipos sem selo (original, notícia) não aparecem; só meme e recorte (R2b, item 2). */
+function rotuloTipoConteudo(tipo: TipoConteudo | null): string | null {
+  if (tipo === "meme" || tipo === "recorte") return ROTULO_TIPO_CONTEUDO_FILTRAVEL[tipo];
+  return null;
+}
+
 /**
  * Um vídeo da biblioteca de referências (V6, item 4, `Referencias.dc.html`,
  * `.video-topo`/`.video-conta`/`.titulo-video`/`.acoes-video`):
@@ -69,6 +81,8 @@ function linhaVelocidade(velocidade: number | null): string {
 export function ReferenciaCartao({ video, salvo, salvando = false, semRede = false, onVerDetalhes, onSalvar }: Props) {
   const [capaComErro, setCapaComErro] = useState(false);
   const mostrarCapa = video.capaUrl !== null && !capaComErro;
+  const rotuloTipo = rotuloTipoConteudo(video.tipoConteudo);
+  const temSelo = video.abaixoDaRegua || rotuloTipo !== null;
 
   return (
     <article className={styles.cartao}>
@@ -111,6 +125,15 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
         <span className={styles.quando}>{video.plataformaData}</span>
         {video.semFala ? <span className={styles.semFala}>{textosReferencias.semFala}</span> : null}
       </div>
+
+      {temSelo ? (
+        <div className={styles.selos}>
+          {rotuloTipo ? <span className={styles.selo}>{rotuloTipo}</span> : null}
+          {video.abaixoDaRegua ? (
+            <span className={[styles.selo, styles.seloProva].join(" ")}>{textosReferencias.abaixoDaRegua}</span>
+          ) : null}
+        </div>
+      ) : null}
 
       {video.titulo ? <p className={styles.tituloVideo}>{video.titulo}</p> : null}
 

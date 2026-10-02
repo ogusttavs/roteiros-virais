@@ -9,6 +9,7 @@ import {
   type FormatoRoteiro,
   type Objetivo,
   type TipoAbertura,
+  type TipoConteudo,
 } from "@/db/schema";
 
 /**
@@ -90,6 +91,19 @@ export const FORMATOS_EM_ORDEM: AnaliseVideo["formato"][] = [
   "esquete",
   "outro",
 ];
+
+/**
+ * R2b, item 2: "Tipo de vídeo" no filtro de `/referencias` mistura `ROTULO_FORMATO` com estes dois
+ * (`pesquisa.ts`, `TipoConteudoFiltravel`); mesmo rótulo no selo do cartão quando o vídeo é um dos
+ * dois (`ReferenciaCartao.tsx`).
+ */
+export const ROTULO_TIPO_CONTEUDO_FILTRAVEL: Record<Extract<TipoConteudo, "meme" | "recorte">, string> = {
+  meme: "meme",
+  recorte: "recorte de outro vídeo",
+};
+
+/** Mesma ordem usada no chip de filtro e no selo do cartão. */
+export const TIPOS_CONTEUDO_FILTRAVEIS_EM_ORDEM: Extract<TipoConteudo, "meme" | "recorte">[] = ["meme", "recorte"];
 
 /**
  * A instrução de abertura por tipo (V4, roteiro sem vício, `prompts/roteiro.ts`,
