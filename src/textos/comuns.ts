@@ -45,4 +45,26 @@ export const textosComuns = {
    * definitivo voltou vazio ou com erro). Compartilhado pelos três lugares que gravam.
    */
   previaUsadaComoResposta: "Usamos o texto que apareceu enquanto você falava. Confira antes de seguir.",
+  /**
+   * A1, "falar em todo campo" (pedido do Gustavo em 01/10, 21:50): o texto do `CampoComFala`
+   * (`src/ui/componentes/CampoComFala.tsx`), o campo de texto livre com o botão de falar que todo
+   * campo fora do briefing e do momento usa agora. Diferente de `textosBriefing.pergunta`: aqui a
+   * fala nunca é reorganizada pela IA, então nunca "Organizando", sempre "Ouvindo".
+   */
+  campoComFala: {
+    falar: "Falar",
+    pararDeFalar: "Parar",
+    ouvindo: "Ouvindo o que você falou",
+    dica: "Toque em Falar para ditar este campo.",
+    semMicrofone: "Não conseguimos usar o microfone deste aparelho. Pode escrever direto.",
+    audioVazio: "Não deu para entender o áudio. Tente de novo ou escreva direto.",
+    falhaTranscricao: "Não conseguimos ouvir o áudio agora. Tente de novo ou escreva direto.",
+    textoSubstituido: "Texto substituído pelo que você falou",
+    textoSomado: "Acrescentamos o que você falou",
+    /** Mesma conta de `textosBriefing.pergunta.contagemGravando`, duplicada por ser a única usuária aqui. */
+    contagemGravando: (segundos: number, limiteSegundos: number) => {
+      const formatar = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      return `${formatar(segundos)} de ${formatar(limiteSegundos)}`;
+    },
+  },
 };

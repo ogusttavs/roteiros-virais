@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { textosRoteiro } from "@/textos/roteiro";
-import { AreaTexto } from "@/ui/componentes/AreaTexto";
+import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
@@ -139,12 +139,13 @@ export function FolhaReprovarAgenda({ aberto, aoFechar, aoReprovar }: Props) {
           );
         })}
       </div>
-      <AreaTexto
+      <CampoComFala
         rotulo={textosRoteiro.reprovar.rotuloTextoLivre}
         value={motivoTexto}
-        onChange={(evento) => setMotivoTexto(evento.target.value)}
+        onChange={setMotivoTexto}
         placeholder={textosRoteiro.reprovar.textoLivrePlaceholder}
         linhasMin={3}
+        nomeArquivo="reprovar"
       />
     </PainelFlutuante>
   );

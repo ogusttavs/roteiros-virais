@@ -22,8 +22,8 @@ import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
-import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
+import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
@@ -310,14 +310,15 @@ export function ObjetivoTela({
         </div>
       )}
 
-      <AreaTexto
+      <CampoComFala
         rotulo={`${textosObjetivo.objetivoDoVideo} ${textosObjetivo.objetivoDoVideoOpcional}`}
         ajuda={textosObjetivo.objetivoDoVideoAjuda}
         value={objetivoDoVideo}
-        onChange={(evento) => setObjetivoDoVideo(evento.target.value)}
+        onChange={setObjetivoDoVideo}
         placeholder={textosObjetivo.objetivoDoVideoPlaceholder}
         maxLength={200}
         linhasMin={2}
+        nomeArquivo="objetivo-do-video"
       />
 
       <BarraAcao

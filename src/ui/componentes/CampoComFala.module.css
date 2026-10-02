@@ -1,0 +1,88 @@
+/**
+ * A1, "falar em todo campo": mesmos tokens de `PerguntaCampo.module.css` (o botão de falar do
+ * briefing), sem o segundo botão ("Copiar para a sua IA", só do briefing).
+ */
+.linhaComMicrofone {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+.linhaComMicrofone > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.acoesCampo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-2);
+}
+
+.botaoFalar {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-acao);
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.botaoFalar:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoFalar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.botaoFalarGravando {
+  border-color: var(--cor-erro);
+  color: var(--cor-erro);
+}
+
+.dicaFalar {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.erroInline {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-erro);
+}
+
+.aviso {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  font-weight: 500;
+  color: var(--cor-positivo);
+}
+
+.previaFala {
+  margin: var(--espaco-2) 0 0;
+  max-height: 4.8em;
+  overflow-y: auto;
+  font-size: var(--tamanho-legenda);
+  line-height: 1.2;
+  color: var(--cor-texto-dica);
+}
+
+.previaAviso {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-dica);
+  opacity: 0.8;
+}
