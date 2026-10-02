@@ -23,12 +23,13 @@
  *   npx tsx scripts/reclassificar-evidencia.ts              # dry run, não gasta nada
  *   npx tsx scripts/reclassificar-evidencia.ts --confirmar   # envia o lote de verdade
  */
-import { and, avg, count, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, avg, count, eq, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "../src/db";
 import { geracoesIA, lotesIa, nichos, videos } from "../src/db/schema";
 import { criarLote, type ItemLote } from "../src/ia/lote";
 import * as extrairVideo from "../src/ia/prompts/extrairVideo";
+import { TAMANHO_MINIMO_TRANSCRICAO } from "../src/jobs/extracao-comum";
 import {
   DENTRO_DO_TETO_DE_DURACAO,
   incluirSeed,
@@ -50,7 +51,8 @@ type Candidato = {
   nichoId: number;
 };
 
-async function candidatosDoSetor(nichoId: number, nomeNicho: string, termosNicho: string[]): Promise<Candidato[]> {
+/** Exportada só para o teste de integração conferir o filtro sem rodar `main()` inteiro. */
+export async function candidatosDoSetor(nichoId: number, nomeNicho: string, termosNicho: string[]): Promise<Candidato[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -58,6 +60,12 @@ async function candidatosDoSetor(nichoId: number, nomeNicho: string, termosNicho
     gte(videos.views, regua.pisoViews),
     isNotNull(videos.analise),
     isNotNull(videos.transcricao),
+    // Achado 5 da revisão do motor (01/10/2026): este script usa `extrairVideo`, que lê a
+    // transcrição; vídeo do caminho sem fala (`semFala = true`, `extrair-sem-fala.ts`, já
+    // corrigido para gravar tipoConteudo/serveDeModelo na hora) ou com transcrição curta demais
+    // (mesmo piso de `extracao-comum.ts`) nunca deveria passar por aqui de novo.
+    sql`${videos.semFala} is not true`,
+    sql`char_length(trim(${videos.transcricao})) >= ${TAMANHO_MINIMO_TRANSCRICAO}`,
     isNull(videos.tipoConteudo),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,

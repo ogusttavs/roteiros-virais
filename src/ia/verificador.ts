@@ -578,6 +578,15 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   };
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
+  /**
+   * Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação (quando a tarefa tem
+   * um) precisa continuar sendo a última linha da entrada mesmo na segunda tentativa; antes,
+   * `gerarComVerificacao` colava o motivo da reprovação depois da entrada inteira (que já vinha
+   * com o lembrete embutido no fim), empurrando o lembrete para o meio do texto. Quem monta a
+   * entrada não inclui mais o próprio lembrete: passa o texto dele aqui, e `gerarComVerificacao`
+   * garante que ele vem por último nas duas tentativas.
+   */
+  lembreteFinal?: string;
 };
 
 export type ResultadoVerificacao<T> = {
@@ -609,12 +618,16 @@ export const MARCADOR_SEGUNDA_TENTATIVA = "A tentativa anterior foi reprovada.";
 export async function gerarComVerificacao<T>(
   params: ParametrosGeracaoVerificada<T>,
 ): Promise<ResultadoVerificacao<T>> {
-  const primeira = await tentarGerarEVerificar(params);
+  // Achado 11: o lembrete (quando houver) sempre por último, nas duas tentativas.
+  const comLembrete = (entrada: string): string =>
+    params.lembreteFinal ? `${entrada}\n\n${params.lembreteFinal}` : entrada;
+
+  const primeira = await tentarGerarEVerificar({ ...params, entrada: comLembrete(params.entrada) });
   if (primeira.aprovado) return { dados: primeira.dados, geracaoId: primeira.geracaoId };
 
   const segunda = await tentarGerarEVerificar({
     ...params,
-    entrada: `${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`,
+    entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
   });
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
 

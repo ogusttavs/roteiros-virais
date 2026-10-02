@@ -61,11 +61,18 @@ export function interpretarVtt(conteudo: string): string {
 }
 
 /**
- * Baixa a legenda automatica em portugues e devolve o texto puro, ou null
- * se o video nao tiver legenda nesse idioma (comum, nao e erro). Apaga o
- * arquivo temporario sempre, mesmo em erro.
+ * Baixa a legenda automatica no idioma pedido e devolve o texto puro, ou
+ * null se o video nao tiver legenda nesse idioma (comum, nao e erro). Apaga
+ * o arquivo temporario sempre, mesmo em erro.
+ *
+ * Achado 3 da revisao do motor (01/10/2026): `idioma` nao tem mais valor
+ * padrao. Antes, "pt" fixo pedia ao YouTube a faixa traduzida para
+ * portugues em todo video de outro idioma (o `--sub-lang` do yt-dlp busca a
+ * legenda NESSE idioma, traduzida quando preciso, nunca a original); quem
+ * chama agora so pede quando ja sabe o idioma de verdade do video
+ * (`videos.idioma`), pedindo a faixa original, nao a traducao.
  */
-export async function baixarLegendaYoutube(url: string, idioma = "pt"): Promise<string | null> {
+export async function baixarLegendaYoutube(url: string, idioma: "pt" | "en" | "es"): Promise<string | null> {
   const pasta = tmpdir();
   const prefixo = `legenda-${randomUUID()}`;
   const caminhoEsperado = join(pasta, `${prefixo}.${idioma}.vtt`);

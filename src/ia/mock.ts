@@ -180,15 +180,16 @@ function mockAvaliarTema(entrada: string) {
     novidade: pilarPadrao,
     facilidade: pilarPadrao,
   };
+  // Achado 8 da revisao do motor: a nota final nao faz mais parte do schema (fica por conta de
+  // `servicos/temas.ts`, media calculada por codigo); o mock so precisa dela aqui, por conta
+  // propria, para decidir "aprovado" como antes.
   const nota =
     Object.values(pilares).reduce((soma, p) => soma + p.nota, 0) / Object.values(pilares).length;
-  const notaArredondada = Math.round(nota * 10) / 10;
-  const aprovado = notaArredondada >= 9;
+  const aprovado = Math.round(nota * 10) / 10 >= 9;
   const idsCitados = extrairIds(entrada);
 
   return {
     pilares,
-    nota: notaArredondada,
     recomendacao: aprovado ? "tema com evidencia suficiente" : "ajustar para um angulo com evidencia",
     anguloSugerido: aprovado ? null : "angulo vizinho simulado",
     evidencias: tema.includes(MARCADOR_EVIDENCIA_INVENTADA) ? [...idsCitados, 999999] : idsCitados,
@@ -512,7 +513,7 @@ function mockExtrairVideo(entrada: string) {
   };
 }
 
-/** M3, item 2: mesma ideia de mockExtrairVideo, sem os campos de fala (`idioma`, `tipoAbertura`). */
+/** M3, item 2: mesma ideia de mockExtrairVideo, sem os campos de fala (`idioma`, `tipoAbertura`); achado 5 da revisão do motor acrescenta `tipoConteudo`/`serveDeModelo`, igual ao caminho com fala. */
 function mockExtrairVideoSemFala(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
   const nichoLinha = extrairCampo(entrada, "Nicho:");
@@ -538,6 +539,7 @@ function mockExtrairVideoSemFala(entrada: string) {
       .slice(0, 4),
     pertenceAoNicho,
     motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda não cita nenhum termo do nicho",
+    ...tipoConteudoMock(titulo),
   };
 }
 

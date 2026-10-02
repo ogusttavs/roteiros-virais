@@ -4,10 +4,10 @@
  * colunas em `videos`. Extraído nesta rodada para o caminho imediato não duplicar a mesma regra
  * de qualidade (revisão do PR #30: análise nenhuma é pior que uma com um campo em inglês).
  */
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos, type AnaliseVideo } from "@/db/schema";
+import { lotesIa, nichos, videos, type AnaliseVideo } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 import { registrarGeracao } from "@/ia/registro";
@@ -21,6 +21,30 @@ import { pareceTextoEmPortugues } from "@/lib/idioma";
  * legenda foi o problema.
  */
 export const TAMANHO_MINIMO_TRANSCRICAO = 80;
+
+/**
+ * Achado 13 da revisão do motor (01/10/2026): vídeo já num lote da mesma tarefa ainda em
+ * andamento (a API de lote é assíncrona, até 24h) nunca entra em outro lote nem no caminho
+ * imediato (`extrair-agora.ts`); sem isto, o mesmo vídeo podia ser analisado duas vezes (gasto em
+ * dobro) enquanto o lote de ontem ainda não tinha voltado.
+ */
+export async function idsEmLotePendente(tarefa: string): Promise<Set<number>> {
+  const lotes = await db()
+    .select({ videoIds: lotesIa.videoIds })
+    .from(lotesIa)
+    .where(and(eq(lotesIa.tarefa, tarefa), eq(lotesIa.status, "em_andamento")));
+  return new Set(lotes.flatMap((l) => l.videoIds));
+}
+
+/**
+ * Achado 13 da revisão do motor (01/10/2026): sem isto, todo vídeo "curto" era reagendado para
+ * daqui a 7 dias EM TODA RODADA (`extrair`/`extrairAgora` rodam todo dia), mesmo quando já tinha
+ * uma tentativa futura pendente; a data nunca chegava a passar, porque era empurrada de novo
+ * antes de vencer. Só reagenda quem está sem tentativa marcada ou já passou da marcada.
+ */
+export function precisaAgendarNovaTentativa(proximaTentativaTranscricao: Date | null, agora: Date): boolean {
+  return !proximaTentativaTranscricao || proximaTentativaTranscricao <= agora;
+}
 
 /**
  * So os campos que o cliente le (o gancho pode vir sozinho no idioma
@@ -62,6 +86,10 @@ export async function retentarEmPortugues(videoId: number): Promise<extrairVideo
   const dadosVideo = await buscarDadosParaRetentativa(videoId);
   if (!dadosVideo) return null;
 
+  // Achado 11 da revisão do motor: `montarEntrada` já termina com o lembrete de acentuação; esta
+  // instrução de tradução entra depois dele (ao contrário da segunda tentativa do roteiro, que o
+  // achado pede explicitamente reordenada), porque o próprio pedido de traduzir tudo já cobre
+  // acentuação, e esta retentativa é sobre idioma, não sobre o lembrete genérico.
   const entrada = `${extrairVideo.montarEntrada(dadosVideo)}\n\nA tentativa anterior saiu em outro idioma ou so parte dela. Traduza tudo para o português do Brasil, inclusive o gancho.`;
 
   const resultado = await gerarEstruturado({
@@ -119,6 +147,14 @@ export async function resolverIdioma(
  * titulo/descricao para idioma e mais precisa que so o gancho ja extraido para tipo de
  * abertura). `tipoConteudo`/`serveDeModelo` (H4, item 2) ficam tanto no jsonb `analise` (registro
  * completo) quanto em colunas proprias (`evidenciaParaRoteiro` filtra por SQL).
+ *
+ * Achado 3 da revisao do motor (01/10/2026): quando `idiomaConfirmado` e verdadeiro (a Groq ou a
+ * legenda do YouTube ja confirmaram o idioma na fala de verdade, `transcrever.ts`), so grava o
+ * palpite da extracao se ele concordar na mesma lingua base (os dois primeiros caracteres: "pt"
+ * de "pt-BR"/"pt-PT" continua refinando um "pt" generico). Discordando (por exemplo, confirmado
+ * "en" e a extracao devolveu "pt-BR"), mantem o idioma confirmado: foi exatamente essa
+ * divergencia, de um texto forcado no idioma errado, que fazia a extracao concluir "pt-BR" para
+ * um video em outro idioma e a conta virar `pais = 'BR'` para sempre (`pontuar.ts`).
  */
 export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
   const { etiquetas, idioma, tipoAbertura, ...analise } = dados;
@@ -129,7 +165,11 @@ export async function aplicarResultadoExtracao(videoId: number, dados: extrairVi
     .set({
       analise: analiseVideo,
       etiquetas,
-      idioma,
+      idioma: sql`CASE
+        WHEN ${videos.idiomaConfirmado} AND left(${videos.idioma}, 2) IS DISTINCT FROM left(${idioma}, 2)
+        THEN ${videos.idioma}
+        ELSE ${idioma}
+      END`,
       tipoAbertura,
       tipoConteudo: dados.tipoConteudo,
       serveDeModelo: dados.serveDeModelo,

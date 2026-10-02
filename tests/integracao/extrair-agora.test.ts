@@ -135,6 +135,46 @@ describe("rodarExtrairAgora", () => {
     expect(atualizado.proximaTentativaTranscricao).not.toBeNull();
   });
 
+  /**
+   * Achado 13 da revisão do motor (01/10/2026): sem isto, o caminho imediato (mais caro que o
+   * lote) podia analisar de novo um vídeo que já estava num lote de `extrairVideo` ainda em
+   * andamento de ontem, gastando em dobro.
+   */
+  it("video ja num lote de extrairVideo em andamento nunca entra no caminho imediato", async () => {
+    const jaEmLote = await criarVideo(nichoNovoId, "ja-em-lote-imediato", { transcricao: TRANSCRICAO_BOA });
+    const livre = await criarVideo(nichoNovoId, "livre-para-o-imediato", { transcricao: TRANSCRICAO_BOA });
+    await db().insert(lotesIa).values({
+      tarefa: "extrairVideo",
+      loteIdExterno: "lote-externo-pendente-imediato",
+      videoIds: [jaEmLote.id],
+      status: "em_andamento",
+    });
+
+    const resumo = await rodarExtrairAgora(nichoNovoId);
+
+    expect(resumo.videosAnalisados).toBe(1);
+    const [videoPendente] = await db().select().from(videos).where(eq(videos.id, jaEmLote.id));
+    expect(videoPendente.analise).toBeNull();
+    const [videoLivre] = await db().select().from(videos).where(eq(videos.id, livre.id));
+    expect(videoLivre.analise).not.toBeNull();
+  });
+
+  /**
+   * Achado 13 da revisão do motor: sem isto, toda rodada (`rodarExtrairAgora` roda todo dia para
+   * setor novo) reagendava o vídeo curto para daqui a 7 dias de novo, empurrando a data antes dela
+   * vencer; a transcrição nunca voltava de fato à fila.
+   */
+  it("video curto com tentativa ja agendada no futuro nao tem a data empurrada de novo", async () => {
+    const video = await criarVideo(nichoNovoId, "curto-ja-agendado-imediato", { transcricao: "E ai" });
+    const dataOriginal = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
+    await db().update(videos).set({ proximaTentativaTranscricao: dataOriginal }).where(eq(videos.id, video.id));
+
+    await rodarExtrairAgora(nichoNovoId);
+
+    const [videoDepois] = await db().select().from(videos).where(eq(videos.id, video.id));
+    expect(videoDepois.proximaTentativaTranscricao?.getTime()).toBe(dataOriginal.getTime());
+  });
+
   it("video mais longo que o teto de duracao (hotfix #72) fica de fora", async () => {
     const longo = await criarVideo(nichoNovoId, "video-longo", {
       transcricao: TRANSCRICAO_BOA,

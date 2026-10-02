@@ -135,8 +135,20 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
 
     const { etiquetas, ...analise } = resultado.dados;
     const analiseVideo: AnaliseVideo = analise;
-    // M4, item 1: este é o caminho sem fala, por definição.
-    await db().update(videos).set({ analise: analiseVideo, etiquetas, semFala: true }).where(eq(videos.id, video.id));
+    // M4, item 1: este é o caminho sem fala, por definição. Achado 5 da revisão do motor
+    // (01/10/2026): tipoConteudo/serveDeModelo saem em colunas próprias também (mesmo caminho de
+    // `aplicarResultadoExtracao`, que mantém os dois no jsonb `analise` e fora dele), para
+    // `evidenciaParaRoteiro` filtrar por SQL.
+    await db()
+      .update(videos)
+      .set({
+        analise: analiseVideo,
+        etiquetas,
+        tipoConteudo: resultado.dados.tipoConteudo,
+        serveDeModelo: resultado.dados.serveDeModelo,
+        semFala: true,
+      })
+      .where(eq(videos.id, video.id));
 
     await registrarGeracao({
       tarefa: "extrairVideoSemFala",

@@ -153,7 +153,12 @@ export const config = {
     minimoEvidenciaModeloNicho: 10,
     janelaLinhaEditorial: 15,
     minimoParaAvisoLinhaEditorial: 5,
-    /** V2b, item 6, escopo 5.11: no minimo 70% brasileiro em tudo que escolhe video (`aplicarProporcaoBrasil`). */
+    /**
+     * V2b, item 6, escopo 5.11: no minimo 70% brasileiro. Achado 2 da revisão do motor
+     * (01/10/2026): a seleção de leitura (o que transcrever, o que ler por imagem) parou de
+     * aplicar isto (`semProporcaoBrasil`); continua valendo nas telas e na prova do tema e do
+     * roteiro (`aplicarProporcaoBrasil`), até o Gustavo decidir.
+     */
     proporcaoBrasil: 0.7,
     /**
      * V9d, item 0b (decisão do Gustavo em 25/09/2026, achado usando o painel): um vídeo de 128

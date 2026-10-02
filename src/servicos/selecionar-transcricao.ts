@@ -11,11 +11,11 @@
  * transcrição (e as Referências, que puxam do que já foi analisado) não
  * saírem quase todas de uma conta só.
  *
- * V2b, item 6: depois do teto por conta, `aplicarProporcaoBrasil` corta a
- * fila para no máximo 30% internacional (o resto de `proporcaoBrasil`),
- * no lugar do corte simples por tamanho que havia antes.
+ * Achado 2 da revisão do motor (01/10/2026): a proporção do Brasil não entra mais aqui (o que
+ * `transcrever.ts` escolhe é leitura, não tela); só "outro" continua de fora, pela mesma
+ * `semProporcaoBrasil`.
  */
-import { aplicarProporcaoBrasil, classificarBrasil } from "./proporcao-brasil";
+import { classificarBrasil, semProporcaoBrasil } from "./proporcao-brasil";
 
 export type VideoParaSelecionar = {
   id: number;
@@ -67,7 +67,6 @@ export function selecionarParaTranscrever(
   candidatos: VideoParaSelecionar[],
   limite: number,
   agora: Date,
-  proporcaoBrasil: number,
 ): number[] {
   const porId = new Map(candidatos.map((c) => [c.id, c]));
 
@@ -92,12 +91,11 @@ export function selecionarParaTranscrever(
   const contaPorId = new Map(candidatos.map((c) => [c.id, c.contaId]));
   const limitadosPorConta = limitarPorConta(elegiveis, contaPorId, MAX_POR_CONTA);
 
-  const comProporcao = aplicarProporcaoBrasil(
+  const semOutro = semProporcaoBrasil(
     limitadosPorConta.map((id) => porId.get(id)!),
     limite,
     (v) => classificarBrasil(v.idioma, v.contaBrasileira),
-    proporcaoBrasil,
   );
 
-  return comProporcao.map((v) => v.id);
+  return semOutro.map((v) => v.id);
 }

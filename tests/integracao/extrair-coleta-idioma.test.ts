@@ -26,7 +26,11 @@ const gerarEstruturadoMock = vi.mocked(gerarEstruturado);
 
 let nichoId: number;
 
-async function criarVideo(idExterno: string, titulo: string) {
+async function criarVideo(
+  idExterno: string,
+  titulo: string,
+  opcoes: { idioma?: string | null; idiomaConfirmado?: boolean } = {},
+) {
   const [v] = await db()
     .insert(videos)
     .values({
@@ -37,6 +41,8 @@ async function criarVideo(idExterno: string, titulo: string) {
       titulo,
       views: 100,
       transcricao: "falou sobre o produto principal, contando com detalhe o que ele resolve e para quem serve.",
+      idioma: opcoes.idioma,
+      idiomaConfirmado: opcoes.idiomaConfirmado,
     })
     .returning();
   return v;
@@ -133,6 +139,7 @@ describe("rodarExtrairColeta, checagem de idioma", () => {
         etiquetas: ["sofa", "mancha"],
         pertenceAoNicho: true,
         motivoNicho: "fala do assunto do nicho",
+        idioma: "pt-BR",
       },
       modelo: "mock-corrigido",
       tokensEntrada: 10,
@@ -149,5 +156,44 @@ describe("rodarExtrairColeta, checagem de idioma", () => {
 
     const [video] = await db().select().from(videos).where(eq(videos.idExterno, "video-corrigido-na-segunda"));
     expect(video.analise?.gancho).toBe("voce nunca fez isso com o seu sofa antes");
+  });
+});
+
+/**
+ * Achado 3 da revisao do motor (01/10/2026): `idiomaConfirmado` (a Groq ou a legenda do YouTube
+ * confirmaram o idioma na fala de verdade, `transcrever.ts`) impede a extracao de trocar para uma
+ * lingua base diferente, mas continua deixando ela refinar dentro da mesma (o mock de
+ * `extrairVideo` sempre devolve "pt-BR", `src/ia/mock.ts`).
+ */
+describe("aplicarResultadoExtracao, achado 3: idioma confirmado nao e sobrescrito por lingua diferente", () => {
+  it("idioma confirmado 'en': a extracao (mock sempre 'pt-BR') nao sobrescreve, o idioma continua 'en'", async () => {
+    await criarVideo("video-idioma-confirmado-en", "assunto qualquer", { idioma: "en", idiomaConfirmado: true });
+
+    await rodarExtrair();
+    await rodarExtrairColeta();
+
+    const [video] = await db().select().from(videos).where(eq(videos.idExterno, "video-idioma-confirmado-en"));
+    expect(video.idioma).toBe("en");
+    expect(video.analise).not.toBeNull(); // a analise em si grava normalmente, so o idioma fica protegido.
+  });
+
+  it("idioma confirmado 'pt' generico: a extracao pode refinar para 'pt-BR' (mesma lingua base)", async () => {
+    await criarVideo("video-idioma-confirmado-pt", "assunto qualquer", { idioma: "pt", idiomaConfirmado: true });
+
+    await rodarExtrair();
+    await rodarExtrairColeta();
+
+    const [video] = await db().select().from(videos).where(eq(videos.idExterno, "video-idioma-confirmado-pt"));
+    expect(video.idioma).toBe("pt-BR");
+  });
+
+  it("sem idioma confirmado (o caso de sempre): a extracao grava o proprio palpite normalmente", async () => {
+    await criarVideo("video-idioma-nao-confirmado", "assunto qualquer", { idioma: "en", idiomaConfirmado: false });
+
+    await rodarExtrair();
+    await rodarExtrairColeta();
+
+    const [video] = await db().select().from(videos).where(eq(videos.idExterno, "video-idioma-nao-confirmado"));
+    expect(video.idioma).toBe("pt-BR");
   });
 });

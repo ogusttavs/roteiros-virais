@@ -767,6 +767,55 @@ describe("gerarComVerificacao", () => {
     expect(registrarGeracaoMock).toHaveBeenCalledTimes(3);
   });
 
+  /**
+   * Achado 11 da revisão do motor (01/10/2026): sem `lembreteFinal`, `gerarComVerificacao`
+   * simplesmente colava o motivo depois da entrada inteira; quando a entrada já terminava com um
+   * lembrete embutido por `montarEntrada` (o caso do roteiro antes desta correção), o motivo
+   * empurrava o lembrete para o meio do texto, não mais a última linha.
+   */
+  it("com lembreteFinal, ele continua sendo a ultima linha na primeira e na segunda tentativa", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({
+        dados: { corpo: "texto ruim — com travessao" },
+        modelo: "mock",
+        ...usoZero,
+      })
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({
+        dados: { aprovado: true, motivo: null },
+        modelo: "mock",
+        ...usoZero,
+      });
+
+    await gerarComVerificacao({
+      ...parametrosBase,
+      entrada: "entrada original",
+      lembreteFinal: "lembrete de acentuacao",
+    });
+
+    const primeiraChamada = gerarEstruturadoMock.mock.calls[0][0] as { entrada: string };
+    expect(primeiraChamada.entrada.endsWith("lembrete de acentuacao")).toBe(true);
+
+    const segundaChamada = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
+    // o motivo da reprovacao entra antes do lembrete, nunca depois (o que empurraria o lembrete
+    // para o meio do texto, onde o modelo ja nao le com a mesma atencao antes de escrever).
+    expect(segundaChamada.entrada.endsWith("lembrete de acentuacao")).toBe(true);
+    expect(segundaChamada.entrada.indexOf("travessao")).toBeLessThan(
+      segundaChamada.entrada.lastIndexOf("lembrete de acentuacao"),
+    );
+  });
+
+  it("sem lembreteFinal, a entrada segue exatamente como veio (comportamento de sempre)", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+    await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+    const primeiraChamada = gerarEstruturadoMock.mock.calls[0][0] as { entrada: string };
+    expect(primeiraChamada.entrada).toBe("entrada original");
+  });
+
   it("lanca ErroIA quando as duas tentativas reprovam na checagem local", async () => {
     gerarEstruturadoMock.mockResolvedValue({
       dados: { corpo: "sempre ruim \u2014 com travessao" },

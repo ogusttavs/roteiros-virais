@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { montarSistemaEstavel } from "./avaliarTema";
+import { LEMBRETE_ACENTUACAO, montarEntrada, montarSistemaEstavel } from "./avaliarTema";
 
 const BASE = {
   perfilCompilado: "perfil do cliente",
@@ -44,5 +44,18 @@ describe("montarSistemaEstavel", () => {
   it('persona "negocios": o contexto fala em levar gente para os proprios negocios', () => {
     const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [], persona: "negocios" });
     expect(sistema).toContain("Este cliente quer levar gente para os próprios negócios");
+  });
+});
+
+/**
+ * Achado 11 da revisão do motor (01/10/2026): `LEMBRETE_ACENTUACAO` exportado para
+ * `servicos/temas.ts` passar como `lembreteFinal` de `gerarComVerificacao`; `montarEntrada` não
+ * embute o lembrete por conta própria, porque quem garante a posição nas duas tentativas é o
+ * verificador (`verificador.test.ts` cobre a reordenação em si).
+ */
+describe("montarEntrada", () => {
+  it("nao embute o lembrete de acentuacao por conta propria (isso e tarefa de lembreteFinal)", () => {
+    const entrada = montarEntrada({ tema: "limpar sofa de estofado", evidencias: [] });
+    expect(entrada).not.toContain(LEMBRETE_ACENTUACAO);
   });
 });

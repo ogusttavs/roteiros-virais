@@ -46,7 +46,7 @@ import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
-import { foraDaCurvaDoNicho, reguaDoSetor, subindoHoje } from "@/servicos/pesquisa";
+import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
@@ -102,7 +102,6 @@ function comMidiaFrescaComoDesempate<T extends { id: number }>(
 }
 
 async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
-  const regua = await reguaDoSetor(nichoId);
   const tamanhoFila = tetoDiario * FATOR_FILA;
   // V2b, item 10: o teto por conta entra aqui, na consulta, antes do LIMIT
   // (`maxPorConta`), não só depois em `limitarPorConta`; sem isso, quando as
@@ -111,16 +110,20 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   // encolhe o que sobrou para bem menos que `tetoDiario` (achado da prova em
   // produção, 19/09 à noite: 187 vídeos fora da curva do Instagram, com mídia
   // fresca, nunca chegavam a ser tentados).
+  // Achado 1 da revisão do motor (01/10/2026): o último `true` exclui, antes desse mesmo teto por
+  // conta, o vídeo que já tem transcrição, análise ou tentativa futura marcada; sem isso, as duas
+  // vagas de uma conta podiam ir inteiras para vídeo que `selecionarParaTranscrever` já descartava,
+  // e a conta nunca oferecia um 3º vídeo livre.
   const [prioritarios, estruturais] = await Promise.all([
-    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA),
-    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA),
+    subindoHoje(nichoId, tamanhoFila, MAX_POR_CONTA, true),
+    foraDaCurvaDoNicho(nichoId, 90, tamanhoFila, MAX_POR_CONTA, true),
   ]);
 
   const idsUnicos = [...new Set([...prioritarios.map((v) => v.id), ...estruturais.map((v) => v.id)])];
   if (idsUnicos.length === 0) {
     return {
       selecionados: [] as number[],
-      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null }>(),
+      porId: new Map<number, { url: string; urlParaBaixar: string; plataforma: Plataforma; duracaoS: number | null; idioma: string | null }>(),
     };
   }
 
@@ -163,7 +166,6 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
     candidatos,
     tamanhoFila,
     agora,
-    regua.proporcaoBrasil,
   );
 
   const porId = new Map(
@@ -174,6 +176,7 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
         urlParaBaixar: idsComMidiaFresca.has(l.id) ? l.midiaUrl! : l.url,
         plataforma: l.plataforma,
         duracaoS: l.duracaoS,
+        idioma: l.idioma,
       },
     ]),
   );
@@ -195,16 +198,30 @@ type ResultadoVideo =
  */
 const TAMANHO_MINIMO_LEGENDA = 200;
 
+/** "outro" e nulo (nao sei, alfabeto nao latino): so os tres que a Groq e o YouTube sabem buscar/forcar de verdade. */
+function idiomaParaForcar(idioma: string | null): "pt" | "en" | "es" | undefined {
+  return idioma === "pt" || idioma === "en" || idioma === "es" ? idioma : undefined;
+}
+
 async function transcreverUm(
   videoId: number,
   url: string,
   plataforma: Plataforma,
   duracaoS: number | null,
+  idiomaConhecido: string | null,
 ): Promise<ResultadoVideo> {
-  if (plataforma === "youtube") {
-    const legenda = await baixarLegendaYoutube(url);
+  const idiomaParaBuscar = idiomaParaForcar(idiomaConhecido);
+
+  // Achado 3 da revisao do motor (01/10/2026): so pede legenda do YouTube quando ja sabe o
+  // idioma do video (`videos.idioma`, da coleta); sem isso, "--sub-lang" forcado buscava a
+  // traducao automatica do YouTube para quem nao sabia, nunca a fala original.
+  if (plataforma === "youtube" && idiomaParaBuscar) {
+    const legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
-      await db().update(videos).set({ transcricao: legenda, transcritoEm: new Date() }).where(eq(videos.id, videoId));
+      await db()
+        .update(videos)
+        .set({ transcricao: legenda, transcritoEm: new Date(), idiomaConfirmado: true })
+        .where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
   }
@@ -216,8 +233,41 @@ async function transcreverUm(
   let caminhoAudio: string | null = null;
   try {
     caminhoAudio = await baixarAudio(url, plataforma);
-    const texto = await transcreverAudio(caminhoAudio);
-    await db().update(videos).set({ transcricao: texto, transcritoEm: new Date() }).where(eq(videos.id, videoId));
+    const { texto, idiomaDetectado, semFala } = await transcreverAudio(caminhoAudio, idiomaParaBuscar);
+
+    // Achado 13 da revisão do motor (01/10/2026): vazia sem a Groq confirmar ausência de fala
+    // (no_speech_prob baixo) é tratada como falha de verdade, com nova tentativa em 7 dias; sem
+    // isto, `transcricao` virava uma string vazia permanente (nunca mais null), e a elegibilidade
+    // de `pesquisa.ts` (achado 1, `isNull(videos.transcricao)`) nunca mais oferecia o vídeo de
+    // novo, mesmo com a data de nova tentativa já vencida.
+    if (!semFala && !texto.trim()) {
+      await db()
+        .update(videos)
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+        .where(eq(videos.id, videoId));
+      return { tipo: "falhou", motivo: "transcricao da Groq veio vazia, sem confirmar ausencia de fala" };
+    }
+
+    // Achado 3: `semFala` já deixa `texto` vazio, o suficiente para `extracao-comum.ts` mandar o
+    // vídeo para o caminho sem fala; sem fala de verdade não há sinal de idioma confiável (achado
+    // rodando contra a API de verdade: silêncio puro também "detecta" um idioma qualquer), então
+    // não grava `idioma` nem `idiomaConfirmado` nesse caso. Com fala, o idioma que a Groq detectou
+    // só substitui o que já estava em `videos.idioma` quando esse ainda não era confiável (nulo ou
+    // "outro"); quando já era pt/en/es conhecido, mantém o valor e só confirma.
+    await db()
+      .update(videos)
+      .set({
+        transcricao: texto,
+        transcritoEm: new Date(),
+        ...(semFala
+          ? {}
+          : idiomaParaBuscar
+            ? { idiomaConfirmado: true }
+            : idiomaDetectado && idiomaDetectado !== "outro"
+              ? { idioma: idiomaDetectado, idiomaConfirmado: true }
+              : {}),
+      })
+      .where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {
@@ -294,7 +344,7 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
       tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
 
       try {
-        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS);
+        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma);
         if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
           sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
           sucessosNoNicho += 1;

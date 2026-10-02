@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TIPOS_CONTEUDO } from "@/db/schema";
+
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
@@ -14,10 +16,24 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * descrição, `detectarIdioma`), e o tipo de abertura fica de fora nesta primeira rodada por
  * falta de sinal confiável só com a legenda e os quadros; `videos.tipoAbertura` continua nulo
  * para estes vídeos, como já é para todo vídeo extraído antes daquela coluna existir.
+ *
+ * Tipo de vídeo (1.1.0, achado 5 da revisão do motor, 01/10/2026): sem isto, repost e meme sem
+ * fala entravam como evidência e referência igual a um vídeo original, porque
+ * `videos.serveDeModelo` ficava nulo (conta como "pode usar") para todo vídeo deste caminho.
+ * Mesmos campos e mesmo critério de `extrairVideo.ts`, já nos quadros e na legenda, sem chamada
+ * nova: o modelo já olha a tela inteira para montar o resto da ficha.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): lembrete de acentuação como última linha da
+ * entrada; esta tarefa não tem retentativa nenhuma hoje, então a posição já nasce definitiva.
+ * Versão 1.2.0.
  */
-export const versao = "1.0.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
+
+/** Mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`. */
+const LEMBRETE_ACENTUACAO =
+  "Escreva a ficha inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que o título ou a legenda do post estejam sem acento.";
 
 export const schema = z.object({
   assunto: z.string(),
@@ -31,6 +47,8 @@ export const schema = z.object({
   etiquetas: z.array(z.string()),
   pertenceAoNicho: z.boolean(),
   motivoNicho: z.string(),
+  tipoConteudo: z.enum(TIPOS_CONTEUDO),
+  serveDeModelo: z.boolean(),
 });
 
 export type SaidaExtrairVideoSemFala = z.infer<typeof schema>;
@@ -55,10 +73,23 @@ mais a legenda que a pessoa escreveu no post, e extrai uma ficha fixa:
   assunto qualquer). Diga true só quando o vídeo fala mesmo do assunto do nicho descrito abaixo;
   false quando não fala.
 - motivoNicho: uma frase curta explicando a decisão de pertenceAoNicho.
+- tipoConteudo: o que este vídeo é, para quem decide se ele pode virar modelo de estrutura de
+  um roteiro:
+  - "original": quem aparece é quem publicou o vídeo, mostrando o próprio trabalho ou produto.
+  - "recorte": um trecho de outra pessoa, de um programa ou de um podcast, reproduzido por
+    quem publicou (não é a própria cena de quem publicou).
+  - "meme": humor, dublagem, montagem ou um formato de "POV" (você na pele de alguém ou algo).
+  - "noticia": um fato mostrado, sem quem publicou aparecer defendendo um ponto de vista próprio.
+  Sinais de "recorte" ou "meme": o título ou a legenda tem "POV", emoji de riso, uma legenda de
+  outra página sobreposta na tela, ou os quadros mostram uma tela de outro vídeo sendo reproduzida
+  (duplo enquadramento, marca d'água de outra conta).
+- serveDeModelo: true só para "original" (a estrutura de como esse vídeo mostra algo é um bom
+  exemplo a seguir); false para "recorte", "meme" e "noticia" (o vídeo ainda pode mostrar o que
+  está em alta no assunto, mas a forma como ele é mostrado não é um modelo de roteiro).
 
 Sem travessão, sem emoji. Escreva em português do Brasil, com acentuação correta.`;
 }
 
 export function montarEntrada(dados: { titulo: string; legenda: string; duracaoS: number; nomeNicho: string; termosNicho: string[] }): string {
-  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\nLegenda do post: ${dados.legenda || "(sem legenda)"}\n\nOs quadros do video estao anexados.`;
+  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\nLegenda do post: ${dados.legenda || "(sem legenda)"}\n\nOs quadros do video estao anexados.\n\n${LEMBRETE_ACENTUACAO}`;
 }

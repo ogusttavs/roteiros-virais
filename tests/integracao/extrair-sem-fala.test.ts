@@ -119,6 +119,41 @@ describe("rodarExtrairSemFala", () => {
     expect(linha.tipoAbertura).toBeNull();
     // M4, item 1: este e o caminho sem fala, por definicao.
     expect(linha.semFala).toBe(true);
+    // Achado 5 da revisao do motor (01/10/2026): tipoConteudo/serveDeModelo tambem saem do
+    // caminho sem fala agora, em coluna propria (mock: titulo sem "pov" vira "original").
+    expect(linha.tipoConteudo).toBe("original");
+    expect(linha.serveDeModelo).toBe(true);
+    expect(linha.analise!.tipoConteudo).toBe("original");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  /** Achado 5 da revisao do motor: meme sem fala (sinal "pov" no mock) nunca serve de modelo. */
+  it("video sem fala classificado como meme (titulo com 'pov') grava serveDeModelo falso", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-meme", true);
+    const v = await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "extrair-sem-fala-meme-candidato",
+        url: "https://exemplo.invalido/extrair-sem-fala-meme-candidato",
+        nichoId: nicho.id,
+        titulo: "[exemplo] video pov de quem esquece a senha",
+        descricao: "legenda do post de exemplo",
+        views: 100_000,
+        foraDaCurva: "5",
+        publicadoEm: diasAtras(2),
+        transcricao: "muito curta",
+      })
+      .returning()
+      .then(([linha]) => linha);
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.analisados).toBe(1);
+
+    const [linha] = await db().select().from(videos).where(eq(videos.id, v.id));
+    expect(linha.tipoConteudo).toBe("meme");
+    expect(linha.serveDeModelo).toBe(false);
 
     await db().delete(videos).where(eq(videos.nichoId, nicho.id));
   });

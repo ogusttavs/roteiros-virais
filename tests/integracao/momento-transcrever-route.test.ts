@@ -103,9 +103,11 @@ describe("POST /api/momento/transcrever", () => {
 
   it("com sessao e audio validos, transcreve pela Groq (mockada) e devolve so o texto transcrito", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("momento-rota"));
-    transcreverAudioMock.mockResolvedValue(
-      "Eu tô aqui no aeroporto, cinco da manhã. Acabei de passar pela segurança, vou embarcar para a feira de fornecedores. Dá para mostrar a fila do check-in e a mala de amostras que eu levo.",
-    );
+    transcreverAudioMock.mockResolvedValue({
+      texto: "Eu tô aqui no aeroporto, cinco da manhã. Acabei de passar pela segurança, vou embarcar para a feira de fornecedores. Dá para mostrar a fila do check-in e a mala de amostras que eu levo.",
+      idiomaDetectado: "pt",
+      semFala: false,
+    });
     const { POST } = await import("@/app/api/momento/transcrever/route");
 
     const resposta = await POST(requisicao(formaComAudio("18")));
@@ -130,7 +132,7 @@ describe("POST /api/momento/transcrever", () => {
 
   it("transcricao vazia: recusa com 422", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("momento-rota"));
-    transcreverAudioMock.mockResolvedValue("   ");
+    transcreverAudioMock.mockResolvedValue({ texto: "   ", idiomaDetectado: null, semFala: false });
     const { POST } = await import("@/app/api/momento/transcrever/route");
 
     const resposta = await POST(requisicao(formaComAudio("5")));
