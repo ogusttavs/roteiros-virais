@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { montarSistemaEstavel } from "./temasDoDia";
+import { montarEntrada, montarSistemaEstavel } from "./temasDoDia";
 
 /** R1, item 3: os temas do dia podem citar a regra de plataforma que explica a evidência. */
 describe("montarSistemaEstavel, regra de plataforma em porQue (R1, item 3)", () => {
@@ -18,5 +18,17 @@ describe("montarSistemaEstavel, regra de plataforma em porQue (R1, item 3)", () 
     expect(sistema).toContain("R-YT-SHORT-01");
     expect(sistema).toContain("R-IG-STORY-01");
     expect(sistema).not.toContain("R-YT-VIDEO-01");
+  });
+});
+
+/**
+ * Achado 11 da revisão do motor (01/10/2026): esta tarefa não passa por `gerarComVerificacao`
+ * (sem segunda tentativa), então o lembrete de acentuação já nasce na posição definitiva, embutido
+ * por `montarEntrada` mesmo.
+ */
+describe("montarEntrada, lembrete de acentuacao (achado 11)", () => {
+  it("o lembrete de acentuacao e a ultima linha da entrada", () => {
+    const entrada = montarEntrada({ subindoHoje: [], noticias: [] });
+    expect(entrada.endsWith("acentuação correta do português (você, não, já, também, é, está).")).toBe(true);
   });
 });

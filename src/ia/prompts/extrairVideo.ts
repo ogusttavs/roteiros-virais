@@ -49,10 +49,20 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * `extracao-comum.ts` sobrescrevem `videos.tipoConteudo`/`serveDeModelo`,
  * fora do jsonb `analise` (mesmo caminho de `idioma` e `tipoAbertura`), para
  * `evidenciaParaRoteiro` (`servicos/pesquisa.ts`) filtrar por SQL.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): lembrete de acentuação como última linha da
+ * entrada, mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`; esta tarefa
+ * roda em lote (sem `gerarComVerificacao`), então a retentativa própria (`retentarEmPortugues`,
+ * `extracao-comum.ts`) já pede tradução explícita por conta própria, sem risco de empurrar isto
+ * para o meio do texto. Versão 1.7.0.
  */
-export const versao = "1.6.0";
+export const versao = "1.7.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
+
+/** Mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`. */
+const LEMBRETE_ACENTUACAO =
+  "Escreva a ficha inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que a transcrição original esteja em outro idioma ou sem acento.";
 
 export const schema = z.object({
   assunto: z.string(),
@@ -129,5 +139,5 @@ export function montarEntrada(dados: {
   nomeNicho: string;
   termosNicho: string[];
 }): string {
-  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\n\nTranscricao:\n${dados.transcricao}`;
+  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\n\nTranscricao:\n${dados.transcricao}\n\n${LEMBRETE_ACENTUACAO}`;
 }

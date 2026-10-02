@@ -40,8 +40,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * próprio modelo somava os cinco pilares e dividia por 5, uma conta simples demais para arriscar
  * errar); `servicos/temas.ts` calcula a média no código a partir das cinco notas por pilar.
  * Versão 1.5.0.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): `LEMBRETE_ACENTUACAO`, igual a `roteiro.ts`, exportado
+ * para `servicos/temas.ts` passar como `lembreteFinal` de `gerarComVerificacao`, a última linha da
+ * entrada nas duas tentativas (o lembrete do sistema estável, abaixo, continua, mas sozinho não
+ * bastou em outras tarefas, `roteiro.ts`). Versão 1.6.0.
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -61,6 +66,10 @@ export const schema = z.object({
 });
 
 export type SaidaAvaliarTema = z.infer<typeof schema>;
+
+/** Achado 11 da revisão do motor: mesma posição e mesmo texto-base de `roteiro.ts`/`avaliarResposta.ts`. */
+export const LEMBRETE_ACENTUACAO =
+  "Escreva a sua avaliação inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que o tema que o cliente propôs esteja sem acento nenhum.";
 
 function textoPersona(persona: Persona): string {
   switch (persona) {

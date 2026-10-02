@@ -62,6 +62,10 @@ export async function retentarEmPortugues(videoId: number): Promise<extrairVideo
   const dadosVideo = await buscarDadosParaRetentativa(videoId);
   if (!dadosVideo) return null;
 
+  // Achado 11 da revisão do motor: `montarEntrada` já termina com o lembrete de acentuação; esta
+  // instrução de tradução entra depois dele (ao contrário da segunda tentativa do roteiro, que o
+  // achado pede explicitamente reordenada), porque o próprio pedido de traduzir tudo já cobre
+  // acentuação, e esta retentativa é sobre idioma, não sobre o lembrete genérico.
   const entrada = `${extrairVideo.montarEntrada(dadosVideo)}\n\nA tentativa anterior saiu em outro idioma ou so parte dela. Traduza tudo para o português do Brasil, inclusive o gancho.`;
 
   const resultado = await gerarEstruturado({

@@ -22,10 +22,18 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * `videos.serveDeModelo` ficava nulo (conta como "pode usar") para todo vídeo deste caminho.
  * Mesmos campos e mesmo critério de `extrairVideo.ts`, já nos quadros e na legenda, sem chamada
  * nova: o modelo já olha a tela inteira para montar o resto da ficha.
+ *
+ * Achado 11 da revisão do motor (01/10/2026): lembrete de acentuação como última linha da
+ * entrada; esta tarefa não tem retentativa nenhuma hoje, então a posição já nasce definitiva.
+ * Versão 1.2.0.
  */
-export const versao = "1.1.0";
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
+
+/** Mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`. */
+const LEMBRETE_ACENTUACAO =
+  "Escreva a ficha inteira com a acentuação correta do português (você, não, já, também, é, está), mesmo que o título ou a legenda do post estejam sem acento.";
 
 export const schema = z.object({
   assunto: z.string(),
@@ -83,5 +91,5 @@ Sem travessão, sem emoji. Escreva em português do Brasil, com acentuação cor
 }
 
 export function montarEntrada(dados: { titulo: string; legenda: string; duracaoS: number; nomeNicho: string; termosNicho: string[] }): string {
-  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\nLegenda do post: ${dados.legenda || "(sem legenda)"}\n\nOs quadros do video estao anexados.`;
+  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\nDuracao: ${dados.duracaoS} segundos\nLegenda do post: ${dados.legenda || "(sem legenda)"}\n\nOs quadros do video estao anexados.\n\n${LEMBRETE_ACENTUACAO}`;
 }

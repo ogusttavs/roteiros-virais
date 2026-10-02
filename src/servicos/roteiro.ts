@@ -974,6 +974,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       contextoDeSerie,
       marcaCitada,
     }),
+    // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
+    // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
+    lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,

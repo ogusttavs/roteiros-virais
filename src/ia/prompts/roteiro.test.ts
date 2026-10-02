@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { JARGAO } from "@/lib/regras-de-texto";
 
-import { montarEntrada, montarSistemaEstavel, type InstrucaoAbertura } from "./roteiro";
+import { LEMBRETE_ACENTUACAO, montarEntrada, montarSistemaEstavel, type InstrucaoAbertura } from "./roteiro";
 
 // OBJETIVOS_EM_ORDEM[2] (nao o literal, checar-texto varre este diretorio): o objetivo
 // "gente me chamar para comprar" (`NOME_OBJETIVO`), o mesmo que a asserção abaixo confere.
@@ -69,6 +69,18 @@ describe("montarEntrada", () => {
   it("sem objetivoDoVideo, nao menciona nada sobre o recado do video", () => {
     const entrada = montarEntrada(BASE);
     expect(entrada).not.toContain("precisa comunicar");
+  });
+
+  /**
+   * Achado 11 da revisão do motor (01/10/2026): `LEMBRETE_ACENTUACAO` saiu de dentro de
+   * `montarEntrada` (`servicos/roteiro.ts` passa ele como `lembreteFinal` de
+   * `gerarComVerificacao`, que garante a posição certa nas duas tentativas); sem isso, a segunda
+   * tentativa colava o motivo da reprovação depois do lembrete, empurrando ele para o meio do
+   * texto (`verificador.test.ts` cobre a reordenação em si).
+   */
+  it("nao embute mais o lembrete de acentuacao por conta propria", () => {
+    const entrada = montarEntrada(BASE);
+    expect(entrada).not.toContain(LEMBRETE_ACENTUACAO);
   });
 });
 

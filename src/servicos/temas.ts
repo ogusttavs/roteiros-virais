@@ -377,6 +377,9 @@ export async function avaliarTema(cliente: Cliente, texto: string): Promise<Resu
       regrasCliente,
     }),
     entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias }),
+    // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
+    // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).
+    lembreteFinal: avaliarTemaIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: false,
     evidenciasFornecidas: evidencias.map((v) => v.id),
