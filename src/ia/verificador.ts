@@ -625,8 +625,16 @@ export async function gerarComVerificacao<T>(
   const primeira = await tentarGerarEVerificar({ ...params, entrada: comLembrete(params.entrada) });
   if (primeira.aprovado) return { dados: primeira.dados, geracaoId: primeira.geracaoId };
 
+  /**
+   * Revisão do Fable no PR #102 (M5b, achado 4): a faixa de duração do nicho reprova a primeira
+   * tentativa (o modelo recebe o motivo e tem a chance de acertar), mas nunca derruba a geração
+   * sozinha. Na segunda tentativa a faixa não é conferida: a duração que vier é gravada como é,
+   * sem encaixe. A pessoa esperando o roteiro não pode receber um erro porque o vídeo saiu alguns
+   * segundos fora dos percentis do setor.
+   */
   const segunda = await tentarGerarEVerificar({
     ...params,
+    faixaDuracaoNicho: undefined,
     entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
   });
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };

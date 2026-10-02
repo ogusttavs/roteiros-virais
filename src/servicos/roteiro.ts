@@ -988,9 +988,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       ? dados.anguloParaEvitar.duracaoAnteriorS
       : undefined,
     extrairDuracaoS: (d) => d.duracaoS,
-    // M5b, achado 4: duração fora da faixa real do nicho reprova no verificador, em vez de ser
-    // encaixada depois (`respeitarDuracaoDoNicho`, removida junto desta etapa).
-    faixaDuracaoNicho: modeloNichoLinha?.modelo.duracaoTipicaS ?? undefined,
+    // M5b, achado 4: duração fora da faixa real do nicho reprova a primeira tentativa no
+    // verificador, em vez de ser encaixada depois (`respeitarDuracaoDoNicho`, removida junto desta
+    // etapa). Revisão do Fable no PR #102: só o Reels falado; a faixa é medida em vídeo com fala
+    // do feed, e um Story (soma de cartões) ou um vídeo sem fala (8 a 15 s é normal) fora dela é
+    // legítimo.
+    faixaDuracaoNicho:
+      dados.formato === "story" || dados.estilo === "sem_fala"
+        ? undefined
+        : (modeloNichoLinha?.modelo.duracaoTipicaS ?? undefined),
     generoTexto: "roteiro",
     formato: dados.formato,
     estilo: dados.estilo,

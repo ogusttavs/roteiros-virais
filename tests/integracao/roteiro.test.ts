@@ -3,7 +3,7 @@
  * e `marcarPostado` (etapa 11): ciclo completo contra o Postgres real, em
  * mock (`AI_PROVIDER=mock`, `vitest.config.mts`).
  */
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/ia/cliente", async (importarOriginal) => {
@@ -241,21 +241,47 @@ describe("gerarRoteiro", () => {
   /**
    * M5b, achado 4 da revisão do motor (01/10/2026): antes, uma duração fora da faixa do modelo
    * do nicho era silenciosamente encaixada (`respeitarDuracaoDoNicho`, removida); agora reprova
-   * no verificador, as duas tentativas (o mock sempre devolve 40s, fora dos 20 a 30 de
-   * `MODELO_PADRAO`), e a geração termina em erro em vez de um roteiro com duração inventada.
+   * na primeira tentativa do verificador (o mock sempre devolve 40s, fora dos 20 a 30 de
+   * `MODELO_PADRAO`). Revisão do Fable no PR #102: a faixa nunca derruba a geração sozinha; a
+   * segunda tentativa é aceita com a duração real, sem encaixe, e as duas ficam registradas.
    */
-  it("duracao fora da faixa do modelo do nicho reprova, nao e mais encaixada", async () => {
+  it("duracao fora da faixa do modelo do nicho reprova a primeira tentativa; a segunda sai com a duracao real, sem encaixe", async () => {
     const clienteId = await criarCliente();
     await criarVideoEvidencia("ev-duracao-fora-da-faixa", "cheiro de mofo no estofado");
     await criarModeloNicho();
 
-    await expect(
-      gerarRoteiro(clienteId, {
-        origem: "livre",
-        textoTema: "cheiro de mofo no estofado",
-        objetivo: "conversao",
-      }),
-    ).rejects.toThrow(/duracao.*fora da faixa tipica do nicho/);
+    const roteiro = await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo no estofado",
+      objetivo: "conversao",
+    });
+
+    expect((roteiro.conteudo as { duracaoS: number }).duracaoS).toBe(40);
+    const geracoes = await db()
+      .select({ id: geracoesIA.id, entradas: geracoesIA.entradas })
+      .from(geracoesIA)
+      .where(and(eq(geracoesIA.tarefa, "roteiro"), eq(geracoesIA.clienteId, clienteId)));
+    expect(geracoes).toHaveLength(2);
+    expect(JSON.stringify(geracoes.map((g) => g.entradas))).toContain("fora da faixa tipica do nicho");
+  });
+
+  it("video sem fala nao e reprovado pela faixa de duracao do nicho (a faixa e de video falado)", async () => {
+    const clienteId = await criarCliente();
+    await criarVideoEvidencia("ev-duracao-sem-fala", "cheiro de mofo no estofado");
+    await criarModeloNicho();
+
+    await gerarRoteiro(clienteId, {
+      origem: "livre",
+      textoTema: "cheiro de mofo no estofado",
+      objetivo: "conversao",
+      estilo: "sem_fala",
+    });
+
+    const geracoes = await db()
+      .select({ id: geracoesIA.id })
+      .from(geracoesIA)
+      .where(and(eq(geracoesIA.tarefa, "roteiro"), eq(geracoesIA.clienteId, clienteId)));
+    expect(geracoes).toHaveLength(1);
   });
 
   /**
