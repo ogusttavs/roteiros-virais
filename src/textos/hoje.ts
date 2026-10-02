@@ -146,6 +146,67 @@ export const textosHoje = {
     /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
     legendaReels: "Reels",
     legendaStory: "Story",
+    /**
+     * Passo 12 do Opus, o planejador, com aba própria desde a decisão do Gustavo de 01/10, 22:15
+     * (`/planejamento`, não mais dentro de Hoje): o cabeçalho é um só nas três visões
+     * (`cabeca-plano`), com o rótulo pequeno do período, o título grande, as duas setas (o
+     * significado muda por visão) e o seletor Dia, Semana, Mês. `rotuloPeriodo` é o texto pequeno
+     * acima do título; os nomes das visões e os pares de seta vêm de `visao` e `setas` (dúvida 12
+     * do README, lista literal).
+     */
+    planejador: {
+      seletorRotulo: "Ver o calendário por",
+      visao: { dia: "Dia", semana: "Semana", mes: "Mês" },
+      setas: {
+        dia: { anterior: "Dia anterior", seguinte: "Próximo dia" },
+        semana: { anterior: "Semana anterior", seguinte: "Próxima semana" },
+        mes: { anterior: "Mês anterior", seguinte: "Próximo mês" },
+      },
+      hoje: "Hoje",
+      semanaPassada: "Semana passada",
+      semanaQueVem: "Semana que vem",
+      mesPassado: "Mês passado",
+      esteMes: "Este mês",
+      mesQueVem: "Mês que vem",
+      criarRoteiroParaEsteDia: "Criar roteiro para este dia",
+      /** O "mais" de cada dia da Semana, e o dia vazio do desktop (dúvida 12: "Criar roteiro" curto). */
+      criarRoteiro: "Criar roteiro",
+      criarRoteiroParaDia: (diaPorExtenso: string) => `Criar roteiro para ${diaPorExtenso}`,
+      verMais: (n: number) => `Ver mais ${n}`,
+      sugerido: "sugerido",
+      legendaSugerido: "sugerido: veio da sua agenda e ainda não tem roteiro",
+      notaSugeridos: "Os sugeridos vieram da agenda que você contou. Toque num deles para escrever o roteiro.",
+      soltarAqui: "Soltar aqui",
+      movendoPara: (titulo: string, dia: string) => `Movendo ${titulo} para ${dia}.`,
+      semanaVaziaTitulo: "Nada marcado nesta semana",
+      semanaVaziaDescricao:
+        "Toque num dia para criar um roteiro para ele, ou conte a sua agenda e a gente sugere o que gravar em cada dia.",
+      nadaMarcadoNesteDiaTitulo: "Nada marcado neste dia",
+      proximoMarcadoCurto: (quando: string, formato: string) => `O mais perto marcado é ${quando}: um ${formato}.`,
+      erroAviso: "Não deu para abrir o calendário",
+      erroTitulo: "O que você marcou está guardado",
+      erro: "A falha foi nossa. Os seus roteiros e os dias marcados continuam aqui; é só tentar de novo.",
+      carregandoRotulo: "Carregando a semana",
+      /** O selo de estado dos itens da Semana (`.estado`), minúsculo, igual ao desenho. */
+      estadoAtrasado: "atrasado",
+    },
+    /**
+     * Pedido do Gustavo em 01/10, 21:33: tirar um item da frente sem abrir o roteiro. O mesmo menu
+     * em três lugares (o destaque, as linhas e os itens da Semana, nas abas Hoje e Planejar); as
+     * folhas são as que já existem (Mudar o dia, Arquivar com desfazer, Reprovar com motivo).
+     */
+    menu: {
+      abrir: "Mais opções",
+      /** Vários itens na mesma tela, cada um com o próprio menu (dúvida de acessibilidade: "mais
+       * opções" sozinho não diz de qual item, com vários na tela). */
+      abrirRotulo: (titulo: string) => `Mais opções: ${titulo}`,
+      naoVouGravarHoje: "Não vou gravar hoje",
+      arquivar: "Arquivar",
+      naoGosteiQueroOutro: "Não gostei, quero outro",
+      arquivadoToast: "Arquivado",
+      desfazer: "Desfazer",
+      erroArquivar: "Não foi possível arquivar. Tente de novo.",
+    },
     /** O título de cada coluna do dia: muda só quando o dia aberto não é hoje (dúvida 2). */
     reels: { hoje: "Reels de hoje", outroDia: "Reels" },
     stories: { hoje: "Stories de hoje", outroDia: "Stories" },

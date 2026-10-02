@@ -1,0 +1,81 @@
+/**
+ * Mesmas classes de `RoteiroTela.module.css` (o painel "reprovar" de lá), com nome próprio porque
+ * é outro módulo CSS: `.btn`, `.tituloPainel`, `.ajudaReprovar`, `.fraseErroPainel`,
+ * `.avisoTempoReprovar`, `.btnTextoCancelar`.
+ */
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.ajuda {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
+
+.btn {
+  flex: 1 1 auto;
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  width: 100%;
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid transparent;
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--cor-acao-hover);
+}
+
+.btn:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.aviso {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+  text-align: center;
+}
+
+.cancelar {
+  justify-self: center;
+  min-height: var(--altura-toque);
+  border: 0;
+  background: transparent;
+  padding: var(--espaco-2) var(--espaco-4);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.cancelar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

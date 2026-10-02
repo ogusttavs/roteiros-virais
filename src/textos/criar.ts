@@ -22,8 +22,8 @@ export const textosCriar = {
   },
   caminhoPlano: {
     titulo: "Planejar os próximos dias",
-    /** E39c, parte 1: a porta leva ao calendário, não direto para contar a agenda. */
-    ajuda: "Veja o calendário dos seus próximos dias e escolha onde criar.",
+    /** E39c, parte 2a: a porta leva à aba Planejar, na visão Semana. */
+    ajuda: "Veja a semana e o mês e marque o que gravar em cada dia.",
   },
   notaAgenda: "Tudo o que você cria fica marcado no dia, em Hoje.",
 

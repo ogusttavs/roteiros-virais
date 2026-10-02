@@ -1,0 +1,298 @@
+/**
+ * Passo 12 do Opus, a visão Semana (`Hoje.dc.html`, estado `semana`): no celular e no tablet em
+ * pé, uma lista de dias; do tablet deitado para cima, sete colunas. `hojeStyles` (`HojeTela.module.css`)
+ * dá as marcas (`.marcaReels`/`.marcaStory`), os botões de pé e o rodapé; aqui só o que é só da Semana.
+ */
+.semanaPlano {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+  max-width: var(--largura-comparacao);
+}
+
+.diaPlano {
+  position: relative;
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.diaPlanoHoje {
+  border-color: var(--cor-acao);
+}
+
+.diaPlanoPassado {
+  opacity: 0.75;
+}
+
+.cabecaDia {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+}
+
+.diaTitulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font: inherit;
+  margin: 0;
+}
+
+.nomeDia {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.numero {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2rem;
+  height: 2rem;
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pill);
+  font: var(--peso-semibold) var(--tamanho-cabecalho) / 1 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.diaPlanoHoje .numero {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
+.diaPlanoPassado .numero {
+  color: var(--cor-texto-dica);
+}
+
+.nada {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.maisDia {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.itensDia {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.linhaPlano {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--altura-toque);
+  align-items: center;
+  gap: var(--espaco-1);
+}
+
+.itemPlano {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px var(--espaco-2);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-2) var(--espaco-3);
+  border: var(--largura-borda) solid transparent;
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tipo {
+  grid-column: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-width: 0;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.tituloItem {
+  grid-column: 1;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.3;
+  color: var(--cor-titulo);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.estado {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: start;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.estadoFeito {
+  color: var(--cor-destaque);
+}
+
+.itemPlanoSugerido {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--cor-borda-forte);
+}
+
+.itemPlanoSugerido .tituloItem {
+  color: var(--cor-texto-suave);
+}
+
+.maisItens {
+  justify-self: start;
+  padding-left: 0;
+  min-height: var(--altura-toque);
+  border: 0;
+  background: transparent;
+  color: var(--cor-acao);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.criarNoDia,
+.maisFim {
+  display: none;
+}
+
+.periodoVazio {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  margin-bottom: var(--espaco-4);
+}
+
+.periodoVazio p {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.peSemana {
+  justify-content: space-between;
+}
+
+.legendaSugerido {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.marcaSugerida {
+  border-color: var(--cor-texto-dica);
+}
+
+@media (min-width: 1024px) {
+  .semanaPlano {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--espaco-2);
+    align-items: stretch;
+  }
+  .diaPlano {
+    padding: var(--espaco-2);
+    min-height: 22rem;
+    border-radius: var(--raio-md);
+  }
+  .cabecaDia {
+    gap: var(--espaco-1);
+    padding-left: var(--espaco-1);
+  }
+  .cabecaDia .nada,
+  .cabecaDia .maisDia {
+    display: none;
+  }
+  .maisFim {
+    display: grid;
+    place-items: center;
+    width: 100%;
+    min-height: var(--altura-toque);
+    border: var(--largura-borda) dashed var(--cor-borda-forte);
+    border-radius: var(--raio-md);
+    background: transparent;
+    color: var(--cor-texto-suave);
+    cursor: pointer;
+  }
+  .criarNoDia {
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: var(--espaco-1);
+    min-height: 7rem;
+    padding: var(--espaco-3) var(--espaco-2);
+    border: var(--largura-borda) dashed var(--cor-borda-forte);
+    border-radius: var(--raio-md);
+    background: transparent;
+    color: var(--cor-texto-suave);
+    font-size: var(--tamanho-rodape);
+    text-align: center;
+    cursor: pointer;
+  }
+  .itemPlano {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--espaco-2);
+  }
+  .tituloItem {
+    -webkit-line-clamp: 4;
+    font-size: var(--tamanho-rodape);
+    overflow-wrap: anywhere;
+  }
+  .estado {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: var(--espaco-1);
+  }
+  .linhaPlano {
+    grid-template-columns: minmax(0, 1fr);
+    position: relative;
+  }
+  /*
+   * No desktop o "mais" fica para o foco e o hover (dúvida 7 do passo 12: quem usa teclado).
+   * Seletor por `aria-haspopup` (`MenuAcoesAgenda.tsx`), não por classe: o botão vem de outro
+   * módulo CSS (`MenuAcoesAgenda.module.css`), cujo nome de classe não dá para apontar daqui.
+   */
+  .linhaPlano button[aria-haspopup="menu"] {
+    position: absolute;
+    top: 0;
+    right: 0;
+    opacity: 0;
+  }
+  .linhaPlano:hover button[aria-haspopup="menu"],
+  .linhaPlano:focus-within button[aria-haspopup="menu"] {
+    opacity: 1;
+  }
+}

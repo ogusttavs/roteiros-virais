@@ -39,6 +39,9 @@ type Props = {
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
    * é hoje; repassada aos caminhos que levam a "para quando é" (temas, assunto seu, momento). */
   dataInicial?: string;
+  /** E39c, parte 2a: veio de um sugerido tocado na visão Semana do planejador (`?plano=`, qualquer
+   * dia, não só hoje); abre a folha do momento já preenchida com o que a agenda contou daquele dia. */
+  itemPlanoInicial?: ItemPlano | null;
 };
 
 /**
@@ -58,6 +61,7 @@ export function CriarTela({
   tipo,
   quemGravaPadrao,
   dataInicial,
+  itemPlanoInicial,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -105,6 +109,15 @@ export function CriarTela({
     setItemPlanoParaFolha(item);
     setFolhaMomentoAberta(true);
   }
+
+  /** E39c, parte 2a: um sugerido tocado na visão Semana chega aqui por `?plano=` (`page.tsx`,
+   * `itemPlanoPorId`); abre a mesma folha de "o seu plano de hoje" usa, sem exigir que a pessoa
+   * toque de novo. Só na montagem: trocar de item não deve reabrir a folha sozinha. */
+  useEffect(() => {
+    if (itemPlanoInicial) {
+      abrirGravarAgoraDoPlano(itemPlanoInicial);
+    }
+  }, [itemPlanoInicial]);
 
   async function pularItemDoPlano(item: ItemPlano) {
     if (pulandoId !== null) return;
@@ -245,7 +258,7 @@ export function CriarTela({
               disabled={ocupado || semConexao}
               aria-busy={acao === "plano" || undefined}
               aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
-              onClick={() => ir("plano", dataInicial ? `/hoje/mes?dia=${dataInicial}` : "/hoje/mes")}
+              onClick={() => ir("plano", dataInicial ? `/planejamento?visao=semana&dia=${dataInicial}` : "/planejamento?visao=semana")}
             >
               <span className={styles.marcaPorta} aria-hidden="true">
                 <CalendarDays size={20} strokeWidth={1.75} aria-hidden="true" />

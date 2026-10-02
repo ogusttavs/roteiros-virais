@@ -1,0 +1,185 @@
+/**
+ * Passo 12 do Opus, `Hoje.dc.html` e `base.css`: o cabeçalho único do planejador, compartilhado
+ * pelas três visões (Dia, Semana, Mês). `.segmentado`/`.segmento` já existem em `base.css`,
+ * reaproveitados aqui como em `ReferenciasTela.module.css`.
+ */
+.cabecaPlano {
+  display: grid;
+  gap: var(--espaco-4);
+  width: 100%;
+  max-width: var(--largura-comparacao);
+}
+
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.data {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-dica);
+}
+
+.periodo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.periodo h1 {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0 var(--espaco-2) 0 0;
+  font-size: var(--tamanho-titulo);
+}
+
+.barraPlano {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+@media (min-width: 768px) {
+  .barraPlano {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .contar {
+    margin-left: auto;
+  }
+}
+
+@media (min-width: 768px) {
+  .soCelular {
+    display: none !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .foraCelular {
+    display: none !important;
+  }
+}
+
+.botaoBarra {
+  min-width: var(--altura-toque);
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-acao);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botaoBarra:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoBarra:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoBarra:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoSecundarioSm {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botaoSecundarioSm:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoSecundarioSm:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoSecundarioSm:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.segmentado {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: auto;
+  width: 100%;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+@media (min-width: 768px) {
+  .segmentado {
+    display: inline-grid;
+    width: auto;
+    justify-self: start;
+  }
+}
+
+.segmentoBotao {
+  min-height: var(--altura-toque);
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .segmentoBotao {
+    padding: 0 var(--espaco-5);
+  }
+}
+
+.segmentoBotao:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.segmentoAtivo {
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  box-shadow: var(--sombra-controle);
+}
