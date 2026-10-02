@@ -7,11 +7,11 @@
  * primeiro do site, estável e sempre no ar, mesma escolha de `referencias.spec.ts`) para confirmar
  * o iframe de verdade, com o segundo inicial da referência.
  *
- * O Instagram não tem e2e de embed de verdade aqui (a prova com vídeo real da R2a, fora desta
- * suíte, achou que o Instagram nunca manda o aviso de redimensionar para um domínio que ele não
- * reconhece, nem com o `embed.js` oficial): o teste abaixo confirma a queda no link depois do
- * tempo limite, sem precisar de rede nenhuma de verdade (o `VideoEmbed` nunca chega a montar o
- * iframe do Instagram, então o teste não depende do instagram.com responder).
+ * O Instagram toca pelo `/embed` oficial dentro do iframe (prova da revisão da R2a, num navegador de
+ * verdade e numa página https de outro domínio; em `http://localhost` a incorporação vem em branco,
+ * por isso aqui só se prova o que dá para provar em CI: o iframe montado com o endereço certo, com
+ * o instagram.com interceptado). O reserva (a capa escurecida com "Abrir no <rede>") é provado pelo
+ * TikTok, com o oEmbed respondendo erro por rota do Playwright.
  */
 import { expect, test } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
@@ -141,7 +141,7 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
     });
   });
 
-  test("Instagram sem embed cai no reserva (moldura escurecida, motivo e botão) depois do tempo limite", async ({ page }) => {
+  test("Instagram monta o iframe de incorporação; o reserva (moldura, motivo e botão) entra quando a rede falha de verdade", async ({ page }) => {
     test.setTimeout(20_000);
     const id = "e2e-r2a-instagram";
     await db().delete(user).where(eq(user.id, id));
@@ -171,10 +171,8 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
       .values({
         plataforma: "instagram",
         idExterno: "e2e-r2a-instagram-video",
-        // URL real do Instagram (o formato /p/<codigo>/, não o vídeo em si): o `VideoEmbed` nunca
-        // chega a chamar a rede para o Instagram (achado da prova com vídeo real da R2a, fora
-        // desta suíte), então o teste não depende do instagram.com responder; precisa só do
-        // domínio certo para `urlEmbedInstagram` reconhecer e entrar no caminho do tempo limite.
+        // O formato real do Instagram (/p/<codigo>/), com um código que não existe: o teste
+        // intercepta o instagram.com e confere só o endereço do iframe.
         url: "https://www.instagram.com/p/e2e-r2a-instagram/",
         nichoId: nicho.id,
         titulo: "video sem embed de verdade",
@@ -186,6 +184,23 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
         publicadoEm: new Date(),
         analise: analiseExemplo("teste r2a instagram") as never,
       });
+    await db()
+      .insert(videos)
+      .values({
+        plataforma: "tiktok",
+        idExterno: "e2e-r2a-tiktok-video",
+        url: "https://www.tiktok.com/@e2e/video/7000000000000000000",
+        nichoId: nicho.id,
+        titulo: "video que a rede nao deixa mostrar",
+        views: 60000,
+        foraDaCurva: "19.0",
+        idioma: "pt",
+        publicadoEm: new Date(),
+        analise: analiseExemplo("teste r2a tiktok") as never,
+      });
+
+    await page.route("**://www.instagram.com/**", (rota) => rota.fulfill({ status: 200, contentType: "text/html", body: "<p>incorporado</p>" }));
+    await page.route("**://www.tiktok.com/**", (rota) => rota.fulfill({ status: 500, body: "" }));
 
     await entrar(page, `${id}@exemplo.teste`);
     await page.goto("/referencias");
@@ -195,8 +210,18 @@ test.describe("R2a, a prévia do vídeo dentro do aplicativo", () => {
 
     const folha = page.getByRole("dialog", { name: "Por que esse funcionou" });
     await expect(folha).toBeVisible();
-    await expect(folha.getByText("O Instagram não deixa mostrar este vídeo aqui.")).toBeVisible({ timeout: 10_000 });
-    await expect(folha.getByRole("link", { name: "Abrir no Instagram" })).toBeVisible();
+    await expect(folha.locator("iframe")).toHaveAttribute("src", "https://www.instagram.com/p/e2e-r2a-instagram/embed", {
+      timeout: 10_000,
+    });
+    await expect(folha.getByText("O Instagram não deixa mostrar este vídeo aqui.")).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(folha).toBeHidden();
+
+    const cartaoTiktok = page.locator("article", { hasText: "video que a rede nao deixa mostrar" });
+    await cartaoTiktok.getByRole("button", { name: "Ver detalhes" }).click();
+    await expect(folha).toBeVisible();
+    await expect(folha.getByText("O TikTok não deixa mostrar este vídeo aqui.")).toBeVisible({ timeout: 10_000 });
+    await expect(folha.getByRole("link", { name: "Abrir no TikTok" })).toBeVisible();
     // A folha continua com o próprio "Abrir na plataforma" no rodapé, sem relação com o reserva
     // de dentro do VideoEmbed (é outro botão, sempre presente).
     await expect(folha.getByRole("link", { name: "Abrir na plataforma" })).toBeVisible();

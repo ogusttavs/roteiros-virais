@@ -76,10 +76,10 @@ function eUrlDoTiktok(url: string): boolean {
  * então o carregamento tardio dispara uma chamada ao oEmbed oficial do TikTok
  * (`https://www.tiktok.com/oembed?url=`) só para extrair o id do vídeo, sem
  * injetar o HTML nem o script que a resposta traz: o iframe final
- * (`/embed/v2/<id>`) é montado à mão. O Instagram cai sempre no reserva (prova
- * da R2a com vídeo de verdade: o embed carrega em branco para um domínio que
- * ele não reconhece, com ou sem o `embed.js` oficial), ver o comentário do
- * temporizador abaixo. A capa com o play antes de tocar (o estado `previa` do
+ * (`/embed/v2/<id>`) é montado à mão. O Instagram vira iframe por
+ * transformação de URL (`/reel/<codigo>/embed`). O reserva (a capa escurecida
+ * com "Abrir no <rede>") entra só em falha de verdade: `falhou` vindo de fora,
+ * TikTok sem id, ou sem rede. A capa com o play antes de tocar (o estado `previa` do
  * desenho) fica para a R2b; aqui o carregamento continua automático ao
  * entrar na tela.
  */
@@ -138,20 +138,13 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
   }, [visivel, eTiktok, idTiktok, falhouTiktok, url]);
 
   useEffect(() => {
+    // O Instagram toca pelo `/embed` oficial dentro do iframe (prova da revisão da R2a, num navegador de
+    // verdade e numa página https de outro domínio: a incorporação desenha e o play toca ali dentro; em
+    // `http://localhost` ela vem em branco, e o pedido fora de iframe recebe `X-Frame-Options: DENY`, por
+    // isso nenhum dos dois serve de prova). Não há sinal de falha para ouvir, então o reserva do
+    // Instagram só entra sem rede, o mesmo caso em que o TikTok nem tenta.
     if (!visivel || !urlInstagram || falhouInstagram) return;
-    /**
-     * O Instagram não devolve erro nenhum para um domínio que ele não reconhece: o iframe carrega
-     * em branco, para sempre (achado da prova com vídeo de verdade da R2a: nos dois jeitos
-     * testados, com `/embed` direto e com o `embed.js` oficial mais a mensagem de redimensionar que
-     * ele espera de volta, nenhum dos dois jamais recebeu essa mensagem). Sem sinal de sucesso para
-     * esperar, o iframe do Instagram nem chega a ser montado (não existe um bloco "visivel &&
-     * urlInstagram" abaixo, de propósito): o mesmo tempo limite do TikTok decide, e cai no reserva
-     * em vez de um retângulo em branco parado para sempre. Se um dia o Instagram passar a mandar essa
-     * mensagem para o nosso domínio, a correção é ouvir `message` aqui, confirmar o sucesso antes do
-     * tempo esgotar e só então montar o iframe de verdade.
-     */
-    const temporizador = setTimeout(() => setFalhouInstagram(true), TEMPO_LIMITE_OEMBED_MS);
-    return () => clearTimeout(temporizador);
+    if (navigator.onLine === false) setFalhouInstagram(true);
   }, [visivel, urlInstagram, falhouInstagram]);
 
   if (falhou || falhouTiktok || falhouInstagram) {
@@ -188,6 +181,18 @@ export function VideoEmbed({ url, alt, rotuloCarregamento, falhou = false, hrefE
       <iframe
         className={styles.iframe}
         src={src.toString()}
+        title={alt}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+      />
+    );
+  }
+
+  if (visivel && urlInstagram) {
+    return (
+      <iframe
+        className={styles.iframe}
+        src={urlInstagram}
         title={alt}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
