@@ -24,6 +24,22 @@
   background: var(--cor-superficie-hover);
 }
 
+/**
+ * Acabamento da E39c, parte 2a (revisão do Fable no PR #95, 02/10/2026): a 360px, "Abrir o
+ * roteiro" ao lado deste botão quebrava em duas linhas. O rótulo "Mais opções" some abaixo de
+ * 480px (mesmo ícone de sempre continua dizendo o que é, igual à variante "linha"), sobrando
+ * espaço para "Abrir o roteiro" caber numa linha só.
+ */
+.rotuloDestaque {
+  display: none;
+}
+
+@media (min-width: 480px) {
+  .rotuloDestaque {
+    display: inline;
+  }
+}
+
 .botaoLinha {
   flex: 0 0 auto;
   display: grid;
@@ -45,6 +61,48 @@
 
 .botaoDestaque:focus-visible,
 .botaoLinha:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/**
+ * Título e X do menu (acabamento da E39c, parte 2a, revisão do Fable no PR #95, 02/10/2026): o
+ * painel flutuante só tinha o título como aria-label, sem nada visível para quem olha a tela.
+ */
+.cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  margin-bottom: var(--espaco-2);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.fechar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  margin-right: calc(var(--espaco-2) * -1);
+  border: 0;
+  border-radius: var(--raio-md);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.fechar:hover {
+  background: var(--cor-superficie-recuada);
+}
+
+.fechar:focus-visible {
   outline: none;
   box-shadow: var(--sombra-foco);
 }

@@ -11,13 +11,16 @@ import styles from "./CabecaPlano.module.css";
  * o título da semana atual, com as setas e o seletor desenhados mas inertes (não há `visao` nem
  * `dia` da URL para saber para onde levariam). Vira interativo assim que a visão real carrega.
  */
-export function CabecaPlanoEstatica({ tituloPeriodo }: { tituloPeriodo: string }) {
+export function CabecaPlanoEstatica({ tituloPeriodo, tituloPeriodoCurto }: { tituloPeriodo: string; tituloPeriodoCurto: string }) {
   return (
     <div className={styles.cabecaPlano}>
       <div className={styles.cabecalhoTela}>
         <span className={styles.data}>{textosHoje.agenda.estaSemana}</span>
         <div className={styles.periodo}>
-          <h1>{tituloPeriodo}</h1>
+          <h1>
+            <span className={styles.tituloCurto}>{tituloPeriodoCurto}</span>
+            <span className={styles.tituloLongo}>{tituloPeriodo}</span>
+          </h1>
           <button type="button" className={styles.botaoBarra} disabled aria-hidden="true" tabIndex={-1}>
             <ChevronLeft size={18} strokeWidth={1.75} aria-hidden="true" />
           </button>

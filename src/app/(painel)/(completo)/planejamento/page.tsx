@@ -115,6 +115,30 @@ function tituloSemana(segunda: string, domingo: string): string {
   return `${diaInicio} a ${diaFim}`;
 }
 
+const FORMATAR_DIA_MES_CURTO = new Intl.DateTimeFormat("pt-BR", { month: "short", timeZone: "America/Sao_Paulo" });
+/** "set.", "out." -> "set", "out": sem ponto, para a forma curta do período. */
+function mesCurto(data: Date): string {
+  return FORMATAR_DIA_MES_CURTO.format(data).replace(/\.$/, "");
+}
+
+/**
+ * Acabamento da E39c, parte 2a (revisão do Fable no PR #95, 02/10/2026): "28 set a 4 out" em vez
+ * de "28 de setembro a 4 de outubro", para caber abaixo de 768px (`CabecaPlano`, `tituloCurto`).
+ */
+function tituloSemanaCurto(segunda: string, domingo: string): string {
+  const [, mesSegunda] = segunda.split("-");
+  const [, mesDomingo] = domingo.split("-");
+  const [anoS, mesS, diaS] = segunda.split("-").map(Number);
+  const [anoD, mesD, diaD] = domingo.split("-").map(Number);
+  if (mesSegunda === mesDomingo) {
+    const mesFim = mesCurto(new Date(Date.UTC(anoD, mesD - 1, diaD, 12)));
+    return `${diaS} a ${diaD} ${mesFim}`;
+  }
+  const inicio = `${diaS} ${mesCurto(new Date(Date.UTC(anoS, mesS - 1, diaS, 12)))}`;
+  const fim = `${diaD} ${mesCurto(new Date(Date.UTC(anoD, mesD - 1, diaD, 12)))}`;
+  return `${inicio} a ${fim}`;
+}
+
 /** O rótulo pequeno acima do título da visão Semana: "Esta semana", "Semana passada" ou "Semana que vem". */
 function rotuloPeriodoSemana(segundaVisualizada: string, segundaDeHoje: string): string {
   if (segundaVisualizada === segundaDeHoje) return textosHoje.agenda.estaSemana;
@@ -293,6 +317,7 @@ export default async function Planejamento({ searchParams }: Props) {
     cabeca = {
       rotuloPeriodo: rotuloPeriodoSemana(segunda, segundaDeHoje),
       tituloPeriodo: tituloSemana(segunda, domingo),
+      tituloPeriodoCurto: tituloSemanaCurto(segunda, domingo),
       mostrarHoje: segunda !== segundaDeHoje,
       hrefAnterior: `/planejamento?visao=semana&dia=${somarDiasISO(diaVisualizado, -7)}`,
       hrefSeguinte: `/planejamento?visao=semana&dia=${somarDiasISO(diaVisualizado, 7)}`,

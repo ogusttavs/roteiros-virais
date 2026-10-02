@@ -1,10 +1,11 @@
 "use client";
 
-import { Ellipsis } from "lucide-react";
+import { Ellipsis, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
+import { textosComuns } from "@/textos/comuns";
 import { textosHoje } from "@/textos/hoje";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { useTratarFalha } from "@/ui/ConexaoContext";
@@ -99,10 +100,16 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
         }}
       >
         <Ellipsis size={variante === "destaque" ? 20 : 18} strokeWidth={1.75} aria-hidden="true" />
-        {variante === "destaque" ? textosHoje.agenda.menu.abrir : null}
+        {variante === "destaque" ? <span className={styles.rotuloDestaque}>{textosHoje.agenda.menu.abrir}</span> : null}
       </button>
 
       <PainelFlutuante titulo={textosHoje.agenda.menu.abrirRotulo(titulo)} aberto={menuAberto} aoFechar={fecharMenu} role="menu">
+        <div className={styles.cabecalho}>
+          <h2 className={styles.titulo}>{textosHoje.agenda.menu.abrirRotulo(titulo)}</h2>
+          <button type="button" className={styles.fechar} onClick={fecharMenu} aria-label={textosComuns.fechar}>
+            <X size={20} strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </div>
         <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoVouGravarHoje}>
           {textosHoje.agenda.menu.naoVouGravarHoje}
         </button>

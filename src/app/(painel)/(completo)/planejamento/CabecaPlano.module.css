@@ -36,6 +36,30 @@
   font-size: var(--tamanho-titulo);
 }
 
+/**
+ * Acabamento da E39c, parte 2a (revisão do Fable no PR #95, 02/10/2026): abaixo de 768px, o
+ * período da semana usa a forma curta ("28 set a 4 out" em vez de "28 de setembro a 4 de
+ * outubro"), para caber ao lado das setas sem espremer. Só a visão Semana tem a forma curta
+ * (`tituloPeriodoCurto`); Dia e Mês continuam só com `tituloPeriodo`.
+ */
+.tituloCurto {
+  display: inline;
+}
+
+.tituloLongo {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .tituloCurto {
+    display: none;
+  }
+
+  .tituloLongo {
+    display: inline;
+  }
+}
+
 .barraPlano {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
