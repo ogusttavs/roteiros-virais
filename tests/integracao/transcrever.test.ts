@@ -374,14 +374,12 @@ describe("rodarTranscrever, V2a item 1: vaga perdida nao conta", () => {
  * internacional da fila com base em quantos brasileiros de fato entraram,
  * não no tamanho da fila.
  */
-describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
-  it("video internacional em excesso nunca entra na fila, mesmo com prioridade maior que o brasileiro que entrou", async () => {
-    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 5 => tamanhoFila = 20.
-    // Cinco "pt" disponiveis => brasileirosAceitos = 5; maxInternacional =
-    // floor(5*0,3/0,7) = 2 (nao mais um calculo sobre a fila de 20). Dez "en"
-    // com prioridade maior (foraDaCurva mais alto) que os cinco "pt": so os
-    // 2 primeiros "en" cabem na fila, os outros oito ficam de fora, mesmo
-    // tendo prioridade maior que qualquer "pt".
+describe("rodarTranscrever, achado 2 da revisao do motor: sem proporcao do Brasil na fila de leitura", () => {
+  it("sem a proporcao, os cinco de maior prioridade entram, mesmo todos internacionais", async () => {
+    // FATOR_FILA (fixo, transcrever.ts) = 4; teto diario 5 => tamanhoFila = 20. Dez "en" com
+    // prioridade maior (foraDaCurva mais alto) que os cinco "pt": antes da M5a, a proporcao 70/30
+    // cortava o "en" em 2; agora a ordem de prioridade manda sozinha, e os cinco primeiros "en"
+    // fecham o teto diario antes de qualquer "pt" ou "en" de prioridade menor ser tentado.
     config.regras.transcricoesPorDia = 5;
 
     const urlsEn: string[] = [];
@@ -435,19 +433,15 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
     await rodarTranscrever();
 
     const chamadas = vi.mocked(baixarLegendaYoutube).mock.calls.map(([url]) => url);
-    // Os dois "en" de maior prioridade entraram (cabem no teto de 2 internacionais).
-    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 2)));
-    // Do terceiro "en" em diante, nenhum entrou na fila, mesmo com prioridade
-    // maior que qualquer "pt": a proporcao cortou antes deles.
-    for (const url of urlsEn.slice(2)) {
+    // Os cinco "en" de maior prioridade fecham o teto diario, nenhum "pt" e tentado.
+    expect(chamadas).toEqual(expect.arrayContaining(urlsEn.slice(0, 5)));
+    for (const url of [...urlsEn.slice(5), ...urlsPt]) {
       expect(chamadas).not.toContain(url);
     }
-    // Os "pt" completam o teto de 5 sucessos (2 en + 3 pt primeiros).
-    expect(chamadas).toEqual(expect.arrayContaining(urlsPt.slice(0, 3)));
   });
 
-  /** A nova regra: sem nenhum brasileiro disponivel, a fila fica vazia, nunca so internacional. */
-  it("sem nenhum brasileiro disponivel, a fila fica vazia: nenhum internacional e tentado", async () => {
+  /** Achado 2: sem nenhum brasileiro disponivel, o internacional entra normalmente na fila agora. */
+  it("sem nenhum brasileiro disponivel, o internacional entra normalmente na fila", async () => {
     config.regras.transcricoesPorDia = 5;
 
     for (let i = 1; i <= 5; i += 1) {
@@ -474,8 +468,8 @@ describe("rodarTranscrever, V2b item 6: proporcao 70/30 na fila", () => {
 
     const resumo = await rodarTranscrever();
 
-    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
-    expect((resumo.tentativas as Record<string, number>).youtube).toBe(0);
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(5);
+    expect((resumo.tentativas as Record<string, number>).youtube).toBe(5);
   });
 });
 

@@ -116,6 +116,19 @@ export function aplicarProporcaoBrasil<T>(
 }
 
 /**
+ * Achado 2 da revisão do motor (01/10/2026): a seleção de leitura (o que `transcrever.ts` escolhe
+ * para transcrever, o que `analisar-visual.ts` escolhe para ler por imagem) deixa de aplicar a
+ * proporção do Brasil, que zerava o estrangeiro inteiro quando não havia nenhum brasileiro na
+ * janela, qualquer que fosse a régua do setor. "Outro" continua de fora, mesma regra de sempre; a
+ * ordem de prioridade e o corte em `limite` continuam os mesmos de `aplicarProporcaoBrasil`. O que
+ * aparece nas telas (Referências) e a prova do tema e do roteiro continuam com a proporção, até o
+ * Gustavo decidir (`estrategia/revisao-motor-2026-10-01.md`, achado 2).
+ */
+export function semProporcaoBrasil<T>(itens: T[], limite: number, classificar: (item: T) => ClassificacaoBrasil): T[] {
+  return itens.filter((item) => classificar(item) !== "outro").slice(0, limite);
+}
+
+/**
  * A rede principal da marca vem primeiro na ordem de prioridade (V12, item
  * 3a): reordenação estável, nunca um corte; sem rede principal, devolve a
  * lista como veio. Chamada antes de `aplicarProporcaoBrasil`, para a

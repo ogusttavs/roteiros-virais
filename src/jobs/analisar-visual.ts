@@ -18,10 +18,9 @@
  * leitura); é o sinal que `resumoLeituraPorPlataforma` (`admin-coleta.ts`)
  * usa para "analisados hoje" em `/admin/nichos/[slug]`.
  *
- * V2b, item 6: a proporção 70/30 corta os dez escolhidos, no lugar do
- * corte simples por tamanho que havia antes; a consulta busca um pool
- * maior (mesmo raciocínio de `pesquisa.ts`) para sobrar brasileiro
- * suficiente.
+ * Achado 2 da revisão do motor (01/10/2026): a proporção do Brasil não entra mais na escolha dos
+ * dez (ler por imagem é leitura, não tela); só "outro" continua de fora. A consulta mantém o pool
+ * maior que o corte final só por segurança de poucos candidatos; não é mais por causa da proporção.
  */
 import { and, asc, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
 
@@ -32,7 +31,7 @@ import * as analisarVisualIA from "@/ia/prompts/analisarVisual";
 import { registrarGeracao } from "@/ia/registro";
 import { config } from "@/lib/config";
 import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO, reguaDoSetor } from "@/servicos/pesquisa";
-import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
+import { classificarBrasil, contaEhBrasileira, semProporcaoBrasil } from "@/servicos/proporcao-brasil";
 import { temposDeQuadro } from "@/servicos/quadros";
 
 import { midiaUrlFresca } from "./coleta-comum";
@@ -40,7 +39,7 @@ import { apagarVideo, baixarVideo480p, duracaoDoArquivoS, extrairQuadros } from 
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "./youtube-cliente";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
-/** V2b, item 6: mesmo raciocínio do `FATOR_POOL_BRASIL` de `pesquisa.ts`. */
+/** Pool maior que o corte final, para "outro" ter o que sobrar depois de filtrado. */
 const FATOR_POOL_BRASIL = 4;
 
 type CandidatoVisual = {
@@ -96,11 +95,8 @@ async function candidatosDoNicho(nichoId: number): Promise<CandidatoVisual[]> {
     .orderBy(desc(videos.foraDaCurva), asc(videos.id))
     .limit(config.regras.visuaisPorSemana * FATOR_POOL_BRASIL);
 
-  return aplicarProporcaoBrasil(
-    linhas,
-    config.regras.visuaisPorSemana,
-    (l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
-    regua.proporcaoBrasil,
+  return semProporcaoBrasil(linhas, config.regras.visuaisPorSemana, (l) =>
+    classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)),
   );
 }
 
