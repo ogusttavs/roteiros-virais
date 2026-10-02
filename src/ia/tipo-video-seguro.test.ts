@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { corrigirTipoConteudoInvalido } from "./tipo-conteudo-seguro";
+import { corrigirTipoConteudoInvalido } from "./tipo-video-seguro";
 
 describe("corrigirTipoConteudoInvalido", () => {
   it("tipoConteudo valido passa intocado, com o serveDeModelo que veio", () => {

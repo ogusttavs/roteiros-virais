@@ -46,7 +46,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * entrada nas duas tentativas (o lembrete do sistema estável, abaixo, continua, mas sozinho não
  * bastou em outras tarefas, `roteiro.ts`). Versão 1.6.0.
  *
- * E43: quando o tema nasce de "Criar conteúdo com esta notícia", o título, o resumo e o ângulo
+ * E43: quando o tema nasce de "Criar vídeo com esta notícia", o título, o resumo e o ângulo
  * sugerido da notícia entram na entrada, para o modelo avaliar com esse contexto. Versão 1.7.0.
  */
 export const versao = "1.7.0";
@@ -147,7 +147,7 @@ sem acento nenhum; a sua justificativa sai sempre acentuada, mesmo assim.`;
 export function montarEntrada(dados: {
   tema: string;
   evidencias: { id: number; assunto: string; gancho: string; foraDaCurva: number }[];
-  /** E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia". */
+  /** E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null };
 }): string {
   const listaEvidencias =

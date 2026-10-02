@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronRight, History } from "lucide-react";
+import { Bookmark, ChevronRight, History, Newspaper } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -19,14 +19,14 @@ type Props = {
 
 const ITENS = [
   { href: "/referencias", rotulo: textosNav.referencias, ajuda: textosNav.ajudaReferencias, Icone: Bookmark },
+  { href: "/noticias", rotulo: textosNav.noticias, ajuda: textosNav.ajudaNoticias, Icone: Newspaper },
   { href: "/historico", rotulo: textosNav.historico, ajuda: textosNav.ajudaHistorico, Icone: History },
 ];
 
 /**
  * A folha que o "Mais" da cápsula do celular abre (passo 13 do Opus, `Casca.dc.html`, estado
  * `mais`, `.lista-mais`/`.item-mais`): os destinos para consultar, cada um com o que tem lá dentro
- * numa linha. Do tablet para cima eles já estão na barra lateral (`Nav.tsx`), sem esta folha. A
- * aba Notícias entra na lista quando a E43 existir (hoje nem aparece na lateral).
+ * numa linha. Do tablet para cima eles já estão na barra lateral (`Nav.tsx`), sem esta folha.
  */
 export function FolhaMais({ aoFechar, aoNavegar }: Props) {
   const router = useRouter();

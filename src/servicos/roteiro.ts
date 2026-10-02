@@ -330,7 +330,7 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    */
   quemAparece?: QuemGrava;
   /**
-   * E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia" (Tema livre, estado
+   * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia" (Tema livre, estado
    * `comNoticia`). Resolvida aqui, escopada pelo nicho do cliente, nunca confiando num id de outro
    * setor vindo do client; `origem` continua `"livre"` (é o mesmo fluxo de tema livre, só com um
    * ponto de partida), a notícia vira um campo próprio em vez de uma quarta origem.
@@ -790,7 +790,7 @@ type MontarERoteiroDados = {
    */
   momento?: Momento;
   /**
-   * E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia". Ao contrário do
+   * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". Ao contrário do
    * momento, não muda a busca de evidência (continua normal, pelo tema); só acrescenta o bloco da
    * notícia na entrada do prompt.
    */

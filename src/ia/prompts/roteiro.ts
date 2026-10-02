@@ -219,7 +219,7 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * `gerarComVerificacao` como `lembreteFinal`, que garante a posição certa nas duas tentativas.
  * Versão 2.7.3.
  *
- * E43: quando o roteiro nasce de "Criar conteúdo com esta notícia" (Tema livre, estado
+ * E43: quando o roteiro nasce de "Criar vídeo com esta notícia" (Tema livre, estado
  * `comNoticia`), o título, o resumo e o ângulo sugerido da notícia entram como um bloco, logo
  * depois do tema (a notícia é o que fez a pessoa escrever aquele tema, não o substitui: a busca de
  * evidência continua normal, ao contrário do momento). Versão 2.8.0.
@@ -640,7 +640,7 @@ export function montarEntrada(dados: {
    */
   marcaCitada?: { nome: string; perfilCompilado: string };
   /**
-   * E43: presente quando o tema nasceu de "Criar conteúdo com esta notícia". Ao contrário do
+   * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". Ao contrário do
    * momento, não substitui `tema` nem o bloco de evidência: a notícia é o que motivou a pessoa a
    * escrever aquele tema, a busca de evidência no banco continua normal.
    */

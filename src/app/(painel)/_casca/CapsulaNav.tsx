@@ -18,7 +18,7 @@ const ITENS_CAPSULA: { href: string; rotulo: string; Icone: ComponentType<{ size
   { href: "/planejamento", rotulo: textosNav.planejar, Icone: Calendar },
 ];
 /** As mesmas rotas de `FolhaMais.tsx`, só para saber quando "Mais" fica aceso. */
-const ROTAS_NO_MAIS = ["/referencias", "/historico"];
+const ROTAS_NO_MAIS = ["/referencias", "/noticias", "/historico"];
 
 type Props = {
   /** V5, item 5: o rótulo escrito some da vista ao rolar para baixo, continua para o leitor de tela. */
@@ -28,9 +28,9 @@ type Props = {
 /**
  * A cápsula de navegação do celular (passo 13 do Opus, `Casca.dc.html`, `.abas`/`.aba`): só os
  * três destinos de todo dia (Hoje, Criar, Planejar) mais "Mais", que abre `FolhaMais.tsx` com o
- * que é para consultar (Referências, Histórico; Notícias quando a E43 existir). A 360 px, seis
- * (ou cinco) destinos não cabem com o rótulo legível e o alvo de 44 px; a barra lateral do
- * tablet/desktop (`Nav.tsx`) mostra todos direto, sem este recorte.
+ * que é para consultar (Referências, Notícias, Histórico). A 360 px, seis destinos não cabem com
+ * o rótulo legível e o alvo de 44 px; a barra lateral do tablet/desktop (`Nav.tsx`) mostra todos
+ * direto, sem este recorte.
  */
 export function CapsulaNav({ encolhida = false }: Props) {
   const pathname = usePathname();

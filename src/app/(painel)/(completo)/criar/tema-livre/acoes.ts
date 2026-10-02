@@ -26,7 +26,7 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  * precisa achar o texto lá. Só some quando a pessoa avalia outro assunto
  * ou apaga o campo (`salvarRascunhoTemaLivre`).
  *
- * E43: `noticiaId` presente quando o tema nasceu de "Criar conteúdo com esta
+ * E43: `noticiaId` presente quando o tema nasceu de "Criar vídeo com esta
  * notícia". A notícia é resolvida aqui, escopada pelo setor do cliente, nunca
  * confiando num id de outro setor vindo do client.
  */
