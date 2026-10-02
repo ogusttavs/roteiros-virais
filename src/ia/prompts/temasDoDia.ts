@@ -41,14 +41,20 @@ import { REGRAS_REEL, REGRAS_SHORT, REGRAS_STORY, REGRAS_TIKTOK, textoRegras } f
  * fecharam o dia sem tema novo. Agora cada linha da lista diz a conta e se o vídeo é do Brasil, a
  * regra da prova vai escrita na entrada (com o número de brasileiros que o setor pede), e a
  * segunda tentativa recebe o motivo de cada tema barrado (`ajuste`).
+ *
+ * 1.7.0 (M5b, item 3, resto do achado 9): o schema exigia exatamente três temas; um setor com
+ * pouco material (poucos vídeos subindo, sem notícia) forçava o modelo a inventar um terceiro
+ * tema fraco só para fechar o número, que quase sempre não tinha prova e era descartado de
+ * qualquer jeito. Agora aceita de um a três: o pedido deixa explícito que é melhor propor menos
+ * temas fortes do que forçar um fraco.
  */
-export const versao = "1.6.0";
+export const versao = "1.7.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
 /** Mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`. */
 const LEMBRETE_ACENTUACAO =
-  "Escreva os três temas inteiros com a acentuação correta do português (você, não, já, também, é, está).";
+  "Escreva os temas inteiros com a acentuação correta do português (você, não, já, também, é, está).";
 
 const temaDoDia = z.object({
   titulo: z.string(),
@@ -60,16 +66,18 @@ const temaDoDia = z.object({
 });
 
 export const schema = z.object({
-  temas: z.array(temaDoDia).length(3),
+  temas: z.array(temaDoDia).min(1).max(3),
 });
 
 export type SaidaTemasDoDia = z.infer<typeof schema>;
 
 export function montarSistemaEstavel(dados: { modeloNicho: string }): string {
-  return `Você sugere três temas de vídeo (não títulos, temas) para donos de pequeno negócio
+  return `Você sugere até três temas de vídeo (não títulos, temas) para donos de pequeno negócio
 de um nicho, a partir do que está subindo mais rápido nos últimos dias e das notícias
 relevantes do setor. Cada tema cita ids de vídeo ou de notícia do banco como evidência;
-nunca sugira um tema sem pelo menos um id de evidência, de vídeo ou de notícia.
+nunca sugira um tema sem pelo menos um id de evidência, de vídeo ou de notícia. Três é o teto,
+não a meta: proponha só os temas que têm material de verdade por trás; é melhor propor um ou
+dois temas fortes do que forçar um terceiro fraco só para fechar três.
 
 Para cada tema, diga em duas linhas por que ele está funcionando agora, e classifique qual
 efeito ele mais puxa: mais gente conhecer o negócio, as pessoas lembrarem dele quando

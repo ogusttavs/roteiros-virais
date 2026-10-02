@@ -1,6 +1,41 @@
 import { describe, expect, it } from "vitest";
 
-import { montarEntrada, montarSistemaEstavel } from "./temasDoDia";
+import { puxaParaEnum } from "../enums";
+
+import { montarEntrada, montarSistemaEstavel, schema } from "./temasDoDia";
+
+/** `puxaParaEnum.options[0]`, não o texto literal: `checar-texto` varre todo `.ts` de `src/ia/prompts/`, testes inclusive, e os três valores são jargão (regra 6 do projeto) fora deste enum interno. */
+const TEMA_EXEMPLO = {
+  titulo: "tema exemplo",
+  descricao: "descricao exemplo",
+  porQue: "porque exemplo",
+  evidencias: [1],
+  evidenciasNoticias: [],
+  puxaPara: puxaParaEnum.options[0],
+};
+
+/** M5b, item 3: o schema aceita de 1 a 3 temas, não exatamente 3 (acabamento do achado 9). */
+describe("schema, de um a tres temas (M5b, item 3)", () => {
+  it("aceita um tema so", () => {
+    expect(schema.safeParse({ temas: [TEMA_EXEMPLO] }).success).toBe(true);
+  });
+
+  it("aceita dois temas", () => {
+    expect(schema.safeParse({ temas: [TEMA_EXEMPLO, TEMA_EXEMPLO] }).success).toBe(true);
+  });
+
+  it("aceita tres temas", () => {
+    expect(schema.safeParse({ temas: [TEMA_EXEMPLO, TEMA_EXEMPLO, TEMA_EXEMPLO] }).success).toBe(true);
+  });
+
+  it("reprova zero temas", () => {
+    expect(schema.safeParse({ temas: [] }).success).toBe(false);
+  });
+
+  it("reprova mais de tres temas", () => {
+    expect(schema.safeParse({ temas: [TEMA_EXEMPLO, TEMA_EXEMPLO, TEMA_EXEMPLO, TEMA_EXEMPLO] }).success).toBe(false);
+  });
+});
 
 /** R1, item 3: os temas do dia podem citar a regra de plataforma que explica a evidência. */
 describe("montarSistemaEstavel, regra de plataforma em porQue (R1, item 3)", () => {
@@ -9,6 +44,13 @@ describe("montarSistemaEstavel, regra de plataforma em porQue (R1, item 3)", () 
     expect(sistema).toContain("use a ideia dela dentro da própria frase");
     expect(sistema).toContain("nunca escreva o número da regra");
     expect(sistema).toContain("nunca liste regras soltas fora da frase");
+  });
+
+  it("deixa claro que tres e o teto, nao a meta (M5b, item 3)", () => {
+    const sistema = montarSistemaEstavel({ modeloNicho: "modelo do nicho" });
+    expect(sistema).toContain("até três");
+    expect(sistema).toContain("Três é o teto,");
+    expect(sistema).toContain("não a meta");
   });
 
   it("traz as quatro bases curtas de regras (Reels, TikTok, Short, Story), sem video longo", () => {

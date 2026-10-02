@@ -1,0 +1,1 @@
+ALTER TABLE "temas_dia" ADD COLUMN "candidatos_na_ultima_tentativa" integer;

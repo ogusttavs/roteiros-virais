@@ -46,9 +46,20 @@
  * gerou tema porque `extrairColeta` so buscava o resultado do lote de
  * extracao de 4 em 4 horas, e as 05:30 nenhum video do nicho novo ainda
  * tinha analise. Agora `extrairColeta` roda de hora em hora, aos 20 (e uma
- * consulta de estado do lote, barata) e `temasDoDia` vai para as 06:30:
- * transcrever 04:00, meta-hashtags 04:20, extrair (monta o lote) 05:00,
- * resultado normalmente ate 06:20, tema 06:30, lembrete padrao 08:00.
+ * consulta de estado do lote, barata) e `temasDoDia` vai para as 06:30.
+ *
+ * M5b, item 1 (02/10/2026, conferencia com a fila destravada pela M5a): `transcrever` (04:00) ja
+ * nao espera o relogio para os dois passos seguintes. Ao terminar, ele mesmo enfileira
+ * `extrairSemFala`, que ao terminar enfileira `extrair` (`transcrever.ts`, `extrair-sem-fala.ts`);
+ * os horarios fixos de `extrairSemFala` (04:40) e `extrair` (05:00) abaixo viram so reserva, para
+ * quando a cadeia nao disparar (o worker caindo no meio, por exemplo). Timeline tipica agora:
+ * transcrever 04:00 (hoje leva mais de uma hora), a cadeia dispara extrair-sem-fala e extrair logo
+ * em seguida, resultado do lote normalmente ate 06:20, tema 06:30, lembrete padrao 08:00.
+ * `metaHashtags` continua fixo as 04:20 porque transcreve o video sem_dono na propria hora, sem
+ * depender da fila de `transcrever` (`meta-hashtags.ts`); num dia raro em que `transcrever` termine
+ * rapido demais (antes das 04:20) e a cadeia alcance `extrair` antes de `metaHashtags` gravar o
+ * video do dia, esse video em particular so entra no lote do dia seguinte. Caso conhecido, nao
+ * corrigido nesta rodada: na pratica `transcrever` nunca terminou antes dos 25 minutos.
  */
 import { config } from "@/lib/config";
 
@@ -143,12 +154,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     fila: FILAS.extrairSemFala,
     cron: "40 4 * * *",
     descricao:
-      "analise de video sem fala por quadros e legenda (M3, so setor que aceita), todo dia as 04:40, depois de meta-hashtags e antes de montar o lote",
+      "analise de video sem fala por quadros e legenda (M3, so setor que aceita), reserva as 04:40 (M5b, item 1: o transcrever encadeia direto ao terminar; este horario so roda se a cadeia nao disparar, por exemplo o worker caindo no meio)",
   },
   {
     fila: FILAS.extrair,
     cron: "0 5 * * *",
-    descricao: "monta o lote de extracao, todo dia as 05:00, depois de transcrever",
+    descricao: "monta o lote de extracao, reserva as 05:00 (M5b, item 1: o extrair-sem-fala encadeia direto ao terminar; este horario so roda se a cadeia nao disparar)",
   },
   {
     fila: FILAS.temasDoDia,

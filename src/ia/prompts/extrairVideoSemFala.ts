@@ -26,8 +26,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Achado 11 da revisão do motor (01/10/2026): lembrete de acentuação como última linha da
  * entrada; esta tarefa não tem retentativa nenhuma hoje, então a posição já nasce definitiva.
  * Versão 1.2.0.
+ *
+ * M5b, item 2 (02/10/2026): `formato` ganha `.catch("outro")`, mesmo conserto e mesmo motivo de
+ * `extrairVideo.ts` (um valor fora da lista não pode reprovar a ficha inteira). Versão 1.3.0.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -42,7 +45,9 @@ export const schema = z.object({
   estrutura: z.string(),
   fechamento: z.string(),
   chamadaFinal: z.string(),
-  formato: z.enum(["fala_para_camera", "podcast", "caixinha", "esquete", "outro"]),
+  // M5b, item 2: mesmo achado de `extrairVideo.ts`, mesmo conserto (valor fora da lista vira
+  // "outro" em vez de perder a ficha inteira).
+  formato: z.enum(["fala_para_camera", "podcast", "caixinha", "esquete", "outro"]).catch("outro"),
   porQueFuncionou: z.string(),
   etiquetas: z.array(z.string()),
   pertenceAoNicho: z.boolean(),
