@@ -11,6 +11,7 @@ import { db, getPool } from "@/db";
 import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, user, videos } from "@/db/schema";
 import { podeSobrescreverTemasDoDia, rodarTemasDoDia } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
+import { temasDoDiaOuRecente } from "@/servicos/temas";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -424,6 +425,39 @@ describe("rodarTemasDoDia", () => {
  * `extrairAgora` enfileiram `temasDoDia` com `nichoId` depois de analisar vídeo novo; o job
  * confere sozinho se o setor já tem tema hoje e nunca regenera o de quem já escolheu.
  */
+/**
+ * M5b, item 3 (revisão do Fable no PR #101): a marca de "tentou hoje e ficou sem prova" é uma linha
+ * com `temas: []`. Quem lê os temas para a tela e para o lembrete nunca pode devolver essa linha no
+ * lugar do tema de ontem.
+ */
+describe("temasDoDiaOuRecente com a marca de tentativa sem prova (M5b, item 3)", () => {
+  it("a linha vazia de hoje nao esconde o tema de ontem", async () => {
+    const hoje = hojeISO();
+    const ontem = new Date(new Date(`${hoje}T12:00:00Z`).getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await db()
+      .insert(temasDia)
+      .values([
+        {
+          nichoId,
+          data: ontem,
+          temas: [{ titulo: "tema de ontem que continua valendo", descricao: "x", porQue: "x", evidencias: [], puxaPara: "conversao" }],
+        },
+        { nichoId, data: hoje, temas: [], candidatosNaUltimaTentativa: 4 },
+      ]);
+
+    const resultado = await temasDoDiaOuRecente(nichoId, hoje);
+    expect(resultado?.dataUsada).toBe(ontem);
+    expect(resultado?.temas[0]?.titulo).toBe("tema de ontem que continua valendo");
+  });
+
+  it("so a linha vazia, sem tema nos dias anteriores: devolve nulo, como se nao houvesse tema", async () => {
+    const hoje = hojeISO();
+    await db().insert(temasDia).values({ nichoId, data: hoje, temas: [], candidatosNaUltimaTentativa: 4 });
+
+    expect(await temasDoDiaOuRecente(nichoId, hoje)).toBeNull();
+  });
+});
+
 describe("rodarTemasDoDia com nichoId (M1, item 2)", () => {
   it("setor que ja tem tema hoje: pula, nao chama a IA de novo", async () => {
     await db()

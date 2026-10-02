@@ -4,7 +4,7 @@
  * tema): os temas do dia com a regra de estabilidade e o aviso da linha
  * editorial, e a nota em cinco pilares de um tema livre.
  */
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -181,6 +181,10 @@ export async function temasDoDiaOuRecente(
         eq(temasDia.nichoId, nichoId),
         gte(temasDia.data, diasAtrasIsoDe(data, DIAS_REGRA_ESTABILIDADE)),
         lte(temasDia.data, data),
+        // M5b, item 3 (revisão do Fable no PR #101): a linha vazia é só a marca de "tentou hoje e
+        // ficou sem prova" do `temas-do-dia`; nunca pode esconder o tema de ontem, que continua
+        // valendo em `/hoje` e no lembrete.
+        sql`jsonb_array_length(${temasDia.temas}) > 0`,
       ),
     )
     .orderBy(desc(temasDia.data))
