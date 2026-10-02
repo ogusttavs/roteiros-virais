@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 
 import type { Plataforma } from "@/db/schema";
 
+import { ocultarSegredos } from "./audio";
 import { argumentosPorPlataforma } from "./youtube-cliente";
 
 const execFileAsync = promisify(execFile);
@@ -78,7 +79,7 @@ export async function baixarVideo480p(url: string, plataforma: Plataforma): Prom
   try {
     await execFileAsync("yt-dlp", argumentosDeVideo480p(url, plataforma, caminho));
   } catch (erro) {
-    throw new ErroVideo(`nao foi possivel baixar o video de ${url}: ${String(erro)}`);
+    throw new ErroVideo(`nao foi possivel baixar o video de ${url}: ${ocultarSegredos(String(erro))}`);
   }
 
   return caminho;
@@ -114,7 +115,7 @@ export async function duracaoDoArquivoS(caminhoVideo: string): Promise<number> {
       caminhoVideo,
     ]));
   } catch (erro) {
-    throw new ErroVideo(`nao foi possivel ler a duracao de ${caminhoVideo} com ffprobe: ${String(erro)}`);
+    throw new ErroVideo(`nao foi possivel ler a duracao de ${caminhoVideo} com ffprobe: ${ocultarSegredos(String(erro))}`);
   }
 
   return interpretarDuracaoFfprobe(stdout);
@@ -155,7 +156,7 @@ export async function extrairQuadros(caminhoVideo: string, temposS: number[]): P
       const buffer = await readFile(caminhoQuadro);
       quadros.push({ segundo, base64: buffer.toString("base64") });
     } catch (erro) {
-      throw new ErroVideo(`nao foi possivel extrair o quadro em ${segundo}s: ${String(erro)}`);
+      throw new ErroVideo(`nao foi possivel extrair o quadro em ${segundo}s: ${ocultarSegredos(String(erro))}`);
     } finally {
       await apagarVideo(caminhoQuadro);
     }

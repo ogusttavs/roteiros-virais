@@ -95,4 +95,18 @@ describe("executarComRegistro", () => {
       "yt-dlp falhou: nao foi possivel conectar a http://***token mascarado***@proxy.dataimpulse.com:823",
     );
   });
+
+  /** Hotfix de 01/10/2026: o caminho de sucesso também mascara (a lista `erros` dentro do resumo). */
+  it("mascara credencial de proxy dentro do resumo gravado e devolvido, no caminho de sucesso", async () => {
+    const resultado = await executarComRegistro("teste-ok-proxy", async () => ({
+      analisados: 1,
+      erros: ["video 1: yt-dlp --proxy http://usuario123:senhaSecreta456@proxy.exemplo.invalido:823 -o x falhou"],
+    }));
+
+    const execucao = await ultimaExecucao("teste-ok-proxy");
+    const gravado = JSON.stringify(execucao.resumo);
+    expect(gravado).not.toContain("senhaSecreta456");
+    expect(gravado).not.toContain("usuario123");
+    expect(JSON.stringify(resultado)).not.toContain("senhaSecreta456");
+  });
 });
