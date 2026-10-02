@@ -41,8 +41,14 @@ import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
-import { formatarModeloNicho, modeloNichoAtual, semDonoComAnalise, subindoHojeComAnalise } from "@/servicos/pesquisa";
-import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
+import {
+  formatarModeloNicho,
+  modeloNichoAtual,
+  reguaDoSetor,
+  semDonoComAnalise,
+  subindoHojeComAnalise,
+} from "@/servicos/pesquisa";
+import { buscarVideosParaProva, janelaDeProva, minimoBrasileirosNaProva, motivoSemProva } from "@/servicos/prova-tema";
 
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 const LIMITE_NOTICIAS = 60;
@@ -199,18 +205,24 @@ async function filtrarTemasComProva(
   temas: TemaDoDia[],
   nicho: NichoAtivo,
   agora: Date,
-): Promise<{ temasComProva: TemaDoDia[]; temasSemProva: number }> {
+  proporcaoBrasil: number,
+): Promise<{ temasComProva: TemaDoDia[]; temasSemProva: number; barrados: { titulo: string; motivo: string }[] }> {
   const idsVideo = [...new Set(temas.flatMap((t) => t.evidencias))];
-  if (idsVideo.length === 0) {
-    return { temasComProva: [], temasSemProva: temas.length };
-  }
-
   const videosPorId = await buscarVideosParaProva(idsVideo);
   const janela = janelaDeProva(nicho.criadoEm, agora);
 
-  const temasComProva = temas.filter((tema) => temaTemProvaSuficiente(tema.evidencias, videosPorId, agora, janela));
-  return { temasComProva, temasSemProva: temas.length - temasComProva.length };
+  const temasComProva: TemaDoDia[] = [];
+  const barrados: { titulo: string; motivo: string }[] = [];
+  for (const tema of temas) {
+    const motivo = motivoSemProva(tema.evidencias, videosPorId, agora, janela, proporcaoBrasil);
+    if (motivo === null) temasComProva.push(tema);
+    else barrados.push({ titulo: tema.titulo, motivo });
+  }
+  return { temasComProva, temasSemProva: barrados.length, barrados };
 }
+
+/** Quantos temas o dia fecha (os "três temas" do produto). */
+const TEMAS_POR_DIA = 3;
 
 /**
  * R1, item 0 (achado de produção em 01/10, `temas-do-dia`): rodar o job de novo no mesmo dia
@@ -252,8 +264,11 @@ export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: Te
 async function gerarTemasDoNicho(
   nicho: NichoAtivo,
 ): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "mantido"; temasSemProva: number }> {
-  const [subindo, semDono, candidatasNoticias] = await Promise.all([
-    subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO),
+  const [regua, subindo, semDono, candidatasNoticias] = await Promise.all([
+    reguaDoSetor(nicho.id),
+    // Hotfix de 02/10/2026: brasileiro primeiro na lista que o modelo recebe, senão o tema não tem
+    // como montar a prova num setor com muita conta de fora.
+    subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO, { brasilPrimeiro: true }),
     semDonoComAnalise(nicho.id),
     noticiasCandidatas(nicho.id),
   ]);
@@ -270,11 +285,13 @@ async function gerarTemasDoNicho(
   const sistemaEstavel = temasDoDiaIA.montarSistemaEstavel({
     modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
   });
-  const entrada = temasDoDiaIA.montarEntrada({
+  const dadosEntrada = {
     subindoHoje: subindo,
     semDono,
     noticias: noticiasRelevantes.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
-  });
+    minimoBrasilEmTres: minimoBrasileirosNaProva(3, regua.proporcaoBrasil),
+  };
+  const entrada = temasDoDiaIA.montarEntrada(dadosEntrada);
 
   const parametrosTentativa = {
     nicho,
@@ -294,7 +311,44 @@ async function gerarTemasDoNicho(
     }
   }
 
-  const { temasComProva, temasSemProva } = await filtrarTemasComProva(tentativa.temas, nicho, new Date());
+  const primeira = await filtrarTemasComProva(tentativa.temas, nicho, new Date(), regua.proporcaoBrasil);
+  let temasComProva = primeira.temasComProva;
+  let temasSemProva = primeira.temasSemProva;
+
+  /**
+   * Hotfix de 02/10/2026: tema barrado na prova deixava o setor com menos de três temas, ou sem
+   * nenhum (Overtake e o perfil do Bruno em 02/10), sem segunda chance. Agora o gerador recebe de
+   * volta o que foi barrado e por quê, e refaz uma vez; os temas com prova das duas tentativas se
+   * somam, até três. Só refaz quando existe vídeo na lista (tema só de notícia nunca tem prova, e
+   * refazer não mudaria isso).
+   */
+  if (temasComProva.length < TEMAS_POR_DIA && idsValidos.size > 0) {
+    const jaAprovados = temasComProva.map((t) => `"${t.titulo}"`).join(", ");
+    const ajuste = [
+      "Segunda tentativa. Na primeira, estes temas foram descartados por não cumprirem a regra da prova:",
+      ...primeira.barrados.map((b) => `- "${b.titulo}": ${b.motivo}.`),
+      jaAprovados ? `Estes já foram aprovados, não repita o assunto deles: ${jaAprovados}.` : "",
+      "Proponha três temas de novo, cada um apoiado num grupo de vídeos da lista que cumpra a regra da prova. Confira conta e origem de cada id antes de citar.",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const segunda = await tentarGerarTemas({
+      ...parametrosTentativa,
+      entrada: temasDoDiaIA.montarEntrada({ ...dadosEntrada, ajuste }),
+    });
+    if (segunda.valido) {
+      const refeita = await filtrarTemasComProva(segunda.temas, nicho, new Date(), regua.proporcaoBrasil);
+      const titulos = new Set(temasComProva.map((t) => t.titulo));
+      for (const tema of refeita.temasComProva) {
+        if (temasComProva.length >= TEMAS_POR_DIA) break;
+        if (titulos.has(tema.titulo)) continue;
+        temasComProva = [...temasComProva, tema];
+        titulos.add(tema.titulo);
+      }
+      temasSemProva = TEMAS_POR_DIA - temasComProva.length;
+    }
+  }
+
   if (temasComProva.length === 0) {
     return { status: "sem_prova", temasSemProva };
   }

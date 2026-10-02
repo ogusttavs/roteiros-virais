@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import type { TemaDoDia } from "@/db/schema";
-import { temaTemProvaSuficiente, type VideoParaProva } from "@/servicos/prova-tema";
+import {
+  minimoBrasileirosNaProva,
+  motivoSemProva,
+  temaTemProvaSuficiente,
+  type VideoParaProva,
+} from "@/servicos/prova-tema";
 
 import { evidenciaValida } from "./temas-do-dia";
 
@@ -86,6 +91,56 @@ describe("temaTemProvaSuficiente", () => {
   it("aprova com 3 videos de 2 contas, maioria brasileira", () => {
     const videos = [video(1, { contaId: 10 }), video(2, { contaId: 10 }), video(3, { contaId: 20 })];
     expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7)).toBe(true);
+  });
+
+  /**
+   * Hotfix de 02/10/2026: a parte brasileira da prova segue a régua do setor. Achado de produção:
+   * a Overtake (régua em 30%) e o perfil do Bruno fecharam o dia sem tema porque os três temas
+   * citavam 1 brasileiro em 3.
+   */
+  it("setor com a régua em 30%: 1 brasileiro em 3 basta; no padrão de 70% continua reprovando", () => {
+    const videos = [
+      video(1, { contaId: 10, idioma: "en" }),
+      video(2, { contaId: 20, idioma: "es" }),
+      video(3, { contaId: 30, idioma: "pt-BR" }),
+    ];
+    expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7, 0.3)).toBe(true);
+    expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7, 0.7)).toBe(false);
+    expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7)).toBe(false);
+  });
+
+  it("setor com a régua em 30% e nenhum brasileiro citado: continua sem prova", () => {
+    const videos = [
+      video(1, { contaId: 10, idioma: "en" }),
+      video(2, { contaId: 20, idioma: "es" }),
+      video(3, { contaId: 30, idioma: "en" }),
+    ];
+    expect(temaTemProvaSuficiente([1, 2, 3], mapa(videos), AGORA, 7, 0.3)).toBe(false);
+  });
+
+  it("minimoBrasileirosNaProva: a régua nunca pede mais que a maioria simples", () => {
+    expect(minimoBrasileirosNaProva(3, 0.7)).toBe(2);
+    expect(minimoBrasileirosNaProva(3, 0.3)).toBe(1);
+    expect(minimoBrasileirosNaProva(4, 0.3)).toBe(2);
+    expect(minimoBrasileirosNaProva(5, 0.3)).toBe(2);
+    expect(minimoBrasileirosNaProva(3, 0)).toBe(0);
+    expect(minimoBrasileirosNaProva(3, 1)).toBe(2);
+  });
+
+  it("motivoSemProva diz em uma frase o que faltou, para a segunda tentativa do gerador", () => {
+    const poucos = [video(1, { contaId: 10 }), video(2, { contaId: 20 })];
+    expect(motivoSemProva([1, 2], mapa(poucos), AGORA, 7)).toContain("pelo menos 3");
+
+    const umaConta = [video(1, { contaId: 10 }), video(2, { contaId: 10 }), video(3, { contaId: 10 })];
+    expect(motivoSemProva([1, 2, 3], mapa(umaConta), AGORA, 7)).toContain("contas diferentes");
+
+    const deFora = [
+      video(1, { contaId: 10, idioma: "en" }),
+      video(2, { contaId: 20, idioma: "en" }),
+      video(3, { contaId: 30, idioma: "pt" }),
+    ];
+    expect(motivoSemProva([1, 2, 3], mapa(deFora), AGORA, 7)).toContain("do Brasil");
+    expect(motivoSemProva([1, 2, 3], mapa(deFora), AGORA, 7, 0.3)).toBeNull();
   });
 
   it("reprova com menos de 3 videos, mesmo com 2 contas e maioria brasileira", () => {

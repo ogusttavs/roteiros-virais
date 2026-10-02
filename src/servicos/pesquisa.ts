@@ -333,14 +333,28 @@ export async function subindoHoje(
   return linhas.map(mapear);
 }
 
-export type VideoComAssunto = { id: number; assunto: string; velocidadeRelativa: number };
+export type VideoComAssunto = {
+  id: number;
+  assunto: string;
+  velocidadeRelativa: number;
+  /** Hotfix de 02/10/2026: a conta e a origem vão para o prompt do tema, que precisa montar a prova (2 contas, parte brasileira). */
+  contaId: number | null;
+  brasileiro: boolean;
+};
+
+/** Quantas vezes o `limite` o `brasilPrimeiro` olha para achar brasileiro mais abaixo na fila da velocidade. */
+const FOLGA_BRASIL_PRIMEIRO = 4;
 
 /**
  * `subindoHoje` com o assunto da análise, para o job `temasDoDia` (etapa 10,
  * decisão 2 do `PROXIMO.md`) citar como evidência. Só vídeo já extraído
  * conta; sem `analise` não tem assunto para o tema descrever.
  */
-export async function subindoHojeComAnalise(nichoId: number, limite = 30): Promise<VideoComAssunto[]> {
+export async function subindoHojeComAnalise(
+  nichoId: number,
+  limite = 30,
+  opts?: { brasilPrimeiro?: boolean },
+): Promise<VideoComAssunto[]> {
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -355,22 +369,50 @@ export async function subindoHojeComAnalise(nichoId: number, limite = 30): Promi
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
   const linhas = await db()
-    .select({ id: videos.id, analise: videos.analise, velocidadeRelativa: videos.velocidadeRelativa })
+    .select({
+      id: videos.id,
+      analise: videos.analise,
+      velocidadeRelativa: videos.velocidadeRelativa,
+      contaId: videos.contaId,
+      idioma: videos.idioma,
+      contaPais: contas.pais,
+      contaIdiomaPrincipal: contas.idiomaPrincipal,
+    })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
     .orderBy(desc(videos.velocidadeRelativa), asc(videos.id))
-    .limit(limite);
+    .limit(opts?.brasilPrimeiro ? limite * FOLGA_BRASIL_PRIMEIRO : limite);
 
-  return linhas
+  const todos = linhas
     .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
     .map((l) => ({
       id: l.id,
       assunto: l.analise.assunto,
       velocidadeRelativa: l.velocidadeRelativa === null ? 0 : Number(l.velocidadeRelativa),
+      contaId: l.contaId,
+      brasileiro:
+        classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)) === "brasileiro",
     }));
+  if (!opts?.brasilPrimeiro) return todos;
+
+  /**
+   * Hotfix de 02/10/2026: os 30 mais rápidos de um setor com muita conta de fora quase não traziam
+   * brasileiro, e o tema nascia sem ter como montar a prova. Reserva para o Brasil a proporção do
+   * setor (nunca menos que metade), completa com o resto na ordem da velocidade, e devolve na
+   * ordem da velocidade, como sempre.
+   */
+  const cotaBrasil = Math.ceil(limite * Math.max(regua.proporcaoBrasil, 0.5));
+  const brasileiros = todos.filter((v) => v.brasileiro);
+  const deFora = todos.filter((v) => !v.brasileiro);
+  const doBrasil = brasileiros.slice(0, cotaBrasil);
+  const escolhidos = [...doBrasil, ...deFora.slice(0, limite - doBrasil.length)];
+  const faltam = limite - escolhidos.length;
+  if (faltam > 0) escolhidos.push(...brasileiros.slice(cotaBrasil, cotaBrasil + faltam));
+  return escolhidos.sort((a, b) => b.velocidadeRelativa - a.velocidadeRelativa || a.id - b.id);
 }
 
-export type VideoSemDonoComAssunto = { id: number; assunto: string };
+export type VideoSemDonoComAssunto = { id: number; assunto: string; brasileiro: boolean };
 
 const LIMITE_SEM_DONO = 10;
 
@@ -396,7 +438,7 @@ export async function semDonoComAnalise(nichoId: number): Promise<VideoSemDonoCo
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
 
   const linhas = await db()
-    .select({ id: videos.id, analise: videos.analise })
+    .select({ id: videos.id, analise: videos.analise, idioma: videos.idioma })
     .from(videos)
     .where(and(...condicoes))
     .orderBy(desc(videos.publicadoEm), asc(videos.id))
@@ -404,7 +446,11 @@ export async function semDonoComAnalise(nichoId: number): Promise<VideoSemDonoCo
 
   return linhas
     .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
-    .map((l) => ({ id: l.id, assunto: l.analise.assunto }));
+    .map((l) => ({
+      id: l.id,
+      assunto: l.analise.assunto,
+      brasileiro: classificarBrasil(l.idioma, false) === "brasileiro",
+    }));
 }
 
 /** Palavras com 4 ou mais letras do texto do tema, sem repetir (etapa 10). */
