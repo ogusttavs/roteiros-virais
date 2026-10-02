@@ -1650,7 +1650,7 @@ function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
     objetivo: linha.objetivo,
     duracaoS: corpoDoRoteiro(linha).duracaoS,
     criadoEm: linha.criadoEm,
-    aindaValeResultado: linha.aindaValeResultado,
+    aindaValeResultado: aindaValeDeHoje(linha),
   };
 }
 
@@ -1729,6 +1729,20 @@ export async function mudarDataRoteiro(roteiroId: number, novaData: string): Pro
   await db().update(roteiros).set({ data: validada }).where(eq(roteiros.id, roteiroId));
 }
 
+/**
+ * Revisão do Fable no PR #91: a resposta de "ainda vale?" só vale no dia em que foi conferida. O
+ * que está subindo muda todo dia, e um roteiro remarcado para outro dia (ou conferido ontem e
+ * ainda não gravado) tem de poder ser conferido de novo; sem isto a primeira resposta ficava
+ * guardada para sempre.
+ */
+function aindaValeDeHoje(linha: {
+  aindaValeChecadoEm: Date | null;
+  aindaValeResultado: AindaValeResultado | null;
+}): AindaValeResultado | null {
+  if (!linha.aindaValeChecadoEm || !linha.aindaValeResultado) return null;
+  return hojeISO(linha.aindaValeChecadoEm) === hojeISO() ? linha.aindaValeResultado : null;
+}
+
 /** Quantos candidatos de "o que está subindo hoje" entram na checagem de "ainda vale?" (E39b, item a). */
 const LIMITE_CANDIDATOS_AINDA_VALE = 15;
 
@@ -1741,9 +1755,8 @@ const LIMITE_CANDIDATOS_AINDA_VALE = 15;
 export async function conferirAindaVale(roteiroId: number): Promise<AindaValeResultado> {
   const [atual] = await db().select().from(roteiros).where(eq(roteiros.id, roteiroId));
   if (!atual) throw new ErroRoteiro("roteiro nao encontrado.");
-  if (atual.aindaValeChecadoEm && atual.aindaValeResultado) {
-    return atual.aindaValeResultado;
-  }
+  const jaConferidoHoje = aindaValeDeHoje(atual);
+  if (jaConferidoHoje) return jaConferidoHoje;
 
   const cliente = await clientePorId(atual.clienteId);
   const candidatos = cliente?.nichoId
