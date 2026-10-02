@@ -1,7 +1,7 @@
 /**
- * `/hoje/mes` (E39b, item e, design v2, `entrega/telas/Hoje.dc.html`, estado `calendario`).
- * Reaproveita boa parte das classes de `HojeTela.module.css` (`hojeStyles` no `.tsx`): só o que é
- * só do calendário mora aqui.
+ * `/planejamento`, visão Mês (passo 12 do Opus; era `/hoje/mes`, design v2,
+ * `entrega/telas/Hoje.dc.html`, estado `calendario`). Reaproveita boa parte das classes de
+ * `../hoje/HojeTela.module.css` (`hojeStyles` no `.tsx`): só o que é só do calendário mora aqui.
  */
 
 .agendaMes {
@@ -21,18 +21,6 @@
   display: grid;
   gap: var(--espaco-4);
   min-width: 0;
-}
-
-.cabecaMes {
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-2);
-}
-
-.cabecaMes h1 {
-  flex: 1;
-  margin: 0;
-  font-size: var(--tamanho-titulo-2);
 }
 
 .cartaoMes {
@@ -118,17 +106,14 @@
   border: var(--largura-borda) dashed var(--cor-atencao);
 }
 
-/* E39c, parte 1: o dia tocado sem nada marcado ganha "Criar roteiro" (antes, só o aviso). */
 .diaMesVazio {
   display: grid;
   gap: var(--espaco-3);
   justify-items: start;
 }
 
-/*
- * E39c, parte 1: o que "Contar a minha agenda" gerou para o dia, ainda sem roteiro (só leitura,
- * mesmo espírito de "Meu plano"; virar roteiro continua pelas portas de sempre).
- */
+/* O que "Contar a minha agenda" gerou para o dia, ainda sem roteiro (só leitura, mesmo espírito
+   de "Meu plano"; virar roteiro continua pelas portas de sempre). */
 .planoDoDia {
   display: grid;
   gap: var(--espaco-2);

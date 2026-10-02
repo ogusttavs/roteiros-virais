@@ -125,8 +125,10 @@ function eraParaTexto(dataISO: string, hoje: string): string {
  * E39b, item (b): um atrasado, com as ações certas por estado (`sozinho`: hoje está livre,
  * "Gravar hoje" aparece primeiro; senão, a linha explica por que não aparece). "Mudar o dia" abre
  * `FolhaMudarDia`; as três ações recarregam a Agenda ao terminar (`aoMudouAlgo`).
+ * Exportado (E39c, parte 2a) para a visão Dia do planejador, em `/planejamento`, reusar a mesma
+ * peça; "as peças são as mesmas, muda a casa" (decisão do Gustavo de 01/10, 22:15).
  */
-function AtrasadoCard({
+export function AtrasadoCard({
   item,
   sozinho,
   hoje,
@@ -233,7 +235,7 @@ type ExibicaoAindaVale = { status: "vale" } | { status: "novo"; assunto: string;
  * carga, o refresh podia terminar depois do que o teste esperava, embora o banco já estivesse
  * certo; `aoMudouAlgo` continua chamado, para a tela recarregada mais tarde já nascer certa).
  */
-function AindaValeBloco({
+export function AindaValeBloco({
   roteiroId,
   aindaVale,
   aoMudouAlgo,
@@ -498,7 +500,11 @@ export function HojeTela({
                 >
                   <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                 </button>
-                <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("mes", `/hoje/mes?dia=${diaVisualizado}`)}>
+                <button
+                  type="button"
+                  className={styles.botaoSecundarioSm}
+                  onClick={() => ir("mes", `/planejamento?visao=mes&dia=${diaVisualizado}`)}
+                >
                   {textosHoje.agenda.calendario.verOMes}
                 </button>
               </div>

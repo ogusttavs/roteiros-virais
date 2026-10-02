@@ -7,7 +7,7 @@
  */
 .nav {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   height: var(--altura-toque-lg);
 }
 
@@ -15,7 +15,7 @@
    proporcionais à barra inteira, para o container (`layout.module.css`,
    `.barraInferior.encolhida`, `width: auto`) encolher junto com o grid. */
 .navEncolhida {
-  grid-template-columns: repeat(4, 3.25rem);
+  grid-template-columns: repeat(5, 3.25rem);
 }
 .navEncolhida .item {
   min-height: var(--altura-toque);

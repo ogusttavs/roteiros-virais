@@ -286,6 +286,20 @@ export async function planoQueVem(clienteId: number, apartirDe: string): Promise
   return linhas.filter((l) => l.estado !== "pulado").map(linhaParaItem);
 }
 
+/**
+ * Um item do plano pela sua data e id (E39c, parte 2a): a visão Semana do planejador mostra um
+ * sugerido de qualquer dia, não só hoje; tocar nele leva ao Criar com o momento já preenchido
+ * (`CriarTela.tsx`, `itemPlanoInicial`), o mesmo caminho que "o seu plano de hoje" já usa. `null`
+ * em vez de lançar erro: um link velho ou um item já aceito por outra aba não deve quebrar a tela.
+ */
+export async function itemPlanoPorId(itemId: number, clienteId: number): Promise<ItemPlano | null> {
+  const [linha] = await db()
+    .select()
+    .from(planoGravacoes)
+    .where(and(eq(planoGravacoes.id, itemId), eq(planoGravacoes.clienteId, clienteId)));
+  return linha ? linhaParaItem(linha) : null;
+}
+
 async function itemPorId(itemId: number, clienteId: number): Promise<typeof planoGravacoes.$inferSelect> {
   const [linha] = await db()
     .select()

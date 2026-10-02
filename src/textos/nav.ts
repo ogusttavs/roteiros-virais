@@ -2,6 +2,8 @@ export const textosNav = {
   hoje: "Hoje",
   /** E39a: a nova aba, a oficina onde todo roteiro nasce (antes morava dentro de Hoje). */
   criar: "Criar",
+  /** E39c, parte 2a: a aba do planejador (passo 12 do Opus), decisão do Gustavo de 01/10, 22:15. */
+  planejar: "Planejar",
   referencias: "Referências",
   historico: "Histórico",
   /** E39a: Briefing sai da navegação e vira uma linha dentro de Conta (desenho do Opus, dúvida 2). */

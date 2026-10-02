@@ -766,3 +766,36 @@
     width: auto;
   }
 }
+
+/**
+ * E39c, parte 2a: o pé "Criar roteiro para este dia" / "Contar a minha agenda" da visão Dia do
+ * planejador (`../planejamento/DiaConteudo.tsx`). `.soCelular` esconde do tablet para cima, onde
+ * "Contar a minha agenda" já está no cabeçalho (`CabecaPlano`).
+ */
+.pePlano {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.botaoTexto {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  background: transparent;
+  color: var(--cor-acao);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+@media (min-width: 768px) {
+  .soCelular {
+    display: none !important;
+  }
+}

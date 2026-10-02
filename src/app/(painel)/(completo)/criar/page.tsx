@@ -3,12 +3,12 @@ import { redirect } from "next/navigation";
 import { hojeISO } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
-import { planoDoDia, planoQueVem } from "@/servicos/plano";
+import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { temasParaCliente } from "@/servicos/temas";
 
 import { CriarTela } from "./CriarTela";
 
-type Props = { searchParams: Promise<{ data?: string }> };
+type Props = { searchParams: Promise<{ data?: string; plano?: string }> };
 
 /**
  * `/criar` (E39a, design v2, `Criar.dc.html`, estado `inicio`): a oficina. Os quatro caminhos sem
@@ -33,13 +33,15 @@ export default async function Criar({ searchParams }: Props) {
   }
 
   const hoje = hojeISO();
-  const { data } = await searchParams;
+  const { data, plano } = await searchParams;
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) && data >= hoje ? data : undefined;
+  const planoItemId = plano && /^\d+$/.test(plano) ? Number(plano) : undefined;
 
-  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem] = await Promise.all([
+  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
     planoDoDia(cliente.id, hoje),
     planoQueVem(cliente.id, hoje),
+    planoItemId ? itemPlanoPorId(planoItemId, cliente.id) : Promise.resolve(null),
   ]);
   const objetivoRecomendado = resultadoTemas?.status === "ok" ? resultadoTemas.objetivoRecomendado : null;
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
@@ -56,6 +58,7 @@ export default async function Criar({ searchParams }: Props) {
       tipo={cliente.tipo}
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
+      itemPlanoInicial={itemPlanoInicial}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, History, House, SquarePlus } from "lucide-react";
+import { Bookmark, Calendar, History, House, SquarePlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
@@ -11,7 +11,7 @@ import styles from "./Nav.module.css";
 import { ehRotaAtiva } from "./navAtivo";
 
 /**
- * Quatro itens, sem "Conta" (foi para o avatar do cabecalho, decisao do
+ * Cinco itens, sem "Conta" (foi para o avatar do cabecalho, decisao do
  * Fable no PROXIMO.md, etapa D parte 1). Base de 64 px no celular, coluna de
  * 220 px no desktop (a largura e da casca, nao deste componente).
  *
@@ -19,10 +19,15 @@ import { ehRotaAtiva } from "./navAtivo";
  * entra como a oficina (de onde todo roteiro nasce); Briefing sai daqui e vira uma linha dentro
  * de Conta, com a nota e uma seta (duvida 2 do desenho). `SquarePlus` e o icone mais perto do
  * "quadrado com mais" do desenho; nao existe um feito a mao no conjunto entregue ainda.
+ *
+ * E39c, parte 2a (decisao do Gustavo de 01/10, 22:15): "Planejar" entra entre Criar e
+ * Referencias, com icone de calendario. Seis destinos no fim (Noticias, na E43) nao cabem na
+ * capsula do celular; por enquanto sao cinco, `Nav.module.css` com a grade e 5 colunas.
  */
 const ITENS: { href: string; rotulo: string; Icone: ComponentType<{ size?: number; strokeWidth?: number }> }[] = [
   { href: "/hoje", rotulo: textosNav.hoje, Icone: House },
   { href: "/criar", rotulo: textosNav.criar, Icone: SquarePlus },
+  { href: "/planejamento", rotulo: textosNav.planejar, Icone: Calendar },
   { href: "/referencias", rotulo: textosNav.referencias, Icone: Bookmark },
   { href: "/historico", rotulo: textosNav.historico, Icone: History },
 ];

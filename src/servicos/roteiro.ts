@@ -1914,6 +1914,109 @@ export async function mesDaAgenda(clienteId: number, anoMes: string): Promise<Di
   return dias;
 }
 
+export type ItemSemanaPlano = {
+  id: number;
+  /** Sem roteiro próprio ainda, só o que "Contar a minha agenda" gerou (`planoGravacoes`, estado "sugerido"). */
+  sugerido: boolean;
+  tipo: FormatoRoteiro;
+  momentoDoDia: MomentoDoDia | null;
+  /** Só um sugerido tem lugar (de onde veio na agenda); um roteiro já escrito é `null`. */
+  lugar: string | null;
+  titulo: string;
+  status: "gerado" | "gravado" | "postado";
+  objetivo: Objetivo;
+};
+export type DiaSemanaPlano = {
+  data: string;
+  diaDoMes: number;
+  diaDaSemanaCurto: string;
+  hoje: boolean;
+  passado: boolean;
+  itens: ItemSemanaPlano[];
+};
+
+/**
+ * Passo 12 do Opus, a visão Semana do planejador (`/planejamento`, aba própria desde a decisão do
+ * Gustavo de 01/10, 22:15): os sete dias da semana que contém `dataReferencia`, cada um com os
+ * roteiros já escritos e os itens do plano ainda "sugerido" juntos, mesmo espírito de
+ * `mesDaAgenda` (um sugerido também aparece, sem roteiro próprio ainda; virar roteiro continua
+ * pelas portas de sempre). `titulo` de um sugerido vem de `situacao` (o compromisso da agenda que
+ * gerou aquele item), o único texto que a pessoa já escreveu sobre ele.
+ */
+export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaSemanaPlano[]> {
+  const hoje = hojeISO();
+  const segunda = segundaDaSemanaISO(dataReferencia);
+  const domingo = somarDiasISO(segunda, 6);
+
+  const [linhasRoteiro, linhasPlano] = await Promise.all([
+    db()
+      .select()
+      .from(roteiros)
+      .where(
+        and(
+          eq(roteiros.clienteId, clienteId),
+          gte(roteiros.data, segunda),
+          lte(roteiros.data, domingo),
+          isNull(roteiros.arquivadoEm),
+          SEM_VERSAO_MAIS_NOVA,
+        ),
+      ),
+    db()
+      .select()
+      .from(planoGravacoes)
+      .where(
+        and(
+          eq(planoGravacoes.clienteId, clienteId),
+          eq(planoGravacoes.estado, "sugerido"),
+          gte(planoGravacoes.dia, segunda),
+          lte(planoGravacoes.dia, domingo),
+        ),
+      ),
+  ]);
+
+  const porDia = new Map<string, ItemSemanaPlano[]>();
+  for (const linha of linhasRoteiro) {
+    const atual = porDia.get(linha.data) ?? [];
+    atual.push({
+      id: linha.id,
+      sugerido: false,
+      tipo: linha.formato,
+      momentoDoDia: linha.momentoDoDia,
+      lugar: null,
+      titulo: corpoDoRoteiro(linha).titulo,
+      status: linha.status,
+      objetivo: linha.objetivo,
+    });
+    porDia.set(linha.data, atual);
+  }
+  for (const linha of linhasPlano) {
+    const atual = porDia.get(linha.dia) ?? [];
+    atual.push({
+      id: linha.id,
+      sugerido: true,
+      tipo: linha.formato,
+      momentoDoDia: null,
+      lugar: linha.lugar,
+      titulo: linha.situacao,
+      status: "gerado",
+      objetivo: linha.objetivo,
+    });
+    porDia.set(linha.dia, atual);
+  }
+
+  return Array.from({ length: 7 }, (_, indice) => {
+    const data = somarDiasISO(segunda, indice);
+    return {
+      data,
+      diaDoMes: Number(data.split("-")[2]),
+      diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
+      hoje: data === hoje,
+      passado: data < hoje,
+      itens: porDia.get(data) ?? [],
+    };
+  });
+}
+
 /**
  * R1, item 0c: a base da recuperação quando a tela de espera acha que a conexão caiu, mas o
  * servidor pode ter terminado de gerar mesmo assim (geração não depende da aba continuar
