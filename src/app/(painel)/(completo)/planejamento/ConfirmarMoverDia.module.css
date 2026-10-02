@@ -1,0 +1,83 @@
+/**
+ * E39c, parte 2b: a confirmação de "soltar num dia que já tem o mesmo formato", no mesmo lugar
+ * e no mesmo espírito do `Toast` (fixo, acima da barra fixa da tela), mas sem sumir sozinha: são
+ * duas ações, não uma só com "desfazer".
+ */
+.barra {
+  position: fixed;
+  left: var(--margem-celular);
+  right: var(--margem-celular);
+  bottom: calc(var(--toast-base, var(--espaco-6)) + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+  margin: 0 auto;
+  max-width: 480px;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-titulo);
+  color: var(--cor-fundo);
+  font-size: var(--tamanho-secundario);
+  box-shadow: var(--sombra-md);
+  animation: surgir var(--duracao-base) var(--curva-saida);
+}
+
+.pergunta {
+  flex: 1 1 100%;
+  margin: 0;
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin-left: auto;
+}
+
+/* Botões próprios, não o `Botao` compartilhado: aquele supõe o tema claro (texto escuro), e
+ * esta barra é escura como o `Toast` (`color: inherit`, mesmo espírito do botão "Desfazer"). */
+.botaoMover,
+.botaoCancelar {
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.botaoMover:disabled,
+.botaoCancelar:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoMover {
+  padding: var(--espaco-1) var(--espaco-3);
+  border-radius: var(--raio-pill);
+  background: var(--cor-fundo);
+  color: var(--cor-titulo);
+}
+
+.botaoCancelar {
+  padding: 0;
+  text-decoration: underline;
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .barra {
+    animation: none;
+  }
+}

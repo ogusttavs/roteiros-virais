@@ -216,6 +216,11 @@
   border-color: var(--cor-texto-dica);
 }
 
+.erroMover {
+  color: var(--cor-erro);
+  font-size: var(--tamanho-rodape);
+}
+
 @media (min-width: 1024px) {
   .semanaPlano {
     grid-template-columns: repeat(7, minmax(0, 1fr));
@@ -294,5 +299,27 @@
   .linhaPlano:hover button[aria-haspopup="menu"],
   .linhaPlano:focus-within button[aria-haspopup="menu"] {
     opacity: 1;
+  }
+  .linhaPlano[draggable="true"] {
+    cursor: grab;
+  }
+  .linhaPlano[draggable="true"]:active {
+    cursor: grabbing;
+  }
+
+  /* E39c, parte 2b: o item some do lugar de onde saiu (só o contorno) e o dia de destino acende,
+   * como o passo 12 desenhou (`.saindo`/`.destino` do `Planejar.dc.html`). */
+  .linhaPlanoArrastando .itemPlano {
+    background: transparent;
+    border-style: dashed;
+    border-color: var(--cor-borda-forte);
+  }
+  .linhaPlanoArrastando .itemPlano > * {
+    visibility: hidden;
+  }
+  .diaPlanoAlvo {
+    background: var(--cor-selecao-suave);
+    border-style: dashed;
+    border-color: var(--cor-acao);
   }
 }

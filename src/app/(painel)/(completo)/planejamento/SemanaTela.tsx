@@ -13,8 +13,10 @@ import hojeStyles from "../hoje/HojeTela.module.css";
 import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
 import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
+import { ConfirmarMoverDia } from "./ConfirmarMoverDia";
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import styles from "./SemanaTela.module.css";
+import { useMoverDeDia } from "./useMoverDeDia";
 
 type Props = {
   dias: DiaSemanaPlano[];
@@ -50,11 +52,11 @@ function rotuloEstadoItem(item: ItemSemanaPlano, dia: DiaSemanaPlano): string {
  * "Ver mais N" (abre a visão Dia daquele dia). O sugerido é tracejado; tocar nele leva ao Criar
  * (`CriarTela.tsx`, `itemPlanoInicial`), não abre roteiro nenhum, porque ainda não existe.
  *
- * Mover de dia por arrasto (do tablet deitado para cima) fica para depois desta rodada; o menu de
- * três ações (`MenuAcoesAgenda`, E39c parte 2a, pedido do Gustavo em 01/10, 21:33) já cobre "não
- * vou gravar hoje" (a mesma folha "Mudar o dia" de antes), arquivar e reprovar com motivo, em
- * qualquer tamanho de tela. Só nos itens que já são roteiro: mover um sugerido de dia é uma ação
- * nova que o código ainda não tem (hipótese mais simples desta rodada, registrada no TODO.md).
+ * Mover de dia por arrasto (E39c, parte 2b, do tablet deitado para cima): só nos itens que já têm
+ * o menu de três ações (`MenuAcoesAgenda`, um roteiro escrito, não um dia passado), porque o
+ * arrasto é só outro caminho para a mesma ação do menu ("Não vou gravar hoje", a folha "Mudar o
+ * dia"), nunca uma segunda regra (`useMoverDeDia.ts`). Um sugerido continua sem jeito de mudar de
+ * dia nesta rodada (hipótese já registrada na parte 2a).
  */
 export function SemanaConteudo({ dias }: Props) {
   const router = useRouter();
@@ -62,6 +64,7 @@ export function SemanaConteudo({ dias }: Props) {
   const [ocupado, iniciarTransicao] = useTransition();
   const [diasExpandidos, setDiasExpandidos] = useState<Set<string>>(new Set());
   const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
+  const mover = useMoverDeDia();
 
   function ir(destino: string) {
     if (ocupado) return;
@@ -77,6 +80,35 @@ export function SemanaConteudo({ dias }: Props) {
   }
 
   const semNadaNaSemana = dias.every((dia) => dia.itens.length === 0);
+
+  const rodapeMover = (
+    <>
+      <p className="so-leitor" aria-live="assertive">
+        {mover.itemArrastando && mover.diaAlvo
+          ? textosHoje.agenda.planejador.movendoPara(mover.itemArrastando.titulo, diaPorExtenso(mover.diaAlvo))
+          : ""}
+      </p>
+      {mover.pendente ? (
+        <ConfirmarMoverDia
+          pergunta={textosHoje.agenda.planejador.confirmarMoverPergunta(
+            mover.pendente.titulo,
+            diaPorExtenso(mover.pendente.paraData),
+            mover.pendente.tipo === "reels" ? textosHoje.agenda.legendaReels : textosHoje.agenda.legendaStory,
+          )}
+          movendo={mover.movendo}
+          aoConfirmar={mover.confirmarMoverMesmoAssim}
+          aoCancelar={mover.cancelarMover}
+          confirmarRotulo={textosHoje.agenda.planejador.confirmarMoverBotao}
+          cancelarRotulo={textosHoje.agenda.planejador.cancelarMoverBotao}
+        />
+      ) : null}
+      {mover.erro ? (
+        <p role="alert" className={styles.erroMover}>
+          {mover.erro}
+        </p>
+      ) : null}
+    </>
+  );
 
   if (semNadaNaSemana) {
     return (
@@ -97,8 +129,10 @@ export function SemanaConteudo({ dias }: Props) {
           aoArquivar={arquivarComDesfazer}
           expandidos={diasExpandidos}
           setExpandidos={setDiasExpandidos}
+          mover={mover}
         />
         {toastArquivar}
+        {rodapeMover}
       </>
     );
   }
@@ -113,6 +147,7 @@ export function SemanaConteudo({ dias }: Props) {
         aoArquivar={arquivarComDesfazer}
         expandidos={diasExpandidos}
         setExpandidos={setDiasExpandidos}
+        mover={mover}
       />
       <div className={[hojeStyles.pePlano, styles.peSemana].join(" ")}>
         <p className={styles.legendaSugerido}>
@@ -125,6 +160,7 @@ export function SemanaConteudo({ dias }: Props) {
         </button>
       </div>
       {toastArquivar}
+      {rodapeMover}
     </>
   );
 }
@@ -137,6 +173,7 @@ function DiasGrade({
   aoArquivar,
   expandidos,
   setExpandidos,
+  mover,
 }: {
   dias: DiaSemanaPlano[];
   ocupado: boolean;
@@ -145,6 +182,7 @@ function DiasGrade({
   aoArquivar: (roteiroId: number) => Promise<void>;
   expandidos: Set<string>;
   setExpandidos: (atualizar: (atual: Set<string>) => Set<string>) => void;
+  mover: ReturnType<typeof useMoverDeDia>;
 }) {
   return (
     <div className={styles.semanaPlano}>
@@ -153,14 +191,24 @@ function DiasGrade({
         const itensVisiveis = expandido || dia.itens.length <= MAX_ITENS_VISIVEIS ? dia.itens : dia.itens.slice(0, MAX_ANTES_DE_VER_MAIS);
         const faltam = dia.itens.length - itensVisiveis.length;
         const semNada = dia.itens.length === 0;
+        const temConflito = mover.itemArrastando ? dia.itens.some((item) => item.tipo === mover.itemArrastando?.tipo) : false;
 
         return (
           <section
             key={dia.data}
-            className={[styles.diaPlano, dia.hoje ? styles.diaPlanoHoje : "", dia.passado ? styles.diaPlanoPassado : "", semNada ? styles.diaPlanoSemNada : ""]
+            className={[
+              styles.diaPlano,
+              dia.hoje ? styles.diaPlanoHoje : "",
+              dia.passado ? styles.diaPlanoPassado : "",
+              semNada ? styles.diaPlanoSemNada : "",
+              mover.diaAlvo === dia.data ? styles.diaPlanoAlvo : "",
+            ]
               .filter(Boolean)
               .join(" ")}
             aria-label={dia.hoje ? `${diaPorExtenso(dia.data)}, hoje` : diaPorExtenso(dia.data)}
+            onDragOver={(evento) => mover.aoPassarPorCimaDoDia(evento, dia.data, dia.passado)}
+            onDragLeave={(evento) => mover.aoSairDoDia(evento, dia.data)}
+            onDrop={(evento) => mover.aoSoltarNoDia(evento, dia.data, temConflito)}
           >
             <div className={styles.cabecaDia}>
               <h3 className={styles.diaTitulo}>
@@ -190,28 +238,37 @@ function DiasGrade({
               ) : null
             ) : (
               <ol className={styles.itensDia}>
-                {itensVisiveis.map((item) => (
-                  <li key={`${item.sugerido ? "sugerido" : "roteiro"}-${item.id}`} className={styles.linhaPlano}>
-                    <button
-                      type="button"
-                      className={[styles.itemPlano, item.sugerido ? styles.itemPlanoSugerido : ""].filter(Boolean).join(" ")}
-                      disabled={ocupado}
-                      onClick={() => abrirItem(item, dia.data)}
+                {itensVisiveis.map((item) => {
+                  const podeArrastar = !item.sugerido && item.status === "gerado" && !dia.passado;
+                  return (
+                    <li
+                      key={`${item.sugerido ? "sugerido" : "roteiro"}-${item.id}`}
+                      className={[styles.linhaPlano, mover.itemArrastando?.id === item.id ? styles.linhaPlanoArrastando : ""]
+                        .filter(Boolean)
+                        .join(" ")}
+                      draggable={podeArrastar}
+                      onDragStart={(evento) => podeArrastar && mover.aoComecarArrasto(evento, item, dia.data)}
+                      onDragEnd={mover.aoTerminarArrasto}
                     >
-                      <span className={styles.tipo}>
-                        <i className={item.tipo === "reels" ? hojeStyles.marcaReels : hojeStyles.marcaStory} aria-hidden="true" />
-                        {rotuloTipo(item)}
-                      </span>
-                      <span className={styles.tituloItem}>{item.titulo}</span>
-                      <span className={[styles.estado, item.status !== "gerado" && !item.sugerido ? styles.estadoFeito : ""].filter(Boolean).join(" ")}>
-                        {rotuloEstadoItem(item, dia)}
-                      </span>
-                    </button>
-                    {!item.sugerido && item.status === "gerado" && !dia.passado ? (
-                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={dia.data} aoArquivar={aoArquivar} />
-                    ) : null}
-                  </li>
-                ))}
+                      <button
+                        type="button"
+                        className={[styles.itemPlano, item.sugerido ? styles.itemPlanoSugerido : ""].filter(Boolean).join(" ")}
+                        disabled={ocupado}
+                        onClick={() => abrirItem(item, dia.data)}
+                      >
+                        <span className={styles.tipo}>
+                          <i className={item.tipo === "reels" ? hojeStyles.marcaReels : hojeStyles.marcaStory} aria-hidden="true" />
+                          {rotuloTipo(item)}
+                        </span>
+                        <span className={styles.tituloItem}>{item.titulo}</span>
+                        <span className={[styles.estado, item.status !== "gerado" && !item.sugerido ? styles.estadoFeito : ""].filter(Boolean).join(" ")}>
+                          {rotuloEstadoItem(item, dia)}
+                        </span>
+                      </button>
+                      {podeArrastar ? <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={dia.data} aoArquivar={aoArquivar} /> : null}
+                    </li>
+                  );
+                })}
               </ol>
             )}
             {faltam > 0 ? (
