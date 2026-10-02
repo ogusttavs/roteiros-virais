@@ -21,6 +21,8 @@ function inicioDoPeriodo(periodo: PeriodoNoticias, agora = new Date()): Date {
 export type NoticiaListada = {
   id: number;
   titulo: string;
+  /** "Ler no site" (item 1, cuidado 1 do escopo: nunca a matéria inteira, só o link para o original). */
+  url: string;
   fonte: string | null;
   publicadoEm: Date | null;
   resumo: string | null;
@@ -67,6 +69,7 @@ export async function noticiasDoSetor(
   return linhas.map((n) => ({
     id: n.id,
     titulo: n.titulo,
+    url: n.url,
     fonte: n.fonte,
     publicadoEm: n.publicadoEm,
     resumo: n.resumo,

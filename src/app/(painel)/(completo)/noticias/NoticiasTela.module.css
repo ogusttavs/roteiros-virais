@@ -1,0 +1,250 @@
+/**
+ * `/noticias` (E43, design v2, `entrega/telas/Noticias.dc.html`). Mesma base de `.pagina`/
+ * `.cabecalhoTela`/`.cartao` de `ReferenciasTela.module.css`, para as duas telas de lista não
+ * divergirem na moldura.
+ */
+.pagina {
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+@media (max-width: 767px) {
+  .pagina {
+    --toast-base: calc(62px + var(--espaco-4));
+  }
+}
+
+.cabecalhoTela {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.cabecalhoTela h1 {
+  margin: 0;
+  font-size: var(--tamanho-titulo);
+}
+
+.cabecalhoTela p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- O filtro de período (dúvida 2 do passo 11: Semana é o padrão) ---------- */
+
+.filtro {
+  display: flex;
+  gap: var(--espaco-2);
+}
+
+.chip {
+  padding: var(--espaco-2) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+  transition:
+    background var(--duracao-rapida) var(--curva-saida),
+    color var(--duracao-rapida) var(--curva-saida);
+}
+
+.chip:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.chip:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.chipAtivo,
+.chipAtivo:hover {
+  background: var(--cor-titulo);
+  border-color: var(--cor-titulo);
+  color: var(--cor-fundo);
+}
+
+/* ---------- Cartão base (mesmo tom de `ReferenciaCartao.module.css`) ---------- */
+
+.cartao {
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+  min-width: 0;
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  padding: var(--espaco-5);
+  text-align: left;
+}
+
+.estado {
+  justify-items: start;
+}
+
+.estado h2 {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.aviso,
+.avisoSuave {
+  background: var(--cor-superficie-recuada);
+  border-color: transparent;
+}
+
+.avisoTitulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.avisoDescricao {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.rotuloQuantidade {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+/* ---------- A grade de notícias ---------- */
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+  gap: var(--espaco-4);
+}
+
+.noticia {
+  width: 100%;
+  cursor: pointer;
+  transition: border-color var(--duracao-rapida) var(--curva-saida);
+}
+
+.noticia:hover {
+  border-color: var(--cor-borda-forte);
+}
+
+.fonte {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.tituloNoticia {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.resumo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---------- "Como isso vira vídeo seu" (dúvida 4 do passo 11: visual da sugestão do briefing) ---------- */
+
+.angulo {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.anguloRotulo {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.anguloTexto {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.peNoticia {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin-top: auto;
+}
+
+.abrirRotulo {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+.virouRoteiro {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.verRoteiro {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+/* ---------- A folha "a notícia aberta" ---------- */
+
+.corpoFolha {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.fonteCompleta {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.resumoInteiro {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  white-space: pre-wrap;
+}
+
+.deQuem {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.lerNoSite {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  text-decoration: none;
+  padding: var(--espaco-3) 0;
+}
+
+.lerNoSite:hover {
+  color: var(--cor-titulo);
+}

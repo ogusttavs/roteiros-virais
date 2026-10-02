@@ -100,6 +100,20 @@ export function formatarFonteEData(fonte: string | null, publicadoEm: Date | nul
   return fonte ?? tempo ?? "";
 }
 
+const FORMATAR_HORA = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
+
+/**
+ * E43, dúvida 3 do passo 11: a notícia aberta (a folha) mostra a data e a hora exatas, "7 de
+ * setembro, 07:10"; a lista usa só `formatarTempoRelativo`.
+ */
+export function formatarDataHoraPorExtenso(data: Date): string {
+  return `${FORMATAR_DATA_POR_EXTENSO.format(data)}, ${FORMATAR_HORA.format(data)}`;
+}
+
 export type FaixaMultiplo = "acima" | "media" | "abaixo";
 
 /**

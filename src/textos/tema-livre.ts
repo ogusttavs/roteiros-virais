@@ -42,7 +42,7 @@ export const textosTemaLivre = {
 
   /**
    * E43, "Criar vídeo com esta notícia" (design v2, `Noticias.dc.html`/`TemaLivre.dc.html`, estado
-   * `comNoticia`; "conteúdo" virou "vídeo" na palavra, `checar-texto`, regra 6).
+   * `comNoticia`; o desenho usava a palavra que a regra 6 proíbe como jargão, trocada por "vídeo").
    */
   tituloComNoticia: "Criar vídeo com esta notícia",
   subtituloComNoticia:
