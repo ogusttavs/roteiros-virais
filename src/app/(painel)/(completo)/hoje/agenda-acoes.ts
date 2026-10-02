@@ -13,7 +13,7 @@ import {
 } from "@/lib/formatarNumero";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
-import { arquivarRoteiro, conferirAindaVale, mudarDataRoteiro, roteiroPorId } from "@/servicos/roteiro";
+import { arquivarRoteiro, conferirAindaVale, desarquivarRoteiro, mudarDataRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 /**
@@ -30,18 +30,26 @@ async function roteiroDoClienteOuFalha(roteiroId: number) {
 /**
  * `router.refresh()` (quem chama estas ações) e `revalidatePath` juntos: o primeiro repete o
  * `fetch` do servidor na hora, sem esperar o `staleTime` do roteador; o segundo invalida o cache
- * do lado do servidor, para o `/hoje` e o `/hoje/mes` nunca devolverem uma página antiga quando a
- * pessoa navega para lá por outro caminho (um link, o histórico do navegador) logo em seguida.
+ * do lado do servidor, para o `/hoje` e o `/planejamento` nunca devolverem uma página antiga
+ * quando a pessoa navega para lá por outro caminho (um link, o histórico do navegador) logo em
+ * seguida. `/hoje/mes` virou um redirect fino (E39c, parte 2a), não precisa mais de cache próprio.
  */
 function revalidarAgenda() {
   revalidatePath("/hoje");
-  revalidatePath("/hoje/mes");
+  revalidatePath("/planejamento");
 }
 
-/** E39b, item (b): "Arquivar" num atrasado. */
+/** E39b, item (b): "Arquivar" num atrasado; também o menu de três ações (E39c, parte 2a). */
 export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
   await roteiroDoClienteOuFalha(roteiroId);
   await arquivarRoteiro(roteiroId);
+  revalidarAgenda();
+}
+
+/** E39c, parte 2a: o "desfazer" do toast de "Arquivar" no menu de três ações. */
+export async function desarquivarAction(roteiroId: number): Promise<void> {
+  await roteiroDoClienteOuFalha(roteiroId);
+  await desarquivarRoteiro(roteiroId);
   revalidarAgenda();
 }
 

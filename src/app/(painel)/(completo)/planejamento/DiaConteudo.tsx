@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Mic, Plus } from "lucide-react";
+import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -19,6 +19,8 @@ import {
   type ProximoMarcado,
 } from "../hoje/HojeTela";
 import styles from "../hoje/HojeTela.module.css";
+import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
+import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 
@@ -67,6 +69,7 @@ export function DiaConteudo({
   const aoAbrirContarAgenda = useAbrirContarAgenda();
   const [ocupado, iniciarTransicao] = useTransition();
   const [acao, setAcao] = useState<string | null>(null);
+  const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
 
   function ir(chave: string, destino: string) {
     if (ocupado) return;
@@ -203,20 +206,29 @@ export function DiaConteudo({
                   </div>
                   <h3>{agenda.reels[0].titulo}</h3>
                   {ehHoje ? <AindaValeBloco roteiroId={agenda.reels[0].id} aindaVale={aindaVale} aoMudouAlgo={recarregarAgenda} /> : null}
-                  <button
-                    type="button"
-                    className={styles.botaoPrimario}
-                    aria-busy={acao === `item-${agenda.reels[0].id}` || undefined}
-                    onClick={() => ir(`item-${agenda.reels[0].id}`, `/roteiros/${agenda.reels[0].id}`)}
-                  >
-                    {textosHoje.agenda.abrirRoteiro}
-                  </button>
+                  <div className={styles.acoesDestaque}>
+                    <button
+                      type="button"
+                      className={styles.botaoPrimario}
+                      aria-busy={acao === `item-${agenda.reels[0].id}` || undefined}
+                      onClick={() => ir(`item-${agenda.reels[0].id}`, `/roteiros/${agenda.reels[0].id}`)}
+                    >
+                      {textosHoje.agenda.abrirRoteiro}
+                    </button>
+                    <MenuAcoesAgenda
+                      roteiroId={agenda.reels[0].id}
+                      titulo={agenda.reels[0].titulo}
+                      data={diaVisualizado}
+                      variante="destaque"
+                      aoArquivar={arquivarComDesfazer}
+                    />
+                  </div>
                 </article>
                 {agenda.reels.length > 1 ? (
                   <div className={styles.listaAgendaCartao}>
                     <ol className={styles.listaAgenda}>
                       {agenda.reels.slice(1).map((item) => (
-                        <li key={item.id}>
+                        <li key={item.id} className={styles.linhaComMenu}>
                           <button
                             type="button"
                             className={styles.itemAgenda}
@@ -226,8 +238,8 @@ export function DiaConteudo({
                             <span className={styles.momento}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
                             <span className={styles.tituloItem}>{item.titulo}</span>
                             <EstadoItem item={item} ehHoje={ehHoje} />
-                            <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                           </button>
+                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
                         </li>
                       ))}
                     </ol>
@@ -245,7 +257,7 @@ export function DiaConteudo({
               <div className={styles.listaAgendaCartao}>
                 <ol className={styles.listaAgenda}>
                   {agenda.stories.map((item) => (
-                    <li key={item.id}>
+                    <li key={item.id} className={styles.linhaComMenu}>
                       <button
                         type="button"
                         className={styles.itemAgenda}
@@ -255,8 +267,8 @@ export function DiaConteudo({
                         <span className={styles.momento}>{item.momentoDoDia ? (ROTULO_MOMENTO[item.momentoDoDia] ?? item.momentoDoDia) : ""}</span>
                         <span className={styles.tituloItem}>{item.titulo}</span>
                         <EstadoItem item={item} ehHoje={ehHoje} />
-                        <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                       </button>
+                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
                     </li>
                   ))}
                 </ol>
@@ -287,6 +299,7 @@ export function DiaConteudo({
           </button>
         </div>
       )}
+      {toastArquivar}
     </>
   );
 }

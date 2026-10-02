@@ -264,8 +264,8 @@ test.describe("Ainda vale? (E39b, item a)", () => {
   });
 });
 
-test.describe("O calendário do mês (E39b, item e)", () => {
-  test("'Ver o mês' leva para /hoje/mes; tocar num dia mostra a agenda dele; 'Voltar para hoje' sai do calendário", async ({
+test.describe("O calendário do mês (E39b, item e; E39c, parte 2a: aba Planejar)", () => {
+  test("'Ver o mês' leva à aba Planejar, na visão Mês; tocar num dia mostra a agenda dele; a aba Hoje sai do calendário", async ({
     page,
   }) => {
     const { marcaId, email } = await criarMarca();
@@ -275,7 +275,7 @@ test.describe("O calendário do mês (E39b, item e)", () => {
     await entrar(page, email);
 
     await page.getByRole("button", { name: "Ver o mês" }).click();
-    await expect(page).toHaveURL(/\/hoje\/mes/);
+    await expect(page).toHaveURL(/\/planejamento\?visao=mes/);
 
     const diaComRoteiro = somarDias(hoje, 5);
     const [ano, mes, dia] = diaComRoteiro.split("-").map(Number);
@@ -284,7 +284,8 @@ test.describe("O calendário do mês (E39b, item e)", () => {
     await expect(page).toHaveURL(new RegExp(`dia=${diaComRoteiro}`));
     await expect(page.getByText("planejado para daqui a 5 dias")).toBeVisible();
 
-    await page.getByRole("button", { name: "Voltar para hoje" }).click();
+    // Sem "Voltar para hoje" no planejador: sair do calendário agora é trocar de aba.
+    await page.getByRole("navigation", { name: "Navegação principal" }).getByRole("link", { name: "Hoje" }).click();
     await expect(page).toHaveURL(/\/hoje$/);
   });
 
@@ -292,7 +293,7 @@ test.describe("O calendário do mês (E39b, item e)", () => {
     const { email } = await criarMarca();
     await entrar(page, email);
 
-    await page.goto("/hoje/mes");
+    await page.goto("/planejamento?visao=mes");
     const tituloInicial = await page.locator("h1").first().textContent();
 
     await page.getByRole("button", { name: "Próximo mês" }).click();

@@ -165,18 +165,6 @@
   color: var(--cor-texto-suave);
 }
 
-.mudarDiaBotao {
-  display: grid;
-  place-items: center;
-  width: var(--altura-toque);
-  height: var(--altura-toque);
-  border: 0;
-  border-radius: var(--raio-pill);
-  background: transparent;
-  color: var(--cor-texto-dica);
-  cursor: pointer;
-}
-
 .maisItens {
   justify-self: start;
   padding-left: 0;
@@ -292,15 +280,19 @@
     grid-template-columns: minmax(0, 1fr);
     position: relative;
   }
-  /* No desktop o botão de mudar o dia fica para o foco e o hover (dúvida 7 do passo 12: quem usa teclado). */
-  .linhaPlano .mudarDiaBotao {
+  /*
+   * No desktop o "mais" fica para o foco e o hover (dúvida 7 do passo 12: quem usa teclado).
+   * Seletor por `aria-haspopup` (`MenuAcoesAgenda.tsx`), não por classe: o botão vem de outro
+   * módulo CSS (`MenuAcoesAgenda.module.css`), cujo nome de classe não dá para apontar daqui.
+   */
+  .linhaPlano button[aria-haspopup="menu"] {
     position: absolute;
     top: 0;
     right: 0;
     opacity: 0;
   }
-  .linhaPlano:hover .mudarDiaBotao,
-  .linhaPlano:focus-within .mudarDiaBotao {
+  .linhaPlano:hover button[aria-haspopup="menu"],
+  .linhaPlano:focus-within button[aria-haspopup="menu"] {
     opacity: 1;
   }
 }

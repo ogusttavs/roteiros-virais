@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Mic, Plus } from "lucide-react";
+import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -8,10 +8,10 @@ import type { DiaSemanaPlano, ItemSemanaPlano } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
 
-import { mudarDataAtrasadoAction } from "../hoje/agenda-acoes";
-import { FolhaMudarDia } from "../hoje/FolhaMudarDia";
 import { ROTULO_MOMENTO } from "../hoje/HojeTela";
 import hojeStyles from "../hoje/HojeTela.module.css";
+import { MenuAcoesAgenda } from "../hoje/MenuAcoesAgenda";
+import { useDesfazerArquivar } from "../hoje/useDesfazerArquivar";
 
 import { useAbrirContarAgenda } from "./PlanejadorShell";
 import styles from "./SemanaTela.module.css";
@@ -50,17 +50,18 @@ function rotuloEstadoItem(item: ItemSemanaPlano, dia: DiaSemanaPlano): string {
  * "Ver mais N" (abre a visão Dia daquele dia). O sugerido é tracejado; tocar nele leva ao Criar
  * (`CriarTela.tsx`, `itemPlanoInicial`), não abre roteiro nenhum, porque ainda não existe.
  *
- * Mover de dia por arrasto (do tablet deitado para cima) fica para depois desta rodada; o ícone de
- * calendário já abre a folha "Mudar o dia" em qualquer tamanho de tela, que cobre o teclado também
- * (dúvida 7 do passo 12). Só nos itens que já são roteiro: mover um sugerido de dia é uma ação nova
- * que o código ainda não tem (hipótese mais simples desta rodada, registrada no TODO.md).
+ * Mover de dia por arrasto (do tablet deitado para cima) fica para depois desta rodada; o menu de
+ * três ações (`MenuAcoesAgenda`, E39c parte 2a, pedido do Gustavo em 01/10, 21:33) já cobre "não
+ * vou gravar hoje" (a mesma folha "Mudar o dia" de antes), arquivar e reprovar com motivo, em
+ * qualquer tamanho de tela. Só nos itens que já são roteiro: mover um sugerido de dia é uma ação
+ * nova que o código ainda não tem (hipótese mais simples desta rodada, registrada no TODO.md).
  */
 export function SemanaConteudo({ dias }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
   const [ocupado, iniciarTransicao] = useTransition();
-  const [itemParaMudarDia, setItemParaMudarDia] = useState<{ id: number; titulo: string; data: string } | null>(null);
   const [diasExpandidos, setDiasExpandidos] = useState<Set<string>>(new Set());
+  const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
 
   function ir(destino: string) {
     if (ocupado) return;
@@ -73,13 +74,6 @@ export function SemanaConteudo({ dias }: Props) {
       return;
     }
     ir(`/roteiros/${item.id}`);
-  }
-
-  async function salvarMudarDia(novaData: string) {
-    if (!itemParaMudarDia) return;
-    await mudarDataAtrasadoAction(itemParaMudarDia.id, novaData);
-    setItemParaMudarDia(null);
-    router.refresh();
   }
 
   const semNadaNaSemana = dias.every((dia) => dia.itens.length === 0);
@@ -95,14 +89,31 @@ export function SemanaConteudo({ dias }: Props) {
             {textosPlano.botaoContarAgenda}
           </button>
         </section>
-        <DiasGrade dias={dias} ocupado={ocupado} ir={ir} abrirItem={abrirItem} abrirMudarDia={setItemParaMudarDia} expandidos={diasExpandidos} setExpandidos={setDiasExpandidos} />
+        <DiasGrade
+          dias={dias}
+          ocupado={ocupado}
+          ir={ir}
+          abrirItem={abrirItem}
+          aoArquivar={arquivarComDesfazer}
+          expandidos={diasExpandidos}
+          setExpandidos={setDiasExpandidos}
+        />
+        {toastArquivar}
       </>
     );
   }
 
   return (
     <>
-      <DiasGrade dias={dias} ocupado={ocupado} ir={ir} abrirItem={abrirItem} abrirMudarDia={setItemParaMudarDia} expandidos={diasExpandidos} setExpandidos={setDiasExpandidos} />
+      <DiasGrade
+        dias={dias}
+        ocupado={ocupado}
+        ir={ir}
+        abrirItem={abrirItem}
+        aoArquivar={arquivarComDesfazer}
+        expandidos={diasExpandidos}
+        setExpandidos={setDiasExpandidos}
+      />
       <div className={[hojeStyles.pePlano, styles.peSemana].join(" ")}>
         <p className={styles.legendaSugerido}>
           <i className={[hojeStyles.marcaStory, styles.marcaSugerida].join(" ")} aria-hidden="true" />
@@ -113,14 +124,7 @@ export function SemanaConteudo({ dias }: Props) {
           {textosPlano.botaoContarAgenda}
         </button>
       </div>
-
-      {itemParaMudarDia ? (
-        <FolhaMudarDia
-          aoFechar={() => setItemParaMudarDia(null)}
-          dataInicial={itemParaMudarDia.data}
-          aoSalvar={salvarMudarDia}
-        />
-      ) : null}
+      {toastArquivar}
     </>
   );
 }
@@ -130,7 +134,7 @@ function DiasGrade({
   ocupado,
   ir,
   abrirItem,
-  abrirMudarDia,
+  aoArquivar,
   expandidos,
   setExpandidos,
 }: {
@@ -138,7 +142,7 @@ function DiasGrade({
   ocupado: boolean;
   ir: (destino: string) => void;
   abrirItem: (item: ItemSemanaPlano, data: string) => void;
-  abrirMudarDia: (item: { id: number; titulo: string; data: string }) => void;
+  aoArquivar: (roteiroId: number) => Promise<void>;
   expandidos: Set<string>;
   setExpandidos: (atualizar: (atual: Set<string>) => Set<string>) => void;
 }) {
@@ -204,14 +208,7 @@ function DiasGrade({
                       </span>
                     </button>
                     {!item.sugerido && item.status === "gerado" && !dia.passado ? (
-                      <button
-                        type="button"
-                        className={styles.mudarDiaBotao}
-                        aria-label={textosHoje.agenda.planejador.mudarODiaRotulo(item.titulo)}
-                        onClick={() => abrirMudarDia({ id: item.id, titulo: item.titulo, data: dia.data })}
-                      >
-                        <Calendar size={18} strokeWidth={1.75} aria-hidden="true" />
-                      </button>
+                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={dia.data} aoArquivar={aoArquivar} />
                     ) : null}
                   </li>
                 ))}

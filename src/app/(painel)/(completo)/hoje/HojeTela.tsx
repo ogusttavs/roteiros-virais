@@ -25,6 +25,8 @@ import {
 import { FolhaMudarDia } from "./FolhaMudarDia";
 import { HojeCabecalho } from "./HojeCabecalho";
 import styles from "./HojeTela.module.css";
+import { MenuAcoesAgenda } from "./MenuAcoesAgenda";
+import { useDesfazerArquivar } from "./useDesfazerArquivar";
 
 export type AvisoBriefingAgenda = { nota: string; meta: string };
 export type ProximoMarcado = { quando: string; rotuloFormato: string };
@@ -369,6 +371,7 @@ export function HojeTela({
   const [ocupado, iniciarTransicao] = useTransition();
   const [acao, setAcao] = useState<string | null>(null);
   const atualizando = ocupado && acao === "atualizar";
+  const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
 
   function ir(chave: string, destino: string) {
     if (ocupado) return;
@@ -610,20 +613,29 @@ export function HojeTela({
                       {ehHoje ? (
                         <AindaValeBloco roteiroId={agenda.reels[0].id} aindaVale={aindaVale} aoMudouAlgo={recarregarAgenda} />
                       ) : null}
-                      <button
-                        type="button"
-                        className={styles.botaoPrimario}
-                        aria-busy={acao === `item-${agenda.reels[0].id}` || undefined}
-                        onClick={() => ir(`item-${agenda.reels[0].id}`, `/roteiros/${agenda.reels[0].id}`)}
-                      >
-                        {textosHoje.agenda.abrirRoteiro}
-                      </button>
+                      <div className={styles.acoesDestaque}>
+                        <button
+                          type="button"
+                          className={styles.botaoPrimario}
+                          aria-busy={acao === `item-${agenda.reels[0].id}` || undefined}
+                          onClick={() => ir(`item-${agenda.reels[0].id}`, `/roteiros/${agenda.reels[0].id}`)}
+                        >
+                          {textosHoje.agenda.abrirRoteiro}
+                        </button>
+                        <MenuAcoesAgenda
+                          roteiroId={agenda.reels[0].id}
+                          titulo={agenda.reels[0].titulo}
+                          data={diaVisualizado}
+                          variante="destaque"
+                          aoArquivar={arquivarComDesfazer}
+                        />
+                      </div>
                     </article>
                     {agenda.reels.length > 1 ? (
                       <div className={styles.listaAgendaCartao}>
                         <ol className={styles.listaAgenda}>
                           {agenda.reels.slice(1).map((item) => (
-                            <li key={item.id}>
+                            <li key={item.id} className={styles.linhaComMenu}>
                               <button
                                 type="button"
                                 className={styles.itemAgenda}
@@ -633,8 +645,8 @@ export function HojeTela({
                                 <span className={styles.momento}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
                                 <span className={styles.tituloItem}>{item.titulo}</span>
                                 <EstadoItem item={item} ehHoje={ehHoje} />
-                                <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                               </button>
+                              <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
                             </li>
                           ))}
                         </ol>
@@ -652,7 +664,7 @@ export function HojeTela({
                   <div className={styles.listaAgendaCartao}>
                     <ol className={styles.listaAgenda}>
                       {agenda.stories.map((item) => (
-                        <li key={item.id}>
+                        <li key={item.id} className={styles.linhaComMenu}>
                           <button
                             type="button"
                             className={styles.itemAgenda}
@@ -664,8 +676,8 @@ export function HojeTela({
                             </span>
                             <span className={styles.tituloItem}>{item.titulo}</span>
                             <EstadoItem item={item} ehHoje={ehHoje} />
-                            <ChevronRight size={18} strokeWidth={1.75} aria-hidden="true" />
                           </button>
+                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
                         </li>
                       ))}
                     </ol>
@@ -678,6 +690,7 @@ export function HojeTela({
           )}
         </div>
       )}
+      {toastArquivar}
     </div>
   );
 }

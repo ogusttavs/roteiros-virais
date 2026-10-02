@@ -1,0 +1,88 @@
+/**
+ * O menu de três ações (E39c, parte 2a): o botão "mais" em dois tamanhos (destaque e linha) e o
+ * item de menu, mesmo estilo de `RoteiroTela.module.css` (`.itemMenu`), nome próprio por ser outro
+ * módulo CSS.
+ */
+.botaoDestaque {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-4);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.botaoDestaque:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoLinha {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  margin-right: calc(var(--espaco-2) * -1);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-dica);
+  cursor: pointer;
+}
+
+.botaoLinha:hover {
+  background: var(--cor-superficie-hover);
+  color: var(--cor-texto);
+}
+
+.botaoDestaque:focus-visible,
+.botaoLinha:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.itemMenu {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  background: transparent;
+  border-radius: var(--raio-md);
+  color: inherit;
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  text-align: left;
+  cursor: pointer;
+}
+
+.itemMenu:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.itemMenu:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.itemMenu:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.erro {
+  margin: 0;
+  padding: 0 var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}

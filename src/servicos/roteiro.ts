@@ -1720,6 +1720,14 @@ export async function arquivarRoteiro(roteiroId: number): Promise<void> {
 }
 
 /**
+ * E39c, parte 2a: o "desfazer" do toast de "Arquivar" no menu de três ações. Alguns segundos para
+ * voltar atrás sem precisar procurar o roteiro no Histórico.
+ */
+export async function desarquivarRoteiro(roteiroId: number): Promise<void> {
+  await db().update(roteiros).set({ arquivadoEm: null }).where(eq(roteiros.id, roteiroId));
+}
+
+/**
  * E39b, item (b): "Mudar o dia" e "Gravar hoje" num atrasado usam a mesma troca, só muda qual
  * data chega (a de hoje, no segundo caso). `validarData` já garante que não é no passado.
  */

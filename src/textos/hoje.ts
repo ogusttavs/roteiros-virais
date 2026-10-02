@@ -176,7 +176,6 @@ export const textosHoje = {
       sugerido: "sugerido",
       legendaSugerido: "sugerido: veio da sua agenda e ainda não tem roteiro",
       notaSugeridos: "Os sugeridos vieram da agenda que você contou. Toque num deles para escrever o roteiro.",
-      mudarODiaRotulo: (titulo: string) => `Mudar o dia: ${titulo}`,
       soltarAqui: "Soltar aqui",
       movendoPara: (titulo: string, dia: string) => `Movendo ${titulo} para ${dia}.`,
       semanaVaziaTitulo: "Nada marcado nesta semana",
@@ -198,9 +197,15 @@ export const textosHoje = {
      */
     menu: {
       abrir: "Mais opções",
+      /** Vários itens na mesma tela, cada um com o próprio menu (dúvida de acessibilidade: "mais
+       * opções" sozinho não diz de qual item, com vários na tela). */
+      abrirRotulo: (titulo: string) => `Mais opções: ${titulo}`,
       naoVouGravarHoje: "Não vou gravar hoje",
       arquivar: "Arquivar",
       naoGosteiQueroOutro: "Não gostei, quero outro",
+      arquivadoToast: "Arquivado",
+      desfazer: "Desfazer",
+      erroArquivar: "Não foi possível arquivar. Tente de novo.",
     },
     /** O título de cada coluna do dia: muda só quando o dia aberto não é hoje (dúvida 2). */
     reels: { hoje: "Reels de hoje", outroDia: "Reels" },

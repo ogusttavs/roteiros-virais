@@ -542,6 +542,12 @@
   border-top: var(--largura-borda) solid var(--cor-divisor);
 }
 
+/**
+ * E39c, parte 2a: o menu de três ações substitui a seta no fim da linha (`MenuAcoesAgenda.tsx`,
+ * `.linhaComMenu` abaixo), então aqui dentro `.itemAgenda` não desenha mais o próprio `<svg>`
+ * (`MesTela.tsx` continua sem o menu, de propósito, e ainda desenha o seu; a 3ª coluna da grade
+ * fica vazia nas linhas com menu, sem problema).
+ */
 .itemAgenda {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
@@ -555,6 +561,26 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
+}
+
+/* A linha com `.itemAgenda` (abre o roteiro) e `MenuAcoesAgenda` lado a lado, sem um cobrir o toque do outro. */
+.linhaComMenu {
+  display: flex;
+  align-items: center;
+}
+.linhaComMenu .itemAgenda {
+  flex: 1;
+  min-width: 0;
+}
+
+/* O rodapé do Reels em destaque: "Abrir o roteiro" e o "mais" lado a lado. */
+.acoesDestaque {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+.acoesDestaque .botaoPrimario {
+  flex: 1;
 }
 
 .itemAgenda:focus-visible {
