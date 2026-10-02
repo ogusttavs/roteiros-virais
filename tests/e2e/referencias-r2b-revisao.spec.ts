@@ -261,7 +261,7 @@ test.describe("/referencias e /roteiros, revisão do Fable no PR #100", () => {
     await page.screenshot({ path: path.join(PASTA_CAPTURAS, "de-onde-veio-1280.png") });
   });
 
-  test("item 4: filtros ativos viram fichas removíveis, com X e 'Tirar os filtros', a 390 e a 1280", async ({ page }) => {
+  test("item 4: filtros ativos viram fichas removíveis, com X e 'Tirar os filtros', a 390", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
     await page.goto("/referencias?periodo=90&plataforma=youtube");
@@ -272,13 +272,28 @@ test.describe("/referencias e /roteiros, revisão do Fable no PR #100", () => {
     await expect(fichas.getByRole("button", { name: "Tirar os filtros" })).toBeVisible();
     await page.screenshot({ path: path.join(PASTA_CAPTURAS, "fichas-390.png") });
 
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await expect(fichas).toBeVisible();
-    await page.screenshot({ path: path.join(PASTA_CAPTURAS, "fichas-1280.png") });
-
     await fichas.getByRole("button", { name: "Tirar os filtros" }).click();
     await expect(page).not.toHaveURL(/plataforma=youtube/);
     await expect(fichas).toBeHidden();
+  });
+
+  /**
+   * Passo 14 (etapa posterior a este PR): a partir de 1024px as pílulas de filtro à vista
+   * substituem as fichas, que o item 4 original media aqui; a pílula mostra o próprio estado
+   * ativo, sem ficha nenhuma. Cobertura própria em `referencias-pilulas.spec.ts`.
+   */
+  test("item 4, a 1280: as fichas somem, a pílula mostra o estado ativo no lugar delas", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await entrar(page);
+    await page.goto("/referencias?periodo=90&plataforma=youtube");
+
+    await expect(page.getByLabel("Filtros ligados")).toBeHidden();
+    await expect(page.getByRole("button", { name: "YouTube" })).toBeVisible();
+    await page.screenshot({ path: path.join(PASTA_CAPTURAS, "fichas-1280.png") });
+
+    await page.getByRole("button", { name: "YouTube" }).click();
+    await page.getByRole("menuitemcheckbox", { name: "YouTube" }).click();
+    await expect(page).not.toHaveURL(/plataforma=youtube/);
   });
 
   test("item 5: o segmento Todos mostra o próprio subtítulo, não o de Fora da curva", async ({ page }) => {

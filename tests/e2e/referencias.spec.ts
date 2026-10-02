@@ -287,6 +287,8 @@ test.describe("/referencias no design v2", () => {
   });
 
   test("filtrar por plataforma pela folha, o contador aparece no botão Filtrar", async ({ page }) => {
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" vira as pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL);
     await page.goto("/referencias");
 
@@ -325,6 +327,8 @@ test.describe("/referencias no design v2", () => {
     // 6s do item 2 (recarrega a página inteira); no pior caso (as 12 chamadas de `navegar` do laço
     // caindo nela), ainda cabe dentro do prazo.
     test.setTimeout(150_000);
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" vira as pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL);
     await page.goto("/referencias");
 
@@ -364,6 +368,8 @@ test.describe("/referencias no design v2", () => {
    */
   test("aplicar um filtro e sair da tela antes de 6s não puxa a pessoa de volta (F1, ajuste A)", async ({ page }) => {
     test.setTimeout(20_000);
+    // Abaixo de 1024px: a partir dali o seletor de período some, substituído pela pílula "Período" (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL);
     await page.goto("/referencias");
 
@@ -385,6 +391,8 @@ test.describe("/referencias no design v2", () => {
    * repetição de verdade tem que morar dentro do teste, não na flag da linha de comando.
    */
   test("filtrar e limpar pela folha, repetido várias vezes seguidas, nunca fica na URL de antes", async ({ page }) => {
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" vira as pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL);
     await page.goto("/referencias");
 
@@ -412,6 +420,8 @@ test.describe("/referencias no design v2", () => {
    * existe mais como "voltar para a folha aberta"), não ficar preso nem voltar para a folha.
    */
   test("o Voltar do aparelho depois de aplicar um filtro sai para a lista de antes, não para a folha", async ({ page }) => {
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" vira as pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL);
     await page.goto("/referencias");
     await expect(page).toHaveURL(/^[^?]*\/referencias$/);
@@ -665,6 +675,9 @@ test.describe("/referencias, 'Limpar os filtros' com rede principal (item 8, V12
   });
 
   test("'Limpar os filtros' na folha continua limpo depois de trocar o período", async ({ page }) => {
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" e o seletor de período somem, substituídos
+    // pelas pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, EMAIL_LIMPAR);
 
     // A rede principal (instagram) prefiltra de saída: só o vídeo de instagram aparece.
