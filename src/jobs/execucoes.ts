@@ -52,7 +52,14 @@ export async function executarComRegistro(
   const [execucao] = await db().insert(execucoesJob).values({ nome, status: "rodando" }).returning();
 
   try {
-    const resumo = await tarefa(execucao.id);
+    /**
+     * Hotfix de 01/10/2026 (achado do Fable rodando `extrair-sem-fala` em produção): o caminho de
+     * sucesso gravava o `resumo` cru, e a lista `erros` dentro dele trazia a linha de comando do
+     * `yt-dlp` com a credencial do proxy (`video.ts` não mascarava, só `audio.ts`). A máscara vale
+     * aqui para qualquer job, de uma vez: o que vai para `execucoes_job.resumo` e o que volta para
+     * quem chamou (o `npm run job` imprime) passam por `mascararSegredos`.
+     */
+    const resumo = mascararSegredos(await tarefa(execucao.id)) as Record<string, unknown>;
     await db()
       .update(execucoesJob)
       .set({ status: "ok", resumo, terminadoEm: new Date() })
