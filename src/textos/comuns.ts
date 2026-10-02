@@ -67,4 +67,13 @@ export const textosComuns = {
       return `${formatar(segundos)} de ${formatar(limiteSegundos)}`;
     },
   },
+  /**
+   * R2a, a prévia do vídeo (`src/ui/componentes/VideoEmbed.tsx`): o reserva, quando a rede não
+   * deixa mostrar o vídeo dentro do aplicativo (desenho do passo 14, `base.css`, `.moldura-video
+   * .reserva`). `rede` já formatado ("Instagram", "TikTok", "YouTube").
+   */
+  videoReserva: {
+    texto: (rede: string) => `O ${rede} não deixa mostrar este vídeo aqui.`,
+    abrir: (rede: string) => `Abrir no ${rede}`,
+  },
 };

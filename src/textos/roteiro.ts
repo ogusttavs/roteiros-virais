@@ -84,6 +84,9 @@ export const textosRoteiro = {
   /** V9c, item 4: por que o roteiro saiu assim, uma linha por regra aplicada (`porQueAssim` do prompt). */
   porQueAssim: "Por que assim",
   referencia: "Referência",
+  /** R2a: o vídeo tocando dentro do "De onde veio", mesmo texto de `textosReferencias.embedAlt`/`embedCarregando`. */
+  embedAlt: (conta: string) => `vídeo de ${conta}`,
+  embedCarregando: "Carregando o vídeo",
   /**
    * A força da evidência (V4, item 6, escopo 5.12, item 8): a fraca é a
    * frase literal do escopo, "tema novo, pouca prova ainda", dita sem

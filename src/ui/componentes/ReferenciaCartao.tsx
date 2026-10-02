@@ -33,6 +33,8 @@ export type VideoFormatado = {
   capaUrl: string | null;
   /** M4, item 1: etiqueta "sem fala" quando `true`. */
   semFala: boolean;
+  /** R2a: o embed já começa aqui quando a análise visual achou o momento chave. */
+  segundoChave: number | null;
 };
 
 type Props = {

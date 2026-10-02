@@ -50,6 +50,7 @@ import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
 import { Toast } from "@/ui/componentes/Toast";
+import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
 import { ID_FAIXA_SEM_CONEXAO, useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
@@ -886,6 +887,16 @@ export function RoteiroTela({
                 referencia.segundo !== null && referencia.segundo > 0
                   ? textosRoteiro.trechoComeca(formatarSegundo(referencia.segundo))
                   : null
+              }
+              miniatura={
+                <VideoEmbed
+                  url={video.url}
+                  alt={textosRoteiro.embedAlt(video.contaNome ?? video.contaHandle ?? "")}
+                  rotuloCarregamento={textosRoteiro.embedCarregando}
+                  hrefExterno={video.url}
+                  segundoInicial={referencia.segundo ?? undefined}
+                  capaUrl={video.capaUrl}
+                />
               }
               botao={{ rotulo: textosRoteiro.abrirReferencia, href: video.url }}
               forca={corpo.forcaEvidencia ? textosRoteiro.forcaEvidencia[corpo.forcaEvidencia] : null}

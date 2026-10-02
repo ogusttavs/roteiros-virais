@@ -740,6 +740,8 @@ export type VideoReferencia = {
   capaUrl: string | null;
   /** M4, item 1: etiqueta "sem fala" no cartão quando `true`; nulo (lido antes desta coluna existir) conta como falado. */
   semFala: boolean | null;
+  /** R2a: `analiseVisual.momentoChave.segundo`, para o embed já começar ali; `null` sem análise visual. */
+  segundoChave: number | null;
 };
 
 /**
@@ -857,6 +859,7 @@ export async function referenciasDoNicho(
         contaIdiomaPrincipal: contas.idiomaPrincipal,
         capaUrl: videos.capaUrl,
         semFala: videos.semFala,
+        analiseVisual: videos.analiseVisual,
       })
       .from(videos)
       .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -911,6 +914,7 @@ export async function referenciasDoNicho(
       formato: l.analise.formato,
       capaUrl: l.capaUrl,
       semFala: l.semFala,
+      segundoChave: l.analiseVisual?.momentoChave?.segundo ?? null,
     })),
   };
 }
@@ -1006,6 +1010,8 @@ export type VideoParaEmbed = {
   contaMedianaOrigem: MedianaOrigem | null;
   foraDaCurva: number;
   porQueFuncionou: string | null;
+  /** R2a: a capa do vídeo, para a moldura do reserva quando a rede não deixa mostrar o embed. */
+  capaUrl: string | null;
 };
 
 /**
@@ -1024,6 +1030,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
       contaMedianaOrigem: contas.medianaOrigem,
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
+      capaUrl: videos.capaUrl,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -1039,6 +1046,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     contaMedianaOrigem: linha.contaMedianaOrigem,
     foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
     porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
+    capaUrl: linha.capaUrl,
   };
 }
 

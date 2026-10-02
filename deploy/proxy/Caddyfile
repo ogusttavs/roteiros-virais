@@ -16,6 +16,9 @@
 # roteiros
 app.srv1953618.hstgr.cloud {
 	encode zstd gzip
+	# R2a: o video de referencia toca dentro do aplicativo (YouTube, TikTok e Instagram pelos
+	# incorporados oficiais, nunca baixado nem hospedado por nos); frame-src libera so os tres.
+	header Content-Security-Policy "frame-src 'self' https://www.youtube-nocookie.com https://www.tiktok.com https://www.instagram.com"
 	reverse_proxy roteiros-app:3000
 }
 
