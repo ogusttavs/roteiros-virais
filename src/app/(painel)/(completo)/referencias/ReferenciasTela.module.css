@@ -176,16 +176,23 @@
 
 /**
  * R2b, item 4 (revisão do Fable no PR #100, desenho `.fichas-filtro`/`.ficha`): uma ficha por
- * filtro ligado, removível com um toque, mais "Tirar os filtros". Em qualquer largura de tela
- * (o desenho esconde isto a partir de 1024px, substituído pelas pílulas da barra; esta rodada não
- * construiu as pílulas, então as fichas ficam como o único jeito de ver e tirar um filtro sem
- * reabrir a folha).
+ * filtro ligado, removível com um toque, mais "Tirar os filtros". Abaixo de 1024px é o único
+ * jeito de ver e tirar um filtro sem reabrir a folha; a partir dali as pílulas
+ * (`PilulasFiltroReferencias`) mostram o próprio estado ativo e isto some (passo 14).
  */
 .fichas {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--espaco-2);
+}
+
+@media (min-width: 1024px) {
+  .seletorPeriodo,
+  .botaoFiltrar,
+  .fichas {
+    display: none;
+  }
 }
 
 .ficha {
@@ -235,6 +242,32 @@
   letter-spacing: var(--espacamento-legenda);
   text-transform: uppercase;
   color: var(--cor-texto-dica);
+}
+
+/* Passo 14: a contagem e a pílula de Ordem lado a lado, do tablet deitado para cima
+ * (`.contagem`/`.lado-contagem` do desenho; nome diferente aqui para não colidir com `.contagem`
+ * de cima, que já existia). */
+.linhaContagem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.ladoContagem {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .ladoContagem {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+  }
+  .ordemSufixo {
+    display: none;
+  }
 }
 
 /** V12b, item 8: a rede principal escolhida não tinha vídeo no período; discreta, não é erro. */

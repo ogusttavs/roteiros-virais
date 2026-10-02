@@ -190,6 +190,8 @@ test.describe("/referencias, R2b: o segmento Todos, os filtros e Ver mais", () =
   test("o filtro de Tipo de vídeo (meme) reduz a lista em Todos, e o botão Filtrar mostra só o número, sem vírgula", async ({
     page,
   }) => {
+    // Abaixo de 1024px: a partir dali o botão "Filtrar" vira as pílulas (passo 14).
+    await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
     await page.goto("/referencias?seg=todos&periodo=90");
 

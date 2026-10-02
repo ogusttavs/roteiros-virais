@@ -1289,6 +1289,9 @@ test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
     });
 
     test(`Referências, folha filtrar, em ${rotulo}px`, async ({ page }) => {
+      // Passo 14: a partir de 1024px as pílulas substituem o botão "Filtrar" e a folha; a
+      // cobertura de layout delas é própria, em `referencias-pilulas.spec.ts`.
+      test.skip(largura >= 1024, "a partir de 1024px o botão Filtrar vira as pílulas (passo 14)");
       await page.setViewportSize({ width: largura, height: altura });
       await entrarReferencias(page);
       await page.goto("/referencias");
@@ -1322,6 +1325,7 @@ test.describe("layout: Referências (V6) em 390, 820 e 1280", () => {
     });
 
     test(`Referências, folha filtrar fecha por Voltar, Esc, toque fora e arrastar, em ${rotulo}px`, async ({ page }) => {
+      test.skip(largura >= 1024, "a partir de 1024px o botão Filtrar vira as pílulas (passo 14)");
       await page.setViewportSize({ width: largura, height: altura });
       await entrarReferencias(page);
       await page.goto("/referencias");

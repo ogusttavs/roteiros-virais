@@ -19,6 +19,7 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import { desfavoritarAction, favoritarAction } from "./acoes";
 import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
 import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
+import { PilulaOrdem, PilulasFiltroReferencias } from "./PilulasFiltroReferencias";
 import styles from "./ReferenciasTela.module.css";
 
 export type Segmento = "foradacurva" | "todos" | "salvos";
@@ -181,6 +182,12 @@ export function ReferenciasTela({
   const tratarFalha = useTratarFalha();
   const [campoBusca, setCampoBusca] = useState(busca);
   const [folhaFiltrarAberta, setFolhaFiltrarAberta] = useState(false);
+  /**
+   * Passo 14: as pílulas de filtro à vista, do tablet deitado para cima; a folha "Filtrar"
+   * continua a mesma abaixo disso. Uma string só para todas as sete pílulas (as seis do grupo
+   * mais a de "Ordem", que mora perto da contagem): só uma aberta por vez.
+   */
+  const [pilulaAberta, setPilulaAberta] = useState<string | null>(null);
   const [videoDetalheId, setVideoDetalheId] = useState<number | null>(null);
   const [favoritos, setFavoritos] = useState(() => new Set(favoritosIniciais));
   const [aviso, setAviso] = useState<{ id: number; texto: string; variante: "sucesso" | "erro" } | null>(null);
@@ -619,6 +626,23 @@ export function ReferenciasTela({
             {/* Hotfix (passo 14): a contagem é só o número, nunca mais ", N" com a vírgula solta. */}
             {quantosFiltrosAtivos > 0 ? <span className={styles.quantosAtivos}>{quantosFiltrosAtivos}</span> : null}
           </Botao>
+
+          {/* Passo 14: a partir de 1024px, as seis pílulas à vista substituem o botão "Filtrar" e
+              as fichas (escondidos por CSS nessa largura); cada clique já navega, sem "aplicar". */}
+          <PilulasFiltroReferencias
+            plataformasAtivas={plataformasExibidas}
+            formatosAtivos={formatosExibidos}
+            periodoDias={periodoExibido}
+            viewsMin={viewsMinExibido}
+            comFala={comFalaExibido}
+            brasil={brasilExibido}
+            tiposConteudo={tiposConteudoExibidos}
+            contagens={contagensFiltro}
+            pilulaAberta={pilulaAberta}
+            onAbrir={setPilulaAberta}
+            onFechar={() => setPilulaAberta(null)}
+            onMudar={(mudanca) => navegar(mudanca)}
+          />
         </div>
 
         {fichasAtivas.length > 0 ? (
@@ -704,14 +728,30 @@ export function ReferenciasTela({
       ) : (
         <>
           {navegando ? null : (
-            <p className={styles.contagem}>
-              {segmento === "salvos"
-                ? textosReferencias.contagemSalvos(total)
-                : segmento === "todos"
-                  ? textosReferencias.contagemTodos(total, periodoDias)
-                  : textosReferencias.contagem(total, periodoDias)}
-              {segmento !== "salvos" ? `, ${textosReferencias.ordemSufixo[ordemExibida ?? "recentes"]}` : ""}
-            </p>
+            <div className={styles.linhaContagem}>
+              <p className={styles.contagem}>
+                {segmento === "salvos"
+                  ? textosReferencias.contagemSalvos(total)
+                  : segmento === "todos"
+                    ? textosReferencias.contagemTodos(total, periodoDias)
+                    : textosReferencias.contagem(total, periodoDias)}
+                {/* Passo 14: a partir de 1024px a pílula de Ordem já diz a ordem; o sufixo some (`.ladoContagem` abaixo). */}
+                {segmento !== "salvos" ? (
+                  <span className={styles.ordemSufixo}>{`, ${textosReferencias.ordemSufixo[ordemExibida ?? "recentes"]}`}</span>
+                ) : null}
+              </p>
+              {segmento !== "salvos" ? (
+                <span className={styles.ladoContagem}>
+                  <PilulaOrdem
+                    ordem={ordemExibida}
+                    pilulaAberta={pilulaAberta}
+                    onAbrir={setPilulaAberta}
+                    onFechar={() => setPilulaAberta(null)}
+                    onMudar={(mudanca) => navegar(mudanca)}
+                  />
+                </span>
+              ) : null}
+            </div>
           )}
           <div className={styles.grade}>
             {formatados.map((video) => (

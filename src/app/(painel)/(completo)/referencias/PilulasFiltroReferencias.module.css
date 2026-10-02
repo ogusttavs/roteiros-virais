@@ -1,0 +1,15 @@
+/* Passo 14: as pílulas só existem do tablet deitado para cima; abaixo disso o botão "Filtrar" e
+ * as fichas (`ReferenciasTela.module.css`) continuam sendo o único caminho, como sempre foi. */
+.pilulas {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .pilulas {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--espaco-2);
+    width: 100%;
+  }
+}

@@ -37,7 +37,11 @@ export const textosReferencias = {
 
   // A folha "Filtrar"
   folhaFiltrarTitulo: "Filtrar",
+  /** Passo 14: o `aria-label` do grupo de pílulas à vista, a partir de 1024px. */
+  ordemEFiltros: "Ordem e filtros",
   ondeFoiPostado: "Onde foi postado",
+  /** Passo 14: o rótulo curto da pílula, sem rede marcada; o menu continua "Onde foi postado". */
+  rede: "Rede",
   /** R2b, item 2: o grupo combinado, `analise.formato` mais meme/recorte (antes só "Formato"). */
   tipoDeVideo: "Tipo de vídeo",
   verVideos: (n: number) => `Ver os ${n} ${n === 1 ? "vídeo" : "vídeos"}`,
@@ -58,6 +62,9 @@ export const textosReferencias = {
   deOnde: "De onde",
   doBrasil: "Do Brasil",
   deFora: "De fora",
+  /** Passo 14: o rótulo curto das duas pílulas, sem nada marcado (o desenho, `.pilula-filtro`). */
+  comOuSemFala: "Com ou sem fala",
+  brasilOuFora: "Brasil ou fora",
   /**
    * R2b, item 4 (revisão do Fable no PR #100): as fichas removíveis logo abaixo da barra de
    * filtros, uma por filtro ligado, com "Tirar os filtros" ao lado (desenho, `.fichas-filtro`).
