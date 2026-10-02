@@ -263,15 +263,38 @@ export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: Te
 
 async function gerarTemasDoNicho(
   nicho: NichoAtivo,
-): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "mantido"; temasSemProva: number }> {
-  const [regua, subindo, semDono, candidatasNoticias] = await Promise.all([
+): Promise<{ status: "gerado" | "sem_evidencia" | "sem_prova" | "sem_novidade" | "mantido"; temasSemProva: number }> {
+  const [regua, subindo, semDono, candidatasNoticias, existente] = await Promise.all([
     reguaDoSetor(nicho.id),
     // Hotfix de 02/10/2026: brasileiro primeiro na lista que o modelo recebe, senão o tema não tem
     // como montar a prova num setor com muita conta de fora.
     subindoHojeComAnalise(nicho.id, LIMITE_SUBINDO, { brasilPrimeiro: true }),
     semDonoComAnalise(nicho.id),
     noticiasCandidatas(nicho.id),
+    db()
+      .select({ temas: temasDia.temas, candidatosNaUltimaTentativa: temasDia.candidatosNaUltimaTentativa })
+      .from(temasDia)
+      .where(and(eq(temasDia.nichoId, nicho.id), eq(temasDia.data, hojeISO())))
+      .then((linhas) => linhas[0]),
   ]);
+
+  /**
+   * M5b, item 3, resto do achado 9: o setor que já tentou hoje e ficou sem prova (`temas: []`,
+   * `candidatosNaUltimaTentativa` gravado lá embaixo) só tenta de novo quando a lista de vídeos
+   * cresceu desde a última tentativa; notícia nova sozinha nunca ajuda a prova (ela não conta como
+   * evidência da prova, só como evidência de tema), por isso a contagem é só de vídeo. Sem isso,
+   * cada lote de análise que termina ao longo do dia disparava outra rodada inteira no modelo
+   * forte para um setor que continuava sem o vídeo a mais que faltava.
+   */
+  const candidatosAgora = subindo.length + semDono.length;
+  if (
+    existente &&
+    existente.temas.length === 0 &&
+    existente.candidatosNaUltimaTentativa !== null &&
+    candidatosAgora <= existente.candidatosNaUltimaTentativa
+  ) {
+    return { status: "sem_novidade", temasSemProva: 0 };
+  }
 
   const noticiasRelevantes = await filtrarEGravarNoticias(nicho, candidatasNoticias);
 
@@ -350,6 +373,20 @@ async function gerarTemasDoNicho(
   }
 
   if (temasComProva.length === 0) {
+    /**
+     * M5b, item 3: marca a tentativa (nunca por cima de um dia que já tinha tema de verdade; essa
+     * defesa é só por segurança, porque o `existente` já buscado acima teria desviado para
+     * "sem_novidade" antes de chegar aqui quando havia um tema real e nenhum vídeo novo).
+     */
+    if (!existente || existente.temas.length === 0) {
+      await db()
+        .insert(temasDia)
+        .values({ nichoId: nicho.id, data: hojeISO(), temas: [], candidatosNaUltimaTentativa: candidatosAgora })
+        .onConflictDoUpdate({
+          target: [temasDia.nichoId, temasDia.data],
+          set: { temas: [], candidatosNaUltimaTentativa: candidatosAgora },
+        });
+    }
     return { status: "sem_prova", temasSemProva };
   }
 
@@ -373,7 +410,10 @@ async function gerarTemasDoNicho(
  * comportamento de sempre (o cron das 06:30): todo nicho ativo, sempre tentando (a escrita em si
  * respeita `podeSobrescreverTemasDoDia`, item 0 da R1). Com `nichoId` (chamado por
  * `extrairColeta` ou `extrairAgora` depois de analisar vídeo novo), só aquele setor, e só se ele
- * ainda não tem tema hoje: nunca regenera o tema de quem já escolheu.
+ * ainda não tem tema **de verdade** hoje: nunca regenera o tema de quem já escolheu. Uma linha
+ * com `temas: []` (M5b, item 3: tentou e ficou sem prova) não conta como "já tem hoje" aqui; quem
+ * decide se vale tentar de novo é `gerarTemasDoNicho`, que sabe se chegou vídeo novo desde a
+ * última tentativa.
  *
  * R1, item 0: `opts.forcar` pula esse "já tem hoje, não regenera" (`npm run job --
  * temas-do-dia <nichoId> --refazer`, `rodar.ts`), para refazer um setor só sob pedido; a
@@ -385,17 +425,18 @@ export async function rodarTemasDoDia(
   opts?: { forcar?: boolean },
 ): Promise<Record<string, unknown>> {
   if (nichoId !== undefined && !opts?.forcar) {
-    const [jaTemHoje] = await db()
-      .select({ id: temasDia.id })
+    const [existente] = await db()
+      .select({ temas: temasDia.temas })
       .from(temasDia)
       .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
-    if (jaTemHoje) {
+    if (existente && existente.temas.length > 0) {
       return {
         nichos: 1,
         gerados: 0,
         mantidos: 0,
         semEvidencia: 0,
         semProva: 0,
+        semNovidade: 0,
         temasSemProva: 0,
         falhas: 0,
         jaTinhaTemaHoje: true,
@@ -414,6 +455,7 @@ export async function rodarTemasDoDia(
   let mantidos = 0;
   let semEvidencia = 0;
   let semProva = 0;
+  let semNovidade = 0;
   let temasSemProva = 0;
   let falhas = 0;
   const erros: string[] = [];
@@ -425,6 +467,7 @@ export async function rodarTemasDoDia(
       if (resultado.status === "gerado") gerados += 1;
       else if (resultado.status === "mantido") mantidos += 1;
       else if (resultado.status === "sem_prova") semProva += 1;
+      else if (resultado.status === "sem_novidade") semNovidade += 1;
       else semEvidencia += 1;
     } catch (erro) {
       falhas += 1;
@@ -438,6 +481,7 @@ export async function rodarTemasDoDia(
     mantidos,
     semEvidencia,
     semProva,
+    semNovidade,
     temasSemProva,
     falhas,
     erros: erros.length > 0 ? erros : undefined,

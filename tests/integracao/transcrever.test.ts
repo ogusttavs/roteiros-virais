@@ -6,11 +6,12 @@
 /* eslint-disable import/order -- quatro vi.mock intercalados com os imports que
    precisam vir depois deles confundem a regra (ela conta a linha em branco entre
    os imports do bloco de cima e os de baixo como "dentro do mesmo grupo"). */
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
+import { FILAS } from "@/jobs/fila";
 
 vi.mock("@/jobs/legendas-youtube", () => ({ baixarLegendaYoutube: vi.fn() }));
 vi.mock("@/jobs/audio", async (importarOriginal) => {
@@ -557,5 +558,35 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
 
     await rodarTranscrever();
     expect(baixarAudio).toHaveBeenCalledWith("https://exemplo.invalido/insta-sem-midia", "instagram");
+  });
+
+  /**
+   * M5b, item 1: a rodada global (sem nichoId, o cron das 04:00) encadeia direto para
+   * `extrair-sem-fala` ao terminar, em vez de esperar o horário fixo de reserva.
+   */
+  describe("M5b, item 1: a rodada global encadeia extrair-sem-fala", () => {
+    afterEach(async () => {
+      await db().execute(sql`delete from pgboss.job where name = ${FILAS.extrairSemFala}`);
+    });
+
+    it("sem nichoId (a rodada global), enfileira extrair-sem-fala ao terminar", async () => {
+      await criarVideo("encadeamento-global", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+      vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+      await rodarTranscrever();
+
+      const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala} limit 1`);
+      expect(jobs.rows.length).toBe(1);
+    });
+
+    it("com nichoId (a cadeia síncrona da primeira carga), não enfileira extrair-sem-fala", async () => {
+      await criarVideo("encadeamento-por-nicho", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+      vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+      await rodarTranscrever(nichoId);
+
+      const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala} limit 1`);
+      expect(jobs.rows.length).toBe(0);
+    });
   });
 });

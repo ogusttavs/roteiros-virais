@@ -344,6 +344,13 @@
       "when": 1790942398709,
       "tag": "0048_videos-nicho-views",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1790951039928,
+      "tag": "0049_temas-dia-candidatos-ultima-tentativa",
+      "breakpoints": true
     }
   ]
 }
