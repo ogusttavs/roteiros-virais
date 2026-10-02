@@ -139,8 +139,13 @@ export const nichos = pgTable("nichos", {
 export type QuemGrava = "propria_pessoa" | "pessoa_e_equipe" | "equipe" | "outra_pessoa";
 export const VALORES_QUEM_GRAVA = ["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"] as const;
 
-/** V12c, item 1: onde estao os clientes do negocio, substitui cidade/bairro na tela. */
-export type Alcance = "brasil" | "local";
+/**
+ * V12c, item 1: onde estao os clientes do negocio, substitui cidade/bairro na tela. E42a, item 1
+ * (achado do Gustavo em 02/10, no Comecar pelo celular: "ta muito limitado ao Brasil"):
+ * "outro_pais" (um pais, campo `clientes.pais`) e "mais_de_um_pais" (campo `clientes.paises`,
+ * texto livre com quais) entram ao lado de "brasil" e "local".
+ */
+export type Alcance = "brasil" | "local" | "outro_pais" | "mais_de_um_pais";
 
 /** Perfis do cliente nas redes, coletados no briefing (secao 1). */
 export type PerfisCliente = {
@@ -210,6 +215,10 @@ export const clientes = pgTable("clientes", {
   alcance: text("alcance").$type<Alcance>(),
   /** Texto livre ("Campinas e regiao"), so usado quando `alcance = "local"`. */
   regiao: text("regiao"),
+  /** E42a, item 1: texto livre ("Estados Unidos"), so usado quando `alcance = "outro_pais"`. */
+  pais: text("pais"),
+  /** E42a, item 1: texto livre ("Estados Unidos e Mexico"), so usado quando `alcance = "mais_de_um_pais"`. */
+  paises: text("paises"),
   /** V12c, item 6, a E37b: endereco publico da marca, opcional. Validado como URL publica. */
   site: text("site"),
   /** Texto do ramo quando o cliente escolheu "outro" na lista (briefing-e-rubricas.md, secao 1). */

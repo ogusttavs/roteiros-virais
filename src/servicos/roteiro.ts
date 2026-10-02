@@ -357,13 +357,19 @@ function resolverQuemAparece(override: QuemGrava | undefined, cliente: Cliente):
  * migrado sem cidade) não entra na camada, como antes.
  */
 export function formatarCamadaExclusiva(
-  cliente: Pick<Cliente, "alcance" | "regiao" | "camadaExclusiva">,
+  cliente: Pick<Cliente, "alcance" | "regiao" | "pais" | "paises" | "camadaExclusiva">,
 ): string {
   const linhas: string[] = [];
   if (cliente.alcance === "local" && cliente.regiao) {
     linhas.push(`Região: ${cliente.regiao}.`);
   } else if (cliente.alcance === "brasil") {
     linhas.push("Vende para o Brasil inteiro: não cite cidade nem bairro, nem fale como negócio de bairro.");
+  } else if (cliente.alcance === "outro_pais" && cliente.pais) {
+    // E42a, item 1: o motor nao muda nesta etapa (a pesquisa de video continua so no Brasil), so o
+    // roteiro sabe para quem a pessoa esta falando.
+    linhas.push(`Público no exterior, em ${cliente.pais}: não cite cidade nem bairro do Brasil.`);
+  } else if (cliente.alcance === "mais_de_um_pais" && cliente.paises) {
+    linhas.push(`Público no exterior, em mais de um país (${cliente.paises}): não cite cidade nem bairro do Brasil.`);
   }
   if (cliente.camadaExclusiva.concorrentes.length > 0) {
     linhas.push(
@@ -1069,7 +1075,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
      * (tema novo, pouca prova), mas também não é "forte" (vários vídeos
      * confirmando), então fica no meio.
      */
-    forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidenciasCitadas),
+    // E42a, item 4: a força lê a régua do setor (já resolvida acima, para `combinarEvidencias`),
+    // nunca mais fixa em 0,7.
+    forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidenciasCitadas, undefined, proporcaoBrasil),
     legenda: saida.legenda,
   };
 

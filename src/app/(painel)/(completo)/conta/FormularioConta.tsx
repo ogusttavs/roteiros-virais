@@ -2,7 +2,11 @@
 
 import { useState, type FormEvent } from "react";
 
-import type { TemaPreferido } from "@/db/schema";
+import { dadosFixosDoBriefing } from "@/config/briefing";
+import type { TemaPreferido, TipoMarca } from "@/db/schema";
+import type { OndeValor } from "@/lib/onde";
+import { montarCampoOnde } from "@/lib/onde";
+import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
@@ -24,6 +28,12 @@ type Props = {
   horaLembreteInicial: string;
   /** V3, item 4: "Perfis nas redes" é da marca ativa, ganha o nome dela no subtítulo. */
   nomeMarca: string;
+  /** E42a, item 1: "Onde está o seu público?" editável aqui, com as opções do tipo da marca. */
+  tipo: TipoMarca;
+  ondeInicial: OndeValor | null;
+  regiaoInicial: string | null;
+  paisInicial: string | null;
+  paisesInicial: string | null;
 };
 
 const OPCOES_TEMA = textosConta.temas;
@@ -76,11 +86,21 @@ export function FormularioConta({
   temaInicial,
   horaLembreteInicial,
   nomeMarca,
+  tipo,
+  ondeInicial,
+  regiaoInicial,
+  paisInicial,
+  paisesInicial,
 }: Props) {
+  const dadosFixos = dadosFixosDoBriefing(tipo);
   const [nome, setNome] = useState(nomeInicial);
   const [instagram, setInstagram] = useState(instagramInicial);
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
+  const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
+  const [regiao, setRegiao] = useState(regiaoInicial ?? "");
+  const [pais, setPais] = useState(paisInicial ?? "");
+  const [paises, setPaises] = useState(paisesInicial ?? "");
   const [tema, setTema] = useState<TemaPreferido>(temaInicial);
   const [horaLembrete, setHoraLembrete] = useState(horaLembreteInicial);
   const [salvando, setSalvando] = useState(false);
@@ -90,6 +110,7 @@ export function FormularioConta({
   const { avisarRedeOk } = useConexao();
 
   const indiceTema = OPCOES_TEMA.findIndex((opcao) => opcao.valor === tema);
+  const indiceOnde = dadosFixos.onde.opcoes.findIndex((opcao) => opcao.valor === onde);
 
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
@@ -99,9 +120,28 @@ export function FormularioConta({
       setErro(textosConta.erroHoraForaDaFaixa);
       return;
     }
+    if (onde === "local" && regiao.trim().length === 0) {
+      setErro(textosBriefing.dadosFixos.regiaoObrigatoria);
+      return;
+    }
+    if (onde === "outro_pais" && pais.trim().length === 0) {
+      setErro(textosBriefing.dadosFixos.paisObrigatorio);
+      return;
+    }
+    if (onde === "mais_de_um_pais" && paises.trim().length === 0) {
+      setErro(textosBriefing.dadosFixos.paisesObrigatorio);
+      return;
+    }
     setSalvando(true);
     try {
-      await salvarContaAction({ nome, perfis: { instagram, tiktok, youtube }, tema, horaLembrete: horaArredondada });
+      await salvarContaAction({
+        nome,
+        perfis: { instagram, tiktok, youtube },
+        tema,
+        horaLembrete: horaArredondada,
+        // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
+        ...(onde ? montarCampoOnde(onde, regiao.trim(), pais.trim(), paises.trim()) : {}),
+      });
       avisarRedeOk();
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
@@ -149,6 +189,43 @@ export function FormularioConta({
             onMudar={setYoutube}
             avisoInvalido={textosConta.perfilInvalido}
           />
+        </div>
+
+        <div className={styles.grupo}>
+          <span className={styles.rotuloGrupo}>{dadosFixos.onde.rotulo}</span>
+          <Chips
+            rotuloGrupo={dadosFixos.onde.rotulo}
+            opcoes={dadosFixos.onde.opcoes.map((opcao) => opcao.rotulo)}
+            selecionado={indiceOnde}
+            onChange={(indice) => setOnde(dadosFixos.onde.opcoes[indice].valor as OndeValor)}
+          />
+          {onde === "local" ? (
+            <Campo
+              rotulo={dadosFixos.onde.campoRegiao.rotulo}
+              ajuda={dadosFixos.onde.campoRegiao.ajuda}
+              value={regiao}
+              onChange={(e) => setRegiao(e.target.value)}
+            />
+          ) : null}
+          {onde === "outro_pais" ? (
+            <Campo
+              rotulo={dadosFixos.onde.campoPais.rotulo}
+              ajuda={dadosFixos.onde.campoPais.ajuda}
+              value={pais}
+              onChange={(e) => setPais(e.target.value)}
+            />
+          ) : null}
+          {onde === "mais_de_um_pais" ? (
+            <Campo
+              rotulo={dadosFixos.onde.campoPaises.rotulo}
+              ajuda={dadosFixos.onde.campoPaises.ajuda}
+              value={paises}
+              onChange={(e) => setPaises(e.target.value)}
+            />
+          ) : null}
+          {onde === "outro_pais" || onde === "mais_de_um_pais" ? (
+            <p className={styles.subGrupo}>{dadosFixos.onde.avisoPesquisaNoBrasil}</p>
+          ) : null}
         </div>
 
         <Campo

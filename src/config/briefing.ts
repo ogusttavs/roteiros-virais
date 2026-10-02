@@ -30,6 +30,15 @@ export type DadosFixosConfig = {
     rotulo: string;
     opcoes: OndeOpcao[];
     campoRegiao: { rotulo: string; ajuda: string };
+    /** E42a, item 1: só com a opção "outro_pais". */
+    campoPais: { rotulo: string; ajuda: string };
+    /** E42a, item 1: só com a opção "mais_de_um_pais". */
+    campoPaises: { rotulo: string; ajuda: string };
+    /**
+     * E42a, item 1: com o público de fora do Brasil (as duas opções novas), a tela diz, numa
+     * linha, que a pesquisa de vídeos ainda é feita por aqui (o motor não muda nesta etapa).
+     */
+    avisoPesquisaNoBrasil: string;
   };
   site: { rotulo: string; ajuda: string };
   ramo: {
@@ -51,11 +60,22 @@ export type DadosFixosConfig = {
   };
 };
 
-/** V12c, item 1: substitui cidade e bairro, decisao do Gustavo em 29/09/2026. */
+/**
+ * V12c, item 1: substitui cidade e bairro, decisao do Gustavo em 29/09/2026. E42a, item 1 (achado
+ * dele em 02/10, no Comecar pelo celular: "ta muito limitado ao Brasil e se for outro pais nao ta
+ * falando nada"): as duas opcoes novas, "outro_pais" e "mais_de_um_pais".
+ */
 const ONDE_OPCOES: OndeOpcao[] = [
   { valor: "brasil", rotulo: "No Brasil inteiro" },
   { valor: "local", rotulo: "Na minha cidade ou região" },
+  { valor: "outro_pais", rotulo: "Em outro país" },
+  { valor: "mais_de_um_pais", rotulo: "Em mais de um país" },
 ];
+
+const ONDE_CAMPO_PAIS = { rotulo: "Qual país?", ajuda: 'Por exemplo "Estados Unidos" ou "Portugal".' };
+const ONDE_CAMPO_PAISES = { rotulo: "Quais países?", ajuda: 'Por exemplo "Estados Unidos e México".' };
+const ONDE_AVISO_PESQUISA_NO_BRASIL =
+  "Por enquanto, a pesquisa de vídeos que vira roteiro olha só o Brasil, mesmo com o seu público em outro lugar.";
 
 const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
   nome: { rotulo: "Nome do negócio" },
@@ -63,6 +83,9 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
     rotulo: "Onde estão os seus clientes?",
     opcoes: ONDE_OPCOES,
     campoRegiao: { rotulo: "Qual cidade ou região?", ajuda: 'Por exemplo "Campinas e região" ou "zona sul de São Paulo".' },
+    campoPais: ONDE_CAMPO_PAIS,
+    campoPaises: ONDE_CAMPO_PAISES,
+    avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
   },
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
   ramo: {
@@ -98,6 +121,9 @@ const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
     rotulo: "Onde está o seu público?",
     opcoes: ONDE_OPCOES,
     campoRegiao: { rotulo: "Qual cidade ou região?", ajuda: 'Por exemplo "Campinas e região" ou "zona sul de São Paulo".' },
+    campoPais: ONDE_CAMPO_PAIS,
+    campoPaises: ONDE_CAMPO_PAISES,
+    avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
   },
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
   ramo: {

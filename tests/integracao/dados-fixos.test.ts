@@ -18,6 +18,7 @@ import {
   preferenciasDoUsuario,
   salvarDadosFixos,
   salvarHoraLembrete,
+  salvarOndeConta,
   salvarPerfilConta,
   salvarTema,
 } from "@/servicos/clientes";
@@ -161,6 +162,61 @@ describe("salvarDadosFixos", () => {
     ).rejects.toThrow();
   });
 
+  /** E42a, item 1 (achado do Gustavo em 02/10, no Comecar pelo celular: "ta muito limitado ao Brasil"). */
+  it("alcance outro_pais grava o pais, limpa regiao e paises", async () => {
+    await salvarDadosFixos(clienteId, {
+      nome: "Sorriso Novo",
+      alcance: "local",
+      regiao: "Belo Horizonte",
+      nichoId: nichoAtivoId,
+      persona: "negocio",
+    });
+    const cliente = await salvarDadosFixos(clienteId, {
+      nome: "Sorriso Novo",
+      alcance: "outro_pais",
+      pais: "Portugal",
+      nichoId: nichoAtivoId,
+      persona: "negocio",
+    });
+
+    expect(cliente.alcance).toBe("outro_pais");
+    expect(cliente.pais).toBe("Portugal");
+    expect(cliente.regiao).toBeNull();
+    expect(cliente.paises).toBeNull();
+  });
+
+  it("alcance mais_de_um_pais grava os paises, limpa regiao e pais", async () => {
+    const cliente = await salvarDadosFixos(clienteId, {
+      nome: "Sorriso Novo",
+      alcance: "mais_de_um_pais",
+      paises: "Estados Unidos e México",
+      nichoId: nichoAtivoId,
+      persona: "negocio",
+    });
+
+    expect(cliente.alcance).toBe("mais_de_um_pais");
+    expect(cliente.paises).toBe("Estados Unidos e México");
+    expect(cliente.regiao).toBeNull();
+    expect(cliente.pais).toBeNull();
+  });
+
+  it("recusa alcance outro_pais sem pais", async () => {
+    await expect(
+      salvarDadosFixos(clienteId, { nome: "Sorriso Novo", alcance: "outro_pais", nichoId: nichoAtivoId, persona: "negocio" }),
+    ).rejects.toThrow();
+  });
+
+  it("recusa alcance mais_de_um_pais sem paises", async () => {
+    await expect(
+      salvarDadosFixos(clienteId, {
+        nome: "Sorriso Novo",
+        alcance: "mais_de_um_pais",
+        nichoId: nichoAtivoId,
+        persona: "negocio",
+      }),
+    ).rejects.toThrow();
+  });
+
   it("salvar os dados fixos de um cliente nao muda os de outro", async () => {
     await salvarDadosFixos(clienteId, {
       nome: "Sorriso Novo",
@@ -264,6 +320,41 @@ describe("salvarPerfilConta", () => {
 
     expect(cliente.nome).toBe("Sorriso Novo");
     expect(cliente.perfis).toEqual({ instagram: "@sorrisonovo", tiktok: null, youtube: null });
+  });
+});
+
+/** E42a, item 1: "onde está o seu público?" editável pela Conta, sem precisar passar pelo Começar de novo. */
+describe("salvarOndeConta", () => {
+  it("grava local com regiao", async () => {
+    const cliente = await salvarOndeConta(clienteId, { alcance: "local", regiao: "Recife, Boa Viagem" });
+    expect(cliente.alcance).toBe("local");
+    expect(cliente.regiao).toBe("Recife, Boa Viagem");
+  });
+
+  it("grava outro_pais com pais, limpa regiao de uma escolha anterior", async () => {
+    await salvarOndeConta(clienteId, { alcance: "local", regiao: "Recife" });
+    const cliente = await salvarOndeConta(clienteId, { alcance: "outro_pais", pais: "Estados Unidos" });
+    expect(cliente.alcance).toBe("outro_pais");
+    expect(cliente.pais).toBe("Estados Unidos");
+    expect(cliente.regiao).toBeNull();
+  });
+
+  it("grava mais_de_um_pais com paises", async () => {
+    const cliente = await salvarOndeConta(clienteId, { alcance: "mais_de_um_pais", paises: "Argentina e Chile" });
+    expect(cliente.alcance).toBe("mais_de_um_pais");
+    expect(cliente.paises).toBe("Argentina e Chile");
+  });
+
+  it("recusa local sem regiao, outro_pais sem pais, mais_de_um_pais sem paises", async () => {
+    await expect(salvarOndeConta(clienteId, { alcance: "local" })).rejects.toThrow();
+    await expect(salvarOndeConta(clienteId, { alcance: "outro_pais" })).rejects.toThrow();
+    await expect(salvarOndeConta(clienteId, { alcance: "mais_de_um_pais" })).rejects.toThrow();
+  });
+
+  it("salvar onde esta o publico de um cliente nao muda o de outro", async () => {
+    await salvarOndeConta(clienteId, { alcance: "outro_pais", pais: "Canadá" });
+    const [outroCliente] = await db().select().from(clientes).where(eq(clientes.id, outroClienteId));
+    expect(outroCliente?.alcance).toBeNull();
   });
 });
 
