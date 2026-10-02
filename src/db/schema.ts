@@ -948,7 +948,19 @@ export const temasDia = pgTable(
       .notNull()
       .references(() => nichos.id),
     data: date("data").notNull(),
+    /**
+     * M5b, item 3: `[]` quando o setor tentou hoje e ficou sem prova (nunca sobrescreve uma linha
+     * com tema de verdade; `temas-do-dia.ts` confere antes de gravar). Não é "sem tentativa", é "já
+     * tentou, sem sucesso".
+     */
     temas: jsonb("temas").$type<TemaDoDia[]>().notNull(),
+    /**
+     * M5b, item 3: quantos vídeos (subindo hoje mais sem dono) havia na última tentativa sem
+     * prova; nulo quando `temas` tem conteúdo de verdade (a contagem só importa para decidir se
+     * vale tentar de novo). Evita que cada análise nova dispare outra rodada no modelo forte sem
+     * ter chegado evidência nenhuma a mais desde a última tentativa.
+     */
+    candidatosNaUltimaTentativa: integer("candidatos_na_ultima_tentativa"),
     criadoEm: criadoEm(),
   },
   (t) => [uniqueIndex("temas_dia_nicho_data").on(t.nichoId, t.data)],

@@ -20,7 +20,9 @@ import { nichos, videos, type AnaliseVideo, type Plataforma } from "@/db/schema"
 import { gerarEstruturado } from "@/ia/cliente";
 import * as extrairVideoSemFalaIA from "@/ia/prompts/extrairVideoSemFala";
 import { registrarGeracao } from "@/ia/registro";
+import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { DENTRO_DO_TETO_DE_DURACAO, incluirSeed, PERTENCE_AO_NICHO, reguaDoSetor } from "@/servicos/pesquisa";
 import { temposDeQuadro } from "@/servicos/quadros";
 
@@ -203,6 +205,22 @@ export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<stri
       }
 
       if (ehUrlDoYoutube(video.url)) await pausaEntreVideosYoutube();
+    }
+  }
+
+  /**
+   * M5b, item 1: a ordem dos jobs da madrugada, encadeada. Só a rodada global (sem `nichoId`, o
+   * cron das 04:40) encadeia para `extrair`; mesmo raciocínio de `transcrever.ts`: não duplica
+   * trabalho porque `extrair` só busca vídeo com `transcricao` e sem `analise`
+   * (`idsEmLotePendente`/`isNull(videos.analise)`), e a fila nunca derruba este job por falha de
+   * enfileirar o próximo.
+   */
+  if (nichoId === undefined) {
+    try {
+      await garantirBossPronto();
+      await boss().send(FILAS.extrair, {});
+    } catch (erro) {
+      logger.error({ err: erro }, "nao foi possivel enfileirar extrair depois do extrair-sem-fala");
     }
   }
 

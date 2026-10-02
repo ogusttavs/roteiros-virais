@@ -43,9 +43,11 @@ import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
 import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
+import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
@@ -389,6 +391,29 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
 
     if (youtubePausadoNoNicho) youtubePausado = true;
     if (tiktokPausadoNoNicho) tiktokPausado = true;
+  }
+
+  /**
+   * M5b, item 1: a ordem dos jobs da madrugada, encadeada (achado da conferência de 02/10, com a
+   * fila destravada pela M5a: o `transcrever` levou 1h33 e passou por cima do `extrair-sem-fala`
+   * das 04:40 e do `extrair` das 05:00, que só acharam o que já estava transcrito antes deles
+   * começarem). Só a rodada global (sem `nichoId`, o cron das 04:00) encadeia; a "primeira carga"
+   * de `pesquisa-de-setor.ts` (que passa `nichoId`) já tem a própria cadeia síncrona, passo a
+   * passo, e não deve disparar `extrair-sem-fala`/`extrair` para todos os setores por causa de um
+   * setor só. Os horários fixos de `agenda.ts` continuam como reserva (se o worker cair no meio da
+   * cadeia, por exemplo); não duplicam trabalho porque `extrair-sem-fala` e `extrair` só
+   * selecionam vídeo sem `analise` (conferido: `condicoesElegivelSemFala`, `isNull(videos.analise)`
+   * em extrair.ts), então uma segunda rodada sobre o mesmo vídeo não acha nada para processar de
+   * novo. A fila nunca derruba a transcrição (mesma regra de `extrair-coleta.ts`): se o pg-boss
+   * estiver fora do ar, o erro fica só no log.
+   */
+  if (nichoId === undefined) {
+    try {
+      await garantirBossPronto();
+      await boss().send(FILAS.extrairSemFala, {});
+    } catch (erro) {
+      logger.error({ err: erro }, "nao foi possivel enfileirar extrair-sem-fala depois da transcricao");
+    }
   }
 
   return {

@@ -5,11 +5,12 @@
  */
 /* eslint-disable import/order -- vi.mock precisa vir antes do import do modulo
    mockado; mesmo ajuste de analisar-visual.test.ts. */
-import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { eq, sql } from "drizzle-orm";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
 import { nichos, videos } from "@/db/schema";
+import { FILAS } from "@/jobs/fila";
 
 vi.mock("@/jobs/video", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/video")>();
@@ -307,5 +308,39 @@ describe("rodarExtrairSemFala", () => {
     expect(resumo2.falhas).toBe(0);
 
     await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  /**
+   * M5b, item 1: a rodada global (sem nichoId, o cron das 04:40) encadeia direto para `extrair`
+   * ao terminar, em vez de esperar o horário fixo de reserva.
+   */
+  describe("M5b, item 1: a rodada global encadeia extrair", () => {
+    afterEach(async () => {
+      await db().execute(sql`delete from pgboss.job where name = ${FILAS.extrair}`);
+    });
+
+    it("sem nichoId (a rodada global), enfileira extrair ao terminar", async () => {
+      const nicho = await criarNicho("extrair-sem-fala-encadeia-global", true);
+      const v = await criarVideo(nicho.id, "encadeia-global-video", { views: 100_000 });
+
+      await rodarExtrairSemFala();
+
+      const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrair} limit 1`);
+      expect(jobs.rows.length).toBe(1);
+
+      await db().delete(videos).where(eq(videos.id, v.id));
+    });
+
+    it("com nichoId (a cadeia síncrona da primeira carga), não enfileira extrair", async () => {
+      const nicho = await criarNicho("extrair-sem-fala-encadeia-por-nicho", true);
+      const v = await criarVideo(nicho.id, "encadeia-por-nicho-video", { views: 100_000 });
+
+      await rodarExtrairSemFala(nicho.id);
+
+      const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrair} limit 1`);
+      expect(jobs.rows.length).toBe(0);
+
+      await db().delete(videos).where(eq(videos.id, v.id));
+    });
   });
 });

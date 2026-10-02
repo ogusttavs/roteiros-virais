@@ -238,8 +238,11 @@ describe("rodarTemasDoDia", () => {
     expect(resumo.temasSemProva).toBe(3);
     expect(resumo.falhas).toBe(0);
 
-    const linhas = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
-    expect(linhas).toHaveLength(0);
+    // M5b, item 3: a tentativa sem prova fica marcada (temas vazio, a contagem de vídeos daquela
+    // hora), para a próxima rodada saber se chegou vídeo novo antes de chamar o modelo de novo.
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toEqual([]);
+    expect(linha.candidatosNaUltimaTentativa).toBe(0);
   });
 
   it("resposta com id de evidencia inventado nas duas tentativas registra duas geracoes reprovadas e falhas: 1", async () => {
@@ -290,8 +293,41 @@ describe("rodarTemasDoDia", () => {
     expect(resumo.gerados).toBe(0);
     expect(resumo.semProva).toBe(1);
 
-    const linhas = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
-    expect(linhas).toHaveLength(0);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toEqual([]);
+    expect(linha.candidatosNaUltimaTentativa).toBe(2);
+  });
+
+  /**
+   * M5b, item 3, resto do achado 9: rodar de novo no mesmo dia sem vídeo novo não chama o modelo
+   * outra vez (fica "sem_novidade", sem nova linha em `geracoesIA`); com vídeo novo, tenta de novo
+   * de verdade (chama o modelo, atualiza `candidatosNaUltimaTentativa`).
+   */
+  it("sem video novo desde a ultima tentativa sem prova, nao chama o modelo de novo; com video novo, tenta de novo", async () => {
+    await criarVideo("sem-novidade-1", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaAId });
+    await criarVideo("sem-novidade-2", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaBId });
+
+    const primeira = await rodarTemasDoDia();
+    expect(primeira.semProva).toBe(1);
+    const geracoesAposPrimeira = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracoesAposPrimeira.length).toBeGreaterThan(0);
+
+    // De novo, sem vídeo novo: sem_novidade, nenhuma chamada nova ao modelo.
+    const segunda = await rodarTemasDoDia();
+    expect(segunda.semProva).toBe(0);
+    expect(segunda.semNovidade).toBe(1);
+    const geracoesAposSegunda = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracoesAposSegunda).toHaveLength(geracoesAposPrimeira.length);
+
+    const [linhaAntes] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linhaAntes.candidatosNaUltimaTentativa).toBe(2);
+
+    // Chega vídeo novo (terceira conta, completa a prova): a terceira rodada tenta de novo.
+    await criarVideo("sem-novidade-3", { velocidadeRelativa: 5, assunto: "assunto sem novidade", contaId: contaCId });
+    const terceira = await rodarTemasDoDia();
+    expect(terceira.semNovidade).toBe(0);
+    const geracoesAposTerceira = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracoesAposTerceira.length).toBeGreaterThan(geracoesAposSegunda.length);
   });
 
   /** V2b, item 8: 3+ videos, mas todos da mesma conta, nunca tem prova (exige 2+ contas). */

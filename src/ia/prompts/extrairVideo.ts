@@ -55,8 +55,14 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * roda em lote (sem `gerarComVerificacao`), então a retentativa própria (`retentarEmPortugues`,
  * `extracao-comum.ts`) já pede tradução explícita por conta própria, sem risco de empurrar isto
  * para o meio do texto. Versão 1.7.0.
+ *
+ * Achado 2 da revisão do motor, M5b item 2 (02/10/2026, conferência de produção: 2 de 92 saídas
+ * do lote reprovaram o schema inteiro por um valor fora da lista em `formato` ou `tipoAbertura`):
+ * os dois campos ganham `.catch("outro")`, sem mudar o texto do pedido (o modelo continua sendo
+ * instruído a escolher um dos valores da lista; o `.catch` só evita perder a ficha inteira quando
+ * ele erra). Versão 1.8.0.
  */
-export const versao = "1.7.0";
+export const versao = "1.8.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -70,13 +76,17 @@ export const schema = z.object({
   estrutura: z.string(),
   fechamento: z.string(),
   chamadaFinal: z.string(),
-  formato: z.enum(["fala_para_camera", "podcast", "caixinha", "esquete", "outro"]),
+  // M5b, item 2 (achado da conferência de 02/10: 2 de 92 saídas do lote de extração reprovaram o
+  // schema inteiro por um valor fora da lista nestes dois campos). `.catch("outro")` troca o valor
+  // desconhecido por "outro" em vez de perder a ficha inteira do vídeo; os dois campos já têm
+  // "outro" na própria lista.
+  formato: z.enum(["fala_para_camera", "podcast", "caixinha", "esquete", "outro"]).catch("outro"),
   porQueFuncionou: z.string(),
   etiquetas: z.array(z.string()),
   pertenceAoNicho: z.boolean(),
   motivoNicho: z.string(),
   idioma: z.enum(["pt-BR", "pt-PT", "en", "es", "outro"]),
-  tipoAbertura: z.enum(TIPOS_ABERTURA),
+  tipoAbertura: z.enum(TIPOS_ABERTURA).catch("outro"),
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
 });
