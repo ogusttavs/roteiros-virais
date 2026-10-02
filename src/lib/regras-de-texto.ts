@@ -10,6 +10,14 @@ export const TRAVESSAO = /\u2014/;
 export const EMOJI = /\p{Extended_Pictographic}/u;
 
 /**
+ * Os textos dos dois motivos mec\u00e2nicos (M5b, achado 10 da revis\u00e3o do motor, 01/10/2026):
+ * exportados para `verificador.ts` reconhecer, sem duplicar a frase, quando a reprova\u00e7\u00e3o de
+ * `encontrarProblemas` pode ser corrigida por c\u00f3digo em vez de gastar o modelo forte de novo.
+ */
+export const MOTIVO_TRAVESSAO = "travessao (regra 1 do CLAUDE.md)";
+export const MOTIVO_EMOJI = "emoji (regra 2 do CLAUDE.md)";
+
+/**
  * `palavra` e a forma escrita normal (com acento), usada para montar a
  * instrucao que a IA le (ajuste de 06/09/2026, revisao do PR #27, item 3):
  * `avaliarResposta.montarSistemaEstavel` monta "nunca escreva X; diga Y" a
@@ -44,10 +52,10 @@ export function encontrarProblemas(texto: string): string[] {
   const motivos: string[] = [];
 
   if (TRAVESSAO.test(texto)) {
-    motivos.push("travessao (regra 1 do CLAUDE.md)");
+    motivos.push(MOTIVO_TRAVESSAO);
   }
   if (EMOJI.test(texto)) {
-    motivos.push("emoji (regra 2 do CLAUDE.md)");
+    motivos.push(MOTIVO_EMOJI);
   }
   for (const { proibido, usar } of JARGAO) {
     const achado = texto.match(proibido)?.[0];

@@ -15,7 +15,7 @@
  * `minimoEvidenciaModeloNicho`, completa com os melhores abaixo do limiar em
  * vez de modelar com pouca evidencia.
  */
-import { and, asc, desc, eq, gte, isNotNull, lt, ne } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { modelosNicho, nichos, videos, type AnaliseVideo, type AnaliseVisual, type ModeloNicho } from "@/db/schema";
@@ -86,6 +86,31 @@ async function videosComAnaliseVisual(nichoId: number) {
     .where(and(...condicoes)) as Promise<{ id: number; analiseVisual: AnaliseVisual | null }[]>;
 }
 
+/**
+ * M5b, achado 4 da revisão do motor (01/10/2026): percentis 25 a 75 da duração dos vídeos de
+ * referência, por SQL, em vez de deixar o modelo inventar a faixa (o schema exigia o campo, a
+ * entrada nunca trazia a duração de nenhum vídeo). `percentile_cont` ignora `duracao_s` nulo
+ * (comum no Instagram, que não traz duração do ator) por conta própria; o piso de
+ * `minimoEvidenciaModeloNicho` (mesmo da evidência do modelo) evita calcular uma faixa a partir
+ * de 1 ou 2 vídeos só. Sem vídeo o bastante com duração gravada, devolve nulo: quem usa já trata
+ * "sem faixa" como "aceita a duração que vier" (não existia faixa nenhuma antes desta etapa).
+ */
+async function faixaDeDuracao(idsVideos: number[]): Promise<{ min: number; max: number } | null> {
+  if (idsVideos.length === 0) return null;
+
+  const [linha] = await db()
+    .select({
+      min: sql<number>`percentile_cont(0.25) within group (order by ${videos.duracaoS})`,
+      max: sql<number>`percentile_cont(0.75) within group (order by ${videos.duracaoS})`,
+      n: sql<string>`count(${videos.duracaoS})`,
+    })
+    .from(videos)
+    .where(inArray(videos.id, idsVideos));
+
+  if (!linha || Number(linha.n) < config.regras.minimoEvidenciaModeloNicho) return null;
+  return { min: Math.round(Number(linha.min)), max: Math.round(Number(linha.max)) };
+}
+
 async function videosParaAudioDaSemana(nichoId: number) {
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -110,6 +135,7 @@ async function modelarNicho(nicho: { id: number; slug: string }): Promise<"model
   if (comAnalise.length === 0) return "sem_evidencia";
 
   const audiosDaSemana = contarAudiosDaSemana(paraAudio);
+  const duracaoTipicaS = await faixaDeDuracao(comAnalise.map((v) => v.id));
 
   const resultado = await gerarEstruturado({
     tarefa: "modeloNicho",
@@ -132,10 +158,11 @@ async function modelarNicho(nicho: { id: number; slug: string }): Promise<"model
       analisesVisuais: comAnaliseVisual
         .filter((v): v is { id: number; analiseVisual: AnaliseVisual } => v.analiseVisual !== null)
         .map((v) => ({ id: v.id, ritmoDeCorte: v.analiseVisual.ritmoDeCorte, recursos: v.analiseVisual.recursos })),
+      duracaoTipicaS,
     }),
   });
 
-  const modelo: ModeloNicho = { ...resultado.dados, baseadoEm: comAnalise.length, acimaDoLimiar };
+  const modelo: ModeloNicho = { ...resultado.dados, duracaoTipicaS, baseadoEm: comAnalise.length, acimaDoLimiar };
 
   await db().insert(modelosNicho).values({
     nichoId: nicho.id,

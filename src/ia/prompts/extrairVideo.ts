@@ -54,9 +54,16 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * entrada, mesmo texto-base de `roteiro.ts`/`avaliarTema.ts`/`avaliarResposta.ts`; esta tarefa
  * roda em lote (sem `gerarComVerificacao`), então a retentativa própria (`retentarEmPortugues`,
  * `extracao-comum.ts`) já pede tradução explícita por conta própria, sem risco de empurrar isto
- * para o meio do texto. Versão 1.7.0.
+ * para o meio do texto.
+ *
+ * Legenda e conta (1.8.0, M5b, achado 7 da revisão do motor, 01/10/2026): a extração só via até
+ * 90 caracteres de título (`videos.titulo`, derivado da primeira linha da legenda em TikTok e
+ * Instagram, `servicos/normalizadores/titulo.ts`) e a transcrição, mas o prompt já pedia para
+ * reconhecer "POV" e legenda de outra página sobreposta na tela, sinais que vivem no resto da
+ * legenda, fora do título. `montarEntrada` passa a receber a legenda inteira do post
+ * (`videos.descricao`, até 400 caracteres) e o @ da conta.
  */
-export const versao = "1.7.0";
+export const versao = "1.8.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -133,11 +140,20 @@ parafrasear nem resumir. Sem travessão, sem emoji.
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
+/** M5b, achado 7: até onde vai a legenda do post na entrada, cortada por code point (mesma técnica de `servicos/normalizadores/titulo.ts`, para nunca partir um emoji ao meio). */
+const MAX_CARACTERES_LEGENDA = 400;
+
 export function montarEntrada(dados: {
   titulo: string;
+  /** M5b, achado 7: a legenda inteira do post (`videos.descricao`), cortada aqui para o tamanho da entrada; nula quando a plataforma não trouxe nenhuma. */
+  descricao: string | null;
+  /** M5b, achado 7: o @ da conta, sem o @ (`contas.handle`); nulo no vídeo sem dono (`videos.semDono`). */
+  handle: string | null;
   transcricao: string;
   nomeNicho: string;
   termosNicho: string[];
 }): string {
-  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nTitulo: ${dados.titulo}\n\nTranscricao:\n${dados.transcricao}\n\n${LEMBRETE_ACENTUACAO}`;
+  const legenda = dados.descricao ? Array.from(dados.descricao).slice(0, MAX_CARACTERES_LEGENDA).join("") : null;
+  const conta = dados.handle ? `@${dados.handle}` : "(sem conta)";
+  return `Nicho: ${dados.nomeNicho} (termos: ${dados.termosNicho.join(", ")})\n\nConta: ${conta}\nTitulo: ${dados.titulo}\nLegenda do post: ${legenda ?? "(sem legenda)"}\n\nTranscricao:\n${dados.transcricao}\n\n${LEMBRETE_ACENTUACAO}`;
 }

@@ -7,9 +7,33 @@ import { describe, expect, it } from "vitest";
 
 import { montarEntrada } from "./extrairVideo";
 
+const BASE = { titulo: "titulo qualquer", descricao: null, handle: null, transcricao: "transcricao qualquer", nomeNicho: "nicho", termosNicho: [] };
+
 describe("montarEntrada", () => {
   it("o lembrete de acentuacao e a ultima linha da entrada", () => {
-    const entrada = montarEntrada({ titulo: "titulo qualquer", transcricao: "transcricao qualquer", nomeNicho: "nicho", termosNicho: [] });
+    const entrada = montarEntrada(BASE);
     expect(entrada.endsWith("acentuação correta do português (você, não, já, também, é, está), mesmo que a transcrição original esteja em outro idioma ou sem acento.")).toBe(true);
+  });
+
+  /** M5b, achado 7 da revisão do motor (01/10/2026): a legenda e o @ da conta entram na entrada. */
+  it("sem legenda e sem conta, a entrada diz isso em vez de ficar vazia", () => {
+    const entrada = montarEntrada(BASE);
+    expect(entrada).toContain("Conta: (sem conta)");
+    expect(entrada).toContain("Legenda do post: (sem legenda)");
+  });
+
+  it("com legenda e conta, as duas aparecem na entrada", () => {
+    const entrada = montarEntrada({ ...BASE, descricao: "Olha como ficou o sofa #limpezaprofissional", handle: "sofamaislimpo" });
+    expect(entrada).toContain("Conta: @sofamaislimpo");
+    expect(entrada).toContain("Legenda do post: Olha como ficou o sofa #limpezaprofissional");
+  });
+
+  it("legenda maior que 400 caracteres entra cortada, sem partir um emoji ao meio", () => {
+    // 399 letras mais um emoji de duas unidades UTF-16 (mesmo caso do hotfix de `titulo.ts`); em
+    // escape, para `checar-texto` (varre src/ia/prompts/**, inclusive `.test.ts`) não reprovar.
+    const descricao = `${"a".repeat(399)}\u{1F600}resto da legenda`;
+    const entrada = montarEntrada({ ...BASE, descricao, handle: "conta" });
+    const linhaLegenda = entrada.split("\n").find((l) => l.startsWith("Legenda do post:"));
+    expect(linhaLegenda).toBe(`Legenda do post: ${"a".repeat(399)}\u{1F600}`);
   });
 });

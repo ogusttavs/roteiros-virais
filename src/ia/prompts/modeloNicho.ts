@@ -6,8 +6,14 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * Modelo semanal do nicho (escopo 5.9.5, base lenta; usado a partir da
  * etapa 9). Guarda ganchos e fechamentos como frases reais, nao como
  * descricoes abstratas: o modelo imita exemplo melhor do que segue regra.
+ *
+ * M5b, achado 4 da revisao do motor (01/10/2026): a duracao tipica deixou de ser pedida ao
+ * modelo (ele inventava, porque o schema exigia o campo e a entrada nunca trazia a duracao de
+ * nenhum video). Agora e um fato calculado por SQL (`faixaDeDuracao`, `jobs/modelo-nicho.ts`,
+ * percentis 25 a 75) e so entra na entrada, para o modelo escrever `resumo`/`formatos` cientes
+ * dela; `modelarNicho` grava esse valor direto no `ModeloNicho`, nunca o que o modelo devolve.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -21,7 +27,6 @@ const formatoComParticipacao = z.object({ formato: z.string(), participacao: z.s
 export const schema = z.object({
   resumo: z.string(),
   ganchos: z.array(ganchoComExemplo),
-  duracaoTipicaS: z.object({ min: z.number(), max: z.number() }),
   estruturas: z.array(z.string()),
   fechamentos: z.array(z.string()),
   chamadasFinais: z.array(z.string()),
@@ -46,7 +51,6 @@ depois.
 - resumo: como esse nicho fala e o que funciona nele, em poucas frases.
 - ganchos: tipos de gancho que se repetem, cada um com um exemplo literal (copiado de um
   vídeo de verdade, nunca inventado) e a frequência com que aparece.
-- duracaoTipicaS: a faixa de duração dos vídeos que mais funcionam.
 - estruturas: os jeitos mais comuns de organizar o vídeo.
 - fechamentos: frases ou jeitos de fechamento que se repetem.
 - chamadasFinais: o que os vídeos pedem no final, com frequência.
@@ -73,6 +77,8 @@ export function montarEntrada(dados: {
     formato: string;
   }[];
   analisesVisuais: { id: number; ritmoDeCorte: string; recursos: string[] }[];
+  /** M5b, achado 4: fato calculado por SQL, não pedido mais ao modelo (ver o cabeçalho do arquivo). */
+  duracaoTipicaS: { min: number; max: number } | null;
 }): string {
   const listaVideos = dados.videosAnalisados
     .map(
@@ -85,5 +91,9 @@ export function montarEntrada(dados: {
     .map((v) => `id ${v.id}: ritmo ${v.ritmoDeCorte}, recursos ${v.recursos.join(", ")}`)
     .join("\n");
 
-  return `Videos analisados (fora da curva, ultimas 12 semanas):\n${listaVideos}\n\nAnalise visual dos dez melhores da semana:\n${listaVisuais}`;
+  const duracao = dados.duracaoTipicaS
+    ? `Duração típica medida (percentis 25 a 75 dos vídeos analisados): de ${dados.duracaoTipicaS.min} a ${dados.duracaoTipicaS.max} segundos.`
+    : "Duração típica: sem vídeo com duração registrada o bastante para medir.";
+
+  return `Videos analisados (fora da curva, ultimas 12 semanas):\n${listaVideos}\n\nAnalise visual dos dez melhores da semana:\n${listaVisuais}\n\n${duracao}`;
 }

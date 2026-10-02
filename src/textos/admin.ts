@@ -237,6 +237,7 @@ export const textosAdmin = {
     ganchoFrequencia: (frequencia: string) => `frequência: ${frequencia}`,
     duracaoTitulo: "duração típica",
     duracaoValor: (min: number, max: number) => `${min} a ${max} segundos`,
+    duracaoSemDado: "sem vídeo com duração registrada o bastante para medir",
     estruturasTitulo: "estruturas",
     fechamentosTitulo: "fechamentos",
     chamadasFinaisTitulo: "chamadas finais",

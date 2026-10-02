@@ -737,10 +737,17 @@ describe("gerarComVerificacao", () => {
     extrairCampos: (dados: { corpo: string }) => ({ corpo: dados.corpo }),
   };
 
+  /**
+   * M5b, achado 10 da revis\u00e3o do motor (01/10/2026): a reprova\u00e7\u00e3o aqui precisa ser algo que o
+   * c\u00f3digo N\u00c3O corrige sozinho (jarg\u00e3o exige escolher uma reformula\u00e7\u00e3o; ver o describe de baixo),
+   * sen\u00e3o o caminho mec\u00e2nico resolveria na primeira tentativa e este teste deixaria de exercitar
+   * "refaz com o motivo anexado". Antes desta etapa, travess\u00e3o bastava para o mesmo efeito; agora
+   * travess\u00e3o tem o caminho mec\u00e2nico pr\u00f3prio, sem chamar o modelo forte de novo.
+   */
   it("reprova a primeira tentativa, refaz com o motivo anexado, e devolve a segunda quando aprova", async () => {
     gerarEstruturadoMock
       .mockResolvedValueOnce({
-        dados: { corpo: "texto ruim \u2014 com travessao" },
+        dados: { corpo: "isso aumenta o alcance" },
         modelo: "mock",
         ...usoZero,
       })
@@ -761,7 +768,7 @@ describe("gerarComVerificacao", () => {
     // vezes" so entre a primeira e a sua propria segunda tentativa; nunca reescrever esta
     // asserção so pelo texto solto "reprovada" sem conferir a constante exportada.
     expect(segundaChamada.entrada).toContain(MARCADOR_SEGUNDA_TENTATIVA);
-    expect(segundaChamada.entrada).toContain("travessao");
+    expect(segundaChamada.entrada).toContain("alcance");
 
     // as duas tentativas da tarefa real ficam registradas, mais a chamada de verificarTexto
     expect(registrarGeracaoMock).toHaveBeenCalledTimes(3);
@@ -776,7 +783,7 @@ describe("gerarComVerificacao", () => {
   it("com lembreteFinal, ele continua sendo a ultima linha na primeira e na segunda tentativa", async () => {
     gerarEstruturadoMock
       .mockResolvedValueOnce({
-        dados: { corpo: "texto ruim — com travessao" },
+        dados: { corpo: "isso aumenta o alcance" },
         modelo: "mock",
         ...usoZero,
       })
@@ -800,7 +807,7 @@ describe("gerarComVerificacao", () => {
     // o motivo da reprovacao entra antes do lembrete, nunca depois (o que empurraria o lembrete
     // para o meio do texto, onde o modelo ja nao le com a mesma atencao antes de escrever).
     expect(segundaChamada.entrada.endsWith("lembrete de acentuacao")).toBe(true);
-    expect(segundaChamada.entrada.indexOf("travessao")).toBeLessThan(
+    expect(segundaChamada.entrada.indexOf("alcance")).toBeLessThan(
       segundaChamada.entrada.lastIndexOf("lembrete de acentuacao"),
     );
   });
@@ -818,7 +825,7 @@ describe("gerarComVerificacao", () => {
 
   it("lanca ErroIA quando as duas tentativas reprovam na checagem local", async () => {
     gerarEstruturadoMock.mockResolvedValue({
-      dados: { corpo: "sempre ruim \u2014 com travessao" },
+      dados: { corpo: "isso aumenta o alcance, sempre" },
       modelo: "mock",
       ...usoZero,
     });
@@ -830,5 +837,86 @@ describe("gerarComVerificacao", () => {
     // nunca chega a chamar a tarefa verificarTexto, pois reprova local nas duas vezes
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
     expect(registrarGeracaoMock).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * M5b, achado 10 da revis\u00e3o do motor (01/10/2026): falha s\u00f3 mec\u00e2nica (travess\u00e3o, emoji, ou o
+   * conjunto fechado de palavra sem acento) \u00e9 corrigida por c\u00f3digo, sem gastar o modelo forte de
+   * novo numa segunda tentativa inteira. S\u00f3 uma chamada \u00e0 tarefa real, mais a de `verificarTexto`
+   * (chamada de qualquer gera\u00e7\u00e3o aprovada, mec\u00e2nica ou n\u00e3o); nunca uma segunda tentativa da
+   * tarefa real.
+   */
+  describe("correcao mecanica (achado 10)", () => {
+    it("travessao sozinho e corrigido por codigo, sem segunda tentativa da tarefa real", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({
+          dados: { corpo: "texto bom \u2014 com travessao" },
+          modelo: "mock",
+          ...usoZero,
+        })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+      expect(resultado.dados).toEqual({ corpo: "texto bom, com travessao" });
+      // uma chamada so da tarefa real (nunca a segunda tentativa), mais o verificarTexto.
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+      expect(gerarEstruturadoMock.mock.calls[0][0]).toMatchObject({ tarefa: "roteiro" });
+      expect(gerarEstruturadoMock.mock.calls[1][0]).toMatchObject({ tarefa: "verificarTexto" });
+      // so uma linha para a tarefa real (ja com o texto corrigido), mais a do verificarTexto.
+      expect(registrarGeracaoMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("emoji sozinho e corrigido por codigo", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({
+          dados: { corpo: "seu roteiro esta pronto \u{1F389}" },
+          modelo: "mock",
+          ...usoZero,
+        })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+      expect(resultado.dados).toEqual({ corpo: "seu roteiro esta pronto" });
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("palavra sem acento do conjunto fechado e corrigida por codigo", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({
+          dados: { corpo: "voce ja pode gravar" },
+          modelo: "mock",
+          ...usoZero,
+        })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+      expect(resultado.dados).toEqual({ corpo: "voc\u00ea j\u00e1 pode gravar" });
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    });
+
+    /**
+     * Mistura de motivo mec\u00e2nico (travess\u00e3o) com n\u00e3o mec\u00e2nico (jarg\u00e3o): o c\u00f3digo s\u00f3 aceita a
+     * corre\u00e7\u00e3o quando ela zera TODOS os motivos; jarg\u00e3o sozinho n\u00e3o \u00e9 corrig\u00edvel, ent\u00e3o o
+     * caminho de sempre (segunda tentativa na tarefa real) continua valendo.
+     */
+    it("misturado com jargao, nao usa o caminho mecanico (jargao exige reformular, nao e so travessao)", async () => {
+      gerarEstruturadoMock
+        .mockResolvedValueOnce({
+          dados: { corpo: "isso aumenta o alcance \u2014 de verdade" },
+          modelo: "mock",
+          ...usoZero,
+        })
+        .mockResolvedValueOnce({ dados: { corpo: "texto limpo" }, modelo: "mock", ...usoZero })
+        .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+      const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
+
+      expect(resultado.dados).toEqual({ corpo: "texto limpo" });
+      // as tres chamadas de sempre: a primeira tentativa, a segunda, e o verificarTexto da segunda.
+      expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+    });
   });
 });

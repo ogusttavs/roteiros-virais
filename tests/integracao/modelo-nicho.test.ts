@@ -48,6 +48,7 @@ async function criarVideo(
     analiseVisual?: AnaliseVisual;
     audio?: VideoAudio;
     plataforma?: "youtube" | "tiktok" | "instagram";
+    duracaoS?: number;
   },
 ) {
   const [v] = await db()
@@ -64,6 +65,7 @@ async function criarVideo(
       analise: opcoes.analise as never,
       analiseVisual: opcoes.analiseVisual as never,
       audio: opcoes.audio as never,
+      duracaoS: opcoes.duracaoS,
     })
     .returning();
   return v;
@@ -250,5 +252,77 @@ describe("rodarModeloNicho", () => {
     const atual = await modeloNichoAtual(nichoId);
     expect(atual!.modelo.acimaDoLimiar).toBe(11);
     expect(atual!.modelo.baseadoEm).toBe(11);
+  });
+
+  /**
+   * M5b, achado 4 da revisão do motor (01/10/2026): a duração típica deixou de ser inventada
+   * pelo modelo e passou a ser calculada por SQL (percentis 25 a 75), sobre os mesmos vídeos de
+   * evidência do modelo do nicho.
+   */
+  describe("duracaoTipicaS (M5b, achado 4)", () => {
+    it("percentis 25 a 75 por SQL, sobre a evidencia do modelo", async () => {
+      // 10 videos, todos acima do limiar (3), com duracaoS 10, 20, ..., 100: baseadoEm = 10
+      // exatamente (sem completar com "abaixo"), para o calculo do percentil ser previsivel.
+      for (let i = 1; i <= 10; i += 1) {
+        await criarVideo(`duracao-${i}`, {
+          foraDaCurva: 9,
+          publicadoEm: diasAtras(5),
+          analise: ANALISE_PADRAO,
+          duracaoS: i * 10,
+        });
+      }
+
+      const resumo = await rodarModeloNicho();
+      expect(resumo.modelados).toBe(1);
+
+      const atual = await modeloNichoAtual(nichoId);
+      expect(atual!.modelo.baseadoEm).toBe(10);
+      // percentile_cont(0.25) sobre 10,20,...,100 = 32.5; percentile_cont(0.75) = 77.5.
+      expect(atual!.modelo.duracaoTipicaS).toEqual({ min: 33, max: 78 });
+    });
+
+    it("menos videos com duracao gravada do que o minimo de evidencia: fica nulo", async () => {
+      // 9 com duracaoS (abaixo do minimo de 10) e 1 sem duracaoS nenhuma: ainda 10 videos de
+      // evidencia (baseadoEm = 10), mas so 9 tem duracaoS, entao a faixa nao e calculada.
+      for (let i = 1; i <= 9; i += 1) {
+        await criarVideo(`com-duracao-${i}`, {
+          foraDaCurva: 9,
+          publicadoEm: diasAtras(5),
+          analise: ANALISE_PADRAO,
+          duracaoS: i * 10,
+        });
+      }
+      await criarVideo("sem-duracao", { foraDaCurva: 9, publicadoEm: diasAtras(5), analise: ANALISE_PADRAO });
+
+      const resumo = await rodarModeloNicho();
+      expect(resumo.modelados).toBe(1);
+
+      const atual = await modeloNichoAtual(nichoId);
+      expect(atual!.modelo.baseadoEm).toBe(10);
+      expect(atual!.modelo.duracaoTipicaS).toBeNull();
+    });
+
+    it("video sem duracaoS gravada nao entra no calculo (so conta quem tem)", async () => {
+      // Os mesmos 10 valores de duracaoS de cima, mais 5 videos de evidencia extra sem
+      // duracaoS: o resultado do percentil tem que ser o mesmo, os 5 extras nao entram na conta.
+      for (let i = 1; i <= 10; i += 1) {
+        await criarVideo(`com-duracao-${i}`, {
+          foraDaCurva: 9,
+          publicadoEm: diasAtras(5),
+          analise: ANALISE_PADRAO,
+          duracaoS: i * 10,
+        });
+      }
+      for (let i = 1; i <= 5; i += 1) {
+        await criarVideo(`sem-duracao-${i}`, { foraDaCurva: 8, publicadoEm: diasAtras(5), analise: ANALISE_PADRAO });
+      }
+
+      const resumo = await rodarModeloNicho();
+      expect(resumo.modelados).toBe(1);
+
+      const atual = await modeloNichoAtual(nichoId);
+      expect(atual!.modelo.baseadoEm).toBe(15);
+      expect(atual!.modelo.duracaoTipicaS).toEqual({ min: 33, max: 78 });
+    });
   });
 });

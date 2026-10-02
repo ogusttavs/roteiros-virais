@@ -6,7 +6,8 @@
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
 import type { CartaoStory, EstiloRoteiro, FormatoRoteiro, TipoAbertura } from "@/db/schema";
-import { encontrarProblemas } from "@/lib/regras-de-texto";
+import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
+import { EMOJI, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
@@ -90,6 +91,16 @@ export function verificarLocalmente(
      * quem chama.
      */
     duracaoParaMuitoLongo?: { anteriorS: number; novaS: number };
+    /**
+     * M5b, achado 4 da revisão do motor (01/10/2026): a duração real do roteiro (`duracaoS` da
+     * saída) e a faixa de percentis 25 a 75 do modelo do nicho (`ModeloNicho.duracaoTipicaS`,
+     * calculada por SQL em `jobs/modelo-nicho.ts`, nunca mais inventada pelo modelo). Fora da
+     * faixa, reprova aqui; antes disto o roteiro era só encaixado na faixa depois de escrito
+     * (`respeitarDuracaoDoNicho`, removida). Sem faixa (nicho sem modelo ainda, ou sem vídeo com
+     * duração gravada o bastante para medir), a checagem não roda, igual a antes.
+     */
+    duracaoS?: number;
+    faixaDuracaoNicho?: { min: number; max: number };
     /**
      * V9a, item 2: com o momento (o gancho precisa nascer da cena que está
      * na frente do celular), as palavras de conteúdo de `onde` e
@@ -227,6 +238,17 @@ export function verificarLocalmente(
     );
   }
 
+  if (
+    opcoes.duracaoS !== undefined &&
+    opcoes.faixaDuracaoNicho &&
+    (opcoes.duracaoS < opcoes.faixaDuracaoNicho.min || opcoes.duracaoS > opcoes.faixaDuracaoNicho.max)
+  ) {
+    motivos.push(
+      `duracao: ${opcoes.duracaoS}s fora da faixa tipica do nicho (${opcoes.faixaDuracaoNicho.min}s a ` +
+        `${opcoes.faixaDuracaoNicho.max}s, M5b achado 4)`,
+    );
+  }
+
   if (opcoes.evidenciasFornecidas) {
     const fornecidas = new Set(opcoes.evidenciasFornecidas);
     const inventadas = evidenciasCitadas.filter((id) => !fornecidas.has(id));
@@ -305,6 +327,12 @@ const ENTRE_ASPAS = /"[^"]*"|'[^']*'|“[^”]*”|‘[^’]*’/g;
 const PALAVRAS_SEM_ACENTO = /\b(voce|nao|tambem|ja)\b/gi;
 const TEM_CARACTERE_ACENTUADO = /[áàâãéèêíïóôõöúüçÁÀÂÃÉÈÊÍÏÓÔÕÖÚÜÇ]/;
 const MINIMO_CARACTERES_PARA_EXIGIR_ACENTO = 200;
+/**
+ * M5b, achado 10: só este motivo (o conjunto fechado de quatro palavras) é corrigível por código
+ * de forma determinística (`corrigirMecanicamente`, abaixo); o outro ramo de `problemaDeAcentuacao`
+ * ("200 caracteres sem nenhum acento") não diz ONDE falta acento, não dá para corrigir por código.
+ */
+const MOTIVO_PALAVRA_SEM_ACENTO = 'sem acentuacao: tem "voce", "nao", "tambem" ou "ja" sem o acento (H2, achado de 29/09/2026)';
 
 function temPalavraSemAcento(texto: string): boolean {
   for (const encontrada of texto.matchAll(PALAVRAS_SEM_ACENTO)) {
@@ -317,7 +345,7 @@ function temPalavraSemAcento(texto: string): boolean {
 function problemaDeAcentuacao(texto: string): string | null {
   const semAspas = texto.replace(ENTRE_ASPAS, "");
   if (temPalavraSemAcento(semAspas)) {
-    return 'sem acentuacao: tem "voce", "nao", "tambem" ou "ja" sem o acento (H2, achado de 29/09/2026)';
+    return MOTIVO_PALAVRA_SEM_ACENTO;
   }
   if (semAspas.length > MINIMO_CARACTERES_PARA_EXIGIR_ACENTO && !TEM_CARACTERE_ACENTUADO.test(semAspas)) {
     return `sem acentuacao: mais de ${MINIMO_CARACTERES_PARA_EXIGIR_ACENTO} caracteres sem nenhum acento (H2, achado de 29/09/2026)`;
@@ -348,42 +376,12 @@ function primeiraPalavra(texto: string): string {
 }
 
 /**
- * Palavras curtas ou de ligação demais para contar como "elemento concreto"
- * do momento (V9a, item 2): a lista é pequena de propósito, só o que
- * apareceria demais e derrubaria a checagem por acaso, não uma lista
- * completa de preposições e artigos do português.
+ * Palavras curtas ou de ligação demais para contar como "elemento concreto" do momento (V9a,
+ * item 2). M5b, achado 6: vem de `PALAVRAS_VAZIAS` (`lib/palavras-vazias.ts`), a mesma lista que
+ * `servicos/pesquisa.ts` usa para a evidência do tema e do roteiro, para as duas nunca divergirem;
+ * normalizada aqui (sem acento) porque este verificador compara contra `normalizar(texto)`.
  */
-const PALAVRAS_PARADA_MOMENTO = new Set([
-  "para",
-  "pela",
-  "pelo",
-  "esta",
-  "estou",
-  "estamos",
-  "aqui",
-  "isso",
-  "essa",
-  "esse",
-  "muito",
-  "muita",
-  "hoje",
-  "agora",
-  "onde",
-  "aonde",
-  "sendo",
-  "tendo",
-  "depois",
-  "antes",
-  "porque",
-  "porem",
-  "entao",
-  "sobre",
-  "ainda",
-  "todo",
-  "toda",
-  "todos",
-  "todas",
-]);
+const PALAVRAS_PARADA_MOMENTO = new Set([...PALAVRAS_VAZIAS].map((palavra) => normalizar(palavra)));
 
 /**
  * As palavras de conteúdo de um texto (V9a, item 2, verificador local do
@@ -552,6 +550,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    */
   duracaoReprovadaS?: number;
   extrairDuracaoS?: (dados: T) => number;
+  /** M5b, achado 4: a faixa de percentis 25 a 75 do modelo do nicho, para `verificarLocalmente` reprovar fora dela (ver lá). */
+  faixaDuracaoNicho?: { min: number; max: number };
   /**
    * "padrao" (default) ou "analise" (rodada de acabamento de 06/09, item
    * 1): qual criterio de tom a tarefa verificarTexto usa. Ver
@@ -634,38 +634,71 @@ export async function gerarComVerificacao<T>(
   throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
 }
 
+/**
+ * As opções locais de `verificarLocalmente` a partir dos parâmetros genéricos da tarefa e de uma
+ * saída concreta (M5b, achado 10): extraída para `tentarGerarEVerificar` poder chamar de novo
+ * depois de `corrigirMecanicamente`, sem duplicar a montagem.
+ */
+function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados: T) {
+  return {
+    proibicoes: params.proibicoes,
+    evidencias: params.extrairEvidencias?.(dados) ?? [],
+    exigeEvidencia: params.exigeEvidencia,
+    evidenciasFornecidas: params.evidenciasFornecidas,
+    ganchosRecentes: params.ganchosRecentes,
+    ganchosUltimos5: params.ganchosUltimos5,
+    tipoAberturaAtual: params.extrairTipoAbertura?.(dados),
+    tipoAberturaAnterior: params.tipoAberturaAnterior,
+    instrucaoAbertura: params.instrucaoAbertura,
+    duracaoParaMuitoLongo:
+      params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
+        ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(dados) }
+        : undefined,
+    duracaoS: params.extrairDuracaoS?.(dados),
+    faixaDuracaoNicho: params.faixaDuracaoNicho,
+    palavrasDoMomento: params.palavrasDoMomento,
+    formato: params.formato,
+    estilo: params.estilo,
+    cartoes: params.extrairCartoes?.(dados),
+    legenda: params.extrairLegenda?.(dados),
+    porQueAssim: params.extrairPorQueAssim?.(dados),
+    numerosRegrasPlataforma: params.numerosRegrasPlataforma,
+    narrativa: params.extrairNarrativa?.(dados),
+  };
+}
+
 async function tentarGerarEVerificar<T>(
   params: ParametrosGeracaoVerificada<T>,
 ): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number }> {
   const inicio = Date.now();
   const resultado = await gerarEstruturado(params);
   const duracaoMs = Date.now() - inicio;
-  const campos = params.extrairCampos(resultado.dados);
-  const evidencias = params.extrairEvidencias?.(resultado.dados) ?? [];
 
-  const local = verificarLocalmente(campos, {
-    proibicoes: params.proibicoes,
-    evidencias,
-    exigeEvidencia: params.exigeEvidencia,
-    evidenciasFornecidas: params.evidenciasFornecidas,
-    ganchosRecentes: params.ganchosRecentes,
-    ganchosUltimos5: params.ganchosUltimos5,
-    tipoAberturaAtual: params.extrairTipoAbertura?.(resultado.dados),
-    tipoAberturaAnterior: params.tipoAberturaAnterior,
-    instrucaoAbertura: params.instrucaoAbertura,
-    duracaoParaMuitoLongo:
-      params.duracaoReprovadaS !== undefined && params.extrairDuracaoS
-        ? { anteriorS: params.duracaoReprovadaS, novaS: params.extrairDuracaoS(resultado.dados) }
-        : undefined,
-    palavrasDoMomento: params.palavrasDoMomento,
-    formato: params.formato,
-    estilo: params.estilo,
-    cartoes: params.extrairCartoes?.(resultado.dados),
-    legenda: params.extrairLegenda?.(resultado.dados),
-    porQueAssim: params.extrairPorQueAssim?.(resultado.dados),
-    numerosRegrasPlataforma: params.numerosRegrasPlataforma,
-    narrativa: params.extrairNarrativa?.(resultado.dados),
-  });
+  let dados = resultado.dados;
+  let campos = params.extrairCampos(dados);
+  let evidencias = params.extrairEvidencias?.(dados) ?? [];
+  let local = verificarLocalmente(campos, opcoesVerificacaoLocal(params, dados));
+
+  /**
+   * M5b, achado 10 da revisão do motor (01/10/2026): quando a única coisa que reprovou é
+   * mecânica (travessão, emoji, ou o conjunto fechado "voce/nao/tambem/ja" sem acento), corrige
+   * por código em vez de gastar o modelo forte de novo numa segunda tentativa inteira
+   * (`gerarComVerificacao`, abaixo). Só aceita a correção se ela realmente zera os motivos
+   * locais; sobrou algum motivo (ou a correção introduziu um novo, caso que não deveria
+   * acontecer dado que as três transformações são seguras), segue com os dados originais e o
+   * motivo original, para `gerarComVerificacao` decidir a segunda tentativa normalmente.
+   */
+  if (!local.aprovado && local.motivos.every(ehMotivoMecanico)) {
+    const corrigidos = corrigirMecanicamente(dados);
+    const camposCorrigidos = params.extrairCampos(corrigidos);
+    const localCorrigido = verificarLocalmente(camposCorrigidos, opcoesVerificacaoLocal(params, corrigidos));
+    if (localCorrigido.aprovado) {
+      dados = corrigidos;
+      campos = camposCorrigidos;
+      evidencias = params.extrairEvidencias?.(corrigidos) ?? [];
+      local = localCorrigido;
+    }
+  }
 
   let aprovado = local.aprovado;
   let motivos = local.motivos;
@@ -719,7 +752,7 @@ async function tentarGerarEVerificar<T>(
     clienteId: params.clienteId,
     entradas: { entrada: params.entrada },
     evidencias,
-    saida: resultado.dados as Record<string, unknown>,
+    saida: dados as Record<string, unknown>,
     uso: {
       tokensEntrada: resultado.tokensEntrada,
       tokensSaida: resultado.tokensSaida,
@@ -730,5 +763,76 @@ async function tentarGerarEVerificar<T>(
     duracaoMs,
   });
 
-  return { aprovado, dados: resultado.dados, motivos, geracaoId };
+  return { aprovado, dados, motivos, geracaoId };
+}
+
+/**
+ * M5b, achado 10 da revisão do motor: só reprovações que uma transformação determinística de
+ * texto resolve sozinha, sem precisar de nenhum julgamento (jargão, por exemplo, exige escolher
+ * uma reformulação, então não entra aqui; o segundo ramo de `problemaDeAcentuacao`, "200
+ * caracteres sem nenhum acento", também não, porque não diz onde o acento falta).
+ */
+function ehMotivoMecanico(motivo: string): boolean {
+  return motivo.includes(MOTIVO_TRAVESSAO) || motivo.includes(MOTIVO_EMOJI) || motivo.includes(MOTIVO_PALAVRA_SEM_ACENTO);
+}
+
+const EMOJI_GLOBAL = new RegExp(EMOJI.source, "gu");
+const SUBSTITUICOES_ACENTO: Record<string, string> = { voce: "você", nao: "não", tambem: "também", ja: "já" };
+
+/**
+ * Mesma regra de `temPalavraSemAcento` (preserva o que está entre aspas, ignora sigla toda em
+ * maiúsculas), mas substitui em vez de só detectar.
+ */
+function corrigirAcentuacao(texto: string): string {
+  let ultimo = 0;
+  let corrigido = "";
+  for (const m of texto.matchAll(ENTRE_ASPAS)) {
+    corrigido += substituirPalavrasSemAcento(texto.slice(ultimo, m.index));
+    corrigido += m[0];
+    ultimo = (m.index ?? 0) + m[0].length;
+  }
+  corrigido += substituirPalavrasSemAcento(texto.slice(ultimo));
+  return corrigido;
+}
+
+function substituirPalavrasSemAcento(trecho: string): string {
+  return trecho.replace(/\b(voce|nao|tambem|ja)\b/gi, (palavra) =>
+    palavra === palavra.toUpperCase() ? palavra : SUBSTITUICOES_ACENTO[palavra.toLowerCase()],
+  );
+}
+
+/**
+ * As três correções mecânicas (M5b, achado 10): tira emoji, troca travessão por vírgula (regra 1
+ * do CLAUDE.md: "vírgula, dois-pontos ou reformular a frase"; vírgula é a troca mecânica segura) e
+ * corrige o conjunto fechado de palavras sem acento. Pura, sobre uma string só.
+ */
+function corrigirTextoMecanicamente(texto: string): string {
+  const semEmoji = texto.replace(EMOJI_GLOBAL, "").replace(/ {2,}/g, " ");
+  const semTravessao = semEmoji
+    .replaceAll("—", ",")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/,([,.;:!?])/g, "$1")
+    .replace(/ {2,}/g, " ")
+    .replace(/^,\s*/, "")
+    .replace(/\s*,$/, "");
+  return corrigirAcentuacao(semTravessao).trim();
+}
+
+/**
+ * Aplica `corrigirTextoMecanicamente` em toda folha de string de uma saída de IA, não importa a
+ * forma (roteiro, briefing, tema): percorre objetos e arrays, sem precisar saber o schema de cada
+ * tarefa. As três transformações nunca dependem de qual campo é, então são seguras em qualquer
+ * folha. Devolve um valor novo, nunca muta `dados`.
+ */
+function corrigirMecanicamente<T>(dados: T): T {
+  return corrigirValorMecanicamente(dados) as T;
+}
+
+function corrigirValorMecanicamente(valor: unknown): unknown {
+  if (typeof valor === "string") return corrigirTextoMecanicamente(valor);
+  if (Array.isArray(valor)) return valor.map(corrigirValorMecanicamente);
+  if (valor !== null && typeof valor === "object") {
+    return Object.fromEntries(Object.entries(valor).map(([chave, v]) => [chave, corrigirValorMecanicamente(v)]));
+  }
+  return valor;
 }

@@ -20,7 +20,7 @@
 import { and, count, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, videos } from "@/db/schema";
+import { contas, nichos, videos } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
 import { registrarGeracao } from "@/ia/registro";
@@ -55,7 +55,14 @@ async function nichosParaAnaliseImediata(nichoId?: number): Promise<{ id: number
   return candidatos.filter((n) => (analisadosPorNicho.get(n.id) ?? 0) < LIMITE_ANALISADOS_SETOR_NOVO);
 }
 
-type CandidatoImediato = { id: number; titulo: string | null; transcricao: string | null; proximaTentativaTranscricao: Date | null };
+type CandidatoImediato = {
+  id: number;
+  titulo: string | null;
+  descricao: string | null;
+  handle: string | null;
+  transcricao: string | null;
+  proximaTentativaTranscricao: Date | null;
+};
 
 /**
  * `contasIds` (P2, item 0a): escopa aos vídeos dessas contas, em vez de todo o setor. Usado pela
@@ -71,8 +78,16 @@ async function candidatosDoSetor(nichoId: number, idsPendentes: Set<number>, con
   if (contasIds && contasIds.length > 0) condicoes.push(inArray(videos.contaId, contasIds));
 
   return db()
-    .select({ id: videos.id, titulo: videos.titulo, transcricao: videos.transcricao, proximaTentativaTranscricao: videos.proximaTentativaTranscricao })
+    .select({
+      id: videos.id,
+      titulo: videos.titulo,
+      descricao: videos.descricao,
+      handle: contas.handle,
+      transcricao: videos.transcricao,
+      proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
+    })
     .from(videos)
+    .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
     .orderBy(sql`${videos.foraDaCurva} desc nulls last`, desc(videos.views))
     .limit(LIMITE_CANDIDATOS_IMEDIATO);
@@ -91,6 +106,8 @@ async function extrairUmVideo(
     sistemaEstavel: extrairVideo.montarSistemaEstavel(),
     entrada: extrairVideo.montarEntrada({
       titulo: video.titulo ?? "",
+      descricao: video.descricao,
+      handle: video.handle,
       transcricao: video.transcricao ?? "",
       nomeNicho,
       termosNicho,
