@@ -24,22 +24,137 @@
   text-overflow: ellipsis;
 }
 
+/* Passo 16 do Opus (decisão 32 do PR #110, revisada): a lista deixa de flutuar. Ela abre DENTRO do cartão, em fluxo, e empurra o que está embaixo: nunca
+   cobre a pergunta seguinte nem some atrás do teclado. */
 .lista {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + var(--espaco-2));
-  left: 0;
-  right: 0;
   display: grid;
   gap: var(--espaco-1);
   max-height: min(55vh, 26rem);
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--espaco-2);
+  margin-top: var(--espaco-2);
+  padding: var(--espaco-1);
   border: var(--largura-borda) solid var(--cor-borda);
   border-radius: var(--raio-md);
-  background: var(--cor-superficie-elevada);
-  box-shadow: var(--sombra-md);
+  background: var(--cor-superficie-recuada);
+}
+
+/* O campo vazio (passo 16): a dica e a porta para a lista inteira, no lugar dos 44 ramos abertos de uma vez. */
+.dica {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-3);
+  margin-top: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.verALista {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-acao);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--duracao-soltar) var(--curva-mola),
+    background-color var(--duracao-rapida) var(--curva-padrao);
+}
+
+.verALista:active {
+  transform: scale(var(--escala-toque));
+  transition-duration: var(--duracao-toque);
+}
+
+.verALista:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/* O botão de apagar a busca, no canto direito do campo. */
+.limpar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.limpar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/* O ramo escolhido: os exemplos e o "Trocar" embaixo do campo. */
+.escolhido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-1);
+}
+
+/* A busca e a lista da folha "Os ramos". */
+.campoDaFolha {
+  position: relative;
+}
+
+.entradaDaFolha {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-3) 0 calc(var(--espaco-3) + 18px + var(--espaco-2));
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  /* 16px no mínimo: abaixo disso o iPhone aproxima a tela ao focar. */
+  font-family: var(--fonte-texto);
+  font-size: max(1rem, var(--tamanho-corpo));
+}
+
+.entradaDaFolha:focus-visible {
+  outline: none;
+  border-color: var(--cor-acao);
+  box-shadow: var(--sombra-foco);
+}
+
+.listaDaFolha {
+  display: grid;
+}
+
+.grupoDaFolha {
+  display: block;
+}
+
+.opcaoDaFolha {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding-inline: 0;
+  border-radius: 0;
+}
+
+.opcaoDaFolha + .opcaoDaFolha {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.opcaoDaFolha:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
 }
 
 /* O listbox de dentro (só as opções e os grupos de opções); a caixa, a rolagem e o aviso de "sem resultado" ficam na `.lista`. */
@@ -77,10 +192,14 @@
   cursor: pointer;
 }
 
-/* Fundo de seleção mais a barra à esquerda: só o fundo de hover quase não se distingue do fundo da lista no tema claro (achado da revisão). */
+/* O marcado (passo 16): fundo de seleção e contorno, sem a tarja à esquerda, e o nome na cor de destaque. */
 .opcaoAtiva {
   background: var(--cor-selecao-suave);
-  box-shadow: inset 3px 0 0 var(--cor-acao);
+  box-shadow: inset 0 0 0 var(--largura-borda) var(--cor-selecao-borda);
+}
+
+.opcaoAtiva .nome {
+  color: var(--cor-destaque);
 }
 
 .nome {

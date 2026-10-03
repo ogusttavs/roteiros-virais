@@ -14,7 +14,7 @@ export const textosConta = {
   soLeitura: "(só leitura)",
   /** E45, PR 1: o ramo editável na Conta (antes só o Começar tinha o campo, e depois do briefing a pessoa ficava sem como mudá-lo). */
   ramo: {
-    rotulo: "ramo",
+    rotulo: "Ramo",
     ajuda: "Escreva uma palavra ou uma letra do que você faz e escolha na lista.",
     /** E45 PR 3: só leitura; quem liga e desliga é o admin (decisão do Gustavo de 02/10/2026). */
     alternativos: (nomes: string[]) =>
@@ -23,7 +23,7 @@ export const textosConta = {
         : `A gente ligou também ${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]} ao seu tema livre, às suas referências e aos seus roteiros.`,
     aviso: "Ao trocar, os temas e as referências passam a ser os do ramo novo. Se ele ainda não foi pesquisado, aparecem a partir da próxima madrugada. O briefing e os roteiros continuam.",
     /** E45 PR 2: o "Não achei o meu" da Conta (o campo de texto livre que abre, no estilo minúsculo da tela). */
-    campoOutro: "qual é o seu ramo",
+    campoOutro: "Qual é o seu ramo",
     ajudaOutro: "Escreva em poucas palavras.",
   },
   redes: "perfis nas redes",

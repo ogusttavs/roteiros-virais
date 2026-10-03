@@ -49,7 +49,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 function campoRamo(): HTMLInputElement {
-  return screen.getByRole("combobox", { name: "ramo" }) as HTMLInputElement;
+  return screen.getByRole("combobox", { name: "Ramo" }) as HTMLInputElement;
 }
 
 function campoSite(): HTMLInputElement {
@@ -124,7 +124,7 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     expect(saida).toBeTruthy();
     fireEvent.click(saida!);
 
-    const texto = screen.getByLabelText("qual é o seu ramo") as HTMLInputElement;
+    const texto = screen.getByLabelText("Qual é o seu ramo") as HTMLInputElement;
     expect(texto.value).toBe("criação de abelhas");
     expect(campoRamo().value).toBe("Não achei o meu");
   });
@@ -159,7 +159,7 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     );
 
     expect(campoRamo().value).toBe("Não achei o meu");
-    expect((screen.getByLabelText("qual é o seu ramo") as HTMLInputElement).value).toBe("criação de abelhas");
+    expect((screen.getByLabelText("Qual é o seu ramo") as HTMLInputElement).value).toBe("criação de abelhas");
     expect(screen.getByText("Você está em Agro e campo enquanto a gente confere o seu ramo.")).toBeTruthy();
 
     await salvar();
@@ -203,7 +203,7 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     expect(ultimaGravacao().ramo).toBe("nutricao");
     expect(ultimaGravacao()).not.toHaveProperty("ramoOutro");
     await waitFor(() => expect(screen.queryByText(/enquanto a gente confere o seu ramo/)).toBeNull());
-    expect(screen.queryByLabelText("qual é o seu ramo")).toBeNull();
+    expect(screen.queryByLabelText("Qual é o seu ramo")).toBeNull();
   });
 
   it("com o pedido aberto, escolher da lista o próprio ramo provisório também manda o ramo (e fecha o pedido)", async () => {
@@ -268,7 +268,7 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     fireEvent.change(campoRamo(), { target: { value: "xyzw" } });
     fireEvent.keyDown(campoRamo(), { key: "ArrowDown" });
     fireEvent.click(screen.getAllByRole("option").find((o) => o.textContent?.includes("Não achei o meu"))!);
-    fireEvent.change(screen.getByLabelText("qual é o seu ramo"), { target: { value: "   " } });
+    fireEvent.change(screen.getByLabelText("Qual é o seu ramo"), { target: { value: "   " } });
 
     fireEvent.click(screen.getByRole("button", { name: "salvar" }));
 

@@ -1,0 +1,45 @@
+/*
+ * A tela que chega (`template.tsx`, passo 16 do Opus, capítulo 3). `backwards`: depois da entrada não sobra `transform` nenhum na tela (um `transform` parado
+ * prenderia os elementos `position: fixed` de dentro dela). Só `transform` e `opacity`.
+ */
+.troca {
+  animation: tela-esmaece var(--duracao-troca) var(--curva-padrao) backwards;
+}
+
+.entra {
+  animation: tela-entra var(--duracao-tela) var(--curva-mola-suave) backwards;
+}
+
+.volta {
+  animation: tela-volta var(--duracao-tela-volta) var(--curva-saida) backwards;
+}
+
+@keyframes tela-esmaece {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tela-entra {
+  from {
+    opacity: 0;
+    transform: translateX(12%);
+  }
+}
+
+@keyframes tela-volta {
+  from {
+    opacity: 0;
+    transform: translateX(-8%);
+  }
+}
+
+/* "Reduzir movimento": nada anda pelo espaço, só o esmaecer curto (150 ms nos tokens). */
+@media (prefers-reduced-motion: reduce) {
+  .entra,
+  .volta {
+    animation-name: tela-esmaece;
+    animation-duration: 150ms;
+    animation-timing-function: var(--curva-padrao);
+  }
+}
