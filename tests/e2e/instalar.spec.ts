@@ -261,6 +261,7 @@ test.describe("convite de instalar: já instalado", () => {
     await admin.getByLabel("E-mail").fill("admin@exemplo.teste");
     await admin.getByLabel("Senha").fill(SENHA);
     await admin.getByRole("button", { name: "entrar", exact: true }).click();
+    await expect(admin).toHaveURL(/\/admin/);
     await admin.goto("/admin/clientes");
     const linha = admin.locator("tr", { hasText: "[teste] Instalar e2e-instalar-instalado" });
     await expect(linha.locator("[data-instalou='sim']")).toBeVisible();
