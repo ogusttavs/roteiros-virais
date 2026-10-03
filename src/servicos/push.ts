@@ -27,7 +27,7 @@ const SERVICOS_DE_PUSH_POR_SUFIXO = [".push.apple.com", ".push.services.mozilla.
  * (lista fechada por nome), `https`, porta padrão, sem ponto final no nome e sem usuário na URL. Um nome público que resolva para um IP interno
  * (`127.0.0.1.nip.io`), `localhost.`, IP literal e porta qualquer ficam todos de fora. Navegador novo com serviço novo: acrescentar o sufixo aqui, com a fonte.
  */
-export function enderecoDeServicoDePush(endpoint: string): { ok: true } | { ok: false; host: string } {
+export function enderecoDeServicoDePush(endpoint: string): { ok: true; href: string } | { ok: false; host: string } {
   let url: URL;
   try {
     url = new URL(endpoint);
@@ -41,17 +41,23 @@ export function enderecoDeServicoDePush(endpoint: string): { ok: true } | { ok: 
     url.username === "" &&
     url.password === "" &&
     !host.endsWith(".") &&
+    // O `web-push` envia com `url.parse` (legado), que lê o nome de outro jeito que a URL do WHATWG quando há `;`, `,` e afins no nome
+    // (`https://127.0.0.1;.push.apple.com/x`: o WHATWG lê o sufixo da Apple, o legado lê 127.0.0.1). Só letras minúsculas, dígitos, ponto e hífen: nos dois
+    // o nome é o mesmo.
+    /^[a-z0-9.-]+$/.test(host) &&
     (SERVICOS_DE_PUSH_EXATOS.includes(host) || SERVICOS_DE_PUSH_POR_SUFIXO.some((sufixo) => host.endsWith(sufixo) && host.length > sufixo.length));
-  return permitido ? { ok: true } : { ok: false, host };
+  // O endereço normalizado (`href`) é o que se grava e se usa; nunca o texto cru que o navegador mandou.
+  return permitido ? { ok: true, href: url.href } : { ok: false, host };
 }
 
-function validar(dados: DadosDaInscricao): void {
+function validar(dados: DadosDaInscricao): string {
   if (dados.p256dh.length < 10 || dados.auth.length < 4 || dados.endpoint.length > 2000) throw new ErroInscricaoPush("Inscrição do aviso inválida.");
   const confere = enderecoDeServicoDePush(dados.endpoint);
   if (!confere.ok) {
     logger.warn({ host: confere.host }, "push: endereco de inscricao recusado (fora da lista de servicos de push)");
     throw new ErroInscricaoPush("Endereço do aviso inválido.");
   }
+  return confere.href;
 }
 
 /**
@@ -61,12 +67,12 @@ function validar(dados: DadosDaInscricao): void {
  * - chaves iguais e outra pessoa: recusa. Quem passou a usar o aparelho precisa desligar e ligar de novo, o que gera uma inscrição nova.
  */
 export async function registrarInscricaoPush(usuarioId: string, dados: DadosDaInscricao, sistema: SistemaInstalado): Promise<InscricaoPush> {
-  validar(dados);
-  const [existente] = await db().select().from(inscricoesPush).where(eq(inscricoesPush.endpoint, dados.endpoint));
+  const endpoint = validar(dados);
+  const [existente] = await db().select().from(inscricoesPush).where(eq(inscricoesPush.endpoint, endpoint));
   if (!existente) {
     const [criada] = await db()
       .insert(inscricoesPush)
-      .values({ usuarioId, endpoint: dados.endpoint, p256dh: dados.p256dh, auth: dados.auth, sistema })
+      .values({ usuarioId, endpoint, p256dh: dados.p256dh, auth: dados.auth, sistema })
       .onConflictDoNothing()
       .returning();
     // Duas gravações ao mesmo tempo: quem perdeu a corrida lê o que o outro criou e segue a regra do endereço que já existe.

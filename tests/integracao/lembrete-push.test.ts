@@ -3,6 +3,8 @@
  * e-mail; quem não tem (ou cujo push não foi aceito) recebe o e-mail; 404 e 410 apagam a inscrição na hora, a segunda falha seguida apaga; o texto muda
  * com e sem roteiro marcado na agenda; e as inscrições são da pessoa (registrar, trocar de dono, desligar).
  */
+import { parse } from "node:url";
+
 import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -33,6 +35,9 @@ import {
 } from "@/servicos/push";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
+
+/** O que o `web-push` 3.6 usa para ler o endereço de envio (`url.parse`, o legado), para provar que lê o mesmo nome que a lista validou. */
+const parseLegado = (href: string) => parse(href);
 
 /** 11:00 em Brasilia (UTC-3), uma quinta-feira qualquer, longe de meia-noite. */
 const AGORA = new Date("2026-09-03T14:00:00Z");
@@ -284,7 +289,12 @@ describe("as inscrições da pessoa", () => {
       "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABk",
       "https://wns2-par02p.notify.windows.com/w/?token=BQYAAAB",
     ];
-    for (const endereco of reais) expect(enderecoDeServicoDePush(endereco), endereco).toEqual({ ok: true });
+    for (const endereco of reais) {
+      const resultado = enderecoDeServicoDePush(endereco);
+      expect(resultado.ok, endereco).toBe(true);
+      // O que o `web-push` enxerga (`url.parse`, legado) é o mesmo nome que a lista validou, e o endereço gravado é o normalizado.
+      if (resultado.ok) expect(parseLegado(resultado.href).hostname, endereco).toBe(new URL(endereco).hostname);
+    }
 
     const recusados = [
       "https://localhost./push",
@@ -295,6 +305,10 @@ describe("as inscrições da pessoa", () => {
       "https://usuario@fcm.googleapis.com/fcm/send/x",
       "https://usuario:senha@fcm.googleapis.com/fcm/send/x",
       "https://127.0.0.1.nip.io/push",
+      "https://127.0.0.1;.push.apple.com/x",
+      "https://127.0.0.1,.push.apple.com/x",
+      "https://fcm.googleapis.com;.evil.example/fcm/send/x",
+      "https://fcm.googleapis.com,x.push.apple.com/x",
       "https://fcm.googleapis.com.evil.example/fcm/send/x",
       "https://evilfcm.googleapis.com/fcm/send/x",
       "https://evilpush.apple.com/x",
@@ -307,6 +321,10 @@ describe("as inscrições da pessoa", () => {
       "nao e uma url",
     ];
     for (const endereco of recusados) expect(enderecoDeServicoDePush(endereco).ok, endereco).toBe(false);
+    // Os maliciosos com `;`: o legado enxerga outro nome que o WHATWG (a vírgula não diverge hoje, mas fica de fora pela mesma regra do nome).
+    for (const endereco of recusados.filter((e) => e.includes(";"))) {
+      expect(parseLegado(endereco).hostname, endereco).not.toBe(new URL(endereco).hostname);
+    }
 
     const a = await criarPessoaComMarca();
     for (const endereco of recusados.slice(0, 8)) {
