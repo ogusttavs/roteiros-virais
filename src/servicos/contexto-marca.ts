@@ -33,7 +33,7 @@ import {
   TAMANHO_MAXIMO_TEXTO_DA_PESSOA,
   estadoDaSecao,
   itemVisivel,
-  limparTextoDoItem,
+  limparTextoSemCortar,
   proximaLeituraEm,
   textoEmVigor,
   textoParaMostrar,
@@ -178,8 +178,8 @@ export async function confirmarItem(clienteId: number, itemId: number): Promise<
 
 /** "Corrigir": o texto da pessoa vale no lugar do da IA, e a IA nunca o sobrescreve. */
 export async function corrigirItem(clienteId: number, itemId: number, textoDaPessoa: string): Promise<void> {
-  // Um a mais que o teto: a limpeza corta no limite que recebe, e passar do teto aqui é erro, não corte.
-  const texto = limparTextoDoItem(textoDaPessoa, TAMANHO_MAXIMO_TEXTO_DA_PESSOA + 1);
+  // Passar do teto é erro, nunca corte: o texto dela entra em todo roteiro como ela escreveu.
+  const texto = limparTextoSemCortar(textoDaPessoa);
   if (texto === "") throw new ErroContextoMarca("escreva o que está certo.");
   if (texto.length > TAMANHO_MAXIMO_TEXTO_DA_PESSOA) throw new ErroContextoMarca("o texto está longo demais.");
   const agora = new Date();

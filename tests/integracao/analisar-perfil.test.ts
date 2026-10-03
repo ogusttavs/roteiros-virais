@@ -134,7 +134,9 @@ describe("rodarAnalisarPerfil, TikTok (Apify suspenso)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     const linha = await linhaAnalisada(clienteId, "perfiltiktok");
     expect(linha?.existeNaRede).toBe(false);
-    expect(linha?.erro).toContain("Apify suspenso");
+    // E38 PR 2, acabamento a: o motivo é coluna própria, e o TikTok desligado não é erro nenhum.
+    expect(linha?.motivo).toBe("tiktok_desligado");
+    expect(linha?.erro).toBeNull();
   });
 });
 
@@ -148,7 +150,8 @@ describe("rodarAnalisarPerfil, YouTube", () => {
     expect(resultado.descartado).toBe("nao_encontrado");
     const linha = await linhaAnalisada(clienteId, "@naoexiste");
     expect(linha?.existeNaRede).toBe(false);
-    expect(linha?.erro).toContain("nao encontrado na rede.");
+    expect(linha?.motivo).toBe("nao_encontrado");
+    expect(linha?.erro).toBeNull();
   });
 
   it("o canal nao tem playlist de uploads (ErroYoutubeApi com playlistNotFound): descartado como sem_videos", async () => {
@@ -163,6 +166,7 @@ describe("rodarAnalisarPerfil, YouTube", () => {
     expect(resultado.descartado).toBe("sem_videos");
     const linha = await linhaAnalisada(clienteId, "@semvideos");
     expect(linha?.existeNaRede).toBe(false);
+    expect(linha?.motivo).toBe("sem_videos");
   });
 
   it("cliente sem setor: grava a leitura, nunca classifica (qualificaParaSetor falso)", async () => {

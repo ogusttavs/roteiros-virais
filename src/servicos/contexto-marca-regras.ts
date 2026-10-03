@@ -82,13 +82,18 @@ export type Reconciliacao = {
   };
 };
 
-/** Uma linha só, sem marcação, sem espaço sobrando, no tamanho que cabe na tela e no prompt. */
-export function limparTextoDoItem(bruto: string, maximo: number = TAMANHO_MAXIMO_ITEM): string {
-  const limpo = bruto
+/** Uma linha só, sem marcação e sem espaço sobrando, sem cortar nada (para medir o tamanho de verdade). */
+export function limparTextoSemCortar(bruto: string): string {
+  return bruto
     .replace(/<[^>]*>/g, " ")
     .replace(/[<>]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** O mesmo, cortado (de preferência numa palavra inteira) no tamanho que cabe na tela e no prompt. */
+export function limparTextoDoItem(bruto: string, maximo: number = TAMANHO_MAXIMO_ITEM): string {
+  const limpo = limparTextoSemCortar(bruto);
   if (limpo.length <= maximo) return limpo;
   const corte = limpo.slice(0, maximo);
   const ultimoEspaco = corte.lastIndexOf(" ");

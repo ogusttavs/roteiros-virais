@@ -7,6 +7,7 @@ import {
   itemVisivel,
   lerIdAnterior,
   limparTextoDoItem,
+  limparTextoSemCortar,
   proximaLeituraEm,
   reconciliarItens,
   similaridade,
@@ -61,6 +62,12 @@ describe("limparTextoDoItem", () => {
     expect(limparTextoDoItem("  O removedor\n\n  de   500 ml <b>agora</b> vem com bico.  ")).toBe(
       "O removedor de 500 ml agora vem com bico.",
     );
+  });
+
+  it("limparTextoSemCortar mede o tamanho de verdade: nunca corta (a validação do texto da pessoa depende disso)", () => {
+    const longo = "a ".repeat(400);
+    expect(limparTextoSemCortar(longo).length).toBe(799);
+    expect(limparTextoDoItem(longo).length).toBeLessThan(799);
   });
 
   it("corta no limite, de preferência numa palavra inteira", () => {
