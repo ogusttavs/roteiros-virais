@@ -586,6 +586,41 @@ export const contextoMarcaItens = pgTable(
   (t) => [index("contexto_marca_itens_cliente_id").on(t.clienteId)],
 );
 
+/** O pedido de ramo: aberto até o admin olhar; atendido (encaixado ou ramo criado) ou cancelado (a pessoa escolheu um ramo da lista antes). */
+export type EstadoPedidoDeRamo = "aberto" | "atendido" | "cancelado";
+export type ResolucaoPedidoDeRamo = "encaixado" | "ramo_criado";
+
+/**
+ * E45, PR 2: o "Não achei o meu". A pessoa que não se achou no catálogo escreve o ramo com as palavras dela; o texto vira um pedido ao
+ * admin, e a marca entra PROVISORIAMENTE no ramo mais próximo do que escreveu (`setorProvisorioId`, nulo quando nada casou) para não ficar
+ * sem temas. O admin decide (nunca setor novo automático): encaixa a marca num ramo que existe, ou cria o ramo. Uma marca tem no máximo um
+ * pedido aberto (índice único parcial): escrever de novo atualiza o mesmo. O texto também fica em `clientes.ramo_outro` enquanto o pedido
+ * está aberto.
+ */
+export const pedidosDeRamo = pgTable(
+  "pedidos_de_ramo",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    texto: text("texto").notNull(),
+    /** O setor em que a marca entrou enquanto espera; nulo quando nada casou (ou o teto de setores novos do dia segurou). */
+    setorProvisorioId: integer("setor_provisorio_id").references(() => nichos.id),
+    estado: text("estado").$type<EstadoPedidoDeRamo>().notNull().default("aberto"),
+    /** Como o admin resolveu (só em `atendido`). */
+    resolucao: text("resolucao").$type<ResolucaoPedidoDeRamo>(),
+    /** O setor em que a marca ficou ao resolver (o encaixado, ou o que o admin criou). */
+    setorFinalId: integer("setor_final_id").references(() => nichos.id),
+    criadoEm: criadoEm(),
+    resolvidoEm: timestamp("resolvido_em", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("pedidos_de_ramo_um_aberto_por_marca").on(t.clienteId).where(sql`${t.estado} = 'aberto'`),
+    index("pedidos_de_ramo_estado").on(t.estado),
+  ],
+);
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------
@@ -1704,3 +1739,4 @@ export type ConsumoApi = typeof consumoApi.$inferSelect;
 export type AprendizadoCliente = typeof aprendizadoCliente.$inferSelect;
 export type ContextoMarca = typeof contextoMarca.$inferSelect;
 export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;
+export type PedidoDeRamo = typeof pedidosDeRamo.$inferSelect;

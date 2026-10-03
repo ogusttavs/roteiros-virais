@@ -39,6 +39,7 @@ import { sessaoAtual } from "@/lib/sessao";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
+import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
 import { textosAdmin } from "@/textos/admin";
@@ -645,8 +646,14 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
 
   // E45, PR 1: o ramo do catálogo vira o setor dele (que nasce, se for o primeiro a escolher; e se a marca já está nele, nada muda); o
   // `nichoId` de antes (um setor que o admin criou à mão, e que a tela mostra como o ramo atual) continua valendo quando a pessoa não
-  // escolheu outro.
-  const nichoId = dados.ramo ? (await setorParaAMarca(antes?.nichoId ?? null, dados.ramo)).nichoId : (dados.nichoId ?? null);
+  // escolheu outro. E45, PR 2: no "Não achei o meu" (só o texto livre) a marca fica onde está por ora, e o pedido de ramo, registrado depois
+  // da gravação, a põe provisoriamente no ramo mais próximo do que ela escreveu.
+  const escolheuDaLista = Boolean(dados.ramo) || Boolean(dados.nichoId);
+  const nichoId = dados.ramo
+    ? (await setorParaAMarca(antes?.nichoId ?? null, dados.ramo)).nichoId
+    : dados.nichoId
+      ? dados.nichoId
+      : (antes?.nichoId ?? null);
 
   const [cliente] = await db()
     .update(clientes)
@@ -658,7 +665,7 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
       paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
       site: dados.site?.trim() || null,
       nichoId,
-      ramoOutro: nichoId ? null : (dados.ramoOutro?.trim() ?? null),
+      ramoOutro: escolheuDaLista ? null : (dados.ramoOutro?.trim() ?? null),
       persona: dados.persona,
       perfis,
       quemGrava: dados.quemGrava ?? null,
@@ -671,6 +678,17 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado. A troca já foi gravada: isto
   // nunca a derruba.
   if (antes?.nichoId && antes.nichoId !== cliente.nichoId) await desligarSetorSeSemMarca(antes.nichoId).catch(() => undefined);
+
+  // E45, PR 2: escolheu da lista, o pedido de ramo que estivesse aberto deixa de valer; escreveu com as palavras dela, o pedido abre (ou se
+  // atualiza) e a marca entra no ramo provisório. O teto de setores novos do dia nunca derruba esta gravação: o pedido vai aberto do mesmo jeito.
+  let clienteFinal = cliente;
+  if (escolheuDaLista) {
+    await cancelarPedidoAberto(clienteId);
+  } else {
+    await registrarPedidoDeRamo(clienteId, dados.ramoOutro ?? "");
+    const [fresco] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    clienteFinal = fresco ?? cliente;
+  }
 
   /**
    * E38 PR 2 (gatilho que o PR 1 deixou sem): o Começar é onde o site e os perfis são informados pela
@@ -686,7 +704,7 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   if (perfisMudaram(antes?.perfis ?? null, perfis)) {
     void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
   }
-  return cliente;
+  return clienteFinal;
 }
 
 /** O Instagram ou o YouTube mudou (são os dois que se analisam; o TikTok não). Comparação sem "@" e sem diferença de maiúscula. */
@@ -918,6 +936,8 @@ export async function salvarRamoConta(clienteId: number, ramoSlug: string): Prom
   const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
   const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
   if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
+  // Escolheu da lista: o pedido de ramo aberto (o "Não achei o meu" de antes) deixa de valer.
+  await cancelarPedidoAberto(clienteId);
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado (nunca derruba a troca).
   if (antes.nichoId && antes.nichoId !== nichoId) await desligarSetorSeSemMarca(antes.nichoId).catch(() => undefined);
   return { cliente, mudou: antes.nichoId !== nichoId };

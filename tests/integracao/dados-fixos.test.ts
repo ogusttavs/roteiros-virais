@@ -144,7 +144,7 @@ describe("salvarDadosFixos", () => {
     ).rejects.toThrow();
   });
 
-  it("ramo por texto livre grava ramoOutro e limpa nichoId", async () => {
+  it("ramo por texto livre (\"Não achei o meu\") grava ramoOutro e abre o pedido; a marca entra no ramo provisório mais próximo (E45 PR 2)", async () => {
     const cliente = await salvarDadosFixos(clienteId, {
       nome: "Sorriso Novo",
       alcance: "brasil",
@@ -153,6 +153,16 @@ describe("salvarDadosFixos", () => {
     });
 
     expect(cliente.ramoOutro).toBe("clinica veterinaria");
+    // Antes da E45 PR 2 o setor ficava nulo e a marca sem temas até alguém criar um setor à mão; agora ela espera no ramo mais próximo.
+    const [setor] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "veterinaria-e-pet"));
+    expect(cliente.nichoId).toBe(setor.id);
+  });
+
+  it("texto livre que nenhum ramo do catálogo reconhece grava ramoOutro e deixa a marca sem setor (o pedido vai aberto do mesmo jeito)", async () => {
+    const [marca] = await db().insert(clientes).values({ usuarioId: outroUsuarioId, nome: "[teste] Sem palpite" }).returning();
+    const cliente = await salvarDadosFixos(marca.id, { nome: "Sem palpite", alcance: "brasil", ramoOutro: "xyzw abcd", persona: "negocio" });
+
+    expect(cliente.ramoOutro).toBe("xyzw abcd");
     expect(cliente.nichoId).toBeNull();
   });
 
