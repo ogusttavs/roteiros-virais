@@ -83,6 +83,20 @@ describe("TAREFAS (rodar.ts)", () => {
     }
   });
 
+  it("entender-marca: um argumento que não é o id (erro de digitação) é erro, nunca o despachante de todas as marcas", () => {
+    const argvOriginal = process.argv;
+    try {
+      for (const argumento of ["12abc", "1,2", "abc", "12.5", "-3", "idDaMarca"]) {
+        vi.mocked(rodarEntenderMarca).mockClear();
+        process.argv = ["node", "rodar.ts", FILAS.entenderMarca, argumento];
+        expect(() => TAREFAS[FILAS.entenderMarca](555), argumento).toThrow("nao e um id de marca");
+        expect(rodarEntenderMarca).not.toHaveBeenCalled();
+      }
+    } finally {
+      process.argv = argvOriginal;
+    }
+  });
+
   /**
    * M2, item 0a2 da revisão do PR #73: `extrair-agora` estava em `FILAS`, no worker e na rota do
    * admin, mas faltava aqui, então `npm run job -- extrair-agora` respondia "job desconhecido"

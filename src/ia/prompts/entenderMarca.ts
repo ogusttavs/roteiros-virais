@@ -162,7 +162,7 @@ export function montarEntrada(dados: {
   for (const rede of dados.redes) if (!fontes.includes(rede.rede)) fontes.push(rede.rede);
 
   const partes: string[] = [
-    `Marca: ${dados.nomeDaMarca}`,
+    `Marca: ${limparParaEntrada(dados.nomeDaMarca)}`,
     `Tipo: ${descreverTipo(dados.tipo)}`,
     "",
     "O que a pessoa respondeu no briefing (só para você comparar; nunca copie daqui):",
@@ -187,7 +187,7 @@ export function montarEntrada(dados: {
   ];
 
   if (dados.site && dados.site.paginas.length > 0) {
-    partes.push("", `Site (${dados.site.endereco}), ${dados.site.paginas.length} página(s):`);
+    partes.push("", `Site (${limparParaEntrada(dados.site.endereco)}), ${dados.site.paginas.length} página(s):`);
     for (const pagina of dados.site.paginas) {
       // Sem aspas no caminho: uma aspa fecharia o atributo e deixaria o texto de fora escrever atributos falsos na marcação.
       partes.push(`<pagina caminho="${limparParaEntrada(pagina.caminho).replace(/["']/g, "")}">`, limparParaEntrada(pagina.texto), "</pagina>");
@@ -198,7 +198,7 @@ export function montarEntrada(dados: {
     const nome = rede.rede === "instagram" ? "Instagram" : "YouTube";
     partes.push(
       "",
-      `${nome} @${rede.handle.replace(/^@+/, "")}, ${rede.videos.length} vídeo(s) recente(s)` +
+      `${nome} @${limparParaEntrada(rede.handle).replace(/^@+/, "")}, ${rede.videos.length} vídeo(s) recente(s)` +
         (rede.medianaVisualizacoes !== null
           ? `, mediana de visualizações do perfil: ${formatarNumero(rede.medianaVisualizacoes)}`
           : ", poucos vídeos para dizer qual é a mediana do perfil"),

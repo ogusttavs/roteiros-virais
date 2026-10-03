@@ -50,8 +50,10 @@ const idDoBotao = (id: number, acao: "corrigir" | "desfazer" | "estaCerto") => `
  * confirma ou corrige chega aos roteiros (`perfilDoCliente`). Otimista com volta, como o
  * `AprendizadoCard`: a linha muda na hora e desfaz se a ação falhar, com a frase embaixo dela.
  *
- * O pai põe `key={secao.versao}`: quando o servidor traz outra leitura (por `router.refresh`), o cartão
- * recomeça dela, em vez de ficar com a lista de antes.
+ * Quando o servidor traz outra leitura (`router.refresh`: o botão de atualizar do celular, ou a própria
+ * ação que descobriu que a proposta mudou), `secao.versao` muda e a lista local recomeça dela, em vez de
+ * ficar com a de antes (o padrão de "ajustar o estado durante a renderização", sem efeito). As frases de
+ * erro e o campo de correção aberto continuam: a pessoa não perde o que escrevia nem a frase que explica.
  *
  * Montado com as peças existentes onde o desenho não cobre (regra 11): os estados sem fonte, lendo e
  * "não deu", o "Tirar" com "Desfazer" inline e a lista dos itens tirados, "Corrigido por você", "o que
@@ -63,7 +65,12 @@ export function ContextoMarcaCard({ secao }: Props) {
   const { semConexao, avisarRedeOk } = useConexao();
   const tratarFalha = useTratarFalha();
   const [itens, setItens] = useState<ItemLocal[]>(secao.itens);
-  const [tirados] = useState<ItemTirado[]>(secao.tirados);
+  const [versaoDaSecao, setVersaoDaSecao] = useState(secao.versao);
+  if (versaoDaSecao !== secao.versao) {
+    setVersaoDaSecao(secao.versao);
+    setItens(secao.itens);
+  }
+  const tirados: ItemTirado[] = secao.tirados;
   const [editando, setEditando] = useState<{ id: number; texto: string } | null>(null);
   /** Um Set de ids, não um id só (a lição do V7 no `AprendizadoCard`). */
   const [idsPendentes, setIdsPendentes] = useState<ReadonlySet<number>>(() => new Set());

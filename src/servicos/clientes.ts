@@ -10,6 +10,8 @@ import {
   account,
   briefings,
   clientes,
+  contextoMarca,
+  contextoMarcaItens,
   membrosMarca,
   nichos,
   preferenciasUsuario,
@@ -420,6 +422,13 @@ export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promis
       .update(briefings)
       .set({ respostas: {}, avaliacoes: {}, notaGeral: null, completo: false, perfil: null })
       .where(eq(briefings.clienteId, clienteId));
+
+    // E38 PR 2: o que a pessoa confirmou sobre a marca foi escrito sob o tipo antigo ("vende", "fala" de um
+    // negócio não descrevem uma pessoa) e voltaria ao perfil de todo roteiro assim que o briefing novo fosse
+    // compilado, sem ela confirmar de novo. Zera junto com o briefing: a leitura recomeça quando o briefing
+    // novo ficar completo (o resumo dele entra no hash, então a IA roda de novo).
+    await tx.delete(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId));
+    await tx.delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
 
     return cliente;
   });

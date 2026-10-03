@@ -137,8 +137,7 @@ export function BriefingVivo({
           ) : null}
 
           {/* Depois de "Como o sistema te entende", antes do aprendizado: a ordem do desenho aprovado (`Briefing.dc.html`). */}
-          {/* `key` na versão da seção: quando o servidor traz outra leitura, o cartão recomeça dela em vez de ficar com a lista de antes. */}
-          <ContextoMarcaCard key={contextoMarca.versao} secao={contextoMarca} />
+          <ContextoMarcaCard secao={contextoMarca} />
 
           <AprendizadoCard regrasIniciais={regrasIniciais} />
 

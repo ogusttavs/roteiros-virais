@@ -144,6 +144,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.entenderMarca]: () => {
     const clienteIdArg = process.argv[3];
     const forcar = process.argv.includes("--forcar");
+    // Um argumento que não é o id (e não é uma opção) é um erro de digitação: cair no despachante enfileiraria até 25
+    // leituras de marcas que ninguém pediu, sem o sim do Gustavo que a leitura manual exige.
+    if (clienteIdArg !== undefined && !clienteIdArg.startsWith("--") && !/^\d+$/.test(clienteIdArg)) {
+      throw new Error(`uso: npm run job -- entender-marca [<clienteId>] [--forcar]; "${clienteIdArg}" nao e um id de marca.`);
+    }
     return rodarEntenderMarca(
       clienteIdArg && /^\d+$/.test(clienteIdArg) ? { clienteId: Number(clienteIdArg), origem: "manual", forcar } : null,
     );

@@ -180,7 +180,9 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const secao = page.getByRole("region", { name: SECAO });
     await expect(secao.getByText("Ainda não conseguimos ler.")).toBeVisible();
     await expect(secao.getByText("Site: não deixou a gente ler.")).toBeVisible();
-    await expect(secao.getByText("Instagram: só dá para ler conta profissional e sem restrição de idade.")).toBeVisible();
+    await expect(
+      secao.getByText("Instagram: não conseguimos ler este perfil. Confira o @; o Instagram também só deixa ler conta profissional e sem restrição de idade."),
+    ).toBeVisible();
   });
 
   test("os itens aparecem com a origem, a pílula de novidade e a data da leitura; só as fontes lidas entram na frase", async ({ page }) => {
@@ -195,7 +197,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
 
     const doSite = itemNaTela(page, "bico de spray");
     await expect(doSite.getByText("Do seu site")).toBeVisible();
-    await expect(doSite.getByText("novidade deste mês")).toBeVisible();
+    await expect(doSite.getByText("mudou desde a última leitura")).toBeVisible();
     await expect(doSite.getByRole("button", { name: "Está certo" })).toBeVisible();
 
     const doInstagram = itemNaTela(page, "teste no canto escondido");
@@ -204,6 +206,8 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const confirmado = itemNaTela(page, "antes e depois em tecido claro");
     await expect(confirmado.getByText("Confirmado")).toBeVisible();
     await expect(confirmado.getByRole("button", { name: "Está certo" })).toHaveCount(0);
+    // A pílula de "novidade deste mês" é só dos itens novos (aqui, nenhum).
+    await expect(secao.getByText("novidade deste mês", { exact: true })).toHaveCount(0);
   });
 
   test("Está certo: o item vira Confirmado, a pílula some, e continua assim depois de recarregar", async ({ page }) => {
@@ -215,7 +219,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const item = itemNaTela(page, "bico de spray");
     await item.getByRole("button", { name: "Está certo" }).click();
     await expect(item.getByText("Confirmado")).toBeVisible();
-    await expect(item.getByText("novidade deste mês")).toHaveCount(0);
+    await expect(item.getByText("mudou desde a última leitura")).toHaveCount(0);
     // O sinal de que gravou (a action terminou): o botão de corrigir volta a ficar disponível.
     await expect(item.getByRole("button", { name: "Corrigir" })).toBeEnabled();
 
@@ -313,11 +317,12 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const secao = page.getByRole("region", { name: SECAO });
     await expect(secao.getByText("O TikTok ainda não é lido por aqui; o seu @ fica guardado.")).toBeVisible();
     // A linha da data lista só o que foi lido de verdade: nunca o TikTok.
-    await expect(secao.getByText(/Lido em .*no Instagram e no site/)).toBeVisible();
-    await expect(secao.getByText(/Lido em .*TikTok/)).toHaveCount(0);
+    const linhaDaData = secao.getByText(/^Lido em /);
+    await expect(linhaDaData).toHaveText("Lido em 20 de setembro, no Instagram e no site. A próxima leitura é em 20 de outubro.");
+    await expect(linhaDaData).not.toContainText("TikTok");
   });
 
-  test("marca do tipo pessoa: nada de 'negócio' nos textos da seção", async ({ page }) => {
+  test("os textos da seção não falam em 'negócio' (servem à pessoa e ao negócio: o cartão é o mesmo para os dois tipos)", async ({ page }) => {
     const clienteId = await marca("e2e-contexto-pessoa", { tipo: "pessoa" });
     await semearLeitura(clienteId);
     await entrar(page, "e2e-contexto-pessoa@exemplo.teste");
@@ -341,6 +346,164 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     await expect(secao.getByText("bico de spray")).toHaveCount(0);
     await expect(page.getByText("bico de spray")).toHaveCount(0);
   });
+
+  test("a ação falha (rede cortada): a linha volta ao que era, com a frase embaixo dela, e nada é gravado", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-falha");
+    const ids = await semearLeitura(clienteId);
+    await entrar(page, "e2e-contexto-falha@exemplo.teste");
+    await page.goto("/briefing");
+    // As ações do servidor são POST para a própria página: corta todas.
+    await page.route("**/briefing", (rota) => (rota.request().method() === "POST" ? rota.abort("failed") : rota.continue()));
+
+    const item = itemNaTela(page, "bico de spray");
+    await item.getByRole("button", { name: "Está certo" }).click();
+
+    await expect(item.getByRole("alert")).toContainText(/Não conseguimos confirmar agora|Sem conexão/);
+    await expect(item.getByRole("button", { name: "Está certo" })).toBeVisible();
+    await expect(item.getByText("Confirmado")).toHaveCount(0);
+    expect(await itemNoBanco(ids.vende)).toMatchObject({ estado: "para_confirmar", textoConfirmado: null });
+
+    // Tirar também volta, e a correção continua no campo (nada que a pessoa escreveu se perde).
+    await item.getByRole("button", { name: "Tirar" }).click();
+    await expect(item.getByRole("alert")).toContainText(/Não conseguimos tirar agora|Sem conexão/);
+    await item.getByRole("button", { name: "Corrigir" }).click();
+    await page.getByLabel("Corrigir o que a IA entendeu").fill("Texto que a pessoa escreveu.");
+    await page.getByRole("button", { name: "Salvar" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /Não conseguimos guardar a correção agora|Sem conexão/ })).toBeVisible();
+    await expect(page.getByLabel("Corrigir o que a IA entendeu")).toHaveValue("Texto que a pessoa escreveu.");
+    expect(await itemNoBanco(ids.vende)).toMatchObject({ estado: "para_confirmar", textoConfirmado: null });
+  });
+
+  test("a leitura trocou o texto enquanto a página estava aberta: 'Está certo' não confirma o que a pessoa não leu, e a seção mostra o texto novo", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-mudou");
+    const ids = await semearLeitura(clienteId);
+    await entrar(page, "e2e-contexto-mudou@exemplo.teste");
+    await page.goto("/briefing");
+    await expect(itemNaTela(page, "bico de spray")).toBeVisible();
+
+    // O que a leitura mensal faz: troca a proposta do item que a pessoa ainda não decidiu.
+    await db().update(contextoMarcaItens).set({ texto: "Agora o removedor vem em refil de 1 litro." }).where(eq(contextoMarcaItens.id, ids.vende));
+    await itemNaTela(page, "bico de spray").getByRole("button", { name: "Está certo" }).click();
+
+    await expect(page.getByText("Esta leitura mudou enquanto você olhava. Confira o texto novo e confirme de novo.")).toBeVisible();
+    await expect(itemNaTela(page, "refil de 1 litro")).toBeVisible();
+    await expect(itemNaTela(page, "bico de spray")).toHaveCount(0);
+    expect(await itemNoBanco(ids.vende)).toMatchObject({ estado: "para_confirmar", textoConfirmado: null });
+
+    // Com o texto novo diante dos olhos, confirmar vale.
+    await itemNaTela(page, "refil de 1 litro").getByRole("button", { name: "Está certo" }).click();
+    await expect(itemNaTela(page, "refil de 1 litro").getByText("Confirmado")).toBeVisible();
+    await expect.poll(async () => (await itemNoBanco(ids.vende)).textoConfirmado).toBe("Agora o removedor vem em refil de 1 litro.");
+  });
+
+  test("uma proposta nova por cima de um texto já confirmado mostra o que continua valendo nos roteiros", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-valia-antes");
+    const ids = await semearLeitura(clienteId);
+    await db()
+      .update(contextoMarcaItens)
+      .set({ estado: "para_confirmar", texto: "Agora também vende amaciante.", textoConfirmado: "Vende só removedor de manchas.", novidade: "mudou" })
+      .where(eq(contextoMarcaItens.id, ids.vende));
+    await entrar(page, "e2e-contexto-valia-antes@exemplo.teste");
+    await page.goto("/briefing");
+
+    const item = itemNaTela(page, "Agora também vende amaciante.");
+    await expect(item.getByText("mudou desde a última leitura")).toBeVisible();
+    await expect(item.getByText("Até você decidir, nos seus roteiros continua valendo o que você tinha confirmado:")).toBeVisible();
+    await expect(item.getByText("Vende só removedor de manchas.")).toBeVisible();
+  });
+
+  test("o que a pessoa tirou fica numa lista à parte, e dá para desfazer depois de recarregar", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-tirados");
+    const ids = await semearLeitura(clienteId);
+    await entrar(page, "e2e-contexto-tirados@exemplo.teste");
+    await page.goto("/briefing");
+
+    await itemNaTela(page, "antes e depois em tecido claro").getByRole("button", { name: "Tirar" }).click();
+    await expect(itemNaTela(page, "antes e depois em tecido claro").getByRole("button", { name: "Desfazer" })).toBeEnabled();
+    await page.reload();
+
+    const secao = page.getByRole("region", { name: SECAO });
+    await expect(secao.getByText("1 item que você tirou")).toBeVisible();
+    await secao.getByText("1 item que você tirou").click();
+    await expect(secao.getByText("O que você tira não volta sozinho, nem com outras palavras.")).toBeVisible();
+    await secao.getByRole("button", { name: /^Desfazer/ }).click();
+
+    await expect(itemNaTela(page, "antes e depois em tecido claro").getByText("Confirmado")).toBeVisible();
+    await expect(secao.getByText("1 item que você tirou")).toHaveCount(0);
+    expect(await itemNoBanco(ids.posta)).toMatchObject({ estado: "confirmado" });
+  });
+
+  test("a pessoa tirou todos os itens: a seção diz que não sobrou nada para confirmar (e não que a leitura não achou nada)", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-tudo-tirado");
+    await semearLeitura(clienteId);
+    await db().update(contextoMarcaItens).set({ estado: "recusado", estadoAnterior: "para_confirmar" }).where(eq(contextoMarcaItens.clienteId, clienteId));
+    await entrar(page, "e2e-contexto-tudo-tirado@exemplo.teste");
+    await page.goto("/briefing");
+
+    const secao = page.getByRole("region", { name: SECAO });
+    await expect(secao.getByText("Não sobrou nada para confirmar.")).toBeVisible();
+    await expect(secao.getByText("A gente leu, mas não achou nada claro")).toHaveCount(0);
+    await expect(secao.getByText("3 itens que você tirou")).toBeVisible();
+  });
+
+  test("o que a pessoa já confirmou continua à vista mesmo sem nenhuma fonte na Conta (ainda alimenta os roteiros)", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-confirmado-sem-fonte", { site: null, perfis: { instagram: null, tiktok: null, youtube: null } });
+    await semearLeitura(clienteId);
+    await db().update(clientes).set({ site: null, perfis: { instagram: null, tiktok: null, youtube: null } }).where(eq(clientes.id, clienteId));
+    await db().update(contextoMarcaItens).set({ sumiuEm: new Date("2026-09-25T12:00:00Z") }).where(eq(contextoMarcaItens.clienteId, clienteId));
+    await entrar(page, "e2e-contexto-confirmado-sem-fonte@exemplo.teste");
+    await page.goto("/briefing");
+
+    const secao = page.getByRole("region", { name: SECAO });
+    await expect(secao.getByText("guarde em Conta o site da sua marca")).toBeVisible();
+    // O confirmado aparece (e pode ser tirado); o que ninguém confirmou e a fonte deixou de dizer, não.
+    await expect(itemNaTela(page, "antes e depois em tecido claro").getByText("Confirmado")).toBeVisible();
+    await expect(itemNaTela(page, "antes e depois em tecido claro").getByRole("button", { name: "Tirar" })).toBeVisible();
+    await expect(secao.getByText("bico de spray")).toHaveCount(0);
+  });
+
+  test("teclado e leitor de tela: o campo de correção recebe o foco, o foco volta ao botão, os botões dizem de qual item são, e o resultado é anunciado", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-acessivel");
+    await semearLeitura(clienteId);
+    await entrar(page, "e2e-contexto-acessivel@exemplo.teste");
+    await page.goto("/briefing");
+
+    const secao = page.getByRole("region", { name: SECAO });
+    // O nome do botão leva o começo do texto do item: com vários itens, "Está certo" sozinho não diz qual.
+    const confirmar = secao.getByRole("button", { name: "Está certo: O removedor de 500 ml agora vem com bico de spray." });
+    await expect(confirmar).toBeVisible();
+
+    const corrigir = secao.getByRole("button", { name: "Corrigir: O removedor de 500 ml agora vem com bico de spray." });
+    await corrigir.focus();
+    await page.keyboard.press("Enter");
+    const campo = page.getByLabel("Corrigir o que a IA entendeu");
+    await expect(campo).toBeFocused();
+
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    await expect(corrigir).toBeFocused();
+
+    await confirmar.click();
+    await expect(secao.getByRole("status").filter({ hasText: "Item confirmado." })).toBeAttached();
+    await expect(corrigir).toBeFocused();
+  });
+
+  test("o campo de correção mostra o contador, e texto acima do limite é recusado com a frase certa (nunca cortado em silêncio)", async ({ page }) => {
+    const clienteId = await marca("e2e-contexto-limite");
+    const ids = await semearLeitura(clienteId);
+    await entrar(page, "e2e-contexto-limite@exemplo.teste");
+    await page.goto("/briefing");
+
+    await itemNaTela(page, "bico de spray").getByRole("button", { name: "Corrigir" }).click();
+    const campo = page.getByLabel("Corrigir o que a IA entendeu");
+    await campo.fill("a".repeat(600));
+    await expect(page.getByText("600 de 500 caracteres")).toBeVisible();
+    await page.getByRole("button", { name: "Salvar" }).click();
+
+    await expect(page.getByText("Passou de 500 caracteres.")).toBeVisible();
+    await expect(campo).toHaveAttribute("aria-invalid", "true");
+    await expect(campo).toHaveValue("a".repeat(600));
+    expect(await itemNoBanco(ids.vende)).toMatchObject({ estado: "para_confirmar", textoConfirmado: null });
+  });
 });
 
 test.describe("celular: a seção cabe e os alvos de toque têm 44 pontos", () => {
@@ -357,16 +520,50 @@ test.describe("celular: a seção cabe e os alvos de toque têm 44 pontos", () =
     await itemNaTela(page, "teste no canto escondido").getByRole("button", { name: "Corrigir" }).click();
     await expect(page.getByLabel("Corrigir o que a IA entendeu")).toBeVisible();
 
-    const medidas = await secao.evaluate((no) => ({
-      rolagemParaOLado: document.documentElement.scrollWidth > window.innerWidth,
-      pequenos: Array.from(no.querySelectorAll("button, a, textarea"))
-        .map((el) => ({ nome: (el.textContent || el.getAttribute("aria-label") || el.tagName).trim().slice(0, 30), altura: el.getBoundingClientRect().height }))
-        .filter((m) => m.altura > 0 && m.altura < 44),
-      campoComFonteMenor: Array.from(no.querySelectorAll("textarea")).filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).length,
-    }));
-    expect(medidas.rolagemParaOLado).toBe(false);
-    expect(medidas.pequenos).toEqual([]);
-    expect(medidas.campoComFonteMenor).toBe(0);
+    const medir = () =>
+      secao.evaluate((no) => ({
+        rolagemParaOLado: document.documentElement.scrollWidth > window.innerWidth,
+        // Altura E largura: um botão de 30 pontos de largura também erra o toque.
+        pequenos: Array.from(no.querySelectorAll("button, a, textarea, summary"))
+          .map((el) => {
+            const caixa = el.getBoundingClientRect();
+            return { nome: (el.getAttribute("aria-label") || el.textContent || el.tagName).trim().slice(0, 30), altura: caixa.height, largura: caixa.width };
+          })
+          .filter((m) => m.altura > 0 && (m.altura < 44 || m.largura < 44)),
+        campoComFonteMenor: Array.from(no.querySelectorAll("textarea")).filter((el) => parseFloat(getComputedStyle(el).fontSize) < 16).length,
+      }));
+
+    const emEdicao = await medir();
+    expect(emEdicao.rolagemParaOLado).toBe(false);
+    expect(emEdicao.pequenos).toEqual([]);
+    expect(emEdicao.campoComFonteMenor).toBe(0);
+
+    // O estado "tirado" (com Desfazer) e a lista dos tirados, depois de recarregar.
+    await page.getByRole("button", { name: "Cancelar" }).click();
+    await itemNaTela(page, "antes e depois em tecido claro").getByRole("button", { name: "Tirar" }).click();
+    await expect(itemNaTela(page, "antes e depois em tecido claro").getByRole("button", { name: "Desfazer" })).toBeEnabled();
+    const tirado = await medir();
+    expect(tirado.rolagemParaOLado).toBe(false);
+    expect(tirado.pequenos).toEqual([]);
+
+    await page.reload();
+    await secao.getByText("1 item que você tirou").click();
+    const listaDosTirados = await medir();
+    expect(listaDosTirados.rolagemParaOLado).toBe(false);
+    expect(listaDosTirados.pequenos).toEqual([]);
+  });
+
+  test("sem fonte: o link 'Ir para Conta' também cabe e tem 44 pontos", async ({ page }) => {
+    await marca("e2e-contexto-celular-sem-fonte", { site: null, perfis: { instagram: null, tiktok: null, youtube: null } });
+    await entrar(page, "e2e-contexto-celular-sem-fonte@exemplo.teste");
+    await page.goto("/briefing");
+
+    const link = page.getByRole("region", { name: SECAO }).getByRole("link", { name: "Ir para Conta" });
+    await expect(link).toBeVisible();
+    const caixa = await link.boundingBox();
+    expect(caixa!.height).toBeGreaterThanOrEqual(44);
+    expect(caixa!.width).toBeGreaterThanOrEqual(44);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
   });
 });
 
@@ -379,19 +576,22 @@ test.describe("o cartão de perfis do PR 1: cada motivo com a frase certa", () =
       { clienteId, perfilCitadoId: null, origem: "citado", rede: "instagram", handle: "perfil.pessoal", existeNaRede: false, motivo: "conta_restrita" },
       { clienteId, perfilCitadoId: null, origem: "citado", rede: "youtube", handle: "@canalsemvideo", existeNaRede: false, motivo: "sem_videos" },
       { clienteId, perfilCitadoId: null, origem: "citado", rede: "instagram", handle: "perfil.errado", existeNaRede: false, motivo: "nao_encontrado" },
-      // Linha gravada antes da coluna (motivo nulo): TikTok continua sendo "desligado", o resto "não encontrado".
+      // Linhas gravadas pelo PR 1, antes da coluna (motivo nulo): cada frase velha ainda diz o motivo certo.
       { clienteId, perfilCitadoId: null, origem: "citado", rede: "tiktok", handle: "perfil.antigo", existeNaRede: false, motivo: null },
+      { clienteId, perfilCitadoId: null, origem: "citado", rede: "instagram", handle: "perfil.pessoal.antigo", existeNaRede: false, motivo: null, erro: "perfil pessoal ou com restricao de idade." },
+      { clienteId, perfilCitadoId: null, origem: "citado", rede: "youtube", handle: "@canalantigo", existeNaRede: false, motivo: null, erro: "o canal nao tem video publicado." },
     ]);
     await entrar(page, "e2e-contexto-motivos@exemplo.teste");
     await page.goto("/briefing");
 
     const cartao = page.getByRole("region", { name: "O que a IA viu nos perfis" });
-    // Duas linhas de TikTok: a que gravou o motivo e a antiga, sem motivo.
-    await expect(cartao.getByText("O TikTok ainda não é lido por aqui; o seu @ fica guardado.")).toHaveCount(2);
+    // Duas linhas de TikTok: a que gravou o motivo e a antiga, sem motivo. A frase é neutra ("este @"): serve ao concorrente citado.
+    await expect(cartao.getByText("O TikTok ainda não é lido por aqui; este @ fica guardado.")).toHaveCount(2);
+    // Duas de conta restrita: a que gravou o motivo e a antiga do PR 1 (motivo nulo, só a frase no erro), que não vira "confira o @ de uma conta que existe".
     await expect(
-      cartao.getByText("Não conseguimos ler este perfil: o Instagram só deixa quando a conta é profissional e sem restrição de idade."),
-    ).toBeVisible();
-    await expect(cartao.getByText("Este perfil ainda não tem vídeo publicado para a gente ler.")).toBeVisible();
+      cartao.getByText("Não conseguimos ler este perfil. Confira o @; o Instagram também só deixa ler conta profissional e sem restrição de idade."),
+    ).toHaveCount(2);
+    await expect(cartao.getByText("Este perfil ainda não tem vídeo publicado para a gente ler.")).toHaveCount(2);
     // Só o @ de verdade errado pede para conferir; e o YouTube (que já vem com "@") nunca mostra "@@".
     await expect(cartao.getByText("Não achamos este perfil na rede. Confira se o @ está certo.")).toHaveCount(1);
     await expect(cartao.getByText("@canalsemvideo", { exact: true })).toBeVisible();
@@ -412,8 +612,18 @@ test.describe("Conta: o site da marca se edita no mesmo lugar dos perfis", () =>
 
     await campo.fill("isso nao e um site");
     await page.getByRole("button", { name: "salvar", exact: true }).click();
-    await expect(page.getByText("esse endereço não parece um site válido")).toBeVisible();
+    // O erro mora no próprio campo (liga a ele por aria-describedby), e o foco vai para lá.
+    await expect(page.getByText("Esse endereço não parece um site válido. Confira se está escrito certo.")).toBeVisible();
+    await expect(campo).toHaveAttribute("aria-invalid", "true");
+    await expect(campo).toBeFocused();
     expect((await db().select({ site: clientes.site }).from(clientes).where(eq(clientes.id, clienteId)))[0].site).toBeNull();
+
+    // Quase todo mundo digita sem o https://: é aceito e guardado com ele.
+    await campo.fill("loja-exemplo.test");
+    await page.getByRole("button", { name: "salvar", exact: true }).click();
+    await expect(page.getByText("salvo", { exact: true })).toBeVisible();
+    await expect(campo).toHaveValue("https://loja-exemplo.test");
+    expect((await db().select({ site: clientes.site }).from(clientes).where(eq(clientes.id, clienteId)))[0].site).toBe("https://loja-exemplo.test");
 
     await campo.fill("https://loja-exemplo.test");
     await page.getByRole("button", { name: "salvar", exact: true }).click();

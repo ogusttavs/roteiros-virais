@@ -26,6 +26,7 @@ import {
   briefings,
   clientes,
   contas,
+  contextoMarcaItens,
   geracoesIA,
   membrosMarca,
   modelosNicho,
@@ -433,6 +434,37 @@ describe("gerarRoteiro", () => {
     expect(roteiro.conteudo.semEvidencia).toBe(true);
     expect(roteiro.conteudo.evidencias).toEqual([]);
     expect(roteiro.conteudo.edicao.referencia).toBeNull();
+  });
+
+  /**
+   * E38 PR 2: o que a pessoa confirmou sobre o site e as redes chega ao prompt de sistema do roteiro, mas o
+   * filtro barato de encaixe continua julgando pelo perfil de sempre (mais texto no "na dúvida, reprove"
+   * mudaria o que ele reprova, e não há conjunto de referência dele para medir).
+   */
+  it("o que a pessoa confirmou sobre o site chega ao roteiro, e o filtro de encaixe com a marca não o recebe (E38 PR 2)", async () => {
+    const clienteId = await criarCliente();
+    await db().insert(contextoMarcaItens).values([
+      { clienteId, categoria: "vende", origem: "site", texto: "Proposta pendente que ninguem confirmou.", estado: "para_confirmar" },
+      { clienteId, categoria: "fala", origem: "site", texto: "Fala calma.", estado: "confirmado", textoConfirmado: "Fala devagar e sem palavra dificil." },
+    ]);
+    await criarVideoEvidencia("ev-contexto-confirmado", "mancha de vinho no estofado");
+    gerarEstruturadoMock.mockClear();
+
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: "mancha de vinho no estofado", objetivo: "conversao" });
+
+    const chamadas = gerarEstruturadoMock.mock.calls.map(([params]) => params);
+    const doFiltro = chamadas.find((params) => params.tarefa === "filtrarEvidenciaPorMarca");
+    expect(doFiltro, "o filtro de encaixe deveria ter rodado (há evidência)").toBeDefined();
+    expect(doFiltro!.entrada).not.toContain("Fala devagar e sem palavra dificil.");
+    expect(doFiltro!.entrada).not.toContain("O que ele confirmou sobre a própria marca");
+
+    const doRoteiro = chamadas.filter((params) => params.tarefa === "roteiro").map((params) => String(params.sistemaEstavel));
+    expect(doRoteiro.length).toBeGreaterThan(0);
+    for (const sistema of doRoteiro) {
+      expect(sistema).toContain("- Como fala: Fala devagar e sem palavra dificil.");
+      // A proposta que ninguém confirmou nunca chega a um prompt.
+      expect(sistema).not.toContain("Proposta pendente que ninguem confirmou.");
+    }
   });
 
   /** V2b, item 6: a proporcao 70/30 corta o excesso de evidencia internacional. */

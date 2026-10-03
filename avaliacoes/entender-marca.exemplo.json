@@ -127,7 +127,7 @@
       "paginas": [
         {
           "caminho": "/",
-          "texto": "Loja Exemplo de Limpeza. Removedor de manchas de 500 ml agora vem com bico de spray, por R$ 49,90. Amaciante para tecido delicado 1 litro: R$ 29,90. Atendimento pelo WhatsApp."
+          "texto": "Loja Exemplo de Limpeza. Removedor de manchas de 500 ml agora vem com bico de spray, por R$ 49,90. Amaciante para tecido delicado 1 litro: R$ 29,90. Atendimento pelo WhatsApp, em linguagem formal e técnica, como em um manual de instruções."
         }
       ]
     },
@@ -137,6 +137,25 @@
       { "id": 102, "categoria": "fala", "origem": "site", "estado": "corrigido", "texto": "Fala simples, sem nome difícil, como quem explica para uma vizinha." }
     ],
     "itensTirados": ["Fala de forma muito formal e técnica com o cliente."],
-    "deveReusarId": [101]
+    "deveReusarId": [101],
+    "deveConter": ["49,90"]
+  },
+  {
+    "nome": "perfil com poucos vídeos e uma visualização que o Instagram não deu (sem mediana, nenhum 'rendeu')",
+    "tipo": "negocio",
+    "nomeDaMarca": "Estúdio Exemplo de Unhas",
+    "resumoDoBriefing": "Nail designer que atende em casa, por hora marcada.",
+    "site": null,
+    "redes": [
+      {
+        "rede": "instagram",
+        "handle": "estudio.exemplo.unhas",
+        "videos": [
+          { "titulo": "Passo a passo: unha em gel em casa", "views": 1200 },
+          { "titulo": "Antes e depois: reparo de unha quebrada", "views": null },
+          { "titulo": "Dica: como fazer a cutícula sem machucar", "views": 800 }
+        ]
+      }
+    ]
   }
 ]
