@@ -248,6 +248,89 @@ export const textosBriefing = {
     semConexaoDesligar: "Sem conexão. Não deu para desligar esta regra; tente de novo quando a rede voltar.",
     semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
   },
+  /**
+   * E38 PR 2, "o que entendemos da sua marca" (desenho aprovado do Opus, `Briefing.dc.html`, estado
+   * `contextoDaMarca`): o que a IA leu do site e das redes da pessoa, separado do que ela respondeu,
+   * para ela confirmar, corrigir ou tirar. Os textos do desenho (título, abertura, "novidade deste
+   * mês", "Está certo", "Corrigir", "Confirmado", "Salvar", "Cancelar") são os dele; o resto (os
+   * estados vazio, lendo e "não deu", "Tirar", os erros) é montado com o que existe e fica
+   * registrado para o Opus desenhar depois (regra 11).
+   */
+  contextoDaMarca: {
+    titulo: "O que a IA tirou das suas redes e do seu site",
+    abertura:
+      "Isto não é o que você respondeu: é o que a gente leu. Confirme o que está certo e corrija o que não está; o que você confirma entra em todo roteiro.",
+    /** "Lido em 1 de setembro, no Instagram e no site. A próxima leitura é em 1 de outubro." Só as fontes lidas de verdade. */
+    lidoEm: (lidoEm: Date, fontes: ("site" | "instagram" | "youtube")[], proximaEm: Date | null): string => {
+      const nomes = fontes
+        .slice()
+        .sort((a, b) => (a === "site" ? 1 : 0) - (b === "site" ? 1 : 0))
+        .map((fonte) => (fonte === "site" ? "no site" : fonte === "instagram" ? "no Instagram" : "no YouTube"));
+      const lista = nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+      const proxima = proximaEm ? ` A próxima leitura é em ${formatarDiaMesPorExtenso(proximaEm)}.` : "";
+      return `Lido em ${formatarDiaMesPorExtenso(lidoEm)}, ${lista}.${proxima}`;
+    },
+    tiktokGuardado: "O TikTok ainda não é lido por aqui; o seu @ fica guardado.",
+    semFonte:
+      "Para a gente ler, guarde em Conta o site da sua marca ou o seu Instagram ou YouTube. Depois, o que a gente entendeu aparece aqui, para você confirmar.",
+    irParaConta: "Ir para Conta",
+    lendo: "Estamos lendo o que a sua marca mostra no site e nas redes. Volte em alguns minutos que o que a gente entendeu aparece aqui.",
+    naoLeu: "Ainda não conseguimos ler. A gente tenta de novo sozinha, e você pode conferir o endereço em Conta.",
+    nadaClaro:
+      "A gente leu, mas não achou nada claro o bastante para dizer sobre a sua marca. No mês que vem a gente lê de novo.",
+    origem: { site: "Do seu site", instagram: "Do seu Instagram", youtube: "Do seu YouTube" },
+    novidade: "novidade deste mês",
+    novidadeAlemDoBriefing: "algo que você não tinha contado",
+    confirmado: "Confirmado",
+    corrigido: "Corrigido por você",
+    estaCerto: "Está certo",
+    corrigir: "Corrigir",
+    salvar: "Salvar",
+    cancelar: "Cancelar",
+    tirar: "Tirar",
+    desfazer: "Desfazer",
+    tirado: "Tirado. Não entra nos seus roteiros.",
+    campoCorrigir: "Corrigir o que a IA entendeu",
+    campoCorrigirAjuda: "Escreva do seu jeito, em uma ou duas frases.",
+    textoObrigatorio: "Escreva o que está certo, ou toque em Cancelar.",
+    erroConfirmar: "Não conseguimos confirmar agora. Tente de novo em instantes.",
+    erroCorrigir: "Não conseguimos guardar a correção agora. O que você escreveu continua aí; tente de novo em instantes.",
+    erroTirar: "Não conseguimos tirar agora. Tente de novo em instantes.",
+    erroDesfazer: "Não conseguimos desfazer agora. Tente de novo em instantes.",
+    semConexaoConfirmar: "Sem conexão. Não deu para confirmar; tente de novo quando a rede voltar.",
+    semConexaoCorrigir: "Sem conexão. Não deu para guardar; o que você escreveu continua aí, tente de novo quando a rede voltar.",
+    semConexaoTirar: "Sem conexão. Não deu para tirar; tente de novo quando a rede voltar.",
+    semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
+    /** Por que uma fonte não foi lida, na voz de quem fala com a pessoa (a fonte vai no começo da frase). */
+    naoLida: {
+      site: {
+        endereco_invalido: "Site: o endereço não parece certo. Confira em Conta.",
+        endereco_privado: "Site: o endereço não parece certo. Confira em Conta.",
+        redirecionamento_invalido: "Site: o endereço não parece certo. Confira em Conta.",
+        rede_social: "Site: o endereço é de uma rede social. Aqui vale o site da marca; o perfil a gente lê pelo Instagram ou pelo YouTube.",
+        robots_proibe: "Site: ele pede para não ser lido por programas, e a gente respeita.",
+        robots_indisponivel: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        erro_do_site: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        tempo_esgotado: "Site: demorou demais para responder. A gente tenta de novo em alguns dias.",
+        sem_resposta: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        bloqueado_pelo_site: "Site: não deixou a gente ler.",
+        nao_encontrado: "Site: não achamos a página. Confira o endereço em Conta.",
+        grande_demais: "Site: não conseguimos tirar o texto dele.",
+        nao_e_html: "Site: não conseguimos tirar o texto dele.",
+        sem_texto:
+          "Site: pelo que conseguimos ler, o texto dele só aparece no navegador. As suas redes e o que você respondeu já ajudam.",
+      } as Record<string, string>,
+      rede: {
+        nao_encontrado: "{rede}: não achamos este perfil. Confira o @ em Conta.",
+        sem_videos: "{rede}: ainda não tem vídeo publicado para a gente ler.",
+        conta_restrita: "{rede}: o Instagram só deixa a gente ler conta profissional e sem restrição de idade.",
+        desligada: "{rede}: a leitura está desligada por aqui por enquanto.",
+        indisponivel: "{rede}: não deu para ler agora. A gente tenta de novo em alguns dias.",
+      } as Record<string, string>,
+      padraoSite: "Site: não deu para ler.",
+      padraoRede: "{rede}: não deu para ler.",
+    },
+  },
   /** E38, partes 2 e 3: a leitura de cada perfil citado ou da própria marca, conferido na API de verdade. */
   contextoMarca: {
     titulo: "O que a IA viu nos perfis",

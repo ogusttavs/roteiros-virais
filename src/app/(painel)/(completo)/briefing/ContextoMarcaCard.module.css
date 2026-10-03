@@ -1,0 +1,133 @@
+/**
+ * "O que a IA tirou das suas redes e do seu site" (E38 PR 2). Do desenho aprovado do Opus
+ * (`Briefing.dc.html`, `.contexto-marca`, `.itens-contexto`, `.de-onde-veio`, `.marca-novidade`,
+ * `.confirmado`), traduzido para os tokens do código (`checar-tokens`: nada de cor ou valor solto).
+ */
+.cartao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}
+
+.subtitulo {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.lidoEm {
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.vazio {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.corpoEstado {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-acao);
+}
+
+.itens {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4) 0;
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.deOndeVeio {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  line-height: 1.3;
+  color: var(--cor-texto-dica);
+}
+
+.oQue {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+}
+
+.oQueTirado {
+  text-decoration: line-through;
+  color: var(--cor-texto-dica);
+}
+
+.acoesItem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.marcaNovidade {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  font-size: var(--tamanho-rodape);
+  line-height: 1.2;
+}
+
+.confirmado {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-positivo);
+}
+
+.tiradoAviso {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.fontesNaoLidas {
+  display: grid;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}

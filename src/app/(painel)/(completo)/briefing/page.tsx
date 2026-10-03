@@ -5,6 +5,7 @@ import { sessaoAtual } from "@/lib/sessao";
 import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { secaoDoCliente } from "@/servicos/contexto-marca";
 import { leiturasDoCliente } from "@/servicos/perfis-analisados";
 
 import { BriefingVivo } from "./BriefingVivo";
@@ -20,9 +21,12 @@ export default async function Briefing() {
     redirect("/entrar");
   }
 
-  const briefing = await garantirBriefing(cliente.id);
-  const regras = await regrasDoCliente(cliente.id);
-  const perfisAnalisados = await leiturasDoCliente(cliente.id);
+  const [briefing, regras, perfisAnalisados, contextoMarca] = await Promise.all([
+    garantirBriefing(cliente.id),
+    regrasDoCliente(cliente.id),
+    leiturasDoCliente(cliente.id),
+    secaoDoCliente(cliente),
+  ]);
 
   return (
     <BriefingVivo
@@ -32,6 +36,7 @@ export default async function Briefing() {
       perfil={briefing.perfil}
       regrasIniciais={regras}
       perfisAnalisados={perfisAnalisados}
+      contextoMarca={contextoMarca}
       meta={config.regras.notaMinimaBriefing}
       tipo={cliente.tipo}
     />
