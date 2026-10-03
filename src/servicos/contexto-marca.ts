@@ -175,7 +175,8 @@ export async function secaoDoCliente(
     fontes,
     tiktokGuardado: Boolean(cliente.perfis?.tiktok?.trim()),
     ultimaLeituraOkEm,
-    proximaLeituraEm: proximaLeitura,
+    // Sem nenhuma fonte na Conta nenhuma leitura vai acontecer: não se anuncia "a próxima leitura é em ...".
+    proximaLeituraEm: estado === "sem_fonte" ? null : proximaLeitura,
   };
 }
 

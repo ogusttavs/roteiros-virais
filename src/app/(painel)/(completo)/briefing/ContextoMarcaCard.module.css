@@ -167,6 +167,11 @@
   gap: var(--espaco-3);
 }
 
+/* A frase de ajuda e a lista dos tirados não podem colar uma na outra. */
+.tirados .itens {
+  margin-top: var(--espaco-4);
+}
+
 .tiradosResumo {
   /* list-item (e não flex): é o que mantém o triângulo de abrir e fechar do <summary>. O alvo de toque vem da altura da linha. */
   display: list-item;

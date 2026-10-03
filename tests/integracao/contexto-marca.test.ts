@@ -384,6 +384,8 @@ describe("secaoDoCliente: o que a tela mostra", () => {
     const semNada = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
     const secao = await secaoDoCliente(semNada, AGORA);
     expect(secao.estado).toBe("sem_fonte");
+    // Nenhuma leitura vai acontecer: a tela não anuncia a próxima.
+    expect(secao.proximaLeituraEm).toBeNull();
     expect(secao.itens.map((i) => i.id)).toEqual([doSiteConfirmado]);
     expect(await contextoConfirmadoDoCliente(clienteId)).toEqual([{ categoria: "fala", texto: "Fala simples." }]);
   });

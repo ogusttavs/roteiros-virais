@@ -14,7 +14,7 @@ import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
 import { chromium, type Locator, type Page } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db, getPool } from "../src/db";
 import { clientes, contextoMarca, contextoMarcaItens, perfisAnalisados } from "../src/db/schema";
@@ -24,6 +24,14 @@ const SENHA_SEED = "ExemploSenha123";
 const USUARIO_SEED = "seed-cliente-limpeza";
 const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
 const SECAO = "O que a IA tirou das suas redes e do seu site";
+
+/** Meio-dia UTC de N dias atrás: a leitura é sempre de 10 dias atrás, e a próxima, 20 dias adiante (a tela nunca anuncia data passada). */
+function haDias(n: number): Date {
+  const data = new Date();
+  data.setUTCHours(12, 0, 0, 0);
+  return new Date(data.getTime() - n * 86_400_000);
+}
+const LEITURA_EM = haDias(10);
 
 const TAMANHOS = [
   { rotulo: "390", largura: 390, altura: 844 },
@@ -45,14 +53,19 @@ async function limparTudo(clienteId: number): Promise<void> {
   await db().delete(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId));
   await db().delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
   await db().delete(perfisAnalisados).where(eq(perfisAnalisados.clienteId, clienteId));
+  // Toda captura começa com as fontes de sempre (alguns estados as tiram da Conta).
+  await db()
+    .update(clientes)
+    .set({ site: "https://loja-exemplo.test", perfis: { instagram: "loja.exemplo.limpeza", tiktok: "perfil.tiktok", youtube: null } })
+    .where(eq(clientes.id, clienteId));
 }
 
 async function semearLeitura(clienteId: number): Promise<void> {
   await limparTudo(clienteId);
   await db().insert(contextoMarca).values({
     clienteId,
-    ultimaLeituraOkEm: new Date("2026-09-20T12:00:00Z"),
-    ultimaTentativaEm: new Date("2026-09-20T12:00:00Z"),
+    ultimaLeituraOkEm: LEITURA_EM,
+    ultimaTentativaEm: LEITURA_EM,
     fontes: [
       { tipo: "site", lida: true, quantidade: 3 },
       { tipo: "instagram", lida: true, quantidade: 8 },
@@ -68,7 +81,13 @@ async function semearLeitura(clienteId: number): Promise<void> {
 
 async function abrirSecao(page: Page): Promise<Locator> {
   const secao = page.getByRole("region", { name: SECAO });
-  await secao.waitFor({ state: "visible" });
+  try {
+    await secao.waitFor({ state: "visible" });
+  } catch (erro) {
+    // Quase sempre é o login que não valeu (limite de taxa, senha do seed) ou a página que não carregou: diz onde a captura parou.
+    const texto = (await page.locator("body").innerText().catch(() => "")).slice(0, 300).replace(/\s+/g, " ");
+    throw new Error(`a secao nao apareceu em ${page.url()}: "${texto}"`, { cause: erro });
+  }
   return secao;
 }
 
@@ -92,8 +111,54 @@ const ESTADOS: Estado[] = [
       const item = secao.getByRole("listitem").filter({ hasText: "bico de spray" });
       await item.getByRole("button", { name: "Tirar" }).click();
       await item.getByText("Tirado. Não entra nos seus roteiros.").waitFor({ state: "visible" });
+      // A ação terminou quando o Desfazer deixa de estar apagado: só então a linha está assentada.
+      await item.getByRole("button", { name: /^Desfazer/ }).waitFor({ state: "visible" });
+      await page.waitForFunction(() => !document.querySelector('button[disabled][aria-label^="Desfazer"]'));
       return secao;
     },
+  },
+  {
+    nome: "MudouComOQueValia",
+    preparar: async (clienteId) => {
+      await semearLeitura(clienteId);
+      await db()
+        .update(contextoMarcaItens)
+        .set({ texto: "Agora também vende amaciante para tecido delicado.", textoConfirmado: "Vende só removedor de manchas de 500 ml.", estado: "para_confirmar", novidade: "mudou" })
+        .where(and(eq(contextoMarcaItens.clienteId, clienteId), eq(contextoMarcaItens.categoria, "vende")));
+    },
+    fotografar: abrirSecao,
+  },
+  {
+    nome: "ListaDosTirados",
+    preparar: async (clienteId) => {
+      await semearLeitura(clienteId);
+      await db()
+        .update(contextoMarcaItens)
+        .set({ estado: "recusado", estadoAnterior: "para_confirmar" })
+        .where(eq(contextoMarcaItens.texto, "O teste no canto escondido do estofado rendeu quase seis vezes mais que os outros vídeos."));
+    },
+    fotografar: async (page) => {
+      const secao = await abrirSecao(page);
+      await secao.getByText("1 item que você tirou").click();
+      await secao.getByText("O que você tira não volta sozinho.").waitFor({ state: "visible" });
+      return secao;
+    },
+  },
+  {
+    nome: "NaoSobrouNada",
+    preparar: async (clienteId) => {
+      await semearLeitura(clienteId);
+      await db().update(contextoMarcaItens).set({ estado: "recusado", estadoAnterior: "para_confirmar" }).where(eq(contextoMarcaItens.clienteId, clienteId));
+    },
+    fotografar: abrirSecao,
+  },
+  {
+    nome: "SemFonteComConfirmado",
+    preparar: async (clienteId) => {
+      await semearLeitura(clienteId);
+      await db().update(clientes).set({ site: null, perfis: { instagram: null, tiktok: null, youtube: null } }).where(eq(clientes.id, clienteId));
+    },
+    fotografar: abrirSecao,
   },
   {
     nome: "Lendo",
@@ -108,7 +173,7 @@ const ESTADOS: Estado[] = [
       await limparTudo(clienteId);
       await db().insert(contextoMarca).values({
         clienteId,
-        ultimaTentativaEm: new Date("2026-09-20T12:00:00Z"),
+        ultimaTentativaEm: LEITURA_EM,
         fontes: [
           { tipo: "site", lida: false, motivo: "bloqueado_pelo_site" },
           { tipo: "instagram", lida: false, motivo: "conta_restrita" },
@@ -123,8 +188,8 @@ const ESTADOS: Estado[] = [
       await limparTudo(clienteId);
       await db().insert(contextoMarca).values({
         clienteId,
-        ultimaLeituraOkEm: new Date("2026-09-20T12:00:00Z"),
-        ultimaTentativaEm: new Date("2026-09-20T12:00:00Z"),
+        ultimaLeituraOkEm: LEITURA_EM,
+        ultimaTentativaEm: LEITURA_EM,
         fontes: [
           { tipo: "site", lida: true, quantidade: 1 },
           { tipo: "instagram", lida: false, motivo: "sem_videos" },
@@ -229,6 +294,14 @@ async function main(): Promise<void> {
         const arquivoConta = path.join(pastaDestino, `Conta.Site.${tamanho.rotulo}.${modo.rotulo}.png`);
         await fotografarElemento(page, page.locator("form").first(), arquivoConta);
         gravados.push(arquivoConta);
+
+        // O endereço que não parece site: o erro mora no próprio campo, e o foco vai para lá (nada é salvo).
+        await campo.fill("isso nao e um site");
+        await page.getByRole("button", { name: "salvar", exact: true }).click();
+        await page.getByText("Esse endereço não parece um site válido").waitFor({ state: "visible" });
+        const arquivoContaInvalido = path.join(pastaDestino, `Conta.SiteInvalido.${tamanho.rotulo}.${modo.rotulo}.png`);
+        await fotografarElemento(page, page.locator("form").first(), arquivoContaInvalido);
+        gravados.push(arquivoContaInvalido);
 
         await contexto.close();
       }
