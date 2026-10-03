@@ -14,7 +14,7 @@ import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
 import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
-import { InformacoesDoAparelho } from "./InformacoesDoAparelho";
+import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
@@ -88,7 +88,7 @@ export default async function Conta() {
       <div className={styles.colunaPrincipal}>
         <InstalarNoCelular />
         <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} />
-        <InformacoesDoAparelho versaoPainel={config.gitSha} />
+        <InformacoesDoAparelhoAdmin ehAdmin={sessao.user.role === "admin"} versaoPainel={config.gitSha} />
         <BotaoSair />
       </div>
     </div>

@@ -26,8 +26,32 @@ import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario
 
 const SENHA = "ExemploSenha123";
 const EMAIL_CLIENTE = "e2e-tema-preferencia@exemplo.teste";
+const EMAIL_ADMIN_COM_MARCA = "e2e-tema-admin@exemplo.teste";
+
+/** A2, item 9: um admin que também tem marca (o Gustavo), para ver a Conta com a folha "Informações do aparelho". */
+async function criarAdminComMarca() {
+  const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-tema-admin"));
+  if (jaExiste) return;
+  const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
+  await db().insert(user).values({ id: "e2e-tema-admin", name: "[teste] Admin com marca", email: EMAIL_ADMIN_COM_MARCA, role: "admin" });
+  await db()
+    .insert(account)
+    .values({
+      id: "e2e-tema-admin-credential",
+      issuer: "local:credential",
+      accountId: "e2e-tema-admin",
+      providerId: "credential",
+      userId: "e2e-tema-admin",
+      password: await hashPassword(SENHA),
+    });
+  const [cliente] = await db().insert(clientes).values({ usuarioId: "e2e-tema-admin", nome: "[teste] Admin com marca", nichoId: nicho.id }).returning();
+  await db().insert(membrosMarca).values({ usuarioId: "e2e-tema-admin", clienteId: cliente.id, papel: "dono" });
+  await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-tema-admin", aceitouTermosEm: new Date() });
+  await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
+}
 
 test.beforeAll(async () => {
+  await criarAdminComMarca();
   // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
   const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-tema-preferencia"));
   if (jaExiste) return;
@@ -89,24 +113,37 @@ test("escolhe escuro, salva, recarrega com data-tema escuro; volta para do siste
   await expect(page.locator("html")).not.toHaveAttribute("data-tema");
 });
 
-/** H3, item 4: a folha "Informações do aparelho", só leitura, sem dado de cliente. */
-test("Informações do aparelho: abre a folha, mostra a largura da janela e o navegador, e o botão Copiar funciona", async ({
+/** H3, item 4 (A2, item 9: só para admin): a folha "Informações do aparelho", só leitura, sem dado de cliente. */
+test("Informações do aparelho: o cliente comum não vê; o admin abre a folha, vê a largura da janela e o navegador, e o botão Copiar funciona", async ({
   page,
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
+  // O cliente comum não vê nem o botão (e a frase não cita nome de agente).
   await page.goto("/entrar");
   await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_CLIENTE);
   await page.getByLabel("senha", { exact: true }).fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await expect(page).toHaveURL(/\/hoje/);
+  await page.goto("/conta");
+  await expect(page.getByRole("heading", { name: "Conta" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Informações do aparelho" })).toHaveCount(0);
+  await expect(page.getByText("Só para o Fable")).toHaveCount(0);
 
+  // O admin (com marca) vê.
+  await page.getByRole("button", { name: /sair/i }).first().click();
+  await expect(page).toHaveURL(/\/entrar/);
+  await page.getByLabel("e-mail", { exact: true }).fill(EMAIL_ADMIN_COM_MARCA);
+  await page.getByLabel("senha", { exact: true }).fill(SENHA);
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
+  await page.waitForURL(/\/(hoje|admin)/);
   await page.goto("/conta");
   await page.getByRole("button", { name: "Informações do aparelho" }).click();
 
   const folha = page.getByRole("dialog", { name: "Informações do aparelho" });
   await expect(folha).toBeVisible();
+  await expect(folha.getByText("para a gente entender o que apareceu torto", { exact: false })).toBeVisible();
   await expect(folha.getByText("largura da janela")).toBeVisible();
   await expect(folha.getByText("navegador", { exact: true })).toBeVisible();
   await expect(folha.getByText(/^\d+px$/).first()).toBeVisible();
