@@ -30,6 +30,8 @@ export const textosNav = {
   abrirMenu: "abrir o menu",
   /** V3, item 3: o seletor de marca na casca (Casca.dc.html). */
   atualizar: "Atualizar",
+  /** Passo 16, capítulo 5: se a atualização não trouxe nada novo, o botão diz isto por 2 segundos e volta a "Atualizar". */
+  jaEstavaEmDia: "Já estava em dia",
   suasMarcas: "Suas marcas",
   trocarPara: "Trocar para",
   estaMarcaAgora: "É desta marca o que aparece no painel agora.",

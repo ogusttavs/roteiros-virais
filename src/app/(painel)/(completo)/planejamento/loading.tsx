@@ -3,6 +3,7 @@ import { somarDiasISO } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlanejamento } from "@/textos/planejamento";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { FraseDemora } from "@/ui/componentes/FraseDemora";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 
 import hojeStyles from "../hoje/HojeTela.module.css";
@@ -67,6 +68,7 @@ export default function CarregandoPlanejamento() {
           ))}
         </div>
       </div>
+      <FraseDemora />
     </div>
   );
 }

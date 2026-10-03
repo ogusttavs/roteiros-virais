@@ -10,10 +10,17 @@
   font-family: var(--fonte-texto);
   font-weight: var(--peso-semibold);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* Passo 16, capítulo 6: o dedo encostou, aperta em 90 ms; saiu, volta na mola em 220 ms. */
   transition:
-    background var(--duracao-rapida) var(--curva-saida),
-    color var(--duracao-rapida) var(--curva-saida),
-    transform var(--duracao-rapida) var(--curva-saida);
+    background var(--duracao-rapida) var(--curva-padrao),
+    color var(--duracao-rapida) var(--curva-padrao),
+    transform var(--duracao-soltar) var(--curva-mola);
+}
+
+.botao:not(:disabled):active {
+  transform: scale(var(--escala-toque));
+  transition-duration: var(--duracao-toque);
 }
 
 .botao:disabled {
@@ -44,7 +51,6 @@
 
 .primario:not(:disabled):active {
   background: var(--cor-acao-pressionada);
-  transform: scale(0.98);
 }
 
 .secundario {

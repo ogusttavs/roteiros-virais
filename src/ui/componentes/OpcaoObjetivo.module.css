@@ -15,7 +15,15 @@
   cursor: pointer;
   transition:
     border-color var(--duracao-rapida) var(--curva-saida),
-    background var(--duracao-rapida) var(--curva-saida);
+    background var(--duracao-rapida) var(--curva-saida),
+    transform var(--duracao-soltar) var(--curva-mola);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Opção grande: aperta menos (passo 16, capítulo 6). */
+.opcao:active {
+  transform: scale(var(--escala-toque-grande));
+  transition-duration: var(--duracao-toque);
 }
 
 .opcao:hover {

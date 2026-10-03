@@ -1,3 +1,4 @@
+import { FraseDemora } from "@/ui/componentes/FraseDemora";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 
 import styles from "./HistoricoTela.module.css";
@@ -14,6 +15,7 @@ export default function CarregandoHistorico() {
       </div>
       <Skeleton variante="corpo" largura="90%" />
       <Skeleton variante="corpo" largura="90%" />
+      <FraseDemora />
     </div>
   );
 }

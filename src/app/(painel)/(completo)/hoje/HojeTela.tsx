@@ -663,7 +663,7 @@ export function HojeTela({
                             <li key={item.id} className={styles.linhaComMenu}>
                               <button
                                 type="button"
-                                className={styles.itemAgenda}
+                                className={`${styles.itemAgenda} cartao-toque`}
                                 aria-busy={acao === `item-${item.id}` || undefined}
                                 onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                               >
@@ -693,7 +693,7 @@ export function HojeTela({
                         <li key={item.id} className={styles.linhaComMenu}>
                           <button
                             type="button"
-                            className={styles.itemAgenda}
+                            className={`${styles.itemAgenda} cartao-toque`}
                             aria-busy={acao === `item-${item.id}` || undefined}
                             onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                           >

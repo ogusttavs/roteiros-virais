@@ -1,3 +1,4 @@
+import { FraseDemora } from "@/ui/componentes/FraseDemora";
 import { Skeleton } from "@/ui/componentes/Skeleton";
 
 import styles from "./ReferenciasTela.module.css";
@@ -14,6 +15,7 @@ export default function CarregandoReferencias() {
         <Skeleton variante="video" />
         <Skeleton variante="video" />
       </div>
+      <FraseDemora />
     </div>
   );
 }

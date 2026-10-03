@@ -54,7 +54,8 @@
 
 /** Atualizando (V7, item 4 do PROXIMO.md): o icone gira ate a tela nova chegar; o botao fica desabilitado, sem toque duplo. */
 .girando {
-  animation: girar 0.9s linear infinite;
+  /* Uma volta em 800 ms, e para sempre no fim de uma volta (passo 16, capítulo 5). */
+  animation: girar 0.8s linear infinite;
 }
 
 @keyframes girar {

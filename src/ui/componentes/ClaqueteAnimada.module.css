@@ -6,7 +6,7 @@
 .braco {
   transform-box: view-box;
   transform-origin: 16px 42px;
-  animation: bater 1.6s var(--curva-saida) infinite;
+  animation: bater 1.2s var(--curva-saida) infinite;
 }
 
 @keyframes bater {

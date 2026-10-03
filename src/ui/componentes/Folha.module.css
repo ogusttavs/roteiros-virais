@@ -154,3 +154,91 @@
     width: min(60rem, calc(100vw - var(--espaco-12)));
   }
 }
+
+/*
+ * Passo 16 do Opus, capítulo 4 (`base.css`, "A folha"): sobe na mola (440 ms), o véu aparece junto (240 ms); desce com a curva de entrada (260 ms) e o véu clareia
+ * junto; do tablet para cima ela é um painel no meio da tela e cresce de 96% com um esmaecer, em vez de subir do pé; com "reduzir movimento" só esmaece.
+ * `--arrasto` é o deslocamento do dedo (`usePuxarParaFechar`); a entrada usa `backwards` para, depois dela, o transform voltar a ser o do arrasto, e a saída parte
+ * de onde o dedo largou. Nada anima `left` ou `right`.
+ */
+.folha {
+  transform: translateY(var(--arrasto, 0px));
+  animation: folha-sobe var(--duracao-folha) var(--curva-mola) backwards;
+}
+.folhaFundo {
+  animation: veu-aparece var(--duracao-lista) var(--curva-padrao) backwards;
+}
+.folha.saindo {
+  pointer-events: none;
+  animation: folha-desce var(--duracao-folha-sai) var(--curva-entrada) both;
+}
+.folhaFundo.saindo {
+  pointer-events: none;
+  animation: veu-some var(--duracao-folha-sai) var(--curva-entrada) both;
+}
+@keyframes folha-sobe {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes folha-desce {
+  from {
+    transform: translateY(var(--arrasto, 0px));
+  }
+  to {
+    transform: translateY(110%);
+  }
+}
+@keyframes veu-aparece {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes veu-some {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes folha-aparece {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes folha-some {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (min-width: 768px) {
+  .folha {
+    transform: none;
+    animation-name: folha-aparece;
+    animation-timing-function: var(--curva-padrao);
+    animation-duration: var(--duracao-troca);
+  }
+  .folha.saindo {
+    animation-name: folha-some;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .folha {
+    animation-name: veu-aparece;
+  }
+  .folha.saindo {
+    animation-name: veu-some;
+  }
+}
+
+/* O botão fechar também aperta (capítulo 6) e volta na mola. */
+.folhaFechar {
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--duracao-soltar) var(--curva-mola),
+    background-color var(--duracao-rapida) var(--curva-padrao);
+}
+.folhaFechar:active {
+  transform: scale(var(--escala-toque));
+  transition-duration: var(--duracao-toque);
+}

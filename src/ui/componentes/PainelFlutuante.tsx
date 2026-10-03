@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { useFolhaAnimada } from "@/ui/useFolhaAnimada";
 import { usePuxarParaFechar } from "@/ui/usePuxarParaFechar";
 
 import styles from "./PainelFlutuante.module.css";
@@ -65,6 +66,7 @@ type Props = {
 export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rodape, children }: Props) {
   const arrasto = usePuxarParaFechar(aoFechar);
   const painelRef = arrasto.folhaRef;
+  const { montada, saindo } = useFolhaAnimada(aberto);
 
   // O pai cria um `aoFechar` novo a cada renderização (cada tecla digitada num campo do painel renderiza o pai).
   // Se ele entrasse nas dependências do efeito abaixo, o foco voltava para o painel a cada tecla e o teclado do
@@ -96,11 +98,11 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rod
     };
   }, [aberto, role, painelRef]);
 
-  if (!aberto) return null;
+  if (!montada) return null;
 
   return (
     <>
-      <div className={styles.veu} onClick={aoFechar} aria-hidden="true" data-folha-aberta="" />
+      <div className={[styles.veu, saindo ? styles.saindo : ""].filter(Boolean).join(" ")} onClick={aoFechar} aria-hidden="true" data-folha-aberta="" data-veu="" />
       <div
         ref={painelRef}
         role={role}
@@ -108,7 +110,8 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rod
         aria-label={titulo}
         tabIndex={-1}
         data-folha-aberta=""
-        className={rodape ? styles.painelComRodape : styles.painel}
+        data-saindo={saindo ? "" : undefined}
+        className={[rodape ? styles.painelComRodape : styles.painel, saindo ? styles.saindo : ""].filter(Boolean).join(" ")}
       >
         {/* A alça desenhada tem 5px; quem agarra é esta área de 44px em volta dela (some do tablet para cima). */}
         <div className={styles.areaAlca} {...arrasto.alca}>
