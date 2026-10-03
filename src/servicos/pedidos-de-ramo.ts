@@ -63,6 +63,8 @@ export async function registrarPedidoDeRamo(clienteId: number, textoBruto: strin
       .orderBy(desc(pedidosDeRamo.resolvidoEm), desc(pedidosDeRamo.id))
       .limit(1);
     if (atendido && atendido.setorFinalId !== null && atendido.setorFinalId === marca.nichoId && normalizarBusca(atendido.texto) === normalizarBusca(texto)) {
+      // O formulário velho já gravou o texto em `ramo_outro` antes de chegar aqui: sem pedido aberto, ele não pode ficar.
+      await db().update(clientes).set({ ramoOutro: null }).where(eq(clientes.id, clienteId));
       return { pedido: atendido, setorProvisorioId: null, limite: false };
     }
   }
@@ -183,14 +185,18 @@ async function pedidoAbertoPorId(pedidoId: number): Promise<PedidoDeRamo> {
 }
 
 /** Leva a marca ao setor, fecha o pedido, e desliga o setor provisório (e o de antes) se ficou sem marca. */
-async function fecharPedidoComSetor(pedido: PedidoDeRamo, nichoId: number, resolucao: "encaixado" | "ramo_criado"): Promise<void> {
+/** Exportada para o teste da corrida (o pedido some entre a conferência e o fechamento); fora disso só este arquivo a chama. */
+export async function fecharPedidoComSetor(pedido: PedidoDeRamo, nichoId: number, resolucao: "encaixado" | "ramo_criado"): Promise<void> {
   const [marca] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, pedido.clienteId));
   await db().transaction(async (tx) => {
     await tx.update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, pedido.clienteId));
-    await tx
+    const [fechado] = await tx
       .update(pedidosDeRamo)
       .set({ estado: "atendido", resolucao, setorFinalId: nichoId, resolvidoEm: new Date() })
-      .where(and(eq(pedidosDeRamo.id, pedido.id), eq(pedidosDeRamo.estado, "aberto")));
+      .where(and(eq(pedidosDeRamo.id, pedido.id), eq(pedidosDeRamo.estado, "aberto")))
+      .returning({ id: pedidosDeRamo.id });
+    // Numa corrida com a pessoa escolhendo da lista (o pedido foi cancelado entre a conferência e aqui), a marca não é movida: desfaz tudo.
+    if (!fechado) throw new ErroNicho("esse pedido ja foi resolvido ou nao existe.");
   });
   for (const antigo of new Set([marca?.nichoId, pedido.setorProvisorioId])) {
     if (antigo && antigo !== nichoId) await desligarSetorSeSemMarca(antigo).catch(() => undefined);

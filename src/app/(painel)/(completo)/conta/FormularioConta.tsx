@@ -138,7 +138,11 @@ export function FormularioConta({
   /** O texto livre só vai ao servidor se a pessoa o escreveu de novo (ou o escreveu pela primeira vez): salvar sem mexer não refaz o palpite. */
   const outroMudou = modoOutro && ramoOutro.trim().length > 0 && normalizarBusca(ramoOutro) !== normalizarBusca(pedidoDeRamo?.texto ?? "");
   const avisoDoPedido = pedidoDeRamo
-    ? pedidoDeRamo.ramoProvisorio
+    ? pedidoDeRamo.limiteDeRamosNovos
+      ? ramoInicial
+        ? textosRamo.limiteNoRamoDeHoje(ramoInicial.nome)
+        : textosRamo.limiteSemTemas
+      : pedidoDeRamo.ramoProvisorio
       ? textosRamo.provisorio(pedidoDeRamo.ramoProvisorio)
       : ramoInicial
         ? textosRamo.aguardandoNoRamoDeHoje(ramoInicial.nome)

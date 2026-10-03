@@ -2,7 +2,7 @@
 
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
-import { clienteDaSessaoAtual, salvarDadosFixos } from "@/servicos/clientes";
+import { clienteDaSessaoAtual, salvarDadosFixosComPedido } from "@/servicos/clientes";
 import { ErroLimiteDeSetores } from "@/servicos/ramos";
 import { textosRamo } from "@/textos/ramo";
 
@@ -16,13 +16,13 @@ import { textosRamo } from "@/textos/ramo";
 /**
  * E45 PR 2: o teto de setores novos por dia vira a frase na tela (`ResultadoAcao`), não um erro lançado: em produção o Next esconde a
  * mensagem de uma exceção, e a pessoa veria o "confira os campos" genérico com o formulário certo. Qualquer outro erro continua sendo lançado.
- * Nada do `Cliente` volta ao navegador (ninguém usava).
+ * Nada do `Cliente` volta ao navegador; volta só se o teto segurou o palpite do ramo provisório (o pedido vai aberto e a tela não promete o ramo).
  */
-export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<ResultadoAcao<null>> {
+export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<ResultadoAcao<{ limiteDeRamosNovos: boolean }>> {
   const cliente = await clienteDaSessaoAtual();
   try {
-    await salvarDadosFixos(cliente.id, dadosBrutos);
-    return { ok: true, dado: null };
+    const { limiteDeRamosNovos } = await salvarDadosFixosComPedido(cliente.id, dadosBrutos);
+    return { ok: true, dado: { limiteDeRamosNovos } };
   } catch (erro) {
     if (erro instanceof ErroLimiteDeSetores) return { ok: false, erro: textosRamo.limiteDeRamosNovos };
     throw erro;

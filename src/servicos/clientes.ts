@@ -631,6 +631,14 @@ export function clienteTemOndeEscolhido(cliente: Pick<Cliente, "alcance">): bool
 }
 
 export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown): Promise<Cliente> {
+  return (await salvarDadosFixosComPedido(clienteId, dadosBrutos)).cliente;
+}
+
+/**
+ * `salvarDadosFixos` com o que o pedido de ramo decidiu: `limiteDeRamosNovos` é verdadeiro quando o teto de setores novos do dia segurou o
+ * palpite (o pedido vai aberto, e a marca fica onde estava: sem setor, se não tinha). A tela diz isso em vez de prometer o ramo provisório.
+ */
+export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: unknown): Promise<{ cliente: Cliente; limiteDeRamosNovos: boolean }> {
   const dados = dadosFixosSchema.parse(dadosBrutos);
 
   const perfis: PerfisCliente = {
@@ -682,10 +690,11 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   // E45, PR 2: escolheu da lista, o pedido de ramo que estivesse aberto deixa de valer; escreveu com as palavras dela, o pedido abre (ou se
   // atualiza) e a marca entra no ramo provisório. O teto de setores novos do dia nunca derruba esta gravação: o pedido vai aberto do mesmo jeito.
   let clienteFinal = cliente;
+  let limiteDeRamosNovos = false;
   if (escolheuDaLista) {
     await cancelarPedidoAberto(clienteId);
   } else {
-    await registrarPedidoDeRamo(clienteId, dados.ramoOutro ?? "");
+    limiteDeRamosNovos = (await registrarPedidoDeRamo(clienteId, dados.ramoOutro ?? "")).limite;
     const [fresco] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
     clienteFinal = fresco ?? cliente;
   }
@@ -704,7 +713,7 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   if (perfisMudaram(antes?.perfis ?? null, perfis)) {
     void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
   }
-  return clienteFinal;
+  return { cliente: clienteFinal, limiteDeRamosNovos };
 }
 
 /** O Instagram ou o YouTube mudou (são os dois que se analisam; o TikTok não). Comparação sem "@" e sem diferença de maiúscula. */

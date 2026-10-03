@@ -2,7 +2,7 @@
 
 import { CircleCheck, Clock, Mic, Pencil } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "@/app/(painel)/_briefing/PerguntaCampo";
@@ -14,6 +14,7 @@ import { config } from "@/lib/config";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
+import { textosRamo } from "@/textos/ramo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Botao } from "@/ui/componentes/Botao";
@@ -163,11 +164,20 @@ export function ComecarWizard({
     }
   }
 
+  // O teto de setores novos do dia segurou o palpite do ramo provisório: o pedido foi gravado, mas a marca não entrou em ramo nenhum. A frase
+  // aparece uma vez, no formulário, e o "Continuar" seguinte avança (o que ficou gravado vale; tentar de novo devolveria a mesma frase).
+  const limiteAvisado = useRef(false);
+
   async function aoSalvarDadosFixos(dados: unknown): Promise<ResultadoAcao<null>> {
     const resultado = await salvarDadosFixosAction(dados);
     // Só avança de passo se salvou; a frase de um erro esperado (o teto de ramos novos do dia) fica no formulário.
-    if (resultado.ok) setEtapa("blocos");
-    return resultado;
+    if (!resultado.ok) return resultado;
+    if (resultado.dado.limiteDeRamosNovos && !limiteAvisado.current) {
+      limiteAvisado.current = true;
+      return { ok: false, erro: textosRamo.limiteSemTemas };
+    }
+    setEtapa("blocos");
+    return { ok: true, dado: null };
   }
 
   if (etapa === "intro") {

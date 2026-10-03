@@ -23,6 +23,12 @@ export const textosRamo = {
   limiteDeRamosNovos: "Muitos ramos novos hoje; tente de novo amanhã.",
   /** O que a marca vê, no Começar e na Conta, enquanto o pedido do ramo dela espera a conferência e ela já está num ramo provisório. */
   provisorio: (ramo: string) => `Você está em ${ramo} enquanto a gente confere o seu ramo.`,
+  /**
+   * O teto de setores novos do dia segurou o palpite do ramo provisório: o pedido está aberto, mas a marca não entrou em ramo nenhum
+   * (ou continua no que já tinha). Nunca se diz "você está em X" nesse caso.
+   */
+  limiteSemTemas: "Muitos ramos novos hoje; a gente confere o seu ramo e, até lá, você fica sem temas.",
+  limiteNoRamoDeHoje: (ramo: string) => `Muitos ramos novos hoje; a gente confere o seu ramo e, até lá, você continua em ${ramo}.`,
   /** Pedido aberto e nenhum ramo parecido: a marca ainda não tem temas. */
   aguardandoSemRamo: "A gente vai conferir o seu ramo. Até lá, os temas e as referências do seu ramo ainda não aparecem.",
   /** Pedido aberto, nenhum ramo parecido, mas a marca já estava num ramo: continua nele. */
