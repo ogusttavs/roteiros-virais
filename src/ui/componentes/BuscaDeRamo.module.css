@@ -15,8 +15,9 @@
   pointer-events: none;
 }
 
-/* O campo (`Campo.module.css`, `.entrada`) é de largura própria; aqui ocupa a linha e deixa lugar para a lupa. */
-.entrada {
+/* O campo (`Campo.module.css`, `.entrada`) é de largura própria; aqui ocupa a linha e deixa lugar para a lupa. `.caixa .entrada` (duas classes) para ganhar do
+   `padding` do Campo em qualquer ordem em que o navegador carregue os dois arquivos (no servidor de desenvolvimento a ordem muda de uma página para outra, e na Conta a lupa ficava por cima do texto). */
+.caixa .entrada {
   width: 100%;
   padding-left: calc(var(--espaco-3) + 18px + var(--espaco-2));
   /* Nome comprido ("Importação e desenvolvimento de produto") no celular: reticências com o campo parado, o texto inteiro ao focar. */

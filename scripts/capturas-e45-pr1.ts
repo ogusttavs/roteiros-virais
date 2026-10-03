@@ -20,8 +20,11 @@ import { clientes } from "../src/db/schema";
 import { marcasDoUsuario } from "../src/servicos/clientes";
 
 const SENHA_SEED = "ExemploSenha123";
+/** O Começar, com a marca que fica de propósito sem briefing completo. */
 const USUARIO_SEED = "seed-cliente-dentistas";
 const EMAIL_SEED = `${USUARIO_SEED}@exemplo.teste`;
+/** A Conta, com a marca que já aceitou os termos e completou o briefing (a dos dentistas ainda vê só o aceite dos termos ali). */
+const EMAIL_SEED_CONTA = "seed-cliente-limpeza@exemplo.teste";
 
 const TAMANHOS = [
   { rotulo: "390", largura: 390, altura: 844 },
@@ -62,9 +65,9 @@ async function fotografarJanela(page: Page, campo: Locator, arquivo: string): Pr
   await page.screenshot({ path: arquivo });
 }
 
-async function entrar(page: Page, baseUrl: string): Promise<void> {
+async function entrar(page: Page, baseUrl: string, email: string = EMAIL_SEED): Promise<void> {
   await page.goto(`${baseUrl}/entrar`);
-  await page.getByLabel("E-mail").fill(EMAIL_SEED);
+  await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha").fill(SENHA_SEED);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await page.waitForLoadState("networkidle");
@@ -141,11 +144,9 @@ async function main(): Promise<void> {
         await fotografarElemento(page, cartao, escolhido);
         gravados.push(escolhido);
 
-        // A Conta, com a marca como estava (o ramo dos dentistas do seed).
-        await db()
-          .update(clientes)
-          .set({ nichoId: original.nichoId, ramoOutro: original.ramoOutro, alcance: original.alcance ?? "brasil" })
-          .where(eq(clientes.id, cliente.id));
+        // A Conta, com outra marca do seed (a dos dentistas ainda não aceitou os termos): o ramo dela é o da limpeza.
+        await contexto.clearCookies();
+        await entrar(page, baseUrl, EMAIL_SEED_CONTA);
         await page.goto(`${baseUrl}/conta`);
         const campoDaConta = page.getByRole("combobox", { name: "ramo" });
         await campoDaConta.waitFor({ state: "visible" });
