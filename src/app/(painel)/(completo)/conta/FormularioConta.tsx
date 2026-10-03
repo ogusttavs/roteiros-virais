@@ -108,7 +108,13 @@ export function FormularioConta({
   const [site, setSite] = useState(siteInicial);
   /** O ramo do catálogo escolhido agora. Nulo: nada escolhido, ou o ramo de hoje não é do catálogo e a pessoa não escolheu outro. */
   const [ramo, setRamo] = useState<string | null>(ramoInicial?.slug ?? null);
-  const ramoMudou = ramo !== null && ramo !== (ramoInicial?.slug ?? null);
+  /**
+   * O ramo que está gravado: o da página ao abrir, e o que a pessoa acabou de salvar (a página não recarrega depois do "salvar"). Sem isto,
+   * trocar, salvar e voltar ao ramo de antes comparava com o de ANTES de salvar e não mandava nada: a tela dizia "salvo" com o ramo errado
+   * gravado (achado da revisão independente da E45 PR 1).
+   */
+  const [ramoSalvo, setRamoSalvo] = useState<string | null>(ramoInicial?.slug ?? null);
+  const ramoMudou = ramo !== null && ramo !== ramoSalvo;
   const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
   const [regiao, setRegiao] = useState(regiaoInicial ?? "");
   const [pais, setPais] = useState(paisInicial ?? "");
@@ -172,6 +178,7 @@ export function FormularioConta({
       });
       avisarRedeOk();
       if (siteMudou) setSite(siteNormalizado);
+      if (ramoMudou) setRamoSalvo(ramo);
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
       setToastAberto(true);

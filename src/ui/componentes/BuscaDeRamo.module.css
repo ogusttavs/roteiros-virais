@@ -41,6 +41,12 @@
   box-shadow: var(--sombra-md);
 }
 
+/* O listbox de dentro (só as opções e os grupos de opções); a caixa, a rolagem e o aviso de "sem resultado" ficam na `.lista`. */
+.opcoes {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
 .grupoDeRamos {
   display: grid;
   gap: 2px;
@@ -70,8 +76,10 @@
   cursor: pointer;
 }
 
+/* Fundo de seleção mais a barra à esquerda: só o fundo de hover quase não se distingue do fundo da lista no tema claro (achado da revisão). */
 .opcaoAtiva {
-  background: var(--cor-superficie-hover);
+  background: var(--cor-selecao-suave);
+  box-shadow: inset 3px 0 0 var(--cor-acao);
 }
 
 .nome {

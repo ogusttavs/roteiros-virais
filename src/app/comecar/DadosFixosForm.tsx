@@ -184,8 +184,9 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
             erro={tentouEnviar && escolhaDeRamo.tipo === "nenhuma" ? t.ramoNaoEscolhido : undefined}
             onEscolher={(slug) => setEscolhaDeRamo({ tipo: "catalogo", slug })}
             onNaoAchei={(digitado) => {
-              // O que a pessoa tinha digitado vira o começo do texto livre; se ela já tinha escrito um, o dela fica.
-              if (digitado) setRamoOutro((atual) => (atual.trim() ? atual : digitado));
+              // O que a pessoa acabou de digitar na busca vira o texto livre (o que ela escreveu antes, de outra vez, dá lugar a isto: é o que ela
+              // tinha em mente agora). Sem nada digitado, o texto de antes fica.
+              if (digitado) setRamoOutro(digitado);
               setEscolhaDeRamo({ tipo: "outro" });
               setPedirFocoNoOutro(true);
             }}

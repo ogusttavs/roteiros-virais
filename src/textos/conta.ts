@@ -16,7 +16,7 @@ export const textosConta = {
   ramo: {
     rotulo: "ramo",
     ajuda: "Escreva uma palavra ou uma letra do que você faz e escolha na lista.",
-    aviso: "Ao trocar, a base de vídeos e os temas passam a ser os do ramo novo, a partir da próxima madrugada. O briefing e os roteiros continuam.",
+    aviso: "Ao trocar, os temas e as referências passam a ser os do ramo novo. Se ele ainda não foi pesquisado, aparecem a partir da próxima madrugada. O briefing e os roteiros continuam.",
   },
   redes: "perfis nas redes",
   /** V3, item 4: o grupo ganha o nome da marca ativa no subtítulo (dúvida 5 do BRIEF.md). */

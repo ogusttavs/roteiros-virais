@@ -242,7 +242,7 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
 
     const campo = page.getByRole("combobox", { name: "ramo" });
     await expect(campo).toHaveValue("Odontologia");
-    await expect(page.getByText("Ao trocar, a base de vídeos e os temas passam a ser os do ramo novo")).toHaveCount(0);
+    await expect(page.getByText("Ao trocar, os temas e as referências passam a ser os do ramo novo")).toHaveCount(0);
 
     await campo.fill("confeit");
     await expect(page.getByRole("option").first()).toContainText("Confeitaria e padaria");
@@ -250,7 +250,7 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     await expect(page.getByRole("option", { name: /Não achei o meu/ })).toHaveCount(0);
     await campo.press("Enter");
 
-    await expect(page.getByText("Ao trocar, a base de vídeos e os temas passam a ser os do ramo novo")).toBeVisible();
+    await expect(page.getByText("Ao trocar, os temas e as referências passam a ser os do ramo novo")).toBeVisible();
     await page.getByRole("button", { name: "salvar", exact: true }).click();
     await expect(page.getByText("salvo")).toBeVisible();
 

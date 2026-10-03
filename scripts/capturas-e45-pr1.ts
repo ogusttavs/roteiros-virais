@@ -160,7 +160,7 @@ async function main(): Promise<void> {
         gravados.push(contaLista);
 
         await campoDaConta.press("Enter");
-        await page.getByText("Ao trocar, a base de vídeos e os temas passam a ser os do ramo novo").waitFor({ state: "visible" });
+        await page.getByText("Ao trocar, os temas e as referências passam a ser os do ramo novo").waitFor({ state: "visible" });
         const contaTrocando = nomeDe("Conta", "RamoTrocando");
         await fotografarElemento(page, page.locator("form").first(), contaTrocando);
         gravados.push(contaTrocando);

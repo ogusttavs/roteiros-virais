@@ -3,9 +3,16 @@
  * uma pesquisa do Google" (exigência do Gustavo em 02/10/2026). Função pura, sem rede e sem banco: roda no navegador a cada tecla.
  *
  * Como casa: cada palavra digitada precisa ser o COMEÇO de alguma palavra do ramo, sem acento, sem maiúscula e sem pontuação
- * ("jiu" acha "jiu-jitsu", "estetica" acha "Estética"), no nome do ramo, nas palavras que levam a ele ou na linha de exemplos.
- * Quanto mais perto do nome, mais pontos. O resultado vem agrupado (um grupo do catálogo por bloco) e o primeiro da tela é o
- * primeiro ramo do primeiro bloco, o que o Enter escolhe.
+ * ("jiu" acha "jiu-jitsu", "estetica" acha "Estética"), no nome do ramo, nas palavras que levam a ele, na linha de exemplos ou no nome
+ * do grupo ("beleza" mostra o grupo Beleza e estética). Quanto mais perto do nome, mais pontos. O resultado vem agrupado (um grupo do
+ * catálogo por bloco) e o primeiro da tela é o primeiro ramo do primeiro bloco, o que o Enter escolhe.
+ *
+ * Três tentativas, da mais exata para a mais generosa, e a lista nunca some por uma palavra que o catálogo não conhece (achado da
+ * revisão independente: "salão de beleza" mostrava Cabelo e barbearia até a pessoa terminar de escrever "beleza", e aí esvaziava):
+ *  1. todas as palavras digitadas casam com o mesmo ramo;
+ *  2. se nada casou, as mesmas palavras sem o plural e sem a vogal final ("dentistas", "cabeleireira", "roupas");
+ *  3. se ainda nada casou e há mais de uma palavra, os ramos que casam com ALGUMA delas, os que casam com mais palavras primeiro
+ *     ("personal trainer" acha Academia e treino por "personal").
  */
 import { GRUPOS_DE_RAMO, RAMOS_DO_CATALOGO, type GrupoDeRamo, type RamoDoCatalogo } from "@/config/ramos";
 
@@ -27,7 +34,8 @@ function palavrasDe(texto: string): string[] {
 }
 
 /** Palavras de ligação: ignoradas quando a pessoa digitou algo além delas ("loja de carros" casa por "loja" e "carros"). */
-const LIGACAO = new Set(["de", "da", "do", "dos", "das", "e", "em", "a", "o", "para", "com"]);
+const LIGACAO = ["de", "da", "do", "dos", "das", "e", "em", "a", "o", "para", "com"];
+const LIGACAO_SET = new Set(LIGACAO);
 
 type RamoIndexado = {
   ramo: RamoDoCatalogo;
@@ -36,6 +44,7 @@ type RamoIndexado = {
   termos: string[][];
   termosTexto: string[];
   exemplos: string[];
+  grupo: string[];
 };
 
 let indice: RamoIndexado[] | null = null;
@@ -49,6 +58,7 @@ function indiceDoCatalogo(): RamoIndexado[] {
     termos: ramo.palavras.map(palavrasDe),
     termosTexto: ramo.palavras.map(normalizarBusca),
     exemplos: palavrasDe(ramo.exemplos),
+    grupo: palavrasDe(GRUPOS_DE_RAMO.find((g) => g.slug === ramo.grupo)?.nome ?? ""),
   }));
   return indice;
 }
@@ -66,16 +76,29 @@ function pontosNoConjunto(digitada: string, palavras: string[], base: number): n
   return melhor;
 }
 
+/** O nome do ramo vale mais que as palavras que levam a ele, que valem mais que os exemplos, que valem mais que o nome do grupo. */
 function pontosDaPalavra(digitada: string, ramoIndexado: RamoIndexado): number {
   const noNome = pontosNoConjunto(digitada, ramoIndexado.nome, 30);
   let nasPalavras = 0;
   for (const termo of ramoIndexado.termos) nasPalavras = Math.max(nasPalavras, pontosNoConjunto(digitada, termo, 20));
   const nosExemplos = pontosNoConjunto(digitada, ramoIndexado.exemplos, 10);
-  return Math.max(noNome, nasPalavras, nosExemplos);
+  const noGrupo = pontosNoConjunto(digitada, ramoIndexado.grupo, 3);
+  return Math.max(noNome, nasPalavras, nosExemplos, noGrupo);
 }
 
-/** Pontos do ramo para a consulta inteira, ou 0 quando alguma palavra digitada não casa com nada dele. */
-function pontosDoRamo(consulta: string, digitadas: string[], ramoIndexado: RamoIndexado): number {
+/**
+ * A palavra sem o plural e sem a vogal final, para a segunda tentativa ("dentistas" e "cabeleireira" chegam em "dentist" e
+ * "cabeleireir", começos de "dentista" e "cabeleireiro"). Palavra curta fica como está: tirar letra de "casa" ou "bar" acharia tudo.
+ */
+export function raizDaPalavra(palavra: string): string {
+  let raiz = palavra;
+  if (raiz.length >= 5 && raiz.endsWith("s")) raiz = raiz.slice(0, -1);
+  if (raiz.length >= 5 && /[aeo]$/.test(raiz)) raiz = raiz.slice(0, -1);
+  return raiz;
+}
+
+/** Pontos do ramo para a consulta inteira, ou 0 quando alguma palavra não casa com nada dele (a primeira e a segunda tentativas). */
+function pontosDoRamoEstrito(consulta: string, digitadas: string[], ramoIndexado: RamoIndexado): number {
   let soma = 0;
   for (const digitada of digitadas) {
     const pontos = pontosDaPalavra(digitada, ramoIndexado);
@@ -87,6 +110,45 @@ function pontosDoRamo(consulta: string, digitadas: string[], ramoIndexado: RamoI
   if (ramoIndexado.nomeTexto.startsWith(consulta)) soma += 50;
   if (ramoIndexado.termosTexto.some((termo) => termo.startsWith(consulta))) soma += 25;
   return soma;
+}
+
+type Pontuado = { ramo: RamoDoCatalogo; ordem: number; pontos: number; casadas: number };
+
+function pontuarEstrito(consulta: string, digitadas: string[], todos: RamoIndexado[]): Pontuado[] {
+  return todos
+    .map((ramoIndexado, ordem) => ({ ramo: ramoIndexado.ramo, ordem, pontos: pontosDoRamoEstrito(consulta, digitadas, ramoIndexado), casadas: digitadas.length }))
+    .filter((p) => p.pontos > 0);
+}
+
+/** A terceira tentativa: os ramos que casam com pelo menos uma palavra (como foi digitada ou sem o plural), os que casam com mais primeiro. */
+function pontuarParcial(digitadas: string[], todos: RamoIndexado[]): Pontuado[] {
+  return todos
+    .map((ramoIndexado, ordem) => {
+      let pontos = 0;
+      let casadas = 0;
+      for (const digitada of digitadas) {
+        const daPalavra = Math.max(pontosDaPalavra(digitada, ramoIndexado), pontosDaPalavra(raizDaPalavra(digitada), ramoIndexado));
+        if (daPalavra > 0) {
+          casadas += 1;
+          pontos += daPalavra;
+        }
+      }
+      return { ramo: ramoIndexado.ramo, ordem, pontos, casadas };
+    })
+    .filter((p) => p.casadas > 0);
+}
+
+/**
+ * As palavras que contam: sem as de ligação, e sem o começo de uma palavra de ligação que a pessoa ainda está escrevendo ("salão d"
+ * não pode esvaziar a lista só porque o "d" ainda pode virar "de"). Se só sobrasse ligação, ela mesma é a palavra.
+ */
+function palavrasQueContam(consulta: string): string[] {
+  const todas = consulta.split(" ");
+  const contam = todas.filter((palavra) => !LIGACAO_SET.has(palavra));
+  if (contam.length === 0) return todas;
+  const ultima = todas[todas.length - 1];
+  const ultimaEstaSendoEscrita = !LIGACAO_SET.has(ultima) && ultima.length <= 2 && LIGACAO.some((ligacao) => ligacao.startsWith(ultima));
+  return ultimaEstaSendoEscrita && contam.length > 1 ? contam.slice(0, -1) : contam;
 }
 
 /**
@@ -104,27 +166,28 @@ export function buscarRamos(consultaBruta: string): GrupoDeResultados[] {
     );
   }
 
-  const todasDigitadas = consulta.split(" ");
-  const semLigacao = todasDigitadas.filter((palavra) => !LIGACAO.has(palavra));
-  const digitadas = semLigacao.length > 0 ? semLigacao : todasDigitadas;
+  const digitadas = palavrasQueContam(consulta);
+  let pontuados = pontuarEstrito(consulta, digitadas, todos);
+  if (pontuados.length === 0) {
+    const raizes = digitadas.map(raizDaPalavra);
+    if (raizes.some((raiz, i) => raiz !== digitadas[i])) pontuados = pontuarEstrito(consulta, raizes, todos);
+  }
+  if (pontuados.length === 0 && digitadas.length > 1) pontuados = pontuarParcial(digitadas, todos);
 
-  const pontuados = todos
-    .map((ramoIndexado, ordem) => ({ ramo: ramoIndexado.ramo, ordem, pontos: pontosDoRamo(consulta, digitadas, ramoIndexado) }))
-    .filter((p) => p.pontos > 0);
-
-  const porGrupo = new Map<string, typeof pontuados>();
+  const porGrupo = new Map<string, Pontuado[]>();
   for (const p of pontuados) {
     const lista = porGrupo.get(p.ramo.grupo) ?? [];
     lista.push(p);
     porGrupo.set(p.ramo.grupo, lista);
   }
 
+  const ordenar = (a: Pontuado, b: Pontuado) => b.casadas - a.casadas || b.pontos - a.pontos || a.ordem - b.ordem;
   const grupos = GRUPOS_DE_RAMO.map((grupo, ordemDoGrupo) => {
-    const lista = (porGrupo.get(grupo.slug) ?? []).sort((a, b) => b.pontos - a.pontos || a.ordem - b.ordem);
-    return { grupo, ordemDoGrupo, melhor: lista[0]?.pontos ?? 0, ramos: lista.map((p) => p.ramo) };
+    const lista = (porGrupo.get(grupo.slug) ?? []).sort(ordenar);
+    return { grupo, ordemDoGrupo, melhor: lista[0], ramos: lista.map((p) => p.ramo) };
   }).filter((g) => g.ramos.length > 0);
 
-  grupos.sort((a, b) => b.melhor - a.melhor || a.ordemDoGrupo - b.ordemDoGrupo);
+  grupos.sort((a, b) => (b.melhor?.casadas ?? 0) - (a.melhor?.casadas ?? 0) || (b.melhor?.pontos ?? 0) - (a.melhor?.pontos ?? 0) || a.ordemDoGrupo - b.ordemDoGrupo);
   return grupos.map(({ grupo, ramos }) => ({ grupo, ramos }));
 }
 
