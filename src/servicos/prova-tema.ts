@@ -84,8 +84,8 @@ export function motivoSemProva(
   janelaDias: number,
   proporcaoBrasil: number = config.regras.proporcaoBrasil,
   /**
-   * E45 PR 3: com ramos alternativos, a janela e a proporção do Brasil são as do setor de cada vídeo (como o piso, decisão 48); o mínimo de
-   * brasileiros é a soma dos mínimos de cada setor. Sem isto (ou para um setor que não está no mapa), vale o par `janelaDias`/`proporcaoBrasil`.
+   * E45 PR 3: com ramos alternativos, a janela de cada vídeo é a do setor dele (como o piso, decisão 48), e a proporção do Brasil é a média das proporções
+   * dos setores ponderada pelo número de vídeos de cada um (o mínimo continua calculado sobre o total). Sem isto (ou para um setor que não está no mapa), vale o par `janelaDias`/`proporcaoBrasil`.
    */
   regrasPorSetor?: Map<number, RegraDoSetor>,
 ): string | null {
@@ -112,17 +112,13 @@ export function motivoSemProva(
   const brasileiros = naJanela.filter(
     (v) => classificarBrasil(v.idioma, contaEhBrasileira(v.contaPais, v.contaIdiomaPrincipal)) === "brasileiro",
   ).length;
-  // O mínimo de cada setor soma: os vídeos de um setor de régua branda não cobrem a exigência de outro de régua dura.
-  // Só agrupa por setor quando as regras por setor existem: sem elas (os temas do dia), um grupo só, o total, como sempre.
-  const porSetor = new Map<string, { total: number; proporcao: number }>();
-  for (const v of naJanela) {
-    const chave = regrasPorSetor ? String(v.nichoId ?? "") : "";
-    const regra = regraDe(v);
-    const atual = porSetor.get(chave) ?? { total: 0, proporcao: regra.proporcaoBrasil };
-    atual.total += 1;
-    porSetor.set(chave, atual);
-  }
-  const minimo = [...porSetor.values()].reduce((soma, g) => soma + minimoBrasileirosNaProva(g.total, g.proporcao), 0);
+  // Com regras por setor (E45 PR 3, item 0a da E48): o mínimo é calculado sobre o TOTAL de vídeos citados, com a proporção ponderada pelo número de
+  // vídeos de cada setor (sum(n_setor * p_setor) / n_total), e o teto "maioria simples" sobre o total, como sempre. Sem as regras (os temas do dia),
+  // a proporção é a recebida, como antes.
+  const proporcaoDaProva = regrasPorSetor
+    ? naJanela.reduce((soma, v) => soma + regraDe(v).proporcaoBrasil, 0) / naJanela.length
+    : proporcaoBrasil;
+  const minimo = minimoBrasileirosNaProva(naJanela.length, proporcaoDaProva);
   if (brasileiros < minimo) {
     return `só ${brasileiros} de ${naJanela.length} vídeos citados são do Brasil, precisa de pelo menos ${minimo}`;
   }

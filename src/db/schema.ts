@@ -337,7 +337,36 @@ export const preferenciasUsuario = pgTable("preferencias_usuario", {
    */
   conviteInstalarAdiadoAte: timestamp("convite_instalar_adiado_ate", { withTimezone: true }),
   instaladoEm: timestamp("instalado_em", { withTimezone: true }),
+  /** E48 PR 2: onde o aplicativo foi instalado (`iphone`, `android` ou `computador`), gravado junto de `instaladoEm`: o admin diz onde e o aviso por push sabe se é um celular. */
+  instaladoEmSistema: text("instalado_em_sistema").$type<SistemaInstalado>(),
+  /** E48 PR 2: "agora não" no pedido de permissão do aviso de manhã: a folha não volta antes disto (sete dias, como o convite de instalar). */
+  pushAdiadoAte: timestamp("push_adiado_ate", { withTimezone: true }),
 });
+
+export type SistemaInstalado = "iphone" | "android" | "computador";
+
+/**
+ * E48 PR 2: o aviso de manhã por push. Uma linha por aparelho que a pessoa deixou receber (pode ter mais de um); o endpoint é único. `falhasSeguidas` conta
+ * os envios que falharam um atrás do outro (a segunda seguida apaga a inscrição; 404 e 410 do serviço de push apagam na hora, o aparelho já não existe).
+ */
+export const inscricoesPush = pgTable(
+  "inscricoes_push",
+  {
+    id: id(),
+    usuarioId: text("usuario_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    sistema: text("sistema").$type<SistemaInstalado>().notNull(),
+    criadoEm: criadoEm(),
+    ultimaFalhaEm: timestamp("ultima_falha_em", { withTimezone: true }),
+    falhasSeguidas: integer("falhas_seguidas").notNull().default(0),
+  },
+  (t) => [uniqueIndex("inscricoes_push_endpoint").on(t.endpoint), index("inscricoes_push_usuario").on(t.usuarioId)],
+);
+export type InscricaoPush = typeof inscricoesPush.$inferSelect;
 
 // ---------------------------------------------------------------------------
 // Briefing vivo (escopo 4.1)

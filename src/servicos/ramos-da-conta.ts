@@ -9,6 +9,7 @@ import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { clientes, nichos, ramosDaConta } from "@/db/schema";
+import { logger } from "@/lib/log";
 import { MAXIMO_DE_RAMOS_ALTERNATIVOS } from "@/lib/ramos-alternativos";
 
 import { ErroNicho } from "./nichos";
@@ -68,7 +69,10 @@ export async function tirarAlternativoQueViraPrincipal(clienteId: number, nichoI
   await db()
     .delete(ramosDaConta)
     .where(and(eq(ramosDaConta.clienteId, clienteId), eq(ramosDaConta.nichoId, nichoIdNovo)))
-    .catch(() => undefined);
+    .catch((erro) => {
+      // Nunca derruba a troca de ramo de quem chama, mas a linha que ficou parada precisa deixar rastro (ela ocupa uma das duas vagas até alguém ligar um ramo).
+      logger.warn({ clienteId, err: erro }, "ramos-da-conta: nao foi possivel tirar o alternativo que virou principal");
+    });
 }
 
 /**

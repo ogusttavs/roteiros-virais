@@ -9,7 +9,7 @@ import { db, getPool } from "@/db";
 import { clientes, membrosMarca, preferenciasUsuario, user } from "@/db/schema";
 import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
 import { listarClientesAdmin } from "@/servicos/admin-coleta";
-import { adiarConviteDeInstalar, preferenciasDoUsuario, registrarInstalacao } from "@/servicos/clientes";
+import { aceitarTermos, adiarConviteDeInstalar, preferenciasDoUsuario, registrarInstalacao, salvarHoraLembrete } from "@/servicos/clientes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -60,25 +60,27 @@ describe("registrarInstalacao", () => {
     await criarPessoa("inst-registrar", true);
     const primeira = new Date("2026-10-03T12:00:00Z");
 
-    expect(await registrarInstalacao("inst-registrar", primeira)).toBe(true);
-    expect(await registrarInstalacao("inst-registrar", new Date("2026-10-10T12:00:00Z"))).toBe(false);
+    expect(await registrarInstalacao("inst-registrar", "android", primeira)).toBe(true);
+    expect(await registrarInstalacao("inst-registrar", "iphone", new Date("2026-10-10T12:00:00Z"))).toBe(false);
 
     const prefs = await preferenciasDoUsuario("inst-registrar");
     expect(prefs?.instaladoEm?.getTime()).toBe(primeira.getTime());
+    // E o sistema da primeira abertura fica (a segunda, do iphone, não o troca).
+    expect(prefs?.instaladoEmSistema).toBe("android");
     // Instalado: o convite nunca mais, mesmo sem nenhum agora não.
     expect(conviteDeInstalarPodeAparecer(prefs, new Date("2027-01-01T00:00:00Z"))).toBe(false);
   });
 
   it("duas aberturas ao mesmo tempo gravam uma vez só", async () => {
     await criarPessoa("inst-corrida", true);
-    const resultados = await Promise.all([registrarInstalacao("inst-corrida"), registrarInstalacao("inst-corrida"), registrarInstalacao("inst-corrida")]);
+    const resultados = await Promise.all([registrarInstalacao("inst-corrida", "computador"), registrarInstalacao("inst-corrida", "computador"), registrarInstalacao("inst-corrida", "computador")]);
 
     expect(resultados.filter(Boolean)).toHaveLength(1);
   });
 
   it("sem linha de preferências, cria a linha e grava", async () => {
     await criarPessoa("inst-sem-linha", false);
-    expect(await registrarInstalacao("inst-sem-linha")).toBe(true);
+    expect(await registrarInstalacao("inst-sem-linha", "iphone")).toBe(true);
     expect((await preferenciasDoUsuario("inst-sem-linha"))?.instaladoEm).not.toBeNull();
   });
 
@@ -94,5 +96,22 @@ describe("registrarInstalacao", () => {
   it("não mexe nas preferências de outra pessoa", async () => {
     const [outra] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, "inst-adiar"));
     expect(outra.instaladoEm).toBeNull();
+  });
+});
+
+describe("a hora de fábrica do lembrete (E48 PR 2): 09:00 para conta nova, e quem já escolheu mantém", () => {
+  it("aceitar os termos cria a preferência com 09:00; quem já tinha escolhido uma hora não muda ao aceitar de novo", async () => {
+    await criarPessoa("inst-hora-nova", false);
+    expect((await aceitarTermos("inst-hora-nova")).horaLembrete).toBe("09:00");
+
+    await criarPessoa("inst-hora-escolhida", false);
+    await salvarHoraLembrete("inst-hora-escolhida", "07:00");
+    expect((await aceitarTermos("inst-hora-escolhida")).horaLembrete).toBe("07:00");
+  });
+
+  it("a linha criada pelo convite ou pelo registro da instalação também nasce com 09:00", async () => {
+    await criarPessoa("inst-hora-convite", false);
+    await adiarConviteDeInstalar("inst-hora-convite");
+    expect((await preferenciasDoUsuario("inst-hora-convite"))?.horaLembrete).toBe("09:00");
   });
 });

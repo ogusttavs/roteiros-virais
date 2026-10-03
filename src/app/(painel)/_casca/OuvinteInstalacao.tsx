@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import { sistemaDeInstalacao } from "@/lib/convite-instalar";
 import { comecarAOuvirInstalacao, jaEstaInstalado } from "@/ui/instalacao";
 
 import { registrarInstalacaoAction } from "./instalar-acoes";
@@ -16,7 +17,7 @@ export function OuvinteInstalacao({ instalado }: { instalado: boolean }) {
 
   useEffect(() => {
     if (instalado) return;
-    if (jaEstaInstalado()) void registrarInstalacaoAction().catch(() => undefined);
+    if (jaEstaInstalado()) void registrarInstalacaoAction(sistemaDeInstalacao(navigator.userAgent)).catch(() => undefined);
   }, [instalado]);
 
   return null;
