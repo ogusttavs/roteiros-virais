@@ -1,0 +1,20 @@
+/* E48 PR 2: o corpo da folha do pedido de permissão do aviso de manhã. */
+.pedido {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-erro-fundo);
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

@@ -78,6 +78,7 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                 <th>{t.colunaDiasSemGravar}</th>
                 <th className={styles.num}>{t.colunaPessoas}</th>
                 <th>{t.colunaInstalou}</th>
+                <th>{t.colunaPush}</th>
                 <th></th>
               </tr>
             </thead>
@@ -106,7 +107,12 @@ export function TabelaClientes({ clientes, nichos }: Props) {
                   </td>
                   <td className={styles.num}>{cliente.pessoas}</td>
                   <td className={styles.mono} data-instalou={cliente.instaladoEm ? "sim" : "nao"}>
-                    {cliente.instaladoEm ? formatarData(cliente.instaladoEm) : t.instalouNao}
+                    {cliente.instaladoEm
+                      ? `${formatarData(cliente.instaladoEm)}${cliente.instaladoEmSistema ? `, ${t.sistemaDaInstalacao[cliente.instaladoEmSistema]}` : ""}`
+                      : t.instalouNao}
+                  </td>
+                  <td className={styles.mono} data-aparelhos-push={cliente.aparelhosComPush}>
+                    {t.aparelhos(cliente.aparelhosComPush)}
                   </td>
                   <td>
                     <Link href={`/admin/clientes/${cliente.id}`} className={styles.botaoAbrir}>

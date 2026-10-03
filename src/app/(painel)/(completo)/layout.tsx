@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import {
   acessouHoje,
@@ -9,7 +10,9 @@ import {
   preferenciasDoUsuario,
   registrarAcessoHoje,
 } from "@/servicos/clientes";
+import { inscricoesDaPessoa, pedidoDePushPodeAparecer } from "@/servicos/push";
 import { VERSAO_TERMOS_EM } from "@/textos/termos";
+import { PedidoDeAviso } from "@/ui/componentes/PedidoDeAviso";
 
 import { FolhaAceiteTermos } from "../_casca/FolhaAceiteTermos";
 import { OuvinteInstalacao } from "../_casca/OuvinteInstalacao";
@@ -50,9 +53,15 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
     return <FolhaAceiteTermos />;
   }
 
+  // E48 PR 2: o pedido de permissão do aviso de manhã (só aparece no aplicativo instalado, no celular, e uma vez: o navegador confere o resto).
+  const aparelhosDoAviso = (await inscricoesDaPessoa(sessao.user.id)).length;
   return (
     <>
       <OuvinteInstalacao instalado={Boolean(preferencias.instaladoEm)} />
+      <PedidoDeAviso
+        podeAparecer={pedidoDePushPodeAparecer(preferencias, aparelhosDoAviso, new Date())}
+        chavePublica={config.push.publicKey}
+      />
       {children}
     </>
   );

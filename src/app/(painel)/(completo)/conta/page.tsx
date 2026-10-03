@@ -10,6 +10,7 @@ import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { textosConta } from "@/textos/conta";
 
+import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
 import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
@@ -86,6 +87,7 @@ export default async function Conta() {
       ) : null}
       <div className={styles.colunaPrincipal}>
         <InstalarNoCelular />
+        <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} />
         <InformacoesDoAparelho versaoPainel={config.gitSha} />
         <BotaoSair />
       </div>
