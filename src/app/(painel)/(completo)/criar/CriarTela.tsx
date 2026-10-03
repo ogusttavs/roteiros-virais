@@ -42,6 +42,8 @@ type Props = {
   /** E39c, parte 2a: veio de um sugerido tocado na visão Semana do planejador (`?plano=`, qualquer
    * dia, não só hoje); abre a folha do momento já preenchida com o que a agenda contou daquele dia. */
   itemPlanoInicial?: ItemPlano | null;
+  /** A2, item 7: veio do atalho "Criar um Story para hoje" de Hoje (`?formato=story`): abre "Gravar agora" já em Story, com o dia que veio em `dataInicial`. */
+  abrirEmStory?: boolean;
 };
 
 /**
@@ -62,6 +64,7 @@ export function CriarTela({
   quemGravaPadrao,
   dataInicial,
   itemPlanoInicial,
+  abrirEmStory = false,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -118,6 +121,11 @@ export function CriarTela({
       abrirGravarAgoraDoPlano(itemPlanoInicial);
     }
   }, [itemPlanoInicial]);
+
+  /** A2, item 7: o atalho de Story de Hoje abre a folha já em Story, uma vez, na montagem (fechar a folha não a reabre). */
+  useEffect(() => {
+    if (abrirEmStory && !itemPlanoInicial) setFolhaMomentoAberta(true);
+  }, [abrirEmStory, itemPlanoInicial]);
 
   async function pularItemDoPlano(item: ItemPlano) {
     if (pulandoId !== null) return;
@@ -284,6 +292,7 @@ export function CriarTela({
           marcas={outrasMarcas}
           planoItemId={itemPlanoParaFolha?.id}
           dataInicial={itemPlanoParaFolha ? undefined : dataInicial}
+          formatoInicial={abrirEmStory ? "story" : undefined}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
           valoresIniciais={

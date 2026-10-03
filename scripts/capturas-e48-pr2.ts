@@ -64,7 +64,7 @@ async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permis
       if (o.inscrito) localStorage.setItem(chave, "1");
       function montar() {
         return {
-          endpoint: "https://push.exemplo.test/capturas",
+          endpoint: "https://fcm.googleapis.com/fcm/send/capturas",
           toJSON: function () { return { endpoint: this.endpoint, keys: { p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" } }; },
           unsubscribe: function () { return Promise.resolve(true); }
         };

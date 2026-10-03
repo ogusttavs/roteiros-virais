@@ -39,11 +39,17 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
       const novo: Estado = jaEstaInstalado() ? await estadoDoAviso() : "precisa_instalar";
       if (cancelado) return;
       setEstado(novo);
-      // Ligado no navegador: reconcilia com o servidor (registrar é idempotente). Cobre a inscrição que ficou só no navegador (o servidor falhou na hora) e o aparelho
-      // dividido entre duas pessoas (a inscrição passa a ser de quem está com a Conta aberta).
+      // Ligado no navegador: reconcilia com o servidor (registrar é idempotente, e só aceita o aparelho de quem já o tem ou com chaves novas). Se o servidor recusar
+      // (o aparelho é de outra pessoa que não saiu, ou a inscrição é inválida), o cartão não pode dizer "ligado": tira a inscrição do navegador e mostra "desligado".
       if (novo === "ligado") {
         const dados = await inscricaoAtualDoAparelho();
-        if (dados) void registrarInscricaoPushAction(dados, sistemaDeInstalacao(navigator.userAgent)).catch(() => undefined);
+        if (dados) {
+          const guardou = await registrarInscricaoPushAction(dados, sistemaDeInstalacao(navigator.userAgent)).catch(() => true);
+          if (!guardou && !cancelado) {
+            await desligarAviso().catch(() => null);
+            setEstado("desligado");
+          }
+        }
       }
     })();
     return () => {
@@ -68,6 +74,7 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
         setErro(t.erro);
         return;
       }
+      if (resultado.endpointAntigo && resultado.endpointAntigo !== resultado.inscricao.endpoint) void apagarInscricaoPushAction(resultado.endpointAntigo).catch(() => undefined);
       setEstado("ligado");
     } catch {
       setErro(t.erro);

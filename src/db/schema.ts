@@ -361,8 +361,14 @@ export const inscricoesPush = pgTable(
     auth: text("auth").notNull(),
     sistema: text("sistema").$type<SistemaInstalado>().notNull(),
     criadoEm: criadoEm(),
+    /**
+     * Quando começou a falha CORRENTE (a primeira de uma sequência sem nenhum envio aceito); nulo quando está tudo certo. Um envio aceito a zera. Uma
+     * inscrição que falha por mais de 14 dias sem nenhum envio aceito (401, 403, 429, 5xx: falhas que não contam como do aparelho) é apagada.
+     */
     ultimaFalhaEm: timestamp("ultima_falha_em", { withTimezone: true }),
     falhasSeguidas: integer("falhas_seguidas").notNull().default(0),
+    /** Quando o serviço de push aceitou um envio pela última vez (A2). */
+    ultimoSucessoEm: timestamp("ultimo_sucesso_em", { withTimezone: true }),
   },
   (t) => [uniqueIndex("inscricoes_push_endpoint").on(t.endpoint), index("inscricoes_push_usuario").on(t.usuarioId)],
 );

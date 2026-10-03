@@ -18,7 +18,7 @@ const ITENS_CAPSULA: { href: string; rotulo: string; Icone: ComponentType<{ size
   { href: "/planejamento", rotulo: textosNav.planejar, Icone: Calendar },
 ];
 /** As mesmas rotas de `FolhaMais.tsx`, só para saber quando "Mais" fica aceso. */
-const ROTAS_NO_MAIS = ["/referencias", "/noticias", "/historico"];
+const ROTAS_NO_MAIS = ["/referencias", "/noticias", "/historico", "/conta"];
 
 type Props = {
   /** V5, item 5: o rótulo escrito some da vista ao rolar para baixo, continua para o leitor de tela. */

@@ -63,7 +63,7 @@ export const textosConta = {
   diagnostico: {
     linha: "Informações do aparelho",
     tituloFolha: "Informações do aparelho",
-    explica: "Só para o Fable entender o que apareceu torto no seu aparelho. Nada daqui sai do seu navegador.",
+    explica: "Informações do aparelho, para a gente entender o que apareceu torto. Nada daqui sai do seu navegador.",
     larguraJanela: "largura da janela",
     alturaJanela: "altura da janela",
     alturaVisivel: "altura visível",

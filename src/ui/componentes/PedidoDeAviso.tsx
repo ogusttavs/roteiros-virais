@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { adiarPedidoDePushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
+import { adiarPedidoDePushAction, apagarInscricaoPushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { sistemaDoAparelho, type SistemaDoAparelho } from "@/lib/convite-instalar";
 import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
@@ -47,7 +47,7 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
   useEffect(() => {
     const sistemaDoNavegador = sistemaDoAparelho(navigator.userAgent);
     setSistema(sistemaDoNavegador);
-    setElegivel(sistemaDoNavegador !== "outro" && jaEstaInstalado() && suportaPush() && Notification.permission === "default");
+    setElegivel(sistemaDoNavegador !== "outro" && jaEstaInstalado() && suportaPush() && Notification.permission !== "denied");
   }, []);
 
   const devePedir = podeAparecer && Boolean(chavePublica) && elegivel && !dispensado;
@@ -82,6 +82,8 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
         setErro(t.erro);
         return;
       }
+      // A inscrição que o navegador tinha (a que foi trocada) sai do servidor: sem isto ela ficava órfã até o primeiro 404 ou 410 de um envio.
+      if (resultado.endpointAntigo && resultado.endpointAntigo !== resultado.inscricao.endpoint) void apagarInscricaoPushAction(resultado.endpointAntigo).catch(() => undefined);
       ligouAgora.current = true;
       fechar();
     } catch {

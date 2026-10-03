@@ -88,8 +88,9 @@ async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permis
       return permissao;
     };
     const chave = "e2e-push-inscricao";
-    const montar = () => ({
-      endpoint: "https://push.exemplo.test/e2e/" + window.location.hostname,
+    // Cada inscrição tem um endereço próprio (como no navegador de verdade): o mesmo endereço com as mesmas chaves de outra pessoa é recusado pelo servidor.
+    const montar = (id: string) => ({
+      endpoint: "https://fcm.googleapis.com/fcm/send/e2e-" + id,
       toJSON() {
         return { endpoint: this.endpoint, keys: { p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" } };
       },
@@ -99,10 +100,14 @@ async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permis
       },
     });
     const falso = {
-      getSubscription: async () => (localStorage.getItem(chave) ? montar() : null),
+      getSubscription: async () => {
+        const id = localStorage.getItem(chave);
+        return id ? montar(id) : null;
+      },
       subscribe: async () => {
-        localStorage.setItem(chave, "1");
-        return montar();
+        const id = Math.random().toString(36).slice(2);
+        localStorage.setItem(chave, id);
+        return montar(id);
       },
     };
     Object.defineProperty(ServiceWorkerRegistration.prototype, "pushManager", { get: () => falso, configurable: true });

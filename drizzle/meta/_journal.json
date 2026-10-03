@@ -421,6 +421,13 @@
       "when": 1791056943393,
       "tag": "0059_aviso-push",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1791063484245,
+      "tag": "0060_push-ultimo-sucesso",
+      "breakpoints": true
     }
   ]
 }

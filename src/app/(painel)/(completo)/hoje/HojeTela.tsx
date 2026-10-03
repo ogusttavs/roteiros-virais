@@ -418,6 +418,23 @@ export function HojeTela({
   const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0;
 
   /**
+   * A2, item 7 (pedido do Gustavo no iPhone): Story a pessoa cria na hora, na maioria das vezes, então "Criar um Story para hoje" fica sempre à mão, com ou sem Story
+   * marcado. É um atalho para o Criar, que abre "Gravar agora" já em Story e com o dia de hoje (a pessoa não escolhe de novo); o Story criado volta para a lista por
+   * conta da agenda. Hoje continua sendo só a agenda: nada se cria aqui dentro. Contorno (secundário), para não competir com o roteiro marcado.
+   */
+  const botaoCriarStory = ehHoje ? (
+    <button
+      type="button"
+      className={styles.botaoSecundario}
+      data-criar-story-hoje
+      aria-busy={acao === "criar-story" || undefined}
+      onClick={() => ir("criar-story", `/criar?data=${diaVisualizado}&formato=story`)}
+    >
+      {textosHoje.agenda.criarStoryHoje}
+    </button>
+  ) : null;
+
+  /**
    * E39b: some da lista na hora que a ação do atrasado termina, sem esperar `router.refresh()`
    * buscar a tela de novo a tempo (mesmo raciocínio do `AindaValeBloco`). `router.refresh()`
    * continua rodando, para a tela recarregada mais tarde já nascer sem o item resolvido.
@@ -578,6 +595,7 @@ export function HojeTela({
               <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("criar", `/criar?data=${diaVisualizado}`)}>
                 {textosHoje.agenda.criarRoteiro}
               </button>
+              {botaoCriarStory}
             </section>
           ) : diaVazio ? (
             <section className={styles.diaLivre}>
@@ -595,6 +613,7 @@ export function HojeTela({
               >
                 {textosHoje.agenda.criarRoteiro}
               </button>
+              {ehHoje ? botaoCriarStory : null}
             </section>
           ) : (
             <div className={styles.diaColunas}>
@@ -661,6 +680,7 @@ export function HojeTela({
               <section className={styles.secaoDia} aria-labelledby="t-stories">
                 <h2 id="t-stories">{ehHoje ? textosHoje.agenda.stories.hoje : textosHoje.agenda.stories.outroDia}</h2>
                 {agenda.stories.length > 0 ? (
+                  <>
                   <div className={styles.listaAgendaCartao}>
                     <ol className={styles.listaAgenda}>
                       {agenda.stories.map((item) => (
@@ -682,6 +702,11 @@ export function HojeTela({
                       ))}
                     </ol>
                   </div>
+                  {ehHoje ? botaoCriarStory : null}
+                  </>
+                ) : ehHoje ? (
+                  // Sem Story marcado, o botão substitui o "Nada marcado" (A2, item 7).
+                  botaoCriarStory
                 ) : (
                   <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
                 )}

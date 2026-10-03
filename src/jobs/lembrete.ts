@@ -48,7 +48,13 @@ import { logger } from "@/lib/log";
 import { enviarPush } from "@/lib/push";
 import { acessouHoje } from "@/servicos/clientes";
 import { planoDoDia } from "@/servicos/plano";
-import { apagarInscricao, inscricoesDaPessoa, registrarEnvioBemSucedido, registrarFalhaDeEnvio } from "@/servicos/push";
+import {
+  apagarInscricao,
+  inscricoesDaPessoa,
+  registrarEnvioBemSucedido,
+  registrarFalhaDeEnvio,
+  registrarFalhaQueNaoConta,
+} from "@/servicos/push";
 import { agendaDoDia, atrasados } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
 import { textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
@@ -132,7 +138,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       try {
         // E48 PR 2: quem tem aparelho inscrito recebe o push; o e-mail só sai para quem não tem inscrição ativa, ou quando nenhum push foi aceito
         // (a inscrição que falhou já foi apagada ou contada, e a pessoa não fica sem o lembrete do dia).
-        const chegouPorPush = await mandarPush(candidato.usuarioId, nomesPendentes);
+        const chegouPorPush = await mandarPush(candidato.usuarioId, nomesPendentes, agora);
         if (chegouPorPush) {
           enviadosPorPush += 1;
         } else {
@@ -171,7 +177,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
  * na agenda do dia, senão "Os temas de hoje chegaram"; o toque abre `/hoje`. 404 e 410 apagam a inscrição na hora; outra falha conta uma vez e a segunda seguida
  * apaga. Devolve se algum aparelho aceitou o aviso (se nenhum aceitou, quem chama manda o e-mail).
  */
-async function mandarPush(usuarioId: string, marcas: MarcaPendente[]): Promise<boolean> {
+async function mandarPush(usuarioId: string, marcas: MarcaPendente[], agora: Date): Promise<boolean> {
   const inscricoes = await inscricoesDaPessoa(usuarioId);
   if (inscricoes.length === 0) return false;
   const temRoteiroNaAgenda = marcas.some((marca) => marca.agendaHoje.length > 0);
@@ -188,14 +194,19 @@ async function mandarPush(usuarioId: string, marcas: MarcaPendente[]): Promise<b
     // só deixa a contagem de falhas desatualizada.
     try {
       if (resultado.ok) {
-        await registrarEnvioBemSucedido(inscricao.id);
+        await registrarEnvioBemSucedido(inscricao.id, agora);
       } else if (resultado.apagar) {
         await apagarInscricao(inscricao.id);
       } else if (resultado.contar) {
-        const apagou = await registrarFalhaDeEnvio(inscricao.id);
+        const apagou = await registrarFalhaDeEnvio(inscricao.id, agora);
         logger.warn({ usuarioId, inscricaoId: inscricao.id, apagou, motivo: resultado.motivo }, "lembrete: o push falhou");
       } else {
-        logger.warn({ usuarioId, inscricaoId: inscricao.id, motivo: resultado.motivo }, "lembrete: o push falhou por causa do ambiente ou do servico de push (nao conta contra o aparelho)");
+        // Não conta como falha seguida, mas a falha corrente começa: depois de 14 dias sem nenhum envio aceito a inscrição é apagada.
+        const apagou = await registrarFalhaQueNaoConta(inscricao.id, agora);
+        logger.warn(
+          { usuarioId, inscricaoId: inscricao.id, apagou, motivo: resultado.motivo },
+          "lembrete: o push falhou por causa do ambiente ou do servico de push (nao conta como falha do aparelho)",
+        );
       }
     } catch (erro) {
       logger.error({ usuarioId, inscricaoId: inscricao.id, err: erro }, "lembrete: nao foi possivel atualizar a inscricao depois do envio");
