@@ -134,6 +134,8 @@ test.describe("planejador, mover de dia por arrasto (E39c, parte 2b)", () => {
     const destino = page.getByRole("region", { name: /quinta-feira, 11 de março/i });
     await expect(origem).toBeVisible();
     await expect(destino).toBeVisible();
+    // Hidratada antes de arrastar: o arrasto que começa antes dos manipuladores existirem não faz nada (oscilou sob carga na CI).
+    await page.waitForLoadState("networkidle");
 
     await origem.dragTo(destino);
 
@@ -148,6 +150,10 @@ test.describe("planejador, mover de dia por arrasto (E39c, parte 2b)", () => {
 
     const origem = page.getByRole("listitem").filter({ hasText: "o item que vai ser arrastado" });
     const destino = page.getByRole("region", { name: /sexta-feira, 12 de março/i });
+    await expect(origem).toBeVisible();
+    await expect(destino).toBeVisible();
+    // Hidratada antes de arrastar (oscilou sob carga na CI).
+    await page.waitForLoadState("networkidle");
     await origem.dragTo(destino);
 
     const confirmacao = page.getByRole("alertdialog");

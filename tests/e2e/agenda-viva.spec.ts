@@ -89,10 +89,12 @@ let contador = 0;
 /** `pisoViews: 0` para o setor nascer sem régua (E39b, item a): o vídeo do teste não precisa de milhões de views. */
 async function criarMarca(opcoes: { pisoViews?: number } = {}) {
   contador += 1;
-  const usuarioId = `e2e-agenda-viva-${contador}-${test.info().testId}`;
+  // O número da tentativa (`retry`) no id: o retry do Playwright insere de novo, e a chave duplicada matava a segunda tentativa (CI do PR #110).
+  const sufixo = `${contador}-${test.info().testId}-r${test.info().retry}`;
+  const usuarioId = `e2e-agenda-viva-${sufixo}`;
   const [nicho] = await db()
     .insert(nichos)
-    .values({ slug: `e2e-agenda-viva-${contador}-${test.info().testId}`, nome: "[teste] Agenda viva", pisoViews: opcoes.pisoViews ?? 0 })
+    .values({ slug: `e2e-agenda-viva-${sufixo}`, nome: "[teste] Agenda viva", pisoViews: opcoes.pisoViews ?? 0 })
     .returning();
   await db().insert(user).values({ id: usuarioId, name: "[teste] Agenda viva", email: `${usuarioId}@exemplo.teste` });
   await db()
@@ -242,7 +244,7 @@ test.describe("Ainda vale? (E39b, item a)", () => {
       .insert(videos)
       .values({
         plataforma: "tiktok",
-        idExterno: `e2e-ainda-vale-${test.info().testId}`,
+        idExterno: `e2e-ainda-vale-${test.info().testId}-r${test.info().retry}`,
         url: "https://exemplo.invalido/ainda-vale",
         nichoId,
         views: 999_999,

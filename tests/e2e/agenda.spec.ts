@@ -94,9 +94,11 @@ function somarDias(dataISO: string, dias: number): string {
 let nichoId: number;
 
 /** `testId` do Playwright (único por teste, estável sob `fullyParallel`) em vez de um contador em
- * memória: um contador de módulo colidia entre testes deste arquivo (achado da prova local). */
+ * memória: um contador de módulo colidia entre testes deste arquivo (achado da prova local). E o número da
+ * TENTATIVA (`retry`): o retry do Playwright roda o teste de novo e insere o mesmo usuário, e a chave duplicada
+ * (`user_pkey`) matava a segunda tentativa, escondendo a falha de verdade (achado da CI do PR #110). */
 async function criarMarca() {
-  const usuarioId = `e2e-agenda-${test.info().testId}`;
+  const usuarioId = `e2e-agenda-${test.info().testId}-r${test.info().retry}`;
   await db().insert(user).values({ id: usuarioId, name: "[teste] Agenda", email: `${usuarioId}@exemplo.teste` });
   await db()
     .insert(account)
@@ -272,10 +274,14 @@ test.describe("/hoje, a Agenda", () => {
     const diaDaquiA21Dias = somarDias(hoje, 21);
 
     await entrar(page, email);
+    // O clique logo depois de carregar chegava antes da hidratação e se perdia (CI do PR #110): espera a tela assentar, e depois confere a URL a
+    // CADA seta, em vez de três cliques seguidos (um clique perdido no meio fazia a URL final errada e o teste morria sem dizer onde).
+    await page.waitForLoadState("networkidle");
 
-    await page.getByRole("button", { name: "Próxima semana" }).click();
-    await page.getByRole("button", { name: "Próxima semana" }).click();
-    await page.getByRole("button", { name: "Próxima semana" }).click();
+    for (const semanas of [1, 2, 3]) {
+      await page.getByRole("button", { name: "Próxima semana" }).click();
+      await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7 * semanas)}`));
+    }
     await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}`));
 
     await page.getByRole("button", { name: "Ver o mês" }).click();
@@ -287,9 +293,11 @@ test.describe("/hoje, a Agenda", () => {
 
     // Volta para a semana de hoje: as setas também andam para trás, sem limite.
     await page.goto(`/hoje?dia=${diaDaquiA21Dias}`);
-    await page.getByRole("button", { name: "Semana anterior" }).click();
-    await page.getByRole("button", { name: "Semana anterior" }).click();
-    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await page.waitForLoadState("networkidle");
+    for (const semanas of [2, 1, 0]) {
+      await page.getByRole("button", { name: "Semana anterior" }).click();
+      await expect(page).toHaveURL(semanas === 0 ? new RegExp(`dia=${hoje}$`) : new RegExp(`dia=${somarDias(hoje, 7 * semanas)}$`));
+    }
     await expect(page).toHaveURL(new RegExp(`dia=${hoje}$`));
   });
 

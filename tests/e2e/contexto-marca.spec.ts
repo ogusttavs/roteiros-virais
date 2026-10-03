@@ -367,6 +367,9 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const ids = await semearLeitura(clienteId);
     await entrar(page, "e2e-contexto-falha@exemplo.teste");
     await page.goto("/briefing");
+    // A tela pronta e hidratada antes de cortar a rede e clicar: um clique que chega antes da hidratação se perde (oscilou sob carga na CI).
+    await expect(itemNaTela(page, "bico de spray")).toBeVisible();
+    await page.waitForLoadState("networkidle");
     // As ações do servidor são POST para a própria página: corta todas.
     await page.route("**/briefing", (rota) => (rota.request().method() === "POST" ? rota.abort("failed") : rota.continue()));
 
