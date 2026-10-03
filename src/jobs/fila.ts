@@ -48,6 +48,15 @@ export const FILAS = {
   aprenderCliente: "aprender-cliente",
   /** Por evento (E38, partes 2 e 3): um perfil citado foi adicionado, ou o perfil da propria marca mudou. */
   analisarPerfil: "analisar-perfil",
+  /**
+   * E38 PR 2, "o que entendemos da sua marca": dois modos na mesma fila. Sem `clienteId` (o cron
+   * diário e o botão "rodar agora" do admin) é o despachante: enfileira só as marcas cuja última
+   * leitura boa passou de `config.regras.diasEntreLeituraMarca`. Com `clienteId` (evento: a pessoa
+   * salvou o site ou um perfil; ou o próprio despachante) lê aquela marca. Job longo de propósito
+   * (fora de `FILAS_CURTAS`): ler o Instagram pode esperar a janela da Meta por quase uma hora, e
+   * um prazo de 15 minutos com repetição leria o site do cliente de novo por cima do primeiro.
+   */
+  entenderMarca: "entender-marca",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];

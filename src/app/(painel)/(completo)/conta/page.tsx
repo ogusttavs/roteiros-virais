@@ -49,6 +49,7 @@ export default async function Conta() {
           instagramInicial={perfis?.instagram ?? ""}
           tiktokInicial={perfis?.tiktok ?? ""}
           youtubeInicial={perfis?.youtube ?? ""}
+          siteInicial={cliente?.site ?? ""}
           temaInicial={cliente?.tema ?? "sistema"}
           horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
           nomeMarca={cliente?.nome ?? ""}

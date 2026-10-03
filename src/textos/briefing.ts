@@ -11,6 +11,7 @@
  */
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { TipoMarca } from "@/db/schema";
+import type { MotivoLeituraSite } from "@/jobs/site-api";
 
 function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -88,7 +89,7 @@ export const textosBriefing = {
     /** E42a, item 1: as duas opções novas de "onde está o seu público". */
     paisObrigatorio: "Diga o país",
     paisesObrigatorio: "Diga quais países",
-    siteInvalido: "esse endereço não parece um site válido",
+    siteInvalido: "Esse endereço não parece um site válido. Confira se está escrito certo.",
     /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
     perfilInvalido: "Confira o nome do perfil",
     ramoObrigatorio: "Escreva o seu ramo",
@@ -248,6 +249,114 @@ export const textosBriefing = {
     semConexaoDesligar: "Sem conexão. Não deu para desligar esta regra; tente de novo quando a rede voltar.",
     semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
   },
+  /**
+   * E38 PR 2, "o que entendemos da sua marca" (desenho aprovado do Opus, `Briefing.dc.html`, estado
+   * `contextoDaMarca`): o que a IA leu do site e das redes da pessoa, separado do que ela respondeu,
+   * para ela confirmar, corrigir ou tirar. Os textos do desenho (título, abertura, "novidade deste
+   * mês", "Está certo", "Corrigir", "Confirmado", "Salvar", "Cancelar") são os dele; o resto (os
+   * estados vazio, lendo e "não deu", "Tirar", os erros) é montado com o que existe e fica
+   * registrado para o Opus desenhar depois (regra 11).
+   */
+  contextoDaMarca: {
+    titulo: "O que a IA tirou das suas redes e do seu site",
+    abertura:
+      "Isto não é o que você respondeu: é o que a gente leu. Confirme o que está certo e corrija o que não está; o que você confirma entra em todo roteiro.",
+    /** "Lido em 1 de setembro, no Instagram e no site. A próxima leitura é em 1 de outubro." Só as fontes lidas de verdade. */
+    lidoEm: (lidoEm: Date, fontes: ("site" | "instagram" | "youtube")[], proximaEm: Date | null): string => {
+      const nomes = fontes
+        .slice()
+        .sort((a, b) => (a === "site" ? 1 : 0) - (b === "site" ? 1 : 0))
+        .map((fonte) => (fonte === "site" ? "no site" : fonte === "instagram" ? "no Instagram" : "no YouTube"));
+      const lista = nomes.length <= 1 ? nomes.join("") : `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+      const proxima = proximaEm ? ` A próxima leitura é em ${formatarDiaMesPorExtenso(proximaEm)}.` : "";
+      return `Lido em ${formatarDiaMesPorExtenso(lidoEm)}, ${lista}.${proxima}`;
+    },
+    tiktokGuardado: "O TikTok ainda não é lido por aqui; o seu @ fica guardado.",
+    semFonte:
+      "Para a gente ler, guarde em Conta o site da sua marca ou o seu Instagram ou YouTube. Depois, o que a gente entendeu aparece aqui, para você confirmar.",
+    irParaConta: "Ir para Conta",
+    lendo: "Estamos lendo o que a sua marca mostra. Pode levar até um dia; quando terminar, o que a gente entendeu aparece aqui.",
+    naoLeu: "Ainda não conseguimos ler. A gente tenta de novo sozinha.",
+    nadaClaro:
+      "A gente leu, mas não achou nada claro o bastante para dizer sobre a sua marca. No mês que vem a gente lê de novo.",
+    /** A leitura achou itens e a pessoa tirou todos: nada de "não achou nada", que seria falso. */
+    nadaSobrou: "Não sobrou nada para confirmar. O que você tirou fica na lista abaixo, e dá para desfazer.",
+    origem: { site: "Do seu site", instagram: "Do seu Instagram", youtube: "Do seu YouTube" },
+    novidade: "novidade deste mês",
+    /** Uma proposta nova por cima de algo que a pessoa já tinha confirmado. */
+    novidadeMudou: "mudou desde a última leitura",
+    novidadeAlemDoBriefing: "algo que você não tinha contado",
+    confirmado: "Confirmado",
+    corrigido: "Corrigido por você",
+    estaCerto: "Está certo",
+    corrigir: "Corrigir",
+    salvar: "Salvar",
+    cancelar: "Cancelar",
+    tirar: "Tirar",
+    desfazer: "Desfazer",
+    tirado: "Tirado. Não entra nos seus roteiros.",
+    /** Uma proposta nova por cima de um texto que a pessoa já tinha confirmado: o que continua valendo até ela decidir. */
+    valiaAntes: "Até você decidir, nos seus roteiros continua valendo o que você tinha confirmado:",
+    /** A proposta trocou enquanto a página estava aberta: a confirmação não vale para um texto que a pessoa não leu. */
+    mudouEnquantoLia: "Esta leitura mudou enquanto você olhava. Confira o texto novo e confirme de novo.",
+    /** Os itens tirados, numa lista à parte, para dar para desfazer depois de recarregar a página. */
+    tiradosTitulo: (quantos: number): string => (quantos === 1 ? "1 item que você tirou" : `${quantos} itens que você tirou`),
+    tiradosAjuda: "O que você tira não volta sozinho. Se voltar com outras palavras, é só tirar de novo. Se tirou sem querer, toque em Desfazer.",
+    /** O nome acessível de cada botão de ação leva o item (a tela tem vários "Está certo" e "Corrigir"). */
+    rotuloDaAcao: (acao: string, texto: string): string => `${acao}: ${texto.length > 60 ? `${texto.slice(0, 57).trimEnd()}...` : texto}`,
+    anuncioConfirmado: "Item confirmado.",
+    anuncioCorrigido: "Correção guardada.",
+    anuncioTirado: "Item tirado.",
+    anuncioDesfeito: "Item de volta na lista.",
+    campoCorrigir: "Corrigir o que a IA entendeu",
+    campoCorrigirAjuda: "Escreva do seu jeito, em uma ou duas frases.",
+    contadorCorrecao: (usados: number, maximo: number): string => `${usados} de ${maximo} caracteres`,
+    textoObrigatorio: "Escreva o que está certo, ou toque em Cancelar.",
+    textoLongo: (maximo: number): string => `Passou de ${maximo} caracteres. Encurte um pouco: o que você escreve aqui entra inteiro em todo roteiro.`,
+    erroConfirmar: "Não conseguimos confirmar agora. Tente de novo em instantes.",
+    erroCorrigir: "Não conseguimos guardar a correção agora. O que você escreveu continua aí; tente de novo em instantes.",
+    /** O campo daquele item já foi trocado pelo de outro (a pessoa abriu outra correção enquanto este salvava): nada de prometer o texto. */
+    erroCorrigirSemTexto: "Não conseguimos guardar a correção agora. Toque em Corrigir neste item e escreva de novo daqui a instantes.",
+    erroTirar: "Não conseguimos tirar agora. Tente de novo em instantes.",
+    erroDesfazer: "Não conseguimos desfazer agora. Tente de novo em instantes.",
+    semConexaoConfirmar: "Sem conexão. Não deu para confirmar; tente de novo quando a rede voltar.",
+    semConexaoCorrigir: "Sem conexão. Não deu para guardar; o que você escreveu continua aí, tente de novo quando a rede voltar.",
+    semConexaoCorrigirSemTexto: "Sem conexão. Não deu para guardar a correção; toque em Corrigir neste item e escreva de novo quando a rede voltar.",
+    semConexaoTirar: "Sem conexão. Não deu para tirar; tente de novo quando a rede voltar.",
+    semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
+    /** Por que uma fonte não foi lida, na voz de quem fala com a pessoa (a fonte vai no começo da frase). */
+    naoLida: {
+      site: {
+        endereco_invalido: "Site: o endereço não parece certo. Confira em Conta.",
+        endereco_privado: "Site: o endereço não parece certo. Confira em Conta.",
+        redirecionamento_invalido: "Site: o endereço não parece certo. Confira em Conta.",
+        rede_social: "Site: o endereço é de uma rede social. Aqui vale o site da marca; o perfil a gente lê pelo Instagram ou pelo YouTube.",
+        robots_proibe: "Site: ele pede que robôs não leiam, e a gente respeita.",
+        robots_indisponivel: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        erro_do_site: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        tempo_esgotado: "Site: demorou demais para responder. A gente tenta de novo em alguns dias.",
+        sem_resposta: "Site: não respondeu. A gente tenta de novo em alguns dias.",
+        bloqueado_pelo_site: "Site: não deixou a gente ler.",
+        nao_encontrado: "Site: não achamos a página. Confira o endereço em Conta.",
+        grande_demais: "Site: não conseguimos tirar o texto dele.",
+        nao_e_html: "Site: não conseguimos tirar o texto dele.",
+        sem_texto:
+          "Site: não conseguimos pegar o texto dele (alguns sites carregam o texto de um jeito que a gente não alcança). O que você respondeu já ajuda.",
+        limite_de_requisicoes:
+          "Site: foram páginas demais até chegar ao texto. Confira em Conta se o endereço é o da página principal do site.",
+        // Um motivo novo no leitor sem frase aqui deixa de compilar (o `satisfies`), em vez de cair em "não deu para ler" em silêncio.
+      } satisfies Record<MotivoLeituraSite, string>,
+      rede: {
+        nao_encontrado: "{rede}: não achamos este perfil. Confira o @ em Conta.",
+        sem_videos: "{rede}: ainda não tem vídeo publicado para a gente ler.",
+        conta_restrita: "{rede}: não conseguimos ler este perfil. Confira o @; o Instagram também só deixa ler conta profissional e sem restrição de idade.",
+        desligada: "{rede}: a leitura está desligada por aqui por enquanto.",
+        indisponivel: "{rede}: não deu para ler agora. A gente tenta de novo em alguns dias.",
+      } as Record<string, string>,
+      padraoSite: "Site: não deu para ler.",
+      padraoRede: "{rede}: não deu para ler.",
+    },
+  },
   /** E38, partes 2 e 3: a leitura de cada perfil citado ou da própria marca, conferido na API de verdade. */
   contextoMarca: {
     titulo: "O que a IA viu nos perfis",
@@ -258,6 +367,11 @@ export const textosBriefing = {
     rotuloPropriaMarca: "o seu perfil",
     pendente: "Ainda lendo este perfil.",
     naoEncontrado: "Não achamos este perfil na rede. Confira se o @ está certo.",
+    /** E38 PR 2, acabamento a: o TikTok está desligado por decisão, não é @ errado. Frase neutra: serve ao concorrente citado e ao seu. */
+    tiktokDesligado: "O TikTok ainda não é lido por aqui; este @ fica guardado.",
+    semVideos: "Este perfil ainda não tem vídeo publicado para a gente ler.",
+    contaRestrita:
+      "Não conseguimos ler este perfil. Confira o @; o Instagram também só deixa ler conta profissional e sem restrição de idade.",
   },
 };
 

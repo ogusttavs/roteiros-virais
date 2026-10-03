@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { TemaPreferido, TipoMarca } from "@/db/schema";
 import type { OndeValor } from "@/lib/onde";
 import { montarCampoOnde } from "@/lib/onde";
+import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
@@ -24,6 +25,8 @@ type Props = {
   instagramInicial: string;
   tiktokInicial: string;
   youtubeInicial: string;
+  /** E38 PR 2: o site da marca, no mesmo lugar dos perfis (depois do YouTube), como o desenho do Opus pede. */
+  siteInicial: string;
   temaInicial: TemaPreferido;
   horaLembreteInicial: string;
   /** V3, item 4: "Perfis nas redes" é da marca ativa, ganha o nome dela no subtítulo. */
@@ -83,6 +86,7 @@ export function FormularioConta({
   instagramInicial,
   tiktokInicial,
   youtubeInicial,
+  siteInicial,
   temaInicial,
   horaLembreteInicial,
   nomeMarca,
@@ -97,6 +101,7 @@ export function FormularioConta({
   const [instagram, setInstagram] = useState(instagramInicial);
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
+  const [site, setSite] = useState(siteInicial);
   const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
   const [regiao, setRegiao] = useState(regiaoInicial ?? "");
   const [pais, setPais] = useState(paisInicial ?? "");
@@ -105,9 +110,13 @@ export function FormularioConta({
   const [horaLembrete, setHoraLembrete] = useState(horaLembreteInicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  /** O erro do campo do site fica no próprio campo (liga a ele por `aria-describedby`), não no pé do formulário. */
+  const [erroSite, setErroSite] = useState<string | undefined>(undefined);
   const [toastAberto, setToastAberto] = useState(false);
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
+
+  const siteRef = useRef<HTMLInputElement>(null);
 
   const indiceTema = OPCOES_TEMA.findIndex((opcao) => opcao.valor === tema);
   const indiceOnde = dadosFixos.onde.opcoes.findIndex((opcao) => opcao.valor === onde);
@@ -115,9 +124,19 @@ export function FormularioConta({
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
+    setErroSite(undefined);
     const horaArredondada = arredondarParaHoraCheia(horaLembrete);
     if (horaArredondada < HORA_LEMBRETE_MINIMA || horaArredondada > HORA_LEMBRETE_MAXIMA) {
       setErro(textosConta.erroHoraForaDaFaixa);
+      return;
+    }
+    const siteNormalizado = normalizarSite(site);
+    // O site só é conferido (e só vai ao servidor) se a pessoa mexeu nele: um endereço gravado antes da regra de agora (uma porta, um
+    // IP) não pode impedir de salvar o nome, o tema ou o lembrete, e o servidor, sem o campo, não mexe no que está gravado.
+    const siteMudou = siteNormalizado !== normalizarSite(siteInicial);
+    if (siteMudou && siteNormalizado.length > 0 && !siteValido(siteNormalizado)) {
+      setErroSite(textosBriefing.dadosFixos.siteInvalido);
+      siteRef.current?.focus();
       return;
     }
     if (onde === "local" && regiao.trim().length === 0) {
@@ -137,12 +156,14 @@ export function FormularioConta({
       await salvarContaAction({
         nome,
         perfis: { instagram, tiktok, youtube },
+        ...(siteMudou ? { site: siteNormalizado } : {}),
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
         ...(onde ? montarCampoOnde(onde, regiao.trim(), pais.trim(), paises.trim()) : {}),
       });
       avisarRedeOk();
+      if (siteMudou) setSite(siteNormalizado);
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
       setToastAberto(true);
@@ -188,6 +209,21 @@ export function FormularioConta({
             valor={youtube}
             onMudar={setYoutube}
             avisoInvalido={textosConta.perfilInvalido}
+          />
+          <Campo
+            ref={siteRef}
+            rotulo={dadosFixos.site.rotulo}
+            ajuda={dadosFixos.site.ajuda}
+            value={site}
+            onChange={(e) => {
+              setSite(e.target.value);
+              setErroSite(undefined);
+            }}
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            erro={erroSite}
           />
         </div>
 

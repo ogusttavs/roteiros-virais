@@ -18,7 +18,7 @@
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, contas, nichos, perfisAnalisados, type Plataforma } from "@/db/schema";
+import { clientes, contas, nichos, perfisAnalisados, type MotivoPerfilNaoLido, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as analisarPerfilCitado from "@/ia/prompts/analisarPerfilCitado";
 import { calcularCustoUsd, registrarGeracao } from "@/ia/registro";
@@ -60,6 +60,8 @@ async function gravarResultado(
     leitura?: string | null;
     qualificaParaSetor?: boolean;
     erro?: string | null;
+    /** Por que não há leitura (E38 PR 2): a tela escolhe a frase por ele; `erro` fica só para falha técnica. */
+    motivo?: MotivoPerfilNaoLido | null;
   },
 ): Promise<void> {
   await db()
@@ -76,6 +78,7 @@ async function gravarResultado(
       leitura: dados.leitura ?? null,
       qualificaParaSetor: dados.qualificaParaSetor ?? false,
       erro: dados.erro ?? null,
+      motivo: dados.motivo ?? null,
       atualizadoEm: new Date(),
     })
     .onConflictDoUpdate({
@@ -89,6 +92,8 @@ async function gravarResultado(
         leitura: dados.leitura ?? null,
         qualificaParaSetor: dados.qualificaParaSetor ?? false,
         erro: dados.erro ?? null,
+        // No `set` também: um perfil que um dia foi "não encontrado" e agora foi lido não pode ficar com o motivo velho.
+        motivo: dados.motivo ?? null,
         atualizadoEm: new Date(),
       },
     });
@@ -101,7 +106,7 @@ function papelDoPerfil(payload: PayloadAnalisarPerfil): "concorrente" | "admira"
 
 export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promise<Record<string, unknown>> {
   if (payload.rede === "tiktok") {
-    await gravarResultado(payload, { existeNaRede: false, erro: "TikTok fora do ar por enquanto (Apify suspenso)." });
+    await gravarResultado(payload, { existeNaRede: false, motivo: "tiktok_desligado" });
     return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, pulado: "tiktok_suspenso" };
   }
 
@@ -110,14 +115,16 @@ export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promi
 
   let confirmado: ContaConfirmada | null;
   try {
-    confirmado = payload.rede === "youtube" ? await confirmarYoutube(payload.handle) : await confirmarInstagram(payload.handle);
+    // Só o perfil citado respeita a lista de contas "tiradas" do setor; o @ da própria marca nunca é barrado por ela.
+    const opcoes = { ignorarTirada: payload.origem === "propria_marca" };
+    confirmado = payload.rede === "youtube" ? await confirmarYoutube(payload.handle, opcoes) : await confirmarInstagram(payload.handle, opcoes);
   } catch (erro) {
     if (erro instanceof ErroYoutubeApi && erro.message.includes("playlistNotFound")) {
-      await gravarResultado(payload, { existeNaRede: false, erro: "o canal nao tem video publicado." });
+      await gravarResultado(payload, { existeNaRede: false, motivo: "sem_videos" });
       return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, descartado: "sem_videos" };
     }
     if (erro instanceof ErroMetaApi && erroMetaEhDaConta(erro)) {
-      await gravarResultado(payload, { existeNaRede: false, erro: "perfil pessoal ou com restricao de idade." });
+      await gravarResultado(payload, { existeNaRede: false, motivo: "conta_restrita" });
       return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, descartado: "conta_restrita" };
     }
     logger.error({ err: erro, clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle }, "analisar-perfil: falha conferindo o perfil");
@@ -125,7 +132,7 @@ export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promi
   }
 
   if (!confirmado) {
-    await gravarResultado(payload, { existeNaRede: false, erro: "perfil nao encontrado na rede." });
+    await gravarResultado(payload, { existeNaRede: false, motivo: "nao_encontrado" });
     return { clienteId: payload.clienteId, rede: payload.rede, handle: payload.handle, descartado: "nao_encontrado" };
   }
 
@@ -145,7 +152,9 @@ export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promi
       tipo: papelDoPerfil(payload),
       nomeDoCliente: cliente.nome,
       oQueVende: perfilCompilado?.fatos.oQueVende ?? "",
-      handle: confirmado.handle,
+      // `payload.handle`, o que a pessoa escreveu: no YouTube `confirmado.handle` é o id do canal (UC...), e o
+      // modelo podia escrever esse id na leitura que ela lê (achado do levantamento do PR 2).
+      handle: payload.handle,
       titulos,
     }),
   });

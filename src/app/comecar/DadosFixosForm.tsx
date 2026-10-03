@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 import { montarCampoOnde } from "@/lib/onde";
-import { siteValido } from "@/lib/site-valido";
+import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
@@ -78,6 +78,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   const [erro, setErro] = useState<string | null>(null);
 
   const [tentouEnviar, setTentouEnviar] = useState(false);
+  /** Conta as tentativas (e não só "tentou"): o segundo toque no Continuar também leva o foco ao campo que está errado. */
+  const [tentativas, setTentativas] = useState(0);
+  const formaRef = useRef<HTMLFormElement>(null);
   const tratarFalha = useTratarFalha();
   const erroRef = useRef<HTMLParagraphElement>(null);
 
@@ -89,13 +92,19 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     if (erro) erroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [erro]);
 
+  // Com o formulário inválido, o foco vai ao primeiro campo marcado como errado (o `Campo` não aceita `ref`): rola até ele
+  // e quem usa leitor de tela ouve a frase do erro. Antes, o toque em "Continuar" não parecia fazer nada.
+  useEffect(() => {
+    if (tentativas > 0) formaRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [tentativas]);
+
   const podeContinuar =
     nome.trim().length > 0 &&
     onde.length > 0 &&
     (onde !== "local" || regiao.trim().length > 0) &&
     (onde !== "outro_pais" || pais.trim().length > 0) &&
     (onde !== "mais_de_um_pais" || paises.trim().length > 0) &&
-    (site.trim().length === 0 || siteValido(site.trim())) &&
+    (site.trim().length === 0 || siteValido(normalizarSite(site))) &&
     (nichoId !== OUTRO || ramoOutro.trim().length > 0);
 
   async function enviar(evento: FormEvent) {
@@ -103,6 +112,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     if (salvando) return;
     if (!podeContinuar) {
       setTentouEnviar(true);
+      setTentativas((n) => n + 1);
       return;
     }
     setSalvando(true);
@@ -112,7 +122,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
         nome,
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
         ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
-        site: site.trim() || undefined,
+        site: normalizarSite(site) || undefined,
         nichoId: nichoId === OUTRO ? undefined : nichoId,
         ramoOutro: nichoId === OUTRO ? ramoOutro : undefined,
         persona,
@@ -132,7 +142,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   }
 
   return (
-    <form className={styles.forma} onSubmit={enviar}>
+    <form ref={formaRef} className={styles.forma} onSubmit={enviar}>
       <Cartao className={styles.dois}>
         <Campo rotulo={dadosFixos.nome.rotulo} value={nome} onChange={(evento) => setNome(evento.target.value)} />
         <label className={styles.campoSelect} htmlFor="ramo">
@@ -168,7 +178,11 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
           ajuda={dadosFixos.site.ajuda}
           value={site}
           onChange={(evento) => setSite(evento.target.value)}
-          erro={tentouEnviar && site.trim().length > 0 && !siteValido(site.trim()) ? t.siteInvalido : undefined}
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          erro={tentouEnviar && site.trim().length > 0 && !siteValido(normalizarSite(site)) ? t.siteInvalido : undefined}
         />
       </Cartao>
 

@@ -134,7 +134,9 @@ describe("rodarAnalisarPerfil, TikTok (Apify suspenso)", () => {
     expect(mockFetch).not.toHaveBeenCalled();
     const linha = await linhaAnalisada(clienteId, "perfiltiktok");
     expect(linha?.existeNaRede).toBe(false);
-    expect(linha?.erro).toContain("Apify suspenso");
+    // E38 PR 2, acabamento a: o motivo é coluna própria, e o TikTok desligado não é erro nenhum.
+    expect(linha?.motivo).toBe("tiktok_desligado");
+    expect(linha?.erro).toBeNull();
   });
 });
 
@@ -148,7 +150,8 @@ describe("rodarAnalisarPerfil, YouTube", () => {
     expect(resultado.descartado).toBe("nao_encontrado");
     const linha = await linhaAnalisada(clienteId, "@naoexiste");
     expect(linha?.existeNaRede).toBe(false);
-    expect(linha?.erro).toContain("nao encontrado na rede.");
+    expect(linha?.motivo).toBe("nao_encontrado");
+    expect(linha?.erro).toBeNull();
   });
 
   it("o canal nao tem playlist de uploads (ErroYoutubeApi com playlistNotFound): descartado como sem_videos", async () => {
@@ -163,6 +166,25 @@ describe("rodarAnalisarPerfil, YouTube", () => {
     expect(resultado.descartado).toBe("sem_videos");
     const linha = await linhaAnalisada(clienteId, "@semvideos");
     expect(linha?.existeNaRede).toBe(false);
+    expect(linha?.motivo).toBe("sem_videos");
+  });
+
+  it("canal que o admin tirou da vigilância do setor: o perfil citado continua barrado, mas o @ da PRÓPRIA marca é lido (E38 PR 2)", async () => {
+    await db().insert(contas).values({ plataforma: "youtube", handle: "canal-tirado-do-setor", origem: "coleta", removidaEm: new Date() });
+    const clienteId = await criarClienteComNicho("canal-tirado", null);
+    mockYoutube(
+      { "@canaltirado": { id: "canal-tirado-do-setor", country: "BR", playlistId: "pl-canal-tirado" } },
+      { "canal-tirado-do-setor": videosBonsPadrao("canal-tirado") },
+    );
+
+    const citado = await rodarAnalisarPerfil(payload(clienteId, "@canaltirado", { origem: "citado", tipoCitado: "concorrente", perfilCitadoId: null }));
+    expect(citado.descartado).toBe("nao_encontrado");
+
+    const propria = await rodarAnalisarPerfil(payload(clienteId, "@canaltirado"));
+    expect(propria.descartado).toBeUndefined();
+    const linha = await linhaAnalisada(clienteId, "@canaltirado");
+    expect(linha?.existeNaRede).toBe(true);
+    expect(linha?.leitura).toBeTruthy();
   });
 
   it("cliente sem setor: grava a leitura, nunca classifica (qualificaParaSetor falso)", async () => {

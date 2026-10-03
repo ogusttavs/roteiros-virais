@@ -73,11 +73,24 @@ export function analisarUrlPerfil(bruta: string): { plataforma: Plataforma; hand
 export function limparCampoPerfil(valor: string, plataforma: Plataforma): string {
   const aparado = valor.trim();
   if (!aparado) return "";
+  // Nenhum perfil de verdade chega perto disto; o limite (e o laço linear de `semBarrasNoFim`, no lugar de `/\/+$/`, que é
+  // quadrático numa linha de barras) existe porque o campo chega do servidor sem teto, por uma ação que a tela não mandou.
+  if (aparado.length > TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL) return "";
   const comoUrl = analisarUrlPerfil(aparado);
   if (comoUrl && comoUrl.plataforma === plataforma) {
     return normalizarHandle(comoUrl.handle, plataforma);
   }
-  return normalizarHandle(aparado.replace(/\/+$/, ""), plataforma);
+  return normalizarHandle(semBarrasNoFim(aparado), plataforma);
+}
+
+/** O que cabe no campo de um perfil (um endereço inteiro cola nele): acima disto o servidor recusa e a limpeza devolve vazio. */
+export const TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL = 300;
+
+/** Tira as barras do fim, num laço (a regex `/\/+$/` testa cada posição de uma linha de barras e é quadrática). */
+export function semBarrasNoFim(texto: string): string {
+  let fim = texto.length;
+  while (fim > 0 && texto[fim - 1] === "/") fim -= 1;
+  return texto.slice(0, fim);
 }
 
 /**
@@ -90,4 +103,13 @@ export function perfilPareceValido(handleLimpo: string): boolean {
   if (!handleLimpo) return true;
   const semArroba = handleLimpo.replace(/^@/, "");
   return /^[a-zA-Z0-9._-]+$/.test(semArroba);
+}
+
+/**
+ * Mostra o handle com um "@" só (E38 PR 2, achado do levantamento do PR 1): o YouTube é guardado
+ * com "@" (`normalizarHandle`), o Instagram e o TikTok sem; escrever `@${handle}` na tela e no
+ * prompt do roteiro dava "@@canal" no YouTube.
+ */
+export function comArroba(handle: string): string {
+  return handle.startsWith("@") ? handle : `@${handle}`;
 }

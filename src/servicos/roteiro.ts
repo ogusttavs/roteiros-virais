@@ -45,6 +45,7 @@ import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { comArroba } from "@/lib/perfil-redes";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -390,7 +391,7 @@ export function formatarCamadaExclusiva(
     );
   }
   for (const leitura of leiturasPerfis) {
-    linhas.push(`Sobre @${leitura.handle}: ${leitura.leitura}`);
+    linhas.push(`Sobre ${comArroba(leitura.handle)}: ${leitura.leitura}`);
   }
   return linhas.length > 0
     ? linhas.join(" ")
@@ -870,7 +871,14 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       );
   const evidencias = ehMomento
     ? []
-    : await filtrarEvidenciaPelaMarca(evidenciasCombinadas, perfilCompilado, dados.clienteId);
+    : await filtrarEvidenciaPelaMarca(
+        evidenciasCombinadas,
+        // E38 PR 2: o filtro continua julgando pelo perfil de sempre, sem o bloco do que a pessoa
+        // confirmou sobre o site e as redes (mais texto no "na dúvida, reprove" mudaria o que ele
+        // reprova, e não há conjunto de referência dele para medir).
+        formatarPerfilCompilado(perfil, { semContextoConfirmado: true }),
+        dados.clienteId,
+      );
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { comArroba } from "@/lib/perfil-redes";
+
 import type { EsforcoIA, NivelIA } from "../tipos";
 
 /**
@@ -7,7 +9,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * (concorrente ou perfil que admira) ou da própria marca, pelos últimos títulos/legendas que a
  * API de verdade devolveu (nunca por memória do modelo). Modelo barato, uma chamada por perfil.
  */
-export const versao = "1.0.0";
+/**
+ * 1.0.1 (E38 PR 2): o handle do YouTube já vem com "@" (`normalizarHandle`), e `@${handle}` escrevia
+ * "@@canal" na entrada; agora `comArroba`. Só a linha "Perfil:" da entrada muda.
+ */
+export const versao = "1.0.1";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -57,7 +63,7 @@ export function montarEntrada(dados: {
       : "nenhum título ou legenda disponível";
 
   return `Cliente: ${dados.nomeDoCliente} (${dados.oQueVende})
-Perfil: @${dados.handle}, ${papel}
+Perfil: ${comArroba(dados.handle)}, ${papel}
 
 Títulos/legendas recentes do perfil:
 ${lista}`;

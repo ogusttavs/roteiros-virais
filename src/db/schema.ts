@@ -381,6 +381,16 @@ export type PerfilCompilado = {
    * `formatarPerfilCompilado` trata como listas vazias.
    */
   perfisCitados?: { concorrentes: string[]; admira: string[] };
+  /**
+   * E38 PR 2 ("o que entendemos da sua marca"): o que a pessoa CONFIRMOU ou CORRIGIU na seção "O
+   * que a IA tirou das suas redes e do seu site" do briefing. Nunca mora neste JSON: `briefings.perfil`
+   * é reescrito inteiro a cada edição de resposta (`compilarEGravarPerfil`), o que apagaria o
+   * campo. A fonte é a tabela `contexto_marca_itens`; `perfilDoCliente` (src/servicos/briefing.ts)
+   * mescla o campo na hora de ler, para todo consumidor do perfil (roteiro, tema, plano) ver a
+   * versão em vigor sem recompilar nada. Opcional, nunca obrigatório: mais de 15 arquivos montam
+   * literais deste tipo. Só item que a pessoa confirmou entra; pendente nunca vai para um prompt.
+   */
+  contextoConfirmado?: { categoria: CategoriaContextoMarca; texto: string }[];
 };
 
 export const briefings = pgTable("briefings", {
@@ -441,6 +451,13 @@ export const perfisCitados = pgTable(
 export type OrigemPerfilAnalisado = "citado" | "propria_marca";
 
 /**
+ * Por que um perfil analisado não tem leitura (E38 PR 2, acabamento a). Separado de `erro`: a
+ * tela escolhe a frase pelo motivo, e só "nao_encontrado" é de fato um @ digitado errado. Linhas
+ * antigas têm `motivo` nulo; `estadoDoPerfilAnalisado` (src/lib/perfil-analisado-motivo.ts) deriva na leitura (pela frase antiga em `erro`).
+ */
+export type MotivoPerfilNaoLido = "tiktok_desligado" | "nao_encontrado" | "sem_videos" | "conta_restrita";
+
+/**
  * A camada exclusiva de verdade (E38, partes 2 e 3; `clientes.camadaExclusiva`, acima, é só texto
  * livre para o prompt, sem vídeo nem conferência nenhuma). Uma linha por perfil citado pelo
  * cliente ou pela própria marca, conferido na API da rede de verdade (nunca por memória do
@@ -475,10 +492,90 @@ export const perfisAnalisados = pgTable(
     viraDoSetorEm: timestamp("vira_do_setor_em", { withTimezone: true }),
     /** A conferência ou a leitura falharam de um jeito que não vale tentar nesta mesma hora. */
     erro: text("erro"),
+    /** Por que não há leitura (E38 PR 2, acabamento a); nulo em linha antiga e quando há leitura. */
+    motivo: text("motivo").$type<MotivoPerfilNaoLido>(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
     criadoEm: criadoEm(),
   },
   (t) => [uniqueIndex("perfis_analisados_cliente_rede_handle").on(t.clienteId, t.rede, t.handle)],
+);
+
+/** As quatro coisas que "o que entendemos da sua marca" diz (plano, E38, item 1). */
+export type CategoriaContextoMarca = "vende" | "fala" | "posta" | "rendeu";
+/** De onde veio o item; só o que foi lido de verdade naquela leitura pode ser declarado. */
+export type FonteContextoMarca = "site" | "instagram" | "youtube";
+/** `para_confirmar`: a proposta da IA ainda sem resposta; `recusado`: a pessoa tirou, nunca volta. */
+export type EstadoItemContextoMarca = "para_confirmar" | "confirmado" | "corrigido" | "recusado";
+/** O que a pílula "novidade" diz: item novo, texto que mudou, ou algo que a pessoa não tinha contado. */
+export type NovidadeContextoMarca = "nova" | "mudou" | "alem_do_briefing";
+
+/** O estado de cada fonte na última leitura, para a tela dizer o que foi lido e o que não deu. */
+export type FonteDoContexto = {
+  tipo: FonteContextoMarca | "tiktok";
+  lida: boolean;
+  /** Por que não foi lida (ver `MotivoLeituraSite` e `MotivoPerfilNaoLido`); ausente quando lida. */
+  motivo?: string;
+  /** Páginas do site ou vídeos da rede que entraram na leitura. */
+  quantidade?: number;
+};
+
+/**
+ * E38 PR 2: o estado da leitura mensal do site e das redes da própria marca, uma linha por
+ * cliente. Nada daqui alimenta a base do setor (nenhuma ligação com `nichos`, `contas` ou
+ * `videos`): é a camada exclusiva do cliente, como `perfis_analisados`. ESTA tabela não guarda o
+ * texto bruto das páginas, só o hash, a quantidade e o estado. Atenção: o texto lido (até cinco
+ * páginas) vai na entrada da chamada de IA, e `geracoes_ia.entradas` guarda a entrada inteira de
+ * toda chamada, sem prazo (ver "decisões pendentes" do TODO: privacidade e exclusão da marca).
+ */
+export const contextoMarca = pgTable("contexto_marca", {
+  id: id(),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id, { onDelete: "cascade" })
+    .unique(),
+  /** sha256 do texto das páginas, dos títulos lidos e do resumo do briefing usado; igual ao anterior e a IA não é chamada (o briefing pronto depois refaz a leitura). */
+  hashFontes: text("hash_fontes"),
+  ultimaLeituraOkEm: timestamp("ultima_leitura_ok_em", { withTimezone: true }),
+  ultimaTentativaEm: timestamp("ultima_tentativa_em", { withTimezone: true }),
+  /** Depois de uma falha esperada (site fora do ar, bloqueio, IA reprovada): não insistir antes. */
+  proximaTentativaEm: timestamp("proxima_tentativa_em", { withTimezone: true }),
+  /** Trava atômica: duas leituras da mesma marca nunca rodam juntas (hotfix de 01/10, jobs repetidos). */
+  lendoDesde: timestamp("lendo_desde", { withTimezone: true }),
+  fontes: jsonb("fontes").$type<FonteDoContexto[]>().notNull().default([]),
+  criadoEm: criadoEm(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Uma afirmação sobre a marca que a pessoa confirma, corrige ou tira. `texto` é a última proposta
+ * da IA; `textoConfirmado` é o que está em vigor (o texto da IA que ela aceitou, ou o que ela
+ * escreveu no lugar) e é o único que chega aos prompts. Se uma leitura nova propõe outro texto,
+ * `texto` muda e o item volta a `para_confirmar`, mas `textoConfirmado` continua valendo até a
+ * pessoa decidir. A correção da pessoa nunca é sobrescrita pela IA; item `recusado` nunca volta.
+ */
+export const contextoMarcaItens = pgTable(
+  "contexto_marca_itens",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    categoria: text("categoria").$type<CategoriaContextoMarca>().notNull(),
+    origem: text("origem").$type<FonteContextoMarca>().notNull(),
+    texto: text("texto").notNull(),
+    textoConfirmado: text("texto_confirmado"),
+    estado: text("estado").$type<EstadoItemContextoMarca>().notNull().default("para_confirmar"),
+    /** O estado de antes de a pessoa tirar o item, para "Desfazer" devolver o que era. */
+    estadoAnterior: text("estado_anterior").$type<EstadoItemContextoMarca>(),
+    novidade: text("novidade").$type<NovidadeContextoMarca>(),
+    /** A última leitura que leu a fonte do item e não o propôs de novo. */
+    sumiuEm: timestamp("sumiu_em", { withTimezone: true }),
+    ultimaVezVistoEm: timestamp("ultima_vez_visto_em", { withTimezone: true }).notNull().defaultNow(),
+    confirmadoEm: timestamp("confirmado_em", { withTimezone: true }),
+    criadoEm: criadoEm(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("contexto_marca_itens_cliente_id").on(t.clienteId)],
 );
 
 // ---------------------------------------------------------------------------
@@ -1589,3 +1686,5 @@ export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;
 export type ConsumoApi = typeof consumoApi.$inferSelect;
 export type AprendizadoCliente = typeof aprendizadoCliente.$inferSelect;
+export type ContextoMarca = typeof contextoMarca.$inferSelect;
+export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;

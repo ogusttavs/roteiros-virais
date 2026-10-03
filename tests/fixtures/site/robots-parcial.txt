@@ -1,0 +1,13 @@
+# robots.txt de exemplo
+User-agent: *
+Disallow: /privado/
+Disallow: /produtos/bolos
+Allow: /produtos/bolos/vitrine
+Disallow: /*.pdf$
+Disallow: /busca?
+
+User-agent: OutroRobo
+Disallow: /
+
+Sitemap: https://loja-exemplo.test/sitemap.xml
+Sitemap: https://outro-site.test/sitemap.xml

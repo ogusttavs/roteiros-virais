@@ -123,12 +123,12 @@ describe("salvarDadosFixos", () => {
     ).rejects.toThrow();
   });
 
-  it("recusa um site que nao e https ou nao tem dominio", async () => {
+  it("recusa um site de rede interna ou sem dominio (o http:// vira https://, não é mais recusado)", async () => {
     await expect(
       salvarDadosFixos(clienteId, {
         nome: "Sorriso Novo",
         alcance: "brasil",
-        site: "http://sorrisonovo.com.br",
+        site: "ftp://sorrisonovo.com.br",
         nichoId: nichoAtivoId,
         persona: "negocio",
       }),

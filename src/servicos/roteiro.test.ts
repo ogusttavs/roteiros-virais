@@ -127,6 +127,19 @@ describe("formatarCamadaExclusiva", () => {
     expect(texto).toContain("Sobre @concorrente1: posta antes e depois com música.");
     expect(texto).toContain("Sobre @marca_propria: o que mais rende são os bastidores.");
   });
+
+  it("o YouTube guarda o @ no handle: a linha sai com um arroba só, nunca '@@'", () => {
+    const texto = formatarCamadaExclusiva(
+      { alcance: null, regiao: null, pais: null, paises: null, camadaExclusiva: CAMADA_VAZIA },
+      [
+        { handle: "@canal", leitura: "explica passo a passo." },
+        { handle: "canal2", leitura: "fala devagar." },
+      ],
+    );
+    expect(texto).toContain("Sobre @canal: explica passo a passo.");
+    expect(texto).toContain("Sobre @canal2: fala devagar.");
+    expect(texto).not.toContain("@@");
+  });
 });
 
 function evidencia(

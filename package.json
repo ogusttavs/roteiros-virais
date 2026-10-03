@@ -42,6 +42,7 @@
     "avaliar:agendas": "tsx scripts/avaliar-agendas.ts",
     "avaliar:stories": "tsx scripts/avaliar-stories.ts",
     "avaliar:roteiros-sem-fala": "tsx scripts/avaliar-roteiros-sem-fala.ts",
+    "avaliar:entender-marca": "tsx scripts/avaliar-entender-marca.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
@@ -54,7 +55,8 @@
     "capturas:v9b-plano": "AI_PROVIDER=mock tsx scripts/capturas-v9b-plano.ts",
     "capturas:sem-limite-diario": "AI_PROVIDER=mock tsx scripts/capturas-sem-limite-diario.ts",
     "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts",
-    "capturas:v12-portas": "AI_PROVIDER=mock tsx scripts/capturas-v12-portas.ts"
+    "capturas:v12-portas": "AI_PROVIDER=mock tsx scripts/capturas-v12-portas.ts",
+    "capturas:e38-pr2": "AI_PROVIDER=mock tsx scripts/capturas-e38-pr2.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",
@@ -67,6 +69,7 @@
     "groq-sdk": "^1.6.0",
     "lucide-react": "^1.39.0",
     "next": "^15.5.25",
+    "parse5": "^8.0.1",
     "pg": "^8.23.0",
     "pg-boss": "^12.29.0",
     "pino": "^10.3.1",
@@ -75,6 +78,7 @@
     "react-dom": "^19.2.8",
     "resend": "^6.25.0",
     "rss-parser": "^3.13.0",
+    "undici": "^7.30.0",
     "zod": "^4.5.4"
   },
   "devDependencies": {

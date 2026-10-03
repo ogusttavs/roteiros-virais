@@ -115,3 +115,29 @@ npm run avaliar:roteiros-sem-fala
 Imprime cada cena gerada (o que falar, que precisa sair vazio, o que mostrar, o texto na
 tela), a legenda do post, e quantos casos o verificador de produção (checagem com
 `estilo: "sem_fala"` mais `verificarTexto`) reprovaria.
+
+## Formato de `entender-marca.json` e `entender-marca.exemplo.json` (E38 PR 2)
+
+A tarefa `entenderMarca` ("o que entendemos da sua marca") também não tem nota de 0 a 10: o que dá para
+medir por código é conferido, e o resto (se um item é um fato inventado) fica impresso para leitura
+humana. Cada caso é uma marca: `tipo` ("negocio" ou "pessoa"), `nomeDaMarca`, `resumoDoBriefing` (só
+para a IA comparar), `site` (`endereco` mais `paginas` com `caminho` e `texto`, ou `null`), `redes`
+(`rede`, `handle` e `videos` com `titulo` e `views`; a mediana e o "quantas vezes passa dela" são
+calculados pelo script com o mesmo código de produção, nunca pela IA). Opcionais: `itensAtuais` (os que
+já existem, com `id`, `categoria`, `origem`, `estado` e `texto`), `itensTirados` (o que a pessoa tirou),
+`naoDeveConter` (trechos que o caso escondeu no site como "instrução", que a IA nunca pode obedecer) e
+`deveReusarId` (os ids que a IA precisa reaproveitar) e `deveConter` (texto que algum item tem de trazer; só com a chave real, o mock devolve um texto fixo). `GOLDEN_SET_DIR/entender-marca.json` é o real; sem
+ele, roda com `entender-marca.exemplo.json`, sete casos fictícios (uma loja de limpeza, uma clínica, uma
+personal trainer, uma padaria com instrução escondida, um estúdio americano com site em inglês, um caso
+com itens que já existem, e um perfil com poucos vídeos e uma visualização sem dado).
+
+```bash
+npm run avaliar:entender-marca
+```
+
+Imprime os itens de cada caso e, por caso, as conferências automáticas (origem que não foi lida, item de
+"rendeu" sem número, item de "rendeu" com um número que a entrada não trouxe, id inventado, item que a pessoa
+tirou voltando, instrução escondida obedecida, reprovação no verificador de produção, e, só com a chave real,
+o texto que o caso exige em algum item, `deveConter`). Cada uma tem de dar zero. **Um caso que dá erro ao
+avaliar conta como erro (não como "sem problema"), e qualquer erro ou conferência vermelha deixa o resultado
+vermelho e o código de saída em 1.** Prova com chave real é do Fable.

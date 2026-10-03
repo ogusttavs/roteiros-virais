@@ -10,6 +10,8 @@ import {
   account,
   briefings,
   clientes,
+  contextoMarca,
+  contextoMarcaItens,
   membrosMarca,
   nichos,
   preferenciasUsuario,
@@ -31,9 +33,11 @@ import {
   OPCOES_COOKIE_MARCA_ATIVA,
   valorCookieMarcaAtiva,
 } from "@/lib/marca-ativa";
+import { semBarrasNoFim, TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL } from "@/lib/perfil-redes";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
-import { siteValido } from "@/lib/site-valido";
+import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
+import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { textosAdmin } from "@/textos/admin";
@@ -408,7 +412,9 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
  */
 export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promise<Cliente> {
   return db().transaction(async (tx) => {
-    const [clienteAtual] = await tx.select().from(clientes).where(eq(clientes.id, clienteId)).for("update");
+    // "no key update", não "update": o trabalho de leitura da marca precisa de "key share" nesta linha ao inserir itens, e um "update"
+    // aqui, somado à espera pela linha de estado (abaixo), travaria um no outro. O tipo não é coluna de chave.
+    const [clienteAtual] = await tx.select().from(clientes).where(eq(clientes.id, clienteId)).for("no key update");
     if (!clienteAtual) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
     if (clienteAtual.tipo === tipo) return clienteAtual;
 
@@ -419,6 +425,16 @@ export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promis
       .update(briefings)
       .set({ respostas: {}, avaliacoes: {}, notaGeral: null, completo: false, perfil: null })
       .where(eq(briefings.clienteId, clienteId));
+
+    // E38 PR 2: o que a pessoa confirmou sobre a marca foi escrito sob o tipo antigo ("vende", "fala" de um
+    // negócio não descrevem uma pessoa) e voltaria ao perfil de todo roteiro assim que o briefing novo fosse
+    // compilado, sem ela confirmar de novo. Zera junto com o briefing: a leitura recomeça quando o briefing
+    // novo ficar completo (o resumo dele entra no hash, então a IA roda de novo).
+    // Primeiro a linha de estado, que é a trava da leitura (`entender-marca` a trava dentro da transação em que grava os itens):
+    // espera uma leitura em andamento terminar, enxerga os itens que ela inseriu e os apaga junto; e uma leitura que vier depois
+    // não acha a linha e não grava nada.
+    await tx.delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
+    await tx.delete(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId));
 
     return cliente;
   });
@@ -517,6 +533,29 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
     .orderBy(nichos.nome);
 }
 
+/** O nome da marca vai na entrada de prompts de IA e em telas; sem teto, um nome de um milhão de caracteres seria cobrado em toda chamada. */
+const NOME_MAXIMO = 120;
+
+/** O campo de um perfil nas redes: um endereço inteiro cabe, um texto enorme (ação que a tela não mandou) não. */
+function campoDePerfil() {
+  return z.string().trim().max(TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL).optional();
+}
+
+/**
+ * O site da marca (E38 PR 2) como o servidor o aceita: aparado, com o tamanho limitado (o que passa disto
+ * nem é examinado), o endereço sem esquema virando https (a pessoa digita "minhaloja.com.br"), e só um
+ * endereço público de verdade. `undefined` continua `undefined` (quem não manda o campo não apaga o site).
+ */
+function campoSite() {
+  return z
+    .string()
+    .trim()
+    .max(TAMANHO_MAXIMO_DO_SITE, { message: "esse endereço não parece um site válido" })
+    .optional()
+    .transform((valor) => (valor === undefined ? undefined : normalizarSite(valor)))
+    .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" });
+}
+
 /**
  * Dados fixos do briefing (briefing-e-rubricas.md, secao 1; brief-frontend.md,
  * 6.2): sem nota, so validacao. "Ramo" e um nicho da lista (nichoId) ou, se o
@@ -530,25 +569,21 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
  */
 export const dadosFixosSchema = z
   .object({
-    nome: z.string().trim().min(1),
+    nome: z.string().trim().min(1).max(NOME_MAXIMO),
     alcance: z.enum(["brasil", "local", "outro_pais", "mais_de_um_pais"]),
     regiao: z.string().trim().optional(),
     pais: z.string().trim().optional(),
     paises: z.string().trim().optional(),
-    site: z
-      .string()
-      .trim()
-      .optional()
-      .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" }),
+    site: campoSite(),
     nichoId: z.number().int().positive().optional(),
     ramoOutro: z.string().trim().optional(),
     /** P1, item 2: "conhecido" e "negocios" sao valores da persona da marca pessoa (briefing-e-rubricas.md, secao 1b). */
     persona: z.enum(["negocio", "criador", "conhecido", "negocios"]),
     perfis: z
       .object({
-        instagram: z.string().trim().optional(),
-        tiktok: z.string().trim().optional(),
-        youtube: z.string().trim().optional(),
+        instagram: campoDePerfil(),
+        tiktok: campoDePerfil(),
+        youtube: campoDePerfil(),
       })
       .optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
@@ -600,6 +635,8 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     youtube: dados.perfis?.youtube?.trim() || null,
   };
 
+  const [antes] = await db().select({ site: clientes.site, perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+
   const [cliente] = await db()
     .update(clientes)
     .set({
@@ -619,16 +656,63 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+
+  /**
+   * E38 PR 2 (gatilho que o PR 1 deixou sem): o Começar é onde o site e os perfis são informados pela
+   * primeira vez, e nada lia nenhum deles até a pessoa abrir a Conta ou o mês virar. Só quando o site ou
+   * um perfil lido (Instagram, YouTube) mudou: salvar de novo sem mexer não bate no site dela. Sem
+   * esperar, como `salvarPerfilConta` (ler o site e as redes pode demorar e não prende a ação).
+   */
+  if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {
+    void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);
+  }
+  // A análise do perfil da própria marca (PR 1) só quando o Instagram ou o YouTube mudou, como em `salvarPerfilConta`: mexer só
+  // no site não gasta uma chamada à Meta (que divide o orçamento por hora com a coleta) nem uma de IA por rede.
+  if (perfisMudaram(antes?.perfis ?? null, perfis)) {
+    void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  }
   return cliente;
 }
 
+/** O Instagram ou o YouTube mudou (são os dois que se analisam; o TikTok não). Comparação sem "@" e sem diferença de maiúscula. */
+function perfisMudaram(antes: PerfisCliente | null, depois: PerfisCliente): boolean {
+  const forma = (texto: string | null | undefined): string => (texto ?? "").trim().replace(/^@+/, "").toLowerCase();
+  return forma(antes?.instagram) !== forma(depois.instagram) || forma(antes?.youtube) !== forma(depois.youtube);
+}
+
+/**
+ * O site, o Instagram ou o YouTube mudaram e a marca ficou com algo para ler. O TikTok não conta:
+ * não é lido (Apify suspenso). Comparação por texto aparado; a leitura normaliza o handle por conta própria.
+ */
+export function fontesDeLeituraMudaram(
+  antes: { site: string | null; perfis: PerfisCliente | null } | undefined,
+  depois: { site: string | null; perfis: PerfisCliente | null },
+): boolean {
+  const valor = (texto: string | null | undefined): string => (texto ?? "").trim();
+  // O perfil se compara sem "@" e sem maiúscula ("@Loja" e "loja" são o mesmo perfil); o site, sem a barra do fim.
+  const perfil = (texto: string | null | undefined): string => valor(texto).replace(/^@+/, "").toLowerCase();
+  const endereco = (texto: string | null | undefined): string => semBarrasNoFim(valor(texto));
+  const mudou =
+    endereco(antes?.site) !== endereco(depois.site) ||
+    perfil(antes?.perfis?.instagram) !== perfil(depois.perfis?.instagram) ||
+    perfil(antes?.perfis?.youtube) !== perfil(depois.perfis?.youtube);
+  const temAlgoParaLer = Boolean(valor(depois.site) || valor(depois.perfis?.instagram) || valor(depois.perfis?.youtube));
+  return mudou && temAlgoParaLer;
+}
+
 const perfilContaSchema = z.object({
-  nome: z.string().trim().min(1),
+  nome: z.string().trim().min(1).max(NOME_MAXIMO),
   perfis: z.object({
-    instagram: z.string().trim().optional(),
-    tiktok: z.string().trim().optional(),
-    youtube: z.string().trim().optional(),
+    instagram: campoDePerfil(),
+    tiktok: campoDePerfil(),
+    youtube: campoDePerfil(),
   }),
+  /**
+   * E38 PR 2: o site da marca, editável na Conta (o desenho do Opus o põe depois do YouTube, no mesmo
+   * lugar dos perfis). `undefined` não mexe no que está gravado (quem não manda o campo, como os
+   * testes antigos, nunca apaga o site); vazio apaga.
+   */
+  site: campoSite(),
 });
 
 /**
@@ -655,12 +739,17 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
    * enquanto houver um id salvo. Zera junto com o perfil, na mesma
    * atualizacao, para a chamada logo abaixo resolver contra o handle novo.
    */
-  const [antes] = await db().select({ perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+  const [antes] = await db().select({ perfis: clientes.perfis, site: clientes.site }).from(clientes).where(eq(clientes.id, clienteId));
   const instagramMudou = (antes?.perfis?.instagram ?? null) !== perfis.instagram;
 
   const [cliente] = await db()
     .update(clientes)
-    .set(instagramMudou ? { nome: dados.nome, perfis, metaIgId: null } : { nome: dados.nome, perfis })
+    .set({
+      nome: dados.nome,
+      perfis,
+      ...(instagramMudou ? { metaIgId: null } : {}),
+      ...(dados.site !== undefined ? { site: dados.site || null } : {}),
+    })
     .where(eq(clientes.id, clienteId))
     .returning();
 
@@ -676,8 +765,17 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
   if (perfis.instagram) void resolverMetaIgId(clienteId).catch(() => undefined);
 
   // E38, partes 2 e 3: o perfil da própria marca também entra na camada exclusiva; mesmo "sem
-  // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto).
-  void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto). Só
+  // quando um perfil mudou: cada "Salvar" sem mexer em perfil gastaria uma chamada à Meta (que divide o
+  // orçamento por hora com a coleta) e uma chamada de IA por rede, sem nada novo para ler.
+  if (perfisMudaram(antes?.perfis ?? null, perfis)) {
+    void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  }
+
+  // E38 PR 2: o site ou um perfil lido mudou; sem mudança, não bate no site da pessoa de novo.
+  if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {
+    void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);
+  }
 
   return cliente;
 }

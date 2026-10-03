@@ -22,6 +22,7 @@ import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
+import { rodarEntenderMarca } from "./entender-marca";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
@@ -134,6 +135,26 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
         ? { clienteId, perfilCitadoId: citado.id, origem: "citado", tipoCitado: citado.tipo, rede, handle }
         : { clienteId, perfilCitadoId: null, origem: "propria_marca", tipoCitado: null, rede, handle },
     );
+  },
+  /**
+   * E38 PR 2: sem argumento roda o despachante (o mesmo do cron diário, só enfileira quem precisa);
+   * `npm run job -- entender-marca <clienteId> [--forcar]` lê uma marca na hora (o Fable roda assim
+   * para as marcas que já existem, com o sim do Gustavo), direto, sem passar pela fila.
+   */
+  [FILAS.entenderMarca]: () => {
+    // Todos os argumentos depois do nome do job, em qualquer ordem: o id da marca (só dígitos) e `--forcar`. Qualquer outra coisa,
+    // mais de um id, ou `--forcar` sem id é erro de digitação: cair no despachante enfileiraria até 25 leituras de marcas que
+    // ninguém pediu, sem o sim do Gustavo que a leitura manual exige.
+    const argumentos = process.argv.slice(3);
+    const forcar = argumentos.includes("--forcar");
+    const ids = argumentos.filter((argumento) => /^\d+$/.test(argumento));
+    const estranho = argumentos.find((argumento) => argumento !== "--forcar" && !/^\d+$/.test(argumento));
+    if (estranho !== undefined || ids.length > 1 || (forcar && ids.length === 0)) {
+      throw new Error(
+        `uso: npm run job -- entender-marca [<clienteId> [--forcar]]; recebi "${argumentos.join(" ")}" (um id de marca, só dígitos, e --forcar só com id).`,
+      );
+    }
+    return rodarEntenderMarca(ids.length === 1 ? { clienteId: Number(ids[0]), origem: "manual", forcar } : null);
   },
 };
 

@@ -7,6 +7,7 @@ import { perguntasDoBriefing, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/br
 import type { AvaliacaoResposta, PerfilCompilado, TipoMarca } from "@/db/schema";
 import type { RegraCliente } from "@/servicos/aprendizado";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
+import type { SecaoContextoMarca } from "@/servicos/contexto-marca";
 import type { PerfilAnalisadoComTipo } from "@/servicos/perfis-analisados";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
@@ -17,6 +18,7 @@ import { PerguntaCampo, type ResultadoAcaoBriefing } from "../../_briefing/Pergu
 import { avaliarRespostaAction, salvarRascunhoAction } from "./acoes";
 import { AprendizadoCard } from "./AprendizadoCard";
 import styles from "./BriefingVivo.module.css";
+import { ContextoMarcaCard } from "./ContextoMarcaCard";
 import { PerfisAnalisadosCard } from "./PerfisAnalisadosCard";
 
 type Props = {
@@ -26,6 +28,8 @@ type Props = {
   perfil: PerfilCompilado | null;
   regrasIniciais: RegraCliente[];
   perfisAnalisados: PerfilAnalisadoComTipo[];
+  /** E38 PR 2: "o que a IA tirou das suas redes e do seu site", para confirmar ou corrigir. */
+  contextoMarca: SecaoContextoMarca;
   meta: number;
   tipo: TipoMarca;
 };
@@ -64,6 +68,7 @@ export function BriefingVivo({
   perfil,
   regrasIniciais,
   perfisAnalisados,
+  contextoMarca,
   meta,
   tipo,
 }: Props) {
@@ -130,6 +135,9 @@ export function BriefingVivo({
               <p className={styles.perfilRodape}>{textosBriefing.briefing.perfilRodape}</p>
             </Cartao>
           ) : null}
+
+          {/* Depois de "Como o sistema te entende", antes do aprendizado: a ordem do desenho aprovado (`Briefing.dc.html`). */}
+          <ContextoMarcaCard secao={contextoMarca} />
 
           <AprendizadoCard regrasIniciais={regrasIniciais} />
 

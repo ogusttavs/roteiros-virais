@@ -37,3 +37,17 @@ describe("montarEntrada, o papel por tipo", () => {
     expect(entrada).toContain("1. Primeiro video\n2. Segundo video");
   });
 });
+
+/** E38 PR 2 (versão 1.0.1): o handle do YouTube já vem com "@"; nunca "@@" na entrada. */
+describe("montarEntrada, o arroba do handle", () => {
+  it("Instagram e TikTok (sem arroba): ganha um", () => {
+    const entrada = montarEntrada({ tipo: "concorrente", nomeDoCliente: "Loja", oQueVende: "limpeza", handle: "loja.exemplo", titulos: [] });
+    expect(entrada).toContain("Perfil: @loja.exemplo, ");
+  });
+
+  it("YouTube (já com arroba): um só", () => {
+    const entrada = montarEntrada({ tipo: "propria_marca", nomeDoCliente: "Loja", oQueVende: "limpeza", handle: "@canalexemplo", titulos: [] });
+    expect(entrada).toContain("Perfil: @canalexemplo, ");
+    expect(entrada).not.toContain("@@");
+  });
+});
