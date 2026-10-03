@@ -17,6 +17,9 @@ export const textosConta = {
     rotulo: "ramo",
     ajuda: "Escreva uma palavra ou uma letra do que você faz e escolha na lista.",
     aviso: "Ao trocar, os temas e as referências passam a ser os do ramo novo. Se ele ainda não foi pesquisado, aparecem a partir da próxima madrugada. O briefing e os roteiros continuam.",
+    /** E45 PR 2: o "Não achei o meu" da Conta (o campo de texto livre que abre, no estilo minúsculo da tela). */
+    campoOutro: "qual é o seu ramo",
+    ajudaOutro: "Escreva em poucas palavras.",
   },
   redes: "perfis nas redes",
   /** V3, item 4: o grupo ganha o nome da marca ativa no subtítulo (dúvida 5 do BRIEF.md). */

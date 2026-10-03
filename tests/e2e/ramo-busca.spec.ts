@@ -11,9 +11,11 @@ import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, pedidosDeRamo, preferenciasUsuario, user } from "../../src/db/schema";
 
 const SENHA = "ExemploSenha123";
+/** Nenhum ramo do catálogo reconhece estas palavras (nem pelo nome, nem pelos exemplos, nem pelas palavras que levam ao ramo). */
+const TEXTO_SEM_RAMO = "xyzw abcd";
 
 const EMAIL_LEITURA = "e2e-ramo-leitura@exemplo.teste";
 const EMAIL_SALVA = "e2e-ramo-salva@exemplo.teste";
@@ -182,15 +184,16 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     await abrirPassoDoRamo(page, EMAIL_OUTRO);
     const campo = campoDoRamo(page);
 
-    await campo.fill("criação de abelhas");
-    await expect(page.getByText("Nenhum ramo começa com “criação de abelhas”.")).toBeVisible();
+    // Um texto que nenhum ramo do catálogo reconhece (E45 PR 2: "criação de abelhas" já cai em Agro e campo, e é o caso do `ramo-pedido.spec.ts`).
+    await campo.fill(TEXTO_SEM_RAMO);
+    await expect(page.getByText(`Nenhum ramo começa com “${TEXTO_SEM_RAMO}”.`)).toBeVisible();
     const naoAchei = page.getByRole("option", { name: /Não achei o meu/ });
     await expect(naoAchei).toBeVisible();
     await naoAchei.click();
 
     const textoLivre = page.getByLabel("Qual é o seu ramo");
     await expect(textoLivre).toBeVisible();
-    await expect(textoLivre).toHaveValue("criação de abelhas");
+    await expect(textoLivre).toHaveValue(TEXTO_SEM_RAMO);
     await expect(textoLivre).toBeFocused();
     await expect(campo).toHaveValue("Não achei o meu");
 
@@ -201,13 +204,21 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     await expect(page.getByText("Escreva o seu ramo")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Sobre o seu negócio" })).toBeVisible();
 
-    // Escrito, passa, e o texto fica guardado, sem setor (nada novo é pesquisado por um texto livre).
-    await textoLivre.fill("criação de abelhas");
+    // Escrito, passa, e o texto fica guardado como pedido de ramo aberto. Nenhum ramo se parece com ele (E45 PR 2): a marca fica sem setor, e o
+    // admin decide (nada novo é pesquisado por um texto livre).
+    await textoLivre.fill(TEXTO_SEM_RAMO);
+    await expect(page.getByText(/enquanto a gente confere o seu ramo/)).toHaveCount(0);
+    await expect(page.locator("[data-aviso-ramo-provisorio]")).toHaveText(
+      "A gente vai conferir o seu ramo. Até lá, os temas e as referências do seu ramo ainda não aparecem.",
+    );
     await page.getByRole("button", { name: "Continuar", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Sobre o negócio" })).toBeVisible();
     const [marca] = await db().select().from(clientes).where(eq(clientes.usuarioId, "e2e-ramo-outro"));
-    expect(marca.ramoOutro).toBe("criação de abelhas");
+    expect(marca.ramoOutro).toBe(TEXTO_SEM_RAMO);
     expect(marca.nichoId).toBeNull();
+    const pedidos = await db().select().from(pedidosDeRamo).where(eq(pedidosDeRamo.clienteId, marca.id));
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]).toMatchObject({ texto: TEXTO_SEM_RAMO, estado: "aberto", setorProvisorioId: null });
   });
 
   test("escolher um ramo sem setor cria o setor dele, a marca entra nele, e voltar ao passo mostra o ramo escolhido", async ({ page }) => {
@@ -249,8 +260,8 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
 
     await campo.fill("confeit");
     await expect(page.getByRole("option").first()).toContainText("Confeitaria e padaria");
-    // Na Conta não há "Não achei o meu" nesta etapa (o pedido de um ramo que não existe é do PR 2).
-    await expect(page.getByRole("option", { name: /Não achei o meu/ })).toHaveCount(0);
+    // Na Conta também há "Não achei o meu" (E45 PR 2, decisão 28); o `ramo-pedido.spec.ts` percorre o caminho dele.
+    await expect(page.getByRole("option", { name: /Não achei o meu/ })).toBeVisible();
     await campo.press("Enter");
 
     await expect(page.getByText("Ao trocar, os temas e as referências passam a ser os do ramo novo")).toBeVisible();

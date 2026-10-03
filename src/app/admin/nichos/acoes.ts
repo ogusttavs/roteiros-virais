@@ -18,6 +18,7 @@ import {
   ErroNicho,
   tirarConta,
 } from "@/servicos/nichos";
+import { conferirPedidoAberto, encaixarPedido, resolverPedidoComSetorNovo } from "@/servicos/pedidos-de-ramo";
 import { efeitoPiso, type EfeitoPiso } from "@/servicos/pesquisa";
 
 import { dispararJobAction } from "../_jobs/acoes";
@@ -40,6 +41,44 @@ export async function criarNichoAction(dados: {
   try {
     const nicho = await criarNicho(dados);
     revalidatePath("/admin/nichos");
+    return { ok: true, slug: nicho.slug };
+  } catch (erro) {
+    return { ok: false, mensagem: mensagemDeErro(erro) };
+  }
+}
+
+/**
+ * E45 PR 2, "encaixar em um que existe": a marca do pedido vai para o setor do ramo do catálogo que o admin escolheu (que nasce ou volta, se
+ * preciso; o teto de setores novos do dia vale e vira a mensagem), o pedido fecha, e o setor provisório desliga se ficou sem marca. O número
+ * ao lado de "Nichos" (no layout) se atualiza com o `revalidatePath` do layout inteiro.
+ */
+export async function encaixarPedidoAction(pedidoId: number, slugDoRamo: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await encaixarPedido(pedidoId, slugDoRamo);
+    revalidatePath("/admin", "layout");
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, mensagem: mensagemDeErro(erro) };
+  }
+}
+
+/**
+ * E45 PR 2, "criar ramo": o admin cria o setor novo (a mesma tela de sempre, já preenchida com o que a pessoa escreveu), a marca vai para ele e
+ * o pedido fecha. Confere ANTES de criar que o pedido ainda está aberto (um setor criado sem pedido para fechar seria lixo).
+ */
+export async function criarRamoDoPedidoAction(
+  pedidoId: number,
+  dados: { nome: string; descricao: string; termosBruto: string },
+): Promise<Resultado & { slug?: string }> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await conferirPedidoAberto(pedidoId);
+    const nicho = await criarNicho(dados);
+    await resolverPedidoComSetorNovo(pedidoId, nicho.id);
+    revalidatePath("/admin", "layout");
     return { ok: true, slug: nicho.slug };
   } catch (erro) {
     return { ok: false, mensagem: mensagemDeErro(erro) };

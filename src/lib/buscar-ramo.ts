@@ -191,6 +191,19 @@ export function buscarRamos(consultaBruta: string): GrupoDeResultados[] {
   return grupos.map(({ grupo, ramos }) => ({ grupo, ramos }));
 }
 
+/**
+ * O ramo mais próximo de um texto livre (E45 PR 2): para a marca que escolheu "Não achei o meu" entrar provisoriamente em algum ramo enquanto
+ * o admin confere o pedido. É o primeiro resultado da mesma busca (as três tentativas, a terceira com cada palavra solta quando há mais de
+ * uma). Nulo quando a busca não acha nada, ou quando o texto só tem palavras de ligação e fragmentos de uma ou duas letras ("a b": a lista
+ * toda casaria com a primeira letra, e um palpite sobre isso não vale nada).
+ */
+export function ramoMaisProximo(texto: string): RamoDoCatalogo | null {
+  const consulta = normalizarBusca(texto);
+  if (consulta === "") return null;
+  if (!palavrasQueContam(consulta).some((palavra) => palavra.length >= 3)) return null;
+  return primeiroRamoDosResultados(buscarRamos(consulta));
+}
+
 /** O ramo que o Enter escolhe: o primeiro da tela (primeiro do primeiro grupo). */
 export function primeiroRamoDosResultados(grupos: readonly GrupoDeResultados[]): RamoDoCatalogo | null {
   return grupos[0]?.ramos[0] ?? null;

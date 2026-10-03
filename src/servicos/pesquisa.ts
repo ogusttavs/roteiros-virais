@@ -1549,3 +1549,14 @@ export async function setorAindaLendo(nichoId: number): Promise<boolean> {
     .where(eq(videos.nichoId, nichoId));
   return (linha?.total ?? 0) > 0 && (linha?.analisados ?? 0) === 0;
 }
+
+/**
+ * E45 PR 2 (decisão 35): o setor ainda não tem vídeo nenhum. É o que acontece com um ramo que acabou de nascer (a primeira marca que o escolheu, o
+ * ramo provisório do "Não achei o meu", uma troca de ramo pela Conta): a pesquisa de setor e a primeira coleta ainda não deram nada. Os temas e as
+ * referências dessa marca só vêm depois, e a tela diz isso em vez de "hoje não saiu tema" (como se algo tivesse falhado).
+ * `setorAindaLendo` é o passo seguinte (tem vídeo, falta a análise).
+ */
+export async function setorSemBase(nichoId: number): Promise<boolean> {
+  const [linha] = await db().select({ total: sql<number>`count(*)::int` }).from(videos).where(eq(videos.nichoId, nichoId));
+  return (linha?.total ?? 0) === 0;
+}

@@ -37,6 +37,22 @@
   min-width: 0;
 }
 
+/* E45 PR 2: onde a marca espera enquanto o pedido do ramo dela é conferido. */
+.avisoProvisorio {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}
+
+@media (min-width: 600px) {
+  .avisoProvisorio {
+    grid-column: 1 / -1;
+  }
+}
+
 .grupo {
   display: flex;
   flex-direction: column;

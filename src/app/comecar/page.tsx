@@ -10,6 +10,7 @@ import {
   dadosOndeIniciais,
   marcasDoUsuario,
 } from "@/servicos/clientes";
+import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 
@@ -32,10 +33,11 @@ export default async function Comecar() {
    * desta rodada). `marcas` (V12b, item 0): quem tem mais de uma marca troca
    * daqui tambem, sem ficar presa no briefing incompleto de uma so.
    */
-  const [briefing, ramoAtual, marcas] = await Promise.all([
+  const [briefing, ramoAtual, marcas, pedidoAberto] = await Promise.all([
     garantirBriefing(cliente.id),
     ramoAtualDoCliente(cliente.nichoId),
     marcasDoUsuario(sessao.user.id),
+    pedidoAbertoDaMarca(cliente.id),
   ]);
 
   if (briefing.completo) {
@@ -60,6 +62,14 @@ export default async function Comecar() {
             ramoSlug: ramoAtual?.ramoSlug ?? null,
             ramoNome: ramoAtual?.nome ?? null,
             ramoOutro: cliente.ramoOutro,
+            // E45 PR 2: o pedido de ramo aberto (o "Não achei o meu" da marca) e o ramo provisório em que ela espera, se ainda está nele.
+            pedidoDeRamo: pedidoAberto
+              ? {
+                  texto: pedidoAberto.texto,
+                  ramoProvisorio:
+                    pedidoAberto.setorProvisorioId !== null && pedidoAberto.setorProvisorioId === cliente.nichoId ? (ramoAtual?.nome ?? null) : null,
+                }
+              : null,
             persona: cliente.persona,
             perfis: cliente.perfis,
             quemGrava: cliente.quemGrava,

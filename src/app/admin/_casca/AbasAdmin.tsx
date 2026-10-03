@@ -14,7 +14,14 @@ const ABAS = [
 ];
 
 /** Abas do admin com o traco embaixo da ativa (CascaAdmin.dc.html). */
-export function AbasAdmin({ rotulos }: { rotulos: Record<"clientes" | "nichos" | "jobs" | "geracoes" | "viagem", string> }) {
+export function AbasAdmin({
+  rotulos,
+  selos = {},
+}: {
+  rotulos: Record<"clientes" | "nichos" | "jobs" | "geracoes" | "viagem", string>;
+  /** E45 PR 2: um número ao lado do rótulo (os pedidos de ramo abertos, ao lado de "Nichos"), com a frase que o leitor de tela lê. */
+  selos?: Partial<Record<"clientes" | "nichos" | "jobs" | "geracoes" | "viagem", { quantos: number; descricao: string }>>;
+}) {
   const pathname = usePathname();
 
   return (
@@ -29,6 +36,11 @@ export function AbasAdmin({ rotulos }: { rotulos: Record<"clientes" | "nichos" |
             className={[styles.aba, ativo ? styles.ativo : ""].filter(Boolean).join(" ")}
           >
             {rotulos[rotuloChave]}
+            {selos[rotuloChave] && selos[rotuloChave]!.quantos > 0 ? (
+              <span className={styles.selo} role="img" aria-label={selos[rotuloChave]!.descricao}>
+                {selos[rotuloChave]!.quantos}
+              </span>
+            ) : null}
             <span className={styles.traco} aria-hidden="true" />
           </Link>
         );

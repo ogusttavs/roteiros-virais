@@ -4,9 +4,12 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
+import { normalizarBusca, ramoMaisProximo } from "@/lib/buscar-ramo";
 import { montarCampoOnde } from "@/lib/onde";
+import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
+import { textosRamo } from "@/textos/ramo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
@@ -31,6 +34,11 @@ export type DadosFixosIniciais = {
   /** O nome do ramo atual da marca, do catálogo ou do setor feito à mão. */
   ramoNome: string | null;
   ramoOutro: string | null;
+  /**
+   * E45 PR 2: o pedido de ramo aberto da marca (o "Não achei o meu" que ela já fez) e o ramo provisório em que espera (nulo se nada casou ou ela
+   * já saiu dele). Com pedido aberto o campo reabre em "Não achei o meu", com o texto dela, e não no ramo provisório como se fosse escolha dela.
+   */
+  pedidoDeRamo: { texto: string; ramoProvisorio: string | null } | null;
   persona: Persona;
   perfis: PerfisCliente | null;
   quemGrava: QuemGrava | null;
@@ -38,7 +46,8 @@ export type DadosFixosIniciais = {
 
 type Props = {
   inicial: DadosFixosIniciais;
-  onSalvar: (dados: unknown) => Promise<void>;
+  /** `ok: false` é um erro esperado com a frase certa para a tela (o teto de ramos novos do dia); o resto é lançado. */
+  onSalvar: (dados: unknown) => Promise<ResultadoAcao<null>>;
   onVoltar: () => void;
   tipo: TipoMarca;
 };
@@ -56,6 +65,7 @@ type EscolhaDeRamo =
   | { tipo: "nenhuma" };
 
 function escolhaInicialDeRamo(inicial: DadosFixosIniciais): EscolhaDeRamo {
+  if (inicial.pedidoDeRamo) return { tipo: "outro" };
   if (inicial.ramoSlug) return { tipo: "catalogo", slug: inicial.ramoSlug };
   if (inicial.nichoId) return { tipo: "atual", nichoId: inicial.nichoId, nome: inicial.ramoNome ?? "" };
   if (inicial.ramoOutro) return { tipo: "outro" };
@@ -123,6 +133,22 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
     }
   }, [pedirFocoNoOutro, escolhaDeRamo]);
 
+  // O aviso do ramo provisório (E45 PR 2). Com o texto que já está no pedido, o que o servidor decidiu; com um texto novo, o que ele vai decidir
+  // (a mesma busca, que é pura): a pessoa vê onde vai ficar antes de continuar.
+  const palpite = ramoOutro.trim() ? ramoMaisProximo(ramoOutro) : null;
+  const textoDoPedidoSalvo = inicial.pedidoDeRamo?.texto ?? null;
+  const ramoProvisorio =
+    textoDoPedidoSalvo !== null && normalizarBusca(ramoOutro) === normalizarBusca(textoDoPedidoSalvo)
+      ? (inicial.pedidoDeRamo?.ramoProvisorio ?? null)
+      : (palpite?.nome ?? null);
+  const avisoDoProvisorio = ramoOutro.trim()
+    ? ramoProvisorio
+      ? textosRamo.provisorio(ramoProvisorio)
+      : inicial.ramoNome
+        ? textosRamo.aguardandoNoRamoDeHoje(inicial.ramoNome)
+        : textosRamo.aguardandoSemRamo
+    : null;
+
   const podeContinuar =
     nome.trim().length > 0 &&
     onde.length > 0 &&
@@ -144,7 +170,7 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
     setSalvando(true);
     setErro(null);
     try {
-      await onSalvar({
+      const resultado = await onSalvar({
         nome,
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
         ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
@@ -160,6 +186,7 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
         },
         quemGrava: quemGrava || undefined,
       });
+      if (!resultado.ok) setErro(resultado.erro);
     } catch (falha) {
       // Falha de rede nao e campo errado: a frase diz que foi a rede e que o digitado continua aqui.
       setErro(tratarFalha(falha, t.erro));
@@ -201,6 +228,11 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
             onChange={(evento) => setRamoOutro(evento.target.value)}
             erro={tentouEnviar && ramoOutro.trim().length === 0 ? t.ramoObrigatorio : undefined}
           />
+        ) : null}
+        {escolhaDeRamo.tipo === "outro" && avisoDoProvisorio ? (
+          <p className={styles.avisoProvisorio} data-aviso-ramo-provisorio>
+            {avisoDoProvisorio}
+          </p>
         ) : null}
         <Campo
           rotulo={dadosFixos.site.rotulo}

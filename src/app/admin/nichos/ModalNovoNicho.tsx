@@ -8,7 +8,7 @@ import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { Campo } from "@/ui/componentes/Campo";
 
-import { criarNichoAction } from "./acoes";
+import { criarNichoAction, criarRamoDoPedidoAction } from "./acoes";
 import styles from "./ModalNovoNicho.module.css";
 
 const t = textosAdmin.nichos;
@@ -16,11 +16,19 @@ const t = textosAdmin.nichos;
 type Props = {
   aberto: boolean;
   onFechar: () => void;
+  /** E45 PR 2: aberto a partir de um pedido de ramo, o nome começa com o que a pessoa escreveu, e salvar também move a marca e fecha o pedido. */
+  pedido?: { id: number; texto: string; marcaNome: string };
 };
 
-export function ModalNovoNicho({ aberto, onFechar }: Props) {
+/** O texto do pedido com a primeira letra maiúscula, para ser o nome do ramo novo. */
+function nomeDoPedido(texto: string): string {
+  const limpo = texto.trim();
+  return limpo.charAt(0).toUpperCase() + limpo.slice(1);
+}
+
+export function ModalNovoNicho({ aberto, onFechar, pedido }: Props) {
   const router = useRouter();
-  const [nome, setNome] = useState("");
+  const [nome, setNome] = useState(pedido ? nomeDoPedido(pedido.texto) : "");
   const [descricao, setDescricao] = useState("");
   const [termosBruto, setTermosBruto] = useState("");
   const [criando, setCriando] = useState(false);
@@ -30,7 +38,9 @@ export function ModalNovoNicho({ aberto, onFechar }: Props) {
     evento.preventDefault();
     setCriando(true);
     setErro(null);
-    const resultado = await criarNichoAction({ nome, descricao, termosBruto });
+    const resultado = pedido
+      ? await criarRamoDoPedidoAction(pedido.id, { nome, descricao, termosBruto })
+      : await criarNichoAction({ nome, descricao, termosBruto });
     setCriando(false);
     if (!resultado.ok) {
       setErro(resultado.mensagem ?? t.erroCriar);
@@ -48,11 +58,12 @@ export function ModalNovoNicho({ aberto, onFechar }: Props) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t.modalTitulo}
+        aria-label={pedido ? t.modalTituloPedido : t.modalTitulo}
         className={styles.painel}
         onClick={(evento) => evento.stopPropagation()}
       >
-        <h2 className={styles.titulo}>{t.modalTitulo}</h2>
+        <h2 className={styles.titulo}>{pedido ? t.modalTituloPedido : t.modalTitulo}</h2>
+        {pedido ? <p className={styles.avisoPedido}>{t.avisoPedido(pedido.marcaNome, pedido.texto)}</p> : null}
         <form className={styles.forma} onSubmit={criar}>
           <Campo rotulo={t.campoNome} required value={nome} onChange={(e) => setNome(e.target.value)} />
           <Campo rotulo={t.campoDescricao} value={descricao} onChange={(e) => setDescricao(e.target.value)} />
@@ -70,7 +81,7 @@ export function ModalNovoNicho({ aberto, onFechar }: Props) {
             </p>
           ) : null}
           <Botao type="submit" tamanho="lg" carregando={criando}>
-            {criando ? t.criando : t.botaoCriar}
+            {criando ? t.criando : pedido ? t.botaoCriarPedido : t.botaoCriar}
           </Botao>
         </form>
       </div>

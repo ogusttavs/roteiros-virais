@@ -11,6 +11,7 @@ import { SeletorMarcaDesktop } from "@/app/(painel)/_casca/SeletorMarcaDesktop";
 import { perguntasDoBriefing, perguntaPorId, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/briefing";
 import type { AvaliacaoResposta, TipoMarca } from "@/db/schema";
 import { config } from "@/lib/config";
+import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
@@ -162,9 +163,11 @@ export function ComecarWizard({
     }
   }
 
-  async function aoSalvarDadosFixos(dados: unknown) {
-    await salvarDadosFixosAction(dados);
-    setEtapa("blocos");
+  async function aoSalvarDadosFixos(dados: unknown): Promise<ResultadoAcao<null>> {
+    const resultado = await salvarDadosFixosAction(dados);
+    // Só avança de passo se salvou; a frase de um erro esperado (o teto de ramos novos do dia) fica no formulário.
+    if (resultado.ok) setEtapa("blocos");
+    return resultado;
   }
 
   if (etapa === "intro") {

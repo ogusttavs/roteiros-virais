@@ -4,6 +4,7 @@ import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
+import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { textosConta } from "@/textos/conta";
 
@@ -32,6 +33,7 @@ export default async function Conta() {
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
+  const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
 
   return (
@@ -57,6 +59,18 @@ export default async function Conta() {
           nomeMarca={cliente?.nome ?? ""}
           tipo={cliente?.tipo ?? "negocio"}
           ramoInicial={ramoAtual ? { slug: ramoAtual.ramoSlug, nome: ramoAtual.nome } : null}
+          pedidoDeRamo={
+            pedidoAberto
+              ? {
+                  texto: pedidoAberto.texto,
+                  // O ramo provisório só vale enquanto a marca está nele (se ela saiu por outro caminho, a frase não o cita).
+                  ramoProvisorio:
+                    pedidoAberto.setorProvisorioId !== null && pedidoAberto.setorProvisorioId === cliente?.nichoId ? (ramoAtual?.nome ?? null) : null,
+                  ramoProvisorioSlug:
+                    pedidoAberto.setorProvisorioId !== null && pedidoAberto.setorProvisorioId === cliente?.nichoId ? (ramoAtual?.ramoSlug ?? null) : null,
+                }
+              : null
+          }
           ondeInicial={onde?.onde ?? null}
           regiaoInicial={onde?.regiao ?? null}
           paisInicial={onde?.pais ?? null}

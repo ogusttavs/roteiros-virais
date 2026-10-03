@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { GRUPOS_DE_RAMO, RAMOS_DO_CATALOGO } from "@/config/ramos";
 
-import { buscarRamos, normalizarBusca, primeiroRamoDosResultados, ramosEmOrdemDeTela } from "./buscar-ramo";
+import { buscarRamos, normalizarBusca, primeiroRamoDosResultados, ramoMaisProximo, ramosEmOrdemDeTela } from "./buscar-ramo";
 
 function numeros(consulta: string): number[] {
   return ramosEmOrdemDeTela(buscarRamos(consulta)).map((r) => r.numero);
@@ -220,5 +220,36 @@ describe("buscarRamos: o que vale mais, preso por exemplos", () => {
 
   it("a frase inteira no começo de uma palavra de busca vale mais que as palavras soltas: 'limpeza de pele' é Estética e pele", () => {
     expect(numeros("limpeza de pele")).toEqual([17]);
+  });
+});
+
+/** E45 PR 2: o ramo provisório de quem escolheu "Não achei o meu". */
+describe("ramoMaisProximo", () => {
+  it.each([
+    ["criação de abelhas", "agro-e-campo"],
+    ["clínica veterinária", "veterinaria-e-pet"],
+    ["salão de beleza", "cabelo-e-barbearia"],
+    ["dentistas", "odontologia"],
+    ["personal trainer", "academia-e-treino"],
+    ["fazenda de abelhas", "agro-e-campo"],
+  ])("%s cai em %s", (texto, slug) => {
+    expect(ramoMaisProximo(texto)?.slug).toBe(slug);
+  });
+
+  it("devolve nulo quando nada casa, e para texto que não diz nada (vazio, pontuação, só ligação, fragmentos)", () => {
+    expect(ramoMaisProximo("xyzw abcd")).toBeNull();
+    expect(ramoMaisProximo("tatuador qqq")).toBeNull();
+    expect(ramoMaisProximo("")).toBeNull();
+    expect(ramoMaisProximo("   ")).toBeNull();
+    expect(ramoMaisProximo("---")).toBeNull();
+    expect(ramoMaisProximo("de")).toBeNull();
+    expect(ramoMaisProximo("a b")).toBeNull();
+    expect(ramoMaisProximo("d")).toBeNull();
+  });
+
+  it("é o mesmo primeiro resultado que a lista da tela mostra (a busca e o palpite não discordam)", () => {
+    for (const texto of ["loja de roupas", "pilotagem de kart", "clínica de nutrição", "criação de abelhas"]) {
+      expect(ramoMaisProximo(texto)?.slug).toBe(primeiroRamoDosResultados(buscarRamos(texto))?.slug);
+    }
   });
 });
