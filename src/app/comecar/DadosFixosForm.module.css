@@ -27,39 +27,14 @@
    * produção, o nome cortava dividindo a linha com "Nome do negócio", ex.:
    * "Empreendedorismo e Cor"). Nome maior que a linha quebra, nunca corta.
    */
-  .campoSelect {
+  .campoRamo {
     grid-column: 1 / -1;
   }
 }
 
-.campoSelect {
+/* A busca de ramo (E45, PR 1) no lugar do select: a mesma linha inteira, e `min-width: 0` para o nome comprido quebrar em vez de esticar a coluna. */
+.campoRamo {
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--espaco-2);
-  font-size: var(--tamanho-secundario);
-  font-weight: 500;
-  color: var(--cor-titulo);
-}
-
-.ajuda {
-  font-size: var(--tamanho-legenda);
-  font-weight: 400;
-  color: var(--cor-texto-suave);
-}
-
-.select {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  border: 1px solid var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie);
-  color: var(--cor-titulo);
-  font-family: var(--fonte-texto);
-  font-size: var(--tamanho-corpo);
-  padding: var(--espaco-3) var(--espaco-4);
-  min-height: var(--altura-toque);
 }
 
 .grupo {

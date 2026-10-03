@@ -8,6 +8,7 @@ import { montarCampoOnde } from "@/lib/onde";
 import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
+import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
 import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Cartao } from "@/ui/componentes/Cartao";
@@ -25,6 +26,10 @@ export type DadosFixosIniciais = {
   paises: string | null;
   site: string | null;
   nichoId: number | null;
+  /** E45, PR 1: o ramo do catálogo do setor da marca (nulo se o setor foi criado à mão e não está no catálogo). */
+  ramoSlug: string | null;
+  /** O nome do ramo atual da marca, do catálogo ou do setor feito à mão. */
+  ramoNome: string | null;
   ramoOutro: string | null;
   persona: Persona;
   perfis: PerfisCliente | null;
@@ -32,7 +37,6 @@ export type DadosFixosIniciais = {
 };
 
 type Props = {
-  nichos: { id: number; nome: string }[];
   inicial: DadosFixosIniciais;
   onSalvar: (dados: unknown) => Promise<void>;
   onVoltar: () => void;
@@ -40,9 +44,25 @@ type Props = {
 };
 
 const t = textosBriefing.dadosFixos;
-const OUTRO = "outro" as const;
 
-export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Props) {
+/**
+ * O que a pessoa escolheu como ramo (E45, PR 1): um ramo do catálogo; o ramo que a marca já tinha e que não está no catálogo (um setor
+ * que o admin criou à mão: continua valendo até ela escolher outro); o "Não achei o meu", com o que ela escreveu; ou nada ainda.
+ */
+type EscolhaDeRamo =
+  | { tipo: "catalogo"; slug: string }
+  | { tipo: "atual"; nichoId: number; nome: string }
+  | { tipo: "outro" }
+  | { tipo: "nenhuma" };
+
+function escolhaInicialDeRamo(inicial: DadosFixosIniciais): EscolhaDeRamo {
+  if (inicial.ramoSlug) return { tipo: "catalogo", slug: inicial.ramoSlug };
+  if (inicial.nichoId) return { tipo: "atual", nichoId: inicial.nichoId, nome: inicial.ramoNome ?? "" };
+  if (inicial.ramoOutro) return { tipo: "outro" };
+  return { tipo: "nenhuma" };
+}
+
+export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
   const dadosFixos = dadosFixosDoBriefing(tipo);
   const personaInicial = dadosFixos.persona.opcoes.some((opcao) => opcao.valor === inicial.persona)
     ? inicial.persona
@@ -55,17 +75,14 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   const [paises, setPaises] = useState(inicial.paises ?? "");
   const [site, setSite] = useState(inicial.site ?? "");
   /**
-   * Sem ramo escolhido ainda (cliente novo, sem nichoId nem ramoOutro), o
-   * select comeca em "outro" em vez do primeiro nicho da lista (achado no
-   * code review desta rodada): a pessoa tinha como continuar sem nunca
-   * tocar no campo, e o formulario gravava silenciosamente o primeiro nicho
-   * da lista como se fosse a escolha dela. Em "outro", precisa digitar
-   * alguma coisa (ou trocar para um nicho de verdade) antes de continuar.
+   * Sem ramo escolhido ainda (cliente novo, sem setor nem texto livre), o campo começa vazio e a pessoa precisa escolher ou escrever
+   * antes de continuar: nunca se grava um ramo que ela não escolheu (achado do code review da etapa dos dados fixos, quando o
+   * formulário gravava em silêncio o primeiro setor da lista).
    */
-  const [nichoId, setNichoId] = useState<number | typeof OUTRO>(
-    inicial.nichoId ?? OUTRO,
-  );
+  const [escolhaDeRamo, setEscolhaDeRamo] = useState<EscolhaDeRamo>(() => escolhaInicialDeRamo(inicial));
   const [ramoOutro, setRamoOutro] = useState(inicial.ramoOutro ?? "");
+  const campoRamoOutroRef = useRef<HTMLInputElement>(null);
+  const [pedirFocoNoOutro, setPedirFocoNoOutro] = useState(false);
   const [persona, setPersona] = useState<Persona>(personaInicial);
   const [instagram, setInstagram] = useState(inicial.perfis?.instagram ?? "");
   const [tiktok, setTiktok] = useState(inicial.perfis?.tiktok ?? "");
@@ -98,6 +115,14 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     if (tentativas > 0) formaRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [tentativas]);
 
+  // "Não achei o meu" abre o campo do texto livre e leva o foco para ele (já com o que a pessoa tinha digitado na busca).
+  useEffect(() => {
+    if (pedirFocoNoOutro && escolhaDeRamo.tipo === "outro") {
+      campoRamoOutroRef.current?.focus();
+      setPedirFocoNoOutro(false);
+    }
+  }, [pedirFocoNoOutro, escolhaDeRamo]);
+
   const podeContinuar =
     nome.trim().length > 0 &&
     onde.length > 0 &&
@@ -105,7 +130,8 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     (onde !== "outro_pais" || pais.trim().length > 0) &&
     (onde !== "mais_de_um_pais" || paises.trim().length > 0) &&
     (site.trim().length === 0 || siteValido(normalizarSite(site))) &&
-    (nichoId !== OUTRO || ramoOutro.trim().length > 0);
+    escolhaDeRamo.tipo !== "nenhuma" &&
+    (escolhaDeRamo.tipo !== "outro" || ramoOutro.trim().length > 0);
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
@@ -123,8 +149,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
         ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
         site: normalizarSite(site) || undefined,
-        nichoId: nichoId === OUTRO ? undefined : nichoId,
-        ramoOutro: nichoId === OUTRO ? ramoOutro : undefined,
+        ramo: escolhaDeRamo.tipo === "catalogo" ? escolhaDeRamo.slug : undefined,
+        nichoId: escolhaDeRamo.tipo === "atual" ? escolhaDeRamo.nichoId : undefined,
+        ramoOutro: escolhaDeRamo.tipo === "outro" ? ramoOutro : undefined,
         persona,
         perfis: {
           instagram: instagram.trim() || undefined,
@@ -145,27 +172,28 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     <form ref={formaRef} className={styles.forma} onSubmit={enviar}>
       <Cartao className={styles.dois}>
         <Campo rotulo={dadosFixos.nome.rotulo} value={nome} onChange={(evento) => setNome(evento.target.value)} />
-        <label className={styles.campoSelect} htmlFor="ramo">
-          {dadosFixos.ramo.rotulo}
-          <span className={styles.ajuda}>{dadosFixos.ramo.ajuda}</span>
-          <select
-            id="ramo"
-            className={styles.select}
-            value={nichoId}
-            onChange={(evento) =>
-              setNichoId(evento.target.value === OUTRO ? OUTRO : Number(evento.target.value))
+        <div className={styles.campoRamo}>
+          <BuscaDeRamo
+            rotulo={dadosFixos.ramo.rotulo}
+            ajuda={dadosFixos.ramo.ajuda}
+            valor={escolhaDeRamo.tipo === "catalogo" ? escolhaDeRamo.slug : null}
+            nomeForaDoCatalogo={
+              escolhaDeRamo.tipo === "atual" ? escolhaDeRamo.nome : escolhaDeRamo.tipo === "outro" ? dadosFixos.ramo.opcaoOutro : null
             }
-          >
-            {nichos.map((nicho) => (
-              <option key={nicho.id} value={nicho.id}>
-                {nicho.nome}
-              </option>
-            ))}
-            <option value={OUTRO}>{dadosFixos.ramo.opcaoOutro}</option>
-          </select>
-        </label>
-        {nichoId === OUTRO ? (
+            textoNaoAchei={dadosFixos.ramo.opcaoOutro}
+            erro={tentouEnviar && escolhaDeRamo.tipo === "nenhuma" ? t.ramoNaoEscolhido : undefined}
+            onEscolher={(slug) => setEscolhaDeRamo({ tipo: "catalogo", slug })}
+            onNaoAchei={(digitado) => {
+              // O que a pessoa tinha digitado vira o começo do texto livre; se ela já tinha escrito um, o dela fica.
+              if (digitado) setRamoOutro((atual) => (atual.trim() ? atual : digitado));
+              setEscolhaDeRamo({ tipo: "outro" });
+              setPedirFocoNoOutro(true);
+            }}
+          />
+        </div>
+        {escolhaDeRamo.tipo === "outro" ? (
           <Campo
+            ref={campoRamoOutroRef}
             rotulo={t.campoRamoOutro}
             ajuda={t.ajudaRamoOutro}
             value={ramoOutro}
