@@ -315,8 +315,10 @@ async function transcreverUm(
         .update(videos)
         .set({
           proximaTentativaTranscricao: new Date(Date.now() + (ehBotDoYoutube ? TRES_DIAS_MS : SETE_DIAS_MS)),
-          // O bloqueio do robô é falha de infraestrutura como o tempo limite (item 0 da E45); a falha comum, não: apaga a marca.
-          falhaDeInfraEm: ehBotDoYoutube ? new Date() : null,
+          // O bloqueio do robô é falha de infraestrutura como o tempo limite (item 0 da E45), e a Groq que falha (limite de uso, 5xx,
+          // conexão) também: o áudio baixou, o vídeo não tem nada de errado (achado da revisão independente). A falha comum de download
+          // (link morto, vídeo privado) não: apaga a marca.
+          falhaDeInfraEm: ehBotDoYoutube || erro instanceof ErroGroq ? new Date() : null,
         })
         .where(eq(videos.id, videoId));
       return ehBotDoYoutube

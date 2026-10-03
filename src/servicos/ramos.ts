@@ -6,12 +6,13 @@
  * 39 ramos o setor não existe até a primeira marca escolher o ramo: aí ele nasce, com o nome, os exemplos e os termos do catálogo, e
  * a pesquisa de setor (M2) começa. "Ramo sem conta não custa nada" (catálogo, regra 5): nenhum setor é criado antes disso.
  */
-import { eq } from "drizzle-orm";
+import { and, count, eq, gt, isNotNull, sql } from "drizzle-orm";
 
 import { ramoPorSlug, type RamoDoCatalogo } from "@/config/ramos";
 import { db } from "@/db";
-import { nichos, type Nicho } from "@/db/schema";
+import { clientes, nichos, type Nicho } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 
 import { ErroNicho, normalizarTermos } from "./nichos";
@@ -32,6 +33,11 @@ export function termosDoRamo(ramo: RamoDoCatalogo): string[] {
   const todos = normalizarTermos([ramo.nome, ...ramo.palavras, ...exemplos].join("\n"));
   return todos.slice(0, TERMOS_MAXIMOS_DO_RAMO);
 }
+
+/** Nasceram setores demais hoje (`config.regras.setoresNovosPorDia`): a escolha de um ramo que ainda não tem setor espera o dia seguinte. */
+export class ErroLimiteDeSetores extends ErroNicho {}
+
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
 /** O setor que corresponde a um ramo do catálogo, se já existe (ativo ou não). */
 export async function nichoDoRamo(slugDoRamo: string): Promise<Nicho | null> {
@@ -64,6 +70,19 @@ export async function garantirNichoDoRamo(slugDoRamo: string): Promise<NichoDoRa
     if (existente.ativo) return { nicho: existente, criado: false, reativado: false };
     const [reativado] = await db().update(nichos).set({ ativo: true }).where(eq(nichos.id, existente.id)).returning();
     return { nicho: reativado ?? { ...existente, ativo: true }, criado: false, reativado: true };
+  }
+
+  // O teto de setores novos por dia (custo): conta os que nasceram do catálogo nas últimas 24 horas, no sistema todo.
+  const teto = config.regras.setoresNovosPorDia;
+  if (teto > 0) {
+    const [{ nasceram }] = await db()
+      .select({ nasceram: count() })
+      .from(nichos)
+      .where(and(isNotNull(nichos.ramoCatalogo), gt(nichos.criadoEm, new Date(Date.now() - UM_DIA_MS))));
+    if (nasceram >= teto) {
+      logger.warn({ nasceram, teto, ramo: ramo.slug }, "teto de setores novos por dia atingido; a escolha do ramo espera");
+      throw new ErroLimiteDeSetores("muitos ramos novos hoje; tente de novo amanha.");
+    }
   }
 
   // O endereço do setor é o do ramo; se um setor feito à mão já usa esse endereço sem estar ligado a ramo nenhum, o novo ganha um sufixo.
@@ -118,4 +137,40 @@ export async function ramoAtualDoCliente(nichoId: number | null | undefined): Pr
   if (!nicho) return null;
   const ramo = ramoPorSlug(nicho.ramoCatalogo);
   return { nichoId: nicho.id, nome: ramo?.nome ?? nicho.nome, ramoSlug: ramo?.slug ?? null };
+}
+
+/**
+ * O setor da marca ao escolher um ramo: o que ela já tem, se já é o ramo escolhido (nada muda, e um setor que o admin desligou não volta
+ * só porque a pessoa salvou o formulário de novo), senão o do ramo, criando ou reativando. `trocou` diz se a marca mudou de setor.
+ */
+export async function setorParaAMarca(nichoIdAtual: number | null, slugDoRamo: string): Promise<{ nichoId: number; trocou: boolean }> {
+  if (nichoIdAtual) {
+    const [atual] = await db().select({ ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.id, nichoIdAtual));
+    if (atual?.ramoCatalogo === slugDoRamo) return { nichoId: nichoIdAtual, trocou: false };
+  }
+  const { nicho } = await garantirNichoDoRamo(slugDoRamo);
+  return { nichoId: nicho.id, trocou: nicho.id !== nichoIdAtual };
+}
+
+/**
+ * "Ramo sem conta não é pesquisado" (catálogo, regra 5), na volta: quando a última marca sai de um setor que nasceu de um ramo do
+ * catálogo, ele é desligado e para de ser coletado, transcrito e pesquisado (achado da revisão independente: o setor nascia ligado e
+ * nunca mais desligava, e os jobs só olham `ativo`, nunca se há marca). Setor feito à mão (sem `ramo_catalogo`) nunca é desligado
+ * daqui: quem desliga é o admin. Devolve se desligou.
+ */
+export async function desligarSetorSeSemMarca(nichoId: number | null | undefined): Promise<boolean> {
+  if (!nichoId) return false;
+  const desligados = await db()
+    .update(nichos)
+    .set({ ativo: false })
+    .where(
+      and(
+        eq(nichos.id, nichoId),
+        eq(nichos.ativo, true),
+        isNotNull(nichos.ramoCatalogo),
+        sql`not exists (select 1 from ${clientes} where ${clientes.nichoId} = ${nichos.id} and ${clientes.ativo})`,
+      ),
+    )
+    .returning({ id: nichos.id });
+  return desligados.length > 0;
 }

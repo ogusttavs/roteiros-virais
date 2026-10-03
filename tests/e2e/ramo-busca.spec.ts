@@ -152,6 +152,8 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
   test("pelo teclado: seta para baixo anda pela lista, o Enter escolhe sem enviar o formulário, o Esc fecha só a lista", async ({ page }) => {
     await abrirPassoDoRamo(page, EMAIL_LEITURA);
     const campo = campoDoRamo(page);
+    // O resto do formulário pronto: um Enter que ENVIASSE o formulário mudaria de passo, e o teste veria (sem o "onde", o envio só mostraria um erro).
+    await page.getByRole("radio", { name: "No Brasil inteiro" }).click();
 
     await campo.fill("est");
     const opcoes = page.getByRole("option");
@@ -166,6 +168,7 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     await expect(campo).toHaveValue(nomeDaSegunda);
     await expect(page.getByRole("listbox")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Sobre o seu negócio" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sobre o negócio" })).toHaveCount(0);
 
     await campo.fill("xyz");
     await expect(page.getByRole("listbox")).toBeVisible();
@@ -259,15 +262,34 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     const [marca] = await db().select().from(clientes).where(eq(clientes.id, clienteContaId));
     expect(marca.nichoId).toBe(setor.id);
 
+    // Sem recarregar: voltar ao ramo de antes e salvar de novo tem de gravar (a página não recarrega depois do salvar).
+    await page.getByRole("combobox", { name: "ramo" }).fill("dentista");
+    await page.getByRole("combobox", { name: "ramo" }).press("Enter");
+    await expect(page.getByText("Ao trocar, os temas e as referências passam a ser os do ramo novo")).toBeVisible();
+    await page.getByRole("button", { name: "salvar", exact: true }).click();
+    await expect(page.getByText("salvo")).toBeVisible();
+    const [dentistas] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "odontologia"));
+    await expect.poll(async () => (await db().select().from(clientes).where(eq(clientes.id, clienteContaId)))[0].nichoId).toBe(dentistas.id);
+
     await page.reload();
-    await expect(page.getByRole("combobox", { name: "ramo" })).toHaveValue("Confeitaria e padaria");
+    await expect(page.getByRole("combobox", { name: "ramo" })).toHaveValue("Odontologia");
+  });
+
+  test("uma palavra que o catálogo não conhece não esvazia a lista, e o plural acha o ramo: 'salão de beleza', 'dentistas'", async ({ page }) => {
+    await abrirPassoDoRamo(page, EMAIL_LEITURA);
+    const campo = campoDoRamo(page);
+
+    await campo.fill("salão de beleza");
+    await expect(page.getByRole("option").first()).toContainText("Cabelo e barbearia");
+    await campo.fill("dentistas");
+    await expect(page.getByRole("option").first()).toContainText("Odontologia");
   });
 
   for (const [largura, altura] of [
     [390, 844],
     [1280, 800],
   ] as const) {
-    test(`com a lista aberta em ${largura}px: sem rolagem para o lado, campo de 44 pontos, e a lista cabe na tela`, async ({ page }) => {
+    test(`com a lista aberta em ${largura}px: sem rolagem para o lado, campo de 44 pontos, e a lista não passa da largura da tela`, async ({ page }) => {
       await page.setViewportSize({ width: largura, height: altura });
       await abrirPassoDoRamo(page, EMAIL_LEITURA);
       const campo = campoDoRamo(page);

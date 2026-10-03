@@ -12,10 +12,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RAMOS_DO_CATALOGO } from "@/config/ramos";
 import { db, getPool } from "@/db";
 import { briefings, clientes, nichos, user } from "@/db/schema";
-import { FILAS } from "@/jobs/fila";
+import { FILAS, garantirBossPronto } from "@/jobs/fila";
+import { config } from "@/lib/config";
 import { salvarDadosFixos, salvarRamoConta } from "@/servicos/clientes";
 import { ErroNicho } from "@/servicos/nichos";
-import { garantirNichoDoRamo, nichoDoRamo, ramoAtualDoCliente, termosDoRamo } from "@/servicos/ramos";
+import {
+  desligarSetorSeSemMarca,
+  ErroLimiteDeSetores,
+  garantirNichoDoRamo,
+  nichoDoRamo,
+  ramoAtualDoCliente,
+  termosDoRamo,
+} from "@/servicos/ramos";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -34,9 +42,13 @@ async function criarMarca(usuarioId: string, nome: string): Promise<number> {
 
 beforeAll(async () => {
   await resetarSchema(db());
+  // Os testes de baixo criam dezenas de setores de propósito; o teto de verdade (10 por dia) tem o describe dele, que o baixa de novo.
+  config.regras.setoresNovosPorDia = 1000;
   // O `resetarSchema` não derruba o schema do pg-boss: os jobs de pesquisa de setor de outras rodadas (com ids de setor repetidos) ficam lá.
+  // E num banco novo (ou rodando só este arquivo) o schema do pg-boss ainda nem existe: sobe o pg-boss antes de apagar.
+  await garantirBossPronto();
   await db().execute(sql`delete from pgboss.job where name = ${FILAS.pesquisaDeSetor}`);
-}, 30_000);
+}, 60_000);
 
 afterAll(async () => {
   await getPool().end();
@@ -221,6 +233,139 @@ describe("ramoAtualDoCliente", () => {
     expect(await ramoAtualDoCliente(null)).toBeNull();
     expect(await ramoAtualDoCliente(undefined)).toBeNull();
     expect(await ramoAtualDoCliente(999_999)).toBeNull();
+  });
+});
+
+
+describe("o setor de um ramo sem marca para de ser pesquisado (achado da revisão: nascia ligado e nunca desligava)", () => {
+  it("desligarSetorSeSemMarca desliga o setor do catálogo que ficou sem marca ativa, e só ele", async () => {
+    const { nicho } = await garantirNichoDoRamo("jardim-e-paisagismo");
+    expect(nicho.ativo).toBe(true);
+
+    expect(await desligarSetorSeSemMarca(nicho.id)).toBe(true);
+    const [depois] = await db().select().from(nichos).where(eq(nichos.id, nicho.id));
+    expect(depois.ativo).toBe(false);
+    // Já desligado: nada a fazer.
+    expect(await desligarSetorSeSemMarca(nicho.id)).toBe(false);
+  });
+
+  it("com uma marca ativa nele, o setor continua ligado; uma marca desativada não o segura", async () => {
+    const { nicho } = await garantirNichoDoRamo("agro-e-campo");
+    const marca = await criarMarca("ramos-desliga-segura", "Segura o setor");
+    await db().update(clientes).set({ nichoId: nicho.id }).where(eq(clientes.id, marca));
+
+    expect(await desligarSetorSeSemMarca(nicho.id)).toBe(false);
+    expect((await db().select().from(nichos).where(eq(nichos.id, nicho.id)))[0].ativo).toBe(true);
+
+    await db().update(clientes).set({ ativo: false }).where(eq(clientes.id, marca));
+    expect(await desligarSetorSeSemMarca(nicho.id)).toBe(true);
+  });
+
+  it("um setor feito à mão (sem ramo do catálogo) nunca é desligado daqui: quem desliga é o admin", async () => {
+    const [aMao] = await db().insert(nichos).values({ slug: "setor-a-mao-nao-desliga", nome: "Setor à mão" }).returning();
+    expect(await desligarSetorSeSemMarca(aMao.id)).toBe(false);
+    expect((await db().select().from(nichos).where(eq(nichos.id, aMao.id)))[0].ativo).toBe(true);
+    expect(await desligarSetorSeSemMarca(null)).toBe(false);
+  });
+
+  it("trocar de ramo pela Conta desliga o setor de que a marca saiu quando era a única nele, e deixa ligado quando outra marca fica", async () => {
+    const sozinha = await criarMarca("ramos-troca-desliga-a", "Sozinha");
+    const acompanhada = await criarMarca("ramos-troca-desliga-b", "Acompanhada");
+    const outra = await criarMarca("ramos-troca-desliga-c", "Outra");
+    await salvarRamoConta(sozinha, "tecnologia-e-automacao");
+    await salvarRamoConta(acompanhada, "marketing-e-design");
+    await salvarRamoConta(outra, "marketing-e-design");
+    const tecnologia = (await nichoDoRamo("tecnologia-e-automacao"))!;
+    const marketing = (await nichoDoRamo("marketing-e-design"))!;
+
+    await salvarRamoConta(sozinha, "turismo-e-hospedagem");
+    await salvarRamoConta(acompanhada, "turismo-e-hospedagem");
+
+    expect((await db().select().from(nichos).where(eq(nichos.id, tecnologia.id)))[0].ativo).toBe(false);
+    expect((await db().select().from(nichos).where(eq(nichos.id, marketing.id)))[0].ativo).toBe(true);
+    expect((await nichoDoRamo("turismo-e-hospedagem"))!.ativo).toBe(true);
+  });
+
+  it("salvar os dados fixos com outro ramo também desliga o setor de que a marca saiu", async () => {
+    const marca = await criarMarca("ramos-dados-fixos-desliga", "Dados fixos desliga");
+    const DADOS = { nome: "[teste] Marca", alcance: "brasil" as const, persona: "negocio" as const };
+    await salvarDadosFixos(marca, { ...DADOS, ramo: "decoracao-e-moveis" });
+    const decoracao = (await nichoDoRamo("decoracao-e-moveis"))!;
+
+    await salvarDadosFixos(marca, { ...DADOS, ramo: "educacao-e-cursos" });
+
+    expect((await db().select().from(nichos).where(eq(nichos.id, decoracao.id)))[0].ativo).toBe(false);
+  });
+});
+
+describe("um setor que o admin desligou não volta só porque a pessoa salvou de novo", () => {
+  it("salvar os dados fixos com o mesmo ramo que a marca já tem não reativa o setor", async () => {
+    const marca = await criarMarca("ramos-nao-reativa-a", "Não reativa");
+    const DADOS = { nome: "[teste] Marca", alcance: "brasil" as const, persona: "negocio" as const };
+    await salvarDadosFixos(marca, { ...DADOS, ramo: "joias-oculos-e-acessorios" });
+    const setor = (await nichoDoRamo("joias-oculos-e-acessorios"))!;
+    // O admin desligou este setor de propósito (custo).
+    await db().update(nichos).set({ ativo: false }).where(eq(nichos.id, setor.id));
+
+    await salvarDadosFixos(marca, { ...DADOS, ramo: "joias-oculos-e-acessorios", nome: "[teste] Marca com outro nome" });
+    await salvarRamoConta(marca, "joias-oculos-e-acessorios");
+
+    expect((await db().select().from(nichos).where(eq(nichos.id, setor.id)))[0].ativo).toBe(false);
+  });
+
+  it("escolher um ramo diferente, de um setor parado, reativa (é a regra: o setor volta quando uma marca o escolhe)", async () => {
+    const marca = await criarMarca("ramos-nao-reativa-b", "Reativa ao escolher");
+    const [parado] = await db()
+      .insert(nichos)
+      .values({ slug: "esportes-parado", nome: "Esportes parado", ramoCatalogo: "esportes-e-lutas", ativo: false })
+      .returning();
+
+    await salvarRamoConta(marca, "esportes-e-lutas");
+
+    expect((await db().select().from(nichos).where(eq(nichos.id, parado.id)))[0].ativo).toBe(true);
+  });
+});
+
+describe("o teto de setores novos por dia (custo: cada setor novo começa uma pesquisa paga)", () => {
+  async function setoresNovosNas24Horas(): Promise<number> {
+    const linhas = await db()
+      .select({ id: nichos.id })
+      .from(nichos)
+      .where(sql`${nichos.ramoCatalogo} is not null and ${nichos.criadoEm} > now() - interval '24 hours'`);
+    return linhas.length;
+  }
+
+  it("passado o teto, um ramo que ainda não tem setor espera o dia seguinte, e nada nasce; o que já existe continua escolhível", async () => {
+    const { nicho: jaExistia } = await garantirNichoDoRamo("alimentos-e-mercado");
+    const antes = await setoresNovosNas24Horas();
+    config.regras.setoresNovosPorDia = antes + 1;
+    try {
+      const { criado } = await garantirNichoDoRamo("artesanato-e-feito-a-mao");
+      expect(criado).toBe(true);
+
+      await expect(garantirNichoDoRamo("agro-e-campo-teto-nao-existe")).rejects.toBeInstanceOf(ErroNicho);
+      const total = (await db().select().from(nichos)).length;
+      await expect(garantirNichoDoRamo("importacao-e-desenvolvimento-de-produto")).rejects.toBeInstanceOf(ErroLimiteDeSetores);
+      expect((await db().select().from(nichos)).length).toBe(total);
+      expect(await nichoDoRamo("importacao-e-desenvolvimento-de-produto")).toBeNull();
+
+      // Um ramo que já tem setor segue escolhível mesmo com o teto estourado (não nasce nada).
+      const outraVez = await garantirNichoDoRamo("alimentos-e-mercado");
+      expect(outraVez.nicho.id).toBe(jaExistia.id);
+      expect(outraVez.criado).toBe(false);
+    } finally {
+      config.regras.setoresNovosPorDia = 1000;
+    }
+  });
+
+  it("com o teto em 0 não há teto", async () => {
+    config.regras.setoresNovosPorDia = 0;
+    try {
+      const { criado } = await garantirNichoDoRamo("carreira-e-desenvolvimento-pessoal");
+      expect(criado).toBe(true);
+    } finally {
+      config.regras.setoresNovosPorDia = 1000;
+    }
   });
 });
 
