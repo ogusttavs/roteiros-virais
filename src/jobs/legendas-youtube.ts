@@ -5,16 +5,22 @@
  * legenda automatica publica sem autenticacao nenhuma. Sem custo, tentada
  * antes de baixar audio e gastar credito da Groq.
  */
-import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile, rm } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { promisify } from "node:util";
 
+import { config } from "@/lib/config";
+
+import { apagarSobrasDoDownload, type ExecutorDeProcesso, ErroTempoLimite, executarComLimite } from "./processo";
 import { argumentosYoutube } from "./youtube-cliente";
 
-const execFileAsync = promisify(execFile);
+/**
+ * O `yt-dlp` passou do tempo limite por vídeo (M5c) e foi morto, buscando a legenda. Diferente de "sem legenda" (que é
+ * `null`, comum e sem erro): quem chama NÃO tenta o áudio em seguida (é o mesmo proxy, o mesmo YouTube, e o áudio
+ * penduraria pelo mesmo motivo, dobrando o tempo perdido neste vídeo).
+ */
+export class ErroLegendaTempoLimite extends Error {}
 
 const ENTIDADES_HTML: Record<string, string> = {
   "&gt;": ">",
@@ -72,33 +78,50 @@ export function interpretarVtt(conteudo: string): string {
  * chama agora so pede quando ja sabe o idioma de verdade do video
  * (`videos.idioma`), pedindo a faixa original, nao a traducao.
  */
-export async function baixarLegendaYoutube(url: string, idioma: "pt" | "en" | "es"): Promise<string | null> {
+export async function baixarLegendaYoutube(
+  url: string,
+  idioma: "pt" | "en" | "es",
+  /** Só para o teste: o limite e o processo. Sem isto, `config.transcricao.ytdlpLimiteS` e o `yt-dlp` de verdade. */
+  opcoes: { limiteMs?: number; executar?: ExecutorDeProcesso } = {},
+): Promise<string | null> {
   const pasta = tmpdir();
   const prefixo = `legenda-${randomUUID()}`;
   const caminhoEsperado = join(pasta, `${prefixo}.${idioma}.vtt`);
+  const limiteMs = opcoes.limiteMs ?? config.transcricao.ytdlpLimiteS * 1000;
 
   try {
-    await execFileAsync("yt-dlp", [
-      "--write-auto-sub",
-      "--sub-lang",
-      idioma,
-      "--skip-download",
-      "--sub-format",
-      "vtt",
-      ...argumentosYoutube(),
-      "-o",
-      join(pasta, `${prefixo}.%(ext)s`),
-      url,
-    ]);
+    try {
+      await executarComLimite(
+        "yt-dlp",
+        [
+          "--write-auto-sub",
+          "--sub-lang",
+          idioma,
+          "--skip-download",
+          "--sub-format",
+          "vtt",
+          ...argumentosYoutube(),
+          "-o",
+          join(pasta, `${prefixo}.%(ext)s`),
+          url,
+        ],
+        limiteMs,
+        opcoes.executar,
+      );
+    } catch (erro) {
+      if (erro instanceof ErroTempoLimite) {
+        throw new ErroLegendaTempoLimite(`o yt-dlp passou de ${Math.round(limiteMs / 1000)} s buscando a legenda de ${url} (tempo limite por video)`);
+      }
+      return null;
+    }
 
     const conteudo = await readFile(caminhoEsperado, "utf8").catch(() => null);
     if (!conteudo) return null;
 
     const texto = interpretarVtt(conteudo);
     return texto || null;
-  } catch {
-    return null;
   } finally {
-    await rm(caminhoEsperado, { force: true }).catch(() => undefined);
+    // O arquivo esperado e o que um `yt-dlp` morto pelo limite deixou pela metade (mesmo prefixo).
+    await apagarSobrasDoDownload(pasta, prefixo);
   }
 }

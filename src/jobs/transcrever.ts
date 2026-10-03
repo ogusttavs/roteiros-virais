@@ -36,15 +36,26 @@
  * grava essa coluna em toda recoleta, e a linha do admin acabava medindo a
  * coleta, não a leitura (77 "transcritos hoje" contra 8 de verdade).
  * `atualizadoEm` volta a ser só da coleta.
+ *
+ * M5c (hotfix, achado da madrugada de 03/10/2026: o job começou às 04:00 e ainda rodava às 07:00, com 45 vídeos da
+ * Dr.Wash, 3 do Bruno e zero da Overtake; os do YouTube passam um a um pelo proxy, com pausa, e o `yt-dlp` não tinha
+ * tempo limite; a fila vence o job às 4 h sem repetir, e a cadeia nunca disparava). Três coisas: (1) tempo limite por
+ * vídeo no `yt-dlp` (áudio e legenda, `audio.ts` e `legendas-youtube.ts`, via `processo.ts`) e na Groq (`groq-api.ts`):
+ * o processo morre, o vídeo conta como falha com nova tentativa em 3 dias, e o job segue para o próximo; (2) orçamento
+ * de tempo por setor aqui dentro (`orcamentoTranscreverPorSetorMin`, 30 min): passou, o setor para e o que sobrou fica
+ * para a noite seguinte (a fila é por vídeo ainda sem leitura), então um setor lento não deixa os outros a zero; o
+ * orçamento de cada setor é também limitado por um teto do job inteiro dividido pelos setores que faltam
+ * (`orcamentoTranscreverTotalMin`, 3h30, abaixo das 4 h da fila), então o job sempre termina; (3) a cadeia
+ * `extrair-sem-fala` e `extrair` dispara no fim do job SEMPRE (num `finally`), parou pelo orçamento ou não.
  */
 import { and, eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
-import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
+import { apagarAudio, baixarAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
-import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
+import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
 import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
@@ -53,7 +64,7 @@ import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
-import { ErroGroq, transcreverAudio } from "./groq-api";
+import { ErroGroq, ErroGroqTempoLimite, transcreverAudio } from "./groq-api";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
 /**
@@ -190,7 +201,9 @@ type ResultadoVideo =
   | { tipo: "pulado" }
   | { tipo: "groq"; duracaoS: number | null }
   | { tipo: "falhou"; motivo: string }
-  | { tipo: "falhouYoutubeBot"; motivo: string };
+  | { tipo: "falhouYoutubeBot"; motivo: string }
+  /** O `yt-dlp` ou a Groq passou do tempo limite por vídeo e foi encerrado (M5c). */
+  | { tipo: "falhouTempoLimite"; motivo: string };
 
 /**
  * Legenda automatica curta demais ("E ai", ou uma legenda confusa que virou
@@ -218,7 +231,21 @@ async function transcreverUm(
   // idioma do video (`videos.idioma`, da coleta); sem isso, "--sub-lang" forcado buscava a
   // traducao automatica do YouTube para quem nao sabia, nunca a fala original.
   if (plataforma === "youtube" && idiomaParaBuscar) {
-    const legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
+    let legenda: string | null;
+    try {
+      legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
+    } catch (erro) {
+      // O `yt-dlp` pendurou na legenda (proxy engasgado): o áudio penduraria pelo mesmo motivo, então o vídeo fica para daqui a
+      // alguns dias em vez de gastar o limite uma segunda vez neste mesmo vídeo.
+      if (erro instanceof ErroLegendaTempoLimite) {
+        await db()
+          .update(videos)
+          .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS) })
+          .where(eq(videos.id, videoId));
+        return { tipo: "falhouTempoLimite", motivo: erro.message };
+      }
+      throw erro;
+    }
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
       await db()
         .update(videos)
@@ -272,6 +299,15 @@ async function transcreverUm(
       .where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
+    // O tempo limite vem antes do resto (`ErroAudioTempoLimite` e `ErroGroqTempoLimite` herdam dos erros comuns): tempo
+    // perdido, falha transitória, nova tentativa em 3 dias, e contada à parte.
+    if (erro instanceof ErroAudioTempoLimite || erro instanceof ErroGroqTempoLimite) {
+      await db()
+        .update(videos)
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS) })
+        .where(eq(videos.id, videoId));
+      return { tipo: "falhouTempoLimite", motivo: erro.message };
+    }
     if (erro instanceof ErroAudio || erro instanceof ErroGroq) {
       const ehBotDoYoutube = plataforma === "youtube" && MENSAGEM_BOT_YOUTUBE.test(erro.message);
       await db()
@@ -301,15 +337,50 @@ async function transcreverUm(
 const MAX_FALHAS_SEGUIDAS_FREIO = 10;
 
 /**
+ * O relógio e os orçamentos do `rodarTranscrever` (M5c). Só o teste passa algo aqui; o job de verdade usa `Date.now` e os
+ * dois números de `config.regras`.
+ */
+export type OpcoesTranscrever = {
+  agora?: () => number;
+  orcamentoPorSetorMs?: number;
+  orcamentoTotalMs?: number;
+};
+
+/** Os dois orçamentos do job em milissegundos, a partir da configuração (que vem em minutos). A conversão fica aqui, e não solta no job, para o teste conferir a escala. */
+export function orcamentosDaConfig(): { porSetorMs: number; totalMs: number } {
+  return {
+    porSetorMs: config.regras.orcamentoTranscreverPorSetorMin * 60_000,
+    totalMs: config.regras.orcamentoTranscreverTotalMin * 60_000,
+  };
+}
+
+/**
+ * O orçamento de tempo de um setor (M5c): o menor entre o por setor e o que sobra do teto do job dividido pelos setores que ainda
+ * faltam (o atual inclusive). Pura, para testar sem relógio: com 6 setores, 30 min cada e teto de 3h30, nenhum setor perde a vez
+ * porque os de antes gastaram o que era dele, e a soma nunca passa do teto.
+ */
+export function orcamentoDoSetor(porSetorMs: number, totalMs: number, decorridoMs: number, setoresQueFaltam: number): number {
+  const restante = Math.max(0, totalMs - decorridoMs);
+  return Math.min(porSetorMs, Math.floor(restante / Math.max(1, setoresQueFaltam)));
+}
+
+/**
  * M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor, sem esperar o `for` percorrer
  * todo o resto dos nichos ativos antes de chegar nele (a "cadeia de verdade" da primeira carga,
  * item 4: o teto diário já é por nicho dentro do laço, nunca compartilhado entre eles; o que faltava
  * era poder pular direto para um setor só). Sem `nichoId`, o comportamento de sempre.
  */
-export async function rodarTranscrever(nichoId?: number): Promise<Record<string, unknown>> {
+export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrever = {}): Promise<Record<string, unknown>> {
+  const agora = opcoes.agora ?? Date.now;
+  const daConfig = orcamentosDaConfig();
+  const porSetorMs = opcoes.orcamentoPorSetorMs ?? daConfig.porSetorMs;
+  const totalMs = opcoes.orcamentoTotalMs ?? daConfig.totalMs;
+  const inicioDoJob = agora();
+
   const condicoes = [eq(nichos.ativo, true)];
   if (nichoId !== undefined) condicoes.push(eq(nichos.id, nichoId));
-  const nichosAtivos = await db().select().from(nichos).where(and(...condicoes));
+  // Ordem fixa por id: a mesma de sempre, sem depender da ordem em que o banco devolve as linhas.
+  const nichosAtivos = await db().select().from(nichos).where(and(...condicoes)).orderBy(nichos.id);
 
   let porLegenda = 0;
   let porGroq = 0;
@@ -317,6 +388,8 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
   let falhas = 0;
   /** Falhas com a mensagem do bot do YouTube, contadas à parte (também somam em `falhas`), para a conferência ler de longe. */
   let falhasYoutubeBot = 0;
+  /** Falhas por tempo limite (`yt-dlp` ou Groq encerrados), contadas à parte (também somam em `falhas`). */
+  let falhasPorTempoLimite = 0;
   let segundosAudioGroq = 0;
   const erros: string[] = [];
 
@@ -324,95 +397,132 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
   const sucessos: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
   let youtubePausado = false;
   let tiktokPausado = false;
+  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
+  const setoresParadosPeloOrcamento: { slug: string; ficaramParaDepois: number }[] = [];
+  /** Quanto cada setor levou, em segundos (para calibrar o orçamento olhando o resumo, sem abrir log). */
+  const segundosPorSetor: Record<string, number> = {};
 
-  for (const nicho of nichosAtivos) {
-    const tetoDiario = config.regras.transcricoesPorDia;
-    const { selecionados, porId } = await candidatosDoNicho(nicho.id, tetoDiario);
+  try {
+    for (const [indiceDoSetor, nicho] of nichosAtivos.entries()) {
+      const inicioDoSetor = agora();
+      const orcamentoMs = orcamentoDoSetor(porSetorMs, totalMs, inicioDoSetor - inicioDoJob, nichosAtivos.length - indiceDoSetor);
+      const tetoDiario = config.regras.transcricoesPorDia;
+      const { selecionados, porId } = await candidatosDoNicho(nicho.id, tetoDiario);
 
-    let sucessosNoNicho = 0;
-    let falhasSeguidasBotYoutube = 0;
-    let falhasSeguidasTiktok = 0;
-    let youtubePausadoNoNicho = false;
-    let tiktokPausadoNoNicho = false;
+      let sucessosNoNicho = 0;
+      let falhasSeguidasBotYoutube = 0;
+      let falhasSeguidasTiktok = 0;
+      let youtubePausadoNoNicho = false;
+      let tiktokPausadoNoNicho = false;
 
-    for (const videoId of selecionados) {
-      if (sucessosNoNicho >= tetoDiario) break;
+      for (const [indiceDoVideo, videoId] of selecionados.entries()) {
+        if (sucessosNoNicho >= tetoDiario) break;
 
-      const info = porId.get(videoId);
-      if (!info) continue;
-      if (info.plataforma === "youtube" && youtubePausadoNoNicho) continue;
-      if (info.plataforma === "tiktok" && tiktokPausadoNoNicho) continue;
-
-      tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
-
-      try {
-        const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma);
-        if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
-          sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
-          sucessosNoNicho += 1;
-          if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
-          if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
-
-          if (resultado.tipo === "legenda") porLegenda += 1;
-          else {
-            porGroq += 1;
-            segundosAudioGroq += resultado.duracaoS ?? 0;
-          }
-        } else if (resultado.tipo === "pulado") {
-          pulados += 1;
-        } else if (resultado.tipo === "falhou") {
-          falhas += 1;
-          erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
-          if (info.plataforma === "tiktok") {
-            falhasSeguidasTiktok += 1;
-            if (falhasSeguidasTiktok >= MAX_FALHAS_SEGUIDAS_FREIO) tiktokPausadoNoNicho = true;
-          }
-        } else if (resultado.tipo === "falhouYoutubeBot") {
-          falhas += 1;
-          falhasYoutubeBot += 1;
-          erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
-          falhasSeguidasBotYoutube += 1;
-          if (falhasSeguidasBotYoutube >= MAX_FALHAS_SEGUIDAS_FREIO) youtubePausadoNoNicho = true;
+        // O orçamento do setor acabou: o que sobrou da fila fica para a noite seguinte (a fila é por vídeo ainda sem leitura, então
+        // o vídeo não tentado volta sozinho), e o job segue para o próximo setor. Confere antes de cada vídeo, nunca no meio de um:
+        // um vídeo em andamento ainda pode passar do orçamento pelo seu próprio pior caso (legenda, áudio e Groq, cada um com o seu limite).
+        if (agora() - inicioDoSetor >= orcamentoMs) {
+          setoresParadosPeloOrcamento.push({
+            slug: nicho.slug,
+            ficaramParaDepois: selecionados.slice(indiceDoVideo).filter((id) => porId.has(id)).length,
+          });
+          break;
         }
-      } catch (erro) {
-        falhas += 1;
-        erros.push(`video ${videoId} / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+
+        const info = porId.get(videoId);
+        if (!info) continue;
+        if (info.plataforma === "youtube" && youtubePausadoNoNicho) continue;
+        if (info.plataforma === "tiktok" && tiktokPausadoNoNicho) continue;
+
+        tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
+
+        try {
+          const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma);
+          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
+            sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
+            sucessosNoNicho += 1;
+            if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
+            if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
+
+            if (resultado.tipo === "legenda") porLegenda += 1;
+            else {
+              porGroq += 1;
+              segundosAudioGroq += resultado.duracaoS ?? 0;
+            }
+          } else if (resultado.tipo === "pulado") {
+            pulados += 1;
+          } else if (resultado.tipo === "falhou") {
+            falhas += 1;
+            erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+            if (info.plataforma === "tiktok") {
+              falhasSeguidasTiktok += 1;
+              if (falhasSeguidasTiktok >= MAX_FALHAS_SEGUIDAS_FREIO) tiktokPausadoNoNicho = true;
+            }
+          } else if (resultado.tipo === "falhouYoutubeBot") {
+            falhas += 1;
+            falhasYoutubeBot += 1;
+            erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+            falhasSeguidasBotYoutube += 1;
+            if (falhasSeguidasBotYoutube >= MAX_FALHAS_SEGUIDAS_FREIO) youtubePausadoNoNicho = true;
+          } else if (resultado.tipo === "falhouTempoLimite") {
+            falhas += 1;
+            falhasPorTempoLimite += 1;
+            erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
+            // Dez vídeos seguidos pendurados na mesma plataforma é o proxy (ou o próprio YouTube) fora do ar: o mesmo freio do bloqueio.
+            if (info.plataforma === "youtube") {
+              falhasSeguidasBotYoutube += 1;
+              if (falhasSeguidasBotYoutube >= MAX_FALHAS_SEGUIDAS_FREIO) youtubePausadoNoNicho = true;
+            }
+            if (info.plataforma === "tiktok") {
+              falhasSeguidasTiktok += 1;
+              if (falhasSeguidasTiktok >= MAX_FALHAS_SEGUIDAS_FREIO) tiktokPausadoNoNicho = true;
+            }
+          }
+        } catch (erro) {
+          falhas += 1;
+          erros.push(`video ${videoId} / nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+        }
+
+        // Espaça as chamadas ao YouTube (item 2 desta rodada), depois de
+        // processar o vídeo (qualquer resultado), antes do próximo. Olha a
+        // `url` da página (nunca `urlParaBaixar`): é ela que diz se o yt-dlp
+        // falou com o YouTube, e o endereço direto de mídia da Meta nunca é.
+        // O download em si decide por plataforma (`argumentosPorPlataforma`,
+        // `audio.ts` e `video.ts`), não por host; `ehUrlDoYoutube` ficou só
+        // para esta pausa.
+        if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
       }
 
-      // Espaça as chamadas ao YouTube (item 2 desta rodada), depois de
-      // processar o vídeo (qualquer resultado), antes do próximo. Olha a
-      // `url` da página (nunca `urlParaBaixar`): é ela que diz se o yt-dlp
-      // falou com o YouTube, e o endereço direto de mídia da Meta nunca é.
-      // O download em si decide por plataforma (`argumentosPorPlataforma`,
-      // `audio.ts` e `video.ts`), não por host; `ehUrlDoYoutube` ficou só
-      // para esta pausa.
-      if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
+      if (youtubePausadoNoNicho) youtubePausado = true;
+      if (tiktokPausadoNoNicho) tiktokPausado = true;
+      segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
     }
-
-    if (youtubePausadoNoNicho) youtubePausado = true;
-    if (tiktokPausadoNoNicho) tiktokPausado = true;
-  }
-
-  /**
-   * M5b, item 1: a ordem dos jobs da madrugada, encadeada (achado da conferência de 02/10, com a
-   * fila destravada pela M5a: o `transcrever` levou 1h33 e passou por cima do `extrair-sem-fala`
-   * das 04:40 e do `extrair` das 05:00, que só acharam o que já estava transcrito antes deles
-   * começarem). Só a rodada global (sem `nichoId`, o cron das 04:00) encadeia; a "primeira carga"
-   * de `pesquisa-de-setor.ts` (que passa `nichoId`) já tem a própria cadeia síncrona, passo a
-   * passo, e não deve disparar `extrair-sem-fala`/`extrair` para todos os setores por causa de um
-   * setor só. Os horários fixos de `agenda.ts` continuam como reserva (se o worker cair no meio da
-   * cadeia, por exemplo); não duplicam trabalho porque `extrair-sem-fala` e `extrair` só
-   * selecionam vídeo sem `analise` (conferido: `condicoesElegivelSemFala`, `isNull(videos.analise)`
-   * em extrair.ts), então uma segunda rodada sobre o mesmo vídeo não acha nada para processar de
-   * novo. A fila nunca derruba a transcrição (mesma regra de `extrair-coleta.ts`): se o pg-boss
-   * estiver fora do ar, o erro fica só no log.
-   */
-  if (nichoId === undefined) {
-    try {
-      await garantirBossPronto();
-      await boss().send(FILAS.extrairSemFala, {});
-    } catch (erro) {
-      logger.error({ err: erro }, "nao foi possivel enfileirar extrair-sem-fala depois da transcricao");
+  } finally {
+    /**
+     * M5b, item 1: a ordem dos jobs da madrugada, encadeada (achado da conferência de 02/10, com a
+     * fila destravada pela M5a: o `transcrever` levou 1h33 e passou por cima do `extrair-sem-fala`
+     * das 04:40 e do `extrair` das 05:00, que só acharam o que já estava transcrito antes deles
+     * começarem). Só a rodada global (sem `nichoId`, o cron das 04:00) encadeia; a "primeira carga"
+     * de `pesquisa-de-setor.ts` (que passa `nichoId`) já tem a própria cadeia síncrona, passo a
+     * passo, e não deve disparar `extrair-sem-fala`/`extrair` para todos os setores por causa de um
+     * setor só. Os horários fixos de `agenda.ts` continuam como reserva (se o worker cair no meio da
+     * cadeia, por exemplo); não duplicam trabalho porque `extrair-sem-fala` e `extrair` só
+     * selecionam vídeo sem `analise` (conferido: `condicoesElegivelSemFala`, `isNull(videos.analise)`
+     * em extrair.ts), então uma segunda rodada sobre o mesmo vídeo não acha nada para processar de
+     * novo. A fila nunca derruba a transcrição (mesma regra de `extrair-coleta.ts`): se o pg-boss
+     * estiver fora do ar, o erro fica só no log.
+     *
+     * M5c: dispara SEMPRE que a rodada global termina, num `finally`: parou pelo orçamento de tempo, acabou
+     * a fila, ou um erro inesperado interrompeu o laço (antes, o job que passava das 4 h nunca chegava aqui,
+     * e o que já estava transcrito ficava sem análise até a noite seguinte).
+     */
+    if (nichoId === undefined) {
+      try {
+        await garantirBossPronto();
+        await boss().send(FILAS.extrairSemFala, {});
+      } catch (erro) {
+        logger.error({ err: erro }, "nao foi possivel enfileirar extrair-sem-fala depois da transcricao");
+      }
     }
   }
 
@@ -423,12 +533,15 @@ export async function rodarTranscrever(nichoId?: number): Promise<Record<string,
     puladosSemChaveGroq: pulados,
     falhas,
     falhasYoutubeBot,
+    falhasPorTempoLimite,
     segundosAudioGroq,
     custoEstimadoGroqUsd: Number(((segundosAudioGroq / 3600) * PRECO_GROQ_USD_POR_HORA).toFixed(4)),
     tentativas,
     sucessos,
     youtubePausado,
     tiktokPausado,
+    segundosPorSetor,
+    setoresParadosPeloOrcamento: setoresParadosPeloOrcamento.length > 0 ? setoresParadosPeloOrcamento : undefined,
     erros: erros.length > 0 ? erros : undefined,
   };
 }
