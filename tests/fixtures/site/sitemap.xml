@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://loja-exemplo.test/</loc><lastmod>2026-09-01</lastmod></url>
+  <url><loc>https://loja-exemplo.test/sobre-nos/</loc></url>
+  <url><loc>https://loja-exemplo.test/produtos/</loc></url>
+  <url><loc>https://loja-exemplo.test/servicos/encomendas/</loc></url>
+  <url><loc><![CDATA[https://loja-exemplo.test/contato?origem=mapa&amp;x=1]]></loc></url>
+  <url><loc>https://loja-exemplo.test/politica-de-privacidade/</loc></url>
+  <url><loc>https://outro-site.test/sobre-nos/</loc></url>
+  <url><loc>https://loja-exemplo.test/blog/como-escolher-o-melhor-servico-de-padaria</loc></url>
+</urlset>
