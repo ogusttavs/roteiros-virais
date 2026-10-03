@@ -46,7 +46,7 @@ export async function estadoDoAviso(): Promise<EstadoDoAviso> {
 export type DadosDaInscricaoNoNavegador = { endpoint: string; p256dh: string; auth: string };
 
 export type ResultadoDeLigar =
-  | { tipo: "ligado"; inscricao: DadosDaInscricaoNoNavegador }
+  | { tipo: "ligado"; inscricao: DadosDaInscricaoNoNavegador; /** O endereço da inscrição que foi trocada, para quem chama apagá-la no servidor (nulo se não havia). */ endpointAntigo: string | null }
   | { tipo: "negado" }
   | { tipo: "erro" };
 
@@ -65,11 +65,12 @@ export async function ligarAviso(chavePublica: string): Promise<ResultadoDeLigar
     // Sempre uma inscrição nova (A2): a que já existia pode ser de uma chave VAPID antiga ou apontar para um endereço que o serviço de push já não aceita, e é
     // exatamente o caso de quem volta a ligar o aviso depois de a inscrição ter sido apagada no servidor.
     const antiga = await registro.pushManager.getSubscription();
+    const endpointAntigo = antiga?.endpoint ?? null;
     if (antiga) await antiga.unsubscribe().catch(() => false);
     const inscricao = await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(chavePublica) });
     const json = inscricao.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return { tipo: "erro" };
-    return { tipo: "ligado", inscricao: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth } };
+    return { tipo: "ligado", inscricao: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }, endpointAntigo };
   } catch {
     return { tipo: "erro" };
   }

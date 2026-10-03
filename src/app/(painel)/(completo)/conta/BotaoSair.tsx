@@ -43,7 +43,8 @@ export function BotaoSair({
     // sem inscrição neste aparelho, ou sem rede, nada acontece e a saída segue (a próxima pessoa a ligar o aviso aqui gera uma inscrição nova).
     try {
       const inscricao = await inscricaoAtualDoAparelho();
-      if (inscricao) await apagarInscricaoPushAction(inscricao.endpoint);
+      // Com rede que aceita a conexão e não responde, a saída não espera mais que 4 s por isto.
+      if (inscricao) await Promise.race([apagarInscricaoPushAction(inscricao.endpoint), new Promise<void>((resolver) => setTimeout(resolver, 4000))]);
     } catch {
       // Nunca impede a saída.
     }

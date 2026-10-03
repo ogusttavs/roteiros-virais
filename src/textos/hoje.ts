@@ -250,6 +250,8 @@ export const textosHoje = {
     /** O lugar reservado de uma coluna (Reels ou Stories) sem nada, com a outra coluna preenchida; nunca "para hoje", vale em qualquer dia. */
     semNadaNaColuna: "Nada marcado",
     criarRoteiro: "Criar roteiro",
+    /** A2, item 7: o atalho sempre visível em "Stories de hoje" (Story a pessoa cria na hora, na maioria das vezes); leva ao Criar já em Story e no dia de hoje. */
+    criarStoryHoje: "Criar um Story para hoje",
     abrirRoteiro: "Abrir o roteiro",
     briefingPodeRenderMais: "O seu briefing pode render mais",
     briefingNotaEMeta: (nota: string, meta: string) =>

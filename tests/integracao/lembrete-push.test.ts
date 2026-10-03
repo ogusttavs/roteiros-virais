@@ -338,6 +338,17 @@ describe("as inscrições da pessoa", () => {
     expect(pedidoDePushPodeAparecer({ pushAdiadoAte: null }, await aparelhosSemFalha(recente.usuarioId), AGORA)).toBe(true);
   });
 
+  it("registrar o endereço de um aparelho que o job apagou no meio do caminho cria a inscrição de novo, e nunca devolve nada", async () => {
+    const { usuarioId } = await criarPessoaComMarca();
+    const feita = await inscrever(usuarioId);
+    await db().delete(inscricoesPush).where(eq(inscricoesPush.id, feita.id));
+
+    const outra = await registrarInscricaoPush(usuarioId, inscricao(usuarioId, "a"), "android");
+
+    expect(outra.id).toBeGreaterThan(0);
+    expect((await inscricoesDaPessoa(usuarioId)).length).toBe(1);
+  });
+
   it("a falha corrente começa na primeira falha da sequência (não anda a cada dia); um envio aceito a termina e anota o sucesso", async () => {
     const { usuarioId } = await criarPessoaComMarca();
     const feita = await inscrever(usuarioId);
@@ -346,7 +357,9 @@ describe("as inscrições da pessoa", () => {
     await rodarLembrete(AGORA);
     const [primeira] = await inscricoesDaPessoa(usuarioId);
     const inicio = primeira.ultimaFalhaEm!.getTime();
-    expect(await aparelhosSemFalha(usuarioId)).toBe(0);
+    // Uma falha corrente de menos de 3 dias ainda não tira o aparelho da conta (uma queda curta do serviço não convida todo mundo a ligar de novo).
+    expect(await aparelhosSemFalha(usuarioId, AGORA)).toBe(1);
+    expect(await aparelhosSemFalha(usuarioId, new Date(AGORA.getTime() + 4 * 24 * 60 * 60 * 1000))).toBe(0);
 
     await db().update(preferenciasUsuario).set({ ultimoLembreteEm: null }).where(eq(preferenciasUsuario.usuarioId, usuarioId));
     await new Promise((resolver) => setTimeout(resolver, 20));

@@ -2,7 +2,7 @@
  * As inscrições do aviso de manhã por push (E48 PR 2): uma linha por aparelho que a pessoa deixou receber. O endpoint é único (a mesma inscrição
  * nunca vira duas linhas). Uma falha de envio do aparelho conta; a segunda seguida apaga. Falha que não é do aparelho só apaga depois de 14 dias sem nenhum envio aceito.
  */
-import { and, count, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { db } from "@/db";
@@ -85,7 +85,8 @@ export async function registrarInscricaoPush(usuarioId: string, dados: DadosDaIn
     )
     .where(eq(inscricoesPush.id, existente.id))
     .returning();
-  return atualizada;
+  // A linha sumiu entre a leitura e a atualização (um 404 ou 410 do job apagou o aparelho): cai no caso "endereço novo", em vez de devolver nada.
+  return atualizada ?? registrarInscricaoPush(usuarioId, dados, sistema);
 }
 
 /** As inscrições da pessoa (todas valem: a que falha é apagada, não marcada). */
@@ -167,12 +168,19 @@ export async function aparelhosAtivosPorPessoa(usuarioIds: string[]): Promise<Ma
   return new Map(linhas.map((l) => [l.usuarioId, l.total]));
 }
 
-/** Quantos aparelhos da pessoa estão sem falha corrente (a inscrição que já falha não conta: a pessoa pode ser convidada a ligar de novo). */
-export async function aparelhosSemFalha(usuarioId: string): Promise<number> {
+/** Uma falha corrente de menos de 3 dias ainda não tira o aparelho da conta: uma queda curta do serviço de push (429, 5xx) não pode convidar todo mundo a ligar de novo. */
+export const DIAS_DE_FALHA_PARA_CONVIDAR = 3;
+
+/**
+ * Quantos aparelhos da pessoa estão funcionando: sem falha corrente, ou com uma falha corrente de menos de `DIAS_DE_FALHA_PARA_CONVIDAR` dias. A inscrição que
+ * já falha há mais que isso não conta, e a pessoa pode ser convidada a ligar de novo (o pedido de permissão volta).
+ */
+export async function aparelhosSemFalha(usuarioId: string, agora: Date = new Date()): Promise<number> {
+  const limite = new Date(agora.getTime() - DIAS_DE_FALHA_PARA_CONVIDAR * DIA_MS);
   const [linha] = await db()
     .select({ total: count() })
     .from(inscricoesPush)
-    .where(and(eq(inscricoesPush.usuarioId, usuarioId), isNull(inscricoesPush.ultimaFalhaEm)));
+    .where(and(eq(inscricoesPush.usuarioId, usuarioId), or(isNull(inscricoesPush.ultimaFalhaEm), gt(inscricoesPush.ultimaFalhaEm, limite))));
   return linha?.total ?? 0;
 }
 

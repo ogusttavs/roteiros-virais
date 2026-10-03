@@ -227,6 +227,33 @@
   cursor: progress;
 }
 
+/* A2, item 7: o contorno do "Criar um Story para hoje" (o mesmo padrão do botão de "Abrir o roteiro" do Reels, só que secundário). */
+.botaoSecundario {
+  background: transparent;
+  color: var(--cor-titulo);
+  border-color: var(--cor-borda-forte);
+  justify-self: start;
+}
+
+.botaoSecundario:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoSecundario:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoSecundario:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoSecundario[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
 .botaoSecundarioSm {
   min-height: var(--altura-toque);
   display: inline-flex;

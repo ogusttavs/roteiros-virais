@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, ChevronRight, History, Newspaper } from "lucide-react";
+import { Bookmark, ChevronRight, History, Newspaper, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -21,6 +21,8 @@ const ITENS = [
   { href: "/referencias", rotulo: textosNav.referencias, ajuda: textosNav.ajudaReferencias, Icone: Bookmark },
   { href: "/noticias", rotulo: textosNav.noticias, ajuda: textosNav.ajudaNoticias, Icone: Newspaper },
   { href: "/historico", rotulo: textosNav.historico, ajuda: textosNav.ajudaHistorico, Icone: History },
+  // A2, item 8: a última da folha; "Mais" acende em /conta (`CapsulaNav.tsx`). O avatar do cabeçalho continua levando à Conta.
+  { href: "/conta", rotulo: textosNav.contaEAjustes, ajuda: textosNav.ajudaConta, Icone: UserRound },
 ];
 
 /**

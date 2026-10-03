@@ -14,11 +14,14 @@ export const textosNav = {
    * Histórico).
    */
   mais: "Mais",
-  maisAriaLabel: "Mais: Referências, Notícias e Histórico",
+  maisAriaLabel: "Mais: Referências, Notícias, Histórico e Conta",
   maisAriaLabelLista: "Para consultar",
   ajudaReferencias: "Os vídeos que estão funcionando no seu setor",
   ajudaNoticias: "O que saiu sobre o seu setor, e como virar vídeo",
   ajudaHistorico: "Os seus roteiros e como foram os vídeos",
+  /** A2, item 8: a entrada "Conta e ajustes" da folha Mais (a letra do avatar no cabeçalho não é intuitiva para quem procura as configurações). */
+  contaEAjustes: "Conta e ajustes",
+  ajudaConta: "Ramo, perfis, lembrete, aviso de manhã, instalar",
   /** E39a: Briefing sai da navegação e vira uma linha dentro de Conta (desenho do Opus, dúvida 2). */
   briefing: "Briefing",
   conta: "Conta",

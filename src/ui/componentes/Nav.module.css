@@ -36,6 +36,14 @@
   text-decoration: none;
   border-radius: var(--raio-md);
   transition: color var(--duracao-rapida) var(--curva-saida);
+  /* O "Mais" é um <button> (abre a folha) e os outros três são links: o Safari do iPhone pinta o botão com o cinza do sistema (fundo, borda e aparência
+     nativa), e o "Mais" parecia sempre selecionado (A2, item 6). O mesmo reset dos links, sem tocar na cor do texto. */
+  padding: 0;
+  border: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
 }
 
 .item:focus-visible {
@@ -43,9 +51,12 @@
   box-shadow: var(--sombra-foco);
 }
 
+/* O item ativo da cápsula (Casca.dc.html, `.aba[aria-current="page"]`): cor de ação, peso e um fundo de vidro: três sinais que não dependem só da cor, nos dois temas
+   (`--vidro-selecao` já é mais claro no escuro). Na barra lateral (abaixo, desde 768px) vale o fundo de seleção suave de sempre. */
 .ativo {
   color: var(--cor-acao);
   font-weight: var(--peso-semibold);
+  background: var(--vidro-selecao);
 }
 
 .traco {

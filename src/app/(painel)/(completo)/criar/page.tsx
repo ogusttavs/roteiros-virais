@@ -8,7 +8,7 @@ import { temasParaCliente } from "@/servicos/temas";
 
 import { CriarTela } from "./CriarTela";
 
-type Props = { searchParams: Promise<{ data?: string; plano?: string }> };
+type Props = { searchParams: Promise<{ data?: string; plano?: string; formato?: string }> };
 
 /**
  * `/criar` (E39a, design v2, `Criar.dc.html`, estado `inicio`): a oficina. Os quatro caminhos sem
@@ -33,7 +33,7 @@ export default async function Criar({ searchParams }: Props) {
   }
 
   const hoje = hojeISO();
-  const { data, plano } = await searchParams;
+  const { data, plano, formato } = await searchParams;
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) && data >= hoje ? data : undefined;
   const planoItemId = plano && /^\d+$/.test(plano) ? Number(plano) : undefined;
 
@@ -59,6 +59,7 @@ export default async function Criar({ searchParams }: Props) {
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
       itemPlanoInicial={itemPlanoInicial}
+      abrirEmStory={formato === "story"}
     />
   );
 }
