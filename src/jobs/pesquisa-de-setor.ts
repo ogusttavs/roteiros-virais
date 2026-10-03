@@ -174,6 +174,9 @@ export async function confirmarYoutube(handleOuNome: string): Promise<ContaConfi
 
 /** Instagram: Business Discovery (grátis), o mesmo caminho que `contas-base.ts` usa no catch-up diário. */
 export async function confirmarInstagram(handle: string): Promise<ContaConfirmada | null> {
+  // O @ entra cru na expressão de campos da Graph API (`business_discovery.username(...)`): quem chega aqui por um campo
+  // que a pessoa escreve (a Conta, o briefing) nunca pode trazer parênteses, chaves ou vírgula. Só o que o Instagram permite.
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(handle)) return null;
   if (!config.coleta.metaAtivo) return null;
   if (await candidatoFoiTirado("instagram", handle)) return null;
 

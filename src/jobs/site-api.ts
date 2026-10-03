@@ -20,12 +20,21 @@
  * 4. Corpo lido em stream, com teto por página e total, recusa de Content-Length enorme,
  *    só HTML, e cancelamento do stream ao estourar (o `undici` descomprime antes do stream,
  *    então o teto também protege de bomba de descompressão).
+ * 5. O CUSTO de CPU do que chega. O worker é um processo só e o parse5 é síncrono (nenhum prazo o
+ *    interrompe), então `site-extrair.ts` limita o trabalho ANTES de entregar o texto de terceiros
+ *    ao parser e às regras do robots.txt (teto de `<` por documento, de atributos por tag, de
+ *    elementos de formatação, de regras e de curingas do robots.txt, de nós por conferência), com
+ *    o pior caso por página medido e anotado lá. Aqui basta respeitar os tetos de bytes e de
+ *    requisições da camada 4: o corpo é decodificado inteiro e entregue de uma vez àquelas funções.
  *
  * Comportamento com o site, sem exceção: User-Agent honesto (montado de `APP_NAME`,
  * `APP_URL` e `EMAIL_CONTATO`), nenhum cookie, nenhum `Authorization`, nunca proxy (o proxy
  * resolveria o DNS e a guarda de IP deixaria de valer, e proxy custa por gigabyte), nunca
  * disfarçar de navegador e nunca tentar de novo com outro User-Agent quando vier 401, 403,
- * 429 ou tela de desafio: o motivo é registrado e a rodada para. Respeita o robots.txt
+ * 429 ou tela de desafio: o motivo é registrado e a rodada para. Cada página é pedida no
+ * formato em que o site escreveu o link (com ou sem a barra final): pedir `/sobre` quando o
+ * WordPress escreve `/sobre/` custa um redirecionamento por página, e o teto de requisições
+ * corta páginas (o motivo é `limite_de_requisicoes`). Respeita o robots.txt
  * (RFC 9309; erro 5xx ou tempo esgotado do robots vale como "proibido"). Sem navegador sem
  * cabeça: site que só carrega por JavaScript cai no motivo `sem_texto`.
  *
@@ -85,7 +94,14 @@ export type MotivoLeituraSite =
   | "nao_e_html"
   | "sem_texto"
   | "redirecionamento_invalido"
-  | "sem_resposta";
+  | "sem_resposta"
+  /**
+   * Acrescentado ao fim da união (E38 PR 2, revisão): a leitura gastou o teto de requisições
+   * (robots.txt, saltos e páginas contam) antes de pedir esta página. Antes era `grande_demais`,
+   * que na tela diz "não conseguimos tirar o texto dele" e engana. Quem recebe um motivo que não
+   * conhece usa a frase padrão (`fraseDaFonteNaoLida`).
+   */
+  | "limite_de_requisicoes";
 
 /** Falha esperada de leitura: carrega o `motivo` que a leitura devolve e que a tela explica. */
 export class ErroLeituraSite extends Error {
@@ -412,6 +428,11 @@ function motivoDoStatus(status: number): MotivoLeituraSite {
   return "erro_do_site";
 }
 
+/** Sitemap `.gz` não é lido (descomprimir é trabalho que o leitor não faz): sem regex, o caminho é de terceiros. */
+function ehSitemapComprimido(url: URL): boolean {
+  return url.pathname.toLowerCase().endsWith(".gz");
+}
+
 const TIPOS_DE_HTML = new Set(["text/html", "application/xhtml+xml"]);
 
 function comecaComMenor(bytes: Uint8Array): boolean {
@@ -567,7 +588,7 @@ export async function lerSiteDaMarca(
     if (sinalTotal.aborted)
       throw new ErroLeituraSite("tempo_esgotado", "tempo total da leitura esgotado");
     if (resultado.requisicoes >= limites.maxRequisicoes) {
-      throw new ErroLeituraSite("grande_demais", "teto de requisicoes da leitura atingido");
+      throw new ErroLeituraSite("limite_de_requisicoes", "teto de requisicoes da leitura atingido");
     }
     const orcamentoBytes = limites.bytesTotais - resultado.bytesTotais;
     if (orcamentoBytes <= 0)
@@ -812,7 +833,7 @@ export async function lerSiteDaMarca(
         const url = new URL(endereco, homeUrl);
         return url.protocol === "https:" &&
           mesmoSite(url.hostname, hostPermitido) &&
-          !/\.gz$/i.test(url.pathname)
+          !ehSitemapComprimido(url)
           ? [url]
           : [];
       } catch {
@@ -853,7 +874,7 @@ export async function lerSiteDaMarca(
           return (
             url.protocol === "https:" &&
             mesmoSite(url.hostname, hostPermitido) &&
-            !/\.gz$/i.test(url.pathname)
+            !ehSitemapComprimido(url)
           );
         } catch {
           return false;

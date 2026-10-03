@@ -193,7 +193,7 @@ afterEach(async () => {
 });
 
 describe("a primeira leitura", () => {
-  it("lê o site, cria os itens a confirmar sem pílula de novidade, e grava o estado sem guardar o texto da página", async () => {
+  it("lê o site, cria os itens a confirmar sem pílula de novidade, e o estado (contexto_marca) e o resumo do job não guardam o texto da página", async () => {
     const clienteId = await criarCliente();
     const { deps, chamadas } = depsComSite(TEXTO_DO_SITE);
 
@@ -211,7 +211,7 @@ describe("a primeira leitura", () => {
     expect(estado.lendoDesde).toBeNull();
     expect(estado.hashFontes).toMatch(/^[0-9a-f]{64}$/);
     expect(estado.fontes).toEqual([{ tipo: "site", lida: true, quantidade: 1 }]);
-    // O texto bruto da página nunca é guardado (nem no estado, nem no resumo do job).
+    // O texto bruto da página não fica no estado nem no resumo do job (ele vai só na entrada da chamada de IA, que `geracoes_ia` registra: ver a nota do schema).
     expect(JSON.stringify(estado)).not.toContain("removedor");
     expect(JSON.stringify(resultado)).not.toContain("removedor");
   });

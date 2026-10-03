@@ -2,9 +2,32 @@
  * `escolherTermosParaPesquisa` (P2, item 0b da revisão do PR #74): os termos mais curtos primeiro
  * (mais genéricos), até o limite configurado.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { escolherTermosParaPesquisa } from "./pesquisa-de-setor";
+import { config } from "@/lib/config";
+
+import { buscarBusinessDiscovery } from "./meta-api";
+import { confirmarInstagram, escolherTermosParaPesquisa } from "./pesquisa-de-setor";
+
+vi.mock("./meta-api", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("./meta-api")>();
+  return { ...original, buscarBusinessDiscovery: vi.fn() };
+});
+
+describe("confirmarInstagram: o @ entra cru na expressão de campos da Graph API", () => {
+  it("um @ com parênteses, chaves ou vírgula nunca chega à Meta, nem com a Meta ligada", async () => {
+    const original = config.coleta.metaAtivo;
+    config.coleta.metaAtivo = true;
+    try {
+      for (const handle of ["x){id,followers_count},media{caption", "a b", "a(b)", "a,b", "a{b}", "", "a".repeat(31)]) {
+        expect(await confirmarInstagram(handle), handle).toBeNull();
+      }
+      expect(buscarBusinessDiscovery).not.toHaveBeenCalled();
+    } finally {
+      config.coleta.metaAtivo = original;
+    }
+  });
+});
 
 describe("escolherTermosParaPesquisa", () => {
   it("ordena do mais curto para o mais longo", () => {

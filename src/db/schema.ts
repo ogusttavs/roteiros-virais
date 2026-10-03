@@ -522,8 +522,10 @@ export type FonteDoContexto = {
 /**
  * E38 PR 2: o estado da leitura mensal do site e das redes da própria marca, uma linha por
  * cliente. Nada daqui alimenta a base do setor (nenhuma ligação com `nichos`, `contas` ou
- * `videos`): é a camada exclusiva do cliente, como `perfis_analisados`. Não guarda o texto bruto
- * das páginas, só o hash, a quantidade e o estado.
+ * `videos`): é a camada exclusiva do cliente, como `perfis_analisados`. ESTA tabela não guarda o
+ * texto bruto das páginas, só o hash, a quantidade e o estado. Atenção: o texto lido (até cinco
+ * páginas) vai na entrada da chamada de IA, e `geracoes_ia.entradas` guarda a entrada inteira de
+ * toda chamada, sem prazo (ver "decisões pendentes" do TODO: privacidade e exclusão da marca).
  */
 export const contextoMarca = pgTable("contexto_marca", {
   id: id(),

@@ -24,6 +24,7 @@ import {
   type ResolverDns,
   type ResultadoLeituraSite,
 } from "./site-api";
+import { MINIMO_TEXTO_UTIL } from "./site-extrair";
 
 function fixture(nome: string): string {
   return readFileSync(
@@ -51,19 +52,38 @@ const comStatus = (status: number, cabecalhos: Record<string, string> = {}): Res
 const redireciona = (para: string, status = 302): Response =>
   new Response(null, { status, headers: { location: para } });
 
-/** O site de exemplo: home com links, as páginas que o orçamento escolhe, e robots.txt ausente. */
+/**
+ * O site de exemplo: home com links, as páginas que o orçamento escolhe, e robots.txt ausente. As
+ * páginas ficam no endereço com barra final, que é como a home as escreve (o jeito do WordPress), e
+ * a forma SEM barra responde 301 para a com barra, como o WordPress de verdade: quem pedir sem a
+ * barra gasta uma requisição de redirecionamento por página (e o teto de 10 requisições corta
+ * páginas). `/contato` é escrito sem barra na home, e fica assim.
+ */
 function padaria(): Rotas {
+  const comBarra = (caminho: string, pagina: string): Rotas => ({
+    [`loja-exemplo.test${caminho}/`]: () => html(fixture(pagina)),
+    [`loja-exemplo.test${caminho}`]: () => redireciona(`https://loja-exemplo.test${caminho}/`, 301),
+  });
   return {
     "loja-exemplo.test/robots.txt": () => comStatus(404),
     "loja-exemplo.test/": () => html(fixture("home-padaria.html")),
-    "loja-exemplo.test/sobre-nos": () => html(fixture("pagina-sobre.html")),
-    "loja-exemplo.test/produtos": () => html(fixture("pagina-produtos.html")),
-    "loja-exemplo.test/produtos/bolos": () => html(fixture("pagina-servicos.html")),
-    "loja-exemplo.test/produtos/paes-artesanais": () => html(fixture("pagina-servicos.html")),
-    "loja-exemplo.test/servicos/encomendas": () => html(fixture("pagina-servicos.html")),
+    ...comBarra("/sobre-nos", "pagina-sobre.html"),
+    ...comBarra("/produtos", "pagina-produtos.html"),
+    ...comBarra("/produtos/bolos", "pagina-servicos.html"),
+    ...comBarra("/produtos/paes-artesanais", "pagina-servicos.html"),
+    ...comBarra("/servicos/encomendas", "pagina-servicos.html"),
     "loja-exemplo.test/contato": () => html(fixture("pagina-contato.html")),
   };
 }
+
+/** Os endereços das cinco páginas que a leitura normal da padaria devolve, na ordem. */
+const PAGINAS_DA_PADARIA = [
+  "https://loja-exemplo.test/",
+  "https://loja-exemplo.test/sobre-nos/",
+  "https://loja-exemplo.test/produtos/",
+  "https://loja-exemplo.test/produtos/bolos/",
+  "https://loja-exemplo.test/contato",
+];
 
 type Chamada = { url: string; init: PedidoLeitor };
 
@@ -163,21 +183,9 @@ describe("lerSiteDaMarca: a leitura normal", () => {
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.urlInicial).toBe("https://loja-exemplo.test/");
     expect(resultado.hostFinal).toBe("loja-exemplo.test");
-    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual([
-      "https://loja-exemplo.test/",
-      "https://loja-exemplo.test/sobre-nos",
-      "https://loja-exemplo.test/produtos",
-      "https://loja-exemplo.test/produtos/bolos",
-      "https://loja-exemplo.test/contato",
-    ]);
-    expect(urls()).toEqual([
-      "https://loja-exemplo.test/robots.txt",
-      "https://loja-exemplo.test/",
-      "https://loja-exemplo.test/sobre-nos",
-      "https://loja-exemplo.test/produtos",
-      "https://loja-exemplo.test/produtos/bolos",
-      "https://loja-exemplo.test/contato",
-    ]);
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(PAGINAS_DA_PADARIA);
+    /** O endereço pedido é o do link, com a barra: nenhum redirecionamento gasto. */
+    expect(urls()).toEqual(["https://loja-exemplo.test/robots.txt", ...PAGINAS_DA_PADARIA]);
     expect(resultado.requisicoes).toBe(6);
     expect(resultado.ignoradas).toEqual([]);
 
@@ -284,8 +292,32 @@ describe("lerSiteDaMarca: a leitura normal", () => {
     expect(total).toBeLessThanOrEqual(20_000);
     expect(resultado.paginas[0].texto.length).toBeGreaterThan(5_000);
     expect(resultado.paginas[0].url).toBe("https://loja-exemplo.test/");
-    expect(resultado.paginas.length + resultado.ignoradas.length).toBe(5);
-    expect(resultado.ignoradas.every((ignorada) => ignorada.motivo === "grande_demais")).toBe(true);
+    /**
+     * A home, a de sobre e a de produtos tomam 18.000; a de serviços ainda cabe com os 2.000 que
+     * sobram; a de contato encontra o orçamento acabado e fica de fora com `grande_demais`. A
+     * versão anterior dizia `ignoradas.every(...)`, que é verdade para uma lista vazia, e somava
+     * páginas e ignoradas dando 5 mesmo com páginas vazias dentro de `paginas`.
+     */
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual([
+      "https://loja-exemplo.test/",
+      "https://loja-exemplo.test/sobre",
+      "https://loja-exemplo.test/produtos",
+      "https://loja-exemplo.test/servicos",
+    ]);
+    expect(resultado.paginas.map((pagina) => pagina.texto.length > 5_000)).toEqual([
+      true,
+      true,
+      true,
+      false,
+    ]);
+    /** O que sobrou do orçamento de 20.000 depois das três primeiras (cada uma cortada em fronteira de linha). */
+    expect(resultado.paginas[3].texto.length).toBeLessThan(3_000);
+    expect(total).toBeGreaterThan(19_000);
+    for (const pagina of resultado.paginas)
+      expect(pagina.texto.length).toBeGreaterThanOrEqual(MINIMO_TEXTO_UTIL);
+    expect(resultado.ignoradas).toEqual([
+      { url: "https://loja-exemplo.test/contato", motivo: "grande_demais" },
+    ]);
     expect(resultado.motivoGeral).toBeNull();
   });
 
@@ -520,11 +552,11 @@ describe("lerSiteDaMarca: redirecionamentos", () => {
 
   it("segunda pagina: redirecionar para outro host e recusado, e o resto da leitura continua", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/sobre-nos"] = () => redireciona("https://outro-site.test/");
+    rotas["loja-exemplo.test/sobre-nos/"] = () => redireciona("https://outro-site.test/");
     const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.ignoradas).toEqual([
-      { url: "https://loja-exemplo.test/sobre-nos", motivo: "redirecionamento_invalido" },
+      { url: "https://loja-exemplo.test/sobre-nos/", motivo: "redirecionamento_invalido" },
     ]);
     expect(urls().some((url) => url.includes("outro-site.test"))).toBe(false);
     expect(resultado.paginas.map((pagina) => pagina.url)).toContain(
@@ -535,10 +567,10 @@ describe("lerSiteDaMarca: redirecionamentos", () => {
 
   it("segunda pagina: redirecionar para IP privado e recusado como endereco_privado", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/produtos"] = () => redireciona("https://192.168.0.1/");
+    rotas["loja-exemplo.test/produtos/"] = () => redireciona("https://192.168.0.1/");
     const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.ignoradas).toContainEqual({
-      url: "https://loja-exemplo.test/produtos",
+      url: "https://loja-exemplo.test/produtos/",
       motivo: "endereco_privado",
     });
     expect(urls().some((url) => url.includes("192.168"))).toBe(false);
@@ -546,7 +578,7 @@ describe("lerSiteDaMarca: redirecionamentos", () => {
 
   it("segunda pagina: redirecionar dentro do mesmo site (com barra, com www) vale", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/sobre-nos"] = () =>
+    rotas["loja-exemplo.test/sobre-nos/"] = () =>
       redireciona("https://www.loja-exemplo.test/sobre-nos/");
     rotas["www.loja-exemplo.test/robots.txt"] = () => comStatus(404);
     rotas["www.loja-exemplo.test/sobre-nos/"] = () => html(fixture("pagina-sobre.html"));
@@ -886,7 +918,7 @@ describe("lerSiteDaMarca: tempo", () => {
   it("uma pagina lenta no meio da leitura vira ignorada e as outras seguem", async () => {
     const site = montar(padaria());
     const buscar: BuscarLeitor = vi.fn(async (url, init) => {
-      if (new URL(url).pathname === "/sobre-nos") return ficarPendenteAteAbortar(init);
+      if (new URL(url).pathname === "/sobre-nos/") return ficarPendenteAteAbortar(init);
       return site.buscar(url, init);
     });
     const resultado = await lerSiteDaMarca("https://loja-exemplo.test/", {
@@ -896,7 +928,7 @@ describe("lerSiteDaMarca: tempo", () => {
     });
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.ignoradas).toEqual([
-      { url: "https://loja-exemplo.test/sobre-nos", motivo: "tempo_esgotado" },
+      { url: "https://loja-exemplo.test/sobre-nos/", motivo: "tempo_esgotado" },
     ]);
     expect(resultado.paginas).toHaveLength(4);
   });
@@ -904,7 +936,7 @@ describe("lerSiteDaMarca: tempo", () => {
   it("timeout total: ao estourar, as paginas que faltam nem sao pedidas", async () => {
     const site = montar(padaria());
     const buscar: BuscarLeitor = vi.fn(async (url, init) => {
-      if (new URL(url).pathname === "/sobre-nos") return ficarPendenteAteAbortar(init);
+      if (new URL(url).pathname === "/sobre-nos/") return ficarPendenteAteAbortar(init);
       return site.buscar(url, init);
     });
     const resultado = await lerSiteDaMarca("https://loja-exemplo.test/", {
@@ -922,7 +954,7 @@ describe("lerSiteDaMarca: tempo", () => {
     expect(pedidas).toEqual([
       "https://loja-exemplo.test/robots.txt",
       "https://loja-exemplo.test/",
-      "https://loja-exemplo.test/sobre-nos",
+      "https://loja-exemplo.test/sobre-nos/",
     ]);
   });
 
@@ -1020,14 +1052,14 @@ describe("lerSiteDaMarca: robots.txt", () => {
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.ignoradas).toEqual(
       expect.arrayContaining([
-        { url: "https://loja-exemplo.test/sobre-nos", motivo: "robots_proibe" },
-        { url: "https://loja-exemplo.test/produtos/bolos", motivo: "robots_proibe" },
+        { url: "https://loja-exemplo.test/sobre-nos/", motivo: "robots_proibe" },
+        { url: "https://loja-exemplo.test/produtos/bolos/", motivo: "robots_proibe" },
       ]),
     );
-    expect(urls()).not.toContain("https://loja-exemplo.test/sobre-nos");
-    expect(urls()).not.toContain("https://loja-exemplo.test/produtos/bolos");
-    expect(urls()).toContain("https://loja-exemplo.test/produtos");
-    expect(urls()).toContain("https://loja-exemplo.test/servicos/encomendas");
+    expect(urls()).not.toContain("https://loja-exemplo.test/sobre-nos/");
+    expect(urls()).not.toContain("https://loja-exemplo.test/produtos/bolos/");
+    expect(urls()).toContain("https://loja-exemplo.test/produtos/");
+    expect(urls()).toContain("https://loja-exemplo.test/servicos/encomendas/");
   });
 
   it("Allow mais especifico reabre um caminho", async () => {
@@ -1035,8 +1067,8 @@ describe("lerSiteDaMarca: robots.txt", () => {
     rotas["loja-exemplo.test/robots.txt"] = () =>
       texto("User-agent: *\nDisallow: /produtos\nAllow: /produtos/bolos\n");
     const { urls } = await ler("https://loja-exemplo.test/", rotas);
-    expect(urls()).toContain("https://loja-exemplo.test/produtos/bolos");
-    expect(urls()).not.toContain("https://loja-exemplo.test/produtos");
+    expect(urls()).toContain("https://loja-exemplo.test/produtos/bolos/");
+    expect(urls()).not.toContain("https://loja-exemplo.test/produtos/");
   });
 
   it("proibir so a home nao deixa ler a home, mesmo com o resto liberado", async () => {
@@ -1052,7 +1084,7 @@ describe("lerSiteDaMarca: robots.txt", () => {
 /* ------------------------------------------------------------------ */
 
 describe("lerSiteDaMarca: status e bloqueios", () => {
-  it.each([[401], [403], [429]])(
+  it.each([[401], [403], [429], [451]])(
     "home com %i: bloqueado_pelo_site, sem repetir com outro User-Agent",
     async (status) => {
       const rotas = padaria();
@@ -1069,16 +1101,16 @@ describe("lerSiteDaMarca: status e bloqueios", () => {
 
   it("403 numa pagina do meio para a rodada: as seguintes nem sao pedidas", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/produtos"] = () => comStatus(403);
+    rotas["loja-exemplo.test/produtos/"] = () => comStatus(403);
     const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.paginas.map((pagina) => pagina.url)).toEqual([
       "https://loja-exemplo.test/",
-      "https://loja-exemplo.test/sobre-nos",
+      "https://loja-exemplo.test/sobre-nos/",
     ]);
     expect(resultado.ignoradas).toEqual([
-      { url: "https://loja-exemplo.test/produtos", motivo: "bloqueado_pelo_site" },
-      { url: "https://loja-exemplo.test/produtos/bolos", motivo: "bloqueado_pelo_site" },
+      { url: "https://loja-exemplo.test/produtos/", motivo: "bloqueado_pelo_site" },
+      { url: "https://loja-exemplo.test/produtos/bolos/", motivo: "bloqueado_pelo_site" },
       { url: "https://loja-exemplo.test/contato", motivo: "bloqueado_pelo_site" },
     ]);
     expect(urls()).not.toContain("https://loja-exemplo.test/contato");
@@ -1095,7 +1127,7 @@ describe("lerSiteDaMarca: status e bloqueios", () => {
 
   it("desafio no meio da leitura: a pagina e as seguintes ficam de fora e a rodada para", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/produtos"] = () => html(fixture("pagina-desafio.html"));
+    rotas["loja-exemplo.test/produtos/"] = () => html(fixture("pagina-desafio.html"));
     const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.paginas).toHaveLength(2);
     expect(resultado.ignoradas.map((ignorada) => ignorada.motivo)).toEqual([
@@ -1132,15 +1164,42 @@ describe("lerSiteDaMarca: status e bloqueios", () => {
     },
   );
 
+  it.each([
+    [301, "redirecionamento_invalido"],
+    [404, "nao_encontrado"],
+    [410, "nao_encontrado"],
+    [500, "erro_do_site"],
+    [503, "erro_do_site"],
+    [451, "bloqueado_pelo_site"],
+  ])(
+    "resposta %i na home: o corpo nunca e lido, so cancelado (nao baixa megabytes de uma pagina de erro)",
+    async (status, motivo) => {
+      const leituras = vi.fn();
+      const cancelamentos = vi.fn();
+      const rotas = padaria();
+      rotas["loja-exemplo.test/"] = () =>
+        new Response(corpoQueNaoDeveSerLido(leituras, cancelamentos), {
+          status,
+          headers: { "content-type": "text/html", ...(status === 301 ? { location: "/" } : {}) },
+        });
+      const { resultado } = await ler("https://loja-exemplo.test/", rotas);
+      expect(resultado.motivoGeral).toBe(motivo);
+      expect(leituras).not.toHaveBeenCalled();
+      /** O 301 da home aponta para ela mesma: cada salto cancela o corpo (4 saltos no total). */
+      expect(cancelamentos).toHaveBeenCalledTimes(status === 301 ? 4 : 1);
+      expect(resultado.bytesTotais).toBe(0);
+    },
+  );
+
   it("pagina 404 no meio da leitura: ignorada, sem repetir, e a leitura segue", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/produtos"] = () => comStatus(404);
+    rotas["loja-exemplo.test/produtos/"] = () => comStatus(404);
     const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.motivoGeral).toBeNull();
     expect(resultado.ignoradas).toEqual([
-      { url: "https://loja-exemplo.test/produtos", motivo: "nao_encontrado" },
+      { url: "https://loja-exemplo.test/produtos/", motivo: "nao_encontrado" },
     ]);
-    expect(urls().filter((url) => url === "https://loja-exemplo.test/produtos")).toHaveLength(1);
+    expect(urls().filter((url) => url === "https://loja-exemplo.test/produtos/")).toHaveLength(1);
     expect(resultado.paginas).toHaveLength(4);
   });
 });
@@ -1157,8 +1216,11 @@ describe("lerSiteDaMarca: tetos", () => {
     expect(buscar).toHaveBeenCalledTimes(3);
     expect(resultado.requisicoes).toBe(3);
     expect(resultado.paginas).toHaveLength(2);
-    expect(resultado.ignoradas).toHaveLength(3);
-    expect(resultado.ignoradas.every((ignorada) => ignorada.motivo === "grande_demais")).toBe(true);
+    expect(resultado.ignoradas.map((ignorada) => ignorada.motivo)).toEqual([
+      "limite_de_requisicoes",
+      "limite_de_requisicoes",
+      "limite_de_requisicoes",
+    ]);
     expect(resultado.motivoGeral).toBeNull();
   });
 
@@ -1171,23 +1233,23 @@ describe("lerSiteDaMarca: tetos", () => {
       limites: { maxRequisicoes: 3 },
     });
     expect(buscar).toHaveBeenCalledTimes(3);
-    expect(resultado.motivoGeral).toBe("grande_demais");
+    expect(resultado.motivoGeral).toBe("limite_de_requisicoes");
   });
 
   it("teto padrao: no maximo 10 requisicoes mesmo com robots, saltos e paginas que redirecionam", async () => {
     const rotas = padaria();
     rotas["loja-exemplo.test/"] = () => redireciona("/inicio");
     rotas["loja-exemplo.test/inicio"] = () => html(fixture("home-padaria.html"));
-    for (const caminho of ["/sobre-nos", "/produtos", "/produtos/bolos", "/contato"]) {
+    for (const caminho of ["/sobre-nos/", "/produtos/", "/produtos/bolos/", "/contato"]) {
       const original = rotas[`loja-exemplo.test${caminho}`];
-      rotas[`loja-exemplo.test${caminho}`] = () => redireciona(`${caminho}/final`);
-      rotas[`loja-exemplo.test${caminho}/final`] = original;
+      rotas[`loja-exemplo.test${caminho}`] = () => redireciona(`${caminho}final`);
+      rotas[`loja-exemplo.test${caminho}final`] = original;
     }
     const { resultado, buscar } = await ler("https://loja-exemplo.test/", rotas);
     expect(buscar).toHaveBeenCalledTimes(10);
     expect(resultado.requisicoes).toBe(10);
     expect(resultado.ignoradas).toEqual([
-      { url: "https://loja-exemplo.test/contato", motivo: "grande_demais" },
+      { url: "https://loja-exemplo.test/contato", motivo: "limite_de_requisicoes" },
     ]);
     expect(resultado.paginas).toHaveLength(4);
   });
@@ -1212,7 +1274,7 @@ describe("lerSiteDaMarca: tetos", () => {
     expect(resultado.bytesTotais).toBeGreaterThanOrEqual(512 * 1024);
     expect(resultado.bytesTotais).toBeLessThan(512 * 1024 + 200_000);
     /** A regra que veio depois do teto de 512 KiB nao vale. */
-    expect(urls()).toContain("https://loja-exemplo.test/sobre-nos");
+    expect(urls()).toContain("https://loja-exemplo.test/sobre-nos/");
   });
 });
 
@@ -1242,11 +1304,11 @@ describe("lerSiteDaMarca: texto e sitemap", () => {
 
   it("home com texto mas paginas vazias: as vazias ficam como sem_texto", async () => {
     const rotas = padaria();
-    rotas["loja-exemplo.test/sobre-nos"] = () =>
+    rotas["loja-exemplo.test/sobre-nos/"] = () =>
       html("<html><body><nav>so menu</nav><script>x</script></body></html>");
     const { resultado } = await ler("https://loja-exemplo.test/", rotas);
     expect(resultado.ignoradas).toContainEqual({
-      url: "https://loja-exemplo.test/sobre-nos",
+      url: "https://loja-exemplo.test/sobre-nos/",
       motivo: "sem_texto",
     });
     expect(resultado.motivoGeral).toBeNull();
@@ -1282,15 +1344,15 @@ describe("lerSiteDaMarca: texto e sitemap", () => {
       "https://loja-exemplo.test/robots.txt",
       "https://loja-exemplo.test/",
       "https://loja-exemplo.test/sitemap.xml",
-      "https://loja-exemplo.test/sobre-nos",
-      "https://loja-exemplo.test/produtos",
-      "https://loja-exemplo.test/servicos/encomendas",
+      "https://loja-exemplo.test/sobre-nos/",
+      "https://loja-exemplo.test/produtos/",
+      "https://loja-exemplo.test/servicos/encomendas/",
       expect.stringMatching(/^https:\/\/loja-exemplo\.test\/contato\?/),
     ]);
     expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(
       expect.arrayContaining([
-        "https://loja-exemplo.test/sobre-nos",
-        "https://loja-exemplo.test/produtos",
+        "https://loja-exemplo.test/sobre-nos/",
+        "https://loja-exemplo.test/produtos/",
       ]),
     );
     expect(resultado.motivoGeral).toBeNull();
@@ -1390,7 +1452,7 @@ describe("lerSiteDaMarca: nunca lanca por falha esperada", () => {
     const registrar = vi.spyOn(logger, "error").mockImplementation(() => undefined);
     const site = montar(padaria());
     const buscar: BuscarLeitor = async (url, init) => {
-      if (new URL(url).pathname === "/produtos")
+      if (new URL(url).pathname === "/produtos/")
         throw new Error("defeito inesperado do nosso lado");
       return site.buscar(url, init);
     };
@@ -1399,7 +1461,7 @@ describe("lerSiteDaMarca: nunca lanca por falha esperada", () => {
       esperar: site.esperar,
     });
     expect(resultado.ignoradas).toContainEqual({
-      url: "https://loja-exemplo.test/produtos",
+      url: "https://loja-exemplo.test/produtos/",
       motivo: "sem_resposta",
     });
     expect(resultado.paginas.length).toBeGreaterThan(1);
@@ -1553,22 +1615,37 @@ describe("transporte real: a guarda de IP esta no caminho de conexao", () => {
   });
 
   it("o leitor real recusa resposta mista de DNS (um publico e um privado) sem conectar", async () => {
-    const conectar = vi.spyOn(net.Socket.prototype, "connect");
-    const resolver: ResolverDns = (_host, _opcoes, callback) =>
+    /**
+     * A versão anterior olhava o `host` que o soquete recebe, que é o NOME (o lookup roda lá dentro),
+     * então o `expect` nunca podia falhar. Aqui o que prova é: o resolvedor falso foi consultado
+     * com o nome do site, a leitura terminou como `endereco_privado` (sem a guarda, o lookup
+     * devolveria os dois endereços, e o resultado seria sem_resposta ou tempo_esgotado) e nenhum
+     * soquete chegou a emitir `connect` para nenhum dos dois IPs.
+     */
+    const conectados: string[] = [];
+    const emitir = net.Socket.prototype.emit;
+    vi.spyOn(net.Socket.prototype, "emit").mockImplementation(function (
+      this: net.Socket,
+      evento: string | symbol,
+      ...argumentos: unknown[]
+    ) {
+      if (evento === "connect" && this.remoteAddress) conectados.push(this.remoteAddress);
+      return Reflect.apply(emitir, this, [evento, ...argumentos]) as boolean;
+    });
+    const resolver = vi.fn<ResolverDns>((_host, _opcoes, callback) =>
       callback(null, [
         { address: "8.8.8.8", family: 4 },
         { address: "169.254.169.254", family: 4 },
-      ]);
+      ]),
+    );
     const resultado = await lerSiteDaMarca("https://loja-exemplo.test/", {
       resolver,
       esperar: async () => undefined,
     });
     expect(resultado.motivoGeral).toBe("endereco_privado");
-    /** O `connect` do soquete ate foi chamado (e la dentro que o lookup roda), mas nenhum soquete abriu conexao: o servico de DNS falso e o unico que respondeu. */
-    for (const chamada of conectar.mock.calls) {
-      const alvo = chamada[0] as unknown as net.TcpNetConnectOpts;
-      expect(alvo.host).not.toBe("8.8.8.8");
-    }
+    expect(resolver).toHaveBeenCalled();
+    expect(resolver.mock.calls.every((chamada) => chamada[0] === "loja-exemplo.test")).toBe(true);
+    expect(conectados.filter((ip) => ip === "8.8.8.8" || ip === "169.254.169.254")).toEqual([]);
   });
 
   it.each([
@@ -1866,4 +1943,436 @@ describe("transporte real: leitura de ponta a ponta contra um servidor em 127.0.
     expect(resultado.motivoGeral).toBe("endereco_privado");
     expect(servidor.requisicoes.map((requisicao) => requisicao.url)).toEqual(["/robots.txt", "/"]);
   });
+});
+
+/* ------------------------------------------------------------------ */
+/* A barra final do link (o jeito do WordPress)                         */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: a barra final do link", () => {
+  const CAMINHOS = ["/sobre", "/produtos", "/servicos", "/contato"];
+  const WWW = "www.exemplo-wp.test";
+
+  /**
+   * Um site de WordPress: salvo sem o www, redireciona para o www (robots do host de lá, home de lá:
+   * 4 requisições antes da primeira página interna); as páginas moram no endereço COM barra, e a
+   * forma sem barra responde 301 para a com barra. O menu escreve os links com ou sem a barra.
+   */
+  function wordpress(comBarraNoLink: boolean): Rotas {
+    const link = (caminho: string) => (comBarraNoLink ? `${caminho}/` : caminho);
+    const pagina = (rotulo: string) =>
+      html(
+        `<html><head><title>${rotulo}</title></head><body><p>${`Texto da pagina ${rotulo} do site de exemplo, com frases inteiras. `.repeat(8)}</p></body></html>`,
+      );
+    const home = `<html><head><title>Exemplo</title></head><body><nav>${CAMINHOS.map((c) => `<a href="${link(c)}">${c.slice(1)}</a>`).join("")}</nav><p>${"Texto da home do site de exemplo. ".repeat(10)}</p></body></html>`;
+    const rotas: Rotas = {
+      "exemplo-wp.test/robots.txt": () => comStatus(404),
+      "exemplo-wp.test/": () => redireciona(`https://${WWW}/`, 301),
+      [`${WWW}/robots.txt`]: () => comStatus(404),
+      [`${WWW}/`]: () => html(home),
+    };
+    for (const caminho of CAMINHOS) {
+      rotas[`${WWW}${caminho}/`] = () => pagina(caminho);
+      rotas[`${WWW}${caminho}`] = () => redireciona(`https://${WWW}${caminho}/`, 301);
+    }
+    return rotas;
+  }
+
+  it("com os links no formato do WordPress (com barra), as 5 paginas cabem em 8 requisicoes: nenhuma gasta um redirecionamento", async () => {
+    const { resultado, urls } = await ler("https://exemplo-wp.test/", wordpress(true));
+    expect(resultado.motivoGeral).toBeNull();
+    expect(resultado.hostFinal).toBe(WWW);
+    expect(resultado.paginas).toHaveLength(5);
+    expect(resultado.ignoradas).toEqual([]);
+    expect(resultado.requisicoes).toBe(8);
+    expect(urls().slice(0, 4)).toEqual([
+      "https://exemplo-wp.test/robots.txt",
+      "https://exemplo-wp.test/",
+      `https://${WWW}/robots.txt`,
+      `https://${WWW}/`,
+    ]);
+    /** Cada página é pedida UMA vez e no formato do link (com a barra); a forma sem barra nunca é pedida. */
+    expect(urls().slice(4)).toEqual([
+      `https://${WWW}/sobre/`,
+      `https://${WWW}/produtos/`,
+      `https://${WWW}/servicos/`,
+      `https://${WWW}/contato/`,
+    ]);
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual([
+      `https://${WWW}/`,
+      ...CAMINHOS.map((caminho) => `https://${WWW}${caminho}/`),
+    ]);
+  });
+
+  it("controle: com os links SEM barra, cada pagina gasta um redirecionamento e o teto de 10 requisicoes corta a ultima, com motivo proprio", async () => {
+    const { resultado, urls } = await ler("https://exemplo-wp.test/", wordpress(false));
+    expect(resultado.requisicoes).toBe(10);
+    expect(resultado.paginas).toHaveLength(4);
+    expect(resultado.ignoradas).toEqual([
+      { url: `https://${WWW}/contato`, motivo: "limite_de_requisicoes" },
+    ]);
+    /** O servidor falso de verdade responde 301 na forma sem barra: o leitor segue e termina na com barra. */
+    expect(urls()).toContain(`https://${WWW}/sobre`);
+    expect(urls()).toContain(`https://${WWW}/sobre/`);
+    expect(resultado.paginas[1].url).toBe(`https://${WWW}/sobre/`);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Sitemap de outro host e sitemap comprimido                           */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: sitemap fora do site e sitemap comprimido", () => {
+  const homeSemLinks = () =>
+    html(
+      `<html><head><title>Padaria Exemplo</title></head><body><p>${"Padaria de bairro com pão artesanal, bolos e café coado na hora. ".repeat(8)}</p></body></html>`,
+    );
+  const xml = (corpo: string) =>
+    new Response(corpo, { status: 200, headers: { "content-type": "application/xml" } });
+  const indice = (...filhos: string[]) =>
+    `<sitemapindex>${filhos.map((filho) => `<sitemap><loc>${filho}</loc></sitemap>`).join("")}</sitemapindex>`;
+
+  it("filho de um indice de sitemaps em OUTRO host nao e buscado; o do mesmo host, sim", async () => {
+    const rotas = padaria();
+    rotas["loja-exemplo.test/"] = homeSemLinks;
+    rotas["loja-exemplo.test/robots.txt"] = () =>
+      texto("User-agent: *\nSitemap: https://loja-exemplo.test/mapa.xml\n");
+    rotas["loja-exemplo.test/mapa.xml"] = () =>
+      xml(
+        indice(
+          "https://outro-site.test/page-sitemap.xml",
+          "https://loja-exemplo.test/post-sitemap.xml",
+        ),
+      );
+    rotas["loja-exemplo.test/post-sitemap.xml"] = () => xml(fixture("sitemap.xml"));
+    const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
+    expect(urls().some((url) => url.includes("outro-site.test"))).toBe(false);
+    expect(urls()).toContain("https://loja-exemplo.test/post-sitemap.xml");
+    expect(resultado.paginas.length).toBeGreaterThan(1);
+  });
+
+  it("indice so com filhos de outro host: nada alem do indice e buscado, e a leitura devolve a home", async () => {
+    const rotas = padaria();
+    rotas["loja-exemplo.test/"] = homeSemLinks;
+    rotas["loja-exemplo.test/sitemap.xml"] = () =>
+      xml(
+        indice(
+          "https://outro-site.test/a.xml",
+          "http://loja-exemplo.test/b.xml",
+          "https://[::1]/c.xml",
+        ),
+      );
+    const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
+    expect(urls()).toEqual([
+      "https://loja-exemplo.test/robots.txt",
+      "https://loja-exemplo.test/",
+      "https://loja-exemplo.test/sitemap.xml",
+    ]);
+    expect(resultado.paginas).toHaveLength(1);
+    expect(resultado.motivoGeral).toBeNull();
+  });
+
+  it("Sitemap declarado no robots.txt com .gz (em qualquer caixa), em outro host ou em http nao e buscado: o leitor usa /sitemap.xml", async () => {
+    const rotas = padaria();
+    rotas["loja-exemplo.test/"] = homeSemLinks;
+    rotas["loja-exemplo.test/robots.txt"] = () =>
+      texto(
+        [
+          "User-agent: *",
+          "Sitemap: https://loja-exemplo.test/mapa.xml.gz",
+          "Sitemap: https://loja-exemplo.test/MAPA.XML.GZ",
+          "Sitemap: https://outro-site.test/mapa.xml",
+          "Sitemap: http://loja-exemplo.test/mapa.xml",
+        ].join("\n"),
+      );
+    rotas["loja-exemplo.test/sitemap.xml"] = () => xml(fixture("sitemap.xml"));
+    const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
+    expect(urls().slice(0, 3)).toEqual([
+      "https://loja-exemplo.test/robots.txt",
+      "https://loja-exemplo.test/",
+      "https://loja-exemplo.test/sitemap.xml",
+    ]);
+    expect(urls().some((url) => /\.gz$/i.test(url) || url.includes("outro-site"))).toBe(false);
+    expect(resultado.paginas.length).toBeGreaterThan(1);
+  });
+
+  it("filho .gz de um indice nao e buscado: o filho comum e escolhido mesmo pontuando menos", async () => {
+    const rotas = padaria();
+    rotas["loja-exemplo.test/"] = homeSemLinks;
+    rotas["loja-exemplo.test/sitemap.xml"] = () =>
+      xml(
+        indice(
+          "https://loja-exemplo.test/page-sitemap.xml.gz",
+          "https://loja-exemplo.test/post-sitemap.xml",
+        ),
+      );
+    rotas["loja-exemplo.test/post-sitemap.xml"] = () => xml(fixture("sitemap.xml"));
+    const { urls } = await ler("https://loja-exemplo.test/", rotas);
+    expect(urls().some((url) => /\.gz$/i.test(url))).toBe(false);
+    expect(urls()).toContain("https://loja-exemplo.test/post-sitemap.xml");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* maxPaginas                                                          */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: maxPaginas", () => {
+  it("o limite conta a home: com 3, le a home e as duas primeiras do orcamento", async () => {
+    const { resultado, urls } = await ler("https://loja-exemplo.test/", padaria(), {
+      limites: { maxPaginas: 3 },
+    });
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(PAGINAS_DA_PADARIA.slice(0, 3));
+    expect(urls()).toEqual([
+      "https://loja-exemplo.test/robots.txt",
+      ...PAGINAS_DA_PADARIA.slice(0, 3),
+    ]);
+    expect(resultado.ignoradas).toEqual([]);
+  });
+
+  it.each([[1], [0]])("com %i, so a home e lida", async (maximo) => {
+    const { resultado, urls } = await ler("https://loja-exemplo.test/", padaria(), {
+      limites: { maxPaginas: maximo },
+    });
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(["https://loja-exemplo.test/"]);
+    expect(urls()).toEqual(["https://loja-exemplo.test/robots.txt", "https://loja-exemplo.test/"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* O catch do topo: a garantia de que nunca lança                       */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: o catch do topo", () => {
+  afterEach(() => {
+    vi.doUnmock("./site-extrair");
+    vi.resetModules();
+  });
+
+  /**
+   * Recarrega o leitor com o `hashDoTexto` trocado por um que falha na chamada pedida. É uma exceção
+   * REAL no meio da coleta (depois de a home e as páginas terem sido lidas, fora de qualquer
+   * try/catch por página), que só o catch do topo de `lerSiteDaMarca` segura.
+   */
+  async function lerComDefeitoNoHash(falhaNaChamada: number) {
+    vi.resetModules();
+    let chamadas = 0;
+    vi.doMock("./site-extrair", async (importarOriginal) => {
+      const real = await importarOriginal<typeof import("./site-extrair")>();
+      return {
+        ...real,
+        hashDoTexto: (conteudo: string) => {
+          chamadas += 1;
+          if (chamadas === falhaNaChamada) throw new RangeError("defeito simulado no hash");
+          return real.hashDoTexto(conteudo);
+        },
+      };
+    });
+    const novoLeitor = await import("./site-api");
+    const novoLog = await import("@/lib/log");
+    const registrar = vi.spyOn(novoLog.logger, "error").mockImplementation(() => undefined);
+    const site = montar(padaria());
+    const resultado = await novoLeitor.lerSiteDaMarca("https://loja-exemplo.test/", {
+      buscar: site.buscar,
+      esperar: site.esperar,
+    });
+    return { resultado, registrar };
+  }
+
+  it("defeito antes de a primeira pagina entrar em `paginas`: nao lanca, devolve sem_resposta e registra", async () => {
+    const { resultado, registrar } = await lerComDefeitoNoHash(1);
+    expect(resultado.paginas).toEqual([]);
+    expect(resultado.motivoGeral).toBe("sem_resposta");
+    expect(registrar).toHaveBeenCalledTimes(1);
+    expect(String(registrar.mock.calls[0][1])).toContain("falha inesperada na leitura");
+  });
+
+  it("defeito depois de ja haver paginas prontas: nao lanca e entrega as que ja estavam, sem motivo de falha", async () => {
+    const { resultado, registrar } = await lerComDefeitoNoHash(3);
+    expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(PAGINAS_DA_PADARIA.slice(0, 2));
+    expect(resultado.motivoGeral).toBeNull();
+    expect(registrar).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Tabelas: sufixos internos e redes sociais                            */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: nomes internos e redes sociais, um por um", () => {
+  it.each([
+    [".localhost"],
+    [".local"],
+    [".internal"],
+    [".lan"],
+    [".home.arpa"],
+    [".localdomain"],
+    [".intranet"],
+    [".private"],
+  ])("nome terminado em %s: endereco_privado, sem chamar o buscar", async (sufixo) => {
+    const site = montar(padaria());
+    const resolver = vi.fn();
+    const resultado = await lerSiteDaMarca(`https://painel${sufixo}/`, {
+      buscar: site.buscar,
+      esperar: site.esperar,
+      resolver,
+    });
+    expect(resultado.motivoGeral).toBe("endereco_privado");
+    expect(resultado.requisicoes).toBe(0);
+    expect(site.buscar).not.toHaveBeenCalled();
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  const REDES = [
+    "instagram.com",
+    "facebook.com",
+    "fb.com",
+    "fb.me",
+    "tiktok.com",
+    "youtube.com",
+    "youtu.be",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "threads.net",
+    "wa.me",
+    "whatsapp.com",
+    "t.me",
+    "linktr.ee",
+    "beacons.ai",
+    "bio.site",
+    "taplink.cc",
+    "linkin.bio",
+    "lnk.bio",
+    "campsite.bio",
+  ];
+
+  it.each(REDES.map((rede) => [rede]))(
+    "%s digitado como site: rede_social, sem ler; e como destino do redirecionamento da home tambem",
+    async (rede) => {
+      const direto = await ler(`https://www.${rede}/perfil`, padaria());
+      expect(direto.resultado.motivoGeral).toBe("rede_social");
+      expect(direto.buscar).not.toHaveBeenCalled();
+
+      const rotas = padaria();
+      rotas["loja-exemplo.test/"] = () => redireciona(`https://m.${rede}/perfil`);
+      const { resultado, urls } = await ler("https://loja-exemplo.test/", rotas);
+      expect(resultado.motivoGeral).toBe("rede_social");
+      expect(urls().some((url) => url.includes(rede))).toBe(false);
+    },
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/* Negação de serviço de ponta a ponta                                  */
+/* ------------------------------------------------------------------ */
+
+describe("lerSiteDaMarca: paginas e robots hostis nao seguram o worker", () => {
+  const TETO_MS = 5_000;
+  const TIMEOUT_MS = 20_000;
+  const antes = `<p>${"Texto de antes do ataque. ".repeat(20)}</p>`;
+
+  /** Cada corpo é o do relatório de revisão, no tamanho que cabe em 1 MiB. */
+  const ataques: [string, string][] = [
+    [
+      "span aninhado e fechamentos sem par",
+      `${"<span>".repeat(100_000)}oi${"</x>".repeat(100_000)}`,
+    ],
+    ["svg aninhado e fechamentos sem par", `${"<svg>".repeat(100_000)}${"</x>".repeat(100_000)}`],
+    ["svg, g e fechamentos sem par", `<svg>${"<g>".repeat(100_000)}${"</q>".repeat(100_000)}`],
+    [
+      "uma so tag com 100 mil atributos",
+      `<div ${Array.from({ length: 100_000 }, (_, i) => `a${i}`).join(" ")}>ola</div>`,
+    ],
+    [
+      "b com atributos diferentes",
+      Array.from({ length: 100_000 }, (_, i) => `<b a="${i}">`).join(""),
+    ],
+    [
+      "JSON-LD com 100 mil `<`",
+      `<script type="application/ld+json">{"@type":"Organization","description":"${"<".repeat(100_000)}"}</script>`,
+    ],
+    [
+      "cinco blocos de JSON-LD de 200 mil caracteres",
+      `<script type="application/ld+json">{"@type":"Organization","description":"${"<".repeat(190_000)}"}</script>`.repeat(
+        5,
+      ),
+    ],
+    [
+      "span.cookie-banner aninhado com texto no fundo",
+      `${'<span class="cookie-banner">'.repeat(50_000)}${"palavra ".repeat(300)}`,
+    ],
+    ["comentarios aos milhares", "<!--a-->".repeat(120_000)],
+  ];
+
+  it.each(ataques)(
+    "%s: a leitura termina em poucos segundos e aproveita o texto de antes",
+    async (_nome, corpo) => {
+      const rotas = padaria();
+      rotas["loja-exemplo.test/"] = () => html(`<html><body>${antes}${corpo}</body></html>`);
+      const inicio = performance.now();
+      const { resultado } = await ler("https://loja-exemplo.test/", rotas, {
+        limites: { tempoTotalMs: 3_000 },
+      });
+      expect(performance.now() - inicio).toBeLessThan(TETO_MS);
+      expect(resultado.paginas[0].texto).toContain("Texto de antes do ataque");
+      expect(resultado.motivoGeral).toBeNull();
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "robots.txt com 2.300 regras longas e links de 2 KB: o custo e limitado na origem (as regras longas nem entram) e a leitura devolve em fracao de segundo",
+    async () => {
+      const regraLonga = `Disallow: /sobre/*${"a".repeat(200)}b\n`;
+      const robots = `User-agent: *\n${regraLonga.repeat(2_300)}Disallow: /sobre\nDisallow: /produto\nDisallow: /contato\n`;
+      expect(robots.length).toBeLessThan(LIMITES_PADRAO.robotsBytes);
+      const links = Array.from(
+        { length: 8 },
+        (_, i) => `<a href="/sobre/aaa${i}${"a".repeat(1_900)}">Sobre ${i}</a>`,
+      ).join("\n");
+      const rotas = padaria();
+      rotas["loja-exemplo.test/robots.txt"] = () => texto(robots);
+      rotas["loja-exemplo.test/"] = () =>
+        html(
+          `<html><head><title>Padaria Exemplo</title></head><body><p>${"Somos uma padaria de bairro que faz pao todos os dias. ".repeat(10)}</p>${links}</body></html>`,
+        );
+      const inicio = performance.now();
+      const { resultado } = await ler("https://loja-exemplo.test/", rotas);
+      expect(performance.now() - inicio).toBeLessThan(TETO_MS);
+      expect(resultado.paginas.map((pagina) => pagina.url)).toEqual(["https://loja-exemplo.test/"]);
+      expect(resultado.ignoradas.map((ignorada) => ignorada.motivo)).toEqual(
+        Array.from({ length: 8 }, () => "robots_proibe"),
+      );
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "mil regras de cinco curingas contra os 60 candidatos que a home pode render: tempo limitado, e todos barrados",
+    async () => {
+      const regra = (i: number) => `Disallow: /${"a*".repeat(5)}${"a".repeat(150)}${i % 7}b`;
+      /** A regra que barra os candidatos vem primeiro: só as 1.000 primeiras regras entram na avaliação. */
+      const robots = `User-agent: *\nDisallow: /servico\n${Array.from({ length: 999 }, (_, i) => regra(i)).join("\n")}\n`;
+      const links = Array.from(
+        { length: 60 },
+        (_, i) => `<a href="/servico-${"a".repeat(480 + (i % 30))}-${i}">Servico ${i}</a>`,
+      ).join("");
+      const rotas = padaria();
+      rotas["loja-exemplo.test/robots.txt"] = () => texto(robots);
+      rotas["loja-exemplo.test/"] = () =>
+        html(
+          `<html><head><title>Padaria Exemplo</title></head><body><p>${"Somos uma padaria de bairro que faz pao todos os dias. ".repeat(10)}</p>${links}</body></html>`,
+        );
+      const inicio = performance.now();
+      const { resultado } = await ler("https://loja-exemplo.test/", rotas);
+      expect(performance.now() - inicio).toBeLessThan(TETO_MS);
+      expect(resultado.paginas).toHaveLength(1);
+      expect(resultado.ignoradas).toHaveLength(60);
+      expect(resultado.ignoradas.every((ignorada) => ignorada.motivo === "robots_proibe")).toBe(
+        true,
+      );
+    },
+    TIMEOUT_MS,
+  );
 });

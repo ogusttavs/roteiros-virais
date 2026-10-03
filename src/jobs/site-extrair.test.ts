@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   aplicarTetosDeTexto,
   analisarRobots,
+  classeOuIdDeAvisoDeCookie,
   classificarCandidatos,
   decodificarCorpo,
   detectarCharset,
@@ -17,9 +18,11 @@ import {
   extrairLocsDeSitemap,
   hashDoTexto,
   limitarComplexidadeDoHtml,
-  MAXIMO_DE_TAGS_DE_BLOCO,
   limitarTexto,
   limparLinhas,
+  MAXIMO_DE_ATRIBUTOS_POR_TAG,
+  MAXIMO_DE_MENORES_NO_HTML,
+  MAXIMO_DE_TAGS_DE_FORMATACAO,
   mesmoSite,
   MINIMO_HOME_CARACTERES,
   MINIMO_SOMA_CARACTERES,
@@ -51,6 +54,35 @@ const RAIZ = new URL(`https://${HOST}/`);
 
 function links(...hrefs: string[]): LinkBruto[] {
   return hrefs.map((href) => ({ href, texto: "", emNav: false }));
+}
+
+/** Quantos `<` o texto tem, sem montar um vetor gigante. */
+const contarMenores = (texto: string): number => texto.split("<").length - 1;
+
+/**
+ * Teto de tempo dos cenários de negação de serviço: generoso de propósito (os cenários reais
+ * levavam de dezenas de segundos a minutos, e o pior caso que sobra leva meio segundo), para não
+ * ficar instável em máquina lenta. A prova de verdade de cada cenário é a asserção estrutural
+ * ao lado (o documento foi cortado, o número de regras foi limitado).
+ */
+const TETO_DE_TEMPO_MS = 5_000;
+const TIMEOUT_DO_TESTE_MS = 20_000;
+
+function medir<T>(funcao: () => T): { resultado: T; ms: number } {
+  const inicio = performance.now();
+  const resultado = funcao();
+  return { resultado, ms: performance.now() - inicio };
+}
+
+/** Gerador pseudoaleatório fixo (mulberry32): o teste diferencial tem sempre os mesmos casos. */
+function aleatorio(semente: number): () => number {
+  let estado = semente;
+  return () => {
+    estado = (estado + 0x6d2b79f5) | 0;
+    let t = Math.imul(estado ^ (estado >>> 15), 1 | estado);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 describe("normalizarUrlDoSite", () => {
@@ -114,6 +146,38 @@ describe("normalizarUrlDoSite", () => {
     }
   });
 
+  it.each([
+    ".localhost",
+    ".local",
+    ".internal",
+    ".lan",
+    ".home.arpa",
+    ".localdomain",
+    ".intranet",
+    ".private",
+  ])(
+    "nome terminado em %s e rede interna: endereco_privado, com ou sem o ponto final",
+    (sufixo) => {
+      for (const entrada of [`https://painel${sufixo}/`, `https://a.b.painel${sufixo}./x`]) {
+        expect(normalizarUrlDoSite(entrada), entrada).toMatchObject({
+          ok: false,
+          motivo: "endereco_privado",
+        });
+      }
+    },
+  );
+
+  it("nome que so parece terminar em sufixo de rede interna nao e recusado", () => {
+    for (const entrada of [
+      "https://painel.localidade.com.br/",
+      "https://exemplo.internacional.com.br/",
+      "https://loja.private-label.com.br/",
+      "https://empresa.lancamentos.com.br/",
+    ]) {
+      expect(normalizarUrlDoSite(entrada), entrada).toMatchObject({ ok: true });
+    }
+  });
+
   it("recusa IP literal privado em qualquer forma, e aceita IP publico", () => {
     for (const entrada of [
       "https://127.0.0.1/",
@@ -173,6 +237,44 @@ describe("normalizarUrlDoSite", () => {
     expect(ehRedeSocialOuLinkHub("meuinstagram.com")).toBe(false);
     expect(ehRedeSocialOuLinkHub("padaria.com.br")).toBe(false);
   });
+
+  it.each([
+    "instagram.com",
+    "facebook.com",
+    "fb.com",
+    "fb.me",
+    "tiktok.com",
+    "youtube.com",
+    "youtu.be",
+    "x.com",
+    "twitter.com",
+    "linkedin.com",
+    "threads.net",
+    "wa.me",
+    "whatsapp.com",
+    "t.me",
+    "linktr.ee",
+    "beacons.ai",
+    "bio.site",
+    "taplink.cc",
+    "linkin.bio",
+    "lnk.bio",
+    "campsite.bio",
+  ])(
+    "%s: o host, o www, um subdominio e o ponto final sao rede_social; um nome parecido nao",
+    (rede) => {
+      for (const host of [rede, `www.${rede}`, `m.${rede}`, `${rede}.`]) {
+        expect(ehRedeSocialOuLinkHub(host), host).toBe(true);
+        expect(normalizarUrlDoSite(`https://${host}/perfil`), host).toMatchObject({
+          ok: false,
+          motivo: "rede_social",
+        });
+      }
+      for (const parecido of [`meu${rede}`, `${rede}.exemplo.com.br`, `exemplo-${rede}`]) {
+        expect(ehRedeSocialOuLinkHub(parecido), parecido).toBe(false);
+      }
+    },
+  );
 });
 
 describe("validarUrlDeLeitura", () => {
@@ -279,7 +381,33 @@ describe("limpeza de texto", () => {
     }
   });
 
-  it("nao remove numero comum de texto (preco, ano, CNPJ, horario)", () => {
+  it("remove os formatos que a primeira versao deixava passar: sem DDD, hifen e ponto entre as partes, 55 sem +, e-mail com acento", () => {
+    const casos: [string, string][] = [
+      ["Fale conosco: 3333-4444", "Fale conosco"],
+      ["Atendimento 3333-4444 de segunda a sexta", "Atendimento de segunda a sexta"],
+      ["Chame no 91234-5678 agora", "Chame no agora"],
+      ["Ligue 11-91234-5678 agora", "Ligue agora"],
+      ["Ligue 11.91234.5678 agora", "Ligue agora"],
+      ["Ligue (11)91234-5678 agora", "Ligue agora"],
+      ["Pedidos 5511912345678 hoje", "Pedidos hoje"],
+      ["Zap 55 11 91234-5678 hoje", "Zap hoje"],
+      ["Fixo 551133334444 hoje", "Fixo hoje"],
+      ["Falamos pelo 11-91234-5678 agora", "Falamos pelo agora"],
+      ["Falamos pelo 11.91234.5678 agora", "Falamos pelo agora"],
+      ["Falamos pelo (11)91234-5678 agora", "Falamos pelo agora"],
+      ["Falamos pelo 11 3333-4444 agora", "Falamos pelo agora"],
+      ["Falamos pelo 21-3333-4444 agora", "Falamos pelo agora"],
+      ["Escreva para josé@exemplo.com.br hoje", "Escreva para hoje"],
+      ["Escreva para ana.maçã@exemplo.com.br hoje", "Escreva para hoje"],
+      ["Escreva para JOÃO_SILVA+loja@exemplo.com.br hoje", "Escreva para hoje"],
+    ];
+    for (const [entrada, esperado] of casos) {
+      const limpo = removerDadosDeContato(entrada).replace(/\s+/g, " ").trim();
+      expect(limpo, entrada).toBe(esperado);
+    }
+  });
+
+  it("nao remove numero comum de texto (preco, ano, CNPJ, horario, intervalo de anos ou de preco)", () => {
     for (const texto of [
       "Pães a partir de R$ 12,50",
       "Desde 2014 no bairro",
@@ -287,9 +415,78 @@ describe("limpeza de texto", () => {
       "Aberto das 06:00 às 18:00",
       "Temos 250 clientes e 3 lojas",
       "CEP 01310-100",
+      "Temporada 2024-2025 de sabores",
+      "Edições de 12 2024-2025",
+      "Pedidos 2023-2024 foram recordes",
+      "Planos de R$ 2000-4000 por mês",
+      "Planos de R$2000-4000 por mês",
+      "Entre 2000-4000 reais por mês",
+      "Preço de 1.234-5678 unidades",
+      "Rua das Flores, 1234 Centro",
+      "Pedido 45 de 2025 aprovado",
     ]) {
       expect(removerDadosDeContato(texto), texto).toBe(texto);
     }
+  });
+
+  it(
+    "e-mail e telefone em linhas enormes e patologicas custam tempo linear",
+    () => {
+      const entradas = [
+        `${"a".repeat(2_900)}@`,
+        `${"a.".repeat(1_400)}@x`,
+        `@${"a".repeat(2_900)}`,
+        `a@${"a".repeat(2_900)}`,
+        `tel ${" ".repeat(2_900)}x`,
+        `${"1 ".repeat(1_400)}`,
+        `1${" ".repeat(2_900)}`,
+        `${"tel ".repeat(700)}`,
+        `${"+1 ".repeat(900)}`,
+      ];
+      const { ms } = medir(() => {
+        for (let i = 0; i < 50; i += 1)
+          for (const entrada of entradas) removerDadosDeContato(entrada);
+      });
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it("tira os caracteres que a pessoa nao ve e o modelo le: tag characters, seletores de variacao e afins", () => {
+    const tagCharacters = String.fromCodePoint(
+      0xe0049,
+      0xe0067,
+      0xe006e,
+      0xe006f,
+      0xe0072,
+      0xe0065,
+    );
+    const [visivel] = limparLinhas([`Texto visivel ${tagCharacters} depois`]);
+    expect(visivel).toBe("Texto visivel depois");
+    expect(/[\u{E0000}-\u{E007F}]/u.test(visivel)).toBe(false);
+
+    const invisiveis = [
+      ["\uFE00", "seletor de variacao 1"],
+      ["\uFE0F", "seletor de variacao 16"],
+      [String.fromCodePoint(0xe0100), "seletor de variacao suplementar"],
+      ["\u034F", "junção de grafemas"],
+      ["\u061C", "marca de letra arabe"],
+      ["\u180E", "separador mongol"],
+      ["\u3164", "preenchimento de hangul"],
+      ["\uFFA0", "preenchimento de hangul de meia largura"],
+      ["\u2800", "braile em branco"],
+      ["\u200B", "espaco de largura zero"],
+      ["\u202E", "inversao de direcao"],
+      ["\u00AD", "hifen suave"],
+      ["\u0085", "controle C1"],
+    ] as const;
+    for (const [caractere, nome] of invisiveis) {
+      expect(limparLinhas([`a${caractere}b${caractere}c`])[0], nome).toMatch(/^a\s?b\s?c$/);
+      expect(limparLinhas([`a${caractere}b${caractere}c`])[0].includes(caractere), nome).toBe(
+        false,
+      );
+    }
+    expect(limparLinhas(["a\uFE0Fb\u034Fc\u061Cd\u180Ee\u3164f\u2800g"])).toEqual(["abcdefg"]);
   });
 
   it("limparLinhas tira caracteres invisiveis, sinais de marcacao, linhas curtas e repetidas", () => {
@@ -483,6 +680,59 @@ describe("extrairDoHtml", () => {
     expect(linhas.length).toBeLessThan(10);
   });
 
+  it(
+    "JSON-LD valido e enorme, cheio de `<` sem `>`: custo linear, o texto sai fatiado e sem sinal de marcacao",
+    () => {
+      /** O regex antigo (`<[^>]*>` sobre a string inteira) levava 4 s com 100 mil `<` e 88 s com cinco blocos assim. */
+      const bloco = JSON.stringify({
+        "@type": "Organization",
+        name: "Padaria Exemplo",
+        description: "<".repeat(190_000),
+      });
+      expect(bloco.length).toBeLessThan(200_000);
+      const { resultado: linhas, ms } = medir(() => extrairLinhasDeJsonLd([bloco, bloco]));
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      expect(linhas[0]).toBe("Padaria Exemplo");
+      for (const linha of linhas) {
+        expect(linha.length).toBeLessThanOrEqual(600);
+        expect(linha).not.toMatch(/[<>]/);
+      }
+      /** Os campos que passam do teto de entrada (2.000 caracteres) nem são lidos inteiros. */
+      const longo = JSON.stringify({
+        "@type": "Organization",
+        description: `${"a ".repeat(1_500)}FIMDOTEXTO`,
+      });
+      expect(extrairLinhasDeJsonLd([longo]).join("")).not.toContain("FIMDOTEXTO");
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it("JSON-LD: o teto de blocos e o de caracteres no total valem, e um bloco acima do teto individual e pulado", () => {
+    const bloco = (nome: string, enchimento = 0) =>
+      JSON.stringify({ "@type": "Organization", name: nome, description: "x".repeat(enchimento) });
+    const nove = Array.from({ length: 9 }, (_, i) => bloco(`Bloco ${i}`));
+    const lidos = extrairLinhasDeJsonLd(nove).filter((linha) => linha.startsWith("Bloco"));
+    expect(lidos).toEqual(Array.from({ length: 8 }, (_, i) => `Bloco ${i}`));
+
+    /** Três blocos de 150 mil passam do total de 400 mil: o terceiro não é lido. */
+    const grandes = [bloco("Um", 150_000), bloco("Dois", 150_000), bloco("Tres", 150_000)];
+    const nomes = extrairLinhasDeJsonLd(grandes).filter((linha) =>
+      ["Um", "Dois", "Tres"].includes(linha),
+    );
+    expect(nomes).toEqual(["Um", "Dois"]);
+
+    const acima = extrairLinhasDeJsonLd([bloco("Enorme", 250_000), bloco("Normal")]);
+    expect(acima).not.toContain("Enorme");
+    expect(acima).toContain("Normal");
+  });
+
+  it("JSON-LD: valor aninhado em vetores e em `name` dentro de `name` nao estoura a pilha", () => {
+    const fundoEmVetor = `{"@type":"Organization","name":${"[".repeat(5_000)}"x"${"]".repeat(5_000)},"description":"Texto de fora"}`;
+    const fundoEmNome = `{"@type":"Organization","description":${'{"name":'.repeat(5_000)}"x"${"}".repeat(5_000)}}`;
+    expect(() => extrairLinhasDeJsonLd([fundoEmVetor, fundoEmNome])).not.toThrow();
+    expect(extrairLinhasDeJsonLd([fundoEmVetor])).toContain("Texto de fora");
+  });
+
   it("junta os links, com o texto e a marca de menu, sem perder os do menu", () => {
     expect(home.baseHref).toBe("https://loja-exemplo.test/");
     const quemSomos = home.links.find((link) => link.href === "/sobre-nos/");
@@ -515,6 +765,189 @@ describe("extrairDoHtml", () => {
     expect(texto).not.toContain("Marca do topo do site");
     expect(texto).not.toContain("Rodape do site inteiro");
   });
+
+  it("header solto com h1 e sem menu (landing de template) e conteudo; o rodape e o header de menu continuam de fora", () => {
+    const extracao = extrairDoHtml(fixture("pagina-masthead.html"));
+    expect(extracao.texto).toContain("Consultoria financeira para pequenos negócios");
+    expect(extracao.texto).toContain("Ajudamos donos de padarias, oficinas e lojas de bairro");
+    expect(extracao.texto).toContain("Na primeira conversa mapeamos o que entra");
+    expect(extracao.texto).not.toContain("Privacidade");
+    expect(extracao.texto).not.toContain("Termos");
+
+    const corpo = `<p>${"Conteudo real da pagina de teste. ".repeat(10)}</p>`;
+    const casos: [string, string][] = [
+      [
+        "com nav dentro",
+        `<header><nav><a href="/a">Inicio</a></nav><h1>Titulo no cabecalho</h1><p>Frase do cabecalho</p></header>`,
+      ],
+      ["sem h1", `<header><p>Frase do cabecalho</p><a href="/a">Entrar</a></header>`],
+      [
+        "dominado por links",
+        `<header><h1><a href="/">Titulo no cabecalho</a></h1><a href="/a">Frase do cabecalho com links</a><a href="/b">e mais links de menu</a></header>`,
+      ],
+      [
+        "rodape solto dominado por links",
+        `<footer><h1><a href="/">Titulo no cabecalho</a></h1><p><a href="/a">Frase do cabecalho</a></p></footer>`,
+      ],
+    ];
+    for (const [nome, cabecalho] of casos) {
+      const texto = extrairDoHtml(`<html><body>${cabecalho}${corpo}</body></html>`).texto;
+      expect(texto, nome).toContain("Conteudo real da pagina de teste");
+      expect(texto, nome).not.toContain("Frase do cabecalho");
+    }
+
+    const solto = extrairDoHtml(
+      `<html><body><header class="masthead"><h1>Titulo no cabecalho</h1><p>Frase do cabecalho</p></header>${corpo}</body></html>`,
+    ).texto;
+    expect(solto).toContain("Titulo no cabecalho");
+    expect(solto).toContain("Frase do cabecalho");
+    /** O papel `banner` de um `<header>` é o papel implícito dele: quem decide é o conteúdo. */
+    const comPapel = extrairDoHtml(
+      `<html><body><header role="banner"><h1>Titulo no cabecalho</h1><p>Frase do cabecalho</p></header>${corpo}</body></html>`,
+    ).texto;
+    expect(comPapel).toContain("Frase do cabecalho");
+    const divBanner = extrairDoHtml(
+      `<html><body><div role="banner"><h1>Titulo no cabecalho</h1><p>Frase do cabecalho</p></div>${corpo}</body></html>`,
+    ).texto;
+    expect(divBanner).not.toContain("Frase do cabecalho");
+  });
+
+  it("loja de biscoitos: `cookies` e produto, nao aviso; o aviso de consentimento de verdade continua de fora", () => {
+    const extracao = extrairDoHtml(fixture("pagina-loja-biscoitos.html"));
+    expect(extracao.texto).toContain("Cookie de chocolate belga");
+    expect(extracao.texto).toContain("Massa amanteigada com gotas de chocolate belga");
+    expect(extracao.texto).toContain("Cookie de nozes com doce de leite");
+    expect(extracao.texto).toContain("Cada unidade custa onze reais.");
+    expect(extracao.texto).toContain("Como guardar cookies para que fiquem macios");
+    expect(extracao.texto).not.toContain("Usamos cookies para melhorar");
+  });
+
+  it("classes e ids de aviso de consentimento: reconhece as ferramentas e as frases de aviso, nao a palavra solta", () => {
+    const avisos: [string, string][] = [
+      ["cookie-banner", ""],
+      ["has-cookie-banner", ""],
+      ["cookie-notice cn-bottom", "cookie-notice"],
+      ["", "cookie-law-info-bar"],
+      ["cc-window cc-banner", ""],
+      ["cc-cookie-consent", ""],
+      ["cmplz-cookiebanner", ""],
+      ["", "onetrust-banner-sdk"],
+      ["ot-sdk-container", ""],
+      ["", "CybotCookiebotDialog"],
+      ["", "cookiescript_injected"],
+      ["js-cookie-consent", ""],
+      ["gdpr-banner", ""],
+      ["lgpd-aviso", ""],
+      ["aviso_de_cookies", ""],
+      ["barra-cookies", ""],
+      ["consent-manager", ""],
+      ["didomi-popup-container", ""],
+      ["iubenda-cs-banner", ""],
+      ["CookieConsent", ""],
+      ["eu-cookie-compliance", ""],
+    ];
+    for (const [classe, id] of avisos) {
+      expect(classeOuIdDeAvisoDeCookie(classe, id), `${classe} ${id}`).toBe(true);
+    }
+    const naoSao: [string, string][] = [
+      ["product type-product product_cat-cookies", ""],
+      ["post category-cookies tag-receitas", ""],
+      ["cookies-accepted", ""],
+      ["term-cookies", ""],
+      ["cookies", ""],
+      ["cookie", ""],
+      ["menu-cookies-e-brownies", ""],
+      ["", "produto-cookie-de-chocolate"],
+      ["consentimento-informado", ""],
+      ["gdpr-plugins-lista-de-compras", ""],
+      ["success-message", ""],
+      ["acc-menu", ""],
+      ["", ""],
+    ];
+    for (const [classe, id] of naoSao) {
+      expect(classeOuIdDeAvisoDeCookie(classe, id), `${classe} ${id}`).toBe(false);
+    }
+  });
+
+  it("pagina inteira embrulhada num form (ASP.NET WebForms) nao perde o texto", () => {
+    const extracao = extrairDoHtml(fixture("pagina-aspnet-form.html"));
+    expect(extracao.titulo).toBe("Oficina Mecânica Exemplo");
+    expect(extracao.texto).toContain(
+      "Oficina mecânica de bairro, cuidando do seu carro desde 1998",
+    );
+    expect(extracao.texto).toContain("Fazemos revisão completa, troca de óleo, freios");
+    expect(extracao.texto).toContain("Atendemos de segunda a sexta");
+    expect(extracao.texto).toContain("Diagnóstico por computador");
+    expect(extracao.texto).not.toContain("dados-de-estado");
+    expect(extracao.texto).not.toContain("Buscar");
+    expect(extracao.texto.length).toBeGreaterThan(MINIMO_HOME_CARACTERES);
+  });
+
+  it("form de interface (busca, newsletter, contato curto) continua de fora; form longo, com h1 ou com varios paragrafos, nao", () => {
+    const corpo = `<p>${"Conteudo real da pagina de teste. ".repeat(10)}</p>`;
+    const interfaces = [
+      `<form role="search"><p>Buscar no site agora</p><p>Digite o que procura</p><p>Frase de interface</p><input name="q"></form>`,
+      `<form action="/busca"><label>Frase de interface</label><input name="q"><button>Ir</button></form>`,
+      `<form><h2>Assine a newsletter</h2><p>Frase de interface</p><input type="email"><select><option>${"Cidade ".repeat(400)}</option></select></form>`,
+    ];
+    for (const formulario of interfaces) {
+      const texto = extrairDoHtml(`<html><body>${formulario}${corpo}</body></html>`).texto;
+      expect(texto, formulario).toContain("Conteudo real da pagina de teste");
+      expect(texto, formulario).not.toContain("Frase de interface");
+    }
+    const naoSao = [
+      `<form><h1>Titulo da pagina</h1><p>Frase de pagina</p></form>`,
+      `<form><p>Frase de pagina</p><p>Segundo paragrafo</p><p>Terceiro paragrafo</p></form>`,
+      `<form><p>Frase de pagina. ${"Texto longo de pagina. ".repeat(100)}</p></form>`,
+    ];
+    for (const formulario of naoSao) {
+      const texto = extrairDoHtml(`<html><body>${formulario}${corpo}</body></html>`).texto;
+      expect(texto, formulario).toContain("Frase de pagina");
+    }
+  });
+
+  it("conferencia com teto de nos: um aviso de cookie com mais de 2.000 nos nao e apagado, e um header ou form assim cai no comportamento seguro", () => {
+    const corpo = `<p>${"Conteudo real da pagina de teste. ".repeat(10)}</p>`;
+    const vazios = "<span></span>".repeat(3_000);
+    const aviso = extrairDoHtml(
+      `<html><body><div class="cookie-banner">${vazios}<p>Aceite os cookies agora</p></div>${corpo}</body></html>`,
+    ).texto;
+    expect(aviso).toContain("Aceite os cookies agora");
+    const pequeno = extrairDoHtml(
+      `<html><body><div class="cookie-banner"><p>Aceite os cookies agora</p></div>${corpo}</body></html>`,
+    ).texto;
+    expect(pequeno).not.toContain("Aceite os cookies agora");
+
+    /** Sem orçamento para decidir um header solto, vale o comportamento antigo: descartar. */
+    const cabecalho = extrairDoHtml(
+      `<html><body><header class="masthead"><h1>Titulo no cabecalho</h1><p>Frase do cabecalho</p>${vazios}</header>${corpo}</body></html>`,
+    ).texto;
+    expect(cabecalho).not.toContain("Frase do cabecalho");
+    /** Sem orçamento para decidir um form, o texto fica (não vira interface). */
+    const formulario = extrairDoHtml(
+      `<html><body><form><p>Frase de formulario</p>${vazios}</form>${corpo}</body></html>`,
+    ).texto;
+    expect(formulario).toContain("Frase de formulario");
+  });
+
+  it(
+    "orcamento de nos por pagina: avisos de cookie aninhados esgotam o orcamento e o texto passa (lado seguro), em tempo curto",
+    () => {
+      const nivel = '<span class="cookie-banner">';
+      const entrada = `<html><body><p>${"Conteudo real da pagina de teste. ".repeat(10)}</p>${nivel.repeat(3_000)}<p>Frase curta no fundo</p>${"</span>".repeat(3_000)}</body></html>`;
+      expect(contarMenores(entrada)).toBeLessThan(MAXIMO_DE_MENORES_NO_HTML);
+      const { resultado, ms } = medir(() => extrairDoHtml(entrada));
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      expect(resultado.texto).toContain("Conteudo real da pagina de teste");
+      /**
+       * Cada nível confere até 2.000 nós e todas as conferências da página juntas até 60.000: o
+       * orçamento acaba nos primeiros níveis, e a frase do fundo (que um aviso de 1.000 níveis de
+       * profundidade apagaria) fica no texto.
+       */
+      expect(resultado.texto).toContain("Frase curta no fundo");
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
 
   it("papel de menu, dialogo e janela tambem escondem o texto", () => {
     const html = `<html><body><div role="navigation"><p>Menu falso</p></div><div role="dialog"><p>Janela de promocao</p></div><div aria-modal="true"><p>Janela modal</p></div><p>${"Conteudo real da pagina. ".repeat(12)}</p></body></html>`;
@@ -562,18 +995,24 @@ describe("extrairDoHtml", () => {
     expect(extrairDoHtml("").texto).toBe("");
   });
 
-  it("aninhamento absurdo nao trava o worker nem estoura a pilha, e o que veio antes e aproveitado", () => {
-    const antes = `<p>${"Texto antes do aninhamento absurdo. ".repeat(12)}</p>`;
-    for (const tag of ["div", "ul", "section", "template"]) {
-      const inicio = Date.now();
-      const extracao = extrairDoHtml(
-        `<html><body>${antes}${`<${tag}>`.repeat(150_000)}<p>depois</p></body></html>`,
-      );
-      expect(extracao.texto, tag).toContain("Texto antes do aninhamento absurdo");
-      expect(extracao.texto, tag).not.toContain("depois");
-      expect(Date.now() - inicio, tag).toBeLessThan(2_000);
-    }
-  });
+  it(
+    "aninhamento absurdo nao trava o worker nem estoura a pilha, e o que veio antes e aproveitado",
+    () => {
+      const antes = `<p>${"Texto antes do aninhamento absurdo. ".repeat(12)}</p>`;
+      for (const tag of ["div", "ul", "section", "template"]) {
+        const entrada = `<html><body>${antes}${`<${tag}>`.repeat(150_000)}<p>depois</p></body></html>`;
+        /** Estrutural: o que o parser recebe foi cortado antes da tag que passou da profundidade. */
+        expect(contarMenores(limitarComplexidadeDoHtml(entrada)), tag).toBeLessThanOrEqual(
+          MAXIMO_DE_MENORES_NO_HTML,
+        );
+        const { resultado: extracao, ms } = medir(() => extrairDoHtml(entrada));
+        expect(extracao.texto, tag).toContain("Texto antes do aninhamento absurdo");
+        expect(extracao.texto, tag).not.toContain("depois");
+        expect(ms, tag).toBeLessThan(TETO_DE_TEMPO_MS);
+      }
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
 
   it("pagina com aninhamento fundo mas real (centenas de niveis) continua inteira", () => {
     const fundo = `<div>`.repeat(300);
@@ -602,15 +1041,29 @@ describe("extrairDoHtml", () => {
 });
 
 describe("limitarComplexidadeDoHtml", () => {
+  /** Comparar o texto inteiro com `toBe` imprimiria megabytes se falhasse: aqui o resultado é um booleano. */
+  const intacto = (html: string): boolean => limitarComplexidadeDoHtml(html) === html;
+  const distintos = (tag: string, atributo: string, quantidade: number): string =>
+    Array.from({ length: quantidade }, (_, i) => `<${tag} ${atributo}="${i}">`).join("");
+
+  it("os tetos de custo estao fixados: mudar um deles e uma decisao que exige medir de novo (a bateria de padroes patologicos)", () => {
+    expect(MAXIMO_DE_MENORES_NO_HTML).toBe(10_000);
+    expect(MAXIMO_DE_ATRIBUTOS_POR_TAG).toBe(100);
+    expect(MAXIMO_DE_TAGS_DE_FORMATACAO).toBe(2_500);
+    expect(PROFUNDIDADE_MAXIMA_DO_HTML).toBe(1_000);
+  });
+
   it("pagina normal passa intacta, inclusive as fixtures", () => {
     for (const nome of [
       "home-padaria.html",
       "pagina-sobre.html",
       "pagina-truncada.html",
       "pagina-divs.html",
+      "pagina-loja-biscoitos.html",
+      "pagina-aspnet-form.html",
+      "pagina-masthead.html",
     ]) {
-      const html = fixture(nome);
-      expect(limitarComplexidadeDoHtml(html), nome).toBe(html);
+      expect(intacto(fixture(nome)), nome).toBe(true);
     }
   });
 
@@ -621,20 +1074,21 @@ describe("limitarComplexidadeDoHtml", () => {
     expect(cortado).not.toContain("depois");
     expect((cortado.match(/<div>/g) ?? []).length).toBe(PROFUNDIDADE_MAXIMA_DO_HTML);
     const balanceado = `${"<div>".repeat(PROFUNDIDADE_MAXIMA_DO_HTML)}<p>no fundo</p>${"</div>".repeat(PROFUNDIDADE_MAXIMA_DO_HTML)}`;
-    expect(limitarComplexidadeDoHtml(balanceado)).toBe(balanceado);
+    expect(intacto(balanceado)).toBe(true);
   });
 
-  it("muitos irmaos numa pilha funda, mas dentro do teto de blocos, passam", () => {
-    const raso = `${"<div>".repeat(20)}${"<div></div>".repeat(10_000)}<p>fim</p>`;
-    expect(limitarComplexidadeDoHtml(raso)).toBe(raso);
+  it("muitos irmaos numa pilha funda, mas dentro do teto de `<`, passam", () => {
+    const raso = `${"<div>".repeat(20)}${"<div></div>".repeat(4_000)}<p>fim</p>`;
+    expect(contarMenores(raso)).toBeLessThan(MAXIMO_DE_MENORES_NO_HTML);
+    expect(intacto(raso)).toBe(true);
   });
 
   it("fechamento opcional (p, li) nao conta como aprofundamento", () => {
-    const html = `<ul>${"<li>item".repeat(6_000)}</ul>${"<p>paragrafo".repeat(6_000)}<p>fim</p>`;
-    expect(limitarComplexidadeDoHtml(html)).toBe(html);
+    const html = `<ul>${"<li>item".repeat(3_000)}</ul>${"<p>paragrafo".repeat(3_000)}<p>fim</p>`;
+    expect(intacto(html)).toBe(true);
   });
 
-  it("tag dentro de comentario, script, estilo, texto de area e valor de atributo nao conta", () => {
+  it("tag dentro de comentario, script, estilo, texto de area e valor de atributo nao conta na profundidade", () => {
     const falsas = "<div>".repeat(PROFUNDIDADE_MAXIMA_DO_HTML + 10);
     const html = [
       `<!-- ${falsas} -->`,
@@ -646,7 +1100,8 @@ describe("limitarComplexidadeDoHtml", () => {
       `<script type="text/template"><div></div></script >`,
       `<p>fim</p>`,
     ].join("\n");
-    expect(limitarComplexidadeDoHtml(html)).toBe(html);
+    expect(contarMenores(html)).toBeLessThan(MAXIMO_DE_MENORES_NO_HTML);
+    expect(intacto(html)).toBe(true);
   });
 
   it("uma aspa solta num valor sem aspas nao esconde o aninhamento do parser de verdade", () => {
@@ -664,6 +1119,7 @@ describe("limitarComplexidadeDoHtml", () => {
       ["comentario abrupto", `<!-->${divs}<p>depois</p>`],
       ["comentario abrupto com hifen", `<!--->${divs}<p>depois</p>`],
       ["comentario com --!>", `<!-- x --!>${divs}<p>depois</p>`],
+      ["comentario com ---> no fim", `<!-- a --- b --->${divs}<p>depois</p>`],
     ];
     for (const [nome, html] of evasoes) {
       const cortado = limitarComplexidadeDoHtml(html);
@@ -675,7 +1131,7 @@ describe("limitarComplexidadeDoHtml", () => {
   it("svg fechado direito nao desliga a protecao do script que vem depois", () => {
     const divs = "<div>".repeat(PROFUNDIDADE_MAXIMA_DO_HTML + 100);
     const html = `<svg><path d="M0 0"/></svg><script>var t = "${divs}";</script><p>depois</p>`;
-    expect(limitarComplexidadeDoHtml(html)).toBe(html);
+    expect(intacto(html)).toBe(true);
   });
 
   it("tags de fechamento opcional empilhadas no aninhamento de ruby tambem sao contadas", () => {
@@ -685,33 +1141,210 @@ describe("limitarComplexidadeDoHtml", () => {
     }
   });
 
-  it("teto de tags de bloco: protege mesmo quando a profundidade e escondida num escopo de tabela", () => {
-    /** O parse5 ignora um `</div>` preso numa celula de tabela; a varredura nao: so a contagem total segura. */
-    const rodada = `${"<div>".repeat(900)}<table><tr><td>${"</div>".repeat(900)}`;
-    const html = `${rodada.repeat(40)}<p>depois</p>`;
-    const cortado = limitarComplexidadeDoHtml(html);
-    expect(cortado).not.toContain("depois");
-    expect((cortado.match(/<div>/g) ?? []).length).toBeLessThanOrEqual(MAXIMO_DE_TAGS_DE_BLOCO);
-    const muitos = `${"<p>x".repeat(MAXIMO_DE_TAGS_DE_BLOCO + 10)}<i>depois</i>`;
-    expect(limitarComplexidadeDoHtml(muitos)).not.toContain("depois");
-    const pouco = `${"<p>x".repeat(MAXIMO_DE_TAGS_DE_BLOCO - 10)}<i>depois</i>`;
-    expect(limitarComplexidadeDoHtml(pouco)).toBe(pouco);
-  });
+  it("teto de `<`: o documento e cortado antes do `<` de numero 10.001, qualquer que seja a tag", () => {
+    const base = "<p>x".repeat(MAXIMO_DE_MENORES_NO_HTML);
+    expect(contarMenores(base)).toBe(MAXIMO_DE_MENORES_NO_HTML);
+    expect(intacto(base)).toBe(true);
 
-  it("o trabalho do parser fica limitado mesmo nas evasoes: nenhuma leva mais que um par de segundos", () => {
-    const divs = "<div>".repeat(150_000);
-    const entradas = [
-      `<html><body><svg><script>${divs}</body></html>`,
-      `<html><body><!-->${divs}</body></html>`,
-      `<html><body>${`${"<div>".repeat(900)}<table><tr><td>${"</div>".repeat(900)}`.repeat(100)}</body></html>`,
-      `<html><body>${"<rt>".repeat(150_000)}</body></html>`,
-    ];
-    for (const entrada of entradas) {
-      const inicio = Date.now();
-      extrairDoHtml(entrada);
-      expect(Date.now() - inicio).toBeLessThan(3_000);
+    const passou = `${base}<i>depois</i>`;
+    const cortado = limitarComplexidadeDoHtml(passou);
+    expect(cortado === base).toBe(true);
+    expect(contarMenores(cortado)).toBe(MAXIMO_DE_MENORES_NO_HTML);
+    expect(cortado).not.toContain("depois");
+
+    /** Conta tudo que é `<`: comentário, texto bruto de script e valor de atributo também. */
+    for (const [nome, enchimento] of [
+      ["comentario", `<!-- ${"<".repeat(MAXIMO_DE_MENORES_NO_HTML)} -->`],
+      ["script", `<script>${"<".repeat(MAXIMO_DE_MENORES_NO_HTML)}</script>`],
+      ["atributo", `<a title="${"<".repeat(MAXIMO_DE_MENORES_NO_HTML)}">x</a>`],
+      ["texto", "<".repeat(MAXIMO_DE_MENORES_NO_HTML)],
+    ] as const) {
+      const html = `<p>antes</p>${enchimento}<p>depois</p>`;
+      const recortado = limitarComplexidadeDoHtml(html);
+      expect(recortado.startsWith("<p>antes</p>"), nome).toBe(true);
+      expect(recortado, nome).not.toContain("depois");
+      expect(contarMenores(recortado), nome).toBeLessThanOrEqual(MAXIMO_DE_MENORES_NO_HTML);
     }
   });
+
+  it(
+    "teto de atributos por tag: o corte e antes da tag, em tag de abertura e de fechamento, e valor com `>` nao esconde a contagem",
+    () => {
+      const atributos = (quantidade: number, modelo: (i: number) => string) =>
+        Array.from({ length: quantidade }, (_, i) => modelo(i)).join(" ");
+      const limite = MAXIMO_DE_ATRIBUTOS_POR_TAG;
+      const abertura = (n: number, modelo: (i: number) => string = (i) => `a${i}`) =>
+        `<p>antes</p><div ${atributos(n, modelo)}><p>depois</p>`;
+
+      expect(intacto(abertura(limite))).toBe(true);
+      for (const [nome, modelo] of [
+        ["sem valor", (i: number) => `a${i}`],
+        ["com valor entre aspas", (i: number) => `a${i}="x"`],
+        ["com valor entre aspas simples", (i: number) => `a${i}='x'`],
+        ["com valor sem aspas", (i: number) => `a${i}=x`],
+        ["com `>` dentro do valor", (i: number) => `a${i}="x>"`],
+        ["com `>` dentro do valor repetido", () => `a="x>"`],
+        ["separados por barra", (i: number) => `a${i}/`],
+        ["nome comecando por igual, com valor", (i: number) => `=a${i}=x`],
+      ] as const) {
+        const html = abertura(limite + 1, modelo);
+        const cortado = limitarComplexidadeDoHtml(html);
+        expect(cortado, nome).toBe("<p>antes</p>");
+      }
+
+      const fechamento = `<p>antes</p></div ${atributos(limite + 1, (i) => `a${i}`)}><p>depois</p>`;
+      expect(limitarComplexidadeDoHtml(fechamento)).toBe("<p>antes</p>");
+
+      /** O cenário do relatório: um só `<` com 100 mil atributos. */
+      const enorme = `<p>antes</p><div ${atributos(100_000, (i) => `a${i}`)}>ola</div>`;
+      expect(enorme.length).toBeGreaterThan(500_000);
+      expect(limitarComplexidadeDoHtml(enorme)).toBe("<p>antes</p>");
+      const { resultado, ms } = medir(() => extrairDoHtml(`<html><body>${enorme}</body></html>`));
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      expect(resultado.texto).toContain("antes");
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it("teto de aberturas de elemento de formatacao: b e font com atributos diferentes nao crescem a lista do parser sem fim", () => {
+    const limite = MAXIMO_DE_TAGS_DE_FORMATACAO;
+    const exato = `<p>antes</p>${distintos("b", "a", limite)}`;
+    expect(intacto(exato)).toBe(true);
+    for (const tag of [
+      "b",
+      "font",
+      "i",
+      "strong",
+      "em",
+      "u",
+      "small",
+      "tt",
+      "big",
+      "s",
+      "code",
+      "nobr",
+    ]) {
+      const html = `<p>antes</p>${distintos(tag, "a", limite + 1)}<p>depois</p>`;
+      const cortado = limitarComplexidadeDoHtml(html);
+      expect(cortado, tag).not.toContain("depois");
+      expect(cortado.startsWith("<p>antes</p>"), tag).toBe(true);
+      expect(cortado.split(`<${tag} `).length - 1, tag).toBe(limite);
+    }
+    /** Link não conta (o `<a>` novo fecha o anterior e a lista não cresce), e uma página real tem centenas. */
+    const links = Array.from({ length: 4_000 }, (_, i) => `<a href="/p${i}">x</a>`).join("");
+    expect(contarMenores(links)).toBeLessThan(MAXIMO_DE_MENORES_NO_HTML);
+    expect(intacto(links)).toBe(true);
+  });
+
+  it(
+    "comentarios aos milhares, sem `--!>`, nao tornam a varredura quadratica",
+    () => {
+      const html = `<html><body>${"<!--a-->".repeat(200_000)}<p>fim</p></body></html>`;
+      const { resultado, ms } = medir(() => limitarComplexidadeDoHtml(html));
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      expect(contarMenores(resultado)).toBeLessThanOrEqual(MAXIMO_DE_MENORES_NO_HTML);
+      const dentro = `${"<!--".repeat(3_000)}${"-- ".repeat(100_000)}`;
+      expect(medir(() => limitarComplexidadeDoHtml(dentro)).ms).toBeLessThan(TETO_DE_TEMPO_MS);
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  /**
+   * Os cenários de negação de serviço do relatório de revisão, e os que a bateria de medidas achou
+   * depois, todos com o tamanho que cabe em 1 MiB. Cada um tem a prova estrutural (o parser recebe
+   * no máximo 10 mil `<`, ou foi cortado antes da tag que estourou o teto de atributos ou de
+   * formatação) e um teto de tempo generoso. Sem as defesas, cada um levava de 10 segundos a
+   * vários minutos.
+   */
+  const cenarios: [string, () => string][] = [
+    [
+      "x aberto 150 mil vezes e </y> 150 mil vezes",
+      () => "<x>".repeat(150_000) + "</y>".repeat(150_000),
+    ],
+    [
+      "svg com 100 mil <g> e </q> sem par",
+      () => "<svg>" + "<g>".repeat(100_000) + "</q>".repeat(100_000),
+    ],
+    [
+      "span 100 mil vezes e </x> sem par",
+      () => "<span>".repeat(100_000) + "oi" + "</x>".repeat(100_000),
+    ],
+    ["svg 100 mil vezes e </x> sem par", () => "<svg>".repeat(100_000) + "</x>".repeat(100_000)],
+    ["x aberto 30 mil vezes e </h1>", () => "<x>".repeat(30_000) + "</h1>".repeat(30_000)],
+    ["x aberto 30 mil vezes e </p>", () => "<x>".repeat(30_000) + "</p>".repeat(30_000)],
+    ["span e <li> em cima", () => "<span>".repeat(60_000) + "<li>x".repeat(60_000)],
+    ["span e <div> em cima", () => "<span>".repeat(60_000) + "<div>x".repeat(60_000)],
+    [
+      "foreignObject e </q>",
+      () => "<svg>" + "<foreignObject>".repeat(60_000) + "</q>".repeat(60_000),
+    ],
+    ["math e mi", () => "<math>" + "<mi>".repeat(60_000) + "</q>".repeat(60_000)],
+    ["b com atributos diferentes", () => distintos("b", "a", 100_000)],
+    ["font com atributos diferentes", () => distintos("font", "size", 100_000)],
+    [
+      "b com atributos diferentes e <p> em cima",
+      () => distintos("b", "a", 50_000) + "<p>x".repeat(50_000),
+    ],
+    ["div aninhado 200 mil vezes", () => "<div>".repeat(200_000)],
+    ["template aninhado", () => "<template>".repeat(100_000)],
+    ["rt aninhado", () => "<rt>".repeat(150_000)],
+    ["svg com script e div dentro", () => "<svg><script>" + "<div>".repeat(150_000)],
+    [
+      "div preso em tabela",
+      () => `${"<div>".repeat(900)}<table><tr><td>${"</div>".repeat(900)}`.repeat(100),
+    ],
+    [
+      "uma tag com 100 mil atributos",
+      () => `<div ${Array.from({ length: 100_000 }, (_, i) => `a${i}`).join(" ")}>`,
+    ],
+    [
+      "tags com 99 atributos cada",
+      () => `<b ${Array.from({ length: 99 }, (_, i) => `a${i}`).join(" ")}>`.repeat(5_000),
+    ],
+    ["comentarios e fechamentos", () => "<!--a-->".repeat(100_000) + "</y>".repeat(100_000)],
+  ];
+
+  it.each(cenarios)(
+    "negacao de servico: %s fica limitado (estrutura e tempo)",
+    (_nome, gerar) => {
+      const entrada = `<html><body><p>${"Texto antes do ataque. ".repeat(12)}</p>${gerar()}`;
+      const recebido = limitarComplexidadeDoHtml(entrada);
+      expect(contarMenores(recebido)).toBeLessThanOrEqual(MAXIMO_DE_MENORES_NO_HTML);
+      expect(recebido.length).toBeLessThan(entrada.length);
+      const { resultado, ms } = medir(() => extrairDoHtml(entrada));
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      expect(resultado.texto).toContain("Texto antes do ataque");
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it(
+    "o pior caso que sobra: o teto de `<` aproveitado ao maximo por quem quer o parser mais lento",
+    () => {
+      const metade = MAXIMO_DE_MENORES_NO_HTML / 2;
+      const piores: [string, string][] = [
+        ["svg e </q>", "<svg>" + "<g>".repeat(metade - 1) + "</q>".repeat(metade)],
+        ["svg aninhado", "<svg>".repeat(metade) + "</q>".repeat(metade)],
+        ["foreignObject", "<svg>" + "<foreignObject>".repeat(metade - 1) + "</q>".repeat(metade)],
+        ["x aberto", "<x>".repeat(metade) + "</y>".repeat(metade)],
+        ["span e </x>", "<span>".repeat(metade) + "</x>".repeat(metade)],
+        [
+          "formatacao no teto e </y>",
+          distintos("b", "a", MAXIMO_DE_TAGS_DE_FORMATACAO) +
+            "</y>".repeat(MAXIMO_DE_MENORES_NO_HTML - MAXIMO_DE_TAGS_DE_FORMATACAO),
+        ],
+      ];
+      for (const [nome, ataque] of piores) {
+        const entrada = `<html><body>${ataque}`;
+        expect(contarMenores(limitarComplexidadeDoHtml(entrada)), nome).toBeLessThanOrEqual(
+          MAXIMO_DE_MENORES_NO_HTML,
+        );
+        const { ms } = medir(() => extrairDoHtml(entrada));
+        expect(ms, nome).toBeLessThan(TETO_DE_TEMPO_MS);
+      }
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
 
   it("tag que nunca fecha e texto bruto sem fim terminam a varredura sem travar", () => {
     expect(limitarComplexidadeDoHtml('<div><a href="x')).toBe('<div><a href="x');
@@ -723,11 +1356,12 @@ describe("limitarComplexidadeDoHtml", () => {
     expect(limitarComplexidadeDoHtml("<plaintext>" + "<div>".repeat(5_000))).toContain(
       "<plaintext>",
     );
-    const inicio = Date.now();
-    limitarComplexidadeDoHtml("<a ".repeat(300_000));
-    limitarComplexidadeDoHtml('<a b="'.repeat(300_000));
-    limitarComplexidadeDoHtml("<!".repeat(300_000));
-    expect(Date.now() - inicio).toBeLessThan(2_000);
+    const { ms } = medir(() => {
+      limitarComplexidadeDoHtml("<a ".repeat(300_000));
+      limitarComplexidadeDoHtml('<a b="'.repeat(300_000));
+      limitarComplexidadeDoHtml("<!".repeat(300_000));
+    });
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
   });
 });
 
@@ -735,24 +1369,35 @@ describe("normalizarLink", () => {
   const normalizar = (href: string, base: URL = RAIZ) =>
     normalizarLink(href, base, HOST)?.href ?? null;
 
-  it("resolve relativo, tira fragmento e rastreio, sobe http para https e tira a barra final", () => {
-    expect(normalizar("/sobre-nos/")).toBe("https://loja-exemplo.test/sobre-nos");
+  it("resolve relativo, tira fragmento e rastreio, sobe http para https e MANTEM a barra final do link", () => {
+    expect(normalizar("/sobre-nos/")).toBe("https://loja-exemplo.test/sobre-nos/");
+    expect(normalizar("/sobre-nos")).toBe("https://loja-exemplo.test/sobre-nos");
     expect(normalizar("sobre", new URL("https://loja-exemplo.test/institucional/"))).toBe(
       "https://loja-exemplo.test/institucional/sobre",
     );
     expect(normalizar("/produtos/?utm_source=a&utm_medium=b&fbclid=c&gclid=d")).toBe(
-      "https://loja-exemplo.test/produtos",
+      "https://loja-exemplo.test/produtos/",
     );
     expect(normalizar("/produtos/?cat=3&utm_source=a")).toBe(
-      "https://loja-exemplo.test/produtos?cat=3",
+      "https://loja-exemplo.test/produtos/?cat=3",
     );
     expect(normalizar("/produtos#depoimentos")).toBe("https://loja-exemplo.test/produtos");
     expect(normalizar("http://loja-exemplo.test/contato")).toBe(
       "https://loja-exemplo.test/contato",
     );
     expect(normalizar("https://LOJA-exemplo.test//contato//")).toBe(
-      "https://loja-exemplo.test/contato",
+      "https://loja-exemplo.test/contato/",
     );
+  });
+
+  it("endereco enorme (acima de 2.048 caracteres) nao e candidato, e nao custa nada", () => {
+    expect(normalizar(`/sobre/${"a".repeat(2_100)}`)).toBeNull();
+    expect(normalizar(`/sobre/${"a".repeat(1_000)}`)).not.toBeNull();
+    expect(normalizar(`${" ".repeat(5_000)}/sobre`)).toBeNull();
+    const { ms } = medir(() => {
+      for (let i = 0; i < 2_000; i += 1) normalizar(`/sobre/${"a.".repeat(3_000)}`);
+    });
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
   });
 
   it("reescreve a variante com ou sem www para o host da leitura", () => {
@@ -822,9 +1467,86 @@ describe("normalizarLink", () => {
       "/termos-de-uso/",
       "/terms",
       "/politica-de-cookies",
+      "/cookies",
+      "/politica-de-privacidade-e-cookies/",
+      "/institucional/termos-de-uso-do-site",
+      "/termos-e-condicoes",
+      "/privacy-policy/",
+      "/terms-of-service",
+      "/lista-de-desejos",
+      "/esqueci-minha-senha",
+      "/pol%C3%ADtica-de-privacidade",
+      "/Politica-De-Privacidade/",
+      "/lgpd",
+      "/search",
+      "/busca",
+      "/buscar",
+      "/rss",
+      "/signup",
+      "/sign-in",
+      "/logout",
+      "/cart/",
+      "/xmlrpc.php",
+      "/wp-includes/js/x",
+      "/wishlist",
     ]) {
       expect(normalizar(href), href).toBeNull();
     }
+  });
+
+  it("paginas de verdade cujo slug so CONTEM uma palavra de area descartada passam: o descarte e por segmento inteiro ou frase fixa", () => {
+    for (const href of [
+      "/entrar-em-contato",
+      "/servicos/search-engine-optimization",
+      "/servicos/busca-e-apreensao",
+      "/termos-de-garantia",
+      "/blog/feed-de-noticias",
+      "/atuacao/privacy-law",
+      "/politica-de-troca",
+      "/cadastro-de-fornecedores",
+      "/carrinho-de-compras-para-festas",
+      "/cartao-de-visita",
+      "/login-social-na-loja",
+      "/loja/cookies-artesanais",
+      "/produtos/cookies-e-brownies",
+      "/lgpd-para-pequenas-empresas",
+      "/signup-bonus-para-clientes",
+      "/checkout-express-no-balcao",
+      "/buscar-parceiros",
+    ]) {
+      expect(normalizar(href), href).not.toBeNull();
+    }
+    /** O segmento inteiro vale em qualquer posição do caminho, e só ele. */
+    expect(normalizar("/loja/carrinho/itens")).toBeNull();
+    expect(normalizar("/loja/carrinho-novo/itens")).not.toBeNull();
+  });
+
+  it("mantem a barra final, mas a chave de comparacao ignora: o mesmo link com e sem barra e uma pagina so", () => {
+    const candidatos = classificarCandidatos(
+      [
+        { href: "/servicos/", texto: "Serviços", emNav: true },
+        { href: "/servicos", texto: "", emNav: false },
+        { href: "/servicos/?utm_source=x", texto: "", emNav: false },
+        { href: "/contato/", texto: "", emNav: false },
+      ],
+      RAIZ,
+      null,
+      HOST,
+    );
+    expect(candidatos.map((candidato) => candidato.url).sort()).toEqual([
+      "https://loja-exemplo.test/contato/",
+      "https://loja-exemplo.test/servicos/",
+    ]);
+    /** A própria página não é candidata, com ou sem barra. */
+    const propria = classificarCandidatos(
+      links("/servicos", "/servicos/", "/contato"),
+      new URL("https://loja-exemplo.test/servicos/"),
+      null,
+      HOST,
+    );
+    expect(propria.map((candidato) => candidato.url)).toEqual([
+      "https://loja-exemplo.test/contato",
+    ]);
   });
 });
 
@@ -835,12 +1557,14 @@ describe("classificarCandidatos e selecionarPorOrcamento", () => {
     const extracao = extrairDoHtml(home);
     const candidatos = classificarCandidatos(extracao.links, RAIZ, extracao.baseHref, HOST);
     const urls = candidatos.map((candidato) => candidato.url);
+    /** O endereço sai no formato em que o site escreveu o link (com a barra, quando tem). */
     expect(urls).toEqual(
       expect.arrayContaining([
-        "https://loja-exemplo.test/sobre-nos",
-        "https://loja-exemplo.test/produtos",
+        "https://loja-exemplo.test/sobre-nos/",
+        "https://loja-exemplo.test/produtos/",
         "https://loja-exemplo.test/contato",
-        "https://loja-exemplo.test/servicos/encomendas",
+        "https://loja-exemplo.test/servicos/encomendas/",
+        "https://loja-exemplo.test/produtos/bolos/",
       ]),
     );
     for (const url of urls) {
@@ -850,13 +1574,13 @@ describe("classificarCandidatos e selecionarPorOrcamento", () => {
       expect(url.startsWith("https://loja-exemplo.test/")).toBe(true);
     }
     expect(urls).not.toContain("https://loja-exemplo.test/");
-    expect(candidatos.find((candidato) => candidato.url.endsWith("/sobre-nos"))?.categoria).toBe(
+    expect(candidatos.find((candidato) => candidato.url.endsWith("/sobre-nos/"))?.categoria).toBe(
       "sobre",
     );
     expect(candidatos.find((candidato) => candidato.url.endsWith("/contato"))?.categoria).toBe(
       "extra",
     );
-    expect(candidatos.find((candidato) => candidato.url.endsWith("/produtos"))?.categoria).toBe(
+    expect(candidatos.find((candidato) => candidato.url.endsWith("/produtos/"))?.categoria).toBe(
       "produtos",
     );
   });
@@ -950,6 +1674,35 @@ describe("classificarCandidatos e selecionarPorOrcamento", () => {
       "https://loja-exemplo.test/a/b/c/servicos",
       "https://loja-exemplo.test/blog/como-escolher-servicos",
     ]);
+  });
+
+  it("o bonus de menu desempata a favor do link do menu, e a query string tira pontos", () => {
+    const comMenu = classificarCandidatos(
+      [
+        { href: "/servicos-z", texto: "", emNav: true },
+        { href: "/servicos-a", texto: "", emNav: false },
+      ],
+      RAIZ,
+      null,
+      HOST,
+    );
+    expect(comMenu.map((candidato) => candidato.url)).toEqual([
+      "https://loja-exemplo.test/servicos-z",
+      "https://loja-exemplo.test/servicos-a",
+    ]);
+    expect(comMenu[0].pontos - comMenu[1].pontos).toBe(2);
+
+    const comQuery = classificarCandidatos(
+      links("/servicos?x=1", "/servicos-longo-demais"),
+      RAIZ,
+      null,
+      HOST,
+    );
+    expect(comQuery.map((candidato) => candidato.url)).toEqual([
+      "https://loja-exemplo.test/servicos-longo-demais",
+      "https://loja-exemplo.test/servicos?x=1",
+    ]);
+    expect(comQuery[0].pontos - comQuery[1].pontos).toBe(3);
   });
 
   it("considera no maximo 60 candidatos", () => {
@@ -1147,11 +1900,164 @@ describe("analisarRobots (RFC 9309)", () => {
 
   it("robots.txt gigante e padrao patologico nao travam", () => {
     const regras = analisarRobots(`User-agent: *\nDisallow: /${"*a".repeat(300)}b\n`, TOKEN);
-    const inicio = Date.now();
-    expect(regras.permite(`/${"a".repeat(1_900)}`)).toBe(true);
-    expect(Date.now() - inicio).toBeLessThan(2_000);
+    const { resultado, ms } = medir(() => regras.permite(`/${"a".repeat(1_900)}`));
+    expect(resultado).toBe(true);
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
     const enorme = analisarRobots(`User-agent: *\n${"Disallow: /x\n".repeat(20_000)}`, TOKEN);
     expect(enorme.permite("/x")).toBe(false);
+  });
+
+  it("tetos de custo, provados pela estrutura: padrao de ate 200 caracteres, ate 5 curingas, ate 1.000 regras avaliadas", () => {
+    const robots = (...linhas: string[]) =>
+      analisarRobots(`User-agent: *\n${linhas.join("\n")}`, TOKEN);
+
+    /** 200 caracteres valem; 201, não: a regra é ignorada, não corta nem libera nada. */
+    const noTeto = `/${"a".repeat(199)}`;
+    expect(noTeto).toHaveLength(200);
+    expect(robots(`Disallow: ${noTeto}`).permite(noTeto)).toBe(false);
+    expect(robots(`Disallow: ${noTeto}a`).permite(`${noTeto}a`)).toBe(true);
+    /** Ignorada de verdade: se valesse, seria a mais longa e ganharia do `Allow: /a`. */
+    expect(robots(`Disallow: ${noTeto}a`, "Allow: /a").permite(`${noTeto}a`)).toBe(true);
+    expect(robots(`Disallow: ${noTeto}`, "Allow: /a").permite(noTeto)).toBe(false);
+    expect(robots(`Disallow: ${noTeto}a`, "Disallow: /").permite(`${noTeto}a`)).toBe(false);
+
+    /** 5 curingas valem; 6, não. Curingas seguidos contam como um. */
+    expect(robots("Disallow: /a*b*c*d*e*f").permite("/a-b-c-d-e-f")).toBe(false);
+    expect(robots("Disallow: /a*b*c*d*e*f*g").permite("/a-b-c-d-e-f-g")).toBe(true);
+    expect(robots("Disallow: /a***b").permite("/a-b")).toBe(false);
+    /** Curingas seguidos valem como um (sete juntos não estouram o teto de 5). */
+    expect(robots(`Disallow: /a${"*".repeat(7)}b`).permite("/a-b")).toBe(false);
+    expect(robots(`Disallow: /a${"*".repeat(7)}b*c*d*e*f*g`).permite("/a-b-c-d-e-f-g")).toBe(true);
+    expect(robots("Disallow: /a*b*c*d*e*f$").permite("/a-b-c-d-e-f")).toBe(false);
+
+    /** Só as 1.000 primeiras regras do grupo entram na avaliação. */
+    const mil = Array.from({ length: 1_000 }, (_, i) => `Disallow: /x${i}`);
+    const todas = robots(...mil, "Disallow: /alvo");
+    expect(todas.permite("/x999")).toBe(false);
+    expect(todas.permite("/alvo")).toBe(true);
+    expect(robots(...mil.slice(0, 999), "Disallow: /alvo").permite("/alvo")).toBe(false);
+    /** Regra de outro grupo não gasta a conta do nosso. */
+    const outroGrupo = analisarRobots(
+      `User-agent: Outro\n${mil.join("\n")}\nUser-agent: *\nDisallow: /alvo\n`,
+      TOKEN,
+    );
+    expect(outroGrupo.permite("/alvo")).toBe(false);
+
+    /** O caminho é avaliado só até 512 caracteres (e `/robots.txt` continua sempre livre). */
+    const longo = `/${"a".repeat(600)}zzz`;
+    expect(robots("Disallow: /*zzz").permite(longo)).toBe(true);
+    expect(robots("Disallow: /aaa").permite(longo)).toBe(false);
+    expect(robots("Disallow: /").permite("/robots.txt")).toBe(true);
+  });
+
+  it(
+    "o cenario do relatorio (centenas de regras longas com curinga contra um caminho de 2 KB) leva fracoes de segundo",
+    () => {
+      const caminho = `/sobre/${"a".repeat(2_000)}`;
+      for (const m of [150, 180, 190]) {
+        /** Regras no limite do que passa pelos tetos (200 caracteres, curinga no meio) e que quase casam. */
+        const regra = `Disallow: /sobre/*${"a".repeat(m)}b\n`;
+        const quantidade = 1_500;
+        const robots = analisarRobots(`User-agent: *\n${regra.repeat(quantidade)}`, TOKEN);
+        const { resultado, ms } = medir(() => robots.permite(caminho));
+        expect(resultado, `m=${m}`).toBe(true);
+        expect(ms, `m=${m}`).toBeLessThan(TETO_DE_TEMPO_MS);
+      }
+      /** Acima do teto de 200 caracteres a regra nem entra: o cenário original (2.383 regras de 209) sobra vazio. */
+      const original = analisarRobots(
+        `User-agent: *\n${`Disallow: /sobre/*${"a".repeat(200)}b\n`.repeat(2_383)}Disallow: /sobre\n`,
+        TOKEN,
+      );
+      expect(original.permite(caminho)).toBe(false);
+      expect(original.permite("/contato")).toBe(true);
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it(
+    "o pior caso que os tetos deixam passar (mil regras de cinco curingas) leva fracoes de segundo por pagina, mesmo para 60 caminhos",
+    () => {
+      const regra = (i: number) => `Disallow: /${"a*".repeat(5)}${"a".repeat(150)}${i % 7}b`;
+      const robots = analisarRobots(
+        `User-agent: *\n${Array.from({ length: 1_000 }, (_, i) => regra(i)).join("\n")}`,
+        TOKEN,
+      );
+      const { ms } = medir(() => {
+        for (let i = 0; i < 60; i += 1) robots.permite(`/${"a".repeat(480 + (i % 30))}${i}`);
+      });
+      expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+      /** O resultado de um caminho é memorizado: a segunda pergunta devolve a mesma resposta. */
+      expect(robots.permite(`/${"a".repeat(480)}0`)).toBe(robots.permite(`/${"a".repeat(480)}0`));
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it(
+    "o resultado por caminho e memorizado: vinte mil perguntas iguais custam o mesmo que uma",
+    () => {
+      const regra = (i: number) => `Disallow: /${"a*".repeat(5)}${"a".repeat(150)}${i % 7}b`;
+      const robots = analisarRobots(
+        `User-agent: *\n${Array.from({ length: 1_000 }, (_, i) => regra(i)).join("\n")}`,
+        TOKEN,
+      );
+      const caminho = `/${"a".repeat(511)}`;
+      const { ms } = medir(() => {
+        for (let i = 0; i < 20_000; i += 1) robots.permite(caminho);
+      });
+      /** Sem a memória, cada pergunta avalia as 1.000 regras (perto de 1 ms): 20 segundos. */
+      expect(ms).toBeLessThan(2_000);
+    },
+    TIMEOUT_DO_TESTE_MS,
+  );
+
+  it("diferencial: o casamento por segmentos e o mesmo de uma referencia com expressao regular (maior correspondencia, empate para Allow)", () => {
+    const sorteio = aleatorio(20260103);
+    const escolher = <T>(itens: readonly T[]): T => itens[Math.floor(sorteio() * itens.length)];
+    const alfabeto = ["a", "b", "/", "?", ".", "a", "b"] as const;
+    const texto = (tamanho: number) =>
+      Array.from({ length: tamanho }, () => escolher(alfabeto)).join("");
+    /** Um padrão sem curingas seguidos, com até 5 (um deles pode ser o último caractere), e `$` no fim de vez em quando. */
+    const padrao = (): { valor: string; ancorado: boolean } => {
+      const partes = Array.from({ length: 1 + Math.floor(sorteio() * 5) }, () =>
+        texto(1 + Math.floor(sorteio() * 3)),
+      );
+      const valor = `/${partes.join("*")}${sorteio() < 0.2 ? "*" : ""}`;
+      return { valor, ancorado: sorteio() < 0.25 };
+    };
+    const escapar = (valor: string) => valor.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+
+    let divergencias = 0;
+    for (let caso = 0; caso < 4_000; caso += 1) {
+      const regras = Array.from({ length: 1 + Math.floor(sorteio() * 6) }, () => ({
+        permitir: sorteio() < 0.4,
+        ...padrao(),
+      }));
+      const linhas = regras.map(
+        (regra) =>
+          `${regra.permitir ? "Allow" : "Disallow"}: ${regra.valor}${regra.ancorado ? "$" : ""}`,
+      );
+      const robots = analisarRobots(`User-agent: *\n${linhas.join("\n")}`, TOKEN);
+      for (let n = 0; n < 6; n += 1) {
+        const caminho = `/${texto(Math.floor(sorteio() * 10))}`;
+        let melhor: { tamanho: number; permitir: boolean } | null = null;
+        for (const regra of regras) {
+          const expressao = new RegExp(
+            `^${escapar(regra.valor).replace(/\\\*/g, ".*")}${regra.ancorado ? "$" : ""}`,
+          );
+          if (!expressao.test(caminho)) continue;
+          const tamanho = regra.valor.length;
+          if (
+            melhor === null ||
+            tamanho > melhor.tamanho ||
+            (tamanho === melhor.tamanho && regra.permitir && !melhor.permitir)
+          )
+            melhor = { tamanho, permitir: regra.permitir };
+        }
+        const esperado = melhor ? melhor.permitir : true;
+        if (robots.permite(caminho) !== esperado) divergencias += 1;
+      }
+    }
+    expect(divergencias).toBe(0);
   });
 });
 
@@ -1185,9 +2091,60 @@ describe("sitemap", () => {
   it("XML malformado e <loc> sem fechar nao travam nem lancam", () => {
     expect(extrairLocsDeSitemap("<loc>https://a.test/").urls).toEqual([]);
     expect(extrairLocsDeSitemap("").urls).toEqual([]);
-    const inicio = Date.now();
-    expect(extrairLocsDeSitemap("<loc>".repeat(200_000)).urls).toEqual([]);
-    expect(Date.now() - inicio).toBeLessThan(2_000);
+    const { resultado, ms } = medir(() => extrairLocsDeSitemap("<loc>".repeat(200_000)).urls);
+    expect(resultado).toEqual([]);
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+  });
+
+  it("<loc> enorme nao vira endereco, e milhares de <loc> custam tempo linear e param em 5.000", () => {
+    const grande = `https://a.test/${"x".repeat(2_100)}`;
+    const noTeto = `https://a.test/${"y".repeat(2_000)}`;
+    const { urls } = extrairLocsDeSitemap(
+      `<urlset><url><loc>${grande}</loc></url><url><loc>${noTeto}</loc></url><url><loc>https://a.test/ok</loc></url></urlset>`,
+    );
+    expect(urls).toEqual([noTeto, "https://a.test/ok"]);
+
+    const muitos = `<urlset>${Array.from({ length: 20_000 }, (_, i) => `<url><loc>https://a.test/p${i}</loc></url>`).join("")}</urlset>`;
+    const { resultado, ms } = medir(() => extrairLocsDeSitemap(muitos));
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
+    expect(resultado.urls).toHaveLength(5_000);
+    const comEntidades = `<loc>${"&amp;".repeat(500_000)}</loc>`;
+    expect(medir(() => extrairLocsDeSitemap(comEntidades)).ms).toBeLessThan(TETO_DE_TEMPO_MS);
+    expect(extrairLocsDeSitemap(comEntidades).urls).toEqual([]);
+  });
+
+  it("o indice so e reconhecido no comeco do arquivo (o elemento raiz)", () => {
+    expect(
+      extrairLocsDeSitemap(
+        "<sitemapindex><sitemap><loc>https://a.test/s.xml</loc></sitemap></sitemapindex>",
+      ).ehIndice,
+    ).toBe(true);
+    const lixo = `<urlset>${" ".repeat(60_000)}<sitemapindex>`;
+    expect(extrairLocsDeSitemap(lixo).ehIndice).toBe(false);
+  });
+
+  it("escolherSitemapFilho: o primeiro de maior pontuacao ganha, e milhares de filhos custam tempo linear", () => {
+    expect(
+      escolherSitemapFilho([
+        "https://a.test/x1.xml",
+        "https://a.test/x2.xml",
+        "https://a.test/post-sitemap.xml",
+      ]),
+    ).toBe("https://a.test/x1.xml");
+    expect(
+      escolherSitemapFilho(["https://a.test/image-sitemap.xml", "https://a.test/post-sitemap.xml"]),
+    ).toBe("https://a.test/post-sitemap.xml");
+    expect(
+      escolherSitemapFilho(["https://a.test/page-sitemap.xml", "https://a.test/pages-2.xml"]),
+    ).toBe("https://a.test/page-sitemap.xml");
+    const filhos = Array.from(
+      { length: 5_000 },
+      (_, i) => `https://a.test/sitemap-${i}-${"z".repeat(200)}.xml`,
+    );
+    filhos.push("https://a.test/paginas-sitemap.xml");
+    const { resultado, ms } = medir(() => escolherSitemapFilho(filhos));
+    expect(resultado).toBe("https://a.test/paginas-sitemap.xml");
+    expect(ms).toBeLessThan(TETO_DE_TEMPO_MS);
   });
 
   it("candidatos a partir do sitemap passam pelo mesmo filtro e pela mesma pontuacao", () => {
@@ -1201,10 +2158,10 @@ describe("sitemap", () => {
     const lista = candidatos.map((candidato) =>
       candidato.url.replace("https://loja-exemplo.test", ""),
     );
-    expect(lista).toContain("/sobre-nos");
-    expect(lista).toContain("/produtos");
-    expect(lista).toContain("/servicos/encomendas");
-    expect(lista).not.toContain("/politica-de-privacidade");
+    expect(lista).toContain("/sobre-nos/");
+    expect(lista).toContain("/produtos/");
+    expect(lista).toContain("/servicos/encomendas/");
+    expect(lista).not.toContain("/politica-de-privacidade/");
     expect(lista.some((url) => url.includes("outro-site"))).toBe(false);
     expect(lista.findIndex((url) => url.startsWith("/blog"))).toBe(lista.length - 1);
   });
