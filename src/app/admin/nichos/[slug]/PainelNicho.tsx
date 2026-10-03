@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import type { Nicho, ResumoPesquisaSetor } from "@/db/schema";
 import type { ContaSemente, ExecucaoResumo, PassoSetor, ResumoLeituraPlataforma } from "@/servicos/admin-coleta";
+import type { PerfilAnalisado } from "@/servicos/perfis-analisados";
 import { textosAdmin } from "@/textos/admin";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -20,6 +21,7 @@ import {
   pesquisarMercadoAction,
   preverEfeitoReguaAction,
   tirarContaAction,
+  virarContaDoSetorAction,
 } from "../acoes";
 
 import styles from "./PainelNicho.module.css";
@@ -43,6 +45,8 @@ type Props = {
   /** M3: o padrão de `config.regras`, para a tela mostrar ao lado de cada campo da régua (o número, não só "padrão"). */
   padraoPisoViews: number;
   padraoProporcaoBrasil: number;
+  /** E38, parte 3: perfis que um cliente citou ou da própria marca, já conferidos na API e dentro da régua do setor. */
+  perfisIndicados: (PerfilAnalisado & { clienteNome: string })[];
 };
 
 function formatarQuando(data: Date | undefined): string {
@@ -66,6 +70,7 @@ export function PainelNicho({
   passo,
   padraoPisoViews,
   padraoProporcaoBrasil,
+  perfisIndicados,
 }: Props) {
   const router = useRouter();
 
@@ -90,6 +95,8 @@ export function PainelNicho({
 
   const [tirandoId, setTirandoId] = useState<number | null>(null);
   const [aceitandoTermo, setAceitandoTermo] = useState<string | null>(null);
+  const [virandoId, setVirandoId] = useState<number | null>(null);
+  const [mensagemVirar, setMensagemVirar] = useState<Mensagem | null>(null);
 
   /** M3: a régua por setor. Percentual em texto (0 a 100) porque é assim que a pessoa digita; vira fração só ao salvar. */
   const [pisoViewsInput, setPisoViewsInput] = useState(nicho.pisoViews === null ? "" : String(nicho.pisoViews));
@@ -196,6 +203,19 @@ export function PainelNicho({
     setAceitandoTermo(termo);
     await aceitarTermoSugeridoAction(nicho.id, nicho.slug, termo);
     setAceitandoTermo(null);
+    router.refresh();
+  }
+
+  async function virarContaDoSetor(perfilAnalisadoId: number) {
+    setVirandoId(perfilAnalisadoId);
+    setMensagemVirar(null);
+    const resultado = await virarContaDoSetorAction(perfilAnalisadoId, nicho.slug);
+    setVirandoId(null);
+    if (!resultado.ok) {
+      setMensagemVirar({ tipo: "erro", texto: resultado.mensagem ?? "" });
+      return;
+    }
+    setMensagemVirar({ tipo: "sucesso", texto: t.sucessoVirarConta });
     router.refresh();
   }
 
@@ -487,6 +507,44 @@ export function PainelNicho({
             ))}
           </ul>
         )}
+      </div>
+
+      <hr className={styles.divisor} />
+
+      <div>
+        <h2>{t.perfisIndicadosTitulo}</h2>
+        <p className={styles.ajuda}>{t.perfisIndicadosAjuda}</p>
+        {perfisIndicados.length === 0 ? (
+          <p className={styles.ajuda}>{t.vazioPerfisIndicados}</p>
+        ) : (
+          <ul className={styles.execucoesLista}>
+            {perfisIndicados.map((perfil) => (
+              <li key={perfil.id} className={styles.linhaContaSemente}>
+                <span>
+                  {perfil.rede} · {perfil.handle} · {perfil.clienteNome}
+                </span>
+                <Botao
+                  variante="secundario"
+                  carregando={virandoId === perfil.id}
+                  onClick={() => virarContaDoSetor(perfil.id)}
+                >
+                  {virandoId === perfil.id ? t.virandoContaDoSetor : t.virarContaDoSetor}
+                </Botao>
+              </li>
+            ))}
+          </ul>
+        )}
+        {mensagemVirar ? (
+          <p
+            className={[
+              styles.mensagem,
+              mensagemVirar.tipo === "erro" ? styles.mensagemErro : styles.mensagemSucesso,
+            ].join(" ")}
+            role="status"
+          >
+            {mensagemVirar.texto}
+          </p>
+        ) : null}
       </div>
 
       <hr className={styles.divisor} />

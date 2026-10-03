@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { virarContaDoSetor } from "@/jobs/analisar-perfil";
 import { contagemElegivelSemFala, type EfeitoVideoSemFala } from "@/jobs/extrair-sem-fala";
 import { FILAS } from "@/jobs/fila";
 import { sessaoAtual } from "@/lib/sessao";
@@ -178,4 +179,17 @@ export async function preverEfeitoReguaAction(
 
   const [piso, semFala] = await Promise.all([efeitoPiso(nichoId, pisoViews), contagemElegivelSemFala(nichoId, pisoViews)]);
   return { ...piso, ...semFala };
+}
+
+/** E38, parte 3: o perfil indicado por um cliente que já passou na régua vira conta vigiada do setor. */
+export async function virarContaDoSetorAction(perfilAnalisadoId: number, slug: string): Promise<Resultado> {
+  garantirSessaoAdmin(await sessaoAtual());
+
+  try {
+    await virarContaDoSetor(perfilAnalisadoId);
+    revalidatePath(`/admin/nichos/${slug}`);
+    return { ok: true };
+  } catch (erro) {
+    return { ok: false, mensagem: erro instanceof Error ? erro.message : "nao foi possivel virar conta agora. Tente de novo." };
+  }
 }

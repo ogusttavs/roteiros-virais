@@ -5,7 +5,13 @@
  */
 import "dotenv/config";
 
+import { eq } from "drizzle-orm";
+
+import { db } from "@/db";
+import { perfisCitados, type Plataforma } from "@/db/schema";
+
 import { listarAgendamentos } from "./agenda";
+import { rodarAnalisarPerfil } from "./analisar-perfil";
 import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
@@ -106,6 +112,28 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
       throw new Error("uso: npm run job -- aprender-cliente <clienteId>");
     }
     return rodarAprenderCliente(clienteId);
+  },
+  /**
+   * E38, partes 2 e 3: mesmo raciocínio do `aprender-cliente`, só para um perfil por vez. Acha
+   * sozinho se o handle é um citado (`perfisCitados`) ou a própria marca, pelo que está gravado.
+   */
+  [FILAS.analisarPerfil]: async () => {
+    const clienteId = Number(process.argv[3]);
+    const rede = process.argv[4] as Plataforma | undefined;
+    const handle = process.argv[5];
+    if (!Number.isFinite(clienteId) || !rede || !handle) {
+      throw new Error("uso: npm run job -- analisar-perfil <clienteId> <youtube|instagram|tiktok> <handle>");
+    }
+    const [citado] = await db()
+      .select()
+      .from(perfisCitados)
+      .where(eq(perfisCitados.clienteId, clienteId))
+      .then((linhas) => linhas.filter((l) => l.rede === rede && l.handle === handle));
+    return rodarAnalisarPerfil(
+      citado
+        ? { clienteId, perfilCitadoId: citado.id, origem: "citado", tipoCitado: citado.tipo, rede, handle }
+        : { clienteId, perfilCitadoId: null, origem: "propria_marca", tipoCitado: null, rede, handle },
+    );
   },
 };
 

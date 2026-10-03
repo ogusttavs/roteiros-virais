@@ -7,6 +7,7 @@ import { perguntasDoBriefing, perguntasDoBloco, TOTAL_BLOCOS } from "@/config/br
 import type { AvaliacaoResposta, PerfilCompilado, TipoMarca } from "@/db/schema";
 import type { RegraCliente } from "@/servicos/aprendizado";
 import { perguntaQueMaisAjuda, resumirMelhorar } from "@/servicos/briefing-regras";
+import type { PerfilAnalisadoComTipo } from "@/servicos/perfis-analisados";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Cartao } from "@/ui/componentes/Cartao";
@@ -16,6 +17,7 @@ import { PerguntaCampo, type ResultadoAcaoBriefing } from "../../_briefing/Pergu
 import { avaliarRespostaAction, salvarRascunhoAction } from "./acoes";
 import { AprendizadoCard } from "./AprendizadoCard";
 import styles from "./BriefingVivo.module.css";
+import { PerfisAnalisadosCard } from "./PerfisAnalisadosCard";
 
 type Props = {
   respostasIniciais: Record<string, string>;
@@ -23,6 +25,7 @@ type Props = {
   notaGeralInicial: number;
   perfil: PerfilCompilado | null;
   regrasIniciais: RegraCliente[];
+  perfisAnalisados: PerfilAnalisadoComTipo[];
   meta: number;
   tipo: TipoMarca;
 };
@@ -60,6 +63,7 @@ export function BriefingVivo({
   notaGeralInicial,
   perfil,
   regrasIniciais,
+  perfisAnalisados,
   meta,
   tipo,
 }: Props) {
@@ -128,6 +132,8 @@ export function BriefingVivo({
           ) : null}
 
           <AprendizadoCard regrasIniciais={regrasIniciais} />
+
+          <PerfisAnalisadosCard perfis={perfisAnalisados} />
 
           {BLOCOS.map((bloco) => {
             const perguntas = perguntasDoBloco(bloco, tipo);

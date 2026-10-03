@@ -20,6 +20,7 @@ import {
   ultimaPesquisaDeSetor,
   videosPorId,
 } from "@/servicos/admin-coleta";
+import { listarPerfisIndicados } from "@/servicos/perfis-analisados";
 import { estatisticasDoSetor, foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -91,6 +92,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     contasSemente,
     ultimaPesquisa,
     passo,
+    perfisIndicados,
   ] = await Promise.all([
     foraDaCurvaDoNicho(nicho.id, 90, 30),
     subindoHoje(nicho.id, 30),
@@ -104,6 +106,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
     listarContasSemente(nicho.id),
     ultimaPesquisaDeSetor(nicho.id),
     passoDoSetor(nicho.id),
+    listarPerfisIndicados(nicho.id),
   ]);
 
   const idsEvidencia = [...new Set((temasHoje ?? []).flatMap((tema) => tema.evidencias))];
@@ -141,6 +144,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         passo={passo}
         padraoPisoViews={config.regras.pisoViewsReferencia}
         padraoProporcaoBrasil={config.regras.proporcaoBrasil}
+        perfisIndicados={perfisIndicados}
       />
 
       <section className={styles.secao}>

@@ -248,6 +248,17 @@ export const textosBriefing = {
     semConexaoDesligar: "Sem conexão. Não deu para desligar esta regra; tente de novo quando a rede voltar.",
     semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
   },
+  /** E38, partes 2 e 3: a leitura de cada perfil citado ou da própria marca, conferido na API de verdade. */
+  contextoMarca: {
+    titulo: "O que a IA viu nos perfis",
+    subtitulo: "Perfis que você citou e o seu próprio, lidos de verdade nas redes.",
+    vazio: "Ainda nada. Cite um concorrente ou um perfil que você admira, ou guarde o seu @, e a leitura aparece aqui.",
+    rotuloConcorrente: "concorrente citado",
+    rotuloAdmira: "perfil que você admira",
+    rotuloPropriaMarca: "o seu perfil",
+    pendente: "Ainda lendo este perfil.",
+    naoEncontrado: "Não achamos este perfil na rede. Confira se o @ está certo.",
+  },
 };
 
 /**

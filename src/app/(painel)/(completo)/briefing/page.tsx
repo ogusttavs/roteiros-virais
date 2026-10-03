@@ -5,6 +5,7 @@ import { sessaoAtual } from "@/lib/sessao";
 import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { leiturasDoCliente } from "@/servicos/perfis-analisados";
 
 import { BriefingVivo } from "./BriefingVivo";
 
@@ -21,6 +22,7 @@ export default async function Briefing() {
 
   const briefing = await garantirBriefing(cliente.id);
   const regras = await regrasDoCliente(cliente.id);
+  const perfisAnalisados = await leiturasDoCliente(cliente.id);
 
   return (
     <BriefingVivo
@@ -29,6 +31,7 @@ export default async function Briefing() {
       notaGeralInicial={Number(briefing.notaGeral ?? 0)}
       perfil={briefing.perfil}
       regrasIniciais={regras}
+      perfisAnalisados={perfisAnalisados}
       meta={config.regras.notaMinimaBriefing}
       tipo={cliente.tipo}
     />

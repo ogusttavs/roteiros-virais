@@ -742,6 +742,18 @@ export function ReferenciasTela({
               </p>
               {segmento !== "salvos" ? (
                 <span className={styles.ladoContagem}>
+                  {/* Acabamento do PR 1 da E38: no desktop (pílulas, sem fichas), "tirar os filtros" mora
+                      aqui ao lado da contagem (`Referencias.ComFiltros.1280`). */}
+                  {quantosFiltrosAtivos > 0 ? (
+                    <button
+                      type="button"
+                      className={styles.botaoTirarFiltrosDesktop}
+                      disabled={navegando}
+                      onClick={tirarOsFiltros}
+                    >
+                      {textosReferencias.tirarOsFiltros}
+                    </button>
+                  ) : null}
                   <PilulaOrdem
                     ordem={ordemExibida}
                     pilulaAberta={pilulaAberta}

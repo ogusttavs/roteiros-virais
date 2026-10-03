@@ -11,6 +11,8 @@ import { db } from "@/db";
 import { perfisCitados, type Plataforma, type TipoPerfilCitado } from "@/db/schema";
 import { limparCampoPerfil } from "@/lib/perfil-redes";
 
+import { enfileirarAnaliseDePerfil } from "./perfis-analisados";
+
 export class ErroPerfilCitado extends Error {}
 
 const LIMITE_POR_LISTA = 10;
@@ -68,7 +70,11 @@ export async function adicionarPerfilCitado(
     .onConflictDoNothing()
     .returning();
 
-  if (linha) return linha;
+  if (linha) {
+    // E38, partes 2 e 3: a conferência na API pode demorar; a tela não espera por ela.
+    void enfileirarAnaliseDePerfil(clienteId, linha.id).catch(() => undefined);
+    return linha;
+  }
 
   // onConflictDoNothing: ja existia esse mesmo cliente+tipo+rede+handle; devolve a linha de verdade.
   const [existente] = await db()

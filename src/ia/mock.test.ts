@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 
 import { construirSaidaMock } from "./mock";
+import * as analisarPerfilCitadoIA from "./prompts/analisarPerfilCitado";
 import * as avaliarRespostaIA from "./prompts/avaliarResposta";
 import * as organizarFalaBriefingIA from "./prompts/organizarFalaBriefing";
 
@@ -68,5 +69,36 @@ describe("mock de organizarFalaBriefing", () => {
     const saida = organizarFalaBriefingIA.schema.parse(construirSaidaMock("organizarFalaBriefing", entrada));
 
     expect(saida.textoOrganizado).toBe(falaLimpa);
+  });
+});
+
+/** E38, partes 2 e 3: a leitura curta de um perfil citado ou da propria marca. */
+describe("mock de analisarPerfilCitado", () => {
+  it("com titulos: cita o handle e diz que ha assunto repetido, e a saida valida contra o schema real", () => {
+    const entrada = analisarPerfilCitadoIA.montarEntrada({
+      tipo: "concorrente",
+      nomeDoCliente: "Loja Exemplo",
+      oQueVende: "produtos de limpeza",
+      handle: "concorrente_exemplo",
+      titulos: ["Como limpar o box", "Dica de limpeza rapida"],
+    });
+    const saida = analisarPerfilCitadoIA.schema.parse(construirSaidaMock("analisarPerfilCitado", entrada));
+
+    expect(saida.leitura).toContain("@concorrente_exemplo");
+    expect(encontrarProblemas(saida.leitura)).toEqual([]);
+  });
+
+  it("sem nenhum titulo (perfil sem video recente): diz que nao tinha o que ler, sem inventar assunto", () => {
+    const entrada = analisarPerfilCitadoIA.montarEntrada({
+      tipo: "propria_marca",
+      nomeDoCliente: "Loja Exemplo",
+      oQueVende: "produtos de limpeza",
+      handle: "loja_exemplo",
+      titulos: [],
+    });
+    const saida = analisarPerfilCitadoIA.schema.parse(construirSaidaMock("analisarPerfilCitado", entrada));
+
+    expect(saida.leitura).toContain("@loja_exemplo");
+    expect(saida.leitura).toContain("não tinha vídeo recente");
   });
 });

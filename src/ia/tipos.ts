@@ -41,7 +41,9 @@ export type TarefaIA =
   | "classificarContaDoSetor"
   | "organizarFalaBriefing"
   | "filtrarEvidenciaPorMarca"
-  | "aindaValeRoteiro";
+  | "aindaValeRoteiro"
+  /** E38, partes 2 e 3: a leitura curta de um perfil citado pelo cliente ou da própria marca. */
+  | "analisarPerfilCitado";
 
 export type ImagemEntrada = {
   base64: string;

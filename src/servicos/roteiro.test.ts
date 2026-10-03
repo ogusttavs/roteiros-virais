@@ -97,6 +97,36 @@ describe("formatarCamadaExclusiva", () => {
     expect(texto).not.toContain("Região:");
     expect(texto).toContain("Clínica Popular");
   });
+
+  /** E38, partes 2 e 3: a leitura de cada perfil citado ou da própria marca, conferido de verdade na API. */
+  it("sem leituras de perfil: nao acrescenta linha nenhuma sobre perfil", () => {
+    const texto = formatarCamadaExclusiva({
+      alcance: null,
+      regiao: null,
+      pais: null,
+      paises: null,
+      camadaExclusiva: CAMADA_VAZIA,
+    });
+    expect(texto).not.toContain("Sobre @");
+  });
+
+  it("com leituras de perfil: uma linha por perfil, com o handle e a leitura", () => {
+    const texto = formatarCamadaExclusiva(
+      {
+        alcance: null,
+        regiao: null,
+        pais: null,
+        paises: null,
+        camadaExclusiva: CAMADA_VAZIA,
+      },
+      [
+        { handle: "concorrente1", leitura: "posta antes e depois com música." },
+        { handle: "marca_propria", leitura: "o que mais rende são os bastidores." },
+      ],
+    );
+    expect(texto).toContain("Sobre @concorrente1: posta antes e depois com música.");
+    expect(texto).toContain("Sobre @marca_propria: o que mais rende são os bastidores.");
+  });
 });
 
 function evidencia(

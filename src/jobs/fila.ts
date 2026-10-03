@@ -46,6 +46,8 @@ export const FILAS = {
   emailAcompanhamento: "email-acompanhamento",
   /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
   aprenderCliente: "aprender-cliente",
+  /** Por evento (E38, partes 2 e 3): um perfil citado foi adicionado, ou o perfil da propria marca mudou. */
+  analisarPerfil: "analisar-perfil",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -56,7 +58,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil]);
 
 let instancia: PgBoss | null = null;
 
@@ -85,6 +87,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.curvaCliente,
   FILAS.emailAcompanhamento,
   FILAS.aprenderCliente,
+  FILAS.analisarPerfil,
 ]);
 
 const QUATRO_HORAS_S = 4 * 60 * 60;
