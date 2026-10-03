@@ -67,8 +67,12 @@ export type ResultadoTranscricaoGroq = {
 };
 
 /**
- * `limiteMs`: o prazo da chamada INTEIRA, com as tentativas que o SDK faz sozinho (429, 5xx), por um `AbortSignal` que o SDK
- * respeita; sem isto, um upload pendurado segurava o `transcrever` até o prazo de 4 horas da fila (M5c). Só o teste passa o limite.
+ * `limiteMs`: o prazo da chamada INTEIRA, com as tentativas que o SDK faz sozinho (429, 5xx). Sem isto, um upload pendurado segurava
+ * o `transcrever` até o prazo de 4 horas da fila (M5c). O prazo vale de duas formas: o `AbortSignal` que o SDK respeita, e uma
+ * corrida contra o próprio sinal, porque o SDK dorme o `retry-after` de um 429 sem olhar o sinal (só confere o aborto depois de
+ * acordar) e um 429 com `retry-after` de minutos seguraria o job por esse tempo (achado da revisão independente do M5c, reproduzido
+ * contra um servidor falso: limite de 1,5 s, espera de 12 s). A chamada que perde a corrida acorda depois, vê o sinal abortado e
+ * morre sozinha, sem nova tentativa; as tentativas curtas do SDK (um 429 de poucos segundos) continuam valendo. Só o teste passa o limite.
  */
 export async function transcreverAudio(
   caminhoArquivo: string,
@@ -76,8 +80,16 @@ export async function transcreverAudio(
   limiteMs: number = config.transcricao.groqLimiteS * 1000,
 ): Promise<ResultadoTranscricaoGroq> {
   const sinal = AbortSignal.timeout(limiteMs);
+  let aoAbortar: (() => void) | undefined;
+  const corte = new Promise<never>((_resolver, rejeitar) => {
+    aoAbortar = () => rejeitar(sinal.reason);
+    if (sinal.aborted) aoAbortar();
+    else sinal.addEventListener("abort", aoAbortar, { once: true });
+  });
+  // Com um limite que já nasce vencido, o corte rejeita antes de a corrida existir: sem dono, seria uma rejeição não tratada.
+  corte.catch(() => undefined);
   try {
-    const resultado = (await groq().audio.transcriptions.create(
+    const chamada = groq().audio.transcriptions.create(
       {
         model: config.transcricao.groqModel,
         file: createReadStream(caminhoArquivo),
@@ -85,7 +97,10 @@ export async function transcreverAudio(
         response_format: "verbose_json",
       },
       { signal: sinal, timeout: limiteMs },
-    )) as unknown as RespostaVerboseJson;
+    );
+    // Se o corte ganhar, a chamada ainda pode rejeitar depois (ao acordar do retry-after): sem isto seria uma rejeição sem dono.
+    chamada.catch(() => undefined);
+    const resultado = (await Promise.race([chamada, corte])) as unknown as RespostaVerboseJson;
 
     const segmentos = resultado.segments ?? [];
     const mediaSemFala = segmentos.length > 0 ? segmentos.reduce((soma, s) => soma + s.no_speech_prob, 0) / segmentos.length : 0;
@@ -97,12 +112,15 @@ export async function transcreverAudio(
       semFala,
     };
   } catch (erro) {
-    // O limite estourou: o nosso sinal abortou, ou o SDK deu o seu próprio "timeout" (`APIConnectionTimeoutError`; o nome, não a
-    // classe, porque nada aqui pode depender de importar a classe do SDK). As duas são o mesmo caso.
-    const nome = typeof erro === "object" && erro !== null ? (erro as { name?: string }).name : undefined;
-    if (sinal.aborted || nome === "APIConnectionTimeoutError") {
+    // O limite estourou: o nosso sinal abortou (a corrida ou o SDK), ou o SDK deu o seu próprio "timeout" (`APIConnectionTimeoutError`).
+    // Olha o nome da CLASSE, não `.name`: o SDK não define `.name` nas suas classes (sempre "Error"), e nada aqui pode depender de
+    // importar a classe do SDK. Os dois são o mesmo caso.
+    const nomeDaClasse = typeof erro === "object" && erro !== null ? (erro as { constructor?: { name?: string } }).constructor?.name : undefined;
+    if (sinal.aborted || nomeDaClasse === "APIConnectionTimeoutError") {
       throw new ErroGroqTempoLimite(`transcricao da Groq passou de ${Math.round(limiteMs / 1000)} s (tempo limite)`);
     }
     throw new ErroGroq(`transcricao da Groq falhou: ${String(erro)}`);
+  } finally {
+    if (aoAbortar) sinal.removeEventListener("abort", aoAbortar);
   }
 }

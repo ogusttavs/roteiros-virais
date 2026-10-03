@@ -678,6 +678,50 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
     expect(naoTentados.filter((v) => v.proximaTentativaTranscricao === null)).toHaveLength(2);
   });
 
+  it("dez vídeos seguidos do TikTok pendurados também acionam o freio, e o resto fica para a noite seguinte", async () => {
+    config.regras.transcricoesPorDia = 40;
+    const TOTAL = 12;
+    for (let i = 0; i < TOTAL; i += 1) {
+      await criarVideo(`tt-pendurado-${i}`, { plataforma: "tiktok", foraDaCurva: TOTAL - i, publicadoEm: diasAtras(10), semDono: true });
+    }
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioTempoLimite("o yt-dlp passou de 90 s baixando o audio (tempo limite por video)"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.tiktokPausado).toBe(true);
+    expect(resumo.falhasPorTempoLimite).toBe(10);
+    expect(baixarAudio).toHaveBeenCalledTimes(10);
+  });
+
+  it("um sucesso no meio zera a contagem do freio: nove vídeos pendurados, um bom e mais nove pendurados não pausam o YouTube", async () => {
+    config.regras.transcricoesPorDia = 40;
+    const TOTAL = 19;
+    for (let i = 0; i < TOTAL; i += 1) {
+      await criarVideo(`yt-intercalado-${i}`, { velocidadeRelativa: TOTAL - i, publicadoEm: diasAtras(3), semDono: true });
+    }
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async (url: string) => {
+      if (url.endsWith("yt-intercalado-9")) return LEGENDA_LONGA;
+      throw new ErroLegendaTempoLimite("o yt-dlp passou de 90 s buscando a legenda (tempo limite por video)");
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.youtubePausado).toBe(false);
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(TOTAL);
+    expect(resumo.falhasPorTempoLimite).toBe(18);
+    expect(resumo.transcritosPorLegenda).toBe(1);
+  });
+
+  it("o motivo do tempo limite chega ao resumo do job (é o que o admin mostra), com o setor e o vídeo", async () => {
+    await criarVideo("tt-motivo", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioTempoLimite("o yt-dlp passou de 90 s baixando o audio (tempo limite por video)"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.erros).toEqual([expect.stringContaining("tempo limite")]);
+    expect((resumo.erros as string[])[0]).toContain("transcrever-teste");
+  });
+
   it("um erro comum de download continua com os 7 dias de sempre (o tempo limite não mudou o resto)", async () => {
     await criarVideo("tiktok-falha-comum", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
     vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video indisponivel"));
@@ -728,6 +772,8 @@ describe("rodarTranscrever, M5c: o orçamento de tempo por setor e a cadeia", ()
     relogio = 0;
     config.regras.transcricoesPorDia = 10;
     await db().update(nichos).set({ ativo: true }).where(eq(nichos.id, nicho2Id));
+    // O `resetarSchema` só derruba `public` e `drizzle`: os jobs do pg-boss sobrevivem entre rodadas, e as contagens abaixo precisam partir de zero.
+    await db().execute(sql`delete from pgboss.job where name = ${FILAS.extrairSemFala}`);
   });
 
   afterEach(async () => {
@@ -804,6 +850,33 @@ describe("rodarTranscrever, M5c: o orçamento de tempo por setor e a cadeia", ()
     expect(resumo.setoresParadosPeloOrcamento).toEqual([{ slug: "transcrever-teste", ficaramParaDepois: 3 }]);
   });
 
+  it("o teto diário e o orçamento esgotando juntos: o setor parou pelo teto, não pelo orçamento, e não é registrado como parado", async () => {
+    config.regras.transcricoesPorDia = 3;
+    for (let i = 0; i < 8; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    // Três vídeos de 10 min gastam exatamente os 30 min do setor: o teto diário (3) é conferido antes do orçamento.
+    const resumo = await rodarTranscrever(nichoId, { agora, orcamentoPorSetorMs: 30 * MIN, orcamentoTotalMs: 600 * MIN });
+
+    expect(await transcritosDo(nichoId)).toBe(3);
+    expect(resumo.setoresParadosPeloOrcamento).toBeUndefined();
+  });
+
+  it("sem relógio injetado, vale o relógio de verdade: um orçamento de 1 ms para o setor na primeira conferência depois do primeiro vídeo", async () => {
+    for (let i = 0; i < 4; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    // Cada leitura leva 15 ms de verdade: com 1 ms de orçamento, no máximo o primeiro vídeo entra (se a consulta dos candidatos
+    // foi mais rápida que 1 ms), e os outros nunca.
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async () => {
+      await new Promise((resolver) => setTimeout(resolver, 15));
+      return LEGENDA_LONGA;
+    });
+
+    const resumo = await rodarTranscrever(nichoId, { orcamentoPorSetorMs: 1, orcamentoTotalMs: 600 * MIN });
+
+    expect(vi.mocked(baixarLegendaYoutube).mock.calls.length).toBeLessThanOrEqual(1);
+    expect(resumo.setoresParadosPeloOrcamento).toBeDefined();
+  });
+
   it("a cadeia dispara no fim da rodada global MESMO quando o job parou pelo orçamento", async () => {
     for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
     legendaQueLeva10Minutos();
@@ -818,10 +891,9 @@ describe("rodarTranscrever, M5c: o orçamento de tempo por setor e a cadeia", ()
   it("a cadeia dispara também quando um erro inesperado interrompe o laço, e o erro continua subindo", async () => {
     for (let i = 0; i < 3; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
     legendaQueLeva10Minutos();
-    let chamadas = 0;
+    // Quebra na primeira conferência depois de o primeiro vídeo ter sido lido (a legenda anda o relógio 10 min): no meio do laço.
     const relogioQueQuebra = () => {
-      chamadas += 1;
-      if (chamadas >= 4) throw new Error("o relogio quebrou");
+      if (relogio > 0) throw new Error("o relogio quebrou");
       return relogio;
     };
 

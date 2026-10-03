@@ -21,8 +21,19 @@ const alias = {
  * si (`pesquisa.test.ts`) sobrescreve com `vi.mock("@/lib/config", ...)`, no
  * mesmo espírito de `AI_PROVIDER` aqui: regra de produto forçada para teste
  * nunca vazar do `.env` local.
+ *
+ * YTDLP_LIMITE_S, GROQ_LIMITE_S e os dois ORCAMENTO_TRANSCREVER_* (M5c): os testes do tempo limite e do orçamento leem os padrões
+ * (90 s, 60 s, 30 min, 210 min); um `.env` local com outro valor deixava vermelho teste que não tem nada de errado (achado da
+ * revisão independente do M5c, reproduzido com `YTDLP_LIMITE_S=30`).
  */
-const envDeTeste = { AI_PROVIDER: "mock", PISO_VIEWS_REFERENCIA: "0" };
+const envDeTeste = {
+  AI_PROVIDER: "mock",
+  PISO_VIEWS_REFERENCIA: "0",
+  YTDLP_LIMITE_S: "90",
+  GROQ_LIMITE_S: "60",
+  ORCAMENTO_TRANSCREVER_SETOR_MIN: "30",
+  ORCAMENTO_TRANSCREVER_TOTAL_MIN: "210",
+};
 
 export default defineConfig({
   test: {

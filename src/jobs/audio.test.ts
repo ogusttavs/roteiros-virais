@@ -171,13 +171,23 @@ describe("baixarAudio, tempo limite por vídeo", () => {
     await expect(access(join(pastaEPrefixo!.pasta, `${pastaEPrefixo!.prefixo}.webm.part`))).rejects.toThrow();
   });
 
-  it("uma falha comum do yt-dlp continua sendo ErroAudio, não ErroAudioTempoLimite", async () => {
+  it("uma falha comum do yt-dlp continua sendo ErroAudio, não ErroAudioTempoLimite, e também apaga o que deixou na pasta", async () => {
+    let arquivoParcial: string | null = null;
+    const { writeFile, access } = await import("node:fs/promises");
+    const { dirname, basename, join } = await import("node:path");
+
     const chamada = baixarAudio("https://www.youtube.com/watch?v=privado", "youtube", {
-      executar: async () => {
+      executar: async (_comando, args) => {
+        const modelo = args[args.indexOf("-o") + 1];
+        arquivoParcial = join(dirname(modelo), `${basename(modelo).split(".")[0]}.webm.part`);
+        await writeFile(arquivoParcial, "pela metade");
         throw new Error("Video unavailable");
       },
     });
     await expect(chamada).rejects.toBeInstanceOf(ErroAudio);
     await expect(chamada).rejects.not.toBeInstanceOf(ErroAudioTempoLimite);
+    // A pasta é o tmpfs de 1 GB do worker: o que uma falha comum deixa lá também enche o disco (achado da revisão independente do M5c).
+    expect(arquivoParcial).not.toBeNull();
+    await expect(access(arquivoParcial!)).rejects.toThrow();
   });
 });

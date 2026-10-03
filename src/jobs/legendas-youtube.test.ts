@@ -90,6 +90,17 @@ describe("baixarLegendaYoutube, tempo limite por vídeo", () => {
     expect(legenda).toBeNull();
   });
 
+  it("sem limiteMs, vale YTDLP_LIMITE_S (90 s): é o caminho de produção, que nunca passa o limite à mão", async () => {
+    let recebido: { timeout: number; killSignal: string } | null = null;
+    await baixarLegendaYoutube("https://www.youtube.com/watch?v=padrao", "pt", {
+      executar: async (_comando, _args, opcoes) => {
+        recebido = opcoes;
+        return { stdout: "", stderr: "" };
+      },
+    });
+    expect(recebido).toEqual({ timeout: 90_000, killSignal: "SIGKILL" });
+  });
+
   it("o limite chega ao processo como timeout, com SIGKILL, e o texto da legenda baixada ainda sai", async () => {
     let recebido: { timeout: number; killSignal: string } | null = null;
     const legenda = await baixarLegendaYoutube("https://www.youtube.com/watch?v=ok", "pt", {

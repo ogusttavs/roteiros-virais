@@ -5,9 +5,25 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { orcamentoDoSetor } from "./transcrever";
+import { FILAS, opcoesDaFila } from "./fila";
+import { orcamentoDoSetor, orcamentosDaConfig } from "./transcrever";
 
 const MIN = 60_000;
+
+/** A ligação da configuração ao orçamento: a escala (minutos para milissegundos) e a garantia de que o teto cabe no prazo da fila. */
+describe("orcamentosDaConfig", () => {
+  it("os padrões são 30 minutos por setor e 3h30 no total, em milissegundos", () => {
+    expect(orcamentosDaConfig()).toEqual({ porSetorMs: 30 * MIN, totalMs: 210 * MIN });
+  });
+
+  it("o teto do job inteiro é menor que o prazo da fila do transcrever (4 h), com folga para o vídeo que já começou", () => {
+    const prazoDaFilaMs = opcoesDaFila(FILAS.transcrever).expireInSeconds * 1000;
+    const { totalMs } = orcamentosDaConfig();
+    // O pior vídeo que passa do teto: legenda 90 s, áudio 90 s, Groq 60 s e a pausa de 20 s do YouTube.
+    const piorVideoMs = (90 + 90 + 60 + 20) * 1000;
+    expect(totalMs + piorVideoMs).toBeLessThan(prazoDaFilaMs);
+  });
+});
 
 describe("orcamentoDoSetor", () => {
   it("com folga, cada setor tem o orçamento por setor inteiro (30 min)", () => {

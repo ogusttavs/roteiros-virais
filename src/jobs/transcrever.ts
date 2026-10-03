@@ -346,6 +346,14 @@ export type OpcoesTranscrever = {
   orcamentoTotalMs?: number;
 };
 
+/** Os dois orçamentos do job em milissegundos, a partir da configuração (que vem em minutos). A conversão fica aqui, e não solta no job, para o teste conferir a escala. */
+export function orcamentosDaConfig(): { porSetorMs: number; totalMs: number } {
+  return {
+    porSetorMs: config.regras.orcamentoTranscreverPorSetorMin * 60_000,
+    totalMs: config.regras.orcamentoTranscreverTotalMin * 60_000,
+  };
+}
+
 /**
  * O orçamento de tempo de um setor (M5c): o menor entre o por setor e o que sobra do teto do job dividido pelos setores que ainda
  * faltam (o atual inclusive). Pura, para testar sem relógio: com 6 setores, 30 min cada e teto de 3h30, nenhum setor perde a vez
@@ -364,8 +372,9 @@ export function orcamentoDoSetor(porSetorMs: number, totalMs: number, decorridoM
  */
 export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrever = {}): Promise<Record<string, unknown>> {
   const agora = opcoes.agora ?? Date.now;
-  const porSetorMs = opcoes.orcamentoPorSetorMs ?? config.regras.orcamentoTranscreverPorSetorMin * 60_000;
-  const totalMs = opcoes.orcamentoTotalMs ?? config.regras.orcamentoTranscreverTotalMin * 60_000;
+  const daConfig = orcamentosDaConfig();
+  const porSetorMs = opcoes.orcamentoPorSetorMs ?? daConfig.porSetorMs;
+  const totalMs = opcoes.orcamentoTotalMs ?? daConfig.totalMs;
   const inicioDoJob = agora();
 
   const condicoes = [eq(nichos.ativo, true)];

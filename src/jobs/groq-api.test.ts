@@ -126,11 +126,34 @@ describe("transcreverAudio", () => {
       expect(Date.now() - comeco).toBeLessThan(5_000);
     });
 
-    it("o timeout do próprio SDK (APIConnectionTimeoutError) também é o tempo limite", async () => {
+    it("o timeout do próprio SDK (a classe APIConnectionTimeoutError, cujo .name é sempre 'Error') também é o tempo limite", async () => {
       const { ErroGroqTempoLimite } = await import("./groq-api");
-      create.mockRejectedValue(Object.assign(new Error("Request timed out."), { name: "APIConnectionTimeoutError" }));
+      // O SDK de verdade não define `.name` nas suas classes: quem identifica é o nome da CLASSE (achado da revisão independente do M5c).
+      class APIConnectionTimeoutError extends Error {}
+      create.mockRejectedValue(new APIConnectionTimeoutError("Request timed out."));
 
       await expect(transcreverAudio("/tmp/a.mp3")).rejects.toBeInstanceOf(ErroGroqTempoLimite);
+    });
+
+    it("o SDK dormindo o retry-after de um 429 sem olhar o sinal não segura o job: o limite devolve a vez na hora, e a chamada que ficou dormindo é descartada", async () => {
+      const { ErroGroqTempoLimite } = await import("./groq-api");
+      // Uma chamada que ignora o sinal por completo (o SDK de verdade dorme o `retry-after` assim) e só rejeita depois.
+      let acordar: (() => void) | undefined;
+      create.mockImplementation(
+        () =>
+          new Promise((_resolver, rejeitar) => {
+            acordar = () => rejeitar(new Error("Request was aborted."));
+          }),
+      );
+      const comeco = Date.now();
+
+      const chamada = transcreverAudio("/tmp/a.mp3", undefined, 50);
+
+      await expect(chamada).rejects.toBeInstanceOf(ErroGroqTempoLimite);
+      expect(Date.now() - comeco).toBeLessThan(5_000);
+      // A chamada perdedora acorda e rejeita depois: não pode virar rejeição sem dono (o vitest falharia a rodada com ela).
+      acordar?.();
+      await new Promise((resolver) => setTimeout(resolver, 20));
     });
 
     it("um erro comum da Groq (limite de uso, rede) continua sendo ErroGroq, nunca o do tempo limite", async () => {
