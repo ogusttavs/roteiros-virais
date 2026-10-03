@@ -109,6 +109,13 @@ export default defineConfig({
        * variável já definida no processo, então zerar aqui garante que
        * nenhuma chave real chega ao servidor do e2e.
        */
+      /**
+       * E48 PR 2: a chave PÚBLICA de teste do aviso por push (a do exemplo do `web-push`, sem par privado em lugar nenhum): sem ela a tela não pede
+       * a permissão. A privada fica vazia: `enviarPush` cai no log em modo e2e, nada sai para o serviço de push.
+       */
+      VAPID_PUBLIC_KEY: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U",
+      VAPID_PRIVATE_KEY: "",
+      VAPID_SUBJECT: "",
       RESEND_API_KEY: "",
       SENTRY_DSN: "",
       ANTHROPIC_API_KEY: "",
