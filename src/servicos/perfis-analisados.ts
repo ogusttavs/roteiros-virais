@@ -10,7 +10,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { clientes, perfisAnalisados, perfisCitados, type PerfisCliente } from "@/db/schema";
 
-import { FILAS, boss } from "../jobs/fila";
+import { FILAS, boss, garantirBossPronto } from "../jobs/fila";
 
 export type PerfilAnalisado = typeof perfisAnalisados.$inferSelect;
 /** `tipoCitado` só preenchido quando `origem === "citado"` (join com `perfisCitados`); a tela
@@ -51,6 +51,7 @@ export async function listarPerfisIndicados(
 export async function enfileirarAnaliseDePerfil(clienteId: number, perfilCitadoId: number): Promise<void> {
   const [citado] = await db().select().from(perfisCitados).where(eq(perfisCitados.id, perfilCitadoId));
   if (!citado) return;
+  await garantirBossPronto();
   await boss().send(FILAS.analisarPerfil, {
     clienteId,
     perfilCitadoId,
@@ -67,6 +68,8 @@ export async function enfileirarAnaliseDaPropriaMarca(clienteId: number, perfis:
     { rede: "instagram", handle: perfis.instagram },
     { rede: "youtube", handle: perfis.youtube },
   ];
+  if (!redes.some((r) => r.handle)) return;
+  await garantirBossPronto();
   for (const { rede, handle } of redes) {
     if (!handle) continue;
     await boss().send(FILAS.analisarPerfil, {
