@@ -162,6 +162,47 @@ export function proximaLeituraEm(ultimaLeituraOkEm: Date | null, dias: number): 
   return new Date(ultimaLeituraOkEm.getTime() + dias * 86_400_000);
 }
 
+/** Quantos vídeos com visualização são precisos para a mediana do perfil dizer alguma coisa. */
+export const MINIMO_VIDEOS_PARA_MEDIANA = 5;
+/** Quantos vídeos recentes de cada rede entram na leitura. */
+export const MAXIMO_VIDEOS_POR_REDE = 15;
+const TAMANHO_MAXIMO_TITULO = 140;
+
+export type VideoParaResumir = { titulo: string | null; views: number | null };
+export type VideoResumido = { titulo: string; visualizacoes: number | null; vezesAMediana: number | null };
+
+function medianaDe(valores: number[]): number {
+  const ordenados = [...valores].sort((a, b) => a - b);
+  const meio = Math.floor(ordenados.length / 2);
+  return ordenados.length % 2 === 0 ? (ordenados[meio - 1] + ordenados[meio]) / 2 : ordenados[meio];
+}
+
+/**
+ * "O que rendeu" é conta, não opinião (escopo 5.9, item 10; "viral é relativo à conta"): a mediana
+ * das visualizações do próprio perfil e quantas vezes cada vídeo passa dela, calculadas aqui, e o
+ * modelo só descreve. Com poucos vídeos com visualização, não há mediana e nenhum múltiplo.
+ */
+export function resumirVideosParaIA(videos: VideoParaResumir[]): {
+  medianaVisualizacoes: number | null;
+  videos: VideoResumido[];
+} {
+  const recentes = videos
+    .map((video) => ({ titulo: limparTextoDoItem(video.titulo ?? "").slice(0, TAMANHO_MAXIMO_TITULO).trim(), views: video.views }))
+    .filter((video) => video.titulo !== "")
+    .slice(0, MAXIMO_VIDEOS_POR_REDE);
+  const visualizacoes = recentes.map((v) => v.views).filter((v): v is number => v !== null && v >= 0);
+  const mediana = visualizacoes.length >= MINIMO_VIDEOS_PARA_MEDIANA ? medianaDe(visualizacoes) : null;
+  return {
+    medianaVisualizacoes: mediana !== null ? Math.round(mediana) : null,
+    videos: recentes.map((video) => ({
+      titulo: video.titulo,
+      visualizacoes: video.views,
+      vezesAMediana:
+        mediana !== null && mediana > 0 && video.views !== null ? Math.round((video.views / mediana) * 10) / 10 : null,
+    })),
+  };
+}
+
 function estaVivo(item: ItemExistente): boolean {
   return item.estado !== "recusado";
 }

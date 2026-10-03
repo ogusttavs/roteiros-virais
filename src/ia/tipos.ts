@@ -43,7 +43,9 @@ export type TarefaIA =
   | "filtrarEvidenciaPorMarca"
   | "aindaValeRoteiro"
   /** E38, partes 2 e 3: a leitura curta de um perfil citado pelo cliente ou da própria marca. */
-  | "analisarPerfilCitado";
+  | "analisarPerfilCitado"
+  /** E38 PR 2: "o que entendemos da sua marca", do site e das redes dela, para ela confirmar. */
+  | "entenderMarca";
 
 export type ImagemEntrada = {
   base64: string;

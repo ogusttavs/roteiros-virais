@@ -72,6 +72,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockAindaValeRoteiro(entrada);
     case "analisarPerfilCitado":
       return mockAnalisarPerfilCitado(entrada);
+    case "entenderMarca":
+      return mockEntenderMarca(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -726,6 +728,46 @@ function mockAnalisarPerfilCitado(entrada: string) {
     leitura: temTitulos
       ? `${handle} posta sobre os mesmos assuntos com frequência, no formato curto de sempre.`
       : `${handle} não tinha vídeo recente para ler ainda.`,
+  };
+}
+
+/**
+ * E38 PR 2: uma afirmação por fonte lida ("Fontes lidas agora:"), com acento e sem jargão, e o id
+ * de um item que já existe da mesma origem (`i12 | vende | site | ...`), como a tarefa real faria.
+ * Dois marcadores na entrada (por exemplo dentro do texto de uma página do teste) pedem o que o
+ * teste precisa ver: "[mock:mudar]" muda o texto de tudo, "[mock:alem]" marca `alemDoBriefing`,
+ * "[mock:vazio]" devolve a lista vazia (a IA não achou nada de claro).
+ */
+function mockEntenderMarca(entrada: string) {
+  if (entrada.includes("[mock:vazio]")) return { itens: [] };
+  const fontes = extrairCampo(entrada, "Fontes lidas agora:")
+    .split(",")
+    .map((fonte) => fonte.trim())
+    .filter((fonte): fonte is "site" | "instagram" | "youtube" => fonte === "site" || fonte === "instagram" || fonte === "youtube");
+  const mudar = entrada.includes("[mock:mudar]");
+  const alem = entrada.includes("[mock:alem]");
+  const existentes = [...entrada.matchAll(/^i(\d+) \| (\w+) \| (\w+) \|/gm)].map((m) => ({
+    id: m[1],
+    categoria: m[2],
+    origem: m[3],
+  }));
+  const textoBase: Record<"site" | "instagram" | "youtube", string> = {
+    site: "O site apresenta os produtos e os serviços da marca, com o jeito de comprar e de falar com ela.",
+    instagram: "No Instagram, a marca publica vídeos curtos que mostram o trabalho de perto.",
+    youtube: "No YouTube, a marca publica vídeos que explicam o trabalho passo a passo.",
+  };
+  return {
+    itens: fontes.map((fonte) => {
+      const categoria = fonte === "site" ? ("vende" as const) : ("posta" as const);
+      const anterior = existentes.find((e) => e.origem === fonte && e.categoria === categoria);
+      return {
+        categoria,
+        origem: fonte,
+        texto: mudar ? `${textoBase[fonte]} Agora também mostra as novidades da semana.` : textoBase[fonte],
+        idAnterior: anterior ? `i${anterior.id}` : null,
+        alemDoBriefing: alem,
+      };
+    }),
   };
 }
 
