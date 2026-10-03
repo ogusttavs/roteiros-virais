@@ -28,7 +28,12 @@ export type VideoParaProva = {
   idioma: string | null;
   contaPais: string | null;
   contaIdiomaPrincipal: string | null;
+  /** E45 PR 3: o setor do vídeo, para a regra por setor (o principal ou um ramo alternativo da marca). */
+  nichoId?: number | null;
 };
+
+/** E45 PR 3: a janela e a proporção do Brasil do setor de um vídeo (cada ramo da conta tem a sua régua). */
+export type RegraDoSetor = { janelaDias: number; proporcaoBrasil: number };
 
 /** Janela de dias da prova (V2b, item 8): dobra para nicho com menos de `JANELA_PROVA_DIAS` dias de base. */
 export function janelaDeProva(nichoCriadoEm: Date, agora: Date): number {
@@ -56,8 +61,9 @@ export function temaTemProvaSuficiente(
   agora: Date,
   janelaDias: number,
   proporcaoBrasil: number = config.regras.proporcaoBrasil,
+  regrasPorSetor?: Map<number, RegraDoSetor>,
 ): boolean {
-  return motivoSemProva(idsEvidenciaVideo, videosPorId, agora, janelaDias, proporcaoBrasil) === null;
+  return motivoSemProva(idsEvidenciaVideo, videosPorId, agora, janelaDias, proporcaoBrasil, regrasPorSetor) === null;
 }
 
 /** Quantos brasileiros a prova pede entre `total` vídeos, pela régua do setor (nunca mais que a maioria simples). */
@@ -77,11 +83,22 @@ export function motivoSemProva(
   agora: Date,
   janelaDias: number,
   proporcaoBrasil: number = config.regras.proporcaoBrasil,
+  /**
+   * E45 PR 3: com ramos alternativos, a janela e a proporção do Brasil são as do setor de cada vídeo (como o piso, decisão 48); o mínimo de
+   * brasileiros é a soma dos mínimos de cada setor. Sem isto (ou para um setor que não está no mapa), vale o par `janelaDias`/`proporcaoBrasil`.
+   */
+  regrasPorSetor?: Map<number, RegraDoSetor>,
 ): string | null {
-  const desde = new Date(agora.getTime() - janelaDias * DIA_MS);
+  const regraDe = (v: VideoParaProva): RegraDoSetor =>
+    (v.nichoId != null ? regrasPorSetor?.get(v.nichoId) : undefined) ?? { janelaDias, proporcaoBrasil };
   const naJanela = idsEvidenciaVideo
     .map((id) => videosPorId.get(id))
-    .filter((v): v is VideoParaProva => v !== undefined && v.publicadoEm !== null && v.publicadoEm >= desde);
+    .filter(
+      (v): v is VideoParaProva =>
+        v !== undefined &&
+        v.publicadoEm !== null &&
+        v.publicadoEm >= new Date(agora.getTime() - regraDe(v).janelaDias * DIA_MS),
+    );
 
   if (naJanela.length < MINIMO_VIDEOS_PROVA) {
     return `citou ${naJanela.length} vídeo(s) válidos, precisa de pelo menos ${MINIMO_VIDEOS_PROVA}`;
@@ -95,7 +112,16 @@ export function motivoSemProva(
   const brasileiros = naJanela.filter(
     (v) => classificarBrasil(v.idioma, contaEhBrasileira(v.contaPais, v.contaIdiomaPrincipal)) === "brasileiro",
   ).length;
-  const minimo = minimoBrasileirosNaProva(naJanela.length, proporcaoBrasil);
+  // O mínimo de cada setor soma: os vídeos de um setor de régua branda não cobrem a exigência de outro de régua dura.
+  const porSetor = new Map<string, { total: number; proporcao: number }>();
+  for (const v of naJanela) {
+    const chave = String(v.nichoId ?? "");
+    const regra = regraDe(v);
+    const atual = porSetor.get(chave) ?? { total: 0, proporcao: regra.proporcaoBrasil };
+    atual.total += 1;
+    porSetor.set(chave, atual);
+  }
+  const minimo = [...porSetor.values()].reduce((soma, g) => soma + minimoBrasileirosNaProva(g.total, g.proporcao), 0);
   if (brasileiros < minimo) {
     return `só ${brasileiros} de ${naJanela.length} vídeos citados são do Brasil, precisa de pelo menos ${minimo}`;
   }
@@ -114,6 +140,7 @@ export async function buscarVideosParaProva(idsVideo: number[]): Promise<Map<num
       idioma: videos.idioma,
       contaPais: contas.pais,
       contaIdiomaPrincipal: contas.idiomaPrincipal,
+      nichoId: videos.nichoId,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))

@@ -223,7 +223,7 @@ test.describe("ramos alternativos: o que o cliente vê", () => {
 
     // A Conta só lê: a frase diz o ramo que o admin ligou, sem botão para ligar ou tirar.
     await page.goto("/conta");
-    await expect(page.locator("[data-ramos-alternativos-conta]")).toHaveText("A gente ligou também Nutrição aos seus temas e referências.");
+    await expect(page.locator("[data-ramos-alternativos-conta]")).toHaveText("A gente ligou também Nutrição ao seu tema livre, às suas referências e aos seus roteiros.");
   });
 
   test("tema livre: o assunto que só o ramo alternativo tem prova recebe a prova daquele ramo, e sem o alternativo não", async ({ page }) => {

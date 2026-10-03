@@ -21,7 +21,7 @@ import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual, reguaDoSetor } from "@/servicos/pesquisa";
-import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
+import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente, type RegraDoSetor } from "@/servicos/prova-tema";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -437,12 +437,23 @@ export async function avaliarTema(
     const agora = new Date();
     const videosPorId = await buscarVideosParaProva(dados.evidencias);
     const regua = await reguaDoSetor(cliente.nichoId);
+    // E45 PR 3, item 0b: a janela e a proporção do Brasil são as do setor de cada vídeo citado (o principal e cada ramo alternativo).
+    const regrasPorSetor = new Map<number, RegraDoSetor>([[cliente.nichoId, { janelaDias: janelaDeProva(nicho.criadoEm, agora), proporcaoBrasil: regua.proporcaoBrasil }]]);
+    for (const alternativo of alternativosDaMarca) {
+      const [setor] = await db().select({ criadoEm: nichos.criadoEm }).from(nichos).where(eq(nichos.id, alternativo.nichoId));
+      const reguaAlt = await reguaDoSetor(alternativo.nichoId);
+      regrasPorSetor.set(alternativo.nichoId, {
+        janelaDias: setor ? janelaDeProva(setor.criadoEm, agora) : janelaDeProva(nicho.criadoEm, agora),
+        proporcaoBrasil: reguaAlt.proporcaoBrasil,
+      });
+    }
     anguloTemProva = temaTemProvaSuficiente(
       dados.evidencias,
       videosPorId,
       agora,
       janelaDeProva(nicho.criadoEm, agora),
       regua.proporcaoBrasil,
+      regrasPorSetor,
     );
   }
 

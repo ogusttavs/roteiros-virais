@@ -42,6 +42,7 @@ import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
+import { tirarAlternativoQueViraPrincipal } from "@/servicos/ramos-da-conta";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -682,6 +683,8 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+  // E45 PR 3, item 0: o alternativo que virou o principal sai da tabela dos alternativos.
+  if (antes?.nichoId !== cliente.nichoId) await tirarAlternativoQueViraPrincipal(clienteId, cliente.nichoId);
 
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado. A troca já foi gravada: isto
   // nunca a derruba.
@@ -945,6 +948,7 @@ export async function salvarRamoConta(clienteId: number, ramoSlug: string): Prom
   const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
   const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
   if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
+  if (antes.nichoId !== nichoId) await tirarAlternativoQueViraPrincipal(clienteId, nichoId);
   // Escolheu da lista: o pedido de ramo aberto (o "Não achei o meu" de antes) deixa de valer.
   await cancelarPedidoAberto(clienteId);
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado (nunca derruba a troca).

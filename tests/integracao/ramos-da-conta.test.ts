@@ -9,6 +9,8 @@ import { db, getPool } from "@/db";
 import { clientes, nichos, ramosDaConta, user } from "@/db/schema";
 import { FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
+import { salvarRamoConta } from "@/servicos/clientes";
+import { registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { desligarSetorSeSemMarca, ErroLimiteDeSetores, garantirNichoDoRamo, nichoDoRamo } from "@/servicos/ramos";
 import {
   ErroRamosDaConta,
@@ -152,8 +154,8 @@ describe("as regras do admin, em frase", () => {
 
     await expect(ligarRamoAlternativo(dona, "odontologia", ADMIN)).rejects.toThrow(/ramo principal/);
     await ligarRamoAlternativo(dona, "nutricao", ADMIN);
-    await expect(ligarRamoAlternativo(dona, "nutricao", ADMIN)).rejects.toThrow(/ja esta ligado/);
-    await expect(ligarRamoAlternativo(dona, "ramo-que-nao-existe", ADMIN)).rejects.toThrow(/desconhecido/);
+    await expect(ligarRamoAlternativo(dona, "nutricao", ADMIN)).rejects.toThrow(/já está ligado/);
+    await expect(ligarRamoAlternativo(dona, "ramo-que-nao-existe", ADMIN)).rejects.toThrow(/desconhecido/i);
     await expect(ligarRamoAlternativo(semPrincipal, "nutricao", ADMIN)).rejects.toThrow(/ramo principal/);
   });
 
@@ -206,6 +208,52 @@ describe("um alternativo que a marca depois escolheu como principal", () => {
     expect(await setoresDaConta(dona, ligado.nichoId)).toEqual([ligado.nichoId]);
     // E o ramo que era o principal pode ser ligado como alternativo agora.
     await expect(ligarRamoAlternativo(dona, "odontologia", ADMIN)).resolves.toBeDefined();
+  });
+});
+
+describe("o teto de dois alternativos não fura quando o principal troca (E45 PR 3, item 0a da E48)", () => {
+  it("principal P com A e B; A vira o principal e o admin liga C; a marca troca para D: A não reaparece, ficam B e C, e um terceiro continua recusado", async () => {
+    const dona = await criarMarca("rdc-teto-troca", "Teto troca", "odontologia");
+    await ligarRamoAlternativo(dona, "nutricao", ADMIN);
+    await ligarRamoAlternativo(dona, "advocacia", ADMIN);
+
+    await salvarRamoConta(dona, "nutricao");
+    // A linha de Nutrição saiu da tabela ao virar principal (não ficou escondida).
+    expect((await db().select().from(ramosDaConta).where(eq(ramosDaConta.clienteId, dona))).length).toBe(1);
+    await ligarRamoAlternativo(dona, "educacao-e-cursos", ADMIN);
+    await salvarRamoConta(dona, "eventos-e-festas");
+
+    const visiveis = (await ramosAlternativosDaMarca(dona)).map((a) => a.ramoSlug);
+    expect(visiveis.sort()).toEqual(["advocacia", "educacao-e-cursos"]);
+    await expect(ligarRamoAlternativo(dona, "fotografia-e-video", ADMIN)).rejects.toThrow(/2 ramos alternativos/);
+  });
+
+  it("o alternativo que vira o principal pelo palpite do 'Não achei o meu' e pelo admin que resolve o pedido também sai da tabela", async () => {
+    const dona = await criarMarca("rdc-teto-pedido", "Teto pedido", "odontologia");
+    await ligarRamoAlternativo(dona, "nutricao", ADMIN);
+
+    // O palpite de "nutricionista" leva a marca para Nutrição (o provisório): é o principal agora.
+    const { pedido } = await registrarPedidoDeRamo(dona, "nutricionista esportiva");
+    expect((await db().select().from(ramosDaConta).where(eq(ramosDaConta.clienteId, dona))).length).toBe(0);
+
+    await ligarRamoAlternativo(dona, "advocacia", ADMIN);
+    const { encaixarPedido } = await import("@/servicos/pedidos-de-ramo");
+    await encaixarPedido(pedido.id, "advocacia");
+    expect((await db().select().from(ramosDaConta).where(eq(ramosDaConta.clienteId, dona))).length).toBe(0);
+  });
+
+  it("uma linha que ficou parada (igual ao principal) conta no teto: com ela e mais um alternativo, o terceiro é recusado", async () => {
+    const dona = await criarMarca("rdc-linha-parada", "Linha parada", "odontologia");
+    const principal = (await nichoDoRamo("odontologia"))!;
+    const { nicho: nutricao } = await garantirNichoDoRamo("nutricao");
+    // Dado antigo, de antes da correção: a linha do próprio principal e um alternativo de verdade.
+    await db().insert(ramosDaConta).values([
+      { clienteId: dona, nichoId: principal.id },
+      { clienteId: dona, nichoId: nutricao.id },
+    ]);
+    expect((await ramosAlternativosDaMarca(dona)).length).toBe(1);
+
+    await expect(ligarRamoAlternativo(dona, "advocacia", ADMIN)).rejects.toThrow(/2 ramos alternativos/);
   });
 });
 

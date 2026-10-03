@@ -12,6 +12,7 @@ import { normalizarBusca, ramoMaisProximo } from "@/lib/buscar-ramo";
 
 import { ErroNicho } from "./nichos";
 import { desligarSetorSeSemMarca, ErroLimiteDeSetores, setorParaAMarca } from "./ramos";
+import { tirarAlternativoQueViraPrincipal } from "./ramos-da-conta";
 
 /** O que a pessoa escreve cabe em uma ou duas frases; um texto de um milhão de caracteres não vai para o banco nem para a tela do admin. */
 const TEXTO_MAXIMO = 300;
@@ -99,6 +100,7 @@ export async function registrarPedidoDeRamo(clienteId: number, textoBruto: strin
     .returning();
 
   await db().update(clientes).set({ ramoOutro: texto, nichoId: nichoIdDaMarca }).where(eq(clientes.id, clienteId));
+  if (nichoIdDaMarca !== marca.nichoId) await tirarAlternativoQueViraPrincipal(clienteId, nichoIdDaMarca);
 
   // O setor em que a marca estava antes (o provisório do texto de antes, por exemplo) para de ser pesquisado se ficou sem marca.
   if (marca.nichoId && marca.nichoId !== nichoIdDaMarca) await desligarSetorSeSemMarca(marca.nichoId).catch(() => undefined);
@@ -180,7 +182,7 @@ async function pedidoAbertoPorId(pedidoId: number): Promise<PedidoDeRamo> {
     .select()
     .from(pedidosDeRamo)
     .where(and(eq(pedidosDeRamo.id, pedidoId), eq(pedidosDeRamo.estado, "aberto")));
-  if (!pedido) throw new ErroNicho("esse pedido ja foi resolvido ou nao existe.");
+  if (!pedido) throw new ErroNicho("Esse pedido já foi resolvido ou não existe.");
   return pedido;
 }
 
@@ -196,8 +198,9 @@ export async function fecharPedidoComSetor(pedido: PedidoDeRamo, nichoId: number
       .where(and(eq(pedidosDeRamo.id, pedido.id), eq(pedidosDeRamo.estado, "aberto")))
       .returning({ id: pedidosDeRamo.id });
     // Numa corrida com a pessoa escolhendo da lista (o pedido foi cancelado entre a conferência e aqui), a marca não é movida: desfaz tudo.
-    if (!fechado) throw new ErroNicho("esse pedido ja foi resolvido ou nao existe.");
+    if (!fechado) throw new ErroNicho("Esse pedido já foi resolvido ou não existe.");
   });
+  await tirarAlternativoQueViraPrincipal(pedido.clienteId, nichoId);
   for (const antigo of new Set([marca?.nichoId, pedido.setorProvisorioId])) {
     if (antigo && antigo !== nichoId) await desligarSetorSeSemMarca(antigo).catch(() => undefined);
   }
