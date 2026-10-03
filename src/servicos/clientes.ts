@@ -5,6 +5,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
+import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { db } from "@/db";
 import {
   account,
@@ -22,6 +23,7 @@ import {
   type PerfisCliente,
   type Plataforma,
   type PlanoMarca,
+  type SistemaInstalado,
   type TemaPreferido,
   type TipoMarca,
 } from "@/db/schema";
@@ -841,20 +843,20 @@ export async function adiarConviteDeInstalar(usuarioId: string, agora: Date = ne
   const ate = adiamentoDoConvite(agora);
   await db()
     .insert(preferenciasUsuario)
-    .values({ usuarioId, conviteInstalarAdiadoAte: ate })
+    .values({ usuarioId, conviteInstalarAdiadoAte: ate, horaLembrete: HORA_LEMBRETE_PADRAO })
     .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { conviteInstalarAdiadoAte: ate } });
   return ate;
 }
 
 /**
  * E48 PR 1: a primeira abertura em modo aplicativo (tela cheia, sem a barra do navegador) grava `instalado_em`, uma vez só: abrir de novo não
- * muda a data. Serve ao admin (quem instalou) e ao envio de aviso pelo celular (PR 2). Devolve se esta chamada foi a que gravou.
+ * muda a data. Grava também onde foi instalado (`iphone`, `android` ou `computador`: o aplicativo instalado no Chrome do computador também abre em modo aplicativo). Devolve se esta chamada foi a que gravou.
  */
-export async function registrarInstalacao(usuarioId: string, agora: Date = new Date()): Promise<boolean> {
-  await db().insert(preferenciasUsuario).values({ usuarioId }).onConflictDoNothing();
+export async function registrarInstalacao(usuarioId: string, sistema: SistemaInstalado, agora: Date = new Date()): Promise<boolean> {
+  await db().insert(preferenciasUsuario).values({ usuarioId, horaLembrete: HORA_LEMBRETE_PADRAO }).onConflictDoNothing();
   const gravadas = await db()
     .update(preferenciasUsuario)
-    .set({ instaladoEm: agora })
+    .set({ instaladoEm: agora, instaladoEmSistema: sistema })
     .where(and(eq(preferenciasUsuario.usuarioId, usuarioId), isNull(preferenciasUsuario.instaladoEm)))
     .returning({ usuarioId: preferenciasUsuario.usuarioId });
   return gravadas.length > 0;
@@ -1043,7 +1045,7 @@ export async function aceitarTermos(usuarioId: string): Promise<PreferenciasUsua
   const agora = new Date();
   const [preferencias] = await db()
     .insert(preferenciasUsuario)
-    .values({ usuarioId, aceitouTermosEm: agora })
+    .values({ usuarioId, aceitouTermosEm: agora, horaLembrete: HORA_LEMBRETE_PADRAO })
     .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: agora } })
     .returning();
   return preferencias;

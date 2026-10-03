@@ -1,0 +1,31 @@
+/* E48 PR 2: o cartão "Aviso de manhã" da Conta, no mesmo estilo do cartão de instalar no celular. */
+.aviso {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  align-items: flex-start;
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+}
+
+.frase {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.horario {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

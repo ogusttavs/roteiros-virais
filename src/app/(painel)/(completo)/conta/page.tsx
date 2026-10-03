@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
@@ -9,6 +10,7 @@ import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { textosConta } from "@/textos/conta";
 
+import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
 import { BriefingLinha } from "./BriefingLinha";
 import { FormularioConta } from "./FormularioConta";
@@ -57,7 +59,7 @@ export default async function Conta() {
           youtubeInicial={perfis?.youtube ?? ""}
           siteInicial={cliente?.site ?? ""}
           temaInicial={cliente?.tema ?? "sistema"}
-          horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
+          horaLembreteInicial={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO}
           nomeMarca={cliente?.nome ?? ""}
           tipo={cliente?.tipo ?? "negocio"}
           ramoInicial={ramoAtual ? { slug: ramoAtual.ramoSlug, nome: ramoAtual.nome } : null}
@@ -85,6 +87,7 @@ export default async function Conta() {
       ) : null}
       <div className={styles.colunaPrincipal}>
         <InstalarNoCelular />
+        <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} />
         <InformacoesDoAparelho versaoPainel={config.gitSha} />
         <BotaoSair />
       </div>

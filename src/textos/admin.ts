@@ -37,6 +37,11 @@ export const textosAdmin = {
     /** E48 PR 1: o dono abriu o aplicativo instalado no celular (a data); "não" até a primeira vez. */
     colunaInstalou: "instalou",
     instalouNao: "não",
+    /** E48 PR 2: o sistema onde instalou, junto da data. */
+    sistemaDaInstalacao: { iphone: "iPhone", android: "Android", computador: "computador" } as const,
+    /** E48 PR 2: quantos aparelhos do dono recebem o aviso de manhã por push. */
+    colunaPush: "push",
+    aparelhos: (n: number) => (n === 0 ? "nenhum" : n === 1 ? "1 aparelho" : `${n} aparelhos`),
     semNicho: "sem nicho",
     semNota: "sem nota",
     semRoteiro: "sem roteiro ainda",

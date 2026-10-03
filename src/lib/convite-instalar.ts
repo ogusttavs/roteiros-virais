@@ -38,3 +38,12 @@ export function sistemaDoAparelho(userAgent: string): SistemaDoAparelho {
   if (/Android/i.test(userAgent) && /Mobile/i.test(userAgent)) return "android";
   return "outro";
 }
+
+/**
+ * Onde o aplicativo foi aberto instalado (E48 PR 2): `iphone` e `android` pelo `User-Agent`; qualquer outro é `computador` (o aplicativo instalado no Chrome
+ * do computador também abre em modo aplicativo). O aviso por push só vale para celular, e o admin diz onde a pessoa instalou.
+ */
+export function sistemaDeInstalacao(userAgent: string): "iphone" | "android" | "computador" {
+  const sistema = sistemaDoAparelho(userAgent);
+  return sistema === "outro" ? "computador" : sistema;
+}

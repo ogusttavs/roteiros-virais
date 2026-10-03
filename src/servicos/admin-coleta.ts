@@ -27,6 +27,7 @@ import {
   type AvaliacaoGeracao,
   type Nicho,
   type PlanoMarca,
+  type SistemaInstalado,
   type TipoMarca,
   type Plataforma,
   type ResumoPesquisaSetor,
@@ -35,6 +36,7 @@ import {
 import { chamadasDesde, JANELA_MS, LIMITE_CHAMADAS_HORA } from "@/jobs/meta-api";
 import { JANELA_SEMANA_MS, LIMITE_HASHTAGS_SEMANA } from "@/jobs/meta-hashtags";
 import { config, hojeISO } from "@/lib/config";
+import { aparelhosAtivosPorPessoa } from "@/servicos/push";
 import { constanciaDoCliente } from "@/servicos/temas";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -112,6 +114,10 @@ export type ClienteAdmin = {
   pessoas: number;
   /** E48 PR 1: quando o dono abriu o aplicativo instalado pela primeira vez; nulo se ainda não instalou. */
   instaladoEm: Date | null;
+  /** E48 PR 2: onde instalou (`iphone`, `android`, `computador`); nulo se ainda não instalou. */
+  instaladoEmSistema: SistemaInstalado | null;
+  /** E48 PR 2: quantos aparelhos do dono estão inscritos no aviso de manhã. */
+  aparelhosComPush: number;
 };
 
 /**
@@ -136,6 +142,8 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
         nichoNome: nichos.nome,
         ativo: clientes.ativo,
         instaladoEm: preferenciasUsuario.instaladoEm,
+        instaladoEmSistema: preferenciasUsuario.instaladoEmSistema,
+        donoId: user.id,
       })
       .from(clientes)
       .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))
@@ -159,7 +167,9 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
   );
   const constanciaPorCliente = new Map(constancias);
 
-  return linhas.map((linha) => {
+  const aparelhos = await aparelhosAtivosPorPessoa([...new Set(linhas.map((l) => l.donoId).filter((id): id is string => Boolean(id)))]);
+
+  return linhas.map(({ donoId, ...linha }) => {
     const notaGeral = notas.find((n) => n.clienteId === linha.id)?.notaGeral ?? null;
     const ultimaTexto = ultimosRoteiros.find((r) => r.clienteId === linha.id)?.ultima ?? null;
     const ultimoRoteiro = ultimaTexto ? new Date(ultimaTexto) : null;
@@ -173,6 +183,7 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
       ultimoRoteiro,
       diasSemGravar,
       pessoas,
+      aparelhosComPush: donoId ? (aparelhos.get(donoId) ?? 0) : 0,
     };
   });
 }

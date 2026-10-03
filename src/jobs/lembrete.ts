@@ -42,13 +42,17 @@ import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clientes, membrosMarca, preferenciasUsuario, user } from "@/db/schema";
-import { hojeISO, horaAtualISO } from "@/lib/config";
+import { config, hojeISO, horaAtualISO } from "@/lib/config";
 import { enviarEmail } from "@/lib/email";
+import { logger } from "@/lib/log";
+import { enviarPush } from "@/lib/push";
 import { acessouHoje } from "@/servicos/clientes";
 import { planoDoDia } from "@/servicos/plano";
+import { apagarInscricao, inscricoesDaPessoa, registrarEnvioBemSucedido, registrarFalhaDeEnvio } from "@/servicos/push";
 import { agendaDoDia, atrasados } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
 import { textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
+import { textosPush } from "@/textos/push";
 
 /**
  * `agora` é injetável (hora real por padrão) para o teste de integração
@@ -72,6 +76,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
   let enviados = 0;
   let jaReceberam = 0;
   let semMarcaPendente = 0;
+  let enviadosPorPush = 0;
   const erros: string[] = [];
 
   for (const candidato of candidatos) {
@@ -125,11 +130,18 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
         .set({ ultimoLembreteEm: agora })
         .where(eq(preferenciasUsuario.usuarioId, candidato.usuarioId));
       try {
-        await enviarEmail({
-          para: candidato.email,
-          assunto: textosEmail.assuntoLembrete,
-          html: textosEmail.corpoLembrete(nomesPendentes),
-        });
+        // E48 PR 2: quem tem aparelho inscrito recebe o push; o e-mail só sai para quem não tem inscrição ativa, ou quando nenhum push foi aceito
+        // (a inscrição que falhou já foi apagada ou contada, e a pessoa não fica sem o lembrete do dia).
+        const chegouPorPush = await mandarPush(candidato.usuarioId, nomesPendentes);
+        if (chegouPorPush) {
+          enviadosPorPush += 1;
+        } else {
+          await enviarEmail({
+            para: candidato.email,
+            assunto: textosEmail.assuntoLembrete,
+            html: textosEmail.corpoLembrete(nomesPendentes),
+          });
+        }
         enviados += 1;
       } catch (erroDeEnvio) {
         await db()
@@ -147,8 +159,47 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
     horaAtual,
     candidatos: candidatos.length,
     enviados,
+    enviadosPorPush,
     jaReceberam,
     semMarcaPendente,
     erros: erros.length > 0 ? erros : undefined,
   };
+}
+
+/**
+ * O push do lembrete para os aparelhos inscritos da pessoa (E48 PR 2). O texto: "O seu roteiro de hoje está pronto" quando alguma marca dela tem roteiro marcado
+ * na agenda do dia, senão "Os temas de hoje chegaram"; o toque abre `/hoje`. 404 e 410 apagam a inscrição na hora; outra falha conta uma vez e a segunda seguida
+ * apaga. Devolve se algum aparelho aceitou o aviso (se nenhum aceitou, quem chama manda o e-mail).
+ */
+async function mandarPush(usuarioId: string, marcas: MarcaPendente[]): Promise<boolean> {
+  const inscricoes = await inscricoesDaPessoa(usuarioId);
+  if (inscricoes.length === 0) return false;
+  const temRoteiroNaAgenda = marcas.some((marca) => marca.agendaHoje.length > 0);
+  const aviso = {
+    titulo: config.appName,
+    corpo: temRoteiroNaAgenda ? textosPush.roteiroPronto : textosPush.temasChegaram,
+    url: "/hoje",
+  };
+  let algumAceitou = false;
+  for (const inscricao of inscricoes) {
+    const resultado = await enviarPush(inscricao, aviso);
+    if (resultado.ok) algumAceitou = true;
+    // A contabilidade de cada aparelho nunca derruba o envio aos outros nem desfaz o carimbo do dia: o aviso já saiu (ou não), e uma falha do banco aqui
+    // só deixa a contagem de falhas desatualizada.
+    try {
+      if (resultado.ok) {
+        await registrarEnvioBemSucedido(inscricao.id);
+      } else if (resultado.apagar) {
+        await apagarInscricao(inscricao.id);
+      } else if (resultado.contar) {
+        const apagou = await registrarFalhaDeEnvio(inscricao.id);
+        logger.warn({ usuarioId, inscricaoId: inscricao.id, apagou, motivo: resultado.motivo }, "lembrete: o push falhou");
+      } else {
+        logger.warn({ usuarioId, inscricaoId: inscricao.id, motivo: resultado.motivo }, "lembrete: o push falhou por causa do ambiente ou do servico de push (nao conta contra o aparelho)");
+      }
+    } catch (erro) {
+      logger.error({ usuarioId, inscricaoId: inscricao.id, err: erro }, "lembrete: nao foi possivel atualizar a inscricao depois do envio");
+    }
+  }
+  return algumAceitou;
 }

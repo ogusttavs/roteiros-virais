@@ -335,3 +335,72 @@ self.addEventListener("message", function (event) {
     event.waitUntil(guardarEstaticos(dados.caminhos));
   }
 });
+
+/*
+ * O aviso de manha por push (E48 PR 2). Nao mexe no cache nem no que o service worker ja faz: so recebe o `push` e mostra a notificacao, e leva ao
+ * app no toque.
+ *
+ * `push`: o servidor manda {titulo, corpo, url} (src/lib/push.ts). O icone e o do manifest. Sem dado (um push vazio) mostra o aviso generico, porque
+ * o navegador exige que todo push mostre alguma notificacao. A `url` so vale se for um caminho do proprio app (comeca com uma barra e nao com duas).
+ *
+ * `notificationclick`: foca uma janela do app se houver (e a leva ao caminho), senao abre uma nova em /hoje.
+ */
+function caminhoDoApp(url) {
+  // So um caminho do proprio app: nada de contrabarra, tab ou quebra de linha (o navegador os trata como barra e sai do site) e a origem tem de ser a nossa.
+  if (typeof url !== "string" || url.charAt(0) !== "/" || /[\\\t\n\r]/.test(url)) return "/hoje";
+  try {
+    var alvo = new URL(url, self.location.origin);
+    if (alvo.origin !== self.location.origin) return "/hoje";
+    return alvo.pathname + alvo.search;
+  } catch (erro) {
+    return "/hoje";
+  }
+}
+
+self.addEventListener("push", function (event) {
+  var dados = {};
+  try {
+    dados = event.data ? event.data.json() : {};
+  } catch (erro) {
+    dados = {};
+  }
+  var titulo = typeof dados.titulo === "string" && dados.titulo ? dados.titulo : "Aviso";
+  var corpo = typeof dados.corpo === "string" ? dados.corpo : "O seu dia chegou";
+  event.waitUntil(
+    self.registration.showNotification(titulo, {
+      body: corpo,
+      icon: "/icone-192.png",
+      badge: "/icone-192.png",
+      data: { url: caminhoDoApp(dados.url) },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  var destino = caminhoDoApp(event.notification.data && event.notification.data.url);
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(function (janelas) {
+        // Prefere a janela do app que o usuario esta vendo; sem nenhuma, abre uma nova.
+        var escolhida = null;
+        for (var i = 0; i < janelas.length; i++) {
+          if (janelas[i].focused || janelas[i].visibilityState === "visible") {
+            escolhida = janelas[i];
+            break;
+          }
+          if (!escolhida) escolhida = janelas[i];
+        }
+        if (!escolhida || !("focus" in escolhida)) return self.clients.openWindow(destino);
+        return escolhida.focus().then(function (focada) {
+          if (focada && "navigate" in focada) return focada.navigate(destino);
+          return undefined;
+        });
+      })
+      // `focus()` e `navigate()` rejeitam para janela que este service worker nao controla: o toque nunca pode ficar sem efeito.
+      .catch(function () {
+        return self.clients.openWindow(destino);
+      }),
+  );
+});

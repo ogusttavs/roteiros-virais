@@ -132,6 +132,16 @@ export const config = {
     resendKey: env("RESEND_API_KEY"),
     de: env("EMAIL_FROM", "painel@localhost"),
   },
+  /**
+   * E48 PR 2: as chaves VAPID do aviso por push (gerar com `npx web-push generate-vapid-keys`). Sem elas nenhum push sai e o lembrete continua por
+   * e-mail para todo mundo. A chave pública também vai ao navegador (a tela a recebe do servidor, em tempo de execução: `NEXT_PUBLIC_*` pediria
+   * a chave no build da imagem). `subject` é um `mailto:` ou uma URL do responsável.
+   */
+  push: {
+    publicKey: env("VAPID_PUBLIC_KEY"),
+    privateKey: env("VAPID_PRIVATE_KEY"),
+    subject: env("VAPID_SUBJECT"),
+  },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
   /**
