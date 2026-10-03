@@ -182,7 +182,11 @@ test.describe("/hoje, a Agenda", () => {
     // escopo). Sábado ou domingo podem não sobrar dia válido; se não sobrar, o teste falha claro.
     const outroDia = Array.from({ length: 7 }, (_, indice) => somarDias(semana, indice)).find(
       (data) => data !== hoje && data !== amanha && data > hoje,
-    )!;
+    );
+    // Sábado e domingo não deixam dia válido na semana visível (achado da revisão do PR #108, rodada num
+    // sábado): o teste pula com motivo em vez de falhar por causa do calendário.
+    test.skip(!outroDia, "sem dia futuro na semana visível (sábado ou domingo); o cenário vale de segunda a sexta");
+    const dia = outroDia as string;
     const temas: TemaDoDia[] = [
       { titulo: "tema do dia marcado", descricao: "descricao", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
     ];
@@ -192,30 +196,30 @@ test.describe("/hoje, a Agenda", () => {
 
     await entrar(page, email);
 
-    await page.goto(`/hoje?dia=${outroDia}`);
+    await page.goto(`/hoje?dia=${dia}`);
     await page.getByRole("button", { name: "Criar roteiro" }).click();
-    await expect(page).toHaveURL(new RegExp(`/criar\\?data=${outroDia}$`));
+    await expect(page).toHaveURL(new RegExp(`/criar\\?data=${dia}$`));
 
     await page.getByRole("button", { name: "Os temas de hoje" }).click();
-    await expect(page).toHaveURL(new RegExp(`/criar/temas\\?data=${outroDia}$`));
+    await expect(page).toHaveURL(new RegExp(`/criar/temas\\?data=${dia}$`));
 
     await page
       .getByRole("button", { name: "Quero esse" })
       .first()
       .click();
-    await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&data=${outroDia}$`));
+    await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&data=${dia}$`));
 
     await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
 
     // A pessoa tocou em "Criar roteiro" no dia outroDia: "para quando é" já nasce marcado nele,
     // sem precisar escolher a data de novo (decisão 5 do Fable no PR #90).
-    await expect(page.getByLabel("Escolher a data")).toHaveValue(outroDia);
+    await expect(page.getByLabel("Escolher a data")).toHaveValue(dia);
 
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
 
     const [roteiroCriado] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaId));
-    expect(roteiroCriado.data).toBe(outroDia);
+    expect(roteiroCriado.data).toBe(dia);
   });
 
   test("o Reels de hoje em destaque e os Stories na ordem do momento, manhã antes de meio do dia antes de noite", async ({
