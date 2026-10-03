@@ -161,6 +161,27 @@ describe("mock de entenderMarca", () => {
     expect(vazio.itens).toEqual([]);
   });
 
+  it("mudouDeSentido: false quando repete o id e nada mudou, true com a mudança, null em item novo", () => {
+    const existentes = [{ id: 7, categoria: "vende" as const, origem: "site" as const, estado: "confirmado" as const, texto: "Vende removedor." }];
+    const montar = (texto: string, itensAtuais: typeof existentes) =>
+      entenderMarcaIA.montarEntrada({ ...BASE, itensAtuais, site: { ...SITE, paginas: [{ caminho: "/", texto }] } });
+
+    const igual = entenderMarcaIA.schema.parse(construirSaidaMock("entenderMarca", montar("Texto", existentes)));
+    expect(igual.itens[0]).toMatchObject({ idAnterior: "i7", mudouDeSentido: false });
+
+    const mudou = entenderMarcaIA.schema.parse(construirSaidaMock("entenderMarca", montar("Texto [mock:mudar]", existentes)));
+    expect(mudou.itens[0]).toMatchObject({ idAnterior: "i7", mudouDeSentido: true });
+
+    const novo = entenderMarcaIA.schema.parse(construirSaidaMock("entenderMarca", montar("Texto", [])));
+    expect(novo.itens[0]).toMatchObject({ idAnterior: null, mudouDeSentido: null });
+  });
+
+  it("[mock:gritar] devolve um texto que o verificador mock reprova", () => {
+    const entrada = entenderMarcaIA.montarEntrada({ ...BASE, site: { ...SITE, paginas: [{ caminho: "/", texto: "Texto [mock:gritar]" }] } });
+    const saida = entenderMarcaIA.schema.parse(construirSaidaMock("entenderMarca", entrada));
+    expect(saida.itens[0].texto).toBe("ISTO E UM TEXTO GRITADO!!");
+  });
+
   it("sem fonte nenhuma não devolve item nenhum", () => {
     const saida = entenderMarcaIA.schema.parse(
       construirSaidaMock("entenderMarca", entenderMarcaIA.montarEntrada({ ...BASE, site: null })),

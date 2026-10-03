@@ -9,10 +9,11 @@
 import { createHash } from "node:crypto";
 
 import { and, count, eq, sql } from "drizzle-orm";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import {
+  briefings,
   clientes,
   contas,
   contextoMarca,
@@ -20,14 +21,18 @@ import {
   geracoesIA,
   user,
   videos,
+  type PerfilCompilado,
   type PerfisCliente,
 } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
 import { rodarEntenderMarca, type DepsEntenderMarca } from "@/jobs/entender-marca";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { ErroMetaApi } from "@/jobs/meta-api";
 import type { ContaConfirmada } from "@/jobs/pesquisa-de-setor";
 import type { ResultadoLeituraSite } from "@/jobs/site-api";
+import { ErroYoutubeApi } from "@/jobs/youtube-api";
 import { config } from "@/lib/config";
-import { confirmarItem, corrigirItem, tirarItem } from "@/servicos/contexto-marca";
+import { confirmarItem, corrigirItem, secaoDoCliente, tirarItem } from "@/servicos/contexto-marca";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -133,12 +138,49 @@ async function chamadasDeIA(clienteId: number): Promise<number> {
 
 const TEXTO_DO_SITE = "Vendemos removedor de manchas para tecido claro e atendemos pelo WhatsApp.";
 
+const PERFIL_DO_BRIEFING: PerfilCompilado = {
+  fatos: {
+    oQueVende: "removedor de manchas",
+    preco: "30 a 90 reais",
+    clienteIdeal: "quem cuida da casa",
+    medos: [],
+    frasesDaFala: [],
+    proibicoes: [],
+    cenasFilmaveis: [],
+    concorrentes: [],
+    perfisAdmirados: [],
+  },
+  resumo: "Loja de produtos de limpeza para tecido.",
+  referencias: [],
+};
+
+/** O briefing completo da marca (o perfil que a pessoa já compilou): sem ele, a IA não tem com o que comparar. */
+async function darBriefingA(clienteId: number): Promise<void> {
+  await db().insert(briefings).values({ clienteId, completo: true, notaGeral: "9.00", perfil: PERFIL_DO_BRIEFING });
+}
+
+async function limparFilaDaMarca(): Promise<void> {
+  await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);
+}
+
+/** O que a IA recebeu na leitura mais recente da marca (a entrada gravada em `geracoes_ia`). */
+async function ultimaEntradaDaIA(clienteId: number): Promise<string> {
+  const [geracao] = await db()
+    .select({ entradas: geracoesIA.entradas })
+    .from(geracoesIA)
+    .where(and(eq(geracoesIA.clienteId, clienteId), eq(geracoesIA.tarefa, "entenderMarca")))
+    .orderBy(sql`${geracoesIA.id} desc`)
+    .limit(1);
+  return String((geracao.entradas as { entrada: string }).entrada);
+}
+
 beforeAll(async () => {
   await resetarSchema(db());
   await garantirBossPronto();
 }, 60_000);
 
 afterAll(async () => {
+  await limparFilaDaMarca();
   await boss().stop({ graceful: false });
   await getPool().end();
 });
@@ -146,6 +188,8 @@ afterAll(async () => {
 afterEach(async () => {
   // O teto do mês é global (soma de `geracoes_ia`): quem o estoura limpa o que gravou.
   await db().delete(geracoesIA).where(and(eq(geracoesIA.tarefa, "entenderMarca"), eq(geracoesIA.versaoPrompt, "teste-teto")));
+  // A fila do pg-boss não é limpa pelo `resetarSchema`: job de um teste, com id de cliente reciclado, não pode sobrar para outro (nem para um worker de desenvolvimento no mesmo banco).
+  await limparFilaDaMarca();
 });
 
 describe("a primeira leitura", () => {
@@ -174,12 +218,37 @@ describe("a primeira leitura", () => {
 
   it("o que a IA achou que a pessoa não tinha contado vem marcado; o resto, não", async () => {
     const clienteId = await criarCliente();
+    await darBriefingA(clienteId);
     const { deps } = depsComSite(`${TEXTO_DO_SITE} [mock:alem]`);
 
     await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), deps);
 
     const itens = await itensDe(clienteId);
     expect(itens[0].novidade).toBe("alem_do_briefing");
+  });
+
+  it("sem briefing ainda (o Começar lê o site antes das respostas), 'além do briefing' não quer dizer nada: nenhuma pílula", async () => {
+    const clienteId = await criarCliente();
+    const { deps } = depsComSite(`${TEXTO_DO_SITE} [mock:alem]`);
+
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), deps);
+
+    expect((await itensDe(clienteId))[0].novidade).toBeNull();
+  });
+
+  it("o resumo do briefing e os itens que a pessoa tirou vão para a IA, para ela comparar e não repropor", async () => {
+    const clienteId = await criarCliente();
+    await darBriefingA(clienteId);
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+    const [item] = await itensDe(clienteId);
+    await tirarItem(clienteId, item.id);
+
+    await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+
+    const entrada = await ultimaEntradaDaIA(clienteId);
+    expect(entrada).toContain("removedor de manchas");
+    expect(entrada).toContain("quem cuida da casa");
+    expect(entrada).toContain(item.texto);
   });
 
   it("a IA não achou nada claro: a leitura conta como boa, sem itens", async () => {
@@ -210,6 +279,19 @@ describe("as mesmas fontes não gastam IA", () => {
     expect(await itensDe(clienteId)).toHaveLength(1);
   });
 
+  it("o briefing que ficou pronto depois da primeira leitura muda o que a IA recebe: a leitura roda de novo, não é dada como em dia", async () => {
+    const clienteId = await criarCliente();
+    const { deps } = depsComSite(TEXTO_DO_SITE);
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), deps);
+    const antes = await chamadasDeIA(clienteId);
+    await darBriefingA(clienteId);
+
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), deps);
+
+    expect(resultado.hashIgual).toBeUndefined();
+    expect(await chamadasDeIA(clienteId)).toBe(antes + 1);
+  });
+
   it("forcar ignora o hash e chama a IA de novo", async () => {
     const clienteId = await criarCliente();
     const { deps } = depsComSite(TEXTO_DO_SITE);
@@ -228,7 +310,7 @@ describe("o que a pessoa decidiu nunca é atropelado", () => {
     await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
     const [item] = await itensDe(clienteId);
     const textoAntes = item.texto;
-    await confirmarItem(clienteId, item.id);
+    await confirmarItem(clienteId, item.id, item.texto);
 
     await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(`${TEXTO_DO_SITE} Texto novo [mock:mudar]`).deps);
 
@@ -306,6 +388,31 @@ describe("o que a pessoa decidiu nunca é atropelado", () => {
     expect(item.estado).toBe("para_confirmar");
   });
 
+  it("uma fonte que a pessoa tirou da Conta: o item dela some da tela (se não foi confirmado), e o confirmado fica", async () => {
+    const clienteId = await criarCliente({ perfis: { instagram: "perfil-exemplo", tiktok: null, youtube: null } });
+    const conta = contaFalsa("instagram", [100, 120, 90, 110, 5000, 100]);
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), { ...depsComSite(TEXTO_DO_SITE).deps, confirmarRede: async () => conta });
+    const doSite = (await itensDe(clienteId)).find((i) => i.origem === "site")!;
+    await confirmarItem(clienteId, doSite.id, doSite.texto);
+    const doInstagram = (await itensDe(clienteId)).find((i) => i.origem === "instagram")!;
+
+    // Ela apaga o Instagram e o site da Conta e deixa só o YouTube: nenhuma das duas fontes antigas é lida.
+    await db().update(clientes).set({ site: null, perfis: { instagram: null, tiktok: null, youtube: "@canal-exemplo" } }).where(eq(clientes.id, clienteId));
+    await rodarEntenderMarca(
+      { clienteId, origem: "manual", forcar: true },
+      agora(),
+      { confirmarRede: async () => contaFalsa("youtube", [100, 120, 90, 110, 5000, 100]) },
+    );
+
+    const itens = await itensDe(clienteId);
+    expect(itens.find((i) => i.id === doInstagram.id)?.sumiuEm).not.toBeNull();
+    expect(itens.find((i) => i.id === doSite.id)?.sumiuEm).not.toBeNull();
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    const secao = await secaoDoCliente(cliente);
+    expect(secao.itens.map((i) => i.id)).toContain(doSite.id);
+    expect(secao.itens.map((i) => i.id)).not.toContain(doInstagram.id);
+  });
+
   it("numa leitura seguinte, uma fonte nova traz um item 'nova'", async () => {
     const clienteId = await criarCliente();
     await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
@@ -368,7 +475,7 @@ describe("falha esperada nunca lança", () => {
     expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(config.regras.diasEntreLeituraMarca * 86_400_000);
   });
 
-  it("perfil restrito ou sem vídeo na rede: o motivo fica gravado, sem lançar", async () => {
+  it("perfil que a rede não achou: o motivo fica gravado, sem lançar", async () => {
     const clienteId = await criarCliente({ site: null, perfis: { instagram: "perfil-pessoal", tiktok: null, youtube: null } });
 
     const resultado = await rodarEntenderMarca(
@@ -379,6 +486,155 @@ describe("falha esperada nunca lança", () => {
 
     expect(resultado.pulado).toBe("nada_lido");
     expect((await estadoDe(clienteId)).fontes).toEqual([{ tipo: "instagram", lida: false, motivo: "nao_encontrado" }]);
+  });
+
+  it("cada erro da rede vira o motivo certo: conta restrita (Meta), canal sem vídeo (YouTube), sem vídeo nenhum, rede fora do ar", async () => {
+    const casos: { rede: "instagram" | "youtube"; confirmar: () => Promise<ContaConfirmada | null>; motivo: string; transitorio: boolean }[] = [
+      {
+        rede: "instagram",
+        confirmar: async () => {
+          throw new ErroMetaApi("Invalid user id", 110, 2207013);
+        },
+        motivo: "conta_restrita",
+        transitorio: false,
+      },
+      {
+        rede: "youtube",
+        confirmar: async () => {
+          throw new ErroYoutubeApi("playlistNotFound", 404);
+        },
+        motivo: "sem_videos",
+        transitorio: false,
+      },
+      { rede: "instagram", confirmar: async () => contaFalsa("instagram", []), motivo: "sem_videos", transitorio: false },
+      {
+        rede: "youtube",
+        confirmar: async () => {
+          throw new Error("rede caiu");
+        },
+        motivo: "indisponivel",
+        transitorio: true,
+      },
+    ];
+    for (const caso of casos) {
+      const clienteId = await criarCliente({
+        site: null,
+        perfis: {
+          instagram: caso.rede === "instagram" ? "perfil-exemplo" : null,
+          tiktok: null,
+          youtube: caso.rede === "youtube" ? "@canal-exemplo" : null,
+        },
+      });
+      const quando = agora();
+
+      const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, quando, { confirmarRede: caso.confirmar });
+
+      expect(resultado.pulado, caso.motivo).toBe("nada_lido");
+      const estado = await estadoDe(clienteId);
+      expect(estado.fontes, caso.motivo).toEqual([{ tipo: caso.rede, lida: false, motivo: caso.motivo }]);
+      const dias = (estado.proximaTentativaEm!.getTime() - quando.getTime()) / 86_400_000;
+      expect(dias, caso.motivo).toBe(caso.transitorio ? 3 : config.regras.diasEntreLeituraMarca);
+    }
+  });
+
+  it("o Instagram desligado por aqui: motivo 'desligada', sem chamar a Meta", async () => {
+    const original = config.coleta.metaAtivo;
+    config.coleta.metaAtivo = false;
+    try {
+      const clienteId = await criarCliente({ site: null, perfis: { instagram: "perfil-exemplo", tiktok: null, youtube: null } });
+      const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), {});
+      expect(resultado.pulado).toBe("nada_lido");
+      expect((await estadoDe(clienteId)).fontes).toEqual([{ tipo: "instagram", lida: false, motivo: "desligada" }]);
+    } finally {
+      config.coleta.metaAtivo = original;
+    }
+  });
+
+  it("um @ com parênteses ou chaves (ação forjada) nunca chega à rede: nem entra na expressão de campos da Graph API", async () => {
+    const clienteId = await criarCliente({ site: null, perfis: { instagram: "x){id,followers_count},media{caption", tiktok: null, youtube: null } });
+    let chamadas = 0;
+
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), {
+      confirmarRede: async () => {
+        chamadas += 1;
+        return null;
+      },
+    });
+
+    expect(chamadas).toBe(0);
+    expect((await estadoDe(clienteId)).fontes).toEqual([{ tipo: "instagram", lida: false, motivo: "nao_encontrado" }]);
+  });
+
+  it("site com texto curto demais (um 'em breve', ou montado só por programação): não lido, sem gastar IA, com o motivo certo", async () => {
+    const clienteId = await criarCliente();
+
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(siteFalso(["Em breve."], "sem_texto")).deps);
+
+    expect(resultado.pulado).toBe("nada_lido");
+    expect(await chamadasDeIA(clienteId)).toBe(0);
+    expect((await estadoDe(clienteId)).fontes).toEqual([{ tipo: "site", lida: false, motivo: "sem_texto" }]);
+    expect(await itensDe(clienteId)).toHaveLength(0);
+  });
+
+  it("um site sem texto não faz o item dele 'sumir': o que foi lido antes continua", async () => {
+    const clienteId = await criarCliente();
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+
+    await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, agora(), depsComSite(siteFalso(["Em breve."], "sem_texto")).deps);
+
+    expect((await itensDe(clienteId))[0].sumiuEm).toBeNull();
+  });
+
+  it("o leitor de site lança por um defeito dele: a leitura das redes segue e a marca ganha nova tentativa em 3 dias", async () => {
+    const clienteId = await criarCliente({ perfis: { instagram: "perfil-exemplo", tiktok: null, youtube: null } });
+    const quando = agora();
+
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, quando, {
+      lerSite: async () => {
+        throw new Error("defeito do leitor");
+      },
+      confirmarRede: async () => contaFalsa("instagram", [100, 120, 90, 110, 5000, 100]),
+    });
+
+    expect(resultado.pulado).toBeUndefined();
+    const estado = await estadoDe(clienteId);
+    expect(estado.fontes).toEqual([
+      { tipo: "site", lida: false, motivo: "sem_resposta" },
+      { tipo: "instagram", lida: true, quantidade: 6 },
+    ]);
+    expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(3 * 86_400_000);
+    expect(estado.lendoDesde).toBeNull();
+    expect((await itensDe(clienteId)).map((i) => i.origem)).toEqual(["instagram"]);
+  });
+
+  it("a IA reprovada nas duas tentativas (o verificador não aprovou o texto): falha esperada, não lança, tenta de novo em 3 dias, nada vira 'lido'", async () => {
+    const clienteId = await criarCliente();
+    const quando = agora();
+
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "evento" }, quando, depsComSite(`${TEXTO_DO_SITE} [mock:gritar]`).deps);
+
+    expect(resultado.pulado).toBe("ia_reprovada");
+    const estado = await estadoDe(clienteId);
+    expect(estado.ultimaLeituraOkEm).toBeNull();
+    expect(estado.hashFontes).toBeNull();
+    expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(3 * 86_400_000);
+    expect(estado.lendoDesde).toBeNull();
+    expect(await itensDe(clienteId)).toHaveLength(0);
+  });
+
+  it("a API da IA fora do ar (saldo, limite, chave): a falha SOBE para o painel e o Sentry, a trava solta, e a nova tentativa fica para amanhã", async () => {
+    const clienteId = await criarCliente();
+    const quando = agora();
+
+    await expect(
+      rodarEntenderMarca({ clienteId, origem: "evento" }, quando, depsComSite(`${TEXTO_DO_SITE} [mock:api-fora]`).deps),
+    ).rejects.toBeInstanceOf(ErroIA);
+
+    const estado = await estadoDe(clienteId);
+    expect(estado.lendoDesde).toBeNull();
+    expect(estado.ultimaLeituraOkEm).toBeNull();
+    expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(86_400_000);
+    expect(await itensDe(clienteId)).toHaveLength(0);
   });
 
   it("marca inativa ou sem nada para ler: pula sem tocar em nada", async () => {
@@ -447,6 +703,45 @@ describe("quando não ler", () => {
     expect((await estadoDe(clienteId)).lendoDesde).toBeNull();
   });
 
+  it("o freio por marca: gastou as chamadas de IA do dia, a leitura pula e tenta amanhã (forcar passa por cima)", async () => {
+    const clienteId = await criarCliente();
+    await db().insert(geracoesIA).values(
+      Array.from({ length: config.regras.chamadasDeIaPorMarcaPorDia }, () => ({
+        tarefa: "entenderMarca" as const,
+        clienteId,
+        versaoPrompt: "teste-teto",
+        modelo: "mock",
+        entradas: {},
+        custoUsd: "0",
+      })),
+    );
+    const quando = new Date();
+
+    const barrada = await rodarEntenderMarca({ clienteId, origem: "evento" }, quando, depsComSite(TEXTO_DO_SITE).deps);
+    expect(barrada).toMatchObject({ pulado: "limite_do_dia" });
+    const estado = await estadoDe(clienteId);
+    expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(86_400_000);
+
+    const forcada = await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, quando, depsComSite(TEXTO_DO_SITE).deps);
+    expect(forcada.pulado).toBeUndefined();
+  });
+
+  it("a leitura lenta que terminou depois de a trava vencer não solta a trava de outra leitura que já a tomou", async () => {
+    const clienteId = await criarCliente();
+    const quando = agora();
+    const daOutraLeitura = new Date(quando.getTime() + 5 * 3_600_000);
+
+    await rodarEntenderMarca({ clienteId, origem: "manual" }, quando, {
+      lerSite: async () => {
+        // No meio da leitura, outra execução assume a trava (o que acontece quando esta passa do prazo).
+        await db().update(contextoMarca).set({ lendoDesde: daOutraLeitura }).where(eq(contextoMarca.clienteId, clienteId));
+        return siteFalso([TEXTO_DO_SITE]);
+      },
+    });
+
+    expect((await estadoDe(clienteId)).lendoDesde?.getTime()).toBe(daOutraLeitura.getTime());
+  });
+
   it("o teto de custo do mês: passou, a leitura pula (forcar passa por cima)", async () => {
     const clienteId = await criarCliente();
     await db().insert(geracoesIA).values({
@@ -459,6 +754,12 @@ describe("quando não ler", () => {
 
     const barrada = await rodarEntenderMarca({ clienteId, origem: "evento" }, new Date(), depsComSite(TEXTO_DO_SITE).deps);
     expect(barrada.pulado).toBe("teto_do_mes");
+    // A tentativa fica registrada: a tela não fica em "lendo" o mês inteiro, e a próxima vai para o dia 1.
+    const estado = await estadoDe(clienteId);
+    expect(estado.ultimaTentativaEm).not.toBeNull();
+    expect(estado.proximaTentativaEm!.getTime()).toBeGreaterThan(Date.now());
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    expect((await secaoDoCliente(cliente)).estado).toBe("nao_leu");
 
     const forcada = await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, new Date(), depsComSite(TEXTO_DO_SITE).deps);
     expect(forcada.pulado).toBeUndefined();
@@ -476,8 +777,13 @@ describe("o despachante", () => {
   }
 
   async function limparFila(): Promise<void> {
-    await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);
+    await limparFilaDaMarca();
   }
+
+  // Os testes do despachante contam quem ele enfileira: marca de teste anterior, ainda elegível, entraria na conta (e o limite por rodada a empurraria para fora).
+  beforeEach(async () => {
+    await db().update(clientes).set({ ativo: false });
+  });
 
   it("enfileira só a marca que nunca foi lida, a que passou de 30 dias e a de nova tentativa vencida", async () => {
     await limparFila();
@@ -505,6 +811,45 @@ describe("o despachante", () => {
     expect(await jobsDaFila()).not.toContain(semFonte);
   });
 
+  it("a marca que nunca foi lida vem primeiro, e a que está sendo lida agora (trava recente) fica de fora", async () => {
+    await limparFila();
+    await db().delete(contextoMarca);
+    const quando = BASE;
+    const velha = await criarCliente();
+    const nunca = await criarCliente();
+    const lendoAgora = await criarCliente();
+    await db().insert(contextoMarca).values([
+      { clienteId: velha, ultimaLeituraOkEm: new Date(quando.getTime() - 45 * 86_400_000) },
+      { clienteId: lendoAgora, lendoDesde: new Date(quando.getTime() - 5 * 60_000) },
+    ]);
+    const original = config.regras.leiturasDeMarcaPorRodada;
+    config.regras.leiturasDeMarcaPorRodada = 1;
+    try {
+      const resultado = await rodarEntenderMarca(null, quando);
+      expect(resultado).toMatchObject({ marcasElegiveis: 2, enfileiradas: 1, ficaramParaAmanha: 1 });
+      expect(await jobsDaFila()).toEqual([nunca]);
+    } finally {
+      config.regras.leiturasDeMarcaPorRodada = original;
+    }
+  });
+
+  it("o interruptor segura o despachante (a primeira rodada leria, sozinha, toda marca ainda não lida), e a leitura por evento continua", async () => {
+    await limparFila();
+    const original = config.regras.leituraDaMarcaPeloDespachante;
+    config.regras.leituraDaMarcaPeloDespachante = false;
+    try {
+      const clienteId = await criarCliente();
+      const resultado = await rodarEntenderMarca(null, BASE);
+      expect(resultado).toMatchObject({ modo: "despacho", desligado: true });
+      expect(await jobsDaFila()).toEqual([]);
+
+      const evento = await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+      expect(evento.pulado).toBeUndefined();
+    } finally {
+      config.regras.leituraDaMarcaPeloDespachante = original;
+    }
+  });
+
   it("rodar de novo no mesmo dia não duplica (a marca já está na fila)", async () => {
     await limparFila();
     const clienteId = await criarCliente();
@@ -522,11 +867,11 @@ describe("o despachante", () => {
     const original = config.regras.leiturasDeMarcaPorRodada;
     config.regras.leiturasDeMarcaPorRodada = 1;
     try {
-      const ids = [await criarCliente(), await criarCliente()];
+      await criarCliente();
+      await criarCliente();
       const resultado = await rodarEntenderMarca(null, new Date(BASE.getTime() + 400 * 86_400_000));
       expect(resultado.enfileiradas).toBe(1);
-      expect((resultado.ficaramParaAmanha as number) >= 1).toBe(true);
-      expect(ids.length).toBe(2);
+      expect(resultado.ficaramParaAmanha).toBe(1);
     } finally {
       config.regras.leiturasDeMarcaPorRodada = original;
     }
@@ -574,7 +919,7 @@ describe("isolamento", () => {
     await rodarEntenderMarca({ clienteId: a, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
     const [itemDeA] = await itensDe(a);
 
-    await expect(confirmarItem(b, itemDeA.id)).rejects.toThrow("item nao encontrado.");
+    await expect(confirmarItem(b, itemDeA.id, itemDeA.texto)).rejects.toThrow("item nao encontrado.");
     await expect(corrigirItem(b, itemDeA.id, "texto de outra marca")).rejects.toThrow("item nao encontrado.");
     await expect(tirarItem(b, itemDeA.id)).rejects.toThrow("item nao encontrado.");
 

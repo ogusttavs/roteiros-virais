@@ -36,9 +36,9 @@ export async function reativarRegraAction(regraId: number): Promise<void> {
  * um item. A marca vem da sessão (nunca de um parâmetro, e o serviço confere `id` e `clienteId`
  * juntos no `WHERE`): um id de item de outra marca nunca vale.
  */
-export async function confirmarItemContextoAction(itemId: number): Promise<void> {
+export async function confirmarItemContextoAction(itemId: number, textoVisto: string): Promise<"confirmado" | "mudou"> {
   const cliente = await clienteDaSessaoAtual();
-  await confirmarItem(cliente.id, itemId);
+  return confirmarItem(cliente.id, itemId, textoVisto);
 }
 
 export async function corrigirItemContextoAction(itemId: number, texto: string): Promise<void> {

@@ -41,6 +41,8 @@ const PERFIL: PerfilCompilado = {
 };
 
 const AGORA = new Date("2026-10-03T12:00:00Z");
+/** O texto do item que `criarItem` cria sem parâmetro: o que a pessoa "viu" ao confirmar. */
+const TEXTO_PADRAO = "Vende removedor de manchas para tecido claro.";
 let sequencia = 0;
 
 async function criarCliente(extra: Partial<typeof clientes.$inferInsert> = {}, comPerfil = true): Promise<number> {
@@ -99,7 +101,7 @@ describe("perfilDoCliente: só o que a pessoa confirmou chega aos prompts", () =
     const clienteId = await criarCliente();
     const id = await criarItem(clienteId);
 
-    await confirmarItem(clienteId, id);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
     expect((await perfilDoCliente(clienteId))?.contextoConfirmado).toEqual([{ categoria: "vende", texto: "Vende removedor de manchas para tecido claro." }]);
 
     await corrigirItem(clienteId, id, "  Vende removedor\n de manchas só para tecido branco. ");
@@ -116,7 +118,7 @@ describe("perfilDoCliente: só o que a pessoa confirmou chega aos prompts", () =
   it("uma proposta nova por cima de um item confirmado não tira o que estava em vigor", async () => {
     const clienteId = await criarCliente();
     const id = await criarItem(clienteId);
-    await confirmarItem(clienteId, id);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
     // O que o job faz quando o site muda: a proposta vira outra e o item volta a confirmar.
     await db().update(contextoMarcaItens).set({ texto: "Agora também vende amaciante.", estado: "para_confirmar", novidade: "mudou" }).where(eq(contextoMarcaItens.id, id));
 
@@ -133,8 +135,8 @@ describe("perfilDoCliente: só o que a pessoa confirmou chega aos prompts", () =
     const clienteId = await criarCliente();
     const rendeu = await criarItem(clienteId, { categoria: "rendeu", texto: "O antes e depois rende mais." });
     const vende = await criarItem(clienteId, { categoria: "vende", texto: "Vende removedor." });
-    await confirmarItem(clienteId, rendeu);
-    await confirmarItem(clienteId, vende);
+    await confirmarItem(clienteId, rendeu, "O antes e depois rende mais.");
+    await confirmarItem(clienteId, vende, "Vende removedor.");
 
     expect((await contextoConfirmadoDoCliente(clienteId)).map((i) => i.categoria)).toEqual(["vende", "rendeu"]);
   });
@@ -144,17 +146,32 @@ describe("as quatro ações da pessoa", () => {
   it("confirmar duas vezes (duplo toque) não dá erro; confirmar o que foi tirado, sim", async () => {
     const clienteId = await criarCliente();
     const id = await criarItem(clienteId);
-    await confirmarItem(clienteId, id);
-    await expect(confirmarItem(clienteId, id)).resolves.toBeUndefined();
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
+    await expect(confirmarItem(clienteId, id, TEXTO_PADRAO)).resolves.toBe("confirmado");
 
     await tirarItem(clienteId, id);
-    await expect(confirmarItem(clienteId, id)).rejects.toBeInstanceOf(ErroContextoMarca);
+    await expect(confirmarItem(clienteId, id, TEXTO_PADRAO)).rejects.toBeInstanceOf(ErroContextoMarca);
+  });
+
+  it("confirmar um texto que a leitura já trocou: devolve 'mudou' e não confirma o que a pessoa não leu", async () => {
+    const clienteId = await criarCliente();
+    const id = await criarItem(clienteId);
+    // A pessoa abriu a página com este texto; enquanto isso a leitura mensal trocou a proposta.
+    await db().update(contextoMarcaItens).set({ texto: "Agora também vende amaciante." }).where(eq(contextoMarcaItens.id, id));
+
+    await expect(confirmarItem(clienteId, id, TEXTO_PADRAO)).resolves.toBe("mudou");
+    expect(await itemPorId(id)).toMatchObject({ estado: "para_confirmar", textoConfirmado: null });
+    expect(await contextoConfirmadoDoCliente(clienteId)).toEqual([]);
+
+    // Com o texto novo diante dos olhos, confirmar vale.
+    await expect(confirmarItem(clienteId, id, "Agora também vende amaciante.")).resolves.toBe("confirmado");
+    expect((await itemPorId(id)).textoConfirmado).toBe("Agora também vende amaciante.");
   });
 
   it("confirmar limpa a pílula de novidade e guarda quando", async () => {
     const clienteId = await criarCliente();
     const id = await criarItem(clienteId, { novidade: "nova" });
-    await confirmarItem(clienteId, id);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
     const item = await itemPorId(id);
     expect(item).toMatchObject({ estado: "confirmado", novidade: null, textoConfirmado: "Vende removedor de manchas para tecido claro." });
     expect(item.confirmadoEm).not.toBeNull();
@@ -171,10 +188,20 @@ describe("as quatro ações da pessoa", () => {
     expect((await itemPorId(id)).textoConfirmado).toBe(texto500);
   });
 
+  it("corrigir guarda o que a pessoa escreveu, sem apagar nada (< e > de um preço ficam), e recusa texto enorme sem examinar", async () => {
+    const clienteId = await criarCliente();
+    const id = await criarItem(clienteId);
+    await corrigirItem(clienteId, id, "Vendo kits de 5 a 9 reais, nunca  < 50 e sempre > 20 por unidade.");
+    expect((await itemPorId(id)).textoConfirmado).toBe("Vendo kits de 5 a 9 reais, nunca < 50 e sempre > 20 por unidade.");
+
+    await expect(corrigirItem(clienteId, id, "<".repeat(2_001))).rejects.toThrow("longo demais");
+    expect((await itemPorId(id)).textoConfirmado).toBe("Vendo kits de 5 a 9 reais, nunca < 50 e sempre > 20 por unidade.");
+  });
+
   it("tirar e desfazer devolvem o estado de antes (confirmado volta confirmado, não a confirmar)", async () => {
     const clienteId = await criarCliente();
     const id = await criarItem(clienteId);
-    await confirmarItem(clienteId, id);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
 
     await tirarItem(clienteId, id);
     expect(await itemPorId(id)).toMatchObject({ estado: "recusado", estadoAnterior: "confirmado" });
@@ -199,11 +226,11 @@ describe("as quatro ações da pessoa", () => {
     const b = await criarCliente();
     const id = await criarItem(a);
     for (const acao of [
-      () => confirmarItem(b, id),
+      () => confirmarItem(b, id, TEXTO_PADRAO),
       () => corrigirItem(b, id, "texto"),
       () => tirarItem(b, id),
       () => desfazerTirarItem(b, id),
-      () => confirmarItem(a, 99_999_999),
+      () => confirmarItem(a, 99_999_999, TEXTO_PADRAO),
     ]) {
       await expect(acao()).rejects.toBeInstanceOf(ErroContextoMarca);
     }
@@ -268,6 +295,65 @@ describe("secaoDoCliente: o que a tela mostra", () => {
     expect(depois).toMatchObject({ texto: "O que eu disse.", estado: "corrigido" });
   });
 
+  it("uma proposta nova por cima de um texto confirmado mostra a proposta e diz o que continua valendo", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
+    const id = await criarItem(clienteId);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    expect((await secaoDoCliente(cliente, AGORA)).itens[0]).toMatchObject({ estado: "confirmado", texto: TEXTO_PADRAO, valiaAntes: null });
+
+    await db().update(contextoMarcaItens).set({ texto: "Agora também vende amaciante.", estado: "para_confirmar", novidade: "mudou" }).where(eq(contextoMarcaItens.id, id));
+    expect((await secaoDoCliente(cliente, AGORA)).itens[0]).toMatchObject({
+      estado: "para_confirmar",
+      texto: "Agora também vende amaciante.",
+      valiaAntes: TEXTO_PADRAO,
+    });
+  });
+
+  it("os itens tirados vêm numa lista à parte, do mais recente ao mais antigo, para dar para desfazer depois de recarregar", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
+    const a = await criarItem(clienteId, { texto: "Primeiro item." });
+    const b = await criarItem(clienteId, { texto: "Segundo item." });
+    await tirarItem(clienteId, a);
+    await tirarItem(clienteId, b);
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+
+    const secao = await secaoDoCliente(cliente, AGORA);
+    expect(secao.itens).toEqual([]);
+    expect(secao.tirados.map((t) => t.id)).toEqual([b, a]);
+
+    await desfazerTirarItem(clienteId, a);
+    const depois = await secaoDoCliente(cliente, AGORA);
+    expect(depois.itens.map((i) => i.id)).toEqual([a]);
+    expect(depois.tirados.map((t) => t.id)).toEqual([b]);
+  });
+
+  it("a versão da seção muda quando algo muda no servidor, e só então", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
+    const id = await criarItem(clienteId);
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+
+    const antes = (await secaoDoCliente(cliente, AGORA)).versao;
+    expect((await secaoDoCliente(cliente, AGORA)).versao).toBe(antes);
+    await confirmarItem(clienteId, id, TEXTO_PADRAO);
+    expect((await secaoDoCliente(cliente, AGORA)).versao).not.toBe(antes);
+  });
+
+  it("a próxima leitura anunciada é a nova tentativa marcada, e nunca uma data que já passou", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    const ultima = new Date("2026-09-20T10:00:00Z");
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: ultima, proximaTentativaEm: new Date("2026-10-06T10:00:00Z") });
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    expect((await secaoDoCliente(cliente, AGORA)).proximaLeituraEm?.toISOString()).toBe("2026-10-06T10:00:00.000Z");
+
+    // Passou a tentativa marcada e o mês da última leitura boa também: nada a prometer.
+    const muitoDepois = new Date("2026-11-30T10:00:00Z");
+    expect((await secaoDoCliente(cliente, muitoDepois)).proximaLeituraEm).toBeNull();
+  });
+
   it("nunca mostra item de outra marca", async () => {
     const a = await criarCliente({ site: "https://a.exemplo.test" });
     const b = await criarCliente({ site: "https://b.exemplo.test" });
@@ -279,12 +365,23 @@ describe("secaoDoCliente: o que a tela mostra", () => {
 });
 
 describe("enfileirarEntenderMarca", () => {
-  it("duas chamadas seguidas viram um job só; uma chave própria não é engolida pela outra", async () => {
+  it("por evento não há janela: o segundo 'Salvar' da pessoa (o endereço corrigido) nunca é engolido pelo primeiro", async () => {
     const clienteId = await criarCliente();
     await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);
 
     expect(await enfileirarEntenderMarca(clienteId, "evento")).toBe(true);
-    expect(await enfileirarEntenderMarca(clienteId, "evento")).toBe(false);
+    expect(await enfileirarEntenderMarca(clienteId, "evento")).toBe(true);
+    const [{ total }] = (await db().execute(sql`select count(*)::int as total from pgboss.job where name = ${FILAS.entenderMarca}`)).rows as { total: number }[];
+    expect(total).toBe(2);
+  });
+
+  it("a leitura mensal e a reenfileirada têm janela: duas chamadas viram um job só, e a chave própria não é engolida pela outra", async () => {
+    const clienteId = await criarCliente();
+    await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);
+
+    expect(await enfileirarEntenderMarca(clienteId, "mensal", { janelaSegundos: 12 * 3600 })).toBe(true);
+    expect(await enfileirarEntenderMarca(clienteId, "mensal", { janelaSegundos: 12 * 3600 })).toBe(false);
     expect(await enfileirarEntenderMarca(clienteId, "evento", { chave: `marca-${clienteId}-depois`, janelaSegundos: 600, depoisDeSegundos: 605 })).toBe(true);
+    expect(await enfileirarEntenderMarca(clienteId, "evento", { chave: `marca-${clienteId}-depois`, janelaSegundos: 600, depoisDeSegundos: 605 })).toBe(false);
   });
 });

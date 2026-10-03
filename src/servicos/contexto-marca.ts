@@ -11,7 +11,9 @@
  * Este arquivo é importado por `briefing.ts` (`perfilDoCliente`): não pode importar nenhum job que
  * volte a `briefing.ts` (o `analisar-perfil` importa `perfilDoCliente`). Só `jobs/fila`, que enfileira.
  */
-import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
+
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -30,35 +32,20 @@ import { FILAS, boss, garantirBossPronto } from "../jobs/fila";
 
 import {
   type EstadoDaSecao,
+  TAMANHO_MAXIMO_TEXTO_BRUTO_DA_PESSOA,
   TAMANHO_MAXIMO_TEXTO_DA_PESSOA,
   estadoDaSecao,
   itemVisivel,
-  limparTextoSemCortar,
-  proximaLeituraEm,
+  limparTextoDaPessoa,
+  proximaLeituraParaMostrar,
   textoEmVigor,
   textoParaMostrar,
 } from "./contexto-marca-regras";
 
 export class ErroContextoMarca extends Error {}
 
-/** O item é desta marca e está num dos estados esperados; senão, erro (nunca vaza que o id existe em outra marca). */
-async function garantirItemDaMarca(
-  clienteId: number,
-  itemId: number,
-  estados: EstadoItemContextoMarca[],
-): Promise<void> {
-  const [linha] = await db()
-    .select({ id: contextoMarcaItens.id })
-    .from(contextoMarcaItens)
-    .where(
-      and(
-        eq(contextoMarcaItens.id, itemId),
-        eq(contextoMarcaItens.clienteId, clienteId),
-        inArray(contextoMarcaItens.estado, estados),
-      ),
-    );
-  if (!linha) throw new ErroContextoMarca("item nao encontrado.");
-}
+/** Quantos itens tirados a seção lista para a pessoa poder desfazer (os mais recentes primeiro). */
+const MAXIMO_ITENS_TIRADOS_NA_TELA = 20;
 
 export type ItemDaSecao = {
   id: number;
@@ -68,12 +55,28 @@ export type ItemDaSecao = {
   estado: Exclude<EstadoItemContextoMarca, "recusado">;
   /** O que a tela mostra: a proposta pendente, ou o que está em vigor (confirmado ou corrigido). */
   texto: string;
+  /**
+   * Só quando há uma proposta nova por cima de um texto que a pessoa já tinha confirmado: o que continua
+   * valendo nos roteiros até ela decidir. Sem isto a tela mostraria a proposta como se ela já valesse.
+   */
+  valiaAntes: string | null;
   novidade: NovidadeContextoMarca | null;
+};
+
+/** Um item que a pessoa tirou: fica numa lista à parte, para ela poder desfazer depois de recarregar a página. */
+export type ItemTirado = {
+  id: number;
+  categoria: CategoriaContextoMarca;
+  origem: FonteContextoMarca;
+  texto: string;
 };
 
 export type SecaoContextoMarca = {
   estado: EstadoDaSecao;
   itens: ItemDaSecao[];
+  tirados: ItemTirado[];
+  /** Muda quando qualquer coisa da seção muda no servidor: a tela usa de `key` para não ficar com o estado de antes. */
+  versao: string;
   fontes: FonteDoContexto[];
   /** O TikTok da marca está guardado, mas ainda não é lido (Apify suspenso). */
   tiktokGuardado: boolean;
@@ -111,23 +114,60 @@ export async function secaoDoCliente(
       origem: item.origem,
       estado: item.estado as ItemDaSecao["estado"],
       texto: textoParaMostrar(item),
+      valiaAntes: item.estado === "para_confirmar" ? item.textoConfirmado : null,
       novidade: item.novidade,
     }))
     .sort((a, b) => ORDEM_CATEGORIA[a.categoria] - ORDEM_CATEGORIA[b.categoria] || a.id - b.id);
 
+  // O que a pessoa tirou: do mais recente para o mais antigo (id alto primeiro), o texto que estava à mostra.
+  const tirados: ItemTirado[] = itensDoBanco
+    .filter((item) => item.estado === "recusado")
+    .sort((a, b) => b.id - a.id)
+    .slice(0, MAXIMO_ITENS_TIRADOS_NA_TELA)
+    .map((item) => ({
+      id: item.id,
+      categoria: item.categoria,
+      origem: item.origem,
+      texto: item.textoConfirmado ?? item.texto,
+    }));
+
+  const ultimaLeituraOkEm = linha?.ultimaLeituraOkEm ?? null;
+  const proximaLeitura = proximaLeituraParaMostrar(
+    ultimaLeituraOkEm,
+    linha?.proximaTentativaEm ?? null,
+    config.regras.diasEntreLeituraMarca,
+    agora,
+  );
+  const estado = estadoDaSecao({
+    temFonte: marcaTemFonteParaLer(cliente),
+    ultimaLeituraOkEm,
+    ultimaTentativaEm: linha?.ultimaTentativaEm ?? null,
+    lendoDesde: linha?.lendoDesde ?? null,
+    agora,
+  });
+  const fontes = linha?.fontes ?? [];
+  const versao = createHash("sha1")
+    .update(
+      JSON.stringify([
+        estado,
+        ultimaLeituraOkEm?.getTime() ?? null,
+        itens.map((i) => [i.id, i.estado, i.texto, i.valiaAntes, i.novidade]),
+        tirados.map((i) => [i.id, i.texto]),
+        fontes.map((f) => [f.tipo, f.lida, f.motivo ?? null]),
+      ]),
+    )
+    .digest("hex")
+    .slice(0, 16);
+
   return {
-    estado: estadoDaSecao({
-      temFonte: marcaTemFonteParaLer(cliente),
-      ultimaLeituraOkEm: linha?.ultimaLeituraOkEm ?? null,
-      ultimaTentativaEm: linha?.ultimaTentativaEm ?? null,
-      lendoDesde: linha?.lendoDesde ?? null,
-      agora,
-    }),
+    estado,
     itens,
-    fontes: linha?.fontes ?? [],
+    tirados,
+    versao,
+    fontes,
     tiktokGuardado: Boolean(cliente.perfis?.tiktok?.trim()),
-    ultimaLeituraOkEm: linha?.ultimaLeituraOkEm ?? null,
-    proximaLeituraEm: proximaLeituraEm(linha?.ultimaLeituraOkEm ?? null, config.regras.diasEntreLeituraMarca),
+    ultimaLeituraOkEm,
+    proximaLeituraEm: proximaLeitura,
   };
 }
 
@@ -149,8 +189,16 @@ export async function contextoConfirmadoDoCliente(
     .sort((a, b) => ORDEM_CATEGORIA[a.categoria] - ORDEM_CATEGORIA[b.categoria]);
 }
 
-/** "Está certo": a proposta da IA passa a valer. Item que a pessoa tirou não se confirma. */
-export async function confirmarItem(clienteId: number, itemId: number): Promise<void> {
+/**
+ * "Está certo": a proposta da IA passa a valer. Item que a pessoa tirou não se confirma. A pessoa confirma
+ * o texto que VIU (`textoVisto`): se uma leitura nova trocou a proposta enquanto a página estava aberta, a
+ * confirmação não vale para um texto que ela não leu, e o resultado é `"mudou"` (a tela recarrega a seção).
+ */
+export async function confirmarItem(
+  clienteId: number,
+  itemId: number,
+  textoVisto: string,
+): Promise<"confirmado" | "mudou"> {
   const agora = new Date();
   const [linha] = await db()
     .update(contextoMarcaItens)
@@ -167,19 +215,30 @@ export async function confirmarItem(clienteId: number, itemId: number): Promise<
         eq(contextoMarcaItens.id, itemId),
         eq(contextoMarcaItens.clienteId, clienteId),
         eq(contextoMarcaItens.estado, "para_confirmar"),
+        eq(contextoMarcaItens.texto, textoVisto),
       ),
     )
     .returning({ id: contextoMarcaItens.id });
-  if (!linha) {
-    // Já confirmado (duplo toque) conta como feito; outro estado ou outra marca, não.
-    await garantirItemDaMarca(clienteId, itemId, ["confirmado", "corrigido"]);
+  if (linha) return "confirmado";
+
+  const [atual] = await db()
+    .select({ estado: contextoMarcaItens.estado, texto: contextoMarcaItens.texto, textoConfirmado: contextoMarcaItens.textoConfirmado })
+    .from(contextoMarcaItens)
+    .where(and(eq(contextoMarcaItens.id, itemId), eq(contextoMarcaItens.clienteId, clienteId)));
+  if (!atual || atual.estado === "recusado") throw new ErroContextoMarca("item nao encontrado.");
+  // Duplo toque: já está confirmado com o mesmo texto que ela viu, conta como feito.
+  if (atual.estado !== "para_confirmar" && (atual.textoConfirmado === textoVisto || atual.texto === textoVisto)) {
+    return "confirmado";
   }
+  return "mudou";
 }
 
 /** "Corrigir": o texto da pessoa vale no lugar do da IA, e a IA nunca o sobrescreve. */
 export async function corrigirItem(clienteId: number, itemId: number, textoDaPessoa: string): Promise<void> {
-  // Passar do teto é erro, nunca corte: o texto dela entra em todo roteiro como ela escreveu.
-  const texto = limparTextoSemCortar(textoDaPessoa);
+  // Passar do teto é erro, nunca corte: o texto dela entra em todo roteiro como ela escreveu. O tamanho cru
+  // se confere antes de qualquer tratamento (um texto enorme nem é examinado).
+  if (textoDaPessoa.length > TAMANHO_MAXIMO_TEXTO_BRUTO_DA_PESSOA) throw new ErroContextoMarca("o texto está longo demais.");
+  const texto = limparTextoDaPessoa(textoDaPessoa);
   if (texto === "") throw new ErroContextoMarca("escreva o que está certo.");
   if (texto.length > TAMANHO_MAXIMO_TEXTO_DA_PESSOA) throw new ErroContextoMarca("o texto está longo demais.");
   const agora = new Date();
@@ -234,8 +293,14 @@ export async function desfazerTirarItem(clienteId: number, itemId: number): Prom
 
 /**
  * Dispara a leitura da marca sem esperar (mesmo desenho de `enfileirarAnaliseDaPropriaMarca`: ler o
- * site e as redes não pode prender uma ação da pessoa). Uma por marca por janela: dois toques em
- * "Salvar" seguidos viram um job só. Devolve `false` quando o pg-boss deduplicou.
+ * site e as redes não pode prender uma ação da pessoa).
+ *
+ * Por evento (a pessoa salvou o site ou um perfil), SEM janela de deduplicação do pg-boss: a janela é
+ * por balde de tempo e descartaria o segundo "Salvar" (a pessoa corrige o endereço trinta segundos
+ * depois e a leitura corrigida nunca rodaria). O próprio job já cuida do excesso: a trava por marca, o
+ * intervalo mínimo entre leituras por evento (que reenfileira uma só para depois) e o hash das fontes
+ * (que não gasta IA quando nada mudou). Mensal e manual, e a reenfileirada ("depois"), têm janela.
+ * Devolve `false` quando o pg-boss deduplicou.
  */
 export async function enfileirarEntenderMarca(
   clienteId: number,
@@ -243,12 +308,14 @@ export async function enfileirarEntenderMarca(
   opcoes: { janelaSegundos?: number; depoisDeSegundos?: number; chave?: string } = {},
 ): Promise<boolean> {
   await garantirBossPronto();
+  const comJanela = origem !== "evento" || opcoes.chave !== undefined;
   const id = await boss().send(
     FILAS.entenderMarca,
     { clienteId, origem },
     {
-      singletonKey: opcoes.chave ?? `marca-${clienteId}`,
-      singletonSeconds: opcoes.janelaSegundos ?? 60,
+      ...(comJanela
+        ? { singletonKey: opcoes.chave ?? `marca-${clienteId}`, singletonSeconds: opcoes.janelaSegundos ?? 60 }
+        : {}),
       ...(opcoes.depoisDeSegundos ? { startAfter: opcoes.depoisDeSegundos } : {}),
     },
   );

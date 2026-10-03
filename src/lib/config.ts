@@ -206,6 +206,18 @@ export const config = {
     tetoCustoLeituraMarcaMesUsd: envNumero("TETO_CUSTO_LEITURA_MARCA_MES_USD", 5),
     /** Leitura disparada por evento (a pessoa salvou o site ou um perfil) não repete o site em menos de N minutos. */
     minutosEntreLeiturasMarcaPorEvento: envNumero("MINUTOS_ENTRE_LEITURAS_MARCA_EVENTO", 10),
+    /**
+     * Quantas chamadas da tarefa uma marca gasta por dia antes de o job pular (o freio por marca, além do
+     * teto global do mês: quem troca o site de dez em dez minutos não esgota o teto de todo mundo). Cada
+     * leitura gasta uma chamada, ou duas se o verificador reprovar a primeira.
+     */
+    chamadasDeIaPorMarcaPorDia: envNumero("CHAMADAS_IA_MARCA_POR_DIA", 6),
+    /**
+     * O despachante diário lê, sozinho, toda marca ativa com site ou perfil que ainda não foi lida: na primeira
+     * rodada depois de subir a versão, as marcas que já existem. `LEITURA_MARCA_DESPACHO=0` segura isso até
+     * alguém liberar (a leitura por evento, quando a pessoa salva o site ou um perfil, continua).
+     */
+    leituraDaMarcaPeloDespachante: env("LEITURA_MARCA_DESPACHO", "1") !== "0",
   },
 };
 

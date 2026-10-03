@@ -3,9 +3,14 @@
  * (a Conta) só enfileiram `entender-marca` quando o site ou um perfil que se lê (Instagram, YouTube)
  * mudou. Salvar de novo sem mexer não bate no site da pessoa; apagar tudo não enfileira nada; mexer
  * só no TikTok (que não é lido) também não. O PR 1 deixou o Começar sem gatilho nenhum.
+ *
+ * O envio é "sem esperar" (`void ...`): os testes esperam por sondagem (o positivo) e olham por um tempo
+ * (o negativo), nunca por um intervalo fixo que passe só por sorte. Endereços e perfis são fictícios
+ * (`.test`), e a fila é limpa antes e depois: um worker de desenvolvimento no mesmo banco não pode ler
+ * site de verdade por causa de um teste.
  */
 import { eq, sql } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, nichos, user } from "@/db/schema";
@@ -36,14 +41,25 @@ function dadosFixos(extra: { site?: string; instagram?: string; tiktok?: string;
   };
 }
 
-async function jobsDoCliente(clienteId: number, fila: string): Promise<number> {
-  // O envio é "sem esperar" (`void ...`): dá um instante para o pg-boss gravar.
-  await new Promise((resolver) => setTimeout(resolver, 150));
+async function contarJobs(clienteId: number, fila: string): Promise<number> {
   const resultado = await db().execute(sql`
     select count(*)::int as total from pgboss.job
     where name = ${fila} and (data ->> 'clienteId')::int = ${clienteId}
   `);
   return Number((resultado.rows[0] as { total: number }).total);
+}
+
+/** O positivo: espera (até 5 s) o envio "sem esperar" chegar, e confere o total exato. */
+async function esperarJobs(clienteId: number, fila: string, esperado: number): Promise<void> {
+  await expect.poll(() => contarJobs(clienteId, fila), { timeout: 5_000, interval: 50 }).toBe(esperado);
+}
+
+/** O negativo: olha por meio segundo (o envio leva dezenas de milissegundos) e exige que nunca apareça nada. */
+async function garantirSemJobs(clienteId: number, fila: string): Promise<void> {
+  for (let i = 0; i < 10; i += 1) {
+    expect(await contarJobs(clienteId, fila)).toBe(0);
+    await new Promise((resolver) => setTimeout(resolver, 50));
+  }
 }
 
 async function limparFilas(): Promise<void> {
@@ -58,56 +74,69 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
+  await limparFilas();
   await boss().stop({ graceful: false });
   await getPool().end();
 });
 
 beforeEach(limparFilas);
+afterEach(limparFilas);
 
 describe("salvarDadosFixos (o Começar)", () => {
   it("a primeira vez, com site e Instagram: enfileira a leitura da marca e a análise do próprio perfil", async () => {
     const clienteId = await criarCliente();
 
-    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.com.br", instagram: "loja.exemplo" }));
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test", instagram: "loja.exemplo" }));
 
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
-    expect(await jobsDoCliente(clienteId, FILAS.analisarPerfil)).toBe(1);
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
   });
 
   it("salvar de novo sem mudar nada não enfileira de novo (nem bate no site da pessoa)", async () => {
     const clienteId = await criarCliente();
-    const dados = dadosFixos({ site: "https://loja-exemplo.com.br", instagram: "loja.exemplo" });
+    const dados = dadosFixos({ site: "https://loja-exemplo.test", instagram: "loja.exemplo" });
     await salvarDadosFixos(clienteId, dados);
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1); // espera o primeiro envio (é "sem esperar") antes de limpar
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1); // espera o primeiro envio (é "sem esperar") antes de limpar
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
     await limparFilas();
 
     await salvarDadosFixos(clienteId, dados);
 
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
-    expect(await jobsDoCliente(clienteId, FILAS.analisarPerfil)).toBe(0);
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
+    await garantirSemJobs(clienteId, FILAS.analisarPerfil);
+  });
+
+  it("o mesmo endereço escrito de outro jeito (maiúscula, barra no fim) não conta como mudança", async () => {
+    const clienteId = await criarCliente();
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test", instagram: "Loja.Exemplo" }));
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await limparFilas();
+
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test/", instagram: "@loja.exemplo" }));
+
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
   });
 
   it("sem site e sem perfil nenhum: não há o que ler, não enfileira", async () => {
     const clienteId = await criarCliente();
     await salvarDadosFixos(clienteId, dadosFixos());
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
   });
 
-  it("só o TikTok (que não é lido): não enfileira", async () => {
+  it("só o TikTok (que não é lido): não enfileira a leitura da marca", async () => {
     const clienteId = await criarCliente();
     await salvarDadosFixos(clienteId, dadosFixos({ tiktok: "perfil.tiktok" }));
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
   });
 
-  it("trocar o site depois enfileira de novo", async () => {
+  it("trocar o site depois enfileira de novo; e o segundo 'Salvar', logo em seguida (a pessoa corrigiu o endereço), nunca é engolido pelo primeiro", async () => {
     const clienteId = await criarCliente();
-    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.com.br" }));
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
-    await limparFilas();
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test" }));
 
-    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://outra-loja-exemplo.com.br" }));
+    // Sem limpar a fila entre os dois: é o que a pessoa faz ao errar uma letra e corrigir segundos depois.
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://outra-loja-exemplo.test" }));
 
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
+    await esperarJobs(clienteId, FILAS.entenderMarca, 2);
   });
 });
 
@@ -117,59 +146,90 @@ describe("salvarPerfilConta (a Conta)", () => {
   it("o site agora se edita na Conta: grava, e enfileira a leitura", async () => {
     const clienteId = await criarCliente();
 
-    const cliente = await salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site: " https://loja-exemplo.com.br " });
+    const cliente = await salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site: " https://loja-exemplo.test " });
 
-    expect(cliente.site).toBe("https://loja-exemplo.com.br");
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
+    expect(cliente.site).toBe("https://loja-exemplo.test");
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+  });
+
+  it("o endereço digitado sem o https:// (o que quase todo mundo faz) é aceito e guardado com https://", async () => {
+    const clienteId = await criarCliente();
+
+    const cliente = await salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site: "loja-exemplo.test" });
+
+    expect(cliente.site).toBe("https://loja-exemplo.test");
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
   });
 
   it("quem não manda o campo do site (chamada antiga) nunca apaga o que está gravado nem enfileira", async () => {
     const clienteId = await criarCliente();
-    await db().update(clientes).set({ site: "https://loja-exemplo.com.br" }).where(eq(clientes.id, clienteId));
+    await db().update(clientes).set({ site: "https://loja-exemplo.test" }).where(eq(clientes.id, clienteId));
 
     const cliente = await salvarPerfilConta(clienteId, { nome: "Marca nova", perfis: PERFIS_VAZIOS });
 
-    expect(cliente.site).toBe("https://loja-exemplo.com.br");
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
+    expect(cliente.site).toBe("https://loja-exemplo.test");
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
   });
 
   it("site vazio apaga o site", async () => {
     const clienteId = await criarCliente();
-    await db().update(clientes).set({ site: "https://loja-exemplo.com.br" }).where(eq(clientes.id, clienteId));
+    await db().update(clientes).set({ site: "https://loja-exemplo.test" }).where(eq(clientes.id, clienteId));
 
     const cliente = await salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site: "" });
 
     expect(cliente.site).toBeNull();
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
   });
 
-  it("endereço que não parece site é recusado e nada é gravado", async () => {
+  it("endereço que não parece site, ou que tem porta, usuário e senha, ou é de rede interna, é recusado e nada é gravado", async () => {
     const clienteId = await criarCliente();
-    await expect(salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site: "isso nao e um site" })).rejects.toThrow();
+    for (const site of [
+      "isso nao e um site",
+      "https://loja-exemplo.test:6379/",
+      "https://usuario:senha@loja-exemplo.test",
+      "https://169.254.169.254",
+      "https://impressora.local",
+      `https://loja-exemplo.test/${"a".repeat(3_000)}`,
+    ]) {
+      await expect(salvarPerfilConta(clienteId, { nome: "Marca", perfis: PERFIS_VAZIOS, site }), site.slice(0, 40)).rejects.toThrow();
+    }
     const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
     expect(cliente.site).toBeNull();
   });
 
-  it("salvar a Conta sem mexer no site nem nos perfis lidos não enfileira a leitura da marca", async () => {
+  it("salvar a Conta sem mexer no site nem nos perfis não enfileira a leitura da marca nem a análise do próprio perfil", async () => {
     const clienteId = await criarCliente();
-    const dados = { nome: "Marca", perfis: { instagram: "loja.exemplo", tiktok: "", youtube: "" }, site: "https://loja-exemplo.com.br" };
+    const dados = { nome: "Marca", perfis: { instagram: "loja.exemplo", tiktok: "", youtube: "" }, site: "https://loja-exemplo.test" };
     await salvarPerfilConta(clienteId, dados);
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1); // espera o primeiro envio antes de limpar
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1); // espera o primeiro envio antes de limpar
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
     await limparFilas();
 
     await salvarPerfilConta(clienteId, { ...dados, nome: "Marca com outro nome" });
 
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(0);
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
+    await garantirSemJobs(clienteId, FILAS.analisarPerfil);
   });
 
-  it("mudar o Instagram enfileira de novo", async () => {
+  it("mudar o Instagram enfileira de novo, a leitura da marca e a análise do perfil", async () => {
     const clienteId = await criarCliente();
     await salvarPerfilConta(clienteId, { nome: "Marca", perfis: { instagram: "loja.exemplo", tiktok: "", youtube: "" } });
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
     await limparFilas();
 
     await salvarPerfilConta(clienteId, { nome: "Marca", perfis: { instagram: "outra.loja", tiktok: "", youtube: "" } });
 
-    expect(await jobsDoCliente(clienteId, FILAS.entenderMarca)).toBe(1);
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
+  });
+
+  it("mexer só no TikTok não enfileira nada: o TikTok não é lido nem analisado por aqui", async () => {
+    const clienteId = await criarCliente();
+
+    await salvarPerfilConta(clienteId, { nome: "Marca", perfis: { instagram: "", tiktok: "perfil.tiktok", youtube: "" } });
+
+    await garantirSemJobs(clienteId, FILAS.entenderMarca);
+    await garantirSemJobs(clienteId, FILAS.analisarPerfil);
   });
 });

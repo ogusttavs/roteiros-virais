@@ -31,4 +31,24 @@ describe("estadoDoPerfilAnalisado", () => {
       motivo: "conta_restrita",
     });
   });
+
+  it("linha antiga com a frase do PR 1: cada frase conhecida vira o motivo certo (a conta pessoal não vira '@ errado')", () => {
+    const antigas = [
+      ["instagram", "perfil pessoal ou com restricao de idade.", "conta_restrita"],
+      ["youtube", "o canal nao tem video publicado.", "sem_videos"],
+      ["tiktok", "TikTok fora do ar por enquanto (Apify suspenso).", "tiktok_desligado"],
+      ["instagram", "perfil nao encontrado na rede.", "nao_encontrado"],
+    ] as const;
+    for (const [rede, erro, motivo] of antigas) {
+      expect(estadoDoPerfilAnalisado({ ...BASE, rede, erro })).toEqual({ tipo: "sem_leitura", motivo });
+    }
+  });
+
+  it("frase antiga desconhecida cai no padrão da rede, e o motivo gravado vale mais que a frase", () => {
+    expect(estadoDoPerfilAnalisado({ ...BASE, erro: "alguma frase que ninguém mapeou" })).toEqual({ tipo: "sem_leitura", motivo: "nao_encontrado" });
+    expect(estadoDoPerfilAnalisado({ ...BASE, motivo: "sem_videos", erro: "perfil pessoal ou com restricao de idade." })).toEqual({
+      tipo: "sem_leitura",
+      motivo: "sem_videos",
+    });
+  });
 });

@@ -28,7 +28,7 @@ import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { desligarComGraca } from "./desligamento";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
-import { type PayloadEntenderMarca, rodarEntenderMarca } from "./entender-marca";
+import { type PayloadEntenderMarca, tratarJobEntenderMarca } from "./entender-marca";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
@@ -155,10 +155,10 @@ async function main(): Promise<void> {
   });
   /**
    * E38 PR 2: dois modos. O cron diário manda `null` (o despachante); um evento ou o próprio
-   * despachante mandam `{ clienteId, origem }`. `job[0]?.data ?? null` por isso: o cron nunca traz dado.
+   * despachante mandam `{ clienteId, origem }` (`payloadDoJob`, testado: o cron nunca traz dado).
    */
   await boss().work<PayloadEntenderMarca>(FILAS.entenderMarca, async (job) => {
-    await executarComRegistro(FILAS.entenderMarca, () => rodarEntenderMarca(job[0]?.data ?? null));
+    await tratarJobEntenderMarca(job, FILAS.entenderMarca);
   });
 
   console.log("worker no ar.");

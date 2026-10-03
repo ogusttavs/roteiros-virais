@@ -131,3 +131,43 @@
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-dica);
 }
+
+/* Dito só por voz (leitor de tela): a linha muda no lugar e o foco fica onde estava. */
+.somenteLeitorDeTela {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Proposta nova por cima de um texto já confirmado: o que continua valendo até a pessoa decidir. */
+.valiaAntes {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.valiaAntes span {
+  font-weight: var(--peso-medio);
+}
+
+/* Os itens tirados, numa lista à parte (dá para desfazer depois de recarregar a página). */
+.tirados {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.tiradosResumo {
+  display: flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}

@@ -41,8 +41,8 @@ import * as entenderMarcaIA from "@/ia/prompts/entenderMarca";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
-import { limparCampoPerfil } from "@/lib/perfil-redes";
-import { perfilDoCliente } from "@/servicos/briefing";
+import { limparCampoPerfil, perfilPareceValido } from "@/lib/perfil-redes";
+import { formatarPerfilCompilado, perfilDoCliente } from "@/servicos/briefing";
 import { enfileirarEntenderMarca, marcaTemFonteParaLer } from "@/servicos/contexto-marca";
 import {
   MINUTOS_TRAVA_LEITURA,
@@ -54,9 +54,10 @@ import {
   textoParaMostrar,
 } from "@/servicos/contexto-marca-regras";
 
+import { executarComRegistro } from "./execucoes";
 import { ErroMetaApi, erroMetaEhDaConta } from "./meta-api";
 import { type ContaConfirmada, confirmarInstagram, confirmarYoutube } from "./pesquisa-de-setor";
-import { type ResultadoLeituraSite, lerSiteDaMarca } from "./site-api";
+import { type MotivoLeituraSite, type ResultadoLeituraSite, lerSiteDaMarca } from "./site-api";
 import { ErroYoutubeApi } from "./youtube-api";
 
 export type PayloadEntenderMarca = {
@@ -65,6 +66,21 @@ export type PayloadEntenderMarca = {
   /** Ignora a idade, o intervalo entre leituras, o hash e o teto do mês (só `npm run job -- entender-marca <id> --forcar`). */
   forcar?: boolean;
 } | null;
+
+/**
+ * O que o handler da fila faz com o job que recebeu: o cron manda `null` (o despachante); um evento ou o
+ * próprio despachante mandam `{ clienteId, origem }`. Fica aqui, e não solto no `worker.ts` (que roda
+ * `main()` ao ser importado), para ter teste: um handler que trocasse isto por `null` faria todo evento
+ * rodar o despachante em vez de ler a marca, e nenhuma marca nova seria lida fora do ciclo.
+ */
+export function payloadDoJob(job: { data?: PayloadEntenderMarca }[]): PayloadEntenderMarca {
+  return job[0]?.data ?? null;
+}
+
+/** O que o worker registra para a fila `entender-marca`: a execução em `execucoes_job` e a leitura. */
+export async function tratarJobEntenderMarca(job: { data?: PayloadEntenderMarca }[], nomeDaFila: string): Promise<void> {
+  await executarComRegistro(nomeDaFila, () => rodarEntenderMarca(payloadDoJob(job)));
+}
 
 /** Para os testes trocarem a rede por uma função falsa (o resto do job roda de verdade). */
 export type DepsEntenderMarca = {
@@ -76,7 +92,13 @@ const DIA_MS = 86_400_000;
 /** Falha que costuma passar sozinha (site fora do ar, rede indisponível, IA reprovada): tenta de novo em 3 dias. */
 const DIAS_NOVA_TENTATIVA_TRANSITORIA = 3;
 /** Motivos do leitor de site que costumam passar sozinhos; o resto (rede social, bloqueio, sem texto) espera o ciclo normal. */
-const MOTIVOS_DE_SITE_TRANSITORIOS = new Set<string>(["erro_do_site", "tempo_esgotado", "sem_resposta", "robots_indisponivel"]);
+export const MOTIVOS_DE_SITE_TRANSITORIOS: ReadonlySet<MotivoLeituraSite> = new Set<MotivoLeituraSite>([
+  "erro_do_site",
+  "tempo_esgotado",
+  "sem_resposta",
+  "robots_indisponivel",
+]);
+const UM_DIA_MS = DIA_MS;
 
 const PAGINAS_NO_MAXIMO = 5;
 
@@ -93,14 +115,46 @@ async function custoDoMesUsd(agora: Date): Promise<number> {
   return Number(linha?.total ?? 0);
 }
 
-/** sha256 do que foi lido: o texto limpo das páginas e os títulos dos vídeos (nunca os números de visualização, que mudam todo dia). */
+/**
+ * sha256 do que foi lido: o texto limpo das páginas, os títulos dos vídeos (nunca os números de
+ * visualização, que mudam todo dia) e o resumo do briefing usado. Este último entra para que o briefing
+ * ficar pronto depois da primeira leitura (o Começar lê o site antes de a pessoa responder o briefing)
+ * mude o hash e a IA rode de novo com o briefing na mão, em vez de a leitura ser dada como em dia.
+ */
 export function hashDasFontes(
   hashesDasPaginas: string[],
   redes: { rede: string; titulos: string[] }[],
+  resumoDoBriefing = "",
 ): string {
   return createHash("sha256")
-    .update(JSON.stringify({ site: [...hashesDasPaginas].sort(), redes: redes.map((r) => [r.rede, r.titulos]) }))
+    .update(
+      JSON.stringify({
+        site: [...hashesDasPaginas].sort(),
+        redes: redes.map((r) => [r.rede, r.titulos]),
+        briefing: createHash("sha256").update(resumoDoBriefing).digest("hex"),
+      }),
+    )
     .digest("hex");
+}
+
+/** O próximo dia 1 às 00:00 UTC: quando o teto de custo do mês zera. */
+function inicioDoProximoMes(agora: Date): Date {
+  return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth() + 1, 1));
+}
+
+/** Quantas chamadas da tarefa uma marca já gastou nas últimas 24 horas (o freio por marca, além do teto do mês). */
+async function chamadasDeIaDaMarcaNoDia(clienteId: number, agoraReal: Date): Promise<number> {
+  const [linha] = await db()
+    .select({ total: sql<number>`count(*)::int` })
+    .from(geracoesIA)
+    .where(
+      and(
+        eq(geracoesIA.clienteId, clienteId),
+        eq(geracoesIA.tarefa, "entenderMarca"),
+        gte(geracoesIA.criadoEm, new Date(agoraReal.getTime() - UM_DIA_MS)),
+      ),
+    );
+  return Number(linha?.total ?? 0);
 }
 
 /**
@@ -110,6 +164,11 @@ export function hashDasFontes(
  * esteja velha (nada de insistir no site de quem acabou de falhar).
  */
 async function despachar(agora: Date): Promise<Record<string, unknown>> {
+  // O interruptor de quem sobe a versão: a primeira rodada lê, sozinha, toda marca ativa que ainda não foi lida
+  // (site de cliente buscado, Meta e YouTube chamados). `LEITURA_MARCA_DESPACHO=0` no `.env` segura isto até alguém liberar.
+  if (!config.regras.leituraDaMarcaPeloDespachante) {
+    return { modo: "despacho", desligado: true };
+  }
   const gastoDoMes = await custoDoMesUsd(agora);
   if (gastoDoMes >= config.regras.tetoCustoLeituraMarcaMesUsd) {
     logger.warn({ gastoDoMes }, "entender-marca: teto de custo do mês atingido, nada enfileirado");
@@ -183,7 +242,9 @@ async function lerRede(
   });
 
   const handle = limparCampoPerfil(handleBruto, rede);
-  if (!handle) return naoLida("nao_encontrado");
+  // O handle vai cru para dentro da expressão de campos da Graph API (`business_discovery.username(...)`) e o servidor
+  // nunca o validou (só a tela): um valor com parênteses ou chaves, vindo de uma ação forjada, alteraria a consulta.
+  if (!handle || !perfilPareceValido(handle)) return naoLida("nao_encontrado");
   if (rede === "instagram" && !deps.confirmarRede && !config.coleta.metaAtivo) return naoLida("desligada");
 
   let confirmado: ContaConfirmada | null;
@@ -265,7 +326,21 @@ async function lerMarca(
     const gastoDoMes = await custoDoMesUsd(agora);
     if (gastoDoMes >= config.regras.tetoCustoLeituraMarcaMesUsd) {
       logger.warn({ clienteId, gastoDoMes }, "entender-marca: teto de custo do mês atingido");
+      // Grava a tentativa e a próxima (o dia 1): sem isto a tela de uma marca nova ficaria em "lendo" o mês inteiro.
+      await db()
+        .update(contextoMarca)
+        .set({ ultimaTentativaEm: agora, proximaTentativaEm: inicioDoProximoMes(agora), atualizadoEm: new Date() })
+        .where(eq(contextoMarca.clienteId, clienteId));
       return { ...resumoBase, pulado: "teto_do_mes", custoDoMesUsd: gastoDoMes };
+    }
+    // O freio por marca, além do teto global: quem mexe no site ou no Instagram da Conta de dez em dez minutos não gasta o teto de todos.
+    const chamadasHoje = await chamadasDeIaDaMarcaNoDia(clienteId, inicioReal);
+    if (chamadasHoje >= config.regras.chamadasDeIaPorMarcaPorDia) {
+      await db()
+        .update(contextoMarca)
+        .set({ ultimaTentativaEm: agora, proximaTentativaEm: new Date(agora.getTime() + DIA_MS), atualizadoEm: new Date() })
+        .where(eq(contextoMarca.clienteId, clienteId));
+      return { ...resumoBase, pulado: "limite_do_dia", chamadasHoje };
     }
   }
 
@@ -285,10 +360,12 @@ async function lerMarca(
   try {
     return await lerMarcaComTrava({ ...resumoBase, forcar }, cliente, antes, agora, inicioReal, deps);
   } finally {
+    // Só solta a trava que ESTA leitura pôs (`lendo_desde` igual ao que gravou): uma leitura lenta, que passou do prazo da
+    // trava, não pode soltar a de outra que já a tomou.
     await db()
       .update(contextoMarca)
       .set({ lendoDesde: null })
-      .where(eq(contextoMarca.clienteId, clienteId))
+      .where(and(eq(contextoMarca.clienteId, clienteId), eq(contextoMarca.lendoDesde, agora)))
       .catch((erro: unknown) => logger.error({ err: erro, clienteId }, "entender-marca: nao soltou a trava"));
   }
 }
@@ -309,16 +386,30 @@ async function lerMarcaComTrava(
   let site: { endereco: string; paginas: entenderMarcaIA.PaginaParaIA[] } | null = null;
   let hashesDasPaginas: string[] = [];
   if (cliente.site?.trim()) {
-    const resultado = await (deps.lerSite ?? lerSiteDaMarca)(cliente.site.trim());
-    const paginas = resultado.paginas.filter((pagina) => pagina.texto.trim() !== "").slice(0, PAGINAS_NO_MAXIMO);
-    if (paginas.length > 0) {
-      site = { endereco: enderecoDoSite(resultado, cliente.site), paginas: paginas.map((p) => ({ caminho: caminhoDaPagina(p.url), texto: p.texto })) };
-      hashesDasPaginas = paginas.map((p) => p.hash);
-      fontes.push({ tipo: "site", lida: true, quantidade: paginas.length });
-    } else {
-      const motivo = resultado.motivoGeral ?? "sem_texto";
-      fontes.push({ tipo: "site", lida: false, motivo });
-      if (MOTIVOS_DE_SITE_TRANSITORIOS.has(motivo)) transitorio = true;
+    let resultado: ResultadoLeituraSite | null = null;
+    try {
+      resultado = await (deps.lerSite ?? lerSiteDaMarca)(cliente.site.trim());
+    } catch (erro) {
+      // O contrato do leitor é nunca lançar por falha esperada; um defeito dele não pode derrubar a leitura das
+      // redes nem deixar a marca sem uma próxima tentativa (o despachante bateria no site todo dia, sem nunca ler o resto).
+      logger.error({ err: erro, clienteId }, "entender-marca: o leitor de site lancou");
+      fontes.push({ tipo: "site", lida: false, motivo: "sem_resposta" });
+      transitorio = true;
+    }
+    if (resultado) {
+      const paginas = resultado.paginas.filter((pagina) => pagina.texto.trim() !== "").slice(0, PAGINAS_NO_MAXIMO);
+      // `motivoGeral` nulo é "saiu texto suficiente" (contrato do leitor). Qualquer motivo, mesmo com algumas páginas
+      // (um aviso de "em breve", um site que só monta o texto por programação), é um site que não deu para ler: não se
+      // gasta IA em cima de um aviso, e a frase certa aparece na tela.
+      if (resultado.motivoGeral === null && paginas.length > 0) {
+        site = { endereco: enderecoDoSite(resultado, cliente.site), paginas: paginas.map((p) => ({ caminho: caminhoDaPagina(p.url), texto: p.texto })) };
+        hashesDasPaginas = paginas.map((p) => p.hash);
+        fontes.push({ tipo: "site", lida: true, quantidade: paginas.length });
+      } else {
+        const motivo = resultado.motivoGeral ?? "sem_texto";
+        fontes.push({ tipo: "site", lida: false, motivo });
+        if (MOTIVOS_DE_SITE_TRANSITORIOS.has(motivo)) transitorio = true;
+      }
     }
   }
 
@@ -334,6 +425,14 @@ async function lerMarcaComTrava(
   }
 
   const fontesLidas = new Set<FonteContextoMarca>(fontes.filter((f) => f.lida && f.tipo !== "tiktok").map((f) => f.tipo as FonteContextoMarca));
+  // O que a Conta tem hoje: o que veio de uma fonte que a pessoa tirou sai da tela (se não foi confirmado).
+  const fontesConfiguradas = new Set<FonteContextoMarca>(
+    [
+      cliente.site?.trim() ? "site" : null,
+      cliente.perfis?.instagram?.trim() ? "instagram" : null,
+      cliente.perfis?.youtube?.trim() ? "youtube" : null,
+    ].filter((fonte): fonte is FonteContextoMarca => fonte !== null),
+  );
   const resumoDasFontes = fontes.map((f) => ({ tipo: f.tipo, lida: f.lida, motivo: f.motivo, quantidade: f.quantidade }));
   const quandoTentarDeNovo = (): Date =>
     new Date(agora.getTime() + (transitorio ? DIAS_NOVA_TENTATIVA_TRANSITORIA : config.regras.diasEntreLeituraMarca) * DIA_MS);
@@ -347,8 +446,24 @@ async function lerMarcaComTrava(
     return { ...resumoBase, pulado: "nada_lido", fontes: resumoDasFontes };
   }
 
+  // O resumo do briefing que a IA recebe para comparar. Sem briefing ainda (o Começar lê o site antes de a pessoa
+  // responder as perguntas), a IA não tem com o que comparar: `alemDoBriefing` vale falso (mais abaixo), e quando o
+  // briefing ficar pronto o hash muda e a leitura roda de novo.
+  const perfil = await perfilDoCliente(clienteId);
+  const resumoDoBriefing = perfil
+    ? formatarPerfilCompilado(perfil, { semContextoConfirmado: true })
+        .split("\n")
+        .map((linha) => linha.trim())
+        .filter(Boolean)
+        .join(" | ")
+    : "";
+
   // 3. Mesmas fontes de antes: não gasta IA, só confirma que a leitura continua em dia.
-  const hash = hashDasFontes(hashesDasPaginas, redes.map((r) => ({ rede: r.rede, titulos: r.resumo.videos.map((v) => v.titulo) })));
+  const hash = hashDasFontes(
+    hashesDasPaginas,
+    redes.map((r) => ({ rede: r.rede, titulos: r.resumo.videos.map((v) => v.titulo) })),
+    resumoDoBriefing,
+  );
   if (!resumoBase.forcar && antes?.hashFontes === hash && antes.ultimaLeituraOkEm) {
     await db()
       .update(contextoMarca)
@@ -359,9 +474,6 @@ async function lerMarcaComTrava(
 
   // 4. A IA.
   const itensDoBanco = await db().select().from(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId)).orderBy(asc(contextoMarcaItens.id));
-  const perfil = await perfilDoCliente(clienteId);
-  const resumoDoBriefing = perfil ? [perfil.resumo, `O que vende: ${perfil.fatos.oQueVende}`, `Cliente ideal: ${perfil.fatos.clienteIdeal}`].filter(Boolean).join(" ") : "";
-
   let saida: entenderMarcaIA.SaidaEntenderMarca;
   try {
     const { dados } = await gerarComVerificacao({
@@ -397,13 +509,24 @@ async function lerMarcaComTrava(
     saida = dados;
   } catch (erro) {
     if (!(erro instanceof ErroIA)) throw erro;
-    // Reprovada duas vezes pelo verificador (ou a IA recusou): falha esperada, nova tentativa em alguns dias.
-    logger.error({ err: erro, clienteId }, "entender-marca: a IA nao produziu um texto aprovado");
+    if (/reprovada duas vezes/.test(erro.message)) {
+      // O verificador reprovou o texto nas duas tentativas: falha esperada, nova tentativa em alguns dias.
+      logger.error({ err: erro, clienteId }, "entender-marca: a IA nao produziu um texto aprovado");
+      await db()
+        .update(contextoMarca)
+        .set({ fontes, proximaTentativaEm: new Date(agora.getTime() + DIAS_NOVA_TENTATIVA_TRANSITORIA * DIA_MS), atualizadoEm: new Date() })
+        .where(eq(contextoMarca.clienteId, clienteId));
+      return { ...resumoBase, pulado: "ia_reprovada", fontes: resumoDasFontes };
+    }
+    // Qualquer outro ErroIA (saldo da API acabou, limite de taxa, chave revogada, a API fora do ar) é problema de
+    // infraestrutura, não do texto: nova tentativa amanhã e a falha SOBE (aparece como erro no painel e no Sentry; antes
+    // terminava "ok" e a marca ficava três dias sem tentar, mesmo depois de o saldo voltar).
     await db()
       .update(contextoMarca)
-      .set({ fontes, proximaTentativaEm: new Date(agora.getTime() + DIAS_NOVA_TENTATIVA_TRANSITORIA * DIA_MS), atualizadoEm: new Date() })
-      .where(eq(contextoMarca.clienteId, clienteId));
-    return { ...resumoBase, pulado: "ia_reprovada", fontes: resumoDasFontes };
+      .set({ fontes, proximaTentativaEm: new Date(agora.getTime() + DIA_MS), atualizadoEm: new Date() })
+      .where(eq(contextoMarca.clienteId, clienteId))
+      .catch((falha: unknown) => logger.error({ err: falha, clienteId }, "entender-marca: nao gravou a proxima tentativa"));
+    throw erro;
   }
 
   // 5. Junta com o que já existe, numa transação, com as linhas travadas (a pessoa pode estar confirmando agora).
@@ -416,9 +539,12 @@ async function lerMarcaComTrava(
         origem: item.origem,
         texto: item.texto,
         idAnterior: lerIdAnterior(item.idAnterior),
-        alemDoBriefing: item.alemDoBriefing,
+        // Sem briefing a IA não tem com o que comparar: "além do briefing" não quer dizer nada.
+        alemDoBriefing: resumoDoBriefing !== "" && item.alemDoBriefing,
+        mudouDeSentido: item.mudouDeSentido,
       })),
       fontesLidas,
+      fontesConfiguradas,
       primeiraLeitura: existentes.length === 0 && !antes?.ultimaLeituraOkEm,
       agora,
     });

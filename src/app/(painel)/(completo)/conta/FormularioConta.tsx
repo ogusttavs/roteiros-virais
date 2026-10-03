@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { TemaPreferido, TipoMarca } from "@/db/schema";
 import type { OndeValor } from "@/lib/onde";
 import { montarCampoOnde } from "@/lib/onde";
-import { siteValido } from "@/lib/site-valido";
+import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
@@ -110,9 +110,18 @@ export function FormularioConta({
   const [horaLembrete, setHoraLembrete] = useState(horaLembreteInicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  /** O erro do campo do site fica no próprio campo (liga a ele por `aria-describedby`), não no pé do formulário. */
+  const [erroSite, setErroSite] = useState<string | undefined>(undefined);
   const [toastAberto, setToastAberto] = useState(false);
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
+
+  const formaRef = useRef<HTMLFormElement>(null);
+
+  // O erro do site leva o foco ao próprio campo (o `Campo` não aceita `ref`: acha-se o campo marcado como inválido).
+  useEffect(() => {
+    if (erroSite) formaRef.current?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
+  }, [erroSite]);
 
   const indiceTema = OPCOES_TEMA.findIndex((opcao) => opcao.valor === tema);
   const indiceOnde = dadosFixos.onde.opcoes.findIndex((opcao) => opcao.valor === onde);
@@ -120,13 +129,15 @@ export function FormularioConta({
   async function salvar(evento: FormEvent) {
     evento.preventDefault();
     setErro(null);
+    setErroSite(undefined);
     const horaArredondada = arredondarParaHoraCheia(horaLembrete);
     if (horaArredondada < HORA_LEMBRETE_MINIMA || horaArredondada > HORA_LEMBRETE_MAXIMA) {
       setErro(textosConta.erroHoraForaDaFaixa);
       return;
     }
-    if (site.trim().length > 0 && !siteValido(site.trim())) {
-      setErro(textosBriefing.dadosFixos.siteInvalido);
+    const siteNormalizado = normalizarSite(site);
+    if (siteNormalizado.length > 0 && !siteValido(siteNormalizado)) {
+      setErroSite(textosBriefing.dadosFixos.siteInvalido);
       return;
     }
     if (onde === "local" && regiao.trim().length === 0) {
@@ -146,13 +157,14 @@ export function FormularioConta({
       await salvarContaAction({
         nome,
         perfis: { instagram, tiktok, youtube },
-        site: site.trim(),
+        site: siteNormalizado,
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
         ...(onde ? montarCampoOnde(onde, regiao.trim(), pais.trim(), paises.trim()) : {}),
       });
       avisarRedeOk();
+      setSite(siteNormalizado);
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
       setToastAberto(true);
@@ -166,7 +178,7 @@ export function FormularioConta({
 
   return (
     <>
-      <form className={styles.forma} onSubmit={salvar}>
+      <form ref={formaRef} className={styles.forma} onSubmit={salvar}>
         <Campo rotulo={textosConta.nome} value={nome} onChange={(e) => setNome(e.target.value)} required />
         <Campo
           rotulo={`${textosConta.email} ${textosConta.soLeitura}`}
@@ -203,7 +215,15 @@ export function FormularioConta({
             rotulo={dadosFixos.site.rotulo}
             ajuda={dadosFixos.site.ajuda}
             value={site}
-            onChange={(e) => setSite(e.target.value)}
+            onChange={(e) => {
+              setSite(e.target.value);
+              setErroSite(undefined);
+            }}
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            erro={erroSite}
           />
         </div>
 

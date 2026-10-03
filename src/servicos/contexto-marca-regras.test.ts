@@ -184,7 +184,7 @@ describe("reconciliarItens: o que já existe", () => {
     const resultado = reconciliar([existente({ id: 1, estado: "confirmado", textoConfirmado: "Vende removedor." })], [
       proposto({ idAnterior: 1, texto: "Vende removedor de manchas para tecido claro em frasco de 500 ml" }),
     ]);
-    expect(resultado.atualizar).toEqual([{ id: 1, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
+    expect(resultado.atualizar).toEqual([{ id: 1, novidade: null, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
     expect(resultado.resumo.iguais).toBe(1);
   });
 
@@ -213,7 +213,7 @@ describe("reconciliarItens: o que já existe", () => {
       ],
       [proposto({ idAnterior: 1, texto: "Vende removedor de manchas para tecido claro em frasco de 500 ml." })],
     );
-    expect(resultado.atualizar).toEqual([{ id: 1, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
+    expect(resultado.atualizar).toEqual([{ id: 1, novidade: null, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
     expect(resultado.resumo.mudaram).toBe(0);
   });
 });
@@ -259,7 +259,7 @@ describe("reconciliarItens: o que não voltou", () => {
 
   it("item que a IA volta a propor deixa de estar sumido", () => {
     const resultado = reconciliar([existente({ id: 1, sumiuEm: new Date("2026-09-01T00:00:00Z") })], [proposto({ idAnterior: 1 })]);
-    expect(resultado.atualizar).toEqual([{ id: 1, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
+    expect(resultado.atualizar).toEqual([{ id: 1, novidade: null, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
   });
 });
 
@@ -267,7 +267,7 @@ describe("reconciliarItens: ligação sem id e repetição", () => {
   it("proposta sem id do mesmo assunto de um item vivo liga a ele, não cria outro", () => {
     const resultado = reconciliar([existente({ id: 1 })], [proposto({ texto: "Vende removedor de manchas para tecido claro em frasco de 500 ml." })]);
     expect(resultado.criar).toEqual([]);
-    expect(resultado.atualizar).toEqual([{ id: 1, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
+    expect(resultado.atualizar).toEqual([{ id: 1, novidade: null, ultimaVezVistoEm: AGORA, sumiuEm: null }]);
   });
 
   it("id que a IA inventou é tratado como item novo", () => {

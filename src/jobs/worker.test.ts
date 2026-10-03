@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 
 import { FILAS } from "./fila";
 
-const TEXTO_DO_WORKER = readFileSync(join(__dirname, "worker.ts"), "utf8");
+/** Sem comentários: um `.work(` dentro de um comentário não registra nada, e o regex o casaria. */
+const TEXTO_DO_WORKER = readFileSync(join(__dirname, "worker.ts"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
 
 describe("worker.ts", () => {
   it("toda fila de FILAS tem um boss().work no worker", () => {
@@ -19,5 +22,9 @@ describe("worker.ts", () => {
       const registrada = new RegExp(`\\.work(?:<[^>]*>)?\\(\\s*FILAS\\.${chave}\\b`).test(TEXTO_DO_WORKER);
       expect(registrada, `o worker nao registra a fila "${nome}" (FILAS.${chave})`).toBe(true);
     }
+  });
+
+  it("o handler da fila entender-marca usa o tratador testado, com o nome da própria fila", () => {
+    expect(TEXTO_DO_WORKER).toContain("tratarJobEntenderMarca(job, FILAS.entenderMarca)");
   });
 });

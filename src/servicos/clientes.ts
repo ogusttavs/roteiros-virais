@@ -33,7 +33,7 @@ import {
 } from "@/lib/marca-ativa";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
-import { siteValido } from "@/lib/site-valido";
+import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
@@ -519,6 +519,21 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
 }
 
 /**
+ * O site da marca (E38 PR 2) como o servidor o aceita: aparado, com o tamanho limitado (o que passa disto
+ * nem é examinado), o endereço sem esquema virando https (a pessoa digita "minhaloja.com.br"), e só um
+ * endereço público de verdade. `undefined` continua `undefined` (quem não manda o campo não apaga o site).
+ */
+function campoSite() {
+  return z
+    .string()
+    .trim()
+    .max(TAMANHO_MAXIMO_DO_SITE, { message: "esse endereço não parece um site válido" })
+    .optional()
+    .transform((valor) => (valor === undefined ? undefined : normalizarSite(valor)))
+    .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" });
+}
+
+/**
  * Dados fixos do briefing (briefing-e-rubricas.md, secao 1; brief-frontend.md,
  * 6.2): sem nota, so validacao. "Ramo" e um nicho da lista (nichoId) ou, se o
  * cliente escolher "outro", um texto livre em ramoOutro; os dois nunca
@@ -536,11 +551,7 @@ export const dadosFixosSchema = z
     regiao: z.string().trim().optional(),
     pais: z.string().trim().optional(),
     paises: z.string().trim().optional(),
-    site: z
-      .string()
-      .trim()
-      .optional()
-      .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" }),
+    site: campoSite(),
     nichoId: z.number().int().positive().optional(),
     ramoOutro: z.string().trim().optional(),
     /** P1, item 2: "conhecido" e "negocios" sao valores da persona da marca pessoa (briefing-e-rubricas.md, secao 1b). */
@@ -636,6 +647,12 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
   return cliente;
 }
 
+/** O Instagram ou o YouTube mudou (são os dois que se analisam; o TikTok não). Comparação sem "@" e sem diferença de maiúscula. */
+function perfisMudaram(antes: PerfisCliente | null, depois: PerfisCliente): boolean {
+  const forma = (texto: string | null | undefined): string => (texto ?? "").trim().replace(/^@+/, "").toLowerCase();
+  return forma(antes?.instagram) !== forma(depois.instagram) || forma(antes?.youtube) !== forma(depois.youtube);
+}
+
 /**
  * O site, o Instagram ou o YouTube mudaram e a marca ficou com algo para ler. O TikTok não conta:
  * não é lido (Apify suspenso). Comparação por texto aparado; a leitura normaliza o handle por conta própria.
@@ -645,10 +662,13 @@ export function fontesDeLeituraMudaram(
   depois: { site: string | null; perfis: PerfisCliente | null },
 ): boolean {
   const valor = (texto: string | null | undefined): string => (texto ?? "").trim();
+  // O perfil se compara sem "@" e sem maiúscula ("@Loja" e "loja" são o mesmo perfil); o site, sem a barra do fim.
+  const perfil = (texto: string | null | undefined): string => valor(texto).replace(/^@+/, "").toLowerCase();
+  const endereco = (texto: string | null | undefined): string => valor(texto).replace(/\/+$/, "");
   const mudou =
-    valor(antes?.site) !== valor(depois.site) ||
-    valor(antes?.perfis?.instagram) !== valor(depois.perfis?.instagram) ||
-    valor(antes?.perfis?.youtube) !== valor(depois.perfis?.youtube);
+    endereco(antes?.site) !== endereco(depois.site) ||
+    perfil(antes?.perfis?.instagram) !== perfil(depois.perfis?.instagram) ||
+    perfil(antes?.perfis?.youtube) !== perfil(depois.perfis?.youtube);
   const temAlgoParaLer = Boolean(valor(depois.site) || valor(depois.perfis?.instagram) || valor(depois.perfis?.youtube));
   return mudou && temAlgoParaLer;
 }
@@ -665,11 +685,7 @@ const perfilContaSchema = z.object({
    * lugar dos perfis). `undefined` não mexe no que está gravado (quem não manda o campo, como os
    * testes antigos, nunca apaga o site); vazio apaga.
    */
-  site: z
-    .string()
-    .trim()
-    .optional()
-    .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" }),
+  site: campoSite(),
 });
 
 /**
@@ -722,8 +738,12 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
   if (perfis.instagram) void resolverMetaIgId(clienteId).catch(() => undefined);
 
   // E38, partes 2 e 3: o perfil da própria marca também entra na camada exclusiva; mesmo "sem
-  // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto).
-  void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto). Só
+  // quando um perfil mudou: cada "Salvar" sem mexer em perfil gastaria uma chamada à Meta (que divide o
+  // orçamento por hora com a coleta) e uma chamada de IA por rede, sem nada novo para ler.
+  if (perfisMudaram(antes?.perfis ?? null, perfis)) {
+    void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  }
 
   // E38 PR 2: o site ou um perfil lido mudou; sem mudança, não bate no site da pessoa de novo.
   if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {

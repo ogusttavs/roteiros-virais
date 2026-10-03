@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { PerfisCliente, Persona, QuemGrava, TipoMarca } from "@/db/schema";
 import { montarCampoOnde } from "@/lib/onde";
-import { siteValido } from "@/lib/site-valido";
+import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { Campo } from "@/ui/componentes/Campo";
@@ -95,7 +95,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     (onde !== "local" || regiao.trim().length > 0) &&
     (onde !== "outro_pais" || pais.trim().length > 0) &&
     (onde !== "mais_de_um_pais" || paises.trim().length > 0) &&
-    (site.trim().length === 0 || siteValido(site.trim())) &&
+    (site.trim().length === 0 || siteValido(normalizarSite(site))) &&
     (nichoId !== OUTRO || ramoOutro.trim().length > 0);
 
   async function enviar(evento: FormEvent) {
@@ -112,7 +112,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
         nome,
         // `podeContinuar`, checado acima, já garante `onde` preenchido.
         ...montarCampoOnde(onde as "brasil" | "local" | "outro_pais" | "mais_de_um_pais", regiao.trim(), pais.trim(), paises.trim()),
-        site: site.trim() || undefined,
+        site: normalizarSite(site) || undefined,
         nichoId: nichoId === OUTRO ? undefined : nichoId,
         ramoOutro: nichoId === OUTRO ? ramoOutro : undefined,
         persona,
@@ -168,7 +168,11 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
           ajuda={dadosFixos.site.ajuda}
           value={site}
           onChange={(evento) => setSite(evento.target.value)}
-          erro={tentouEnviar && site.trim().length > 0 && !siteValido(site.trim()) ? t.siteInvalido : undefined}
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          erro={tentouEnviar && site.trim().length > 0 && !siteValido(normalizarSite(site)) ? t.siteInvalido : undefined}
         />
       </Cartao>
 

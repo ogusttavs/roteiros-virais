@@ -6,6 +6,7 @@
  * quebra o teste que o usa, não passa disfarcado.
  */
 import type { ParametrosGeracao } from "./cliente";
+import { ErroIA } from "./erro";
 import type { ResultadoGeracao, TarefaIA } from "./tipos";
 
 const USO_ZERO = {
@@ -16,6 +17,10 @@ const USO_ZERO = {
 };
 
 export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<ResultadoGeracao<T>> {
+  // "[mock:api-fora]" na leitura da marca: a API da IA falha (saldo, limite, fora do ar), que não é o mesmo que o verificador reprovar.
+  if (params.tarefa === "entenderMarca" && params.entrada.includes("[mock:api-fora]")) {
+    throw new ErroIA("erro da API (402): saldo insuficiente.");
+  }
   const dados = params.schema.parse(construirSaidaMock(params.tarefa, params.entrada, params.sistemaEstavel));
   return { dados, modelo: "mock", ...USO_ZERO };
 }
@@ -740,6 +745,8 @@ function mockAnalisarPerfilCitado(entrada: string) {
  */
 function mockEntenderMarca(entrada: string) {
   if (entrada.includes("[mock:vazio]")) return { itens: [] };
+  // "[mock:gritar]": um texto que o verificador mock reprova nas duas tentativas (maiúscula e "!!"), para o teste do ramo "IA reprovada".
+  const gritar = entrada.includes("[mock:gritar]");
   const fontes = extrairCampo(entrada, "Fontes lidas agora:")
     .split(",")
     .map((fonte) => fonte.trim())
@@ -763,9 +770,14 @@ function mockEntenderMarca(entrada: string) {
       return {
         categoria,
         origem: fonte,
-        texto: mudar ? `${textoBase[fonte]} Agora também mostra as novidades da semana.` : textoBase[fonte],
+        texto: gritar
+          ? "ISTO E UM TEXTO GRITADO!!"
+          : mudar
+            ? `${textoBase[fonte]} Agora também mostra as novidades da semana.`
+            : textoBase[fonte],
         idAnterior: anterior ? `i${anterior.id}` : null,
         alemDoBriefing: alem,
+        mudouDeSentido: anterior ? mudar : null,
       };
     }),
   };

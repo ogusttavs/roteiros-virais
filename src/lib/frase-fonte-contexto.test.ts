@@ -11,14 +11,19 @@ describe("fraseDaFonteNaoLida", () => {
   });
 
   it("site: uma frase por motivo, e uma de reserva para motivo desconhecido", () => {
-    expect(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo: "sem_texto" })).toContain("só aparece no navegador");
+    expect(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo: "sem_texto" })).toContain("não conseguimos pegar o texto dele");
+    expect(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo: "robots_proibe" })).toContain("pede que robôs não leiam");
     expect(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo: "rede_social" })).toContain("rede social");
     expect(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo: "inventado" })).toBe("Site: não deu para ler.");
     expect(fraseDaFonteNaoLida({ tipo: "site", lida: false })).toBe("Site: não deu para ler.");
   });
 
   it("rede: o nome da rede entra na frase", () => {
-    expect(fraseDaFonteNaoLida({ tipo: "instagram", lida: false, motivo: "conta_restrita" })).toContain("Instagram: ");
+    // O código 110 da Meta serve ao @ que não existe e à conta pessoal: a frase cobre os dois, sem acusar só um.
+    const restrita = fraseDaFonteNaoLida({ tipo: "instagram", lida: false, motivo: "conta_restrita" }) ?? "";
+    expect(restrita).toContain("Instagram: ");
+    expect(restrita).toContain("Confira o @");
+    expect(restrita).toContain("conta profissional");
     expect(fraseDaFonteNaoLida({ tipo: "youtube", lida: false, motivo: "sem_videos" })).toBe(
       "YouTube: ainda não tem vídeo publicado para a gente ler.",
     );

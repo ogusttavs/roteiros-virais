@@ -6,11 +6,14 @@
  * As regras que não podem falhar (cada uma tem teste):
  * - a correção da pessoa nunca é sobrescrita pela IA, e o que ela confirmou continua em vigor até
  *   ela decidir sobre uma proposta nova;
- * - item que a pessoa tirou nunca volta, nem com outras palavras;
+ * - item que a pessoa tirou nunca volta, nem com outras palavras, nem em outra categoria;
  * - um item só pode declarar uma origem (site, Instagram, YouTube) que foi lida de verdade naquela
- *   leitura; e o que veio de uma fonte que não foi lida agora fica como está, nunca "sumiu";
+ *   leitura; e o que veio de uma fonte que não foi lida agora fica como está, nunca "sumiu" (a não
+ *   ser que a pessoa tenha tirado a fonte da Conta: aí o que não foi confirmado sai da tela);
+ * - a IA não escolhe a categoria de um item que já existe: o id só liga dentro da mesma categoria;
  * - a primeira leitura de uma marca não marca tudo como novidade (viraria ruído); só marca o que a
- *   IA achou que a pessoa não tinha contado.
+ *   IA achou que a pessoa não tinha contado;
+ * - texto de terceiros que parece ordem, endereço ou dado de contato nunca vira item.
  */
 import type {
   CategoriaContextoMarca,
@@ -22,12 +25,21 @@ import type {
 
 /** Quantos itens vivos (não tirados, não sumidos) a seção comporta. */
 export const TETO_ITENS_ATIVOS = 12;
-/** Tamanho máximo do texto de um item, depois de limpo. */
+/** Tamanho máximo do texto de um item da IA, depois de limpo. */
 export const TAMANHO_MAXIMO_ITEM = 320;
 /** Duas frases com esta semelhança (palavras em comum) dizem a mesma coisa. */
 export const LIMIAR_MESMO_TEXTO = 0.8;
 /** Semelhança mínima para ligar uma proposta sem id a um item que já existe, ou a um que foi tirado. */
 export const LIMIAR_MESMO_ASSUNTO = 0.6;
+/**
+ * Quando a IA cita o id e diz que o sentido não mudou (`mudouDeSentido: false`), basta um mínimo de
+ * palavras em comum para acreditar: uma paráfrase honesta ("Oferece cursos de culinária" para "Vende
+ * cursos de gastronomia") divide poucas palavras, e a regra 6 do prompt a permite. Abaixo disto, o
+ * "não mudou" da IA não vale e o item vira "mudou" (o erro contrário esconderia uma mudança de fato).
+ */
+export const LIMIAR_PARAFRASE_DECLARADA = 0.25;
+/** Quantos caracteres do texto cru de terceiros se olham antes de qualquer regex (limite do custo). */
+const LIMITE_DO_TEXTO_CRU = 5_000;
 
 /** Rótulo de cada categoria no texto que vai para os prompts (perfil compilado). */
 export const ROTULO_CATEGORIA: Record<CategoriaContextoMarca, string> = {
@@ -50,6 +62,8 @@ export type ItemProposto = {
   idAnterior: number | null;
   /** A IA achou que isto acrescenta ou contradiz o que a pessoa respondeu no briefing. */
   alemDoBriefing: boolean;
+  /** Só com `idAnterior`: a IA diz se o sentido mudou em relação ao item que já existe. */
+  mudouDeSentido?: boolean | null;
 };
 
 export type AtualizacaoItem = {
@@ -78,20 +92,35 @@ export type Reconciliacao = {
     mudaram: number;
     iguais: number;
     sumiram: number;
-    descartados: { origemNaoLida: number; tiradoVoltando: number; repetido: number; acimaDoTeto: number };
+    descartados: { origemNaoLida: number; tiradoVoltando: number; repetido: number; acimaDoTeto: number; suspeito: number };
   };
 };
 
-/** Uma linha só, sem marcação e sem espaço sobrando, sem cortar nada (para medir o tamanho de verdade). */
+/**
+ * Uma linha só, sem marcação e sem espaço sobrando, sem cortar nada (para medir o tamanho de verdade).
+ * É para texto de TERCEIROS (a IA, os títulos de vídeo): olha só os primeiros `LIMITE_DO_TEXTO_CRU`
+ * caracteres, e a marcação sai com um padrão linear (`[^<>]*`: cada `<` falha na hora se achar outro
+ * `<`; o `[^>]*` de antes era quadrático com muitos `<` e nenhum `>`).
+ */
 export function limparTextoSemCortar(bruto: string): string {
   return bruto
-    .replace(/<[^>]*>/g, " ")
+    .slice(0, LIMITE_DO_TEXTO_CRU)
+    .replace(/<[^<>]*>/g, " ")
     .replace(/[<>]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-/** O mesmo, cortado (de preferência numa palavra inteira) no tamanho que cabe na tela e no prompt. */
+/**
+ * O texto que a PESSOA escreve ao corrigir: só junta as linhas e tira o espaço das pontas. Nada é
+ * apagado ("preço < 50 e > 20" fica como ela escreveu); o `<` e o `>` só são trocados na hora de
+ * montar o prompt da leitura, que nunca recebe marcação.
+ */
+export function limparTextoDaPessoa(bruto: string): string {
+  return bruto.replace(/\s+/g, " ").trim();
+}
+
+/** O mesmo que `limparTextoSemCortar`, cortado (de preferência numa palavra inteira) no tamanho da tela e do prompt. */
 export function limparTextoDoItem(bruto: string, maximo: number = TAMANHO_MAXIMO_ITEM): string {
   const limpo = limparTextoSemCortar(bruto);
   if (limpo.length <= maximo) return limpo;
@@ -137,6 +166,29 @@ export function lerIdAnterior(bruto: string | null | undefined): number | null {
   return achado ? Number(achado[1]) : null;
 }
 
+const PADRAO_ENDERECO_NA_WEB = /(?:https?:\/\/|www\.)\S+/i;
+const PADRAO_EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.\p{L}{2,}/u;
+/** Oito dígitos ou mais, mesmo com espaço, ponto, hífen e parênteses no meio: telefone. Preço (R$ 1.299,00) tem seis. */
+const PADRAO_NUMERO_DE_CONTATO = /(?:\d[\s().-]*){8,}/;
+const PADRAO_ORDEM_ESCONDIDA =
+  /\b(?:ignor[ae]r?|desconsider[ae]r?|esque[cç]a|instru[cç](?:ão|ões|ao|oes)\s+anteriores?|nova\s+instru[cç](?:ão|ao)|a\s+partir\s+de\s+agora|voc[eê]\s+(?:deve|precisa)\s)/i;
+
+/**
+ * O texto de um item é uma descrição da marca para a pessoa confirmar e, confirmado, entra no prompt de
+ * todo roteiro, tema e plano. Um site (ou um site invadido) pode tentar fazer a IA escrever uma ordem, um
+ * endereço de venda ou um telefone dentro de um item; a pessoa pode tocar "Está certo" sem ler. Estas
+ * checagens, por código, descartam esse item antes de ele existir (o modelo já é instruído a não
+ * escrever nada disso, mas a regra dura é do código).
+ */
+export function itemSuspeito(texto: string): boolean {
+  return (
+    PADRAO_ENDERECO_NA_WEB.test(texto) ||
+    PADRAO_EMAIL.test(texto) ||
+    PADRAO_NUMERO_DE_CONTATO.test(texto) ||
+    PADRAO_ORDEM_ESCONDIDA.test(texto)
+  );
+}
+
 /** O texto que a tela mostra: a proposta pendente, ou o que está em vigor quando não há nada a decidir. */
 export function textoParaMostrar(item: Pick<ContextoMarcaItem, "texto" | "textoConfirmado" | "estado">): string {
   if (item.estado === "para_confirmar") return item.texto;
@@ -167,10 +219,31 @@ export function proximaLeituraEm(ultimaLeituraOkEm: Date | null, dias: number): 
   return new Date(ultimaLeituraOkEm.getTime() + dias * 86_400_000);
 }
 
-/** Uma leitura que passa disto sem terminar foi interrompida: a trava solta e outra pode começar. */
-export const MINUTOS_TRAVA_LEITURA = 30;
+/**
+ * A data que a tela anuncia como "a próxima leitura": a nova tentativa marcada, quando há (uma leitura
+ * parcial promete tentar de novo em alguns dias, não só no mês seguinte), senão N dias depois da última
+ * leitura boa. Nunca uma data que já passou (o despachante diário lê no dia seguinte): nesse caso, nada.
+ */
+export function proximaLeituraParaMostrar(
+  ultimaLeituraOkEm: Date | null,
+  proximaTentativaEm: Date | null,
+  dias: number,
+  agora: Date,
+): Date | null {
+  const data = proximaTentativaEm && proximaTentativaEm > agora ? proximaTentativaEm : proximaLeituraEm(ultimaLeituraOkEm, dias);
+  return data && data > agora ? data : null;
+}
+
+/**
+ * Uma leitura que passa disto sem terminar foi interrompida: a trava solta e outra pode começar. Maior
+ * que o pior caso de espera pela janela da Meta (quase uma hora, `aguardarJanela`); a tela também só
+ * considera "lendo" por esse tempo.
+ */
+export const MINUTOS_TRAVA_LEITURA = 90;
 /** O texto que a própria pessoa escreve ao corrigir um item: mais folgado que o da IA, nunca cortado em silêncio. */
 export const TAMANHO_MAXIMO_TEXTO_DA_PESSOA = 500;
+/** O que se aceita receber como correção antes de qualquer tratamento (acima disto, erro sem olhar o texto). */
+export const TAMANHO_MAXIMO_TEXTO_BRUTO_DA_PESSOA = 2_000;
 
 /**
  * O que a seção do briefing mostra, em quatro estados (os quatro estados de toda tela, brief-frontend
@@ -247,18 +320,23 @@ export function reconciliarItens(entrada: {
   existentes: ItemExistente[];
   propostos: ItemProposto[];
   fontesLidas: ReadonlySet<FonteContextoMarca>;
+  /**
+   * As fontes que a marca tem hoje na Conta (site informado, Instagram, YouTube). O que veio de uma
+   * fonte que a pessoa tirou da Conta sai da tela (se não foi confirmado). Sem este campo, a regra não vale.
+   */
+  fontesConfiguradas?: ReadonlySet<FonteContextoMarca>;
   primeiraLeitura: boolean;
   agora: Date;
   tetoAtivos?: number;
 }): Reconciliacao {
-  const { existentes, fontesLidas, primeiraLeitura, agora } = entrada;
+  const { existentes, fontesLidas, fontesConfiguradas, primeiraLeitura, agora } = entrada;
   const teto = entrada.tetoAtivos ?? TETO_ITENS_ATIVOS;
   const resumo: Reconciliacao["resumo"] = {
     novos: 0,
     mudaram: 0,
     iguais: 0,
     sumiram: 0,
-    descartados: { origemNaoLida: 0, tiradoVoltando: 0, repetido: 0, acimaDoTeto: 0 },
+    descartados: { origemNaoLida: 0, tiradoVoltando: 0, repetido: 0, acimaDoTeto: 0, suspeito: 0 },
   };
   const atualizacoes = new Map<number, AtualizacaoItem>();
   const criar: NovoItem[] = [];
@@ -267,7 +345,7 @@ export function reconciliarItens(entrada: {
   const ligados = new Set<number>();
   const tirados = existentes.filter((item) => item.estado === "recusado");
 
-  // A. Limpa e filtra o que a IA propôs.
+  // A. Limpa e filtra o que a IA propôs. Um id que não existe (a IA pode inventar) conta como "sem id".
   const limpos: ItemProposto[] = [];
   for (const proposto of entrada.propostos) {
     const texto = limparTextoDoItem(proposto.texto);
@@ -276,80 +354,111 @@ export function reconciliarItens(entrada: {
       resumo.descartados.origemNaoLida += 1;
       continue;
     }
+    if (itemSuspeito(texto)) {
+      resumo.descartados.suspeito += 1;
+      continue;
+    }
+    const idValido = proposto.idAnterior !== null && porId.has(proposto.idAnterior) ? proposto.idAnterior : null;
     const repetido = limpos.some(
       (outro) =>
-        (proposto.idAnterior !== null && outro.idAnterior === proposto.idAnterior) ||
+        (idValido !== null && outro.idAnterior === idValido) ||
         (outro.categoria === proposto.categoria && similaridade(outro.texto, texto) >= LIMIAR_MESMO_TEXTO),
     );
     if (repetido) {
       resumo.descartados.repetido += 1;
       continue;
     }
-    limpos.push({ ...proposto, texto });
+    limpos.push({ ...proposto, texto, idAnterior: idValido });
   }
 
-  // B. Primeiro as que citam um id que existe: é a ligação que a IA fez de propósito.
+  // B. Primeiro as que citam um id que existe: é a ligação que a IA fez de propósito. Só vale dentro da
+  //    mesma categoria: uma confirmação de "vende" nunca vira "fala" porque a IA reaproveitou o id.
   const semLigacao: ItemProposto[] = [];
   const paraLigar: { proposto: ItemProposto; existente: ItemExistente }[] = [];
   for (const proposto of limpos) {
     const citado = proposto.idAnterior !== null ? porId.get(proposto.idAnterior) : undefined;
-    if (citado && !ligados.has(citado.id)) {
-      if (!estaVivo(citado)) {
-        resumo.descartados.tiradoVoltando += 1;
-        continue;
-      }
-      ligados.add(citado.id);
-      paraLigar.push({ proposto, existente: citado });
-    } else {
-      semLigacao.push(proposto);
+    if (!citado || ligados.has(citado.id)) {
+      semLigacao.push({ ...proposto, idAnterior: null });
+      continue;
     }
-  }
-
-  // C. As sem id: se é o que a pessoa tirou, descarta; se é o mesmo assunto de um item vivo, liga; senão é novo.
-  for (const proposto of semLigacao) {
-    const lembraUmTirado = tirados.some(
-      (tirado) =>
-        tirado.categoria === proposto.categoria &&
-        similaridade(tirado.texto, proposto.texto) >= LIMIAR_MESMO_ASSUNTO,
-    );
-    if (lembraUmTirado) {
+    if (!estaVivo(citado)) {
       resumo.descartados.tiradoVoltando += 1;
       continue;
     }
-    let melhor: ItemExistente | null = null;
-    let melhorNota = 0;
+    if (citado.categoria !== proposto.categoria) {
+      semLigacao.push({ ...proposto, idAnterior: null });
+      continue;
+    }
+    ligados.add(citado.id);
+    paraLigar.push({ proposto, existente: citado });
+  }
+
+  // C. As sem id: se lembra o que a pessoa tirou (em qualquer categoria), descarta; se é o mesmo assunto de um
+  //    item vivo da mesma categoria, liga (os pares de maior semelhança primeiro, nunca pela ordem da IA);
+  //    senão é novo.
+  const restantes: ItemProposto[] = [];
+  for (const proposto of semLigacao) {
+    if (tirados.some((tirado) => similaridade(tirado.texto, proposto.texto) >= LIMIAR_MESMO_ASSUNTO)) {
+      resumo.descartados.tiradoVoltando += 1;
+      continue;
+    }
+    restantes.push(proposto);
+  }
+  const pares: { indice: number; existente: ItemExistente; nota: number }[] = [];
+  restantes.forEach((proposto, indice) => {
     for (const existente of existentes) {
       if (!estaVivo(existente) || ligados.has(existente.id) || existente.categoria !== proposto.categoria) continue;
       const nota = Math.max(
         similaridade(existente.texto, proposto.texto),
         existente.textoConfirmado ? similaridade(existente.textoConfirmado, proposto.texto) : 0,
       );
-      if (nota >= LIMIAR_MESMO_ASSUNTO && nota > melhorNota) {
-        melhor = existente;
-        melhorNota = nota;
-      }
+      if (nota >= LIMIAR_MESMO_ASSUNTO) pares.push({ indice, existente, nota });
     }
-    if (melhor) {
-      ligados.add(melhor.id);
-      paraLigar.push({ proposto, existente: melhor });
-    } else {
-      criar.push({
-        categoria: proposto.categoria,
-        origem: proposto.origem,
-        texto: proposto.texto,
-        novidade: primeiraLeitura ? (proposto.alemDoBriefing ? "alem_do_briefing" : null) : "nova",
-      });
-    }
+  });
+  pares.sort((a, b) => b.nota - a.nota);
+  const propostasLigadas = new Set<number>();
+  for (const par of pares) {
+    if (propostasLigadas.has(par.indice) || ligados.has(par.existente.id)) continue;
+    propostasLigadas.add(par.indice);
+    ligados.add(par.existente.id);
+    paraLigar.push({ proposto: restantes[par.indice], existente: par.existente });
   }
+  restantes.forEach((proposto, indice) => {
+    if (propostasLigadas.has(indice)) return;
+    criar.push({
+      categoria: proposto.categoria,
+      origem: proposto.origem,
+      texto: proposto.texto,
+      novidade: primeiraLeitura ? (proposto.alemDoBriefing ? "alem_do_briefing" : null) : "nova",
+    });
+  });
 
-  // D. Os ligados: igual (só atualiza a data) ou mudou (a nova proposta vai a confirmar, o que estava em vigor continua).
+  // D. Os ligados. Igual: só a data (e a pílula de "novidade deste mês" dura até a leitura seguinte, então
+  //    sai aqui). A IA voltou a dizer o que a pessoa tinha confirmado, e havia uma proposta pendente
+  //    diferente: a pendente cai e o item volta a ser o que a pessoa confirmou. Mudou: a nova proposta vai
+  //    a confirmar, e o que estava em vigor continua valendo até ela decidir.
   for (const { proposto, existente } of paraLigar) {
-    const igualAProposta = similaridade(existente.texto, proposto.texto) >= LIMIAR_MESMO_TEXTO;
+    const semelhancaComAProposta = similaridade(existente.texto, proposto.texto);
+    const semelhancaComOConfirmado = existente.textoConfirmado !== null ? similaridade(existente.textoConfirmado, proposto.texto) : 0;
+    const diziaQueNaoMudou = proposto.mudouDeSentido === false;
+    const igualAProposta =
+      semelhancaComAProposta >= LIMIAR_MESMO_TEXTO || (diziaQueNaoMudou && semelhancaComAProposta >= LIMIAR_PARAFRASE_DECLARADA);
     const igualAoConfirmado =
-      existente.textoConfirmado !== null && similaridade(existente.textoConfirmado, proposto.texto) >= LIMIAR_MESMO_TEXTO;
-    if (igualAProposta || igualAoConfirmado) {
+      existente.textoConfirmado !== null &&
+      (semelhancaComOConfirmado >= LIMIAR_MESMO_TEXTO || (diziaQueNaoMudou && semelhancaComOConfirmado >= LIMIAR_PARAFRASE_DECLARADA));
+    if (igualAProposta) {
       resumo.iguais += 1;
-      atualizacoes.set(existente.id, { id: existente.id, ultimaVezVistoEm: agora, sumiuEm: null });
+      atualizacoes.set(existente.id, { id: existente.id, novidade: null, ultimaVezVistoEm: agora, sumiuEm: null });
+      continue;
+    }
+    if (igualAoConfirmado) {
+      resumo.iguais += 1;
+      atualizacoes.set(
+        existente.id,
+        existente.estado === "para_confirmar"
+          ? { id: existente.id, texto: proposto.texto, estado: "confirmado", novidade: null, ultimaVezVistoEm: agora, sumiuEm: null }
+          : { id: existente.id, novidade: null, ultimaVezVistoEm: agora, sumiuEm: null },
+      );
       continue;
     }
     resumo.mudaram += 1;
@@ -365,10 +474,12 @@ export function reconciliarItens(entrada: {
     });
   }
 
-  // E. O que não voltou: só "sumiu" se a fonte do item foi lida agora (fonte não lida não diz nada).
+  // E. O que não voltou: "sumiu" se a fonte do item foi lida agora e não o repropôs, ou se a pessoa tirou a
+  //    fonte da Conta. Fonte que não foi lida agora (e continua na Conta) não diz nada.
   for (const existente of existentes) {
     if (!estaVivo(existente) || ligados.has(existente.id)) continue;
-    if (!fontesLidas.has(existente.origem)) continue;
+    const fonteTirada = fontesConfiguradas !== undefined && !fontesConfiguradas.has(existente.origem);
+    if (!fontesLidas.has(existente.origem) && !fonteTirada) continue;
     if (existente.sumiuEm === null) {
       resumo.sumiram += 1;
       atualizacoes.set(existente.id, { id: existente.id, sumiuEm: agora });

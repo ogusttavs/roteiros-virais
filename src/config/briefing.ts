@@ -87,7 +87,7 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
     campoPaises: ONDE_CAMPO_PAISES,
     avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
   },
-  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
+  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
     rotulo: "Ramo",
     ajuda: "Escolha o que mais se parece com o seu negócio. Se não achar, escolha \"outro\".",
@@ -125,7 +125,7 @@ const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
     campoPaises: ONDE_CAMPO_PAISES,
     avisoPesquisaNoBrasil: ONDE_AVISO_PESQUISA_NO_BRASIL,
   },
-  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Começa com https://" },
+  site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
     rotulo: "Ramo",
     ajuda: "O ramo do seu assunto principal. Se não achar, escolha \"outro\".",
