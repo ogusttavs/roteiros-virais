@@ -168,6 +168,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
           aria-invalid={Boolean(erro)}
           className={[campo.entrada, styles.entrada, erro ? campo.comErro : ""].filter(Boolean).join(" ")}
           value={texto}
+          title={nomeAtual || undefined}
           placeholder={textosRamo.placeholder}
           autoComplete="off"
           autoCapitalize="none"

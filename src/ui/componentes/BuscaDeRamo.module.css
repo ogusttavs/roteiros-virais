@@ -19,6 +19,8 @@
 .entrada {
   width: 100%;
   padding-left: calc(var(--espaco-3) + 18px + var(--espaco-2));
+  /* Nome comprido ("Importação e desenvolvimento de produto") no celular: reticências com o campo parado, o texto inteiro ao focar. */
+  text-overflow: ellipsis;
 }
 
 .lista {
