@@ -4,11 +4,13 @@ import { useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { TemaPreferido, TipoMarca } from "@/db/schema";
+import { normalizarBusca } from "@/lib/buscar-ramo";
 import type { OndeValor } from "@/lib/onde";
 import { montarCampoOnde } from "@/lib/onde";
 import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
+import { textosRamo } from "@/textos/ramo";
 import { Botao } from "@/ui/componentes/Botao";
 import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
@@ -17,7 +19,7 @@ import { Chips } from "@/ui/componentes/Chips";
 import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { salvarContaAction } from "./acoes";
+import { salvarContaAction, type PedidoDeRamoNaTela } from "./acoes";
 import styles from "./page.module.css";
 
 type Props = {
@@ -36,6 +38,8 @@ type Props = {
   tipo: TipoMarca;
   /** E45, PR 1: o ramo da marca: do catálogo (com `slug`) ou um setor que o admin criou à mão (`slug` nulo, só o nome). */
   ramoInicial: { slug: string | null; nome: string } | null;
+  /** E45 PR 2: o pedido de ramo aberto da marca (o "Não achei o meu") e o ramo provisório em que ela espera. */
+  pedidoDeRamo: PedidoDeRamoNaTela | null;
   ondeInicial: OndeValor | null;
   regiaoInicial: string | null;
   paisInicial: string | null;
@@ -95,6 +99,7 @@ export function FormularioConta({
   nomeMarca,
   tipo,
   ramoInicial,
+  pedidoDeRamo: pedidoDeRamoInicial,
   ondeInicial,
   regiaoInicial,
   paisInicial,
@@ -114,7 +119,24 @@ export function FormularioConta({
    * gravado (achado da revisão independente da E45 PR 1).
    */
   const [ramoSalvo, setRamoSalvo] = useState<string | null>(ramoInicial?.slug ?? null);
-  const ramoMudou = ramo !== null && ramo !== ramoSalvo;
+  /**
+   * "Não achei o meu" (E45 PR 2): o pedido de ramo aberto da marca (o que a página trouxe, e o que a última gravação devolveu), o modo em que o
+   * campo mostra "Não achei o meu" com o texto livre, e o texto. Com pedido aberto a página abre já nesse modo (o ramo do catálogo que ela mostrava
+   * era o provisório, não uma escolha da pessoa).
+   */
+  const [pedidoDeRamo, setPedidoDeRamo] = useState<PedidoDeRamoNaTela | null>(pedidoDeRamoInicial);
+  const [modoOutro, setModoOutro] = useState(pedidoDeRamoInicial !== null);
+  const [ramoOutro, setRamoOutro] = useState(pedidoDeRamoInicial?.texto ?? "");
+  const ramoMudou = !modoOutro && ramo !== null && ramo !== ramoSalvo;
+  /** O texto livre só vai ao servidor se a pessoa o escreveu de novo (ou o escreveu pela primeira vez): salvar sem mexer não refaz o palpite. */
+  const outroMudou = modoOutro && ramoOutro.trim().length > 0 && normalizarBusca(ramoOutro) !== normalizarBusca(pedidoDeRamo?.texto ?? "");
+  const avisoDoPedido = pedidoDeRamo
+    ? pedidoDeRamo.ramoProvisorio
+      ? textosRamo.provisorio(pedidoDeRamo.ramoProvisorio)
+      : ramoInicial && !pedidoDeRamoInicial
+        ? textosRamo.aguardandoNoRamoDeHoje(ramoInicial.nome)
+        : textosRamo.aguardandoSemRamo
+    : null;
   const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
   const [regiao, setRegiao] = useState(regiaoInicial ?? "");
   const [pais, setPais] = useState(paisInicial ?? "");
@@ -164,21 +186,36 @@ export function FormularioConta({
       setErro(textosBriefing.dadosFixos.paisesObrigatorio);
       return;
     }
+    if (modoOutro && ramoOutro.trim().length === 0) {
+      setErro(textosBriefing.dadosFixos.ramoObrigatorio);
+      return;
+    }
     setSalvando(true);
     try {
-      await salvarContaAction({
+      const resultado = await salvarContaAction({
         nome,
         perfis: { instagram, tiktok, youtube },
         ...(siteMudou ? { site: siteNormalizado } : {}),
         ...(ramoMudou ? { ramo } : {}),
+        ...(outroMudou ? { ramoOutro: ramoOutro.trim() } : {}),
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
         ...(onde ? montarCampoOnde(onde, regiao.trim(), pais.trim(), paises.trim()) : {}),
       });
+      // Um erro esperado (o teto de ramos novos do dia) volta como frase, e nada foi gravado: o formulário fica como a pessoa deixou.
+      if (!resultado.ok) {
+        setErro(resultado.erro);
+        return;
+      }
       avisarRedeOk();
       if (siteMudou) setSite(siteNormalizado);
       if (ramoMudou) setRamoSalvo(ramo);
+      // O pedido de ramo depois da gravação: `undefined` o ramo não mexeu; `null` o pedido fechou; objeto, o pedido aberto e o provisório.
+      if (resultado.dado.pedidoDeRamo !== undefined) {
+        setPedidoDeRamo(resultado.dado.pedidoDeRamo);
+        if (resultado.dado.pedidoDeRamo === null) setModoOutro(false);
+      }
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
       setToastAberto(true);
@@ -205,11 +242,33 @@ export function FormularioConta({
           <BuscaDeRamo
             rotulo={textosConta.ramo.rotulo}
             ajuda={textosConta.ramo.ajuda}
-            valor={ramo}
-            nomeForaDoCatalogo={ramoInicial && !ramoInicial.slug ? ramoInicial.nome : null}
-            onEscolher={setRamo}
+            valor={modoOutro ? null : ramo}
+            nomeForaDoCatalogo={modoOutro ? textosBriefing.dadosFixos.naoAchei : ramoInicial && !ramoInicial.slug ? ramoInicial.nome : null}
+            textoNaoAchei={textosBriefing.dadosFixos.naoAchei}
+            onEscolher={(slug) => {
+              setRamo(slug);
+              setModoOutro(false);
+            }}
+            onNaoAchei={(digitado) => {
+              // O que a pessoa acabou de digitar na busca vira o texto livre; sem nada digitado, o texto de antes fica.
+              if (digitado) setRamoOutro(digitado);
+              setModoOutro(true);
+            }}
           />
+          {modoOutro ? (
+            <Campo
+              rotulo={textosConta.ramo.campoOutro}
+              ajuda={textosConta.ramo.ajudaOutro}
+              value={ramoOutro}
+              onChange={(e) => setRamoOutro(e.target.value)}
+            />
+          ) : null}
           {ramoMudou ? <p className={styles.subGrupo}>{textosConta.ramo.aviso}</p> : null}
+          {modoOutro && avisoDoPedido ? (
+            <p className={styles.subGrupo} data-aviso-ramo-provisorio>
+              {avisoDoPedido}
+            </p>
+          ) : null}
         </div>
 
         <div className={styles.grupo}>

@@ -16,4 +16,15 @@ export const textosRamo = {
   naoAcheiAjuda: "Escreva o seu ramo com as suas palavras.",
   /** Lido pelo leitor de tela dentro da opção do ramo que a marca já tem. */
   ramoAtual: "o ramo de hoje",
+  /**
+   * E45 PR 2: o teto de setores novos por dia. A Server Action devolve esta frase em vez de lançar um erro (em produção o Next esconde a
+   * mensagem de um erro lançado, e a pessoa veria "confira os campos" com o formulário certo).
+   */
+  limiteDeRamosNovos: "Muitos ramos novos hoje; tente de novo amanhã.",
+  /** O que a marca vê, no Começar e na Conta, enquanto o pedido do ramo dela espera a conferência e ela já está num ramo provisório. */
+  provisorio: (ramo: string) => `Você está em ${ramo} enquanto a gente confere o seu ramo.`,
+  /** Pedido aberto e nenhum ramo parecido: a marca ainda não tem temas. */
+  aguardandoSemRamo: "A gente vai conferir o seu ramo. Até lá, os temas e as referências do seu ramo ainda não aparecem.",
+  /** Pedido aberto, nenhum ramo parecido, mas a marca já estava num ramo: continua nele. */
+  aguardandoNoRamoDeHoje: (ramo: string) => `A gente vai conferir o seu ramo. Até lá, você continua em ${ramo}.`,
 };

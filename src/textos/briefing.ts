@@ -95,6 +95,8 @@ export const textosBriefing = {
     ramoObrigatorio: "Escreva o seu ramo",
     /** E45, PR 1: tentou continuar sem escolher nenhum ramo na busca. */
     ramoNaoEscolhido: "Escolha o seu ramo na lista",
+    /** E45 PR 2: o nome do "Não achei o meu" quando a Conta o mostra no campo do ramo (a mesma frase do Começar, em `config/briefing.ts`). */
+    naoAchei: "Não achei o meu",
     botaoContinuar: "Continuar",
     salvando: "Salvando",
     erro: "Não conseguimos salvar agora; confira os campos e tente de novo",
