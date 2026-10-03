@@ -13,7 +13,10 @@ import { db, getPool } from "@/db";
 import { contas, nichos, videos } from "@/db/schema";
 import { FILAS } from "@/jobs/fila";
 
-vi.mock("@/jobs/legendas-youtube", () => ({ baixarLegendaYoutube: vi.fn() }));
+vi.mock("@/jobs/legendas-youtube", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/jobs/legendas-youtube")>();
+  return { ...original, baixarLegendaYoutube: vi.fn() };
+});
 vi.mock("@/jobs/audio", async (importarOriginal) => {
   const original = await importarOriginal<typeof import("@/jobs/audio")>();
   return { ...original, baixarAudio: vi.fn(), apagarAudio: vi.fn() };
@@ -34,9 +37,9 @@ vi.mock("@/lib/config", async (importarOriginal) => {
   };
 });
 
-import { baixarLegendaYoutube } from "@/jobs/legendas-youtube";
-import { apagarAudio, baixarAudio, ErroAudio } from "@/jobs/audio";
-import { transcreverAudio } from "@/jobs/groq-api";
+import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
+import { apagarAudio, baixarAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
+import { ErroGroqTempoLimite, transcreverAudio } from "@/jobs/groq-api";
 import { rodarTranscrever } from "@/jobs/transcrever";
 import { config } from "@/lib/config";
 
@@ -588,5 +591,255 @@ describe("rodarTranscrever, V2a item 3: instagram pela media direta", () => {
       const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala} limit 1`);
       expect(jobs.rows.length).toBe(0);
     });
+  });
+});
+
+/**
+ * M5c (hotfix, achado da madrugada de 03/10/2026: o `transcrever` começou às 04:00 e às 07:00 ainda rodava, com 45 vídeos da
+ * Dr.Wash, 3 do Bruno e zero da Overtake): o tempo limite por vídeo no `yt-dlp` (legenda e áudio) e na Groq, o orçamento de
+ * tempo por setor, e a cadeia `extrair-sem-fala` disparando mesmo quando o job para pelo orçamento. O relógio do orçamento é
+ * falso (cada transcrição "leva" 10 minutos): nenhum teste espera tempo de verdade.
+ */
+describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
+  const TRES_DIAS = 3 * DIA_MS;
+
+  it("a legenda do YouTube pendurou (tempo limite): o vídeo falha com nova tentativa em 3 dias, o áudio nem é tentado, e o job segue para o próximo", async () => {
+    await criarVideo("yt-legenda-lenta", { velocidadeRelativa: 5, publicadoEm: diasAtras(3) });
+    await criarVideo("yt-depois-da-lenta", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async (url: string) => {
+      if (url.includes("yt-legenda-lenta")) throw new ErroLegendaTempoLimite("o yt-dlp passou de 90 s buscando a legenda (tempo limite por video)");
+      return LEGENDA_LONGA;
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasPorTempoLimite).toBe(1);
+    expect(resumo.falhasYoutubeBot).toBe(0);
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    // O mesmo proxy, o mesmo YouTube: o áudio penduraria pelo mesmo motivo. Não gasta o limite uma segunda vez neste vídeo.
+    expect(baixarAudio).not.toHaveBeenCalled();
+
+    const [lenta] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-lenta"));
+    expect(lenta.transcricao).toBeNull();
+    const diferenca = lenta.proximaTentativaTranscricao!.getTime() - Date.now();
+    expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
+    expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
+    const [seguinte] = await db().select().from(videos).where(eq(videos.idExterno, "yt-depois-da-lenta"));
+    expect(seguinte.transcricao).toBe(LEGENDA_LONGA.trim());
+  });
+
+  it("o download do áudio pendurou (tempo limite): 3 dias, não os 7 da falha comum, contado à parte", async () => {
+    await criarVideo("tiktok-audio-lento", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioTempoLimite("o yt-dlp passou de 90 s baixando o audio (tempo limite por video)"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasPorTempoLimite).toBe(1);
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-audio-lento"));
+    expect(linha.transcricao).toBeNull();
+    const diferenca = linha.proximaTentativaTranscricao!.getTime() - Date.now();
+    expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
+    expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
+  });
+
+  it("a Groq pendurou (tempo limite): 3 dias, e o áudio baixado é apagado mesmo assim", async () => {
+    await criarVideo("tiktok-groq-lenta", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-groq-lenta.mp3");
+    vi.mocked(transcreverAudio).mockRejectedValue(new ErroGroqTempoLimite("transcricao da Groq passou de 60 s (tempo limite)"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhasPorTempoLimite).toBe(1);
+    expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-groq-lenta.mp3");
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-groq-lenta"));
+    expect(linha.transcricao).toBeNull();
+    const diferenca = linha.proximaTentativaTranscricao!.getTime() - Date.now();
+    expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
+    expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
+  });
+
+  it("dez vídeos seguidos do YouTube pendurados é o proxy fora do ar: o mesmo freio do bloqueio, e o resto fica para a noite seguinte", async () => {
+    config.regras.transcricoesPorDia = 40;
+    const TOTAL = 12;
+    for (let i = 0; i < TOTAL; i += 1) {
+      await criarVideo(`yt-pendurado-${i}`, { velocidadeRelativa: TOTAL - i, publicadoEm: diasAtras(3), semDono: true });
+    }
+    vi.mocked(baixarLegendaYoutube).mockRejectedValue(new ErroLegendaTempoLimite("o yt-dlp passou de 90 s buscando a legenda (tempo limite por video)"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.youtubePausado).toBe(true);
+    expect(resumo.falhasPorTempoLimite).toBe(10);
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(10);
+    // Os dois que nunca foram tentados continuam elegíveis (sem tentativa marcada) para a noite seguinte.
+    const naoTentados = await db().select().from(videos).where(eq(videos.nichoId, nichoId));
+    expect(naoTentados.filter((v) => v.proximaTentativaTranscricao === null)).toHaveLength(2);
+  });
+
+  it("um erro comum de download continua com os 7 dias de sempre (o tempo limite não mudou o resto)", async () => {
+    await criarVideo("tiktok-falha-comum", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video indisponivel"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasPorTempoLimite).toBe(0);
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-falha-comum"));
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(Date.now() + 6 * DIA_MS);
+  });
+});
+
+describe("rodarTranscrever, M5c: o orçamento de tempo por setor e a cadeia", () => {
+  const MIN = 60_000;
+  let nicho2Id: number;
+  let relogio = 0;
+  const agora = () => relogio;
+
+  /** Cada leitura de legenda "leva" 10 minutos do relógio falso; o resto não leva nada. */
+  function legendaQueLeva10Minutos() {
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async () => {
+      relogio += 10 * MIN;
+      return LEGENDA_LONGA;
+    });
+  }
+
+  async function criarVideoDoNicho(nichoDoVideo: number, idExterno: string, prioridade: number) {
+    await db().insert(videos).values({
+      plataforma: "youtube",
+      idExterno,
+      url: `https://exemplo.invalido/${idExterno}`,
+      contaId: null,
+      nichoId: nichoDoVideo,
+      views: 100,
+      publicadoEm: diasAtras(3),
+      velocidadeRelativa: String(prioridade),
+      idioma: "pt",
+    });
+  }
+
+  beforeAll(async () => {
+    const [segundo] = await db().insert(nichos).values({ slug: "transcrever-teste-2", nome: "Transcrever teste 2", termos: [] }).returning();
+    nicho2Id = segundo.id;
+  });
+
+  beforeEach(async () => {
+    relogio = 0;
+    config.regras.transcricoesPorDia = 10;
+    await db().update(nichos).set({ ativo: true }).where(eq(nichos.id, nicho2Id));
+  });
+
+  afterEach(async () => {
+    await db().delete(videos).where(eq(videos.nichoId, nicho2Id));
+    // Os testes de fora deste bloco rodam a rodada global: o segundo setor não pode ficar ativo para eles.
+    await db().update(nichos).set({ ativo: false }).where(eq(nichos.id, nicho2Id));
+    await db().execute(sql`delete from pgboss.job where name = ${FILAS.extrairSemFala}`);
+  });
+
+  async function transcritosDo(nichoDoVideo: number): Promise<number> {
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoDoVideo));
+    return linhas.filter((v) => v.transcricao !== null).length;
+  }
+
+  async function tentativaMarcadaDo(nichoDoVideo: number): Promise<number> {
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoDoVideo));
+    return linhas.filter((v) => v.proximaTentativaTranscricao !== null).length;
+  }
+
+  it("um setor lento para no orçamento, o que sobrou fica para a noite seguinte, e o segundo setor NÃO fica a zero (a madrugada de 03/10)", async () => {
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nicho2Id, `b-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    // 25 min por setor, 10 min por vídeo: cada setor lê 3 (confere o orçamento ANTES de cada vídeo: 0, 10 e 20 min passam; 30 não).
+    const resumo = await rodarTranscrever(undefined, { agora, orcamentoPorSetorMs: 25 * MIN, orcamentoTotalMs: 600 * MIN });
+
+    expect(await transcritosDo(nichoId)).toBe(3);
+    expect(await transcritosDo(nicho2Id)).toBe(3);
+    expect(resumo.transcritosPorLegenda).toBe(6);
+    expect(resumo.setoresParadosPeloOrcamento).toEqual([
+      { slug: "transcrever-teste", ficaramParaDepois: 3 },
+      { slug: "transcrever-teste-2", ficaramParaDepois: 3 },
+    ]);
+    // O que ficou para depois não ganhou nova tentativa marcada: volta sozinho na fila da noite seguinte.
+    expect(await tentativaMarcadaDo(nichoId)).toBe(0);
+    expect(await tentativaMarcadaDo(nicho2Id)).toBe(0);
+    expect(resumo.segundosPorSetor).toEqual({ "transcrever-teste": 30 * 60, "transcrever-teste-2": 30 * 60 });
+  });
+
+  it("o teto do job inteiro divide o que sobra pelos setores que faltam: o primeiro setor não come a parte do segundo", async () => {
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nicho2Id, `b-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    // Teto de 40 min para 2 setores, mesmo com 30 min "por setor": 20 min para o primeiro e os outros 20 para o segundo.
+    const resumo = await rodarTranscrever(undefined, { agora, orcamentoPorSetorMs: 30 * MIN, orcamentoTotalMs: 40 * MIN });
+
+    expect(await transcritosDo(nichoId)).toBe(2);
+    expect(await transcritosDo(nicho2Id)).toBe(2);
+    expect(resumo.transcritosPorLegenda).toBe(4);
+    expect((resumo.setoresParadosPeloOrcamento as unknown[]).length).toBe(2);
+  });
+
+  it("sem estourar o orçamento, o setor lê tudo o que tem (até o teto diário) e nada é registrado como parado", async () => {
+    for (let i = 0; i < 4; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    const resumo = await rodarTranscrever(nichoId, { agora, orcamentoPorSetorMs: 600 * MIN, orcamentoTotalMs: 600 * MIN });
+
+    expect(await transcritosDo(nichoId)).toBe(4);
+    expect(resumo.setoresParadosPeloOrcamento).toBeUndefined();
+  });
+
+  it("o orçamento zero (teto já gasto) não tenta vídeo nenhum, e nada é marcado como falha", async () => {
+    for (let i = 0; i < 3; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    const resumo = await rodarTranscrever(nichoId, { agora, orcamentoPorSetorMs: 0, orcamentoTotalMs: 0 });
+
+    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
+    expect(resumo.falhas).toBe(0);
+    expect(await tentativaMarcadaDo(nichoId)).toBe(0);
+    expect(resumo.setoresParadosPeloOrcamento).toEqual([{ slug: "transcrever-teste", ficaramParaDepois: 3 }]);
+  });
+
+  it("a cadeia dispara no fim da rodada global MESMO quando o job parou pelo orçamento", async () => {
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    const resumo = await rodarTranscrever(undefined, { agora, orcamentoPorSetorMs: 25 * MIN, orcamentoTotalMs: 600 * MIN });
+
+    expect(resumo.setoresParadosPeloOrcamento).toBeDefined();
+    const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala}`);
+    expect(jobs.rows.length).toBe(1);
+  });
+
+  it("a cadeia dispara também quando um erro inesperado interrompe o laço, e o erro continua subindo", async () => {
+    for (let i = 0; i < 3; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+    let chamadas = 0;
+    const relogioQueQuebra = () => {
+      chamadas += 1;
+      if (chamadas >= 4) throw new Error("o relogio quebrou");
+      return relogio;
+    };
+
+    await expect(rodarTranscrever(undefined, { agora: relogioQueQuebra, orcamentoPorSetorMs: 600 * MIN, orcamentoTotalMs: 600 * MIN })).rejects.toThrow("o relogio quebrou");
+
+    const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala}`);
+    expect(jobs.rows.length).toBe(1);
+  });
+
+  it("a primeira carga de um setor (com nichoId) também respeita o orçamento e continua sem encadear", async () => {
+    for (let i = 0; i < 6; i += 1) await criarVideoDoNicho(nichoId, `a-${i}`, 10 - i);
+    legendaQueLeva10Minutos();
+
+    const resumo = await rodarTranscrever(nichoId, { agora, orcamentoPorSetorMs: 25 * MIN, orcamentoTotalMs: 600 * MIN });
+
+    expect(await transcritosDo(nichoId)).toBe(3);
+    expect(resumo.setoresParadosPeloOrcamento).toEqual([{ slug: "transcrever-teste", ficaramParaDepois: 3 }]);
+    const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala}`);
+    expect(jobs.rows.length).toBe(0);
   });
 });

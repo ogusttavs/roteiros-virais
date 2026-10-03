@@ -18,6 +18,9 @@ import { config } from "@/lib/config";
 
 export class ErroGroq extends Error {}
 
+/** A transcrição passou do tempo limite (M5c): conta como falha do vídeo, com nova tentativa em alguns dias, e o job segue. */
+export class ErroGroqTempoLimite extends ErroGroq {}
+
 let cliente: Groq | null = null;
 
 function groq(): Groq {
@@ -63,14 +66,26 @@ export type ResultadoTranscricaoGroq = {
   semFala: boolean;
 };
 
-export async function transcreverAudio(caminhoArquivo: string, idiomaConhecido?: "pt" | "en" | "es"): Promise<ResultadoTranscricaoGroq> {
+/**
+ * `limiteMs`: o prazo da chamada INTEIRA, com as tentativas que o SDK faz sozinho (429, 5xx), por um `AbortSignal` que o SDK
+ * respeita; sem isto, um upload pendurado segurava o `transcrever` até o prazo de 4 horas da fila (M5c). Só o teste passa o limite.
+ */
+export async function transcreverAudio(
+  caminhoArquivo: string,
+  idiomaConhecido?: "pt" | "en" | "es",
+  limiteMs: number = config.transcricao.groqLimiteS * 1000,
+): Promise<ResultadoTranscricaoGroq> {
+  const sinal = AbortSignal.timeout(limiteMs);
   try {
-    const resultado = (await groq().audio.transcriptions.create({
-      model: config.transcricao.groqModel,
-      file: createReadStream(caminhoArquivo),
-      ...(idiomaConhecido ? { language: idiomaConhecido } : {}),
-      response_format: "verbose_json",
-    })) as unknown as RespostaVerboseJson;
+    const resultado = (await groq().audio.transcriptions.create(
+      {
+        model: config.transcricao.groqModel,
+        file: createReadStream(caminhoArquivo),
+        ...(idiomaConhecido ? { language: idiomaConhecido } : {}),
+        response_format: "verbose_json",
+      },
+      { signal: sinal, timeout: limiteMs },
+    )) as unknown as RespostaVerboseJson;
 
     const segmentos = resultado.segments ?? [];
     const mediaSemFala = segmentos.length > 0 ? segmentos.reduce((soma, s) => soma + s.no_speech_prob, 0) / segmentos.length : 0;
@@ -82,6 +97,12 @@ export async function transcreverAudio(caminhoArquivo: string, idiomaConhecido?:
       semFala,
     };
   } catch (erro) {
+    // O limite estourou: o nosso sinal abortou, ou o SDK deu o seu próprio "timeout" (`APIConnectionTimeoutError`; o nome, não a
+    // classe, porque nada aqui pode depender de importar a classe do SDK). As duas são o mesmo caso.
+    const nome = typeof erro === "object" && erro !== null ? (erro as { name?: string }).name : undefined;
+    if (sinal.aborted || nome === "APIConnectionTimeoutError") {
+      throw new ErroGroqTempoLimite(`transcricao da Groq passou de ${Math.round(limiteMs / 1000)} s (tempo limite)`);
+    }
     throw new ErroGroq(`transcricao da Groq falhou: ${String(erro)}`);
   }
 }

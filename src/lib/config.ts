@@ -81,6 +81,15 @@ export const config = {
      * Gustavo); TikTok usa o mesmo proxy, o Instagram nunca usa.
      */
     ytdlpProxy: env("YTDLP_PROXY"),
+    /**
+     * Tempo limite de UM download do `yt-dlp` (áudio ou legenda), em segundos (M5c, achado de 03/10/2026: sem limite, um
+     * vídeo pendurado no proxy segurava o `transcrever` inteiro por mais de 4 horas). Passou disto, o processo é morto, a
+     * falha conta e o job segue para o próximo vídeo. Um áudio de 64 kbps de um vídeo curto baixa em segundos; 90 s já é
+     * proxy engasgado.
+     */
+    ytdlpLimiteS: envNumero("YTDLP_LIMITE_S", 90),
+    /** Tempo limite de UMA transcrição na Groq (todas as tentativas do SDK juntas), em segundos (M5c). */
+    groqLimiteS: envNumero("GROQ_LIMITE_S", 60),
   },
   coleta: {
     youtubeKey: env("YOUTUBE_API_KEY"),
@@ -146,6 +155,18 @@ export const config = {
     vigilanciaPorNicho: 50,
     limiarForaDaCurva: 3,
     transcricoesPorDia: 40,
+    /**
+     * Orçamento de tempo do `transcrever` por setor, em minutos (M5c): passou disto, o setor para (o que sobrou fica para
+     * a noite seguinte: a fila é por vídeo ainda sem leitura) e o job passa ao próximo setor. Sem isto, um setor lento
+     * (o YouTube pelo proxy, 4 minutos por vídeo) comia a madrugada inteira e os setores seguintes ficavam a zero.
+     */
+    orcamentoTranscreverPorSetorMin: envNumero("ORCAMENTO_TRANSCREVER_SETOR_MIN", 30),
+    /**
+     * Teto do `transcrever` inteiro, em minutos (M5c): 3h30, abaixo das 4 horas em que a fila dá o job por vencido. O orçamento
+     * de cada setor é o menor entre o seu e o que sobra deste teto dividido pelos setores que faltam, então nenhum setor
+     * fica de fora por causa dos de antes, e o job sempre termina (e a cadeia dispara) antes de a fila o vencer.
+     */
+    orcamentoTranscreverTotalMin: envNumero("ORCAMENTO_TRANSCREVER_TOTAL_MIN", 210),
     visuaisPorSemana: 10,
     /** Teto de vídeos com análise usados como evidência do modelo do nicho (etapa 9, decisão 2 do PROXIMO.md: "30 a 60"). */
     videosParaModeloNicho: 60,
