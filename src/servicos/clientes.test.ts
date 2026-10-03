@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dadosFixosSchema, ErroAcessoNegado, garantirSessaoAdmin } from "./clientes";
+import { dadosFixosSchema, ErroAcessoNegado, fontesDeLeituraMudaram, garantirSessaoAdmin } from "./clientes";
 
 describe("garantirSessaoAdmin", () => {
   it("passa para sessao de admin", () => {
@@ -74,5 +74,45 @@ describe("dadosFixosSchema (validacao dos dados fixos do briefing)", () => {
     for (const valor of ["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"] as const) {
       expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, quemGrava: valor }).success).toBe(true);
     }
+  });
+});
+
+/** E38 PR 2: só relê o site e as redes quando algo que se lê mudou. */
+describe("fontesDeLeituraMudaram", () => {
+  const SEM_PERFIS = { instagram: null, tiktok: null, youtube: null };
+
+  it("primeira vez: marca sem nada antes e com site agora", () => {
+    expect(fontesDeLeituraMudaram({ site: null, perfis: SEM_PERFIS }, { site: "https://loja.exemplo.test", perfis: SEM_PERFIS })).toBe(true);
+  });
+
+  it("sem mudança nenhuma, não lê de novo (salvar a Conta sem mexer não bate no site)", () => {
+    const perfis = { instagram: "loja", tiktok: null, youtube: null };
+    expect(fontesDeLeituraMudaram({ site: "https://loja.exemplo.test", perfis }, { site: "https://loja.exemplo.test", perfis })).toBe(false);
+  });
+
+  it("ignora espaço sobrando e o TikTok (não é lido)", () => {
+    expect(
+      fontesDeLeituraMudaram(
+        { site: "https://loja.exemplo.test", perfis: { instagram: "loja", tiktok: null, youtube: null } },
+        { site: " https://loja.exemplo.test ", perfis: { instagram: "loja ", tiktok: "outro", youtube: null } },
+      ),
+    ).toBe(false);
+  });
+
+  it("mudou o Instagram, o YouTube ou o site", () => {
+    const base = { site: "https://loja.exemplo.test", perfis: { instagram: "loja", tiktok: null, youtube: "@canal" } };
+    expect(fontesDeLeituraMudaram(base, { ...base, perfis: { ...base.perfis, instagram: "loja2" } })).toBe(true);
+    expect(fontesDeLeituraMudaram(base, { ...base, perfis: { ...base.perfis, youtube: "@canal2" } })).toBe(true);
+    expect(fontesDeLeituraMudaram(base, { ...base, site: "https://loja2.exemplo.test" })).toBe(true);
+  });
+
+  it("a pessoa tirou tudo: mudou, mas não há o que ler, então não enfileira", () => {
+    expect(
+      fontesDeLeituraMudaram({ site: "https://loja.exemplo.test", perfis: { instagram: "loja", tiktok: null, youtube: null } }, { site: null, perfis: SEM_PERFIS }),
+    ).toBe(false);
+  });
+
+  it("marca sem registro anterior (undefined) conta como primeira vez", () => {
+    expect(fontesDeLeituraMudaram(undefined, { site: null, perfis: { instagram: "loja", tiktok: null, youtube: null } })).toBe(true);
   });
 });

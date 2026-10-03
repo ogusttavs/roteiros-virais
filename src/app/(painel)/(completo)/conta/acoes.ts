@@ -20,6 +20,8 @@ import {
 export async function salvarContaAction(dados: {
   nome: string;
   perfis: { instagram?: string; tiktok?: string; youtube?: string };
+  /** E38 PR 2: o site da marca; vazio apaga, ausente não mexe. */
+  site?: string;
   tema: string;
   horaLembrete: string;
   alcance?: string;
@@ -31,7 +33,7 @@ export async function salvarContaAction(dados: {
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   const cliente = await clienteDaSessaoAtual();
   const [clienteAtualizado, , preferencias] = await Promise.all([
-    salvarPerfilConta(cliente.id, { nome: dados.nome, perfis: dados.perfis }),
+    salvarPerfilConta(cliente.id, { nome: dados.nome, perfis: dados.perfis, site: dados.site }),
     salvarTema(cliente.id, dados.tema),
     salvarHoraLembrete(sessao.user.id, dados.horaLembrete),
     dados.alcance

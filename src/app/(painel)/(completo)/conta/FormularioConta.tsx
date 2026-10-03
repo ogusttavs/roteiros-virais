@@ -6,6 +6,7 @@ import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { TemaPreferido, TipoMarca } from "@/db/schema";
 import type { OndeValor } from "@/lib/onde";
 import { montarCampoOnde } from "@/lib/onde";
+import { siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
@@ -24,6 +25,8 @@ type Props = {
   instagramInicial: string;
   tiktokInicial: string;
   youtubeInicial: string;
+  /** E38 PR 2: o site da marca, no mesmo lugar dos perfis (depois do YouTube), como o desenho do Opus pede. */
+  siteInicial: string;
   temaInicial: TemaPreferido;
   horaLembreteInicial: string;
   /** V3, item 4: "Perfis nas redes" é da marca ativa, ganha o nome dela no subtítulo. */
@@ -83,6 +86,7 @@ export function FormularioConta({
   instagramInicial,
   tiktokInicial,
   youtubeInicial,
+  siteInicial,
   temaInicial,
   horaLembreteInicial,
   nomeMarca,
@@ -97,6 +101,7 @@ export function FormularioConta({
   const [instagram, setInstagram] = useState(instagramInicial);
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
+  const [site, setSite] = useState(siteInicial);
   const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
   const [regiao, setRegiao] = useState(regiaoInicial ?? "");
   const [pais, setPais] = useState(paisInicial ?? "");
@@ -120,6 +125,10 @@ export function FormularioConta({
       setErro(textosConta.erroHoraForaDaFaixa);
       return;
     }
+    if (site.trim().length > 0 && !siteValido(site.trim())) {
+      setErro(textosBriefing.dadosFixos.siteInvalido);
+      return;
+    }
     if (onde === "local" && regiao.trim().length === 0) {
       setErro(textosBriefing.dadosFixos.regiaoObrigatoria);
       return;
@@ -137,6 +146,7 @@ export function FormularioConta({
       await salvarContaAction({
         nome,
         perfis: { instagram, tiktok, youtube },
+        site: site.trim(),
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
@@ -188,6 +198,12 @@ export function FormularioConta({
             valor={youtube}
             onMudar={setYoutube}
             avisoInvalido={textosConta.perfilInvalido}
+          />
+          <Campo
+            rotulo={dadosFixos.site.rotulo}
+            ajuda={dadosFixos.site.ajuda}
+            value={site}
+            onChange={(e) => setSite(e.target.value)}
           />
         </div>
 

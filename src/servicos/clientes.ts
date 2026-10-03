@@ -34,6 +34,7 @@ import {
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
 import { siteValido } from "@/lib/site-valido";
+import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { textosAdmin } from "@/textos/admin";
@@ -600,6 +601,8 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     youtube: dados.perfis?.youtube?.trim() || null,
   };
 
+  const [antes] = await db().select({ site: clientes.site, perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+
   const [cliente] = await db()
     .update(clientes)
     .set({
@@ -619,7 +622,35 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+
+  /**
+   * E38 PR 2 (gatilho que o PR 1 deixou sem): o Começar é onde o site e os perfis são informados pela
+   * primeira vez, e nada lia nenhum deles até a pessoa abrir a Conta ou o mês virar. Só quando o site ou
+   * um perfil lido (Instagram, YouTube) mudou: salvar de novo sem mexer não bate no site dela. Sem
+   * esperar, como `salvarPerfilConta` (ler o site e as redes pode demorar e não prende a ação).
+   */
+  if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {
+    void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);
+    void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+  }
   return cliente;
+}
+
+/**
+ * O site, o Instagram ou o YouTube mudaram e a marca ficou com algo para ler. O TikTok não conta:
+ * não é lido (Apify suspenso). Comparação por texto aparado; a leitura normaliza o handle por conta própria.
+ */
+export function fontesDeLeituraMudaram(
+  antes: { site: string | null; perfis: PerfisCliente | null } | undefined,
+  depois: { site: string | null; perfis: PerfisCliente | null },
+): boolean {
+  const valor = (texto: string | null | undefined): string => (texto ?? "").trim();
+  const mudou =
+    valor(antes?.site) !== valor(depois.site) ||
+    valor(antes?.perfis?.instagram) !== valor(depois.perfis?.instagram) ||
+    valor(antes?.perfis?.youtube) !== valor(depois.perfis?.youtube);
+  const temAlgoParaLer = Boolean(valor(depois.site) || valor(depois.perfis?.instagram) || valor(depois.perfis?.youtube));
+  return mudou && temAlgoParaLer;
 }
 
 const perfilContaSchema = z.object({
@@ -629,6 +660,16 @@ const perfilContaSchema = z.object({
     tiktok: z.string().trim().optional(),
     youtube: z.string().trim().optional(),
   }),
+  /**
+   * E38 PR 2: o site da marca, editável na Conta (o desenho do Opus o põe depois do YouTube, no mesmo
+   * lugar dos perfis). `undefined` não mexe no que está gravado (quem não manda o campo, como os
+   * testes antigos, nunca apaga o site); vazio apaga.
+   */
+  site: z
+    .string()
+    .trim()
+    .optional()
+    .refine((valor) => !valor || siteValido(valor), { message: "esse endereço não parece um site válido" }),
 });
 
 /**
@@ -655,12 +696,17 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
    * enquanto houver um id salvo. Zera junto com o perfil, na mesma
    * atualizacao, para a chamada logo abaixo resolver contra o handle novo.
    */
-  const [antes] = await db().select({ perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+  const [antes] = await db().select({ perfis: clientes.perfis, site: clientes.site }).from(clientes).where(eq(clientes.id, clienteId));
   const instagramMudou = (antes?.perfis?.instagram ?? null) !== perfis.instagram;
 
   const [cliente] = await db()
     .update(clientes)
-    .set(instagramMudou ? { nome: dados.nome, perfis, metaIgId: null } : { nome: dados.nome, perfis })
+    .set({
+      nome: dados.nome,
+      perfis,
+      ...(instagramMudou ? { metaIgId: null } : {}),
+      ...(dados.site !== undefined ? { site: dados.site || null } : {}),
+    })
     .where(eq(clientes.id, clienteId))
     .returning();
 
@@ -678,6 +724,11 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
   // E38, partes 2 e 3: o perfil da própria marca também entra na camada exclusiva; mesmo "sem
   // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto).
   void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
+
+  // E38 PR 2: o site ou um perfil lido mudou; sem mudança, não bate no site da pessoa de novo.
+  if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {
+    void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);
+  }
 
   return cliente;
 }
