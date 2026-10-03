@@ -53,6 +53,12 @@ const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
  * verdade. Duas formas de "já tentou": a transcrição saiu curta demais (`transcricao` preenchida,
  * mas abaixo do mínimo) ou a tentativa falhou de verdade e `transcrever.ts`/`extrair-agora.ts` já
  * marcaram `proximaTentativaTranscricao`.
+ *
+ * Item 0 da E45 (decisão 21 do M5c): a segunda forma NÃO vale quando a última falha foi de infraestrutura (tempo limite do
+ * `yt-dlp` ou da Groq, bloqueio do robô do YouTube: `falhaDeInfraEm` preenchida). Um vídeo falado que só estourou o tempo
+ * ganhava uma ficha só por quadros, com o selo "sem fala", e como `analise` ficava preenchida o `transcrever` nunca mais o lia.
+ * Esse vídeo volta ao `transcrever` quando a data de nova tentativa vence; só entra aqui o que a transcrição leu e achou curto,
+ * ou o que falhou pelo caminho normal (link morto, áudio vazio sem confirmar silêncio).
  */
 function condicoesElegivelSemFala(nichoId: number, pisoViews: number) {
   const condicoes = [
@@ -66,7 +72,7 @@ function condicoesElegivelSemFala(nichoId: number, pisoViews: number) {
     isNull(videos.analise),
     or(
       and(isNotNull(videos.transcricao), sql`char_length(trim(${videos.transcricao})) < ${TAMANHO_MINIMO_TRANSCRICAO}`),
-      isNotNull(videos.proximaTentativaTranscricao),
+      and(isNotNull(videos.proximaTentativaTranscricao), isNull(videos.falhaDeInfraEm)),
     ),
     // Item 0e: o vídeo que falhou no download ou na leitura por imagem some da consulta por 7
     // dias (`proximaTentativaSemFala`), para não ocupar vaga do teto diário em toda rodada.

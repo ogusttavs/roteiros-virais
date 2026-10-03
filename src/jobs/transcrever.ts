@@ -240,7 +240,7 @@ async function transcreverUm(
       if (erro instanceof ErroLegendaTempoLimite) {
         await db()
           .update(videos)
-          .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS) })
+          .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS), falhaDeInfraEm: new Date() })
           .where(eq(videos.id, videoId));
         return { tipo: "falhouTempoLimite", motivo: erro.message };
       }
@@ -249,7 +249,7 @@ async function transcreverUm(
     if (legenda && legenda.length >= TAMANHO_MINIMO_LEGENDA) {
       await db()
         .update(videos)
-        .set({ transcricao: legenda, transcritoEm: new Date(), idiomaConfirmado: true })
+        .set({ transcricao: legenda, transcritoEm: new Date(), idiomaConfirmado: true, falhaDeInfraEm: null })
         .where(eq(videos.id, videoId));
       return { tipo: "legenda" };
     }
@@ -272,7 +272,7 @@ async function transcreverUm(
     if (!semFala && !texto.trim()) {
       await db()
         .update(videos)
-        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS) })
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + SETE_DIAS_MS), falhaDeInfraEm: null })
         .where(eq(videos.id, videoId));
       return { tipo: "falhou", motivo: "transcricao da Groq veio vazia, sem confirmar ausencia de fala" };
     }
@@ -288,6 +288,7 @@ async function transcreverUm(
       .set({
         transcricao: texto,
         transcritoEm: new Date(),
+        falhaDeInfraEm: null,
         ...(semFala
           ? {}
           : idiomaParaBuscar
@@ -304,7 +305,7 @@ async function transcreverUm(
     if (erro instanceof ErroAudioTempoLimite || erro instanceof ErroGroqTempoLimite) {
       await db()
         .update(videos)
-        .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS) })
+        .set({ proximaTentativaTranscricao: new Date(Date.now() + TRES_DIAS_MS), falhaDeInfraEm: new Date() })
         .where(eq(videos.id, videoId));
       return { tipo: "falhouTempoLimite", motivo: erro.message };
     }
@@ -314,6 +315,8 @@ async function transcreverUm(
         .update(videos)
         .set({
           proximaTentativaTranscricao: new Date(Date.now() + (ehBotDoYoutube ? TRES_DIAS_MS : SETE_DIAS_MS)),
+          // O bloqueio do robô é falha de infraestrutura como o tempo limite (item 0 da E45); a falha comum, não: apaga a marca.
+          falhaDeInfraEm: ehBotDoYoutube ? new Date() : null,
         })
         .where(eq(videos.id, videoId));
       return ehBotDoYoutube

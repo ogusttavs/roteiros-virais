@@ -869,6 +869,14 @@ export const videos = pgTable(
      */
     proximaTentativaTranscricao: timestamp("proxima_tentativa_transcricao", { withTimezone: true }),
     /**
+     * Item 0 da E45 (decisão 21 do M5c): quando a ÚLTIMA falha da transcrição foi de infraestrutura, e não do vídeo: o `yt-dlp`
+     * ou a Groq passaram do tempo limite, ou o YouTube bloqueou o robô. Preenchida junto com `proximaTentativaTranscricao` nesses
+     * dois casos, e apagada (nula) por qualquer falha comum e por uma transcrição que saiu. Existe porque `extrair-sem-fala`
+     * aceitava "tentou e falhou" (`proximaTentativaTranscricao` não nula) como porta de entrada sem olhar o motivo: um vídeo
+     * FALADO que só estourou o tempo ganhava uma ficha só por quadros, com o selo "sem fala", e o `transcrever` nunca mais o lia.
+     */
+    falhaDeInfraEm: timestamp("falha_de_infra_em", { withTimezone: true }),
+    /**
      * M4/P2b, item 0e: o download ou a leitura falhou no caminho sem fala (`extrair-sem-fala.ts`);
      * preenchida com "agora + 7 dias", mesmo raciocínio de `proximaTentativaTranscricao`. Sem isto,
      * o mesmo vídeo que sempre falha (um link morto, por exemplo) ocupava vaga do teto diário em

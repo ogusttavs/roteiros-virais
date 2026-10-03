@@ -1,0 +1,1 @@
+ALTER TABLE "videos" ADD COLUMN "falha_de_infra_em" timestamp with time zone;
