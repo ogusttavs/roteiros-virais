@@ -277,6 +277,19 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
   });
 });
 
+describe("FormularioConta: os ramos alternativos (E45 PR 3), só leitura", () => {
+  it("com um ou dois ramos ligados pelo admin, a frase os diz; sem nenhum, não aparece", () => {
+    const { rerender } = render(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição"]} />);
+    expect(screen.getByText("A gente ligou também Nutrição aos seus temas e referências.")).toBeTruthy();
+
+    rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição", "Advocacia"]} />);
+    expect(screen.getByText("A gente ligou também Nutrição e Advocacia aos seus temas e referências.")).toBeTruthy();
+
+    rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={[]} />);
+    expect(screen.queryByText(/A gente ligou também/)).toBeNull();
+  });
+});
+
 describe("FormularioConta: o teto de ramos novos do dia volta como frase", () => {
   it("a frase aparece no formulário (nada foi gravado), e uma segunda tentativa reenvia o ramo", async () => {
     salvarContaAction.mockResolvedValueOnce({ ok: false, erro: "Muitos ramos novos hoje; tente de novo amanhã." });

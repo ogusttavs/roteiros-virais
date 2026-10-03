@@ -375,3 +375,23 @@ describe("BuscaDeRamo: convive com o aviso de 'salvo' das telas", () => {
     expect(document.querySelector("[data-fala-da-busca-de-ramo]")?.getAttribute("aria-live")).toBe("polite");
   });
 });
+
+describe("BuscaDeRamo: ramos escondidos (E45 PR 3, o admin liga um alternativo)", () => {
+  it("o ramo principal e os já ligados não aparecem como opção, nem no catálogo inteiro nem na busca", () => {
+    render(<BuscaDeRamo rotulo="Ramo" valor={null} ramosEscondidos={["odontologia", "nutricao"]} onEscolher={() => {}} />);
+    fireEvent.focus(campoDeBusca());
+
+    expect(screen.getAllByRole("option")).toHaveLength(42);
+    expect(screen.queryByRole("option", { name: /Odontologia/ })).toBeNull();
+
+    fireEvent.change(campoDeBusca(), { target: { value: "dentista" } });
+    expect(screen.queryByRole("option", { name: /Odontologia/ })).toBeNull();
+    expect(falado()).toBe("Nenhum ramo encontrado.");
+  });
+
+  it("sem ramos escondidos, o catálogo inteiro (44) continua aparecendo", () => {
+    render(<BuscaDeRamo rotulo="Ramo" valor={null} ramosEscondidos={[]} onEscolher={() => {}} />);
+    fireEvent.focus(campoDeBusca());
+    expect(screen.getAllByRole("option")).toHaveLength(44);
+  });
+});
