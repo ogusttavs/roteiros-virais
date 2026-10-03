@@ -48,8 +48,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * E43: quando o tema nasce de "Criar vídeo com esta notícia", o título, o resumo e o ângulo
  * sugerido da notícia entram na entrada, para o modelo avaliar com esse contexto. Versão 1.7.0.
+ *
+ * E45 PR 3: a marca pode ter até dois ramos alternativos (ligados pelo admin). A evidência vem do ramo principal e deles; cada vídeo de um
+ * ramo alternativo leva o nome do ramo na lista, e a justificativa de "viralizar" diz de qual ramo vem a prova quando não é o principal.
+ * Versão 1.8.0.
  */
-export const versao = "1.7.0";
+export const versao = "1.8.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -146,14 +150,18 @@ sem acento nenhum; a sua justificativa sai sempre acentuada, mesmo assim.`;
 
 export function montarEntrada(dados: {
   tema: string;
-  evidencias: { id: number; assunto: string; gancho: string; foraDaCurva: number }[];
+  /** `ramo` só vem para o vídeo de um ramo alternativo da marca (E45 PR 3); sem ele, é do ramo principal. */
+  evidencias: { id: number; assunto: string; gancho: string; foraDaCurva: number; ramo?: string }[];
   /** E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null };
 }): string {
   const listaEvidencias =
     dados.evidencias.length > 0
       ? dados.evidencias
-          .map((v) => `id ${v.id}: ${v.assunto}, gancho "${v.gancho}" (fora da curva ${v.foraDaCurva.toFixed(1)}x)`)
+          .map(
+            (v) =>
+              `id ${v.id}: ${v.assunto}, gancho "${v.gancho}" (fora da curva ${v.foraDaCurva.toFixed(1)}x${v.ramo ? `, ramo alternativo: ${v.ramo}` : ""})`,
+          )
           .join("\n")
       : "nenhuma evidencia encontrada nos ultimos 90 dias";
 
@@ -161,5 +169,10 @@ export function montarEntrada(dados: {
     ? `\n\nNoticia que deu origem a este tema:\nTitulo: ${dados.noticia.titulo}${dados.noticia.resumo ? `\nResumo: ${dados.noticia.resumo}` : ""}${dados.noticia.angulo ? `\nAngulo sugerido: ${dados.noticia.angulo}` : ""}`
     : "";
 
-  return `Tema proposto: ${dados.tema}${blocoNoticia}\n\nEvidencia disponivel:\n${listaEvidencias}`;
+  const temAlternativo = dados.evidencias.some((v) => v.ramo);
+  const avisoRamos = temAlternativo
+    ? "\n\nAlguns vídeos vêm de um ramo alternativo da marca (marcados na lista). Quando a prova do pilar de viralizar vem sobretudo de um deles, diga na justificativa de qual ramo ela vem."
+    : "";
+
+  return `Tema proposto: ${dados.tema}${blocoNoticia}\n\nEvidencia disponivel:\n${listaEvidencias}${avisoRamos}`;
 }

@@ -40,6 +40,8 @@ type Props = {
   ramoInicial: { slug: string | null; nome: string } | null;
   /** E45 PR 2: o pedido de ramo aberto da marca (o "Não achei o meu") e o ramo provisório em que ela espera. */
   pedidoDeRamo: PedidoDeRamoNaTela | null;
+  /** E45 PR 3: os nomes dos ramos alternativos que o admin ligou, só leitura (a Conta não liga nem desliga). */
+  ramosAlternativos?: string[];
   ondeInicial: OndeValor | null;
   regiaoInicial: string | null;
   paisInicial: string | null;
@@ -100,6 +102,7 @@ export function FormularioConta({
   tipo,
   ramoInicial,
   pedidoDeRamo: pedidoDeRamoInicial,
+  ramosAlternativos = [],
   ondeInicial,
   regiaoInicial,
   paisInicial,
@@ -280,6 +283,11 @@ export function FormularioConta({
             />
           ) : null}
           {ramoMudou ? <p className={styles.subGrupo}>{textosConta.ramo.aviso}</p> : null}
+          {ramosAlternativos.length > 0 ? (
+            <p className={styles.subGrupo} data-ramos-alternativos-conta>
+              {textosConta.ramo.alternativos(ramosAlternativos)}
+            </p>
+          ) : null}
           {modoOutro && avisoDoPedido ? (
             <p className={styles.subGrupo} data-aviso-ramo-provisorio>
               {avisoDoPedido}

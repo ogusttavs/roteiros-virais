@@ -1,0 +1,5 @@
+/* E45 PR 3: a pílula "Ramo", em qualquer largura (as outras seis só aparecem a partir de 1024px). */
+.envoltorio {
+  display: inline-flex;
+  align-items: center;
+}

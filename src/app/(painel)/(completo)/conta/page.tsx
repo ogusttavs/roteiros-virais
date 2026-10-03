@@ -6,6 +6,7 @@ import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
+import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
@@ -34,6 +35,7 @@ export default async function Conta() {
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
+  const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
 
   return (
@@ -59,6 +61,7 @@ export default async function Conta() {
           nomeMarca={cliente?.nome ?? ""}
           tipo={cliente?.tipo ?? "negocio"}
           ramoInicial={ramoAtual ? { slug: ramoAtual.ramoSlug, nome: ramoAtual.nome } : null}
+          ramosAlternativos={alternativos.map((a) => a.nome)}
           pedidoDeRamo={
             pedidoAberto
               ? {

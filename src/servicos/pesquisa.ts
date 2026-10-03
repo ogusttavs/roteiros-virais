@@ -11,7 +11,7 @@
  * (desempate por id), para a mesma consulta não devolver ordens diferentes
  * em execuções iguais.
  */
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, type SQL, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import { db } from "@/db";
@@ -104,6 +104,24 @@ export async function reguaDoSetor(nichoId: number): Promise<ReguaSetor> {
     proporcaoBrasil: linha?.proporcaoBrasil == null ? config.regras.proporcaoBrasil : Number(linha.proporcaoBrasil),
     videoSemFalaVale: linha?.videoSemFalaVale ?? false,
   };
+}
+
+/** E45 PR 3: um setor da conta (o principal ou um alternativo) com o piso de views dele (a régua é por setor, M3). */
+export type SetorDaBusca = { id: number; pisoViews: number };
+
+/** O piso de cada setor, na ordem recebida (o principal primeiro). Um setor sem linha cai no padrão, como `reguaDoSetor`. */
+export async function setoresComPiso(ids: number[]): Promise<SetorDaBusca[]> {
+  return Promise.all(ids.map(async (id) => ({ id, pisoViews: (await reguaDoSetor(id)).pisoViews })));
+}
+
+/**
+ * "Do setor X, com o piso de X" para um ou mais setores: cada ramo da conta tem a própria régua, então um vídeo do alternativo é medido pelo
+ * piso do alternativo, não pelo do principal. Com um setor só, é o par de condições de sempre (nada muda para quem não tem alternativo).
+ */
+function condicaoDeSetores(setores: SetorDaBusca[]): SQL[] {
+  if (setores.length === 1) return [eq(videos.nichoId, setores[0].id), gte(videos.views, setores[0].pisoViews)];
+  const algum = or(...setores.map((s) => and(eq(videos.nichoId, s.id), gte(videos.views, s.pisoViews))));
+  return algum ? [algum] : [sql`false`];
 }
 
 /**
@@ -498,6 +516,8 @@ function condicoesEvidencia(
   texto: string,
   regua: ReguaSetor,
   exigirServeDeModelo: boolean,
+  /** E45 PR 3: os ramos alternativos da conta, com o piso de cada um (vazio: só o principal, como sempre). */
+  alternativos: SetorDaBusca[] = [],
 ): { condicoes: SQL[]; relevancia: SQL<number> } {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
@@ -519,11 +539,10 @@ function condicoesEvidencia(
         )}]::text[]`
       : sql`array[]::text[]`;
   const condicoes = [
-    eq(videos.nichoId, nichoId),
+    // O setor e o piso dele (V9d, item 0b: o piso vem antes do múltiplo, decisão do Gustavo em 25/09/2026; vale para a evidência do tema e
+    // do roteiro tanto quanto para a biblioteca de referências; M3: piso do setor). E45 PR 3: com ramos alternativos, cada setor com o seu piso.
+    ...condicaoDeSetores([{ id: nichoId, pisoViews: regua.pisoViews }, ...alternativos]),
     gte(videos.publicadoEm, diasAtras(90)),
-    // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); vale para a
-    // evidência do tema e do roteiro tanto quanto para a biblioteca de referências. M3: piso do setor.
-    gte(videos.views, regua.pisoViews),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
@@ -543,7 +562,12 @@ function condicoesEvidencia(
   return { condicoes, relevancia };
 }
 
-export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number };
+/** No desempate da relevância, o vídeo do ramo principal vem antes do de um alternativo (só quando a conta tem alternativo). */
+function principalPrimeiro(nichoId: number, alternativos: number[]): SQL[] {
+  return alternativos.length === 0 ? [] : [sql`case when ${videos.nichoId} = ${nichoId} then 0 else 1 end`];
+}
+
+export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number; /** E45 PR 3: o setor do vídeo (o principal ou um alternativo da conta). */ nichoId: number | null };
 
 /**
  * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
@@ -566,13 +590,16 @@ export async function evidenciaParaTema(
   texto: string,
   limite = 8,
   proporcaoBrasilExplicita?: number,
+  /** E45 PR 3: os ramos alternativos da conta (ids de setor); a prova olha o principal e eles, o principal primeiro no desempate. */
+  alternativos: number[] = [],
 ): Promise<VideoEvidenciaTema[]> {
   const regua = await reguaDoSetor(nichoId);
   const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true);
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos));
   const linhas = await db()
     .select({
       id: videos.id,
+      nichoId: videos.nichoId,
       analise: videos.analise,
       foraDaCurva: videos.foraDaCurva,
       idioma: videos.idioma,
@@ -582,7 +609,7 @@ export async function evidenciaParaTema(
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
-    .orderBy(desc(relevancia), desc(videos.foraDaCurva), asc(videos.id))
+    .orderBy(desc(relevancia), ...principalPrimeiro(nichoId, alternativos), desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
   const comAnalise = linhas.filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null);
@@ -595,6 +622,7 @@ export async function evidenciaParaTema(
 
   return comProporcao.map((l) => ({
     id: l.id,
+    nichoId: l.nichoId,
     assunto: l.analise.assunto,
     gancho: l.analise.gancho,
     foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
@@ -603,6 +631,8 @@ export async function evidenciaParaTema(
 
 export type VideoEvidenciaRoteiro = {
   id: number;
+  /** E45 PR 3: o setor do vídeo (o principal ou um alternativo da conta). */
+  nichoId: number | null;
   assunto: string;
   gancho: string;
   estrutura: string;
@@ -633,6 +663,7 @@ export type VideoEvidenciaRoteiro = {
 function mapearEvidenciaRoteiro(
   linhas: {
     id: number;
+    nichoId: number | null;
     analise: AnaliseVideo | null;
     analiseVisual: AnaliseVisual | null;
     foraDaCurva: string | null;
@@ -650,6 +681,7 @@ function mapearEvidenciaRoteiro(
     .filter((l): l is typeof l & { analise: AnaliseVideo } => l.analise !== null)
     .map((l) => ({
       id: l.id,
+      nichoId: l.nichoId,
       assunto: l.analise.assunto,
       gancho: l.analise.gancho,
       estrutura: l.analise.estrutura,
@@ -677,12 +709,15 @@ export async function evidenciaParaRoteiro(
   nichoId: number,
   texto: string,
   limite = 8,
+  /** E45 PR 3: os ramos alternativos da conta (ids de setor); o principal vem primeiro no desempate, e a proporção do Brasil corta o conjunto. */
+  alternativos: number[] = [],
 ): Promise<VideoEvidenciaRoteiro[]> {
   const regua = await reguaDoSetor(nichoId);
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true);
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos));
   const linhas = await db()
     .select({
       id: videos.id,
+      nichoId: videos.nichoId,
       analise: videos.analise,
       analiseVisual: videos.analiseVisual,
       foraDaCurva: videos.foraDaCurva,
@@ -698,7 +733,7 @@ export async function evidenciaParaRoteiro(
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
     .where(and(...condicoes))
-    .orderBy(desc(relevancia), desc(videos.foraDaCurva), asc(videos.id))
+    .orderBy(desc(relevancia), ...principalPrimeiro(nichoId, alternativos), desc(videos.foraDaCurva), asc(videos.id))
     .limit(limite * FATOR_POOL_BRASIL);
 
   return mapearEvidenciaRoteiro(linhas);
@@ -719,6 +754,7 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
   const linhas = await db()
     .select({
       id: videos.id,
+      nichoId: videos.nichoId,
       analise: videos.analise,
       analiseVisual: videos.analiseVisual,
       foraDaCurva: videos.foraDaCurva,
@@ -790,6 +826,8 @@ export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaRes
 
 export type VideoReferencia = {
   id: number;
+  /** E45 PR 3: o setor do vídeo; a tela mostra o nome do ramo no cartão quando não é o principal. */
+  nichoId: number | null;
   plataforma: Plataforma;
   url: string;
   /** Uma linha, com reticências na tela; o normalizador garante título nas três plataformas desde a E6 parte 3. */
@@ -874,6 +912,13 @@ export type FiltrosReferencias = {
   tiposConteudo?: TipoConteudoFiltravel[];
   /** R2b, item 2: a ordem escolhida; `undefined` é "recentes", o padrão de sempre. */
   ordem?: OrdemReferencias;
+  /**
+   * E45 PR 3: os setores da conta (o principal primeiro, depois os alternativos), cada um com o piso dele. Sem isto, só o `nichoId` da
+   * chamada, como sempre. Com mais de um, a lista olha todos e cada vídeo é medido pelo piso do próprio setor.
+   */
+  setores?: SetorDaBusca[];
+  /** E45 PR 3: a pílula "Ramo": só os vídeos deste setor (um dos `setores`); um id que não é da conta não devolve nada. */
+  ramoId?: number;
 };
 
 export type ResultadoReferencias = {
@@ -921,8 +966,11 @@ function ordenacaoReferencias(ordem: OrdemReferencias | undefined) {
  * `evidenciaParaRoteiro`/`evidenciaParaTema` aceitam: só esta função, só para a tela.
  */
 function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regua: ReguaSetor, semRegua = false) {
-  const condicoes = [
-    eq(videos.nichoId, nichoId),
+  // E45 PR 3: os setores da conta (um só, sem alternativo) e, se a pílula "Ramo" está escolhida, só aquele.
+  const todos: SetorDaBusca[] = filtros.setores && filtros.setores.length > 0 ? filtros.setores : [{ id: nichoId, pisoViews: regua.pisoViews }];
+  const alvos = filtros.ramoId === undefined ? todos : todos.filter((s) => s.id === filtros.ramoId);
+  const condicoes: SQL[] = [
+    alvos.length === 0 ? sql`false` : alvos.length === 1 ? eq(videos.nichoId, alvos[0].id) : inArray(videos.nichoId, alvos.map((s) => s.id)),
     gte(videos.publicadoEm, diasAtras(filtros.periodoDias ?? 7)),
     isNotNull(videos.analise),
     PERTENCE_AO_NICHO,
@@ -930,8 +978,10 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
   ];
   if (!semRegua) {
     // V9d, item 0b: o piso vem antes do múltiplo (decisão do Gustavo em 25/09/2026); um vídeo de
-    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho. M3: piso do setor.
-    condicoes.push(gte(videos.views, regua.pisoViews));
+    // poucas views nunca é referência, nem quando o múltiplo bate o limiar sozinho. M3: piso do setor
+    // (E45 PR 3: o de cada setor da conta, não o do principal para todos).
+    if (alvos.length === 1) condicoes.push(gte(videos.views, alvos[0].pisoViews));
+    else if (alvos.length > 1) condicoes.push(...condicaoDeSetores(alvos));
     condicoes.push(gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA));
     condicoes.push(sql`${videos.serveDeModelo} is not false`);
   }
@@ -999,6 +1049,7 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
  */
 const CAMPOS_VIDEO_REFERENCIA = {
   id: videos.id,
+  nichoId: videos.nichoId,
   plataforma: videos.plataforma,
   url: videos.url,
   titulo: videos.titulo,
@@ -1023,6 +1074,7 @@ const CAMPOS_VIDEO_REFERENCIA = {
 
 type LinhaVideoReferencia = {
   id: number;
+  nichoId: number | null;
   plataforma: Plataforma;
   url: string;
   titulo: string | null;
@@ -1050,10 +1102,13 @@ function abaixoDaRegua(views: number, foraDaCurva: string | null, regua: ReguaSe
   return views < regua.pisoViews || (foraDaCurva === null ? 0 : Number(foraDaCurva)) < LIMIAR_FORA_DA_CURVA;
 }
 
-function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor): VideoReferencia | null {
+function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor, setores?: SetorDaBusca[]): VideoReferencia | null {
   if (l.analise === null) return null;
+  // E45 PR 3: o selo "abaixo do que a gente usa" mede pelo piso do setor do próprio vídeo.
+  const reguaDoVideo = { ...regua, pisoViews: setores?.find((s) => s.id === l.nichoId)?.pisoViews ?? regua.pisoViews };
   return {
     id: l.id,
+    nichoId: l.nichoId,
     plataforma: l.plataforma,
     url: l.url,
     titulo: l.titulo,
@@ -1074,7 +1129,7 @@ function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor): VideoR
     semFala: l.semFala,
     segundoChave: l.analiseVisual?.momentoChave?.segundo ?? null,
     tipoConteudo: l.tipoConteudo,
-    abaixoDaRegua: abaixoDaRegua(l.views, l.foraDaCurva, regua),
+    abaixoDaRegua: abaixoDaRegua(l.views, l.foraDaCurva, reguaDoVideo),
   };
 }
 
@@ -1124,7 +1179,7 @@ export async function referenciasDoNicho(
   return {
     total: contagem[0]?.total ?? 0,
     videos: comTetoPorConta
-      .map((l) => paraVideoReferencia(l, regua))
+      .map((l) => paraVideoReferencia(l, regua, filtros.setores))
       .filter((v): v is VideoReferencia => v !== null),
   };
 }
@@ -1165,7 +1220,7 @@ export async function todosOsVideosDoNicho(
 
   return {
     total: contagem[0]?.total ?? 0,
-    videos: linhas.map((l) => paraVideoReferencia(l, regua)).filter((v): v is VideoReferencia => v !== null),
+    videos: linhas.map((l) => paraVideoReferencia(l, regua, filtros.setores)).filter((v): v is VideoReferencia => v !== null),
   };
 }
 
