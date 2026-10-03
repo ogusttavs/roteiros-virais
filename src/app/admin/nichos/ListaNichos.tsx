@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { NichoComContagem } from "@/servicos/admin-coleta";
+import type { PedidoNaLista } from "@/servicos/pedidos-de-ramo";
 import { textosAdmin } from "@/textos/admin";
 import { Botao } from "@/ui/componentes/Botao";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import { ModalNovoNicho } from "./ModalNovoNicho";
 import styles from "./page.module.css";
+import { PedidosDeRamo } from "./PedidosDeRamo";
 
 const t = textosAdmin.nichos;
 
@@ -19,8 +21,10 @@ function formatarData(data: Date | null): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);
 }
 
-export function ListaNichos({ nichos }: { nichos: NichoComContagem[] }) {
+export function ListaNichos({ nichos, pedidos }: { nichos: NichoComContagem[]; pedidos: PedidoNaLista[] }) {
   const [modalAberto, setModalAberto] = useState(false);
+  /** O pedido de ramo para o qual o modal está aberto ("criar ramo"); nulo é o "novo nicho" de sempre. */
+  const [pedidoDoModal, setPedidoDoModal] = useState<PedidoNaLista | null>(null);
 
   return (
     <div className={styles.pagina}>
@@ -30,9 +34,26 @@ export function ListaNichos({ nichos }: { nichos: NichoComContagem[] }) {
           <p className={styles.subtitulo}>{t.subtitulo(nichos.length)}</p>
         </div>
         <div className={styles.acoes}>
-          <Botao onClick={() => setModalAberto(true)}>{t.novoNicho}</Botao>
+          <Botao
+            onClick={() => {
+              setPedidoDoModal(null);
+              setModalAberto(true);
+            }}
+          >
+            {t.novoNicho}
+          </Botao>
         </div>
       </div>
+
+      {pedidos.length > 0 ? (
+        <PedidosDeRamo
+          pedidos={pedidos}
+          aoCriarRamo={(pedido) => {
+            setPedidoDoModal(pedido);
+            setModalAberto(true);
+          }}
+        />
+      ) : null}
 
       {nichos.length === 0 ? (
         <EstadoVazio icone={<List size={24} strokeWidth={1.5} aria-hidden="true" />} frase={t.vazio} />
@@ -77,7 +98,13 @@ export function ListaNichos({ nichos }: { nichos: NichoComContagem[] }) {
         </div>
       )}
 
-      <ModalNovoNicho aberto={modalAberto} onFechar={() => setModalAberto(false)} />
+      <ModalNovoNicho
+        // Um modal por pedido: o texto do pedido é o ponto de partida do formulário, e outro pedido (ou o "novo nicho" de sempre) começa do zero.
+        key={pedidoDoModal?.id ?? "novo"}
+        aberto={modalAberto}
+        onFechar={() => setModalAberto(false)}
+        pedido={pedidoDoModal ? { id: pedidoDoModal.id, texto: pedidoDoModal.texto, marcaNome: pedidoDoModal.marca.nome } : undefined}
+      />
     </div>
   );
 }

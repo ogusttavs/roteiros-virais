@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { BotaoSair } from "@/app/(painel)/(completo)/conta/BotaoSair";
 import { iniciaisDe } from "@/lib/iniciais";
 import { exigirAdmin } from "@/lib/sessao";
+import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
 import { textosAdmin } from "@/textos/admin";
 import { Simbolo } from "@/ui/Logo";
 
@@ -19,6 +20,8 @@ const t = textosAdmin.navegacao;
  */
 export default async function LayoutAdmin({ children }: { children: ReactNode }) {
   const sessao = await exigirAdmin();
+  // Quantos pedidos de ramo esperam o admin (E45 PR 2): o número ao lado de "Nichos", sem entrar na lista.
+  const pedidosAbertos = await contarPedidosAbertos();
 
   return (
     <div className={styles.pagina}>
@@ -27,7 +30,10 @@ export default async function LayoutAdmin({ children }: { children: ReactNode })
           <Simbolo altura={24} />
           <span className={styles.equipe}>{t.equipe}</span>
         </div>
-        <AbasAdmin rotulos={{ clientes: t.clientes, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes, viagem: t.viagem }} />
+        <AbasAdmin
+          rotulos={{ clientes: t.clientes, nichos: t.nichos, jobs: t.jobs, geracoes: t.geracoes, viagem: t.viagem }}
+          selos={{ nichos: { quantos: pedidosAbertos, descricao: textosAdmin.pedidosDeRamo.seloAria(pedidosAbertos) } }}
+        />
         <div className={styles.conta}>
           <span className={styles.nomeConta}>{sessao.user.name}</span>
           <span className={styles.avatar}>{iniciaisDe(sessao.user.name)}</span>

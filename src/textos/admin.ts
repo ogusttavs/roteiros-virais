@@ -81,6 +81,29 @@ export const textosAdmin = {
     botaoCriar: "criar nicho",
     criando: "criando",
     erroCriar: "não conseguimos criar o nicho",
+    /** E45 PR 2: o modal de "novo nicho" aberto a partir de um pedido de ramo ("criar ramo"). */
+    modalTituloPedido: "Criar ramo para o pedido",
+    avisoPedido: (marca: string, texto: string) => `Pedido de ${marca}: “${texto}”. Ao salvar, a marca vai para este ramo e o pedido fecha.`,
+    botaoCriarPedido: "criar ramo e mover a marca",
+  },
+  /** E45 PR 2: a lista de pedidos de ramo (o "Não achei o meu" dos clientes), na página de Nichos. */
+  pedidosDeRamo: {
+    titulo: "Pedidos de ramo",
+    subtitulo: (n: number) => (n === 1 ? "1 pedido aberto" : `${n} pedidos abertos`),
+    ajuda:
+      "Gente que não se achou na lista e escreveu o ramo com as próprias palavras. Enquanto você não decide, a marca espera no ramo mais parecido. Nunca nasce ramo novo sozinho: a decisão é sua.",
+    escreveu: "escreveu",
+    quando: (data: string) => `em ${data}`,
+    provisorio: (ramo: string) => `espera em ${ramo}`,
+    semProvisorio: "nenhum ramo parecido: sem temas por enquanto",
+    encaixar: "encaixar em um que existe",
+    criar: "criar ramo",
+    encaixarRotulo: (marca: string) => `Encaixar ${marca} em`,
+    confirmarEncaixe: (ramo: string) => `encaixar em ${ramo}`,
+    encaixando: "encaixando",
+    cancelar: "cancelar",
+    erro: "não conseguimos resolver o pedido; tente de novo",
+    seloAria: (n: number) => (n === 1 ? "1 pedido de ramo aberto" : `${n} pedidos de ramo abertos`),
   },
   nichoDetalhe: {
     voltar: "nichos",

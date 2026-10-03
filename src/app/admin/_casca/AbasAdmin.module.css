@@ -22,6 +22,23 @@
   transition: color var(--duracao-rapida) var(--curva-saida);
 }
 
+/* E45 PR 2: o número de pedidos de ramo abertos ao lado de "Nichos". */
+.selo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  margin-left: var(--espaco-2);
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto, var(--cor-superficie));
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  font-weight: 600;
+}
+
 .aba:hover {
   color: var(--cor-titulo);
 }
