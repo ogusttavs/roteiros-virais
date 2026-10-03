@@ -66,6 +66,8 @@ export default async function Conta() {
                   // O ramo provisório só vale enquanto a marca está nele (se ela saiu por outro caminho, a frase não o cita).
                   ramoProvisorio:
                     pedidoAberto.setorProvisorioId !== null && pedidoAberto.setorProvisorioId === cliente?.nichoId ? (ramoAtual?.nome ?? null) : null,
+                  ramoProvisorioSlug:
+                    pedidoAberto.setorProvisorioId !== null && pedidoAberto.setorProvisorioId === cliente?.nichoId ? (ramoAtual?.ramoSlug ?? null) : null,
                 }
               : null
           }

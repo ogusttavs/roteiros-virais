@@ -273,6 +273,24 @@ describe("o admin resolve o pedido", () => {
     expect((await setorPorId(novo.id)).ativo).toBe(true);
   });
 
+  it("um formulário velho com o mesmo texto de um pedido já atendido não o reabre nem tira a marca do setor que o admin escolheu", async () => {
+    const marca = await criarMarca("pedidos-velho", "Formulario velho");
+    const { pedido } = await registrarPedidoDeRamo(marca, "fisioterapeuta de pilates");
+    await encaixarPedido(pedido.id, "psicologia-e-terapias");
+    const destino = (await nichoDoRamo("psicologia-e-terapias"))!;
+
+    const depois = await registrarPedidoDeRamo(marca, "Fisioterapeuta de  pilates");
+
+    expect(depois.pedido.estado).toBe("atendido");
+    expect(await pedidoAbertoDaMarca(marca)).toBeNull();
+    expect((await marcaPorId(marca)).nichoId).toBe(destino.id);
+    expect((await marcaPorId(marca)).ramoOutro).toBeNull();
+
+    // Com um texto diferente é um pedido novo, como sempre; e fora do setor final, o mesmo texto também volta a valer.
+    const novo = await registrarPedidoDeRamo(marca, "personal trainer");
+    expect(novo.pedido.estado).toBe("aberto");
+  });
+
   it("um pedido já resolvido (ou que não existe) não se resolve de novo, e nada muda", async () => {
     const marca = await criarMarca("pedidos-ja-resolvido", "Já resolvido");
     const { pedido } = await registrarPedidoDeRamo(marca, "estúdio de pilates e yoga");
@@ -322,6 +340,18 @@ describe("a lista e o número de pedidos abertos", () => {
     expect(lista[0].setorProvisorio?.nome).toBe("Fisioterapia e pilates");
     expect(lista[1].setorProvisorio).toBeNull();
     expect(await contarPedidosAbertos()).toBe(2);
+  });
+
+  it("a marca que já tinha ramo e nada casou aparece com o ramo em que continua (a lista não diz 'sem temas')", async () => {
+    await db().delete(pedidosDeRamo);
+    const marca = await criarMarca("pedidos-lista-continua", "Lista continua");
+    const { nicho } = await garantirNichoDoRamo("odontologia");
+    await db().update(clientes).set({ nichoId: nicho.id }).where(eq(clientes.id, marca));
+    await registrarPedidoDeRamo(marca, "xyzw abcd");
+
+    const [item] = await listarPedidosAbertos();
+    expect(item.setorProvisorio).toBeNull();
+    expect(item.ramoAtual?.id).toBe(nicho.id);
   });
 
   it("o setor provisório só aparece enquanto a marca está nele (se ela saiu por outro caminho, a lista não o mostra)", async () => {

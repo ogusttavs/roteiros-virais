@@ -96,6 +96,7 @@ export const textosAdmin = {
     quando: (data: string) => `em ${data}`,
     provisorio: (ramo: string) => `espera em ${ramo}`,
     semProvisorio: "nenhum ramo parecido: sem temas por enquanto",
+    semProvisorioNoRamo: (ramo: string) => `nenhum ramo parecido: continua em ${ramo}`,
     encaixar: "encaixar em um que existe",
     criar: "criar ramo",
     encaixarRotulo: (marca: string) => `Encaixar ${marca} em`,

@@ -4,7 +4,7 @@
  * mais próximo do que escreveu, para não ficar sem temas; quando o pedido se resolve, a marca troca de setor e o provisório desliga se ficou
  * sem marca (`desligarSetorSeSemMarca`). Uma marca tem no máximo um pedido aberto (índice único parcial): escrever de novo atualiza o mesmo.
  */
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { clientes, nichos, pedidosDeRamo, type PedidoDeRamo } from "@/db/schema";
@@ -30,6 +30,7 @@ export async function pedidoAbertoDaMarca(clienteId: number): Promise<PedidoDeRa
 }
 
 export type ResultadoDoPedido = {
+  /** O pedido aberto; ou, se o texto é o de um pedido que o admin já atendeu e a marca segue no setor final, esse pedido (`estado` "atendido", nada mudou). */
   pedido: PedidoDeRamo;
   /** O setor em que a marca está provisoriamente; nulo quando nada casou (e a marca fica onde estava) ou o teto de setores novos do dia segurou. */
   setorProvisorioId: number | null;
@@ -51,6 +52,21 @@ export async function registrarPedidoDeRamo(clienteId: number, textoBruto: strin
   if (!marca) throw new ErroNicho("marca nao encontrada.");
 
   const aberto = await pedidoAbertoDaMarca(clienteId);
+
+  // Um formulário velho (o Começar aberto antes de o admin decidir) manda o mesmo texto de um pedido que já foi atendido: se a marca ainda está no
+  // setor final, não é um pedido novo, e reabrir desfaria a resolução do admin (o palpite a tiraria do setor que ele escolheu).
+  if (aberto === null) {
+    const [atendido] = await db()
+      .select()
+      .from(pedidosDeRamo)
+      .where(and(eq(pedidosDeRamo.clienteId, clienteId), eq(pedidosDeRamo.estado, "atendido")))
+      .orderBy(desc(pedidosDeRamo.resolvidoEm), desc(pedidosDeRamo.id))
+      .limit(1);
+    if (atendido && atendido.setorFinalId !== null && atendido.setorFinalId === marca.nichoId && normalizarBusca(atendido.texto) === normalizarBusca(texto)) {
+      return { pedido: atendido, setorProvisorioId: null, limite: false };
+    }
+  }
+
   const mesmoTexto = aberto !== null && normalizarBusca(aberto.texto) === normalizarBusca(texto);
 
   let setorProvisorioId = aberto?.setorProvisorioId ?? null;
@@ -107,6 +123,8 @@ export type PedidoNaLista = {
   marca: { id: number; nome: string };
   /** O setor provisório em que a marca está agora (nulo se nada casou ou a marca já saiu dele). */
   setorProvisorio: { id: number; nome: string } | null;
+  /** O setor em que a marca está agora, quando não é o provisório (a marca que já tinha ramo continua nele enquanto o pedido espera). */
+  ramoAtual: { id: number; nome: string } | null;
 };
 
 /** Os pedidos abertos, do mais antigo para o mais novo, com a marca e o setor provisório (para a lista do admin). */
@@ -127,7 +145,7 @@ export async function listarPedidosAbertos(): Promise<PedidoNaLista[]> {
     .orderBy(asc(pedidosDeRamo.criadoEm), asc(pedidosDeRamo.id));
 
   const nomes = new Map<number, string>();
-  const ids = [...new Set(linhas.map((l) => l.setorProvisorioId).filter((id): id is number => id !== null))];
+  const ids = [...new Set(linhas.flatMap((l) => [l.setorProvisorioId, l.marcaNichoId]).filter((id): id is number => id !== null))];
   if (ids.length > 0) {
     const setores = await db().select({ id: nichos.id, nome: nichos.nome }).from(nichos).where(inArray(nichos.id, ids));
     for (const setor of setores) nomes.set(setor.id, setor.nome);
@@ -141,6 +159,10 @@ export async function listarPedidosAbertos(): Promise<PedidoNaLista[]> {
     setorProvisorio:
       l.setorProvisorioId !== null && l.marcaNichoId === l.setorProvisorioId && nomes.has(l.setorProvisorioId)
         ? { id: l.setorProvisorioId, nome: nomes.get(l.setorProvisorioId)! }
+        : null,
+    ramoAtual:
+      l.marcaNichoId !== null && l.marcaNichoId !== l.setorProvisorioId && nomes.has(l.marcaNichoId)
+        ? { id: l.marcaNichoId, nome: nomes.get(l.marcaNichoId)! }
         : null,
   }));
 }

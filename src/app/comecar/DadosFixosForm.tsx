@@ -144,7 +144,7 @@ export function DadosFixosForm({ inicial, onSalvar, onVoltar, tipo }: Props) {
   const avisoDoProvisorio = ramoOutro.trim()
     ? ramoProvisorio
       ? textosRamo.provisorio(ramoProvisorio)
-      : inicial.ramoNome && textoDoPedidoSalvo === null
+      : inicial.ramoNome
         ? textosRamo.aguardandoNoRamoDeHoje(inicial.ramoNome)
         : textosRamo.aguardandoSemRamo
     : null;

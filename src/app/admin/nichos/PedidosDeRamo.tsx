@@ -67,7 +67,7 @@ export function PedidosDeRamo({ pedidos, aoCriarRamo }: { pedidos: PedidoNaLista
                   <strong>{pedido.marca.nome}</strong> {t.escreveu} <q className={styles.citacao}>{pedido.texto}</q>
                 </p>
                 <p className={styles.detalhe}>
-                  {pedido.setorProvisorio ? t.provisorio(pedido.setorProvisorio.nome) : t.semProvisorio} · {t.quando(formatarData(pedido.criadoEm))}
+                  {pedido.setorProvisorio ? t.provisorio(pedido.setorProvisorio.nome) : pedido.ramoAtual ? t.semProvisorioNoRamo(pedido.ramoAtual.nome) : t.semProvisorio} · {t.quando(formatarData(pedido.criadoEm))}
                 </p>
               </div>
               <div className={styles.acoes}>

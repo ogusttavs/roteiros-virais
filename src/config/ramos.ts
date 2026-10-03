@@ -95,7 +95,7 @@ export const RAMOS_DO_CATALOGO: readonly RamoDoCatalogo[] = [
   ramo(37, "turismo-e-hospedagem", "servicos-e-profissoes", "Turismo e hospedagem", "Agência de viagem, pousada, guia, passeios.", "viagem, turismo, agência, pousada, hotel, guia, passeio"),
   ramo(38, "tecnologia-e-automacao", "servicos-e-profissoes", "Tecnologia e automação", "Informática, sistemas, automação residencial, energia solar, segurança eletrônica.", "tecnologia, informática, sistema, software, automação, energia solar, câmera, segurança"),
   ramo(39, "marketing-e-design", "servicos-e-profissoes", "Marketing e design", "Agência, social media, designer, gráfica.", "marketing, agência, social media, designer, gráfica, tráfego"),
-  ramo(40, "agro-e-campo", "servicos-e-profissoes", "Agro e campo", "Produtor rural, máquinas, insumos, pecuária.", "agro, fazenda, produtor rural, gado, soja, máquinas agrícolas, criação, apicultura, abelha, mel"),
+  ramo(40, "agro-e-campo", "servicos-e-profissoes", "Agro e campo", "Produtor rural, máquinas, insumos, pecuária.", "agro, fazenda, produtor rural, gado, soja, máquinas agrícolas, apicultura, abelha"),
 
   // Perfil pessoal (quem é a marca)
   ramo(41, "empreendedorismo-e-negocios", "perfil-pessoal", "Empreendedorismo e negócios", "Dono de empresa contando como constrói e decide.", "empreendedor, empresário, negócios, empreendedorismo, marca pessoal"),

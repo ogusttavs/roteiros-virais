@@ -32,6 +32,7 @@
 /* E45 PR 2: de que pedido de ramo este novo ramo vem. */
 .avisoPedido {
   margin: 0;
+  overflow-wrap: anywhere;
   padding: var(--espaco-3) var(--espaco-4);
   border-radius: var(--raio-md);
   background: var(--cor-selecao-suave);

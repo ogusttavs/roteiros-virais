@@ -133,13 +133,14 @@ export function FormularioConta({
   const [pedidoDeRamo, setPedidoDeRamo] = useState<PedidoDeRamoNaTela | null>(pedidoDeRamoInicial);
   const [modoOutro, setModoOutro] = useState(pedidoDeRamoInicial !== null);
   const [ramoOutro, setRamoOutro] = useState(pedidoDeRamoInicial?.texto ?? "");
-  const ramoMudou = !modoOutro && ramo !== null && ramo !== ramoSalvo;
+  // Com pedido aberto a marca está no ramo provisório, que não foi escolha da pessoa: escolher da lista (até o próprio provisório) vale como escolha e fecha o pedido.
+  const ramoMudou = !modoOutro && ramo !== null && (ramo !== ramoSalvo || pedidoDeRamo !== null);
   /** O texto livre só vai ao servidor se a pessoa o escreveu de novo (ou o escreveu pela primeira vez): salvar sem mexer não refaz o palpite. */
   const outroMudou = modoOutro && ramoOutro.trim().length > 0 && normalizarBusca(ramoOutro) !== normalizarBusca(pedidoDeRamo?.texto ?? "");
   const avisoDoPedido = pedidoDeRamo
     ? pedidoDeRamo.ramoProvisorio
       ? textosRamo.provisorio(pedidoDeRamo.ramoProvisorio)
-      : ramoInicial && !pedidoDeRamoInicial
+      : ramoInicial
         ? textosRamo.aguardandoNoRamoDeHoje(ramoInicial.nome)
         : textosRamo.aguardandoSemRamo
     : null;
@@ -224,6 +225,8 @@ export function FormularioConta({
       if (resultado.dado.pedidoDeRamo !== undefined) {
         setPedidoDeRamo(resultado.dado.pedidoDeRamo);
         if (resultado.dado.pedidoDeRamo === null) setModoOutro(false);
+        // O ramo gravado acompanha o servidor: o provisório do palpite (nulo se nada casou e a marca ficou onde estava).
+        else if (resultado.dado.pedidoDeRamo.ramoProvisorioSlug) setRamoSalvo(resultado.dado.pedidoDeRamo.ramoProvisorioSlug);
       }
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);

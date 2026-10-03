@@ -180,6 +180,13 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     await waitFor(() => expect(screen.getByText("A gente vai conferir o seu ramo. Até lá, você continua em Odontologia.")).toBeTruthy());
   });
 
+  it("pedido aberto ao abrir a página, sem ramo provisório, para quem já tem ramo: diz que continua nele (e não que os temas somem)", () => {
+    render(<FormularioConta {...PROPS_BASE} pedidoDeRamo={{ texto: "xyzw abcd", ramoProvisorio: null }} />);
+
+    expect(screen.getByText("A gente vai conferir o seu ramo. Até lá, você continua em Odontologia.")).toBeTruthy();
+    expect(screen.queryByText(/ainda não aparecem/)).toBeNull();
+  });
+
   it("escolher um ramo da lista com o pedido aberto manda o ramo, e depois de salvar o aviso do provisório some", async () => {
     salvarContaAction.mockResolvedValue({ ok: true, dado: { pedidoDeRamo: null } });
     render(
@@ -197,6 +204,43 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     expect(ultimaGravacao()).not.toHaveProperty("ramoOutro");
     await waitFor(() => expect(screen.queryByText(/enquanto a gente confere o seu ramo/)).toBeNull());
     expect(screen.queryByLabelText("qual é o seu ramo")).toBeNull();
+  });
+
+  it("com o pedido aberto, escolher da lista o próprio ramo provisório também manda o ramo (e fecha o pedido)", async () => {
+    salvarContaAction.mockResolvedValue({ ok: true, dado: { pedidoDeRamo: null } });
+    render(
+      <FormularioConta
+        {...PROPS_BASE}
+        ramoInicial={{ slug: "agro-e-campo", nome: "Agro e campo" }}
+        pedidoDeRamo={{ texto: "criação de abelhas", ramoProvisorio: "Agro e campo", ramoProvisorioSlug: "agro-e-campo" }}
+      />,
+    );
+
+    await escolherRamo("agro");
+    await salvar();
+
+    expect(ultimaGravacao().ramo).toBe("agro-e-campo");
+  });
+
+  it("depois de salvar um pedido o ramo gravado é o provisório: voltar ao ramo de antes e salvar manda o ramo", async () => {
+    salvarContaAction.mockResolvedValueOnce({
+      ok: true,
+      dado: { pedidoDeRamo: { texto: "criação de abelhas", ramoProvisorio: "Agro e campo", ramoProvisorioSlug: "agro-e-campo" } },
+    });
+    render(<FormularioConta {...PROPS_BASE} />);
+    fireEvent.focus(campoRamo());
+    fireEvent.change(campoRamo(), { target: { value: "criação de abelhas" } });
+    fireEvent.keyDown(campoRamo(), { key: "ArrowDown" });
+    fireEvent.click(screen.getAllByRole("option").find((o) => o.textContent?.includes("Não achei o meu"))!);
+    await salvar();
+    await waitFor(() => expect(screen.getByText(/Você está em Agro e campo/)).toBeTruthy());
+
+    salvarContaAction.mockClear();
+    salvarContaAction.mockResolvedValue({ ok: true, dado: { pedidoDeRamo: null } });
+    await escolherRamo("odonto");
+    await salvar();
+
+    expect(ultimaGravacao().ramo).toBe("odontologia");
   });
 
   it("o texto livre vazio não deixa salvar (a marca precisa escrever o ramo ou escolher um da lista)", async () => {
