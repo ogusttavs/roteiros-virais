@@ -262,7 +262,9 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
           </div>
         ) : null}
       </div>
-      <span className="so-leitor" role="status" aria-live="polite">
+      {/* Sem `role="status"`: o campo está em telas cujos testes esperam o aviso de "salvo" com `getByRole("status")`, e um status sempre presente
+          (mesmo vazio e fora da vista) o confundia com o aviso (achado do e2e do tema, que recarregava antes de o salvar terminar). */}
+      <span className="so-leitor" aria-live="polite" aria-atomic="true" data-fala-da-busca-de-ramo>
         {fala}
       </span>
       {erro ? (

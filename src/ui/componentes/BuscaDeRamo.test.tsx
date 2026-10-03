@@ -46,6 +46,11 @@ function Exemplo(props: {
   );
 }
 
+/** O que a busca fala a quem usa leitor de tela (uma região `aria-live`, sem `role="status"`: ver o comentário no componente). */
+function falado(): string {
+  return document.querySelector("[data-fala-da-busca-de-ramo]")?.textContent ?? "";
+}
+
 function campoDeBusca(): HTMLInputElement {
   return screen.getByRole("combobox", { name: "Ramo" }) as HTMLInputElement;
 }
@@ -85,7 +90,7 @@ describe("BuscaDeRamo", () => {
     expect(opcoes[0].textContent).toContain("Odontologia");
     expect(opcoes[0].getAttribute("aria-selected")).toBe("true");
     expect(campoDeBusca().getAttribute("aria-activedescendant")).toBe(opcoes[0].id);
-    expect(screen.getByRole("status").textContent).toBe("1 ramo encontrado.");
+    expect(falado()).toBe("1 ramo encontrado.");
   });
 
   it("o Enter escolhe o primeiro resultado, fecha a lista, mostra o nome no campo e NÃO envia o formulário em volta", () => {
@@ -104,7 +109,7 @@ describe("BuscaDeRamo", () => {
     expect(aoEscolher).toHaveBeenCalledWith("automobilismo-e-pilotagem");
     expect(campoDeBusca().value).toBe("Automobilismo e pilotagem");
     expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("status").textContent).toBe("Automobilismo e pilotagem escolhido.");
+    expect(falado()).toBe("Automobilismo e pilotagem escolhido.");
     expect(aoEnviar).not.toHaveBeenCalled();
   });
 
@@ -175,7 +180,7 @@ describe("BuscaDeRamo", () => {
     expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
     expect(screen.getAllByRole("option")).toHaveLength(1);
     expect(opcaoAtiva()).toContain(NAO_ACHEI);
-    expect(screen.getByRole("status").textContent).toBe("Nenhum ramo encontrado.");
+    expect(falado()).toBe("Nenhum ramo encontrado.");
 
     fireEvent.keyDown(campoDeBusca(), { key: "Enter" });
 
@@ -357,5 +362,16 @@ describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
     render(<Exemplo />);
     digitar("salão de beleza");
     expect(opcaoAtiva()).toContain("Cabelo e barbearia");
+  });
+});
+
+describe("BuscaDeRamo: convive com o aviso de 'salvo' das telas", () => {
+  it("não tem nenhum role=status (a Conta e o Começar esperam o aviso de 'salvo' por getByRole('status'); um status sempre presente o confundia)", () => {
+    render(<Exemplo />);
+    expect(screen.queryAllByRole("status")).toHaveLength(0);
+    digitar("dentista");
+    expect(screen.queryAllByRole("status")).toHaveLength(0);
+    // E a fala continua numa região aria-live, para o leitor de tela.
+    expect(document.querySelector("[data-fala-da-busca-de-ramo]")?.getAttribute("aria-live")).toBe("polite");
   });
 });
