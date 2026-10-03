@@ -57,6 +57,8 @@
 
 .item {
   display: grid;
+  /* A coluna do grid não encolhe abaixo do conteúdo: sem isto, uma palavra comprida (um link) alarga a página inteira no celular. */
+  min-width: 0;
   gap: var(--espaco-2);
   padding: var(--espaco-4) 0;
   border-top: var(--largura-borda) solid var(--cor-divisor);
@@ -79,6 +81,8 @@
   margin: 0;
   font-size: var(--tamanho-corpo);
   color: var(--cor-titulo);
+  /* O texto vem de uma página de terceiros ou foi digitado: link e cadeia de hashtags não têm espaço onde quebrar. */
+  overflow-wrap: anywhere;
 }
 
 .oQueTirado {
@@ -150,6 +154,7 @@
   margin: 0;
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
 }
 
 .valiaAntes span {
@@ -163,9 +168,9 @@
 }
 
 .tiradosResumo {
-  display: flex;
-  align-items: center;
-  min-height: var(--altura-toque);
+  /* list-item (e não flex): é o que mantém o triângulo de abrir e fechar do <summary>. O alvo de toque vem da altura da linha. */
+  display: list-item;
+  line-height: var(--altura-toque);
   font-size: var(--tamanho-secundario);
   font-weight: var(--peso-medio);
   color: var(--cor-texto-suave);

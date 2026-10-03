@@ -227,6 +227,11 @@ describe("cada ponto de entrada, sozinho, é limpo", () => {
     }
   });
 
+  it("o nome da marca vai com no máximo 120 caracteres (marca já gravada com nome enorme não é cobrada em toda chamada)", () => {
+    const entrada = montarEntrada({ ...BASE_LIMPA, nomeDaMarca: "n".repeat(5_000) });
+    expect(entrada.split("\n")[0]).toBe(`Marca: ${"n".repeat(120)}`);
+  });
+
   it("o caminho não leva aspas nem apóstrofo (não fecha o atributo da marcação)", () => {
     const entrada = montarEntrada({ ...BASE_LIMPA, site: { ...BASE_LIMPA.site, paginas: [{ caminho: `/a"b'c`, texto: "x" }] } });
     expect(entrada).toContain('<pagina caminho="/abc">');

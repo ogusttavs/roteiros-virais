@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { comArroba, limparCampoPerfil, perfilPareceValido } from "./perfil-redes";
+import { comArroba, limparCampoPerfil, perfilPareceValido, semBarrasNoFim, TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL } from "./perfil-redes";
 
 describe("comArroba", () => {
   it("Instagram e TikTok guardam sem arroba: ganha um", () => {
@@ -61,5 +61,29 @@ describe("perfilPareceValido", () => {
     expect(perfilPareceValido("dr wash")).toBe(false);
     expect(perfilPareceValido("dr@wash")).toBe(false);
     expect(perfilPareceValido("dr/wash")).toBe(false);
+  });
+});
+
+describe("limparCampoPerfil: o campo chega do servidor sem teto, então a limpeza não pode ser quadrática nem aceitar texto enorme", () => {
+  it("uma linha de barras com um caractere no fim não trava (a regex de barra no fim era quadrática)", () => {
+    const comeco = performance.now();
+    expect(limparCampoPerfil(`${"/".repeat(250)}x`, "instagram")).toBe(`${"/".repeat(250)}x`.replace(/^@+/, ""));
+    expect(limparCampoPerfil("/".repeat(200_000), "instagram")).toBe("");
+    expect(performance.now() - comeco).toBeLessThan(1_000);
+  });
+
+  it("acima de 300 caracteres devolve vazio (nenhum perfil de verdade chega perto)", () => {
+    expect(limparCampoPerfil("a".repeat(TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL), "instagram")).toBe("a".repeat(TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL));
+    expect(limparCampoPerfil("a".repeat(TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL + 1), "instagram")).toBe("");
+  });
+});
+
+describe("semBarrasNoFim", () => {
+  it("tira só as do fim", () => {
+    expect(semBarrasNoFim("perfil///")).toBe("perfil");
+    expect(semBarrasNoFim("a/b/")).toBe("a/b");
+    expect(semBarrasNoFim("///")).toBe("");
+    expect(semBarrasNoFim("")).toBe("");
+    expect(semBarrasNoFim("sem barra")).toBe("sem barra");
   });
 });

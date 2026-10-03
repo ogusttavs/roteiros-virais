@@ -74,10 +74,13 @@ describe("TAREFAS (rodar.ts)", () => {
       await TAREFAS[FILAS.entenderMarca](555);
       expect(rodarEntenderMarca).toHaveBeenLastCalledWith({ clienteId: 42, origem: "manual", forcar: true });
 
-      // O id da execução (555) nunca aparece como clienteId.
-      process.argv = ["node", "rodar.ts", FILAS.entenderMarca, "--forcar"];
+      // A opção pode vir antes do id.
+      process.argv = ["node", "rodar.ts", FILAS.entenderMarca, "--forcar", "42"];
       await TAREFAS[FILAS.entenderMarca](555);
-      expect(rodarEntenderMarca).toHaveBeenLastCalledWith(null);
+      expect(rodarEntenderMarca).toHaveBeenLastCalledWith({ clienteId: 42, origem: "manual", forcar: true });
+
+      // O id da execução (555) nunca aparece como clienteId.
+      expect(rodarEntenderMarca).not.toHaveBeenCalledWith(expect.objectContaining({ clienteId: 555 }));
     } finally {
       process.argv = argvOriginal;
     }
@@ -86,10 +89,22 @@ describe("TAREFAS (rodar.ts)", () => {
   it("entender-marca: um argumento que não é o id (erro de digitação) é erro, nunca o despachante de todas as marcas", () => {
     const argvOriginal = process.argv;
     try {
-      for (const argumento of ["12abc", "1,2", "abc", "12.5", "-3", "idDaMarca"]) {
+      const casos: string[][] = [
+        ["12abc"],
+        ["1,2"],
+        ["abc"],
+        ["12.5"],
+        ["-3"],
+        ["idDaMarca"],
+        ["--forcar"], // a opção sozinha não vira o despachante
+        ["--forcar", "abc"],
+        ["42", "43"], // dois ids
+        ["42", "--rapido"], // opção que não existe
+      ];
+      for (const argumentos of casos) {
         vi.mocked(rodarEntenderMarca).mockClear();
-        process.argv = ["node", "rodar.ts", FILAS.entenderMarca, argumento];
-        expect(() => TAREFAS[FILAS.entenderMarca](555), argumento).toThrow("nao e um id de marca");
+        process.argv = ["node", "rodar.ts", FILAS.entenderMarca, ...argumentos];
+        expect(() => TAREFAS[FILAS.entenderMarca](555), argumentos.join(" ")).toThrow("uso: npm run job -- entender-marca");
         expect(rodarEntenderMarca).not.toHaveBeenCalled();
       }
     } finally {

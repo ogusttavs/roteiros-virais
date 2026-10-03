@@ -29,9 +29,24 @@ import {
   type AvaliacaoResposta,
   type TipoMarca,
 } from "../../src/db/schema";
+import { config } from "../../src/lib/config";
+import { textosBriefing } from "../../src/textos/briefing";
 
 const SENHA = "ExemploSenha123";
 const SECAO = "O que a IA tirou das suas redes e do seu site";
+
+/**
+ * As datas da leitura são relativas a HOJE (meio-dia UTC, 10 dias atrás): com data fixa, a "próxima leitura" já teria passado e a tela,
+ * que nunca anuncia uma data que passou, deixaria o teste vermelho sozinho (a partir de 20/10/2026). A frase esperada vem do mesmo texto
+ * que a tela usa (o texto em si tem teste de unidade com datas fixas, `src/textos/briefing-contexto.test.ts`).
+ */
+const LEITURA_EM = (() => {
+  const data = new Date();
+  data.setUTCHours(12, 0, 0, 0);
+  return new Date(data.getTime() - 10 * 86_400_000);
+})();
+const PROXIMA_EM = new Date(LEITURA_EM.getTime() + config.regras.diasEntreLeituraMarca * 86_400_000);
+const FRASE_DA_DATA = textosBriefing.contextoDaMarca.lidoEm(LEITURA_EM, ["instagram", "site"], PROXIMA_EM);
 
 async function entrar(page: Page, email: string) {
   await page.goto("/entrar");
@@ -91,8 +106,8 @@ async function semearLeitura(clienteId: number): Promise<{ vende: number; posta:
   await db().delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
   await db().insert(contextoMarca).values({
     clienteId,
-    ultimaLeituraOkEm: new Date("2026-09-20T12:00:00Z"),
-    ultimaTentativaEm: new Date("2026-09-20T12:00:00Z"),
+    ultimaLeituraOkEm: LEITURA_EM,
+    ultimaTentativaEm: LEITURA_EM,
     fontes: [
       { tipo: "site", lida: true, quantidade: 3 },
       { tipo: "instagram", lida: true, quantidade: 8 },
@@ -168,7 +183,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     await db().delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
     await db().insert(contextoMarca).values({
       clienteId,
-      ultimaTentativaEm: new Date("2026-09-20T12:00:00Z"),
+      ultimaTentativaEm: LEITURA_EM,
       fontes: [
         { tipo: "site", lida: false, motivo: "bloqueado_pelo_site" },
         { tipo: "instagram", lida: false, motivo: "conta_restrita" },
@@ -193,7 +208,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
 
     const secao = page.getByRole("region", { name: SECAO });
     await expect(secao.getByText("Isto não é o que você respondeu: é o que a gente leu.")).toBeVisible();
-    await expect(secao.getByText(/Lido em 20 de setembro, no Instagram e no site\. A próxima leitura é em 20 de outubro\./)).toBeVisible();
+    await expect(secao.getByText(FRASE_DA_DATA, { exact: true })).toBeVisible();
 
     const doSite = itemNaTela(page, "bico de spray");
     await expect(doSite.getByText("Do seu site")).toBeVisible();
@@ -318,7 +333,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     await expect(secao.getByText("O TikTok ainda não é lido por aqui; o seu @ fica guardado.")).toBeVisible();
     // A linha da data lista só o que foi lido de verdade: nunca o TikTok.
     const linhaDaData = secao.getByText(/^Lido em /);
-    await expect(linhaDaData).toHaveText("Lido em 20 de setembro, no Instagram e no site. A próxima leitura é em 20 de outubro.");
+    await expect(linhaDaData).toHaveText(FRASE_DA_DATA);
     await expect(linhaDaData).not.toContainText("TikTok");
   });
 
@@ -425,7 +440,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const secao = page.getByRole("region", { name: SECAO });
     await expect(secao.getByText("1 item que você tirou")).toBeVisible();
     await secao.getByText("1 item que você tirou").click();
-    await expect(secao.getByText("O que você tira não volta sozinho, nem com outras palavras.")).toBeVisible();
+    await expect(secao.getByText("O que você tira não volta sozinho.")).toBeVisible();
     await secao.getByRole("button", { name: /^Desfazer/ }).click();
 
     await expect(itemNaTela(page, "antes e depois em tecido claro").getByText("Confirmado")).toBeVisible();
@@ -512,6 +527,13 @@ test.describe("celular: a seção cabe e os alvos de toque têm 44 pontos", () =
   test("sem rolagem para o lado e nenhum botão da seção menor que 44 pontos, nem em edição", async ({ page }) => {
     const clienteId = await marca("e2e-contexto-celular");
     await semearLeitura(clienteId);
+    // Um texto sem espaço onde quebrar (um link, uma cadeia de hashtags), como o que vem de uma página de terceiros: não pode alargar a página.
+    await db().insert(contextoMarcaItens).values({
+      clienteId,
+      categoria: "fala",
+      origem: "site",
+      texto: `Usa sempre as mesmas hashtags: ${"#removedor".repeat(14)} e o endereco ${"a".repeat(90)}`,
+    });
     await entrar(page, "e2e-contexto-celular@exemplo.teste");
     await page.goto("/briefing");
 

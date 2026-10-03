@@ -162,7 +162,7 @@ export function montarEntrada(dados: {
   for (const rede of dados.redes) if (!fontes.includes(rede.rede)) fontes.push(rede.rede);
 
   const partes: string[] = [
-    `Marca: ${limparParaEntrada(dados.nomeDaMarca)}`,
+    `Marca: ${limparParaEntrada(dados.nomeDaMarca).slice(0, 120)}`,
     `Tipo: ${descreverTipo(dados.tipo)}`,
     "",
     "O que a pessoa respondeu no briefing (só para você comparar; nunca copie daqui):",

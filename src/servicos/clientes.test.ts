@@ -33,6 +33,13 @@ describe("dadosFixosSchema (validacao dos dados fixos do briefing)", () => {
     expect(resultado.success).toBe(true);
   });
 
+  it("recusa nome e perfis enormes (ação que a tela não mandou): o nome entra em prompts de IA, o perfil em chamadas à rede", () => {
+    expect(dadosFixosSchema.safeParse({ ...base, nome: "a".repeat(121), nichoId: 1 }).success).toBe(false);
+    expect(dadosFixosSchema.safeParse({ ...base, nome: "a".repeat(120), nichoId: 1 }).success).toBe(true);
+    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, perfis: { instagram: "a".repeat(301) } }).success).toBe(false);
+    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, perfis: { instagram: "a".repeat(300) } }).success).toBe(true);
+  });
+
   it("recusa sem nichoId e sem ramoOutro", () => {
     const resultado = dadosFixosSchema.safeParse(base);
     expect(resultado.success).toBe(false);
@@ -57,8 +64,18 @@ describe("dadosFixosSchema (validacao dos dados fixos do briefing)", () => {
 
   it("site precisa ser https com dominio, nunca endereco de rede interna", () => {
     expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "https://drwash.com.br" }).success).toBe(true);
-    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "http://drwash.com.br" }).success).toBe(false);
+    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "ftp://drwash.com.br" }).success).toBe(false);
     expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "https://localhost" }).success).toBe(false);
+  });
+
+  it("o endereço sem esquema ou com http:// é guardado com https://", () => {
+    for (const digitado of ["drwash.com.br", "http://drwash.com.br", "  www.drwash.com.br  "]) {
+      const resultado = dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: digitado });
+      expect(resultado.success, digitado).toBe(true);
+      if (resultado.success) expect(resultado.data.site?.startsWith("https://")).toBe(true);
+    }
+    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "http://drwash.com.br:8080" }).success).toBe(false);
+    expect(dadosFixosSchema.safeParse({ ...base, nichoId: 1, site: "http://localhost" }).success).toBe(false);
   });
 
   it("regiao, site, perfis e quem grava sao opcionais", () => {

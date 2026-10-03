@@ -121,6 +121,20 @@ describe("o briefing completo traz a releitura da marca", () => {
     expect(await jobsDeLeitura(clienteId)).toBe(1);
   });
 
+  it("uma compilação do perfil que falhou na primeira vez e foi refeita depois também enfileira a releitura (o briefing já estava completo)", async () => {
+    const clienteId = await criarMarcaComBriefing();
+    await expect.poll(() => jobsDeLeitura(clienteId), { timeout: 5_000, interval: 50 }).toBe(1);
+    // O estado de uma compilação que lançou: o briefing ficou completo, mas o perfil não foi gravado.
+    await db().update(briefings).set({ perfil: null }).where(eq(briefings.clienteId, clienteId));
+    await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);
+
+    const primeira = perguntasDoBriefing("negocio")[0];
+    await avaliarResposta(clienteId, primeira.id, `${respostaConcreta(primeira.id)} Reescrevi para a compilação rodar de novo.`, "negocio");
+
+    expect((await garantirBriefing(clienteId)).perfil).not.toBeNull();
+    await expect.poll(() => jobsDeLeitura(clienteId), { timeout: 5_000, interval: 50 }).toBe(1);
+  });
+
   it("uma marca sem site nem perfil não tem o que ler: ficar completa não enfileira nada", async () => {
     const clienteId = await criarMarcaComBriefing();
     await db().execute(sql`delete from pgboss.job where name = ${FILAS.entenderMarca}`);

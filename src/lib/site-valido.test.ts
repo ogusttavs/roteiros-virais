@@ -51,6 +51,12 @@ describe("siteValido", () => {
     expect(siteValido("https://painel.internal")).toBe(false);
   });
 
+  it("o ponto final do nome (forma absoluta) não escapa da regra dos nomes de rede interna", () => {
+    expect(siteValido("https://painel.internal.")).toBe(false);
+    expect(siteValido("https://impressora.local.")).toBe(false);
+    expect(siteValido("https://exemplo.com.br.")).toBe(true);
+  });
+
   it("recusa o que passa do tamanho que se grava", () => {
     expect(siteValido(`https://exemplo.com/${"a".repeat(TAMANHO_MAXIMO_DO_SITE)}`)).toBe(false);
     expect(siteValido(`https://${"a".repeat(300)}.com`)).toBe(false);
@@ -65,10 +71,20 @@ describe("normalizarSite", () => {
     expect(siteValido(normalizarSite("minhaloja.com.br"))).toBe(true);
   });
 
-  it("vazio continua vazio; quem escreveu um esquema fica como escreveu (e a validação recusa)", () => {
+  it("o http:// vira https:// (o leitor só fala https; um site sem https cai na frase de 'não respondeu')", () => {
+    expect(normalizarSite("http://minhaloja.com.br")).toBe("https://minhaloja.com.br");
+    expect(normalizarSite("HTTP://minhaloja.com.br/sobre")).toBe("https://minhaloja.com.br/sobre");
+    expect(siteValido(normalizarSite("http://minhaloja.com.br"))).toBe(true);
+    // O que continua recusado depois de virar https: rede interna, porta, credencial.
+    expect(siteValido(normalizarSite("http://localhost"))).toBe(false);
+    expect(siteValido(normalizarSite("http://minhaloja.com.br:8080"))).toBe(false);
+    expect(siteValido(normalizarSite("http://usuario:senha@minhaloja.com.br"))).toBe(false);
+  });
+
+  it("vazio continua vazio; outro esquema fica como escreveu (e a validação recusa)", () => {
     expect(normalizarSite("   ")).toBe("");
-    expect(normalizarSite("http://minhaloja.com.br")).toBe("http://minhaloja.com.br");
-    expect(siteValido(normalizarSite("http://minhaloja.com.br"))).toBe(false);
+    expect(normalizarSite("ftp://minhaloja.com.br")).toBe("ftp://minhaloja.com.br");
+    expect(siteValido(normalizarSite("ftp://minhaloja.com.br"))).toBe(false);
     expect(siteValido(normalizarSite("javascript:alert(1)"))).toBe(false);
     expect(siteValido(normalizarSite("//minhaloja.com.br"))).toBe(true);
   });

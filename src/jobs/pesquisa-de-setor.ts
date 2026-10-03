@@ -136,14 +136,20 @@ async function candidatoFoiTirado(plataforma: Rede, handle: string): Promise<boo
   return linha?.removidaEm != null;
 }
 
+/**
+ * `ignorarTirada`: quem confere o @ da PRÓPRIA marca de um cliente (`entender-marca`, `analisar-perfil` da própria marca) não pode
+ * ser barrado porque o admin tirou essa conta da vigilância do setor; a lista de "tiradas" é da pesquisa do setor, não da pessoa.
+ */
+export type OpcoesConfirmar = { ignorarTirada?: boolean };
+
 /** YouTube: resolve @handle ou nome para o canal de verdade, pega até `VIDEOS_POR_CANDIDATO` vídeos recentes. */
-export async function confirmarYoutube(handleOuNome: string): Promise<ContaConfirmada | null> {
+export async function confirmarYoutube(handleOuNome: string, opcoes: OpcoesConfirmar = {}): Promise<ContaConfirmada | null> {
   const canalResp = await buscarCanal(handleOuNome);
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
   const canal = canalResp.items?.[0];
   if (!canal) return null;
 
-  if (await candidatoFoiTirado("youtube", canal.id)) return null;
+  if (!opcoes.ignorarTirada && (await candidatoFoiTirado("youtube", canal.id))) return null;
 
   const uploadsResp = await buscarUploadsDoCanal(canal.contentDetails.relatedPlaylists.uploads);
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
@@ -173,12 +179,12 @@ export async function confirmarYoutube(handleOuNome: string): Promise<ContaConfi
 }
 
 /** Instagram: Business Discovery (grátis), o mesmo caminho que `contas-base.ts` usa no catch-up diário. */
-export async function confirmarInstagram(handle: string): Promise<ContaConfirmada | null> {
+export async function confirmarInstagram(handle: string, opcoes: OpcoesConfirmar = {}): Promise<ContaConfirmada | null> {
   // O @ entra cru na expressão de campos da Graph API (`business_discovery.username(...)`): quem chega aqui por um campo
   // que a pessoa escreve (a Conta, o briefing) nunca pode trazer parênteses, chaves ou vírgula. Só o que o Instagram permite.
   if (!/^[A-Za-z0-9._]{1,30}$/.test(handle)) return null;
   if (!config.coleta.metaAtivo) return null;
-  if (await candidatoFoiTirado("instagram", handle)) return null;
+  if (!opcoes.ignorarTirada && (await candidatoFoiTirado("instagram", handle))) return null;
 
   const discovery = await buscarBusinessDiscovery(handle, VIDEOS_POR_CANDIDATO);
   if (!discovery) return null;

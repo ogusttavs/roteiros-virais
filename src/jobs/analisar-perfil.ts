@@ -115,7 +115,9 @@ export async function rodarAnalisarPerfil(payload: PayloadAnalisarPerfil): Promi
 
   let confirmado: ContaConfirmada | null;
   try {
-    confirmado = payload.rede === "youtube" ? await confirmarYoutube(payload.handle) : await confirmarInstagram(payload.handle);
+    // Só o perfil citado respeita a lista de contas "tiradas" do setor; o @ da própria marca nunca é barrado por ela.
+    const opcoes = { ignorarTirada: payload.origem === "propria_marca" };
+    confirmado = payload.rede === "youtube" ? await confirmarYoutube(payload.handle, opcoes) : await confirmarInstagram(payload.handle, opcoes);
   } catch (erro) {
     if (erro instanceof ErroYoutubeApi && erro.message.includes("playlistNotFound")) {
       await gravarResultado(payload, { existeNaRede: false, motivo: "sem_videos" });

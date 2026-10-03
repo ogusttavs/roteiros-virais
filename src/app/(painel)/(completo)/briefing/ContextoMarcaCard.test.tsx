@@ -12,6 +12,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ItemDaSecao, SecaoContextoMarca } from "@/servicos/contexto-marca";
 
+/** Se a rede está fora: o mock de `useConexao` lê daqui (precisa ser criado com `vi.hoisted`, que roda antes dos `vi.mock`). */
+const estadoDaRede = vi.hoisted(() => ({ semConexao: false }));
+/** Os `onTranscrito` que o gravador de voz recebeu (um por campo de correção montado): o teste chama um depois de o campo ter fechado. */
+const transcritos = vi.hoisted(() => [] as ((texto: string, duracaoS: number) => void)[]);
+
 const confirmarAcao = vi.fn();
 const corrigirAcao = vi.fn();
 const tirarAcao = vi.fn();
@@ -29,13 +34,16 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: atualizarRota }
 
 vi.mock("@/ui/ConexaoContext", () => ({
   ID_FAIXA_SEM_CONEXAO: "faixa-sem-conexao",
-  useConexao: () => ({ semConexao: false, avisarRedeOk: vi.fn() }),
+  useConexao: () => ({ semConexao: estadoDaRede.semConexao, avisarRedeOk: vi.fn() }),
   useTratarFalha: () => (_erro: unknown, padrao: string) => padrao,
 }));
 
 vi.mock("@/ui/componentes/useGravadorDeAudio", () => ({
   LIMITE_SEGUNDOS_PADRAO: 120,
-  useGravadorDeAudio: () => ({ fase: "inicial", segundos: 0, semMicrofone: false, erro: null, iniciarGravacao: vi.fn(), pararGravacao: vi.fn() }),
+  useGravadorDeAudio: (opcoes: { onTranscrito: (texto: string, duracaoS: number) => void }) => {
+    transcritos.push(opcoes.onTranscrito);
+    return { fase: "inicial", segundos: 0, semMicrofone: false, erro: null, iniciarGravacao: vi.fn(), pararGravacao: vi.fn() };
+  },
 }));
 
 import { ContextoMarcaCard } from "./ContextoMarcaCard";
@@ -59,6 +67,8 @@ function secao(extra: Partial<SecaoContextoMarca> = {}): SecaoContextoMarca {
 }
 
 beforeEach(() => {
+  estadoDaRede.semConexao = false;
+  transcritos.length = 0;
   confirmarAcao.mockReset().mockResolvedValue("confirmado");
   corrigirAcao.mockReset().mockResolvedValue(undefined);
   tirarAcao.mockReset().mockResolvedValue(undefined);
@@ -251,6 +261,106 @@ describe("Corrigir", () => {
     fireEvent.click(screen.getByRole("button", { name: "Corrigir: Segundo item." }));
 
     await waitFor(() => expect(screen.queryByText(/O que você escreveu continua aí/)).toBeNull());
+  });
+});
+
+describe("o que chega depois de a pessoa ter mudado de campo", () => {
+  it("uma transcrição de voz que chega depois de o campo fechar não o reabre", async () => {
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Primeiro item.")] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir: Primeiro item." }));
+    await screen.findByLabelText("Corrigir o que a IA entendeu");
+    const doPrimeiro = transcritos[transcritos.length - 1];
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    expect(screen.queryByLabelText("Corrigir o que a IA entendeu")).toBeNull();
+
+    act(() => doPrimeiro("texto que chegou atrasado", 5));
+
+    expect(screen.queryByLabelText("Corrigir o que a IA entendeu")).toBeNull();
+  });
+
+  it("a transcrição atrasada de um item não troca o rascunho que a pessoa está escrevendo em outro", async () => {
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Primeiro item."), item(2, "Segundo item.", { categoria: "fala" })] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir: Primeiro item." }));
+    await screen.findByLabelText("Corrigir o que a IA entendeu");
+    const doPrimeiro = transcritos[transcritos.length - 1];
+
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir: Segundo item." }));
+    fireEvent.change(await screen.findByLabelText("Corrigir o que a IA entendeu"), { target: { value: "Rascunho do segundo" } });
+    act(() => doPrimeiro("texto atrasado do primeiro", 5));
+
+    expect((screen.getByLabelText("Corrigir o que a IA entendeu") as HTMLTextAreaElement).value).toBe("Rascunho do segundo");
+  });
+
+  it("a ação de um item falha depois de a pessoa abrir a correção de outro: a frase não promete um texto que já não está no campo", async () => {
+    let falharOPrimeiro: (erro: Error) => void = () => undefined;
+    corrigirAcao.mockImplementationOnce(() => new Promise<void>((_resolver, rejeitar) => (falharOPrimeiro = rejeitar)));
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Primeiro item."), item(2, "Segundo item.", { categoria: "fala" })] })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir: Primeiro item." }));
+    fireEvent.change(await screen.findByLabelText("Corrigir o que a IA entendeu"), { target: { value: "Primeiro corrigido" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir: Segundo item." }));
+    await screen.findByLabelText("Corrigir o que a IA entendeu");
+
+    await act(async () => {
+      falharOPrimeiro(new Error("rede caiu"));
+    });
+
+    expect(await screen.findByText(/Toque em Corrigir neste item e escreva de novo/)).toBeTruthy();
+    expect(screen.queryByText(/O que você escreveu continua aí/)).toBeNull();
+  });
+});
+
+describe("leitor de tela e teclado, depois de uma falha", () => {
+  it("a mesma frase anunciada duas vezes seguidas troca o nó (senão o leitor de tela fica mudo na segunda)", async () => {
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Primeiro item."), item(2, "Segundo item.", { categoria: "fala" })] })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Está certo: Primeiro item." }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Item confirmado."));
+    const primeiroNo = screen.getByRole("status").firstElementChild;
+
+    fireEvent.click(screen.getByRole("button", { name: "Está certo: Segundo item." }));
+    await waitFor(() => expect(screen.getByRole("status").firstElementChild).not.toBe(primeiroNo));
+    expect(screen.getByRole("status").textContent).toBe("Item confirmado.");
+  });
+
+  it("depois de uma falha de 'Está certo', 'Tirar' e 'Desfazer', o foco volta ao botão que a pessoa tinha tocado", async () => {
+    confirmarAcao.mockRejectedValueOnce(new Error("rede caiu"));
+    tirarAcao.mockRejectedValueOnce(new Error("rede caiu"));
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Vende removedor.")] })} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Está certo/ }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Está certo/ })));
+
+    fireEvent.click(screen.getByRole("button", { name: /^Tirar/ }));
+    await waitFor(() => expect(screen.getByText(/Não conseguimos tirar agora/)).toBeTruthy());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Tirar/ })));
+  });
+
+  it("o contador de caracteres mede o texto que vai ser guardado (espaços juntados), o mesmo que o servidor mede", async () => {
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Vende removedor.")] })} />);
+    fireEvent.click(screen.getByRole("button", { name: /^Corrigir/ }));
+    const campo = await screen.findByLabelText("Corrigir o que a IA entendeu");
+
+    fireEvent.change(campo, { target: { value: "a    b\n\n\nc" } });
+
+    expect(screen.getByText("5 de 500 caracteres")).toBeTruthy();
+  });
+});
+
+describe("sem conexão", () => {
+  it("os botões que chamam o servidor ficam desabilitados, e clicar não chama nenhuma ação", () => {
+    estadoDaRede.semConexao = true;
+    render(<ContextoMarcaCard secao={secao({ itens: [item(1, "Vende removedor.")], tirados: [{ id: 9, categoria: "vende", origem: "site", texto: "Fala formal." }] })} />);
+
+    for (const nome of ["Está certo: Vende removedor.", "Corrigir: Vende removedor.", "Tirar: Vende removedor.", "Desfazer: Fala formal."]) {
+      const botao = screen.getByRole("button", { name: nome }) as HTMLButtonElement;
+      expect(botao.disabled, nome).toBe(true);
+      fireEvent.click(botao);
+    }
+    expect(confirmarAcao).not.toHaveBeenCalled();
+    expect(tirarAcao).not.toHaveBeenCalled();
+    expect(desfazerAcao).not.toHaveBeenCalled();
   });
 });
 

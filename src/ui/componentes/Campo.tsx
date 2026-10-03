@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { useId, type InputHTMLAttributes } from "react";
+import { useId, type InputHTMLAttributes, type Ref } from "react";
 
 import styles from "./Campo.module.css";
 
@@ -15,6 +15,8 @@ type Props = InputHTMLAttributes<HTMLInputElement> & {
   contador?: string;
   /** Ex.: "@", mostrado grudado a esquerda do campo. */
   prefixo?: string;
+  /** Para levar o foco ao campo (um erro de validação). React 19 aceita `ref` como prop comum e ele chega ao `<input>` por `...props`. */
+  ref?: Ref<HTMLInputElement>;
 };
 
 export function Campo({ rotulo, rotuloOculto = false, ajuda, erro, contador, prefixo, className, ...props }: Props) {

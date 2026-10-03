@@ -78,6 +78,9 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   const [erro, setErro] = useState<string | null>(null);
 
   const [tentouEnviar, setTentouEnviar] = useState(false);
+  /** Conta as tentativas (e não só "tentou"): o segundo toque no Continuar também leva o foco ao campo que está errado. */
+  const [tentativas, setTentativas] = useState(0);
+  const formaRef = useRef<HTMLFormElement>(null);
   const tratarFalha = useTratarFalha();
   const erroRef = useRef<HTMLParagraphElement>(null);
 
@@ -88,6 +91,12 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   useEffect(() => {
     if (erro) erroRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [erro]);
+
+  // Com o formulário inválido, o foco vai ao primeiro campo marcado como errado (o `Campo` não aceita `ref`): rola até ele
+  // e quem usa leitor de tela ouve a frase do erro. Antes, o toque em "Continuar" não parecia fazer nada.
+  useEffect(() => {
+    if (tentativas > 0) formaRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [tentativas]);
 
   const podeContinuar =
     nome.trim().length > 0 &&
@@ -103,6 +112,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
     if (salvando) return;
     if (!podeContinuar) {
       setTentouEnviar(true);
+      setTentativas((n) => n + 1);
       return;
     }
     setSalvando(true);
@@ -132,7 +142,7 @@ export function DadosFixosForm({ nichos, inicial, onSalvar, onVoltar, tipo }: Pr
   }
 
   return (
-    <form className={styles.forma} onSubmit={enviar}>
+    <form ref={formaRef} className={styles.forma} onSubmit={enviar}>
       <Cartao className={styles.dois}>
         <Campo rotulo={dadosFixos.nome.rotulo} value={nome} onChange={(evento) => setNome(evento.target.value)} />
         <label className={styles.campoSelect} htmlFor="ramo">

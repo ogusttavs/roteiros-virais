@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { encontrarProblemas } from "@/lib/regras-de-texto";
+import { textosBriefing } from "@/textos/briefing";
 
 import { fraseDaFonteNaoLida } from "./frase-fonte-contexto";
 
@@ -30,10 +31,27 @@ describe("fraseDaFonteNaoLida", () => {
     expect(fraseDaFonteNaoLida({ tipo: "youtube", lida: false, motivo: "x" })).toBe("YouTube: não deu para ler.");
   });
 
-  it("nenhuma frase tem travessão, emoji nem jargão", () => {
-    const motivosDeSite = ["endereco_invalido", "rede_social", "robots_proibe", "erro_do_site", "bloqueado_pelo_site", "nao_encontrado", "grande_demais", "sem_texto"];
-    const motivosDeRede = ["nao_encontrado", "sem_videos", "conta_restrita", "desligada", "indisponivel"];
-    for (const motivo of motivosDeSite) expect(encontrarProblemas(fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo }) ?? "")).toEqual([]);
-    for (const motivo of motivosDeRede) expect(encontrarProblemas(fraseDaFonteNaoLida({ tipo: "instagram", lida: false, motivo }) ?? "")).toEqual([]);
+  // Todo motivo do leitor de site (o `satisfies` em `textos/briefing.ts` garante que não falta nenhum) tem frase própria, que não é a de reserva.
+  const MOTIVOS_DE_SITE = Object.keys(textosBriefing.contextoDaMarca.naoLida.site);
+  const MOTIVOS_DE_REDE = Object.keys(textosBriefing.contextoDaMarca.naoLida.rede);
+
+  it("o leitor tem 15 motivos e cada um tem frase própria", () => {
+    expect(MOTIVOS_DE_SITE).toHaveLength(15);
+  });
+
+  it.each(MOTIVOS_DE_SITE)("site, motivo %s: frase própria, sem travessão, emoji nem jargão", (motivo) => {
+    const frase = fraseDaFonteNaoLida({ tipo: "site", lida: false, motivo }) ?? "";
+    expect(frase).not.toBe(textosBriefing.contextoDaMarca.naoLida.padraoSite);
+    expect(frase.startsWith("Site: ")).toBe(true);
+    expect(encontrarProblemas(frase)).toEqual([]);
+  });
+
+  it.each(MOTIVOS_DE_REDE)("rede, motivo %s: frase própria, sem travessão, emoji nem jargão", (motivo) => {
+    for (const tipo of ["instagram", "youtube"] as const) {
+      const frase = fraseDaFonteNaoLida({ tipo, lida: false, motivo }) ?? "";
+      expect(frase).not.toBe(textosBriefing.contextoDaMarca.naoLida.padraoRede.replace("{rede}", tipo === "instagram" ? "Instagram" : "YouTube"));
+      expect(frase).not.toContain("{rede}");
+      expect(encontrarProblemas(frase)).toEqual([]);
+    }
   });
 });

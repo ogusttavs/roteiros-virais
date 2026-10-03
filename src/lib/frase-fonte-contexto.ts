@@ -11,7 +11,8 @@ const NOME_DA_REDE = { instagram: "Instagram", youtube: "YouTube" } as const;
 
 export function fraseDaFonteNaoLida(fonte: FonteDoContexto): string | null {
   if (fonte.lida || fonte.tipo === "tiktok") return null;
-  if (fonte.tipo === "site") return t.naoLida.site[fonte.motivo ?? ""] ?? t.naoLida.padraoSite;
+  // O motivo vem do banco como texto: um valor que o leitor não conhece (de uma versão antiga ou futura) cai na frase padrão.
+  if (fonte.tipo === "site") return (t.naoLida.site as Record<string, string | undefined>)[fonte.motivo ?? ""] ?? t.naoLida.padraoSite;
   const modelo = t.naoLida.rede[fonte.motivo ?? ""] ?? t.naoLida.padraoRede;
   return modelo.replace("{rede}", NOME_DA_REDE[fonte.tipo]);
 }

@@ -279,7 +279,9 @@ export async function avaliarResposta(
    * dada como em dia. Sem esperar (ler o site e as redes pode demorar e não prende a avaliação), e o
    * intervalo mínimo entre leituras por evento cuida do excesso.
    */
-  if (ficouCompletoAgora) {
+  // `briefing.perfil === null`: a primeira compilação com sucesso. Cobre a que falhou da primeira vez (o briefing já estava
+  // completo, `ficouCompletoAgora` não repete) e foi refeita depois.
+  if (ficouCompletoAgora || (deveCompilarPerfil && briefing.perfil === null)) {
     const cliente = await clientePorId(clienteId);
     if (cliente && marcaTemFonteParaLer(cliente)) {
       void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);

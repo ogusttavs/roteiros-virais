@@ -44,8 +44,6 @@ import {
 
 export class ErroContextoMarca extends Error {}
 
-/** Quantos itens tirados a seção lista para a pessoa poder desfazer (os mais recentes primeiro). */
-const MAXIMO_ITENS_TIRADOS_NA_TELA = 20;
 
 export type ItemDaSecao = {
   id: number;
@@ -106,8 +104,19 @@ export async function secaoDoCliente(
     .where(eq(contextoMarcaItens.clienteId, cliente.id))
     .orderBy(asc(contextoMarcaItens.id));
 
+  // As fontes que a Conta tem hoje. O que veio de uma fonte que a pessoa tirou (o site apagado, o Instagram trocado por outro) e que
+  // ela nunca confirmou não é mais dela: some da tela na hora, sem esperar uma leitura (que nem acontece quando não sobrou fonte
+  // nenhuma). O que ela confirmou ou corrigiu continua à vista, porque continua entrando em todo roteiro.
+  const fontesDaConta = new Set<FonteContextoMarca>(
+    [
+      cliente.site?.trim() ? "site" : null,
+      cliente.perfis?.instagram?.trim() ? "instagram" : null,
+      cliente.perfis?.youtube?.trim() ? "youtube" : null,
+    ].filter((fonte): fonte is FonteContextoMarca => fonte !== null),
+  );
+
   const itens: ItemDaSecao[] = itensDoBanco
-    .filter(itemVisivel)
+    .filter((item) => itemVisivel(item) && (item.textoConfirmado !== null || fontesDaConta.has(item.origem)))
     .map((item) => ({
       id: item.id,
       categoria: item.categoria,
@@ -123,7 +132,6 @@ export async function secaoDoCliente(
   const tirados: ItemTirado[] = itensDoBanco
     .filter((item) => item.estado === "recusado")
     .sort((a, b) => b.id - a.id)
-    .slice(0, MAXIMO_ITENS_TIRADOS_NA_TELA)
     .map((item) => ({
       id: item.id,
       categoria: item.categoria,

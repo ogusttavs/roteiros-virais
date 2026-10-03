@@ -32,6 +32,7 @@ import type { ContaConfirmada } from "@/jobs/pesquisa-de-setor";
 import type { ResultadoLeituraSite } from "@/jobs/site-api";
 import { ErroYoutubeApi } from "@/jobs/youtube-api";
 import { config } from "@/lib/config";
+import { mudarTipoMarca } from "@/servicos/clientes";
 import { confirmarItem, corrigirItem, secaoDoCliente, tirarItem } from "@/servicos/contexto-marca";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -234,6 +235,23 @@ describe("a primeira leitura", () => {
     await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), deps);
 
     expect((await itensDe(clienteId))[0].novidade).toBeNull();
+  });
+
+  it("um item que a pessoa tinha confirmado e tirou: os DOIS textos (a proposta da IA e o que estava em vigor) vão à IA na lista dos tirados", async () => {
+    const clienteId = await criarCliente();
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+    const [item] = await itensDe(clienteId);
+    await confirmarItem(clienteId, item.id, item.texto);
+    await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, agora(), depsComSite(`${TEXTO_DO_SITE} Texto novo [mock:mudar]`).deps);
+    const [comProposta] = await itensDe(clienteId);
+    expect(comProposta.textoConfirmado).not.toBe(comProposta.texto);
+    await tirarItem(clienteId, item.id);
+
+    await rodarEntenderMarca({ clienteId, origem: "manual", forcar: true }, agora(), depsComSite(TEXTO_DO_SITE).deps);
+
+    const entrada = await ultimaEntradaDaIA(clienteId);
+    expect(entrada).toContain(`- ${comProposta.texto}`);
+    expect(entrada).toContain(`- ${comProposta.textoConfirmado}`);
   });
 
   it("o resumo do briefing e os itens que a pessoa tirou vão para a IA, para ela comparar e não repropor", async () => {
@@ -692,6 +710,38 @@ describe("quando não ler", () => {
     expect(resultado.pulado).toBe("ja_lendo");
   });
 
+  it("uma leitura parcial (o site caiu, o Instagram leu): conta como lida, e a nova tentativa em 3 dias relê o que falhou", async () => {
+    const clienteId = await criarCliente({ perfis: { instagram: "perfil-exemplo", tiktok: null, youtube: null } });
+    const quando = agora();
+    const depsParcial: DepsEntenderMarca = {
+      lerSite: async () => siteForaDoAr("erro_do_site"),
+      confirmarRede: async () => contaFalsa("instagram", [100, 120, 90, 110, 5000, 100]),
+    };
+    await rodarEntenderMarca({ clienteId, origem: "evento" }, quando, depsParcial);
+    const estado = await estadoDe(clienteId);
+    expect(estado.ultimaLeituraOkEm).not.toBeNull();
+    expect(estado.proximaTentativaEm!.getTime() - quando.getTime()).toBe(3 * 86_400_000);
+
+    // Um dia depois: a leitura boa é recente e a nova tentativa ainda não venceu: pula.
+    const umDiaDepois = new Date(quando.getTime() + 86_400_000);
+    expect((await rodarEntenderMarca({ clienteId, origem: "mensal" }, umDiaDepois, depsComSite(TEXTO_DO_SITE).deps)).pulado).toBe("lido_recentemente");
+
+    // Três dias e uma hora depois: venceu, e o site (agora no ar) é lido.
+    const { deps, chamadas } = depsComSite(TEXTO_DO_SITE);
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "mensal" }, new Date(quando.getTime() + 3 * 86_400_000 + 3_600_000), {
+      ...deps,
+      confirmarRede: depsParcial.confirmarRede,
+    });
+    expect(resultado.pulado).toBeUndefined();
+    expect(chamadas.site).toBe(1);
+    expect((await estadoDe(clienteId)).fontes).toEqual([
+      { tipo: "site", lida: true, quantidade: 1 },
+      { tipo: "instagram", lida: true, quantidade: 6 },
+    ]);
+    expect((await estadoDe(clienteId)).proximaTentativaEm).toBeNull();
+    expect((await itensDe(clienteId)).map((i) => i.origem).sort()).toEqual(["instagram", "site"]);
+  });
+
   it("uma trava velha (leitura interrompida) solta sozinha", async () => {
     const clienteId = await criarCliente();
     const quando = agora();
@@ -726,12 +776,12 @@ describe("quando não ler", () => {
     expect(forcada.pulado).toBeUndefined();
   });
 
-  it("a leitura lenta que terminou depois de a trava vencer não solta a trava de outra leitura que já a tomou", async () => {
+  it("a leitura lenta que terminou depois de a trava vencer não grava nada e não solta a trava de outra leitura que já a tomou", async () => {
     const clienteId = await criarCliente();
     const quando = agora();
     const daOutraLeitura = new Date(quando.getTime() + 5 * 3_600_000);
 
-    await rodarEntenderMarca({ clienteId, origem: "manual" }, quando, {
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "manual" }, quando, {
       lerSite: async () => {
         // No meio da leitura, outra execução assume a trava (o que acontece quando esta passa do prazo).
         await db().update(contextoMarca).set({ lendoDesde: daOutraLeitura }).where(eq(contextoMarca.clienteId, clienteId));
@@ -739,7 +789,27 @@ describe("quando não ler", () => {
       },
     });
 
-    expect((await estadoDe(clienteId)).lendoDesde?.getTime()).toBe(daOutraLeitura.getTime());
+    expect(resultado.pulado).toBe("trava_perdida");
+    expect(await itensDe(clienteId)).toHaveLength(0);
+    const estado = await estadoDe(clienteId);
+    expect(estado.lendoDesde?.getTime()).toBe(daOutraLeitura.getTime());
+    expect(estado.ultimaLeituraOkEm).toBeNull();
+  });
+
+  it("a marca mudou de tipo no meio da leitura (o admin zera o contexto): o texto que a IA escreveu sob o tipo antigo não volta para a tabela zerada", async () => {
+    const clienteId = await criarCliente();
+    const quando = agora();
+
+    const resultado = await rodarEntenderMarca({ clienteId, origem: "manual" }, quando, {
+      lerSite: async () => {
+        await mudarTipoMarca(clienteId, "pessoa");
+        return siteFalso([TEXTO_DO_SITE]);
+      },
+    });
+
+    expect(resultado.pulado).toBe("trava_perdida");
+    expect(await itensDe(clienteId)).toHaveLength(0);
+    expect(await estadoDe(clienteId)).toBeUndefined();
   });
 
   it("o teto de custo do mês: passou, a leitura pula (forcar passa por cima)", async () => {

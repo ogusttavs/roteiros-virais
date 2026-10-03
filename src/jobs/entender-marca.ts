@@ -14,14 +14,19 @@
  * - com `clienteId` (evento: a pessoa salvou o site ou um perfil; ou o próprio despachante): lê
  *   aquela marca.
  *
- * Falha esperada NUNCA lança (site fora do ar, bloqueio, rede restrita, IA reprovada duas vezes):
- * grava o motivo e uma próxima tentativa e retorna. Só erro de infraestrutura (banco, IA fora do
- * ar) lança. Duas razões: `executarComRegistro` marca erro no painel de acompanhamento (o site de
- * um cliente fora do ar não é um job quebrado), e a fila longa não repete (a leitura inteira no
- * site do cliente não pode rodar três vezes). Nada do texto das páginas vai ao log nem ao resumo.
+ * Falha esperada NUNCA lança (site fora do ar, bloqueio, rede restrita, e a IA que reprova o texto duas
+ * vezes, recusa, trunca a saída ou devolve algo fora do schema: tudo do conteúdo desta marca, que repetiria
+ * todo dia): grava o motivo e uma próxima tentativa (3 dias, ou o ciclo normal) e retorna. Lança o que é da
+ * infraestrutura (banco, e a API da IA: saldo, limite de taxa, chave, fora do ar), depois de gravar a nova
+ * tentativa para o dia seguinte: assim aparece como erro no painel e no Sentry. Duas razões para o resto não
+ * lançar: `executarComRegistro` marca erro no painel de acompanhamento (o site de um cliente fora do ar não é
+ * um job quebrado), e a fila longa não repete (a leitura inteira no site do cliente não pode rodar três
+ * vezes). Nada do texto das páginas vai ao log nem ao resumo (ele vai na entrada da IA, que `geracoes_ia`
+ * registra: ver a nota do schema).
  *
- * A regra de "não rodar duas vezes" mora no BANCO (idade da última leitura boa, trava
- * `lendo_desde`, hash das fontes), nunca em `singletonSeconds`, que são janelas alinhadas à época.
+ * A regra de "não rodar duas vezes" mora no BANCO (idade da última leitura boa, trava `lendo_desde`, hash das
+ * fontes) e, no gatilho por evento, nunca em `singletonSeconds` (janelas alinhadas à época, que engoliam o
+ * segundo "Salvar" da pessoa); só o despachante (12 h) e a releitura adiada têm janela.
  */
 import { createHash } from "node:crypto";
 
@@ -78,8 +83,13 @@ export function payloadDoJob(job: { data?: PayloadEntenderMarca }[]): PayloadEnt
 }
 
 /** O que o worker registra para a fila `entender-marca`: a execução em `execucoes_job` e a leitura. */
-export async function tratarJobEntenderMarca(job: { data?: PayloadEntenderMarca }[], nomeDaFila: string): Promise<void> {
-  await executarComRegistro(nomeDaFila, () => rodarEntenderMarca(payloadDoJob(job)));
+export async function tratarJobEntenderMarca(
+  job: { data?: PayloadEntenderMarca }[],
+  nomeDaFila: string,
+  /** Só para o teste trocar quem lê a marca por uma função que ele observa (o handler de verdade usa o padrão). */
+  rodar: (payload: PayloadEntenderMarca) => Promise<Record<string, unknown>> = (payload) => rodarEntenderMarca(payload),
+): Promise<void> {
+  await executarComRegistro(nomeDaFila, () => rodar(payloadDoJob(job)));
 }
 
 /** Para os testes trocarem a rede por uma função falsa (o resto do job roda de verdade). */
@@ -101,6 +111,8 @@ export const MOTIVOS_DE_SITE_TRANSITORIOS: ReadonlySet<MotivoLeituraSite> = new 
 const UM_DIA_MS = DIA_MS;
 
 const PAGINAS_NO_MAXIMO = 5;
+/** As falhas da IA que vêm do conteúdo da leitura (e repetem a cada tentativa), em vez de da API (saldo, limite, chave, fora do ar). */
+export const FALHAS_DO_CONTEUDO_DA_IA = /reprovada duas vezes|recusa do modelo|saida truncada|nao validou o schema|Failed to parse structured output/i;
 
 function inicioDoMes(agora: Date): Date {
   return new Date(Date.UTC(agora.getUTCFullYear(), agora.getUTCMonth(), 1));
@@ -225,7 +237,8 @@ type RedeLida = {
 };
 
 async function confirmarRedeReal(rede: "instagram" | "youtube", handle: string): Promise<ContaConfirmada | null> {
-  return rede === "youtube" ? confirmarYoutube(handle) : confirmarInstagram(handle);
+  // O @ é sempre o da própria marca: a lista de contas "tiradas" da vigilância do setor não vale aqui.
+  return rede === "youtube" ? confirmarYoutube(handle, { ignorarTirada: true }) : confirmarInstagram(handle, { ignorarTirada: true });
 }
 
 /** Uma rede da própria marca: lida, ou o motivo de não ter sido (a tela escolhe a frase pelo motivo). */
@@ -497,7 +510,11 @@ async function lerMarcaComTrava(
             estado: item.estado as "para_confirmar" | "confirmado" | "corrigido",
             texto: textoParaMostrar(item),
           })),
-        itensTirados: itensDoBanco.filter((item) => item.estado === "recusado").slice(-15).map((item) => item.texto),
+        // O que a pessoa tirou pode ter sido o que estava em vigor (`textoConfirmado`): a IA vê os dois textos, sem repetir.
+        itensTirados: itensDoBanco
+          .filter((item) => item.estado === "recusado")
+          .slice(-15)
+          .flatMap((item) => (item.textoConfirmado && item.textoConfirmado !== item.texto ? [item.texto, item.textoConfirmado] : [item.texto])),
         site,
         redes: redes.map((r) => ({ rede: r.rede, handle: r.handle, medianaVisualizacoes: r.resumo.medianaVisualizacoes, videos: r.resumo.videos })),
       }),
@@ -509,8 +526,9 @@ async function lerMarcaComTrava(
     saida = dados;
   } catch (erro) {
     if (!(erro instanceof ErroIA)) throw erro;
-    if (/reprovada duas vezes/.test(erro.message)) {
-      // O verificador reprovou o texto nas duas tentativas: falha esperada, nova tentativa em alguns dias.
+    if (FALHAS_DO_CONTEUDO_DA_IA.test(erro.message)) {
+      // O verificador reprovou o texto nas duas tentativas, ou o modelo recusou, truncou a saída ou devolveu algo fora do schema:
+      // é o texto desta marca, não a infraestrutura, e repetiria todo dia. Falha esperada, nova tentativa em alguns dias.
       logger.error({ err: erro, clienteId }, "entender-marca: a IA nao produziu um texto aprovado");
       await db()
         .update(contextoMarca)
@@ -531,6 +549,11 @@ async function lerMarcaComTrava(
 
   // 5. Junta com o que já existe, numa transação, com as linhas travadas (a pessoa pode estar confirmando agora).
   const reconciliacao = await db().transaction(async (tx) => {
+    // A linha de estado da marca é a trava: com ela travada aqui, e só com a trava ainda sendo desta leitura, nada grava.
+    // Se a marca mudou de tipo no meio da leitura (`mudarTipoMarca` apaga a linha e os itens), ou esta leitura passou do
+    // prazo e outra tomou a trava, o texto que a IA escreveu já não vale e não pode voltar para uma tabela zerada.
+    const [estadoAtual] = await tx.select().from(contextoMarca).where(eq(contextoMarca.clienteId, clienteId)).for("update");
+    if (!estadoAtual || estadoAtual.lendoDesde?.getTime() !== agora.getTime()) return null;
     const existentes = await tx.select().from(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId)).for("update");
     const resultado = reconciliarItens({
       existentes,
@@ -569,6 +592,10 @@ async function lerMarcaComTrava(
       .where(eq(contextoMarca.clienteId, clienteId));
     return resultado;
   });
+  if (!reconciliacao) {
+    logger.warn({ clienteId }, "entender-marca: a trava deixou de ser desta leitura (ou a marca foi zerada); nada foi gravado");
+    return { ...resumoBase, pulado: "trava_perdida", fontes: resumoDasFontes };
+  }
 
   const [gasto] = await db()
     .select({ total: sql<string>`coalesce(sum(${geracoesIA.custoUsd}), 0)` })

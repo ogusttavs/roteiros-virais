@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 
 import { fraseDaFonteNaoLida } from "@/lib/frase-fonte-contexto";
 import type { ItemDaSecao, ItemTirado, SecaoContextoMarca } from "@/servicos/contexto-marca";
-import { TAMANHO_MAXIMO_TEXTO_DA_PESSOA } from "@/servicos/contexto-marca-regras";
+import { limparTextoDaPessoa, TAMANHO_MAXIMO_TEXTO_DA_PESSOA } from "@/servicos/contexto-marca-regras";
 import { textosBriefing } from "@/textos/briefing";
 import { Botao } from "@/ui/componentes/Botao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
@@ -41,7 +41,7 @@ type ItemLocal = Omit<ItemDaSecao, "estado"> & {
 type ResultadoDaAcao = void | "confirmado" | "mudou";
 
 /** O id do botão de um item, para devolver o foco a ele depois de uma ação (os botões não aceitam `ref`). */
-const idDoBotao = (id: number, acao: "corrigir" | "desfazer" | "estaCerto") => `contexto-${id}-${acao}`;
+const idDoBotao = (id: number, acao: "corrigir" | "desfazer" | "estaCerto" | "tirar") => `contexto-${id}-${acao}`;
 
 /**
  * "O que a IA tirou das suas redes e do seu site" (E38 PR 2, desenho do Opus, `Briefing.dc.html`,
@@ -75,20 +75,33 @@ export function ContextoMarcaCard({ secao }: Props) {
   /** Um Set de ids, não um id só (a lição do V7 no `AprendizadoCard`). */
   const [idsPendentes, setIdsPendentes] = useState<ReadonlySet<number>>(() => new Set());
   const [erros, setErros] = useState<Record<number, string>>({});
-  /** A última coisa que a pessoa fez, dita por voz a quem usa leitor de tela (a linha muda e o foco fica onde estava). */
-  const [anuncio, setAnuncio] = useState("");
+  /**
+   * A última coisa que a pessoa fez, dita por voz a quem usa leitor de tela (a linha muda e o foco fica onde estava). O contador
+   * vira a `key` do texto: a mesma frase duas vezes seguidas ("Item confirmado." de novo) só é lida de novo se o nó for outro.
+   */
+  const [anuncio, setAnuncio] = useState({ frase: "", n: 0 });
+  const anunciar = (frase: string) => setAnuncio((atual) => ({ frase, n: atual.n + 1 }));
   /** O id do botão que deve receber o foco depois da próxima renderização. */
   const [foco, setFoco] = useState<string | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const idEditando = editando?.id ?? null;
   const [, iniciarTransicao] = useTransition();
 
+  // O alvo do foco pode ainda não existir (a seção vem de novo do servidor depois de "Desfazer" na lista dos tirados): espera ele aparecer.
   useEffect(() => {
-    if (foco) {
-      document.getElementById(foco)?.focus();
+    if (!foco) return;
+    const alvo = document.getElementById(foco);
+    if (alvo) {
+      alvo.focus();
       setFoco(null);
     }
-  }, [foco]);
+  }, [foco, itens]);
+
+  /** Qual correção está aberta agora, para uma ação que termina depois saber se o campo que ela prometia guardar ainda existe. */
+  const idEditandoRef = useRef<number | null>(null);
+  useEffect(() => {
+    idEditandoRef.current = idEditando;
+  });
 
   // Abrir a correção leva o foco para o campo; sem isso, quem usa teclado ou leitor de tela fica no botão que sumiu.
   useEffect(() => {
@@ -123,7 +136,7 @@ export function ContextoMarcaCard({ secao }: Props) {
     otimista: (item: ItemLocal) => ItemLocal,
     acao: () => Promise<ResultadoDaAcao>,
     frases: { erro: string; semConexao: string; feito: string },
-    focoDepois?: string,
+    alvoDoFoco: { depois: string; seFalhar: string },
   ) {
     const original = itens.find((item) => item.id === id);
     if (!original) return;
@@ -137,15 +150,17 @@ export function ContextoMarcaCard({ secao }: Props) {
           // Outra leitura trocou a proposta: volta a linha, avisa, e busca a seção nova (o `key` recomeça o cartão dela).
           trocar(id, () => original);
           definirErro(id, t.mudouEnquantoLia);
+          setFoco(alvoDoFoco.seFalhar);
           router.refresh();
           return;
         }
         avisarRedeOk();
-        setAnuncio(frases.feito);
-        if (focoDepois) setFoco(focoDepois);
+        anunciar(frases.feito);
+        setFoco(alvoDoFoco.depois);
       } catch (falha) {
         trocar(id, () => original);
         definirErro(id, tratarFalha(falha, frases.erro, frases.semConexao));
+        setFoco(alvoDoFoco.seFalhar);
       } finally {
         marcarPendente(id, false);
       }
@@ -161,7 +176,7 @@ export function ContextoMarcaCard({ secao }: Props) {
       // A pessoa confirma o texto que está vendo: o servidor recusa se a proposta já trocou.
       () => confirmarItemContextoAction(id, item.texto),
       { erro: t.erroConfirmar, semConexao: t.semConexaoConfirmar, feito: t.anuncioConfirmado },
-      idDoBotao(id, "corrigir"),
+      { depois: idDoBotao(id, "corrigir"), seFalhar: idDoBotao(id, "estaCerto") },
     );
   }
 
@@ -172,7 +187,7 @@ export function ContextoMarcaCard({ secao }: Props) {
       (item) => ({ ...item, anterior: item.estado === "recusado" ? item.anterior : item.estado, estado: "recusado", novidade: null }),
       () => tirarItemContextoAction(id),
       { erro: t.erroTirar, semConexao: t.semConexaoTirar, feito: t.anuncioTirado },
-      idDoBotao(id, "desfazer"),
+      { depois: idDoBotao(id, "desfazer"), seFalhar: idDoBotao(id, "tirar") },
     );
   }
 
@@ -182,7 +197,7 @@ export function ContextoMarcaCard({ secao }: Props) {
       (item) => ({ ...item, estado: item.anterior ?? "para_confirmar", anterior: undefined }),
       () => desfazerTirarItemContextoAction(id),
       { erro: t.erroDesfazer, semConexao: t.semConexaoDesfazer, feito: t.anuncioDesfeito },
-      idDoBotao(id, "corrigir"),
+      { depois: idDoBotao(id, "corrigir"), seFalhar: idDoBotao(id, "desfazer") },
     );
   }
 
@@ -194,10 +209,13 @@ export function ContextoMarcaCard({ secao }: Props) {
       try {
         await desfazerTirarItemContextoAction(id);
         avisarRedeOk();
-        setAnuncio(t.anuncioDesfeito);
+        anunciar(t.anuncioDesfeito);
+        // O botão sai da lista quando a seção vem de novo: o foco vai para o item que voltou (o efeito espera ele aparecer).
+        setFoco(idDoBotao(id, "corrigir"));
         router.refresh();
       } catch (falha) {
         definirErro(id, tratarFalha(falha, t.erroDesfazer, t.semConexaoDesfazer));
+        setFoco(idDoBotao(id, "desfazer"));
       } finally {
         marcarPendente(id, false);
       }
@@ -207,7 +225,7 @@ export function ContextoMarcaCard({ secao }: Props) {
   function salvarCorrecao() {
     if (!editando) return;
     const { id } = editando;
-    const texto = editando.texto.replace(/\s+/g, " ").trim();
+    const texto = limparTextoDaPessoa(editando.texto);
     if (texto === "") {
       definirErro(id, t.textoObrigatorio);
       return;
@@ -225,11 +243,20 @@ export function ContextoMarcaCard({ secao }: Props) {
         // Só fecha o editor deste item: a pessoa pode ter aberto o de outro enquanto este salvava.
         setEditando((atual) => (atual?.id === id ? null : atual));
         avisarRedeOk();
-        setAnuncio(t.anuncioCorrigido);
+        anunciar(t.anuncioCorrigido);
         setFoco(idDoBotao(id, "corrigir"));
       } catch (falha) {
-        // O que a pessoa escreveu continua no campo: nada se perde.
-        definirErro(id, tratarFalha(falha, t.erroCorrigir, t.semConexaoCorrigir));
+        // O que a pessoa escreveu continua no campo (nada se perde), a não ser que ela já tenha aberto a correção de outro item:
+        // aí o campo daquele item foi trocado, e a frase não promete o que já não existe.
+        const campoAindaAberto = idEditandoRef.current === id;
+        definirErro(
+          id,
+          tratarFalha(
+            falha,
+            campoAindaAberto ? t.erroCorrigir : t.erroCorrigirSemTexto,
+            campoAindaAberto ? t.semConexaoCorrigir : t.semConexaoCorrigirSemTexto,
+          ),
+        );
       } finally {
         marcarPendente(id, false);
       }
@@ -259,7 +286,7 @@ export function ContextoMarcaCard({ secao }: Props) {
 
       {/* Dito por voz a quem usa leitor de tela: a linha muda no lugar e o foco continua onde estava. */}
       <p className={styles.somenteLeitorDeTela} role="status" aria-live="polite">
-        {anuncio}
+        <span key={anuncio.n}>{anuncio.frase}</span>
       </p>
 
       {secao.estado === "sem_fonte" ? (
@@ -304,10 +331,10 @@ export function ContextoMarcaCard({ secao }: Props) {
                       rotulo={t.campoCorrigir}
                       rotuloOculto
                       ajuda={t.campoCorrigirAjuda}
-                      contador={t.contadorCorrecao(edicao.texto.length, TAMANHO_MAXIMO_TEXTO_DA_PESSOA)}
+                      contador={t.contadorCorrecao(limparTextoDaPessoa(edicao.texto).length, TAMANHO_MAXIMO_TEXTO_DA_PESSOA)}
                       erro={erros[item.id]}
                       value={edicao.texto}
-                      onChange={(texto) => setEditando({ id: item.id, texto })}
+                      onChange={(texto) => setEditando((atual) => (atual?.id === item.id ? { id: item.id, texto } : atual))}
                       nomeArquivo="contexto-marca.webm"
                       disabled={pendente}
                     />
@@ -388,6 +415,7 @@ export function ContextoMarcaCard({ secao }: Props) {
                         {t.corrigir}
                       </Botao>
                       <Botao
+                        id={idDoBotao(item.id, "tirar")}
                         type="button"
                         variante="ghost"
                         aria-label={t.rotuloDaAcao(t.tirar, item.texto)}
@@ -430,6 +458,7 @@ export function ContextoMarcaCard({ secao }: Props) {
                   <p className={[styles.oQue, styles.oQueTirado].join(" ")}>{item.texto}</p>
                   <div className={styles.acoesItem}>
                     <Botao
+                      id={idDoBotao(item.id, "desfazer")}
                       type="button"
                       variante="ghost"
                       aria-label={t.rotuloDaAcao(t.desfazer, item.texto)}

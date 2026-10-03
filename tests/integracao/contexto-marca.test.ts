@@ -267,7 +267,7 @@ describe("secaoDoCliente: o que a tela mostra", () => {
   });
 
   it("os itens vêm por categoria e id; o tirado e o que sumiu sem confirmação não aparecem; o que sumiu e foi confirmado aparece", async () => {
-    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test", perfis: { instagram: "loja.exemplo", tiktok: null, youtube: null } });
     await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA, ultimaTentativaEm: AGORA });
     const posta = await criarItem(clienteId, { categoria: "posta", origem: "instagram", texto: "Posta antes e depois." });
     const vende = await criarItem(clienteId, { texto: "Vende removedor." });
@@ -311,6 +311,17 @@ describe("secaoDoCliente: o que a tela mostra", () => {
     });
   });
 
+  it("todos os itens tirados vêm na lista (sem teto de 20), para o título contar o que a lista mostra", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
+    for (let i = 0; i < 25; i += 1) await criarItem(clienteId, { texto: `Item tirado numero ${i}.`, estado: "recusado", estadoAnterior: "para_confirmar" });
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+
+    const secao = await secaoDoCliente(cliente, AGORA);
+
+    expect(secao.tirados).toHaveLength(25);
+  });
+
   it("os itens tirados vêm numa lista à parte, do mais recente ao mais antigo, para dar para desfazer depois de recarregar", async () => {
     const clienteId = await criarCliente({ site: "https://loja-exemplo.test" });
     await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
@@ -352,6 +363,29 @@ describe("secaoDoCliente: o que a tela mostra", () => {
     // Passou a tentativa marcada e o mês da última leitura boa também: nada a prometer.
     const muitoDepois = new Date("2026-11-30T10:00:00Z");
     expect((await secaoDoCliente(cliente, muitoDepois)).proximaLeituraEm).toBeNull();
+  });
+
+  it("a pessoa tirou uma fonte da Conta: o que veio dela e ela nunca confirmou some da tela na hora, sem esperar leitura; o confirmado fica", async () => {
+    const clienteId = await criarCliente({ site: "https://loja-exemplo.test", perfis: { instagram: "loja.exemplo", tiktok: null, youtube: null } });
+    await db().insert(contextoMarca).values({ clienteId, ultimaLeituraOkEm: AGORA });
+    const doSiteSemConfirmar = await criarItem(clienteId, { origem: "site", texto: "Vende removedor." });
+    const doSiteConfirmado = await criarItem(clienteId, { origem: "site", categoria: "fala", texto: "Fala simples.", estado: "confirmado", textoConfirmado: "Fala simples." });
+    const doInstagram = await criarItem(clienteId, { origem: "instagram", categoria: "posta", texto: "Posta antes e depois." });
+    const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    expect((await secaoDoCliente(cliente, AGORA)).itens.map((i) => i.id)).toEqual([doSiteSemConfirmar, doSiteConfirmado, doInstagram]);
+
+    // Apaga o site da Conta: o item do site que ninguém confirmou sai; o confirmado e o do Instagram ficam.
+    await db().update(clientes).set({ site: null }).where(eq(clientes.id, clienteId));
+    const semSite = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
+    expect((await secaoDoCliente(semSite, AGORA)).itens.map((i) => i.id)).toEqual([doSiteConfirmado, doInstagram]);
+
+    // Apaga todas as fontes: nenhuma leitura vai acontecer, e mesmo assim só o confirmado fica à vista (ele ainda alimenta os roteiros).
+    await db().update(clientes).set({ perfis: { instagram: null, tiktok: null, youtube: null } }).where(eq(clientes.id, clienteId));
+    const semNada = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
+    const secao = await secaoDoCliente(semNada, AGORA);
+    expect(secao.estado).toBe("sem_fonte");
+    expect(secao.itens.map((i) => i.id)).toEqual([doSiteConfirmado]);
+    expect(await contextoConfirmadoDoCliente(clienteId)).toEqual([{ categoria: "fala", texto: "Fala simples." }]);
   });
 
   it("nunca mostra item de outra marca", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import type { TemaPreferido, TipoMarca } from "@/db/schema";
@@ -116,12 +116,7 @@ export function FormularioConta({
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
 
-  const formaRef = useRef<HTMLFormElement>(null);
-
-  // O erro do site leva o foco ao próprio campo (o `Campo` não aceita `ref`: acha-se o campo marcado como inválido).
-  useEffect(() => {
-    if (erroSite) formaRef.current?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
-  }, [erroSite]);
+  const siteRef = useRef<HTMLInputElement>(null);
 
   const indiceTema = OPCOES_TEMA.findIndex((opcao) => opcao.valor === tema);
   const indiceOnde = dadosFixos.onde.opcoes.findIndex((opcao) => opcao.valor === onde);
@@ -136,8 +131,12 @@ export function FormularioConta({
       return;
     }
     const siteNormalizado = normalizarSite(site);
-    if (siteNormalizado.length > 0 && !siteValido(siteNormalizado)) {
+    // O site só é conferido (e só vai ao servidor) se a pessoa mexeu nele: um endereço gravado antes da regra de agora (uma porta, um
+    // IP) não pode impedir de salvar o nome, o tema ou o lembrete, e o servidor, sem o campo, não mexe no que está gravado.
+    const siteMudou = siteNormalizado !== normalizarSite(siteInicial);
+    if (siteMudou && siteNormalizado.length > 0 && !siteValido(siteNormalizado)) {
       setErroSite(textosBriefing.dadosFixos.siteInvalido);
+      siteRef.current?.focus();
       return;
     }
     if (onde === "local" && regiao.trim().length === 0) {
@@ -157,14 +156,14 @@ export function FormularioConta({
       await salvarContaAction({
         nome,
         perfis: { instagram, tiktok, youtube },
-        site: siteNormalizado,
+        ...(siteMudou ? { site: siteNormalizado } : {}),
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
         ...(onde ? montarCampoOnde(onde, regiao.trim(), pais.trim(), paises.trim()) : {}),
       });
       avisarRedeOk();
-      setSite(siteNormalizado);
+      if (siteMudou) setSite(siteNormalizado);
       // Já foi aplicado ao tocar no chip; aqui o servidor guardou, então o navegador também guarda.
       aplicarTema(tema, true);
       setToastAberto(true);
@@ -178,7 +177,7 @@ export function FormularioConta({
 
   return (
     <>
-      <form ref={formaRef} className={styles.forma} onSubmit={salvar}>
+      <form className={styles.forma} onSubmit={salvar}>
         <Campo rotulo={textosConta.nome} value={nome} onChange={(e) => setNome(e.target.value)} required />
         <Campo
           rotulo={`${textosConta.email} ${textosConta.soLeitura}`}
@@ -212,6 +211,7 @@ export function FormularioConta({
             avisoInvalido={textosConta.perfilInvalido}
           />
           <Campo
+            ref={siteRef}
             rotulo={dadosFixos.site.rotulo}
             ajuda={dadosFixos.site.ajuda}
             value={site}

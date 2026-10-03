@@ -6,7 +6,8 @@
  * As regras que não podem falhar (cada uma tem teste):
  * - a correção da pessoa nunca é sobrescrita pela IA, e o que ela confirmou continua em vigor até
  *   ela decidir sobre uma proposta nova;
- * - item que a pessoa tirou nunca volta, nem com outras palavras, nem em outra categoria;
+ * - item que a pessoa tirou não volta quando a proposta repete as palavras dele (as da IA e as que estavam em vigor),
+ *   em qualquer categoria; com palavras bem diferentes só o modelo, instruído a não repropor, segura;
  * - um item só pode declarar uma origem (site, Instagram, YouTube) que foi lida de verdade naquela
  *   leitura; e o que veio de uma fonte que não foi lida agora fica como está, nunca "sumiu" (a não
  *   ser que a pessoa tenha tirado a fonte da Conta: aí o que não foi confirmado sai da tela);
@@ -103,8 +104,12 @@ export type Reconciliacao = {
  * `<`; o `[^>]*` de antes era quadrático com muitos `<` e nenhum `>`).
  */
 export function limparTextoSemCortar(bruto: string): string {
-  return bruto
-    .slice(0, LIMITE_DO_TEXTO_CRU)
+  return tirarMarcacao(bruto.slice(0, LIMITE_DO_TEXTO_CRU));
+}
+
+/** A etapa sem o corte de tamanho (exportada para o teste provar a regex sozinha, sem a ajuda do corte): tira a marcação e junta as linhas. */
+export function tirarMarcacao(texto: string): string {
+  return texto
     .replace(/<[^<>]*>/g, " ")
     .replace(/[<>]/g, " ")
     .replace(/\s+/g, " ")
@@ -149,6 +154,26 @@ function palavrasDoTexto(texto: string): Set<string> {
   return palavras;
 }
 
+const PALAVRAS_DE_NEGACAO = new Set(["nao", "nunca", "sem", "nem", "jamais", "nenhum", "nenhuma"]);
+const PALAVRAS_DE_RESTRICAO = new Set(["so", "somente", "apenas", "exclusivamente"]);
+
+/**
+ * O que a semelhança por palavras não enxerga e que muda o sentido de uma frase: os números (de qualquer tamanho,
+ * "R$ 50" e "R$ 60" são o mesmo texto para o Jaccard, que descarta palavra curta) e a negação ou a restrição
+ * ("não vende" e "vende" dividem 6 de 7 palavras). Duas frases só são "a mesma" se tiverem a mesma assinatura;
+ * mudar um preço, um horário, uma quantidade ou um "só" é mudar o que a pessoa confirmou.
+ */
+export function assinaturaDoTexto(texto: string): string {
+  const normalizado = texto.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  const numeros = (normalizado.replace(/(?<=\d)[.,](?=\d{3}\b)/g, "").match(/\d+/g) ?? []).sort();
+  const classes = new Set<string>();
+  for (const palavra of normalizado.split(/[^a-z0-9]+/)) {
+    if (PALAVRAS_DE_NEGACAO.has(palavra)) classes.add("negacao");
+    if (PALAVRAS_DE_RESTRICAO.has(palavra)) classes.add("restricao");
+  }
+  return `${numeros.join(",")}|${[...classes].sort().join(",")}`;
+}
+
 /** Palavras em comum sobre palavras no total (Jaccard), sem acento, sem maiúscula, sem palavra de ligação. */
 export function similaridade(a: string, b: string): number {
   const conjuntoA = palavrasDoTexto(a);
@@ -170,8 +195,13 @@ const PADRAO_ENDERECO_NA_WEB = /(?:https?:\/\/|www\.)\S+/i;
 const PADRAO_EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.\p{L}{2,}/u;
 /** Oito dígitos ou mais, mesmo com espaço, ponto, hífen e parênteses no meio: telefone. Preço (R$ 1.299,00) tem seis. */
 const PADRAO_NUMERO_DE_CONTATO = /(?:\d[\s().-]*){8,}/;
+/**
+ * Só o imperativo ("ignore", "desconsidere", "esqueça": descrever que a marca "ignora concorrentes" ou "nunca
+ * esquece de agradecer" é descrição normal) e as frases de ordem que só aparecem em quem fala com a IA: "instruções
+ * anteriores", "nova instrução", e "a partir de agora" ou "você deve/precisa" no começo de uma frase.
+ */
 const PADRAO_ORDEM_ESCONDIDA =
-  /\b(?:ignor[ae]r?|desconsider[ae]r?|esque[cç]a|instru[cç](?:ão|ões|ao|oes)\s+anteriores?|nova\s+instru[cç](?:ão|ao)|a\s+partir\s+de\s+agora|voc[eê]\s+(?:deve|precisa)\s)/i;
+  /\b(?:ignore|desconsidere|esque[cç]a)\b|instru[cç](?:ão|ões|ao|oes)\s+anteriores?|nova\s+instru[cç](?:ão|ao)|(?:^|[,.;!?]\s*)(?:a\s+partir\s+de\s+agora|voc[eê]\s+(?:deve|precisa))\b/i;
 
 /**
  * O texto de um item é uma descrição da marca para a pessoa confirmar e, confirmado, entra no prompt de
@@ -362,7 +392,9 @@ export function reconciliarItens(entrada: {
     const repetido = limpos.some(
       (outro) =>
         (idValido !== null && outro.idAnterior === idValido) ||
-        (outro.categoria === proposto.categoria && similaridade(outro.texto, texto) >= LIMIAR_MESMO_TEXTO),
+        (outro.categoria === proposto.categoria &&
+          similaridade(outro.texto, texto) >= LIMIAR_MESMO_TEXTO &&
+          assinaturaDoTexto(outro.texto) === assinaturaDoTexto(texto)),
     );
     if (repetido) {
       resumo.descartados.repetido += 1;
@@ -398,7 +430,14 @@ export function reconciliarItens(entrada: {
   //    senão é novo.
   const restantes: ItemProposto[] = [];
   for (const proposto of semLigacao) {
-    if (tirados.some((tirado) => similaridade(tirado.texto, proposto.texto) >= LIMIAR_MESMO_ASSUNTO)) {
+    // O que a pessoa tirou pode ter sido o que estava em vigor (`textoConfirmado`), não só a última proposta da IA: os dois valem.
+    if (
+      tirados.some(
+        (tirado) =>
+          similaridade(tirado.texto, proposto.texto) >= LIMIAR_MESMO_ASSUNTO ||
+          (tirado.textoConfirmado !== null && similaridade(tirado.textoConfirmado, proposto.texto) >= LIMIAR_MESMO_ASSUNTO),
+      )
+    ) {
       resumo.descartados.tiradoVoltando += 1;
       continue;
     }
@@ -441,14 +480,29 @@ export function reconciliarItens(entrada: {
     const semelhancaComAProposta = similaridade(existente.texto, proposto.texto);
     const semelhancaComOConfirmado = existente.textoConfirmado !== null ? similaridade(existente.textoConfirmado, proposto.texto) : 0;
     const diziaQueNaoMudou = proposto.mudouDeSentido === false;
+    // "Igual" exige a mesma assinatura (os mesmos números e a mesma negação ou restrição): trocar R$ 50 por R$ 60, 24 por 48 horas,
+    // ou "vende" por "não vende" é uma mudança, qualquer que seja a semelhança por palavras e o que a IA declarou.
+    const mesmaAssinaturaDaProposta = assinaturaDoTexto(existente.texto) === assinaturaDoTexto(proposto.texto);
+    const mesmaAssinaturaDoConfirmado = existente.textoConfirmado !== null && assinaturaDoTexto(existente.textoConfirmado) === assinaturaDoTexto(proposto.texto);
     const igualAProposta =
-      semelhancaComAProposta >= LIMIAR_MESMO_TEXTO || (diziaQueNaoMudou && semelhancaComAProposta >= LIMIAR_PARAFRASE_DECLARADA);
+      mesmaAssinaturaDaProposta &&
+      (semelhancaComAProposta >= LIMIAR_MESMO_TEXTO || (diziaQueNaoMudou && semelhancaComAProposta >= LIMIAR_PARAFRASE_DECLARADA));
     const igualAoConfirmado =
       existente.textoConfirmado !== null &&
+      mesmaAssinaturaDoConfirmado &&
       (semelhancaComOConfirmado >= LIMIAR_MESMO_TEXTO || (diziaQueNaoMudou && semelhancaComOConfirmado >= LIMIAR_PARAFRASE_DECLARADA));
     if (igualAProposta) {
       resumo.iguais += 1;
-      atualizacoes.set(existente.id, { id: existente.id, novidade: null, ultimaVezVistoEm: agora, sumiuEm: null });
+      // A pílula de "algo que você não tinha contado" volta a valer enquanto a pessoa não decidiu: o Começar lê o site antes das
+      // respostas do briefing (nada era "além do briefing" naquela leitura), e a releitura com o briefing pronto é a primeira em
+      // que a IA pode dizer isso de um item que já existe.
+      const alemDoBriefing = proposto.alemDoBriefing && existente.estado === "para_confirmar";
+      atualizacoes.set(existente.id, {
+        id: existente.id,
+        novidade: alemDoBriefing ? "alem_do_briefing" : null,
+        ultimaVezVistoEm: agora,
+        sumiuEm: null,
+      });
       continue;
     }
     if (igualAoConfirmado) {

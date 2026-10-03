@@ -453,7 +453,7 @@ export type OrigemPerfilAnalisado = "citado" | "propria_marca";
 /**
  * Por que um perfil analisado não tem leitura (E38 PR 2, acabamento a). Separado de `erro`: a
  * tela escolhe a frase pelo motivo, e só "nao_encontrado" é de fato um @ digitado errado. Linhas
- * antigas têm `motivo` nulo; `motivoDoPerfil` (src/lib/perfil-analisado-motivo.ts) deriva na leitura.
+ * antigas têm `motivo` nulo; `estadoDoPerfilAnalisado` (src/lib/perfil-analisado-motivo.ts) deriva na leitura (pela frase antiga em `erro`).
  */
 export type MotivoPerfilNaoLido = "tiktok_desligado" | "nao_encontrado" | "sem_videos" | "conta_restrita";
 
@@ -533,7 +533,7 @@ export const contextoMarca = pgTable("contexto_marca", {
     .notNull()
     .references(() => clientes.id, { onDelete: "cascade" })
     .unique(),
-  /** sha256 do texto das páginas mais os títulos lidos; igual ao anterior e a IA não é chamada. */
+  /** sha256 do texto das páginas, dos títulos lidos e do resumo do briefing usado; igual ao anterior e a IA não é chamada (o briefing pronto depois refaz a leitura). */
   hashFontes: text("hash_fontes"),
   ultimaLeituraOkEm: timestamp("ultima_leitura_ok_em", { withTimezone: true }),
   ultimaTentativaEm: timestamp("ultima_tentativa_em", { withTimezone: true }),

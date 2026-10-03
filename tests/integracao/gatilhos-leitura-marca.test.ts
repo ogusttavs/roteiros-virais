@@ -138,6 +138,31 @@ describe("salvarDadosFixos (o Começar)", () => {
 
     await esperarJobs(clienteId, FILAS.entenderMarca, 2);
   });
+
+  it("mexer só no site relê a marca, mas não gasta a análise do perfil das redes (que não mudaram)", async () => {
+    const clienteId = await criarCliente();
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test", instagram: "loja.exemplo" }));
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
+    await limparFilas();
+
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://outra-loja-exemplo.test", instagram: "loja.exemplo" }));
+
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await garantirSemJobs(clienteId, FILAS.analisarPerfil);
+  });
+
+  it("mudar o Instagram relê a marca e analisa o perfil novo", async () => {
+    const clienteId = await criarCliente();
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test", instagram: "loja.exemplo" }));
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
+    await limparFilas();
+
+    await salvarDadosFixos(clienteId, dadosFixos({ site: "https://loja-exemplo.test", instagram: "outra.loja" }));
+
+    await esperarJobs(clienteId, FILAS.entenderMarca, 1);
+    await esperarJobs(clienteId, FILAS.analisarPerfil, 1);
+  });
 });
 
 describe("salvarPerfilConta (a Conta)", () => {

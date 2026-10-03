@@ -18,12 +18,15 @@ const ENDERECO_NUMERICO = /^\d{1,3}(\.\d{1,3}){3}$/;
 const SUFIXO_DE_REDE_INTERNA = /\.(localhost|local|localdomain|internal|lan|home\.arpa)$/i;
 
 /**
- * O que quase todo mundo digita é "minhaloja.com.br", sem o https://: o endereço sem esquema vira https.
- * Quem escreveu um esquema (http://, javascript:) fica como escreveu, e `siteValido` o recusa.
+ * O que quase todo mundo digita é "minhaloja.com.br", sem o https://: o endereço sem esquema vira https. O "http://" também
+ * (quem cola o que o navegador mostrava há anos): o leitor só fala https, e um site que não serve https cai na frase de "não
+ * respondeu", que é a verdadeira, em vez de uma acusação de erro de escrita. Outro esquema (javascript:, ftp://) fica como
+ * escreveu, e `siteValido` o recusa.
  */
 export function normalizarSite(valor: string): string {
   const aparado = valor.trim();
   if (aparado === "") return "";
+  if (/^http:\/\//i.test(aparado)) return `https://${aparado.slice("http://".length)}`;
   if (aparado.includes("://")) return aparado;
   if (aparado.startsWith("//")) return `https:${aparado}`;
   return `https://${aparado}`;

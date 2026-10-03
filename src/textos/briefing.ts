@@ -11,6 +11,7 @@
  */
 import type { PerguntaBriefing } from "@/config/briefing";
 import type { TipoMarca } from "@/db/schema";
+import type { MotivoLeituraSite } from "@/jobs/site-api";
 
 function formatarNota(valor: number): string {
   return valor.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -300,7 +301,7 @@ export const textosBriefing = {
     mudouEnquantoLia: "Esta leitura mudou enquanto você olhava. Confira o texto novo e confirme de novo.",
     /** Os itens tirados, numa lista à parte, para dar para desfazer depois de recarregar a página. */
     tiradosTitulo: (quantos: number): string => (quantos === 1 ? "1 item que você tirou" : `${quantos} itens que você tirou`),
-    tiradosAjuda: "O que você tira não volta sozinho, nem com outras palavras. Se tirou sem querer, toque em Desfazer.",
+    tiradosAjuda: "O que você tira não volta sozinho. Se voltar com outras palavras, é só tirar de novo. Se tirou sem querer, toque em Desfazer.",
     /** O nome acessível de cada botão de ação leva o item (a tela tem vários "Está certo" e "Corrigir"). */
     rotuloDaAcao: (acao: string, texto: string): string => `${acao}: ${texto.length > 60 ? `${texto.slice(0, 57).trimEnd()}...` : texto}`,
     anuncioConfirmado: "Item confirmado.",
@@ -314,10 +315,13 @@ export const textosBriefing = {
     textoLongo: (maximo: number): string => `Passou de ${maximo} caracteres. Encurte um pouco: o que você escreve aqui entra inteiro em todo roteiro.`,
     erroConfirmar: "Não conseguimos confirmar agora. Tente de novo em instantes.",
     erroCorrigir: "Não conseguimos guardar a correção agora. O que você escreveu continua aí; tente de novo em instantes.",
+    /** O campo daquele item já foi trocado pelo de outro (a pessoa abriu outra correção enquanto este salvava): nada de prometer o texto. */
+    erroCorrigirSemTexto: "Não conseguimos guardar a correção agora. Toque em Corrigir neste item e escreva de novo daqui a instantes.",
     erroTirar: "Não conseguimos tirar agora. Tente de novo em instantes.",
     erroDesfazer: "Não conseguimos desfazer agora. Tente de novo em instantes.",
     semConexaoConfirmar: "Sem conexão. Não deu para confirmar; tente de novo quando a rede voltar.",
     semConexaoCorrigir: "Sem conexão. Não deu para guardar; o que você escreveu continua aí, tente de novo quando a rede voltar.",
+    semConexaoCorrigirSemTexto: "Sem conexão. Não deu para guardar a correção; toque em Corrigir neste item e escreva de novo quando a rede voltar.",
     semConexaoTirar: "Sem conexão. Não deu para tirar; tente de novo quando a rede voltar.",
     semConexaoDesfazer: "Sem conexão. Não deu para desfazer; tente de novo quando a rede voltar.",
     /** Por que uma fonte não foi lida, na voz de quem fala com a pessoa (a fonte vai no começo da frase). */
@@ -338,7 +342,10 @@ export const textosBriefing = {
         nao_e_html: "Site: não conseguimos tirar o texto dele.",
         sem_texto:
           "Site: não conseguimos pegar o texto dele (alguns sites carregam o texto de um jeito que a gente não alcança). O que você respondeu já ajuda.",
-      } as Record<string, string>,
+        limite_de_requisicoes:
+          "Site: foram páginas demais até chegar ao texto. Confira em Conta se o endereço é o da página principal do site.",
+        // Um motivo novo no leitor sem frase aqui deixa de compilar (o `satisfies`), em vez de cair em "não deu para ler" em silêncio.
+      } satisfies Record<MotivoLeituraSite, string>,
       rede: {
         nao_encontrado: "{rede}: não achamos este perfil. Confira o @ em Conta.",
         sem_videos: "{rede}: ainda não tem vídeo publicado para a gente ler.",

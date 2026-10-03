@@ -126,15 +126,18 @@ para a IA comparar), `site` (`endereco` mais `paginas` com `caminho` e `texto`, 
 calculados pelo script com o mesmo código de produção, nunca pela IA). Opcionais: `itensAtuais` (os que
 já existem, com `id`, `categoria`, `origem`, `estado` e `texto`), `itensTirados` (o que a pessoa tirou),
 `naoDeveConter` (trechos que o caso escondeu no site como "instrução", que a IA nunca pode obedecer) e
-`deveReusarId` (os ids que a IA precisa reaproveitar). `GOLDEN_SET_DIR/entender-marca.json` é o real; sem
-ele, roda com `entender-marca.exemplo.json`, seis casos fictícios (uma loja de limpeza, uma clínica, uma
-personal trainer, uma padaria com instrução escondida, um estúdio americano com site em inglês, e um caso
-com itens que já existem).
+`deveReusarId` (os ids que a IA precisa reaproveitar) e `deveConter` (texto que algum item tem de trazer; só com a chave real, o mock devolve um texto fixo). `GOLDEN_SET_DIR/entender-marca.json` é o real; sem
+ele, roda com `entender-marca.exemplo.json`, sete casos fictícios (uma loja de limpeza, uma clínica, uma
+personal trainer, uma padaria com instrução escondida, um estúdio americano com site em inglês, um caso
+com itens que já existem, e um perfil com poucos vídeos e uma visualização sem dado).
 
 ```bash
 npm run avaliar:entender-marca
 ```
 
 Imprime os itens de cada caso e, por caso, as conferências automáticas (origem que não foi lida, item de
-"rendeu" sem número, id inventado, item que a pessoa tirou voltando, instrução escondida obedecida,
-reprovação no verificador de produção). Cada uma tem de dar zero. Prova com chave real é do Fable.
+"rendeu" sem número, item de "rendeu" com um número que a entrada não trouxe, id inventado, item que a pessoa
+tirou voltando, instrução escondida obedecida, reprovação no verificador de produção, e, só com a chave real,
+o texto que o caso exige em algum item, `deveConter`). Cada uma tem de dar zero. **Um caso que dá erro ao
+avaliar conta como erro (não como "sem problema"), e qualquer erro ou conferência vermelha deixa o resultado
+vermelho e o código de saída em 1.** Prova com chave real é do Fable.

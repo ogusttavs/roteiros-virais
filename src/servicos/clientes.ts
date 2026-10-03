@@ -33,6 +33,7 @@ import {
   OPCOES_COOKIE_MARCA_ATIVA,
   valorCookieMarcaAtiva,
 } from "@/lib/marca-ativa";
+import { semBarrasNoFim, TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL } from "@/lib/perfil-redes";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
@@ -411,7 +412,9 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
  */
 export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promise<Cliente> {
   return db().transaction(async (tx) => {
-    const [clienteAtual] = await tx.select().from(clientes).where(eq(clientes.id, clienteId)).for("update");
+    // "no key update", não "update": o trabalho de leitura da marca precisa de "key share" nesta linha ao inserir itens, e um "update"
+    // aqui, somado à espera pela linha de estado (abaixo), travaria um no outro. O tipo não é coluna de chave.
+    const [clienteAtual] = await tx.select().from(clientes).where(eq(clientes.id, clienteId)).for("no key update");
     if (!clienteAtual) throw new ErroCliente("nao foi possivel trocar o tipo; marca nao encontrada.");
     if (clienteAtual.tipo === tipo) return clienteAtual;
 
@@ -427,8 +430,11 @@ export async function mudarTipoMarca(clienteId: number, tipo: TipoMarca): Promis
     // negócio não descrevem uma pessoa) e voltaria ao perfil de todo roteiro assim que o briefing novo fosse
     // compilado, sem ela confirmar de novo. Zera junto com o briefing: a leitura recomeça quando o briefing
     // novo ficar completo (o resumo dele entra no hash, então a IA roda de novo).
-    await tx.delete(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId));
+    // Primeiro a linha de estado, que é a trava da leitura (`entender-marca` a trava dentro da transação em que grava os itens):
+    // espera uma leitura em andamento terminar, enxerga os itens que ela inseriu e os apaga junto; e uma leitura que vier depois
+    // não acha a linha e não grava nada.
     await tx.delete(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));
+    await tx.delete(contextoMarcaItens).where(eq(contextoMarcaItens.clienteId, clienteId));
 
     return cliente;
   });
@@ -527,6 +533,14 @@ export async function listarNichosAtivos(): Promise<{ id: number; nome: string }
     .orderBy(nichos.nome);
 }
 
+/** O nome da marca vai na entrada de prompts de IA e em telas; sem teto, um nome de um milhão de caracteres seria cobrado em toda chamada. */
+const NOME_MAXIMO = 120;
+
+/** O campo de um perfil nas redes: um endereço inteiro cabe, um texto enorme (ação que a tela não mandou) não. */
+function campoDePerfil() {
+  return z.string().trim().max(TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL).optional();
+}
+
 /**
  * O site da marca (E38 PR 2) como o servidor o aceita: aparado, com o tamanho limitado (o que passa disto
  * nem é examinado), o endereço sem esquema virando https (a pessoa digita "minhaloja.com.br"), e só um
@@ -555,7 +569,7 @@ function campoSite() {
  */
 export const dadosFixosSchema = z
   .object({
-    nome: z.string().trim().min(1),
+    nome: z.string().trim().min(1).max(NOME_MAXIMO),
     alcance: z.enum(["brasil", "local", "outro_pais", "mais_de_um_pais"]),
     regiao: z.string().trim().optional(),
     pais: z.string().trim().optional(),
@@ -567,9 +581,9 @@ export const dadosFixosSchema = z
     persona: z.enum(["negocio", "criador", "conhecido", "negocios"]),
     perfis: z
       .object({
-        instagram: z.string().trim().optional(),
-        tiktok: z.string().trim().optional(),
-        youtube: z.string().trim().optional(),
+        instagram: campoDePerfil(),
+        tiktok: campoDePerfil(),
+        youtube: campoDePerfil(),
       })
       .optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
@@ -651,6 +665,10 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
    */
   if (fontesDeLeituraMudaram(antes, { site: cliente.site, perfis })) {
     void enfileirarEntenderMarca(clienteId, "evento").catch(() => undefined);
+  }
+  // A análise do perfil da própria marca (PR 1) só quando o Instagram ou o YouTube mudou, como em `salvarPerfilConta`: mexer só
+  // no site não gasta uma chamada à Meta (que divide o orçamento por hora com a coleta) nem uma de IA por rede.
+  if (perfisMudaram(antes?.perfis ?? null, perfis)) {
     void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
   }
   return cliente;
@@ -673,7 +691,7 @@ export function fontesDeLeituraMudaram(
   const valor = (texto: string | null | undefined): string => (texto ?? "").trim();
   // O perfil se compara sem "@" e sem maiúscula ("@Loja" e "loja" são o mesmo perfil); o site, sem a barra do fim.
   const perfil = (texto: string | null | undefined): string => valor(texto).replace(/^@+/, "").toLowerCase();
-  const endereco = (texto: string | null | undefined): string => valor(texto).replace(/\/+$/, "");
+  const endereco = (texto: string | null | undefined): string => semBarrasNoFim(valor(texto));
   const mudou =
     endereco(antes?.site) !== endereco(depois.site) ||
     perfil(antes?.perfis?.instagram) !== perfil(depois.perfis?.instagram) ||
@@ -683,11 +701,11 @@ export function fontesDeLeituraMudaram(
 }
 
 const perfilContaSchema = z.object({
-  nome: z.string().trim().min(1),
+  nome: z.string().trim().min(1).max(NOME_MAXIMO),
   perfis: z.object({
-    instagram: z.string().trim().optional(),
-    tiktok: z.string().trim().optional(),
-    youtube: z.string().trim().optional(),
+    instagram: campoDePerfil(),
+    tiktok: campoDePerfil(),
+    youtube: campoDePerfil(),
   }),
   /**
    * E38 PR 2: o site da marca, editável na Conta (o desenho do Opus o põe depois do YouTube, no mesmo
