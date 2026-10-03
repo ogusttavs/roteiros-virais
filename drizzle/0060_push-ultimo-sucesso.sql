@@ -1,0 +1,1 @@
+ALTER TABLE "inscricoes_push" ADD COLUMN "ultimo_sucesso_em" timestamp with time zone;

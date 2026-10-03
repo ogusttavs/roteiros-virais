@@ -89,7 +89,7 @@ async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permis
     };
     const chave = "e2e-push-inscricao";
     const montar = () => ({
-      endpoint: "https://push.exemplo.test/e2e/" + window.location.hostname,
+      endpoint: "https://fcm.googleapis.com/fcm/send/e2e-" + window.location.hostname,
       toJSON() {
         return { endpoint: this.endpoint, keys: { p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" } };
       },

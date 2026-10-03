@@ -8,3 +8,6 @@ test-results
 playwright-report
 coverage
 .claude
+# A2: as arvores de revisao do Fable (cada uma com node_modules) faziam o contexto do build passar de 6 GB.
+.revisao
+avaliacoes-privadas

@@ -3,11 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { apagarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { authClient } from "@/lib/auth-client";
 import { limparCachesDoAparelho } from "@/lib/offline";
 import { textosConexao } from "@/textos/conexao";
 import { textosConta } from "@/textos/conta";
 import { useTratarFalha } from "@/ui/ConexaoContext";
+import { inscricaoAtualDoAparelho } from "@/ui/push";
 
 import styles from "./page.module.css";
 
@@ -37,6 +39,14 @@ export function BotaoSair({
     // O que o aparelho guardou para abrir sem rede é dado de cliente: apaga ANTES de encerrar a sessão
     // (V7, item 7 do PROXIMO.md), para não sobrar nada se a saída falhar no meio.
     await limparCachesDoAparelho();
+    // A2: o aviso de manhã é da pessoa que está com a sessão. Apaga a inscrição deste navegador no servidor ANTES de encerrar a sessão (a ação precisa dela);
+    // sem inscrição neste aparelho, ou sem rede, nada acontece e a saída segue (a próxima pessoa a ligar o aviso aqui gera uma inscrição nova).
+    try {
+      const inscricao = await inscricaoAtualDoAparelho();
+      if (inscricao) await apagarInscricaoPushAction(inscricao.endpoint);
+    } catch {
+      // Nunca impede a saída.
+    }
     try {
       const { error } = await authClient.signOut();
       if (error) throw new Error(error.message ?? "signOut falhou");

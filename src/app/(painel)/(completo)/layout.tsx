@@ -10,7 +10,7 @@ import {
   preferenciasDoUsuario,
   registrarAcessoHoje,
 } from "@/servicos/clientes";
-import { inscricoesDaPessoa, pedidoDePushPodeAparecer } from "@/servicos/push";
+import { aparelhosSemFalha, pedidoDePushPodeAparecer } from "@/servicos/push";
 import { VERSAO_TERMOS_EM } from "@/textos/termos";
 import { PedidoDeAviso } from "@/ui/componentes/PedidoDeAviso";
 
@@ -53,8 +53,8 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
     return <FolhaAceiteTermos />;
   }
 
-  // E48 PR 2: o pedido de permissão do aviso de manhã (só aparece no aplicativo instalado, no celular, e uma vez: o navegador confere o resto).
-  const aparelhosDoAviso = (await inscricoesDaPessoa(sessao.user.id)).length;
+  // E48 PR 2: o pedido de permissão do aviso de manhã (só aparece no aplicativo instalado, no celular, e uma vez: o navegador confere o resto). Só os aparelhos sem falha corrente contam (A2): a pessoa cuja inscrição já falha pode ser convidada a ligar de novo.
+  const aparelhosDoAviso = await aparelhosSemFalha(sessao.user.id);
   return (
     <>
       <OuvinteInstalacao instalado={Boolean(preferencias.instaladoEm)} />

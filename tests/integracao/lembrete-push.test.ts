@@ -23,7 +23,10 @@ import {
   apagarInscricaoDaPessoa,
   aparelhosAtivosPorPessoa,
   ErroInscricaoPush,
-  hostPublico,
+  aparelhosSemFalha,
+  DIAS_DE_FALHA_PARA_APAGAR,
+  enderecoDeServicoDePush,
+  registrarEnvioBemSucedido,
   inscricoesDaPessoa,
   pedidoDePushPodeAparecer,
   registrarInscricaoPush,
@@ -48,7 +51,7 @@ async function criarPessoaComMarca(): Promise<{ usuarioId: string; clienteId: nu
 }
 
 function inscricao(usuarioId: string, chave: string) {
-  return { endpoint: `https://push.exemplo.test/${usuarioId}/${chave}`, p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" };
+  return { endpoint: `https://fcm.googleapis.com/fcm/send/${usuarioId}-${chave}`, p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" };
 }
 
 async function inscrever(usuarioId: string, chave = "a", sistema: "iphone" | "android" = "android") {
@@ -236,27 +239,37 @@ describe("rodarLembrete com push", () => {
 });
 
 describe("as inscrições da pessoa", () => {
-  it("o mesmo aparelho (endpoint) é uma linha só; registrar de novo atualiza as chaves e zera as falhas", async () => {
+  it("o mesmo aparelho (endpoint) é uma linha só: chaves iguais só confirmam o sistema e NÃO zeram a falha corrente; chaves novas (inscrição nova) zeram", async () => {
     const { usuarioId } = await criarPessoaComMarca();
     const primeira = await inscrever(usuarioId);
-    await db().update(inscricoesPush).set({ falhasSeguidas: 1 }).where(eq(inscricoesPush.id, primeira.id));
+    const falhaDeOntem = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await db().update(inscricoesPush).set({ falhasSeguidas: 1, ultimaFalhaEm: falhaDeOntem }).where(eq(inscricoesPush.id, primeira.id));
 
-    const segunda = await registrarInscricaoPush(usuarioId, { ...inscricao(usuarioId, "a"), auth: "auth-nova-de-teste" }, "iphone");
+    const reconciliada = await registrarInscricaoPush(usuarioId, inscricao(usuarioId, "a"), "iphone");
+    expect(reconciliada.id).toBe(primeira.id);
+    expect(reconciliada.sistema).toBe("iphone");
+    expect(reconciliada.falhasSeguidas).toBe(1);
+    expect(reconciliada.ultimaFalhaEm?.getTime()).toBe(falhaDeOntem.getTime());
 
-    expect(segunda.id).toBe(primeira.id);
-    expect(segunda.auth).toBe("auth-nova-de-teste");
-    expect(segunda.sistema).toBe("iphone");
-    expect(segunda.falhasSeguidas).toBe(0);
+    const nova = await registrarInscricaoPush(usuarioId, { ...inscricao(usuarioId, "a"), auth: "auth-nova-de-teste" }, "iphone");
+    expect(nova.id).toBe(primeira.id);
+    expect(nova.auth).toBe("auth-nova-de-teste");
+    expect(nova.falhasSeguidas).toBe(0);
+    expect(nova.ultimaFalhaEm).toBeNull();
     expect((await inscricoesDaPessoa(usuarioId)).length).toBe(1);
   });
 
-  it("o aparelho que passa a ser de outra pessoa muda de dono, e uma pessoa pode ter mais de um aparelho", async () => {
+  it("o mesmo aparelho de outra pessoa: chaves iguais são recusadas (desligar e ligar de novo); chaves novas mudam o dono; e uma pessoa pode ter mais de um aparelho", async () => {
     const a = await criarPessoaComMarca();
     const b = await criarPessoaComMarca();
     await inscrever(a.usuarioId, "x");
     await inscrever(a.usuarioId, "y");
-    await registrarInscricaoPush(b.usuarioId, inscricao(a.usuarioId, "x"), "android");
 
+    await expect(registrarInscricaoPush(b.usuarioId, inscricao(a.usuarioId, "x"), "android")).rejects.toBeInstanceOf(ErroInscricaoPush);
+    expect((await inscricoesDaPessoa(a.usuarioId)).length).toBe(2);
+    expect((await inscricoesDaPessoa(b.usuarioId)).length).toBe(0);
+
+    await registrarInscricaoPush(b.usuarioId, { ...inscricao(a.usuarioId, "x"), p256dh: "outra-chave-publica-de-teste" }, "android");
     expect((await inscricoesDaPessoa(a.usuarioId)).length).toBe(1);
     expect((await inscricoesDaPessoa(b.usuarioId)).length).toBe(1);
     const contagem = await aparelhosAtivosPorPessoa([a.usuarioId, b.usuarioId]);
@@ -264,16 +277,89 @@ describe("as inscrições da pessoa", () => {
     expect(contagem.get(b.usuarioId)).toBe(1);
   });
 
-  it("só endereços de serviço de push público: IP, localhost e nome sem ponto (host interno) são recusados", async () => {
+  it("só os serviços de push conhecidos: um endereço real de cada um passa; ponto final, porta, usuário, IP, nome interno e nome público que resolve para dentro não", async () => {
+    const reais = [
+      "https://fcm.googleapis.com/fcm/send/dXyzAbc123:APA91bH",
+      "https://web.push.apple.com/QWxlbXBsbzEyMzQ1",
+      "https://updates.push.services.mozilla.com/wpush/v2/gAAAAABk",
+      "https://wns2-par02p.notify.windows.com/w/?token=BQYAAAB",
+    ];
+    for (const endereco of reais) expect(enderecoDeServicoDePush(endereco), endereco).toEqual({ ok: true });
+
+    const recusados = [
+      "https://localhost./push",
+      "https://postgres./push",
+      "https://x.internal./push",
+      "https://fcm.googleapis.com./fcm/send/x",
+      "https://fcm.googleapis.com:8443/fcm/send/x",
+      "https://usuario@fcm.googleapis.com/fcm/send/x",
+      "https://usuario:senha@fcm.googleapis.com/fcm/send/x",
+      "https://127.0.0.1.nip.io/push",
+      "https://fcm.googleapis.com.evil.example/fcm/send/x",
+      "https://evilfcm.googleapis.com/fcm/send/x",
+      "https://evilpush.apple.com/x",
+      "https://push.apple.com/x",
+      "https://10.0.0.5/push",
+      "https://[::1]/push",
+      "https://localhost/push",
+      "https://servico-interno/push",
+      "http://fcm.googleapis.com/fcm/send/x",
+      "nao e uma url",
+    ];
+    for (const endereco of recusados) expect(enderecoDeServicoDePush(endereco).ok, endereco).toBe(false);
+
     const a = await criarPessoaComMarca();
-    for (const host of ["10.0.0.5", "127.0.0.1", "localhost", "servico-interno", "[::1]", "a.localhost", "base.internal", "x.local"]) {
-      await expect(
-        registrarInscricaoPush(a.usuarioId, { endpoint: `https://${host}/push`, p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" }, "android"),
-      ).rejects.toBeInstanceOf(ErroInscricaoPush);
+    for (const endereco of recusados.slice(0, 8)) {
+      await expect(registrarInscricaoPush(a.usuarioId, { endpoint: endereco, p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" }, "android")).rejects.toBeInstanceOf(ErroInscricaoPush);
     }
-    for (const host of ["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", "wns2-par02p.notify.windows.com"]) {
-      expect(hostPublico(host)).toBe(true);
-    }
+    expect(await inscricoesDaPessoa(a.usuarioId)).toEqual([]);
+  });
+
+  it("falha que não é do aparelho (403) por mais de 14 dias sem nenhum envio aceito apaga a inscrição; antes disso ela fica; e a pessoa volta ao pedido", async () => {
+    const dia = 24 * 60 * 60 * 1000;
+    const velha = await criarPessoaComMarca();
+    const recente = await criarPessoaComMarca();
+    const ainda = await inscrever(recente.usuarioId, "r");
+    const morta = await inscrever(velha.usuarioId, "v");
+    await db().update(inscricoesPush).set({ ultimaFalhaEm: new Date(AGORA.getTime() - (DIAS_DE_FALHA_PARA_APAGAR + 1) * dia) }).where(eq(inscricoesPush.id, morta.id));
+    await db().update(inscricoesPush).set({ ultimaFalhaEm: new Date(AGORA.getTime() - (DIAS_DE_FALHA_PARA_APAGAR - 1) * dia) }).where(eq(inscricoesPush.id, ainda.id));
+    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: false, contar: false, motivo: "servico de push respondeu 403" });
+
+    await rodarLembrete(AGORA);
+
+    expect(await inscricoesDaPessoa(velha.usuarioId)).toEqual([]);
+    const [restante] = await inscricoesDaPessoa(recente.usuarioId);
+    expect(restante.id).toBe(ainda.id);
+    expect(restante.falhasSeguidas).toBe(0);
+    // As duas receberam o e-mail do dia (nenhum push foi aceito).
+    expect(vi.mocked(enviarEmail)).toHaveBeenCalledTimes(2);
+    // Sem aparelho, o pedido de permissão volta; com a inscrição ainda falhando (ou já apagada), nenhum aparelho "sem falha" conta.
+    expect(await aparelhosSemFalha(velha.usuarioId)).toBe(0);
+    expect(pedidoDePushPodeAparecer({ pushAdiadoAte: null }, await aparelhosSemFalha(recente.usuarioId), AGORA)).toBe(true);
+  });
+
+  it("a falha corrente começa na primeira falha da sequência (não anda a cada dia); um envio aceito a termina e anota o sucesso", async () => {
+    const { usuarioId } = await criarPessoaComMarca();
+    const feita = await inscrever(usuarioId);
+    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: false, contar: false, motivo: "servico de push respondeu 503" });
+
+    await rodarLembrete(AGORA);
+    const [primeira] = await inscricoesDaPessoa(usuarioId);
+    const inicio = primeira.ultimaFalhaEm!.getTime();
+    expect(await aparelhosSemFalha(usuarioId)).toBe(0);
+
+    await db().update(preferenciasUsuario).set({ ultimoLembreteEm: null }).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+    await new Promise((resolver) => setTimeout(resolver, 20));
+    await rodarLembrete(AGORA);
+    const [segunda] = await inscricoesDaPessoa(usuarioId);
+    expect(segunda.ultimaFalhaEm!.getTime()).toBe(inicio);
+
+    const depois = new Date("2026-09-10T14:00:00Z");
+    await registrarEnvioBemSucedido(feita.id, depois);
+    const [sucesso] = await inscricoesDaPessoa(usuarioId);
+    expect(sucesso.ultimaFalhaEm).toBeNull();
+    expect(sucesso.ultimoSucessoEm?.getTime()).toBe(depois.getTime());
+    expect(await aparelhosSemFalha(usuarioId)).toBe(1);
   });
 
   it("a linha de preferências criada por 'agora não' no pedido de push nasce com a hora de fábrica de 09:00", async () => {

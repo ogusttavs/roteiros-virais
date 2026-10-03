@@ -47,7 +47,7 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
   useEffect(() => {
     const sistemaDoNavegador = sistemaDoAparelho(navigator.userAgent);
     setSistema(sistemaDoNavegador);
-    setElegivel(sistemaDoNavegador !== "outro" && jaEstaInstalado() && suportaPush() && Notification.permission === "default");
+    setElegivel(sistemaDoNavegador !== "outro" && jaEstaInstalado() && suportaPush() && Notification.permission !== "denied");
   }, []);
 
   const devePedir = podeAparecer && Boolean(chavePublica) && elegivel && !dispensado;

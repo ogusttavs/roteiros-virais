@@ -62,9 +62,11 @@ export async function ligarAviso(chavePublica: string): Promise<ResultadoDeLigar
     if (permissao !== "granted") return { tipo: "negado" };
     await navigator.serviceWorker.register("/sw.js", { scope: "/" });
     const registro = await navigator.serviceWorker.ready;
-    const inscricao =
-      (await registro.pushManager.getSubscription()) ??
-      (await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(chavePublica) }));
+    // Sempre uma inscrição nova (A2): a que já existia pode ser de uma chave VAPID antiga ou apontar para um endereço que o serviço de push já não aceita, e é
+    // exatamente o caso de quem volta a ligar o aviso depois de a inscrição ter sido apagada no servidor.
+    const antiga = await registro.pushManager.getSubscription();
+    if (antiga) await antiga.unsubscribe().catch(() => false);
+    const inscricao = await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: chaveParaBytes(chavePublica) });
     const json = inscricao.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return { tipo: "erro" };
     return { tipo: "ligado", inscricao: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth } };
