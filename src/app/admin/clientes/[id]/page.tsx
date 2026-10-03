@@ -7,8 +7,10 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { exigirAdmin } from "@/lib/sessao";
 import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
-import { membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
+import { clientePorId, membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import { fontesDoHistorico } from "@/servicos/curva";
+import { ramoAtualDoCliente } from "@/servicos/ramos";
+import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { textosAdmin } from "@/textos/admin";
 import { textosHistorico } from "@/textos/historico";
@@ -16,6 +18,7 @@ import { textosHistorico } from "@/textos/historico";
 import { NomeMarcaAdmin } from "./NomeMarcaAdmin";
 import styles from "./page.module.css";
 import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
+import { RamosAlternativosAdmin } from "./RamosAlternativosAdmin";
 import { SeletorPlanoAdmin } from "./SeletorPlanoAdmin";
 import { SeletorTipoAdmin } from "./SeletorTipoAdmin";
 
@@ -54,6 +57,8 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
   const totalReprovacoes = await contarReprovacoes(cliente.id);
   const regrasAtivas = regras.filter((regra) => regra.ativa).length;
   const membrosBrutos = await membrosDaMarca(cliente.id);
+  const principal = await ramoAtualDoCliente((await clientePorId(cliente.id))?.nichoId);
+  const alternativos = await ramosAlternativosDaMarca(cliente.id);
   // Server Component: NOME_SEM_NOME_AINDA mora num arquivo que importa next/headers,
   // que so pode ser importado aqui (o client component recebe so o booleano ja calculado).
   const membros = membrosBrutos.map((membro) => ({ ...membro, semNome: membro.nome === NOME_SEM_NOME_AINDA }));
@@ -73,6 +78,13 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
       </div>
 
       <QuemTemAcessoAdmin clienteId={cliente.id} nomeMarca={cliente.nome} membros={membros} />
+
+      <RamosAlternativosAdmin
+        clienteId={cliente.id}
+        nomeMarca={cliente.nome}
+        principal={principal ? { nome: principal.nome, slug: principal.ramoSlug } : null}
+        alternativos={alternativos.map((a) => ({ id: a.id, nome: a.nome, slug: a.ramoSlug, ligadoEm: a.ligadoEm.toISOString() }))}
+      />
 
       <section className={styles.secao}>
         <h2>{t.briefingTitulo}</h2>

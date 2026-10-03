@@ -27,6 +27,8 @@ type Props = {
    */
   textoNaoAchei?: string;
   onEscolher: (slug: string) => void;
+  /** Ramos que não aparecem na lista (E45 PR 3, no admin: o ramo principal da marca e os que já estão ligados não são opção). */
+  ramosEscondidos?: readonly string[];
   /** "Não achei o meu": recebe o que a pessoa tinha digitado. */
   onNaoAchei?: (texto: string) => void;
   /** Para levar o foco ao campo quando ele está errado. */
@@ -42,7 +44,7 @@ type Props = {
  * palavras que levam ao ramo). Sem resultado, ou a qualquer hora que haja texto, a última linha é o "Não achei o meu".
  * O Enter nunca envia o formulário com a lista aberta: ele escolhe.
  */
-export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, textoNaoAchei, onEscolher, onNaoAchei, ref }: Props) {
+export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, textoNaoAchei, onEscolher, ramosEscondidos, onNaoAchei, ref }: Props) {
   const id = useId();
   const idLista = `${id}-lista`;
   const idAjuda = ajuda ? `${id}-ajuda` : undefined;
@@ -69,7 +71,12 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
   /** Há o que procurar: texto com pelo menos uma letra ou número (só pontuação ou espaço mostra o catálogo inteiro, sem destacar nada). */
   const buscando = digitou && normalizarBusca(texto) !== "";
   const consulta = buscando ? texto : "";
-  const grupos = useMemo(() => buscarRamos(consulta), [consulta]);
+  const escondidos = (ramosEscondidos ?? []).join("|");
+  const grupos = useMemo(() => {
+    const fora = new Set(escondidos ? escondidos.split("|") : []);
+    const todos = buscarRamos(consulta);
+    return fora.size === 0 ? todos : todos.map((g) => ({ ...g, ramos: g.ramos.filter((r) => !fora.has(r.slug)) })).filter((g) => g.ramos.length > 0);
+  }, [consulta, escondidos]);
   const ramos = ramosEmOrdemDeTela(grupos);
   const mostrarNaoAchei = buscando && Boolean(textoNaoAchei && onNaoAchei);
   const total = ramos.length + (mostrarNaoAchei ? 1 : 0);

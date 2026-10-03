@@ -9,12 +9,12 @@ import { and, asc, eq } from "drizzle-orm";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { clientes, nichos, ramosDaConta } from "@/db/schema";
+import { MAXIMO_DE_RAMOS_ALTERNATIVOS } from "@/lib/ramos-alternativos";
 
 import { ErroNicho } from "./nichos";
 import { desligarSetorSeSemMarca, garantirNichoDoRamo, nichoDoRamo } from "./ramos";
 
-/** O máximo de ramos alternativos por marca (decisão do Gustavo de 02/10/2026). */
-export const MAXIMO_DE_RAMOS_ALTERNATIVOS = 2;
+export { MAXIMO_DE_RAMOS_ALTERNATIVOS };
 
 /** Um erro que o admin lê em frase: o terceiro ramo, o ramo repetido, o ramo que a marca já tem. */
 export class ErroRamosDaConta extends ErroNicho {}

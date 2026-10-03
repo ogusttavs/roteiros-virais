@@ -9,6 +9,7 @@ import { db, getPool } from "@/db";
 import { clientes, nichos, ramosDaConta, user } from "@/db/schema";
 import { FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
+import { desligarSetorSeSemMarca, ErroLimiteDeSetores, garantirNichoDoRamo, nichoDoRamo } from "@/servicos/ramos";
 import {
   ErroRamosDaConta,
   ligarRamoAlternativo,
@@ -18,7 +19,6 @@ import {
   setoresDaConta,
   tirarRamoAlternativo,
 } from "@/servicos/ramos-da-conta";
-import { desligarSetorSeSemMarca, ErroLimiteDeSetores, garantirNichoDoRamo, nichoDoRamo } from "@/servicos/ramos";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
