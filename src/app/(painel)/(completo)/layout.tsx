@@ -12,6 +12,7 @@ import {
 import { VERSAO_TERMOS_EM } from "@/textos/termos";
 
 import { FolhaAceiteTermos } from "../_casca/FolhaAceiteTermos";
+import { OuvinteInstalacao } from "../_casca/OuvinteInstalacao";
 
 /**
  * Cliente sem briefing completo cai em /comecar em qualquer rota do painel
@@ -49,5 +50,10 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
     return <FolhaAceiteTermos />;
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <OuvinteInstalacao instalado={Boolean(preferencias.instaladoEm)} />
+      {children}
+    </>
+  );
 }

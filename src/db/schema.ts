@@ -331,6 +331,12 @@ export const preferenciasUsuario = pgTable("preferencias_usuario", {
   ultimoLembreteEm: timestamp("ultimo_lembrete_em", { withTimezone: true }),
   /** Nulo ate aceitar; quem nao aceitou nao passa do layout (completo) (etapa 12, decisao 7; V3, item 7: da pessoa). */
   aceitouTermosEm: timestamp("aceitou_termos_em", { withTimezone: true }),
+  /**
+   * E48 PR 1: o convite de instalar o aplicativo no celular. "Agora não" adia por sete dias (`conviteInstalarAdiadoAte`); no servidor, e não no
+   * navegador, para valer em qualquer aparelho da pessoa. `instaladoEm` é gravado uma vez, na primeira abertura em modo aplicativo (tela cheia).
+   */
+  conviteInstalarAdiadoAte: timestamp("convite_instalar_adiado_ate", { withTimezone: true }),
+  instaladoEm: timestamp("instalado_em", { withTimezone: true }),
 });
 
 // ---------------------------------------------------------------------------

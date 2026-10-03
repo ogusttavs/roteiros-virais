@@ -407,6 +407,13 @@
       "when": 1791046497641,
       "tag": "0057_ramos-da-conta",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1791051967858,
+      "tag": "0058_convite-instalar",
+      "breakpoints": true
     }
   ]
 }

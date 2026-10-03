@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
@@ -27,6 +27,7 @@ import {
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hojeISO } from "@/lib/config";
+import { adiamentoDoConvite } from "@/lib/convite-instalar";
 import {
   lerClienteIdDoCookie,
   NOME_COOKIE_MARCA_ATIVA,
@@ -830,6 +831,33 @@ export type PreferenciasUsuario = typeof preferenciasUsuario.$inferSelect;
 export async function preferenciasDoUsuario(usuarioId: string): Promise<PreferenciasUsuario | null> {
   const [linha] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
   return linha ?? null;
+}
+
+/**
+ * E48 PR 1: "Agora não" no convite de instalar o aplicativo: a folha não volta por sete dias, em nenhum aparelho da pessoa. Cria a linha de
+ * preferências se ainda não existe (quem chega aqui já aceitou os termos, então ela existe; o upsert é só para nunca falhar à toa).
+ */
+export async function adiarConviteDeInstalar(usuarioId: string, agora: Date = new Date()): Promise<Date> {
+  const ate = adiamentoDoConvite(agora);
+  await db()
+    .insert(preferenciasUsuario)
+    .values({ usuarioId, conviteInstalarAdiadoAte: ate })
+    .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { conviteInstalarAdiadoAte: ate } });
+  return ate;
+}
+
+/**
+ * E48 PR 1: a primeira abertura em modo aplicativo (tela cheia, sem a barra do navegador) grava `instalado_em`, uma vez só: abrir de novo não
+ * muda a data. Serve ao admin (quem instalou) e ao envio de aviso pelo celular (PR 2). Devolve se esta chamada foi a que gravou.
+ */
+export async function registrarInstalacao(usuarioId: string, agora: Date = new Date()): Promise<boolean> {
+  await db().insert(preferenciasUsuario).values({ usuarioId }).onConflictDoNothing();
+  const gravadas = await db()
+    .update(preferenciasUsuario)
+    .set({ instaladoEm: agora })
+    .where(and(eq(preferenciasUsuario.usuarioId, usuarioId), isNull(preferenciasUsuario.instaladoEm)))
+    .returning({ usuarioId: preferenciasUsuario.usuarioId });
+  return gravadas.length > 0;
 }
 
 /** "HH:MM" (etapa 13, ajuste 4: o navegador nao obriga o `step` de hora cheia do campo). */

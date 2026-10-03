@@ -46,6 +46,7 @@ import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import chipStyles from "@/ui/componentes/Chips.module.css";
+import { ConviteInstalar } from "@/ui/componentes/ConviteInstalar";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
@@ -226,6 +227,8 @@ type Props = {
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
+  /** E48 PR 1: o servidor diz que o convite de instalar o aplicativo pode aparecer (não instalou e o "agora não" não vale mais). */
+  conviteInstalarPodeAparecer: boolean;
 };
 
 /**
@@ -242,6 +245,7 @@ export function RoteiroTela({
   marcaAtiva,
   marcas,
   nomePessoa,
+  conviteInstalarPodeAparecer,
 }: Props) {
   const router = useRouter();
   const [gravadoEm, setGravadoEm] = useState(roteiro.gravadoEm);
@@ -1246,6 +1250,8 @@ export function RoteiroTela({
         aberto={toastSalvo}
         onFechar={() => setToastSalvo(false)}
       />
+      {/* E48 PR 1: o convite de instalar o aplicativo, depois que o roteiro está na tela e só com a tela livre (o modo gravação é outra rota). */}
+      <ConviteInstalar podeAparecer={conviteInstalarPodeAparecer} telaLivre={painel === null && !editando && !gravando} />
     </div>
   );
 }
