@@ -130,25 +130,54 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
     }
   });
 
-  test("ao tocar no campo a lista abre com o catálogo em grupos; uma letra já filtra; sem acento e sem maiúscula", async ({ page }) => {
+  test("os seis estados do ramo (passo 16): vazio com a dica, buscando, a folha 'Os ramos', sem resultado, 'Não achei o meu' e escolhido com 'Trocar'", async ({ page }) => {
     await abrirPassoDoRamo(page, EMAIL_LEITURA);
     const campo = campoDoRamo(page);
 
+    // 1. Vazio: a dica e a porta para a lista; o campo vazio NÃO abre os 44 ramos dentro do cartão.
     await campo.click();
-    await expect(page.getByRole("listbox", { name: "Ramos" })).toBeVisible();
-    await expect(page.getByRole("option")).toHaveCount(44);
-    await expect(page.getByRole("group")).toHaveCount(9);
-    await expect(page.getByRole("group", { name: "Casa e limpeza" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Perfil pessoal" })).toBeVisible();
+    await expect(page.getByText("Escreva o que você faz, com as suas palavras.")).toBeVisible();
+    await expect(page.getByRole("listbox", { name: "Ramos" })).toHaveCount(0);
 
+    // 6. A folha "Os ramos": os 44 em nove grupos, com a busca do alto filtrando a mesma lista.
+    await page.getByRole("button", { name: "Ver a lista de ramos" }).click();
+    const folha = page.getByRole("dialog", { name: "Os ramos" });
+    await expect(folha.getByRole("option")).toHaveCount(44);
+    await expect(folha.getByRole("group")).toHaveCount(9);
+    await expect(folha.getByRole("group", { name: "Casa e limpeza" })).toBeVisible();
+    await expect(folha.getByRole("group", { name: "Perfil pessoal" })).toBeVisible();
+    await folha.getByLabel("Buscar um ramo").fill("dentista");
+    await expect(folha.getByRole("option")).toHaveCount(1);
+    await page.keyboard.press("Escape");
+    await expect(folha).toHaveCount(0);
+
+    // 2. Buscando: a lista abre DENTRO do cartão (em fluxo, empurrando o que está embaixo), e uma letra já filtra.
     await campo.fill("d");
+    const lista = page.getByRole("listbox", { name: "Ramos" });
+    await expect(lista).toBeVisible();
     const comUmaLetra = await page.getByRole("option").count();
     expect(comUmaLetra).toBeGreaterThan(10);
     expect(comUmaLetra).toBeLessThan(45);
+    const posicao = await lista.evaluate((el) => {
+      let acima: Element | null = el;
+      while (acima && acima !== document.body) {
+        if (getComputedStyle(acima).position === "absolute") return "absolute";
+        acima = acima.parentElement;
+      }
+      return "fluxo";
+    });
+    expect(posicao).toBe("fluxo");
 
     await campo.fill("ESTETICA");
     await expect(page.getByRole("option", { name: /Estética automotiva/ })).toBeVisible();
     await expect(page.getByRole("option", { name: /Estética e pele/ })).toBeVisible();
+
+    // 5. Escolhido: o campo mostra o ramo, com a linha de exemplos e o "Trocar".
+    await page.getByRole("option", { name: /Estética e pele/ }).click();
+    await expect(campo).toHaveValue("Estética e pele");
+    await expect(page.getByRole("button", { name: "Trocar o ramo" })).toBeVisible();
+    await page.getByRole("button", { name: "Trocar o ramo" }).click();
+    await expect(campo).toBeFocused();
   });
 
   test("pelo teclado: seta para baixo anda pela lista, o Enter escolhe sem enviar o formulário, o Esc fecha só a lista", async ({ page }) => {
@@ -186,7 +215,7 @@ test.describe("E45 PR 1: a busca instantânea de ramo", () => {
 
     // Um texto que nenhum ramo do catálogo reconhece (E45 PR 2: "criação de abelhas" já cai em Agro e campo, e é o caso do `ramo-pedido.spec.ts`).
     await campo.fill(TEXTO_SEM_RAMO);
-    await expect(page.getByText(`Nenhum ramo começa com “${TEXTO_SEM_RAMO}”.`)).toBeVisible();
+    await expect(page.getByText(`Nenhum ramo com “${TEXTO_SEM_RAMO}”. Escolha abaixo e escreva do seu jeito; a gente confere.`)).toBeVisible();
     const naoAchei = page.getByRole("option", { name: /Não achei o meu/ });
     await expect(naoAchei).toBeVisible();
     await naoAchei.click();

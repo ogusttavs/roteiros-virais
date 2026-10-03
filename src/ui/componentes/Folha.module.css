@@ -91,6 +91,8 @@
 }
 
 .folhaTitulo {
+  /* O foco vai ao título ao abrir (passo 16: o leitor de tela começa por ele); o anel de foco aparece só para quem usa o teclado. */
+  outline: none;
   justify-self: start;
   /* Espaço reservado para o X (`.folhaFechar`) não cobrir um título longo. */
   max-width: calc(100% - var(--altura-toque));

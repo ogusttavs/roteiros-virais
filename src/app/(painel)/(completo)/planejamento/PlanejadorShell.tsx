@@ -9,6 +9,7 @@ import { textosPlanejamento } from "@/textos/planejamento";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { useConexao } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
+import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
 import { useTrocaMarca } from "../../_casca/TrocaMarcaContext";
@@ -64,6 +65,7 @@ export function PlanejadorTela({ visao, cabeca, marcaAtiva, marcas, nomePessoa, 
   const [ocupado, iniciarTransicao] = useTransition();
   const [acao, setAcao] = useState<string | null>(null);
   const atualizando = ocupado && acao === "atualizar";
+  const emDia = useJaEstavaEmDia(atualizando);
 
   function atualizar() {
     if (ocupado) return;
@@ -97,7 +99,7 @@ export function PlanejadorTela({ visao, cabeca, marcaAtiva, marcas, nomePessoa, 
               onClick={atualizar}
             >
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" className={atualizando ? styles.girando : undefined} />
-              {marcas.length <= 1 ? <span>{textosNav.atualizar}</span> : null}
+              {marcas.length <= 1 || emDia ? <span aria-live="polite">{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span> : null}
             </button>
           </>
         }

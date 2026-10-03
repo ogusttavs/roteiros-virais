@@ -2,11 +2,12 @@
 
 import { RotateCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useTransition } from "react";
 
 import { textosNav } from "@/textos/nav";
 import { useConexao } from "@/ui/ConexaoContext";
 import { Simbolo } from "@/ui/Logo";
+import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
 
 import styles from "./CabecalhoCelular.module.css";
 import { SeletorMarcaCelular, type MarcaResumo } from "./SeletorMarcaCelular";
@@ -36,25 +37,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
   const router = useRouter();
   const { avisarFalhaDeRede } = useConexao();
   const [atualizando, iniciarAtualizacao] = useTransition();
-  const [emDia, setEmDia] = useState(false);
-  const antes = useRef<string | null>(null);
-  const estavaAtualizando = useRef(false);
-
-  // Passo 16, capítulo 5: o conteúdo velho fica à vista até o novo chegar; se o texto da tela é o mesmo de antes, o botão diz "Já estava em dia" por 2 segundos.
-  useEffect(() => {
-    if (atualizando) {
-      estavaAtualizando.current = true;
-      return;
-    }
-    if (!estavaAtualizando.current) return;
-    estavaAtualizando.current = false;
-    const depois = document.querySelector("main")?.textContent ?? "";
-    if (antes.current !== null && antes.current === depois) {
-      setEmDia(true);
-      const volta = setTimeout(() => setEmDia(false), 2000);
-      return () => clearTimeout(volta);
-    }
-  }, [atualizando]);
+  const emDia = useJaEstavaEmDia(atualizando);
 
   function atualizar() {
     if (!navigator.onLine) {
@@ -62,8 +45,6 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
       avisarFalhaDeRede();
       return;
     }
-    antes.current = document.querySelector("main")?.textContent ?? "";
-    setEmDia(false);
     iniciarAtualizacao(() => {
       router.refresh();
     });
