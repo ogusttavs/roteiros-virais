@@ -93,6 +93,8 @@ export const textosBriefing = {
     /** V12c, item 3b, a E37b: sem travar o passo, o bloco de perfis é opcional. */
     perfilInvalido: "Confira o nome do perfil",
     ramoObrigatorio: "Escreva o seu ramo",
+    /** E45, PR 1: tentou continuar sem escolher nenhum ramo na busca. */
+    ramoNaoEscolhido: "Escolha o seu ramo na lista",
     botaoContinuar: "Continuar",
     salvando: "Salvando",
     erro: "Não conseguimos salvar agora; confira os campos e tente de novo",

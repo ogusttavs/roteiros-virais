@@ -1399,7 +1399,7 @@ test.describe("layout: /comecar no desktop (item 9, V12b)", () => {
     await page.getByRole("button", { name: "entrar", exact: true }).click();
     await expect(page).toHaveURL(/\/comecar/);
     await page.getByRole("button", { name: "Começar", exact: true }).click();
-    await expect(page.locator("#ramo")).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Ramo" })).toBeVisible();
   }
 
   for (const largura of [1024, 1280, 1920]) {
@@ -1407,12 +1407,14 @@ test.describe("layout: /comecar no desktop (item 9, V12b)", () => {
       await page.setViewportSize({ width: largura, height: 900 });
       await abrirPassoDoRamo(page);
 
-      const select = page.locator("#ramo");
-      await expect(select).toHaveValue(String(nichoComecarDesktopId));
+      // E45, PR 1: o ramo é a busca (um combobox), e o setor que a marca já tinha, feito à mão e fora do catálogo, aparece com o nome dele.
+      const campoDoRamo = page.getByRole("combobox", { name: "Ramo" });
+      await expect(campoDoRamo).toHaveValue(NOME_RAMO_COMPRIDO);
+      expect(nichoComecarDesktopId).toBeGreaterThan(0);
 
-      // O select mostra a opção escolhida por inteiro (o navegador não corta o texto da option marcada).
-      const textoOpcaoMarcada = await select.evaluate((el: HTMLSelectElement) => el.options[el.selectedIndex]?.text);
-      expect(textoOpcaoMarcada).toBe(NOME_RAMO_COMPRIDO);
+      // Em 1024 ou mais o nome cabe inteiro no campo (um input não quebra linha: o texto não pode passar da caixa).
+      const cabeInteiro = await campoDoRamo.evaluate((el: HTMLInputElement) => el.scrollWidth <= el.clientWidth);
+      expect(cabeInteiro, "o nome do ramo passa da caixa do campo").toBe(true);
 
       // A coluna do formulário fica centralizada, não colada na margem esquerda (folga dos dois lados parecida).
       const caixa = await page.locator("form").boundingBox();

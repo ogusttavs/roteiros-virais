@@ -8,9 +8,9 @@ import {
   clienteAtivoDoUsuario,
   clienteTemOndeEscolhido,
   dadosOndeIniciais,
-  listarNichosAtivos,
   marcasDoUsuario,
 } from "@/servicos/clientes";
+import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 
 import { ComecarWizard } from "./ComecarWizard";
@@ -32,9 +32,9 @@ export default async function Comecar() {
    * desta rodada). `marcas` (V12b, item 0): quem tem mais de uma marca troca
    * daqui tambem, sem ficar presa no briefing incompleto de uma so.
    */
-  const [briefing, nichos, marcas] = await Promise.all([
+  const [briefing, ramoAtual, marcas] = await Promise.all([
     garantirBriefing(cliente.id),
-    listarNichosAtivos(),
+    ramoAtualDoCliente(cliente.nichoId),
     marcasDoUsuario(sessao.user.id),
   ]);
 
@@ -51,13 +51,14 @@ export default async function Comecar() {
           marcaAtiva={{ id: cliente.id, nome: cliente.nome }}
           marcas={marcas.map((m) => ({ id: m.id, nome: m.nome }))}
           nomePessoa={sessao.user.name}
-          nichos={nichos}
           dadosFixosCompletos={dadosFixosCompletos}
           dadosFixosIniciais={{
             nome: cliente.nome,
             ...dadosOndeIniciais(cliente),
             site: cliente.site,
             nichoId: cliente.nichoId,
+            ramoSlug: ramoAtual?.ramoSlug ?? null,
+            ramoNome: ramoAtual?.nome ?? null,
             ramoOutro: cliente.ramoOutro,
             persona: cliente.persona,
             perfis: cliente.perfis,

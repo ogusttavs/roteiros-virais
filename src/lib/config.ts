@@ -211,6 +211,12 @@ export const config = {
      */
     analiseSemFalaPorDia: envNumero("ANALISE_SEM_FALA_POR_DIA", 15),
     /**
+     * E45 PR 1: quantos setores NOVOS (que nascem da escolha de um ramo do catálogo) podem nascer por dia, no sistema todo. Cada setor novo
+     * começa uma pesquisa paga e passa a ser coletado todo dia (uns US$ 0,60 por dia, medido em 02/10); sem teto, um laço no navegador de
+     * uma conta qualquer faria nascer os 44 de uma vez. `MAX_SETORES_NOVOS_POR_DIA=0` desliga o teto.
+     */
+    setoresNovosPorDia: envNumero("MAX_SETORES_NOVOS_POR_DIA", 10),
+    /**
      * E38 PR 2, "o que entendemos da sua marca": a leitura do site e das redes da própria marca
      * se refaz com esta idade (dias desde a última leitura boa; o despachante diário
      * `entender-marca` só enfileira quem passou disto, o que também pega marca nova e tick

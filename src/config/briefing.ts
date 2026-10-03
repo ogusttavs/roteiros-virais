@@ -90,8 +90,8 @@ const DADOS_FIXOS_NEGOCIO: DadosFixosConfig = {
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
     rotulo: "Ramo",
-    ajuda: "Escolha o que mais se parece com o seu negócio. Se não achar, escolha \"outro\".",
-    opcaoOutro: "outro",
+    ajuda: "Escreva uma palavra ou uma letra do que o seu negócio faz e escolha na lista. Se não achar, escolha “Não achei o meu”.",
+    opcaoOutro: "Não achei o meu",
   },
   persona: {
     rotulo: "O que você quer com os vídeos",
@@ -128,8 +128,8 @@ const DADOS_FIXOS_PESSOA: DadosFixosConfig = {
   site: { rotulo: "O site da sua marca, se tiver", ajuda: "Opcional. Pode escrever só o endereço, como minhaloja.com.br" },
   ramo: {
     rotulo: "Ramo",
-    ajuda: "O ramo do seu assunto principal. Se não achar, escolha \"outro\".",
-    opcaoOutro: "outro",
+    ajuda: "O ramo do seu assunto principal. Escreva uma palavra ou uma letra e escolha na lista. Se não achar, escolha “Não achei o meu”.",
+    opcaoOutro: "Não achei o meu",
   },
   persona: {
     rotulo: "O que você quer com os vídeos",

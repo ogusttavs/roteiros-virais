@@ -39,7 +39,7 @@ vi.mock("@/lib/config", async (importarOriginal) => {
 
 import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
 import { apagarAudio, baixarAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
-import { ErroGroqTempoLimite, transcreverAudio } from "@/jobs/groq-api";
+import { ErroGroq, ErroGroqTempoLimite, transcreverAudio } from "@/jobs/groq-api";
 import { rodarTranscrever } from "@/jobs/transcrever";
 import { config } from "@/lib/config";
 
@@ -62,6 +62,8 @@ async function criarVideo(
     publicadoEm: Date;
     transcricao?: string;
     proximaTentativaTranscricao?: Date;
+    /** Item 0 da E45: a marca de que a última falha foi de infraestrutura (tempo limite ou bloqueio do robô). */
+    falhaDeInfraEm?: Date;
     duracaoS?: number;
     /** V2a, item 2: sem dono nunca conta no teto de 2 por conta; usado nos testes do item 1 para nao interferir. */
     semDono?: boolean;
@@ -89,6 +91,7 @@ async function criarVideo(
         opcoes.velocidadeRelativa === undefined ? undefined : String(opcoes.velocidadeRelativa),
       transcricao: opcoes.transcricao,
       proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
+      falhaDeInfraEm: opcoes.falhaDeInfraEm,
       duracaoS: opcoes.duracaoS,
       midiaUrl: opcoes.midiaUrl,
       midiaUrlEm: opcoes.midiaUrlEm,
@@ -97,6 +100,14 @@ async function criarVideo(
     })
     .returning();
   return v;
+}
+
+/**
+ * Um vídeo que já falhou por infraestrutura numa rodada anterior (a data de nova tentativa já venceu, ele voltou à fila): o que prova que uma
+ * falha comum ou uma transcrição que sai APAGA a marca. Sem a marca antiga, "a marca é nula depois" passaria com ou sem o código que a apaga.
+ */
+function comMarcaDeInfraAntiga() {
+  return { proximaTentativaTranscricao: new Date(Date.now() - 60_000), falhaDeInfraEm: new Date(Date.now() - 3 * DIA_MS) };
 }
 
 const LEGENDA_LONGA =
@@ -250,6 +261,8 @@ describe("rodarTranscrever", () => {
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-bloqueado-bot"));
     expect(linha.transcricao).toBeNull();
     expect(linha.proximaTentativaTranscricao).not.toBeNull();
+    // Item 0 da E45: o bloqueio do robô é falha de infraestrutura, e `extrair-sem-fala` não pode tratá-lo como "o vídeo não tem fala".
+    expect(linha.falhaDeInfraEm).not.toBeNull();
     const emTresDias = Date.now() + 2 * DIA_MS;
     const emQuatroDias = Date.now() + 4 * DIA_MS;
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emTresDias);
@@ -257,7 +270,7 @@ describe("rodarTranscrever", () => {
   });
 
   it("video que falha ao baixar audio com uma mensagem generica (nao a do bot) continua com 7 dias, mesmo sendo do youtube", async () => {
-    await criarVideo("yt-falha-generica", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    await criarVideo("yt-falha-generica", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), ...comMarcaDeInfraAntiga() });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video privado ou removido"));
 
@@ -268,6 +281,7 @@ describe("rodarTranscrever", () => {
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "yt-falha-generica"));
     const emSeteDias = Date.now() + 6 * DIA_MS;
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
+    expect(linha.falhaDeInfraEm).toBeNull();
   });
 
   /**
@@ -277,7 +291,7 @@ describe("rodarTranscrever", () => {
    * nunca mais oferecia o vídeo de novo, mesmo com a data de nova tentativa já vencida.
    */
   it("transcricao vazia sem semFala conta como falha, com nova tentativa em 7 dias, nunca grava transcricao vazia", async () => {
-    await criarVideo("yt-transcricao-vazia", { velocidadeRelativa: 3, publicadoEm: diasAtras(3) });
+    await criarVideo("yt-transcricao-vazia", { velocidadeRelativa: 3, publicadoEm: diasAtras(3), ...comMarcaDeInfraAntiga() });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-fake.mp3");
     vi.mocked(transcreverAudio).mockResolvedValue({ texto: "", idiomaDetectado: "pt", semFala: false });
@@ -292,6 +306,7 @@ describe("rodarTranscrever", () => {
     expect(linha.proximaTentativaTranscricao).not.toBeNull();
     const emSeteDias = Date.now() + 6 * DIA_MS;
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(emSeteDias);
+    expect(linha.falhaDeInfraEm).toBeNull();
   });
 
   /** Achado 3: transcricao vazia COM semFala (a Groq confirmou ausencia de fala) e sucesso, nao falha. */
@@ -622,6 +637,7 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
 
     const [lenta] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-lenta"));
     expect(lenta.transcricao).toBeNull();
+    expect(lenta.falhaDeInfraEm).not.toBeNull();
     const diferenca = lenta.proximaTentativaTranscricao!.getTime() - Date.now();
     expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
     expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
@@ -639,6 +655,7 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
     expect(resumo.falhasPorTempoLimite).toBe(1);
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-audio-lento"));
     expect(linha.transcricao).toBeNull();
+    expect(linha.falhaDeInfraEm).not.toBeNull();
     const diferenca = linha.proximaTentativaTranscricao!.getTime() - Date.now();
     expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
     expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
@@ -655,6 +672,7 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
     expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-groq-lenta.mp3");
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-groq-lenta"));
     expect(linha.transcricao).toBeNull();
+    expect(linha.falhaDeInfraEm).not.toBeNull();
     const diferenca = linha.proximaTentativaTranscricao!.getTime() - Date.now();
     expect(diferenca).toBeGreaterThan(TRES_DIAS - 60_000);
     expect(diferenca).toBeLessThan(TRES_DIAS + 60_000);
@@ -722,8 +740,8 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
     expect((resumo.erros as string[])[0]).toContain("transcrever-teste");
   });
 
-  it("um erro comum de download continua com os 7 dias de sempre (o tempo limite não mudou o resto)", async () => {
-    await criarVideo("tiktok-falha-comum", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+  it("um erro comum de download continua com os 7 dias de sempre (o tempo limite não mudou o resto), e não marca infraestrutura", async () => {
+    await criarVideo("tiktok-falha-comum", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10), ...comMarcaDeInfraAntiga() });
     vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video indisponivel"));
 
     const resumo = await rodarTranscrever();
@@ -732,6 +750,70 @@ describe("rodarTranscrever, M5c: o tempo limite por vídeo", () => {
     expect(resumo.falhasPorTempoLimite).toBe(0);
     const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-falha-comum"));
     expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(Date.now() + 6 * DIA_MS);
+    expect(linha.falhaDeInfraEm).toBeNull();
+  });
+
+  it("item 0 da E45: a Groq que falha (limite de uso, 5xx, conexão) é falha de infraestrutura: marca, os 7 dias de sempre, e o vídeo falado não vira 'sem fala'", async () => {
+    await criarVideo("tiktok-groq-limite-de-uso", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10) });
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-groq-limite.mp3");
+    vi.mocked(transcreverAudio).mockRejectedValue(new ErroGroq("transcricao da Groq falhou: 429 rate limit"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.falhas).toBe(1);
+    expect(resumo.falhasPorTempoLimite).toBe(0);
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-groq-limite-de-uso"));
+    expect(linha.falhaDeInfraEm).not.toBeNull();
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(Date.now() + 6 * DIA_MS);
+    expect(apagarAudio).toHaveBeenCalledWith("/tmp/audio-groq-limite.mp3");
+  });
+
+  it("item 0 da E45: a ÚLTIMA falha é que conta: uma falha comum depois de um tempo limite apaga a marca de infraestrutura", async () => {
+    await criarVideo("tiktok-tempo-limite-e-depois-comum", {
+      plataforma: "tiktok",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      // O tempo limite de uma rodada anterior: a data de nova tentativa já venceu, o vídeo volta à fila.
+      proximaTentativaTranscricao: new Date(Date.now() - 60_000),
+      falhaDeInfraEm: new Date(Date.now() - 3 * DIA_MS),
+    });
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudio("video indisponivel"));
+
+    await rodarTranscrever();
+
+    const [linha] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-tempo-limite-e-depois-comum"));
+    expect(linha.falhaDeInfraEm).toBeNull();
+    expect(linha.proximaTentativaTranscricao!.getTime()).toBeGreaterThan(Date.now() + 6 * DIA_MS);
+  });
+
+  it("item 0 da E45: uma transcrição que sai depois de um tempo limite apaga a marca (legenda e Groq)", async () => {
+    await criarVideo("yt-legenda-depois-do-limite", {
+      velocidadeRelativa: 5,
+      publicadoEm: diasAtras(3),
+      semDono: true,
+      proximaTentativaTranscricao: new Date(Date.now() - 60_000),
+      falhaDeInfraEm: new Date(Date.now() - 3 * DIA_MS),
+    });
+    await criarVideo("tiktok-groq-depois-do-limite", {
+      plataforma: "tiktok",
+      foraDaCurva: 5,
+      publicadoEm: diasAtras(10),
+      semDono: true,
+      proximaTentativaTranscricao: new Date(Date.now() - 60_000),
+      falhaDeInfraEm: new Date(Date.now() - 3 * DIA_MS),
+    });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+    vi.mocked(baixarAudio).mockResolvedValue("/tmp/audio-depois-do-limite.mp3");
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "o que foi dito no video com fala de verdade", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    expect(resumo.transcritosPorGroq).toBe(1);
+    const [pelaLegenda] = await db().select().from(videos).where(eq(videos.idExterno, "yt-legenda-depois-do-limite"));
+    const [pelaGroq] = await db().select().from(videos).where(eq(videos.idExterno, "tiktok-groq-depois-do-limite"));
+    expect(pelaLegenda.falhaDeInfraEm).toBeNull();
+    expect(pelaGroq.falhaDeInfraEm).toBeNull();
   });
 });
 

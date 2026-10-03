@@ -29,7 +29,6 @@ type Props = {
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
-  nichos: { id: number; nome: string }[];
   dadosFixosCompletos: boolean;
   dadosFixosIniciais: DadosFixosIniciais;
   respostasIniciais: Record<string, string>;
@@ -93,7 +92,6 @@ export function ComecarWizard({
   marcaAtiva,
   marcas,
   nomePessoa,
-  nichos,
   dadosFixosCompletos,
   dadosFixosIniciais,
   respostasIniciais,
@@ -211,7 +209,6 @@ export function ComecarWizard({
             <p className={styles.introducao}>{textosBriefing.dadosFixos.introducao}</p>
           </div>
           <DadosFixosForm
-            nichos={nichos}
             inicial={dadosFixosIniciais}
             onSalvar={aoSalvarDadosFixos}
             onVoltar={() => setEtapa("intro")}

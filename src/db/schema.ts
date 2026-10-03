@@ -128,7 +128,15 @@ export const nichos = pgTable("nichos", {
   proporcaoBrasil: numeric("proporcao_brasil", { precision: 4, scale: 3 }),
   /** Vídeo sem fala (transcrição curta) vale como referência via análise visual. Padrão: não. */
   videoSemFalaVale: boolean("video_sem_fala_vale"),
-});
+  /**
+   * E45, PR 1: o ramo do catálogo (`src/config/ramos.ts`) a que este setor corresponde, pelo `slug` do ramo. Nulo nos setores que
+   * o admin criou à mão e ainda não foram encaixados. Único (onde não nulo): um ramo do catálogo tem um setor só, e é isso que
+   * deixa duas pessoas que escolhem o mesmo ramo ao mesmo tempo caírem na mesma base de vídeos. O setor de um ramo sem conta nem
+   * existe: nasce quando a primeira marca escolhe o ramo (`garantirNichoDoRamo`, `servicos/ramos.ts`), e é aí que a pesquisa começa.
+   */
+  ramoCatalogo: text("ramo_catalogo"),
+},
+(t) => [uniqueIndex("nichos_ramo_catalogo_unico").on(t.ramoCatalogo).where(sql`${t.ramoCatalogo} is not null`)]);
 
 /**
  * Quem grava os videos do cliente (briefing-e-rubricas.md, secao 1). V12c,
@@ -868,6 +876,14 @@ export const videos = pgTable(
      * nunca seleciona video com essa data no futuro.
      */
     proximaTentativaTranscricao: timestamp("proxima_tentativa_transcricao", { withTimezone: true }),
+    /**
+     * Item 0 da E45 (decisão 21 do M5c): quando a ÚLTIMA falha da transcrição foi de infraestrutura, e não do vídeo: o `yt-dlp`
+     * ou a Groq passaram do tempo limite, ou o YouTube bloqueou o robô. Preenchida junto com `proximaTentativaTranscricao` nesses
+     * dois casos, e apagada (nula) por qualquer falha comum e por uma transcrição que saiu. Existe porque `extrair-sem-fala`
+     * aceitava "tentou e falhou" (`proximaTentativaTranscricao` não nula) como porta de entrada sem olhar o motivo: um vídeo
+     * FALADO que só estourou o tempo ganhava uma ficha só por quadros, com o selo "sem fala", e o `transcrever` nunca mais o lia.
+     */
+    falhaDeInfraEm: timestamp("falha_de_infra_em", { withTimezone: true }),
     /**
      * M4/P2b, item 0e: o download ou a leitura falhou no caminho sem fala (`extrair-sem-fala.ts`);
      * preenchida com "agora + 7 dias", mesmo raciocínio de `proximaTentativaTranscricao`. Sem isto,

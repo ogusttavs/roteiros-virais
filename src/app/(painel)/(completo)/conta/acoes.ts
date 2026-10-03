@@ -7,6 +7,7 @@ import {
   salvarHoraLembrete,
   salvarOndeConta,
   salvarPerfilConta,
+  salvarRamoConta,
   salvarTema,
 } from "@/servicos/clientes";
 
@@ -28,6 +29,8 @@ export async function salvarContaAction(dados: {
   regiao?: string;
   pais?: string;
   paises?: string;
+  /** E45, PR 1: o ramo do catálogo escolhido (o `slug`); ausente não mexe no ramo. */
+  ramo?: string;
 }) {
   const sessao = await sessaoAtual();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
@@ -39,6 +42,7 @@ export async function salvarContaAction(dados: {
     dados.alcance
       ? salvarOndeConta(cliente.id, { alcance: dados.alcance, regiao: dados.regiao, pais: dados.pais, paises: dados.paises })
       : Promise.resolve(null),
+    dados.ramo ? salvarRamoConta(cliente.id, dados.ramo) : Promise.resolve(null),
   ]);
   return { ...clienteAtualizado, tema: dados.tema, horaLembrete: preferencias.horaLembrete };
 }

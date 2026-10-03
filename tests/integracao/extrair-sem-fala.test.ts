@@ -57,6 +57,8 @@ async function criarVideo(
     foraDaCurva?: number;
     transcricao?: string | null;
     proximaTentativaTranscricao?: Date;
+    /** Item 0 da E45: a última falha da transcrição foi de infraestrutura (tempo limite ou bloqueio do robô). */
+    falhaDeInfraEm?: Date;
     analise?: unknown;
     duracaoS?: number;
     publicadoEm?: Date;
@@ -77,6 +79,7 @@ async function criarVideo(
       publicadoEm: opcoes.publicadoEm ?? diasAtras(2),
       transcricao: opcoes.transcricao === undefined ? "muito curta" : opcoes.transcricao,
       proximaTentativaTranscricao: opcoes.proximaTentativaTranscricao,
+      falhaDeInfraEm: opcoes.falhaDeInfraEm,
       analise: opcoes.analise as never,
       duracaoS: opcoes.duracaoS,
       idioma: opcoes.idioma === undefined ? null : opcoes.idioma,
@@ -251,6 +254,40 @@ describe("rodarExtrairSemFala", () => {
     });
 
     const resumo = await rodarExtrairSemFala(nicho.id);
+    expect(resumo.analisados).toBe(1);
+    expect(baixarVideo480p).toHaveBeenCalledWith(v.url, "youtube");
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0 da E45: a ultima falha foi de infraestrutura (tempo limite ou bloqueio do robo): NAO entra, e o video falado nao ganha ficha 'sem fala'", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-falha-de-infra", true);
+    await criarVideo(nicho.id, "extrair-sem-fala-falha-de-infra-video", {
+      views: 100_000,
+      transcricao: null,
+      proximaTentativaTranscricao: new Date(Date.now() + 3 * DIA_MS),
+      falhaDeInfraEm: new Date(),
+    });
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+
+    expect(resumo.analisados).toBe(0);
+    expect(baixarVideo480p).not.toHaveBeenCalled();
+
+    await db().delete(videos).where(eq(videos.nichoId, nicho.id));
+  });
+
+  it("item 0 da E45: transcricao curta entra mesmo com a marca de infraestrutura de uma falha antiga (a transcricao leu e achou curto)", async () => {
+    const nicho = await criarNicho("extrair-sem-fala-curta-com-marca", true);
+    const v = await criarVideo(nicho.id, "extrair-sem-fala-curta-com-marca-video", {
+      views: 100_000,
+      transcricao: "muito curta",
+      proximaTentativaTranscricao: new Date(Date.now() - 60_000),
+      falhaDeInfraEm: new Date(Date.now() - 3 * DIA_MS),
+    });
+
+    const resumo = await rodarExtrairSemFala(nicho.id);
+
     expect(resumo.analisados).toBe(1);
     expect(baixarVideo480p).toHaveBeenCalledWith(v.url, "youtube");
 

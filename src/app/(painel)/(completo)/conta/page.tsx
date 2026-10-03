@@ -4,6 +4,7 @@ import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
+import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { textosConta } from "@/textos/conta";
 
 import { BotaoSair } from "./BotaoSair";
@@ -30,6 +31,7 @@ export default async function Conta() {
   const onde = cliente ? dadosOndeIniciais(cliente) : null;
   const membros = cliente ? await membrosDaMarca(cliente.id) : [];
   const briefing = cliente ? await garantirBriefing(cliente.id) : null;
+  const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
 
   return (
@@ -54,6 +56,7 @@ export default async function Conta() {
           horaLembreteInicial={preferencias?.horaLembrete ?? "08:00"}
           nomeMarca={cliente?.nome ?? ""}
           tipo={cliente?.tipo ?? "negocio"}
+          ramoInicial={ramoAtual ? { slug: ramoAtual.ramoSlug, nome: ramoAtual.nome } : null}
           ondeInicial={onde?.onde ?? null}
           regiaoInicial={onde?.regiao ?? null}
           paisInicial={onde?.pais ?? null}

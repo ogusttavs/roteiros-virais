@@ -1,0 +1,116 @@
+/**
+ * A busca instantânea de ramo (E45, PR 1). O campo, o rótulo, a ajuda e o erro são os do `Campo` (Campo.module.css); aqui só a lupa,
+ * a lista que abre embaixo e as linhas dela, no mesmo vocabulário do menu das pílulas (`PilulaFiltro.module.css`).
+ */
+.caixa {
+  position: relative;
+}
+
+.lupa {
+  position: absolute;
+  top: calc(var(--altura-toque) / 2);
+  left: var(--espaco-3);
+  transform: translateY(-50%);
+  color: var(--cor-texto-dica);
+  pointer-events: none;
+}
+
+/* O campo (`Campo.module.css`, `.entrada`) é de largura própria; aqui ocupa a linha e deixa lugar para a lupa. `.caixa .entrada` (duas classes) para ganhar do
+   `padding` do Campo em qualquer ordem em que o navegador carregue os dois arquivos (no servidor de desenvolvimento a ordem muda de uma página para outra, e na Conta a lupa ficava por cima do texto). */
+.caixa .entrada {
+  width: 100%;
+  padding-left: calc(var(--espaco-3) + 18px + var(--espaco-2));
+  /* Nome comprido ("Importação e desenvolvimento de produto") no celular: reticências com o campo parado, o texto inteiro ao focar. */
+  text-overflow: ellipsis;
+}
+
+.lista {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + var(--espaco-2));
+  left: 0;
+  right: 0;
+  display: grid;
+  gap: var(--espaco-1);
+  max-height: min(55vh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-elevada);
+  box-shadow: var(--sombra-md);
+}
+
+/* O listbox de dentro (só as opções e os grupos de opções); a caixa, a rolagem e o aviso de "sem resultado" ficam na `.lista`. */
+.opcoes {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.grupoDeRamos {
+  display: grid;
+  gap: 2px;
+}
+
+.cabecalhoDoGrupo {
+  padding: var(--espaco-2) var(--espaco-3) 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+}
+
+.opcao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "nome marca"
+    "exemplos marca";
+  align-items: center;
+  column-gap: var(--espaco-3);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-sm);
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+/* Fundo de seleção mais a barra à esquerda: só o fundo de hover quase não se distingue do fundo da lista no tema claro (achado da revisão). */
+.opcaoAtiva {
+  background: var(--cor-selecao-suave);
+  box-shadow: inset 3px 0 0 var(--cor-acao);
+}
+
+.nome {
+  grid-area: nome;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  overflow-wrap: anywhere;
+}
+
+.exemplos {
+  grid-area: exemplos;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}
+
+.marca {
+  grid-area: marca;
+  color: var(--cor-destaque);
+}
+
+.naoAchei {
+  border-top: var(--largura-borda) solid var(--cor-borda);
+  border-radius: 0 0 var(--raio-sm) var(--raio-sm);
+}
+
+.semResultado {
+  margin: 0;
+  padding: var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  overflow-wrap: anywhere;
+}

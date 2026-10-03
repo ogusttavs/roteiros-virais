@@ -40,6 +40,7 @@ import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-v
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
+import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -576,6 +577,8 @@ export const dadosFixosSchema = z
     paises: z.string().trim().optional(),
     site: campoSite(),
     nichoId: z.number().int().positive().optional(),
+    /** E45, PR 1: o ramo escolhido no catálogo (o `slug` de `src/config/ramos.ts`); o servidor acha ou cria o setor dele. */
+    ramo: z.string().trim().min(1).max(100).optional(),
     ramoOutro: z.string().trim().optional(),
     /** P1, item 2: "conhecido" e "negocios" sao valores da persona da marca pessoa (briefing-e-rubricas.md, secao 1b). */
     persona: z.enum(["negocio", "criador", "conhecido", "negocios"]),
@@ -588,7 +591,7 @@ export const dadosFixosSchema = z
       .optional(),
     quemGrava: z.enum(["propria_pessoa", "pessoa_e_equipe", "equipe", "outra_pessoa"]).optional(),
   })
-  .refine((dados) => Boolean(dados.nichoId) || Boolean(dados.ramoOutro?.trim()), {
+  .refine((dados) => Boolean(dados.ramo) || Boolean(dados.nichoId) || Boolean(dados.ramoOutro?.trim()), {
     message: "escolha um ramo da lista ou descreva o seu",
     path: ["ramo"],
   })
@@ -635,7 +638,15 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     youtube: dados.perfis?.youtube?.trim() || null,
   };
 
-  const [antes] = await db().select({ site: clientes.site, perfis: clientes.perfis }).from(clientes).where(eq(clientes.id, clienteId));
+  const [antes] = await db()
+    .select({ site: clientes.site, perfis: clientes.perfis, nichoId: clientes.nichoId })
+    .from(clientes)
+    .where(eq(clientes.id, clienteId));
+
+  // E45, PR 1: o ramo do catálogo vira o setor dele (que nasce, se for o primeiro a escolher; e se a marca já está nele, nada muda); o
+  // `nichoId` de antes (um setor que o admin criou à mão, e que a tela mostra como o ramo atual) continua valendo quando a pessoa não
+  // escolheu outro.
+  const nichoId = dados.ramo ? (await setorParaAMarca(antes?.nichoId ?? null, dados.ramo)).nichoId : (dados.nichoId ?? null);
 
   const [cliente] = await db()
     .update(clientes)
@@ -646,8 +657,8 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
       pais: dados.alcance === "outro_pais" ? (dados.pais?.trim() ?? null) : null,
       paises: dados.alcance === "mais_de_um_pais" ? (dados.paises?.trim() ?? null) : null,
       site: dados.site?.trim() || null,
-      nichoId: dados.nichoId ?? null,
-      ramoOutro: dados.nichoId ? null : (dados.ramoOutro?.trim() ?? null),
+      nichoId,
+      ramoOutro: nichoId ? null : (dados.ramoOutro?.trim() ?? null),
       persona: dados.persona,
       perfis,
       quemGrava: dados.quemGrava ?? null,
@@ -656,6 +667,10 @@ export async function salvarDadosFixos(clienteId: number, dadosBrutos: unknown):
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+
+  // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado. A troca já foi gravada: isto
+  // nunca a derruba.
+  if (antes?.nichoId && antes.nichoId !== cliente.nichoId) await desligarSetorSeSemMarca(antes.nichoId).catch(() => undefined);
 
   /**
    * E38 PR 2 (gatilho que o PR 1 deixou sem): o Começar é onde o site e os perfis são informados pela
@@ -888,6 +903,24 @@ export async function salvarOndeConta(clienteId: number, dadosBrutos: unknown): 
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar onde esta o publico; cliente nao encontrado.");
   return cliente;
+}
+
+/**
+ * E45, PR 1: trocar o ramo pela Conta (antes só o Começar tinha o campo, e depois do briefing completo a pessoa ficava sem tela para
+ * mudá-lo). Só o ramo: briefing, roteiros e temas já escritos continuam; a base de vídeos e os temas passam a ser os do ramo novo a
+ * partir da próxima madrugada. O setor do ramo nasce, se for o primeiro a escolhê-lo (`garantirNichoDoRamo`). Fatia própria, como
+ * `salvarOndeConta`: não exige persona, onde nem nome, que o Começar pede.
+ */
+export async function salvarRamoConta(clienteId: number, ramoSlug: string): Promise<{ cliente: Cliente; mudou: boolean }> {
+  const [antes] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId));
+  if (!antes) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
+
+  const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
+  const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
+  if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
+  // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado (nunca derruba a troca).
+  if (antes.nichoId && antes.nichoId !== nichoId) await desligarSetorSeSemMarca(antes.nichoId).catch(() => undefined);
+  return { cliente, mudou: antes.nichoId !== nichoId };
 }
 
 const REDES_VALIDAS: Plataforma[] = ["instagram", "tiktok", "youtube"];
