@@ -102,8 +102,6 @@ async function main(): Promise<void> {
   const gravados: string[] = [];
   const browser = await chromium.launch();
   try {
-    await garantirSetor("nutricao", "Nutrição", true);
-    await garantirSetor("advocacia", "Advocacia", false);
     for (const modo of MODOS) {
       for (const tamanho of TAMANHOS) {
         const nomeDe = (tela: string, estado: string) => path.join(pastaDestino, `${tela}.${estado}.${tamanho.rotulo}.${modo.rotulo}.png`);
@@ -112,6 +110,9 @@ async function main(): Promise<void> {
         // ---------------------------------------------------------------- Admin, o bloco na página da marca
         {
           await desfazer();
+          // A cada combinação os dois setores voltam ao ponto de partida (ligar Advocacia a reativa).
+          await garantirSetor("nutricao", "Nutrição", true);
+          await garantirSetor("advocacia", "Advocacia", false);
           const contexto = await novoContexto();
           const page = await contexto.newPage();
           await entrar(page, baseUrl, EMAIL_ADMIN);
