@@ -21,11 +21,14 @@ type Props = {
    * "Não achei o meu". Continua lá até a pessoa escolher outro ramo.
    */
   nomeForaDoCatalogo?: string | null;
-  /** "Não achei o meu": o rótulo da última linha da lista (o mesmo que o campo mostra depois de escolhida). */
-  textoNaoAchei: string;
+  /**
+   * "Não achei o meu": o rótulo da última linha da lista (o mesmo que o campo mostra depois de escolhida). Sem ele (e sem `onNaoAchei`),
+   * a lista não oferece a saída: é o caso da Conta, onde o pedido de um ramo que não existe chega com o PR 2 da E45.
+   */
+  textoNaoAchei?: string;
   onEscolher: (slug: string) => void;
   /** "Não achei o meu": recebe o que a pessoa tinha digitado. */
-  onNaoAchei: (texto: string) => void;
+  onNaoAchei?: (texto: string) => void;
   /** Para levar o foco ao campo quando ele está errado. */
   ref?: Ref<HTMLInputElement>;
 };
@@ -65,7 +68,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
   const consulta = digitou ? texto : "";
   const grupos = useMemo(() => buscarRamos(consulta), [consulta]);
   const ramos = ramosEmOrdemDeTela(grupos);
-  const mostrarNaoAchei = digitou && texto.trim().length > 0;
+  const mostrarNaoAchei = digitou && texto.trim().length > 0 && Boolean(textoNaoAchei && onNaoAchei);
   const total = ramos.length + (mostrarNaoAchei ? 1 : 0);
   const indiceAtivo = total === 0 ? -1 : Math.min(ativo, total - 1);
   const indiceDe = new Map(ramos.map((ramo, indice) => [ramo.slug, indice]));
@@ -98,6 +101,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
   }
 
   function naoAchei() {
+    if (!textoNaoAchei || !onNaoAchei) return;
     const digitado = texto.trim();
     setTexto(textoNaoAchei);
     setDigitou(false);
@@ -230,7 +234,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
                 })}
               </div>
             ))}
-            {ramos.length === 0 && mostrarNaoAchei ? (
+            {ramos.length === 0 && digitou && texto.trim().length > 0 ? (
               <p className={styles.semResultado}>{textosRamo.semResultado(texto.trim())}</p>
             ) : null}
             {mostrarNaoAchei ? (

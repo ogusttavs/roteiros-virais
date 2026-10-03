@@ -12,6 +12,12 @@ export const textosConta = {
   nome: "nome",
   email: "e-mail",
   soLeitura: "(só leitura)",
+  /** E45, PR 1: o ramo editável na Conta (antes só o Começar tinha o campo, e depois do briefing a pessoa ficava sem como mudá-lo). */
+  ramo: {
+    rotulo: "ramo",
+    ajuda: "Escreva uma palavra ou uma letra do que você faz e escolha na lista.",
+    aviso: "Ao trocar, a base de vídeos e os temas passam a ser os do ramo novo, a partir da próxima madrugada. O briefing e os roteiros continuam.",
+  },
   redes: "perfis nas redes",
   /** V3, item 4: o grupo ganha o nome da marca ativa no subtítulo (dúvida 5 do BRIEF.md). */
   redesSub: (nomeMarca: string) => `É por eles que a gente compara os vídeos de ${nomeMarca} com o normal da conta.`,

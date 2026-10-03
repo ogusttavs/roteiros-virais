@@ -10,6 +10,7 @@ import { normalizarSite, siteValido } from "@/lib/site-valido";
 import { textosBriefing } from "@/textos/briefing";
 import { textosConta } from "@/textos/conta";
 import { Botao } from "@/ui/componentes/Botao";
+import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
 import { CampoPerfilRede } from "@/ui/componentes/CampoPerfilRede";
 import { Chips } from "@/ui/componentes/Chips";
@@ -33,6 +34,8 @@ type Props = {
   nomeMarca: string;
   /** E42a, item 1: "Onde está o seu público?" editável aqui, com as opções do tipo da marca. */
   tipo: TipoMarca;
+  /** E45, PR 1: o ramo da marca: do catálogo (com `slug`) ou um setor que o admin criou à mão (`slug` nulo, só o nome). */
+  ramoInicial: { slug: string | null; nome: string } | null;
   ondeInicial: OndeValor | null;
   regiaoInicial: string | null;
   paisInicial: string | null;
@@ -91,6 +94,7 @@ export function FormularioConta({
   horaLembreteInicial,
   nomeMarca,
   tipo,
+  ramoInicial,
   ondeInicial,
   regiaoInicial,
   paisInicial,
@@ -102,6 +106,9 @@ export function FormularioConta({
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
   const [site, setSite] = useState(siteInicial);
+  /** O ramo do catálogo escolhido agora. Nulo: nada escolhido, ou o ramo de hoje não é do catálogo e a pessoa não escolheu outro. */
+  const [ramo, setRamo] = useState<string | null>(ramoInicial?.slug ?? null);
+  const ramoMudou = ramo !== null && ramo !== (ramoInicial?.slug ?? null);
   const [onde, setOnde] = useState<OndeValor | "">(ondeInicial ?? "");
   const [regiao, setRegiao] = useState(regiaoInicial ?? "");
   const [pais, setPais] = useState(paisInicial ?? "");
@@ -157,6 +164,7 @@ export function FormularioConta({
         nome,
         perfis: { instagram, tiktok, youtube },
         ...(siteMudou ? { site: siteNormalizado } : {}),
+        ...(ramoMudou ? { ramo } : {}),
         tema,
         horaLembrete: horaArredondada,
         // `onde` sempre preenchido: o cliente já passou pelo Começar antes de chegar na Conta.
@@ -185,6 +193,17 @@ export function FormularioConta({
           readOnly
           disabled
         />
+
+        <div className={styles.grupo}>
+          <BuscaDeRamo
+            rotulo={textosConta.ramo.rotulo}
+            ajuda={textosConta.ramo.ajuda}
+            valor={ramo}
+            nomeForaDoCatalogo={ramoInicial && !ramoInicial.slug ? ramoInicial.nome : null}
+            onEscolher={setRamo}
+          />
+          {ramoMudou ? <p className={styles.subGrupo}>{textosConta.ramo.aviso}</p> : null}
+        </div>
 
         <div className={styles.grupo}>
           <span className={styles.rotuloGrupo}>{textosConta.redes}</span>

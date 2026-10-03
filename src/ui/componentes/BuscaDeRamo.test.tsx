@@ -19,6 +19,7 @@ function Exemplo(props: {
   onEscolher?: (slug: string) => void;
   onNaoAchei?: (texto: string) => void;
   erro?: string;
+  semNaoAchei?: boolean;
 }) {
   const [valor, setValor] = useState<string | null>(props.valorInicial ?? null);
   return (
@@ -28,15 +29,19 @@ function Exemplo(props: {
       erro={props.erro}
       valor={valor}
       nomeForaDoCatalogo={props.nomeForaDoCatalogo}
-      textoNaoAchei={NAO_ACHEI}
+      textoNaoAchei={props.semNaoAchei ? undefined : NAO_ACHEI}
       onEscolher={(slug) => {
         setValor(slug);
         props.onEscolher?.(slug);
       }}
-      onNaoAchei={(texto) => {
-        setValor(null);
-        props.onNaoAchei?.(texto);
-      }}
+      onNaoAchei={
+        props.semNaoAchei
+          ? undefined
+          : (texto) => {
+              setValor(null);
+              props.onNaoAchei?.(texto);
+            }
+      }
     />
   );
 }
@@ -177,6 +182,20 @@ describe("BuscaDeRamo", () => {
     expect(aoNaoAchar).toHaveBeenCalledWith("xyzw");
     expect(campoDeBusca().value).toBe(NAO_ACHEI);
     expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("sem a saída do 'Não achei o meu' (a Conta, no PR 1): sem resultado só diz o que não casou, e o Enter não escolhe nada", () => {
+    const aoNaoAchar = vi.fn();
+    render(<Exemplo semNaoAchei onNaoAchei={aoNaoAchar} />);
+    digitar("xyzw");
+
+    expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
+    expect(screen.queryAllByRole("option")).toHaveLength(0);
+    expect(screen.queryByText(NAO_ACHEI)).toBeNull();
+
+    fireEvent.keyDown(campoDeBusca(), { key: "Enter" });
+    expect(aoNaoAchar).not.toHaveBeenCalled();
+    expect(campoDeBusca().value).toBe("xyzw");
   });
 
   it("com resultados e texto, o 'Não achei o meu' também está na lista, por último", () => {
