@@ -180,7 +180,7 @@ test.describe("briefing, a seção de o que a IA tirou das redes e do site", () 
     const secao = page.getByRole("region", { name: SECAO });
     await expect(secao.getByText("Ainda não conseguimos ler.")).toBeVisible();
     await expect(secao.getByText("Site: não deixou a gente ler.")).toBeVisible();
-    await expect(secao.getByText("Instagram: o Instagram só deixa a gente ler conta profissional e sem restrição de idade.")).toBeVisible();
+    await expect(secao.getByText("Instagram: só dá para ler conta profissional e sem restrição de idade.")).toBeVisible();
   });
 
   test("os itens aparecem com a origem, a pílula de novidade e a data da leitura; só as fontes lidas entram na frase", async ({ page }) => {

@@ -323,7 +323,7 @@ export const textosBriefing = {
       rede: {
         nao_encontrado: "{rede}: não achamos este perfil. Confira o @ em Conta.",
         sem_videos: "{rede}: ainda não tem vídeo publicado para a gente ler.",
-        conta_restrita: "{rede}: o Instagram só deixa a gente ler conta profissional e sem restrição de idade.",
+        conta_restrita: "{rede}: só dá para ler conta profissional e sem restrição de idade.",
         desligada: "{rede}: a leitura está desligada por aqui por enquanto.",
         indisponivel: "{rede}: não deu para ler agora. A gente tenta de novo em alguns dias.",
       } as Record<string, string>,
