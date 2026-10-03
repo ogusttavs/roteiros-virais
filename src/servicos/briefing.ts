@@ -27,6 +27,8 @@ import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
 import { calcularNotaGeral, perguntaQueMaisAjuda, blocoInicial } from "./briefing-regras";
 import { clientePorId } from "./clientes";
+import { contextoConfirmadoDoCliente } from "./contexto-marca";
+import { ROTULO_CATEGORIA } from "./contexto-marca-regras";
 import { formatarPerfilComArroba, perfisCitadosDoCliente } from "./perfis-citados";
 import { referenciasParaPerfil } from "./referencias";
 
@@ -63,7 +65,13 @@ async function buscarBriefing(clienteId: number): Promise<Briefing | null> {
  */
 export async function perfilDoCliente(clienteId: number): Promise<PerfilCompilado | null> {
   const briefing = await buscarBriefing(clienteId);
-  return briefing?.perfil ?? null;
+  if (!briefing?.perfil) return null;
+  // E38 PR 2: o que a pessoa confirmou em "o que entendemos da sua marca" entra aqui, na hora de ler,
+  // e nunca dentro do JSON gravado: `compilarEGravarPerfil` reescreve `briefings.perfil` inteiro a
+  // cada edição de resposta e apagaria o campo. Todo consumidor (roteiro, tema, plano) passa por esta
+  // função, então a versão em vigor vale na hora, sem recompilar nada.
+  const contextoConfirmado = await contextoConfirmadoDoCliente(clienteId);
+  return contextoConfirmado.length > 0 ? { ...briefing.perfil, contextoConfirmado } : briefing.perfil;
 }
 
 /**
@@ -328,7 +336,10 @@ async function compilarEGravarPerfil(
  * de tema, roteiro): os dois usam o mesmo perfil, então o formato vive aqui
  * em vez de duplicado em cada um.
  */
-export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
+export function formatarPerfilCompilado(
+  perfil: PerfilCompilado,
+  opcoes: { semContextoConfirmado?: boolean } = {},
+): string {
   const linhas = [
     perfil.resumo,
     `O que vende: ${perfil.fatos.oQueVende}`,
@@ -351,6 +362,19 @@ export function formatarPerfilCompilado(perfil: PerfilCompilado): string {
   /** `?? []`: perfil compilado antes da etapa 12 não tem este campo. */
   if ((perfil.referencias ?? []).length > 0) {
     linhas.push(`Vídeos que ele guardou como referência: ${perfil.referencias.join("; ")}`);
+  }
+  /**
+   * E38 PR 2: só o que a pessoa confirmou ou corrigiu (proposta pendente nunca chega aqui), com a
+   * precedência dita no próprio texto: o briefing vale quando divergir. Os prompts de roteiro, tema e
+   * plano recebem este texto sem hierarquia entre as linhas; sem a frase, uma leitura do site podia
+   * passar por cima do que a pessoa respondeu. `?? []`: perfil sem o campo (quase todos).
+   */
+  const contextoConfirmado = opcoes.semContextoConfirmado ? [] : (perfil.contextoConfirmado ?? []);
+  if (contextoConfirmado.length > 0) {
+    linhas.push(
+      "O que ele confirmou sobre a própria marca, lido do site e das redes dele (se divergir das respostas do briefing acima, valem as respostas):",
+    );
+    for (const item of contextoConfirmado) linhas.push(`- ${ROTULO_CATEGORIA[item.categoria]}: ${item.texto}`);
   }
   return linhas.join("\n");
 }

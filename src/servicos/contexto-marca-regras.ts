@@ -83,16 +83,16 @@ export type Reconciliacao = {
 };
 
 /** Uma linha só, sem marcação, sem espaço sobrando, no tamanho que cabe na tela e no prompt. */
-export function limparTextoDoItem(bruto: string): string {
+export function limparTextoDoItem(bruto: string, maximo: number = TAMANHO_MAXIMO_ITEM): string {
   const limpo = bruto
     .replace(/<[^>]*>/g, " ")
     .replace(/[<>]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (limpo.length <= TAMANHO_MAXIMO_ITEM) return limpo;
-  const corte = limpo.slice(0, TAMANHO_MAXIMO_ITEM);
+  if (limpo.length <= maximo) return limpo;
+  const corte = limpo.slice(0, maximo);
   const ultimoEspaco = corte.lastIndexOf(" ");
-  return (ultimoEspaco > TAMANHO_MAXIMO_ITEM / 2 ? corte.slice(0, ultimoEspaco) : corte).trimEnd();
+  return (ultimoEspaco > maximo / 2 ? corte.slice(0, ultimoEspaco) : corte).trimEnd();
 }
 
 const PALAVRAS_SEM_PESO = new Set([
@@ -160,6 +160,33 @@ export function tentativaRecenteDemais(ultimaTentativaEm: Date | null, agora: Da
 export function proximaLeituraEm(ultimaLeituraOkEm: Date | null, dias: number): Date | null {
   if (!ultimaLeituraOkEm) return null;
   return new Date(ultimaLeituraOkEm.getTime() + dias * 86_400_000);
+}
+
+/** Uma leitura que passa disto sem terminar foi interrompida: a trava solta e outra pode começar. */
+export const MINUTOS_TRAVA_LEITURA = 30;
+/** O texto que a própria pessoa escreve ao corrigir um item: mais folgado que o da IA, nunca cortado em silêncio. */
+export const TAMANHO_MAXIMO_TEXTO_DA_PESSOA = 500;
+
+/**
+ * O que a seção do briefing mostra, em quatro estados (os quatro estados de toda tela, brief-frontend
+ * 8): sem nenhuma fonte informada; lendo pela primeira vez; a leitura foi tentada e não rendeu; ou
+ * lida (com itens, ou sem nada de claro).
+ */
+export type EstadoDaSecao = "sem_fonte" | "lendo" | "nao_leu" | "ok";
+
+export function estadoDaSecao(dados: {
+  temFonte: boolean;
+  ultimaLeituraOkEm: Date | null;
+  ultimaTentativaEm: Date | null;
+  lendoDesde: Date | null;
+  agora: Date;
+}): EstadoDaSecao {
+  if (!dados.temFonte) return "sem_fonte";
+  if (dados.ultimaLeituraOkEm) return "ok";
+  const lendoAgora =
+    dados.lendoDesde !== null && dados.agora.getTime() - dados.lendoDesde.getTime() < MINUTOS_TRAVA_LEITURA * 60_000;
+  if (lendoAgora || dados.ultimaTentativaEm === null) return "lendo";
+  return "nao_leu";
 }
 
 /** Quantos vídeos com visualização são precisos para a mediana do perfil dizer alguma coisa. */

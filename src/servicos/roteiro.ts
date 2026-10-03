@@ -870,7 +870,14 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       );
   const evidencias = ehMomento
     ? []
-    : await filtrarEvidenciaPelaMarca(evidenciasCombinadas, perfilCompilado, dados.clienteId);
+    : await filtrarEvidenciaPelaMarca(
+        evidenciasCombinadas,
+        // E38 PR 2: o filtro continua julgando pelo perfil de sempre, sem o bloco do que a pessoa
+        // confirmou sobre o site e as redes (mais texto no "na dúvida, reprove" mudaria o que ele
+        // reprova, e não há conjunto de referência dele para medir).
+        formatarPerfilCompilado(perfil, { semContextoConfirmado: true }),
+        dados.clienteId,
+      );
   const semEvidencia = ehMomento ? true : evidencias.length === 0;
   const evidenciasFornecidas = evidencias.map((v) => v.id);
 

@@ -189,6 +189,23 @@ export const config = {
      * transcrição (baixa o vídeo e chama o modelo forte com imagem), por isso um teto conservador.
      */
     analiseSemFalaPorDia: envNumero("ANALISE_SEM_FALA_POR_DIA", 15),
+    /**
+     * E38 PR 2, "o que entendemos da sua marca": a leitura do site e das redes da própria marca
+     * se refaz com esta idade (dias desde a última leitura boa; o despachante diário
+     * `entender-marca` só enfileira quem passou disto, o que também pega marca nova e tick
+     * perdido do cron). `DIAS_ENTRE_LEITURAS_MARCA` ajusta.
+     */
+    diasEntreLeituraMarca: envNumero("DIAS_ENTRE_LEITURAS_MARCA", 30),
+    /** Quantas marcas o despachante enfileira por rodada; o resto rola para o dia seguinte. */
+    leiturasDeMarcaPorRodada: envNumero("LEITURAS_MARCA_POR_RODADA", 25),
+    /**
+     * Teto de custo de IA da tarefa `entenderMarca` por mês, somado de `geracoes_ia` (nunca em
+     * memória, o job pode repetir): passou disto, o despachante e as leituras novas param com
+     * aviso até o mês virar. Uma leitura custa centavos; o teto só protege de erro de laço.
+     */
+    tetoCustoLeituraMarcaMesUsd: envNumero("TETO_CUSTO_LEITURA_MARCA_MES_USD", 5),
+    /** Leitura disparada por evento (a pessoa salvou o site ou um perfil) não repete o site em menos de N minutos. */
+    minutosEntreLeiturasMarcaPorEvento: envNumero("MINUTOS_ENTRE_LEITURAS_MARCA_EVENTO", 10),
   },
 };
 
