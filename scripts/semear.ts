@@ -32,12 +32,15 @@ type NichoSeed = {
   slug: string;
   nome: string;
   termos: string[];
+  /** E45, PR 1: o ramo do catálogo (`src/config/ramos.ts`) a que o setor semeado corresponde. */
+  ramoCatalogo: string;
 };
 
 const NICHOS_SEED: NichoSeed[] = [
   {
     slug: "dentistas",
     nome: "Dentistas",
+    ramoCatalogo: "odontologia",
     termos: [
       "dentista",
       "clareamento",
@@ -52,6 +55,7 @@ const NICHOS_SEED: NichoSeed[] = [
   {
     slug: "limpeza-e-organizacao-da-casa",
     nome: "Limpeza e organização da casa",
+    ramoCatalogo: "limpeza-e-organizacao-da-casa",
     termos: [
       "produtos de limpeza",
       "limpeza pesada",
