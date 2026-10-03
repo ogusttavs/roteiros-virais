@@ -76,16 +76,6 @@ async function criarRoteiro(clienteId: number, data: string, opcoes: OpcoesRotei
     });
 }
 
-/** Segunda a domingo da semana que contém `dataISO`, sem depender do fuso do servidor (mesma conta de `semanaDaAgenda`). */
-function segundaDaSemana(dataISO: string): string {
-  const [ano, mes, dia] = dataISO.split("-").map(Number);
-  const data = new Date(Date.UTC(ano, mes - 1, dia, 12));
-  const diaDaSemana = data.getUTCDay();
-  const voltarAteSegunda = diaDaSemana === 0 ? 6 : diaDaSemana - 1;
-  data.setUTCDate(data.getUTCDate() - voltarAteSegunda);
-  return data.toISOString().slice(0, 10);
-}
-
 function somarDias(dataISO: string, dias: number): string {
   const [ano, mes, dia] = dataISO.split("-").map(Number);
   return new Date(Date.UTC(ano, mes - 1, dia + dias, 12)).toISOString().slice(0, 10);
@@ -178,17 +168,10 @@ test.describe("/hoje, a Agenda", () => {
     const { marcaId, email } = await criarMarca();
     const hoje = hojeISO();
     const amanha = somarDias(hoje, 1);
-    const semana = segundaDaSemana(hoje);
-    // `/criar` recusa data passada (decisão 5: `data >= hoje`); precisa ser um dia futuro dentro
-    // da semana visível em /hoje (fora da semana atual cai em hoje, calendário é a E39b, fora do
-    // escopo). Sábado ou domingo podem não sobrar dia válido; se não sobrar, o teste falha claro.
-    const outroDia = Array.from({ length: 7 }, (_, indice) => somarDias(semana, indice)).find(
-      (data) => data !== hoje && data !== amanha && data > hoje,
-    );
-    // Sábado e domingo não deixam dia válido na semana visível (achado da revisão do PR #108, rodada num
-    // sábado): o teste pula com motivo em vez de falhar por causa do calendário.
-    test.skip(!outroDia, "sem dia futuro na semana visível (sábado ou domingo); o cenário vale de segunda a sexta");
-    const dia = outroDia as string;
+    // `/criar` recusa data passada (decisão 5: `data >= hoje`); precisa ser um dia futuro dentro da faixa visível em /hoje. Desde o A3 a faixa é hoje e os seis dias
+    // seguintes, então hoje + 2 sempre existe (antes, num sábado ou domingo a semana de segunda a domingo não deixava dia válido e o teste pulava).
+    const dia = somarDias(hoje, 2);
+    expect(dia).not.toBe(amanha);
     const temas: TemaDoDia[] = [
       { titulo: "tema do dia marcado", descricao: "descricao", porQue: "esta subindo", evidencias: [], puxaPara: "alcance" },
     ];
@@ -250,8 +233,7 @@ test.describe("/hoje, a Agenda", () => {
   test("um dia que não é hoje: 'Marcado para', 'Voltar para hoje', e o item diz 'marcado'", async ({ page }) => {
     const { marcaId, email } = await criarMarca();
     const hoje = hojeISO();
-    const semana = segundaDaSemana(hoje);
-    const outroDia = Array.from({ length: 7 }, (_, indice) => somarDias(semana, indice)).find((data) => data !== hoje)!;
+    const outroDia = somarDias(hoje, 3); // dentro da faixa de sete dias a partir de hoje (A3)
     await criarRoteiro(marcaId, outroDia, { formato: "reels", titulo: "o roteiro do outro dia" });
 
     await entrar(page, email);
@@ -264,6 +246,45 @@ test.describe("/hoje, a Agenda", () => {
     await page.getByRole("button", { name: "Voltar para hoje" }).click();
     await expect(page).toHaveURL(/\/hoje$/);
     await expect(page.getByText("Marcado para", { exact: true })).toHaveCount(0);
+  });
+
+  // A3, itens 1, 2 e 4: a faixa e a visão Semana começam em hoje (em qualquer dia da semana em que a suíte rode), as setas andam de sete em sete e ficam no lugar.
+  test("a faixa do Hoje e a Semana do Planejar começam em hoje; as setas de sete em sete ficam fixas", async ({ page }) => {
+    const { email } = await criarMarca();
+    const hoje = hojeISO();
+
+    await entrar(page, email);
+    await page.waitForLoadState("networkidle");
+
+    // Hoje: a primeira da faixa é hoje, e o rótulo diz "Próximos 7 dias".
+    await expect(page.getByText("Próximos 7 dias", { exact: true })).toBeVisible();
+    const faixa = page.getByRole("group", { name: "Os dias da semana" }).getByRole("button");
+    await expect(faixa).toHaveCount(7);
+    const nomesCurtos = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+    const [ano, mes, dia] = hoje.split("-").map(Number);
+    const dowHoje = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay();
+    await expect(faixa.first()).toContainText(nomesCurtos[dowHoje]);
+    await expect(faixa.first()).toContainText(String(dia));
+
+    // Planejar, Semana: hoje na primeira região, e as setas não saem do lugar entre uma semana e outra.
+    await page.goto("/planejamento?visao=semana");
+    await page.waitForLoadState("networkidle");
+    await expect(page.getByText("Próximos 7 dias", { exact: true })).toBeVisible();
+    const regioes = page.locator('section[aria-label]').filter({ has: page.locator("h3") });
+    await expect(regioes.first()).toHaveAttribute("aria-label", /, hoje$/);
+
+    const seta = page.getByRole("button", { name: "Próxima semana" });
+    const antes = await seta.boundingBox();
+    await seta.click();
+    await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7)}`));
+    await expect(page.getByText("Dias à frente", { exact: true })).toBeVisible();
+    const depois = await page.getByRole("button", { name: "Próxima semana" }).boundingBox();
+    expect(Math.abs(depois!.x - antes!.x)).toBeLessThan(1);
+
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, -7)}`));
+    await expect(page.getByText("Dias anteriores", { exact: true })).toBeVisible();
   });
 
   // E39c, parte 1, item 2: as setas da semana, sem limite, e "Ver o mês" carregando o dia visualizado

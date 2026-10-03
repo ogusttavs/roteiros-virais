@@ -149,10 +149,11 @@ export const textosHoje = {
    * ficam fora de propósito.
    */
   agenda: {
-    estaSemana: "Esta semana",
+    /** A3: a faixa e a visão Semana são os sete dias a partir de hoje. */
+    proximosDias: "Próximos 7 dias",
     marcadoPara: "Marcado para",
     voltarParaHoje: "Voltar para hoje",
-    /** E39c, parte 1: as duas setas ao lado de "Esta semana", sem limite de quanto se pode ir. */
+    /** E39c, parte 1: as duas setas ao lado de "Próximos 7 dias", sem limite de quanto se pode ir. */
     semanaAnterior: "Semana anterior",
     proximaSemana: "Próxima semana",
     /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
@@ -175,8 +176,8 @@ export const textosHoje = {
         mes: { anterior: "Mês anterior", seguinte: "Próximo mês" },
       },
       hoje: "Hoje",
-      semanaPassada: "Semana passada",
-      semanaQueVem: "Semana que vem",
+      dias7Anteriores: "Dias anteriores",
+      dias7Seguintes: "Dias à frente",
       mesPassado: "Mês passado",
       esteMes: "Este mês",
       mesQueVem: "Mês que vem",

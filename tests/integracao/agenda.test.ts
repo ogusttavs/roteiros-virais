@@ -1,5 +1,5 @@
 /**
- * `semanaDaAgenda` e `agendaDoDia` (`servicos/roteiro.ts`, E39a): a tira da semana e o conteúdo
+ * `semanaDaAgenda` (A3: a janela de sete dias a partir de hoje), `inicioDaJanelaISO` e `agendaDoDia` (`servicos/roteiro.ts`, E39a): a tira da semana e o conteúdo
  * de um dia da nova Agenda, contra o Postgres real. E39b: `atrasados`, `arquivarRoteiro`,
  * `mudarDataRoteiro`, `conferirAindaVale` e `mesDaAgenda`, mesma suíte.
  */
@@ -15,6 +15,7 @@ import {
   atrasados,
   conferirAindaVale,
   ErroRoteiro,
+  inicioDaJanelaISO,
   mesDaAgenda,
   mudarDataRoteiro,
   roteiroPorId,
@@ -120,62 +121,84 @@ afterAll(async () => {
   await getPool().end();
 });
 
-describe("semanaDaAgenda", () => {
-  it("a semana e sempre segunda a domingo, mesmo com a data de referencia no meio dela", async () => {
-    // 2026-09-16 e uma quarta-feira; a semana que a contem vai de 2026-09-14 (segunda) a 2026-09-20 (domingo).
-    const semana = await semanaDaAgenda(marcaA.id, "2026-09-16");
-    expect(semana.map((d) => d.data)).toEqual([
-      "2026-09-14",
-      "2026-09-15",
-      "2026-09-16",
-      "2026-09-17",
-      "2026-09-18",
-      "2026-09-19",
-      "2026-09-20",
-    ]);
-    expect(semana.map((d) => d.diaDaSemanaCurto)).toEqual(["seg", "ter", "qua", "qui", "sex", "sáb", "dom"]);
-    expect(semana.map((d) => d.diaDoMes)).toEqual([14, 15, 16, 17, 18, 19, 20]);
+describe("semanaDaAgenda (A3: os sete dias a partir de hoje)", () => {
+  const hoje = hojeISO();
+
+  it("a janela comeca em hoje e tem sete dias, com o nome curto do dia da semana de cada um", async () => {
+    const semana = await semanaDaAgenda(marcaA.id, hoje);
+    expect(semana.map((d) => d.data)).toEqual(Array.from({ length: 7 }, (_, i) => somarDiasISO(hoje, i)));
+    expect(semana[0]!.hoje).toBe(true);
+    expect(semana.slice(1).some((d) => d.hoje)).toBe(false);
+    expect(semana.some((d) => d.passado)).toBe(false);
+    const nomes = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+    const [ano, mes, dia] = hoje.split("-").map(Number);
+    const hojeDow = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay();
+    expect(semana.map((d) => d.diaDaSemanaCurto)).toEqual(Array.from({ length: 7 }, (_, i) => nomes[(hojeDow + i) % 7]));
   });
 
-  it("uma data de referencia num domingo ainda devolve a semana que comecou na segunda anterior", async () => {
-    // 2026-09-20 e um domingo; a semana e a mesma do teste acima.
-    const semana = await semanaDaAgenda(marcaA.id, "2026-09-20");
-    expect(semana[0].data).toBe("2026-09-14");
-    expect(semana[6].data).toBe("2026-09-20");
+  it("uma data no meio da janela devolve a mesma janela (tocar num dia nao desloca a faixa)", async () => {
+    const daqui3 = await semanaDaAgenda(marcaA.id, somarDiasISO(hoje, 3));
+    expect(daqui3[0]!.data).toBe(hoje);
+    const daqui6 = await semanaDaAgenda(marcaA.id, somarDiasISO(hoje, 6));
+    expect(daqui6[0]!.data).toBe(hoje);
+  });
+
+  it("a janela anterior e a seguinte sao os blocos de sete dias vizinhos, e a anterior vem toda como passado", async () => {
+    const anterior = await semanaDaAgenda(marcaA.id, somarDiasISO(hoje, -7));
+    expect(anterior[0]!.data).toBe(somarDiasISO(hoje, -7));
+    expect(anterior[6]!.data).toBe(somarDiasISO(hoje, -1));
+    expect(anterior.every((d) => d.passado && !d.hoje)).toBe(true);
+    const seguinte = await semanaDaAgenda(marcaA.id, somarDiasISO(hoje, 7));
+    expect(seguinte[0]!.data).toBe(somarDiasISO(hoje, 7));
+    const diaMeio = await semanaDaAgenda(marcaA.id, somarDiasISO(hoje, -1));
+    expect(diaMeio[0]!.data).toBe(somarDiasISO(hoje, -7));
   });
 
   it("conta reels e stories por dia, isolado por marca, so a ponta de cada serie", async () => {
-    await criarRoteiro(marcaA.id, "2026-09-15", { formato: "reels" });
-    await criarRoteiro(marcaA.id, "2026-09-17", { formato: "story", momentoDoDia: "manha" });
-    await criarRoteiro(marcaA.id, "2026-09-17", { formato: "story", momentoDoDia: "noite" });
+    const d1 = somarDiasISO(hoje, 1);
+    const d3 = somarDiasISO(hoje, 3);
+    await criarRoteiro(marcaA.id, d1, { formato: "reels" });
+    await criarRoteiro(marcaA.id, d3, { formato: "story", momentoDoDia: "manha" });
+    await criarRoteiro(marcaA.id, d3, { formato: "story", momentoDoDia: "noite" });
     // Marca B nao pode aparecer na semana de A.
-    await criarRoteiro(marcaB.id, "2026-09-15", { formato: "reels" });
+    await criarRoteiro(marcaB.id, d1, { formato: "reels" });
 
-    const semana = await semanaDaAgenda(marcaA.id, "2026-09-16");
-    const segunda = semana.find((d) => d.data === "2026-09-14")!;
-    const terca = semana.find((d) => d.data === "2026-09-15")!;
-    const quinta = semana.find((d) => d.data === "2026-09-17")!;
-
-    expect(segunda.marca).toEqual({ qtdReels: 0, qtdStories: 0 });
-    expect(terca.marca).toEqual({ qtdReels: 1, qtdStories: 0 });
-    expect(quinta.marca).toEqual({ qtdReels: 0, qtdStories: 2 });
+    const semana = await semanaDaAgenda(marcaA.id, hoje);
+    expect(semana[0]!.marca).toEqual({ qtdReels: 0, qtdStories: 0 });
+    expect(semana.find((d) => d.data === d1)!.marca).toEqual({ qtdReels: 1, qtdStories: 0 });
+    expect(semana.find((d) => d.data === d3)!.marca).toEqual({ qtdReels: 0, qtdStories: 2 });
   });
 
   it("o plano e quantos roteiros quiser por dia: dois Reels no mesmo dia contam os dois (revisao do Fable no PR #90)", async () => {
-    await criarRoteiro(marcaA.id, "2026-09-18", { formato: "reels", titulo: "primeiro reels do dia" });
-    await criarRoteiro(marcaA.id, "2026-09-18", { formato: "reels", titulo: "segundo reels do dia" });
+    const d5 = somarDiasISO(hoje, 5);
+    await criarRoteiro(marcaA.id, d5, { formato: "reels", titulo: "primeiro reels do dia" });
+    await criarRoteiro(marcaA.id, d5, { formato: "reels", titulo: "segundo reels do dia" });
 
-    const semana = await semanaDaAgenda(marcaA.id, "2026-09-16");
-    const sexta = semana.find((d) => d.data === "2026-09-18")!;
-    expect(sexta.marca).toEqual({ qtdReels: 2, qtdStories: 0 });
+    const semana = await semanaDaAgenda(marcaA.id, hoje);
+    expect(semana.find((d) => d.data === d5)!.marca).toEqual({ qtdReels: 2, qtdStories: 0 });
   });
 
   it("o campo hoje e true so no dia de hoje de verdade", async () => {
-    const hoje = hojeISO();
     const semana = await semanaDaAgenda(marcaA.id, hoje);
     const diasDeHoje = semana.filter((d) => d.hoje);
     expect(diasDeHoje).toHaveLength(1);
     expect(diasDeHoje[0]!.data).toBe(hoje);
+  });
+});
+
+describe("inicioDaJanelaISO (A3)", () => {
+  // 2026-10-03 e um sabado; 2026-10-07 e uma quarta-feira. A janela nunca depende do dia da semana, so de hoje.
+  it.each(["2026-10-03", "2026-10-07", "2026-10-04", "2026-10-05"])("hoje %s: a janela de hoje comeca em hoje e vai 6 dias a frente", (hoje) => {
+    for (let i = 0; i < 7; i++) expect(inicioDaJanelaISO(somarDiasISO(hoje, i), hoje)).toBe(hoje);
+    expect(inicioDaJanelaISO(somarDiasISO(hoje, 7), hoje)).toBe(somarDiasISO(hoje, 7));
+    expect(inicioDaJanelaISO(somarDiasISO(hoje, -1), hoje)).toBe(somarDiasISO(hoje, -7));
+    expect(inicioDaJanelaISO(somarDiasISO(hoje, -7), hoje)).toBe(somarDiasISO(hoje, -7));
+    expect(inicioDaJanelaISO(somarDiasISO(hoje, -8), hoje)).toBe(somarDiasISO(hoje, -14));
+  });
+
+  it("no sabado a janela mostra a segunda e a terca que vem; a anterior e '26 de set a 2 de out' para hoje 3 de out", () => {
+    expect(inicioDaJanelaISO("2026-10-05", "2026-10-03")).toBe("2026-10-03");
+    expect(inicioDaJanelaISO("2026-10-02", "2026-10-03")).toBe("2026-09-26");
   });
 });
 

@@ -11,15 +11,6 @@ import { CabecaPlanoEstatica } from "./CabecaPlanoEstatica";
 import semanaStyles from "./SemanaTela.module.css";
 
 /** Igual a `page.tsx` (Server Component, não dá para puxar de `SemanaTela.tsx`, que é cliente). */
-function segundaDaSemanaISO(dataISO: string): string {
-  const [ano, mes, dia] = dataISO.split("-").map(Number);
-  const data = new Date(Date.UTC(ano, mes - 1, dia, 12));
-  const diaDaSemanaNum = data.getUTCDay();
-  const voltarAteSegunda = diaDaSemanaNum === 0 ? 6 : diaDaSemanaNum - 1;
-  data.setUTCDate(data.getUTCDate() - voltarAteSegunda);
-  return data.toISOString().slice(0, 10);
-}
-
 const FORMATAR_DIA_MES_COM_MES = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" });
 function tituloSemana(segunda: string, domingo: string): string {
   const [, mesSegunda] = segunda.split("-");
@@ -55,7 +46,7 @@ function tituloSemanaCurto(segunda: string, domingo: string): string {
  * cada um com uma a duas linhas em branco, enquanto a semana real carrega. */
 export default function CarregandoPlanejamento() {
   const hoje = hojeISO();
-  const segunda = segundaDaSemanaISO(hoje);
+  const segunda = hoje; // A3: a janela começa em hoje
   const domingo = somarDiasISO(segunda, 6);
 
   return (

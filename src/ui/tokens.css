@@ -427,13 +427,69 @@
   --duracao-lenta: 380ms;
   --duracao-skeleton: 1400ms;
   --curva-saida: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ---------- Movimento, passo 16 do Opus (03/10/2026; entregaveis/design-v2/entrega/tokens.css e telas/Movimento.dc.html) ----------
+     Regra de bolso: o que entra usa a curva de saída e o tempo cheio; o que sai usa a curva de entrada e uns dois terços do tempo; o que a mão arrasta e
+     solta usa a mola. Os quatro primeiros acima são os de sempre. */
+  --duracao-toque: 90ms; /* o dedo encostou: aperta */
+  --duracao-soltar: 220ms; /* o dedo saiu: volta, na mola */
+  --duracao-troca: 180ms; /* troca de aba, troca de conteúdo no lugar */
+  --duracao-tela: 360ms; /* uma tela entra por cima da outra */
+  --duracao-tela-volta: 280ms; /* a mesma, voltando */
+  --duracao-folha: 440ms; /* a folha sobe */
+  --duracao-folha-sai: 260ms; /* a folha desce */
+  --duracao-capsula: 300ms; /* a cápsula encolhe ou abre */
+  --duracao-lista: 240ms; /* cada item de uma lista que chegou */
+  --atraso-lista: 30ms; /* entre um item e o seguinte, só os 6 primeiros */
+  --espera-esqueleto: 300ms; /* antes disso, nada de esqueleto */
+  --minimo-esqueleto: 400ms; /* se apareceu, fica pelo menos isso */
+  --duracao-brilho: 1.6s; /* uma passada do brilho do esqueleto */
+
+  /* o que sai da tela: começa devagar e acelera para fora */
+  --curva-entrada: cubic-bezier(0.32, 0, 0.67, 0);
+  /* o que muda no lugar (cor, opacidade, troca de conteúdo) */
+  --curva-padrao: cubic-bezier(0.2, 0, 0, 1);
+  /* a mola de quem a mão solta: passa 2% do ponto e assenta (folha, cápsula, botão voltando). Sem suporte a linear(), vale a curva de saída. */
+  --curva-mola: linear(0, 0.069, 0.22, 0.397, 0.564, 0.706, 0.817, 0.898, 0.953, 0.988, 1.008, 1.017, 1.02, 1.019, 1.016, 1.013, 1.009, 1.006, 1.004, 1.002, 1);
+  /* a mesma mola sem passar do ponto: o que é grande (a tela inteira) */
+  --curva-mola-suave: linear(0, 0.06, 0.186, 0.329, 0.466, 0.584, 0.682, 0.76, 0.821, 0.868, 0.903, 0.929, 0.949, 0.963, 0.973, 0.981, 0.986, 0.99, 0.993, 0.995, 1);
+
+  --escala-toque: 0.97; /* botão e aba apertados */
+  --escala-toque-grande: 0.985; /* cartão: superfície grande aperta menos */
+  --escala-toque-pilula: 0.95; /* pílula e chip, que são pequenos */
+  --desloca-lista: 0.5rem; /* o item que chega sobe isso */
+  --desloca-tela-atras: -25%; /* a tela de baixo recua isso quando outra entra */
+  --veu-tela-atras: 0.08; /* e escurece isso */
 }
 
+/* Sem linear() no navegador: as molas viram a curva de saída. */
+@supports not (transition-timing-function: linear(0, 1)) {
+  :root {
+    --curva-mola: var(--curva-saida);
+    --curva-mola-suave: var(--curva-saida);
+  }
+}
+
+/* "Reduzir movimento" pedido no aparelho (passo 16): nada anda pelo espaço, nada aumenta nem diminui; o que muda, troca por um esmaecer curto (150 ms). */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --duracao-rapida: 1ms;
     --duracao-base: 1ms;
     --duracao-lenta: 1ms;
+    --duracao-tela: 150ms;
+    --duracao-tela-volta: 150ms;
+    --duracao-folha: 150ms;
+    --duracao-folha-sai: 150ms;
+    --duracao-capsula: 1ms;
+    --duracao-lista: 150ms;
+    --atraso-lista: 0ms;
+    --curva-mola: var(--curva-padrao);
+    --curva-mola-suave: var(--curva-padrao);
+    --escala-toque: 1;
+    --escala-toque-grande: 1;
+    --escala-toque-pilula: 1;
+    --desloca-lista: 0rem;
+    --desloca-tela-atras: 0%;
   }
   *,
   *::before,
