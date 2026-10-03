@@ -20,6 +20,7 @@ function carregarSw() {
   let janelas: { focus: () => Promise<{ navigate: (url: string) => Promise<void> }> }[] = [];
 
   const self = {
+    location: { origin: "https://app.exemplo.test" },
     addEventListener: (tipo: string, ouvinte: Ouvinte) => ouvintes.set(tipo, ouvinte),
     skipWaiting: () => Promise.resolve(),
     registration: {
@@ -104,12 +105,12 @@ describe("push", () => {
 
   it("a url do aviso só vale se for um caminho do próprio app: endereço de fora e '//' viram /hoje", async () => {
     const sw = carregarSw();
-    for (const url of ["https://outro.exemplo/x", "//outro.exemplo/x", "hoje", 42, undefined]) {
+    for (const url of ["https://outro.exemplo/x", "//outro.exemplo/x", "/\\outro.exemplo", "/\t/outro.exemplo", "/\n/outro.exemplo", "hoje", 42, undefined]) {
       const { evento, esperar } = eventoPush({ titulo: "t", corpo: "c", url });
       sw.ouvintes.get("push")!(evento);
       await esperar();
     }
-    expect(sw.notificacoes.map((n) => (n.opcoes.data as { url: string }).url)).toEqual(["/hoje", "/hoje", "/hoje", "/hoje", "/hoje"]);
+    expect(sw.notificacoes.map((n) => (n.opcoes.data as { url: string }).url)).toEqual(Array(8).fill("/hoje"));
   });
 });
 
@@ -130,6 +131,17 @@ describe("notificationclick", () => {
     expect(fechou).toHaveBeenCalled();
     expect(navegou).toEqual(["/roteiros/7"]);
     expect(sw.abertas).toEqual([]);
+  });
+
+  it("um caminho do app com parâmetros vale como veio; e se focar ou navegar rejeitar (janela que o service worker não controla), abre uma nova", async () => {
+    const sw = carregarSw();
+    sw.comJanelas([{ focus: () => Promise.reject(new Error("janela nao controlada")) }]);
+    const esperas: Promise<unknown>[] = [];
+
+    sw.ouvintes.get("notificationclick")!({ notification: { close: vi.fn(), data: { url: "/roteiros/7?de=push" } }, waitUntil: (p: Promise<unknown>) => esperas.push(p) });
+    await Promise.all(esperas);
+
+    expect(sw.abertas).toEqual(["/roteiros/7?de=push"]);
   });
 
   it("sem janela aberta, abre uma nova em /hoje", async () => {

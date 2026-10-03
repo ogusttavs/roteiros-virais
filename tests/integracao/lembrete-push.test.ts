@@ -23,6 +23,7 @@ import {
   apagarInscricaoDaPessoa,
   aparelhosAtivosPorPessoa,
   ErroInscricaoPush,
+  hostPublico,
   inscricoesDaPessoa,
   pedidoDePushPodeAparecer,
   registrarInscricaoPush,
@@ -147,7 +148,7 @@ describe("rodarLembrete com push", () => {
   it("inscrição que o serviço diz que não existe mais (404 ou 410) é apagada na hora, e a pessoa recebe o e-mail", async () => {
     const { usuarioId } = await criarPessoaComMarca();
     await inscrever(usuarioId);
-    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: true, motivo: "servico de push respondeu 410" });
+    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: true, contar: false, motivo: "servico de push respondeu 410" });
 
     const resumo = await rodarLembrete(AGORA);
 
@@ -159,7 +160,7 @@ describe("rodarLembrete com push", () => {
   it("outra falha conta uma vez (a inscrição fica) e a segunda falha seguida apaga; nos dois dias a pessoa recebe o e-mail", async () => {
     const { usuarioId } = await criarPessoaComMarca();
     await inscrever(usuarioId);
-    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: false, motivo: "servico de push respondeu 500" });
+    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: false, contar: true, motivo: "servico de push respondeu 400" });
 
     await rodarLembrete(AGORA);
     const [depoisDaPrimeira] = await inscricoesDaPessoa(usuarioId);
@@ -172,6 +173,37 @@ describe("rodarLembrete com push", () => {
     await rodarLembrete(AGORA);
     expect(await inscricoesDaPessoa(usuarioId)).toEqual([]);
     expect(vi.mocked(enviarEmail)).toHaveBeenCalledTimes(2);
+  });
+
+  it("falha do ambiente ou do serviço de push (chaves, 401, 403, 429, 5xx, rede) não conta contra o aparelho: a inscrição fica e a pessoa recebe o e-mail", async () => {
+    const { usuarioId } = await criarPessoaComMarca();
+    await inscrever(usuarioId);
+    vi.mocked(enviarPush).mockResolvedValue({ ok: false, apagar: false, contar: false, motivo: "servico de push respondeu 503" });
+
+    for (let dia = 0; dia < 3; dia += 1) {
+      await db().update(preferenciasUsuario).set({ ultimoLembreteEm: null }).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+      await rodarLembrete(AGORA);
+    }
+
+    const [restante] = await inscricoesDaPessoa(usuarioId);
+    expect(restante.falhasSeguidas).toBe(0);
+    expect(vi.mocked(enviarEmail)).toHaveBeenCalledTimes(3);
+  });
+
+  it("uma falha do banco ao contar o envio não derruba o lembrete nem manda e-mail por cima de um push que já saiu", async () => {
+    const { usuarioId } = await criarPessoaComMarca();
+    const feita = await inscrever(usuarioId);
+    // A inscrição some entre o envio e a contagem (como uma falha do banco): a contabilidade não pode lançar.
+    vi.mocked(enviarPush).mockImplementation(async () => {
+      await db().delete(inscricoesPush).where(eq(inscricoesPush.id, feita.id));
+      return { ok: true };
+    });
+
+    const resumo = await rodarLembrete(AGORA);
+
+    expect(resumo.enviadosPorPush).toBe(1);
+    expect(resumo.erros).toBeUndefined();
+    expect(vi.mocked(enviarEmail)).not.toHaveBeenCalled();
   });
 
   it("um envio aceito zera as falhas seguidas (a falha de ontem não soma com a de amanhã)", async () => {
@@ -190,7 +222,7 @@ describe("rodarLembrete com push", () => {
     const boa = await inscrever(usuarioId, "boa");
     const ruim = await inscrever(usuarioId, "ruim");
     vi.mocked(enviarPush).mockImplementation(async (alvo) =>
-      alvo.endpoint === ruim.endpoint ? { ok: false, apagar: false, motivo: "servico de push respondeu 500" } : { ok: true },
+      alvo.endpoint === ruim.endpoint ? { ok: false, apagar: false, contar: true, motivo: "servico de push respondeu 400" } : { ok: true },
     );
 
     const resumo = await rodarLembrete(AGORA);
@@ -230,6 +262,28 @@ describe("as inscrições da pessoa", () => {
     const contagem = await aparelhosAtivosPorPessoa([a.usuarioId, b.usuarioId]);
     expect(contagem.get(a.usuarioId)).toBe(1);
     expect(contagem.get(b.usuarioId)).toBe(1);
+  });
+
+  it("só endereços de serviço de push público: IP, localhost e nome sem ponto (host interno) são recusados", async () => {
+    const a = await criarPessoaComMarca();
+    for (const host of ["10.0.0.5", "127.0.0.1", "localhost", "servico-interno", "[::1]", "a.localhost", "base.internal", "x.local"]) {
+      await expect(
+        registrarInscricaoPush(a.usuarioId, { endpoint: `https://${host}/push`, p256dh: "chave-publica-de-teste-longa", auth: "auth-de-teste" }, "android"),
+      ).rejects.toBeInstanceOf(ErroInscricaoPush);
+    }
+    for (const host of ["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com", "wns2-par02p.notify.windows.com"]) {
+      expect(hostPublico(host)).toBe(true);
+    }
+  });
+
+  it("a linha de preferências criada por 'agora não' no pedido de push nasce com a hora de fábrica de 09:00", async () => {
+    const { usuarioId } = await criarPessoaComMarca();
+    await db().delete(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+
+    await adiarPedidoDePush(usuarioId, AGORA);
+
+    const [prefs] = await db().select().from(preferenciasUsuario).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+    expect(prefs.horaLembrete).toBe("09:00");
   });
 
   it("a lista de marcas do admin traz quantos aparelhos do dono recebem o aviso, e zero para quem não tem", async () => {

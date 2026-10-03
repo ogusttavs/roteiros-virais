@@ -81,3 +81,11 @@ export async function desligarAviso(): Promise<string | null> {
   await inscricao.unsubscribe().catch(() => false);
   return endpoint;
 }
+
+/** Os dados da inscrição deste aparelho no navegador (se houver), para reconciliar com o servidor quando a Conta abre. */
+export async function inscricaoAtualDoAparelho(): Promise<DadosDaInscricaoNoNavegador | null> {
+  const inscricao = await inscricaoDesteAparelho().catch(() => null);
+  const json = inscricao?.toJSON();
+  if (!json?.endpoint || !json.keys?.p256dh || !json.keys?.auth) return null;
+  return { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth };
+}

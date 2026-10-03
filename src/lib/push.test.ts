@@ -45,6 +45,7 @@ describe("enviarPush", () => {
 
     expect(pushConfigurado()).toBe(true);
     expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: true });
+    expect(sendNotification.mock.calls[0][2]).toMatchObject({ timeout: 10_000 });
     expect(setVapidDetails).toHaveBeenCalledWith("mailto:a@b.teste", "pub", "priv");
     const [assinatura, corpo] = sendNotification.mock.calls[0];
     expect(assinatura).toEqual({ endpoint: INSCRICAO.endpoint, keys: { p256dh: INSCRICAO.p256dh, auth: INSCRICAO.auth } });
@@ -55,20 +56,25 @@ describe("enviarPush", () => {
     const { enviarPush } = await carregar({ NODE_ENV: "production", VAPID_PUBLIC_KEY: "pub", VAPID_PRIVATE_KEY: "priv", VAPID_SUBJECT: "mailto:a@b.teste" });
 
     sendNotification.mockRejectedValueOnce(Object.assign(new Error("gone"), { statusCode: 410 }));
-    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: true, motivo: "servico de push respondeu 410" });
+    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: true, contar: false, motivo: "servico de push respondeu 410" });
     sendNotification.mockRejectedValueOnce(Object.assign(new Error("nao achei"), { statusCode: 404 }));
     expect((await enviarPush(INSCRICAO, AVISO)).ok).toBe(false);
-    sendNotification.mockRejectedValueOnce(Object.assign(new Error("erro do servidor"), { statusCode: 500 }));
-    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, motivo: "servico de push respondeu 500" });
+    sendNotification.mockRejectedValueOnce(Object.assign(new Error("pedido ruim"), { statusCode: 400 }));
+    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, contar: true, motivo: "servico de push respondeu 400" });
+    // Credenciais nossas (401, 403), limite (429), queda do serviço (5xx) e rede caída não dizem nada sobre o aparelho: nunca contam.
+    for (const status of [401, 403, 429, 500, 503]) {
+      sendNotification.mockRejectedValueOnce(Object.assign(new Error("do servico"), { statusCode: status }));
+      expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, contar: false, motivo: `servico de push respondeu ${status}` });
+    }
     sendNotification.mockRejectedValueOnce(new Error("sem rede"));
-    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, motivo: "sem rede" });
+    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, contar: false, motivo: "sem rede" });
   });
 
   it("em produção sem as chaves nenhum push sai (a falha não apaga a inscrição: é do ambiente, não do aparelho)", async () => {
     const { enviarPush, pushConfigurado } = await carregar({ NODE_ENV: "production", VAPID_PUBLIC_KEY: "", VAPID_PRIVATE_KEY: "", VAPID_SUBJECT: "" });
 
     expect(pushConfigurado()).toBe(false);
-    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, motivo: "chaves VAPID nao configuradas" });
+    expect(await enviarPush(INSCRICAO, AVISO)).toEqual({ ok: false, apagar: false, contar: false, motivo: "chaves VAPID nao configuradas" });
     expect(sendNotification).not.toHaveBeenCalled();
   });
 });

@@ -183,14 +183,22 @@ async function mandarPush(usuarioId: string, marcas: MarcaPendente[]): Promise<b
   let algumAceitou = false;
   for (const inscricao of inscricoes) {
     const resultado = await enviarPush(inscricao, aviso);
-    if (resultado.ok) {
-      algumAceitou = true;
-      await registrarEnvioBemSucedido(inscricao.id);
-    } else if (resultado.apagar) {
-      await apagarInscricao(inscricao.id);
-    } else {
-      const apagou = await registrarFalhaDeEnvio(inscricao.id);
-      logger.warn({ usuarioId, inscricaoId: inscricao.id, apagou, motivo: resultado.motivo }, "lembrete: o push falhou");
+    if (resultado.ok) algumAceitou = true;
+    // A contabilidade de cada aparelho nunca derruba o envio aos outros nem desfaz o carimbo do dia: o aviso já saiu (ou não), e uma falha do banco aqui
+    // só deixa a contagem de falhas desatualizada.
+    try {
+      if (resultado.ok) {
+        await registrarEnvioBemSucedido(inscricao.id);
+      } else if (resultado.apagar) {
+        await apagarInscricao(inscricao.id);
+      } else if (resultado.contar) {
+        const apagou = await registrarFalhaDeEnvio(inscricao.id);
+        logger.warn({ usuarioId, inscricaoId: inscricao.id, apagou, motivo: resultado.motivo }, "lembrete: o push falhou");
+      } else {
+        logger.warn({ usuarioId, inscricaoId: inscricao.id, motivo: resultado.motivo }, "lembrete: o push falhou por causa do ambiente ou do servico de push (nao conta contra o aparelho)");
+      }
+    } catch (erro) {
+      logger.error({ usuarioId, inscricaoId: inscricao.id, err: erro }, "lembrete: nao foi possivel atualizar a inscricao depois do envio");
     }
   }
   return algumAceitou;

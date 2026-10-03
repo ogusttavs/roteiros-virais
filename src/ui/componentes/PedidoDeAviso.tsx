@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { adiarPedidoDePushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { sistemaDoAparelho, type SistemaDoAparelho } from "@/lib/convite-instalar";
@@ -8,7 +8,7 @@ import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
 import { jaEstaInstalado } from "@/ui/instalacao";
-import { ligarAviso, suportaPush } from "@/ui/push";
+import { desligarAviso, ligarAviso, suportaPush } from "@/ui/push";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import styles from "./PedidoDeAviso.module.css";
@@ -40,6 +40,8 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [dispensado, setDispensado] = useState(dispensadoNestaVisita);
+  /** Fechar depois de ligar o aviso não é "agora não": não grava os sete dias, mas passa pelo mesmo caminho (que também desfaz a entrada do histórico). */
+  const ligouAgora = useRef(false);
 
   // O navegador é quem sabe se é o aplicativo instalado, se o aparelho suporta e se a permissão ainda não foi decidida.
   useEffect(() => {
@@ -59,7 +61,7 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
     setAberto(false);
     setDispensado(true);
     dispensadoNestaVisita = true;
-    void adiarPedidoDePushAction().catch(() => undefined);
+    if (!ligouAgora.current) void adiarPedidoDePushAction().catch(() => undefined);
   }
 
   const { fechar } = useFolhaNoHistorico(aberto, adiar);
@@ -75,12 +77,13 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
         return;
       }
       if (resultado.tipo === "erro" || !(await registrarInscricaoPushAction(resultado.inscricao, sistema))) {
+        // O servidor não guardou: tira a inscrição do navegador também (a permissão ficou dada, e o pedido não voltaria a aparecer).
+        if (resultado.tipo === "ligado") await desligarAviso().catch(() => null);
         setErro(t.erro);
         return;
       }
-      setDispensado(true);
-      dispensadoNestaVisita = true;
-      setAberto(false);
+      ligouAgora.current = true;
+      fechar();
     } catch {
       setErro(t.erro);
     } finally {

@@ -23,6 +23,7 @@ export const textosPush = {
     precisaInstalar: "Para receber o aviso, instale o aplicativo na tela de início do celular e abra por ele.",
     semSuporte: "Este navegador não recebe avisos. No iPhone, instale o aplicativo na tela de início primeiro.",
     ligar: "Ligar o aviso",
+    erro: "Não deu para mudar o aviso agora. Tente de novo em instantes.",
     desligar: "Desligar neste aparelho",
     horario: (hora: string) => `Horário do aviso: ${hora}. Você muda no campo de lembrete, logo abaixo.`,
   },

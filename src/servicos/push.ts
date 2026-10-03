@@ -4,6 +4,7 @@
  */
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 
+import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { db } from "@/db";
 import { inscricoesPush, preferenciasUsuario, type InscricaoPush, type SistemaInstalado } from "@/db/schema";
 import { adiamentoDoConvite } from "@/lib/convite-instalar";
@@ -26,6 +27,19 @@ function validar(dados: DadosDaInscricao): void {
   if (url.protocol !== "https:" || dados.p256dh.length < 10 || dados.auth.length < 4 || dados.endpoint.length > 2000) {
     throw new ErroInscricaoPush("Inscrição do aviso inválida.");
   }
+  if (!hostPublico(url.hostname)) throw new ErroInscricaoPush("Endereço do aviso inválido.");
+}
+
+/**
+ * O servidor faz um POST no endereço da inscrição ao mandar o aviso: o endereço que o navegador gera é sempre o de um serviço de push público (FCM, Mozilla,
+ * Apple, Windows), nunca um IP, `localhost` ou um nome sem ponto (host interno da rede da VPS). Recusa esses (defesa contra o servidor ser usado para bater
+ * em serviço interno); não restringe a lista de serviços, para um navegador novo não ficar de fora.
+ */
+export function hostPublico(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || !host.includes(".")) return false;
+  if (host.startsWith("[") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return false;
+  return true;
 }
 
 /** Registra (ou atualiza) a inscrição de um aparelho da pessoa; o sistema é o do aparelho (celular), e a contagem de falhas recomeça. */
@@ -83,7 +97,7 @@ export async function adiarPedidoDePush(usuarioId: string, agora: Date = new Dat
   const ate = adiamentoDoConvite(agora);
   await db()
     .insert(preferenciasUsuario)
-    .values({ usuarioId, pushAdiadoAte: ate })
+    .values({ usuarioId, pushAdiadoAte: ate, horaLembrete: HORA_LEMBRETE_PADRAO })
     .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { pushAdiadoAte: ate } });
   return ate;
 }

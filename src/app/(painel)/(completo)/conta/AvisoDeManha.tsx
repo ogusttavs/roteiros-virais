@@ -8,7 +8,7 @@ import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { jaEstaInstalado } from "@/ui/instalacao";
-import { desligarAviso, estadoDoAviso, ligarAviso, type EstadoDoAviso } from "@/ui/push";
+import { desligarAviso, estadoDoAviso, inscricaoAtualDoAparelho, ligarAviso, type EstadoDoAviso } from "@/ui/push";
 
 import styles from "./AvisoDeManha.module.css";
 
@@ -37,7 +37,14 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
     let cancelado = false;
     void (async () => {
       const novo: Estado = jaEstaInstalado() ? await estadoDoAviso() : "precisa_instalar";
-      if (!cancelado) setEstado(novo);
+      if (cancelado) return;
+      setEstado(novo);
+      // Ligado no navegador: reconcilia com o servidor (registrar é idempotente). Cobre a inscrição que ficou só no navegador (o servidor falhou na hora) e o aparelho
+      // dividido entre duas pessoas (a inscrição passa a ser de quem está com a Conta aberta).
+      if (novo === "ligado") {
+        const dados = await inscricaoAtualDoAparelho();
+        if (dados) void registrarInscricaoPushAction(dados, sistemaDeInstalacao(navigator.userAgent)).catch(() => undefined);
+      }
     })();
     return () => {
       cancelado = true;
@@ -56,12 +63,14 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
         return;
       }
       if (resultado.tipo === "erro" || !(await registrarInscricaoPushAction(resultado.inscricao, sistemaDeInstalacao(navigator.userAgent)))) {
-        setErro(textosPush.pedido.erro);
+        // O servidor não guardou: tira a inscrição do navegador também, para o cartão não dizer "ligado" sem aviso nenhum.
+        if (resultado.tipo === "ligado") await desligarAviso().catch(() => null);
+        setErro(t.erro);
         return;
       }
       setEstado("ligado");
     } catch {
-      setErro(textosPush.pedido.erro);
+      setErro(t.erro);
     } finally {
       setOcupado(false);
     }
@@ -75,7 +84,7 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
       if (endpoint) await apagarInscricaoPushAction(endpoint);
       setEstado("desligado");
     } catch {
-      setErro(textosPush.pedido.erro);
+      setErro(t.erro);
     } finally {
       setOcupado(false);
     }

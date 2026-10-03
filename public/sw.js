@@ -346,7 +346,15 @@ self.addEventListener("message", function (event) {
  * `notificationclick`: foca uma janela do app se houver (e a leva ao caminho), senao abre uma nova em /hoje.
  */
 function caminhoDoApp(url) {
-  return typeof url === "string" && url.charAt(0) === "/" && url.charAt(1) !== "/" ? url : "/hoje";
+  // So um caminho do proprio app: nada de contrabarra, tab ou quebra de linha (o navegador os trata como barra e sai do site) e a origem tem de ser a nossa.
+  if (typeof url !== "string" || url.charAt(0) !== "/" || /[\\\t\n\r]/.test(url)) return "/hoje";
+  try {
+    var alvo = new URL(url, self.location.origin);
+    if (alvo.origin !== self.location.origin) return "/hoje";
+    return alvo.pathname + alvo.search;
+  } catch (erro) {
+    return "/hoje";
+  }
 }
 
 self.addEventListener("push", function (event) {
@@ -372,17 +380,27 @@ self.addEventListener("notificationclick", function (event) {
   event.notification.close();
   var destino = caminhoDoApp(event.notification.data && event.notification.data.url);
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (janelas) {
-      for (var i = 0; i < janelas.length; i++) {
-        var janela = janelas[i];
-        if ("focus" in janela) {
-          return janela.focus().then(function (focada) {
-            if (focada && "navigate" in focada) return focada.navigate(destino);
-            return undefined;
-          });
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then(function (janelas) {
+        // Prefere a janela do app que o usuario esta vendo; sem nenhuma, abre uma nova.
+        var escolhida = null;
+        for (var i = 0; i < janelas.length; i++) {
+          if (janelas[i].focused || janelas[i].visibilityState === "visible") {
+            escolhida = janelas[i];
+            break;
+          }
+          if (!escolhida) escolhida = janelas[i];
         }
-      }
-      return self.clients.openWindow(destino);
-    }),
+        if (!escolhida || !("focus" in escolhida)) return self.clients.openWindow(destino);
+        return escolhida.focus().then(function (focada) {
+          if (focada && "navigate" in focada) return focada.navigate(destino);
+          return undefined;
+        });
+      })
+      // `focus()` e `navigate()` rejeitam para janela que este service worker nao controla: o toque nunca pode ficar sem efeito.
+      .catch(function () {
+        return self.clients.openWindow(destino);
+      }),
   );
 });
