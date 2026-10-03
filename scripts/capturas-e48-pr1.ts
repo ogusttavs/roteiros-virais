@@ -3,7 +3,7 @@
  * da Conta com o botão no Android, e o computador sem convite nenhum (1280, só para provar), claro e escuro. Nenhum dado de cliente: a marca é a
  * do seed.
  *
- * O primeiro roteiro é gerado pela tela de verdade (Gravar agora, em mock) uma vez; as outras capturas reabrem esse roteiro. Cada combinação zera o
+ * O roteiro das capturas é gravado direto no banco uma vez (a geração pela tela em mock demora mais de um minuto, e o convite só olha a tela do roteiro). Cada combinação zera o
  * "agora não" e a data de instalação da pessoa antes de entrar (e ao fim), para o convite aparecer.
  *
  * Pré-requisitos: os mesmos de `scripts/capturas.ts` (`DATABASE_URL` apontando para `roteiros_dev`, nunca `roteiros`, `npm run db:seed`,
@@ -18,7 +18,9 @@ import { chromium, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 
 import { db, getPool } from "../src/db";
-import { preferenciasUsuario, user } from "../src/db/schema";
+import { preferenciasUsuario, roteiros, user } from "../src/db/schema";
+import { hojeISO } from "../src/lib/config";
+import { marcasDoUsuario } from "../src/servicos/clientes";
 
 const SENHA_SEED = "ExemploSenha123";
 const USUARIO = "seed-cliente-limpeza";
@@ -41,6 +43,11 @@ async function entrar(page: Page, baseUrl: string): Promise<void> {
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await page.waitForURL(/\/hoje/);
   await page.waitForLoadState("networkidle");
+}
+
+/** Esconde o portal do Next em desenvolvimento (o selo "N" no canto). */
+async function esconderPortal(page: Page): Promise<void> {
+  await page.addStyleTag({ content: "nextjs-portal { display: none !important; }" });
 }
 
 async function zerarPreferencias(): Promise<void> {
@@ -78,22 +85,36 @@ async function main(): Promise<void> {
   try {
     await zerarPreferencias();
 
-    // O primeiro roteiro, pela tela (no computador, onde o convite não aparece).
-    const contextoInicial = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-    const paginaInicial = await contextoInicial.newPage();
-    await entrar(paginaInicial, baseUrl);
-    await paginaInicial.goto(`${baseUrl}/criar`);
-    await paginaInicial.getByRole("button", { name: "Contar o momento" }).click();
-    const folha = paginaInicial.getByRole("dialog", { name: "Gravar agora" });
-    await folha.waitFor({ state: "visible" });
-    await folha.getByLabel("Onde você está").fill("no escritório, hora do almoço");
-    await folha.getByLabel("O que está acontecendo").fill("organizando os recibos do mês de um cliente");
-    await folha.getByLabel("O que dá para mostrar").fill("a planilha e a pilha de notas fiscais");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
-    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
-    await paginaInicial.waitForURL(/\/roteiros\/\d+/, { timeout: 120_000 });
-    const urlRoteiro = paginaInicial.url();
-    await contextoInicial.close();
+    // O primeiro roteiro, gravado direto no banco (a geração pela tela em mock demora mais de um minuto): o convite só olha a tela do roteiro.
+    const [marca] = await marcasDoUsuario(USUARIO);
+    const [roteiro] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId: marca.id,
+        data: hojeISO(),
+        tema: "organizar os recibos do mês",
+        origem: "livre",
+        objetivo: "alcance",
+        status: "gerado",
+        conteudo: {
+          titulo: "Os recibos do mês em 40 segundos",
+          duracaoS: 40,
+          gancho: "Esta pilha de notas fiscais virou uma planilha em quarenta segundos.",
+          corpo: "Mostro a pilha, passo uma por uma e digo o total no fim.",
+          fechamento: "No fim do mês é só somar a coluna.",
+          chamadaFinal: "Comenta qual recibo você nunca acha.",
+          cartoes: null,
+          porQueAssim: [],
+          cenas: [],
+          ondeGravar: "na mesa do escritório",
+          edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
+          evidencias: [],
+          semEvidencia: true,
+          forcaEvidencia: null,
+        } as never,
+      })
+      .returning();
+    const urlRoteiro = `${baseUrl}/roteiros/${roteiro.id}`;
 
     for (const modo of MODOS) {
       const nomeDe = (tela: string, estado: string, largura: string) => path.join(pastaDestino, `${tela}.${estado}.${largura}.${modo.rotulo}.png`);
@@ -108,22 +129,27 @@ async function main(): Promise<void> {
         await entrar(page, baseUrl);
         await page.goto(urlRoteiro);
         await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(1500);
         await dispararPedidoDeInstalacao(page);
         await page.getByRole("dialog", { name: "Coloque o aplicativo na tela de início" }).waitFor({ state: "visible", timeout: 10_000 });
         await page.getByRole("button", { name: "Adicionar ao celular" }).waitFor({ state: "visible" });
         await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
         const arquivo = nomeDe("Roteiro.ConviteInstalar", "Android", "390");
+        await esconderPortal(page);
         await page.screenshot({ path: arquivo });
         gravados.push(arquivo);
 
         // A Conta, com o mesmo botão no cartão.
         await page.getByRole("button", { name: "Agora não" }).click();
         await page.goto(`${baseUrl}/conta`);
+        await page.waitForLoadState("networkidle");
+        await page.waitForTimeout(1500);
         await dispararPedidoDeInstalacao(page);
         const cartao = page.getByTestId("instalar-no-celular");
         await cartao.getByRole("button", { name: "Adicionar ao celular" }).waitFor({ state: "visible" });
         await cartao.scrollIntoViewIfNeeded();
         const conta = nomeDe("Conta.InstalarNoCelular", "Android", "390");
+        await esconderPortal(page);
         await page.screenshot({ path: conta });
         gravados.push(conta);
         await contexto.close();
@@ -139,6 +165,7 @@ async function main(): Promise<void> {
         await page.getByRole("dialog", { name: "Coloque o aplicativo na tela de início" }).waitFor({ state: "visible", timeout: 10_000 });
         await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running"));
         const arquivo = nomeDe("Roteiro.ConviteInstalar", "iPhone", "390");
+        await esconderPortal(page);
         await page.screenshot({ path: arquivo });
         gravados.push(arquivo);
         await contexto.close();
@@ -155,6 +182,7 @@ async function main(): Promise<void> {
         await page.waitForTimeout(3000);
         if ((await page.getByRole("dialog", { name: "Coloque o aplicativo na tela de início" }).count()) > 0) throw new Error("o convite apareceu no computador");
         const arquivo = nomeDe("Roteiro.ConviteInstalar", "SemConviteNoComputador", "1280");
+        await esconderPortal(page);
         await page.screenshot({ path: arquivo });
         gravados.push(arquivo);
         await contexto.close();
