@@ -365,6 +365,13 @@
       "when": 1790967265233,
       "tag": "0051_clientes-pais-origem",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1790985751779,
+      "tag": "0052_perfis_analisados",
+      "breakpoints": true
     }
   ]
 }

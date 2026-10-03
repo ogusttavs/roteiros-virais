@@ -16,6 +16,7 @@
 import "dotenv/config";
 
 import { agendarTudo, listarAgendamentos } from "./agenda";
+import { rodarAnalisarPerfil, type PayloadAnalisarPerfil } from "./analisar-perfil";
 import { rodarAnalisarVisual } from "./analisar-visual";
 import { rodarAprenderCliente } from "./aprender-cliente";
 import { rodarColetaApify } from "./coleta-apify";
@@ -146,6 +147,10 @@ async function main(): Promise<void> {
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {
     await executarComRegistro(FILAS.aprenderCliente, () => rodarAprenderCliente(job[0].data.clienteId));
+  });
+  /** Por evento (E38, partes 2 e 3): `enfileirarAnaliseDePerfil`/`enfileirarAnaliseDaPropriaMarca` mandam o payload inteiro. */
+  await boss().work<PayloadAnalisarPerfil>(FILAS.analisarPerfil, async (job) => {
+    await executarComRegistro(FILAS.analisarPerfil, () => rodarAnalisarPerfil(job[0].data));
   });
 
   console.log("worker no ar.");

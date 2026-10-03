@@ -144,6 +144,14 @@ export const textosAdmin = {
     origemPesquisa: "achada pela pesquisa",
     origemCuradoria: "cadastrada a mão",
     tirarConta: "tirar",
+    /** E38, partes 2 e 3: perfis que clientes deste setor citaram e que passaram na régua. */
+    perfisIndicadosTitulo: "perfis indicados pelos clientes",
+    vazioPerfisIndicados: "nenhum perfil indicado por um cliente passou na régua do setor ainda.",
+    perfisIndicadosAjuda: "citados por um cliente do setor, conferidos na API e já dentro da régua; vira conta semente com um toque.",
+    virarContaDoSetor: "virar conta do setor",
+    virandoContaDoSetor: "virando conta",
+    sucessoVirarConta: "virou conta do setor.",
+    erroVirarConta: "não foi possível virar conta agora. Tente de novo.",
     /** M2, item 4: em que passo o setor está, ao lado de ativo/inativo no topo do painel. */
     passoPesquisandoContas: "pesquisando contas",
     passoColetando: "coletando",

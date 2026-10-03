@@ -67,9 +67,9 @@ const VIDEOS_POR_CANDIDATO = 20;
 
 type Rede = "youtube" | "tiktok" | "instagram";
 
-type VideoConfirmacao = { views: number; duracaoS: number | null; publicadoEm: Date | null; idioma: string | null; titulo: string | null };
+export type VideoConfirmacao = { views: number; duracaoS: number | null; publicadoEm: Date | null; idioma: string | null; titulo: string | null };
 
-type ContaConfirmada = {
+export type ContaConfirmada = {
   plataforma: Rede;
   /** Para YouTube, o id do canal (a chave real em `contas.handle`), não o @handle que a sugestão deu. */
   handle: string;
@@ -137,7 +137,7 @@ async function candidatoFoiTirado(plataforma: Rede, handle: string): Promise<boo
 }
 
 /** YouTube: resolve @handle ou nome para o canal de verdade, pega até `VIDEOS_POR_CANDIDATO` vídeos recentes. */
-async function confirmarYoutube(handleOuNome: string): Promise<ContaConfirmada | null> {
+export async function confirmarYoutube(handleOuNome: string): Promise<ContaConfirmada | null> {
   const canalResp = await buscarCanal(handleOuNome);
   await registrarConsumo(FONTE_YOUTUBE, CUSTO_LISTA);
   const canal = canalResp.items?.[0];
@@ -173,7 +173,7 @@ async function confirmarYoutube(handleOuNome: string): Promise<ContaConfirmada |
 }
 
 /** Instagram: Business Discovery (grátis), o mesmo caminho que `contas-base.ts` usa no catch-up diário. */
-async function confirmarInstagram(handle: string): Promise<ContaConfirmada | null> {
+export async function confirmarInstagram(handle: string): Promise<ContaConfirmada | null> {
   if (!config.coleta.metaAtivo) return null;
   if (await candidatoFoiTirado("instagram", handle)) return null;
 
@@ -231,7 +231,7 @@ async function confirmarTiktok(handle: string, apifyCabe: () => boolean): Promis
   };
 }
 
-type MotivoDescarte =
+export type MotivoDescarte =
   | "sugerido_e_nao_existe"
   /** Item 0c da revisão dos PRs #74/#76: canal do YouTube existe mas não tem playlist de uploads. */
   | "sem_videos"
@@ -243,7 +243,7 @@ type MotivoDescarte =
   | "erro_na_classificacao";
 
 /** Item 2, o filtro por código (tudo antes da IA, que é mais cara). */
-function passaNoFiltroDeCodigo(candidato: ContaConfirmada): MotivoDescarte | null {
+export function passaNoFiltroDeCodigo(candidato: ContaConfirmada): MotivoDescarte | null {
   if (candidato.plataforma !== "instagram") {
     const curtos = candidato.videos.filter((v) => v.duracaoS !== null && v.duracaoS <= config.regras.tetoDuracaoReferenciaS);
     if (curtos.length < 5) return "video_longo_demais";
@@ -263,7 +263,7 @@ function passaNoFiltroDeCodigo(candidato: ContaConfirmada): MotivoDescarte | nul
   return null;
 }
 
-async function passaNoFiltroDeSetor(
+export async function passaNoFiltroDeSetor(
   candidato: ContaConfirmada,
   nomeSetor: string,
   termosSetor: string[],

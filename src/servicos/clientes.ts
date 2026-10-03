@@ -35,6 +35,7 @@ import { gerarSenhaLegivel } from "@/lib/senha-legivel";
 import { sessaoAtual } from "@/lib/sessao";
 import { siteValido } from "@/lib/site-valido";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
+import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -673,6 +674,10 @@ export async function salvarPerfilConta(clienteId: number, dadosBrutos: unknown)
    * limite (para o job da curva saber parar de tentar a Meta); aqui isso e so ignorado.
    */
   if (perfis.instagram) void resolverMetaIgId(clienteId).catch(() => undefined);
+
+  // E38, partes 2 e 3: o perfil da própria marca também entra na camada exclusiva; mesmo "sem
+  // esperar" de cima, por rede preenchida (YouTube e Instagram; TikTok fica de fora por enquanto).
+  void enfileirarAnaliseDaPropriaMarca(clienteId, perfis).catch(() => undefined);
 
   return cliente;
 }

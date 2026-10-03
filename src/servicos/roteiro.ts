@@ -51,6 +51,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { noticiaPorId } from "./noticias";
+import { leiturasDoCliente } from "./perfis-analisados";
 import {
   evidenciaParaRoteiro,
   evidenciaPorIds,
@@ -356,8 +357,15 @@ function resolverQuemAparece(override: QuemGrava | undefined, cliente: Cliente):
  * mandam agora. Cliente sem `alcance` (nunca passou pela tela nova, ou
  * migrado sem cidade) não entra na camada, como antes.
  */
+/**
+ * E38, partes 2 e 3: a leitura curta de um perfil citado ou da própria marca, conferido de
+ * verdade na API (`perfisAnalisados`); `undefined`/erro nunca entra aqui, só o que a API confirmou.
+ */
+export type LeituraPerfilExclusiva = { handle: string; leitura: string };
+
 export function formatarCamadaExclusiva(
   cliente: Pick<Cliente, "alcance" | "regiao" | "pais" | "paises" | "camadaExclusiva">,
+  leiturasPerfis: LeituraPerfilExclusiva[] = [],
 ): string {
   const linhas: string[] = [];
   if (cliente.alcance === "local" && cliente.regiao) {
@@ -380,6 +388,9 @@ export function formatarCamadaExclusiva(
     linhas.push(
       `Perfil que o cliente admira: ${cliente.camadaExclusiva.perfisAdmirados.join(", ")}.`,
     );
+  }
+  for (const leitura of leiturasPerfis) {
+    linhas.push(`Sobre @${leitura.handle}: ${leitura.leitura}`);
   }
   return linhas.length > 0
     ? linhas.join(" ")
@@ -920,6 +931,12 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   const porQueAssimValido = (itens: { regra: string; motivo: string }[]) =>
     usaPorQueAssim ? itens.filter((item) => numerosRegrasValidas.has(item.regra)) : [];
 
+  /** E38, partes 2 e 3: a leitura de cada perfil citado ou da própria marca, conferido na API de
+   * verdade, como evidência exclusiva a mais no prompt. Só o que a API confirmou (nunca erro nem pendente). */
+  const leiturasPerfis = (await leiturasDoCliente(dados.clienteId))
+    .filter((l) => l.existeNaRede && l.leitura)
+    .map((l) => ({ handle: l.handle, leitura: l.leitura as string }));
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -931,7 +948,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     sistemaEstavel: roteiroIA.montarSistemaEstavel({
       perfilCompilado,
       modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
-      camadaExclusiva: formatarCamadaExclusiva(dados.cliente),
+      camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
       redePrincipal: dados.cliente.redePrincipal,
       duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS?.max,
       regrasCliente,

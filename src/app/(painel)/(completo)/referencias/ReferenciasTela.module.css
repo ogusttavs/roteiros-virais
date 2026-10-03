@@ -236,6 +236,27 @@
   cursor: not-allowed;
 }
 
+/** Acabamento do PR 1 da E38: mesmo texto de `.botaoTirarFiltros`, mas ao lado da contagem em
+ * `.ladoContagem` (visível só a partir de 1024px, quando as fichas já estão escondidas). */
+.botaoTirarFiltrosDesktop {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  background: transparent;
+  color: var(--cor-texto-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: underline;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.botaoTirarFiltrosDesktop:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
 .contagem {
   margin: 0;
   font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);

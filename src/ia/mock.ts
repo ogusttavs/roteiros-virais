@@ -70,6 +70,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockFiltrarEvidenciaPorMarca(entrada);
     case "aindaValeRoteiro":
       return mockAindaValeRoteiro(entrada);
+    case "analisarPerfilCitado":
+      return mockAnalisarPerfilCitado(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -716,6 +718,17 @@ function mockSugerirContasDoSetor(entrada: string) {
 }
 
 /** M2, item 2: mesma ideia de mockExtrairVideo/pertenceAoNicho, aplicada aos titulos do perfil em vez de a um video. */
+function mockAnalisarPerfilCitado(entrada: string) {
+  const perfilLinha = extrairCampo(entrada, "Perfil:");
+  const handle = perfilLinha.split(",")[0]?.trim() || "@perfil";
+  const temTitulos = !entrada.includes("nenhum título ou legenda disponível");
+  return {
+    leitura: temTitulos
+      ? `${handle} posta sobre os mesmos assuntos com frequência, no formato curto de sempre.`
+      : `${handle} não tinha vídeo recente para ler ainda.`,
+  };
+}
+
 function mockClassificarContaDoSetor(entrada: string) {
   const setorLinha = extrairCampo(entrada, "Setor:");
   const termos = (setorLinha.match(/termos: ([^)]*)\)/)?.[1] ?? "")

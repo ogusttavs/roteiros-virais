@@ -437,6 +437,50 @@ export const perfisCitados = pgTable(
   (t) => [uniqueIndex("perfis_citados_cliente_tipo_rede_handle").on(t.clienteId, t.tipo, t.rede, t.handle)],
 );
 
+/** "citado" (de `perfisCitados`) ou "propria_marca" (de `clientes.perfis`), E38 parte 2 e 3. */
+export type OrigemPerfilAnalisado = "citado" | "propria_marca";
+
+/**
+ * A camada exclusiva de verdade (E38, partes 2 e 3; `clientes.camadaExclusiva`, acima, é só texto
+ * livre para o prompt, sem vídeo nem conferência nenhuma). Uma linha por perfil citado pelo
+ * cliente ou pela própria marca, conferido na API da rede de verdade (nunca por memória do
+ * modelo), com a leitura curta que `src/ia/prompts/analisarPerfilCitado.ts` escreve. Separada de
+ * `contas`/`videos` de propósito (nunca uma coluna `clienteId` ali): é pequena e exclusiva de um
+ * cliente, nunca entra na base compartilhada do nicho nem aparece para outra marca.
+ *
+ * `perfilCitadoId` nulo é o perfil da própria marca (`clientes.perfis`); preenchido é um dos
+ * citados. `qualificaParaSetor` é a mesma régua do `pesquisa-de-setor` (M2): só o admin liga
+ * (`viraDoSetorEm`), nunca automático.
+ */
+export const perfisAnalisados = pgTable(
+  "perfis_analisados",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    perfilCitadoId: integer("perfil_citado_id").references(() => perfisCitados.id, { onDelete: "cascade" }),
+    origem: text("origem").$type<OrigemPerfilAnalisado>().notNull(),
+    rede: text("rede").$type<Plataforma>().notNull(),
+    handle: text("handle").notNull(),
+    /** A conta não existe na rede, ou a API recusou (perfil pessoal, restrição de idade). */
+    existeNaRede: boolean("existe_na_rede").notNull().default(true),
+    seguidores: integer("seguidores"),
+    contagemVideosLidos: integer("contagem_videos_lidos").notNull().default(0),
+    /** "o que esse perfil faz que você provavelmente gosta" (citado) ou "o que rende no seu
+     * próprio perfil" (própria marca); nulo enquanto o job ainda não terminou. */
+    leitura: text("leitura"),
+    qualificaParaSetor: boolean("qualifica_para_setor").notNull().default(false),
+    /** Preenchido quando o admin liga (parte 3): vira uma linha em `contas`, vigiada. */
+    viraDoSetorEm: timestamp("vira_do_setor_em", { withTimezone: true }),
+    /** A conferência ou a leitura falharam de um jeito que não vale tentar nesta mesma hora. */
+    erro: text("erro"),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("perfis_analisados_cliente_rede_handle").on(t.clienteId, t.rede, t.handle)],
+);
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------
@@ -491,10 +535,12 @@ export const contas = pgTable(
      * como conta semente (etapa 24, parte 1), "pesquisa" foi achada e
      * conferida pelo job `pesquisa-de-setor` (M2): mesmo tratamento de
      * semente que "curadoria" na vigilância, só que descoberta pela
-     * máquina em vez de colada pela pessoa. Mesma forma de videos.origem.
+     * máquina em vez de colada pela pessoa. "indicada" é um perfil citado por
+     * um cliente (`perfisAnalisados`, E38) que o admin confirmou virar conta
+     * do setor. Mesma forma de videos.origem.
      */
     origem: text("origem")
-      .$type<"coleta" | "seed" | "curadoria" | "pesquisa">()
+      .$type<"coleta" | "seed" | "curadoria" | "pesquisa" | "indicada">()
       .notNull()
       .default("coleta"),
     /**
