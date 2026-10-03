@@ -322,7 +322,7 @@ export const textosAdmin = {
     vazio: "Nenhum ramo alternativo ligado.",
     desde: (data: string) => `desde ${data}`,
     tirar: "tirar",
-    tirando: "tirando",
+    tirarRamo: (ramo: string) => `tirar ${ramo}`,
     ligar: "ligar outro ramo",
     ligarRotulo: (marca: string) => `Ligar a ${marca} o ramo`,
     cheio: "A marca já tem dois ramos alternativos; tire um antes de ligar outro.",

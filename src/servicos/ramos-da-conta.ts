@@ -4,7 +4,7 @@
  * evidência do roteiro; nunca nos temas do dia. Ter um alternativo ligado conta como "ter marca" para o setor: ele não é desligado enquanto
  * houver quem o use (`desligarSetorSeSemMarca`), e ligar um alternativo a um setor parado o reativa.
  */
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne, sql } from "drizzle-orm";
 
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
@@ -40,7 +40,9 @@ export async function ramosAlternativosDaMarca(clienteId: number): Promise<RamoA
     })
     .from(ramosDaConta)
     .innerJoin(nichos, eq(nichos.id, ramosDaConta.nichoId))
-    .where(eq(ramosDaConta.clienteId, clienteId))
+    .innerJoin(clientes, eq(clientes.id, ramosDaConta.clienteId))
+    // Um alternativo que virou o ramo principal (a marca trocou de ramo depois de o admin ligá-lo) deixa de contar: nunca aparece duas vezes.
+    .where(and(eq(ramosDaConta.clienteId, clienteId), ne(ramosDaConta.nichoId, sql`coalesce(${clientes.nichoId}, -1)`)))
     .orderBy(asc(ramosDaConta.ligadoEm), asc(ramosDaConta.id));
   return linhas.map((l) => ({
     id: l.id,
@@ -109,6 +111,8 @@ export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string
   const depois = await ramosAlternativosDaMarca(clienteId);
   if (depois.length > MAXIMO_DE_RAMOS_ALTERNATIVOS) {
     await db().delete(ramosDaConta).where(eq(ramosDaConta.id, linha.id));
+    // O setor que `garantirNichoDoRamo` acabou de criar ou reativar não fica ligado sem marca.
+    await desligarSetorSeSemMarca(nicho.id).catch(() => undefined);
     throw new ErroRamosDaConta(`a marca ja tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
   }
   return { id: linha.id, nichoId: nicho.id, nome: ramo.nome, ramoSlug: ramo.slug, ligadoEm: linha.ligadoEm };

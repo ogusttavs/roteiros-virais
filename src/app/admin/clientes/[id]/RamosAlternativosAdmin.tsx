@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { MAXIMO_DE_RAMOS_ALTERNATIVOS } from "@/lib/ramos-alternativos";
 import { textosAdmin } from "@/textos/admin";
@@ -37,6 +37,8 @@ export function RamosAlternativosAdmin({ clienteId, nomeMarca, principal, altern
   const [previa, setPrevia] = useState<PreviaNaTela | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  /** O ramo da prévia mais recente pedida: a resposta de uma escolha anterior que chega tarde não troca a prévia do ramo de agora. */
+  const ultimaPrevia = useRef<string | null>(null);
 
   const cheio = alternativos.length >= MAXIMO_DE_RAMOS_ALTERNATIVOS;
   const escondidos = [principal?.slug, ...alternativos.map((a) => a.slug)].filter((s): s is string => Boolean(s));
@@ -49,6 +51,7 @@ export function RamosAlternativosAdmin({ clienteId, nomeMarca, principal, altern
   }
 
   function fechar() {
+    ultimaPrevia.current = null;
     setLigando(false);
     setSlug(null);
     setPrevia(null);
@@ -59,7 +62,9 @@ export function RamosAlternativosAdmin({ clienteId, nomeMarca, principal, altern
     setSlug(novo);
     setPrevia(null);
     setErro(null);
+    ultimaPrevia.current = novo;
     const resultado = await previaDeLigarRamoAction(novo);
+    if (ultimaPrevia.current !== novo) return;
     if (!resultado.ok) {
       setErro(resultado.erro);
       return;
@@ -111,7 +116,7 @@ export function RamosAlternativosAdmin({ clienteId, nomeMarca, principal, altern
                 <strong>{alternativo.nome}</strong>
                 <span className={styles.detalhe}>{t.desde(formatarData(alternativo.ligadoEm))}</span>
               </div>
-              <Botao variante="secundario" disabled={ocupado} onClick={() => tirar(alternativo.id)}>
+              <Botao variante="secundario" disabled={ocupado} aria-label={t.tirarRamo(alternativo.nome)} onClick={() => tirar(alternativo.id)}>
                 {t.tirar}
               </Botao>
             </li>

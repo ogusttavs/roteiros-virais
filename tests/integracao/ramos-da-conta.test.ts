@@ -194,6 +194,21 @@ describe("as regras do admin, em frase", () => {
   });
 });
 
+describe("um alternativo que a marca depois escolheu como principal", () => {
+  it("deixa de contar como alternativo (a lista, os setores da conta e o máximo não o repetem)", async () => {
+    const dona = await criarMarca("rdc-virou-principal", "Virou principal", "odontologia");
+    const ligado = await ligarRamoAlternativo(dona, "nutricao", ADMIN);
+    expect((await ramosAlternativosDaMarca(dona)).map((a) => a.id)).toEqual([ligado.id]);
+
+    await db().update(clientes).set({ nichoId: ligado.nichoId }).where(eq(clientes.id, dona));
+
+    expect(await ramosAlternativosDaMarca(dona)).toEqual([]);
+    expect(await setoresDaConta(dona, ligado.nichoId)).toEqual([ligado.nichoId]);
+    // E o ramo que era o principal pode ser ligado como alternativo agora.
+    await expect(ligarRamoAlternativo(dona, "odontologia", ADMIN)).resolves.toBeDefined();
+  });
+});
+
 describe("a lista dos setores da conta e a prévia de custo", () => {
   it("o principal vem primeiro, depois os alternativos na ordem em que foram ligados", async () => {
     const dona = await criarMarca("rdc-lista", "Lista", "odontologia");
