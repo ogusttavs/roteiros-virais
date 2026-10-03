@@ -400,6 +400,13 @@
       "when": 1791039222327,
       "tag": "0056_pedidos-de-ramo",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1791046497641,
+      "tag": "0057_ramos-da-conta",
+      "breakpoints": true
     }
   ]
 }

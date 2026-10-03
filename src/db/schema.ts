@@ -621,6 +621,28 @@ export const pedidosDeRamo = pgTable(
   ],
 );
 
+/**
+ * E45, PR 3: os ramos alternativos de uma marca. `clientes.nicho_id` continua sendo o ramo principal (os temas do dia vêm só dele); aqui ficam
+ * até dois alternativos, que o admin liga e desliga (o cliente não liga sozinho, decisão do Gustavo de 02/10/2026). Entram no tema livre, nas
+ * Referências e na evidência do roteiro. A regra do máximo de dois mora no serviço (`ramos-da-conta.ts`); o índice único impede o mesmo setor duas vezes.
+ */
+export const ramosDaConta = pgTable(
+  "ramos_da_conta",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    nichoId: integer("nicho_id")
+      .notNull()
+      .references(() => nichos.id),
+    ligadoPorUsuarioId: text("ligado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+    ligadoEm: timestamp("ligado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("ramos_da_conta_marca_setor").on(t.clienteId, t.nichoId), index("ramos_da_conta_setor").on(t.nichoId)],
+);
+export type RamoDaConta = typeof ramosDaConta.$inferSelect;
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------
