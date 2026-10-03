@@ -111,6 +111,8 @@ export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string
   const [principal] = await db().select({ ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.id, marca.nichoId));
   if (principal?.ramoCatalogo === slugDoRamo) throw new ErroRamosDaConta("Esse já é o ramo principal da marca.");
 
+  // Linhas paradas de antes (o alternativo que a marca já escolheu como principal) saem aqui, antes de contar o teto.
+  await tirarAlternativoQueViraPrincipal(clienteId, marca.nichoId);
   const ligados = await ramosAlternativosDaMarca(clienteId);
   if (ligados.some((l) => l.ramoSlug === slugDoRamo)) throw new ErroRamosDaConta("Esse ramo já está ligado à marca.");
   // O teto conta as LINHAS da tabela, não só as visíveis: uma linha que ficou parada (o alternativo virou principal e a marca trocou de novo) conta até sair.

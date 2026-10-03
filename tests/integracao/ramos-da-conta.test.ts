@@ -242,7 +242,7 @@ describe("o teto de dois alternativos não fura quando o principal troca (E45 PR
     expect((await db().select().from(ramosDaConta).where(eq(ramosDaConta.clienteId, dona))).length).toBe(0);
   });
 
-  it("uma linha que ficou parada (igual ao principal) conta no teto: com ela e mais um alternativo, o terceiro é recusado", async () => {
+  it("uma linha que ficou parada (igual ao principal, de antes da correção) sai ao ligar um ramo, e não ocupa uma das duas vagas", async () => {
     const dona = await criarMarca("rdc-linha-parada", "Linha parada", "odontologia");
     const principal = (await nichoDoRamo("odontologia"))!;
     const { nicho: nutricao } = await garantirNichoDoRamo("nutricao");
@@ -253,7 +253,11 @@ describe("o teto de dois alternativos não fura quando o principal troca (E45 PR
     ]);
     expect((await ramosAlternativosDaMarca(dona)).length).toBe(1);
 
-    await expect(ligarRamoAlternativo(dona, "advocacia", ADMIN)).rejects.toThrow(/2 ramos alternativos/);
+    await ligarRamoAlternativo(dona, "advocacia", ADMIN);
+
+    // A linha parada saiu: ficam os dois alternativos de verdade, e um terceiro continua recusado.
+    expect((await db().select().from(ramosDaConta).where(eq(ramosDaConta.clienteId, dona))).length).toBe(2);
+    await expect(ligarRamoAlternativo(dona, "educacao-e-cursos", ADMIN)).rejects.toThrow(/2 ramos alternativos/);
   });
 });
 

@@ -113,9 +113,10 @@ export function motivoSemProva(
     (v) => classificarBrasil(v.idioma, contaEhBrasileira(v.contaPais, v.contaIdiomaPrincipal)) === "brasileiro",
   ).length;
   // O mínimo de cada setor soma: os vídeos de um setor de régua branda não cobrem a exigência de outro de régua dura.
+  // Só agrupa por setor quando as regras por setor existem: sem elas (os temas do dia), um grupo só, o total, como sempre.
   const porSetor = new Map<string, { total: number; proporcao: number }>();
   for (const v of naJanela) {
-    const chave = String(v.nichoId ?? "");
+    const chave = regrasPorSetor ? String(v.nichoId ?? "") : "";
     const regra = regraDe(v);
     const atual = porSetor.get(chave) ?? { total: 0, proporcao: regra.proporcaoBrasil };
     atual.total += 1;

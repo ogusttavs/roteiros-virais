@@ -18,6 +18,12 @@ const t = textosInstalar.convite;
 /** Quanto esperar depois de a tela do roteiro montar: o roteiro aparece primeiro, e o convite entra depois, nunca por cima do carregamento. */
 const ESPERA_DO_CONVITE_MS = 1500;
 
+/**
+ * "Agora não" já foi dito nesta visita ao aplicativo (vale até recarregar): o Voltar do aplicativo pode trazer de volta a tela do roteiro guardada, ainda
+ * dizendo que o convite pode aparecer, e ele não deve reabrir por causa disso. O servidor guarda os sete dias; isto só cobre a visita.
+ */
+let dispensadoNestaVisita = false;
+
 type Props = {
   /** O servidor diz que o convite pode aparecer (não instalou e o "agora não" não vale mais). */
   podeAparecer: boolean;
@@ -35,7 +41,7 @@ export function ConviteInstalar({ podeAparecer, telaLivre }: Props) {
   const [aberto, setAberto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   /** "Agora não" já foi dito nesta visita: o convite não reabre sozinho enquanto a tela estiver montada. */
-  const [dispensado, setDispensado] = useState(false);
+  const [dispensado, setDispensado] = useState(dispensadoNestaVisita);
   const { disponivel, instalar } = usePedidoDeInstalacao();
 
   // O aparelho só o navegador sabe (e se já está instalado): decide depois de montar, como o cartão da Conta.
@@ -54,6 +60,7 @@ export function ConviteInstalar({ podeAparecer, telaLivre }: Props) {
   function adiar() {
     setAberto(false);
     setDispensado(true);
+    dispensadoNestaVisita = true;
     // Fechou: o servidor guarda o "agora não" (a falha de rede só deixa o convite voltar antes; nada se perde).
     void adiarConviteDeInstalarAction().catch(() => undefined);
   }
@@ -64,6 +71,8 @@ export function ConviteInstalar({ podeAparecer, telaLivre }: Props) {
     setOcupado(true);
     try {
       await instalar();
+    } catch {
+      // O pedido do navegador só vale com um toque e uma vez; se ele recusar, a folha fecha do mesmo jeito (sete dias sem convite).
     } finally {
       setOcupado(false);
       // Aceitou ou recusou o pedido do navegador, a folha cumpriu o papel: quem aceitou aparece como instalado na primeira abertura do aplicativo,

@@ -63,12 +63,16 @@ export function usePedidoDeInstalacao(): { disponivel: boolean; instalar: () => 
   async function instalar(): Promise<boolean> {
     const evento = guardado;
     if (!evento) return false;
-    // O evento só vale uma vez: depois de chamar `prompt()` o navegador o consome.
-    guardado = null;
-    avisar();
-    await evento.prompt();
-    const escolha = await evento.userChoice;
-    return escolha.outcome === "accepted";
+    try {
+      await evento.prompt();
+      const escolha = await evento.userChoice;
+      return escolha.outcome === "accepted";
+    } finally {
+      // O evento só vale uma vez (o navegador o consome ao chamar `prompt()`), mas só some depois da escolha: enquanto o pedido do navegador está aberto,
+      // o botão e o texto da tela continuam como estavam.
+      if (guardado === evento) guardado = null;
+      avisar();
+    }
   }
   return { disponivel, instalar };
 }

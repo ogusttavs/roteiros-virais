@@ -56,6 +56,8 @@ export function InstalarNoCelular() {
             setOcupado(true);
             try {
               await instalar();
+            } catch {
+              // O pedido do navegador só vale com um toque e uma vez; recusado, o cartão continua com os passos escritos.
             } finally {
               setOcupado(false);
             }

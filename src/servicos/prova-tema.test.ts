@@ -88,6 +88,22 @@ describe("temaTemProvaSuficiente com regras por setor", () => {
     expect(temaTemProvaSuficiente([1, 2, 3], misto, AGORA, 7, 0.7)).toBe(false);
   });
 
+  it("sem o mapa de regras, vídeos de setores diferentes contam como um total só (os temas do dia nunca agrupam por setor)", () => {
+    const videos = new Map<number, VideoParaProva>(
+      [
+        video(1, PRINCIPAL, true),
+        video(2, PRINCIPAL, false),
+        video(3, PRINCIPAL, false),
+        video(4, ALTERNATIVO, true),
+        video(5, ALTERNATIVO, false),
+        video(6, ALTERNATIVO, false),
+      ].map((v) => [v.id, v]),
+    );
+    // Total 6, proporção 0,3: mínimo ceil(1,8) = 2, e há 2 brasileiros. Por setor seriam 1 + 1 = 2 também, mas com 0,7 o total pede 4 e passaria a ser tratado por grupo.
+    expect(temaTemProvaSuficiente([1, 2, 3, 4, 5, 6], videos, AGORA, 7, 0.3)).toBe(true);
+    expect(motivoSemProva([1, 2, 3, 4, 5, 6], videos, AGORA, 7, 0.7)).toBe("só 2 de 6 vídeos citados são do Brasil, precisa de pelo menos 4");
+  });
+
   it("sem regras por setor, ou com um vídeo de setor que não está no mapa, vale o par de sempre", () => {
     const videos = new Map<number, VideoParaProva>([video(1, 9, true), video(2, 9, true), video(3, 9, true)].map((v) => [v.id, v]));
     expect(temaTemProvaSuficiente([1, 2, 3], videos, AGORA, 7, 0.7)).toBe(true);
