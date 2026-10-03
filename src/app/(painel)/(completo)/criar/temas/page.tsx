@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { evidenciaResumoPorIds, setorAindaLendo, type EvidenciaResumo } from "@/servicos/pesquisa";
+import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
+import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
@@ -55,9 +56,15 @@ export default async function Temas({ searchParams }: Props) {
   const evidenciasTemas = await Promise.all(
     temas.map((tema) => evidenciaResumoPorIds(tema.evidencias).then(paraEvidenciaTema)),
   );
-  const aindaLendo =
-    resultado.status === "sem_tema" && cliente.nichoId ? await setorAindaLendo(cliente.nichoId) : false;
-  const aviso = avisoSemTema(resultado, new Date(), aindaLendo);
+  // O que se sabe do ramo quando não há tema (E45 PR 2): sem setor e com pedido de ramo aberto, o ramo está sendo conferido; com setor sem vídeo
+  // nenhum, está começando a ser pesquisado; com vídeo e sem análise, está sendo lido.
+  const estadoDoRamo =
+    resultado.status !== "sem_tema"
+      ? {}
+      : cliente.nichoId
+        ? { aindaLendo: await setorAindaLendo(cliente.nichoId), semBase: await setorSemBase(cliente.nichoId) }
+        : { emConferencia: (await pedidoAbertoDaMarca(cliente.id)) !== null };
+  const aviso = avisoSemTema(resultado, new Date(), estadoDoRamo);
 
   return (
     <TemasTela

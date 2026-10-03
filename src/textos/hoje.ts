@@ -72,6 +72,18 @@ export const textosHoje = {
   aindaLendoTitulo: "Estamos lendo os vídeos do seu setor",
   aindaLendo:
     "As primeiras referências aparecem em algumas horas. Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
+  /**
+   * E45 PR 2 (decisão 35): o ramo ainda sem base (nenhum vídeo coletado: nasceu agora, pela escolha de um ramo novo, pelo ramo provisório do
+   * "Não achei o meu" ou por uma troca de ramo na Conta). Antes, esta marca lia "Hoje não saiu tema para o seu setor", como se algo tivesse
+   * falhado; nada falhou, a pesquisa do ramo está começando.
+   */
+  ramoNovoTitulo: "O seu ramo ainda está sendo pesquisado",
+  ramoNovo:
+    "Os temas aparecem a partir da próxima madrugada. Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
+  /** E45 PR 2: a marca escreveu o ramo com as palavras dela ("Não achei o meu"), nenhum ramo se parecia, e ela ainda não tem setor: os temas esperam a conferência. */
+  ramoEmConferenciaTitulo: "A gente está conferindo o seu ramo",
+  ramoEmConferencia:
+    "Os temas aparecem depois disso. Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
   erroAviso: "A busca de hoje falhou",
   erroTitulo: "Ainda dá para gravar",
   erro:

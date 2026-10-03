@@ -21,7 +21,7 @@ import {
   user,
   type TemaDoDia,
 } from "../../src/db/schema";
-import { hojeISO, horaMinutoAtualISO } from "../../src/lib/config";
+import { hojeISO } from "../../src/lib/config";
 import { textosHoje } from "../../src/textos/hoje";
 
 const SENHA = "ExemploSenha123";
@@ -256,14 +256,13 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
     await expect(page).toHaveURL(/\/hoje/);
 
     /**
-     * F1, ajuste B: o texto muda com a hora real (`aviso-sem-tema.ts`, H3, item 1). Antes das 6h30 de
-     * Brasília ainda pode ser só cedo demais ("Os temas de hoje saem até as 6h30"); depois, o tema já
-     * devia ter saído e não saiu ("Hoje não saiu tema..."). Mesma função que a tela usa, para o teste
-     * nunca reprovar de madrugada só por rodar antes do corte.
+     * E45 PR 2 (decisão 35): este setor não tem vídeo nenhum, de propósito (o nicho nunca teve coleta), e é o caso do ramo que ainda está começando
+     * a ser pesquisado: a tela diz isso, a qualquer hora, em vez de "Hoje não saiu tema" (que parecia uma falha). O texto que muda com a hora
+     * ("saem até as 6h30" antes, "hoje não saiu" depois, F1 ajuste B, H3 item 1) continua valendo para o setor que já tem vídeo, e o teste
+     * unitário de `avisoSemTema` o prende nas duas horas.
      */
-    const jaPassouDoCorte = horaMinutoAtualISO() >= "06:30";
-    const tituloEsperado = jaPassouDoCorte ? textosHoje.semTemaDepoisTitulo : textosHoje.vazioTitulo;
-    const textoEsperado = jaPassouDoCorte ? textosHoje.semTemaDepois : textosHoje.vazio;
+    const tituloEsperado = textosHoje.ramoNovoTitulo;
+    const textoEsperado = textosHoje.ramoNovo;
 
     await page.goto("/criar/temas");
     await expect(page.getByText(tituloEsperado)).toBeVisible();

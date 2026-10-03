@@ -18,6 +18,7 @@ import {
   referenciasDoNicho,
   semDonoComAnalise,
   setorAindaLendo,
+  setorSemBase,
   subindoHoje,
   subindoHojeComAnalise,
   todosOsVideosDoNicho,
@@ -1785,5 +1786,36 @@ describe("setorAindaLendo", () => {
     await criarVideo("aindalendo-parcial-pendente", { publicadoEm: diasAtras(1), nichoId: id, contaId: cid });
 
     expect(await setorAindaLendo(id)).toBe(false);
+  });
+});
+
+/**
+ * `setorSemBase` (E45 PR 2, decisão 35): o ramo que acabou de nascer (ou a marca acabou de trocar para ele) não tem vídeo nenhum, e a tela de
+ * temas diz "o seu ramo ainda está sendo pesquisado" em vez de "hoje não saiu tema". Um nicho por `it`, como em `setorAindaLendo`.
+ */
+describe("setorSemBase", () => {
+  async function criarNicho(slug: string): Promise<{ nichoId: number; contaId: number }> {
+    const [nicho] = await db().insert(nichos).values({ slug, nome: slug, termos: [] }).returning();
+    const [conta] = await db().insert(contas).values({ plataforma: "tiktok", handle: slug, nichoId: nicho.id }).returning();
+    return { nichoId: nicho.id, contaId: conta.id };
+  }
+
+  it("setor sem vídeo nenhum: sem base (a pesquisa está começando)", async () => {
+    const { nichoId: id } = await criarNicho("sembase-vazio");
+    expect(await setorSemBase(id)).toBe(true);
+  });
+
+  it("setor com um vídeo coletado, analisado ou não: já tem base (o passo seguinte é setorAindaLendo, não este)", async () => {
+    const { nichoId: id, contaId: cid } = await criarNicho("sembase-coletado");
+    await criarVideo("sembase-sem-analise", { publicadoEm: diasAtras(1), nichoId: id, contaId: cid });
+    expect(await setorSemBase(id)).toBe(false);
+    expect(await setorAindaLendo(id)).toBe(true);
+  });
+
+  it("o vídeo de OUTRO setor não conta (isolamento)", async () => {
+    const { nichoId: vazio } = await criarNicho("sembase-isolado-a");
+    const { nichoId: outro, contaId: cid } = await criarNicho("sembase-isolado-b");
+    await criarVideo("sembase-do-outro", { publicadoEm: diasAtras(1), nichoId: outro, contaId: cid });
+    expect(await setorSemBase(vazio)).toBe(true);
   });
 });

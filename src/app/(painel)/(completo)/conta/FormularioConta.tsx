@@ -111,6 +111,12 @@ export function FormularioConta({
   const [tiktok, setTiktok] = useState(tiktokInicial);
   const [youtube, setYoutube] = useState(youtubeInicial);
   const [site, setSite] = useState(siteInicial);
+  /**
+   * O site que está gravado: o da página ao abrir, e o que a pessoa acabou de salvar (a página não recarrega depois do "salvar"). Sem isto, trocar o
+   * site, salvar e voltar ao de antes comparava com o de ANTES do primeiro salvar e não mandava nada: a tela dizia "salvo" com o site errado
+   * gravado (o mesmo defeito do ramo, achado na revisão do PR 1 da E45 e deixado aqui desde a E38 PR 2; decisão 39).
+   */
+  const [siteSalvo, setSiteSalvo] = useState(siteInicial);
   /** O ramo do catálogo escolhido agora. Nulo: nada escolhido, ou o ramo de hoje não é do catálogo e a pessoa não escolheu outro. */
   const [ramo, setRamo] = useState<string | null>(ramoInicial?.slug ?? null);
   /**
@@ -168,7 +174,7 @@ export function FormularioConta({
     const siteNormalizado = normalizarSite(site);
     // O site só é conferido (e só vai ao servidor) se a pessoa mexeu nele: um endereço gravado antes da regra de agora (uma porta, um
     // IP) não pode impedir de salvar o nome, o tema ou o lembrete, e o servidor, sem o campo, não mexe no que está gravado.
-    const siteMudou = siteNormalizado !== normalizarSite(siteInicial);
+    const siteMudou = siteNormalizado !== normalizarSite(siteSalvo);
     if (siteMudou && siteNormalizado.length > 0 && !siteValido(siteNormalizado)) {
       setErroSite(textosBriefing.dadosFixos.siteInvalido);
       siteRef.current?.focus();
@@ -209,7 +215,10 @@ export function FormularioConta({
         return;
       }
       avisarRedeOk();
-      if (siteMudou) setSite(siteNormalizado);
+      if (siteMudou) {
+        setSite(siteNormalizado);
+        setSiteSalvo(siteNormalizado);
+      }
       if (ramoMudou) setRamoSalvo(ramo);
       // O pedido de ramo depois da gravação: `undefined` o ramo não mexeu; `null` o pedido fechou; objeto, o pedido aberto e o provisório.
       if (resultado.dado.pedidoDeRamo !== undefined) {
