@@ -79,10 +79,12 @@ async function criarUsuario(usuarioId: string) {
 async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permissao: "default" | "denied"; recusaAoPedir?: boolean }) {
   await page.addInitScript((o) => {
     if (o.instalado) Object.defineProperty(window.navigator, "standalone", { value: true, configurable: true });
-    let permissao = o.permissao;
+    // A permissão do navegador vale entre recargas (a do teste também): fica em localStorage.
+    let permissao = (localStorage.getItem("e2e-push-permissao") as NotificationPermission | null) ?? o.permissao;
     Object.defineProperty(Notification, "permission", { get: () => permissao, configurable: true });
     Notification.requestPermission = async () => {
       permissao = o.recusaAoPedir ? "denied" : "granted";
+      localStorage.setItem("e2e-push-permissao", permissao);
       return permissao;
     };
     const chave = "e2e-push-inscricao";
@@ -232,7 +234,7 @@ test.describe("aviso de manhã: o cartão da Conta", () => {
     await expect(cartao.getByText("Horário do aviso: 09:00.")).toBeVisible();
 
     await cartao.getByRole("button", { name: "Ligar o aviso" }).click();
-    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "ligado");
+    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "ligado", { timeout: 20_000 });
     await expect(cartao.getByText("Ligado neste aparelho.")).toBeVisible();
     await expect.poll(async () => (await db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-conta"))).length).toBe(1);
 

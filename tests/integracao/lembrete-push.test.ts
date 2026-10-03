@@ -17,6 +17,7 @@ import { clientes, inscricoesPush, membrosMarca, nichos, preferenciasUsuario, ro
 import { rodarLembrete } from "@/jobs/lembrete";
 import { enviarEmail } from "@/lib/email";
 import { enviarPush } from "@/lib/push";
+import { listarClientesAdmin } from "@/servicos/admin-coleta";
 import {
   adiarPedidoDePush,
   apagarInscricaoDaPessoa,
@@ -229,6 +230,18 @@ describe("as inscrições da pessoa", () => {
     const contagem = await aparelhosAtivosPorPessoa([a.usuarioId, b.usuarioId]);
     expect(contagem.get(a.usuarioId)).toBe(1);
     expect(contagem.get(b.usuarioId)).toBe(1);
+  });
+
+  it("a lista de marcas do admin traz quantos aparelhos do dono recebem o aviso, e zero para quem não tem", async () => {
+    const com = await criarPessoaComMarca();
+    const sem = await criarPessoaComMarca();
+    await inscrever(com.usuarioId, "a");
+    await inscrever(com.usuarioId, "b");
+
+    const lista = await listarClientesAdmin();
+
+    expect(lista.find((c) => c.id === com.clienteId)?.aparelhosComPush).toBe(2);
+    expect(lista.find((c) => c.id === sem.clienteId)?.aparelhosComPush).toBe(0);
   });
 
   it("recusa endereço que não é https e chaves vazias; desligar só apaga a inscrição da própria pessoa", async () => {
