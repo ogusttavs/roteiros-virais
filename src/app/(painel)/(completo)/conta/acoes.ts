@@ -56,7 +56,12 @@ export async function salvarContaAction(dados: {
       // Um pedido que o admin já atendeu (formulário velho com o mesmo texto) não é pedido aberto: a tela o trata como fechado.
       pedidoDeRamo =
         resultado.pedido.estado === "aberto"
-          ? { texto: resultado.pedido.texto, ramoProvisorio: provisorio?.nome ?? null, ramoProvisorioSlug: provisorio?.ramoSlug ?? null }
+          ? {
+              texto: resultado.pedido.texto,
+              ramoProvisorio: provisorio?.nome ?? null,
+              ramoProvisorioSlug: provisorio?.ramoSlug ?? null,
+              ...(resultado.limite ? { limiteDeRamosNovos: true } : {}),
+            }
           : null;
     }
   } catch (erro) {
@@ -77,4 +82,10 @@ export async function salvarContaAction(dados: {
 
 /** O pedido de ramo aberto como a tela o mostra: o que a pessoa escreveu e o ramo provisório em que ela espera (nulo se nada casou). */
 /** `ramoProvisorioSlug`: o slug do ramo provisório no catálogo, para a tela saber em que ramo a marca ficou gravada (nulo: setor feito à mão, ou nenhum). */
-export type PedidoDeRamoNaTela = { texto: string; ramoProvisorio: string | null; ramoProvisorioSlug?: string | null };
+export type PedidoDeRamoNaTela = {
+  texto: string;
+  ramoProvisorio: string | null;
+  ramoProvisorioSlug?: string | null;
+  /** O teto de setores novos do dia segurou o palpite: a tela não promete o ramo provisório. */
+  limiteDeRamosNovos?: boolean;
+};

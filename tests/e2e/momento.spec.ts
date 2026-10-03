@@ -14,11 +14,13 @@ import {
   account,
   briefings,
   clientes,
+  contas,
   membrosMarca,
   nichos,
   preferenciasUsuario,
   temasDia,
   user,
+  videos,
   type TemaDoDia,
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
@@ -242,7 +244,17 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
         referencias: [],
       },
     });
-    // De propósito, nenhuma linha em temas_dia: o nicho nunca teve coleta.
+    // De propósito, nenhuma linha em temas_dia: o setor já coletou (um vídeo lido) e não gerou tema. Sem o vídeo, a tela seria a do ramo que ainda
+    // não começou a ser pesquisado (`ramoNovo`, E45 PR 2), que tem o seu próprio e2e em `ramo-pedido.spec.ts`.
+    const [conta] = await db().insert(contas).values({ plataforma: "tiktok", handle: "e2e-momento-sem-tema", nichoId: nicho.id }).returning();
+    await db().insert(videos).values({
+      plataforma: "tiktok",
+      idExterno: "e2e-momento-sem-tema-video",
+      url: "https://exemplo.invalido/e2e-momento-sem-tema-video",
+      contaId: conta.id,
+      nichoId: nicho.id,
+      analise: { assunto: "um jeito novo de organizar recibos", pertenceAoNicho: true } as never,
+    });
   });
 
   test("a 390px: /criar/temas mostra o aviso no lugar dos temas, e 'Contar o momento' gera um roteiro normalmente", async ({
@@ -256,17 +268,12 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
     await expect(page).toHaveURL(/\/hoje/);
 
     /**
-     * E45 PR 2 (decisão 35): este setor não tem vídeo nenhum, de propósito (o nicho nunca teve coleta), e é o caso do ramo que ainda está começando
-     * a ser pesquisado: a tela diz isso, a qualquer hora, em vez de "Hoje não saiu tema" (que parecia uma falha). O texto que muda com a hora
-     * ("saem até as 6h30" antes, "hoje não saiu" depois, F1 ajuste B, H3 item 1) continua valendo para o setor que já tem vídeo, e o teste
-     * unitário de `avisoSemTema` o prende nas duas horas.
+     * O setor já coletou e não gerou tema: a tela diz isso (o texto muda com a hora, "saem até as 6h30" antes e "hoje não saiu" depois, F1 ajuste B
+     * e H3 item 1; o teste unitário de `avisoSemTema` prende as duas horas), e nunca o aviso do ramo que ainda não começou a ser pesquisado.
      */
-    const tituloEsperado = textosHoje.ramoNovoTitulo;
-    const textoEsperado = textosHoje.ramoNovo;
-
     await page.goto("/criar/temas");
-    await expect(page.getByText(tituloEsperado)).toBeVisible();
-    await expect(page.getByText(textoEsperado, { exact: false })).toBeVisible();
+    await expect(page.getByText(new RegExp(`^(${textosHoje.vazioTitulo}|${textosHoje.semTemaDepoisTitulo})$`))).toBeVisible();
+    await expect(page.getByText(textosHoje.ramoNovoTitulo)).toHaveCount(0);
     // "Escrever o meu assunto" continua, mesmo sem tema nenhum.
     await expect(page.getByRole("button", { name: "Escrever o meu assunto" })).toBeVisible();
 

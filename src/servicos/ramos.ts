@@ -10,7 +10,7 @@ import { and, count, eq, gt, isNotNull, sql } from "drizzle-orm";
 
 import { ramoPorSlug, type RamoDoCatalogo } from "@/config/ramos";
 import { db } from "@/db";
-import { clientes, nichos, type Nicho } from "@/db/schema";
+import { clientes, nichos, ramosDaConta, type Nicho } from "@/db/schema";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
@@ -153,7 +153,7 @@ export async function setorParaAMarca(nichoIdAtual: number | null, slugDoRamo: s
 }
 
 /**
- * "Ramo sem conta não é pesquisado" (catálogo, regra 5), na volta: quando a última marca sai de um setor que nasceu de um ramo do
+ * "Ramo sem conta não é pesquisado" (catálogo, regra 5), na volta: quando a última marca (principal ou alternativo) sai de um setor que nasceu de um ramo do
  * catálogo, ele é desligado e para de ser coletado, transcrito e pesquisado (achado da revisão independente: o setor nascia ligado e
  * nunca mais desligava, e os jobs só olham `ativo`, nunca se há marca). Setor feito à mão (sem `ramo_catalogo`) nunca é desligado
  * daqui: quem desliga é o admin. Devolve se desligou.
@@ -169,6 +169,8 @@ export async function desligarSetorSeSemMarca(nichoId: number | null | undefined
         eq(nichos.ativo, true),
         isNotNull(nichos.ramoCatalogo),
         sql`not exists (select 1 from ${clientes} where ${clientes.nichoId} = ${nichos.id} and ${clientes.ativo})`,
+        // E45 PR 3: um ramo alternativo ligado a uma marca ativa também é "ter marca".
+        sql`not exists (select 1 from ${ramosDaConta} r join ${clientes} c on c.id = r.cliente_id where r.nicho_id = ${nichos.id} and c.ativo)`,
       ),
     )
     .returning({ id: nichos.id });

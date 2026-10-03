@@ -9,11 +9,14 @@ import {
   contagensPorFiltroReferencias,
   referenciasDoNicho,
   resolverPlataformasReferencias,
+  setoresComPiso,
   setorAindaLendo,
   todosOsVideosDoNicho,
   type OrdemReferencias,
   type TipoConteudoFiltravel,
 } from "@/servicos/pesquisa";
+import { ramoAtualDoCliente } from "@/servicos/ramos";
+import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { favoritosDoCliente } from "@/servicos/referencias";
 import { textosReferencias } from "@/textos/referencias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
@@ -41,6 +44,8 @@ type SearchParams = {
   brasil?: string;
   tipo?: string;
   quantidade?: string;
+  /** E45 PR 3: a pílula "Ramo" (o id do setor); só vale se for um dos ramos da conta. */
+  ramo?: string;
 };
 
 function listaValida<T extends string>(valor: string | undefined, validos: Set<T>): T[] {
@@ -95,6 +100,17 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       ? Math.min(quantidadeNumero, QUANTIDADE_MAXIMA_TODOS)
       : TAMANHO_PAGINA_TODOS_PADRAO;
 
+  // E45 PR 3: o ramo principal e os alternativos que o admin ligou. Com mais de um, as três abas olham todos (cada vídeo medido pelo piso do
+  // próprio setor) e a pílula "Ramo" escolhe um; com um só, nada muda.
+  const [principal, alternativos] = await Promise.all([ramoAtualDoCliente(cliente.nichoId), ramosAlternativosDaMarca(cliente.id)]);
+  const ramos = [
+    { id: cliente.nichoId, nome: principal?.nome ?? "", principal: true },
+    ...alternativos.map((a) => ({ id: a.nichoId, nome: a.nome, principal: false })),
+  ];
+  const ramoNumero = Number(params.ramo);
+  const ramoAtivo = ramos.length > 1 && ramos.some((r) => r.id === ramoNumero) ? ramoNumero : undefined;
+  const setores = ramos.length > 1 ? await setoresComPiso(ramos.map((r) => r.id)) : undefined;
+
   const favoritos = await favoritosDoCliente(cliente.id);
   const apenasIds = segmento === "salvos" ? [...favoritos] : undefined;
 
@@ -113,7 +129,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
    */
   const contagensFiltro = await contagensPorFiltroReferencias(
     cliente.nichoId,
-    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo },
+    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo, setores, ramoId: ramoAtivo },
     segmento === "todos",
   );
 
@@ -134,6 +150,8 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
     comFala,
     brasil,
     tiposConteudo,
+    setores,
+    ramoId: ramoAtivo,
   };
 
   const resultado =
@@ -166,6 +184,8 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       contagensFiltro={contagensFiltro}
       redePrincipalSemVideo={redePrincipalSemVideo}
       aindaLendo={aindaLendo}
+      ramos={ramos.length > 1 ? ramos : undefined}
+      ramoAtivo={ramoAtivo}
     />
   );
 }

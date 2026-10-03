@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { CUSTO_DIARIO_DE_SETOR_NOVO_USD } from "@/config/precos-ia";
 import type { Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
@@ -17,6 +18,9 @@ import {
   tirarAcesso,
   type ResultadoDarAcesso,
 } from "@/servicos/clientes";
+import { ErroLimiteDeSetores } from "@/servicos/ramos";
+import { ErroRamosDaConta, ligarRamoAlternativo, previaDeLigarRamo, tirarRamoAlternativo } from "@/servicos/ramos-da-conta";
+import { textosRamo } from "@/textos/ramo";
 
 /** V12b, item 4: a folha "Dar acesso" pede o nome também, não só o e-mail. */
 export async function darAcessoAction(
@@ -102,6 +106,49 @@ export async function renomearPessoaAction(
     return { ok: true, dado: null };
   } catch (erro) {
     if (erro instanceof ErroCliente) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+/** E45 PR 3: o que o admin vê antes de confirmar a ligação de um ramo alternativo: o setor já é pesquisado, ou vai começar (e quanto custa por dia). */
+export type PreviaNaTela = { estado: "pesquisado" | "comeca"; nome: string; custoPorDia: string };
+
+export async function previaDeLigarRamoAction(slugDoRamo: string): Promise<ResultadoAcao<PreviaNaTela>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    const previa = await previaDeLigarRamo(slugDoRamo);
+    const custoPorDia = `US$ ${CUSTO_DIARIO_DE_SETOR_NOVO_USD.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return { ok: true, dado: { ...previa, custoPorDia } };
+  } catch (erro) {
+    if (erro instanceof ErroRamosDaConta) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+/** E45 PR 3: o admin liga um ramo alternativo à marca (no máximo dois). O teto de setores novos do dia volta como frase, como no Começar. */
+export async function ligarRamoAlternativoAction(clienteId: number, slugDoRamo: string): Promise<ResultadoAcao<null>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  try {
+    await ligarRamoAlternativo(clienteId, slugDoRamo, sessao!.user.id);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroLimiteDeSetores) return { ok: false, erro: textosRamo.limiteDeRamosNovos };
+    if (erro instanceof ErroRamosDaConta) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+/** E45 PR 3: o admin tira um ramo alternativo; o setor que ficou sem marca para de ser pesquisado. */
+export async function tirarRamoAlternativoAction(clienteId: number, ramoDaContaId: number): Promise<ResultadoAcao<null>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    await tirarRamoAlternativo(clienteId, ramoDaContaId);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroRamosDaConta) return { ok: false, erro: erro.message };
     throw erro;
   }
 }

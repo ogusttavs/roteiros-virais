@@ -12,13 +12,14 @@ import { db, getPool } from "@/db";
 import { clientes, nichos, pedidosDeRamo, user } from "@/db/schema";
 import { FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
-import { salvarDadosFixos, salvarRamoConta } from "@/servicos/clientes";
+import { salvarDadosFixos, salvarDadosFixosComPedido, salvarRamoConta } from "@/servicos/clientes";
 import { ErroNicho } from "@/servicos/nichos";
 import {
   cancelarPedidoAberto,
   contarPedidosAbertos,
   conferirPedidoAberto,
   encaixarPedido,
+  fecharPedidoComSetor,
   listarPedidosAbertos,
   pedidoAbertoDaMarca,
   registrarPedidoDeRamo,
@@ -154,6 +155,24 @@ describe("registrarPedidoDeRamo: o pedido e o ramo provisório", () => {
     }
   });
 
+  it("o Começar avisa quando o teto segurou o palpite (limiteDeRamosNovos), e só então; com palpite, não", async () => {
+    const marca = await criarMarca("pedidos-teto-comecar", "Teto Comecar");
+    const nasceramHoje = (await db().select().from(nichos)).filter((n) => n.ramoCatalogo !== null).length;
+    config.regras.setoresNovosPorDia = nasceramHoje;
+    try {
+      const segurado = await salvarDadosFixosComPedido(marca, { ...DADOS, ramoOutro: "escritório de advocacia trabalhista" });
+      expect(segurado.limiteDeRamosNovos).toBe(true);
+      expect(segurado.cliente.nichoId).toBeNull();
+    } finally {
+      config.regras.setoresNovosPorDia = 1000;
+    }
+    const livre = await salvarDadosFixosComPedido(marca, { ...DADOS, ramoOutro: "escritório de advocacia civil" });
+    expect(livre.limiteDeRamosNovos).toBe(false);
+    expect(livre.cliente.nichoId).not.toBeNull();
+    const sem = await salvarDadosFixosComPedido(marca, { ...DADOS, ramoOutro: "xyzw abcd" });
+    expect(sem.limiteDeRamosNovos).toBe(false);
+  });
+
   it("texto vazio é recusado, e um texto enorme é cortado (o pedido é uma ou duas frases)", async () => {
     const marca = await criarMarca("pedidos-texto-limites", "Limites");
     await expect(registrarPedidoDeRamo(marca, "   ")).rejects.toBeInstanceOf(ErroNicho);
@@ -286,9 +305,29 @@ describe("o admin resolve o pedido", () => {
     expect((await marcaPorId(marca)).nichoId).toBe(destino.id);
     expect((await marcaPorId(marca)).ramoOutro).toBeNull();
 
+    // O caminho do formulário velho (salvarDadosFixos grava o texto em ramo_outro antes de o atalho valer) também não deixa o texto para trás.
+    await salvarDadosFixos(marca, { ...DADOS, ramoOutro: "fisioterapeuta de pilates" });
+    expect(await pedidoAbertoDaMarca(marca)).toBeNull();
+    expect((await marcaPorId(marca)).ramoOutro).toBeNull();
+    expect((await marcaPorId(marca)).nichoId).toBe(destino.id);
+
     // Com um texto diferente é um pedido novo, como sempre; e fora do setor final, o mesmo texto também volta a valer.
     const novo = await registrarPedidoDeRamo(marca, "personal trainer");
     expect(novo.pedido.estado).toBe("aberto");
+  });
+
+  it("a corrida: o pedido some (a pessoa escolheu da lista) entre a conferência do admin e o fechamento, e a marca não é movida", async () => {
+    const marca = await criarMarca("pedidos-corrida", "Corrida");
+    const { pedido } = await registrarPedidoDeRamo(marca, "personal trainer");
+    const antes = (await marcaPorId(marca)).nichoId;
+    const destino = (await garantirNichoDoRamo("psicologia-e-terapias")).nicho;
+    await cancelarPedidoAberto(marca);
+
+    await expect(fecharPedidoComSetor(pedido, destino.id, "encaixado")).rejects.toBeInstanceOf(ErroNicho);
+
+    expect((await marcaPorId(marca)).nichoId).toBe(antes);
+    const [depois] = await db().select().from(pedidosDeRamo).where(eq(pedidosDeRamo.id, pedido.id));
+    expect(depois.estado).toBe("cancelado");
   });
 
   it("um pedido já resolvido (ou que não existe) não se resolve de novo, e nada muda", async () => {

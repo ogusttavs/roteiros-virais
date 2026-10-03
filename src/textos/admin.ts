@@ -312,6 +312,28 @@ export const textosAdmin = {
     sucesso: "job enfileirado; o worker processa em instantes",
     erroDisparar: (mensagem: string) => `não conseguimos disparar o job: ${mensagem}`,
   },
+  /** E45 PR 3: o bloco "Ramos alternativos" na página da marca (só o admin liga e desliga; o cliente só lê na Conta). */
+  ramosAlternativos: {
+    titulo: "Ramos alternativos",
+    ajuda:
+      "Até dois ramos além do principal. Entram no tema livre, nas Referências e nos roteiros desta marca; os temas do dia continuam só do ramo principal.",
+    principal: (ramo: string) => `Ramo principal: ${ramo}`,
+    semPrincipal: "A marca ainda não tem ramo principal; escolha o principal antes de ligar outro.",
+    vazio: "Nenhum ramo alternativo ligado.",
+    desde: (data: string) => `desde ${data}`,
+    tirar: "tirar",
+    tirarRamo: (ramo: string) => `tirar ${ramo}`,
+    ligar: "ligar outro ramo",
+    ligarRotulo: (marca: string) => `Ligar a ${marca} o ramo`,
+    cheio: "A marca já tem dois ramos alternativos; tire um antes de ligar outro.",
+    jaPesquisado: (ramo: string) => `${ramo}: já é pesquisado por outra marca, sem custo novo.`,
+    vaiComecar: (ramo: string, custo: string) =>
+      `${ramo}: vai começar a ser pesquisado hoje, uns ${custo} por dia enquanto tiver marca.`,
+    confirmar: (ramo: string) => `ligar ${ramo}`,
+    ligando: "ligando",
+    cancelar: "cancelar",
+    erro: "não conseguimos mudar os ramos; tente de novo",
+  },
   clienteDetalhe: {
     voltar: "marcas",
     naoEncontrado: "marca não encontrada",

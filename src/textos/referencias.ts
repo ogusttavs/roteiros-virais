@@ -3,6 +3,10 @@
  * Textos literais da entrega onde existem; o resto segue o mesmo tom.
  */
 export const textosReferencias = {
+  /** E45 PR 3: a pílula "Ramo" (só aparece quando o admin ligou um ramo alternativo à marca). */
+  ramo: "Ramo",
+  todosOsRamos: "Todos os ramos",
+  ramoPrincipalSufixo: "(principal)",
   titulo: "O que está funcionando no seu setor",
   linha: "Vídeos que passaram muito do normal da própria conta, e as notícias do seu setor. Os mais recentes primeiro.",
   /** R2b, item 5 (revisão do Fable no PR #100): o subtítulo próprio do segmento "Todos", no lugar do de "Fora da curva". */

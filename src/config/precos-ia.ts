@@ -35,3 +35,11 @@ export const FATOR_LOTE = 0.5;
  */
 export const DATA_PRECO_GROQ = "2026-09-03";
 export const PRECO_GROQ_USD_POR_HORA = 0.04;
+
+/**
+ * E45 PR 3: o que custa por dia manter um setor novo sendo pesquisado (coleta, transcrição, análise e temas), em dólar, medido em 02/10/2026.
+ * Aparece no admin antes de ligar um ramo alternativo a uma marca (o setor que ainda não é pesquisado passa a ser, e a conta é diária
+ * enquanto ele tiver marca). Mudou a medição, atualiza aqui e a data.
+ */
+export const CUSTO_DIARIO_DE_SETOR_NOVO_USD = 0.6;
+export const DATA_CUSTO_DE_SETOR_NOVO = "2026-10-02";

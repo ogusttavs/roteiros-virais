@@ -67,6 +67,7 @@ import {
   classificarBrasil,
   preferirRedePrincipal,
 } from "./proporcao-brasil";
+import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { temasParaCliente } from "./temas";
 
 export class ErroRoteiro extends Error {}
@@ -838,6 +839,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   }
 
   const ehMomento = dados.momento !== undefined;
+  const alternativos = ehMomento ? [] : (await ramosAlternativosDaMarca(dados.clienteId)).map((a) => a.nichoId);
 
   const [
     daBusca,
@@ -848,7 +850,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     ultimosRoteiros,
     marcaCitada,
   ] = await Promise.all([
-    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA),
+    // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
+    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos),
     ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas),
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),

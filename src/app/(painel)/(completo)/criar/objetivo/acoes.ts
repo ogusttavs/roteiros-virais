@@ -6,6 +6,7 @@ import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
+import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import {
   ErroRoteiro,
   gerarRoteiro,
@@ -72,6 +73,7 @@ export async function gerarRoteiroAction(
 export async function sugerirEstiloAction(tema: string): Promise<EstiloRoteiro> {
   const cliente = await clienteDaSessaoAtual();
   if (!cliente.nichoId) return "falado";
-  const evidencias = await evidenciaParaRoteiro(cliente.nichoId, tema);
+  const alternativos = (await ramosAlternativosDaMarca(cliente.id)).map((a) => a.nichoId);
+  const evidencias = await evidenciaParaRoteiro(cliente.nichoId, tema, undefined, alternativos);
   return sugerirEstiloPelaEvidencia(evidencias);
 }

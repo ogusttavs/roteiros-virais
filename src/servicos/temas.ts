@@ -22,6 +22,7 @@ import { gerarComVerificacao } from "@/ia/verificador";
 import { hojeISO } from "@/lib/config";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual, reguaDoSetor } from "@/servicos/pesquisa";
 import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente } from "@/servicos/prova-tema";
+import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
@@ -319,7 +320,12 @@ export async function apagarRascunhoTemaLivre(usuarioId: string, clienteId: numb
  * mesmo assim", nunca o ângulo (regra do `PROXIMO.md`: nada de número ou
  * recomendação sem evidência de verdade por trás).
  */
-export type ResultadoAvaliarTema = avaliarTemaIA.SaidaAvaliarTema & { nota: number; anguloTemProva: boolean };
+export type ResultadoAvaliarTema = avaliarTemaIA.SaidaAvaliarTema & {
+  nota: number;
+  anguloTemProva: boolean;
+  /** E45 PR 3: o nome do ramo alternativo que mais casou com o assunto, quando não é o principal; nulo é o ramo principal (ou nenhuma prova). */
+  ramoDoAssunto: string | null;
+};
 
 /**
  * Achado 8 da revisão do motor (01/10/2026): média simples dos cinco pilares, calculada aqui em
@@ -365,12 +371,22 @@ export async function avaliarTema(
     throw new ErroTemas("o briefing deste cliente ainda nao foi compilado.");
   }
 
+  // E45 PR 3: o tema livre olha o ramo principal e os alternativos que o admin ligou (o modelo do nicho continua sendo o do principal).
+  const alternativosDaMarca = await ramosAlternativosDaMarca(cliente.id);
   const [evidencias, modeloNicho, regrasCliente, [nicho]] = await Promise.all([
-    evidenciaParaTema(cliente.nichoId, texto),
+    evidenciaParaTema(
+      cliente.nichoId,
+      texto,
+      undefined,
+      undefined,
+      alternativosDaMarca.map((a) => a.nichoId),
+    ),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),
     db().select({ criadoEm: nichos.criadoEm }).from(nichos).where(eq(nichos.id, cliente.nichoId)),
   ]);
+
+  const nomesDosAlternativos = new Map(alternativosDaMarca.map((a) => [a.nichoId, a.nome]));
 
   const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",
@@ -385,7 +401,11 @@ export async function avaliarTema(
       persona: cliente.persona,
       regrasCliente,
     }),
-    entrada: avaliarTemaIA.montarEntrada({ tema: texto, evidencias, noticia }),
+    entrada: avaliarTemaIA.montarEntrada({
+      tema: texto,
+      evidencias: evidencias.map((v) => ({ ...v, ramo: nomesDosAlternativos.get(v.nichoId ?? -1) })),
+      noticia,
+    }),
     // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
     // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).
     lembreteFinal: avaliarTemaIA.LEMBRETE_ACENTUACAO,
@@ -426,5 +446,27 @@ export async function avaliarTema(
     );
   }
 
-  return { ...dados, nota, anguloTemProva };
+  return { ...dados, nota, anguloTemProva, ramoDoAssunto: ramoQueMaisCasou(dados.evidencias, evidencias, nomesDosAlternativos) };
+}
+
+/**
+ * E45 PR 3: o ramo do assunto de um tema livre é o setor com mais vídeos entre os que a nota citou. Só devolve o nome quando esse setor é um
+ * ramo alternativo da marca (empate vai para o principal, que não precisa ser dito); sem vídeo citado, nulo.
+ */
+export function ramoQueMaisCasou(
+  idsCitados: number[],
+  evidencias: { id: number; nichoId: number | null }[],
+  nomesDosAlternativos: Map<number, string>,
+): string | null {
+  const citados = evidencias.filter((v) => idsCitados.includes(v.id));
+  if (citados.length === 0 || nomesDosAlternativos.size === 0) return null;
+  const contagem = new Map<number | null, number>();
+  for (const v of citados) contagem.set(v.nichoId, (contagem.get(v.nichoId) ?? 0) + 1);
+  const doPrincipal = [...contagem.entries()].filter(([id]) => id === null || !nomesDosAlternativos.has(id)).reduce((soma, [, n]) => soma + n, 0);
+  let melhor: { nome: string; n: number } | null = null;
+  for (const [id, n] of contagem) {
+    const nome = id === null ? undefined : nomesDosAlternativos.get(id);
+    if (nome && n > doPrincipal && (!melhor || n > melhor.n)) melhor = { nome, n };
+  }
+  return melhor?.nome ?? null;
 }

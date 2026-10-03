@@ -19,6 +19,7 @@ import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 import { desfavoritarAction, favoritarAction } from "./acoes";
 import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
 import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
+import { PilulaDeRamo } from "./PilulaDeRamo";
 import { PilulaOrdem, PilulasFiltroReferencias } from "./PilulasFiltroReferencias";
 import styles from "./ReferenciasTela.module.css";
 
@@ -46,6 +47,10 @@ type Props = {
   redePrincipalSemVideo?: Plataforma;
   /** M1, item 5: o setor tem vídeo coletado mas a análise ainda não rodou; troca o "vazio" de sempre por essa explicação. */
   aindaLendo?: boolean;
+  /** E45 PR 3: os ramos da conta (o principal primeiro); só vem com mais de um, e então a pílula "Ramo" aparece. */
+  ramos?: { id: number; nome: string; principal: boolean }[];
+  /** E45 PR 3: o ramo que a pílula escolheu (`?ramo=` na URL); `undefined` é "todos os ramos". */
+  ramoAtivo?: number;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -60,7 +65,7 @@ const FORMATAR_DATA = new Intl.DateTimeFormat("pt-BR", {
   timeZone: "America/Sao_Paulo",
 });
 
-function formatarVideo(v: VideoReferencia): VideoFormatado {
+function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<number, string>): VideoFormatado {
   const faixa = classificarMultiplo(v.foraDaCurva);
   return {
     id: v.id,
@@ -85,6 +90,7 @@ function formatarVideo(v: VideoReferencia): VideoFormatado {
     segundoChave: v.segundoChave,
     abaixoDaRegua: v.abaixoDaRegua,
     tipoConteudo: v.tipoConteudo,
+    ramoNome: v.nichoId === null ? undefined : nomesDosAlternativos.get(v.nichoId),
   };
 }
 
@@ -109,6 +115,8 @@ type Filtros = {
   tiposConteudo: TipoConteudoFiltravel[];
   /** R2b, item 1: só o segmento "Todos" usa; nas outras duas abas fica sempre no padrão. */
   quantidade: number;
+  /** E45 PR 3: a pílula "Ramo" (o id do setor); `undefined` é todos. */
+  ramo?: number;
 };
 
 /** "sim"/"nao" na URL, mesma codificação de `page.tsx`. */
@@ -140,6 +148,7 @@ function montarUrl(filtros: Filtros): string {
   const brasil = paramBooleano(filtros.brasil);
   if (brasil) params.set("brasil", brasil);
   if (filtros.tiposConteudo.length > 0) params.set("tipo", filtros.tiposConteudo.join(","));
+  if (filtros.ramo !== undefined) params.set("ramo", String(filtros.ramo));
   if (filtros.segmento === "todos" && filtros.quantidade !== TAMANHO_PAGINA_TODOS_PADRAO) {
     params.set("quantidade", String(filtros.quantidade));
   }
@@ -176,6 +185,8 @@ export function ReferenciasTela({
   contagensFiltro,
   redePrincipalSemVideo,
   aindaLendo,
+  ramos,
+  ramoAtivo,
 }: Props) {
   const router = useRouter();
   const { semConexao, avisarRedeOk } = useConexao();
@@ -268,6 +279,7 @@ export function ReferenciasTela({
       brasil,
       tiposConteudo,
       quantidade,
+      ramo: ramoAtivo,
     });
     if (urlPendente.current === urlConfirmada) {
       urlPendente.current = null;
@@ -285,6 +297,7 @@ export function ReferenciasTela({
     brasil,
     tiposConteudo,
     quantidade,
+    ramoAtivo,
     limparRedeDeSeguranca,
   ]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
@@ -298,7 +311,10 @@ export function ReferenciasTela({
   const filtrar = useFolhaNoHistorico(folhaFiltrarAberta, () => setFolhaFiltrarAberta(false));
   const fecharAviso = useCallback(() => setAviso(null), []);
 
-  const formatados = useMemo(() => videos.map(formatarVideo), [videos]);
+  const formatados = useMemo(() => {
+    const nomes = new Map((ramos ?? []).filter((r) => !r.principal).map((r) => [r.id, r.nome] as const));
+    return videos.map((v) => formatarVideo(v, nomes));
+  }, [videos, ramos]);
   const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
   const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
@@ -410,6 +426,7 @@ export function ReferenciasTela({
       // R2b, item 1: qualquer navegação volta para a primeira página de "Todos", menos "Ver mais", que
       // pede a própria quantidade maior explicitamente em `mudanca`.
       quantidade: TAMANHO_PAGINA_TODOS_PADRAO,
+      ramo: ramoAtivo,
       ...mudanca,
     };
     const url = montarUrl(filtros);
@@ -643,6 +660,16 @@ export function ReferenciasTela({
             onFechar={() => setPilulaAberta(null)}
             onMudar={(mudanca) => navegar(mudanca)}
           />
+          {ramos && ramos.length > 1 ? (
+            <PilulaDeRamo
+              ramos={ramos}
+              ramoAtivo={ramoAtivo}
+              pilulaAberta={pilulaAberta}
+              onAbrir={setPilulaAberta}
+              onFechar={() => setPilulaAberta(null)}
+              onEscolher={(ramo) => navegar({ ramo })}
+            />
+          ) : null}
         </div>
 
         {fichasAtivas.length > 0 ? (

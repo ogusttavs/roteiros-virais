@@ -16,6 +16,11 @@ export const textosConta = {
   ramo: {
     rotulo: "ramo",
     ajuda: "Escreva uma palavra ou uma letra do que você faz e escolha na lista.",
+    /** E45 PR 3: só leitura; quem liga e desliga é o admin (decisão do Gustavo de 02/10/2026). */
+    alternativos: (nomes: string[]) =>
+      nomes.length === 1
+        ? `A gente ligou também ${nomes[0]} aos seus temas e referências.`
+        : `A gente ligou também ${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]} aos seus temas e referências.`,
     aviso: "Ao trocar, os temas e as referências passam a ser os do ramo novo. Se ele ainda não foi pesquisado, aparecem a partir da próxima madrugada. O briefing e os roteiros continuam.",
     /** E45 PR 2: o "Não achei o meu" da Conta (o campo de texto livre que abre, no estilo minúsculo da tela). */
     campoOutro: "qual é o seu ramo",

@@ -243,6 +243,25 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
     expect(ultimaGravacao().ramo).toBe("odontologia");
   });
 
+  it("o teto de ramos novos segurou o palpite: o aviso diz isso (nunca 'Você está em X'), e quem tem ramo continua nele", async () => {
+    salvarContaAction.mockResolvedValue({
+      ok: true,
+      dado: { pedidoDeRamo: { texto: "xyzw abcd", ramoProvisorio: null, limiteDeRamosNovos: true } },
+    });
+    render(<FormularioConta {...PROPS_BASE} />);
+    fireEvent.focus(campoRamo());
+    fireEvent.change(campoRamo(), { target: { value: "xyzw abcd" } });
+    fireEvent.keyDown(campoRamo(), { key: "ArrowDown" });
+    fireEvent.click(screen.getAllByRole("option").find((o) => o.textContent?.includes("Não achei o meu"))!);
+
+    await salvar();
+
+    await waitFor(() =>
+      expect(screen.getByText("Muitos ramos novos hoje; a gente confere o seu ramo e, até lá, você continua em Odontologia.")).toBeTruthy(),
+    );
+    expect(screen.queryByText(/Você está em/)).toBeNull();
+  });
+
   it("o texto livre vazio não deixa salvar (a marca precisa escrever o ramo ou escolher um da lista)", async () => {
     render(<FormularioConta {...PROPS_BASE} />);
     fireEvent.focus(campoRamo());
@@ -255,6 +274,19 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
 
     await waitFor(() => expect(screen.getByRole("alert").textContent).toBe("Escreva o seu ramo"));
     expect(salvarContaAction).not.toHaveBeenCalled();
+  });
+});
+
+describe("FormularioConta: os ramos alternativos (E45 PR 3), só leitura", () => {
+  it("com um ou dois ramos ligados pelo admin, a frase os diz; sem nenhum, não aparece", () => {
+    const { rerender } = render(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição"]} />);
+    expect(screen.getByText("A gente ligou também Nutrição aos seus temas e referências.")).toBeTruthy();
+
+    rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição", "Advocacia"]} />);
+    expect(screen.getByText("A gente ligou também Nutrição e Advocacia aos seus temas e referências.")).toBeTruthy();
+
+    rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={[]} />);
+    expect(screen.queryByText(/A gente ligou também/)).toBeNull();
   });
 });
 
