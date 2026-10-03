@@ -9,7 +9,6 @@ import {
   limparTextoDoItem,
   proximaLeituraEm,
   reconciliarItens,
-  resumirVideosParaIA,
   similaridade,
   tentativaRecenteDemais,
   textoEmVigor,

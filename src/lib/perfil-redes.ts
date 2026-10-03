@@ -91,3 +91,12 @@ export function perfilPareceValido(handleLimpo: string): boolean {
   const semArroba = handleLimpo.replace(/^@/, "");
   return /^[a-zA-Z0-9._-]+$/.test(semArroba);
 }
+
+/**
+ * Mostra o handle com um "@" só (E38 PR 2, achado do levantamento do PR 1): o YouTube é guardado
+ * com "@" (`normalizarHandle`), o Instagram e o TikTok sem; escrever `@${handle}` na tela e no
+ * prompt do roteiro dava "@@canal" no YouTube.
+ */
+export function comArroba(handle: string): string {
+  return handle.startsWith("@") ? handle : `@${handle}`;
+}

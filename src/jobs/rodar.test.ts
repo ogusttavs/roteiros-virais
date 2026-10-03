@@ -14,12 +14,14 @@ vi.mock("./meta-hashtags", () => ({ rodarMetaHashtags: vi.fn().mockResolvedValue
 vi.mock("./descoberta-instagram", () => ({ rodarDescobertaInstagram: vi.fn().mockResolvedValue({}) }));
 vi.mock("./coleta-apify", () => ({ rodarColetaApify: vi.fn().mockResolvedValue({}) }));
 vi.mock("./coleta-meio-dia", () => ({ rodarColetaMeioDia: vi.fn().mockResolvedValue({}) }));
+vi.mock("./entender-marca", () => ({ rodarEntenderMarca: vi.fn().mockResolvedValue({}) }));
 
 import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
+import { rodarEntenderMarca } from "./entender-marca";
 import { FILAS, FILAS_POR_EVENTO } from "./fila";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
@@ -50,6 +52,35 @@ describe("TAREFAS (rodar.ts)", () => {
 
     expect(rodarColetaApify).toHaveBeenCalledWith(undefined, idDaExecucao);
     expect(rodarColetaMeioDia).toHaveBeenCalledWith(idDaExecucao);
+  });
+
+  /**
+   * E38 PR 2: sem argumento é o despachante, e o id da execução nunca vira o `clienteId` (o bug do
+   * PR #36); com o id da marca (e `--forcar`) lê uma marca só. `process.argv[3]` é o argumento que o
+   * `npm run job -- entender-marca <clienteId>` deixa.
+   */
+  it("entender-marca: sem argumento roda o despachante; com o id da marca, lê aquela marca", async () => {
+    const argvOriginal = process.argv;
+    try {
+      process.argv = ["node", "rodar.ts", FILAS.entenderMarca];
+      await TAREFAS[FILAS.entenderMarca](555);
+      expect(rodarEntenderMarca).toHaveBeenLastCalledWith(null);
+
+      process.argv = ["node", "rodar.ts", FILAS.entenderMarca, "42"];
+      await TAREFAS[FILAS.entenderMarca](555);
+      expect(rodarEntenderMarca).toHaveBeenLastCalledWith({ clienteId: 42, origem: "manual", forcar: false });
+
+      process.argv = ["node", "rodar.ts", FILAS.entenderMarca, "42", "--forcar"];
+      await TAREFAS[FILAS.entenderMarca](555);
+      expect(rodarEntenderMarca).toHaveBeenLastCalledWith({ clienteId: 42, origem: "manual", forcar: true });
+
+      // O id da execução (555) nunca aparece como clienteId.
+      process.argv = ["node", "rodar.ts", FILAS.entenderMarca, "--forcar"];
+      await TAREFAS[FILAS.entenderMarca](555);
+      expect(rodarEntenderMarca).toHaveBeenLastCalledWith(null);
+    } finally {
+      process.argv = argvOriginal;
+    }
   });
 
   /**

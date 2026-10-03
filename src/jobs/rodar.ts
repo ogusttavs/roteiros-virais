@@ -22,6 +22,7 @@ import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
 import { rodarEmailAcompanhamento } from "./email-acompanhamento";
+import { rodarEntenderMarca } from "./entender-marca";
 import { executarComRegistro } from "./execucoes";
 import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
@@ -133,6 +134,18 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
       citado
         ? { clienteId, perfilCitadoId: citado.id, origem: "citado", tipoCitado: citado.tipo, rede, handle }
         : { clienteId, perfilCitadoId: null, origem: "propria_marca", tipoCitado: null, rede, handle },
+    );
+  },
+  /**
+   * E38 PR 2: sem argumento roda o despachante (o mesmo do cron diário, só enfileira quem precisa);
+   * `npm run job -- entender-marca <clienteId> [--forcar]` lê uma marca na hora (o Fable roda assim
+   * para as marcas que já existem, com o sim do Gustavo), direto, sem passar pela fila.
+   */
+  [FILAS.entenderMarca]: () => {
+    const clienteIdArg = process.argv[3];
+    const forcar = process.argv.includes("--forcar");
+    return rodarEntenderMarca(
+      clienteIdArg && /^\d+$/.test(clienteIdArg) ? { clienteId: Number(clienteIdArg), origem: "manual", forcar } : null,
     );
   },
 };

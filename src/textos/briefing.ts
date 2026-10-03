@@ -258,6 +258,10 @@ export const textosBriefing = {
     rotuloPropriaMarca: "o seu perfil",
     pendente: "Ainda lendo este perfil.",
     naoEncontrado: "Não achamos este perfil na rede. Confira se o @ está certo.",
+    /** E38 PR 2, acabamento a: o TikTok está desligado por decisão, não é @ errado. */
+    tiktokDesligado: "O TikTok ainda não é lido por aqui; o seu @ fica guardado.",
+    semVideos: "Este perfil ainda não tem vídeo publicado para a gente ler.",
+    contaRestrita: "Não conseguimos ler este perfil: o Instagram só deixa quando a conta é profissional e sem restrição de idade.",
   },
 };
 

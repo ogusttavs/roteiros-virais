@@ -18,7 +18,15 @@ afterAll(async () => {
 
 describe("opcoesDaFila", () => {
   it("job longo: 4 horas de prazo e nenhuma repeticao automatica", () => {
-    for (const nome of [FILAS.transcrever, FILAS.pesquisaDeSetor, FILAS.extrairSemFala, FILAS.temasDoDia, FILAS.pontuar]) {
+    for (const nome of [
+      FILAS.transcrever,
+      FILAS.pesquisaDeSetor,
+      FILAS.extrairSemFala,
+      FILAS.temasDoDia,
+      FILAS.pontuar,
+      // E38 PR 2: ler o Instagram pode esperar a janela da Meta por quase uma hora; com 15 minutos e repeticao leria o site do cliente tres vezes.
+      FILAS.entenderMarca,
+    ]) {
       expect(opcoesDaFila(nome)).toEqual({ retryLimit: 0, retryBackoff: false, expireInSeconds: 4 * 60 * 60 });
     }
   });

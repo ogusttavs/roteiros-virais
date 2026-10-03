@@ -240,14 +240,14 @@ export async function desfazerTirarItem(clienteId: number, itemId: number): Prom
 export async function enfileirarEntenderMarca(
   clienteId: number,
   origem: "evento" | "mensal" | "manual",
-  opcoes: { janelaSegundos?: number; depoisDeSegundos?: number } = {},
+  opcoes: { janelaSegundos?: number; depoisDeSegundos?: number; chave?: string } = {},
 ): Promise<boolean> {
   await garantirBossPronto();
   const id = await boss().send(
     FILAS.entenderMarca,
     { clienteId, origem },
     {
-      singletonKey: `marca-${clienteId}`,
+      singletonKey: opcoes.chave ?? `marca-${clienteId}`,
       singletonSeconds: opcoes.janelaSegundos ?? 60,
       ...(opcoes.depoisDeSegundos ? { startAfter: opcoes.depoisDeSegundos } : {}),
     },

@@ -1,3 +1,5 @@
+import { estadoDoPerfilAnalisado } from "@/lib/perfil-analisado-motivo";
+import { comArroba } from "@/lib/perfil-redes";
 import type { PerfilAnalisadoComTipo } from "@/servicos/perfis-analisados";
 import { textosBriefing } from "@/textos/briefing";
 import cartaoStyles from "@/ui/componentes/Cartao.module.css";
@@ -11,6 +13,21 @@ type Props = { perfis: PerfilAnalisadoComTipo[] };
 function rotuloDoPerfil(perfil: PerfilAnalisadoComTipo): string {
   if (perfil.origem === "propria_marca") return t.rotuloPropriaMarca;
   return perfil.tipoCitado === "admira" ? t.rotuloAdmira : t.rotuloConcorrente;
+}
+
+const FRASE_POR_MOTIVO = {
+  tiktok_desligado: t.tiktokDesligado,
+  nao_encontrado: t.naoEncontrado,
+  sem_videos: t.semVideos,
+  conta_restrita: t.contaRestrita,
+} as const;
+
+/** A leitura, o aviso de que ainda está lendo, ou a frase do motivo (só "não encontrado" fala em conferir o @). */
+function CorpoDoPerfil({ perfil }: { perfil: PerfilAnalisadoComTipo }) {
+  const estado = estadoDoPerfilAnalisado(perfil);
+  if (estado.tipo === "leitura") return <p className={styles.leitura}>{perfil.leitura}</p>;
+  if (estado.tipo === "lendo") return <p className={styles.pendente}>{t.pendente}</p>;
+  return <p className={styles.naoEncontrado}>{FRASE_POR_MOTIVO[estado.motivo]}</p>;
 }
 
 /**
@@ -37,16 +54,10 @@ export function PerfisAnalisadosCard({ perfis }: Props) {
             {perfis.map((perfil) => (
               <div key={perfil.id} className={styles.item}>
                 <div className={styles.cabecalho}>
-                  <span className={styles.handle}>@{perfil.handle}</span>
+                  <span className={styles.handle}>{comArroba(perfil.handle)}</span>
                   <span className={styles.rotulo}>{rotuloDoPerfil(perfil)}</span>
                 </div>
-                {perfil.leitura ? (
-                  <p className={styles.leitura}>{perfil.leitura}</p>
-                ) : perfil.existeNaRede ? (
-                  <p className={styles.pendente}>{t.pendente}</p>
-                ) : (
-                  <p className={styles.naoEncontrado}>{t.naoEncontrado}</p>
-                )}
+                <CorpoDoPerfil perfil={perfil} />
               </div>
             ))}
           </div>

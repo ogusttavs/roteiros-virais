@@ -45,6 +45,7 @@ import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { comArroba } from "@/lib/perfil-redes";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -390,7 +391,7 @@ export function formatarCamadaExclusiva(
     );
   }
   for (const leitura of leiturasPerfis) {
-    linhas.push(`Sobre @${leitura.handle}: ${leitura.leitura}`);
+    linhas.push(`Sobre ${comArroba(leitura.handle)}: ${leitura.leitura}`);
   }
   return linhas.length > 0
     ? linhas.join(" ")

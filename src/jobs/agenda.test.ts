@@ -23,6 +23,16 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.pontuar)).toBe("45 3 * * *");
   });
 
+  /**
+   * E38 PR 2: o despachante diario das 01:30 (por idade, nao por calendario: o cron do pg-boss nao
+   * recupera um disparo perdido). Antes da coleta das 03:00 e longe da pesquisa de setor, que so roda
+   * no dia 1 as 02:00.
+   */
+  it("entenderMarca despacha todo dia as 01:30, antes da coleta e sem colidir com a pesquisa de setor", () => {
+    expect(cronDe(FILAS.entenderMarca)).toBe("30 1 * * *");
+    expect(cronDe(FILAS.pesquisaDeSetor)).toBe("0 2 1 * *");
+  });
+
   it("cada fila e chave aparecem no maximo uma vez", () => {
     const chaves = AGENDAMENTOS.map((a) => `${a.fila}::${a.chave ?? ""}`);
     expect(new Set(chaves).size).toBe(chaves.length);

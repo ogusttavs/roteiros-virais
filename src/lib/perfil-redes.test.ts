@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { limparCampoPerfil, perfilPareceValido } from "./perfil-redes";
+import { comArroba, limparCampoPerfil, perfilPareceValido } from "./perfil-redes";
+
+describe("comArroba", () => {
+  it("Instagram e TikTok guardam sem arroba: ganha um", () => {
+    expect(comArroba("drwash")).toBe("@drwash");
+  });
+
+  it("YouTube já vem com arroba: nunca vira dois (o bug do @@canal do PR 1)", () => {
+    expect(comArroba("@canalexemplo")).toBe("@canalexemplo");
+  });
+});
 
 describe("limparCampoPerfil", () => {
   it("instagram: endereco inteiro vira so o nome", () => {

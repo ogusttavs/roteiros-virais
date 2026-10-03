@@ -197,6 +197,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "pesquisa dos maiores do mercado por setor (M2), todo dia 1 do mes as 02:00, para os setores ativos",
   },
   {
+    fila: FILAS.entenderMarca,
+    cron: "30 1 * * *",
+    descricao:
+      "despacha a leitura do site e das redes das marcas sem leitura ou com mais de 30 dias (E38 PR 2), todo dia as 01:30, antes da coleta das 03:00",
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",
