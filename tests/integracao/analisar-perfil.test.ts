@@ -253,6 +253,24 @@ describe("rodarAnalisarPerfil, YouTube", () => {
   });
 });
 
+describe("isolamento (pedido do Fable na revisao do contraponto)", () => {
+  it("mesmo um perfil que qualifica nunca escreve em contas/videos antes da promocao manual: Referencias, tema e evidencia de outra marca nunca veem esse video", async () => {
+    const clienteId = await criarClienteComNicho("isolamento-contas-videos", nichoLimpezaId);
+    mockYoutube(
+      { "@isolamentocv": { id: "canal-isolamento-cv", country: "BR", playlistId: "pl-isolamento-cv" } },
+      { "canal-isolamento-cv": videosBonsPadrao("isolamento-cv") },
+    );
+
+    const resultado = await rodarAnalisarPerfil(payload(clienteId, "@isolamentocv"));
+    expect(resultado.qualificaParaSetor).toBe(true);
+
+    const contasComEsseHandle = await db().select().from(contas).where(eq(contas.handle, "canal-isolamento-cv"));
+    expect(contasComEsseHandle).toHaveLength(0);
+    const videosComEssePrefixo = await db().select().from(videos).where(eq(videos.idExterno, "isolamento-cv-v0"));
+    expect(videosComEssePrefixo).toHaveLength(0);
+  });
+});
+
 describe("virarContaDoSetor", () => {
   it("recusa perfil que nao existe", async () => {
     await expect(virarContaDoSetor(999_999)).rejects.toThrow("perfil analisado nao encontrado");
