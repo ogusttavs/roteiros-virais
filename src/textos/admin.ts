@@ -34,6 +34,9 @@ export const textosAdmin = {
     colunaDiasSemGravar: "dias sem gravar",
     /** V3, item 5: coluna "Pessoas" (quantas tem acesso a esta marca), antes de "Estado" (não existe hoje). */
     colunaPessoas: "pessoas",
+    /** E48 PR 1: o dono abriu o aplicativo instalado no celular (a data); "não" até a primeira vez. */
+    colunaInstalou: "instalou",
+    instalouNao: "não",
     semNicho: "sem nicho",
     semNota: "sem nota",
     semRoteiro: "sem roteiro ainda",

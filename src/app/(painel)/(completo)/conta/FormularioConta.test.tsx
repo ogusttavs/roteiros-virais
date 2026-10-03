@@ -280,10 +280,10 @@ describe("FormularioConta: o 'Não achei o meu' (E45 PR 2)", () => {
 describe("FormularioConta: os ramos alternativos (E45 PR 3), só leitura", () => {
   it("com um ou dois ramos ligados pelo admin, a frase os diz; sem nenhum, não aparece", () => {
     const { rerender } = render(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição"]} />);
-    expect(screen.getByText("A gente ligou também Nutrição aos seus temas e referências.")).toBeTruthy();
+    expect(screen.getByText("A gente ligou também Nutrição ao seu tema livre, às suas referências e aos seus roteiros.")).toBeTruthy();
 
     rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={["Nutrição", "Advocacia"]} />);
-    expect(screen.getByText("A gente ligou também Nutrição e Advocacia aos seus temas e referências.")).toBeTruthy();
+    expect(screen.getByText("A gente ligou também Nutrição e Advocacia ao seu tema livre, às suas referências e aos seus roteiros.")).toBeTruthy();
 
     rerender(<FormularioConta {...PROPS_BASE} ramosAlternativos={[]} />);
     expect(screen.queryByText(/A gente ligou também/)).toBeNull();

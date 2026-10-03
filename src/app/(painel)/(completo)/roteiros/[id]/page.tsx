@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 
+import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoAtual } from "@/lib/sessao";
-import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
+import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
@@ -34,6 +35,7 @@ export default async function Roteiro({ params }: Props) {
     redirect("/hoje");
   }
 
+  const preferencias = await preferenciasDoUsuario(sessao.user.id);
   const [video, versoes] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
@@ -49,6 +51,7 @@ export default async function Roteiro({ params }: Props) {
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}
+      conviteInstalarPodeAparecer={conviteDeInstalarPodeAparecer(preferencias, new Date())}
     />
   );
 }

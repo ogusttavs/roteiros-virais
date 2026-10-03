@@ -1,0 +1,2 @@
+ALTER TABLE "preferencias_usuario" ADD COLUMN "convite_instalar_adiado_ate" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "preferencias_usuario" ADD COLUMN "instalado_em" timestamp with time zone;

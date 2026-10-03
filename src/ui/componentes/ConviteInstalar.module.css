@@ -1,0 +1,60 @@
+/* E48 PR 1: o corpo da folha de convite de instalar o aplicativo. */
+.convite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-4);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.passos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.passos li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+}
+
+.numero {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-titulo);
+}
+
+.texto {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.icone {
+  margin-left: var(--espaco-2);
+  vertical-align: text-bottom;
+  color: var(--cor-titulo);
+}
+
+.semBotao {
+  margin: 0;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}

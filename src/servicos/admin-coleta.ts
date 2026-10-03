@@ -19,6 +19,7 @@ import {
   nichos,
   noticias,
   pesquisasSetor,
+  preferenciasUsuario,
   roteiros,
   temasDia,
   user,
@@ -109,6 +110,8 @@ export type ClienteAdmin = {
   diasSemGravar: number | null;
   /** V3, item 5: quantas pessoas tem acesso a esta marca (membros_marca). */
   pessoas: number;
+  /** E48 PR 1: quando o dono abriu o aplicativo instalado pela primeira vez; nulo se ainda não instalou. */
+  instaladoEm: Date | null;
 };
 
 /**
@@ -132,10 +135,12 @@ export async function listarClientesAdmin(): Promise<ClienteAdmin[]> {
         email: user.email,
         nichoNome: nichos.nome,
         ativo: clientes.ativo,
+        instaladoEm: preferenciasUsuario.instaladoEm,
       })
       .from(clientes)
       .leftJoin(membrosMarca, and(eq(membrosMarca.clienteId, clientes.id), eq(membrosMarca.papel, "dono")))
       .leftJoin(user, eq(user.id, membrosMarca.usuarioId))
+      .leftJoin(preferenciasUsuario, eq(preferenciasUsuario.usuarioId, user.id))
       .leftJoin(nichos, eq(nichos.id, clientes.nichoId))
       .orderBy(clientes.criadoEm),
     db().select({ clienteId: briefings.clienteId, notaGeral: briefings.notaGeral }).from(briefings),

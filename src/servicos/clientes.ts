@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
@@ -27,6 +27,7 @@ import {
 } from "@/db/schema";
 import { auth } from "@/lib/auth";
 import { hojeISO } from "@/lib/config";
+import { adiamentoDoConvite } from "@/lib/convite-instalar";
 import {
   lerClienteIdDoCookie,
   NOME_COOKIE_MARCA_ATIVA,
@@ -42,6 +43,7 @@ import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
+import { tirarAlternativoQueViraPrincipal } from "@/servicos/ramos-da-conta";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -682,6 +684,8 @@ export async function salvarDadosFixosComPedido(clienteId: number, dadosBrutos: 
     .returning();
 
   if (!cliente) throw new ErroCliente("nao foi possivel salvar os dados; cliente nao encontrado.");
+  // E45 PR 3, item 0: o alternativo que virou o principal sai da tabela dos alternativos.
+  if (antes?.nichoId !== cliente.nichoId) await tirarAlternativoQueViraPrincipal(clienteId, cliente.nichoId);
 
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado. A troca já foi gravada: isto
   // nunca a derruba.
@@ -829,6 +833,33 @@ export async function preferenciasDoUsuario(usuarioId: string): Promise<Preferen
   return linha ?? null;
 }
 
+/**
+ * E48 PR 1: "Agora não" no convite de instalar o aplicativo: a folha não volta por sete dias, em nenhum aparelho da pessoa. Cria a linha de
+ * preferências se ainda não existe (quem chega aqui já aceitou os termos, então ela existe; o upsert é só para nunca falhar à toa).
+ */
+export async function adiarConviteDeInstalar(usuarioId: string, agora: Date = new Date()): Promise<Date> {
+  const ate = adiamentoDoConvite(agora);
+  await db()
+    .insert(preferenciasUsuario)
+    .values({ usuarioId, conviteInstalarAdiadoAte: ate })
+    .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { conviteInstalarAdiadoAte: ate } });
+  return ate;
+}
+
+/**
+ * E48 PR 1: a primeira abertura em modo aplicativo (tela cheia, sem a barra do navegador) grava `instalado_em`, uma vez só: abrir de novo não
+ * muda a data. Serve ao admin (quem instalou) e ao envio de aviso pelo celular (PR 2). Devolve se esta chamada foi a que gravou.
+ */
+export async function registrarInstalacao(usuarioId: string, agora: Date = new Date()): Promise<boolean> {
+  await db().insert(preferenciasUsuario).values({ usuarioId }).onConflictDoNothing();
+  const gravadas = await db()
+    .update(preferenciasUsuario)
+    .set({ instaladoEm: agora })
+    .where(and(eq(preferenciasUsuario.usuarioId, usuarioId), isNull(preferenciasUsuario.instaladoEm)))
+    .returning({ usuarioId: preferenciasUsuario.usuarioId });
+  return gravadas.length > 0;
+}
+
 /** "HH:MM" (etapa 13, ajuste 4: o navegador nao obriga o `step` de hora cheia do campo). */
 const horaMinutoSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "hora invalida");
 /** O tema do dia nasce as 05:30; o lembrete nao faz sentido antes disso nem tarde da noite. */
@@ -945,6 +976,7 @@ export async function salvarRamoConta(clienteId: number, ramoSlug: string): Prom
   const { nichoId } = await setorParaAMarca(antes.nichoId, ramoSlug);
   const [cliente] = await db().update(clientes).set({ nichoId, ramoOutro: null }).where(eq(clientes.id, clienteId)).returning();
   if (!cliente) throw new ErroCliente("nao foi possivel trocar o ramo; cliente nao encontrado.");
+  if (antes.nichoId !== nichoId) await tirarAlternativoQueViraPrincipal(clienteId, nichoId);
   // Escolheu da lista: o pedido de ramo aberto (o "Não achei o meu" de antes) deixa de valer.
   await cancelarPedidoAberto(clienteId);
   // O setor de onde a marca saiu, se nasceu de um ramo do catálogo e ficou sem marca, para de ser pesquisado (nunca derruba a troca).

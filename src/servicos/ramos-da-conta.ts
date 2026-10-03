@@ -4,7 +4,7 @@
  * evidência do roteiro; nunca nos temas do dia. Ter um alternativo ligado conta como "ter marca" para o setor: ele não é desligado enquanto
  * houver quem o use (`desligarSetorSeSemMarca`), e ligar um alternativo a um setor parado o reativa.
  */
-import { and, asc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, ne, sql } from "drizzle-orm";
 
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
@@ -53,6 +53,24 @@ export async function ramosAlternativosDaMarca(clienteId: number): Promise<RamoA
   }));
 }
 
+async function contarLinhasDaMarca(clienteId: number): Promise<number> {
+  const [linha] = await db().select({ total: count() }).from(ramosDaConta).where(eq(ramosDaConta.clienteId, clienteId));
+  return linha?.total ?? 0;
+}
+
+/**
+ * O ramo alternativo que a marca escolheu como principal sai da tabela (quem chama é todo caminho que troca `clientes.nicho_id`: o Começar, a
+ * Conta, o palpite do "Não achei o meu" e o admin que resolve o pedido). Sem isto a linha ficava parada, escondida, e reaparecia como alternativo,
+ * com o custo de pesquisa junto, na troca de principal seguinte. Nunca derruba a troca de quem chama.
+ */
+export async function tirarAlternativoQueViraPrincipal(clienteId: number, nichoIdNovo: number | null | undefined): Promise<void> {
+  if (!nichoIdNovo) return;
+  await db()
+    .delete(ramosDaConta)
+    .where(and(eq(ramosDaConta.clienteId, clienteId), eq(ramosDaConta.nichoId, nichoIdNovo)))
+    .catch(() => undefined);
+}
+
 /**
  * Os setores da conta, o principal primeiro: o que o tema livre, as Referências e a evidência do roteiro olham. Sem ramo principal, só os
  * alternativos (o admin liga alternativo a quem já tem principal, mas o dado pode ter ficado assim se o principal mudou depois).
@@ -73,7 +91,7 @@ export type PreviaDeLigarRamo = {
 /** O que acontece se o admin ligar este ramo: o setor já é pesquisado ou vai começar a ser (e custar por dia). Só lê. */
 export async function previaDeLigarRamo(slugDoRamo: string): Promise<PreviaDeLigarRamo> {
   const ramo = ramoPorSlug(slugDoRamo);
-  if (!ramo) throw new ErroRamosDaConta("ramo desconhecido.");
+  if (!ramo) throw new ErroRamosDaConta("Ramo desconhecido.");
   const setor = await nichoDoRamo(slugDoRamo);
   return { estado: setor?.ativo ? "pesquisado" : "comeca", nome: ramo.nome };
 }
@@ -85,18 +103,21 @@ export async function previaDeLigarRamo(slugDoRamo: string): Promise<PreviaDeLig
  */
 export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string, usuarioId: string): Promise<RamoAlternativo> {
   const ramo = ramoPorSlug(slugDoRamo);
-  if (!ramo) throw new ErroRamosDaConta("ramo desconhecido.");
+  if (!ramo) throw new ErroRamosDaConta("Ramo desconhecido.");
 
   const [marca] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId));
-  if (!marca) throw new ErroRamosDaConta("marca nao encontrada.");
-  if (!marca.nichoId) throw new ErroRamosDaConta("a marca ainda nao tem ramo principal; escolha o principal antes de ligar outro.");
+  if (!marca) throw new ErroRamosDaConta("Marca não encontrada.");
+  if (!marca.nichoId) throw new ErroRamosDaConta("A marca ainda não tem ramo principal; escolha o principal antes de ligar outro.");
   const [principal] = await db().select({ ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.id, marca.nichoId));
-  if (principal?.ramoCatalogo === slugDoRamo) throw new ErroRamosDaConta("esse ja e o ramo principal da marca.");
+  if (principal?.ramoCatalogo === slugDoRamo) throw new ErroRamosDaConta("Esse já é o ramo principal da marca.");
 
+  // Linhas paradas de antes (o alternativo que a marca já escolheu como principal) saem aqui, antes de contar o teto.
+  await tirarAlternativoQueViraPrincipal(clienteId, marca.nichoId);
   const ligados = await ramosAlternativosDaMarca(clienteId);
-  if (ligados.some((l) => l.ramoSlug === slugDoRamo)) throw new ErroRamosDaConta("esse ramo ja esta ligado a marca.");
-  if (ligados.length >= MAXIMO_DE_RAMOS_ALTERNATIVOS) {
-    throw new ErroRamosDaConta(`a marca ja tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
+  if (ligados.some((l) => l.ramoSlug === slugDoRamo)) throw new ErroRamosDaConta("Esse ramo já está ligado à marca.");
+  // O teto conta as LINHAS da tabela, não só as visíveis: uma linha que ficou parada (o alternativo virou principal e a marca trocou de novo) conta até sair.
+  if ((await contarLinhasDaMarca(clienteId)) >= MAXIMO_DE_RAMOS_ALTERNATIVOS) {
+    throw new ErroRamosDaConta(`A marca já tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
   }
 
   const { nicho } = await garantirNichoDoRamo(slugDoRamo);
@@ -105,7 +126,7 @@ export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string
     .values({ clienteId, nichoId: nicho.id, ligadoPorUsuarioId: usuarioId })
     .onConflictDoNothing()
     .returning();
-  if (!linha) throw new ErroRamosDaConta("esse ramo ja esta ligado a marca.");
+  if (!linha) throw new ErroRamosDaConta("Esse ramo já está ligado à marca.");
 
   // Duas ligações ao mesmo tempo passariam as duas pela conferência acima: a que passou do máximo se desfaz.
   const depois = await ramosAlternativosDaMarca(clienteId);
@@ -113,7 +134,7 @@ export async function ligarRamoAlternativo(clienteId: number, slugDoRamo: string
     await db().delete(ramosDaConta).where(eq(ramosDaConta.id, linha.id));
     // O setor que `garantirNichoDoRamo` acabou de criar ou reativar não fica ligado sem marca.
     await desligarSetorSeSemMarca(nicho.id).catch(() => undefined);
-    throw new ErroRamosDaConta(`a marca ja tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
+    throw new ErroRamosDaConta(`A marca já tem ${MAXIMO_DE_RAMOS_ALTERNATIVOS} ramos alternativos; tire um antes de ligar outro.`);
   }
   return { id: linha.id, nichoId: nicho.id, nome: ramo.nome, ramoSlug: ramo.slug, ligadoEm: linha.ligadoEm };
 }
@@ -124,6 +145,6 @@ export async function tirarRamoAlternativo(clienteId: number, ramoDaContaId: num
     .delete(ramosDaConta)
     .where(and(eq(ramosDaConta.id, ramoDaContaId), eq(ramosDaConta.clienteId, clienteId)))
     .returning({ nichoId: ramosDaConta.nichoId });
-  if (!removida) throw new ErroRamosDaConta("esse ramo ja foi tirado ou nao e desta marca.");
+  if (!removida) throw new ErroRamosDaConta("Esse ramo já foi tirado ou não é desta marca.");
   await desligarSetorSeSemMarca(removida.nichoId).catch(() => undefined);
 }
