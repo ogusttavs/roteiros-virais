@@ -21,7 +21,7 @@ import { account, briefings, clientes, contas, formatosDaMarca, membrosMarca, ni
 
 const SENHA = "ExemploSenha123";
 const SEED = "seed-cliente-limpeza@exemplo.teste";
-const ADMIN = "seed-admin@exemplo.teste";
+const ADMIN = "admin@exemplo.teste";
 const CAPTURA_ID = "captura-tipos";
 const CAPTURA = `${CAPTURA_ID}@exemplo.teste`;
 
