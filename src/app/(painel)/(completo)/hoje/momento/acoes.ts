@@ -1,5 +1,6 @@
 "use server";
 
+import { ehFicha } from "@/config/fichas";
 import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
@@ -36,6 +37,8 @@ export type DadosMomento = {
   oQueEstaAcontecendo: string;
   oQueDaParaMostrar: string;
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha das cinco (só Reels); decide o objetivo que se grava. Texto livre do navegador, conferido por `ehFicha`. */
+  ficha?: string;
   /** V9a, item 4: "Falar de", só quando a pessoa é membro de mais de uma marca e escolheu uma diferente da ativa. */
   marcaId?: number;
   /** A fala inteira, só no caminho por áudio (o bloco "o que você disse"). */
@@ -102,6 +105,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
         objetivoDoVideo: dados.objetivoDoVideo?.trim() || undefined,
       },
       objetivo: dados.objetivo,
+      ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
       quemAparece: validarQuemAparece(dados.quemAparece),

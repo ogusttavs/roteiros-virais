@@ -19,6 +19,7 @@ import {
   type Cliente,
   type EstadoPlano,
   type EstiloRoteiro,
+  type Ficha,
   type FormatoRoteiro,
   type Momento,
   type MomentoDoDia,
@@ -325,6 +326,8 @@ export async function aceitar(
     oQueEstaAcontecendo: string;
     oQueDaParaMostrar: string;
     objetivo: Objetivo;
+    /** E49 PR 1: a ficha confirmada na folha (só Reels). */
+    ficha?: Ficha;
     /** V9c, item 1: o que a pessoa confirmou na folha; sem isto, cai no mesmo sugerido pelo objetivo. */
     formato?: FormatoRoteiro;
     /** M4, item 2: o que a pessoa confirmou na folha; sem isto, cai em "falado" (sem evidência no momento para sugerir). */
@@ -358,6 +361,7 @@ export async function aceitar(
     origem: "momento",
     momento,
     objetivo: dados.objetivo,
+    ficha: dados.ficha,
     formato,
     estilo,
     quemAparece: dados.quemAparece,

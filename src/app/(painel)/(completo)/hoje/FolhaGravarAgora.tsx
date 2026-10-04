@@ -4,17 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import type { EstiloRoteiro, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import { FICHAS_EM_ORDEM, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha } from "@/config/fichas";
+import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
-  AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
   ESTILOS_ROTEIRO_EM_ORDEM,
   FORMATOS_ROTEIRO_EM_ORDEM,
-  NOME_OBJETIVO,
-  OBJETIVOS_EM_ORDEM,
   ROTULO_ESTILO_ROTEIRO,
   ROTULO_FORMATO_ROTEIRO,
-  sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
 import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
@@ -35,10 +32,6 @@ import { roteiroRecenteDesdeAction } from "./acoes";
 import styles from "./FolhaGravarAgora.module.css";
 import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "./momento/acoes";
 import { aceitarPlanoAction } from "./plano/acoes";
-
-function primeiraMaiuscula(texto: string): string {
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
 
 type MarcaResumo = { id: number; nome: string };
 
@@ -118,14 +111,14 @@ export function FolhaGravarAgora({
   const [onde, setOnde] = useState(valoresIniciais?.onde ?? "");
   const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? "");
   const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? "");
-  const [objetivo, setObjetivo] = useState<Objetivo | null>(valoresIniciais?.objetivo ?? objetivoRecomendado);
-  // V9c, item 1: enquanto a pessoa nao mexe no controle, o formato segue o objetivo (`sugerirFormatoPeloObjetivo`);
-  // vindo de um item do plano, comeca no que `planejarDia` ja sugeriu e conta como "tocado" (a pessoa ve o que o
-  // sistema escolheu, sem a ajuda por cima, do jeito que os outros campos ja chegam preenchidos).
-  const [formato, setFormato] = useState<FormatoRoteiro>(
-    valoresIniciais?.formato ?? formatoInicial ?? (objetivo ? sugerirFormatoPeloObjetivo(objetivo) : "reels"),
-  );
-  const [formatoTocado, setFormatoTocado] = useState(valoresIniciais?.formato !== undefined || formatoInicial !== undefined);
+  // E49 PR 1 (passo 18b): o formato vem ANTES da pergunta; no Reels, as cinco fichas em chips só pelo nome, a recomendada marcada; no Story, nenhuma pergunta.
+  const objetivoInicial = valoresIniciais?.objetivo ?? objetivoRecomendado;
+  const fichaRecomendada: Ficha | null = objetivoRecomendado ? fichaPadraoDoObjetivo(objetivoRecomendado) : null;
+  const [ficha, setFicha] = useState<Ficha | null>(objetivoInicial ? fichaPadraoDoObjetivo(objetivoInicial) : null);
+  // Vindo de um item do plano, o formato começa no que `planejarDia` já sugeriu; senão, o da porta que abriu a folha, ou Reels.
+  const [formato, setFormato] = useState<FormatoRoteiro>(valoresIniciais?.formato ?? formatoInicial ?? "reels");
+  // O Story não tem ficha: o objetivo gravado é o de falar com quem já segue.
+  const objetivo: Objetivo | null = formato === "story" ? "engajamento" : ficha ? objetivoDaFicha(ficha) : null;
   /**
    * M4, item 2: o segundo controle segmentado da folha. Sem sugestão automática aqui (o momento
    * nunca busca evidência no banco, `gerarRoteiro` pula essa busca de propósito para esta origem);
@@ -158,11 +151,6 @@ export function FolhaGravarAgora({
    * `escrever()` precisa ler o valor mais recente mesmo depois do componente sair da tela.
    */
   const saiuRef = useRef(false);
-
-  useEffect(() => {
-    if (formatoTocado || !objetivo) return;
-    setFormato(sugerirFormatoPeloObjetivo(objetivo));
-  }, [objetivo, formatoTocado]);
 
   const {
     fase: faseAudio,
@@ -211,6 +199,7 @@ export function FolhaGravarAgora({
               oQueEstaAcontecendo,
               oQueDaParaMostrar,
               objetivo,
+              ficha: formato === "reels" ? (ficha ?? undefined) : undefined,
               formato,
               estilo,
               marcaId,
@@ -223,6 +212,7 @@ export function FolhaGravarAgora({
               oQueEstaAcontecendo,
               oQueDaParaMostrar,
               objetivo,
+              ficha: formato === "reels" ? (ficha ?? undefined) : undefined,
               formato,
               estilo,
               marcaId,
@@ -341,23 +331,6 @@ export function FolhaGravarAgora({
           linhasMin={2}
         />
 
-        <div className={styles.grupoObjetivo}>
-          <span className={styles.rotuloGrupo}>{textosMomento.objetivo}</span>
-          <div role="radiogroup" aria-label={textosMomento.objetivo} className={styles.opcoesObjetivo}>
-            {OBJETIVOS_EM_ORDEM.map((opcao) => (
-              <OpcaoObjetivo
-                key={opcao}
-                titulo={primeiraMaiuscula(NOME_OBJETIVO[opcao])}
-                ajuda={AJUDA_OBJETIVO[opcao]}
-                marcada={objetivo === opcao}
-                recomendada={objetivoRecomendado === opcao}
-                rotuloRecomendado={textosMomento.recomendado}
-                onEscolher={() => setObjetivo(opcao)}
-              />
-            ))}
-          </div>
-        </div>
-
         <div className={styles.grupoFormato}>
           <span className={styles.rotuloGrupo}>{textosMomento.formato}</span>
           <div role="tablist" aria-label={textosMomento.formato} className={styles.segmentado}>
@@ -370,17 +343,27 @@ export function FolhaGravarAgora({
                 className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
                   .filter(Boolean)
                   .join(" ")}
-                onClick={() => {
-                  setFormatoTocado(true);
-                  setFormato(opcao);
-                }}
+                onClick={() => setFormato(opcao)}
               >
                 {ROTULO_FORMATO_ROTEIRO[opcao]}
               </button>
             ))}
           </div>
-          {!formatoTocado ? <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p> : null}
+          <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p>
         </div>
+
+        {formato === "reels" ? (
+          <div className={styles.grupoObjetivo} data-fichas>
+            <span className={styles.rotuloGrupo}>{textosMomento.objetivo}</span>
+            <Chips
+              rotuloGrupo={textosMomento.objetivo}
+              opcoes={FICHAS_EM_ORDEM.map((f) => NOME_DA_FICHA[f])}
+              selecionado={ficha ? FICHAS_EM_ORDEM.indexOf(ficha) : null}
+              onChange={(indice) => setFicha(FICHAS_EM_ORDEM[indice])}
+            />
+            {fichaRecomendada ? <p className={styles.formatoAjuda}>{textosMomento.recomendado}: {NOME_DA_FICHA[fichaRecomendada]}</p> : null}
+          </div>
+        ) : null}
 
         {planoItemId === undefined ? <PerguntaParaQuando data={data} onChange={setData} /> : null}
         {formato === "story" ? <PerguntaMomentoDoDia valor={momentoDoDia} onChange={setMomentoDoDia} /> : null}
