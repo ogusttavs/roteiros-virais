@@ -41,6 +41,8 @@ const evidenciaSchema = z.object({
 const casoSchema = z.object({
   tema: z.string(),
   objetivo: objetivoSchema,
+  /** E49 PR 1: a ficha do "O que você quer que esse vídeo faça?" (só Reels falado); ausente vale como antes das fichas. */
+  ficha: z.enum(["veja", "guardem", "mandem", "comentem", "me_chamem"]).optional(),
   perfilCompilado: z.string(),
   camadaExclusiva: z.string(),
   modeloNicho: z.string(),
@@ -166,6 +168,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
       entrada: roteiroIA.montarEntrada({
         tema: caso.tema,
         objetivo: caso.objetivo,
+        ficha: caso.ficha,
         formato: caso.formato,
         estilo: caso.estilo,
         evidencias: caso.evidencias,
@@ -290,6 +293,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
           : undefined,
       formato: caso.formato,
       estilo: caso.estilo,
+      ficha: caso.ficha,
       cartoes: saida.cartoes,
       legenda: saida.legenda,
       porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],

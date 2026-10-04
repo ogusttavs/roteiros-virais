@@ -104,3 +104,61 @@ describe("gerarRoteiroAction", () => {
     expect(depois.length).toBe(antes.length);
   });
 });
+
+/** E49 PR 1: as cinco fichas decidem o objetivo que se grava, valem só no Reels, e a reescrita mantém a ficha. */
+describe("gerarRoteiroAction com ficha", () => {
+  let contador = 0;
+  // Cada geração numa marca nova: o mock do tipo de abertura não acompanha muitos roteiros seguidos da mesma marca.
+  async function marcaNova(): Promise<string> {
+    const id = `objetivo-ficha-${++contador}`;
+    const [nicho] = await db().select().from(nichos).limit(1);
+    await db().insert(user).values({ id, name: `[teste] ${id}`, email: `${id}@objetivo-acoes.teste` });
+    const [m] = await db().insert(clientes).values({ usuarioId: id, nome: `[teste] ${id}`, nichoId: nicho.id }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: id, clienteId: m.id, papel: "dono" });
+    await db().insert(briefings).values({ clienteId: m.id, completo: true, perfil: PERFIL });
+    return id;
+  }
+  async function gerar(ficha: string | undefined, formato = "reels", objetivo: "alcance" | "engajamento" | "conversao" = "alcance") {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(await marcaNova()));
+    const r = await gerarRoteiroAction({ origem: "livre", textoTema: `tema numero ${++contador} da ficha ${ficha ?? "sem"} ${formato}` }, objetivo, formato, undefined, undefined, undefined, undefined, undefined, undefined, ficha);
+    if (!r.ok) throw new Error(r.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, r.dado.id));
+    return roteiro;
+  }
+
+  it("a ficha vira o objetivo que se grava (guardem conta em lembrarem de você, mesmo se a tela mandou outro)", async () => {
+    const r = await gerar("guardem", "reels", "alcance");
+    expect(r.ficha).toBe("guardem");
+    expect(r.objetivo).toBe("engajamento");
+    // O mock devolve passo a passo para esta ficha, e o verificador local aprova.
+    expect(r.conteudo.corpo).toContain("Passo 1");
+  });
+
+  it("cada ficha conta no objetivo certo", async () => {
+    expect((await gerar("veja")).objetivo).toBe("alcance");
+    expect((await gerar("mandem")).objetivo).toBe("alcance");
+    expect((await gerar("comentem")).objetivo).toBe("engajamento");
+    expect((await gerar("me_chamem")).objetivo).toBe("conversao");
+  });
+
+  it("no Story a ficha é ignorada: o Story não pergunta", async () => {
+    const r = await gerar("me_chamem", "story", "engajamento");
+    expect(r.formato).toBe("story");
+    expect(r.ficha).toBeNull();
+    expect(r.objetivo).toBe("engajamento");
+  });
+
+  it("ficha que não é uma das cinco vale como ausente, sem derrubar o roteiro", async () => {
+    const r = await gerar("salvamento", "reels", "conversao");
+    expect(r.ficha).toBeNull();
+    expect(r.objetivo).toBe("conversao");
+  });
+
+  it("reprovar e reescrever mantém a ficha da versão anterior", async () => {
+    const { reprovarERescrever } = await import("@/servicos/roteiro");
+    const original = await gerar("comentem");
+    const nova = await reprovarERescrever(original.id, ["muito_longo"]);
+    expect(nova.ficha).toBe("comentem");
+    expect(nova.objetivo).toBe("engajamento");
+  });
+});
