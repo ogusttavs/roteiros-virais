@@ -350,6 +350,12 @@ export function AindaValeBloco({
  * para `/criar`. Os estados da E39b (ainda vale, atrasado, calendário) ficam de fora, de
  * propósito: a tela não finge tê-los.
  */
+/** A3: "Próximos 7 dias" quando a faixa começa hoje; "Dias anteriores" ou "Dias à frente" nas janelas vizinhas, que as setas mostram. */
+function rotuloDaJanela(semana: DiaDaSemanaAgenda[]): string {
+  if (semana.some((dia) => dia.hoje)) return textosHoje.agenda.proximosDias;
+  return semana[0]?.passado ? textosHoje.agenda.planejador.dias7Anteriores : textosHoje.agenda.planejador.dias7Seguintes;
+}
+
 export function HojeTela({
   semana,
   diaVisualizado,
@@ -498,9 +504,9 @@ export function HojeTela({
             </section>
           ) : null}
 
-          <section className={styles.semanaAgenda} aria-label={textosHoje.agenda.estaSemana}>
+          <section className={styles.semanaAgenda} aria-label={textosHoje.agenda.proximosDias}>
             <div className={styles.cabecaSemana}>
-              <span className={styles.rotulo}>{textosHoje.agenda.estaSemana}</span>
+              <span className={styles.rotulo}>{rotuloDaJanela(semana)}</span>
               <div className={styles.acoesSemana}>
                 <button
                   type="button"

@@ -1620,7 +1620,7 @@ export function somarDiasISO(dataISO: string, dias: number): string {
   return new Date(Date.UTC(ano, mes - 1, dia + dias, 12)).toISOString().slice(0, 10);
 }
 
-/** E39a, dúvida 4 do desenho: a semana do calendário, segunda a domingo, nunca uma janela corrida a partir de hoje. */
+/** E39a, dúvida 4 do desenho: a semana do calendário, segunda a domingo (hoje só a grade do mês; a faixa e a visão Semana são a janela a partir de hoje, `inicioDaJanelaISO`). */
 function segundaDaSemanaISO(dataISO: string): string {
   const [ano, mes, dia] = dataISO.split("-").map(Number);
   const diaDaSemana = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay(); // 0 domingo .. 6 sabado
@@ -1628,7 +1628,26 @@ function segundaDaSemanaISO(dataISO: string): string {
   return somarDiasISO(dataISO, -voltarAteSegunda);
 }
 
+/**
+ * A3, item 1 (pedido do Gustavo no iPhone, 03/10/2026): a janela de sete dias começa HOJE, nunca na segunda. As janelas são blocos de sete dias contados a
+ * partir de hoje (hoje a hoje+6, a anterior é hoje-7 a hoje-1, a seguinte hoje+7 a hoje+13), então tocar num dia da faixa não desloca a janela e as setas
+ * (sete dias) caem sempre no bloco vizinho. Devolve o primeiro dia do bloco que contém `dia`.
+ */
+export function inicioDaJanelaISO(dia: string, hoje: string): string {
+  const [a1, m1, d1] = dia.split("-").map(Number);
+  const [a2, m2, d2] = hoje.split("-").map(Number);
+  const diferenca = Math.round((Date.UTC(a1, m1 - 1, d1, 12) - Date.UTC(a2, m2 - 1, d2, 12)) / 86_400_000);
+  return somarDiasISO(hoje, Math.floor(diferenca / 7) * 7);
+}
+
 const DIAS_DA_SEMANA_CURTO = ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"];
+
+/** O nome curto do dia da semana de uma data ("sex"), para a janela que não começa na segunda. */
+function diaCurtoDe(dataISO: string): string {
+  const [ano, mes, dia] = dataISO.split("-").map(Number);
+  const indiceDomingoZero = new Date(Date.UTC(ano, mes - 1, dia, 12)).getUTCDay();
+  return DIAS_DA_SEMANA_CURTO[(indiceDomingoZero + 6) % 7];
+}
 
 export type MarcaDiaAgenda = { qtdReels: number; qtdStories: number };
 export type DiaDaSemanaAgenda = {
@@ -1636,11 +1655,13 @@ export type DiaDaSemanaAgenda = {
   diaDoMes: number;
   diaDaSemanaCurto: string;
   hoje: boolean;
+  /** A3: o dia já passou (a janela anterior, que a seta para trás mostra). */
+  passado: boolean;
   marca: MarcaDiaAgenda;
 };
 
 /**
- * E39a, item 3: a semana (segunda a domingo) que contém `dataReferencia`, com uma marca por dia
+ * E39a, item 3 (A3, item 1: agora a janela de sete dias a partir de hoje, a que contém `dataReferencia`), com uma marca por dia
  * (um ponto por Reels, um anel por Story, com a contagem de cada um quando há mais de um; revisão
  * do Fable no PR #90: o plano é "quantos roteiros quiser por dia" para toda marca, então o Reels
  * também pode ter mais de um, como o Story já tinha). Só conta a ponta de cada série (reescrever
@@ -1648,9 +1669,9 @@ export type DiaDaSemanaAgenda = {
  * da marca do dia dele, "sai da agenda" vale aqui também, não só na lista de atrasados.
  */
 export async function semanaDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaDaSemanaAgenda[]> {
-  const segunda = segundaDaSemanaISO(dataReferencia);
-  const domingo = somarDiasISO(segunda, 6);
   const hoje = hojeISO();
+  const inicio = inicioDaJanelaISO(dataReferencia, hoje);
+  const fim = somarDiasISO(inicio, 6);
 
   const linhas = await db()
     .select({ data: roteiros.data, formato: roteiros.formato })
@@ -1658,8 +1679,8 @@ export async function semanaDaAgenda(clienteId: number, dataReferencia: string):
     .where(
       and(
         eq(roteiros.clienteId, clienteId),
-        gte(roteiros.data, segunda),
-        lte(roteiros.data, domingo),
+        gte(roteiros.data, inicio),
+        lte(roteiros.data, fim),
         isNull(roteiros.arquivadoEm),
         SEM_VERSAO_MAIS_NOVA,
       ),
@@ -1674,12 +1695,13 @@ export async function semanaDaAgenda(clienteId: number, dataReferencia: string):
   }
 
   return Array.from({ length: 7 }, (_, indice) => {
-    const data = somarDiasISO(segunda, indice);
+    const data = somarDiasISO(inicio, indice);
     return {
       data,
       diaDoMes: Number(data.split("-")[2]),
-      diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
+      diaDaSemanaCurto: diaCurtoDe(data),
       hoje: data === hoje,
+      passado: data < hoje,
       marca: porDia.get(data) ?? { qtdReels: 0, qtdStories: 0 },
     };
   });
@@ -2021,7 +2043,7 @@ export type DiaSemanaPlano = {
 
 /**
  * Passo 12 do Opus, a visão Semana do planejador (`/planejamento`, aba própria desde a decisão do
- * Gustavo de 01/10, 22:15): os sete dias da semana que contém `dataReferencia`, cada um com os
+ * Gustavo de 01/10, 22:15; A3, item 1: a janela de sete dias a partir de hoje que contém `dataReferencia`), cada um com os
  * roteiros já escritos e os itens do plano ainda "sugerido" juntos, mesmo espírito de
  * `mesDaAgenda` (um sugerido também aparece, sem roteiro próprio ainda; virar roteiro continua
  * pelas portas de sempre). `titulo` de um sugerido vem de `situacao` (o compromisso da agenda que
@@ -2029,7 +2051,7 @@ export type DiaSemanaPlano = {
  */
 export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: string): Promise<DiaSemanaPlano[]> {
   const hoje = hojeISO();
-  const segunda = segundaDaSemanaISO(dataReferencia);
+  const segunda = inicioDaJanelaISO(dataReferencia, hoje);
   const domingo = somarDiasISO(segunda, 6);
 
   const [linhasRoteiro, linhasPlano] = await Promise.all([
@@ -2093,7 +2115,7 @@ export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: str
     return {
       data,
       diaDoMes: Number(data.split("-")[2]),
-      diaDaSemanaCurto: DIAS_DA_SEMANA_CURTO[indice],
+      diaDaSemanaCurto: diaCurtoDe(data),
       hoje: data === hoje,
       passado: data < hoje,
       itens: porDia.get(data) ?? [],

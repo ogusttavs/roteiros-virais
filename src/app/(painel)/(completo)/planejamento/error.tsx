@@ -16,15 +16,6 @@ import { CabecaPlanoEstatica } from "./CabecaPlanoEstatica";
 
 /** Igual a `loading.tsx` (cada boundary é seu próprio módulo, não dá para importar de um cliente
  * para o outro sem os dois virarem o mesmo arquivo). */
-function segundaDaSemanaISO(dataISO: string): string {
-  const [ano, mes, dia] = dataISO.split("-").map(Number);
-  const data = new Date(Date.UTC(ano, mes - 1, dia, 12));
-  const diaDaSemanaNum = data.getUTCDay();
-  const voltarAteSegunda = diaDaSemanaNum === 0 ? 6 : diaDaSemanaNum - 1;
-  data.setUTCDate(data.getUTCDate() - voltarAteSegunda);
-  return data.toISOString().slice(0, 10);
-}
-
 const FORMATAR_DIA_MES_COM_MES = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" });
 function tituloSemana(segunda: string, domingo: string): string {
   const [, mesSegunda] = segunda.split("-");
@@ -76,7 +67,7 @@ export default function ErroPlanejamento({ error, reset }: { error: Error & { di
   const router = useRouter();
   const [pendente, iniciarTransicao] = useTransition();
   const hoje = hojeNoClienteISO();
-  const segunda = segundaDaSemanaISO(hoje);
+  const segunda = hoje; // A3: a janela começa em hoje
   const domingo = somarDiasISO(segunda, 6);
 
   useEffect(() => {

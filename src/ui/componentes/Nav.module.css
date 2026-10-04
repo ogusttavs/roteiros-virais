@@ -8,21 +8,34 @@
  * painel usa para "isto está selecionado".
  */
 .nav {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   height: var(--altura-toque-lg);
 }
 
-/* A cápsula encolhida (V5, item 5): colunas de largura fixa, não mais
-   proporcionais à barra inteira, para o container (`layout.module.css`,
-   `.barraInferior.encolhida`, `width: auto`) encolher junto com o grid.
-   Só `CapsulaNav.tsx` usa isto (quatro lugares: Hoje, Criar, Planejar, Mais);
-   `Nav.tsx`, a barra lateral, nunca encolhe. */
-.navEncolhida {
-  grid-template-columns: repeat(4, 3.25rem);
-}
+/* A cápsula encolhida (V5, item 5; passo 16): o container (`layout.module.css`, `.barraInferior.encolhida`) encolhe a LARGURA, na mola, e as quatro colunas
+   de frações acompanham. Só `CapsulaNav.tsx` usa isto (quatro lugares: Hoje, Criar, Planejar, Mais); `Nav.tsx`, a barra lateral, nunca encolhe. */
 .navEncolhida .item {
   min-height: var(--altura-toque);
+}
+
+/* A seleção da cápsula (passo 16, `Casca.dc.html`): UM elemento atrás dos ícones, do tamanho de uma coluna, que desliza de aba em aba por `transform` (nunca
+   `left`/`right`: foi o que fez a cápsula pular) e some (`opacity`) quando nenhuma aba está ativa. O mesmo visual do ativo da barra lateral: fundo de seleção
+   suave e contorno. Encolhida, a coluna é estreita e a seleção vira o círculo atrás do ícone. */
+.selecao {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 25%;
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  box-shadow: inset 0 0 0 var(--largura-borda) var(--cor-selecao-borda);
+  pointer-events: none;
+  transition:
+    transform var(--duracao-troca) var(--curva-mola),
+    opacity var(--duracao-troca) var(--curva-padrao);
 }
 
 .item {
@@ -35,7 +48,9 @@
   color: var(--cor-texto-suave);
   text-decoration: none;
   border-radius: var(--raio-md);
-  transition: color var(--duracao-rapida) var(--curva-saida);
+  transition:
+    color var(--duracao-troca) var(--curva-padrao),
+    transform var(--duracao-soltar) var(--curva-mola);
   /* O "Mais" é um <button> (abre a folha) e os outros três são links: o Safari do iPhone pinta o botão com o cinza do sistema (fundo, borda e aparência
      nativa), e o "Mais" parecia sempre selecionado (A2, item 6). O mesmo reset dos links, sem tocar na cor do texto. */
   padding: 0;
@@ -51,12 +66,22 @@
   box-shadow: var(--sombra-foco);
 }
 
-/* O item ativo da cápsula (Casca.dc.html, `.aba[aria-current="page"]`): cor de ação, peso e um fundo de vidro: três sinais que não dependem só da cor, nos dois temas
-   (`--vidro-selecao` já é mais claro no escuro). Na barra lateral (abaixo, desde 768px) vale o fundo de seleção suave de sempre. */
+/* O dedo encostou: aperta (passo 16, `--escala-toque`). */
+.item:active {
+  transform: scale(var(--escala-toque));
+  transition-duration: var(--duracao-toque);
+}
+
+/* O ícone do ativo é cheio (passo 16: o ativo tem três sinais, fundo, ícone cheio e peso; nenhum depende só da cor). */
+.iconeCheio {
+  fill: currentColor;
+  fill-opacity: 0.2;
+}
+
+/* O item ativo: cor de destaque e peso aqui; o fundo é a `.selecao` que desliza (cápsula) ou, na barra lateral (desde 768px, abaixo), o fundo de seleção suave. */
 .ativo {
-  color: var(--cor-acao);
+  color: var(--cor-destaque);
   font-weight: var(--peso-semibold);
-  background: var(--vidro-selecao);
 }
 
 .traco {

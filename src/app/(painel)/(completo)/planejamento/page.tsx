@@ -23,6 +23,7 @@ import {
   proximoDiaMarcado,
   semanaDaAgenda,
   semanaPlanoDaAgenda,
+  inicioDaJanelaISO,
   somarDiasISO,
 } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
@@ -91,15 +92,6 @@ function validarAnoMes(valor: string | undefined, dia: string, hoje: string): st
   return dia.slice(0, 7) || hoje.slice(0, 7);
 }
 
-function segundaDaSemanaISO(dataISO: string): string {
-  const [ano, mes, dia] = dataISO.split("-").map(Number);
-  const data = new Date(Date.UTC(ano, mes - 1, dia, 12));
-  const diaDaSemanaNum = data.getUTCDay();
-  const voltarAteSegunda = diaDaSemanaNum === 0 ? 6 : diaDaSemanaNum - 1;
-  data.setUTCDate(data.getUTCDate() - voltarAteSegunda);
-  return data.toISOString().slice(0, 10);
-}
-
 /** "7 a 13 de setembro", ou "30 de setembro a 6 de outubro" quando a semana cruza o mês. */
 function tituloSemana(segunda: string, domingo: string): string {
   const [, mesSegunda] = segunda.split("-");
@@ -139,10 +131,10 @@ function tituloSemanaCurto(segunda: string, domingo: string): string {
   return `${inicio} a ${fim}`;
 }
 
-/** O rótulo pequeno acima do título da visão Semana: "Esta semana", "Semana passada" ou "Semana que vem". */
-function rotuloPeriodoSemana(segundaVisualizada: string, segundaDeHoje: string): string {
-  if (segundaVisualizada === segundaDeHoje) return textosHoje.agenda.estaSemana;
-  return segundaVisualizada < segundaDeHoje ? textosHoje.agenda.planejador.semanaPassada : textosHoje.agenda.planejador.semanaQueVem;
+/** O rótulo pequeno acima do título da visão Semana (A3, a janela de sete dias a partir de hoje): "Próximos 7 dias", "Dias anteriores" ou "Dias à frente". */
+function rotuloPeriodoSemana(inicioVisualizado: string, hoje: string): string {
+  if (inicioVisualizado === hoje) return textosHoje.agenda.proximosDias;
+  return inicioVisualizado < hoje ? textosHoje.agenda.planejador.dias7Anteriores : textosHoje.agenda.planejador.dias7Seguintes;
 }
 
 /** O mesmo, para a visão Mês: "Este mês", "Mês passado" ou "Mês que vem". */
@@ -310,15 +302,15 @@ export default async function Planejamento({ searchParams }: Props) {
       />
     );
   } else {
-    const segunda = segundaDaSemanaISO(diaVisualizado);
+    // A3, item 1: os sete dias a partir de hoje (blocos de sete contados de hoje), nunca de segunda a domingo.
+    const segunda = inicioDaJanelaISO(diaVisualizado, hoje);
     const domingo = somarDiasISO(segunda, 6);
-    const segundaDeHoje = segundaDaSemanaISO(hoje);
     const dias = await semanaPlanoDaAgenda(cliente.id, diaVisualizado);
     cabeca = {
-      rotuloPeriodo: rotuloPeriodoSemana(segunda, segundaDeHoje),
+      rotuloPeriodo: rotuloPeriodoSemana(segunda, hoje),
       tituloPeriodo: tituloSemana(segunda, domingo),
       tituloPeriodoCurto: tituloSemanaCurto(segunda, domingo),
-      mostrarHoje: segunda !== segundaDeHoje,
+      mostrarHoje: segunda !== hoje,
       hrefAnterior: `/planejamento?visao=semana&dia=${somarDiasISO(diaVisualizado, -7)}`,
       hrefSeguinte: `/planejamento?visao=semana&dia=${somarDiasISO(diaVisualizado, 7)}`,
       hrefHoje: "/planejamento?visao=semana",

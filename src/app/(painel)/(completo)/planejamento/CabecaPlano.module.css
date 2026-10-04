@@ -23,17 +23,22 @@
   color: var(--cor-texto-dica);
 }
 
+/* A3, item 4 (achado do Gustavo no iPhone): as setas FICAM no lugar. O título ocupa o que sobra (com reticências se não couber) e as duas setas, de largura
+   fixa, ficam ancoradas à direita; antes elas seguiam o título, que muda de largura a cada semana, e fugiam do dedo. Vale para Dia, Semana e Mês. */
 .periodo {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--altura-toque) var(--altura-toque);
   align-items: center;
   gap: var(--espaco-2);
 }
 
 .periodo h1 {
-  flex: 0 1 auto;
   min-width: 0;
-  margin: 0 var(--espaco-2) 0 0;
+  margin: 0;
   font-size: var(--tamanho-titulo);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /**
@@ -90,13 +95,15 @@
 }
 
 .botaoBarra {
+  box-sizing: border-box;
+  width: var(--altura-toque);
   min-width: var(--altura-toque);
   min-height: var(--altura-toque);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--espaco-2);
-  padding: 0 var(--espaco-3);
+  padding: 0;
   border: 0;
   border-radius: var(--raio-pill);
   background: transparent;

@@ -13,7 +13,7 @@ export type Visao = "dia" | "semana" | "mes";
 
 type Props = {
   visao: Visao;
-  /** O texto pequeno acima do título ("Esta semana", "Marcado para", "Este mês"...). */
+  /** O texto pequeno acima do título ("Próximos 7 dias", "Marcado para", "Este mês"...). */
   rotuloPeriodo: string;
   /** O título grande do período ("O que gravar hoje", "7 a 13 de setembro", "Setembro de 2026"...). */
   tituloPeriodo: string;

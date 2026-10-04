@@ -116,7 +116,7 @@ export function DiaConteudo({
         </section>
       ) : null}
 
-      <section className={styles.semanaAgenda} aria-label={textosHoje.agenda.estaSemana}>
+      <section className={styles.semanaAgenda} aria-label={textosHoje.agenda.proximosDias}>
         <div className={styles.diasAgenda} role="group" aria-label="Os dias da semana">
           {semana.map((dia) => (
             <button

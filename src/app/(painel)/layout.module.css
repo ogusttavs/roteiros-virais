@@ -38,23 +38,27 @@
  */
 .barraInferior {
   position: fixed;
-  left: var(--espaco-3);
-  right: var(--espaco-3);
+  /* Passo 16: SEMPRE centrada do mesmo jeito (left 50% e translateX); o que anima é só a largura. Antes animava left e right e trocava o transform de uma vez
+     ao encolher, e a cápsula pulava meio corpo para o lado antes de deslizar. */
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 1.5rem);
+  max-width: 26rem;
   bottom: calc(var(--espaco-2) + env(safe-area-inset-bottom, 0px));
   z-index: 30;
+  padding: 0.25rem;
+  box-sizing: border-box;
   border-radius: var(--raio-pill);
   border: var(--largura-borda) solid var(--vidro-borda);
   background: var(--vidro-fundo);
   backdrop-filter: var(--vidro-desfoque);
   -webkit-backdrop-filter: var(--vidro-desfoque);
   box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--vidro-sombra);
-  transition: left var(--duracao-base) var(--curva-saida), right var(--duracao-base) var(--curva-saida);
+  transition: width var(--duracao-capsula) var(--curva-mola);
 }
+/* Encolhida: quatro lugares de 3.25rem (52 px) e o respiro. Continua grade de frações: a largura manda, as colunas acompanham. */
 .barraInferior.encolhida {
-  left: 50%;
-  right: auto;
-  width: auto;
-  transform: translateX(-50%);
+  width: calc(4 * 3.25rem + 0.5rem + 2px);
 }
 @media (prefers-reduced-motion: reduce) {
   .barraInferior {

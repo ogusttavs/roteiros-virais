@@ -7,7 +7,7 @@ import styles from "./CabecaPlano.module.css";
 
 /**
  * A mesma casca de `CabecaPlano.tsx`, sem interatividade: `loading.tsx` e `error.tsx` (os dois
- * sem dado nenhum ainda, Planejar.dc.html estados `carregando` e `erro`) mostram "Esta semana" e
+ * sem dado nenhum ainda, Planejar.dc.html estados `carregando` e `erro`) mostram "Próximos 7 dias" e
  * o título da semana atual, com as setas e o seletor desenhados mas inertes (não há `visao` nem
  * `dia` da URL para saber para onde levariam). Vira interativo assim que a visão real carrega.
  */
@@ -15,7 +15,7 @@ export function CabecaPlanoEstatica({ tituloPeriodo, tituloPeriodoCurto }: { tit
   return (
     <div className={styles.cabecaPlano}>
       <div className={styles.cabecalhoTela}>
-        <span className={styles.data}>{textosHoje.agenda.estaSemana}</span>
+        <span className={styles.data}>{textosHoje.agenda.proximosDias}</span>
         <div className={styles.periodo}>
           <h1>
             <span className={styles.tituloCurto}>{tituloPeriodoCurto}</span>
