@@ -81,7 +81,8 @@
     gap: var(--espaco-2);
   }
 
-  .direita > :global(button),
+  /* A pílula da marca (quem tem várias marcas) não é uma bolha: ela mostra o nome e encolhe com a tela. */
+  .direita > :global(button:not([class*="pilulaMarca"])),
   .direita > :global(a) {
     display: grid;
     place-items: center;
