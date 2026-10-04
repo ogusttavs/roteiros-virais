@@ -1177,6 +1177,10 @@ export const videos = pgTable(
     index("videos_nicho_views").on(t.nichoId, t.views),
     // E44 PR 1: o filtro por formato ligado da marca (`formato_catalogo`).
     index("videos_nicho_formato").on(t.nichoId, t.formatoCatalogo),
+    // E46 PR 3: o Início e as Rotinas contam o que o dia coletou, transcreveu e analisou.
+    index("videos_coletado_em").on(t.coletadoEm),
+    index("videos_transcrito_em").on(t.transcritoEm),
+    index("videos_analise_visual_em").on(t.analiseVisualEm),
   ],
 );
 
@@ -1568,7 +1572,7 @@ export const roteiros = pgTable(
     noticiaId: integer("noticia_id").references(() => noticias.id),
     criadoEm: criadoEm(),
   },
-  (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],
+  (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data), index("roteiros_data").on(t.data)],
 );
 
 /**
@@ -1685,7 +1689,7 @@ export const execucoesJob = pgTable("execucoes_job", {
   status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
   resumo: jsonb("resumo").$type<Record<string, unknown>>(),
   erro: text("erro"),
-});
+}, (t) => [index("execucoes_job_iniciado_em").on(t.iniciadoEm)]);
 
 /**
  * Um lote pendente na API de lote da Anthropic (etapa 8): a API e assincrona
@@ -1803,7 +1807,7 @@ export const geracoesIA = pgTable("geracoes_ia", {
    */
   motivosAvaliacao: jsonb("motivos_avaliacao").$type<string[]>(),
   criadoEm: criadoEm(),
-});
+}, (t) => [index("geracoes_ia_criado_em").on(t.criadoEm)]);
 
 /**
  * A memória do cliente (E27, parte 2): o que ele reprovou vira regra dele.

@@ -96,6 +96,10 @@ describe("listarContasAdmin", () => {
     expect(a.parou).toBe(false);
     expect(a.nuncaEntrou).toBe(false);
 
+    // A sessão de um admin (que passa por todas as contas) nunca conta como entrada de conta nenhuma.
+    await db().insert(user).values({ id: "ac-admin-membro", name: "Admin membro", email: "ac-admin-membro@admin-contas.teste", role: "admin" });
+    await db().insert(membrosMarca).values({ usuarioId: "ac-admin-membro", clienteId: contaB, papel: "membro" });
+    await db().insert(session).values({ id: "ac-s2", token: "ac-t2", userId: "ac-admin-membro", expiresAt: new Date(hoje.getTime() + DIA), updatedAt: hoje });
     // Conta nova sem uso ainda não "parou": nunca começou.
     const novaSemUso = (await listarContasAdmin()).find((c) => c.id === contaB)!;
     expect(novaSemUso.parou).toBe(false);

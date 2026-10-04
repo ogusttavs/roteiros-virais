@@ -35,8 +35,13 @@ export function TiposDeVideoAdmin({ clienteId, nomeMarca, iniciais }: { clienteI
   const [tipos, setTipos] = useState(iniciais);
   // O que o servidor mandou vale de novo depois de cada `router.refresh()`, mas só quando nenhuma troca está a caminho (senão o refresh de uma apagaria a outra).
   const emVoo = useRef(0);
+  // O que o servidor confirmou por chave: uma troca que falha volta para isso, mesmo com cliques seguidos na mesma chave.
+  const confirmados = useRef<Record<string, TipoDaMarcaParaAdmin>>({});
   useEffect(() => {
-    if (emVoo.current === 0) setTipos(iniciais);
+    if (emVoo.current === 0) {
+      confirmados.current = {};
+      setTipos(iniciais);
+    }
   }, [iniciais]);
   const [erro, setErro] = useState<string | null>(null);
   const [aberta, setAberta] = useState(false);
@@ -49,8 +54,10 @@ export function TiposDeVideoAdmin({ clienteId, nomeMarca, iniciais }: { clienteI
   async function trocar(chave: string, ligada: boolean) {
     setErro(null);
     // Só a chave que falhou volta, e para o que ela era NESTE clique: outra chave trocada no meio do caminho não é apagada.
-    const antes = tipos.find((t) => t.chave === chave)!;
-    setTipos((atual) => atual.map((t) => (t.chave === chave ? { ...t, ligada, quem: "admin", decididoEmTexto: hoje } : t)));
+    if (!confirmados.current[chave]) confirmados.current[chave] = tipos.find((t) => t.chave === chave)!;
+    const antes = confirmados.current[chave];
+    const novo: TipoDaMarcaParaAdmin = { ...tipos.find((t) => t.chave === chave)!, ligada, quem: "admin", decididoEmTexto: hoje };
+    setTipos((atual) => atual.map((t) => (t.chave === chave ? novo : t)));
     emVoo.current += 1;
     const resultado = await definirFormatoDaMarcaAction(clienteId, chave, ligada).catch(() => ({ ok: false as const, erro: textosTipos.erro }));
     emVoo.current -= 1;
@@ -59,12 +66,14 @@ export function TiposDeVideoAdmin({ clienteId, nomeMarca, iniciais }: { clienteI
       setErro(resultado.erro);
       return;
     }
+    confirmados.current[chave] = novo;
     router.refresh();
   }
 
   async function voltar(chave: string) {
     setErro(null);
-    const antes = tipos.find((t) => t.chave === chave)!;
+    if (!confirmados.current[chave]) confirmados.current[chave] = tipos.find((t) => t.chave === chave)!;
+    const antes = confirmados.current[chave];
     const padrao = FORMATOS_DO_CATALOGO.find((f) => f.chave === chave)?.ligadaPorPadrao ?? false;
     setTipos((atual) =>
       atual.map((t) =>
@@ -83,6 +92,7 @@ export function TiposDeVideoAdmin({ clienteId, nomeMarca, iniciais }: { clienteI
       setErro(resultado.erro);
       return;
     }
+    delete confirmados.current[chave];
     router.refresh();
   }
 

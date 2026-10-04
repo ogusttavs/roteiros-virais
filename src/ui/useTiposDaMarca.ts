@@ -18,6 +18,8 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
   const [erro, setErro] = useState<string | null>(null);
   // Quando o servidor manda outra lista (a página recarregou), ela vale de novo, mas só sem troca a caminho.
   const emVoo = useRef(0);
+  // O último valor que o servidor confirmou por chave: é para onde uma troca que falha volta, mesmo com dois cliques seguidos na mesma chave.
+  const confirmado = useRef<Record<string, boolean>>({});
   const chaveDasIniciais = iniciais.map((i) => `${i.chave}:${i.ligada ? 1 : 0}`).join(",");
   useEffect(() => {
     if (emVoo.current === 0) setEstado(Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, iniciais.find((i) => i.chave === f.chave)?.ligada ?? f.ligadaPorPadrao])));
@@ -29,7 +31,8 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
   async function trocar(chave: string, ligada: boolean) {
     setErro(null);
     // O que a chave era antes DESTE clique: se falhar, volta para isso (e não para o contrário do pedido, que erra quando dois cliques seguidos se cruzam).
-    const antes = estado[chave];
+    const antes = chave in confirmado.current ? confirmado.current[chave] : estado[chave];
+    if (!(chave in confirmado.current)) confirmado.current[chave] = antes;
     setEstado((atual) => ({ ...atual, [chave]: ligada }));
     emVoo.current += 1;
     const numero = (ultimaDaChave.current[chave] ?? 0) + 1;
@@ -41,6 +44,7 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
       gravou = false;
     }
     emVoo.current -= 1;
+    if (gravou) confirmado.current[chave] = ligada;
     if (!gravou && ultimaDaChave.current[chave] === numero) {
       setEstado((atual) => ({ ...atual, [chave]: antes }));
       setErro(textosTipos.erro);

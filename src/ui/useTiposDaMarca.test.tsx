@@ -44,6 +44,25 @@ describe("useTiposDaMarca", () => {
     expect(result.current.estado.bastidor).toBe(!antesBastidor);
   });
 
+  it("dois cliques seguidos na mesma chave: se o último falha, volta ao que o servidor tinha confirmado, não ao valor do primeiro clique", async () => {
+    let soltaPrimeira: (v: boolean) => void = () => {};
+    responder.mockImplementationOnce(() => new Promise<boolean>((r) => (soltaPrimeira = r)));
+    responder.mockResolvedValueOnce(false);
+    const { result } = renderHook(() => useTiposDaMarca([{ chave: "lista", ligada: true }]));
+    let primeira: Promise<void> = Promise.resolve();
+    act(() => {
+      primeira = result.current.trocar("lista", false);
+    });
+    await act(async () => {
+      await result.current.trocar("lista", true);
+    });
+    await act(async () => {
+      soltaPrimeira(true);
+      await primeira;
+    });
+    expect(result.current.estado.lista).toBe(true);
+  });
+
   it("quando o servidor manda outra lista (a página recarregou), ela vale de novo", () => {
     const { result, rerender } = renderHook(({ iniciais }) => useTiposDaMarca(iniciais), { initialProps: { iniciais: [{ chave: "lista", ligada: false }] } });
     expect(result.current.estado.lista).toBe(false);

@@ -52,10 +52,15 @@ export function estadosDosDias(dias: string[], roteirosPorDia: Map<string, { gra
   });
 }
 
-/** "Usando": gravou em algum dos últimos 3 dias. "Parou": os últimos 4 dias sem nada (nem entrar). */
+/**
+ * "Usando": gravou em algum dos últimos 3 dias (hoje conta). "Parou": os 4 dias COMPLETOS antes de hoje sem nada (nem entrar), e hoje também sem nada: o dia de hoje
+ * pela metade não decide que a conta parou, mas uma entrada hoje a tira de "Parou".
+ */
 export function classificarUso(ultimos7: { estado: EstadoDoDia }[]): { usando: boolean; parou: boolean } {
   const usando = ultimos7.slice(-DIAS_PARA_USANDO).some((d) => d.estado === "gravou");
-  const parou = ultimos7.length >= DIAS_PARA_PARAR && ultimos7.slice(-DIAS_PARA_PARAR).every((d) => d.estado === "nada");
+  const completos = ultimos7.slice(0, -1);
+  const hoje = ultimos7[ultimos7.length - 1];
+  const parou = completos.length >= DIAS_PARA_PARAR && completos.slice(-DIAS_PARA_PARAR).every((d) => d.estado === "nada") && hoje?.estado === "nada";
   return { usando, parou };
 }
 
@@ -105,9 +110,19 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
     db()
       .select({ usuarioId: session.userId, dia: diaDoBrasil(session.updatedAt) })
       .from(session)
-      .where(gte(session.updatedAt, desde))
+      .innerJoin(user, eq(user.id, session.userId))
+      // A sessão é da pessoa, não da marca: a do admin (que passa por todas as contas) nunca conta como uso de conta nenhuma.
+      .where(and(gte(session.updatedAt, desde), sql`coalesce(${user.role}, '') <> 'admin'`))
       .groupBy(session.userId, diaDoBrasil(session.updatedAt)),
-    db().select({ clienteId: briefings.clienteId, completo: briefings.completo, nota: briefings.notaGeral, respostas: briefings.respostas }).from(briefings),
+    db()
+      .select({
+        clienteId: briefings.clienteId,
+        completo: briefings.completo,
+        nota: briefings.notaGeral,
+        // Só o que a lista mostra: quantas das respostas têm texto, contado no banco (sem trazer o JSON de cada briefing).
+        respondidas: sql<number>`(select count(*)::int from jsonb_each_text(${briefings.respostas}) as r where btrim(r.value) <> '')`,
+      })
+      .from(briefings),
   ]);
 
   const roteirosPorConta = new Map<number, Map<string, { gravado: boolean }>>();
@@ -119,8 +134,20 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
   const diasDeSessaoPorPessoa = new Map<string, Set<string>>();
   for (const s of sessoes) diasDeSessaoPorPessoa.set(s.usuarioId, (diasDeSessaoPorPessoa.get(s.usuarioId) ?? new Set()).add(s.dia));
   const todasAsPessoas = [...new Set([...pessoas.values()].flat().map((p) => p.usuarioId))];
+  // Quem entra em mais de uma conta: a sessão não diz em qual, então só vale o último acesso guardado por conta.
+  const emVariasContas = new Set<string>();
+  const vistas = new Set<string>();
+  for (const lista of pessoas.values()) for (const p of lista) (vistas.has(p.usuarioId) ? emVariasContas : vistas).add(p.usuarioId);
   const sessaoAlgumaVez = new Set(
-    todasAsPessoas.length === 0 ? [] : (await db().selectDistinct({ usuarioId: session.userId }).from(session).where(inArray(session.userId, todasAsPessoas))).map((s) => s.usuarioId),
+    todasAsPessoas.length === 0
+      ? []
+      : (
+          await db()
+            .selectDistinct({ usuarioId: session.userId })
+            .from(session)
+            .innerJoin(user, eq(user.id, session.userId))
+            .where(and(inArray(session.userId, todasAsPessoas), sql`coalesce(${user.role}, '') <> 'admin'`))
+        ).map((s) => s.usuarioId),
   );
 
   return base.map((conta) => {
@@ -128,16 +155,16 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
     const gente = pessoas.get(conta.id) ?? [];
     const entrouNoDia = new Set<string>();
     for (const p of gente) {
-      for (const dia of diasDeSessaoPorPessoa.get(p.usuarioId) ?? []) entrouNoDia.add(dia);
+      if (!emVariasContas.has(p.usuarioId)) for (const dia of diasDeSessaoPorPessoa.get(p.usuarioId) ?? []) entrouNoDia.add(dia);
       if (p.ultimoAcessoEm) entrouNoDia.add(hojeISO(p.ultimoAcessoEm));
     }
     if (detalhe?.ultimoAcessoEm) entrouNoDia.add(hojeISO(detalhe.ultimoAcessoEm));
     const ultimos7 = estadosDosDias(dias, roteirosPorConta.get(conta.id) ?? new Map(), entrouNoDia);
     const b = briefingsDeTodos.find((x) => x.clienteId === conta.id);
-    const respondidas = b ? Object.values(b.respostas).filter((r) => typeof r === "string" && r.trim().length > 0).length : 0;
+    const respondidas = b?.respondidas ?? 0;
     const briefingEstado: ContaAdmin["briefingEstado"] =
       !b || (!b.completo && respondidas === 0) ? { tipo: "sem" } : b.completo && b.nota !== null ? { tipo: "pronto", nota: Number(b.nota), abaixo: Number(b.nota) < NOTA_MINIMA_DO_BRIEFING } : { tipo: "incompleto", respondidas };
-    const nuncaEntrou = !detalhe?.ultimoAcessoEm && gente.every((p) => !p.ultimoAcessoEm && !sessaoAlgumaVez.has(p.usuarioId));
+    const nuncaEntrou = !detalhe?.ultimoAcessoEm && gente.every((p) => !p.ultimoAcessoEm && (emVariasContas.has(p.usuarioId) || !sessaoAlgumaVez.has(p.usuarioId)));
     const uso = classificarUso(ultimos7);
     // Conta nova, sem entrada nem roteiro, ainda não "parou": nunca começou.
     const contaNovaSemUso = nuncaEntrou && !conta.ultimoRoteiro && detalhe !== undefined && agora.getTime() - detalhe.criadoEm.getTime() < DIAS_PARA_PARAR * 24 * 60 * 60 * 1000;
