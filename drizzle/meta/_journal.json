@@ -442,6 +442,34 @@
       "when": 1791102965831,
       "tag": "0062_alteracoes-do-admin",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1791108613175,
+      "tag": "0063_indices-do-admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791108759943,
+      "tag": "0064_custos-fixos-e-teto",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1791109712784,
+      "tag": "0065_indice-execucoes-por-nome",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1791111411931,
+      "tag": "0066_disparos-do-admin",
+      "breakpoints": true
     }
   ]
 }

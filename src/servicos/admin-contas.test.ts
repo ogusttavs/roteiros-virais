@@ -28,8 +28,13 @@ describe("classificarUso", () => {
     expect(classificarUso(semana("gravou", "nada", "nada", "nada", "nada", "gerou", "entrou")).usando).toBe(false);
   });
 
-  it("Parou: nada (nem entrar) nos últimos 4 dias", () => {
-    expect(classificarUso(semana("gravou", "gravou", "gravou", "nada", "nada", "nada", "nada")).parou).toBe(true);
-    expect(classificarUso(semana("gravou", "gravou", "gravou", "nada", "nada", "entrou", "nada")).parou).toBe(false);
+  it("Parou: os 4 dias completos antes de hoje sem nada (nem entrar), e hoje também sem nada", () => {
+    expect(classificarUso(semana("gravou", "gravou", "nada", "nada", "nada", "nada", "nada")).parou).toBe(true);
+    expect(classificarUso(semana("gravou", "gravou", "nada", "nada", "entrou", "nada", "nada")).parou).toBe(false);
+  });
+
+  it("o dia de hoje pela metade não decide: só 3 dias completos sem nada ainda não é Parou, e uma entrada hoje tira de Parou", () => {
+    expect(classificarUso(semana("gravou", "gravou", "gravou", "nada", "nada", "nada", "nada")).parou).toBe(false);
+    expect(classificarUso(semana("gravou", "gravou", "nada", "nada", "nada", "nada", "entrou")).parou).toBe(false);
   });
 });

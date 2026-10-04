@@ -72,10 +72,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
     );
   }
 
-  if (nichoId && (await existeJobPendente(nome, nichoId))) {
+  // Dois cliques, ou dois admins: um job igual já na fila (ou rodando) não entra de novo. Vale com e sem `nichoId` (a coleta paga rodaria em dobro).
+  if (await existeJobPendente(nome, nichoId || undefined)) {
     return NextResponse.json({ ok: true, job: nome, enfileirado: null, duplicado: true }, { status: 202 });
   }
 
-  const id = await boss().send(nome, nichoId ? { nichoId } : undefined);
+  // Rede de segurança para dois pedidos no mesmo instante, antes de qualquer um aparecer como pendente: a mesma chave por 30 segundos vira um só.
+  const id = await boss().send(nome, nichoId ? { nichoId } : undefined, { singletonKey: nichoId ? `${nome}-${nichoId}` : nome, singletonSeconds: 30 });
+  if (id === null) return NextResponse.json({ ok: true, job: nome, enfileirado: null, duplicado: true }, { status: 202 });
   return NextResponse.json({ ok: true, job: nome, enfileirado: id, duplicado: false }, { status: 202 });
 }

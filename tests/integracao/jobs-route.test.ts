@@ -181,3 +181,32 @@ describe("POST /api/jobs/[nome]", () => {
     expect(corpoOutroNicho.duplicado).toBe(false);
   });
 });
+
+/** E46 PR 3: "Rodar agora" em Rotinas nunca manda `nichoId`; dois cliques (ou dois admins) seguidos viram um job só, e o disparo à mão fica registrado. */
+describe("POST /api/jobs/[nome], disparo para todos os ramos", () => {
+  it("dois disparos seguidos sem nichoId viram um job só", async () => {
+    const { POST } = await import("@/app/api/jobs/[nome]/route");
+    const { boss } = await import("@/jobs/fila");
+    await boss().deleteAllJobs(FILAS.coletaNoticias);
+
+    const primeira = await POST(requisicao({ "x-jobs-key": config.jobsApiKey }), { params: Promise.resolve({ nome: "coleta-noticias" }) });
+    const segunda = await POST(requisicao({ "x-jobs-key": config.jobsApiKey }), { params: Promise.resolve({ nome: "coleta-noticias" }) });
+    const a = (await primeira.json()) as { duplicado: boolean; enfileirado: string | null };
+    const b = (await segunda.json()) as { duplicado: boolean; enfileirado: string | null };
+
+    expect(a.duplicado).toBe(false);
+    expect(a.enfileirado).toEqual(expect.any(String));
+    expect(b.duplicado).toBe(true);
+    expect(b.enfileirado).toBeNull();
+  });
+
+  it("o disparo à mão fica registrado com quem e quando, e o último de cada fila é o que aparece", async () => {
+    const { registrarDisparo, ultimosDisparos } = await import("@/servicos/admin-rotinas");
+    const { user } = await import("@/db/schema");
+    await db().insert(user).values({ id: "jr-admin", name: "Admin de teste", email: "jr-admin@jobs-route.teste" });
+    await registrarDisparo("coleta-noticias", "jr-admin");
+    const mapa = await ultimosDisparos(["coleta-noticias", "transcrever"]);
+    expect(mapa.get("coleta-noticias")?.porNome).toBe("Admin de teste");
+    expect(mapa.has("transcrever")).toBe(false);
+  });
+});

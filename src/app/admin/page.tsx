@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, TETO_DIARIO_BRL, usdParaBrl } from "@/config/dinheiro";
+import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, usdParaBrl } from "@/config/dinheiro";
 import { exigirAdmin } from "@/lib/sessao";
 import { inicioDoAdmin, type InicioAdmin, type LinhaDaMadrugada } from "@/servicos/admin-inicio";
 import { dataEHoraPorExtenso, dolares, quandoPorExtenso, reais, textosInicioAdmin as t } from "@/textos/admin-contas";
@@ -27,7 +27,7 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
   const continuam = inicio.erros.recentes.filter((e) => e.continua).length;
   if (continuam > 0) itens.push({ chave: "continuam", ...t.atencao.errosContinuam(continuam), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   if (inicio.dinheiro.passouDoTeto) {
-    itens.push({ chave: "teto", ...t.atencao.teto(reais(usdParaBrl(inicio.dinheiro.saiuHojeUsd)), reais(TETO_DIARIO_BRL)), href: "/admin/geracoes", rotulo: t.atencao.verCustos });
+    itens.push({ chave: "teto", ...t.atencao.teto(reais(usdParaBrl(inicio.dinheiro.saiuHojeUsd)), reais(inicio.dinheiro.tetoBrl)), href: "/admin/custos", rotulo: t.atencao.verCustos });
   }
   if (inicio.contas.pararam > 0) itens.push({ chave: "pararam", ...t.atencao.contasPararam(inicio.contas.pararam), href: "/admin/clientes?filtro=parou", rotulo: t.atencao.verContas });
   if (inicio.atencao.pedidosDeRamo > 0) itens.push({ chave: "pedidos", ...t.atencao.pedidosDeRamo(inicio.atencao.pedidosDeRamo), href: "/admin/nichos", rotulo: t.atencao.verRamos });
@@ -198,22 +198,22 @@ export default async function InicioDoAdmin() {
 
         <div className={styles.pilha}>
           <section className={[styles.cartao, styles.dinheiro].join(" ")} aria-labelledby="t-dinheiro" data-bloco="dinheiro">
-            <Titulo id="t-dinheiro" titulo={t.dinheiro.titulo} href="/admin/geracoes" rotulo={t.dinheiro.verCustos} />
+            <Titulo id="t-dinheiro" titulo={t.dinheiro.titulo} href="/admin/custos" rotulo={t.dinheiro.verCustos} />
             <div className={styles.linhaDinheiro}>
               <span className={styles.rotulo}>{t.dinheiro.saiuHoje}</span>
               <div className={styles.valorDinheiro} data-dinheiro="hoje">
                 <b>{reais(gastoHojeBrl)}</b>
-                <span>{t.dinheiro.saiuHojeDetalhe(dolares(dinheiro.saiuHojeUsd), reais(TETO_DIARIO_BRL))}</span>
+                <span>{t.dinheiro.saiuHojeDetalhe(dolares(dinheiro.saiuHojeUsd), reais(dinheiro.tetoBrl))}</span>
               </div>
               <span className={styles.barraMeta}>
-                <i style={{ width: `${Math.min(100, (gastoHojeBrl / TETO_DIARIO_BRL) * 100)}%`, background: dinheiro.passouDoTeto ? "var(--cor-atencao)" : undefined }} />
+                <i style={{ width: `${Math.min(100, (gastoHojeBrl / dinheiro.tetoBrl) * 100)}%`, background: dinheiro.passouDoTeto ? "var(--cor-atencao)" : undefined }} />
               </span>
             </div>
             <div className={styles.linhaDinheiro}>
               <span className={styles.rotulo}>{t.dinheiro.saiu30}</span>
               <div className={styles.valorDinheiro} data-dinheiro="30dias">
                 <b>{reais(dinheiro.saiu30dComFixosBrl)}</b>
-                <span>{t.dinheiro.saiu30Detalhe(reais(usdParaBrl(dinheiro.saiu30dUsd)), reais(CUSTO_FIXO_MENSAL_BRL))}</span>
+                <span>{t.dinheiro.saiu30Detalhe(reais(usdParaBrl(dinheiro.saiu30dUsd)), reais(dinheiro.fixosBrl))}</span>
               </div>
             </div>
             <div className={styles.linhaDinheiro}>

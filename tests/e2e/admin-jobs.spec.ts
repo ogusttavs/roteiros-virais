@@ -1,5 +1,5 @@
 /**
- * `/admin/jobs` pela tela (E6 parte 3, terceira rodada, item 5): as colunas
+ * `/admin/jobs` (as Rotinas, E46 PR 3; antes a tabela da E6 parte 3, item 5): as colunas
  * novas de coleta paga (devolvidos, consumidos, novos, fora da curva, taxa
  * de acerto) aparecem numa execucao de `coleta-apify` e ficam em branco
  * ("-") numa execucao de outro job, que nunca paga o Apify por resultado.
@@ -17,7 +17,7 @@ import { contas, execucoesJob, nichos, videos } from "../../src/db/schema";
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
 
-test.describe("admin de jobs, colunas de coleta paga", () => {
+test.describe("admin de rotinas, números da coleta paga", () => {
   test.beforeAll(async () => {
     const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "dentistas"));
     const [conta] = await db()
@@ -80,23 +80,17 @@ test.describe("admin de jobs, colunas de coleta paga", () => {
     await page.goto("/admin/jobs");
     await expect(page.getByRole("heading", { name: "Rotinas", exact: true })).toBeVisible();
 
-    const cabecalho = page.locator("thead");
-    await expect(cabecalho.getByText("devolvidos", { exact: true })).toBeVisible();
-    await expect(cabecalho.getByText("consumidos", { exact: true })).toBeVisible();
-    await expect(cabecalho.getByText("novos", { exact: true })).toBeVisible();
-    await expect(cabecalho.getByText("fora da curva", { exact: true })).toBeVisible();
-    await expect(cabecalho.getByText("taxa de acerto", { exact: true })).toBeVisible();
+    // As Rotinas (E46 PR 3): o desenho trocou a tabela por cartões; os números da coleta paga ficam no detalhe da rotina "Buscar vídeos novos".
+    const buscar = page.locator('[data-rotina="buscar"]');
+    await expect(buscar).toContainText("deu certo");
+    await buscar.getByText("Ver o detalhe").click();
+    const apify = buscar.locator('[data-fila="coleta-apify"]');
+    await expect(apify).toContainText("devolvidos 40, consumidos 30, novos 4, fora da curva 1, taxa de acerto 3%");
 
-    const linhaApify = page.locator("tbody tr", { has: page.getByText("coleta-apify", { exact: true }) }).first();
-    await expect(linhaApify.locator("td").nth(4)).toHaveText("40"); // devolvidos
-    await expect(linhaApify.locator("td").nth(5)).toHaveText("30"); // consumidos
-    await expect(linhaApify.locator("td").nth(6)).toHaveText("4"); // novos
-    await expect(linhaApify.locator("td").nth(7)).toHaveText("1"); // fora da curva (so o video de 2.0)
-    await expect(linhaApify.locator("td").nth(8)).toHaveText("3%"); // 1/30
-
-    const linhaVigilancia = page.locator("tbody tr", { has: page.getByText("vigilancia", { exact: true }) }).first();
-    for (const indice of [4, 5, 6, 7, 8]) {
-      await expect(linhaVigilancia.locator("td").nth(indice)).toHaveText("-");
-    }
+    // Uma fila que nunca paga por resultado não mostra taxa nenhuma.
+    const pontuar = page.locator('[data-rotina="pontuar"]');
+    await pontuar.getByText("Ver o detalhe").click();
+    await expect(pontuar.locator('[data-fila="vigilancia"]')).not.toContainText("taxa de acerto");
+    await expect(pontuar.locator('[data-fila="vigilancia"]')).toContainText("Nome no sistema: vigilancia");
   });
 });

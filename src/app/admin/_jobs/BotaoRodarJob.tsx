@@ -11,7 +11,7 @@ import styles from "./BotaoRodarJob.module.css";
 
 const t = textosAdmin.jobs;
 
-export function BotaoRodarJob({ nome }: { nome: string }) {
+export function BotaoRodarJob({ nome, rotulo }: { nome: string; rotulo?: string }) {
   const router = useRouter();
   const [rodando, setRodando] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: "erro" | "sucesso"; texto: string } | null>(null);
@@ -29,8 +29,8 @@ export function BotaoRodarJob({ nome }: { nome: string }) {
 
   return (
     <span className={styles.envoltorio}>
-      <Botao variante="secundario" tamanho="md" carregando={rodando} onClick={rodar}>
-        {rodando ? t.disparando : t.botaoDisparar(nome)}
+      <Botao variante="secundario" tamanho="md" carregando={rodando} onClick={rodar} aria-label={rotulo ? `${rotulo}: ${nome}` : undefined}>
+        {rodando ? t.disparando : (rotulo ?? t.botaoDisparar(nome))}
       </Botao>
       {mensagem ? (
         <span className={mensagem.tipo === "erro" ? styles.erro : styles.sucesso} role="status">

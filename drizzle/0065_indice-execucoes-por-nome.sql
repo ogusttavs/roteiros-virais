@@ -1,0 +1,1 @@
+CREATE INDEX "execucoes_job_nome_id" ON "execucoes_job" USING btree ("nome","id");

@@ -728,6 +728,46 @@ export const alteracoesDoAdmin = pgTable(
 );
 export type AlteracaoDoAdmin = typeof alteracoesDoAdmin.$inferSelect;
 
+/**
+ * E46 PR 3: um custo fixo cadastrado no admin (o servidor, as contas de desenvolvimento, as coletas compartilhadas). Em reais ou em dólar, por mês ou por ano. "Tirar" não
+ * apaga: `ativo = false` e `tiradoEm`, porque o que já custou continua nos meses que passaram.
+ */
+export const custosFixos = pgTable("custos_fixos", {
+  id: id(),
+  nome: text("nome").notNull(),
+  /** O valor na moeda de cobrança, por período. */
+  valor: numeric("valor", { precision: 12, scale: 2 }).notNull(),
+  moeda: text("moeda").$type<"brl" | "usd">().notNull().default("brl"),
+  periodo: text("periodo").$type<"mensal" | "anual">().notNull().default("mensal"),
+  /** Texto livre: "todo dia 5", "cartão, no começo do mês". */
+  cobra: text("cobra"),
+  ativo: boolean("ativo").notNull().default(true),
+  tiradoEm: timestamp("tirado_em", { withTimezone: true }),
+  criadoEm: criadoEm(),
+});
+export type CustoFixo = typeof custosFixos.$inferSelect;
+
+/** E46 PR 3: cada "rodar agora" que o admin dispara em Rotinas (quem, qual fila, quando), para o detalhe da rotina dizer "rodada à mão por fulano às 07:23". */
+export const disparosDoAdmin = pgTable(
+  "disparos_do_admin",
+  {
+    id: id(),
+    fila: text("fila").notNull(),
+    porUsuarioId: text("por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+    em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("disparos_do_admin_fila_em").on(t.fila, t.em)],
+);
+export type DisparoDoAdmin = typeof disparosDoAdmin.$inferSelect;
+
+/** E46 PR 3: ajustes do admin que valem para o sistema todo, uma linha por chave ("teto_diario_brl"). Texto, para qualquer valor caber. */
+export const configuracaoAdmin = pgTable("configuracao_admin", {
+  chave: text("chave").primaryKey(),
+  valor: text("valor").notNull(),
+  atualizadoPorUsuarioId: text("atualizado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------
@@ -1177,6 +1217,10 @@ export const videos = pgTable(
     index("videos_nicho_views").on(t.nichoId, t.views),
     // E44 PR 1: o filtro por formato ligado da marca (`formato_catalogo`).
     index("videos_nicho_formato").on(t.nichoId, t.formatoCatalogo),
+    // E46 PR 3: o Início e as Rotinas contam o que o dia coletou, transcreveu e analisou.
+    index("videos_coletado_em").on(t.coletadoEm),
+    index("videos_transcrito_em").on(t.transcritoEm),
+    index("videos_analise_visual_em").on(t.analiseVisualEm),
   ],
 );
 
@@ -1568,7 +1612,7 @@ export const roteiros = pgTable(
     noticiaId: integer("noticia_id").references(() => noticias.id),
     criadoEm: criadoEm(),
   },
-  (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data)],
+  (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data), index("roteiros_data").on(t.data)],
 );
 
 /**
@@ -1685,7 +1729,7 @@ export const execucoesJob = pgTable("execucoes_job", {
   status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
   resumo: jsonb("resumo").$type<Record<string, unknown>>(),
   erro: text("erro"),
-});
+}, (t) => [index("execucoes_job_iniciado_em").on(t.iniciadoEm), index("execucoes_job_nome_id").on(t.nome, t.id)]);
 
 /**
  * Um lote pendente na API de lote da Anthropic (etapa 8): a API e assincrona
@@ -1803,7 +1847,7 @@ export const geracoesIA = pgTable("geracoes_ia", {
    */
   motivosAvaliacao: jsonb("motivos_avaliacao").$type<string[]>(),
   criadoEm: criadoEm(),
-});
+}, (t) => [index("geracoes_ia_criado_em").on(t.criadoEm)]);
 
 /**
  * A memória do cliente (E27, parte 2): o que ele reprovou vira regra dele.

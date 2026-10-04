@@ -165,6 +165,15 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
     await provarQueSoAdminVe(page, request, "/admin/clientes", ["/admin/clientes"], [clienteNome, clienteEmail]);
   });
 
+  // E46 PR 3: Custos e Rotinas, com a mesma prova.
+  test("custos: so a sessao de admin ve o teto, os fixos e os custos por conta", async ({ page, request }) => {
+    await provarQueSoAdminVe(page, request, "/admin/custos", ["/admin/custos"], ["O teto do dia", "Os fixos", "Por onde o dinheiro vai"]);
+  });
+
+  test("rotinas: so a sessao de admin ve a madrugada e as rotinas", async ({ page, request }) => {
+    await provarQueSoAdminVe(page, request, "/admin/jobs", ["/admin/jobs"], ["A madrugada de hoje", "As rotinas"]);
+  });
+
   // V10, item 1: a mesma prova das outras telas do admin, agora para /admin/viagem.
   test("viagem: so a sessao de admin ve o nome da marca", async ({ page, request }) => {
     await provarQueSoAdminVe(page, request, "/admin/viagem", ["/admin/viagem"], [clienteNome]);
