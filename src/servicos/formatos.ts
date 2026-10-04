@@ -66,7 +66,7 @@ export async function filtroDeFormatosDaMarca(clienteId: number): Promise<Filtro
 export const FILTRO_DE_FORMATOS_PADRAO: FiltroDeFormatosDaMarca = { ligados: CHAVES_LIGADAS_POR_PADRAO, temResposta: false };
 
 function conferirChave(chave: string): void {
-  if (!CHAVES_DE_FORMATO.includes(chave)) throw new ErroFormato("Esse formato não existe.");
+  if (!CHAVES_DE_FORMATO.includes(chave)) throw new ErroFormato("Esse tipo de vídeo não existe.");
 }
 
 /**

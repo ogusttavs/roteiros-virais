@@ -220,8 +220,9 @@ describe("o filtro por formato onde a marca lê o banco", () => {
     expect(reguaComMeme).toContain(ids.meme);
 
     const todos = (await todosOsVideosDoNicho(nichoId, { periodoDias: 90, formatosDaMarca: semMeme })).videos.map((v) => v.id);
+    // "Todos" mostra TODO tipo com o selo (revisão do #118): o filtro por chave vale só para evidência, prova e os outros segmentos.
     expect(todos).toContain(ids.passo);
-    expect(todos).not.toContain(ids.meme);
+    expect(todos).toContain(ids.meme);
     expect(todos).toContain(ids.antigoNulo);
     // "Todos" mostra recorte e o resto que nunca serve de modelo com o selo: só as treze chaves do cliente filtram ali.
     expect(todos).toContain(ids.recorte);
