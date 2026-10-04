@@ -13,7 +13,7 @@
  */
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 
-import { FORMATOS_FORA_DO_CATALOGO, FORMATOS_SEM_FALA } from "@/config/formatos";
+import { FORMATOS_SEM_FALA } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import { db } from "@/db";
 import {
@@ -514,25 +514,31 @@ export function palavrasChave(texto: string): string[] {
  * evidência mais parecida com o tema.
  */
 /**
- * E44 PR 1: o vídeo só entra quando o formato dele está ligado para a marca (`formatos_da_marca`, `servicos/formatos.ts`). Os dois "sem fala" passam pela régua do
- * setor e pelo roteiro sem fala (M4), não pelas chaves do cliente. Vídeo ainda sem `formato_catalogo` (não reclassificado) passa como antes, pelo corte da H4
- * (`serve_de_modelo` nulo ou verdadeiro), mesmo para a marca que já respondeu. Para a marca que ainda não respondeu, o corte da H4 vale para todos os vídeos, como
- * antes (a regra antiga some só para quem tem resposta). Sem o filtro da marca (testes, ferramentas), nada muda: o corte da H4 de sempre.
+ * E44: o vídeo só entra quando o tipo dele está ligado para a marca (`formatos_da_marca`, `servicos/formatos.ts`). Os dois "sem fala" passam pela régua do setor e pelo
+ * roteiro sem fala (M4), não pelas chaves do cliente. Vídeo ainda sem `formato_catalogo` (não reclassificado) passa como antes, pelo corte da H4. Sem o filtro da marca
+ * (testes, ferramentas), nada muda: o corte da H4 de sempre.
+ *
+ * `serve_de_modelo = false` é corte DURO além do tipo (revisão do #118): um recorte ou uma notícia nunca serve de modelo, qualquer que seja a chave. A única exceção é o
+ * "humor e meme" que a própria marca ligou: o meme é `serve_de_modelo = false` por definição da H4, e sem a exceção a chave ligada não faria nada. "Todos" nas
+ * Referências (`exigirServeDeModelo` falso) não filtra por tipo: mostra todo vídeo com o selo escrito; o filtro por chave vale para a evidência, a prova do tema e os
+ * outros segmentos.
  */
 function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigirServeDeModelo: boolean): SQL | null {
   const serve = sql`${videos.serveDeModelo} is not false`;
-  if (!formatos) return exigirServeDeModelo ? serve : null;
-  // "Todos" (`exigirServeDeModelo` falso) mostra meme e recorte com o selo escrito (R2b): só as treze chaves do cliente filtram ali, os valores que nunca servem de
-  // modelo (recorte de outro, notícia, ao vivo, outro) continuam à vista.
-  const permitidos = [...formatos.ligados, ...(exigirServeDeModelo ? FORMATOS_SEM_FALA : FORMATOS_FORA_DO_CATALOGO.map((f) => f.chave))];
+  if (!exigirServeDeModelo) return null;
+  if (!formatos) return serve;
+  const permitidos = [...formatos.ligados, ...FORMATOS_SEM_FALA];
   const lista = sql`array[${sql.join(
     permitidos.map((chave) => sql`${chave}`),
     sql`, `,
   )}]::text[]`;
-  const doFormato = sql`${videos.formatoCatalogo} = any(${lista})`;
-  if (!exigirServeDeModelo) return sql`(${videos.formatoCatalogo} is null or ${doFormato})`;
-  if (!formatos.temResposta) return sql`(${serve} and (${videos.formatoCatalogo} is null or ${doFormato}))`;
-  return sql`((${videos.formatoCatalogo} is null and ${serve}) or ${doFormato})`;
+  const doTipo = sql`(${videos.formatoCatalogo} is null or ${videos.formatoCatalogo} = any(${lista}))`;
+  // O meme que a marca ligou de propósito vale por cima do corte da H4 (só para quem já respondeu, onde a chave existe de verdade). RISCO conhecido (decisão 119): um
+  // repost que a extração rotule `humor_e_meme` em vez de `recorte_de_outro` passa a servir de modelo, só para a marca que ligou a chave.
+  if (formatos.temResposta && formatos.ligados.includes("humor_e_meme")) {
+    return sql`((${serve} and ${doTipo}) or ${videos.formatoCatalogo} = 'humor_e_meme')`;
+  }
+  return sql`(${serve} and ${doTipo})`;
 }
 
 function condicoesEvidencia(
@@ -868,6 +874,8 @@ export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaRes
 
 export type VideoReferencia = {
   id: number;
+  /** E44 PR 2: o tipo de vídeo pela lista fechada (`config/formatos.ts`), para o selo do cartão; nulo antes da reclassificação. */
+  formatoCatalogo: string | null;
   /** E45 PR 3: o setor do vídeo; a tela mostra o nome do ramo no cartão quando não é o principal. */
   nichoId: number | null;
   plataforma: Plataforma;
@@ -1114,12 +1122,14 @@ const CAMPOS_VIDEO_REFERENCIA = {
   contaIdiomaPrincipal: contas.idiomaPrincipal,
   capaUrl: videos.capaUrl,
   semFala: videos.semFala,
+  formatoCatalogo: videos.formatoCatalogo,
   analiseVisual: videos.analiseVisual,
   tipoConteudo: videos.tipoConteudo,
 } as const;
 
 type LinhaVideoReferencia = {
   id: number;
+  formatoCatalogo: string | null;
   nichoId: number | null;
   plataforma: Plataforma;
   url: string;
@@ -1154,6 +1164,7 @@ function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor, setores
   const reguaDoVideo = { ...regua, pisoViews: setores?.find((s) => s.id === l.nichoId)?.pisoViews ?? regua.pisoViews };
   return {
     id: l.id,
+    formatoCatalogo: l.formatoCatalogo,
     nichoId: l.nichoId,
     plataforma: l.plataforma,
     url: l.url,
@@ -1444,6 +1455,8 @@ export type VideoParaEmbed = {
   porQueFuncionou: string | null;
   /** R2a: a capa do vídeo, para a moldura do reserva quando a rede não deixa mostrar o embed. */
   capaUrl: string | null;
+  /** E44 PR 2: o tipo de vídeo da referência, para o selo "Tipo: ..." do roteiro. */
+  formatoCatalogo: string | null;
 };
 
 /**
@@ -1463,6 +1476,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
       capaUrl: videos.capaUrl,
+      formatoCatalogo: videos.formatoCatalogo,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -1479,6 +1493,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
     porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
     capaUrl: linha.capaUrl,
+    formatoCatalogo: linha.formatoCatalogo,
   };
 }
 

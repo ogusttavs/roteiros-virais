@@ -1,0 +1,21 @@
+/** `.bloco-formatos` do passo 17 (`Comecar.dc.html`): o cartão, o cabeçalho com o resumo e a lista embaixo. */
+.cartao {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.topo {
+  display: grid;
+  gap: var(--espaco-2);
+  padding-bottom: var(--espaco-2);
+}
+
+.topo h3 {
+  margin: 0;
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}

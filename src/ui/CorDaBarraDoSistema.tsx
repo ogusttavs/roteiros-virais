@@ -67,12 +67,25 @@ export function CorDaBarraDoSistema() {
     aplicar();
     // A tela nova pode demorar um quadro para trazer o cabeçalho: mede de novo logo depois.
     const depois = setTimeout(aplicar, 400);
+    // O cabeçalho de vidro (passo 17b) muda de cor quando a tela rola além de 4 px: mede de novo depois da transição de 180 ms.
+    let rolada = window.scrollY > 4;
+    let depoisDaRolagem: ReturnType<typeof setTimeout> | undefined;
+    function aoRolar() {
+      const agora = window.scrollY > 4;
+      if (agora === rolada) return;
+      rolada = agora;
+      clearTimeout(depoisDaRolagem);
+      depoisDaRolagem = setTimeout(aplicar, 260);
+    }
+    window.addEventListener("scroll", aoRolar, { passive: true });
     const observador = new MutationObserver(aplicar);
     observador.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
     const escuro = window.matchMedia?.("(prefers-color-scheme: dark)");
     escuro?.addEventListener?.("change", aplicar);
     return () => {
       clearTimeout(depois);
+      clearTimeout(depoisDaRolagem);
+      window.removeEventListener("scroll", aoRolar);
       observador.disconnect();
       escuro?.removeEventListener?.("change", aplicar);
     };

@@ -1,7 +1,7 @@
 "use client";
 
 import { RotateCw } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useTransition } from "react";
 
 import { textosNav } from "@/textos/nav";
@@ -11,7 +11,16 @@ import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
 
 import styles from "./CabecalhoCelular.module.css";
 import { SeletorMarcaCelular, type MarcaResumo } from "./SeletorMarcaCelular";
-import { useRolagemParaBaixo } from "./useRolagem";
+import { useBarraRolada } from "./useRolagem";
+
+/** O título curto de cada tela que usa este cabeçalho, para o meio da barra rolada. */
+const TITULO_CURTO: Record<string, string> = {
+  "/referencias": "Referências",
+  "/noticias": "Notícias",
+  "/conta": "Conta",
+  "/briefing": "Briefing",
+  "/historico": "Histórico",
+};
 
 type Props = {
   nomeProduto: string;
@@ -33,7 +42,9 @@ type Props = {
  * derruba o aplicativo para a pagina de erro do navegador.
  */
 export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }: Props) {
-  const escondido = useRolagemParaBaixo();
+  // Passo 17b (o cabeçalho de vidro): o cabeçalho não some mais ao rolar para baixo; rolada a tela ele vira vidro (`useBarraRolada`) e o que está por trás passa desfocado.
+  const rolada = useBarraRolada();
+  const tituloDaTela = TITULO_CURTO[usePathname()];
   const router = useRouter();
   const { avisarFalhaDeRede } = useConexao();
   const [atualizando, iniciarAtualizacao] = useTransition();
@@ -53,13 +64,19 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
   return (
     <header
       data-barra-topo=""
-      className={marcas.length > 1 ? `${styles.cabecalho} ${styles.comMarca}` : styles.cabecalho}
-      style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}
+      className={[styles.cabecalho, marcas.length > 1 ? styles.comMarca : "", rolada ? styles.rolada : ""].filter(Boolean).join(" ")}
+      data-rolada={rolada ? "" : undefined}
     >
       <div className={styles.identidade}>
         <Simbolo altura={24} />
         <span className={styles.nome}>{nomeProduto}</span>
       </div>
+      {/* Passo 17b: rolada a tela, o logotipo cede o lugar ao título curto da tela, no meio (só decorativo: o `<h1>` da página já diz). */}
+      {tituloDaTela ? (
+        <span className={styles.tituloMeio} aria-hidden="true">
+          {tituloDaTela}
+        </span>
+      ) : null}
       <div className={styles.direita}>
         <SeletorMarcaCelular marcaAtiva={marcaAtiva} marcas={marcas} nomePessoa={nomePessoa} />
         <button
@@ -76,11 +93,11 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
             className={atualizando ? styles.girando : undefined}
           />
           <span className={styles.cede}>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span>
-          {/* A região viva existe desde o começo e só o texto muda (uma região que nasce com o texto não é anunciada). */}
-          <span className="so-leitor" role="status" aria-live="polite">
-            {emDia ? textosNav.jaEstavaEmDia : ""}
-          </span>
         </button>
+        {/* A região viva fica FORA do botão (dentro dele o leitor de tela a lê como parte do nome) e existe desde o começo: só o texto muda. */}
+        <span className="so-leitor" role="status" aria-live="polite">
+          {emDia ? textosNav.jaEstavaEmDia : ""}
+        </span>
       </div>
     </header>
   );

@@ -1,0 +1,119 @@
+/** `AdminCliente.dc.html` (passo 17): a linha de Ajustes e a folha com as treze, três colunas (o tipo, quem decidiu, a chave). */
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3) 0;
+}
+
+.titulo {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  min-width: 10rem;
+}
+
+.valor {
+  flex: 1;
+  color: var(--cor-titulo);
+}
+
+.ajuste {
+  margin-left: var(--espaco-2);
+  font: var(--peso-medio) var(--tamanho-legenda) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-destaque);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tipo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+  padding: var(--espaco-3) 0;
+}
+
+.tipo + .tipo {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+@media (min-width: 768px) {
+  .tipo {
+    grid-template-columns: minmax(0, 1fr) 16rem auto;
+  }
+}
+
+.texto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nome {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+}
+
+.frase {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.quem {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  font-size: var(--tamanho-rodape);
+}
+
+.rotuloQuem {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+.quando {
+  color: var(--cor-texto-dica);
+}
+
+.ajustado .rotuloQuem {
+  color: var(--cor-destaque);
+}
+
+.doPadrao .rotuloQuem {
+  color: var(--cor-texto-dica);
+  font-weight: var(--peso-regular);
+}
+
+.voltar {
+  min-height: var(--altura-toque);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cor-acao);
+  font: inherit;
+  font-size: var(--tamanho-rodape);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

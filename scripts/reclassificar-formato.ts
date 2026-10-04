@@ -107,14 +107,19 @@ export async function planejarReclassificacao(): Promise<Plano> {
   const emAndamento = new Set<number>();
   const lotes = await db().select({ videoIds: lotesIa.videoIds }).from(lotesIa).where(and(eq(lotesIa.tarefa, "extrairVideo"), eq(lotesIa.status, "em_andamento")));
   for (const lote of lotes) for (const id of lote.videoIds ?? []) emAndamento.add(id);
+  let jaEmLote = 0;
   if (emAndamento.size > 0) {
-    for (const setor of porSetor) setor.candidatos = setor.candidatos.filter((c) => !emAndamento.has(c.id));
+    for (const setor of porSetor) {
+      const antes = setor.candidatos.length;
+      setor.candidatos = setor.candidatos.filter((c) => !emAndamento.has(c.id));
+      jaEmLote += antes - setor.candidatos.length;
+    }
   }
   const total = porSetor.reduce((soma, s) => soma + s.candidatos.length, 0);
   const custoMedioUsd = await custoMedioHistoricoUsd();
   // API de lote: metade do preço normal.
   const custoEstimadoUsd = custoMedioUsd !== null ? (custoMedioUsd / 2) * total : null;
-  return { total, porSetor: porSetor.filter((s) => s.candidatos.length > 0), custoMedioUsd, custoEstimadoUsd, jaEmLote: emAndamento.size };
+  return { total, porSetor: porSetor.filter((s) => s.candidatos.length > 0), custoMedioUsd, custoEstimadoUsd, jaEmLote };
 }
 
 async function main() {

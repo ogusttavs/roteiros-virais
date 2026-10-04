@@ -86,3 +86,17 @@ export function useCapsulaEncolhida(): { encolhida: boolean; abrir: () => void }
 
   return { encolhida: estado === "encolhida", abrir };
 }
+
+/** Passo 17b (o cabeçalho de vidro): a tela já rolou além de 4 px do topo (`.rolada`: o vidro, o fio de baixo e o título curto entram). Ouvinte passivo; começa pelo que a tela já tem. */
+export function useBarraRolada(): boolean {
+  const [rolada, setRolada] = useState(false);
+  useEffect(() => {
+    function aoRolar() {
+      setRolada(window.scrollY > 4);
+    }
+    aoRolar();
+    window.addEventListener("scroll", aoRolar, { passive: true });
+    return () => window.removeEventListener("scroll", aoRolar);
+  }, []);
+  return rolada;
+}

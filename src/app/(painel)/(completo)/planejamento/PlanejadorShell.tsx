@@ -99,11 +99,12 @@ export function PlanejadorTela({ visao, cabeca, marcaAtiva, marcas, nomePessoa, 
               onClick={atualizar}
             >
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" className={atualizando ? styles.girando : undefined} />
-              {marcas.length <= 1 || emDia ? <span>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span> : null}
-              <span className="so-leitor" role="status" aria-live="polite">
-                {emDia ? textosNav.jaEstavaEmDia : ""}
-              </span>
+              {marcas.length <= 1 || emDia ? <span className={emDia ? undefined : "cede-vidro"}>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span> : null}
             </button>
+            {/* A região viva fica FORA do botão (dentro dele o leitor de tela a lê como parte do nome) e existe desde o começo: só o texto muda. */}
+            <span className="so-leitor" role="status" aria-live="polite">
+              {emDia ? textosNav.jaEstavaEmDia : ""}
+            </span>
           </>
         }
       />

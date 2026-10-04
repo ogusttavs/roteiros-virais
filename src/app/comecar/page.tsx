@@ -10,6 +10,7 @@ import {
   dadosOndeIniciais,
   marcasDoUsuario,
 } from "@/servicos/clientes";
+import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
@@ -80,6 +81,7 @@ export default async function Comecar() {
           blocoInicial={blocoInicial(briefing.avaliacoes, cliente.tipo)}
           meta={config.regras.notaMinimaBriefing}
           tipo={cliente.tipo}
+          tiposIniciais={(await formatosDaMarcaComEstado(cliente.id)).map((t) => ({ chave: t.chave, ligada: t.ligada }))}
         />
       </TrocaMarcaProvider>
     </ConexaoDaTela>

@@ -1,0 +1,76 @@
+/** `base.css` do passo 17: `.lista-formatos`, `.formato`, `.nome-formato`, `.frase-formato`, `.exemplo-formato`, `.trocou`. */
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tipo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-3);
+  padding: var(--espaco-3) 0;
+}
+
+.tipo + .tipo {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.texto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.nome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-1) var(--espaco-2);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+}
+
+.frase {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-compacta);
+}
+
+.exemplo {
+  color: var(--cor-texto-dica);
+  font-size: var(--tamanho-rodape);
+  line-height: var(--altura-compacta);
+}
+
+.trocou {
+  font: var(--peso-medio) var(--tamanho-legenda) / 1.2 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-destaque);
+}
+
+.resumo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-1) var(--espaco-3);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.resumo b {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}

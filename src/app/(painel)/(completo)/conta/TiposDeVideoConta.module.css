@@ -1,0 +1,48 @@
+/** O cartão-botão da Conta (`button.linha-briefing` do passo 17): o mesmo cartão de "O seu briefing", que abre uma folha em vez de uma página. */
+.linha {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  min-height: var(--altura-toque);
+  margin-bottom: var(--espaco-6);
+  padding: var(--espaco-4) var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-divisor);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--duracao-soltar) var(--curva-mola),
+    background-color var(--duracao-rapida) var(--curva-padrao);
+}
+
+.linha:active {
+  transform: scale(var(--escala-toque-grande));
+  background-color: var(--cor-superficie-pressionada);
+  transition-duration: var(--duracao-toque);
+}
+
+.linha:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.quem {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.quem strong {
+  font-weight: var(--peso-semibold);
+}
+
+.quem span {
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}

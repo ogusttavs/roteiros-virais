@@ -9,6 +9,7 @@ import { clienteDetalheAdmin } from "@/servicos/admin-coleta";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
 import { clientePorId, membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import { fontesDoHistorico } from "@/servicos/curva";
+import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { roteirosDoCliente } from "@/servicos/roteiro";
@@ -21,6 +22,7 @@ import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
 import { RamosAlternativosAdmin } from "./RamosAlternativosAdmin";
 import { SeletorPlanoAdmin } from "./SeletorPlanoAdmin";
 import { SeletorTipoAdmin } from "./SeletorTipoAdmin";
+import { TiposDeVideoAdmin } from "./TiposDeVideoAdmin";
 
 const t = textosAdmin.clienteDetalhe;
 const LIMIAR_ATENCAO = 5;
@@ -59,6 +61,8 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
   const membrosBrutos = await membrosDaMarca(cliente.id);
   const principal = await ramoAtualDoCliente((await clientePorId(cliente.id))?.nichoId);
   const alternativos = await ramosAlternativosDaMarca(cliente.id);
+  const tiposDaMarca = await formatosDaMarcaComEstado(cliente.id);
+  const diaPorExtenso = (d: Date) => new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(d);
   // Server Component: NOME_SEM_NOME_AINDA mora num arquivo que importa next/headers,
   // que so pode ser importado aqui (o client component recebe so o booleano ja calculado).
   const membros = membrosBrutos.map((membro) => ({ ...membro, semNome: membro.nome === NOME_SEM_NOME_AINDA }));
@@ -84,6 +88,19 @@ export default async function AdminClienteDetalhe({ params }: { params: Promise<
         nomeMarca={cliente.nome}
         principal={principal ? { nome: principal.nome, slug: principal.ramoSlug } : null}
         alternativos={alternativos.map((a) => ({ id: a.id, nome: a.nome, slug: a.ramoSlug, ligadoEm: a.ligadoEm.toISOString() }))}
+      />
+
+      <TiposDeVideoAdmin
+        clienteId={cliente.id}
+        nomeMarca={cliente.nome}
+        iniciais={tiposDaMarca.map((t) => ({
+          chave: t.chave,
+          ligada: t.ligada,
+          quem: t.quem,
+          respostaDoCliente: t.respostaDoCliente,
+          decididoEmTexto: t.decididoEm ? diaPorExtenso(t.decididoEm) : null,
+          respostaDoClienteEmTexto: t.respostaDoClienteEm ? diaPorExtenso(t.respostaDoClienteEm) : null,
+        }))}
       />
 
       <section className={styles.secao}>

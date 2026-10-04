@@ -18,9 +18,11 @@ import { textosRamo } from "@/textos/ramo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Botao } from "@/ui/componentes/Botao";
+import { CartaoDeTipos } from "@/ui/componentes/CartaoDeTipos";
 import { Progresso } from "@/ui/componentes/Progresso";
 import { Toast } from "@/ui/componentes/Toast";
 import { Simbolo } from "@/ui/Logo";
+import type { TipoLigado } from "@/ui/useTiposDaMarca";
 
 import { avaliarRespostaAction, salvarDadosFixosAction, salvarRascunhoAction } from "./acoes";
 import styles from "./ComecarWizard.module.css";
@@ -39,6 +41,8 @@ type Props = {
   blocoInicial: number;
   meta: number;
   tipo: TipoMarca;
+  /** E44 PR 2: os tipos de vídeo da marca (cada chave ligada ou desligada), para o cartão do fim do último bloco. */
+  tiposIniciais: readonly TipoLigado[];
 };
 
 type Etapa = "intro" | "dadosFixos" | "blocos" | "liberado";
@@ -102,6 +106,7 @@ export function ComecarWizard({
   blocoInicial,
   meta,
   tipo,
+  tiposIniciais,
 }: Props) {
   const router = useRouter();
   const [etapa, setEtapa] = useState<Etapa>(dadosFixosCompletos ? "blocos" : "intro");
@@ -335,6 +340,11 @@ export function ComecarWizard({
               />
             </div>
           ))}
+          {/* Os tipos de vídeo (passo 17): o fim do último bloco, sem virar mais um passo e sem entrar na nota. Sempre montado (só `hidden`), para a troca de bloco não
+              zerar o que a pessoa já trocou. */}
+          <div hidden={bloco !== TOTAL_BLOCOS}>
+            <CartaoDeTipos iniciais={tiposIniciais} onde="comecar" />
+          </div>
           <BarraAcao
             presaAoFluxo
             secundaria={{

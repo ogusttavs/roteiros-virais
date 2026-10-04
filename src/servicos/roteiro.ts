@@ -856,7 +856,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   ] = await Promise.all([
     // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
     ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos, formatosDaMarca),
-    ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas, formatosDaMarca),
+    ehMomento ? Promise.resolve([]) : // A evidência prevista (a que sustentou o tema do dia) não é cortada pelas chaves da marca: o tema já nasceu dela, e cortá-la na hora do roteiro o deixaria
+    // sem a prova que o motivou. Só o corte duro `serve_de_modelo` vale (decisão 106, E44 PR 2).
+    evidenciaPorIds(dados.evidenciasPrevistas),
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),

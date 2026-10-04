@@ -5,6 +5,7 @@ import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
+import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
@@ -18,6 +19,7 @@ import { InformacoesDoAparelhoAdmin } from "./InformacoesDoAparelhoAdmin";
 import { InstalarNoCelular } from "./InstalarNoCelular";
 import styles from "./page.module.css";
 import { QuemTemAcesso } from "./QuemTemAcesso";
+import { TiposDeVideoConta } from "./TiposDeVideoConta";
 
 export default async function Conta() {
   const sessao = await sessaoAtual();
@@ -38,6 +40,7 @@ export default async function Conta() {
   const ramoAtual = await ramoAtualDoCliente(cliente?.nichoId);
   const pedidoAberto = cliente ? await pedidoAbertoDaMarca(cliente.id) : null;
   const alternativos = cliente ? await ramosAlternativosDaMarca(cliente.id) : [];
+  const tiposDaMarca = cliente ? await formatosDaMarcaComEstado(cliente.id) : [];
   const notaBriefing = briefing?.notaGeral ? Number(briefing.notaGeral) : null;
 
   return (
@@ -50,6 +53,7 @@ export default async function Conta() {
       */}
       <div className={styles.colunaPrincipal}>
         {cliente ? <BriefingLinha nota={notaBriefing} /> : null}
+        {cliente ? <TiposDeVideoConta iniciais={tiposDaMarca.map((t) => ({ chave: t.chave, ligada: t.ligada }))} /> : null}
         <h1 className={styles.titulo}>{textosConta.titulo}</h1>
         <FormularioConta
           nomeInicial={sessao.user.name}

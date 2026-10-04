@@ -23,6 +23,10 @@ export type EstadoDoFormato = {
   quem: QuemDecidiu;
   /** O que o cliente respondeu (nulo se não respondeu esta chave), para a tela do admin mostrar a diferença e oferecer "voltar ao que o cliente escolheu". */
   respostaDoCliente: boolean | null;
+  /** Quando foi a decisão que vale hoje (a do admin, a do cliente), ou nulo se é o padrão. */
+  decididoEm: Date | null;
+  /** Quando o cliente respondeu esta chave (nulo se não respondeu), para "respondido em ..." e para "o cliente tinha ligado" na tela do admin. */
+  respostaDoClienteEm: Date | null;
 };
 
 function estadoDasChaves(linhas: FormatoDaMarca[]): EstadoDoFormato[] {
@@ -37,6 +41,8 @@ function estadoDasChaves(linhas: FormatoDaMarca[]): EstadoDoFormato[] {
       ligada: doAdmin ? doAdmin.ligada : doCliente ? doCliente.ligada : formato.ligadaPorPadrao,
       quem,
       respostaDoCliente: doCliente ? doCliente.ligada : null,
+      decididoEm: doAdmin ? doAdmin.decididoEm : doCliente ? doCliente.decididoEm : null,
+      respostaDoClienteEm: doCliente ? doCliente.decididoEm : null,
     };
   });
 }
@@ -66,7 +72,7 @@ export async function filtroDeFormatosDaMarca(clienteId: number): Promise<Filtro
 export const FILTRO_DE_FORMATOS_PADRAO: FiltroDeFormatosDaMarca = { ligados: CHAVES_LIGADAS_POR_PADRAO, temResposta: false };
 
 function conferirChave(chave: string): void {
-  if (!CHAVES_DE_FORMATO.includes(chave)) throw new ErroFormato("Esse formato não existe.");
+  if (!CHAVES_DE_FORMATO.includes(chave)) throw new ErroFormato("Esse tipo de vídeo não existe.");
 }
 
 /**
@@ -90,7 +96,10 @@ export async function voltarFormatoAoDoCliente(clienteId: number, chave: string)
   await db().delete(formatosDaMarca).where(and(eq(formatosDaMarca.clienteId, clienteId), eq(formatosDaMarca.chave, chave), eq(formatosDaMarca.quem, "admin")));
 }
 
-/** O cliente responde as treze de uma vez (o briefing): só as chaves que ele mandou, cada uma ligada ou desligada. */
+/**
+ * O cliente responde as chaves (o briefing, a Conta): só as que ele mandou, cada uma ligada ou desligada. Regra do desenho (dúvida 4 do passo 17): se o cliente troca
+ * DEPOIS do ajuste do admin, vale a do cliente; a linha do admin dessa chave é apagada na mesma transação e o admin passa a ver "Escolhido pelo cliente" com a data nova.
+ */
 export async function responderFormatosDoCliente(clienteId: number, respostas: Record<string, boolean>, usuarioId: string): Promise<void> {
   const chaves = Object.keys(respostas);
   if (chaves.length === 0) throw new ErroFormato("Nenhuma resposta.");
@@ -105,6 +114,7 @@ export async function responderFormatosDoCliente(clienteId: number, respostas: R
           target: [formatosDaMarca.clienteId, formatosDaMarca.chave, formatosDaMarca.quem],
           set: { ligada, decididoPorUsuarioId: usuarioId, decididoEm: new Date() },
         });
+      await tx.delete(formatosDaMarca).where(and(eq(formatosDaMarca.clienteId, clienteId), eq(formatosDaMarca.chave, chave), eq(formatosDaMarca.quem, "admin")));
     }
   });
 }

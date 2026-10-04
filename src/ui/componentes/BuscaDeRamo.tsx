@@ -360,6 +360,10 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
         aoEscolher={(slug) =>
           fecharEDepois(() => {
             focarTrocar.current = true;
+            // Se o "Trocar" não chegar a aparecer, o pedido de foco não fica pendente para a próxima renderização.
+            setTimeout(() => {
+              focarTrocar.current = false;
+            }, 1000);
             escolher(slug);
           })
         }
