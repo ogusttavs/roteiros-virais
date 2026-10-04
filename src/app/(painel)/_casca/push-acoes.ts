@@ -2,7 +2,7 @@
 
 import type { SistemaInstalado } from "@/db/schema";
 import { logger } from "@/lib/log";
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 import { adiarPedidoDePush, apagarInscricaoDaPessoa, ErroInscricaoPush, registrarInscricaoPush } from "@/servicos/push";
 
@@ -15,7 +15,8 @@ function textoNaoVazio(valor: unknown): valor is string {
  * Devolve `true` quando a inscrição ficou registrada; uma inscrição inválida (endereço que não é https, chaves vazias) volta `false`, sem lançar.
  */
 export async function registrarInscricaoPushAction(dados: unknown, sistema: unknown): Promise<boolean> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   // Os argumentos vêm do navegador: só strings não vazias valem (qualquer outra coisa devolve `false`, sem lançar).
   const entrada = dados as { endpoint?: unknown; p256dh?: unknown; auth?: unknown } | null;
@@ -42,7 +43,8 @@ export async function registrarInscricaoPushAction(dados: unknown, sistema: unkn
 
 /** A pessoa desliga o aviso neste aparelho (só apaga uma inscrição dela). */
 export async function apagarInscricaoPushAction(endpoint: unknown): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   if (!textoNaoVazio(endpoint)) return;
   await apagarInscricaoDaPessoa(sessao.user.id, endpoint);
@@ -50,7 +52,8 @@ export async function apagarInscricaoPushAction(endpoint: unknown): Promise<void
 
 /** "Agora não" no pedido de permissão: a folha não volta por sete dias, em nenhum aparelho da pessoa. */
 export async function adiarPedidoDePushAction(): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   await adiarPedidoDePush(sessao.user.id);
 }
@@ -64,7 +67,8 @@ const ULTIMA_FALHA_POR_PESSOA = new Map<string, number>();
 const INTERVALO_DA_FALHA_MS = 60_000;
 
 export async function registrarFalhaDePushAction(motivo: unknown, etapa: unknown, sistema: unknown): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) return;
   const agora = Date.now();
   const antes = ULTIMA_FALHA_POR_PESSOA.get(sessao.user.id);

@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
@@ -11,7 +12,7 @@ import { Campo } from "@/ui/componentes/Campo";
 
 import { FolhaSenhaGerada } from "../FolhaSenhaGerada";
 
-import { darAcessoAction, gerarSenhaNovaAction, renomearPessoaAction, tirarAcessoAction } from "./acoes";
+import { darAcessoAction, entrarVerComoAction, gerarSenhaNovaAction, renomearPessoaAction, tirarAcessoAction } from "./acoes";
 import styles from "./QuemTemAcessoAdmin.module.css";
 
 const t = textosAdmin.acessos;
@@ -23,7 +24,8 @@ const t = textosAdmin.acessos;
  * servidor). Importar dali travaria o build ("You're importing a component
  * that needs next/headers").
  */
-export type Membro = { usuarioId: string; nome: string; email: string; papel: PapelMarca; semNome: boolean };
+/** `podeVerComo` (E46 PR 2): a pessoa não é administradora; o servidor confere de novo. */
+export type Membro = { usuarioId: string; nome: string; email: string; papel: PapelMarca; semNome: boolean; podeVerComo: boolean };
 
 type Props = {
   clienteId: number;
@@ -53,6 +55,29 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
   const [processando, setProcessando] = useState<string | null>(null);
   const [senhaPorUsuario, setSenhaPorUsuario] = useState<Record<string, string>>({});
   const [erroLinha, setErroLinha] = useState<{ usuarioId: string; texto: string } | null>(null);
+  // E46 PR 2: a folha "Ver o painel como" (a pessoa escolhida; `null` é fechada).
+  const [verComoDe, setVerComoDe] = useState<string | null>(null);
+  const [entrandoVerComo, setEntrandoVerComo] = useState(false);
+  const [erroVerComo, setErroVerComo] = useState<string | null>(null);
+  const pessoasVisiveis = membros.filter((m) => m.podeVerComo);
+  const pessoaVerComo = pessoasVisiveis.find((m) => m.usuarioId === verComoDe) ?? null;
+
+  async function entrarVerComo() {
+    if (!pessoaVerComo) return;
+    setEntrandoVerComo(true);
+    setErroVerComo(null);
+    try {
+      // Sucesso redireciona para o painel (a Server Action chama `redirect`); só volta aqui quando recusa.
+      const resultado = await entrarVerComoAction(clienteId, pessoaVerComo.usuarioId);
+      if (resultado && !resultado.ok) setErroVerComo(resultado.erro);
+    } catch (erro) {
+      // `redirect` lança um erro especial que o Next trata; qualquer outro erro vira a frase de sempre.
+      if (erro && typeof erro === "object" && "digest" in erro && String((erro as { digest: unknown }).digest).startsWith("NEXT_REDIRECT")) throw erro;
+      setErroVerComo(t.verComoErro);
+    } finally {
+      setEntrandoVerComo(false);
+    }
+  }
 
   async function darAcesso(evento: FormEvent) {
     evento.preventDefault();
@@ -201,6 +226,11 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
                 </div>
               ) : (
                 <div className={styles.acoesPessoa}>
+                  {membro.podeVerComo ? (
+                    <Botao type="button" variante="ghost" aria-label={t.verComoDe(membro.nome)} onClick={() => { setErroVerComo(null); setVerComoDe(membro.usuarioId); }}>
+                      <Eye size={14} strokeWidth={1.5} aria-hidden="true" /> {t.verComo}
+                    </Botao>
+                  ) : null}
                   <Botao type="button" variante="ghost" onClick={() => iniciarEdicaoNome(membro)}>
                     {t.editarNome}
                   </Botao>
@@ -263,6 +293,51 @@ export function QuemTemAcessoAdmin({ clienteId, nomeMarca, membros }: Props) {
                 </Botao>
               </div>
             </form>
+          </div>
+        </div>
+      ) : null}
+
+      {pessoaVerComo ? (
+        <div className={styles.backdrop} onClick={() => setVerComoDe(null)}>
+          <div role="dialog" aria-modal="true" aria-label={t.verComoTitulo} className={styles.folha} onClick={(evento) => evento.stopPropagation()}>
+            <h3 className={styles.folhaTitulo}>{t.verComoTitulo}</h3>
+            <div className={styles.escolhaPessoa} role="radiogroup" aria-label={t.verComoTitulo}>
+              {pessoasVisiveis.map((m) => (
+                <button
+                  key={m.usuarioId}
+                  type="button"
+                  role="radio"
+                  aria-checked={m.usuarioId === pessoaVerComo.usuarioId}
+                  className={styles.opcaoPessoa}
+                  onClick={() => setVerComoDe(m.usuarioId)}
+                >
+                  <span className={styles.quem}>
+                    <span className={styles.nome}>{m.semNome ? t.semNomeAinda : m.nome}</span>
+                    <span className={styles.email}>{m.email}</span>
+                  </span>
+                  <span className={styles.etiqueta}>{m.papel === "dono" ? t.dono : t.membro}</span>
+                </button>
+              ))}
+            </div>
+            <p className={styles.avisoVerComo}>{t.verComoAviso(pessoaVerComo.semNome ? pessoaVerComo.email : pessoaVerComo.nome, nomeMarca)}</p>
+            <ul className={styles.caminhos}>
+              {t.verComoCaminhos.map((texto) => (
+                <li key={texto}>{texto}</li>
+              ))}
+            </ul>
+            {erroVerComo ? (
+              <p className={styles.erro} role="alert">
+                {erroVerComo}
+              </p>
+            ) : null}
+            <div className={styles.folhaAcoes}>
+              <Botao type="button" variante="ghost" onClick={() => setVerComoDe(null)}>
+                {t.cancelar}
+              </Botao>
+              <Botao type="button" carregando={entrandoVerComo} onClick={entrarVerComo}>
+                {entrandoVerComo ? t.verComoEntrando : t.verComoEntrar(pessoaVerComo.semNome ? pessoaVerComo.email : pessoaVerComo.nome)}
+              </Botao>
+            </div>
           </div>
         </div>
       ) : null}

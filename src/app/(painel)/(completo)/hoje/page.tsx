@@ -9,7 +9,7 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
@@ -74,7 +74,7 @@ type Props = { searchParams: Promise<{ dia?: string }> };
  * e o "ver o mês").
  */
 export default async function Hoje({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

@@ -16,6 +16,7 @@ import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { roteirosDoCliente } from "@/servicos/roteiro";
+import { pessoasVisiveis, ultimasEntradasVerComo } from "@/servicos/ver-como";
 import { textosAdmin } from "@/textos/admin";
 import { dolares, quandoPorExtenso, reais, textosContaAdmin as t } from "@/textos/admin-contas";
 import { textosHistorico } from "@/textos/historico";
@@ -74,7 +75,9 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
   const alteracoes = await alteracoesDaConta(detalhe.id, 8);
   const diaPorExtenso = (d: Date) => new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(d);
   // Server Component: NOME_SEM_NOME_AINDA mora num arquivo que importa next/headers, que só pode ser importado aqui (o client component recebe só o booleano já calculado).
-  const membros = membrosBrutos.map((membro) => ({ ...membro, semNome: membro.nome === NOME_SEM_NOME_AINDA }));
+  const visiveis = new Set((await pessoasVisiveis(detalhe.id)).map((p) => p.usuarioId));
+  const entradasVerComo = await ultimasEntradasVerComo(detalhe.id);
+  const membros = membrosBrutos.map((membro) => ({ ...membro, semNome: membro.nome === NOME_SEM_NOME_AINDA, podeVerComo: visiveis.has(membro.usuarioId) }));
   const escondidos = [principal?.ramoSlug, ...alternativos.map((a) => a.ramoSlug)].filter((s): s is string => Boolean(s));
   const publicoTexto = cliente.alcance ? descreverPublico(cliente) : "";
   const agora = new Date();
@@ -134,6 +137,33 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
         <div className={conta.pilha}>
           <section className={comum.cartao} data-bloco="acesso">
             <QuemTemAcessoAdmin clienteId={detalhe.id} nomeMarca={detalhe.nome} membros={membros} />
+            {/* E46 PR 2, regra 4: as últimas entradas no "ver como" desta conta. */}
+            <div className={conta.registroVerComo} data-bloco="ver-como">
+              <h3>{textosAdmin.acessos.verComoRegistroTitulo}</h3>
+              {entradasVerComo.length === 0 ? (
+                <p className={comum.semDado}>{textosAdmin.acessos.verComoRegistroVazio}</p>
+              ) : (
+                <ul>
+                  {entradasVerComo.map((e) => {
+                    const t0 = textosAdmin.acessos.verComoDuracao;
+                    const aberto = e.saiuEm === null && e.expiraEm.getTime() > agora.getTime();
+                    const minutos = e.saiuEm ? Math.max(0, Math.round((e.saiuEm.getTime() - e.entrouEm.getTime()) / 60000)) : 0;
+                    const duracao = aberto
+                      ? t0.aberto
+                      : e.motivoSaida === "saiu"
+                        ? t0.saiu(minutos)
+                        : e.motivoSaida === "trocou"
+                          ? t0.trocou
+                          : e.motivoSaida === "sessao"
+                            ? t0.sessao
+                            : t0.expirou;
+                    return (
+                      <li key={e.id}>{textosAdmin.acessos.verComoRegistroLinha(e.pessoaNome, quandoPorExtenso(e.entrouEm, agora), duracao)}</li>
+                    );
+                  })}
+                </ul>
+              )}
+            </div>
           </section>
 
           <section className={comum.cartao} aria-labelledby="b-ajustes" data-bloco="ajustes">

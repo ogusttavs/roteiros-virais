@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { fichaPadraoDoObjetivo, fichaRecomendadaParaTema, type Ficha } from "@/config/fichas";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
@@ -18,7 +18,7 @@ type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: str
  * roteiro.
  */
 export default async function Objetivo({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

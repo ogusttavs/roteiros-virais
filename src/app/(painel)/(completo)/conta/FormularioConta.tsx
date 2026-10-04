@@ -46,6 +46,8 @@ type Props = {
   regiaoInicial: string | null;
   paisInicial: string | null;
   paisesInicial: string | null;
+  /** E46 PR 2: no "ver como", o motivo de o salvar estar desligado (os dados são da pessoa); `undefined` fora do modo. */
+  desligadoVerComo?: string;
 };
 
 const OPCOES_TEMA = textosConta.temas;
@@ -107,6 +109,7 @@ export function FormularioConta({
   regiaoInicial,
   paisInicial,
   paisesInicial,
+  desligadoVerComo,
 }: Props) {
   const dadosFixos = dadosFixosDoBriefing(tipo);
   const [nome, setNome] = useState(nomeInicial);
@@ -405,9 +408,14 @@ export function FormularioConta({
           </p>
         ) : null}
 
-        <Botao type="submit" variante="secundario" carregando={salvando} precisaDeRede className={styles.botaoSalvar}>
+        <Botao type="submit" variante="secundario" carregando={salvando} precisaDeRede disabled={desligadoVerComo !== undefined} aria-describedby={desligadoVerComo ? "motivo-salvar" : undefined} className={styles.botaoSalvar}>
           {salvando ? textosConta.salvando : textosConta.salvar}
         </Botao>
+        {desligadoVerComo ? (
+          <p className={styles.motivoDesligado} id="motivo-salvar">
+            {desligadoVerComo}
+          </p>
+        ) : null}
       </form>
       <Toast texto={textosConta.salvo} aberto={toastAberto} onFechar={() => setToastAberto(false)} />
     </>

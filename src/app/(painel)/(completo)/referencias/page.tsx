@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { ehFicha } from "@/config/fichas";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
 import {
@@ -67,7 +67,7 @@ function booleanoValido(valor: string | undefined): boolean | undefined {
 }
 
 export default async function Referencias({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

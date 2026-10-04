@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
+import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
@@ -27,6 +28,7 @@ async function roteiroDoClienteOuFalha(roteiroId: number) {
 }
 
 export async function marcarGravadoAction(roteiroId: number): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await marcarGravado(roteiroId);
   // V9b, item 3: fecha o círculo do plano quando este roteiro veio de um item aceito (sem-op sem plano).
@@ -34,6 +36,7 @@ export async function marcarGravadoAction(roteiroId: number): Promise<void> {
 }
 
 export async function marcarPostadoAction(roteiroId: number, url: string): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await marcarPostado(roteiroId, url);
 }
@@ -43,6 +46,7 @@ export async function reprovarERescreverAction(
   motivosIds: IdMotivoReprovacao[],
   motivoTexto?: string,
 ): Promise<{ id: number }> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   const novaVersao = await reprovarERescrever(roteiroId, motivosIds, motivoTexto);
   return { id: novaVersao.id };
@@ -52,6 +56,7 @@ export async function avaliarRoteiroAction(
   roteiroId: number,
   avaliacao: "gostei" | "nao_gostei",
 ): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await avaliarRoteiro(roteiroId, avaliacao);
 }
@@ -61,6 +66,7 @@ export async function salvarEdicaoAction(
   roteiroId: number,
   campos: CamposEditaveisRoteiro,
 ): Promise<{ id: number }> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   const atualizado = await editarRoteiro(roteiroId, campos);
   return { id: atualizado.id };

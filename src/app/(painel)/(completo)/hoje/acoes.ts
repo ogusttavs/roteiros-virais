@@ -1,6 +1,6 @@
 "use server";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, ErroAcessoNegado, salvarRedePrincipal } from "@/servicos/clientes";
 import { roteiroMaisRecenteDesde } from "@/servicos/roteiro";
 
@@ -10,7 +10,8 @@ import { roteiroMaisRecenteDesde } from "@/servicos/roteiro";
  * `clienteId` vindo do navegador.
  */
 export async function salvarRedePrincipalAction(rede: string): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -28,7 +29,7 @@ export async function salvarRedePrincipalAction(rede: string): Promise<void> {
 const MARGEM_RELOGIO_MS = 15_000;
 
 export async function roteiroRecenteDesdeAction(desdeMs: number): Promise<{ id: number } | null> {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }

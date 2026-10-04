@@ -1,6 +1,6 @@
 "use server";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { aceitarTermos, ErroAcessoNegado } from "@/servicos/clientes";
 
 /**
@@ -10,7 +10,8 @@ import { aceitarTermos, ErroAcessoNegado } from "@/servicos/clientes";
  * padrão de `conta/acoes.ts`).
  */
 export async function aceitarTermosAction(): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   await aceitarTermos(sessao.user.id);
 }

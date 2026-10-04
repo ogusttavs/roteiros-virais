@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, ErroAcessoNegado } from "@/servicos/clientes";
 import { ErroFormato, responderFormatosDoCliente } from "@/servicos/formatos";
 
@@ -11,7 +11,8 @@ import { ErroFormato, responderFormatosDoCliente } from "@/servicos/formatos";
  * gravou; uma resposta que não é um mapa de chave para sim ou não volta `false`, sem lançar.
  */
 export async function responderFormatosAction(respostas: unknown): Promise<boolean> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   if (typeof respostas !== "object" || respostas === null || Array.isArray(respostas)) return false;
   const mapa: Record<string, boolean> = {};

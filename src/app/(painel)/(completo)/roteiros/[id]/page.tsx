@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { videoPorId } from "@/servicos/pesquisa";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
@@ -16,7 +16,7 @@ export default async function Roteiro({ params }: Props) {
   const { id } = await params;
   const roteiroId = idDaRotaOuNulo(id);
 
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

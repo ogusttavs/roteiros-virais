@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { config } from "@/lib/config";
 import { formatarFonteEData } from "@/lib/formatarNumero";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
 import { noticiaPorId } from "@/servicos/noticias";
 import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
@@ -22,7 +22,7 @@ type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?:
  * nem `?tema=` junto (o campo nasce vazio, a pergunta é "o que você pensou", não um assunto).
  */
 export default async function TemaLivre({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

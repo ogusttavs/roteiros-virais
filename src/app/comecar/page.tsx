@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { TrocaMarcaProvider } from "@/app/(painel)/_casca/TrocaMarcaContext";
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { blocoInicial, garantirBriefing } from "@/servicos/briefing";
 import {
   clienteAtivoDoUsuario,
@@ -18,7 +18,7 @@ import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 import { ComecarWizard } from "./ComecarWizard";
 
 export default async function Comecar() {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

@@ -11,6 +11,7 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
+import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { arquivarRoteiro, conferirAindaVale, desarquivarRoteiro, mudarDataRoteiro, roteiroPorId } from "@/servicos/roteiro";
@@ -41,6 +42,7 @@ function revalidarAgenda() {
 
 /** E39b, item (b): "Arquivar" num atrasado; também o menu de três ações (E39c, parte 2a). */
 export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await arquivarRoteiro(roteiroId);
   revalidarAgenda();
@@ -48,6 +50,7 @@ export async function arquivarAtrasadoAction(roteiroId: number): Promise<void> {
 
 /** E39c, parte 2a: o "desfazer" do toast de "Arquivar" no menu de três ações. */
 export async function desarquivarAction(roteiroId: number): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await desarquivarRoteiro(roteiroId);
   revalidarAgenda();
@@ -55,6 +58,7 @@ export async function desarquivarAction(roteiroId: number): Promise<void> {
 
 /** E39b, item (b): "Mudar o dia" e "Gravar hoje" (o cliente manda a data de hoje nesse caso). */
 export async function mudarDataAtrasadoAction(roteiroId: number, novaData: string): Promise<void> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   await mudarDataRoteiro(roteiroId, novaData);
   revalidarAgenda();
@@ -82,6 +86,7 @@ export type RespostaAindaVale = { vale: true } | { vale: false; assunto: string;
  * novo a tempo (achado desta etapa: sob carga, o refresh podia demorar mais que a espera do teste).
  */
 export async function conferirAindaValeAction(roteiroId: number): Promise<RespostaAindaVale> {
+  await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
   const resultado = await conferirAindaVale(roteiroId);
   revalidarAgenda();

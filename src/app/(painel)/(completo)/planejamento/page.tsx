@@ -10,7 +10,7 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
@@ -170,7 +170,7 @@ type Props = { searchParams: Promise<{ visao?: string; dia?: string; mes?: strin
  * e Semana, `mes` da visão Mês. `/hoje/mes` (a rota antiga) redireciona para cá.
  */
 export default async function Planejamento({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

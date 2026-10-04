@@ -444,6 +444,30 @@ export const textosAdmin = {
     avisoSenhaUmaVez: "Esta senha não aparece de novo. Se fechar sem copiar, é só gerar outra na linha dele, em quem tem acesso.",
     copieiPodeFechar: "copiei, pode fechar",
     rodape: "Cada pessoa entra com o próprio e-mail e vê tudo desta marca. Tirar o acesso não apaga a pessoa: ela continua entrando nas outras marcas que tiver.",
+    /** E46 PR 2: o "ver como" (passo 15 do Opus, `AdminCliente.dc.html`, estado `verComo`). */
+    verComo: "ver como",
+    verComoDe: (nome: string) => `Ver o painel como ${nome}`,
+    verComoTitulo: "Ver o painel como",
+    verComoAviso: (nome: string, marca: string) =>
+      `Você vai ver o painel como ${nome} vê, na conta ${marca}. Fica registrado: quem entrou, em qual conta, quando e por quanto tempo.`,
+    verComoCaminhos: [
+      "Você vê e navega por tudo o que ele vê, com os dados dele.",
+      "O que manda algo para fora, gasta ou muda dado em nome dele fica desligado: gerar roteiro, postar, aprovar, mudar a conta, trocar de marca.",
+      "O modo termina sozinho em 30 minutos, ou quando você sair pela faixa do alto.",
+    ],
+    verComoEntrar: (nome: string) => `Ver como ${nome}`,
+    verComoEntrando: "entrando",
+    verComoErro: "não conseguimos abrir o modo agora; tente de novo",
+    verComoRegistroTitulo: "Entradas no ver como",
+    verComoRegistroVazio: "Ninguém entrou como uma pessoa desta conta ainda.",
+    verComoRegistroLinha: (pessoa: string, quando: string, duracao: string) => `${quando}: viu como ${pessoa}, ${duracao}.`,
+    verComoDuracao: {
+      aberto: "ainda aberto",
+      saiu: (minutos: number) => `saiu depois de ${minutos} min`,
+      expirou: "o tempo acabou (30 min)",
+      trocou: "trocou por outra conta",
+      sessao: "a sessão do admin acabou",
+    },
   },
   geracoes: {
     titulo: "Gerações",

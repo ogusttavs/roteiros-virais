@@ -6,6 +6,7 @@ import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
+import { recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
 import { evidenciaParaRoteiro, exemplosPorFicha, setoresComPiso } from "@/servicos/pesquisa";
@@ -49,6 +50,8 @@ export async function gerarRoteiroAction(
   /** E49 PR 1: a ficha do "O que você quer que esse vídeo faça?" (só Reels); valor que não é uma das cinco vale como ausente. */
   ficha?: string,
 ): Promise<ResultadoAcao<{ id: number }>> {
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
   try {
     const roteiro = await gerarRoteiro(cliente.id, {
