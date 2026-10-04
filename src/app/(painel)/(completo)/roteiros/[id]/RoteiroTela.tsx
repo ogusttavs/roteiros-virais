@@ -28,10 +28,11 @@ import {
   type MouseEvent as EventoMouse,
 } from "react";
 
+import { COMPLEMENTO_PARA_QUE, fichaDoRoteiro, ROTULO_PARA_QUE } from "@/config/fichas";
 import { seloDoTipo } from "@/config/formatos";
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
-import { ROTULO_FIGURINHA, ROTULO_OBJETIVO_TRAVADO, ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -673,7 +674,8 @@ export function RoteiroTela({
           <p className={styles.metaRoteiro}>
             {/* E44 PR 2: "Tipo: erro comum", o tipo do vídeo de referência (não aparece em Story nem sem referência classificada). */}
             {seloDoTipo(video?.formatoCatalogo) && roteiro.formato !== "story" ? <span className={styles.seloTipo} data-selo-tipo>{seloDoTipo(video?.formatoCatalogo)}</span> : null}
-            <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
+            {/* E49 PR 1: "Para que te chamem" ao lado do tipo; no Story a linha sai (ele não pergunta para que é o vídeo). */}
+            {roteiro.formato !== "story" ? <span data-ficha-do-roteiro>{ROTULO_PARA_QUE[fichaDoRoteiro(roteiro)]}</span> : null}
             <span className={styles.num}>{corpo.duracaoS} s</span>
             <span className={styles.num}>{formatarData(roteiro.data)}</span>
             {versoes.length > 1 ? (
@@ -1192,7 +1194,7 @@ export function RoteiroTela({
           nomeArquivo="reprovar"
         />
         <p className={styles.objetivoTravado}>
-          {textosRoteiro.reprovar.objetivoContinua(ROTULO_OBJETIVO_TRAVADO[roteiro.objetivo])}
+          {roteiro.formato === "story" ? textosRoteiro.reprovar.storyContinua : textosRoteiro.reprovar.objetivoContinua(COMPLEMENTO_PARA_QUE[fichaDoRoteiro(roteiro)])}
         </p>
       </PainelFlutuante>
 

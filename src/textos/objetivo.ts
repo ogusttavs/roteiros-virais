@@ -16,14 +16,39 @@ export const textosObjetivo = {
   objetivoEscolhido: "Objetivo escolhido",
   pergunta: "O que você quer que esse vídeo faça?",
   recomendado: "Recomendado hoje",
+  /** E49 PR 1: o apoio abaixo da pergunta das cinco fichas. */
+  apoio: "A resposta muda o texto inteiro, não só o final: o começo, o jeito de contar e o que você pede no fim. Dá para trocar depois.",
+  /** E49 PR 1: por que a ficha recomendada, uma frase por ficha. */
+  recomendaPeloTema: "A gente recomenda pelo tema: ",
+  recomendaPeloHistorico: "A gente recomenda pelo que você tem postado: ",
+  razaoDaRecomendada: {
+    veja: "um assunto em alta no seu ramo, com um começo forte, faz muita gente parar para ver.",
+    guardem: "um erro com o jeito certo é coisa que as pessoas guardam para usar depois.",
+    mandem: "é uma situação que a pessoa reconhece na hora e manda para quem precisa ver.",
+    comentem: "é um assunto que divide opinião e faz muita gente querer responder.",
+    me_chamem: "quem está quase decidindo precisa ver a prova de que funciona.",
+  },
+  /** E49 PR 1: os prefixos das linhas das fichas ("Por exemplo: ...", "Ajuda em: ..."). */
+  exemploPrefixo: "Por exemplo: ",
+  ajudaEmPrefixo: "Ajuda em: ",
+  /** E49 PR 1: no vídeo sem fala as fichas somem (a estrutura delas pressupõe fala), com a linha que diz por quê. */
+  semFalaTitulo: "No vídeo sem fala, a conversa é feita de cenas",
+  semFalaTexto: "O vídeo sem fala segue o roteiro de cenas: o que mostrar e o texto na tela. Por isso ele não pergunta para que é o vídeo.",
+  /** E49 PR 1, o Story não pergunta: o título, o apoio e o cartão que explica por quê. */
+  storyTitulo: "Antes de escrever o seu Story",
+  storyApoio: "Só falta dizer quem aparece.",
+  storyCartaoTitulo: "No Story, a conversa é com quem já te segue",
+  storyCartaoTexto: "O Story segue o seu dia: o bastidor, a caixinha de perguntas, a enquete, a continuação do que você postou. Por isso ele não pergunta para que é o vídeo.",
+  reelsCartao: "Reels, para o Instagram, o TikTok e o Shorts",
+  storyCartao: "Story, para quem já te segue",
   escrever: "escrever o roteiro",
   demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
   erro: "Não conseguimos escrever agora. O tema e o objetivo continuam aqui; tente de novo.",
-  /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (`sugerirFormatoPeloObjetivo`). */
+  /** V9c, item 1: o controle segmentado Reels/Story; E49 PR 1: agora vem antes da pergunta das fichas. */
   formato: "Formato",
   formatoAjuda: {
-    reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
-    story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
+    reels: "Para o Instagram, o TikTok e o Shorts.",
+    story: "Para quem já te segue, no dia a dia.",
   },
   /** M4, item 2: o segundo controle segmentado, Falando/Sem fala (`sugerirEstiloPelaEvidencia`). */
   estilo: "Como você aparece",

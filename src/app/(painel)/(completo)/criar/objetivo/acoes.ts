@@ -1,5 +1,6 @@
 "use server";
 
+import { ehFicha } from "@/config/fichas";
 import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
@@ -44,12 +45,15 @@ export async function gerarRoteiroAction(
   momentoDoDia?: string,
   /** E43: presente quando o tema veio de "Criar vídeo com esta notícia" (Tema livre, `?noticiaId=`). */
   noticiaId?: number,
+  /** E49 PR 1: a ficha do "O que você quer que esse vídeo faça?" (só Reels); valor que não é uma das cinco vale como ausente. */
+  ficha?: string,
 ): Promise<ResultadoAcao<{ id: number }>> {
   const cliente = await clienteDaSessaoAtual();
   try {
     const roteiro = await gerarRoteiro(cliente.id, {
       ...origem,
       objetivo,
+      ficha: ehFicha(ficha) ? ficha : undefined,
       formato: validarFormato(formato),
       estilo: validarEstilo(estilo),
       objetivoDoVideo: objetivoDoVideo?.trim() || undefined,

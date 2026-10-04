@@ -5,7 +5,7 @@
  * Reprovou, refaz uma vez com o motivo anexado a entrada; reprovou de novo,
  * ErroIA nomeado. As duas tentativas ficam registradas em geracoes_ia.
  */
-import type { CartaoStory, EstiloRoteiro, FormatoRoteiro, TipoAbertura } from "@/db/schema";
+import type { CartaoStory, EstiloRoteiro, Ficha, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
 import { EMOJI, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
 
@@ -21,6 +21,36 @@ export type ResultadoVerificacaoLocal = {
   aprovado: boolean;
   motivos: string[];
 };
+
+/**
+ * E49 PR 1, a ficha "Que guardem para depois": o corpo precisa ter algo para usar mais tarde, em passos numerados ou na ordem, uma lista com contagem, uma receita ou um modelo
+ * para copiar. Heurística de texto de propósito (o que ela não pega fica para a revisão com a chave real): procura os sinais mais comuns e só reprova quando não há nenhum.
+ */
+export function temAlgoParaGuardar(corpo: string): boolean {
+  const t = corpo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  // Passos numerados: o 1 e o 2 (um "R$ 2.500" ou um "em 3. Depois" sozinhos não bastam).
+  if (/(^|[^\d.,$])1\s*[.):-]\s*\S[\s\S]*?(^|[^\d.,$])2\s*[.):-]\s*\S/.test(t)) return true;
+  // "Passo 1", "etapa 1", "dica 1", "1o passo", "passo a passo".
+  if (/\b(passo|etapa|dica)\s*(1|um)\b|\b1(o|a)?\s*(passo|etapa|dica)\b|\bpasso a passo\b|\bprimeiro passo\b/.test(t)) return true;
+  // Na ordem, escrito: pelo menos dois marcadores de ordem diferentes ("primeiro ... depois ... por fim"), ou a ordem dita ("nessa ordem").
+  if (/\b(nessa|nesta|na|essa|esta) ordem\b|\bordem certa\b/.test(t)) return true;
+  const ordem = ["primeiro", "segundo", "terceiro", "depois", "em seguida", "por fim", "por ultimo", "no final"].filter((m) => new RegExp(String.raw`\b${m}\b`).test(t));
+  if (ordem.length >= 2) return true;
+  // Lista anunciada com contagem: "dois erros", "oito jeitos", "5 dicas", "tres cuidados".
+  if (
+    /\b(dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|[2-9]|10)\s+(dicas?|passos?|erros?|jeitos?|formas?|maneiras?|coisas?|itens?|truques?|motivos?|sinais?|ingredientes?|etapas?|regras?|habitos?|cuidados?|produtos?|perguntas?|mitos?|segredos?|razoes|ideias?|opcoes|exemplos?|situacoes|mudancas?)\b/.test(t)
+  ) {
+    return true;
+  }
+  // Três verbos seguidos no imperativo, em sequência ("lava, enxagua e seca"): uma sequência de ações para repetir.
+  if (/\b[a-z]{3,}(a|e|i)\s*,\s*[a-z]{3,}(a|e|i)\s+e\s+[a-z]{3,}(a|e|i)\b/.test(t) && /\b(ordem|depois|sequencia|assim)\b/.test(t)) return true;
+  // Algo para copiar.
+  if (/\b(modelo pronto|copia e cola|copie e cole|prompt pronto)\b/.test(t)) return true;
+  return false;
+}
 
 /**
  * So checagem local, sem chamada de IA: pura, facil de testar. Uma
@@ -123,6 +153,8 @@ export function verificarLocalmente(
      * presente.
      */
     estilo?: EstiloRoteiro;
+    /** E49 PR 1: a ficha do Reels falado; "guardem" exige algo para usar mais tarde no corpo (`temAlgoParaGuardar`). */
+    ficha?: Ficha;
     cartoes?: CartaoStory[] | null;
     legenda?: string | null;
     porQueAssim?: { regra: string; motivo: string }[];
@@ -283,6 +315,9 @@ export function verificarLocalmente(
       motivos.push(
         "chamadaFinal: nula ou vazia, um roteiro em reels precisa de chamada final (V9d, item 1)",
       );
+    }
+    if (opcoes.ficha === "guardem" && corpo?.trim() && !temAlgoParaGuardar(corpo)) {
+      motivos.push("corpo: a ficha 'que guardem para depois' pede passo a passo, lista ou algo para copiar, e o corpo nao tem nenhum (E49 PR 1)");
     }
   }
 
@@ -564,6 +599,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   formato?: FormatoRoteiro;
   /** M4, item 4: o estilo do roteiro; sem fala troca a checagem de cartões (ver `verificarLocalmente`). */
   estilo?: EstiloRoteiro;
+  /** E49 PR 1: a ficha do Reels falado (ver `verificarLocalmente`). */
+  ficha?: Ficha;
   extrairCartoes?: (dados: T) => CartaoStory[] | null;
   extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
   /** R1, item 2: os números válidos para `porQueAssim` deste roteiro específico (ver `verificarLocalmente`). */
@@ -635,6 +672,8 @@ export async function gerarComVerificacao<T>(
   const segunda = await tentarGerarEVerificar({
     ...params,
     faixaDuracaoNicho: undefined,
+    // E49 PR 1: a heurística da ficha "que guardem" vale só na primeira tentativa, como a faixa de duração: nunca derruba a geração sozinha.
+    ficha: undefined,
     entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
   });
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
@@ -667,6 +706,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
     palavrasDoMomento: params.palavrasDoMomento,
     formato: params.formato,
     estilo: params.estilo,
+    ficha: params.ficha,
     cartoes: params.extrairCartoes?.(dados),
     legenda: params.extrairLegenda?.(dados),
     porQueAssim: params.extrairPorQueAssim?.(dados),

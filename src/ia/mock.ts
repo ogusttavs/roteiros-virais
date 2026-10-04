@@ -375,9 +375,12 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
           gancho: reprovado
             ? `${primeiraPalavra}, um jeito diferente de mostrar ${tema}`
             : `${primeiraPalavra}, os 3 primeiros segundos sobre ${tema}`,
-          corpo: reprovado
-            ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
-            : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
+          // E49 PR 1: na ficha "que guardem para depois" o mock devolve passo a passo, como o verificador local exige.
+          corpo: entrada.includes("Ficha do vídeo: Que guardem para depois")
+            ? `Passo 1: separe o que precisa. Passo 2: faça na ordem certa sobre ${tema}. Passo 3: confira o resultado.`
+            : reprovado
+              ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
+              : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
           fechamento: "resumo do que foi mostrado",
           chamadaFinal: "comenta se você já passou por isso",
           cartoes: null,

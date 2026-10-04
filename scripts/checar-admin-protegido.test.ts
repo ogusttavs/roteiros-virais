@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { listarArquivos, verificarArquivo, verificarConteudo } from "./checar-admin-protegido-regras";
+import { listarArquivos, PADRAO_ACOES, verificarAcoes, verificarArquivoDeAcoes, verificarArquivo, verificarConteudo } from "./checar-admin-protegido-regras";
 
 describe("verificarConteudo", () => {
   it("aceita exigirAdmin() antes de qualquer outra consulta", () => {
@@ -74,5 +74,47 @@ describe("verificarArquivo, contra as paginas de verdade", () => {
     for (const arquivo of arquivos) {
       expect(verificarArquivo(arquivo)).toEqual([]);
     }
+  });
+});
+
+
+describe("verificarAcoes (Server Actions do admin)", () => {
+  it("aceita garantirSessaoAdmin logo depois de ler a sessao, direto ou por ajudante", () => {
+    const conteudo = `
+"use server";
+async function comAdmin(tarefa) {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  return tarefa();
+}
+export async function direta(id) {
+  garantirSessaoAdmin(await sessaoAtual());
+  await fazer(id);
+}
+export async function porAjudante(id) {
+  return comAdmin(async () => { await fazer(id); });
+}
+`;
+    expect(verificarAcoes("acoes.ts", conteudo)).toEqual([]);
+  });
+
+  it("reprova a ação que grava antes de conferir o admin, e a que nunca confere", () => {
+    const conteudo = `
+export async function gravaPrimeiro(id) {
+  await fazer(id);
+  garantirSessaoAdmin(await sessaoAtual());
+}
+export async function nuncaConfere(id) {
+  await fazer(id);
+}
+`;
+    const problemas = verificarAcoes("acoes.ts", conteudo);
+    expect(problemas.map((p) => p.motivo.match(/Action (\w+)/)?.[1])).toEqual(["gravaPrimeiro", "nuncaConfere"]);
+  });
+
+  it("todas as Server Actions de hoje do admin passam", () => {
+    const arquivos = listarArquivos(PADRAO_ACOES);
+    expect(arquivos.length).toBeGreaterThan(0);
+    expect(arquivos.flatMap(verificarArquivoDeAcoes)).toEqual([]);
   });
 });

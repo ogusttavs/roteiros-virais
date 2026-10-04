@@ -4,7 +4,7 @@ import { ArrowLeft, Calendar, Check, ChevronLeft, ChevronRight, RefreshCw } from
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { rotuloParaQue } from "@/config/fichas";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAgendaDoDia, ItemAtrasado } from "@/servicos/roteiro";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
@@ -185,7 +185,7 @@ export function AtrasadoCard({
   return (
     <article className={styles.itemAtrasado}>
       <span className={styles.quandoEra}>{textosHoje.agenda.atrasado.eraPara(eraParaTexto(item.data, hoje))}</span>
-      <p className={styles.objetivoDoDia}>{ROTULO_TEMA_CARTAO[item.objetivo]}</p>
+      <p className={styles.objetivoDoDia}>{rotuloParaQue(item)}</p>
       <h3>{item.titulo}</h3>
       {erro ? (
         <p role="alert" className={styles.erroAgenda}>
@@ -636,7 +636,7 @@ export function HojeTela({
                     <article className={styles.reelsDia}>
                       <div className={styles.linhaTopo}>
                         <span className={styles.objetivoDoDia}>
-                          {ROTULO_TEMA_CARTAO[agenda.reels[0].objetivo]} · {agenda.reels[0].duracaoS} segundos
+                          {rotuloParaQue(agenda.reels[0])} · {agenda.reels[0].duracaoS} segundos
                         </span>
                         <EstadoItem item={agenda.reels[0]} ehHoje={ehHoje} />
                       </div>
@@ -673,7 +673,7 @@ export function HojeTela({
                                 aria-busy={acao === `item-${item.id}` || undefined}
                                 onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                               >
-                                <span className={styles.momento}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                                <span className={styles.momento}>{rotuloParaQue(item)}</span>
                                 <span className={styles.tituloItem}>{item.titulo}</span>
                                 <EstadoItem item={item} ehHoje={ehHoje} />
                               </button>

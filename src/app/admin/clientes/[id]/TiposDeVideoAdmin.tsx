@@ -51,49 +51,53 @@ export function TiposDeVideoAdmin({ clienteId, nomeMarca, iniciais }: { clienteI
   const ajustados = tipos.filter((t) => t.quem === "admin").length;
   const hoje = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(new Date());
 
-  async function trocar(chave: string, ligada: boolean) {
+  // Os pedidos de uma mesma chave têm número: o de maior número que gravou é o que o servidor tem, e só quando nada mais está em voo a tela mostra isso (E49 PR 1, item 0).
+  const numeroDaChave = useRef<Record<string, number>>({});
+  const confirmadoNumero = useRef<Record<string, number>>({});
+  const emVooDaChave = useRef<Record<string, number>>({});
+
+  async function executar(chave: string, otimista: (t: TipoDaMarcaParaAdmin) => TipoDaMarcaParaAdmin, chamada: () => Promise<{ ok: boolean; erro?: string }>, aoConfirmar: (antes: TipoDaMarcaParaAdmin) => TipoDaMarcaParaAdmin | null) {
     setErro(null);
-    // Só a chave que falhou volta, e para o que ela era NESTE clique: outra chave trocada no meio do caminho não é apagada.
-    if (!confirmados.current[chave]) confirmados.current[chave] = tipos.find((t) => t.chave === chave)!;
-    const antes = confirmados.current[chave];
-    const novo: TipoDaMarcaParaAdmin = { ...tipos.find((t) => t.chave === chave)!, ligada, quem: "admin", decididoEmTexto: hoje };
-    setTipos((atual) => atual.map((t) => (t.chave === chave ? novo : t)));
-    emVoo.current += 1;
-    const resultado = await definirFormatoDaMarcaAction(clienteId, chave, ligada).catch(() => ({ ok: false as const, erro: textosTipos.erro }));
-    emVoo.current -= 1;
-    if (!resultado.ok) {
-      setTipos((atual) => atual.map((t) => (t.chave === chave ? antes : t)));
-      setErro(resultado.erro);
-      return;
+    const atual = tipos.find((t) => t.chave === chave)!;
+    if (!confirmados.current[chave]) {
+      confirmados.current[chave] = atual;
+      confirmadoNumero.current[chave] = 0;
     }
-    confirmados.current[chave] = novo;
-    router.refresh();
+    const novo = otimista(atual);
+    setTipos((lista) => lista.map((t) => (t.chave === chave ? otimista(t) : t)));
+    emVoo.current += 1;
+    emVooDaChave.current[chave] = (emVooDaChave.current[chave] ?? 0) + 1;
+    const numero = (numeroDaChave.current[chave] ?? 0) + 1;
+    numeroDaChave.current[chave] = numero;
+    const resultado = await chamada().catch(() => ({ ok: false as const, erro: textosTipos.erro }));
+    emVoo.current -= 1;
+    emVooDaChave.current[chave] -= 1;
+    if (resultado.ok && numero > confirmadoNumero.current[chave]) {
+      confirmados.current[chave] = aoConfirmar(confirmados.current[chave]) ?? novo;
+      confirmadoNumero.current[chave] = numero;
+    }
+    if (!resultado.ok) setErro(resultado.erro ?? textosTipos.erro);
+    if (emVooDaChave.current[chave] === 0) {
+      const certo = confirmados.current[chave];
+      setTipos((lista) => lista.map((t) => (t.chave === chave ? certo : t)));
+    }
+    if (resultado.ok) router.refresh();
+  }
+
+  async function trocar(chave: string, ligada: boolean) {
+    await executar(
+      chave,
+      (t) => ({ ...t, ligada, quem: "admin", decididoEmTexto: hoje }),
+      () => definirFormatoDaMarcaAction(clienteId, chave, ligada),
+      (antes) => ({ ...antes, ligada, quem: "admin", decididoEmTexto: hoje }),
+    );
   }
 
   async function voltar(chave: string) {
-    setErro(null);
-    if (!confirmados.current[chave]) confirmados.current[chave] = tipos.find((t) => t.chave === chave)!;
-    const antes = confirmados.current[chave];
     const padrao = FORMATOS_DO_CATALOGO.find((f) => f.chave === chave)?.ligadaPorPadrao ?? false;
-    setTipos((atual) =>
-      atual.map((t) =>
-        t.chave === chave
-          ? t.respostaDoCliente !== null
-            ? { ...t, ligada: t.respostaDoCliente, quem: "cliente", decididoEmTexto: t.respostaDoClienteEmTexto }
-            : { ...t, ligada: padrao, quem: "padrao", decididoEmTexto: null }
-          : t,
-      ),
-    );
-    emVoo.current += 1;
-    const resultado = await voltarFormatoAoDoClienteAction(clienteId, chave).catch(() => ({ ok: false as const, erro: textosTipos.erro }));
-    emVoo.current -= 1;
-    if (!resultado.ok) {
-      setTipos((atual) => atual.map((t) => (t.chave === chave ? antes : t)));
-      setErro(resultado.erro);
-      return;
-    }
-    delete confirmados.current[chave];
-    router.refresh();
+    const volta = (t: TipoDaMarcaParaAdmin): TipoDaMarcaParaAdmin =>
+      t.respostaDoCliente !== null ? { ...t, ligada: t.respostaDoCliente, quem: "cliente", decididoEmTexto: t.respostaDoClienteEmTexto } : { ...t, ligada: padrao, quem: "padrao", decididoEmTexto: null };
+    await executar(chave, volta, () => voltarFormatoAoDoClienteAction(clienteId, chave), (antes) => volta(antes));
   }
 
   return (

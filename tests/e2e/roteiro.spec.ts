@@ -182,17 +182,16 @@ test.describe("roteiro pela tela", () => {
     await cartaoDoTema.locator("../..").getByRole("button", { name: "quero esse" }).click();
 
     await expect(page).toHaveURL(/\/criar\/objetivo/);
-    await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
-    // V9c, item 1: esse objetivo sugere Story por padrao (R-IG-STORY-10); este teste cobre o
-    // fluxo classico de Reels (reprovar, versoes, PDF), Story tem o proprio em story.spec.ts.
-    await page.getByRole("tablist", { name: "Formato" }).getByRole("tab", { name: "Reels" }).click();
+    await page.getByRole("radio", { name: /Que me chamem/ }).click();
+    // Este teste cobre o fluxo classico de Reels (reprovar, versoes, PDF); Story tem o proprio em story.spec.ts.
+    // E49 PR 1: o formato nao vem mais do objetivo, Reels ja e o padrao.
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByText("Onde gravar e o que mostrar")).toBeVisible();
     await expect(page.getByText("Como editar")).toBeVisible();
-    await expect(page.getByText("Para te chamarem para comprar")).toBeVisible();
+    await expect(page.getByText("Para que te chamem")).toBeVisible();
     // R1, item 2 e 4: o Reels falado agora também segue regra de plataforma (antes só Story), e a
     // mesma peça "Por que assim" do Story mostra o número da regra, aqui sem rede principal
     // escolhida, a padrão do produto (R-IG-REEL).
@@ -206,7 +205,7 @@ test.describe("roteiro pela tela", () => {
 
     const folhaReprovar = page.getByRole("dialog", { name: "O que não ficou bom?" });
     await expect(folhaReprovar).toBeVisible();
-    await expect(folhaReprovar.getByText("O objetivo continua: te chamarem para comprar")).toBeVisible();
+    await expect(folhaReprovar.getByText("Continua sendo para que: te chamem")).toBeVisible();
     await folhaReprovar.getByRole("button", { name: "Gancho fraco", exact: true }).click();
     await folhaReprovar.getByRole("button", { name: "Já falei disso", exact: true }).click();
     await folhaReprovar
@@ -217,7 +216,7 @@ test.describe("roteiro pela tela", () => {
     await expect(page).not.toHaveURL(urlDaV1, { timeout: 15_000 });
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("versão 2 de 2")).toBeVisible();
-    await expect(page.getByText("Para te chamarem para comprar")).toBeVisible();
+    await expect(page.getByText("Para que te chamem")).toBeVisible();
 
     await page.getByText("versão 2 de 2").click();
     const folhaVersoes = page.getByRole("dialog", { name: "Versões" });

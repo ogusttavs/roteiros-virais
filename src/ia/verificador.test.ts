@@ -14,7 +14,7 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
-import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, verificarLocalmente } from "./verificador";
+import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
 
@@ -812,6 +812,25 @@ describe("gerarComVerificacao", () => {
     );
   });
 
+  it("a heurística da ficha 'guardem' vale só na primeira tentativa: a segunda, mesmo sem nada para guardar, é aceita", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "uma explicação corrida sem nada para usar depois" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "outra explicação simples e direta" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+    const resultado = await gerarComVerificacao({
+      ...parametrosBase,
+      entrada: "entrada original",
+      formato: "reels",
+      estilo: "falado",
+      ficha: "guardem",
+      extrairNarrativa: (d: { corpo: string }) => ({ gancho: "gancho", corpo: d.corpo, chamadaFinal: "guarda este vídeo" }),
+    });
+
+    expect(resultado.dados.corpo).toBe("outra explicação simples e direta");
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+  });
+
   it("sem lembreteFinal, a entrada segue exatamente como veio (comportamento de sempre)", async () => {
     gerarEstruturadoMock
       .mockResolvedValueOnce({ dados: { corpo: "texto limpo" }, modelo: "mock", ...usoZero })
@@ -918,5 +937,47 @@ describe("gerarComVerificacao", () => {
       // as tres chamadas de sempre: a primeira tentativa, a segunda, e o verificarTexto da segunda.
       expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
     });
+  });
+});
+
+describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
+  const narrativa = (corpo: string) => ({ gancho: "Olha isso", corpo, chamadaFinal: "guarda esse vídeo" });
+  const base = { formato: "reels" as const, estilo: "falado" as const, ficha: "guardem" as const };
+
+  it("reprova um corpo sem passo a passo, lista nem algo para copiar", () => {
+    const r = verificarLocalmente({}, { ...base, narrativa: narrativa("Eu acho que isso é muito importante para todo mundo que trabalha com isso no dia a dia.") });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.join(" ")).toContain("que guardem para depois");
+  });
+
+  it("aprova passo numerado, lista com contagem, receita e passo a passo escrito", () => {
+    for (const corpo of ["1. separa o material 2. aplica 3. espera", "Três erros que quase todo mundo comete", "Copia e cola esse modelo pronto", "Primeiro faz a base, depois a cobertura, por fim o acabamento", "Dois erros que você comete", "Oito jeitos de tirar a mancha", "Três cuidados que ninguém conta", "Lava, enxágua e seca, nessa ordem", "Cinco hábitos que salvam o sofá"]) {
+      expect(verificarLocalmente({}, { ...base, narrativa: narrativa(corpo) }).aprovado).toBe(true);
+    }
+  });
+
+  it("só vale para a ficha 'guardem': as outras e o roteiro sem ficha não mudam", () => {
+    const corpo = "Uma opinião sincera sobre o assunto, sem lista nenhuma.";
+    expect(verificarLocalmente({}, { ...base, ficha: "comentem", narrativa: narrativa(corpo) }).aprovado).toBe(true);
+    expect(verificarLocalmente({}, { formato: "reels", estilo: "falado", narrativa: narrativa(corpo) }).aprovado).toBe(true);
+  });
+
+  it("não se deixa enganar por número de preço, narrativa corrida nem 'lista de espera'", () => {
+    expect(temAlgoParaGuardar("O orçamento ficou em R$ 2.500 e depois eu expliquei tudo")).toBe(false);
+    expect(temAlgoParaGuardar("Primeiro eu acordei cedo e fui trabalhar")).toBe(false);
+    expect(temAlgoParaGuardar("A lista de espera estava grande hoje")).toBe(false);
+    expect(temAlgoParaGuardar("Eu gosto da receita da minha avó")).toBe(false);
+    expect(temAlgoParaGuardar("Um checklist de ideias soltas")).toBe(false);
+  });
+
+  it("aceita etapa, dica e primeiro passo escritos de outro jeito", () => {
+    expect(temAlgoParaGuardar("Etapa 1: separe o material")).toBe(true);
+    expect(temAlgoParaGuardar("O primeiro passo é lavar bem")).toBe(true);
+    expect(temAlgoParaGuardar("Dica 1 é não esfregar")).toBe(true);
+  });
+
+  it("temAlgoParaGuardar lê o texto sem acento", () => {
+    expect(temAlgoParaGuardar("Cinco dicas rápidas")).toBe(true);
+    expect(temAlgoParaGuardar("Eu gosto muito disso")).toBe(false);
   });
 });

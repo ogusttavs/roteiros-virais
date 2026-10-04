@@ -1,8 +1,9 @@
 import { Music, Scissors, Type, Eye, Sparkles, HelpCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { fichaDoRoteiro, ROTULO_PARA_QUE } from "@/config/fichas";
 import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
-import { ROTULO_FIGURINHA, ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { validarTokenImpressao } from "@/lib/tokenImpressao";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosRoteiro } from "@/textos/roteiro";
@@ -111,7 +112,7 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
       <header className={styles.cabecalho}>
         <h1 className={styles.titulo}>{corpo.titulo}</h1>
         <p className={styles.meta}>
-          <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
+          {roteiro.formato !== "story" ? <span>{ROTULO_PARA_QUE[fichaDoRoteiro(roteiro)]}</span> : null}
           <span>{corpo.duracaoS} s</span>
           <span>{formatarData(roteiro.data)}</span>
         </p>

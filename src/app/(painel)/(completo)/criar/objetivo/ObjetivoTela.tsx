@@ -4,17 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import type { EstiloRoteiro, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY } from "@/config/fichas";
+import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
-  AJUDA_OBJETIVO,
   DESCRICAO_ESTILO_ROTEIRO,
   ESTILOS_ROTEIRO_EM_ORDEM,
   FORMATOS_ROTEIRO_EM_ORDEM,
-  NOME_OBJETIVO,
-  OBJETIVOS_EM_ORDEM,
   ROTULO_ESTILO_ROTEIRO,
   ROTULO_FORMATO_ROTEIRO,
-  sugerirFormatoPeloObjetivo,
 } from "@/ia/enums";
 import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
@@ -34,14 +31,12 @@ import { roteiroRecenteDesdeAction } from "../../hoje/acoes";
 import { gerarRoteiroAction, sugerirEstiloAction } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
 
-function primeiraMaiuscula(texto: string): string {
-  return texto.charAt(0).toUpperCase() + texto.slice(1);
-}
-
 type Props = {
   origem: OrigemRoteiro;
   temaEscolhidoTexto: string;
-  objetivoRecomendado: Objetivo | null;
+  /** E49 PR 1: a ficha que já vem marcada, e de onde veio a recomendação (o tema escolhido, ou o que a pessoa tem postado). */
+  fichaRecomendada: Ficha | null;
+  recomendadaPor: "tema" | "historico";
   tipo: TipoMarca;
   /** V12c, item 3, a E37b: o `quemGrava` do briefing, para o controle já nascer marcado nele. */
   quemGravaPadrao: QuemGrava | null;
@@ -56,7 +51,8 @@ type Props = {
 export function ObjetivoTela({
   origem,
   temaEscolhidoTexto,
-  objetivoRecomendado,
+  fichaRecomendada,
+  recomendadaPor,
   tipo,
   quemGravaPadrao,
   dataInicial,
@@ -65,17 +61,18 @@ export function ObjetivoTela({
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
   const router = useRouter();
-  const [escolhido, setEscolhido] = useState<Objetivo | null>(null);
-  // V9c, item 1: enquanto a pessoa nao mexe no controle, o formato segue o objetivo escolhido
-  // (`sugerirFormatoPeloObjetivo`); depois do primeiro toque, a escolha dela e que manda.
+  // E49 PR 1: a ficha recomendada pelo tema já vem marcada; a pessoa troca. O Story não pergunta.
+  const [ficha, setFicha] = useState<Ficha | null>(fichaRecomendada);
+  // O formato vem ANTES da pergunta (passo 18b): Reels é o padrão, e a pessoa escolhe Story se quiser.
   const [formato, setFormato] = useState<FormatoRoteiro>("reels");
-  const [formatoTocado, setFormatoTocado] = useState(false);
   /**
    * M4, item 2: o segundo controle segmentado, Falando/Sem fala. Ao contrário do formato (decidido
    * pelo objetivo, por código, sem round-trip), o estilo nasce da evidência do tema, então a
    * sugestão chega por uma Server Action (`sugerirEstiloAction`) assim que a tela monta.
    */
   const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
+  // A pergunta das fichas só existe no Reels falado: o Story não pergunta, e o sem fala segue o roteiro de cenas (a estrutura das fichas pressupõe fala).
+  const pergunta = formato === "reels" && estilo === "falado";
   const [estiloTocado, setEstiloTocado] = useState(false);
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
   const [objetivoDoVideo, setObjetivoDoVideo] = useState("");
@@ -99,11 +96,6 @@ export function ObjetivoTela({
    */
   const saiuRef = useRef(false);
 
-  useEffect(() => {
-    if (formatoTocado || !escolhido) return;
-    setFormato(sugerirFormatoPeloObjetivo(escolhido));
-  }, [escolhido, formatoTocado]);
-
   /**
    * M4, item 2: busca a sugestão assim que a tela monta (o tema já está escolhido antes de chegar
    * aqui, ao contrário do objetivo). `cancelado` evita aplicar uma resposta que chegou depois de a
@@ -124,14 +116,16 @@ export function ObjetivoTela({
   }, [temaEscolhidoTexto]);
 
   function escrever() {
-    if (!escolhido) return;
+    if (pergunta && !ficha) return;
+    // O Story e o sem fala não têm ficha: o Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
+    const objetivo: Objetivo = formato === "story" ? OBJETIVO_DO_STORY : !pergunta || !ficha ? OBJETIVO_DO_SEM_FALA : objetivoDaFicha(ficha);
     setErro(null);
     const desdeMs = Date.now();
     iniciarTransicao(async () => {
       try {
         const resultado = await gerarRoteiroAction(
           origem,
-          escolhido,
+          objetivo,
           formato,
           estilo,
           objetivoDoVideo.trim() || undefined,
@@ -139,6 +133,7 @@ export function ObjetivoTela({
           data,
           formato === "story" ? (momentoDoDia ?? undefined) : undefined,
           noticiaId,
+          pergunta ? (ficha ?? undefined) : undefined,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {
@@ -198,10 +193,10 @@ export function ObjetivoTela({
             <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
             <span className={styles.tema}>{temaEscolhidoTexto}</span>
           </div>
-          {escolhido ? (
+          {pergunta && ficha ? (
             <div className={styles.temaEscolhido}>
               <span className={styles.rotulo}>{textosObjetivo.objetivoEscolhido}</span>
-              <span className={styles.tema}>{primeiraMaiuscula(NOME_OBJETIVO[escolhido])}</span>
+              <span className={styles.tema}>{NOME_DA_FICHA[ficha]}</span>
             </div>
           ) : null}
         </div>
@@ -229,21 +224,8 @@ export function ObjetivoTela({
         <span className={styles.tema}>{temaEscolhidoTexto}</span>
       </div>
       <div className={styles.colunaPrincipal}>
-      <h1 className={styles.pergunta}>{textosObjetivo.pergunta}</h1>
-
-      <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
-        {OBJETIVOS_EM_ORDEM.map((objetivo) => (
-          <OpcaoObjetivo
-            key={objetivo}
-            titulo={primeiraMaiuscula(NOME_OBJETIVO[objetivo])}
-            ajuda={AJUDA_OBJETIVO[objetivo]}
-            marcada={escolhido === objetivo}
-            recomendada={objetivoRecomendado === objetivo}
-            rotuloRecomendado={textosObjetivo.recomendado}
-            onEscolher={() => setEscolhido(objetivo)}
-          />
-        ))}
-      </div>
+      <h1 className={styles.pergunta}>{formato === "story" ? textosObjetivo.storyTitulo : pergunta ? textosObjetivo.pergunta : textosObjetivo.semFalaTitulo}</h1>
+      <p className={styles.apoio}>{formato === "story" ? textosObjetivo.storyApoio : pergunta ? textosObjetivo.apoio : textosObjetivo.semFalaTexto}</p>
 
       <div className={styles.grupoFormato}>
         <span className={styles.rotulo}>{textosObjetivo.formato}</span>
@@ -257,17 +239,45 @@ export function ObjetivoTela({
               className={[styles.segmentoBotao, formato === opcao ? styles.segmentoAtivo : ""]
                 .filter(Boolean)
                 .join(" ")}
-              onClick={() => {
-                setFormatoTocado(true);
-                setFormato(opcao);
-              }}
+              onClick={() => setFormato(opcao)}
             >
               {ROTULO_FORMATO_ROTEIRO[opcao]}
             </button>
           ))}
         </div>
-        {!formatoTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.formatoAjuda[formato]}</p> : null}
+        <p className={styles.formatoAjuda}>{textosObjetivo.formatoAjuda[formato]}</p>
       </div>
+
+      {pergunta ? (
+        <div data-fichas>
+          {fichaRecomendada ? (
+            <p className={styles.porque} data-recomendada-por={recomendadaPor}>
+              {recomendadaPor === "tema" ? textosObjetivo.recomendaPeloTema : textosObjetivo.recomendaPeloHistorico}
+              {textosObjetivo.razaoDaRecomendada[fichaRecomendada]}
+            </p>
+          ) : null}
+          <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
+            {FICHAS_EM_ORDEM.map((f) => (
+              <OpcaoObjetivo
+                key={f}
+                titulo={NOME_DA_FICHA[f]}
+                ajuda={FRASE_DA_FICHA[f]}
+                exemplo={EXEMPLO_DA_FICHA[f]}
+                ajudaEm={AJUDA_EM_DA_FICHA[f]}
+                marcada={ficha === f}
+                recomendada={fichaRecomendada === f}
+                rotuloRecomendado={textosObjetivo.recomendado}
+                onEscolher={() => setFicha(f)}
+              />
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className={styles.cartaoStory} data-story-sem-pergunta>
+          <h3>{formato === "story" ? textosObjetivo.storyCartaoTitulo : textosObjetivo.semFalaTitulo}</h3>
+          <p>{formato === "story" ? textosObjetivo.storyCartaoTexto : textosObjetivo.semFalaTexto}</p>
+        </div>
+      )}
 
       <div className={styles.grupoFormato}>
         <span className={styles.rotulo}>{textosObjetivo.estilo}</span>
@@ -327,7 +337,7 @@ export function ObjetivoTela({
 
       <BarraAcao
         secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
-        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: !escolhido, precisaDeRede: true }}
+        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: pergunta && !ficha, precisaDeRede: true }}
       />
       </div>
     </div>

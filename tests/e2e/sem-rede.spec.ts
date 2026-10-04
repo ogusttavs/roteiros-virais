@@ -508,7 +508,7 @@ test.describe("painel sem rede", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-c");
     await page.goto("/criar/objetivo?tema=0");
-    await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
+    await page.getByRole("radio", { name: /Que me chamem/ }).click();
 
     await cortarRedeNaProximaAcao(page);
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();

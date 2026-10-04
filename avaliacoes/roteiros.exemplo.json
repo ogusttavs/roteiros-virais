@@ -259,5 +259,315 @@
     ],
     "roteirosRecentes": [],
     "pontoPrincipal": "Antes e depois: o roteiro mostra como estava e como ficou, com o caso de verdade da clínica (nada de promessa de resultado), em cenas que a pessoa consegue gravar no consultório."
+  },
+  {
+    "tema": "a mancha que todo mundo tem em casa e quase ninguém sabe tirar",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha veja: assunto em alta com gancho amplo; ver se o roteiro prende qualquer um e mantem o ramo no meio, sem virar entretenimento solto",
+    "ficha": "veja"
+  },
+  {
+    "tema": "o erro de limpeza que apareceu em todo vídeo desta semana",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha veja: assunto quente do ramo; ver se o roteiro e feito para ser mandado, com a cara de quem grava",
+    "ficha": "veja"
+  },
+  {
+    "tema": "os três passos, na ordem certa, para a mancha não voltar",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha guardem: a ficha pede passo a passo: o corpo precisa ter passos numerados ou na ordem, algo para usar depois, e a chamada final pede para guardar",
+    "ficha": "guardem"
+  },
+  {
+    "tema": "cinco coisas da casa que você limpa errado",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha guardem: lista com contagem: o corpo tem de listar de verdade, nao so dizer que sao cinco",
+    "ficha": "guardem"
+  },
+  {
+    "tema": "para aquela pessoa que esfrega a mancha com toda a força",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha mandem: identificacao: algo que a pessoa reconhece na hora; a chamada final pede para mandar para quem precisa ver",
+    "ficha": "mandem"
+  },
+  {
+    "tema": "o que todo mundo faz com a esponja e ninguém confessa",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha mandem: verdade incomoda que se manda para alguem, sem humilhar quem assiste",
+    "ficha": "mandem"
+  },
+  {
+    "tema": "vinagre limpa ou estraga? o que você vê todo dia",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha comentem: opiniao que divide: a chamada final pede uma resposta especifica, nao um comenta ai solto",
+    "ficha": "comentem"
+  },
+  {
+    "tema": "o erro comum que quase todo cliente comete ao comprar produto de limpeza",
+    "objetivo": "engajamento",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha comentem: erro comum com pergunta aberta no fim",
+    "ficha": "comentem"
+  },
+  {
+    "tema": "o sofá da cliente de ontem, antes e depois, e quanto custou",
+    "objetivo": "conversao",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha me_chamem: prova: resultado real com dado concreto e convite claro para chamar",
+    "ficha": "me_chamem"
+  },
+  {
+    "tema": "um dia de serviço por dentro, do orçamento ao resultado",
+    "objetivo": "conversao",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "estrutura": "mostra o erro comum antes de explicar o certo",
+        "fechamento": "resumo em uma frase do que foi mostrado",
+        "chamadaFinal": "comenta se voce ja passou por isso",
+        "foraDaCurva": 8.9,
+        "momentoChave": "aos 4s, o antes e depois lado a lado"
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "estrutura": "reacao real gravada no consultorio",
+        "fechamento": "paciente sorrindo para a camera",
+        "chamadaFinal": "chama aqui se voce quer marcar uma avaliacao",
+        "foraDaCurva": 4.2
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "ficha me_chamem: bastidor com preco e convite para chamar; sem prometer o que nao pode cumprir",
+    "ficha": "me_chamem"
   }
 ]

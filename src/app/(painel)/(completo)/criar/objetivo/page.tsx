@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { fichaPadraoDoObjetivo, fichaRecomendadaParaTema, type Ficha } from "@/config/fichas";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
@@ -30,6 +31,9 @@ export default async function Objetivo({ searchParams }: Props) {
   const { tema, livre, data, noticiaId } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
+  // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
+  let fichaRecomendada: Ficha | null = objetivoRecomendado ? fichaPadraoDoObjetivo(objetivoRecomendado) : null;
+  let recomendadaPor: "tema" | "historico" = "historico";
   // Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio.
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
   // E43: "Criar vídeo com esta notícia" carrega o id até aqui; `gerarRoteiro` confere de novo contra o setor do cliente.
@@ -50,13 +54,16 @@ export default async function Objetivo({ searchParams }: Props) {
     }
     origem = { origem: "sugerido", temaIndice: indice };
     temaEscolhidoTexto = temaDoDia.titulo;
+    fichaRecomendada = fichaRecomendadaParaTema(temaDoDia);
+    recomendadaPor = "tema";
   }
 
   return (
     <ObjetivoTela
       origem={origem}
       temaEscolhidoTexto={temaEscolhidoTexto}
-      objetivoRecomendado={objetivoRecomendado}
+      fichaRecomendada={fichaRecomendada}
+      recomendadaPor={recomendadaPor}
       tipo={cliente.tipo}
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}

@@ -108,7 +108,7 @@ test.describe("gravar agora, o caminho por texto", () => {
       .getByLabel("O que está acontecendo")
       .fill("esperando o embarque para a feira de fornecedores");
     await folha.getByLabel("O que dá para mostrar").fill("a fila do check-in e a mala de amostras");
-    await folha.getByRole("radio", { name: "Gente me chamar para comprar" }).click();
+    await folha.getByRole("button", { name: "Que me chamem" }).click();
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
@@ -173,7 +173,7 @@ test.describe("gravar agora, o caminho por texto", () => {
     await folha.getByLabel("Onde você está").fill("no ponto de ônibus");
     await folha.getByLabel("O que está acontecendo").fill("esperando enquanto o cliente liga");
     await folha.getByLabel("O que dá para mostrar").fill("o produto na sacola");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
 
@@ -286,7 +286,7 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
     await folha.getByLabel("Onde você está").fill("no escritorio, hora do almoco");
     await folha.getByLabel("O que está acontecendo").fill("organizando os recibos do mes de um cliente");
     await folha.getByLabel("O que dá para mostrar").fill("a planilha e a pilha de notas fiscais");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });

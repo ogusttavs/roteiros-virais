@@ -30,24 +30,24 @@ export async function trocarTetoAction(reais: number): Promise<ResultadoAcao<nul
 }
 
 export async function adicionarFixoAction(dados: DadosDoFixo): Promise<ResultadoAcao<null>> {
-  return comAdmin(async () => {
-    await adicionarFixo(dados);
+  return comAdmin(async (usuarioId) => {
+    await adicionarFixo(dados, usuarioId);
     return null;
   });
 }
 
 export async function editarFixoAction(id: number, dados: DadosDoFixo): Promise<ResultadoAcao<null>> {
-  return comAdmin(async () => {
+  return comAdmin(async (usuarioId) => {
     if (!Number.isInteger(id) || id < 1 || id > 2_000_000_000) throw new ErroCusto("esse custo não existe mais.");
-    await editarFixo(id, dados);
+    await editarFixo(id, dados, usuarioId);
     return null;
   });
 }
 
 export async function tirarFixoAction(id: number): Promise<ResultadoAcao<null>> {
-  return comAdmin(async () => {
+  return comAdmin(async (usuarioId) => {
     if (!Number.isInteger(id) || id < 1 || id > 2_000_000_000) throw new ErroCusto("esse custo não existe mais.");
-    await tirarFixo(id);
+    await tirarFixo(id, usuarioId);
     return null;
   });
 }

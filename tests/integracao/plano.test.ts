@@ -188,8 +188,8 @@ describe("criarPlano", () => {
     ).rejects.toThrow(ErroPlano);
   });
 
-  // V9c, item 1: cada sugestao ja nasce com o formato de `sugerirFormatoPeloObjetivo(objetivo)`.
-  it("cada item ja nasce com o formato sugerido pelo objetivo", async () => {
+  // E49 PR 1: o formato deixou de vir do objetivo; cada sugestao nasce em Reels e a pessoa troca para Story se quiser.
+  it("cada item ja nasce em Reels", async () => {
     const cliente = await criarCliente();
     const itens = await criarPlano(
       cliente,
@@ -199,7 +199,7 @@ describe("criarPlano", () => {
 
     // mockPlanejarDia rodizia engajamento, alcance, conversao: so alcance sugere reels.
     for (const item of itens) {
-      expect(item.formato).toBe(item.objetivo === "alcance" ? "reels" : "story");
+      expect(item.formato).toBe("reels");
     }
   });
 
@@ -380,7 +380,7 @@ describe("aceitar", () => {
     expect(linha.formato).toBe("reels");
   });
 
-  it("sem formato explicito, usa o mesmo sugerido pelo objetivo", async () => {
+  it("sem formato explicito, usa Reels (o objetivo deixou de decidir o formato, E49 PR 1)", async () => {
     const cliente = await criarCliente();
     const [item] = await criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["fornecedor novo"] }], HOJE);
 
@@ -391,7 +391,7 @@ describe("aceitar", () => {
       objetivo: "conversao",
     });
 
-    expect(roteiro.formato).toBe("story");
+    expect(roteiro.formato).toBe("reels");
   });
 });
 

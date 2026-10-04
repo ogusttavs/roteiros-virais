@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import { rotuloParaQue } from "@/config/fichas";
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { ItemPlano } from "@/servicos/plano";
 import { textosCriar } from "@/textos/criar";
 import { textosNav } from "@/textos/nav";
@@ -175,7 +175,7 @@ export function CriarTela({
                   <div key={item.id} className={styles.linhaPlano}>
                     <span className={styles.blocoPlano}>
                       <span className={styles.rotuloPlano}>
-                        {item.lugar.trim() || textosPlano.semLugar} · {ROTULO_TEMA_CARTAO[item.objetivo]}
+                        {item.lugar.trim() || textosPlano.semLugar} · {rotuloParaQue({ objetivo: item.objetivo, formato: item.formato })}
                       </span>
                       <span className={styles.situacaoPlano}>{item.situacao}</span>
                     </span>

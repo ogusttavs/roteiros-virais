@@ -94,7 +94,7 @@ async function gerarRoteiro(page: Page) {
   await folha.getByLabel("Onde você está").fill("na oficina");
   await folha.getByLabel("O que está acontecendo").fill("consertando uma peça na bancada");
   await folha.getByLabel("O que dá para mostrar").fill("a peça pronta no fim");
-  await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+  await folha.getByRole("button", { name: "Que muita gente veja" }).click();
   await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
   await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 }

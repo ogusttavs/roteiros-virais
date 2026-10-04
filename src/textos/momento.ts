@@ -20,7 +20,7 @@ export const textosMomento = {
   rotuloOQueDaParaMostrar: "O que dá para mostrar",
   oQueVoceDisse: "O que você disse",
   objetivo: "O que você quer que aconteça com o vídeo?",
-  recomendado: "Recomendado",
+  recomendado: "Recomendado pelo que você contou",
   /** V12b, item 6: rotulo visivel acima dos chips (achado do Gustavo em producao, sem titulo a pessoa nao entendia o que era). */
   falarDe: "Falar de outra marca sua também?",
   falarDeAjuda: "Se este vídeo também vai citar outra marca sua, escolha aqui. A marca do vídeo continua sendo a que está aberta.",
@@ -39,8 +39,8 @@ export const textosMomento = {
   /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (`sugerirFormatoPeloObjetivo`). */
   formato: "Formato",
   formatoAjuda: {
-    reels: "Para esse objetivo, hoje um Reels alcança mais gente nova.",
-    story: "Para esse objetivo, hoje um Story com caixinha rende mais.",
+    reels: "Para o Instagram, o TikTok e o Shorts.",
+    story: "No Story não tem a pergunta do que o vídeo deve fazer: ele segue o seu dia e fala com quem já te segue.",
   },
   /** M4, item 2: o segundo controle segmentado, Falando/Sem fala; sem sugestão aqui (o momento não busca evidência). */
   estilo: "Como você aparece",

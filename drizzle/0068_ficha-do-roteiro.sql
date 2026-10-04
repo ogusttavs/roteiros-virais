@@ -1,0 +1,1 @@
+ALTER TABLE "roteiros" ADD COLUMN "ficha" text;

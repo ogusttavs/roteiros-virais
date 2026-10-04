@@ -1,9 +1,11 @@
 import { z } from "zod";
 
+import { estruturaDaFicha } from "@/config/fichas";
 import {
   FIGURINHAS_STORY,
   TIPOS_ABERTURA,
   type EstiloRoteiro,
+  type Ficha,
   type FormatoRoteiro,
   type Objetivo,
   type Persona,
@@ -227,8 +229,12 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * E44 PR 1 (formato da referência): cada vídeo de evidência traz a linha "formato do vídeo" (as treze chaves do estudo, `config/formatos.ts`), e um parágrafo logo depois das regras numeradas (sem virar a 13ª, para o `porQueAssim` seguir citando de 1 a 12) pede o
  * roteiro naquele formato, sempre como a versão da própria marca (a tese: um meme adaptado ao negócio, com a cara de quem grava, nunca o vídeo de outro repostado).
  * Versão 2.9.0.
+ *
+ * E49 PR 1 (as fichas): no Reels a entrada traz a linha "Ficha do vídeo" (as cinco fichas do "O que você quer que esse vídeo faça?", `config/fichas.ts`) com a estrutura dela, e um parágrafo
+ * depois do bloco do objetivo diz que a ficha manda no começo, no jeito de contar e no pedido do fim; o verificador local reprova a ficha "que guardem" sem passo a passo, lista ou
+ * algo para copiar. Sem a linha (Story, roteiros de antes), tudo segue como na 2.9.0. Versão 2.10.0.
  */
-export const versao = "2.9.0";
+export const versao = "2.10.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -543,6 +549,8 @@ O objetivo escolhido muda o roteiro:
   chamada final de comentar ou salvar.
 - Gente me chamar para comprar: ataca o medo antes da compra, mostra prova real, chamada
   final de chamar ou agendar.
+Quando a entrada traz a linha "Ficha do vídeo", ela manda: o começo, o jeito de contar e o que
+você pede no fim seguem a estrutura dela, no lugar da lista acima.
 
 ${blocoEstrutura}
 
@@ -598,6 +606,8 @@ export const LEMBRETE_ACENTUACAO =
 export function montarEntrada(dados: {
   tema: string;
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha do Reels; vira a linha "Ficha do vídeo" com a estrutura dela. */
+  ficha?: Ficha;
   /**
    * E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto que a pessoa
    * escreve no tema livre, na folha do momento ou no dia do plano. Quando presente, vira a
@@ -716,6 +726,7 @@ export function montarEntrada(dados: {
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     blocoNoticia,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
+    dados.ficha && dados.formato === "reels" && dados.estilo === "falado" ? `Ficha do vídeo: ${estruturaDaFicha(dados.ficha, dados.evidencias.length > 0)}` : null,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
       ? `O cliente reprovou a versão anterior por: ${dados.anguloParaEvitar.motivos.join(", ")}.` +

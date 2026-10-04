@@ -100,7 +100,7 @@ async function main(): Promise<void> {
         await folha.getByLabel("Onde você está").fill("no aeroporto, cinco da manha");
         await folha.getByLabel("O que está acontecendo").fill("esperando o embarque para a feira de fornecedores");
         await folha.getByLabel("O que dá para mostrar").fill("a fila do check-in e a mala de amostras");
-        await folha.getByRole("radio", { name: "Gente me chamar para comprar" }).click();
+        await folha.getByRole("button", { name: "Que me chamem" }).click();
 
         const nomeArquivo = `GravarAgora.Preenchida.${tamanho.rotulo}.${modo.rotulo}.png`;
         await page.screenshot({ path: path.join(pastaDestino, nomeArquivo) });

@@ -1,5 +1,6 @@
 "use server";
 
+import { ehFicha } from "@/config/fichas";
 import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { hojeISO } from "@/lib/config";
@@ -51,6 +52,8 @@ export type DadosAceitarPlano = {
   oQueEstaAcontecendo: string;
   oQueDaParaMostrar: string;
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha das cinco (só Reels), texto livre do navegador conferido por `ehFicha`. */
+  ficha?: string;
   /**
    * V9c, item 1: o que a pessoa escolheu no controle segmentado da folha; reels se ausente. Chega
    * como texto livre do navegador (V9d, item 2): `validarFormato` confere antes de chegar ao banco.
@@ -103,6 +106,7 @@ export async function aceitarPlanoAction(
       oQueEstaAcontecendo,
       oQueDaParaMostrar,
       objetivo: dados.objetivo,
+      ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
       marcaId: dados.marcaId,

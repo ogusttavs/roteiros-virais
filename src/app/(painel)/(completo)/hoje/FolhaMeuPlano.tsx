@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { rotuloParaQue } from "@/config/fichas";
 import type { ItemPlano } from "@/servicos/plano";
 import { textosPlano } from "@/textos/plano";
 import { Botao } from "@/ui/componentes/Botao";
@@ -133,7 +133,7 @@ export function FolhaMeuPlano({ aoFechar, itens, aoPlanejarDeNovo }: Props) {
                   ) : null}
                 </div>
                 <p className={styles.itemSituacao}>{item.situacao}</p>
-                <span className={styles.itemObjetivo}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                <span className={styles.itemObjetivo}>{rotuloParaQue({ objetivo: item.objetivo, formato: item.formato })}</span>
               </div>
             ))}
           </div>

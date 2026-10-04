@@ -82,7 +82,7 @@ test.describe("M4, o roteiro sem fala", () => {
     await folha.getByLabel("Onde você está").fill("na oficina");
     await folha.getByLabel("O que está acontecendo").fill("envelopando o capo de um carro");
     await folha.getByLabel("O que dá para mostrar").fill("o antes fosco e o depois brilhando");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     const controleEstilo = folha.getByRole("tablist", { name: "Como você aparece" });
     await expect(controleEstilo.getByRole("tab", { name: "Falando" })).toHaveAttribute("aria-selected", "true");
@@ -114,7 +114,7 @@ test.describe("M4, o roteiro sem fala", () => {
     await folha.getByLabel("Onde você está").fill("na oficina");
     await folha.getByLabel("O que está acontecendo").fill("mostrando o resultado para o cliente");
     await folha.getByLabel("O que dá para mostrar").fill("o cliente vendo o carro pronto");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });

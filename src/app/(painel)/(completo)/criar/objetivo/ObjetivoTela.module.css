@@ -200,3 +200,35 @@
   font-size: var(--tamanho-legenda);
   color: var(--cor-texto-suave);
 }
+
+/* E49 PR 1: o apoio abaixo da pergunta, a linha do porquê da ficha recomendada e o cartão do Story. */
+.apoio {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.porque {
+  margin: 0 0 var(--espaco-3);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.cartaoStory {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.cartaoStory h3 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+}
+
+.cartaoStory p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}

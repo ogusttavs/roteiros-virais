@@ -19,6 +19,7 @@ import {
   type Cliente,
   type EstadoPlano,
   type EstiloRoteiro,
+  type Ficha,
   type FormatoRoteiro,
   type Momento,
   type MomentoDoDia,
@@ -26,7 +27,6 @@ import {
   type QuemGrava,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
-import { sugerirFormatoPeloObjetivo } from "@/ia/enums";
 import * as lerAgendaIA from "@/ia/prompts/lerAgenda";
 import * as planejarDiaIA from "@/ia/prompts/planejarDia";
 import { registrarGeracao } from "@/ia/registro";
@@ -228,7 +228,8 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
         situacao: sugestao.situacao,
         oQueMostrar: sugestao.oQueMostrar,
         objetivo: sugestao.objetivo,
-        formato: sugerirFormatoPeloObjetivo(sugestao.objetivo),
+        // E49 PR 1: Reels é o padrão; o Story é uma escolha da pessoa (o objetivo deixou de decidir o formato).
+        formato: "reels",
         estado: "sugerido",
       });
     });
@@ -325,6 +326,8 @@ export async function aceitar(
     oQueEstaAcontecendo: string;
     oQueDaParaMostrar: string;
     objetivo: Objetivo;
+    /** E49 PR 1: a ficha confirmada na folha (só Reels). */
+    ficha?: Ficha;
     /** V9c, item 1: o que a pessoa confirmou na folha; sem isto, cai no mesmo sugerido pelo objetivo. */
     formato?: FormatoRoteiro;
     /** M4, item 2: o que a pessoa confirmou na folha; sem isto, cai em "falado" (sem evidência no momento para sugerir). */
@@ -344,7 +347,7 @@ export async function aceitar(
     if (roteiroExistente) return roteiroExistente;
   }
 
-  const formato = dados.formato ?? sugerirFormatoPeloObjetivo(dados.objetivo);
+  const formato = dados.formato ?? "reels";
   const estilo = dados.estilo ?? "falado";
   const objetivoDoVideo = dados.objetivoDoVideo?.trim() || undefined;
   const momento: Momento = {
@@ -358,6 +361,7 @@ export async function aceitar(
     origem: "momento",
     momento,
     objetivo: dados.objetivo,
+    ficha: dados.ficha,
     formato,
     estilo,
     quemAparece: dados.quemAparece,

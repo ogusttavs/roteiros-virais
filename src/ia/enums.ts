@@ -41,9 +41,9 @@ export const NOME_OBJETIVO: Record<Objetivo, string> = {
  * seção 3, revisão do lote 6).
  */
 export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
-  alcance: "Para mais gente te conhecer",
-  engajamento: "Para lembrarem de você",
-  conversao: "Para te chamarem para comprar",
+  alcance: "Para que muita gente veja",
+  engajamento: "Para que guardem para depois",
+  conversao: "Para que te chamem",
 };
 
 /**
@@ -54,17 +54,6 @@ export const AJUDA_OBJETIVO: Record<Objetivo, string> = {
   alcance: "para quem ainda não te viu",
   engajamento: "para quem já te segue",
   conversao: "para quem está quase decidindo",
-};
-
-/**
- * "O objetivo continua: X" na folha de reprovar (E27, parte 1;
- * `entrega/telas/Roteiro.dc.html`): mesma razão de `NOME_OBJETIVO` estar
- * aqui, sem o "Para" de `ROTULO_TEMA_CARTAO`.
- */
-export const ROTULO_OBJETIVO_TRAVADO: Record<Objetivo, string> = {
-  alcance: "mais gente te conhecer",
-  engajamento: "lembrarem de você",
-  conversao: "te chamarem para comprar",
 };
 
 /** As três opções de objetivo, na ordem fixa em que a tela mostra (etapa 11). */

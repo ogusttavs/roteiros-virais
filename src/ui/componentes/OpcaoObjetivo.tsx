@@ -1,11 +1,17 @@
 "use client";
 
+import { textosObjetivo } from "@/textos/objetivo";
+
 import styles from "./OpcaoObjetivo.module.css";
 
 type Props = {
   titulo: string;
   /** Sem subtitulo quando a pergunta ja e curta o bastante sozinha (DadosFixosForm). */
   ajuda?: string;
+  /** E49 PR 1: a linha "Por exemplo: ..." das fichas. */
+  exemplo?: string;
+  /** E49 PR 1: a linha discreta "Ajuda em: ..." das fichas, o objetivo antigo em palavras de gente. */
+  ajudaEm?: string;
   marcada: boolean;
   recomendada?: boolean;
   rotuloRecomendado?: string;
@@ -17,7 +23,7 @@ type Props = {
  * radio a esquerda (design v2, `entrega/telas/base.css`, ".opcao"; role="radio",
  * ObjetivoFluxo, DadosFixosForm).
  */
-export function OpcaoObjetivo({ titulo, ajuda, marcada, recomendada = false, rotuloRecomendado, onEscolher }: Props) {
+export function OpcaoObjetivo({ titulo, ajuda, exemplo, ajudaEm, marcada, recomendada = false, rotuloRecomendado, onEscolher }: Props) {
   return (
     <button
       type="button"
@@ -31,6 +37,16 @@ export function OpcaoObjetivo({ titulo, ajuda, marcada, recomendada = false, rot
         {recomendada && rotuloRecomendado ? <span className={styles.recomendado}>{rotuloRecomendado}</span> : null}
         <span className={styles.titulo}>{titulo}</span>
         {ajuda ? <span className={styles.ajuda}>{ajuda}</span> : null}
+        {exemplo ? (
+          <span className={styles.exemplo}>
+            <span className={styles.prefixo}>{textosObjetivo.exemploPrefixo}</span>
+            {exemplo}
+          </span>
+        ) : null}
+        {ajudaEm ? <span className={styles.ajudaEm}>
+            {textosObjetivo.ajudaEmPrefixo}
+            {ajudaEm}
+          </span> : null}
       </span>
     </button>
   );
