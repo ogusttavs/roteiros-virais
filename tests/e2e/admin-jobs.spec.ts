@@ -78,7 +78,7 @@ test.describe("admin de jobs, colunas de coleta paga", () => {
     await expect(page).toHaveURL(/\/admin\/clientes/);
 
     await page.goto("/admin/jobs");
-    await expect(page.getByRole("heading", { name: "Jobs", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Rotinas", exact: true })).toBeVisible();
 
     const cabecalho = page.locator("thead");
     await expect(cabecalho.getByText("devolvidos", { exact: true })).toBeVisible();

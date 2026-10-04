@@ -3,10 +3,8 @@
   display: flex;
   flex-direction: column;
   gap: var(--espaco-3);
-  padding: var(--espaco-5);
-  border: var(--largura-borda) solid var(--cor-borda);
-  border-radius: var(--raio-lg);
-  background: var(--cor-superficie);
+  padding: var(--espaco-3) 0 0;
+  border-top: var(--largura-borda) solid var(--cor-divisor);
 }
 
 .titulo {
