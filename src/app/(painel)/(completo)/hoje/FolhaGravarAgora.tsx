@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import { FICHAS_EM_ORDEM, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha } from "@/config/fichas";
+import { FICHAS_EM_ORDEM, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha, OBJETIVO_DO_STORY } from "@/config/fichas";
 import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   DESCRICAO_ESTILO_ROTEIRO,
@@ -118,7 +118,7 @@ export function FolhaGravarAgora({
   // Vindo de um item do plano, o formato começa no que `planejarDia` já sugeriu; senão, o da porta que abriu a folha, ou Reels.
   const [formato, setFormato] = useState<FormatoRoteiro>(valoresIniciais?.formato ?? formatoInicial ?? "reels");
   // O Story não tem ficha: o objetivo gravado é o de falar com quem já segue.
-  const objetivo: Objetivo | null = formato === "story" ? "engajamento" : ficha ? objetivoDaFicha(ficha) : null;
+  const objetivo: Objetivo | null = formato === "story" ? OBJETIVO_DO_STORY : ficha ? objetivoDaFicha(ficha) : null;
   /**
    * M4, item 2: o segundo controle segmentado da folha. Sem sugestão automática aqui (o momento
    * nunca busca evidência no banco, `gerarRoteiro` pula essa busca de propósito para esta origem);

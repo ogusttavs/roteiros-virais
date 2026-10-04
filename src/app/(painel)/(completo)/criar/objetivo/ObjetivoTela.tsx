@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha } from "@/config/fichas";
+import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha, OBJETIVO_DO_STORY } from "@/config/fichas";
 import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   DESCRICAO_ESTILO_ROTEIRO,
@@ -114,7 +114,7 @@ export function ObjetivoTela({
   function escrever() {
     if (formato === "reels" && !ficha) return;
     // O Story não tem ficha: o objetivo gravado é o de falar com quem já segue (lembrarem de você).
-    const objetivo: Objetivo = formato === "story" || !ficha ? "engajamento" : objetivoDaFicha(ficha);
+    const objetivo: Objetivo = formato === "story" || !ficha ? OBJETIVO_DO_STORY : objetivoDaFicha(ficha);
     setErro(null);
     const desdeMs = Date.now();
     iniciarTransicao(async () => {

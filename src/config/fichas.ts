@@ -115,3 +115,6 @@ export function rotuloParaQue(item: { ficha?: Ficha | null; objetivo: Objetivo; 
   if (item.formato === "story") return ROTULO_STORY_PARA_QUEM;
   return ROTULO_PARA_QUE[fichaDoRoteiro(item)];
 }
+
+/** O objetivo que se grava num Story (ele não pergunta para que é o vídeo): falar com quem já segue. */
+export const OBJETIVO_DO_STORY: Objetivo = "engajamento";
