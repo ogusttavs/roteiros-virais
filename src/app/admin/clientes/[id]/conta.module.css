@@ -173,8 +173,8 @@
   margin: 0;
 }
 
-.numerosUso dd {
-  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono) !important;
+.numerosUso dd[data-numero] {
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
 }
 
 .diaADiaArea {

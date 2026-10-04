@@ -62,7 +62,7 @@ export function FormularioEntrar() {
         return;
       }
       entrou = true;
-      router.push(data.user.role === "admin" ? "/admin/clientes" : "/hoje");
+      router.push(data.user.role === "admin" ? "/admin" : "/hoje");
       router.refresh();
     } catch (falha) {
       setErroForma(fraseDaFalha(falha, textosEntrar.erroDeServidor, textosEntrar.semConexao));

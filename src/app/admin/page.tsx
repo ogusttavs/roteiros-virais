@@ -147,7 +147,7 @@ export default async function InicioDoAdmin() {
                 </p>
                 {linhasVisiveis.length > 0 ? (
                   <div className={styles.tabelaArea}>
-                    <table className={styles.tabela}>
+                    <table className={[styles.tabela, styles.tabelaCompacta].join(" ")}>
                       <thead>
                         <tr>
                           <th scope="col">{t.madrugada.colunas.ramo}</th>

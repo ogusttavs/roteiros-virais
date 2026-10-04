@@ -11,12 +11,11 @@ import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import comum from "../comum.module.css";
 
+import { casaComABusca, noFiltro, normalizar, type FiltroDeContas } from "./busca-contas";
 import proprio from "./contas.module.css";
 import { ModalNovaMarca } from "./ModalNovaMarca";
 
 const styles = { ...comum, ...proprio };
-
-export type FiltroDeContas = "todas" | "usando" | "parou" | "nao_entrou";
 
 const FILTROS: { chave: FiltroDeContas; rotulo: string; doQue: string }[] = [
   { chave: "todas", rotulo: t.filtros.todas, doQue: t.filtros.doQueTodas },
@@ -24,26 +23,6 @@ const FILTROS: { chave: FiltroDeContas; rotulo: string; doQue: string }[] = [
   { chave: "parou", rotulo: t.filtros.parou, doQue: t.filtros.doQueParou },
   { chave: "nao_entrou", rotulo: t.filtros.naoEntrou, doQue: t.filtros.doQueNaoEntrou },
 ];
-
-/** Sem acento e sem maiúscula, para "clinica" achar "Clínica". */
-export function normalizar(texto: string): string {
-  return texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
-}
-
-export function noFiltro(conta: ContaAdmin, filtro: FiltroDeContas): boolean {
-  if (filtro === "usando") return conta.usando;
-  if (filtro === "parou") return conta.parou;
-  if (filtro === "nao_entrou") return conta.nuncaEntrou;
-  return true;
-}
-
-/** A conta casa com a busca pelo nome dela, pelo ramo, ou pelo nome ou e-mail de qualquer pessoa com acesso. */
-export function casaComABusca(conta: ContaAdmin, busca: string): boolean {
-  const termo = normalizar(busca);
-  if (!termo) return true;
-  if (normalizar(conta.nome).includes(termo) || normalizar(conta.ramoNome ?? "").includes(termo)) return true;
-  return conta.quemTemAcesso.some((p) => normalizar(p.nome).includes(termo) || normalizar(p.email).includes(termo));
-}
 
 function Marcado({ texto, busca }: { texto: string; busca: string }): ReactNode {
   const termo = normalizar(busca);

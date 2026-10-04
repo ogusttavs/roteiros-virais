@@ -3,7 +3,8 @@ import { nichos } from "@/db/schema";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 
-import { TabelaContas, type FiltroDeContas } from "./TabelaContas";
+import { type FiltroDeContas } from "./busca-contas";
+import { TabelaContas } from "./TabelaContas";
 
 const FILTROS_VALIDOS: FiltroDeContas[] = ["todas", "usando", "parou", "nao_entrou"];
 

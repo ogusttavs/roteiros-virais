@@ -197,7 +197,7 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
               <dl className={conta.numerosUso}>
                 <div className={comum.dado} data-uso="roteiros">
                   <dt>{t.uso.roteiros}</dt>
-                  <dd>{roteiros.length}</dd>
+                  <dd data-numero>{roteiros.length}</dd>
                 </div>
                 <div className={comum.dado} data-uso="ultimo">
                   <dt>{t.uso.ultimo}</dt>
@@ -205,11 +205,11 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
                 </div>
                 <div className={comum.dado} data-uso="sem-gravar">
                   <dt>{t.uso.semGravar}</dt>
-                  <dd className={detalhe.diasSemGravar !== null && detalhe.diasSemGravar >= LIMIAR_ATENCAO ? antigo.textoAtencao : undefined}>{detalhe.diasSemGravar ?? "-"}</dd>
+                  <dd data-numero className={detalhe.diasSemGravar !== null && detalhe.diasSemGravar >= LIMIAR_ATENCAO ? antigo.textoAtencao : undefined}>{detalhe.diasSemGravar ?? "-"}</dd>
                 </div>
                 <div className={comum.dado} data-uso="reprovou">
                   <dt>{t.uso.reprovou}</dt>
-                  <dd>{totalReprovacoes}</dd>
+                  <dd data-numero>{totalReprovacoes}</dd>
                 </div>
               </dl>
             </div>

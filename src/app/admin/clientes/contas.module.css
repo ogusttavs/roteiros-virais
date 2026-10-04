@@ -274,7 +274,7 @@
   font-family: var(--fonte-mono);
 }
 
-.tabela mark {
+.tabelaContas mark {
   padding: 0 2px;
   border-radius: 3px;
   background: var(--cor-selecao-suave);
@@ -282,8 +282,8 @@
 }
 
 @media (max-width: 1179px) {
-  .tabela th,
-  .tabela td {
+  .tabelaContas th,
+  .tabelaContas td {
     padding-inline: var(--espaco-3);
   }
 }
