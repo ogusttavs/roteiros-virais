@@ -14,9 +14,9 @@ import { z } from "zod";
 
 import { FICHAS_EM_ORDEM } from "../src/config/fichas";
 import { FORMATOS_DO_VIDEO } from "../src/config/formatos";
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as extrairVideoIA from "../src/ia/prompts/extrairVideo";
-import { calcularCustoUsd } from "../src/ia/registro";
+
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const casoSchema = z.object({
   formatoEsperado: z.enum(FORMATOS_DO_VIDEO),
@@ -49,6 +49,8 @@ export type ResultadoAvaliarExtrair = {
   /** Os casos que erraram: o título, o esperado e o devolvido, para leitura humana. */
   erros: { titulo: string; esperado: string; devolvido: string }[];
   custoTotalUsd: number;
+  /** Casos que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
 };
 
 export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
@@ -62,10 +64,13 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
   let acertosDeFicha = 0;
   let comoOutro = 0;
   let custoTotalUsd = 0;
+  let casosFalhos = 0;
   const erros: ResultadoAvaliarExtrair["erros"] = [];
 
-  for (const caso of conjunto) {
-    const resultado = await gerarEstruturado({
+  // O golden set pelo lote (`golden-lote.ts`): todos os casos num lote só, e só então a leitura, caso a caso.
+  const resultados = await gerarVariosOuErro(
+    conjunto.map((caso) => (
+{
       tarefa: "extrairVideo",
       nivel: extrairVideoIA.nivel,
       effort: extrairVideoIA.esforco,
@@ -79,8 +84,19 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
         nomeNicho: "limpeza e organização da casa",
         termosNicho: ["limpeza", "sofá", "mancha", "faxina"],
       }),
-    });
-    custoTotalUsd += calcularCustoUsd(extrairVideoIA.nivel, resultado);
+    }
+    )),
+    "extração",
+  );
+
+  for (const [indice, caso] of conjunto.entries()) {
+    const resultado = resultados[indice];
+    if (resultado instanceof Error) {
+      casosFalhos += 1;
+      console.log(`FALHOU ${caso.titulo}: ${resultado.message}`);
+      continue;
+    }
+    custoTotalUsd += custoDoResultado(extrairVideoIA.nivel, resultado);
     const devolvido = resultado.dados.formatoCatalogo ?? "(nulo)";
     if (devolvido === "outro" || devolvido === "(nulo)") comoOutro += 1;
     const bateu = devolvido === caso.formatoEsperado;
@@ -96,7 +112,8 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
   }
 
   console.log(`\nacertos: ${acertos}/${conjunto.length}, como "outro": ${comoOutro}, fichas: ${acertosDeFicha}/${casosComFicha}, custo: US$ ${custoTotalUsd.toFixed(4)}`);
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, acertos, casosComFicha, acertosDeFicha, comoOutro, erros, custoTotalUsd };
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, acertos, casosComFicha, acertosDeFicha, comoOutro, erros, custoTotalUsd, casosFalhos };
 }
 
 if (require.main === module) {

@@ -16,11 +16,11 @@ import { z } from "zod";
 
 import { perguntaPorId } from "../src/config/briefing";
 import type { TipoMarca } from "../src/db/schema";
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as avaliarRespostaIA from "../src/ia/prompts/avaliarResposta";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { verificarLocalmente } from "../src/ia/verificador";
+
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const casoSchema = z.object({
   perguntaId: z.string(),
@@ -59,6 +59,8 @@ export type ResultadoAvaliarBriefing = {
   reprovadosNoVerificador: number;
   /** Soma do custo de todas as chamadas (avaliarResposta e verificarTexto), em dolares. */
   custoTotalUsd: number;
+  /** Casos que o lote devolveu com falha (ou cujo verificador falhou): pulados com o motivo, e os outros seguem. */
+  casosFalhos: number;
 };
 
 const META_DIFERENCA = 1.0;
@@ -78,23 +80,19 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
   let somaDiferencas = 0;
   let casosAvaliados = 0;
   let reprovadosNoVerificador = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
-  for (const caso of conjunto) {
-    const pergunta = perguntaPorId(caso.perguntaId, tipo);
-    if (!pergunta) {
-      console.log(`${caso.perguntaId}: pergunta desconhecida, pulando`);
-      continue;
-    }
-
-    /**
-     * Um caso que falha (erro transitorio de rede, resposta truncada) nao
-     * pode derrubar o resto do conjunto: sem isso, um golden set de doze
-     * casos perdia todos os que vinham depois do primeiro erro.
-     */
-    try {
-      const resultado = await gerarEstruturado({
-        tarefa: "avaliarResposta",
+  // O golden set pelo lote (`golden-lote.ts`): a nota de todas as respostas num lote, o verificador (checagem local aqui, e o `verificarTexto` num segundo lote só para as que a
+  // local aprovou), e só então a leitura, caso a caso. Um caso que falha (erro de rede, resposta truncada) continua sendo pulado sem derrubar o resto do conjunto.
+  const perguntas = conjunto.map((caso) => perguntaPorId(caso.perguntaId, tipo));
+  const indicesValidos = conjunto.flatMap((_, indice) => (perguntas[indice] ? [indice] : []));
+  const notas = await gerarVariosOuErro(
+    indicesValidos.map((indice) => {
+      const caso = conjunto[indice];
+      const pergunta = perguntas[indice]!;
+      return {
+        tarefa: "avaliarResposta" as const,
         nivel: avaliarRespostaIA.nivel,
         effort: avaliarRespostaIA.esforco,
         schema: avaliarRespostaIA.schema,
@@ -105,54 +103,82 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
           resposta: caso.resposta,
           tipo,
         }),
-      });
-
-      const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
-      somaDiferencas += diferenca;
-      casosAvaliados += 1;
-      custoTotalUsd += calcularCustoUsd(avaliarRespostaIA.nivel, resultado);
-
-      /**
-       * O mesmo verificador de producao (checagem local mais verificarTexto,
-       * `generoTexto: "analise"`), rodado aqui so para saber se aprovaria,
-       * sem repetir nem gravar em geracoes_ia (rodada de acabamento de
-       * 06/09, item 1): antes deste ajuste o script so media a nota, nunca
-       * conferia se a analise passaria no verificador de verdade.
-       */
-      const campos = {
-        bom: resultado.dados.bom,
-        melhorar: resultado.dados.melhorar,
-        como: resultado.dados.como,
-        exemplo: resultado.dados.exemplo,
-        impacto: resultado.dados.impacto,
       };
-      const local = verificarLocalmente(campos);
-      let verificacao = local;
-      if (local.aprovado) {
-        const saida = await gerarEstruturado({
-          tarefa: "verificarTexto",
-          nivel: verificarTextoIA.nivel,
-          effort: verificarTextoIA.esforco,
-          schema: verificarTextoIA.schema,
-          sistemaEstavel: verificarTextoIA.montarSistemaEstavel("analise"),
-          entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
-        });
-        custoTotalUsd += calcularCustoUsd(verificarTextoIA.nivel, saida);
-        verificacao = {
-          aprovado: saida.dados.aprovado,
-          motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"],
-        };
-      }
-      if (!verificacao.aprovado) reprovadosNoVerificador += 1;
+    }),
+    "briefing",
+  );
+  const notaDoCaso = new Map(indicesValidos.map((indice, i) => [indice, notas[i]] as const));
 
-      console.log(
-        `${caso.perguntaId}: IA deu ${resultado.dados.nota}, esperado ${caso.notaEsperada} ` +
-          `(diferenca ${diferenca.toFixed(1)}) - ${caso.pontoPrincipal}` +
-          (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`),
-      );
-    } catch (erro) {
-      console.log(`${caso.perguntaId}: erro ao avaliar, pulando (${erro instanceof Error ? erro.message : String(erro)})`);
+  const camposDoCaso = new Map<number, Record<string, string>>();
+  const locais = new Map<number, { aprovado: boolean; motivos: string[] }>();
+  for (const [indice, nota] of notaDoCaso) {
+    if (nota instanceof Error) continue;
+    const campos = {
+      bom: nota.dados.bom,
+      melhorar: nota.dados.melhorar,
+      como: nota.dados.como,
+      exemplo: nota.dados.exemplo,
+      impacto: nota.dados.impacto,
+    };
+    camposDoCaso.set(indice, campos);
+    locais.set(indice, verificarLocalmente(campos));
+  }
+  const indicesParaVerificador = [...locais].flatMap(([indice, local]) => (local.aprovado ? [indice] : []));
+  const respostasDoVerificador = await gerarVariosOuErro(
+    indicesParaVerificador.map((indice) => ({
+      tarefa: "verificarTexto" as const,
+      nivel: verificarTextoIA.nivel,
+      effort: verificarTextoIA.esforco,
+      schema: verificarTextoIA.schema,
+      sistemaEstavel: verificarTextoIA.montarSistemaEstavel("analise"),
+      entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposDoCaso.get(indice)!).join("\n"), proibicoes: [] }),
+    })),
+    "verificador (briefing)",
+  );
+  const verificadorDoCaso = new Map(indicesParaVerificador.map((indice, i) => [indice, respostasDoVerificador[i]] as const));
+
+  for (const [indice, caso] of conjunto.entries()) {
+    if (!perguntas[indice]) {
+      console.log(`${caso.perguntaId}: pergunta desconhecida, pulando`);
+      continue;
     }
+
+    const resultado = notaDoCaso.get(indice)!;
+    const saida = verificadorDoCaso.get(indice);
+    if (resultado instanceof Error || saida instanceof Error) {
+      const erro = resultado instanceof Error ? resultado : (saida as Error);
+      casosFalhos += 1;
+      console.log(`${caso.perguntaId}: erro ao avaliar, pulando (${erro.message})`);
+      continue;
+    }
+
+    const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
+    somaDiferencas += diferenca;
+    casosAvaliados += 1;
+    custoTotalUsd += custoDoResultado(avaliarRespostaIA.nivel, resultado);
+
+    /**
+     * O mesmo verificador de producao (checagem local mais verificarTexto,
+     * `generoTexto: "analise"`), rodado aqui so para saber se aprovaria,
+     * sem repetir nem gravar em geracoes_ia (rodada de acabamento de
+     * 06/09, item 1): antes deste ajuste o script so media a nota, nunca
+     * conferia se a analise passaria no verificador de verdade.
+     */
+    let verificacao = locais.get(indice)!;
+    if (saida) {
+      custoTotalUsd += custoDoResultado(verificarTextoIA.nivel, saida);
+      verificacao = {
+        aprovado: saida.dados.aprovado,
+        motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"],
+      };
+    }
+    if (!verificacao.aprovado) reprovadosNoVerificador += 1;
+
+    console.log(
+      `${caso.perguntaId}: IA deu ${resultado.dados.nota}, esperado ${caso.notaEsperada} ` +
+        `(diferenca ${diferenca.toFixed(1)}) - ${caso.pontoPrincipal}` +
+        (verificacao.aprovado ? "" : ` [REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`),
+    );
   }
 
   const diferencaMedia = casosAvaliados > 0 ? somaDiferencas / casosAvaliados : 0;
@@ -162,6 +188,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     console.log("acima da meta de 1,0 (plano de execucao, etapa 5).");
   }
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${casosAvaliados}`);
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
   return {
@@ -171,6 +198,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     diferencaMedia,
     acimaDaMeta,
     reprovadosNoVerificador,
+    casosFalhos,
     custoTotalUsd,
   };
 }

@@ -18,12 +18,12 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
+
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -90,6 +90,8 @@ export type ResultadoAvaliarStories = {
   titulos: string[];
   /** Reprovado no verificador de produção: checagem local (por regra R-IG-STORY) mais verificarTexto. */
   reprovadosNoVerificador: number;
+  /** Casos (ou verificadores) que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
   custoTotalUsd: number;
 };
 
@@ -98,18 +100,17 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   const titulos: string[] = [];
   let reprovadosNoVerificador = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
-  for (const [indice, caso] of conjunto.entries()) {
-    console.log(`${"=".repeat(70)}`);
-    console.log(`caso ${indice + 1}/${conjunto.length}: "${caso.tema ?? caso.momento?.onde}"`);
-    console.log(`ponto principal: ${caso.pontoPrincipal}`);
-    console.log(`${"-".repeat(70)}\n`);
-
-    const resultado = await gerarEstruturado({
+  // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; a checagem local, e o `verificarTexto` num segundo lote só para os casos que a
+  // local aprovou; e só então a leitura, caso a caso, na ordem de sempre.
+  const geradas = await gerarVariosOuErro(
+    conjunto.map((caso) => (
+{
       tarefa: "roteiro",
       nivel: roteiroIA.nivel,
       effort: roteiroIA.esforco,
@@ -135,11 +136,74 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
         contextoDeSerie: caso.contextoDeSerie,
         marcaCitada: caso.marcaCitada,
       }),
-    });
+    }
+    )),
+    "stories",
+  );
+  const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
+  const camposPorCaso: Record<string, string>[] = [];
+  conjunto.forEach((caso, indice) => {
+    const gerada = geradas[indice];
+    if (gerada instanceof Error) {
+      camposPorCaso.push({});
+      verificacoes.push({ aprovado: false, motivos: [] });
+      return;
+    }
+    const saida = gerada.dados;
+      const campos = extrairCamposRoteiro(saida);
+      const palavrasDoMomento = caso.momento
+        ? palavrasDeConteudo(`${caso.momento.onde} ${caso.momento.oQueEstaAcontecendo}`)
+        : undefined;
+      const local = verificarLocalmente(campos, {
+        formato: "story",
+        cartoes: saida.cartoes,
+        porQueAssim: saida.porQueAssim,
+        palavrasDoMomento,
+      });
+    camposPorCaso.push(campos);
+    verificacoes.push(local);
+  });
+  const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
+  const respostasDoLote = await gerarVariosOuErro(
+    indicesAprovadosLocal.map((indice) => (
+{
+        tarefa: "verificarTexto",
+        nivel: verificarTextoIA.nivel,
+        effort: verificarTextoIA.esforco,
+        schema: verificarTextoIA.schema,
+        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
+        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [] }),
+      }
+    )),
+    "verificador (stories)",
+  );
+  const respostasVerificador = new Map<number, (typeof respostasDoLote)[number]>();
+  indicesAprovadosLocal.forEach((indice, posicao) => {
+    const resposta = respostasDoLote[posicao];
+    respostasVerificador.set(indice, resposta);
+    if (resposta instanceof Error) return;
+    verificacoes[indice] = {
+      aprovado: resposta.dados.aprovado,
+      motivos: resposta.dados.aprovado ? [] : [resposta.dados.motivo ?? "reprovado"],
+    };
+  });
+
+  for (const [indice, caso] of conjunto.entries()) {
+    console.log(`${"=".repeat(70)}`);
+    console.log(`caso ${indice + 1}/${conjunto.length}: "${caso.tema ?? caso.momento?.onde}"`);
+    console.log(`ponto principal: ${caso.pontoPrincipal}`);
+    console.log(`${"-".repeat(70)}\n`);
+
+    const resultado = geradas[indice];
+    if (resultado instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[FALHOU: ${resultado.message}]\n`);
+      continue;
+    }
 
     const saida = resultado.dados;
     titulos.push(saida.titulo);
-    let custoDoCasoUsd = calcularCustoUsd(roteiroIA.nivel, resultado);
+    let custoDoCasoUsd = custoDoResultado(roteiroIA.nivel, resultado);
 
     console.log(`titulo: ${saida.titulo}`);
     console.log(`duracao: ${saida.duracaoS}s`);
@@ -160,31 +224,13 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
       console.log(`\nmarca citada no caso: ${caso.marcaCitada.nome} (confira se nao virou anuncio dela)`);
     }
 
-    const campos = extrairCamposRoteiro(saida);
-    const palavrasDoMomento = caso.momento
-      ? palavrasDeConteudo(`${caso.momento.onde} ${caso.momento.oQueEstaAcontecendo}`)
-      : undefined;
-    const local = verificarLocalmente(campos, {
-      formato: "story",
-      cartoes: saida.cartoes,
-      porQueAssim: saida.porQueAssim,
-      palavrasDoMomento,
-    });
-    let verificacao = local;
-    if (local.aprovado) {
-      const saidaVerificacao = await gerarEstruturado({
-        tarefa: "verificarTexto",
-        nivel: verificarTextoIA.nivel,
-        effort: verificarTextoIA.esforco,
-        schema: verificarTextoIA.schema,
-        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
-      });
-      custoDoCasoUsd += calcularCustoUsd(verificarTextoIA.nivel, saidaVerificacao);
-      verificacao = {
-        aprovado: saidaVerificacao.dados.aprovado,
-        motivos: saidaVerificacao.dados.aprovado ? [] : [saidaVerificacao.dados.motivo ?? "reprovado"],
-      };
+    const verificacao = verificacoes[indice];
+    const saidaVerificacao = respostasVerificador.get(indice);
+    if (saidaVerificacao instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[VERIFICADOR FALHOU: ${saidaVerificacao.message}]`);
+    } else if (saidaVerificacao) {
+      custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
     }
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
@@ -196,9 +242,10 @@ export async function avaliarStories(): Promise<ResultadoAvaliarStories> {
   }
 
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, custoTotalUsd };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, casosFalhos, custoTotalUsd };
 }
 
 if (require.main === module) {

@@ -17,11 +17,11 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as lerAgendaIA from "../src/ia/prompts/lerAgenda";
 import * as planejarDiaIA from "../src/ia/prompts/planejarDia";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { ErroDataRelativa, resolverDataRelativa } from "../src/lib/data-relativa";
+
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const casoSchema = z.object({
   local: z.string(),
@@ -50,6 +50,8 @@ export type ResultadoAvaliarAgendas = {
   casos: number;
   diasLidos: number;
   diasSemData: number;
+  /** Agendas ou planos de dia que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
   custoTotalUsd: number;
 };
 
@@ -58,10 +60,54 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   let diasLidos = 0;
   let diasSemData = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
+
+  // O golden set pelo lote (`golden-lote.ts`): a leitura de todas as agendas num lote, o plano de todos os dias com data resolvida num segundo, e só então a leitura, caso a caso.
+  const leituras = await gerarVariosOuErro(
+    conjunto.map((caso) => ({
+      tarefa: "lerAgenda" as const,
+      nivel: lerAgendaIA.nivel,
+      effort: lerAgendaIA.esforco,
+      schema: lerAgendaIA.schema,
+      sistemaEstavel: lerAgendaIA.montarSistemaEstavel(),
+      entrada: lerAgendaIA.montarEntrada({ texto: caso.texto }),
+    })),
+    "agendas",
+  );
+
+  // Cada dia lido, com a data resolvida (ou o motivo de não ter resolvido); só os que resolveram pedem plano.
+  type LeituraOk = Exclude<(typeof leituras)[number], Error>;
+  type DiaLido = { indiceCaso: number; dia: LeituraOk["dados"]["dias"][number]; dataResolvida: string | null; motivo: string | null };
+  const diasPorCaso: DiaLido[][] = conjunto.map((caso, indiceCaso) =>
+    (leituras[indiceCaso] instanceof Error ? [] : (leituras[indiceCaso] as LeituraOk).dados.dias).map((dia) => {
+      try {
+        return { indiceCaso, dia, dataResolvida: resolverDataRelativa(dia.referenciaDia, caso.hoje), motivo: null };
+      } catch (erro) {
+        if (erro instanceof ErroDataRelativa) return { indiceCaso, dia, dataResolvida: null, motivo: erro.message };
+        throw erro;
+      }
+    }),
+  );
+  const diasComPlano = diasPorCaso.flat().filter((d) => d.dataResolvida !== null);
+  const planos = await gerarVariosOuErro(
+    diasComPlano.map((d) => ({
+      tarefa: "planejarDia" as const,
+      nivel: planejarDiaIA.nivel,
+      effort: planejarDiaIA.esforco,
+      schema: planejarDiaIA.schema,
+      sistemaEstavel: planejarDiaIA.montarSistemaEstavel({
+        perfilCompilado: conjunto[d.indiceCaso].perfilCompilado,
+        modeloNicho: conjunto[d.indiceCaso].modeloNicho,
+      }),
+      entrada: planejarDiaIA.montarEntrada({ lugar: d.dia.lugar, compromissos: d.dia.compromissos }),
+    })),
+    "plano dos dias",
+  );
+  const planoDoDia = new Map<DiaLido, (typeof planos)[number]>(diasComPlano.map((d, i) => [d, planos[i]]));
 
   for (const [indice, caso] of conjunto.entries()) {
     console.log(`${"=".repeat(70)}`);
@@ -69,47 +115,35 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
     console.log(`agenda contada: ${caso.texto}`);
     console.log(`${"-".repeat(70)}\n`);
 
-    const leitura = await gerarEstruturado({
-      tarefa: "lerAgenda",
-      nivel: lerAgendaIA.nivel,
-      effort: lerAgendaIA.esforco,
-      schema: lerAgendaIA.schema,
-      sistemaEstavel: lerAgendaIA.montarSistemaEstavel(),
-      entrada: lerAgendaIA.montarEntrada({ texto: caso.texto }),
-    });
-    custoTotalUsd += calcularCustoUsd(lerAgendaIA.nivel, leitura);
+    const leitura = leituras[indice];
+    if (leitura instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[FALHOU: ${leitura.message}]\n`);
+      continue;
+    }
+    custoTotalUsd += custoDoResultado(lerAgendaIA.nivel, leitura);
 
-    for (const dia of leitura.dados.dias) {
+    for (const lido of diasPorCaso[indice]) {
+      const { dia } = lido;
       diasLidos += 1;
-      let dataResolvida: string;
-      try {
-        dataResolvida = resolverDataRelativa(dia.referenciaDia, caso.hoje);
-      } catch (erro) {
-        if (erro instanceof ErroDataRelativa) {
-          diasSemData += 1;
-          console.log(`  [SEM DATA] "${dia.referenciaDia}" nao resolveu (${erro.message})`);
-          continue;
-        }
-        throw erro;
+      if (lido.dataResolvida === null) {
+        diasSemData += 1;
+        console.log(`  [SEM DATA] "${dia.referenciaDia}" nao resolveu (${lido.motivo})`);
+        continue;
       }
 
-      console.log(`  dia ${dataResolvida} (referencia "${dia.referenciaDia}"), lugar: ${dia.lugar || "(nao informado)"}`);
+      console.log(`  dia ${lido.dataResolvida} (referencia "${dia.referenciaDia}"), lugar: ${dia.lugar || "(nao informado)"}`);
       for (const compromisso of dia.compromissos) {
         console.log(`    - ${compromisso}`);
       }
 
-      const plano = await gerarEstruturado({
-        tarefa: "planejarDia",
-        nivel: planejarDiaIA.nivel,
-        effort: planejarDiaIA.esforco,
-        schema: planejarDiaIA.schema,
-        sistemaEstavel: planejarDiaIA.montarSistemaEstavel({
-          perfilCompilado: caso.perfilCompilado,
-          modeloNicho: caso.modeloNicho,
-        }),
-        entrada: planejarDiaIA.montarEntrada({ lugar: dia.lugar, compromissos: dia.compromissos }),
-      });
-      custoTotalUsd += calcularCustoUsd(planejarDiaIA.nivel, plano);
+      const plano = planoDoDia.get(lido)!;
+      if (plano instanceof Error) {
+        casosFalhos += 1;
+        console.log(`      [PLANO FALHOU: ${plano.message}]`);
+        continue;
+      }
+      custoTotalUsd += custoDoResultado(planejarDiaIA.nivel, plano);
 
       for (const sugestao of plano.dados.sugestoes) {
         console.log(`      sugestao (${sugestao.objetivo}): ${sugestao.situacao} / mostrar: ${sugestao.oQueMostrar}`);
@@ -119,9 +153,10 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
   }
 
   console.log(`dias lidos: ${diasLidos}, sem data resolvida: ${diasSemData}`);
+  if (casosFalhos > 0) console.log(`falhas no lote (agendas e planos de dia): ${casosFalhos}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diasLidos, diasSemData, custoTotalUsd };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diasLidos, diasSemData, casosFalhos, custoTotalUsd };
 }
 
 if (require.main === module) {
