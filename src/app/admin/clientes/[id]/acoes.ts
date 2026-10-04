@@ -74,6 +74,7 @@ export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): 
 export async function mudarTipoMarcaAction(clienteId: number, tipo: TipoMarca): Promise<ResultadoAcao<Cliente>> {
   const sessao = await sessaoAtual();
   garantirSessaoAdmin(sessao);
+  if (tipo !== "negocio" && tipo !== "pessoa") return { ok: false, erro: "pedido invalido." };
   try {
     await trocarTipoDaConta(clienteId, tipo, sessao!.user.id);
     const cliente = (await clientePorId(clienteId))!;

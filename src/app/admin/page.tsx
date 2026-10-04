@@ -19,9 +19,10 @@ type ItemDeAtencao = { chave: string; titulo: string; detalhe: string; href: str
 
 function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
   const itens: ItemDeAtencao[] = [];
-  const comErro = inicio.madrugada.comProblema.filter((l) => l.busca.estado === "erro" || l.transcricao.estado === "erro").map((l) => l.nome);
+  const { rotinas } = inicio.madrugada;
+  const comErro = [rotinas.busca === "erro" ? t.madrugada.buscaGlobal : null, rotinas.transcricao === "erro" ? t.madrugada.transcricaoGlobal : null].filter((x): x is string => x !== null);
   const semTemas = inicio.madrugada.comProblema.filter((l) => l.temas.atrasado).map((l) => l.nome);
-  if (comErro.length > 0) itens.push({ chave: "erro", ...t.atencao.madrugadaErro(comErro), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
+  if (comErro.length > 0) itens.push({ chave: "erro", ...t.atencao.rotinaGlobalErro(comErro), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   if (semTemas.length > 0) itens.push({ chave: "temas", ...t.atencao.semTemas(semTemas), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   const continuam = inicio.erros.recentes.filter((e) => e.continua).length;
   if (continuam > 0) itens.push({ chave: "continuam", ...t.atencao.errosContinuam(continuam), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
@@ -44,18 +45,12 @@ function Etapa({ certo, falhou, children }: { certo?: boolean; falhou?: boolean;
   );
 }
 
-function passo(estado: string, textoOk: string): ReactNode {
-  if (estado === "erro") return <Etapa falhou>{t.madrugada.deuErro}</Etapa>;
-  if (estado === "sem_execucao") return <Etapa>{t.madrugada.aindaNaoRodou}</Etapa>;
-  return <Etapa certo>{textoOk}</Etapa>;
-}
-
 function CelulasDoRamo({ linha }: { linha: LinhaDaMadrugada }) {
   return (
     <>
       <td className={[styles.forte, styles.corta].join(" ")}>{linha.nome}</td>
-      <td data-celula="busca">{passo(linha.busca.estado, t.madrugada.videos(linha.busca.novos))}</td>
-      <td data-celula="transcricao">{passo(linha.transcricao.estado, t.madrugada.transcritos(linha.transcricao.transcritos))}</td>
+      <td data-celula="busca"><Etapa certo>{t.madrugada.videos(linha.busca.novos)}</Etapa></td>
+      <td data-celula="transcricao"><Etapa certo>{t.madrugada.transcritos(linha.transcricao.transcritos)}</Etapa></td>
       <td data-celula="analise">
         <Etapa certo>{linha.analise.analisados}</Etapa>
       </td>
@@ -140,6 +135,15 @@ export default async function InicioDoAdmin() {
               <p className={styles.semDado}>{t.madrugada.vazio}</p>
             ) : (
               <>
+                <p className={styles.resumoRamos} data-rotinas="hoje">
+                  <span>{t.madrugada.rotinasDeHoje}:</span>
+                  <span data-rotina="busca">
+                    {t.madrugada.buscaGlobal} {t.madrugada.estadoRotina[madrugada.rotinas.busca]}
+                  </span>
+                  <span data-rotina="transcricao">
+                    {t.madrugada.transcricaoGlobal} {t.madrugada.estadoRotina[madrugada.rotinas.transcricao]}
+                  </span>
+                </p>
                 <p className={styles.resumoRamos} data-resumo="ramos">
                   <span>
                     <b>{madrugada.ok}</b> {t.madrugada.resumoOk(madrugada.ok)}

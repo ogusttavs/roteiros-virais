@@ -18,19 +18,22 @@ const DIA_MS = 24 * 60 * 60 * 1000;
 export type LinhaDaMadrugada = {
   nichoId: number;
   nome: string;
-  busca: { estado: EstadoAgregado; novos: number };
-  transcricao: { estado: EstadoAgregado; transcritos: number };
+  busca: { novos: number };
+  transcricao: { transcritos: number };
   analise: { analisados: number };
   temas: { quantos: number; tentou: boolean; /** Sem tema depois da hora em que ele já devia existir. */ atrasado: boolean };
   /** Tem algo a olhar: um passo em erro, ou nenhum tema depois do horário em que ele já devia existir. */
   comProblema: boolean;
 };
 
+/** O estado de hoje das rotinas que são de todos os ramos de uma vez (a busca junta sete jobs globais; a transcrição é uma só): mostrado uma vez, fora da tabela por ramo. */
+export type RotinasDoDia = { busca: EstadoAgregado; transcricao: EstadoAgregado; erroDaBusca: string | null; erroDaTranscricao: string | null };
+
 export type ErroRecente = { id: number; nome: string; quando: Date; mensagem: string; continua: boolean };
 
 export type InicioAdmin = {
   agora: Date;
-  madrugada: { totalDeRamos: number; ok: number; linhas: LinhaDaMadrugada[]; comProblema: LinhaDaMadrugada[] };
+  madrugada: { totalDeRamos: number; ok: number; linhas: LinhaDaMadrugada[]; comProblema: LinhaDaMadrugada[]; rotinas: RotinasDoDia };
   erros: { hoje: number; recentes: ErroRecente[] };
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
@@ -47,7 +50,6 @@ export function horaNoBrasil(d: Date): number {
 
 /** A regra do "com problema", pura para provar sem banco. */
 export function ramoComProblema(linha: Omit<LinhaDaMadrugada, "comProblema">): boolean {
-  if (linha.busca.estado === "erro" || linha.transcricao.estado === "erro") return true;
   return linha.temas.atrasado;
 }
 
@@ -59,7 +61,7 @@ async function madrugada(agora: Date): Promise<InicioAdmin["madrugada"]> {
   const hoje = hojeISO(agora);
   const desde = inicioDoDia(hoje);
   const ramos = await db().select({ id: nichos.id, nome: nichos.nome, ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.ativo, true)).orderBy(nichos.nome);
-  if (ramos.length === 0) return { totalDeRamos: 0, ok: 0, linhas: [], comProblema: [] };
+  if (ramos.length === 0) return { totalDeRamos: 0, ok: 0, linhas: [], comProblema: [], rotinas: { busca: "sem_execucao", transcricao: "sem_execucao", erroDaBusca: null, erroDaTranscricao: null } };
   const ids = ramos.map((r) => r.id);
 
   const [coletaDoDia, transcreverDoDia, novos, transcritos, analisados, temas] = await Promise.all([
@@ -74,23 +76,27 @@ async function madrugada(agora: Date): Promise<InicioAdmin["madrugada"]> {
   const novosPor = por(novos);
   const transcritosPor = por(transcritos);
   const analisadosPor = por(analisados);
-  const estadoColeta = coletaDoDia.get(hoje)?.estado ?? "sem_execucao";
-  const estadoTranscrever = transcreverDoDia.get(hoje)?.estado ?? "sem_execucao";
+  const rotinas: RotinasDoDia = {
+    busca: coletaDoDia.get(hoje)?.estado ?? "sem_execucao",
+    transcricao: transcreverDoDia.get(hoje)?.estado ?? "sem_execucao",
+    erroDaBusca: coletaDoDia.get(hoje)?.erro ?? null,
+    erroDaTranscricao: transcreverDoDia.get(hoje)?.erro ?? null,
+  };
 
   const linhas = ramos.map((r) => {
     const tema = temas.find((t) => t.nichoId === r.id);
     const base = {
       nichoId: r.id,
       nome: ramoPorSlug(r.ramoCatalogo)?.nome ?? r.nome,
-      busca: { estado: estadoColeta, novos: novosPor.get(r.id) ?? 0 },
-      transcricao: { estado: estadoTranscrever, transcritos: transcritosPor.get(r.id) ?? 0 },
+      busca: { novos: novosPor.get(r.id) ?? 0 },
+      transcricao: { transcritos: transcritosPor.get(r.id) ?? 0 },
       analise: { analisados: analisadosPor.get(r.id) ?? 0 },
       temas: { quantos: tema?.temas.length ?? 0, tentou: Boolean(tema), atrasado: (tema?.temas.length ?? 0) === 0 && horaNoBrasil(agora) >= HORA_EM_QUE_O_TEMA_JA_DEVIA_EXISTIR },
     };
     return { ...base, comProblema: ramoComProblema(base) };
   });
   const comProblema = linhas.filter((l) => l.comProblema);
-  return { totalDeRamos: linhas.length, ok: linhas.length - comProblema.length, linhas, comProblema };
+  return { totalDeRamos: linhas.length, ok: linhas.length - comProblema.length, linhas, comProblema, rotinas };
 }
 
 async function erros(agora: Date): Promise<InicioAdmin["erros"]> {

@@ -150,7 +150,7 @@ describe("as trocas do admin deixam registro", () => {
     const [briefing] = await db().select().from(briefings).where(eq(briefings.clienteId, contaA));
     expect(briefing.completo).toBe(false);
     const registro = await alteracoesDaConta(contaA);
-    expect(registro[0]).toMatchObject({ campo: "tipo", antes: "Empresa", depois: "Pessoal" });
+    expect(registro[0]).toMatchObject({ campo: "tipo", antes: "Empresa (briefing e contexto da marca apagados)", depois: "Pessoal" });
 
     const total = registro.length;
     await trocarTipoDaConta(contaA, "pessoa", adminId);
@@ -224,6 +224,9 @@ describe("inicioDoAdmin", () => {
     expect(inicio.dinheiro.saiuHojeUsd).toBeCloseTo(2, 5);
     expect(inicio.dinheiro.saiu30dUsd).toBeCloseTo(2, 5);
     expect(inicio.erros.hoje).toBe(1);
+    // O erro da busca é de todos os ramos: aparece uma vez em rotinas e não marca ramo nenhum como problema.
+    expect(inicio.madrugada.rotinas.busca).toBe("erro");
+    expect(inicio.madrugada.comProblema.every((l) => l.temas.atrasado)).toBe(true);
     expect(inicio.erros.recentes[0]).toMatchObject({ nome: "coleta-youtube", continua: true });
   });
 

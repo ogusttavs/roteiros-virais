@@ -134,7 +134,7 @@ test.describe("admin de contas", () => {
     await page.goto(`/admin/clientes/${contaUm}`);
     await page.getByRole("button", { name: "Trocar tipo" }).click();
     await page.getByRole("radio", { name: "Pessoal" }).click();
-    await expect(page.locator('[data-aviso="tipo"]')).toContainText("as perguntas do briefing mudam");
+    await expect(page.locator('[data-aviso="tipo"]')).toContainText("o que a pessoa confirmou sobre a marca");
     // Cancelar não troca nada.
     await page.getByRole("button", { name: "Cancelar" }).first().click();
     expect((await db().select({ tipo: clientes.tipo }).from(clientes).where(eq(clientes.id, contaUm)))[0].tipo).toBe("negocio");

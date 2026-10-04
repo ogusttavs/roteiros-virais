@@ -51,7 +51,7 @@ export async function trocarTipoDaConta(clienteId: number, tipo: TipoMarca, porU
   const antes = await clientePorId(clienteId);
   if (!antes) throw new ErroCliente("conta nao encontrada.");
   await mudarTipoMarca(clienteId, tipo);
-  await anotar(clienteId, porUsuarioId, "tipo", NOME_DO_TIPO[antes.tipo], NOME_DO_TIPO[tipo]);
+  if (antes.tipo !== tipo) await anotar(clienteId, porUsuarioId, "tipo", `${NOME_DO_TIPO[antes.tipo]} (briefing e contexto da marca apagados)`, NOME_DO_TIPO[tipo]);
 }
 
 export async function trocarRedeDaConta(clienteId: number, rede: string, porUsuarioId: string): Promise<void> {

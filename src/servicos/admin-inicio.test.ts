@@ -7,8 +7,8 @@ function linha(parcial: Partial<Omit<LinhaDaMadrugada, "comProblema">> = {}): Om
   return {
     nichoId: 1,
     nome: "Dentistas",
-    busca: { estado: "ok", novos: 10 },
-    transcricao: { estado: "ok", transcritos: 5 },
+    busca: { novos: 10 },
+    transcricao: { transcritos: 5 },
     analise: { analisados: 3 },
     temas: { quantos: 3, tentou: true, atrasado: false },
     ...parcial,
@@ -20,9 +20,8 @@ describe("ramoComProblema", () => {
     expect(ramoComProblema(linha())).toBe(false);
   });
 
-  it("busca ou transcrição em erro é problema", () => {
-    expect(ramoComProblema(linha({ busca: { estado: "erro", novos: 0 } }))).toBe(true);
-    expect(ramoComProblema(linha({ transcricao: { estado: "erro", transcritos: 0 } }))).toBe(true);
+  it("o estado das rotinas globais não marca ramo nenhum: só o que é do ramo conta", () => {
+    expect(ramoComProblema(linha({ busca: { novos: 0 }, transcricao: { transcritos: 0 } }))).toBe(false);
   });
 
   it("sem tema só é problema depois da hora em que ele já devia existir", () => {
