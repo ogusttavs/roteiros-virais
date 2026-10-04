@@ -68,6 +68,18 @@
   outline-offset: 2px;
 }
 
+/* O dedo encostou: o trilho aperta com a escala de toque (passo 16), e volta na mola ao soltar. */
+.chave::before {
+  transition:
+    background-color var(--duracao-troca) var(--curva-padrao),
+    scale var(--duracao-soltar) var(--curva-mola);
+}
+
+.chave:active::before {
+  scale: var(--escala-toque);
+  transition-duration: var(--duracao-troca), var(--duracao-toque);
+}
+
 .chave:disabled {
   opacity: var(--opacidade-desabilitado);
   cursor: not-allowed;

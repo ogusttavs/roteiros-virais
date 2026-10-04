@@ -533,7 +533,8 @@ function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigir
     sql`, `,
   )}]::text[]`;
   const doTipo = sql`(${videos.formatoCatalogo} is null or ${videos.formatoCatalogo} = any(${lista}))`;
-  // O meme que a marca ligou de propósito vale por cima do corte da H4 (só para quem já respondeu, onde a chave existe de verdade).
+  // O meme que a marca ligou de propósito vale por cima do corte da H4 (só para quem já respondeu, onde a chave existe de verdade). RISCO conhecido (decisão 119): um
+  // repost que a extração rotule `humor_e_meme` em vez de `recorte_de_outro` passa a servir de modelo, só para a marca que ligou a chave.
   if (formatos.temResposta && formatos.ligados.includes("humor_e_meme")) {
     return sql`((${serve} and ${doTipo}) or ${videos.formatoCatalogo} = 'humor_e_meme')`;
   }

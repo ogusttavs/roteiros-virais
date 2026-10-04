@@ -3,7 +3,7 @@
  * cima e "voltar ao que o cliente escolheu"; o filtro por formato ligado nos três lugares onde a marca lê o banco (evidência do roteiro, prova do tema e as
  * Referências), com uma marca que desligou "humor e meme" e outra que ligou; e o vídeo ainda sem formato passando pela regra antiga (o corte da H4).
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CHAVES_DE_FORMATO, CHAVES_LIGADAS_POR_PADRAO } from "@/config/formatos";
@@ -279,5 +279,29 @@ describe("a extração grava o formato", () => {
     expect(video.formato).toBeNull();
     const lista = await evidenciaParaRoteiro(nichoId, "limpeza de estofado", 30, [], await filtroDeFormatosDaMarca(marcaSemMeme));
     expect(lista.map((v) => v.id)).toContain(id);
+  });
+});
+
+describe("o cliente por cima do admin, e o meme só com a chave ligada", () => {
+  it("o admin desliga, o cliente liga depois: vale a do cliente, a linha do admin some e o admin vê 'escolhido pelo cliente'", async () => {
+    const marca = await criarMarca("cliente-por-cima");
+    await definirFormato(marca, "opiniao_direta", false, "admin", "formatos-cliente-por-cima");
+    let estado = (await formatosDaMarcaComEstado(marca)).find((f) => f.chave === "opiniao_direta")!;
+    expect(estado).toMatchObject({ ligada: false, quem: "admin" });
+
+    await responderFormatosDoCliente(marca, { opiniao_direta: true }, "formatos-cliente-por-cima");
+
+    estado = (await formatosDaMarcaComEstado(marca)).find((f) => f.chave === "opiniao_direta")!;
+    expect(estado).toMatchObject({ ligada: true, quem: "cliente", respostaDoCliente: true });
+    expect(await db().select().from(formatosDaMarca).where(and(eq(formatosDaMarca.clienteId, marca), eq(formatosDaMarca.quem, "admin")))).toEqual([]);
+  });
+
+  it("vídeo humor_e_meme com serve_de_modelo=false entra só para a marca que ligou a chave", async () => {
+    const ligou = await evidenciaParaRoteiro(nichoId, "limpeza de estofado", 30, [], await filtroDeFormatosDaMarca(marcaComMeme));
+    const naoLigou = await evidenciaParaRoteiro(nichoId, "limpeza de estofado", 30, [], await filtroDeFormatosDaMarca(marcaSemMeme));
+    const semResposta = await evidenciaParaRoteiro(nichoId, "limpeza de estofado", 30, [], await filtroDeFormatosDaMarca(marcaSemResposta));
+    expect(ligou.map((v) => v.id)).toContain(ids.meme);
+    expect(naoLigou.map((v) => v.id)).not.toContain(ids.meme);
+    expect(semResposta.map((v) => v.id)).not.toContain(ids.meme);
   });
 });

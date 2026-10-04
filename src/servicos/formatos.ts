@@ -96,7 +96,10 @@ export async function voltarFormatoAoDoCliente(clienteId: number, chave: string)
   await db().delete(formatosDaMarca).where(and(eq(formatosDaMarca.clienteId, clienteId), eq(formatosDaMarca.chave, chave), eq(formatosDaMarca.quem, "admin")));
 }
 
-/** O cliente responde as treze de uma vez (o briefing): só as chaves que ele mandou, cada uma ligada ou desligada. */
+/**
+ * O cliente responde as chaves (o briefing, a Conta): só as que ele mandou, cada uma ligada ou desligada. Regra do desenho (dúvida 4 do passo 17): se o cliente troca
+ * DEPOIS do ajuste do admin, vale a do cliente; a linha do admin dessa chave é apagada na mesma transação e o admin passa a ver "Escolhido pelo cliente" com a data nova.
+ */
 export async function responderFormatosDoCliente(clienteId: number, respostas: Record<string, boolean>, usuarioId: string): Promise<void> {
   const chaves = Object.keys(respostas);
   if (chaves.length === 0) throw new ErroFormato("Nenhuma resposta.");
@@ -111,6 +114,7 @@ export async function responderFormatosDoCliente(clienteId: number, respostas: R
           target: [formatosDaMarca.clienteId, formatosDaMarca.chave, formatosDaMarca.quem],
           set: { ligada, decididoPorUsuarioId: usuarioId, decididoEm: new Date() },
         });
+      await tx.delete(formatosDaMarca).where(and(eq(formatosDaMarca.clienteId, clienteId), eq(formatosDaMarca.chave, chave), eq(formatosDaMarca.quem, "admin")));
     }
   });
 }
