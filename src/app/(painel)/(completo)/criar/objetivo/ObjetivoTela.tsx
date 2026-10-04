@@ -298,11 +298,12 @@ export function ObjetivoTela({
               />
             ))}
           </div>
-          {compacta && ficha && !exemplosFalharam ? (
+          {compacta && ficha ? (
             <>
               <button type="button" className={styles.verAsCinco} onClick={() => setCompacta(false)}>
                 {textosObjetivo.verAsCincoDeNovo}
               </button>
+              {exemplosFalharam ? null : (
               <section className={styles.exemplos} aria-labelledby="exemplos-titulo" data-exemplos={exemplos === null ? "carregando" : exemplos.length > 0 ? "com" : "sem"}>
                 <h3 id="exemplos-titulo">{textosObjetivo.exemplosTitulo}</h3>
                 {exemplos === null ? (
@@ -333,6 +334,7 @@ export function ObjetivoTela({
                   </div>
                 )}
               </section>
+              )}
             </>
           ) : null}
         </div>

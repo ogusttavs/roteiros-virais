@@ -115,4 +115,18 @@ test.describe("exemplos por ficha", () => {
     await expect(page).toHaveURL(/feitoPara=guardem/);
     await expect(page.locator("article")).toHaveCount(1);
   });
+
+  test("a falha esconde os exemplos mas dá para voltar às cinco fichas", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    const grupo = page.locator("[data-fichas]");
+    await expect(grupo.getByRole("radio")).toHaveCount(5);
+    // Toda Server Action (POST) falha a partir daqui.
+    await page.route("**/criar/objetivo*", (rota) => (rota.request().method() === "POST" ? rota.abort() : rota.continue()));
+    await grupo.getByRole("radio", { name: /Que guardem para depois/ }).click();
+    await expect(grupo.getByRole("radio")).toHaveCount(1);
+    await expect(page.locator("[data-exemplos]")).toHaveCount(0);
+    await page.getByRole("button", { name: "Ver as cinco de novo" }).click();
+    await expect(grupo.getByRole("radio")).toHaveCount(5);
+  });
 });

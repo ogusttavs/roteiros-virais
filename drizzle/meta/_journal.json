@@ -491,6 +491,13 @@
       "when": 1791119187567,
       "tag": "0069_ficha-do-video",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1791121520585,
+      "tag": "0070_tentativa-de-ficha",
+      "breakpoints": true
     }
   ]
 }

@@ -169,7 +169,21 @@ export async function resolverIdioma(
  * divergencia, de um texto forcado no idioma errado, que fazia a extracao concluir "pt-BR" para
  * um video em outro idioma e a conta virar `pais = 'BR'` para sempre (`pontuar.ts`).
  */
-export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
+export async function aplicarResultadoExtracao(
+  videoId: number,
+  dados: extrairVideo.SaidaExtrairVideo,
+  opcoes: { soFicha?: boolean } = {},
+): Promise<void> {
+  const agora = new Date();
+  if (opcoes.soFicha) {
+    // Reclassificação só da ficha (E49 PR 2): um vídeo que já tem tipo mantém tudo (tipo, tipo de conteúdo, serve de modelo, abertura e análise) e ganha só a ficha;
+    // um que ainda não tem tipo é gravado inteiro, como uma extração qualquer.
+    const [atual] = await db().select({ formatoCatalogo: videos.formatoCatalogo }).from(videos).where(eq(videos.id, videoId));
+    if (atual?.formatoCatalogo) {
+      await db().update(videos).set({ fichaCatalogo: dados.fichaCatalogo, fichaTentadaEm: agora }).where(eq(videos.id, videoId));
+      return;
+    }
+  }
   const { etiquetas, idioma, tipoAbertura, formatoCatalogo, fichaCatalogo, ...analise } = dados;
   const analiseVideo: AnaliseVideo = analise;
   // M4, item 1: este caminho sempre lê a transcrição, nunca é o caminho sem fala.
@@ -190,6 +204,8 @@ export async function aplicarResultadoExtracao(videoId: number, dados: extrairVi
       formatoCatalogo,
       // E49 PR 2: para que o vídeo parece feito, em coluna própria (os exemplos por ficha e o filtro das Referências são em SQL).
       fichaCatalogo,
+      formatoTentadoEm: agora,
+      fichaTentadaEm: agora,
       semFala: false,
     })
     .where(eq(videos.id, videoId));

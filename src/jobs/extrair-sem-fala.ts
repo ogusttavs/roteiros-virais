@@ -13,7 +13,7 @@
  * para julgar (o vídeo mantém o valor detectado na coleta por título e descrição) nem sinal
  * confiável de tipo de abertura só com quadros e legenda.
  */
-import { and, asc, desc, eq, gte, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { nichos, videos, type AnaliseVideo, type Plataforma } from "@/db/schema";
@@ -84,7 +84,30 @@ function condicoesElegivelSemFala(nichoId: number, pisoViews: number) {
   return condicoes;
 }
 
-async function candidatosDoNicho(nichoId: number, teto: number): Promise<CandidatoSemFala[]> {
+const TRINTA_DIAS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * E49 PR 2 (ajuste da revisão): os vídeos sem fala que foram analisados ANTES de a ficha existir (`analise` preenchida, `ficha_catalogo` nula), na mesma janela e
+ * no mesmo piso da evidência, e que a ficha não tentou nos últimos 30 dias. Só a ficha é lida de novo, pela mesma tarefa `extrairVideoSemFala`; o resto do vídeo não muda.
+ * Exportada para a reclassificação contar (e o teste conferir) sem rodar o job.
+ */
+export function condicoesSoFichaSemFala(nichoId: number, pisoViews: number) {
+  const condicoes = [
+    eq(videos.nichoId, nichoId),
+    gte(videos.views, pisoViews),
+    gte(videos.publicadoEm, new Date(Date.now() - NOVENTA_DIAS_MS)),
+    isNotNull(videos.analise),
+    eq(videos.semFala, true),
+    isNull(videos.fichaCatalogo),
+    or(isNull(videos.fichaTentadaEm), lt(videos.fichaTentadaEm, new Date(Date.now() - TRINTA_DIAS_MS))),
+    PERTENCE_AO_NICHO,
+    DENTRO_DO_TETO_DE_DURACAO,
+  ];
+  if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
+  return condicoes;
+}
+
+async function candidatosDoNicho(nichoId: number, teto: number, soFicha = false): Promise<CandidatoSemFala[]> {
   const regua = await reguaDoSetor(nichoId);
   if (!regua.videoSemFalaVale) return [];
 
@@ -100,7 +123,7 @@ async function candidatosDoNicho(nichoId: number, teto: number): Promise<Candida
       duracaoS: videos.duracaoS,
     })
     .from(videos)
-    .where(and(...condicoesElegivelSemFala(nichoId, regua.pisoViews)))
+    .where(and(...(soFicha ? condicoesSoFichaSemFala(nichoId, regua.pisoViews) : condicoesElegivelSemFala(nichoId, regua.pisoViews))))
     .orderBy(sql`${videos.foraDaCurva} desc nulls last`, desc(videos.views), asc(videos.id))
     .limit(teto);
 }
@@ -113,7 +136,7 @@ function urlParaBaixar(video: CandidatoSemFala): string {
   return video.url;
 }
 
-async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNicho: string[]): Promise<void> {
+async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNicho: string[], soFicha = false): Promise<void> {
   let caminhoVideo: string | null = null;
   try {
     caminhoVideo = await baixarVideo480p(urlParaBaixar(video), video.plataforma);
@@ -143,23 +166,31 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
 
     const { etiquetas, formatoCatalogo, fichaCatalogo, ...analise } = resultado.dados;
     if (formatoCatalogo === null) logger.warn({ videoId: video.id }, "extrair-sem-fala: formato_catalogo ficou nulo (valor fora da lista ou ausente)");
+    if (soFicha) {
+      // Só a ficha (E49 PR 2): o vídeo já foi analisado; nada mais dele muda.
+      await db().update(videos).set({ fichaCatalogo, fichaTentadaEm: new Date() }).where(eq(videos.id, video.id));
+    }
     const analiseVideo: AnaliseVideo = analise;
     // M4, item 1: este é o caminho sem fala, por definição. Achado 5 da revisão do motor
     // (01/10/2026): tipoConteudo/serveDeModelo saem em colunas próprias também (mesmo caminho de
     // `aplicarResultadoExtracao`, que mantém os dois no jsonb `analise` e fora dele), para
     // `evidenciaParaRoteiro` filtrar por SQL.
-    await db()
-      .update(videos)
-      .set({
-        analise: analiseVideo,
-        etiquetas,
-        tipoConteudo: resultado.dados.tipoConteudo,
-        serveDeModelo: resultado.dados.serveDeModelo,
-        formatoCatalogo,
-        fichaCatalogo,
-        semFala: true,
-      })
-      .where(eq(videos.id, video.id));
+    if (!soFicha) {
+      await db()
+        .update(videos)
+        .set({
+          analise: analiseVideo,
+          etiquetas,
+          tipoConteudo: resultado.dados.tipoConteudo,
+          serveDeModelo: resultado.dados.serveDeModelo,
+          formatoCatalogo,
+          fichaCatalogo,
+          formatoTentadoEm: new Date(),
+          fichaTentadaEm: new Date(),
+          semFala: true,
+        })
+        .where(eq(videos.id, video.id));
+    }
 
     await registrarGeracao({
       tarefa: "extrairVideoSemFala",
@@ -180,7 +211,8 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
   }
 }
 
-export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<string, unknown>> {
+/** `soFicha` (E49 PR 2): a reclassificação dos sem fala antigos, só a ficha; o cron diário nunca liga. */
+export async function rodarExtrairSemFala(nichoId?: number, soFicha = false): Promise<Record<string, unknown>> {
   const condicoesNicho = [eq(nichos.ativo, true)];
   if (nichoId !== undefined) condicoesNicho.push(eq(nichos.id, nichoId));
   const nichosAtivos = await db()
@@ -194,13 +226,13 @@ export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<stri
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
-    const candidatos = await candidatosDoNicho(nicho.id, config.regras.analiseSemFalaPorDia);
+    const candidatos = await candidatosDoNicho(nicho.id, config.regras.analiseSemFalaPorDia, soFicha);
     if (candidatos.length === 0) continue;
     setoresComVideoSemFala += 1;
 
     for (const video of candidatos) {
       try {
-        await analisarUm(video, nicho.nome, nicho.termos);
+        await analisarUm(video, nicho.nome, nicho.termos, soFicha);
         analisados += 1;
       } catch (erro) {
         falhas += 1;
@@ -209,7 +241,7 @@ export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<stri
         // teto diário com o mesmo vídeo (um link morto, por exemplo) em toda rodada.
         await db()
           .update(videos)
-          .set({ proximaTentativaSemFala: new Date(Date.now() + SETE_DIAS_MS) })
+          .set(soFicha ? { fichaTentadaEm: new Date() } : { proximaTentativaSemFala: new Date(Date.now() + SETE_DIAS_MS) })
           .where(eq(videos.id, video.id));
       }
 
@@ -224,7 +256,7 @@ export async function rodarExtrairSemFala(nichoId?: number): Promise<Record<stri
    * (`idsEmLotePendente`/`isNull(videos.analise)`), e a fila nunca derruba este job por falha de
    * enfileirar o próximo.
    */
-  if (nichoId === undefined) {
+  if (nichoId === undefined && !soFicha) {
     try {
       await garantirBossPronto();
       await boss().send(FILAS.extrair, {});

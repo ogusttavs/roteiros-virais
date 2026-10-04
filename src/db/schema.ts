@@ -1185,8 +1185,14 @@ export const videos = pgTable(
      * passa como antes (o corte da H4). O `analise.formato` de cinco valores e o `tipo_conteudo` continuam gravados até o PR 2.
      */
     formatoCatalogo: text("formato_catalogo"),
-  /** E49 PR 2: "para que o vídeo parece feito" (as cinco fichas, `config/fichas.ts`), lido pela extração; nulo até ser classificado (valor fora da lista também vira nulo). */
-  fichaCatalogo: text("ficha_catalogo").$type<Ficha>(),
+    /** E49 PR 2: "para que o vídeo parece feito" (as cinco fichas, `config/fichas.ts`), lido pela extração; nulo até ser classificado (valor fora da lista também vira nulo). */
+    fichaCatalogo: text("ficha_catalogo").$type<Ficha>(),
+    /**
+     * E49 PR 2 (ajuste da revisão): quando a extração tentou ler o tipo e a ficha pela última vez. Um vídeo cujo valor o modelo devolveu nulo não volta a ser
+     * candidato da reclassificação por 30 dias (sem isso pagaria a extração em toda rodada); nulo é "nunca tentado".
+     */
+    formatoTentadoEm: timestamp("formato_tentado_em", { withTimezone: true }),
+    fichaTentadaEm: timestamp("ficha_tentada_em", { withTimezone: true }),
     /**
      * A miniatura do vídeo (V9d, item 0b, migração 0033): o cartão de
      * Referências não tinha prévia nenhuma (lacuna do PR #52), e o Gustavo
@@ -1761,6 +1767,8 @@ export const lotesIa = pgTable("lotes_ia", {
    * banco nao depender da camada de IA, so o codigo que le/escreve tipa certo. */
   tarefa: text("tarefa").notNull(),
   loteIdExterno: text("lote_id_externo").notNull().unique(),
+  /** E49 PR 2: lote da reclassificação que só quer a ficha; quem já tem tipo o mantém (`aplicarResultadoExtracao`). */
+  soFicha: boolean("so_ficha").notNull().default(false),
   videoIds: jsonb("video_ids").$type<number[]>().notNull().default([]),
   status: text("status")
     .$type<"em_andamento" | "concluido" | "erro">()

@@ -69,7 +69,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
         erros.push(`video ${videoId}: analise reprovada na checagem de idioma depois de refazer`);
       }
 
-      await aplicarResultadoExtracao(videoId, dados);
+      await aplicarResultadoExtracao(videoId, dados, { soFicha: lote.soFicha });
       videosAtualizados += 1;
       if (dados.formatoCatalogo === null) semFormato += 1;
       if (dados.fichaCatalogo === null) semFicha += 1;
