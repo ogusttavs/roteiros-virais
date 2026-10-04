@@ -14,7 +14,7 @@ vi.mock("./registro", () => ({
 import type { CartaoStory } from "@/db/schema";
 
 import { ErroIA } from "./erro";
-import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, verificarLocalmente } from "./verificador";
+import { gerarComVerificacao, MARCADOR_SEGUNDA_TENTATIVA, palavrasDeConteudo, temAlgoParaGuardar, verificarLocalmente } from "./verificador";
 
 const usoZero = { tokensEntrada: 0, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
 
@@ -918,5 +918,33 @@ describe("gerarComVerificacao", () => {
       // as tres chamadas de sempre: a primeira tentativa, a segunda, e o verificarTexto da segunda.
       expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
     });
+  });
+});
+
+describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
+  const narrativa = (corpo: string) => ({ gancho: "Olha isso", corpo, chamadaFinal: "guarda esse vídeo" });
+  const base = { formato: "reels" as const, estilo: "falado" as const, ficha: "guardem" as const };
+
+  it("reprova um corpo sem passo a passo, lista nem algo para copiar", () => {
+    const r = verificarLocalmente({}, { ...base, narrativa: narrativa("Eu acho que isso é muito importante para todo mundo que trabalha com isso no dia a dia.") });
+    expect(r.aprovado).toBe(false);
+    expect(r.motivos.join(" ")).toContain("que guardem para depois");
+  });
+
+  it("aprova passo numerado, lista com contagem, receita e passo a passo escrito", () => {
+    for (const corpo of ["1. separa o material 2. aplica 3. espera", "Três erros que quase todo mundo comete", "Anota a receita aqui", "Primeiro faz a base, depois a cobertura, por fim o acabamento"]) {
+      expect(verificarLocalmente({}, { ...base, narrativa: narrativa(corpo) }).aprovado).toBe(true);
+    }
+  });
+
+  it("só vale para a ficha 'guardem': as outras e o roteiro sem ficha não mudam", () => {
+    const corpo = "Uma opinião sincera sobre o assunto, sem lista nenhuma.";
+    expect(verificarLocalmente({}, { ...base, ficha: "comentem", narrativa: narrativa(corpo) }).aprovado).toBe(true);
+    expect(verificarLocalmente({}, { formato: "reels", estilo: "falado", narrativa: narrativa(corpo) }).aprovado).toBe(true);
+  });
+
+  it("temAlgoParaGuardar lê o texto sem acento", () => {
+    expect(temAlgoParaGuardar("Cinco dicas rápidas")).toBe(true);
+    expect(temAlgoParaGuardar("Eu gosto muito disso")).toBe(false);
   });
 });

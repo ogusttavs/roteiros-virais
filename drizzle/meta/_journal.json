@@ -477,6 +477,13 @@
       "when": 1791113093597,
       "tag": "0067_autor-dos-fixos",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1791113345046,
+      "tag": "0068_ficha-do-roteiro",
+      "breakpoints": true
     }
   ]
 }

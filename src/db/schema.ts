@@ -1386,6 +1386,9 @@ export const rascunhosTemaLivre = pgTable(
 
 export type Objetivo = "alcance" | "engajamento" | "conversao";
 
+/** E49 PR 1: as cinco fichas do "O que você quer que esse vídeo faça?" (só Reels); cada uma conta em um dos três objetivos (`config/fichas.ts`). */
+export type Ficha = "veja" | "guardem" | "mandem" | "comentem" | "me_chamem";
+
 /**
  * Força da evidência que sustenta o roteiro (V4, escopo 5.12, item 8):
  * calculada por código (`src/config/forca-evidencia.ts`), nunca pela IA.
@@ -1524,6 +1527,8 @@ export const roteiros = pgTable(
      */
     momento: jsonb("momento").$type<Momento>(),
     objetivo: text("objetivo").$type<Objetivo>().notNull(),
+    /** E49 PR 1: a ficha escolhida (só Reels). Nula no Story e em todo roteiro de antes das fichas, que valem pela ficha padrão do objetivo. */
+    ficha: text("ficha").$type<Ficha>(),
     /** V9c, item 1: "reels" (padrão) ou "story"; reescrever mantém o formato da versão anterior. */
     formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
     /** M4, item 2: "falado" (padrão) ou "sem_fala", ortogonal ao formato; reescrever mantém o estilo da versão anterior. */

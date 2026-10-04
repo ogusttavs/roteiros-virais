@@ -10,6 +10,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
+import { objetivoDaFicha } from "@/config/fichas";
 import { formatoPorChave } from "@/config/formatos";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
@@ -29,6 +30,7 @@ import {
   type FormatoRoteiro,
   type Momento,
   type MomentoDoDia,
+  type Ficha,
   type Objetivo,
   type Plataforma,
   type QuemGrava,
@@ -314,6 +316,11 @@ export type OrigemRoteiro =
 /** V9c, item 1: "reels" (padrão) se ausente, para quem chama de antes da etapa continuar valendo. */
 export type ParametrosGerarRoteiro = OrigemRoteiro & {
   objetivo: Objetivo;
+  /**
+   * E49 PR 1: a ficha do "O que você quer que esse vídeo faça?", só Reels. Quando vem, ela decide o `objetivo` que se grava (`objetivoDaFicha`) e a estrutura do roteiro; no
+   * Story é ignorada (o Story não pergunta). Ausente: o objetivo de sempre, sem ficha.
+   */
+  ficha?: Ficha | null;
   observacao?: string;
   formato?: FormatoRoteiro;
   /** M4, item 2: "falado" (padrão) se ausente. */
@@ -779,6 +786,8 @@ type MontarERoteiroDados = {
   cliente: Cliente;
   tema: string;
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha, só no Reels; dirige a estrutura do pedido e o verificador. */
+  ficha?: Ficha | null;
   /** V9c, item 1: "reels" ou "story"; troca o bloco de estrutura do prompt e o verificador por regra. */
   formato: FormatoRoteiro;
   /** M4, item 2: "falado" ou "sem_fala", ortogonal ao formato; troca o bloco de estrutura e o verificador. */
@@ -978,6 +987,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     entrada: roteiroIA.montarEntrada({
       tema: dados.tema,
       objetivo: dados.objetivo,
+      ficha: dados.ficha ?? undefined,
       objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
       formato: dados.formato,
       estilo: dados.estilo,
@@ -1056,6 +1066,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     generoTexto: "roteiro",
     formato: dados.formato,
     estilo: dados.estilo,
+    ficha: dados.ficha ?? undefined,
     extrairCartoes: (d) => d.cartoes,
     extrairLegenda: (d) => d.legenda,
     extrairPorQueAssim: (d) => porQueAssimValido(d.porQueAssim),
@@ -1142,6 +1153,9 @@ export async function gerarRoteiro(
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
   const estilo = params.estilo ?? "falado";
+  // E49 PR 1: só o Reels tem ficha; ela decide o objetivo que se grava.
+  const ficha = formato === "reels" && params.ficha ? params.ficha : null;
+  const objetivo = ficha ? objetivoDaFicha(ficha) : params.objetivo;
   // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
   const noticiaLinha =
     params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;
@@ -1153,7 +1167,8 @@ export async function gerarRoteiro(
     clienteId,
     cliente,
     tema,
-    objetivo: params.objetivo,
+    objetivo,
+    ficha,
     formato,
     estilo,
     objetivoDoVideo: params.objetivoDoVideo,
@@ -1174,7 +1189,8 @@ export async function gerarRoteiro(
       tema: momento ? (temaCurto ?? tema) : tema,
       origem: params.origem,
       momento: momento ?? null,
-      objetivo: params.objetivo,
+      objetivo,
+      ficha,
       formato,
       estilo,
       // E40, item 2: da origem momento, o mesmo campo que já está dentro de `momento`.
@@ -1241,6 +1257,8 @@ export async function reprovarERescrever(
     cliente,
     tema: atual.tema,
     objetivo: atual.objetivo,
+    // E49 PR 1: a reescrita mantém a ficha da versão anterior.
+    ficha: atual.ficha,
     // V9c, item 1: a reescrita mantem o formato da versao anterior, nunca troca sozinha.
     formato: atual.formato,
     // M4, item 2: idem para o estilo ("mantém o estilo do roteiro de origem").
@@ -1272,6 +1290,7 @@ export async function reprovarERescrever(
       origem: atual.origem,
       momento: momento ?? null,
       objetivo: atual.objetivo,
+      ficha: atual.ficha,
       formato: atual.formato,
       estilo: atual.estilo,
       objetivoDoVideo: atual.objetivoDoVideo,
