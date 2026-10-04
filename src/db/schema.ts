@@ -743,6 +743,10 @@ export const custosFixos = pgTable("custos_fixos", {
   cobra: text("cobra"),
   ativo: boolean("ativo").notNull().default(true),
   tiradoEm: timestamp("tirado_em", { withTimezone: true }),
+  /** E49 PR 1, item 0: quem cadastrou, quem editou por último e quem tirou. */
+  criadoPorUsuarioId: text("criado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+  atualizadoPorUsuarioId: text("atualizado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+  tiradoPorUsuarioId: text("tirado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
   criadoEm: criadoEm(),
 });
 export type CustoFixo = typeof custosFixos.$inferSelect;

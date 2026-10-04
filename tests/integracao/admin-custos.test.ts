@@ -84,7 +84,7 @@ describe("os fixos", () => {
     expect(fixoPorMesEmReais({ valor: "60.00", moeda: "usd", periodo: "mensal" })).toBeCloseTo(60 * CAMBIO_USD_BRL, 5);
     expect(fixoPorMesEmReais({ valor: "1200.00", moeda: "brl", periodo: "anual" })).toBeCloseTo(100, 5);
 
-    await adicionarFixo({ nome: "Servidor", valor: 109, moeda: "brl", periodo: "mensal", cobra: "todo dia 5" });
+    await adicionarFixo({ nome: "Servidor", valor: 109, moeda: "brl", periodo: "mensal", cobra: "todo dia 5" }, "cu-admin");
     const proxy = await adicionarFixo({ nome: "Proxy do YouTube", valor: 5, moeda: "usd", periodo: "mensal" });
     const fixo = await fixoMensalEmReais();
     expect(fixo.cadastrados).toBe(2);
@@ -107,10 +107,12 @@ describe("os fixos", () => {
 
   it("tirar não apaga: a linha continua, inativa e com a data, e sai da soma", async () => {
     const [alvo] = await db().select().from(custosFixos).where(eq(custosFixos.nome, "Servidor"));
-    await tirarFixo(alvo.id);
+    await tirarFixo(alvo.id, "cu-admin");
     const [depois] = await db().select().from(custosFixos).where(eq(custosFixos.id, alvo.id));
     expect(depois.ativo).toBe(false);
     expect(depois.tiradoEm).not.toBeNull();
+    expect(depois.criadoPorUsuarioId).toBe("cu-admin");
+    expect(depois.tiradoPorUsuarioId).toBe("cu-admin");
     expect((await fixoMensalEmReais()).cadastrados).toBe(1);
     await expect(tirarFixo(alvo.id)).rejects.toBeInstanceOf(ErroCusto);
     await expect(editarFixo(alvo.id, { nome: "Servidor", valor: 1, moeda: "brl", periodo: "mensal" })).rejects.toBeInstanceOf(ErroCusto);

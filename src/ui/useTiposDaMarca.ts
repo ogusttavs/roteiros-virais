@@ -25,16 +25,20 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
     if (emVoo.current === 0) setEstado(Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, iniciais.find((i) => i.chave === f.chave)?.ligada ?? f.ligadaPorPadrao])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveDasIniciais]);
-  // Duas trocas em seguida na mesma chave não se atropelam: a última a voltar do servidor é a que vale.
+  // Duas trocas em seguida na mesma chave não se atropelam: o número do pedido diz qual é o mais novo, e só o último em voo decide o que a tela mostra no fim.
   const ultimaDaChave = useRef<Record<string, number>>({});
+  const confirmadoNumero = useRef<Record<string, number>>({});
+  const emVooDaChave = useRef<Record<string, number>>({});
 
   async function trocar(chave: string, ligada: boolean) {
     setErro(null);
-    // O que a chave era antes DESTE clique: se falhar, volta para isso (e não para o contrário do pedido, que erra quando dois cliques seguidos se cruzam).
-    const antes = chave in confirmado.current ? confirmado.current[chave] : estado[chave];
-    if (!(chave in confirmado.current)) confirmado.current[chave] = antes;
+    if (!(chave in confirmado.current)) {
+      confirmado.current[chave] = estado[chave];
+      confirmadoNumero.current[chave] = 0;
+    }
     setEstado((atual) => ({ ...atual, [chave]: ligada }));
     emVoo.current += 1;
+    emVooDaChave.current[chave] = (emVooDaChave.current[chave] ?? 0) + 1;
     const numero = (ultimaDaChave.current[chave] ?? 0) + 1;
     ultimaDaChave.current[chave] = numero;
     let gravou = false;
@@ -44,11 +48,14 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
       gravou = false;
     }
     emVoo.current -= 1;
-    if (gravou) confirmado.current[chave] = ligada;
-    if (!gravou && ultimaDaChave.current[chave] === numero) {
-      setEstado((atual) => ({ ...atual, [chave]: antes }));
-      setErro(textosTipos.erro);
+    emVooDaChave.current[chave] -= 1;
+    if (gravou && numero > confirmadoNumero.current[chave]) {
+      confirmado.current[chave] = ligada;
+      confirmadoNumero.current[chave] = numero;
     }
+    if (!gravou) setErro(textosTipos.erro);
+    // Nada mais a caminho nesta chave: a tela mostra o que o servidor confirmou por último (o de maior número que gravou), e não o que o clique mais novo pediu.
+    if (emVooDaChave.current[chave] === 0) setEstado((atual) => ({ ...atual, [chave]: confirmado.current[chave] }));
   }
 
   const ligados = FORMATOS_DO_CATALOGO.filter((f) => estado[f.chave]).length;

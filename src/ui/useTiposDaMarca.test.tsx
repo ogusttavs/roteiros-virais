@@ -44,7 +44,7 @@ describe("useTiposDaMarca", () => {
     expect(result.current.estado.bastidor).toBe(!antesBastidor);
   });
 
-  it("dois cliques seguidos na mesma chave: se o último falha, volta ao que o servidor tinha confirmado, não ao valor do primeiro clique", async () => {
+  it("dois cliques seguidos na mesma chave: o primeiro grava, o último falha antes dele voltar; no fim a tela mostra o que o servidor guardou (o do primeiro)", async () => {
     let soltaPrimeira: (v: boolean) => void = () => {};
     responder.mockImplementationOnce(() => new Promise<boolean>((r) => (soltaPrimeira = r)));
     responder.mockResolvedValueOnce(false);
@@ -60,7 +60,7 @@ describe("useTiposDaMarca", () => {
       soltaPrimeira(true);
       await primeira;
     });
-    expect(result.current.estado.lista).toBe(true);
+    expect(result.current.estado.lista).toBe(false);
   });
 
   it("quando o servidor manda outra lista (a página recarregou), ela vale de novo", () => {

@@ -83,17 +83,17 @@ function validarFixo(d: DadosDoFixo): DadosDoFixo {
   return { nome, valor: d.valor, moeda: d.moeda, periodo: d.periodo, cobra: d.cobra?.trim().slice(0, 120) || undefined };
 }
 
-export async function adicionarFixo(dados: DadosDoFixo): Promise<CustoFixo> {
+export async function adicionarFixo(dados: DadosDoFixo, porUsuarioId: string | null = null): Promise<CustoFixo> {
   const d = validarFixo(dados);
-  const [novo] = await db().insert(custosFixos).values({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null }).returning();
+  const [novo] = await db().insert(custosFixos).values({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null, criadoPorUsuarioId: porUsuarioId, atualizadoPorUsuarioId: porUsuarioId }).returning();
   return novo;
 }
 
-export async function editarFixo(id: number, dados: DadosDoFixo): Promise<CustoFixo> {
+export async function editarFixo(id: number, dados: DadosDoFixo, porUsuarioId: string | null = null): Promise<CustoFixo> {
   const d = validarFixo(dados);
   const [linha] = await db()
     .update(custosFixos)
-    .set({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null })
+    .set({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null, atualizadoPorUsuarioId: porUsuarioId })
     .where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true)))
     .returning();
   if (!linha) throw new ErroCusto("esse custo não existe mais.");
@@ -101,8 +101,8 @@ export async function editarFixo(id: number, dados: DadosDoFixo): Promise<CustoF
 }
 
 /** Tirar não apaga: o custo sai dos fixos de agora e continua na linha, com a data. */
-export async function tirarFixo(id: number): Promise<void> {
-  const tirados = await db().update(custosFixos).set({ ativo: false, tiradoEm: new Date() }).where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true))).returning({ id: custosFixos.id });
+export async function tirarFixo(id: number, porUsuarioId: string | null = null): Promise<void> {
+  const tirados = await db().update(custosFixos).set({ ativo: false, tiradoEm: new Date(), tiradoPorUsuarioId: porUsuarioId }).where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true))).returning({ id: custosFixos.id });
   if (tirados.length === 0) throw new ErroCusto("esse custo não existe mais.");
 }
 

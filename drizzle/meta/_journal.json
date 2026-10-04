@@ -470,6 +470,13 @@
       "when": 1791111411931,
       "tag": "0066_disparos-do-admin",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1791113093597,
+      "tag": "0067_autor-dos-fixos",
+      "breakpoints": true
     }
   ]
 }
