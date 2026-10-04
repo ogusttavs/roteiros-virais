@@ -136,9 +136,11 @@ describe("formatoCatalogo", () => {
     for (const chave of FORMATOS_DO_VIDEO) expect(sistema, chave).toContain(`"${chave}":`);
   });
 
-  it("um valor da lista passa; um valor fora da lista vira 'outro' em vez de perder a ficha inteira (mesmo conserto do M5b)", () => {
+  it("um valor da lista passa; fora da lista ou ausente vira NULO e a ficha continua aprovada; 'outro' escolhido de propósito continua 'outro'", () => {
     expect(schema.parse({ ...FICHA, formatoCatalogo: "antes_e_depois" })).toMatchObject({ formatoCatalogo: "antes_e_depois" });
-    expect(schema.parse({ ...FICHA, formatoCatalogo: "tutorial" })).toMatchObject({ formatoCatalogo: "outro" });
-    expect(schema.parse(FICHA)).toMatchObject({ formatoCatalogo: "outro" });
+    expect(schema.parse({ ...FICHA, formatoCatalogo: "tutorial" })).toMatchObject({ formatoCatalogo: null, assunto: "a" });
+    expect(schema.parse(FICHA)).toMatchObject({ formatoCatalogo: null, assunto: "a" });
+    expect(schema.parse({ ...FICHA, formatoCatalogo: null })).toMatchObject({ formatoCatalogo: null });
+    expect(schema.parse({ ...FICHA, formatoCatalogo: "outro" })).toMatchObject({ formatoCatalogo: "outro" });
   });
 });

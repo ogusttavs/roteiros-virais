@@ -80,8 +80,8 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * confiando no que o modelo escreveu para esse campo junto de uma classificação inventada.
  *
  * Formato do vídeo (1.11.0, E44 PR 1, `pesquisa/estudo-formatos.md`): `formatoCatalogo` classifica o vídeo numa lista fechada (as treze chaves do cliente mais
- * os valores que nunca servem de modelo, `config/formatos.ts`), gravado em `videos.formato_catalogo` por `extracao-comum.ts`. Valor fora da lista vira "outro" (mesmo
- * conserto do M5b: reprovar a ficha inteira por um campo perderia o vídeo); o `formato` antigo de cinco valores e o `tipoConteudo` continuam até o PR 2.
+ * os valores que nunca servem de modelo, `config/formatos.ts`), gravado em `videos.formato_catalogo` por `extracao-comum.ts`. Valor fora da lista ou ausente vira nulo (a ficha
+ * continua aprovada, como no M5b; "outro" fica só para quando o modelo o escolhe); o `formato` antigo de cinco valores e o `tipoConteudo` continuam até o PR 2.
  */
 export const versao = "1.11.0";
 export const nivel: NivelIA = "barato";
@@ -110,7 +110,9 @@ const schemaBruto = z.object({
   tipoAbertura: z.enum(TIPOS_ABERTURA).catch("outro"),
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
-  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).catch("outro"),
+  // Valor fora da lista ou ausente vira NULO (a ficha continua aprovada): "outro" é um valor legítimo quando o modelo o escolhe, e gravá-lo no lugar de um erro tiraria o vídeo
+  // da evidência de toda marca sem que nada o reclassificasse. Nulo passa pelo corte da H4 e a reclassificação o pega de volta.
+  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).nullable().catch(null),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);

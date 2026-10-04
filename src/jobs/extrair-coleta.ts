@@ -28,6 +28,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
 
   let lotesConcluidos = 0;
   let videosAtualizados = 0;
+  let semFormato = 0;
   let videosComErro = 0;
   let reprovadosPorIdioma = 0;
   const erros: string[] = [];
@@ -69,6 +70,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
 
       await aplicarResultadoExtracao(videoId, dados);
       videosAtualizados += 1;
+      if (dados.formatoCatalogo === null) semFormato += 1;
       const nichoId = nichoPorVideoId.get(videoId);
       if (nichoId !== null && nichoId !== undefined) nichosAfetados.add(nichoId);
 
@@ -95,6 +97,9 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
       .where(eq(lotesIa.id, lote.id));
     lotesConcluidos += 1;
   }
+
+  // E44 PR 1: o modelo devolveu um tipo fora da lista (ou nenhum): `formato_catalogo` ficou nulo, e o vídeo segue a regra antiga até a reclassificação.
+  if (semFormato > 0) logger.warn({ semFormato, deVideos: videosAtualizados }, "extrair-coleta: videos cujo formato_catalogo ficou nulo (valor fora da lista ou ausente)");
 
   /**
    * M1, item 2: o tema nasce quando a análise chega, não só às 06:30. `temasDoDia` com

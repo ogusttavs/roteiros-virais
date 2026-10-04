@@ -38,7 +38,7 @@ export type ResultadoAvaliarExtrair = {
   ehExemplo: boolean;
   casos: number;
   acertos: number;
-  /** Quantos vieram com "outro" (a ficha perdeu o formato). */
+  /** Quantos vieram com "outro" ou nulos (a ficha ficou sem o formato). */
   comoOutro: number;
   /** Os casos que erraram: o título, o esperado e o devolvido, para leitura humana. */
   erros: { titulo: string; esperado: string; devolvido: string }[];
@@ -73,8 +73,8 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
       }),
     });
     custoTotalUsd += calcularCustoUsd(extrairVideoIA.nivel, resultado);
-    const devolvido = resultado.dados.formatoCatalogo;
-    if (devolvido === "outro") comoOutro += 1;
+    const devolvido = resultado.dados.formatoCatalogo ?? "(nulo)";
+    if (devolvido === "outro" || devolvido === "(nulo)") comoOutro += 1;
     const bateu = devolvido === caso.formatoEsperado;
     if (bateu) acertos += 1;
     else erros.push({ titulo: caso.titulo, esperado: caso.formatoEsperado, devolvido });

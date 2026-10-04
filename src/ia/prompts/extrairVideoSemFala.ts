@@ -65,7 +65,9 @@ const schemaBruto = z.object({
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
   /** E44 PR 1: o formato pela lista fechada (`config/formatos.ts`); aqui os dois "sem fala" são os mais prováveis. */
-  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).catch("outro"),
+  // Valor fora da lista ou ausente vira NULO (a ficha continua aprovada): "outro" é um valor legítimo quando o modelo o escolhe, e gravá-lo no lugar de um erro tiraria o vídeo
+  // da evidência de toda marca sem que nada o reclassificasse. Nulo passa pelo corte da H4 e a reclassificação o pega de volta.
+  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).nullable().catch(null),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);

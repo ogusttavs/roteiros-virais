@@ -254,4 +254,29 @@ describe("a extração grava o formato", () => {
     expect(video.formato).toBe("antes_e_depois");
     expect(video.analise).not.toHaveProperty("formatoCatalogo");
   });
+
+  it("uma ficha sem tipo (o modelo errou ou omitiu) grava NULO, e o vídeo segue a regra antiga em vez de sumir da evidência", async () => {
+    const id = await criarVideo("extraidoNulo", { formato: null });
+    await aplicarResultadoExtracao(id, {
+      assunto: "limpeza de estofado extraidoNulo",
+      gancho: "g",
+      estrutura: "e",
+      fechamento: "f",
+      chamadaFinal: "c",
+      formato: "fala_para_camera",
+      porQueFuncionou: "p",
+      etiquetas: ["x"],
+      pertenceAoNicho: true,
+      motivoNicho: "m",
+      idioma: "pt-BR",
+      tipoAbertura: "outro",
+      tipoConteudo: "original",
+      serveDeModelo: true,
+      formatoCatalogo: null,
+    });
+    const [video] = await db().select({ formato: videos.formatoCatalogo }).from(videos).where(eq(videos.id, id));
+    expect(video.formato).toBeNull();
+    const lista = await evidenciaParaRoteiro(nichoId, "limpeza de estofado", 30, [], await filtroDeFormatosDaMarca(marcaSemMeme));
+    expect(lista.map((v) => v.id)).toContain(id);
+  });
 });
