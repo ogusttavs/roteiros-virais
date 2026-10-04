@@ -42,7 +42,7 @@ type Props = {
  * derruba o aplicativo para a pagina de erro do navegador.
  */
 export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }: Props) {
-  // Passo 17b (o cabeçalho de vidro): o cabeçalho não some mais ao rolar para baixo; rolada a tela ele vira vidro (`useBarraRolada`) e o conteúdo passa desfocado por trás.
+  // Passo 17b (o cabeçalho de vidro): o cabeçalho não some mais ao rolar para baixo; rolada a tela ele vira vidro (`useBarraRolada`) e o que está por trás passa desfocado.
   const rolada = useBarraRolada();
   const tituloDaTela = TITULO_CURTO[usePathname()];
   const router = useRouter();
