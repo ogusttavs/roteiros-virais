@@ -59,6 +59,8 @@ export type ResultadoAvaliarBriefing = {
   reprovadosNoVerificador: number;
   /** Soma do custo de todas as chamadas (avaliarResposta e verificarTexto), em dolares. */
   custoTotalUsd: number;
+  /** Casos que o lote devolveu com falha (ou cujo verificador falhou): pulados com o motivo, e os outros seguem. */
+  casosFalhos: number;
 };
 
 const META_DIFERENCA = 1.0;
@@ -78,6 +80,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
   let somaDiferencas = 0;
   let casosAvaliados = 0;
   let reprovadosNoVerificador = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
   // O golden set pelo lote (`golden-lote.ts`): a nota de todas as respostas num lote, o verificador (checagem local aqui, e o `verificarTexto` num segundo lote só para as que a
@@ -144,6 +147,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     const saida = verificadorDoCaso.get(indice);
     if (resultado instanceof Error || saida instanceof Error) {
       const erro = resultado instanceof Error ? resultado : (saida as Error);
+      casosFalhos += 1;
       console.log(`${caso.perguntaId}: erro ao avaliar, pulando (${erro.message})`);
       continue;
     }
@@ -184,6 +188,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     console.log("acima da meta de 1,0 (plano de execucao, etapa 5).");
   }
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${casosAvaliados}`);
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
   return {
@@ -193,6 +198,7 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     diferencaMedia,
     acimaDaMeta,
     reprovadosNoVerificador,
+    casosFalhos,
     custoTotalUsd,
   };
 }

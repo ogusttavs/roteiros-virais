@@ -19,7 +19,7 @@ import { z } from "zod";
 
 import * as avaliarTemaIA from "../src/ia/prompts/avaliarTema";
 
-import { gerarVarios } from "./golden-lote";
+import { gerarVariosOuErro } from "./golden-lote";
 
 const PILARES = ["viralizar", "gerarCliente", "encaixe", "novidade", "facilidade"] as const;
 
@@ -60,6 +60,8 @@ export type ResultadoAvaliarTemas = {
   casos: number;
   diferencaMediaPorPilar: number;
   acimaDaMeta: boolean;
+  /** Casos que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
 };
 
 const META_DIFERENCA = 1.5;
@@ -74,9 +76,10 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
 
   let somaDiferencas = 0;
   let comparacoes = 0;
+  let casosFalhos = 0;
 
   // O golden set pelo lote (`golden-lote.ts`): todos os casos num lote só, e só então a leitura, caso a caso.
-  const resultados = await gerarVarios(
+  const resultados = await gerarVariosOuErro(
     conjunto.map((caso) => (
 {
       tarefa: "avaliarTema",
@@ -97,6 +100,11 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
 
   for (const [indice, caso] of conjunto.entries()) {
     const resultado = resultados[indice];
+    if (resultado instanceof Error) {
+      casosFalhos += 1;
+      console.log(`"${caso.tema}": [FALHOU: ${resultado.message}]\n`);
+      continue;
+    }
 
     console.log(`"${caso.tema}" (${caso.pontoPrincipal})`);
     if (caso.regrasCliente.length > 0) {
@@ -116,6 +124,7 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
     console.log();
   }
 
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   const diferencaMediaPorPilar = comparacoes > 0 ? somaDiferencas / comparacoes : 0;
   const acimaDaMeta = diferencaMediaPorPilar >= META_DIFERENCA;
   console.log(`diferenca media por pilar: ${diferencaMediaPorPilar.toFixed(2)}`);
@@ -123,7 +132,7 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
     console.log("acima da meta de 1,5 (PROXIMO.md, decisao 7 da etapa 10).");
   }
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diferencaMediaPorPilar, acimaDaMeta };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diferencaMediaPorPilar, acimaDaMeta, casosFalhos };
 }
 
 if (require.main === module) {

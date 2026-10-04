@@ -7,7 +7,7 @@ que a IA dá com a nota que o Gustavo daria (`estrategia/briefing-e-rubricas.md`
 
 Todos os scripts `avaliar:*` mandam os casos de cada etapa num lote só pela API de lote (`scripts/golden-lote.ts`, `src/ia/lote.ts`) e esperam o resultado: roteiros num
 lote, depois o verificador num segundo lote só dos casos que a checagem local aprovou. Mesmos prompts, mesmo schema, mesmo esforço; o custo impresso já é o do lote (metade do
-preço cheio). Um lote leva de minutos a algumas horas (a API promete até 24 h; o script consulta de 30 em 30 segundos). `GOLDEN_SEM_LOTE=1 npm run avaliar:roteiros` volta ao
+preço cheio, x0,5). Atenção: o lote não devolve os tokens de cache de prompt, então esse custo é calculado só por entrada e saída e pode ficar acima do que o console da Anthropic cobra de verdade; na dúvida, vale o console. Um caso que o lote devolve com erro é impresso com o motivo e contado ("casos que falharam no lote"), e os outros seguem; erro de rede na consulta do lote é tentado de novo algumas vezes antes de desistir. Um lote leva de minutos a algumas horas (a API promete até 24 h; o script consulta de 30 em 30 segundos). `GOLDEN_SEM_LOTE=1 npm run avaliar:roteiros` volta ao
 um por vez, pelo preço cheio, para depurar um caso. No mock tudo responde na hora, igual a antes.
 
 ## Por que o arquivo real não está aqui

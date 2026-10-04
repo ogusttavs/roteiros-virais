@@ -3,6 +3,9 @@
  * lote só pela API de lote (`src/ia/lote.ts`, o mesmo caminho de `extrair`, metade do preço) e esperam o resultado, em vez de chamar o modelo um caso por vez.
  * Mesmos prompts, mesmo schema, mesmo esforço: só muda o jeito de chamar. Em mock o lote responde na hora, igual à chamada de sempre.
  *
+ * **Custo:** o que o script imprime é calculado pelos tokens de entrada e saída que o lote devolve, pela metade do preço (`FATOR_LOTE`, x0,5). O lote NÃO devolve os tokens de cache de
+ * prompt (que o preço cheio da chamada um por vez conta com desconto), então o número impresso pode ficar acima do que o console da Anthropic cobra de verdade; na dúvida, vale o console.
+ *
  * `GOLDEN_SEM_LOTE=1` volta à chamada um por vez (para depurar um caso, ou quando a pessoa quer o resultado agora e aceita pagar o preço cheio).
  * Um lote pode levar até 24 h; em geral, minutos. O ajudante consulta de 30 em 30 segundos.
  */
@@ -23,6 +26,21 @@ export function goldenEmLote(): boolean {
 }
 
 const pausa = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
+const TENTATIVAS_DE_REDE = 5;
+
+/** Um erro de rede na consulta do lote (já pago) não derruba a rodada: tenta de novo algumas vezes, com pausa, e só então desiste dizendo o id do lote. */
+async function comTentativas<R>(loteId: string, o_que: string, fazer: () => Promise<R>): Promise<R> {
+  let ultimo: unknown;
+  for (let tentativa = 1; tentativa <= TENTATIVAS_DE_REDE; tentativa++) {
+    try {
+      return await fazer();
+    } catch (erro) {
+      ultimo = erro;
+      if (tentativa < TENTATIVAS_DE_REDE) await pausa(Math.min(INTERVALO_MS, tentativa * 2_000));
+    }
+  }
+  throw new Error(`${o_que} do lote ${loteId} falhou ${TENTATIVAS_DE_REDE} vezes (o lote continua valendo no console): ${ultimo instanceof Error ? ultimo.message : String(ultimo)}`);
+}
 
 /**
  * Manda todos os pedidos (da mesma tarefa e do mesmo schema) num lote e devolve os resultados na MESMA ordem. Um caso que o lote devolve com erro derruba a rodada
@@ -68,12 +86,12 @@ export async function gerarVariosOuErro<T>(pedidos: PedidoGolden<T>[], rotulo: s
   if (config.ia.provedor !== "mock") console.log(`[lote] ${rotulo}: ${pedidos.length} pedido(s) enviados (${loteId}), esperando...`);
 
   const inicio = Date.now();
-  while ((await statusLote(loteId)) !== "concluido") {
+  while ((await comTentativas(loteId, "a consulta", () => statusLote(loteId))) !== "concluido") {
     if (Date.now() - inicio > LIMITE_ESPERA_MS) throw new Error(`lote ${loteId} (${rotulo}) não terminou em 26 h`);
     await pausa(INTERVALO_MS);
   }
 
-  const coletados = await coletarResultadosLote(loteId, pedidos[0].schema);
+  const coletados = await comTentativas(loteId, "a coleta", () => coletarResultadosLote(loteId, pedidos[0].schema));
   const porId = new Map(coletados.map((c) => [c.customId, c]));
   return pedidos.map((_, indice): ResultadoGeracao<T> | Error => {
     const item = porId.get(String(indice));

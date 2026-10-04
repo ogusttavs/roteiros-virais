@@ -19,7 +19,7 @@ import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
-import { custoDoResultado, gerarVarios } from "./golden-lote";
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -85,6 +85,8 @@ export type ResultadoAvaliarRoteirosSemFala = {
   titulos: string[];
   /** Reprovado no verificador de produção: checagem local (`estilo: "sem_fala"`) mais verificarTexto. */
   reprovadosNoVerificador: number;
+  /** Casos (ou verificadores) que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
   custoTotalUsd: number;
 };
 
@@ -93,6 +95,7 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   const titulos: string[] = [];
   let reprovadosNoVerificador = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
@@ -100,7 +103,7 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
 
   // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; a checagem local, e o `verificarTexto` num segundo lote só para os casos que a
   // local aprovou; e só então a leitura, caso a caso, na ordem de sempre.
-  const geradas = await gerarVarios(
+  const geradas = await gerarVariosOuErro(
     conjunto.map((caso) => (
 {
       tarefa: "roteiro",
@@ -133,7 +136,13 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
   const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
   const camposPorCaso: Record<string, string>[] = [];
   conjunto.forEach((caso, indice) => {
-    const saida = geradas[indice].dados;
+    const gerada = geradas[indice];
+    if (gerada instanceof Error) {
+      camposPorCaso.push({});
+      verificacoes.push({ aprovado: false, motivos: [] });
+      return;
+    }
+    const saida = gerada.dados;
       const campos = extrairCamposRoteiro(saida);
       const palavrasDoMomento = caso.momento
         ? palavrasDeConteudo(`${caso.momento.onde} ${caso.momento.oQueEstaAcontecendo}`)
@@ -148,7 +157,7 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
     verificacoes.push(local);
   });
   const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
-  const respostasDoLote = await gerarVarios(
+  const respostasDoLote = await gerarVariosOuErro(
     indicesAprovadosLocal.map((indice) => (
 {
         tarefa: "verificarTexto",
@@ -165,6 +174,7 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
   indicesAprovadosLocal.forEach((indice, posicao) => {
     const resposta = respostasDoLote[posicao];
     respostasVerificador.set(indice, resposta);
+    if (resposta instanceof Error) return;
     verificacoes[indice] = {
       aprovado: resposta.dados.aprovado,
       motivos: resposta.dados.aprovado ? [] : [resposta.dados.motivo ?? "reprovado"],
@@ -178,6 +188,11 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
     console.log(`${"-".repeat(70)}\n`);
 
     const resultado = geradas[indice];
+    if (resultado instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[FALHOU: ${resultado.message}]\n`);
+      continue;
+    }
 
     const saida = resultado.dados;
     titulos.push(saida.titulo);
@@ -198,7 +213,12 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
 
     const verificacao = verificacoes[indice];
     const saidaVerificacao = respostasVerificador.get(indice);
-    if (saidaVerificacao) custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
+    if (saidaVerificacao instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[VERIFICADOR FALHOU: ${saidaVerificacao.message}]`);
+    } else if (saidaVerificacao) {
+      custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
+    }
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
       console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`);
@@ -209,9 +229,10 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
   }
 
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
+  if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, custoTotalUsd };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, casosFalhos, custoTotalUsd };
 }
 
 if (require.main === module) {

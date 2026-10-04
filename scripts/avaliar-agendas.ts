@@ -21,7 +21,7 @@ import * as lerAgendaIA from "../src/ia/prompts/lerAgenda";
 import * as planejarDiaIA from "../src/ia/prompts/planejarDia";
 import { ErroDataRelativa, resolverDataRelativa } from "../src/lib/data-relativa";
 
-import { custoDoResultado, gerarVarios } from "./golden-lote";
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const casoSchema = z.object({
   local: z.string(),
@@ -50,6 +50,8 @@ export type ResultadoAvaliarAgendas = {
   casos: number;
   diasLidos: number;
   diasSemData: number;
+  /** Agendas ou planos de dia que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
+  casosFalhos: number;
   custoTotalUsd: number;
 };
 
@@ -58,13 +60,14 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
   const conjunto = conjuntoSchema.parse(JSON.parse(readFileSync(caminho, "utf8")));
   let diasLidos = 0;
   let diasSemData = 0;
+  let casosFalhos = 0;
   let custoTotalUsd = 0;
 
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
   // O golden set pelo lote (`golden-lote.ts`): a leitura de todas as agendas num lote, o plano de todos os dias com data resolvida num segundo, e só então a leitura, caso a caso.
-  const leituras = await gerarVarios(
+  const leituras = await gerarVariosOuErro(
     conjunto.map((caso) => ({
       tarefa: "lerAgenda" as const,
       nivel: lerAgendaIA.nivel,
@@ -77,9 +80,10 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
   );
 
   // Cada dia lido, com a data resolvida (ou o motivo de não ter resolvido); só os que resolveram pedem plano.
-  type DiaLido = { indiceCaso: number; dia: (typeof leituras)[number]["dados"]["dias"][number]; dataResolvida: string | null; motivo: string | null };
+  type LeituraOk = Exclude<(typeof leituras)[number], Error>;
+  type DiaLido = { indiceCaso: number; dia: LeituraOk["dados"]["dias"][number]; dataResolvida: string | null; motivo: string | null };
   const diasPorCaso: DiaLido[][] = conjunto.map((caso, indiceCaso) =>
-    leituras[indiceCaso].dados.dias.map((dia) => {
+    (leituras[indiceCaso] instanceof Error ? [] : (leituras[indiceCaso] as LeituraOk).dados.dias).map((dia) => {
       try {
         return { indiceCaso, dia, dataResolvida: resolverDataRelativa(dia.referenciaDia, caso.hoje), motivo: null };
       } catch (erro) {
@@ -89,7 +93,7 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
     }),
   );
   const diasComPlano = diasPorCaso.flat().filter((d) => d.dataResolvida !== null);
-  const planos = await gerarVarios(
+  const planos = await gerarVariosOuErro(
     diasComPlano.map((d) => ({
       tarefa: "planejarDia" as const,
       nivel: planejarDiaIA.nivel,
@@ -111,7 +115,13 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
     console.log(`agenda contada: ${caso.texto}`);
     console.log(`${"-".repeat(70)}\n`);
 
-    custoTotalUsd += custoDoResultado(lerAgendaIA.nivel, leituras[indice]);
+    const leitura = leituras[indice];
+    if (leitura instanceof Error) {
+      casosFalhos += 1;
+      console.log(`[FALHOU: ${leitura.message}]\n`);
+      continue;
+    }
+    custoTotalUsd += custoDoResultado(lerAgendaIA.nivel, leitura);
 
     for (const lido of diasPorCaso[indice]) {
       const { dia } = lido;
@@ -128,6 +138,11 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
       }
 
       const plano = planoDoDia.get(lido)!;
+      if (plano instanceof Error) {
+        casosFalhos += 1;
+        console.log(`      [PLANO FALHOU: ${plano.message}]`);
+        continue;
+      }
       custoTotalUsd += custoDoResultado(planejarDiaIA.nivel, plano);
 
       for (const sugestao of plano.dados.sugestoes) {
@@ -138,9 +153,10 @@ export async function avaliarAgendas(): Promise<ResultadoAvaliarAgendas> {
   }
 
   console.log(`dias lidos: ${diasLidos}, sem data resolvida: ${diasSemData}`);
+  if (casosFalhos > 0) console.log(`falhas no lote (agendas e planos de dia): ${casosFalhos}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diasLidos, diasSemData, custoTotalUsd };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, diasLidos, diasSemData, casosFalhos, custoTotalUsd };
 }
 
 if (require.main === module) {
