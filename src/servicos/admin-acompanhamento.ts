@@ -43,7 +43,7 @@ import { config, hojeISO } from "@/lib/config";
 const FUSO = "America/Sao_Paulo";
 
 /** Todo job cujo resultado é vídeo novo no banco (contas-base é catch-up, conta como coleta). */
-const NOMES_JOB_COLETA: string[] = [
+export const NOMES_JOB_COLETA: string[] = [
   FILAS.coletaYoutube,
   FILAS.coletaApify,
   FILAS.coletaMeioDia,
@@ -81,7 +81,7 @@ export async function marcasAtivas(): Promise<MarcaAtiva[]> {
 export type EstadoJobDia = { dia: string; estado: EstadoAgregado; erro: string | null };
 
 /** Bloco 2: o estado (pior de todas as execuções do dia) de um grupo de jobs, por dia. Sem nicho: é a mesma execução para todo mundo. */
-async function estadoPorDia(nomes: string[], desde: string): Promise<Map<string, EstadoJobDia>> {
+export async function estadoPorDia(nomes: string[], desde: string): Promise<Map<string, EstadoJobDia>> {
   const linhas = await db()
     .select({
       dia: sql<string>`(${execucoesJob.iniciadoEm} at time zone ${FUSO})::date::text`,
