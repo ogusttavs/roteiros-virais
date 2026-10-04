@@ -29,7 +29,7 @@ describe("os formatos (E44, estudo-formatos.md, seção 4)", () => {
 
   it("o exemplo de cada tipo é uma frase fixa por tipo (as treze do estudo) e o selo diz 'Tipo: ...' em minúscula", () => {
     expect(Object.keys(EXEMPLO_DO_TIPO)).toEqual(CHAVES_DE_FORMATO);
-    expect(EXEMPLO_DO_TIPO.erro_comum).toBe("Você mostra o jeito errado que muita gente faz e o jeito certo.");
+    expect(EXEMPLO_DO_TIPO.erro_comum).toBe("por que a mancha volta depois da limpeza.");
     expect(seloDoTipo("erro_comum")).toBe("Tipo: erro comum");
     expect(seloDoTipo("humor_e_meme")).toBe("Tipo: humor e meme");
     expect(seloDoTipo("recorte_de_outro")).toBeNull();
