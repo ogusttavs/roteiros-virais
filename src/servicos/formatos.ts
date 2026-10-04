@@ -7,7 +7,7 @@ import { and, eq } from "drizzle-orm";
 
 import { CHAVES_DE_FORMATO, CHAVES_LIGADAS_POR_PADRAO, FORMATOS_DO_CATALOGO } from "@/config/formatos";
 import { db } from "@/db";
-import { formatosDaMarca } from "@/db/schema";
+import { formatosDaMarca, type FormatoDaMarca } from "@/db/schema";
 
 /** Uma chave que não existe: o admin e o cliente nunca digitam a chave, mas a ação recebe texto do navegador. */
 export class ErroFormato extends Error {}
@@ -25,9 +25,7 @@ export type EstadoDoFormato = {
   respostaDoCliente: boolean | null;
 };
 
-/** As treze chaves da marca com o estado de cada uma. */
-export async function formatosDaMarcaComEstado(clienteId: number): Promise<EstadoDoFormato[]> {
-  const linhas = await db().select().from(formatosDaMarca).where(eq(formatosDaMarca.clienteId, clienteId));
+function estadoDasChaves(linhas: FormatoDaMarca[]): EstadoDoFormato[] {
   return FORMATOS_DO_CATALOGO.map((formato) => {
     const doAdmin = linhas.find((l) => l.chave === formato.chave && l.quem === "admin");
     const doCliente = linhas.find((l) => l.chave === formato.chave && l.quem === "cliente");
@@ -43,6 +41,11 @@ export async function formatosDaMarcaComEstado(clienteId: number): Promise<Estad
   });
 }
 
+/** As treze chaves da marca com o estado de cada uma. */
+export async function formatosDaMarcaComEstado(clienteId: number): Promise<EstadoDoFormato[]> {
+  return estadoDasChaves(await db().select().from(formatosDaMarca).where(eq(formatosDaMarca.clienteId, clienteId)));
+}
+
 /** Só as chaves ligadas da marca, na ordem do catálogo. */
 export async function chavesLigadasDaMarca(clienteId: number): Promise<string[]> {
   return (await formatosDaMarcaComEstado(clienteId)).filter((f) => f.ligada).map((f) => f.chave);
@@ -55,8 +58,8 @@ export async function chavesLigadasDaMarca(clienteId: number): Promise<string[]>
 export type FiltroDeFormatosDaMarca = { ligados: string[]; temResposta: boolean };
 
 export async function filtroDeFormatosDaMarca(clienteId: number): Promise<FiltroDeFormatosDaMarca> {
-  const linhas = await db().select({ chave: formatosDaMarca.chave }).from(formatosDaMarca).where(eq(formatosDaMarca.clienteId, clienteId)).limit(1);
-  return { ligados: await chavesLigadasDaMarca(clienteId), temResposta: linhas.length > 0 };
+  const linhas = await db().select().from(formatosDaMarca).where(eq(formatosDaMarca.clienteId, clienteId));
+  return { ligados: estadoDasChaves(linhas).filter((f) => f.ligada).map((f) => f.chave), temResposta: linhas.length > 0 };
 }
 
 /** O padrão do estudo, para quem monta o filtro sem uma marca (testes, ferramentas). */
@@ -89,6 +92,19 @@ export async function voltarFormatoAoDoCliente(clienteId: number, chave: string)
 
 /** O cliente responde as treze de uma vez (o briefing): só as chaves que ele mandou, cada uma ligada ou desligada. */
 export async function responderFormatosDoCliente(clienteId: number, respostas: Record<string, boolean>, usuarioId: string): Promise<void> {
-  for (const chave of Object.keys(respostas)) conferirChave(chave);
-  for (const [chave, ligada] of Object.entries(respostas)) await definirFormato(clienteId, chave, ligada, "cliente", usuarioId);
+  const chaves = Object.keys(respostas);
+  if (chaves.length === 0) throw new ErroFormato("Nenhuma resposta.");
+  for (const chave of chaves) conferirChave(chave);
+  // Tudo ou nada: uma resposta pela metade já tiraria o corte antigo da marca (`temResposta`).
+  await db().transaction(async (tx) => {
+    for (const [chave, ligada] of Object.entries(respostas)) {
+      await tx
+        .insert(formatosDaMarca)
+        .values({ clienteId, chave, ligada, quem: "cliente", decididoPorUsuarioId: usuarioId })
+        .onConflictDoUpdate({
+          target: [formatosDaMarca.clienteId, formatosDaMarca.chave, formatosDaMarca.quem],
+          set: { ligada, decididoPorUsuarioId: usuarioId, decididoEm: new Date() },
+        });
+    }
+  });
 }

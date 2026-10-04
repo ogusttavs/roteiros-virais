@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
-import { contas, geracoesIA, nichos, videos } from "@/db/schema";
+import { contas, geracoesIA, lotesIa, nichos, videos } from "@/db/schema";
 
 import { candidatosDoSetor, planejarReclassificacao } from "../../scripts/reclassificar-formato";
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -75,5 +75,17 @@ describe("reclassificar-formato", () => {
     expect(plano.custoMedioUsd).toBeCloseTo(0.003, 6);
     expect(plano.custoEstimadoUsd).toBeCloseTo(0.03, 6);
     console.log(`dry run: ${plano.total} vídeos, custo estimado em lote US$ ${plano.custoEstimadoUsd?.toFixed(2)}`);
+  });
+
+  it("vídeo que já está num lote em andamento não entra de novo (rodar --confirmar duas vezes não gasta em dobro)", async () => {
+    const antes = await planejarReclassificacao();
+    const jaEnviados = antes.porSetor[0].candidatos.slice(0, 5).map((c) => c.id);
+    await db().insert(lotesIa).values({ tarefa: "extrairVideo", loteIdExterno: "lote-teste-em-andamento", videoIds: jaEnviados, status: "em_andamento" });
+
+    const depois = await planejarReclassificacao();
+
+    expect(depois.jaEmLote).toBe(5);
+    expect(depois.total).toBe(antes.total - 5);
+    expect(depois.porSetor[0].candidatos.some((c) => jaEnviados.includes(c.id))).toBe(false);
   });
 });

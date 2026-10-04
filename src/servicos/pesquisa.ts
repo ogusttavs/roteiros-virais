@@ -13,7 +13,7 @@
  */
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 
-import { FORMATOS_SEM_FALA } from "@/config/formatos";
+import { FORMATOS_FORA_DO_CATALOGO, FORMATOS_SEM_FALA } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import { db } from "@/db";
 import {
@@ -522,7 +522,9 @@ export function palavrasChave(texto: string): string[] {
 function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigirServeDeModelo: boolean): SQL | null {
   const serve = sql`${videos.serveDeModelo} is not false`;
   if (!formatos) return exigirServeDeModelo ? serve : null;
-  const permitidos = [...formatos.ligados, ...FORMATOS_SEM_FALA];
+  // "Todos" (`exigirServeDeModelo` falso) mostra meme e recorte com o selo escrito (R2b): só as treze chaves do cliente filtram ali, os valores que nunca servem de
+  // modelo (recorte de outro, notícia, ao vivo, outro) continuam à vista.
+  const permitidos = [...formatos.ligados, ...(exigirServeDeModelo ? FORMATOS_SEM_FALA : FORMATOS_FORA_DO_CATALOGO.map((f) => f.chave))];
   const lista = sql`array[${sql.join(
     permitidos.map((chave) => sql`${chave}`),
     sql`, `,

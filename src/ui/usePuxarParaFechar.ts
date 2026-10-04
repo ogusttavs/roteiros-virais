@@ -94,6 +94,11 @@ export function usePuxarParaFechar(fechar: () => void): {
           if (folhaRef.current && !folhaRef.current.hasAttribute("data-saindo")) {
             folhaRef.current.style.transition = "transform var(--duracao-soltar) var(--curva-mola)";
             folhaRef.current.style.setProperty("--arrasto", "0px");
+            const veuAgora = veuDaFolha();
+            if (veuAgora) {
+              veuAgora.style.opacity = "";
+              veuAgora.style.removeProperty("--opacidade-veu");
+            }
           }
         }, 400);
         return;

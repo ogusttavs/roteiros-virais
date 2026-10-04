@@ -138,6 +138,13 @@ describe("as chaves da marca", () => {
     expect((await chavesLigadasDaMarca(marca)).includes("lista")).toBe(false);
   });
 
+  it("uma resposta vazia é recusada, e uma resposta com uma chave inválida não grava nenhuma das outras (tudo ou nada)", async () => {
+    const marca = await criarMarca("tudo-ou-nada");
+    await expect(responderFormatosDoCliente(marca, {}, "formatos-tudo-ou-nada")).rejects.toBeInstanceOf(ErroFormato);
+    await expect(responderFormatosDoCliente(marca, { lista: true, inventado: true }, "formatos-tudo-ou-nada")).rejects.toBeInstanceOf(ErroFormato);
+    expect((await filtroDeFormatosDaMarca(marca)).temResposta).toBe(false);
+  });
+
   it("uma chave que não existe é recusada, e as marcas não se misturam", async () => {
     await expect(definirFormato(marcaSemResposta, "formato_inventado", true, "admin", null)).rejects.toBeInstanceOf(ErroFormato);
     await expect(responderFormatosDoCliente(marcaSemResposta, { inventado: true }, "formatos-sem-resposta")).rejects.toBeInstanceOf(ErroFormato);
@@ -216,6 +223,8 @@ describe("o filtro por formato onde a marca lê o banco", () => {
     expect(todos).toContain(ids.passo);
     expect(todos).not.toContain(ids.meme);
     expect(todos).toContain(ids.antigoNulo);
+    // "Todos" mostra recorte e o resto que nunca serve de modelo com o selo: só as treze chaves do cliente filtram ali.
+    expect(todos).toContain(ids.recorte);
     const todosComMeme = (await todosOsVideosDoNicho(nichoId, { periodoDias: 90, formatosDaMarca: comMeme })).videos.map((v) => v.id);
     expect(todosComMeme).toContain(ids.meme);
   });

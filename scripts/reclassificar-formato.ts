@@ -91,6 +91,8 @@ export type Plano = {
   custoMedioUsd: number | null;
   /** O custo estimado em lote (metade do preço), ou nulo sem histórico. */
   custoEstimadoUsd: number | null;
+  /** Quantos vídeos já estão num lote em andamento (ficam de fora do plano). */
+  jaEmLote: number;
 };
 
 /** O que o dry run mostra, sem gastar nada: quantos vídeos entram, por setor, e o custo estimado. Exportada para o teste de integração. */
@@ -101,18 +103,25 @@ export async function planejarReclassificacao(): Promise<Plano> {
     const candidatos = await candidatosDoSetor(nicho.id, nicho.nome, nicho.termos ?? []);
     if (candidatos.length > 0) porSetor.push({ nome: nicho.nome, candidatos });
   }
+  // Vídeo que já está num lote em andamento (enviado e ainda não recolhido, até 24 h) não entra de novo: rodar `--confirmar` duas vezes seguidas gastaria em dobro.
+  const emAndamento = new Set<number>();
+  const lotes = await db().select({ videoIds: lotesIa.videoIds }).from(lotesIa).where(and(eq(lotesIa.tarefa, "extrairVideo"), eq(lotesIa.status, "em_andamento")));
+  for (const lote of lotes) for (const id of lote.videoIds ?? []) emAndamento.add(id);
+  if (emAndamento.size > 0) {
+    for (const setor of porSetor) setor.candidatos = setor.candidatos.filter((c) => !emAndamento.has(c.id));
+  }
   const total = porSetor.reduce((soma, s) => soma + s.candidatos.length, 0);
   const custoMedioUsd = await custoMedioHistoricoUsd();
   // API de lote: metade do preço normal.
   const custoEstimadoUsd = custoMedioUsd !== null ? (custoMedioUsd / 2) * total : null;
-  return { total, porSetor, custoMedioUsd, custoEstimadoUsd };
+  return { total, porSetor: porSetor.filter((s) => s.candidatos.length > 0), custoMedioUsd, custoEstimadoUsd, jaEmLote: emAndamento.size };
 }
 
 async function main() {
   const confirmar = process.argv.includes("--confirmar");
-  const { total, porSetor, custoMedioUsd, custoEstimadoUsd } = await planejarReclassificacao();
+  const { total, porSetor, custoMedioUsd, custoEstimadoUsd, jaEmLote } = await planejarReclassificacao();
 
-  console.log(`vídeos elegíveis a evidência, ainda sem formato_catalogo: ${total}`);
+  console.log(`vídeos elegíveis a evidência, ainda sem formato_catalogo: ${total}${jaEmLote > 0 ? ` (fora ${jaEmLote} que já estão num lote em andamento)` : ""}`);
   for (const setor of porSetor) {
     console.log(`  ${setor.nome}: ${setor.candidatos.length}`);
   }
