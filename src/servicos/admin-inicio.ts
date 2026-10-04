@@ -1,7 +1,8 @@
 import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { CUSTO_FIXO_MENSAL_BRL, TETO_DIARIO_BRL, usdParaBrl } from "@/config/dinheiro";
+import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
+import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { briefings, clientes, execucoesJob, geracoesIA, nichos, roteiros, temasDia, videos } from "@/db/schema";
 import { FILAS } from "@/jobs/fila";
@@ -9,7 +10,6 @@ import { hojeISO } from "@/lib/config";
 import { estadoPorDia, NOMES_JOB_COLETA, type EstadoAgregado } from "@/servicos/admin-acompanhamento";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
-import { ramoPorSlug } from "@/config/ramos";
 
 const FUSO = "America/Sao_Paulo";
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -21,7 +21,7 @@ export type LinhaDaMadrugada = {
   busca: { estado: EstadoAgregado; novos: number };
   transcricao: { estado: EstadoAgregado; transcritos: number };
   analise: { analisados: number };
-  temas: { quantos: number; tentou: boolean };
+  temas: { quantos: number; tentou: boolean; /** Sem tema depois da hora em que ele já devia existir. */ atrasado: boolean };
   /** Tem algo a olhar: um passo em erro, ou nenhum tema depois do horário em que ele já devia existir. */
   comProblema: boolean;
 };
@@ -30,11 +30,11 @@ export type ErroRecente = { id: number; nome: string; quando: Date; mensagem: st
 
 export type InicioAdmin = {
   agora: Date;
-  madrugada: { totalDeRamos: number; ok: number; comProblema: LinhaDaMadrugada[] };
+  madrugada: { totalDeRamos: number; ok: number; linhas: LinhaDaMadrugada[]; comProblema: LinhaDaMadrugada[] };
   erros: { hoje: number; recentes: ErroRecente[] };
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
-  produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: string | null };
+  produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
   atencao: { pedidosDeRamo: number };
 };
 
@@ -46,10 +46,9 @@ export function horaNoBrasil(d: Date): number {
 }
 
 /** A regra do "com problema", pura para provar sem banco. */
-export function ramoComProblema(linha: Omit<LinhaDaMadrugada, "comProblema">, agora: Date): boolean {
+export function ramoComProblema(linha: Omit<LinhaDaMadrugada, "comProblema">): boolean {
   if (linha.busca.estado === "erro" || linha.transcricao.estado === "erro") return true;
-  if (linha.temas.quantos === 0 && horaNoBrasil(agora) >= HORA_EM_QUE_O_TEMA_JA_DEVIA_EXISTIR) return true;
-  return false;
+  return linha.temas.atrasado;
 }
 
 function inicioDoDia(hoje: string): Date {
@@ -60,7 +59,7 @@ async function madrugada(agora: Date): Promise<InicioAdmin["madrugada"]> {
   const hoje = hojeISO(agora);
   const desde = inicioDoDia(hoje);
   const ramos = await db().select({ id: nichos.id, nome: nichos.nome, ramoCatalogo: nichos.ramoCatalogo }).from(nichos).where(eq(nichos.ativo, true)).orderBy(nichos.nome);
-  if (ramos.length === 0) return { totalDeRamos: 0, ok: 0, comProblema: [] };
+  if (ramos.length === 0) return { totalDeRamos: 0, ok: 0, linhas: [], comProblema: [] };
   const ids = ramos.map((r) => r.id);
 
   const [coletaDoDia, transcreverDoDia, novos, transcritos, analisados, temas] = await Promise.all([
@@ -86,12 +85,12 @@ async function madrugada(agora: Date): Promise<InicioAdmin["madrugada"]> {
       busca: { estado: estadoColeta, novos: novosPor.get(r.id) ?? 0 },
       transcricao: { estado: estadoTranscrever, transcritos: transcritosPor.get(r.id) ?? 0 },
       analise: { analisados: analisadosPor.get(r.id) ?? 0 },
-      temas: { quantos: tema?.temas.length ?? 0, tentou: Boolean(tema) },
+      temas: { quantos: tema?.temas.length ?? 0, tentou: Boolean(tema), atrasado: (tema?.temas.length ?? 0) === 0 && horaNoBrasil(agora) >= HORA_EM_QUE_O_TEMA_JA_DEVIA_EXISTIR },
     };
-    return { ...base, comProblema: ramoComProblema(base, agora) };
+    return { ...base, comProblema: ramoComProblema(base) };
   });
   const comProblema = linhas.filter((l) => l.comProblema);
-  return { totalDeRamos: linhas.length, ok: linhas.length - comProblema.length, comProblema };
+  return { totalDeRamos: linhas.length, ok: linhas.length - comProblema.length, linhas, comProblema };
 }
 
 async function erros(agora: Date): Promise<InicioAdmin["erros"]> {
@@ -159,7 +158,7 @@ async function produto(agora: Date): Promise<InicioAdmin["produto"]> {
     gravados: linha?.gravados ?? 0,
     postados: linha?.postados ?? 0,
     reprovados: reprovadas.length,
-    motivoMaisComum: primeiro ? rotuloDoMotivo(primeiro[0]) : null,
+    motivoMaisComum: primeiro ? { rotulo: rotuloDoMotivo(primeiro[0]), vezes: primeiro[1] } : null,
   };
 }
 

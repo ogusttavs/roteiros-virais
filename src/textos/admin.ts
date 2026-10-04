@@ -14,10 +14,11 @@ function formatarDiaMesAbreviado(data: Date): string {
 
 export const textosAdmin = {
   navegacao: {
-    equipe: "Equipe",
-    clientes: "Marcas",
-    nichos: "Nichos",
-    jobs: "Jobs",
+    equipe: "admin",
+    inicio: "Início",
+    clientes: "Contas",
+    nichos: "Ramos",
+    jobs: "Rotinas",
     geracoes: "Gerações",
     viagem: "Viagem",
     sair: "sair",

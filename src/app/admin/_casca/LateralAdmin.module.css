@@ -1,0 +1,177 @@
+/* A barra lateral do admin (`admin.css`, `.lateral-admin`): sticky, a altura da tela, recolhe para ícones a 1180 px ou menos. */
+.lateral {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-content: start;
+  gap: var(--espaco-1);
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: var(--espaco-4) var(--espaco-3);
+  background: var(--cor-superficie-recuada);
+  border-right: var(--largura-borda) solid var(--cor-divisor);
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  flex-wrap: wrap;
+  padding: var(--espaco-2) var(--espaco-3) var(--espaco-6);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+/* O selo existe para ninguém confundir esta casca com o painel do cliente. */
+.selo {
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  color: var(--cor-texto-dica);
+  font: var(--peso-medio) var(--tamanho-legenda) / 1.8 var(--fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+.nav {
+  display: grid;
+  align-content: start;
+  gap: var(--espaco-1);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-md);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--duracao-rapida) var(--curva-saida), color var(--duracao-rapida) var(--curva-saida);
+}
+
+.item:hover {
+  background: var(--cor-superficie-hover);
+  color: var(--cor-titulo);
+}
+
+.item:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.ativo {
+  background: var(--cor-selecao-suave);
+  color: var(--cor-titulo);
+}
+
+.item svg {
+  flex: none;
+}
+
+/* E45 PR 2: o número de pedidos de ramo abertos ao lado de "Ramos". */
+.numero {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto, var(--cor-superficie));
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  font-weight: var(--peso-semibold);
+}
+
+.pe {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3);
+}
+
+.nomeDoAdmin {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1179px) {
+  .lateral {
+    padding-inline: var(--espaco-2);
+    justify-items: center;
+  }
+
+  .marca {
+    padding: var(--espaco-2) 0 var(--espaco-6);
+    justify-content: center;
+  }
+
+  .selo,
+  .rotulo,
+  .nomeDoAdmin {
+    display: none;
+  }
+
+  .item {
+    width: var(--altura-toque);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .numero {
+    position: absolute;
+    top: 2px;
+    right: 0;
+    margin: 0;
+    min-width: 1rem;
+    height: 1rem;
+  }
+
+  .pe {
+    padding-inline: 0;
+    justify-items: center;
+  }
+}
+
+/* O admin é de desktop e iPad (sem desenho de celular): abaixo de 768 px a barra vira uma faixa no topo, só ícones, para nada quebrar. */
+@media (max-width: 767px) {
+  .lateral {
+    position: static;
+    height: auto;
+    grid-template-rows: none;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    padding: var(--espaco-2) var(--margem-celular);
+    border-right: 0;
+    border-bottom: var(--largura-borda) solid var(--cor-divisor);
+    overflow: visible;
+  }
+
+  .marca {
+    padding: 0;
+  }
+
+  .nav {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-content: center;
+    overflow-x: auto;
+  }
+
+  .pe {
+    padding: 0;
+  }
+}
