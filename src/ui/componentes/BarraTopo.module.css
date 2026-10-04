@@ -51,3 +51,60 @@
     padding-inline: max(var(--espaco-10), calc((100% - var(--largura-painel)) / 2));
   }
 }
+
+/*
+ * Passo 17b do Opus, o cabeçalho de vidro (`base.css`, `.barra-topo.vidro` e `.rolada`): só abaixo de 768 px. No topo, sem fundo nem fio (contínua com a faixa do relógio,
+ * que o `theme-color` já pinta); rolada a tela (`.rolada`), vidro com desfoque e o fio de baixo; os botões da direita viram bolhas de vidro de 44 px, e o nome do botão
+ * "Atualizar" fica só para o leitor de tela. As transições seguem os tokens (e "reduzir movimento" os rebaixa).
+ */
+@media (max-width: 767px) {
+  .barra {
+    min-height: 3.75rem;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom-color: transparent;
+    box-shadow: none;
+    transition:
+      background-color var(--duracao-troca) var(--curva-padrao),
+      border-color var(--duracao-troca) var(--curva-padrao);
+  }
+
+  .barra.rolada {
+    background: var(--vidro-fundo);
+    backdrop-filter: var(--vidro-desfoque);
+    -webkit-backdrop-filter: var(--vidro-desfoque);
+    border-bottom-color: var(--vidro-contorno);
+  }
+
+  .direita {
+    gap: var(--espaco-2);
+  }
+
+  .direita > :global(button),
+  .direita > :global(a) {
+    display: grid;
+    place-items: center;
+    width: var(--altura-toque);
+    min-width: var(--altura-toque);
+    height: var(--altura-toque);
+    padding: 0;
+    border: var(--largura-borda) solid var(--vidro-borda);
+    border-radius: var(--raio-pill);
+    background: var(--vidro-fundo-forte);
+    backdrop-filter: var(--vidro-desfoque);
+    -webkit-backdrop-filter: var(--vidro-desfoque);
+    box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--sombra-controle);
+    color: var(--cor-titulo);
+  }
+
+  /* O nome do botão (o "Atualizar" escrito) fica só para o leitor de tela: o ícone basta. */
+  .direita :global(.cede-vidro) {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

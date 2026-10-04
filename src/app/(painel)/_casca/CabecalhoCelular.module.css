@@ -75,6 +75,79 @@
   display: none;
 }
 
+/*
+ * Passo 17b, o cabeçalho de vidro (`.barra-topo.vidro` do passo 17b): no topo da tela, sem fundo nem fio (contínuo com a faixa do relógio); rolada a tela (`.rolada`), vidro com
+ * desfoque e o fio de baixo, o logotipo some e entra o título curto no meio; os botões são bolhas de vidro de 44 px e o nome do "Atualizar" fica só para o leitor de tela.
+ */
+.cabecalho {
+  background: transparent;
+  border-bottom: var(--largura-borda) solid transparent;
+  transition:
+    background-color var(--duracao-troca) var(--curva-padrao),
+    border-color var(--duracao-troca) var(--curva-padrao);
+}
+
+.cabecalho.rolada {
+  background: var(--vidro-fundo);
+  backdrop-filter: var(--vidro-desfoque);
+  -webkit-backdrop-filter: var(--vidro-desfoque);
+  border-bottom-color: var(--vidro-contorno);
+}
+
+.identidade {
+  transition: opacity var(--duracao-troca) var(--curva-padrao);
+}
+
+.cabecalho.rolada .identidade {
+  opacity: 0;
+}
+
+.tituloMeio {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--area-topo) + 28px);
+  translate: -50% -50%;
+  font-size: var(--tamanho-cabecalho);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duracao-troca) var(--curva-padrao);
+}
+
+.cabecalho.rolada .tituloMeio {
+  opacity: 1;
+}
+
+.direita {
+  gap: var(--espaco-2);
+}
+
+.direita > :global(button) {
+  display: grid;
+  place-items: center;
+  width: var(--altura-toque);
+  min-width: var(--altura-toque);
+  height: var(--altura-toque);
+  padding: 0;
+  border: var(--largura-borda) solid var(--vidro-borda);
+  border-radius: var(--raio-pill);
+  background: var(--vidro-fundo-forte);
+  backdrop-filter: var(--vidro-desfoque);
+  -webkit-backdrop-filter: var(--vidro-desfoque);
+  box-shadow: var(--vidro-brilho), 0 0 0 1px var(--vidro-contorno), var(--sombra-controle);
+  color: var(--cor-titulo);
+}
+
+.botaoBarra .cede {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
 @media (min-width: 768px) {
   .cabecalho {
     display: none;
