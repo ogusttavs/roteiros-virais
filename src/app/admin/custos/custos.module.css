@@ -1,0 +1,206 @@
+/* Custos (E46 PR 3, `AdminCustos.dc.html`). O que é comum (cartão, tabela, barra) está em `../comum.module.css`; aqui só o que é desta tela. */
+.contadores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+}
+
+.contador {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  min-width: 11rem;
+  flex: 1 1 11rem;
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+}
+
+.contadorAtencao {
+  border-color: var(--cor-atencao);
+  background: var(--cor-atencao-fundo);
+}
+
+.valor {
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.doQue {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.linhaTeto {
+  margin: 0;
+  font: var(--peso-medio) var(--tamanho-secundario) / 1.4 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.avisoTeto {
+  display: grid;
+  gap: var(--espaco-2);
+  justify-items: start;
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}
+
+.avisoTeto p {
+  margin: 0;
+}
+
+.nota {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.duas {
+  display: grid;
+  gap: var(--espaco-6);
+  align-items: start;
+}
+
+.duas > * {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .duas {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemCusto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-1) var(--espaco-4);
+  align-items: baseline;
+}
+
+.itemCusto > :last-child {
+  grid-column: 1 / -1;
+}
+
+.nomeCusto {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}
+
+.nomeCusto a {
+  color: var(--cor-acao);
+  text-decoration: none;
+}
+
+.valorCusto {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font: var(--peso-semibold) var(--tamanho-secundario) / 1.2 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.detalheCusto {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.fixos {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.rodapeFixos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3) var(--espaco-5);
+}
+
+.totalFixos {
+  font: var(--peso-semibold) var(--tamanho-secundario) / 1.2 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.linhaForm td {
+  background: var(--cor-superficie-recuada);
+  white-space: normal !important;
+}
+
+.formFixo,
+.formTeto {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.formFixo {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  align-items: end;
+}
+
+.formFixo > :last-child,
+.formFixo > [role="alert"] {
+  grid-column: 1 / -1;
+}
+
+.rotuloCampo {
+  display: grid;
+  gap: var(--espaco-1);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+.entrada {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font: inherit;
+  font-size: var(--tamanho-secundario);
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.entrada:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.erroCampo {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.confirmaTirar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+  white-space: normal;
+  max-width: 28rem;
+}

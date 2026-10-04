@@ -728,6 +728,33 @@ export const alteracoesDoAdmin = pgTable(
 );
 export type AlteracaoDoAdmin = typeof alteracoesDoAdmin.$inferSelect;
 
+/**
+ * E46 PR 3: um custo fixo cadastrado no admin (o servidor, as contas de desenvolvimento, as coletas compartilhadas). Em reais ou em dólar, por mês ou por ano. "Tirar" não
+ * apaga: `ativo = false` e `tiradoEm`, porque o que já custou continua nos meses que passaram.
+ */
+export const custosFixos = pgTable("custos_fixos", {
+  id: id(),
+  nome: text("nome").notNull(),
+  /** O valor na moeda de cobrança, por período. */
+  valor: numeric("valor", { precision: 12, scale: 2 }).notNull(),
+  moeda: text("moeda").$type<"brl" | "usd">().notNull().default("brl"),
+  periodo: text("periodo").$type<"mensal" | "anual">().notNull().default("mensal"),
+  /** Texto livre: "todo dia 5", "cartão, no começo do mês". */
+  cobra: text("cobra"),
+  ativo: boolean("ativo").notNull().default(true),
+  tiradoEm: timestamp("tirado_em", { withTimezone: true }),
+  criadoEm: criadoEm(),
+});
+export type CustoFixo = typeof custosFixos.$inferSelect;
+
+/** E46 PR 3: ajustes do admin que valem para o sistema todo, uma linha por chave ("teto_diario_brl"). Texto, para qualquer valor caber. */
+export const configuracaoAdmin = pgTable("configuracao_admin", {
+  chave: text("chave").primaryKey(),
+  valor: text("valor").notNull(),
+  atualizadoPorUsuarioId: text("atualizado_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------

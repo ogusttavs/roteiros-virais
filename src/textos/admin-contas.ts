@@ -56,7 +56,7 @@ export const textosInicioAdmin = {
     verRotinas: "Ver em Rotinas",
     verContas: "Ver as contas",
     verRamos: "Ver os pedidos",
-    verCustos: "Ver em Gerações",
+    verCustos: "Ver em Custos",
   },
   madrugada: {
     titulo: "A madrugada",
@@ -87,7 +87,7 @@ export const textosInicioAdmin = {
   },
   dinheiro: {
     titulo: "O dinheiro",
-    verCustos: "Ver em Gerações",
+    verCustos: "Ver em Custos",
     saiuHoje: "Saiu hoje",
     saiuHojeDetalhe: (dolar: string, teto: string) => `${dolar}, de um teto de ${teto} por dia`,
     saiu30: "Saiu em 30 dias, com os fixos",

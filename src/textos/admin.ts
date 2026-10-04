@@ -21,6 +21,7 @@ export const textosAdmin = {
     jobs: "Rotinas",
     geracoes: "Gerações",
     viagem: "Viagem",
+    custos: "Custos",
     sair: "sair",
     saindo: "saindo",
   },

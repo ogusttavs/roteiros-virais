@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
-import { CUSTO_FIXO_MENSAL_BRL, TETO_DIARIO_BRL, usdParaBrl } from "@/config/dinheiro";
+import { usdParaBrl } from "@/config/dinheiro";
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
@@ -9,6 +9,7 @@ import { FILAS } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { estadoPorDia, NOMES_JOB_COLETA, type EstadoAgregado } from "@/servicos/admin-acompanhamento";
 import { listarContasAdmin } from "@/servicos/admin-contas";
+import { fixoMensalEmReais, tetoDiarioEmReais } from "@/servicos/admin-custos";
 import { contarPedidosAbertos } from "@/servicos/pedidos-de-ramo";
 
 const FUSO = "America/Sao_Paulo";
@@ -35,7 +36,7 @@ export type InicioAdmin = {
   agora: Date;
   madrugada: { totalDeRamos: number; ok: number; linhas: LinhaDaMadrugada[]; comProblema: LinhaDaMadrugada[]; rotinas: RotinasDoDia };
   erros: { hoje: number; recentes: ErroRecente[] };
-  dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; passouDoTeto: boolean };
+  dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; fixosBrl: number; fixosCadastrados: number; tetoBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
   produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
   atencao: { pedidosDeRamo: number };
@@ -139,7 +140,8 @@ async function dinheiro(agora: Date): Promise<InicioAdmin["dinheiro"]> {
   ]);
   const saiuHojeUsd = Number(hoje?.total ?? 0);
   const saiu30dUsd = Number(mes?.total ?? 0);
-  return { saiuHojeUsd, saiu30dUsd, saiu30dComFixosBrl: usdParaBrl(saiu30dUsd) + CUSTO_FIXO_MENSAL_BRL, passouDoTeto: usdParaBrl(saiuHojeUsd) > TETO_DIARIO_BRL };
+  const [fixos, tetoBrl] = await Promise.all([fixoMensalEmReais(), tetoDiarioEmReais()]);
+  return { saiuHojeUsd, saiu30dUsd, saiu30dComFixosBrl: usdParaBrl(saiu30dUsd) + fixos.total, fixosBrl: fixos.total, fixosCadastrados: fixos.cadastrados, tetoBrl, passouDoTeto: usdParaBrl(saiuHojeUsd) > tetoBrl };
 }
 
 async function produto(agora: Date): Promise<InicioAdmin["produto"]> {

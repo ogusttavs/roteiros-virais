@@ -449,6 +449,13 @@
       "when": 1791108613175,
       "tag": "0063_indices-do-admin",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1791108759943,
+      "tag": "0064_custos-fixos-e-teto",
+      "breakpoints": true
     }
   ]
 }
