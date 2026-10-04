@@ -154,6 +154,15 @@ describe("gerarRoteiroAction com ficha", () => {
     expect(r.objetivo).toBe("conversao");
   });
 
+  it("no vídeo sem fala a ficha também é ignorada (a estrutura dela pressupõe fala)", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(await marcaNova()));
+    const r = await gerarRoteiroAction({ origem: "livre", textoTema: "tema sem fala com ficha" }, "alcance", "reels", "sem_fala", undefined, undefined, undefined, undefined, undefined, "comentem");
+    if (!r.ok) throw new Error(r.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, r.dado.id));
+    expect(roteiro.estilo).toBe("sem_fala");
+    expect(roteiro.ficha).toBeNull();
+  });
+
   it("reprovar e reescrever mantém a ficha da versão anterior", async () => {
     const { reprovarERescrever } = await import("@/servicos/roteiro");
     const original = await gerar("comentem");

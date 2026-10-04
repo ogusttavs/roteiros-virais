@@ -380,7 +380,7 @@ describe("aceitar", () => {
     expect(linha.formato).toBe("reels");
   });
 
-  it("sem formato explicito, usa o mesmo sugerido pelo objetivo", async () => {
+  it("sem formato explicito, usa Reels (o objetivo deixou de decidir o formato, E49 PR 1)", async () => {
     const cliente = await criarCliente();
     const [item] = await criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["fornecedor novo"] }], HOJE);
 
@@ -391,7 +391,7 @@ describe("aceitar", () => {
       objetivo: "conversao",
     });
 
-    expect(roteiro.formato).toBe("story");
+    expect(roteiro.formato).toBe("reels");
   });
 });
 
