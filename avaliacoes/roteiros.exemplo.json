@@ -101,7 +101,9 @@
     "anguloParaEvitar": {
       "gancho": "cheiro forte nao quer dizer limpo de verdade",
       "corpo": "explicacao direta sobre cheiro forte, com uma cena real do negocio.",
-      "motivos": ["Já falei disso"]
+      "motivos": [
+        "Já falei disso"
+      ]
     },
     "pontoPrincipal": "simula uma reprovacao por 'ja falei disso': o roteiro precisa ter um gancho e um corpo diferentes do angulo anterior sobre o mesmo tema, sem repetir o que ja foi dito"
   },
@@ -144,7 +146,9 @@
     "anguloParaEvitar": {
       "gancho": "voce ja limpou o mofo do rejunte umas dez vezes e ele sempre volta, ne? deixa eu te explicar direitinho por que isso acontece e o que voce precisa fazer diferente da proxima vez que for limpar o banheiro inteiro",
       "corpo": "explicacao longa sobre ventilacao, tipos de rejunte, produtos errados que as pessoas usam, historia de um cliente que reclamou, e so depois o produto certo, com varias cenas diferentes do banheiro em momentos diferentes do dia.",
-      "motivos": ["Muito longo"],
+      "motivos": [
+        "Muito longo"
+      ],
       "duracaoAnteriorS": 58
     },
     "pontoPrincipal": "reprovado por 'muito longo': a nova versao precisa caber em menos de 58s (o modelo do nicho ja pede 20 a 35s) sem cortar o exemplo concreto do rejunte"
@@ -160,7 +164,9 @@
     "anguloParaEvitar": {
       "gancho": "voce sabia que um erro simples pode atrasar todo o seu tratamento com aparelho",
       "corpo": "explicacao sobre faltar na manutencao, com uma cena real do consultorio.",
-      "motivos": ["Gancho fraco"]
+      "motivos": [
+        "Gancho fraco"
+      ]
     },
     "pontoPrincipal": "reprovado por 'gancho fraco': o gancho novo precisa comecar pelo resultado ou pela cena, nunca por uma pergunta retorica como 'voce sabia que'"
   },
@@ -175,7 +181,9 @@
     "anguloParaEvitar": {
       "gancho": "prezados pacientes, e fundamental esclarecer que a primeira consulta consiste em uma avaliacao detalhada",
       "corpo": "explicacao formal e tecnica sobre o procedimento da primeira consulta, em tom de comunicado.",
-      "motivos": ["Não é assim que eu falo"],
+      "motivos": [
+        "Não é assim que eu falo"
+      ],
       "motivoTexto": "eu nunca falo assim, cheio de formalidade; eu falo igual eu falo com meus amigos, sem enrolacao"
     },
     "pontoPrincipal": "reprovado por 'nao e assim que eu falo': a nova versao precisa soar como o perfil do cliente (direto, sem formalidade), nunca em tom de comunicado"
@@ -199,9 +207,57 @@
     ],
     "roteirosRecentes": [],
     "regrasCliente": [
-      { "regra": "Não começar com pergunta: você começa mostrando.", "contagem": 2 },
-      { "regra": "Nada mais longo que 45 segundos.", "contagem": 1 }
+      {
+        "regra": "Não começar com pergunta: você começa mostrando.",
+        "contagem": 2
+      },
+      {
+        "regra": "Nada mais longo que 45 segundos.",
+        "contagem": 1
+      }
     ],
     "pontoPrincipal": "a memoria do cliente (E27, parte 2): duas regras ativas de reprovacoes anteriores, uma firme (contagem 2) e uma fraca (contagem 1); conferir se o gancho nao comeca com pergunta e se a duracao fica em 45s ou menos, mesmo sem nenhum motivo de reprovacao nesta rodada"
+  },
+  {
+    "tema": "a brincadeira do paciente que jura que escova bem, versão da clínica",
+    "objetivo": "alcance",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 301,
+        "assunto": "o que o paciente diz que faz contra o que ele faz de verdade",
+        "gancho": "eu escovo três vezes por dia, claro",
+        "estrutura": "a pessoa diz uma coisa e a cena mostra o contrário, repetido duas vezes, e o final vira a piada",
+        "fechamento": "a cena final mostra o resultado e a pessoa dá de ombros",
+        "chamadaFinal": "marca um amigo que é assim",
+        "foraDaCurva": 11.2,
+        "formato": "Humor e meme"
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "Humor e meme: o roteiro tem de ser a versão da CLÍNICA da brincadeira (a recepção, o consultório, o jeito de quem atende), nunca o vídeo de outro repostado nem a mesma piada; o formato é uma brincadeira curta, mas o negócio aparece e a pessoa grava com a própria cara."
+  },
+  {
+    "tema": "o clareamento de uma paciente, da primeira consulta ao sorriso final",
+    "objetivo": "conversao",
+    "perfilCompilado": "Clínica odontológica de bairro. Vende consulta a partir de R$ 150, clareamento a partir de R$ 400. Cliente ideal é família da região. Medo do cliente: dor durante o tratamento e preço mais alto que a clínica popular. Frase que fala: aqui a gente explica tudo antes de fazer. Cenas filmáveis: consultório, recepção, sala de espera. Nunca promete resultado que não pode cumprir.",
+    "camadaExclusiva": "Cidade: São Paulo, bairro Vila Sorriso. Concorrente citado pelo cliente: clínica popular da esquina.",
+    "modeloNicho": "Duração típica: 25 a 45 segundos. Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos que funcionam: comparação antes e depois (alta frequência): assim voce clareia os dentes em casa. Estruturas comuns: mostrar o problema, explicar a causa, mostrar a solução. Fechamentos comuns: resumo em uma frase do que foi mostrado. Chamadas finais comuns: comenta se voce ja passou por isso.",
+    "evidencias": [
+      {
+        "id": 302,
+        "assunto": "como estava e como ficou depois do tratamento",
+        "gancho": "olha como ela chegou aqui",
+        "estrutura": "mostra como estava, mostra o que foi feito em uma frase, mostra como ficou",
+        "fechamento": "o sorriso final em close",
+        "chamadaFinal": "chama no WhatsApp para a avaliação",
+        "foraDaCurva": 9.4,
+        "formato": "Antes e depois"
+      }
+    ],
+    "roteirosRecentes": [],
+    "pontoPrincipal": "Antes e depois: o roteiro mostra como estava e como ficou, com o caso de verdade da clínica (nada de promessa de resultado), em cenas que a pessoa consegue gravar no consultório."
   }
 ]

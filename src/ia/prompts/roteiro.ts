@@ -223,8 +223,12 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * `comNoticia`), o título, o resumo e o ângulo sugerido da notícia entram como um bloco, logo
  * depois do tema (a notícia é o que fez a pessoa escrever aquele tema, não o substitui: a busca de
  * evidência continua normal, ao contrário do momento). Versão 2.8.0.
+ *
+ * E44 PR 1 (formato da referência): cada vídeo de evidência traz a linha "formato do vídeo" (as treze chaves do estudo, `config/formatos.ts`), e um parágrafo logo depois das regras numeradas (sem virar a 13ª, para o `porQueAssim` seguir citando de 1 a 12) pede o
+ * roteiro naquele formato, sempre como a versão da própria marca (a tese: um meme adaptado ao negócio, com a cara de quem grava, nunca o vídeo de outro repostado).
+ * Versão 2.9.0.
  */
-export const versao = "2.8.0";
+export const versao = "2.9.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -522,6 +526,14 @@ ${regra9}
     frase curta do que vale a pena olhar nele em oQueOlhar. Se nenhum vídeo da evidência de
     fato serviu de modelo, deixe edicao.referencia nulo inteiro; nunca force uma referência só
     porque existe evidência disponível. Referência errada é pior que referência nenhuma.
+O formato do vídeo de referência (esta não é uma das regras numeradas acima): quando a evidência
+que você usou como modelo trouxer a linha "formato do vídeo", escreva o roteiro NESSE formato
+(um "passo a passo" ensina do começo ao resultado; um "antes e depois" mostra como estava e
+como ficou; um "humor e meme" é uma brincadeira curta; e assim por diante), sempre como a
+versão desta marca: o negócio, a voz e a cara de quem grava, nunca o vídeo de outra pessoa
+repostado nem a mesma piada copiada. Um meme vira a sua versão do assunto, gravada pela
+pessoa, com o que só ela tem (o local, o produto, o cliente). Sem a linha, escolha o formato
+que melhor serve ao tema.
 ${regraVoz}${regraQuemAparece}${regraPersonaConhecido}
 
 O objetivo escolhido muda o roteiro:
@@ -608,6 +620,8 @@ export function montarEntrada(dados: {
     momentoChave?: string;
     /** M4: marca o vídeo de evidência que é ele próprio sem fala, útil de inspiração para este estilo. */
     semFala?: boolean;
+    /** E44 PR 1: o nome do formato do vídeo de referência (`config/formatos.ts`), quando já foi classificado. */
+    formato?: string;
   }[];
   /** Dos ultimos 10 dias (`servicos/roteiro.ts`, `historicoDeRoteiros`), com o gancho de cada um. */
   roteirosRecentes: { tema: string; objetivo: Objetivo; status: string; gancho: string }[];
@@ -652,6 +666,7 @@ export function montarEntrada(dados: {
           .map(
             (v) =>
               `id ${v.id}: ${v.assunto} (fora da curva ${v.foraDaCurva.toFixed(1)}x)${v.semFala ? " (sem fala)" : ""}\n` +
+              (v.formato ? `  formato do vídeo: ${v.formato}\n` : "") +
               `  gancho que funcionou: ${v.gancho}\n` +
               `  estrutura: ${v.estrutura}\n` +
               `  fechamento: ${v.fechamento}\n` +

@@ -5,6 +5,7 @@ import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
 import {
   contagensPorFiltroReferencias,
   referenciasDoNicho,
@@ -111,6 +112,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
   const ramoAtivo = ramos.length > 1 && ramos.some((r) => r.id === ramoNumero) ? ramoNumero : undefined;
   const setores = ramos.length > 1 ? await setoresComPiso(ramos.map((r) => r.id)) : undefined;
 
+  const formatosDaMarca = await filtroDeFormatosDaMarca(cliente.id);
   const favoritos = await favoritosDoCliente(cliente.id);
   const apenasIds = segmento === "salvos" ? [...favoritos] : undefined;
 
@@ -129,7 +131,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
    */
   const contagensFiltro = await contagensPorFiltroReferencias(
     cliente.nichoId,
-    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo, setores, ramoId: ramoAtivo },
+    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo, setores, ramoId: ramoAtivo, formatosDaMarca },
     segmento === "todos",
   );
 
@@ -152,6 +154,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
     tiposConteudo,
     setores,
     ramoId: ramoAtivo,
+    formatosDaMarca,
   };
 
   const resultado =

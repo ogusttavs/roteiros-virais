@@ -26,6 +26,7 @@ import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
+import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 
 export class ErroTemas extends Error {}
@@ -380,6 +381,7 @@ export async function avaliarTema(
       undefined,
       undefined,
       alternativosDaMarca.map((a) => a.nichoId),
+      await filtroDeFormatosDaMarca(cliente.id),
     ),
     modeloNichoAtual(cliente.nichoId),
     regrasAtivasDoCliente(cliente.id),

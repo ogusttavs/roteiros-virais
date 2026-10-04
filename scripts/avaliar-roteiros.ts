@@ -34,6 +34,8 @@ const evidenciaSchema = z.object({
   chamadaFinal: z.string(),
   foraDaCurva: z.number(),
   momentoChave: z.string().optional(),
+  /** E44 PR 1: o nome do formato do vídeo de referência (`config/formatos.ts`), como `servicos/roteiro.ts` o passa ao prompt. */
+  formato: z.string().optional(),
 });
 
 const casoSchema = z.object({

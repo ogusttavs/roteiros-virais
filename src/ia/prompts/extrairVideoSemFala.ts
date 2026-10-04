@@ -1,9 +1,12 @@
 import { z } from "zod";
 
+import { FORMATOS_DO_VIDEO } from "@/config/formatos";
 import { TIPOS_CONTEUDO } from "@/db/schema";
 
 import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
+
+import { definicoesFormato } from "./definicoesFormato";
 
 /**
  * M3, item 2: a ficha fixa de um vídeo (mesmo papel de `extrairVideo`), para o setor que aceita
@@ -37,7 +40,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * reprovar a ficha inteira ou confiar num `serveDeModelo` que o modelo escreveu junto de uma
  * classificação inventada.
  */
-export const versao = "1.4.0";
+export const versao = "1.5.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -61,6 +64,8 @@ const schemaBruto = z.object({
   motivoNicho: z.string(),
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
+  /** E44 PR 1: o formato pela lista fechada (`config/formatos.ts`); aqui os dois "sem fala" são os mais prováveis. */
+  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).catch("outro"),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
@@ -100,6 +105,13 @@ mais a legenda que a pessoa escreveu no post, e extrai uma ficha fixa:
 - serveDeModelo: true só para "original" (a estrutura de como esse vídeo mostra algo é um bom
   exemplo a seguir); false para "recorte", "meme" e "noticia" (o vídeo ainda pode mostrar o que
   está em alta no assunto, mas a forma como ele é mostrado não é um modelo de roteiro).
+- formatoCatalogo: o formato do vídeo, UM destes valores exatos (olhando os quadros, o título e a
+  legenda; sem fala, quase sempre "sem_fala_processo" ou "sem_fala_resultado", mas um vídeo sem fala
+  também pode ser um "antes_e_depois" ou um "produto_em_uso"):
+
+${definicoesFormato()}
+
+  Na dúvida, o formato mais próximo; "outro" só quando nada descreve o vídeo.
 
 Sem travessão, sem emoji. Escreva em português do Brasil, com acentuação correta.`;
 }

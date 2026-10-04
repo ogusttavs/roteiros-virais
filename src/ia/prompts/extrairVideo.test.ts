@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { montarEntrada, schema } from "./extrairVideo";
+import { FORMATOS_DO_VIDEO } from "@/config/formatos";
+
+import { montarEntrada, montarSistemaEstavel, schema } from "./extrairVideo";
 
 const BASE = { titulo: "titulo qualquer", descricao: null, handle: null, transcricao: "transcricao qualquer", nomeNicho: "nicho", termosNicho: [] };
 
@@ -107,5 +109,36 @@ describe("schema, idioma e tipoConteudo invalidos (E43, item 0)", () => {
     expect(resultado.success).toBe(true);
     expect(resultado.success && resultado.data.tipoConteudo).toBe("meme");
     expect(resultado.success && resultado.data.serveDeModelo).toBe(false);
+  });
+});
+
+/** E44 PR 1: o formato pela lista fechada (as treze chaves do cliente mais os valores que nunca servem de modelo). */
+describe("formatoCatalogo", () => {
+  const FICHA = {
+    assunto: "a",
+    gancho: "g",
+    estrutura: "e",
+    fechamento: "f",
+    chamadaFinal: "c",
+    formato: "fala_para_camera",
+    porQueFuncionou: "p",
+    etiquetas: [],
+    pertenceAoNicho: true,
+    motivoNicho: "m",
+    idioma: "pt-BR",
+    tipoAbertura: "outro",
+    tipoConteudo: "original",
+    serveDeModelo: true,
+  };
+
+  it("o prompt traz a definição de uma frase de cada um dos 19 valores", () => {
+    const sistema = montarSistemaEstavel();
+    for (const chave of FORMATOS_DO_VIDEO) expect(sistema, chave).toContain(`"${chave}":`);
+  });
+
+  it("um valor da lista passa; um valor fora da lista vira 'outro' em vez de perder a ficha inteira (mesmo conserto do M5b)", () => {
+    expect(schema.parse({ ...FICHA, formatoCatalogo: "antes_e_depois" })).toMatchObject({ formatoCatalogo: "antes_e_depois" });
+    expect(schema.parse({ ...FICHA, formatoCatalogo: "tutorial" })).toMatchObject({ formatoCatalogo: "outro" });
+    expect(schema.parse(FICHA)).toMatchObject({ formatoCatalogo: "outro" });
   });
 });
