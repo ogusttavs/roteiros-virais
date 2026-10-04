@@ -87,6 +87,30 @@ test.describe("movimento (E51 PR 2)", () => {
     await expect(folha).toHaveCount(0);
   });
 
+  test("a folha centrada do desktop continua centrada depois da animação (a entrada anima `transform`, o centro é a propriedade `translate`)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await entrar(page);
+    await page.goto("/planejamento");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Contar a minha agenda" }).first().click();
+    const folha = page.getByRole("dialog").first();
+    await expect(folha).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+
+    const caixa = (await folha.boundingBox())!;
+    const centroX = caixa.x + caixa.width / 2;
+    const centroY = caixa.y + caixa.height / 2;
+    expect(Math.abs(centroX - 640)).toBeLessThan(2);
+    expect(Math.abs(centroY - 450)).toBeLessThan(2);
+    expect(await folha.evaluate((el) => getComputedStyle(el).translate)).not.toBe("none");
+
+    // E o aperto de um botão não desfaz a posição de nada: depois de apertar e soltar, a folha segue no mesmo lugar.
+    await folha.getByRole("button", { name: "Fechar" }).hover();
+    const depois = (await folha.boundingBox())!;
+    expect(Math.abs(depois.x - caixa.x)).toBeLessThan(1);
+    expect(Math.abs(depois.y - caixa.y)).toBeLessThan(1);
+  });
+
   test("a folha sai pela animação de saída e o foco volta ao botão que a abriu", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);

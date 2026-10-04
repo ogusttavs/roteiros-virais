@@ -52,6 +52,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
 
   return (
     <header
+      data-barra-topo=""
       className={marcas.length > 1 ? `${styles.cabecalho} ${styles.comMarca}` : styles.cabecalho}
       style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}
     >

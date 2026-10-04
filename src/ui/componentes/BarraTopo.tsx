@@ -17,7 +17,7 @@ type Props = {
  */
 export function BarraTopo({ titulo, esquerda, direita }: Props) {
   return (
-    <header className={styles.barra}>
+    <header className={styles.barra} data-barra-topo="">
       {esquerda}
       <span className={styles.titulo}>{titulo}</span>
       {direita ? <span className={styles.direita}>{direita}</span> : null}

@@ -62,3 +62,17 @@ export function formatoPorChave(chave: string | null | undefined): FormatoDoCata
 
 /** As chaves que nascem ligadas (o padrão do estudo): as oito de uma marca que ainda não respondeu. */
 export const CHAVES_LIGADAS_POR_PADRAO = FORMATOS_DO_CATALOGO.filter((f) => f.ligadaPorPadrao).map((f) => f.chave);
+
+/**
+ * O que a pessoa lê (E44, decisão do Fable de 04/10): na tela e nos textos a coisa se chama "tipo de vídeo" e o selo é "Tipo: erro comum", nunca "formato"; por dentro
+ * o nome do banco continua `formato_catalogo`/`formatos_da_marca`. O exemplo de cada tipo é uma frase fixa por tipo, igual para todas as marcas, vinda do estudo
+ * (`pesquisa/estudo-formatos.md`, seção 4): são as treze frases de `FORMATOS_DO_CATALOGO`, reunidas aqui pela chave.
+ */
+export const EXEMPLO_DO_TIPO: Readonly<Record<string, string>> = Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, f.frase]));
+
+/** O selo que o cartão mostra: "Tipo: erro comum" (o nome do tipo em minúscula, depois de "Tipo:"). Vazio para o que não é uma das treze (nunca aparece para o cliente). */
+export function seloDoTipo(chave: string | null | undefined): string | null {
+  const formato = formatoPorChave(chave);
+  if (!formato) return null;
+  return `Tipo: ${formato.nome.charAt(0).toLowerCase()}${formato.nome.slice(1)}`;
+}

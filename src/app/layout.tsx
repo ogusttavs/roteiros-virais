@@ -7,6 +7,7 @@ import { COR_FUNDO_CLARO, COR_FUNDO_ESCURO } from "@/lib/cores-do-aparelho";
 import { sessaoAtual } from "@/lib/sessao";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { OuvinteToque } from "@/ui/componentes/OuvinteToque";
+import { CorDaBarraDoSistema } from "@/ui/CorDaBarraDoSistema";
 
 import "../ui/tokens.css";
 import "../ui/base.css";
@@ -132,6 +133,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       </head>
       <body>
         <OuvinteToque />
+        <CorDaBarraDoSistema />
         {children}
       </body>
     </html>
