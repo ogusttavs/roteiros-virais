@@ -19,6 +19,9 @@ const OUTRA = "e2e-vercomo-outra";
 const OUTRA_EMAIL = "outra-vercomo@exemplo.teste";
 
 let clienteId: number;
+let clienteSemBriefing: number;
+const SEM = "e2e-vercomo-sem";
+const SEM_EMAIL = "sem-briefing-vercomo@exemplo.teste";
 
 async function entrar(page: Page, email: string, aguardar: RegExp) {
   await page.goto("/entrar");
@@ -68,8 +71,23 @@ test.describe("ver como", () => {
     await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
+  test.beforeAll(async () => {
+    const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, SEM));
+    if (!jaExiste) {
+      const [nicho] = await db().insert(nichos).values({ slug: SEM, nome: "[teste] Ver como sem briefing" }).returning();
+      await db().insert(user).values({ id: SEM, name: "Sem Briefing E2E", email: SEM_EMAIL });
+      await db().insert(account).values({ id: `${SEM}-credential`, issuer: "local:credential", accountId: SEM, providerId: "credential", userId: SEM, password: await hashPassword(SENHA) });
+      await db().insert(preferenciasUsuario).values({ usuarioId: SEM, aceitouTermosEm: new Date() });
+      const [marca] = await db().insert(clientes).values({ usuarioId: SEM, nome: "[teste e2e] Marca Sem Briefing", nichoId: nicho.id }).returning();
+      await db().insert(membrosMarca).values({ usuarioId: SEM, clienteId: marca.id, papel: "dono" });
+    }
+    const [m] = await db().select({ id: clientes.id }).from(clientes).where(eq(clientes.usuarioId, SEM));
+    clienteSemBriefing = m.id;
+  });
+
   test("o admin liga o modo, vê o painel da pessoa com a faixa, a recusa vale no servidor, e sai", async ({ page }) => {
     await entrar(page, EMAIL_ADMIN, /\/admin\/?$/);
+    const roteirosAntes = (await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total;
     const sessoesDaPessoaAntes = (await db().select({ total: count() }).from(session).where(eq(session.userId, PESSOA)))[0].total;
 
     await page.goto(`/admin/clientes/${clienteId}`);
@@ -107,7 +125,7 @@ test.describe("ver como", () => {
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
     await expect(page.getByText(/Desligado no modo ver como/)).toBeVisible();
     await expect(page).toHaveURL(/\/criar\/objetivo/);
-    expect((await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total).toBe(0);
+    expect((await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total).toBe(roteirosAntes);
 
     // Conta: o salvar desligado, com o motivo; Sair e o aviso de manhã não aparecem.
     await page.goto("/conta");
@@ -161,5 +179,45 @@ test.describe("ver como", () => {
     await expect(p.locator("[data-faixa-ver-como]")).toHaveCount(0);
     expect((await comoCliente.cookies()).some((c) => c.name === "ver_como")).toBe(false);
     await comoCliente.close();
+  });
+
+  test("as páginas fora do painel também mostram a faixa: o gravar abre no modo, com 'Sair do modo'", async ({ page }) => {
+    const [r] = await db()
+      .insert(roteiros)
+      .values({
+        clienteId,
+        data: hojeISO(),
+        tema: "roteiro do gravar no modo",
+        origem: "livre",
+        objetivo: "alcance",
+        conteudo: { titulo: "roteiro do gravar", duracaoS: 30, gancho: "g", corpo: "c", fechamento: "f", chamadaFinal: "x", cenas: [], porQueAssim: [], cartoes: null, edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null }, evidencias: [] } as never,
+        status: "gerado",
+      } as never)
+      .returning();
+    await entrar(page, EMAIL_ADMIN, /\/admin\/?$/);
+    await page.goto(`/admin/clientes/${clienteId}`);
+    await page.locator('[data-bloco="acesso"]').getByRole("button", { name: "Ver o painel como Paula Vista E2E" }).click();
+    await page.getByRole("dialog", { name: "Ver o painel como" }).getByRole("button", { name: "Ver como Paula Vista E2E" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+    await page.goto(`/roteiros/${r.id}/gravar`);
+    const faixa = page.locator("[data-faixa-ver-como]");
+    await expect(faixa).toContainText("Você está vendo como Paula Vista E2E");
+    await faixa.getByRole("button", { name: "Sair do modo" }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/clientes/${clienteId}$`));
+  });
+
+  test("pessoa sem briefing: /comecar no modo mostra o aviso e a saída, nunca erro nem o assistente", async ({ page }) => {
+    await entrar(page, EMAIL_ADMIN, /\/admin\/?$/);
+    await page.goto(`/admin/clientes/${clienteSemBriefing}`);
+    await page.locator('[data-bloco="acesso"]').getByRole("button", { name: "Ver o painel como Sem Briefing E2E" }).click();
+    await page.getByRole("dialog", { name: "Ver o painel como" }).getByRole("button", { name: "Ver como Sem Briefing E2E" }).click();
+    await expect(page).toHaveURL(/\/comecar/);
+    await expect(page.locator("[data-ver-como-sem-briefing]")).toContainText("Sem Briefing E2E ainda não fez o briefing");
+    await expect(page.locator("[data-faixa-ver-como]")).toBeVisible();
+    // Nada foi criado em nome dela: nem a linha do briefing.
+    const { briefings: tabela } = await import("../../src/db/schema");
+    expect((await db().select().from(tabela).where(eq(tabela.clienteId, clienteSemBriefing))).length).toBe(0);
+    await page.locator("[data-faixa-ver-como]").getByRole("button", { name: "Sair do modo" }).click();
+    await expect(page).toHaveURL(new RegExp(`/admin/clientes/${clienteSemBriefing}$`));
   });
 });

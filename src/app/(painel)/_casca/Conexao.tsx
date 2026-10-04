@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { caminhosEstaticosCarregados, chaveDoEscopo, ehPaginaGuardavel, registrarEscopo } from "@/lib/offline";
+import { caminhosEstaticosCarregados, chaveDoEscopo, ehPaginaGuardavel, limparCachesDoAparelho, registrarEscopo } from "@/lib/offline";
 import { textosConexao } from "@/textos/conexao";
 import { ConexaoContext, ID_FAIXA_SEM_CONEXAO } from "@/ui/ConexaoContext";
 import { useSemRede } from "@/ui/useSemRede";
@@ -26,7 +26,7 @@ import styles from "./Conexao.module.css";
  * por cima de cada recompilacao. Sem suporte do navegador (ou se o registro
  * falhar), o painel funciona igual, so nao abre sem rede.
  */
-export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; marcaId: number; children: ReactNode }) {
+export function Conexao({ usuarioId, marcaId, verComo = false, children }: { usuarioId: string; marcaId: number; verComo?: boolean; children: ReactNode }) {
   const pathname = usePathname();
   // Aparelho sem rede, ou a pagina na tela foi servida do guardado (estado-de-rede.ts).
   const semRede = useSemRede();
@@ -55,6 +55,12 @@ export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; m
 
   const escopo = chaveDoEscopo(usuarioId, marcaId);
   useEffect(() => {
+    // E46 PR 2, "ver como": as páginas da pessoa nunca ficam guardadas no aparelho do admin. Sem escopo o service worker não guarda nada (falha fechada); apaga o que já houver (a
+    // página que acabou de chegar pode ter entrado no escopo do próprio admin antes desta linha rodar) e não registra escopo nem pede para guardar.
+    if (verComo) {
+      void limparCachesDoAparelho();
+      return;
+    }
     if (process.env.NODE_ENV !== "production") return;
     let cancelado = false;
     (async () => {
@@ -77,7 +83,7 @@ export function Conexao({ usuarioId, marcaId, children }: { usuarioId: string; m
     return () => {
       cancelado = true;
     };
-  }, [escopo, pathname]);
+  }, [escopo, pathname, verComo]);
 
   const avisarFalhaDeRede = useCallback(() => setUltimoPedidoCaiu(true), []);
   const valor = useMemo(

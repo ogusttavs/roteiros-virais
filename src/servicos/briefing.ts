@@ -56,6 +56,11 @@ export async function garantirBriefing(clienteId: number): Promise<Briefing> {
   return linha;
 }
 
+/** Lê o briefing sem criar a linha (o "ver como" nunca grava em nome da pessoa). */
+export async function lerBriefing(clienteId: number): Promise<Briefing | null> {
+  return buscarBriefing(clienteId);
+}
+
 async function buscarBriefing(clienteId: number): Promise<Briefing | null> {
   const [linha] = await db().select().from(briefings).where(eq(briefings.clienteId, clienteId));
   return linha ?? null;

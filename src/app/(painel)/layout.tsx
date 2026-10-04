@@ -12,7 +12,7 @@ import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
 import { CapsulaAbas } from "./_casca/CapsulaAbas";
 import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
 import { Conexao } from "./_casca/Conexao";
-import { FaixaVerComo } from "./_casca/FaixaVerComo";
+import { FaixaDoModo } from "./_casca/FaixaVerComo";
 import { SeletorMarcaDesktop } from "./_casca/SeletorMarcaDesktop";
 import { TrocaMarcaProvider } from "./_casca/TrocaMarcaContext";
 import styles from "./layout.module.css";
@@ -51,8 +51,8 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   const marcaAtiva = marcaAtivaResolvida ?? marcas[0] ?? { id: 0, nome: "" };
 
   return (
-    <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id}>
-      {sessao.verComo ? <FaixaVerComo pessoa={sessao.user.name} conta={marcaAtiva.nome} expiraEm={sessao.verComo.expiraEm.getTime()} /> : null}
+    <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id} verComo={sessao.verComo !== null}>
+      <FaixaDoModo verComo={sessao.verComo} pessoa={sessao.user.name} conta={marcaAtiva.nome} />
       <TrocaMarcaProvider>
         <div className={styles.pagina}>
           <CascaCabecalhoCelular

@@ -13,11 +13,9 @@ import { registrarSaidaVerComo } from "@/servicos/ver-como";
  */
 export async function sairDoVerComoAction(): Promise<void> {
   const estado = await lerEstadoVerComo();
-  const jar = await cookies();
-  jar.delete(NOME_COOKIE_VER_COMO);
-  if (estado.estado === "ativo") {
-    await registrarSaidaVerComo(estado.modo.entradaId, "saiu");
-    redirect(`/admin/clientes/${estado.modo.clienteId}`);
-  }
+  // O registro primeiro: se o banco falhar, a entrada não pode ficar aberta com o cookie já apagado (a ação falha, o cookie continua e a pessoa tenta de novo).
+  if (estado.estado === "ativo") await registrarSaidaVerComo(estado.modo.entradaId, "saiu");
+  (await cookies()).delete(NOME_COOKIE_VER_COMO);
+  if (estado.estado === "ativo") redirect(`/admin/clientes/${estado.modo.clienteId}`);
   redirect("/");
 }
