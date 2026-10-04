@@ -38,8 +38,8 @@ function corDaFaixa(): string | null {
 /**
  * A faixa de cima do sistema, atrás do relógio e da bateria (achado do Gustavo no iPhone instalado, 04/10, tema escuro: "devia ser contínuo para parecer mais um
  * app"): o iPhone pinta essa faixa com a cor de `theme-color`, e ela ficava na cor do fundo enquanto o cabeçalho do painel é o vidro, um cinza mais claro. Este efeito
- * mede a cor de verdade do cabeçalho (`[data-barra-topo]`) sobre o fundo, em cada tema, e escreve UMA meta `theme-color` sem `media`, no lugar das do servidor, que só
- * seguem o tema do aparelho e não a escolha da Conta. Refaz quando o tema muda (`data-tema` no `<html>`), quando o aparelho troca de claro para escuro e a cada tela.
+ * mede a cor de verdade do cabeçalho (`[data-barra-topo]`) sobre o fundo, em cada tema, e põe a cor nas metas `theme-color` (tirando o `media` das do servidor, que só
+ * seguem o tema do aparelho e não a escolha da Conta). Refaz quando o tema muda (`data-tema` no `<html>`), quando o aparelho troca de claro para escuro e a cada tela.
  * Sem cabeçalho fixo (modo gravação, Começar, Entrar) a cor é a do fundo daquela tela. O texto do relógio o próprio iOS escolhe (`statusBarStyle: "default"`).
  */
 export function CorDaBarraDoSistema() {
@@ -49,11 +49,20 @@ export function CorDaBarraDoSistema() {
     function aplicar() {
       const cor = corDaFaixa();
       if (!cor) return;
-      document.querySelectorAll('meta[name="theme-color"]').forEach((meta) => meta.remove());
-      const meta = document.createElement("meta");
-      meta.name = "theme-color";
-      meta.content = cor;
-      document.head.appendChild(meta);
+      // Nunca remove nem troca as metas que o Next gerencia (viewport `themeColor`): o React as desmonta na navegação e quebrava com "removeChild" de nulo. Só muda
+      // o atributo delas, tirando o `media` para a cor valer em qualquer tema; sem nenhuma, cria uma.
+      const existentes = document.querySelectorAll('meta[name="theme-color"]');
+      if (existentes.length === 0) {
+        const meta = document.createElement("meta");
+        meta.name = "theme-color";
+        meta.content = cor;
+        document.head.appendChild(meta);
+        return;
+      }
+      existentes.forEach((meta) => {
+        meta.removeAttribute("media");
+        meta.setAttribute("content", cor);
+      });
     }
     aplicar();
     // A tela nova pode demorar um quadro para trazer o cabeçalho: mede de novo logo depois.

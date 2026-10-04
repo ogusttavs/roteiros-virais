@@ -37,7 +37,7 @@ describe("misturarCores", () => {
 });
 
 describe("CorDaBarraDoSistema", () => {
-  it("com cabeçalho fixo, escreve UMA meta com a cor do cabeçalho sobre o fundo, no lugar das do servidor", () => {
+  it("com cabeçalho fixo, põe a cor do cabeçalho sobre o fundo nas metas do servidor, sem remover nenhuma (o React as gerencia) e tirando o media", () => {
     document.body.style.background = "rgb(5, 5, 6)";
     document.body.innerHTML = '<header data-barra-topo="" style="background: rgba(28, 28, 32, 0.82)"></header>';
     for (const media of ["(prefers-color-scheme: light)", "(prefers-color-scheme: dark)"]) {
@@ -50,7 +50,8 @@ describe("CorDaBarraDoSistema", () => {
 
     render(<CorDaBarraDoSistema />);
 
-    expect(metaAtual()).toEqual(["#18181b"]);
+    expect(metaAtual()).toEqual(["#18181b", "#18181b"]);
+    expect(document.head.querySelectorAll('meta[name="theme-color"][media]')).toHaveLength(0);
   });
 
   it("sem cabeçalho fixo (o modo gravação, o Começar, o Entrar), a cor é a do fundo da tela", () => {

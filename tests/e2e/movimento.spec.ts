@@ -55,6 +55,25 @@ test.describe("movimento (E51 PR 2)", () => {
     });
   });
 
+  test("a cor da faixa do sistema (theme-color) acompanha o cabeçalho e navegar não quebra a página (nenhum erro de JavaScript)", async ({ page }) => {
+    const erros: string[] = [];
+    page.on("pageerror", (e) => erros.push(e.message));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page);
+    await page.getByRole("link", { name: "Criar" }).click();
+    await expect(page).toHaveURL(/\/criar$/);
+    await page.getByRole("link", { name: "Hoje" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+    await page.waitForTimeout(600);
+
+    const cores = await page.evaluate(() => Array.from(document.querySelectorAll('meta[name="theme-color"]')).map((m) => m.getAttribute("content")));
+    expect(cores.length).toBeGreaterThan(0);
+    for (const cor of cores) expect(cor).toMatch(/^#[0-9a-f]{6}$/);
+    // Sem `media`: a cor vale na escolha de tema da Conta, não só no tema do aparelho.
+    expect(await page.locator('meta[name="theme-color"][media]').count()).toBe(0);
+    expect(erros).toEqual([]);
+  });
+
   test("a folha arrastada para baixo fecha acompanhando o dedo; solta pouco, volta e continua aberta", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
