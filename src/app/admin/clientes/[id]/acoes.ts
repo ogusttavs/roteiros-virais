@@ -1,24 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 
 import { CUSTO_DIARIO_DE_SETOR_NOVO_USD } from "@/config/precos-ia";
-import type { Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
+import type { Alcance, Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
+import { trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
 import {
+  clientePorId,
   darAcesso,
-  definirPlano,
   ErroCliente,
   garantirSessaoAdmin,
   gerarSenhaNova,
-  mudarTipoMarca,
   renomearCliente,
   renomearPessoa,
   tirarAcesso,
   type ResultadoDarAcesso,
 } from "@/servicos/clientes";
 import { definirFormato, ErroFormato, voltarFormatoAoDoCliente } from "@/servicos/formatos";
+import { ErroNicho } from "@/servicos/nichos";
 import { ErroLimiteDeSetores } from "@/servicos/ramos";
 import { ErroRamosDaConta, ligarRamoAlternativo, previaDeLigarRamo, tirarRamoAlternativo } from "@/servicos/ramos-da-conta";
 import { textosRamo } from "@/textos/ramo";
@@ -61,16 +63,21 @@ export async function tirarAcessoAction(clienteId: number, usuarioId: string): P
 
 /** V9b-0, item 1: o interruptor de plano em `/admin/clientes/[id]`. */
 export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): Promise<void> {
-  garantirSessaoAdmin(await sessaoAtual());
-  await definirPlano(clienteId, plano);
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  if (!Number.isInteger(clienteId) || (plano !== "padrao" && plano !== "sem_limite")) throw new ErroCliente("pedido invalido.");
+  await trocarPlanoDaConta(clienteId, plano, sessao!.user.id);
   revalidatePath(`/admin/clientes/${clienteId}`);
 }
 
 /** P1, item 1: trocar o tipo de conteúdo em `/admin/clientes/[id]`; apaga o briefing (a tela já confirmou). */
 export async function mudarTipoMarcaAction(clienteId: number, tipo: TipoMarca): Promise<ResultadoAcao<Cliente>> {
-  garantirSessaoAdmin(await sessaoAtual());
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  if (tipo !== "negocio" && tipo !== "pessoa") return { ok: false, erro: "pedido invalido." };
   try {
-    const cliente = await mudarTipoMarca(clienteId, tipo);
+    await trocarTipoDaConta(clienteId, tipo, sessao!.user.id);
+    const cliente = (await clientePorId(clienteId))!;
     revalidatePath(`/admin/clientes/${clienteId}`);
     revalidatePath("/admin/clientes");
     return { ok: true, dado: cliente };
@@ -181,4 +188,49 @@ export async function voltarFormatoAoDoClienteAction(clienteId: number, chave: s
   }
   revalidatePath(`/admin/clientes/${clienteId}`);
   return { ok: true, dado: null };
+}
+
+/** E46 PR 1, item 4: trocar o ramo principal da conta. O briefing e os roteiros ficam; a base de vídeos e os temas passam a ser os do ramo novo a partir da próxima madrugada. */
+export async function trocarRamoDaContaAction(clienteId: number, ramoSlug: string): Promise<ResultadoAcao<{ mudou: boolean }>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  try {
+    const dado = await trocarRamoDaConta(clienteId, ramoSlug, sessao!.user.id);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    revalidatePath("/admin/clientes");
+    return { ok: true, dado };
+  } catch (erro) {
+    if (erro instanceof ErroLimiteDeSetores) return { ok: false, erro: textosRamo.limiteDeRamosNovos };
+    if (erro instanceof ErroCliente || erro instanceof ErroNicho) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+/** E46 PR 1, item 4: a rede principal da conta. */
+export async function trocarRedePrincipalAction(clienteId: number, rede: string): Promise<ResultadoAcao<null>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  try {
+    await trocarRedeDaConta(clienteId, rede, sessao!.user.id);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroCliente) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+/** E46 PR 1, item 4: o público da conta (Brasil todo, uma cidade ou região, outro país, mais de um). */
+export async function trocarPublicoDaContaAction(clienteId: number, dados: { alcance: Alcance; regiao?: string; pais?: string; paises?: string }): Promise<ResultadoAcao<null>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  try {
+    await trocarPublicoDaConta(clienteId, dados, sessao!.user.id);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroCliente) return { ok: false, erro: erro.message };
+    if (erro instanceof ZodError) return { ok: false, erro: erro.issues[0]?.message ?? "confira o que foi escrito." };
+    throw erro;
+  }
 }

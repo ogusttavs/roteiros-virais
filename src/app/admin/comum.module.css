@@ -1,0 +1,270 @@
+/*
+ * O que o Início, a lista de Contas e a página da conta (E46 PR 1) dividem: o cartão, a tabela, a etiqueta, o par rótulo e valor, a barra de meta, os botões de link.
+ * Traduzido de `entregaveis/design-v2/entrega/telas/admin.css` (passo 15 do Opus); o que é só de uma tela fica no módulo dela.
+ */
+.pagina {
+  display: grid;
+  gap: var(--espaco-6);
+  align-content: start;
+  min-width: 0;
+}
+
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--espaco-4);
+}
+
+.titulos {
+  display: grid;
+  gap: var(--espaco-1);
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.topo h1 {
+  font-size: var(--tamanho-titulo-1);
+}
+
+.linhaDoDia {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.acoesTopo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+.cartao {
+  display: grid;
+  gap: var(--espaco-5);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-5);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  box-sizing: border-box;
+}
+
+.cartao h2 {
+  font-size: var(--tamanho-titulo-2);
+}
+
+.cartao h3 {
+  font-size: var(--tamanho-cabecalho);
+}
+
+.tabelaTitulo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.quantos {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.verTodos {
+  margin-left: auto;
+}
+
+.semDado {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.rotulo {
+  margin: 0;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+/* Botões que são link: o de texto e o vazio (contorno), no tamanho pequeno do admin, com alvo de 44 px. */
+.botaoTexto,
+.botaoVazio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-acao);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.botaoVazio {
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  color: var(--cor-titulo);
+  background: var(--cor-superficie);
+}
+
+.botaoTexto:hover {
+  text-decoration: underline;
+}
+
+.botaoVazio:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoTexto:focus-visible,
+.botaoVazio:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+/* Tabela: rola na horizontal dentro da própria área, nunca a página. */
+.tabelaArea {
+  overflow-x: auto;
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--tamanho-secundario);
+}
+
+.tabela th,
+.tabela td {
+  padding: var(--espaco-3) var(--espaco-4);
+  text-align: left;
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+  white-space: nowrap;
+}
+
+.tabela tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.tabela thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-dica);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.4 var(--fonte-mono);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+.tabela tbody tr:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.tabela td.num,
+.tabela th.num {
+  text-align: right;
+}
+
+.tabela td.num {
+  font-family: var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.forte {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-medio);
+}
+
+.corta {
+  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabelaCompacta th,
+.tabelaCompacta td {
+  padding-inline: var(--espaco-3);
+}
+
+.etiqueta {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--espaco-2);
+  min-height: 1.5rem;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-suave);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.5 var(--fonte-mono);
+}
+
+.etiquetaAtiva {
+  color: var(--cor-positivo);
+  background: var(--cor-positivo-fundo);
+}
+
+.etiquetaAtencao {
+  color: var(--cor-atencao);
+  background: var(--cor-atencao-fundo);
+}
+
+.etiquetaErro {
+  color: var(--cor-erro);
+  background: var(--cor-erro-fundo);
+}
+
+.dados {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--espaco-4);
+}
+
+.dado {
+  display: grid;
+  gap: var(--espaco-1);
+  min-width: 0;
+}
+
+.dado dt {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+.dado dd {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.barraMeta {
+  display: block;
+  height: 0.375rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-nota-trilho);
+  overflow: hidden;
+  position: relative;
+}
+
+.barraMeta i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--cor-acao);
+}
+
+.somenteLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

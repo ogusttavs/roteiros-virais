@@ -1,0 +1,292 @@
+/*
+ * A lista de Contas (E46 PR 1, `AdminClientes.dc.html` e `admin.css`): os contadores que filtram, a busca por conta ou pessoa, a tabela com os últimos sete dias de cada
+ * conta. O que é comum (cartão, tabela, etiqueta) está em `../comum.module.css`.
+ */
+.visaoContas {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.contadores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-3);
+}
+
+.contador {
+  display: grid;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3) var(--espaco-4);
+  min-width: 7rem;
+  min-height: var(--altura-toque);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.contador:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.contador[aria-pressed="true"] {
+  border-color: var(--cor-acao);
+  background: var(--cor-selecao-suave);
+}
+
+.contador:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.valor {
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.doQue {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.doQue b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.legendaUso {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.legendaUso span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+}
+
+.semanaUso {
+  display: inline-flex;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.semanaUso i,
+.legendaUso i {
+  display: block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 4px;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+}
+
+.legendaUso i {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.gravou {
+  background: var(--cor-destaque) !important;
+  border-color: transparent !important;
+}
+
+.gerou {
+  background: var(--cor-texto-desabilitado) !important;
+  border-color: transparent !important;
+}
+
+.entrou {
+  border-color: var(--cor-texto-dica) !important;
+  background: radial-gradient(circle, var(--cor-texto-dica) 28%, transparent 32%) !important;
+}
+
+.filtros {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.busca {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  flex: 1 1 16rem;
+  max-width: 28rem;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-dica);
+}
+
+.busca input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--cor-titulo);
+  font: inherit;
+  font-size: var(--tamanho-secundario);
+}
+
+.busca:focus-within {
+  box-shadow: var(--sombra-foco);
+}
+
+.achadosPessoa {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.achadosPessoa svg {
+  flex: 0 0 auto;
+}
+
+.achadosPessoa b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.vazio h3 {
+  margin: 0;
+}
+
+.tabelaContas td {
+  vertical-align: top;
+}
+
+.nomeCliente {
+  white-space: normal !important;
+  min-width: 12rem;
+  max-width: 15rem;
+}
+
+.celulaLink {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  min-width: 0;
+  color: var(--cor-acao);
+  text-decoration: none;
+}
+
+.celulaLink:hover {
+  text-decoration: underline;
+}
+
+.subConta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--espaco-2);
+  margin-top: 2px;
+  font-weight: var(--peso-regular);
+}
+
+.tipoConta {
+  display: inline-flex;
+  align-items: center;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.ramoConta {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+  white-space: normal;
+}
+
+.pessoasCelula {
+  min-width: 11rem;
+  max-width: 13rem;
+  white-space: normal !important;
+}
+
+.nomePessoa {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2);
+  color: var(--cor-titulo);
+}
+
+.emailPessoa,
+.detalhePessoa {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.4 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.maisPessoas {
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  font: var(--peso-medio) var(--tamanho-legenda) / 1.6 var(--fonte-mono);
+  color: var(--cor-texto-suave);
+  white-space: nowrap;
+}
+
+.marcaSim,
+.marcaNao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-rodape);
+  font-family: var(--fonte-mono);
+}
+
+.marcaSim {
+  color: var(--cor-positivo);
+}
+
+.marcaNao {
+  color: var(--cor-texto-dica);
+}
+
+.ultimoCelula span {
+  display: block;
+}
+
+.semGravar {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.atencaoNum {
+  color: var(--cor-atencao) !important;
+  font-weight: var(--peso-semibold);
+}
+
+.mono {
+  font-family: var(--fonte-mono);
+}
+
+.tabelaContas mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+}
+
+@media (max-width: 1179px) {
+  .tabelaContas th,
+  .tabelaContas td {
+    padding-inline: var(--espaco-3);
+  }
+}

@@ -1,0 +1,166 @@
+/* O bloco Identidade (`admin.css`/`AdminCliente.dc.html`: `.campos-conta`, `.campo-conta`, `.aviso-troca`, `.acoes-editor`). */
+.campos {
+  display: grid;
+  margin: 0;
+}
+
+.campo {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+  min-height: var(--altura-toque-lg, 3.5rem);
+  padding: var(--espaco-2) 0;
+}
+
+.campo + .campo {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.campo dt {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+}
+
+.campo dd {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+/* Editando: a linha abre, com o fundo recuado, e o rótulo vai para cima. */
+.editando {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  margin-block: var(--espaco-2);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.editando + .campo,
+.campo + .editando {
+  border-top-color: transparent;
+}
+
+.comErro {
+  box-shadow: inset 3px 0 0 var(--cor-erro);
+}
+
+.editor {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.editor button {
+  white-space: nowrap;
+}
+
+.formulario {
+  display: grid;
+  gap: var(--espaco-3);
+}
+
+.entrada {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font: inherit;
+  font-size: var(--tamanho-secundario);
+}
+
+.entrada:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font: inherit;
+  font-size: var(--tamanho-secundario);
+  cursor: pointer;
+}
+
+.chip[aria-checked="true"] {
+  border-color: var(--cor-acao);
+  background: var(--cor-selecao-suave);
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.avisoTroca {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-rodape);
+}
+
+.avisoTroca svg {
+  margin-top: 0.1rem;
+  color: var(--cor-atencao);
+}
+
+.erroCampo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.salvoAgora {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  margin-left: var(--espaco-2);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-positivo);
+  vertical-align: middle;
+}
+
+/* No celular (o admin só precisa não quebrar), o rótulo de cada linha vai para cima. */
+@media (max-width: 767px) {
+  .campo {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .campo dt {
+    grid-column: 1 / -1;
+  }
+}

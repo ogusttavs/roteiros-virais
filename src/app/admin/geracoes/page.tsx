@@ -1,6 +1,7 @@
 import { List } from "lucide-react";
 import Link from "next/link";
 
+import { CAMBIO_USD_BRL } from "@/config/dinheiro";
 import type { AvaliacaoGeracao } from "@/db/schema";
 import { exigirAdmin } from "@/lib/sessao";
 import {
@@ -19,7 +20,6 @@ import { FiltroGeracoes } from "./FiltroGeracoes";
 import styles from "./page.module.css";
 
 const t = textosAdmin.geracoes;
-const CAMBIO_USD_BRL = 5.5;
 
 function formatarData(data: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(data);

@@ -70,7 +70,7 @@ test.describe("/admin/viagem", () => {
     await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
     await page.getByLabel("Senha").fill(SENHA_ADMIN);
     await page.getByRole("button", { name: "entrar", exact: true }).click();
-    await expect(page).toHaveURL(/\/admin\/clientes/);
+    await expect(page).toHaveURL(/\/admin\/?$/);
 
     await page.goto("/admin/viagem");
     await expect(page.getByRole("heading", { name: "Viagem", exact: true })).toBeVisible();

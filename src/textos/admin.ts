@@ -14,18 +14,19 @@ function formatarDiaMesAbreviado(data: Date): string {
 
 export const textosAdmin = {
   navegacao: {
-    equipe: "Equipe",
-    clientes: "Marcas",
-    nichos: "Nichos",
-    jobs: "Jobs",
+    equipe: "admin",
+    inicio: "Início",
+    clientes: "Contas",
+    nichos: "Ramos",
+    jobs: "Rotinas",
     geracoes: "Gerações",
     viagem: "Viagem",
     sair: "sair",
     saindo: "saindo",
   },
   clientes: {
-    titulo: "Marcas",
-    subtitulo: (n: number) => (n === 1 ? "1 marca" : `${n} marcas`),
+    titulo: "Contas",
+    subtitulo: (n: number) => (n === 1 ? "1 conta" : `${n} contas`),
     buscar: "buscar por nome",
     colunaMarca: "marca",
     colunaNicho: "nicho",
@@ -50,8 +51,8 @@ export const textosAdmin = {
     vazio: "Nenhuma marca ainda. Crie a primeira para começar.",
     semResultado: "nenhuma marca com esse nome",
     /** V12b, item 2: a marca nasce sem ninguém; a pessoa entra depois, dentro dela ("dar acesso"). */
-    novaMarca: "nova marca",
-    modalTitulo: "Nova marca",
+    novaMarca: "nova conta",
+    modalTitulo: "Nova conta",
     campoNome: "nome",
     campoNicho: "nicho",
     /** V12b, item 2: ao lado do campo nicho, quando o setor da marca ainda não existe na lista. */
@@ -64,12 +65,12 @@ export const textosAdmin = {
     campoPlano: "roteiros por dia",
     planoPadrao: "um por dia",
     planoSemLimite: "sem limite",
-    botaoCriar: "criar marca",
+    botaoCriar: "criar conta",
     criando: "criando",
-    erroCriar: "não conseguimos criar a marca; confira os dados e tente de novo",
+    erroCriar: "não conseguimos criar a conta; confira os dados e tente de novo",
   },
   nichos: {
-    titulo: "Nichos",
+    titulo: "Ramos",
     subtitulo: (n: number) => (n === 1 ? "1 nicho" : `${n} nichos`),
     colunaNome: "nome",
     colunaVideos: "vídeos no banco",
@@ -297,7 +298,7 @@ export const textosAdmin = {
     verVideoDeExemplo: "ver vídeo de exemplo",
   },
   jobs: {
-    titulo: "Jobs",
+    titulo: "Rotinas",
     subtitulo: (n: number) => (n === 1 ? "1 execução" : `${n} execuções`),
     filtroTodos: "todos",
     colunaJob: "job",

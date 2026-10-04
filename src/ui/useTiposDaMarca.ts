@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { responderFormatosAction } from "@/app/(painel)/_casca/formatos-acoes";
 import { FORMATOS_DO_CATALOGO } from "@/config/formatos";
@@ -16,12 +16,22 @@ export type TipoLigado = { chave: string; ligada: boolean };
 export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
   const [estado, setEstado] = useState<Record<string, boolean>>(() => Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, iniciais.find((i) => i.chave === f.chave)?.ligada ?? f.ligadaPorPadrao])));
   const [erro, setErro] = useState<string | null>(null);
+  // Quando o servidor manda outra lista (a página recarregou), ela vale de novo, mas só sem troca a caminho.
+  const emVoo = useRef(0);
+  const chaveDasIniciais = iniciais.map((i) => `${i.chave}:${i.ligada ? 1 : 0}`).join(",");
+  useEffect(() => {
+    if (emVoo.current === 0) setEstado(Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, iniciais.find((i) => i.chave === f.chave)?.ligada ?? f.ligadaPorPadrao])));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chaveDasIniciais]);
   // Duas trocas em seguida na mesma chave não se atropelam: a última a voltar do servidor é a que vale.
   const ultimaDaChave = useRef<Record<string, number>>({});
 
   async function trocar(chave: string, ligada: boolean) {
     setErro(null);
+    // O que a chave era antes DESTE clique: se falhar, volta para isso (e não para o contrário do pedido, que erra quando dois cliques seguidos se cruzam).
+    const antes = estado[chave];
     setEstado((atual) => ({ ...atual, [chave]: ligada }));
+    emVoo.current += 1;
     const numero = (ultimaDaChave.current[chave] ?? 0) + 1;
     ultimaDaChave.current[chave] = numero;
     let gravou = false;
@@ -30,8 +40,9 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
     } catch {
       gravou = false;
     }
+    emVoo.current -= 1;
     if (!gravou && ultimaDaChave.current[chave] === numero) {
-      setEstado((atual) => ({ ...atual, [chave]: !ligada }));
+      setEstado((atual) => ({ ...atual, [chave]: antes }));
       setErro(textosTipos.erro);
     }
   }

@@ -16,7 +16,7 @@ test("periodo (chips) e filtro por tarefa mudam a URL e a tela", async ({ page }
   await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
   await page.getByLabel("Senha").fill(SENHA_ADMIN);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/clientes/);
+  await expect(page).toHaveURL(/\/admin\/?$/);
 
   await page.goto("/admin/geracoes");
   await expect(page.getByRole("heading", { name: "Gerações", exact: true })).toBeVisible();

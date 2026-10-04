@@ -1,70 +1,47 @@
 .pagina {
   min-height: 100vh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: var(--largura-barra-lateral) minmax(0, 1fr);
+  align-items: start;
 }
 
-.cabecalho {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-6);
-  height: 56px;
-  padding: 0 var(--espaco-8);
-  border-bottom: 1px solid var(--cor-borda);
+.pagina > * {
+  min-width: 0;
+}
+
+.corpo {
+  padding: var(--espaco-6) var(--espaco-6) var(--espaco-12);
   box-sizing: border-box;
+  min-width: 0;
 }
 
-@media (max-width: 767px) {
-  .cabecalho {
-    padding: 0 var(--margem-celular);
+@media (min-width: 1180px) {
+  .corpo {
+    padding-inline: var(--espaco-8);
   }
 }
 
-.identidade {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-3);
+/* A barra recolhe para só os ícones a 1180 px ou menos (iPad): o logotipo cede o lugar à claquete. */
+.logotipo {
+  display: block;
 }
 
-.equipe {
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-rotulo);
-  letter-spacing: var(--espacamento-rotulo);
-  text-transform: uppercase;
-  color: var(--cor-texto-suave);
+.simbolo {
+  display: none;
 }
 
-.conta {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--espaco-3);
-}
+@media (max-width: 1179px) {
+  .pagina {
+    grid-template-columns: var(--largura-barra-recolhida) minmax(0, 1fr);
+  }
 
-.nomeConta {
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
-}
-
-@media (max-width: 767px) {
-  .nomeConta {
+  .logotipo {
     display: none;
   }
-}
 
-.avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--cor-superficie-recuada);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--fonte-mono);
-  font-size: var(--tamanho-legenda);
-  color: var(--cor-titulo);
+  .simbolo {
+    display: block;
+  }
 }
 
 .sair {
@@ -74,6 +51,8 @@
   color: var(--cor-texto-suave);
   font-family: var(--fonte-texto);
   font-size: var(--tamanho-secundario);
+  text-align: left;
+  min-height: var(--altura-toque);
   cursor: pointer;
 }
 
@@ -81,15 +60,11 @@
   color: var(--cor-titulo);
 }
 
-.corpo {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--espaco-8);
-  box-sizing: border-box;
-}
-
 @media (max-width: 767px) {
+  .pagina {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .corpo {
     padding: var(--espaco-6) var(--margem-celular);
   }

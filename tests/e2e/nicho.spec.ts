@@ -31,7 +31,7 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
   await page.getByLabel("Senha").fill(SENHA_ADMIN);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/clientes/);
+  await expect(page).toHaveURL(/\/admin\/?$/);
 
   await page.goto("/admin/nichos");
   await page.getByRole("button", { name: "novo nicho" }).click();
@@ -90,15 +90,15 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await expect(page.getByLabel("piso de views", { exact: true })).toHaveValue("");
 
   await page.goto("/admin/clientes");
-  await page.getByRole("button", { name: "nova marca" }).click();
-  const modalNovaMarca = page.getByRole("dialog", { name: "Nova marca" });
+  await page.getByRole("button", { name: "nova conta" }).click();
+  const modalNovaMarca = page.getByRole("dialog", { name: "Nova conta" });
   await modalNovaMarca.getByLabel("nome", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
   // V9a, item 4 / V12b, item 1: o modal tem um segundo select ("tipo de conteudo"), entao o
   // antigo atalho por getByRole("combobox") (o unico da modal) deixou de resolver so um
   // elemento; os selects tem aria-label igual ao rotulo visivel (mesma regra dos demais,
   // plataforma/CLAUDE.md).
   await modalNovaMarca.getByLabel("nicho", { exact: true }).selectOption({ label: NOME_NICHO });
-  await modalNovaMarca.getByRole("button", { name: "criar marca" }).click();
+  await modalNovaMarca.getByRole("button", { name: "criar conta" }).click();
 
   // V12b, item 2: a marca nasce sem ninguem; a pessoa entra depois, na propria pagina da
   // marca, por "dar acesso" (item 4), com a mesma senha gerada de sempre (V3, item 5; mesmo

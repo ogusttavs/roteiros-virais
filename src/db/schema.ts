@@ -706,6 +706,28 @@ export const formatosDaMarca = pgTable(
 );
 export type FormatoDaMarca = typeof formatosDaMarca.$inferSelect;
 
+/**
+ * E46 PR 1: o registro de tudo o que o admin troca na página de uma conta (ramo, tipo, rede, público, limite): quem, o quê, quando, com o antes e o depois em
+ * texto curto. Só se acrescenta, nunca se edita. A conta apagada leva o registro junto (cascade); a pessoa apagada deixa a linha sem nome (set null).
+ */
+export const alteracoesDoAdmin = pgTable(
+  "alteracoes_do_admin",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    porUsuarioId: text("por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+    /** Chave curta do que mudou: "ramo", "tipo", "rede_principal", "publico", "roteiros_por_dia". */
+    campo: text("campo").notNull(),
+    antes: text("antes"),
+    depois: text("depois"),
+    em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("alteracoes_do_admin_cliente_em").on(t.clienteId, t.em)],
+);
+export type AlteracaoDoAdmin = typeof alteracoesDoAdmin.$inferSelect;
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------

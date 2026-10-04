@@ -1,0 +1,248 @@
+/*
+ * O Início do admin (E46 PR 1, `AdminInicio.dc.html`): a tela da manhã. Duas pilhas que não dependem uma da outra: à esquerda o que aconteceu (o estado, a madrugada, os
+ * erros), à direita os números (o dinheiro, as contas, o produto). O que é comum (cartão, tabela, etiqueta) está em `comum.module.css`.
+ */
+.inicio {
+  display: grid;
+  gap: var(--espaco-6);
+  align-items: start;
+}
+
+.inicio > * {
+  min-width: 0;
+}
+
+.pilha {
+  display: grid;
+  gap: var(--espaco-6);
+  align-content: start;
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .inicio {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 1600px) {
+  .inicio {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+/* A frase de estado: a primeira coisa que se lê de manhã. */
+.estadoManha {
+  gap: var(--espaco-4);
+}
+
+.fraseEstado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-forte);
+  color: var(--cor-titulo);
+}
+
+.fraseEstado svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+}
+
+.fraseCerta svg {
+  color: var(--cor-positivo);
+}
+
+.fraseAtencao svg {
+  color: var(--cor-atencao);
+}
+
+.listaAtencao {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.itemAtencao {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+  padding: var(--espaco-3) 0;
+}
+
+.itemAtencao + .itemAtencao {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.itemAtencao > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--cor-atencao);
+}
+
+.oque {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oque strong {
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+}
+
+.quando {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.tudoCertoLinha {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+/* A madrugada: um ramo por linha, as etapas em colunas. */
+.etapa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  white-space: nowrap;
+}
+
+.etapa svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.certo svg {
+  color: var(--cor-positivo);
+}
+
+.falhou {
+  color: var(--cor-atencao);
+  font-weight: var(--peso-semibold);
+}
+
+.falhou svg {
+  color: var(--cor-atencao);
+}
+
+.resumoRamos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2) var(--espaco-4);
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.resumoRamos b {
+  color: var(--cor-titulo);
+  font-family: var(--fonte-mono);
+}
+
+/* Os últimos erros. */
+.errosRecentes {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erroRecente {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-1) var(--espaco-4);
+  padding: var(--espaco-3) 0;
+}
+
+.erroRecente + .erroRecente {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.oqueErro {
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  overflow-wrap: anywhere;
+}
+
+.onde {
+  grid-column: 1;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.erroRecente > :last-child {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+/* O dinheiro: o que saiu, o que entrou, o resultado. Reais primeiro, o dólar e o câmbio escritos. */
+.dinheiro {
+  gap: var(--espaco-5);
+}
+
+.linhaDinheiro {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.valorDinheiro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--espaco-1) var(--espaco-3);
+}
+
+.valorDinheiro b {
+  font: var(--peso-semibold) var(--tamanho-titulo-1) / 1 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+.valorDinheiro span {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.resultado {
+  padding-top: var(--espaco-4);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.semCobranca {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.cambio {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.numerosBloco {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-4);
+  margin: 0;
+}
+
+.numerosBloco dd {
+  font: var(--peso-semibold) var(--tamanho-titulo-2) / 1 var(--fonte-mono);
+}
+
+.numerosBloco dd.atencaoNum {
+  color: var(--cor-atencao);
+}

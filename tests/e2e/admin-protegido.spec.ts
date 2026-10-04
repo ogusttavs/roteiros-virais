@@ -156,6 +156,15 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
     ]);
   });
 
+  // E46 PR 1: o Início e a lista de Contas, com a mesma prova (o corpo da resposta, sem seguir o redirecionamento).
+  test("inicio: so a sessao de admin ve a madrugada, o dinheiro e os numeros das contas", async ({ page, request }) => {
+    await provarQueSoAdminVe(page, request, "/admin", ["/admin"], ["A madrugada", "O dinheiro", "As contas"]);
+  });
+
+  test("contas: so a sessao de admin ve o nome e o e-mail das pessoas", async ({ page, request }) => {
+    await provarQueSoAdminVe(page, request, "/admin/clientes", ["/admin/clientes"], [clienteNome, clienteEmail]);
+  });
+
   // V10, item 1: a mesma prova das outras telas do admin, agora para /admin/viagem.
   test("viagem: so a sessao de admin ve o nome da marca", async ({ page, request }) => {
     await provarQueSoAdminVe(page, request, "/admin/viagem", ["/admin/viagem"], [clienteNome]);
