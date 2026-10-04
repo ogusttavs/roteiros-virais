@@ -49,6 +49,8 @@ export function usePuxarParaFechar(fechar: () => void): {
 
   const aoIniciar = useCallback((evento: PointerEventReact<HTMLElement>) => {
     if (evento.pointerType === "mouse" && evento.button !== 0) return;
+    // Do tablet para cima a folha é um painel no meio da tela, sem alça: o título não é uma área de arrastar (com o mouse fechava a folha sem querer).
+    if (window.matchMedia("(min-width: 768px)").matches) return;
     inicio.current = { y: evento.clientY, t: evento.timeStamp };
     evento.currentTarget.setPointerCapture(evento.pointerId);
     if (folhaRef.current) folhaRef.current.style.transition = "none";
@@ -85,13 +87,18 @@ export function usePuxarParaFechar(fechar: () => void): {
       if (fecha) {
         // A saída (`folha-desce`) parte de `--arrasto` e o véu volta ao controle do CSS (`veu-some`).
         folha.style.transition = "none";
-        if (veu) veu.style.opacity = "";
+        // A opacidade do véu continua inline até a folha sair: limpá-la aqui fazia o véu voltar a 100% antes de `veu-some` partir de `--opacidade-veu`.
         fechar();
         // Se a folha continuar montada (fechar recusado), volta ao lugar com a mola.
         setTimeout(() => {
           if (folhaRef.current && !folhaRef.current.hasAttribute("data-saindo")) {
             folhaRef.current.style.transition = "transform var(--duracao-soltar) var(--curva-mola)";
             folhaRef.current.style.setProperty("--arrasto", "0px");
+            const veuAgora = veuDaFolha();
+            if (veuAgora) {
+              veuAgora.style.opacity = "";
+              veuAgora.style.removeProperty("--opacidade-veu");
+            }
           }
         }, 400);
         return;

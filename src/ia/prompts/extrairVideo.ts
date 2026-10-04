@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+import { FORMATOS_DO_VIDEO } from "@/config/formatos";
 import { TIPOS_ABERTURA, TIPOS_CONTEUDO } from "@/db/schema";
 
 import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { definicoesFormato } from "./definicoesFormato";
 import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
 
 /**
@@ -76,8 +78,12 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * ganha o mesmo tratamento, mas acoplado a `serveDeModelo` (`corrigirTipoConteudoInvalido`,
  * `ia/tipo-video-seguro.ts`): vira "original" com `serveDeModelo` forçado para `false`, nunca
  * confiando no que o modelo escreveu para esse campo junto de uma classificação inventada.
+ *
+ * Formato do vídeo (1.11.0, E44 PR 1, `pesquisa/estudo-formatos.md`): `formatoCatalogo` classifica o vídeo numa lista fechada (as treze chaves do cliente mais
+ * os valores que nunca servem de modelo, `config/formatos.ts`), gravado em `videos.formato_catalogo` por `extracao-comum.ts`. Valor fora da lista ou ausente vira nulo (a ficha
+ * continua aprovada, como no M5b; "outro" fica só para quando o modelo o escolhe); o `formato` antigo de cinco valores e o `tipoConteudo` continuam até o PR 2.
  */
-export const versao = "1.10.0";
+export const versao = "1.11.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -104,6 +110,9 @@ const schemaBruto = z.object({
   tipoAbertura: z.enum(TIPOS_ABERTURA).catch("outro"),
   tipoConteudo: z.enum(TIPOS_CONTEUDO),
   serveDeModelo: z.boolean(),
+  // Valor fora da lista ou ausente vira NULO (a ficha continua aprovada): "outro" é um valor legítimo quando o modelo o escolhe, e gravá-lo no lugar de um erro tiraria o vídeo
+  // da evidência de toda marca sem que nada o reclassificasse. Nulo passa pelo corte da H4 e a reclassificação o pega de volta.
+  formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).nullable().catch(null),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
@@ -152,6 +161,14 @@ ${definicoesTipoAbertura()}
 - serveDeModelo: true só para "original" (a estrutura de como esse vídeo conta algo é um bom
   exemplo a seguir); false para "recorte", "meme" e "noticia" (o vídeo ainda pode mostrar o que
   está em alta no assunto, mas a forma como ele é contado não é um modelo de roteiro).
+
+- formatoCatalogo: o formato do vídeo, UM destes valores exatos (escolha o que melhor descreve
+  como o vídeo é feito, olhando o título, a legenda e a transcrição):
+
+${definicoesFormato()}
+
+  Na dúvida entre um formato e "outro", escolha o formato mais próximo; "outro" só quando nada
+  descreve o vídeo. Um vídeo de outra pessoa reaproveitado é "recorte_de_outro", nunca um formato do cliente.
 
 Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
 Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem

@@ -18,6 +18,7 @@ import {
   tirarAcesso,
   type ResultadoDarAcesso,
 } from "@/servicos/clientes";
+import { definirFormato, ErroFormato, voltarFormatoAoDoCliente } from "@/servicos/formatos";
 import { ErroLimiteDeSetores } from "@/servicos/ramos";
 import { ErroRamosDaConta, ligarRamoAlternativo, previaDeLigarRamo, tirarRamoAlternativo } from "@/servicos/ramos-da-conta";
 import { textosRamo } from "@/textos/ramo";
@@ -151,4 +152,33 @@ export async function tirarRamoAlternativoAction(clienteId: number, ramoDaContaI
     if (erro instanceof ErroRamosDaConta) return { ok: false, erro: erro.message };
     throw erro;
   }
+}
+
+/** E44 PR 1: o admin corrige uma chave de formato da marca (vale por cima da resposta do cliente). A tela é do PR 2. */
+export async function definirFormatoDaMarcaAction(clienteId: number, chave: string, ligada: boolean): Promise<ResultadoAcao<null>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  if (!Number.isInteger(clienteId) || typeof chave !== "string" || typeof ligada !== "boolean") return { ok: false, erro: "Pedido inválido." };
+  try {
+    await definirFormato(clienteId, chave, ligada, "admin", sessao!.user.id);
+  } catch (erro) {
+    if (erro instanceof ErroFormato) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+  revalidatePath(`/admin/clientes/${clienteId}`);
+  return { ok: true, dado: null };
+}
+
+/** E44 PR 1: "voltar ao que o cliente escolheu": apaga a correção do admin dessa chave. */
+export async function voltarFormatoAoDoClienteAction(clienteId: number, chave: string): Promise<ResultadoAcao<null>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  if (!Number.isInteger(clienteId) || typeof chave !== "string") return { ok: false, erro: "Pedido inválido." };
+  try {
+    await voltarFormatoAoDoCliente(clienteId, chave);
+  } catch (erro) {
+    if (erro instanceof ErroFormato) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+  revalidatePath(`/admin/clientes/${clienteId}`);
+  return { ok: true, dado: null };
 }

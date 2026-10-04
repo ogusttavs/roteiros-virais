@@ -55,6 +55,25 @@ test.describe("movimento (E51 PR 2)", () => {
     });
   });
 
+  test("a cor da faixa do sistema (theme-color) acompanha o cabeçalho e navegar não quebra a página (nenhum erro de JavaScript)", async ({ page }) => {
+    const erros: string[] = [];
+    page.on("pageerror", (e) => erros.push(e.message));
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrar(page);
+    await page.getByRole("link", { name: "Criar" }).click();
+    await expect(page).toHaveURL(/\/criar$/);
+    await page.getByRole("link", { name: "Hoje" }).click();
+    await expect(page).toHaveURL(/\/hoje/);
+    await page.waitForTimeout(600);
+
+    const cores = await page.evaluate(() => Array.from(document.querySelectorAll('meta[name="theme-color"]')).map((m) => m.getAttribute("content")));
+    expect(cores.length).toBeGreaterThan(0);
+    for (const cor of cores) expect(cor).toMatch(/^#[0-9a-f]{6}$/);
+    // Sem `media`: a cor vale na escolha de tema da Conta, não só no tema do aparelho.
+    expect(await page.locator('meta[name="theme-color"][media]').count()).toBe(0);
+    expect(erros).toEqual([]);
+  });
+
   test("a folha arrastada para baixo fecha acompanhando o dedo; solta pouco, volta e continua aberta", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
@@ -85,6 +104,30 @@ test.describe("movimento (E51 PR 2)", () => {
     await page.mouse.move(caixa2.x + caixa2.width / 2, caixa2.y + 400, { steps: 8 });
     await page.mouse.up();
     await expect(folha).toHaveCount(0);
+  });
+
+  test("a folha centrada do desktop continua centrada depois da animação (a entrada anima `transform`, o centro é a propriedade `translate`)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await entrar(page);
+    await page.goto("/planejamento");
+    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: "Contar a minha agenda" }).first().click();
+    const folha = page.getByRole("dialog").first();
+    await expect(folha).toBeVisible();
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+
+    const caixa = (await folha.boundingBox())!;
+    const centroX = caixa.x + caixa.width / 2;
+    const centroY = caixa.y + caixa.height / 2;
+    expect(Math.abs(centroX - 640)).toBeLessThan(2);
+    expect(Math.abs(centroY - 450)).toBeLessThan(2);
+    expect(await folha.evaluate((el) => getComputedStyle(el).translate)).not.toBe("none");
+
+    // E o aperto de um botão não desfaz a posição de nada: depois de apertar e soltar, a folha segue no mesmo lugar.
+    await folha.getByRole("button", { name: "Fechar" }).hover();
+    const depois = (await folha.boundingBox())!;
+    expect(Math.abs(depois.x - caixa.x)).toBeLessThan(1);
+    expect(Math.abs(depois.y - caixa.y)).toBeLessThan(1);
   });
 
   test("a folha sai pela animação de saída e o foco volta ao botão que a abriu", async ({ page }) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 const DURACAO_MS = 600;
 
@@ -12,7 +12,8 @@ export function useNotaContada(valor: number): number {
   const [mostrada, setMostrada] = useState(valor);
   const jaContou = useRef(false);
 
-  useEffect(() => {
+  // `useLayoutEffect`: o zero entra antes da primeira pintura, em vez de um quadro com o valor final e depois o zero (o servidor e a hidratação mostram o valor).
+  useLayoutEffect(() => {
     if (jaContou.current) {
       setMostrada(valor);
       return;

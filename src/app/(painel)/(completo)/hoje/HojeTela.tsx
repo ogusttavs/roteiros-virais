@@ -469,7 +469,10 @@ export function HojeTela({
               onClick={atualizar}
             >
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" className={atualizando ? styles.girando : undefined} />
-              {marcas.length <= 1 || emDia ? <span aria-live="polite">{emDia ? textosNav.jaEstavaEmDia : textosHoje.atualizar}</span> : null}
+              {marcas.length <= 1 || emDia ? <span>{emDia ? textosNav.jaEstavaEmDia : textosHoje.atualizar}</span> : null}
+              <span className="so-leitor" role="status" aria-live="polite">
+                {emDia ? textosNav.jaEstavaEmDia : ""}
+              </span>
             </button>
           </>
         }

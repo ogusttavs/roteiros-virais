@@ -75,6 +75,15 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
     setFolhaAberta(false);
   });
   const entradaRef = useRef<HTMLInputElement | null>(null);
+  const trocarRef = useRef<HTMLButtonElement | null>(null);
+  /** Escolheu pela folha: o botão que a abriu desmontou, e o foco vai ao "Trocar" (não ao campo: no Android o foco no campo abre o teclado por cima). */
+  const focarTrocar = useRef(false);
+  useEffect(() => {
+    if (focarTrocar.current && trocarRef.current) {
+      focarTrocar.current = false;
+      trocarRef.current.focus({ preventScroll: true });
+    }
+  });
   const grupoRef = useRef<HTMLDivElement | null>(null);
 
   function abrirFolha() {
@@ -337,7 +346,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
       {!aberto && ramoPorSlug(valor) ? (
         <div className={styles.escolhido}>
           <span className={styles.exemplos}>{ramoPorSlug(valor)?.exemplos}</span>
-          <button type="button" className={styles.verALista} aria-label={textosRamo.trocarORamo} onClick={() => entradaRef.current?.focus()}>
+          <button ref={trocarRef} type="button" className={styles.verALista} aria-label={textosRamo.trocarORamo} onClick={() => entradaRef.current?.focus()}>
             {textosRamo.trocar}
           </button>
         </div>
@@ -348,7 +357,12 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
         aoFechar={fecharFolha}
         valor={valor}
         ramosEscondidos={ramosEscondidos ?? []}
-        aoEscolher={(slug) => fecharEDepois(() => escolher(slug))}
+        aoEscolher={(slug) =>
+          fecharEDepois(() => {
+            focarTrocar.current = true;
+            escolher(slug);
+          })
+        }
         textoNaoAchei={onNaoAchei ? textoNaoAchei : undefined}
         aoNaoAchei={onNaoAchei ? () => fecharEDepois(() => naoAchei()) : undefined}
       />

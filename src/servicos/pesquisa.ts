@@ -13,6 +13,7 @@
  */
 import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 
+import { FORMATOS_FORA_DO_CATALOGO, FORMATOS_SEM_FALA } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import { db } from "@/db";
 import {
@@ -31,6 +32,7 @@ import {
 import { config } from "@/lib/config";
 import { LIMIAR_FORA_DA_CURVA } from "@/lib/formatarNumero";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
+import type { FiltroDeFormatosDaMarca } from "@/servicos/formatos";
 import { aplicarProporcaoBrasil, classificarBrasil, contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { aplicarTetoPorConta } from "@/servicos/teto-por-conta";
 
@@ -511,6 +513,28 @@ export function palavrasChave(texto: string): string[] {
  * casamento de verdade, desde que o vídeo tivesse múltiplo alto: "os 8 maiores do setor", não a
  * evidência mais parecida com o tema.
  */
+/**
+ * E44 PR 1: o vídeo só entra quando o formato dele está ligado para a marca (`formatos_da_marca`, `servicos/formatos.ts`). Os dois "sem fala" passam pela régua do
+ * setor e pelo roteiro sem fala (M4), não pelas chaves do cliente. Vídeo ainda sem `formato_catalogo` (não reclassificado) passa como antes, pelo corte da H4
+ * (`serve_de_modelo` nulo ou verdadeiro), mesmo para a marca que já respondeu. Para a marca que ainda não respondeu, o corte da H4 vale para todos os vídeos, como
+ * antes (a regra antiga some só para quem tem resposta). Sem o filtro da marca (testes, ferramentas), nada muda: o corte da H4 de sempre.
+ */
+function condicaoDeFormato(formatos: FiltroDeFormatosDaMarca | undefined, exigirServeDeModelo: boolean): SQL | null {
+  const serve = sql`${videos.serveDeModelo} is not false`;
+  if (!formatos) return exigirServeDeModelo ? serve : null;
+  // "Todos" (`exigirServeDeModelo` falso) mostra meme e recorte com o selo escrito (R2b): só as treze chaves do cliente filtram ali, os valores que nunca servem de
+  // modelo (recorte de outro, notícia, ao vivo, outro) continuam à vista.
+  const permitidos = [...formatos.ligados, ...(exigirServeDeModelo ? FORMATOS_SEM_FALA : FORMATOS_FORA_DO_CATALOGO.map((f) => f.chave))];
+  const lista = sql`array[${sql.join(
+    permitidos.map((chave) => sql`${chave}`),
+    sql`, `,
+  )}]::text[]`;
+  const doFormato = sql`${videos.formatoCatalogo} = any(${lista})`;
+  if (!exigirServeDeModelo) return sql`(${videos.formatoCatalogo} is null or ${doFormato})`;
+  if (!formatos.temResposta) return sql`(${serve} and (${videos.formatoCatalogo} is null or ${doFormato}))`;
+  return sql`((${videos.formatoCatalogo} is null and ${serve}) or ${doFormato})`;
+}
+
 function condicoesEvidencia(
   nichoId: number,
   texto: string,
@@ -518,6 +542,8 @@ function condicoesEvidencia(
   exigirServeDeModelo: boolean,
   /** E45 PR 3: os ramos alternativos da conta, com o piso de cada um (vazio: só o principal, como sempre). */
   alternativos: SetorDaBusca[] = [],
+  /** E44 PR 1: os formatos ligados da marca; com resposta dela, o corte global de meme e recorte da H4 sai e vale o formato. */
+  formatos?: FiltroDeFormatosDaMarca,
 ): { condicoes: SQL[]; relevancia: SQL<number> } {
   const palavras = palavrasChave(texto);
   const padroes = palavras.map((p) => `%${p}%`);
@@ -552,7 +578,8 @@ function condicoesEvidencia(
     ))`,
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
-  if (exigirServeDeModelo) condicoes.push(sql`${videos.serveDeModelo} is not false`);
+  const porFormato = condicaoDeFormato(formatos, exigirServeDeModelo);
+  if (porFormato) condicoes.push(porFormato);
 
   const relevancia = sql<number>`(
     (select count(*) from unnest(${palavrasSql}) as palavra where ${videos.busca} @@ plainto_tsquery('portuguese', palavra))
@@ -592,10 +619,12 @@ export async function evidenciaParaTema(
   proporcaoBrasilExplicita?: number,
   /** E45 PR 3: os ramos alternativos da conta (ids de setor); a prova olha o principal e eles, o principal primeiro no desempate. */
   alternativos: number[] = [],
+  /** E44 PR 1: os formatos ligados da marca. */
+  formatos?: FiltroDeFormatosDaMarca,
 ): Promise<VideoEvidenciaTema[]> {
   const regua = await reguaDoSetor(nichoId);
   const proporcaoBrasil = proporcaoBrasilExplicita ?? regua.proporcaoBrasil;
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos));
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos), formatos);
   const linhas = await db()
     .select({
       id: videos.id,
@@ -652,6 +681,8 @@ export type VideoEvidenciaRoteiro = {
   plataforma: Plataforma;
   /** M4: para `sugerirEstiloPelaEvidencia` (ia/enums.ts) e para a preferência por evidência sem fala. */
   semFala: boolean | null;
+  /** E44 PR 1: o formato do vídeo de referência (`config/formatos.ts`), para o roteiro ser escrito nesse formato, sempre como a versão da marca. Nulo antes da reclassificação. */
+  formatoCatalogo: string | null;
 };
 
 /**
@@ -675,6 +706,7 @@ function mapearEvidenciaRoteiro(
     publicadoEm: Date | null;
     plataforma: Plataforma;
     semFala: boolean | null;
+    formatoCatalogo: string | null;
   }[],
 ): VideoEvidenciaRoteiro[] {
   return linhas
@@ -696,6 +728,7 @@ function mapearEvidenciaRoteiro(
       publicadoEm: l.publicadoEm,
       plataforma: l.plataforma,
       semFala: l.semFala,
+      formatoCatalogo: l.formatoCatalogo,
     }));
 }
 
@@ -711,9 +744,11 @@ export async function evidenciaParaRoteiro(
   limite = 8,
   /** E45 PR 3: os ramos alternativos da conta (ids de setor); o principal vem primeiro no desempate, e a proporção do Brasil corta o conjunto. */
   alternativos: number[] = [],
+  /** E44 PR 1: os formatos ligados da marca. */
+  formatos?: FiltroDeFormatosDaMarca,
 ): Promise<VideoEvidenciaRoteiro[]> {
   const regua = await reguaDoSetor(nichoId);
-  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos));
+  const { condicoes, relevancia } = condicoesEvidencia(nichoId, texto, regua, true, await setoresComPiso(alternativos), formatos);
   const linhas = await db()
     .select({
       id: videos.id,
@@ -729,6 +764,7 @@ export async function evidenciaParaRoteiro(
       publicadoEm: videos.publicadoEm,
       plataforma: videos.plataforma,
       semFala: videos.semFala,
+      formatoCatalogo: videos.formatoCatalogo,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -749,7 +785,7 @@ export async function evidenciaParaRoteiro(
  * (recorte e meme contam como sinal de assunto ali); aqui, que é evidência do
  * roteiro, filtra, mesma regra de `evidenciaParaRoteiro` (H4, item 2).
  */
-export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRoteiro[]> {
+export async function evidenciaPorIds(ids: number[], formatos?: FiltroDeFormatosDaMarca): Promise<VideoEvidenciaRoteiro[]> {
   if (ids.length === 0) return [];
   const linhas = await db()
     .select({
@@ -766,10 +802,16 @@ export async function evidenciaPorIds(ids: number[]): Promise<VideoEvidenciaRote
       publicadoEm: videos.publicadoEm,
       plataforma: videos.plataforma,
       semFala: videos.semFala,
+      formatoCatalogo: videos.formatoCatalogo,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
-    .where(and(inArray(videos.id, ids), sql`${videos.serveDeModelo} is not false`));
+    .where(
+      and(
+        inArray(videos.id, ids),
+        condicaoDeFormato(formatos, true) ?? sql`true`,
+      ),
+    );
 
   return mapearEvidenciaRoteiro(linhas);
 }
@@ -892,6 +934,8 @@ export type OrdemReferencias = "recentes" | "views" | "multiplo" | "velocidade";
 export type TipoConteudoFiltravel = Extract<TipoConteudo, "meme" | "recorte">;
 
 export type FiltrosReferencias = {
+  /** E44 PR 1: os formatos ligados da marca; só entra vídeo de formato ligado (os três segmentos), e com resposta dela o corte global de meme e recorte da H4 sai. */
+  formatosDaMarca?: FiltroDeFormatosDaMarca;
   /** 7, 30 ou 90; padrão 7, como o design. */
   periodoDias?: number;
   /** Assunto ou conta (V6, item 1): a coluna `busca` (tsvector) mais `contas.nome`. */
@@ -983,8 +1027,10 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
     if (alvos.length === 1) condicoes.push(gte(videos.views, alvos[0].pisoViews));
     else if (alvos.length > 1) condicoes.push(...condicaoDeSetores(alvos));
     condicoes.push(gte(videos.foraDaCurva, LIMIAR_FORA_DA_CURVA_CONSULTA));
-    condicoes.push(sql`${videos.serveDeModelo} is not false`);
   }
+  // E44 PR 1: os três segmentos (inclusive "Todos") só trazem vídeo de formato ligado para a marca; "Todos" não tem o corte da H4 (mostra meme e recorte com o selo).
+  const porFormato = condicaoDeFormato(filtros.formatosDaMarca, !semRegua);
+  if (porFormato) condicoes.push(porFormato);
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   if (filtros.apenasIds) condicoes.push(inArray(videos.id, filtros.apenasIds.length > 0 ? filtros.apenasIds : [-1]));
   if (filtros.plataformas && filtros.plataformas.length > 0) {

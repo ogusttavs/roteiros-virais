@@ -497,6 +497,19 @@ function tipoConteudoMock(texto: string): { tipoConteudo: "original" | "meme"; s
   return { tipoConteudo: ehMeme ? "meme" : "original", serveDeModelo: !ehMeme };
 }
 
+/** E44 PR 1: o formato que o mock dá, pelo texto do título e da legenda (palavras que o estudo usa), para os testes e os ensaios exercitarem mais de um valor. */
+function formatoCatalogoMock(texto: string, semFala: boolean): string {
+  const minusculo = texto.toLowerCase();
+  if (/(^|\s)pov(\s|$)|meme|brincadeira/.test(minusculo)) return "humor_e_meme";
+  if (/antes e depois|antes\/depois|antes.*depois/.test(minusculo)) return "antes_e_depois";
+  if (/^\d+\s|\d+ (dicas|jeitos|erros|motivos)/.test(minusculo)) return "lista";
+  if (/erro|errado|nunca faça/.test(minusculo)) return "erro_comum";
+  if (/bastidor|dia a dia|rotina/.test(minusculo)) return "bastidor";
+  if (/pergunta|respondendo|caixinha|dúvida/.test(minusculo)) return "respondendo_pergunta";
+  if (semFala) return "sem_fala_processo";
+  return "passo_a_passo";
+}
+
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
   // M5b, achado 7 da revisão do motor (01/10/2026): "POV" e outros sinais de recorte ou meme
@@ -531,6 +544,7 @@ function mockExtrairVideo(entrada: string) {
     idioma: "pt-BR" as const,
     tipoAbertura: "outro" as const,
     ...tipoConteudoMock(`${titulo} ${legenda}`),
+    formatoCatalogo: formatoCatalogoMock(`${titulo} ${legenda}`, false),
   };
 }
 
@@ -561,6 +575,7 @@ function mockExtrairVideoSemFala(entrada: string) {
     pertenceAoNicho,
     motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda não cita nenhum termo do nicho",
     ...tipoConteudoMock(titulo),
+    formatoCatalogo: formatoCatalogoMock(titulo, true),
   };
 }
 

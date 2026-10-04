@@ -684,6 +684,28 @@ export const ramosDaConta = pgTable(
 );
 export type RamoDaConta = typeof ramosDaConta.$inferSelect;
 
+/**
+ * E44 PR 1: as chaves de formato de uma marca. Uma linha só existe quando alguém decidiu: sem linha, vale o padrão do estudo (`config/formatos.ts`). `quem` é
+ * `cliente` (a resposta do briefing) ou `admin` (a correção do Gustavo, que vale por cima); "voltar ao que o cliente escolheu" apaga a linha do admin.
+ * Uma marca "tem resposta" quando tem qualquer linha aqui (o corte global de meme e recorte da H4 só sai para ela, até o PR 2).
+ */
+export const formatosDaMarca = pgTable(
+  "formatos_da_marca",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    chave: text("chave").notNull(),
+    ligada: boolean("ligada").notNull(),
+    quem: text("quem").$type<"cliente" | "admin">().notNull(),
+    decididoPorUsuarioId: text("decidido_por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+    decididoEm: timestamp("decidido_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("formatos_da_marca_chave").on(t.clienteId, t.chave, t.quem)],
+);
+export type FormatoDaMarca = typeof formatosDaMarca.$inferSelect;
+
 // ---------------------------------------------------------------------------
 // Motor de pesquisa (escopo 5)
 // ---------------------------------------------------------------------------
@@ -1092,6 +1114,12 @@ export const videos = pgTable(
     tipoConteudo: text("tipo_conteudo").$type<TipoConteudo>(),
     serveDeModelo: boolean("serve_de_modelo"),
     /**
+     * E44 PR 1: o formato do vídeo pela lista fechada do estudo (`config/formatos.ts`: as treze chaves do cliente mais os valores que nunca servem de modelo),
+     * gravado pela extração. Nulo em todo vídeo analisado antes dele existir, até a reclassificação em lote rodar (`scripts/reclassificar-formato.ts`); nulo
+     * passa como antes (o corte da H4). O `analise.formato` de cinco valores e o `tipo_conteudo` continuam gravados até o PR 2.
+     */
+    formatoCatalogo: text("formato_catalogo"),
+    /**
      * A miniatura do vídeo (V9d, item 0b, migração 0033): o cartão de
      * Referências não tinha prévia nenhuma (lacuna do PR #52), e o Gustavo
      * leu isso como "não aparece a prévia". YouTube monta a url por código
@@ -1125,6 +1153,8 @@ export const videos = pgTable(
      * memória). `foraDaCurva` e `velocidadeRelativa` já tinham índice próprio; só `views` faltava.
      */
     index("videos_nicho_views").on(t.nichoId, t.views),
+    // E44 PR 1: o filtro por formato ligado da marca (`formato_catalogo`).
+    index("videos_nicho_formato").on(t.nichoId, t.formatoCatalogo),
   ],
 );
 

@@ -52,6 +52,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
 
   return (
     <header
+      data-barra-topo=""
       className={marcas.length > 1 ? `${styles.cabecalho} ${styles.comMarca}` : styles.cabecalho}
       style={{ transform: escondido ? "translateY(-100%)" : "translateY(0)" }}
     >
@@ -74,8 +75,10 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
             aria-hidden="true"
             className={atualizando ? styles.girando : undefined}
           />
-          <span className={styles.cede} aria-live="polite">
-            {emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}
+          <span className={styles.cede}>{emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}</span>
+          {/* A região viva existe desde o começo e só o texto muda (uma região que nasce com o texto não é anunciada). */}
+          <span className="so-leitor" role="status" aria-live="polite">
+            {emDia ? textosNav.jaEstavaEmDia : ""}
           </span>
         </button>
       </div>

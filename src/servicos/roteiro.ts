@@ -10,6 +10,7 @@
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
+import { formatoPorChave } from "@/config/formatos";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
@@ -51,6 +52,7 @@ import { textosRoteiro } from "@/textos/roteiro";
 import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
 import { leiturasDoCliente } from "./perfis-analisados";
 import {
@@ -840,6 +842,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
 
   const ehMomento = dados.momento !== undefined;
   const alternativos = ehMomento ? [] : (await ramosAlternativosDaMarca(dados.clienteId)).map((a) => a.nichoId);
+  // E44 PR 1: só vídeo de formato ligado para a marca serve de referência.
+  const formatosDaMarca = ehMomento ? undefined : await filtroDeFormatosDaMarca(dados.clienteId);
 
   const [
     daBusca,
@@ -851,8 +855,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     marcaCitada,
   ] = await Promise.all([
     // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
-    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos),
-    ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas),
+    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos, formatosDaMarca),
+    ehMomento ? Promise.resolve([]) : evidenciaPorIds(dados.evidenciasPrevistas, formatosDaMarca),
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
@@ -988,6 +992,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
           ? `aos ${v.analiseVisual.momentoChave.segundo}s, ${v.analiseVisual.momentoChave.oQue}`
           : undefined,
         semFala: v.semFala ?? undefined,
+        formato: formatoPorChave(v.formatoCatalogo)?.nome,
       })),
       roteirosRecentes,
       instrucaoAbertura,
