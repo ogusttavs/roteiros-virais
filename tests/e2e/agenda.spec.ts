@@ -258,7 +258,7 @@ test.describe("/hoje, a Agenda", () => {
 
     // Hoje: a primeira da faixa é hoje, e o rótulo diz "Próximos 7 dias".
     await expect(page.getByText("Próximos 7 dias", { exact: true })).toBeVisible();
-    const faixa = page.getByRole("group", { name: "Os dias da semana" }).getByRole("button");
+    const faixa = page.getByRole("group", { name: "Os próximos 7 dias" }).getByRole("button");
     await expect(faixa).toHaveCount(7);
     const nomesCurtos = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
     const [ano, mes, dia] = hoje.split("-").map(Number);
@@ -273,16 +273,16 @@ test.describe("/hoje, a Agenda", () => {
     const regioes = page.locator('section[aria-label]').filter({ has: page.locator("h3") });
     await expect(regioes.first()).toHaveAttribute("aria-label", /, hoje$/);
 
-    const seta = page.getByRole("button", { name: "Próxima semana" });
+    const seta = page.getByRole("button", { name: "Próximos 7 dias", exact: true });
     const antes = await seta.boundingBox();
     await seta.click();
     await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7)}`));
     await expect(page.getByText("Dias à frente", { exact: true })).toBeVisible();
-    const depois = await page.getByRole("button", { name: "Próxima semana" }).boundingBox();
+    const depois = await page.getByRole("button", { name: "Próximos 7 dias", exact: true }).boundingBox();
     expect(Math.abs(depois!.x - antes!.x)).toBeLessThan(1);
 
-    await page.getByRole("button", { name: "Semana anterior" }).click();
-    await page.getByRole("button", { name: "Semana anterior" }).click();
+    await page.getByRole("button", { name: "7 dias anteriores" }).click();
+    await page.getByRole("button", { name: "7 dias anteriores" }).click();
     await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, -7)}`));
     await expect(page.getByText("Dias anteriores", { exact: true })).toBeVisible();
   });
@@ -300,7 +300,7 @@ test.describe("/hoje, a Agenda", () => {
     await page.waitForLoadState("networkidle");
 
     for (const semanas of [1, 2, 3]) {
-      await page.getByRole("button", { name: "Próxima semana" }).click();
+      await page.getByRole("button", { name: "Próximos 7 dias", exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7 * semanas)}`));
     }
     await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}`));
@@ -316,7 +316,7 @@ test.describe("/hoje, a Agenda", () => {
     await page.goto(`/hoje?dia=${diaDaquiA21Dias}`);
     await page.waitForLoadState("networkidle");
     for (const semanas of [2, 1, 0]) {
-      await page.getByRole("button", { name: "Semana anterior" }).click();
+      await page.getByRole("button", { name: "7 dias anteriores" }).click();
       await expect(page).toHaveURL(semanas === 0 ? new RegExp(`dia=${hoje}$`) : new RegExp(`dia=${somarDias(hoje, 7 * semanas)}$`));
     }
     await expect(page).toHaveURL(new RegExp(`dia=${hoje}$`));

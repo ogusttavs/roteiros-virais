@@ -12,7 +12,7 @@ import { Folha } from "./Folha";
 
 type Props = {
   aberto: boolean;
-  /** O `fechar` de `useFolhaNoHistorico` (quem é dono do estado chama o hook). */
+  /** O `fechar` do gancho do histórico (quem é dono do estado chama o gancho). */
   aoFechar: () => void;
   /** Escolher um ramo: quem é dono fecha a folha e segue como se tivesse escolhido na lista do campo. */
   aoEscolher: (slug: string) => void;

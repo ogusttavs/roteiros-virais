@@ -47,8 +47,9 @@ function tituloSemanaCurto(segunda: string, domingo: string): string {
   return `${inicio} a ${fim}`;
 }
 
+/** O dia de hoje no Brasil, como `hojeISO` de `@/lib/config` (que não dá para importar aqui: puxa a configuração do servidor). UTC viraria o dia às 21h. */
 function hojeNoClienteISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
 /** Igual a `@/servicos/roteiro`, que não dá para importar aqui: `error.tsx` é Client Component

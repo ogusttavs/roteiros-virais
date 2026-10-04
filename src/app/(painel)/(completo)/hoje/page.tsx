@@ -69,8 +69,8 @@ type Props = { searchParams: Promise<{ dia?: string }> };
 
 /**
  * `/hoje` vira a agenda (E39a, design v2, `Hoje.dc.html`, estados `agenda`, `agendaVazia`,
- * `agendaOutroDia`, `agendaBriefingIncompleto`). `?dia=AAAA-MM-DD` troca o dia aberto na semana,
- * sem sair da tela; fora da semana atual ou inválido, cai em hoje (a E39b é que traz o calendário
+ * `agendaOutroDia`, `agendaBriefingIncompleto`). `?dia=AAAA-MM-DD` troca o dia aberto nos próximos 7 dias,
+ * sem sair da tela; fora da janela atual ou inválido, cai em hoje (a E39b é que traz o calendário
  * e o "ver o mês").
  */
 export default async function Hoje({ searchParams }: Props) {

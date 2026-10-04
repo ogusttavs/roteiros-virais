@@ -61,7 +61,12 @@ export function usePuxarParaFechar(fechar: () => void): {
     const folha = folhaRef.current;
     folha.style.setProperty("--arrasto", `${deslocamento}px`);
     const veu = veuDaFolha();
-    if (veu) veu.style.opacity = String(Math.max(0, 1 - Math.max(0, deslocamento) / Math.max(1, folha.offsetHeight)));
+    if (veu) {
+      const opacidade = String(Math.max(0, 1 - Math.max(0, deslocamento) / Math.max(1, folha.offsetHeight)));
+      veu.style.opacity = opacidade;
+      // A saída (`veu-some`) parte desta opacidade, e não de 1, para o véu não piscar ao fechar arrastando.
+      veu.style.setProperty("--opacidade-veu", opacidade);
+    }
      
   }, []);
 
@@ -96,6 +101,7 @@ export function usePuxarParaFechar(fechar: () => void): {
       if (veu) {
         veu.style.transition = "opacity var(--duracao-soltar) var(--curva-padrao)";
         veu.style.opacity = "";
+        veu.style.removeProperty("--opacidade-veu");
       }
     },
      

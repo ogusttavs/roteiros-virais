@@ -14,13 +14,17 @@ export function useJaEstavaEmDia(atualizando: boolean): boolean {
   useEffect(() => {
     if (atualizando) {
       antes.current = document.querySelector("main")?.textContent ?? "";
+      setEmDia(false);
       return;
     }
     if (antes.current === null) return;
     const depois = document.querySelector("main")?.textContent ?? "";
     const igual = antes.current === depois;
     antes.current = null;
-    if (!igual) return;
+    if (!igual) {
+      setEmDia(false);
+      return;
+    }
     setEmDia(true);
     const volta = setTimeout(() => setEmDia(false), 2000);
     return () => clearTimeout(volta);

@@ -154,8 +154,8 @@ export const textosHoje = {
     marcadoPara: "Marcado para",
     voltarParaHoje: "Voltar para hoje",
     /** E39c, parte 1: as duas setas ao lado de "Próximos 7 dias", sem limite de quanto se pode ir. */
-    semanaAnterior: "Semana anterior",
-    proximaSemana: "Próxima semana",
+    semanaAnterior: "7 dias anteriores",
+    proximaSemana: "Próximos 7 dias",
     /** A legenda do topo da semana: um ponto cheio é Reels, um anel é Story. */
     legendaReels: "Reels",
     legendaStory: "Story",
@@ -172,7 +172,7 @@ export const textosHoje = {
       visao: { dia: "Dia", semana: "Semana", mes: "Mês" },
       setas: {
         dia: { anterior: "Dia anterior", seguinte: "Próximo dia" },
-        semana: { anterior: "Semana anterior", seguinte: "Próxima semana" },
+        semana: { anterior: "7 dias anteriores", seguinte: "Próximos 7 dias" },
         mes: { anterior: "Mês anterior", seguinte: "Próximo mês" },
       },
       hoje: "Hoje",
@@ -197,7 +197,7 @@ export const textosHoje = {
       confirmarMoverBotao: "Mover mesmo assim",
       cancelarMoverBotao: "Cancelar",
       erroMover: "Não deu para mover. Tente de novo.",
-      semanaVaziaTitulo: "Nada marcado nesta semana",
+      semanaVaziaTitulo: "Nada marcado nos próximos 7 dias",
       semanaVaziaDescricao:
         "Toque num dia para criar um roteiro para ele, ou conte a sua agenda e a gente sugere o que gravar em cada dia.",
       nadaMarcadoNesteDiaTitulo: "Nada marcado neste dia",

@@ -63,8 +63,24 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
   const [anuncio, setAnuncio] = useState("");
   /** A folha "Os ramos" (passo 16): os 44 ramos de uma vez, que o campo vazio não abre mais dentro do cartão. */
   const [folhaAberta, setFolhaAberta] = useState(false);
-  const { fechar: fecharFolha, fecharEDepois } = useFolhaNoHistorico(folhaAberta, () => setFolhaAberta(false));
+  /** Cada abertura da folha é uma folha nova (a busca do alto começa vazia). */
+  const [aberturas, setAberturas] = useState(0);
+  /** A folha, ao fechar, devolve o foco ao campo: esse foco não é a pessoa tocando nele e não deve reabrir a lista do campo. */
+  const ignorarFoco = useRef(false);
+  const { fechar: fecharFolha, fecharEDepois } = useFolhaNoHistorico(folhaAberta, () => {
+    ignorarFoco.current = true;
+    setTimeout(() => {
+      ignorarFoco.current = false;
+    }, 600);
+    setFolhaAberta(false);
+  });
   const entradaRef = useRef<HTMLInputElement | null>(null);
+  const grupoRef = useRef<HTMLDivElement | null>(null);
+
+  function abrirFolha() {
+    setAberturas((n) => n + 1);
+    setFolhaAberta(true);
+  }
 
   // O que está escolhido mudou por fora (a tela trocou o ramo): o campo passa a mostrar o novo.
   const [nomeAnterior, setNomeAnterior] = useState(nomeAtual);
@@ -132,7 +148,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
       case "ArrowDown":
         evento.preventDefault();
         if (!aberto) setAberto(true);
-        else if (!buscando) setFolhaAberta(true);
+        else if (!buscando) abrirFolha();
         else if (total > 0) setAtivo(indiceAtivo < 0 ? 0 : (indiceAtivo + 1) % total);
         break;
       case "ArrowUp":
@@ -162,7 +178,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
   const fala = aberto && buscando ? (ramos.length === 0 ? textosRamo.nenhum : textosRamo.resultados(ramos.length)) : anuncio;
 
   return (
-    <div className={campo.grupo}>
+    <div className={campo.grupo} ref={grupoRef}>
       <label className={campo.rotulo} htmlFor={id}>
         {rotulo}
       </label>
@@ -197,13 +213,21 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
           autoCorrect="off"
           spellCheck={false}
           onFocus={(evento) => {
+            if (ignorarFoco.current) {
+              ignorarFoco.current = false;
+              return;
+            }
             setAberto(true);
             setDigitou(false);
             setAtivo(-1);
             evento.currentTarget.select();
           }}
           onClick={() => setAberto(true)}
-          onBlur={fechar}
+          onBlur={(evento) => {
+            // O foco indo para a dica ("Ver a lista de ramos") ou para o "Trocar" não fecha: senão o Tab nunca chegaria neles.
+            if (evento.relatedTarget instanceof Node && grupoRef.current?.contains(evento.relatedTarget)) return;
+            fechar();
+          }}
           onChange={(evento) => {
             setTexto(evento.target.value);
             setDigitou(true);
@@ -235,7 +259,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
       {aberto && !buscando ? (
         <div className={styles.dica} onMouseDown={(evento) => evento.preventDefault()}>
           <span>{textosRamo.dica}</span>
-          <button type="button" className={styles.verALista} aria-haspopup="dialog" onClick={() => setFolhaAberta(true)}>
+          <button type="button" className={styles.verALista} aria-haspopup="dialog" onClick={abrirFolha}>
             {textosRamo.verALista}
           </button>
         </div>
@@ -319,6 +343,7 @@ export function BuscaDeRamo({ rotulo, ajuda, erro, valor, nomeForaDoCatalogo, te
         </div>
       ) : null}
       <FolhaDosRamos
+        key={aberturas}
         aberto={folhaAberta}
         aoFechar={fecharFolha}
         valor={valor}

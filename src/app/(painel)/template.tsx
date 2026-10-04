@@ -12,9 +12,12 @@ function fundura(caminho: string): number {
 
 // O Voltar do aparelho (ou do navegador) dispara `popstate` antes da rota trocar: guarda isso para a tela que chega entrar pelo outro lado.
 let foiVoltar = false;
+let ultimoCaminho: string | null = null;
 if (typeof window !== "undefined") {
+  ultimoCaminho = window.location.pathname;
+  // Fechar uma folha também faz `history.back()` (e dispara `popstate`) sem trocar de rota: só vale como "voltar" se o caminho mudou.
   window.addEventListener("popstate", () => {
-    foiVoltar = true;
+    if (window.location.pathname !== ultimoCaminho) foiVoltar = true;
   });
 }
 
@@ -39,6 +42,7 @@ export default function TemplateDoPainel({ children }: { children: ReactNode }) 
     const agora = fundura(caminho);
     const antes = anterior.current;
     anterior.current = agora;
+    ultimoCaminho = window.location.pathname;
     const el = elemento.current;
     // A primeira tela da visita não anima (já está lá), e a mesma rota de novo (um refresh) também não.
     if (!el || antes === null) {

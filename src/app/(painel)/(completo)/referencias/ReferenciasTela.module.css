@@ -362,7 +362,7 @@
  * sexto). Sem "reduzir movimento" o deslocamento some (`--desloca-lista: 0` em `tokens.css`) e fica só o esmaecer.
  */
 .grade > * {
-  animation: itemChega var(--duracao-lista) var(--curva-saida) both;
+  animation: itemChega var(--duracao-lista) var(--curva-saida) backwards;
 }
 .grade > :nth-child(2) { animation-delay: calc(1 * var(--atraso-lista)); }
 .grade > :nth-child(3) { animation-delay: calc(2 * var(--atraso-lista)); }

@@ -20,6 +20,8 @@
 .caixa .entrada {
   width: 100%;
   padding-left: calc(var(--espaco-3) + 18px + var(--espaco-2));
+  /* O X de apagar a busca fica no canto direito. */
+  padding-right: var(--altura-toque);
   /* Nome comprido ("Importação e desenvolvimento de produto") no celular: reticências com o campo parado, o texto inteiro ao focar. */
   text-overflow: ellipsis;
 }

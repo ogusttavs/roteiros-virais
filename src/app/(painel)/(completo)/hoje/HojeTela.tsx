@@ -541,7 +541,7 @@ export function HojeTela({
                 </button>
               </div>
             </div>
-            <div className={styles.diasAgenda} role="group" aria-label="Os dias da semana">
+            <div className={styles.diasAgenda} role="group" aria-label="Os próximos 7 dias">
               {semana.map((dia) => (
                 <button
                   key={dia.data}

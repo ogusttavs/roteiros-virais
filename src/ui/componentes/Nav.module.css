@@ -38,6 +38,13 @@
     opacity var(--duracao-troca) var(--curva-padrao);
 }
 
+/* "Reduzir movimento": a seleção não anda pelo espaço (passo 16: nada anda); troca de lugar na hora e só o `opacity` anima. */
+@media (prefers-reduced-motion: reduce) {
+  .selecao {
+    transition: opacity var(--duracao-troca) var(--curva-padrao);
+  }
+}
+
 .item {
   position: relative;
   display: flex;

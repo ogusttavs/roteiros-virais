@@ -197,6 +197,9 @@
   }
 }
 @keyframes veu-some {
+  from {
+    opacity: var(--opacidade-veu, 1);
+  }
   to {
     opacity: 0;
   }
