@@ -74,7 +74,11 @@ export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, childre
       const primeiro = alvos[0];
       const ultimo = alvos[alvos.length - 1];
       const atual = document.activeElement;
-      if (evento.shiftKey && (atual === primeiro || atual === folhaRef.current || atual === tituloRef.current)) {
+      if (evento.shiftKey && atual === tituloRef.current) {
+        // O título vem depois do X na ordem do documento: Shift+Tab dele volta ao X, não ao último elemento.
+        evento.preventDefault();
+        primeiro.focus();
+      } else if (evento.shiftKey && (atual === primeiro || atual === folhaRef.current)) {
         evento.preventDefault();
         ultimo.focus();
       } else if (!evento.shiftKey && atual === ultimo) {

@@ -59,9 +59,21 @@ export async function adiarPedidoDePushAction(): Promise<void> {
  * O aparelho não conseguiu ligar o aviso (item 0d): só grava no log, no nível de aviso, com o id da pessoa, o passo em que falhou e o motivo do navegador.
  * Nunca o endereço da inscrição nem uma chave. Não lança: quem chama já está mostrando o erro.
  */
+const ULTIMA_FALHA_POR_PESSOA = new Map<string, number>();
+/** Um aviso por pessoa por minuto: uma pessoa logada não enche o log repetindo a chamada. */
+const INTERVALO_DA_FALHA_MS = 60_000;
+
 export async function registrarFalhaDePushAction(motivo: unknown, etapa: unknown, sistema: unknown): Promise<void> {
   const sessao = await sessaoAtual();
   if (!sessao) return;
+  const agora = Date.now();
+  const antes = ULTIMA_FALHA_POR_PESSOA.get(sessao.user.id);
+  if (antes !== undefined && agora - antes < INTERVALO_DA_FALHA_MS) return;
+  ULTIMA_FALHA_POR_PESSOA.set(sessao.user.id, agora);
+  // O mapa não cresce sem fim: passando de mil pessoas, esquece as antigas.
+  if (ULTIMA_FALHA_POR_PESSOA.size > 1000) {
+    for (const [id, quando] of ULTIMA_FALHA_POR_PESSOA) if (agora - quando >= INTERVALO_DA_FALHA_MS) ULTIMA_FALHA_POR_PESSOA.delete(id);
+  }
   const limpo = (valor: unknown, tamanho: number) => (typeof valor === "string" ? valor.replace(/[\r\n]+/g, " ").slice(0, tamanho) : "?");
   logger.warn({ usuarioId: sessao.user.id, etapa: limpo(etapa, 20), sistema: limpo(sistema, 20), motivo: limpo(motivo, 300) }, "push: o aparelho nao conseguiu ligar o aviso");
 }
