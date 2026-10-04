@@ -27,7 +27,6 @@ import {
   type QuemGrava,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
-import { sugerirFormatoPeloObjetivo } from "@/ia/enums";
 import * as lerAgendaIA from "@/ia/prompts/lerAgenda";
 import * as planejarDiaIA from "@/ia/prompts/planejarDia";
 import { registrarGeracao } from "@/ia/registro";
@@ -229,7 +228,8 @@ export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hoj
         situacao: sugestao.situacao,
         oQueMostrar: sugestao.oQueMostrar,
         objetivo: sugestao.objetivo,
-        formato: sugerirFormatoPeloObjetivo(sugestao.objetivo),
+        // E49 PR 1: Reels é o padrão; o Story é uma escolha da pessoa (o objetivo deixou de decidir o formato).
+        formato: "reels",
         estado: "sugerido",
       });
     });
@@ -347,7 +347,7 @@ export async function aceitar(
     if (roteiroExistente) return roteiroExistente;
   }
 
-  const formato = dados.formato ?? sugerirFormatoPeloObjetivo(dados.objetivo);
+  const formato = dados.formato ?? "reels";
   const estilo = dados.estilo ?? "falado";
   const objetivoDoVideo = dados.objetivoDoVideo?.trim() || undefined;
   const momento: Momento = {

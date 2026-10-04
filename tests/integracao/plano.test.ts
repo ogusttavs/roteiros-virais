@@ -188,8 +188,8 @@ describe("criarPlano", () => {
     ).rejects.toThrow(ErroPlano);
   });
 
-  // V9c, item 1: cada sugestao ja nasce com o formato de `sugerirFormatoPeloObjetivo(objetivo)`.
-  it("cada item ja nasce com o formato sugerido pelo objetivo", async () => {
+  // E49 PR 1: o formato deixou de vir do objetivo; cada sugestao nasce em Reels e a pessoa troca para Story se quiser.
+  it("cada item ja nasce em Reels", async () => {
     const cliente = await criarCliente();
     const itens = await criarPlano(
       cliente,
@@ -199,7 +199,7 @@ describe("criarPlano", () => {
 
     // mockPlanejarDia rodizia engajamento, alcance, conversao: so alcance sugere reels.
     for (const item of itens) {
-      expect(item.formato).toBe(item.objetivo === "alcance" ? "reels" : "story");
+      expect(item.formato).toBe("reels");
     }
   });
 

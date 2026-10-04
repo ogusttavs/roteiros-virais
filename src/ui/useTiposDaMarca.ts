@@ -22,6 +22,10 @@ export function useTiposDaMarca(iniciais: readonly TipoLigado[]) {
   const confirmado = useRef<Record<string, boolean>>({});
   const chaveDasIniciais = iniciais.map((i) => `${i.chave}:${i.ligada ? 1 : 0}`).join(",");
   useEffect(() => {
+    if (emVoo.current === 0) {
+      confirmado.current = {};
+      confirmadoNumero.current = {};
+    }
     if (emVoo.current === 0) setEstado(Object.fromEntries(FORMATOS_DO_CATALOGO.map((f) => [f.chave, iniciais.find((i) => i.chave === f.chave)?.ligada ?? f.ligadaPorPadrao])));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chaveDasIniciais]);

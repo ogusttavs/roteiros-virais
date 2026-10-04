@@ -29,12 +29,19 @@ export type ResultadoVerificacaoLocal = {
 export function temAlgoParaGuardar(corpo: string): boolean {
   const t = corpo
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase();
-  if (/(^|\n|\s)(1|2|3)\s*[.):-]\s*\S/.test(t)) return true;
-  if (/\bpasso\s*(1|2|3|um|dois|tres|a passo)|\bpasso a passo\b|\bprimeiro\b.*\b(depois|segundo|em seguida|por fim|aí|ai)\b/s.test(t)) return true;
+  // Passos numerados: o 1 e o 2 (um "R$ 2.500" ou um "em 3. Depois" sozinhos não bastam).
+  if (/(^|[^\d.,$])1\s*[.):-]\s*\S[\s\S]*?(^|[^\d.,$])2\s*[.):-]\s*\S/.test(t)) return true;
+  // "Passo 1", "etapa 1", "dica 1", "1o passo", "passo a passo".
+  if (/\b(passo|etapa|dica)\s*(1|um)\b|\b1(o|a)?\s*(passo|etapa|dica)\b|\bpasso a passo\b|\bprimeiro passo\b/.test(t)) return true;
+  // Na ordem, escrito: pelo menos dois marcadores de ordem diferentes ("primeiro ... depois ... por fim").
+  const ordem = ["primeiro", "segundo", "terceiro", "depois", "em seguida", "por fim", "por ultimo", "no final"].filter((m) => new RegExp(String.raw`\b${m}\b`).test(t));
+  if (ordem.length >= 2) return true;
+  // Lista anunciada com contagem: "três erros", "cinco dicas".
   if (/\b(duas|tres|quatro|cinco|seis|sete|2|3|4|5|6|7)\s+(dicas?|passos?|erros?|jeitos?|maneiras?|coisas?|itens?|truques?|motivos?|sinais?|ingredientes?|etapas?)\b/.test(t)) return true;
-  if (/\b(receita|modelo pronto|copia e cola|copie|anota|anote|lista)\b/.test(t)) return true;
+  // Algo para copiar.
+  if (/\b(receita|modelo pronto|copia e cola|prompt pronto|checklist)\b/.test(t)) return true;
   return false;
 }
 

@@ -943,6 +943,18 @@ describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
     expect(verificarLocalmente({}, { formato: "reels", estilo: "falado", narrativa: narrativa(corpo) }).aprovado).toBe(true);
   });
 
+  it("não se deixa enganar por número de preço, narrativa corrida nem 'lista de espera'", () => {
+    expect(temAlgoParaGuardar("O orçamento ficou em R$ 2.500 e depois eu expliquei tudo")).toBe(false);
+    expect(temAlgoParaGuardar("Primeiro eu acordei cedo e fui trabalhar")).toBe(false);
+    expect(temAlgoParaGuardar("A lista de espera estava grande hoje")).toBe(false);
+  });
+
+  it("aceita etapa, dica e primeiro passo escritos de outro jeito", () => {
+    expect(temAlgoParaGuardar("Etapa 1: separe o material")).toBe(true);
+    expect(temAlgoParaGuardar("O primeiro passo é lavar bem")).toBe(true);
+    expect(temAlgoParaGuardar("Dica 1 é não esfregar")).toBe(true);
+  });
+
   it("temAlgoParaGuardar lê o texto sem acento", () => {
     expect(temAlgoParaGuardar("Cinco dicas rápidas")).toBe(true);
     expect(temAlgoParaGuardar("Eu gosto muito disso")).toBe(false);

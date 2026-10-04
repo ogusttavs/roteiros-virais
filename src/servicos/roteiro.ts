@@ -1154,7 +1154,7 @@ export async function gerarRoteiro(
   const formato = params.formato ?? "reels";
   const estilo = params.estilo ?? "falado";
   // E49 PR 1: só o Reels tem ficha; ela decide o objetivo que se grava.
-  const ficha = formato === "reels" && params.ficha ? params.ficha : null;
+  const ficha = formato === "reels" && estilo === "falado" && params.ficha ? params.ficha : null;
   const objetivo = ficha ? objetivoDaFicha(ficha) : params.objetivo;
   // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
   const noticiaLinha =
@@ -1756,6 +1756,8 @@ export type ItemAgendaDoDia = {
   objetivo: Objetivo;
   /** E49 PR 1: a ficha do roteiro (nula no Story e nos de antes das fichas). */
   ficha: Ficha | null;
+  /** E49 PR 1: o formato, para o rótulo dizer "Com quem já segue" no Story (que grava o objetivo mas não tem ficha). */
+  formato: FormatoRoteiro;
   duracaoS: number;
   criadoEm: Date;
   /** E39b, item (a): nulo até a pessoa tocar em "Conferir" (só preenchido no destaque do Reels). */
@@ -1775,6 +1777,7 @@ function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
     momentoDoDia: linha.momentoDoDia,
     objetivo: linha.objetivo,
     ficha: linha.ficha,
+    formato: linha.formato,
     duracaoS: corpoDoRoteiro(linha).duracaoS,
     criadoEm: linha.criadoEm,
     aindaValeResultado: aindaValeDeHoje(linha),

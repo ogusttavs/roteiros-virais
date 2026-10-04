@@ -727,7 +727,7 @@ export function montarEntrada(dados: {
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     blocoNoticia,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
-    dados.ficha && dados.formato === "reels" ? `Ficha do vídeo: ${ESTRUTURA_DA_FICHA[dados.ficha]}` : null,
+    dados.ficha && dados.formato === "reels" && dados.estilo === "falado" ? `Ficha do vídeo: ${ESTRUTURA_DA_FICHA[dados.ficha]}` : null,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
       ? `O cliente reprovou a versão anterior por: ${dados.anguloParaEvitar.motivos.join(", ")}.` +
