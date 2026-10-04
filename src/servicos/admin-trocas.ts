@@ -10,7 +10,7 @@ import { ramoAtualDoCliente } from "@/servicos/ramos";
  */
 
 export const NOME_DA_REDE: Record<Plataforma, string> = { instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube" };
-const NOME_DO_TIPO: Record<TipoMarca, string> = { negocio: "Empresa", pessoa: "Pessoa" };
+const NOME_DO_TIPO: Record<TipoMarca, string> = { negocio: "Empresa", pessoa: "Pessoal" };
 const NOME_DO_PLANO: Record<PlanoMarca, string> = { padrao: "um por dia", sem_limite: "sem limite" };
 
 export function descreverPublico(c: { alcance: Alcance | null; regiao: string | null; pais: string | null; paises: string | null }): string {
