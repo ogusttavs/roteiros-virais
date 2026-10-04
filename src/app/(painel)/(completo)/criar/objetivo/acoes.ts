@@ -1,13 +1,14 @@
 "use server";
 
 import { ehFicha } from "@/config/fichas";
+import { formatoPorChave } from "@/config/formatos";
 import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
-import { evidenciaParaRoteiro } from "@/servicos/pesquisa";
+import { evidenciaParaRoteiro, exemplosPorFicha, setoresComPiso } from "@/servicos/pesquisa";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import {
   ErroRoteiro,
@@ -81,4 +82,28 @@ export async function sugerirEstiloAction(tema: string): Promise<EstiloRoteiro> 
   const alternativos = (await ramosAlternativosDaMarca(cliente.id)).map((a) => a.nichoId);
   const evidencias = await evidenciaParaRoteiro(cliente.nichoId, tema, undefined, alternativos, await filtroDeFormatosDaMarca(cliente.id));
   return sugerirEstiloPelaEvidencia(evidencias);
+}
+
+/** Um exemplo de "Exemplos que fazem isso" no Criar (E49 PR 2): o que o cartão mostra, já em texto. */
+export type ExemploDaFicha = { id: number; titulo: string; conta: string; plataforma: string; tipo: string | null; capaUrl: string | null };
+
+/**
+ * "Exemplos que fazem isso" (E49 PR 2): até três vídeos dos ramos da conta que a extração leu como feitos para a ficha escolhida, pelo filtro de tipo ligado da marca e o corte
+ * duro de recorte e notícia. A ficha chega como texto livre do navegador (`ehFicha` confere); sem ficha válida, ramo ou vídeo, a lista vem vazia (o estado "ainda não temos exemplos").
+ */
+export async function exemplosDaFichaAction(ficha: string): Promise<ExemploDaFicha[]> {
+  if (!ehFicha(ficha)) return [];
+  const cliente = await clienteDaSessaoAtual();
+  if (!cliente.nichoId) return [];
+  const alternativos = (await ramosAlternativosDaMarca(cliente.id)).map((a) => a.nichoId);
+  const setores = await setoresComPiso([cliente.nichoId, ...alternativos]);
+  const lista = await exemplosPorFicha(cliente.nichoId, ficha, { setores, formatosDaMarca: await filtroDeFormatosDaMarca(cliente.id) });
+  return lista.map((v) => ({
+    id: v.id,
+    titulo: v.titulo ?? v.assunto,
+    conta: v.contaNome ?? v.contaHandle ?? "",
+    plataforma: v.plataforma,
+    tipo: formatoPorChave(v.formatoCatalogo)?.nome ?? null,
+    capaUrl: v.capaUrl,
+  }));
 }

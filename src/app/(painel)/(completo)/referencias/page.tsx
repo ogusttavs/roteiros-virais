@@ -1,6 +1,7 @@
 import { Bookmark } from "lucide-react";
 import { redirect } from "next/navigation";
 
+import { ehFicha } from "@/config/fichas";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
@@ -47,6 +48,8 @@ type SearchParams = {
   quantidade?: string;
   /** E45 PR 3: a pílula "Ramo" (o id do setor); só vale se for um dos ramos da conta. */
   ramo?: string;
+  /** E49 PR 2: "Parece feito para" (a ficha lida pela extração); texto que não é ficha é ignorado. */
+  feitoPara?: string;
 };
 
 function listaValida<T extends string>(valor: string | undefined, validos: Set<T>): T[] {
@@ -95,6 +98,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
   const comFala = booleanoValido(params.fala);
   const brasil = booleanoValido(params.brasil);
   const tiposConteudo = listaValida(params.tipo, TIPOS_CONTEUDO_VALIDOS);
+  const fichas = params.feitoPara && ehFicha(params.feitoPara) ? [params.feitoPara] : [];
   const quantidadeNumero = Number(params.quantidade);
   const quantidade =
     segmento === "todos" && Number.isInteger(quantidadeNumero) && quantidadeNumero > TAMANHO_PAGINA_TODOS_PADRAO
@@ -131,7 +135,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
    */
   const contagensFiltro = await contagensPorFiltroReferencias(
     cliente.nichoId,
-    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo, setores, ramoId: ramoAtivo, formatosDaMarca },
+    { periodoDias, busca, apenasIds, viewsMin, comFala, brasil, tiposConteudo, fichas, setores, ramoId: ramoAtivo, formatosDaMarca },
     segmento === "todos",
   );
 
@@ -152,6 +156,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
     comFala,
     brasil,
     tiposConteudo,
+    fichas,
     setores,
     ramoId: ramoAtivo,
     formatosDaMarca,
@@ -183,6 +188,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       comFala={comFala}
       brasil={brasil}
       tiposConteudo={tiposConteudo}
+      feitoPara={fichas[0]}
       quantidade={quantidade}
       contagensFiltro={contagensFiltro}
       redePrincipalSemVideo={redePrincipalSemVideo}

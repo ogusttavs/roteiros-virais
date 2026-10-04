@@ -3,6 +3,15 @@
  * Textos literais da entrega onde existem; o resto segue o mesmo tom.
  */
 export const textosReferencias = {
+  /** E49 PR 2: a pílula "Parece feito para" (a ficha lida pela extração, nunca um número da rede). */
+  feitoPara: "Parece feito para",
+  todosOsFeitoPara: "Todos",
+  contagemFeitoPara: (n: number, dias: number, paraQue: string) =>
+    `${n} ${n === 1 ? "vídeo dos" : "vídeos dos"} últimos ${dias} dias ${n === 1 ? "parece feito" : "parecem feitos"} para ${paraQue}`,
+  vazioFeitoParaTitulo: "Ainda não temos exemplos deste tipo no seu setor",
+  vazioFeitoParaTexto: (dias: number, paraQue: string) =>
+    `Nenhum vídeo dos últimos ${dias} dias parece feito para ${paraQue}. Veja todos os vídeos, ou espere a próxima rodada de pesquisa.`,
+  verTodos: "Ver todos",
   /** E45 PR 3: a pílula "Ramo" (só aparece quando o admin ligou um ramo alternativo à marca). */
   ramo: "Ramo",
   todosOsRamos: "Todos os ramos",

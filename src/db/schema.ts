@@ -1185,6 +1185,14 @@ export const videos = pgTable(
      * passa como antes (o corte da H4). O `analise.formato` de cinco valores e o `tipo_conteudo` continuam gravados até o PR 2.
      */
     formatoCatalogo: text("formato_catalogo"),
+    /** E49 PR 2: "para que o vídeo parece feito" (as cinco fichas, `config/fichas.ts`), lido pela extração; nulo até ser classificado (valor fora da lista também vira nulo). */
+    fichaCatalogo: text("ficha_catalogo").$type<Ficha>(),
+    /**
+     * E49 PR 2 (ajuste da revisão): quando a extração tentou ler o tipo e a ficha pela última vez. Um vídeo cujo valor o modelo devolveu nulo não volta a ser
+     * candidato da reclassificação por 30 dias (sem isso pagaria a extração em toda rodada); nulo é "nunca tentado".
+     */
+    formatoTentadoEm: timestamp("formato_tentado_em", { withTimezone: true }),
+    fichaTentadaEm: timestamp("ficha_tentada_em", { withTimezone: true }),
     /**
      * A miniatura do vídeo (V9d, item 0b, migração 0033): o cartão de
      * Referências não tinha prévia nenhuma (lacuna do PR #52), e o Gustavo
@@ -1221,6 +1229,8 @@ export const videos = pgTable(
     index("videos_nicho_views").on(t.nichoId, t.views),
     // E44 PR 1: o filtro por formato ligado da marca (`formato_catalogo`).
     index("videos_nicho_formato").on(t.nichoId, t.formatoCatalogo),
+    // E49 PR 2: os exemplos por ficha do Criar e o filtro "Parece feito para" das Referências.
+    index("videos_nicho_ficha").on(t.nichoId, t.fichaCatalogo),
     // E46 PR 3: o Início e as Rotinas contam o que o dia coletou, transcreveu e analisou.
     index("videos_coletado_em").on(t.coletadoEm),
     index("videos_transcrito_em").on(t.transcritoEm),
@@ -1722,6 +1732,9 @@ export const metricasVideoCliente = pgTable("metricas_video_cliente", {
   views: integer("views").notNull().default(0),
   likes: integer("likes").notNull().default(0),
   comentarios: integer("comentarios").notNull().default(0),
+  /** E49 PR 2: quantas vezes guardaram e mandaram o vídeo, só quando a rede devolve (a Meta, com a conta conectada); nulo é "sem número", nunca zero inventado. */
+  saves: integer("saves"),
+  shares: integer("shares"),
   /** De onde veio esta medida (V8, item 3); nula no que foi medido antes desta etapa. */
   fonte: text("fonte").$type<FonteMedida>(),
 });
@@ -1754,6 +1767,8 @@ export const lotesIa = pgTable("lotes_ia", {
    * banco nao depender da camada de IA, so o codigo que le/escreve tipa certo. */
   tarefa: text("tarefa").notNull(),
   loteIdExterno: text("lote_id_externo").notNull().unique(),
+  /** E49 PR 2: lote da reclassificação que só quer a ficha; quem já tem tipo o mantém (`aplicarResultadoExtracao`). */
+  soFicha: boolean("so_ficha").notNull().default(false),
   videoIds: jsonb("video_ids").$type<number[]>().notNull().default([]),
   status: text("status")
     .$type<"em_andamento" | "concluido" | "erro">()

@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY } from "@/config/fichas";
+import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY, PARECE_FEITO_PARA } from "@/config/fichas";
 import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   DESCRICAO_ESTILO_ROTEIRO,
@@ -28,7 +29,7 @@ import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
 import { roteiroRecenteDesdeAction } from "../../hoje/acoes";
 
-import { gerarRoteiroAction, sugerirEstiloAction } from "./acoes";
+import { exemplosDaFichaAction, gerarRoteiroAction, sugerirEstiloAction, type ExemploDaFicha } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
 
 type Props = {
@@ -63,8 +64,31 @@ export function ObjetivoTela({
   const router = useRouter();
   // E49 PR 1: a ficha recomendada pelo tema já vem marcada; a pessoa troca. O Story não pergunta.
   const [ficha, setFicha] = useState<Ficha | null>(fichaRecomendada);
+  // E49 PR 2: depois de ESCOLHER uma ficha (um toque), ela fica sozinha com "Ver as cinco de novo" e embaixo vêm os exemplos do setor; a recomendada já marcada não fecha a lista.
+  const [compacta, setCompacta] = useState(false);
+  const [exemplos, setExemplos] = useState<ExemploDaFicha[] | null>(null);
+  // Falha de rede não é "sem exemplos": a seção some em silêncio e o roteiro segue.
+  const [exemplosFalharam, setExemplosFalharam] = useState(false);
   // O formato vem ANTES da pergunta (passo 18b): Reels é o padrão, e a pessoa escolhe Story se quiser.
   const [formato, setFormato] = useState<FormatoRoteiro>("reels");
+  // Os exemplos acompanham a ficha escolhida (só no modo compacto); a resposta de uma escolha anterior que chega tarde não troca a de agora.
+  useEffect(() => {
+    if (!compacta || !ficha) return;
+    let cancelado = false;
+    setExemplos(null);
+    setExemplosFalharam(false);
+    exemplosDaFichaAction(ficha)
+      .then((lista) => {
+        if (!cancelado) setExemplos(lista);
+      })
+      .catch(() => {
+        if (!cancelado) setExemplosFalharam(true);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [compacta, ficha]);
+
   /**
    * M4, item 2: o segundo controle segmentado, Falando/Sem fala. Ao contrário do formato (decidido
    * pelo objetivo, por código, sem round-trip), o estilo nasce da evidência do tema, então a
@@ -257,7 +281,7 @@ export function ObjetivoTela({
             </p>
           ) : null}
           <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
-            {FICHAS_EM_ORDEM.map((f) => (
+            {FICHAS_EM_ORDEM.filter((f) => !compacta || f === ficha).map((f) => (
               <OpcaoObjetivo
                 key={f}
                 titulo={NOME_DA_FICHA[f]}
@@ -267,10 +291,52 @@ export function ObjetivoTela({
                 marcada={ficha === f}
                 recomendada={fichaRecomendada === f}
                 rotuloRecomendado={textosObjetivo.recomendado}
-                onEscolher={() => setFicha(f)}
+                onEscolher={() => {
+                  setFicha(f);
+                  setCompacta(true);
+                }}
               />
             ))}
           </div>
+          {compacta && ficha ? (
+            <>
+              <button type="button" className={styles.verAsCinco} onClick={() => setCompacta(false)}>
+                {textosObjetivo.verAsCincoDeNovo}
+              </button>
+              {exemplosFalharam ? null : (
+              <section className={styles.exemplos} aria-labelledby="exemplos-titulo" data-exemplos={exemplos === null ? "carregando" : exemplos.length > 0 ? "com" : "sem"}>
+                <h3 id="exemplos-titulo">{textosObjetivo.exemplosTitulo}</h3>
+                {exemplos === null ? (
+                  <p className={styles.apoio}>{textosObjetivo.carregandoExemplos}</p>
+                ) : exemplos.length > 0 ? (
+                  <>
+                    <p className={styles.apoio}>{textosObjetivo.exemplosFrase(PARECE_FEITO_PARA[ficha])}</p>
+                    <ul className={styles.listaExemplos}>
+                      {exemplos.map((e) => (
+                        <li key={e.id} className={styles.exemplo} data-exemplo={e.id}>
+                          <span className={styles.exemploTitulo}>{e.titulo}</span>
+                          <span className={styles.exemploConta}>
+                            {e.conta ? `${e.conta}, ` : ""}
+                            {e.plataforma}
+                          </span>
+                          {e.tipo ? <span className={styles.exemploSelo}>{e.tipo}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link className={styles.verMais} href={`/referencias?feitoPara=${ficha}&periodo=90`}>
+                      {textosObjetivo.verMaisEmReferencias}
+                    </Link>
+                  </>
+                ) : (
+                  <div className={styles.semExemplos}>
+                    <strong>{textosObjetivo.semExemplosTitulo}</strong>
+                    <p>{textosObjetivo.semExemplosTexto}</p>
+                  </div>
+                )}
+              </section>
+              )}
+            </>
+          ) : null}
         </div>
       ) : (
         <div className={styles.cartaoStory} data-story-sem-pergunta>

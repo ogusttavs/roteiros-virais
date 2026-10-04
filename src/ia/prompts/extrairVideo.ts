@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { FICHAS_EM_ORDEM } from "@/config/fichas";
 import { FORMATOS_DO_VIDEO } from "@/config/formatos";
-import { TIPOS_ABERTURA, TIPOS_CONTEUDO } from "@/db/schema";
+import { TIPOS_ABERTURA, TIPOS_CONTEUDO, type Ficha } from "@/db/schema";
 
 import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { definicoesFicha } from "./definicoesFicha";
 import { definicoesFormato } from "./definicoesFormato";
 import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
 
@@ -83,7 +85,7 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * os valores que nunca servem de modelo, `config/formatos.ts`), gravado em `videos.formato_catalogo` por `extracao-comum.ts`. Valor fora da lista ou ausente vira nulo (a ficha
  * continua aprovada, como no M5b; "outro" fica só para quando o modelo o escolhe); o `formato` antigo de cinco valores e o `tipoConteudo` continuam até o PR 2.
  */
-export const versao = "1.11.0";
+export const versao = "1.12.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -113,6 +115,8 @@ const schemaBruto = z.object({
   // Valor fora da lista ou ausente vira NULO (a ficha continua aprovada): "outro" é um valor legítimo quando o modelo o escolhe, e gravá-lo no lugar de um erro tiraria o vídeo
   // da evidência de toda marca sem que nada o reclassificasse. Nulo passa pelo corte da H4 e a reclassificação o pega de volta.
   formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).nullable().catch(null),
+  // E49 PR 2: para que o vídeo parece feito, uma das cinco fichas; fora da lista ou ausente vira nulo, do mesmo jeito que o formato.
+  fichaCatalogo: z.enum(FICHAS_EM_ORDEM as [Ficha, ...Ficha[]]).nullable().catch(null),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
@@ -169,6 +173,11 @@ ${definicoesFormato()}
 
   Na dúvida entre um formato e "outro", escolha o formato mais próximo; "outro" só quando nada
   descreve o vídeo. Um vídeo de outra pessoa reaproveitado é "recorte_de_outro", nunca um formato do cliente.
+
+- fichaCatalogo: para que o vídeo parece feito, UM destes valores exatos (pelo que dá para ler no
+  título, na legenda e na transcrição; a leitura é uma estimativa sua, não um número da rede):
+
+${definicoesFicha()}
 
 Quando a transcrição já estiver em português, copie o gancho literalmente, nunca parafraseie.
 Quando estiver em outra língua, traduza o gancho o mais literalmente possível, sem

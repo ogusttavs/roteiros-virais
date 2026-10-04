@@ -31,6 +31,14 @@ export const textosObjetivo = {
   /** E49 PR 1: os prefixos das linhas das fichas ("Por exemplo: ...", "Ajuda em: ..."). */
   exemploPrefixo: "Por exemplo: ",
   ajudaEmPrefixo: "Ajuda em: ",
+  /** E49 PR 2: a ficha escolhida fica sozinha, com "Ver as cinco de novo", e embaixo os exemplos do setor. */
+  verAsCincoDeNovo: "Ver as cinco de novo",
+  exemplosTitulo: "Exemplos que fazem isso",
+  exemplosFrase: (paraQue: string) => `Vídeos do seu setor que parecem feitos para ${paraQue}. É uma leitura nossa do vídeo, não um número da rede.`,
+  verMaisEmReferencias: "Ver mais em Referências",
+  semExemplosTitulo: "Ainda não temos exemplos deste tipo no seu setor.",
+  semExemplosTexto: "O roteiro sai do mesmo jeito: a gente usa o que as plataformas pedem para esse tipo de vídeo. Os exemplos aparecem aqui quando o seu setor tiver.",
+  carregandoExemplos: "Procurando exemplos no seu setor",
   /** E49 PR 1: no vídeo sem fala as fichas somem (a estrutura delas pressupõe fala), com a linha que diz por quê. */
   semFalaTitulo: "No vídeo sem fala, a conversa é feita de cenas",
   semFalaTexto: "O vídeo sem fala segue o roteiro de cenas: o que mostrar e o texto na tela. Por isso ele não pergunta para que é o vídeo.",

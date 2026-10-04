@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, metricasVideoCliente, nichos, roteiros, user, videosCliente } from "@/db/schema";
-import { fontesDoHistorico } from "@/servicos/curva";
+import { fontesDoHistorico, pontosDaCurva } from "@/servicos/curva";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -161,5 +161,21 @@ describe("fontesDoHistorico", () => {
     await db().insert(metricasVideoCliente).values({ videoClienteId: video.id, views: 1, likes: 0, comentarios: 0, fonte: "meta" });
 
     expect((await fontesDoHistorico(clienteId, [roteiroId])).has(roteiroId)).toBe(false);
+  });
+});
+
+describe("pontosDaCurva: guardado e mandado (E49 PR 2)", () => {
+  it("devolve saves e shares quando a rede deu o número, e null quando não deu (nunca zero inventado)", async () => {
+    const roteiroId = await criarRoteiro();
+    const [video] = await db().insert(videosCliente).values({ clienteId, roteiroId, url: "https://exemplo.invalido/s", postadoEm: new Date() }).returning();
+    await db().insert(metricasVideoCliente).values({ videoClienteId: video.id, views: 100, likes: 1, comentarios: 0, coletadoEm: new Date(Date.now() - 3_600_000) });
+    await db().insert(metricasVideoCliente).values({ videoClienteId: video.id, views: 900, likes: 9, comentarios: 1, saves: 42, shares: 7, fonte: "meta" });
+
+    const pontos = await pontosDaCurva(video.id);
+    expect(pontos).toHaveLength(2);
+    expect(pontos[0].saves).toBeNull();
+    expect(pontos[0].shares).toBeNull();
+    expect(pontos[1].saves).toBe(42);
+    expect(pontos[1].shares).toBe(7);
   });
 });

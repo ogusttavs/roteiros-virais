@@ -122,8 +122,8 @@ async function main(): Promise<void> {
     await executarComRegistro(FILAS.analisarVisual, rodarAnalisarVisual);
   });
   /** M3, item 2: sem `nichoId`, roda para todo setor ativo que aceita "vídeo sem fala vale" (o cron diário). */
-  await boss().work<{ nichoId?: number }>(FILAS.extrairSemFala, async (job) => {
-    await executarComRegistro(FILAS.extrairSemFala, () => rodarExtrairSemFala(job[0]?.data?.nichoId));
+  await boss().work<{ nichoId?: number; soFicha?: boolean }>(FILAS.extrairSemFala, async (job) => {
+    await executarComRegistro(FILAS.extrairSemFala, () => rodarExtrairSemFala(job[0]?.data?.nichoId, job[0]?.data?.soFicha === true));
   });
   await boss().work(FILAS.modeloNicho, async () => {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);

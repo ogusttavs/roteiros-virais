@@ -12,6 +12,7 @@ import path from "node:path";
 
 import { z } from "zod";
 
+import { FICHAS_EM_ORDEM } from "../src/config/fichas";
 import { FORMATOS_DO_VIDEO } from "../src/config/formatos";
 import { gerarEstruturado } from "../src/ia/cliente";
 import * as extrairVideoIA from "../src/ia/prompts/extrairVideo";
@@ -19,6 +20,8 @@ import { calcularCustoUsd } from "../src/ia/registro";
 
 const casoSchema = z.object({
   formatoEsperado: z.enum(FORMATOS_DO_VIDEO),
+  /** E49 PR 2: para que o vídeo parece feito, pelas cinco fichas; ausente (conjunto antigo) não entra na conta. */
+  fichaEsperada: z.enum(FICHAS_EM_ORDEM as [(typeof FICHAS_EM_ORDEM)[number], ...(typeof FICHAS_EM_ORDEM)[number][]]).optional(),
   titulo: z.string(),
   descricao: z.string().nullable().default(null),
   handle: z.string().nullable().default(null),
@@ -38,6 +41,9 @@ export type ResultadoAvaliarExtrair = {
   ehExemplo: boolean;
   casos: number;
   acertos: number;
+  /** E49 PR 2: quantos casos com ficha esperada, e em quantos a ficha devolvida bateu (o julgamento fino é humano; isto só aponta o que desviou). */
+  casosComFicha: number;
+  acertosDeFicha: number;
   /** Quantos vieram com "outro" ou nulos (a ficha ficou sem o formato). */
   comoOutro: number;
   /** Os casos que erraram: o título, o esperado e o devolvido, para leitura humana. */
@@ -52,6 +58,8 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
   console.log(`${conjunto.length} caso(s)\n`);
 
   let acertos = 0;
+  let casosComFicha = 0;
+  let acertosDeFicha = 0;
   let comoOutro = 0;
   let custoTotalUsd = 0;
   const erros: ResultadoAvaliarExtrair["erros"] = [];
@@ -78,11 +86,17 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
     const bateu = devolvido === caso.formatoEsperado;
     if (bateu) acertos += 1;
     else erros.push({ titulo: caso.titulo, esperado: caso.formatoEsperado, devolvido });
+    if (caso.fichaEsperada) {
+      casosComFicha += 1;
+      const ficha = resultado.dados.fichaCatalogo ?? "(nulo)";
+      if (ficha === caso.fichaEsperada) acertosDeFicha += 1;
+      else console.log(`     ficha: esperada ${caso.fichaEsperada}, devolvida ${ficha}`);
+    }
     console.log(`${bateu ? "ok  " : "erro"} ${caso.formatoEsperado.padEnd(22)} ${devolvido.padEnd(22)} ${caso.titulo}`);
   }
 
-  console.log(`\nacertos: ${acertos}/${conjunto.length}, como "outro": ${comoOutro}, custo: US$ ${custoTotalUsd.toFixed(4)}`);
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, acertos, comoOutro, erros, custoTotalUsd };
+  console.log(`\nacertos: ${acertos}/${conjunto.length}, como "outro": ${comoOutro}, fichas: ${acertosDeFicha}/${casosComFicha}, custo: US$ ${custoTotalUsd.toFixed(4)}`);
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, acertos, casosComFicha, acertosDeFicha, comoOutro, erros, custoTotalUsd };
 }
 
 if (require.main === module) {

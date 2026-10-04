@@ -29,6 +29,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
   let lotesConcluidos = 0;
   let videosAtualizados = 0;
   let semFormato = 0;
+  let semFicha = 0;
   let videosComErro = 0;
   let reprovadosPorIdioma = 0;
   const erros: string[] = [];
@@ -68,9 +69,10 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
         erros.push(`video ${videoId}: analise reprovada na checagem de idioma depois de refazer`);
       }
 
-      await aplicarResultadoExtracao(videoId, dados);
+      await aplicarResultadoExtracao(videoId, dados, { soFicha: lote.soFicha });
       videosAtualizados += 1;
       if (dados.formatoCatalogo === null) semFormato += 1;
+      if (dados.fichaCatalogo === null) semFicha += 1;
       const nichoId = nichoPorVideoId.get(videoId);
       if (nichoId !== null && nichoId !== undefined) nichosAfetados.add(nichoId);
 
@@ -99,6 +101,7 @@ export async function rodarExtrairColeta(): Promise<Record<string, unknown>> {
   }
 
   // E44 PR 1: o modelo devolveu um tipo fora da lista (ou nenhum): `formato_catalogo` ficou nulo, e o vídeo segue a regra antiga até a reclassificação.
+  if (semFicha > 0) logger.warn({ semFicha, deVideos: videosAtualizados }, "extrair-coleta: videos cuja ficha_catalogo ficou nula (valor fora da lista ou ausente)");
   if (semFormato > 0) logger.warn({ semFormato, deVideos: videosAtualizados }, "extrair-coleta: videos cujo formato_catalogo ficou nulo (valor fora da lista ou ausente)");
 
   /**

@@ -10,6 +10,14 @@ export const textosHistorico = {
   /** V9c, item 4: só aparece para `formato === "story"`, ao lado da data, como `origemMomento`. */
   formatoStory: "story",
   pontoCurva: (views: string, horas: number) => `${views} views em ${horas}h`,
+  /** E49 PR 2: só aparece quando a rede devolveu o número; sem número, a frase some. */
+  guardadoMandado: (guardado: number | null, mandado: number | null) =>
+    [
+      guardado === null ? null : `guardado ${guardado.toLocaleString("pt-BR")} ${guardado === 1 ? "vez" : "vezes"}`,
+      mandado === null ? null : `mandado ${mandado.toLocaleString("pt-BR")} ${mandado === 1 ? "vez" : "vezes"}`,
+    ]
+      .filter(Boolean)
+      .join(", "),
   aprendendo: "ainda aprendendo o normal da sua conta",
   acimaDoNormal: (vezes: string) => `${vezes} acima do normal da sua conta; responda os comentários hoje`,
   semAcompanhamento: "sem acompanhamento",

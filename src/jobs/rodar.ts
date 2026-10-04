@@ -81,7 +81,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
   [FILAS.extrairSemFala]: () => {
     const nichoIdArg = process.argv[3];
-    return rodarExtrairSemFala(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+    return rodarExtrairSemFala(nichoIdArg === undefined || nichoIdArg.startsWith("--") ? undefined : Number(nichoIdArg), process.argv.includes("--so-ficha"));
   },
   [FILAS.modeloNicho]: () => rodarModeloNicho(),
   /**
