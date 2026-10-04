@@ -12,6 +12,8 @@ import type { PerfilAnalisadoComTipo } from "@/servicos/perfis-analisados";
 import { textosBriefing } from "@/textos/briefing";
 import { BarraNotaGeral } from "@/ui/componentes/BarraNotaGeral";
 import { Cartao } from "@/ui/componentes/Cartao";
+import { CartaoDeTipos } from "@/ui/componentes/CartaoDeTipos";
+import type { TipoLigado } from "@/ui/useTiposDaMarca";
 
 import { PerguntaCampo, type ResultadoAcaoBriefing } from "../../_briefing/PerguntaCampo";
 
@@ -32,6 +34,9 @@ type Props = {
   contextoMarca: SecaoContextoMarca;
   meta: number;
   tipo: TipoMarca;
+  /** E44 PR 2: os tipos de vídeo da marca e quando o cliente respondeu ("3 de outubro"), para o cartão editável no lugar. */
+  tiposIniciais: readonly TipoLigado[];
+  tiposRespondidoEm: string | null;
 };
 
 const BLOCOS = Array.from({ length: TOTAL_BLOCOS }, (_, i) => i + 1);
@@ -71,6 +76,8 @@ export function BriefingVivo({
   contextoMarca,
   meta,
   tipo,
+  tiposIniciais,
+  tiposRespondidoEm,
 }: Props) {
   const [respostas, setRespostas] = useState(respostasIniciais);
   const [avaliacoes, setAvaliacoes] = useState(avaliacoesIniciais);
@@ -138,6 +145,9 @@ export function BriefingVivo({
 
           {/* Depois de "Como o sistema te entende", antes do aprendizado: a ordem do desenho aprovado (`Briefing.dc.html`). */}
           <ContextoMarcaCard secao={contextoMarca} />
+
+          {/* Os tipos de vídeo (passo 17): editáveis no lugar, sem botão de salvar, antes do aprendizado. */}
+          <CartaoDeTipos iniciais={tiposIniciais} onde="briefing" respondidoEm={tiposRespondidoEm} />
 
           <AprendizadoCard regrasIniciais={regrasIniciais} />
 

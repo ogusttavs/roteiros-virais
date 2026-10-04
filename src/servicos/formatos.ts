@@ -23,6 +23,10 @@ export type EstadoDoFormato = {
   quem: QuemDecidiu;
   /** O que o cliente respondeu (nulo se não respondeu esta chave), para a tela do admin mostrar a diferença e oferecer "voltar ao que o cliente escolheu". */
   respostaDoCliente: boolean | null;
+  /** Quando foi a decisão que vale hoje (a do admin, a do cliente), ou nulo se é o padrão. */
+  decididoEm: Date | null;
+  /** Quando o cliente respondeu esta chave (nulo se não respondeu), para "respondido em ..." e para "o cliente tinha ligado" na tela do admin. */
+  respostaDoClienteEm: Date | null;
 };
 
 function estadoDasChaves(linhas: FormatoDaMarca[]): EstadoDoFormato[] {
@@ -37,6 +41,8 @@ function estadoDasChaves(linhas: FormatoDaMarca[]): EstadoDoFormato[] {
       ligada: doAdmin ? doAdmin.ligada : doCliente ? doCliente.ligada : formato.ligadaPorPadrao,
       quem,
       respostaDoCliente: doCliente ? doCliente.ligada : null,
+      decididoEm: doAdmin ? doAdmin.decididoEm : doCliente ? doCliente.decididoEm : null,
+      respostaDoClienteEm: doCliente ? doCliente.decididoEm : null,
     };
   });
 }

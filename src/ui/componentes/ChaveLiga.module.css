@@ -1,0 +1,80 @@
+/**
+ * `base.css` do passo 17, `.chave-liga`: o trilho (51 x 31) e a bolinha (27) desenhados com `::before` e `::after` dentro de um alvo de toque de 56 x 44. A bolinha anda por `translate`, na mola (`--curva-mola`),
+ * nunca por `left`. "Reduzir movimento": a bolinha troca de lugar na hora.
+ */
+.chave {
+  position: relative;
+  flex: 0 0 auto;
+  width: 3.5rem;
+  min-height: var(--altura-toque);
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chave::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: 3.1875rem;
+  height: 1.9375rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-nota-trilho);
+  box-shadow: inset 0 0 0 var(--largura-borda) var(--cor-borda);
+  transition: background-color var(--duracao-troca) var(--curva-padrao);
+}
+
+.chave::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(50% - 1.59375rem + 0.125rem);
+  translate: 0 -50%;
+  width: 1.6875rem;
+  height: 1.6875rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-elevada);
+  box-shadow: var(--sombra-controle);
+  transition:
+    translate var(--duracao-soltar) var(--curva-mola),
+    background-color var(--duracao-troca) var(--curva-padrao);
+}
+
+.chave[aria-checked="true"]::before {
+  background: var(--cor-destaque);
+  box-shadow: none;
+}
+
+.chave[aria-checked="true"]::after {
+  /* A bolinha anda 1,25 rem para a direita (trilho 3,1875 menos bolinha 1,6875 menos as duas folgas de 0,125). */
+  translate: 1.25rem -50%;
+  background: var(--cor-acao-texto);
+}
+
+:global([data-tema="escuro"]) .chave[aria-checked="false"]::after {
+  background: var(--cor-texto-suave);
+}
+
+.chave:focus-visible {
+  outline: none;
+}
+
+.chave:focus-visible::before {
+  outline: 3px solid var(--cor-foco);
+  outline-offset: 2px;
+}
+
+.chave:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chave::after {
+    transition: none;
+  }
+}
