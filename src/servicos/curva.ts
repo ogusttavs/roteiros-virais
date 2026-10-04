@@ -168,12 +168,13 @@ export function estaAcimaDoNormal(ultimaMedicaoViews: number, mediana: number | 
   return mediana !== null && mediana > 0 && ultimaMedicaoViews / mediana >= MULTIPLICADOR_ACIMA_DO_NORMAL;
 }
 
-export type PontoCurva = { coletadoEm: Date; views: number };
+/** `saves` e `shares` (E49 PR 2) só vêm quando a rede devolveu o número; `null` é sem número, nunca zero inventado. */
+export type PontoCurva = { coletadoEm: Date; views: number; saves: number | null; shares: number | null };
 
 /** Os pontos medidos de um vídeo, mais antigo primeiro (decisão 5: texto e números, não gráfico). */
 export async function pontosDaCurva(videoClienteId: number): Promise<PontoCurva[]> {
   const linhas = await db()
-    .select({ coletadoEm: metricasVideoCliente.coletadoEm, views: metricasVideoCliente.views })
+    .select({ coletadoEm: metricasVideoCliente.coletadoEm, views: metricasVideoCliente.views, saves: metricasVideoCliente.saves, shares: metricasVideoCliente.shares })
     .from(metricasVideoCliente)
     .where(eq(metricasVideoCliente.videoClienteId, videoClienteId))
     .orderBy(metricasVideoCliente.coletadoEm);

@@ -141,7 +141,7 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
       imagens: quadros.map((quadro) => ({ base64: quadro.base64, mediaType: "image/jpeg" as const })),
     });
 
-    const { etiquetas, formatoCatalogo, ...analise } = resultado.dados;
+    const { etiquetas, formatoCatalogo, fichaCatalogo, ...analise } = resultado.dados;
     if (formatoCatalogo === null) logger.warn({ videoId: video.id }, "extrair-sem-fala: formato_catalogo ficou nulo (valor fora da lista ou ausente)");
     const analiseVideo: AnaliseVideo = analise;
     // M4, item 1: este é o caminho sem fala, por definição. Achado 5 da revisão do motor
@@ -156,6 +156,7 @@ async function analisarUm(video: CandidatoSemFala, nomeNicho: string, termosNich
         tipoConteudo: resultado.dados.tipoConteudo,
         serveDeModelo: resultado.dados.serveDeModelo,
         formatoCatalogo,
+        fichaCatalogo,
         semFala: true,
       })
       .where(eq(videos.id, video.id));

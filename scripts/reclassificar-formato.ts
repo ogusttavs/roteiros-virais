@@ -1,6 +1,6 @@
 /**
  * Script de uma vez só (E44 PR 1): classifica o FORMATO (as treze chaves do estudo mais os valores que nunca servem de modelo, `config/formatos.ts`) dos vídeos já
- * analisados antes de `videos.formato_catalogo` existir (`extrairVideo`, versão 1.11.0). Mesmo caminho de `reclassificar-evidencia.ts` (H4): o lote reextrai a ficha
+ * analisados antes de `videos.formato_catalogo` existir (`extrairVideo`, versão 1.11.0; E49 PR 2: e agora também `videos.ficha_catalogo`, versão 1.12.0, na mesma rodada: o lote reextrai os dois campos pelo mesmo preço). Mesmo caminho de `reclassificar-evidencia.ts` (H4): o lote reextrai a ficha
  * com o prompt novo e o job `extrairColeta` grava tudo, inclusive o formato, quando o lote termina. Vídeo sem `formato_catalogo` continua passando pelo corte da H4
  * até aqui (`condicaoDeFormato`, `servicos/pesquisa.ts`: nulo passa), então rodar isto aos poucos nunca esvazia a evidência de ninguém.
  *
@@ -16,7 +16,7 @@
  *   npx tsx scripts/reclassificar-formato.ts              # dry run, não gasta nada
  *   npx tsx scripts/reclassificar-formato.ts --confirmar   # envia o lote de verdade
  */
-import { and, avg, count, eq, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
+import { and, avg, count, eq, gte, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
 import { db } from "../src/db";
 import { contas, geracoesIA, lotesIa, nichos, videos } from "../src/db/schema";
@@ -59,7 +59,8 @@ export async function candidatosDoSetor(nichoId: number, nomeNicho: string, term
     // transcrição curta demais (mesmo piso de `extracao-comum.ts`) não passa por aqui.
     sql`${videos.semFala} is not true`,
     sql`char_length(trim(${videos.transcricao})) >= ${TAMANHO_MINIMO_TRANSCRICAO}`,
-    isNull(videos.formatoCatalogo),
+    // E49 PR 2: uma rodada só reclassifica os dois campos (o custo é o mesmo): falta o tipo OU falta a ficha ("para que o vídeo parece feito").
+    or(isNull(videos.formatoCatalogo), isNull(videos.fichaCatalogo)),
     PERTENCE_AO_NICHO,
     DENTRO_DO_TETO_DE_DURACAO,
   ];
@@ -126,7 +127,7 @@ async function main() {
   const confirmar = process.argv.includes("--confirmar");
   const { total, porSetor, custoMedioUsd, custoEstimadoUsd, jaEmLote } = await planejarReclassificacao();
 
-  console.log(`vídeos elegíveis a evidência, ainda sem formato_catalogo: ${total}${jaEmLote > 0 ? ` (fora ${jaEmLote} que já estão num lote em andamento)` : ""}`);
+  console.log(`vídeos elegíveis a evidência, ainda sem formato_catalogo ou sem ficha_catalogo: ${total}${jaEmLote > 0 ? ` (fora ${jaEmLote} que já estão num lote em andamento)` : ""}`);
   for (const setor of porSetor) {
     console.log(`  ${setor.nome}: ${setor.candidatos.length}`);
   }

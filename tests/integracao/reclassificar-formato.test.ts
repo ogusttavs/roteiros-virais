@@ -49,15 +49,17 @@ afterAll(async () => {
 });
 
 describe("reclassificar-formato", () => {
-  it("só entra vídeo analisado, sem formato, com fala e transcrição suficiente", async () => {
+  it("só entra vídeo analisado, sem formato OU sem ficha, com fala e transcrição suficiente (E49 PR 2: uma rodada reclassifica os dois campos)", async () => {
     await video("elegivel");
-    await video("ja-tem-formato", { formatoCatalogo: "lista" });
+    await video("ja-tem-formato-e-ficha", { formatoCatalogo: "lista", fichaCatalogo: "guardem" });
+    // Tem o tipo mas falta a ficha: entra.
+    await video("tem-formato-sem-ficha", { formatoCatalogo: "lista" });
     await video("sem-fala", { semFala: true });
     await video("curta", { transcricao: "muito curta" });
     await video("sem-analise", { analise: null });
 
     const candidatos = await candidatosDoSetor(nichoId, "Reclassificar formato teste", []);
-    expect(candidatos).toHaveLength(1);
+    expect(candidatos).toHaveLength(2);
     await db().delete(videos).where(eq(videos.nichoId, nichoId));
   });
 

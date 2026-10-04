@@ -484,6 +484,13 @@
       "when": 1791113345046,
       "tag": "0068_ficha-do-roteiro",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1791119187567,
+      "tag": "0069_ficha-do-video",
+      "breakpoints": true
     }
   ]
 }

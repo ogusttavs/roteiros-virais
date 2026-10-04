@@ -23,6 +23,7 @@ import {
   videos,
   type AnaliseVideo,
   type AnaliseVisual,
+  type Ficha,
   type MedianaOrigem,
   type ModeloNicho,
   type Plataforma,
@@ -876,6 +877,8 @@ export type VideoReferencia = {
   id: number;
   /** E44 PR 2: o tipo de vídeo pela lista fechada (`config/formatos.ts`), para o selo do cartão; nulo antes da reclassificação. */
   formatoCatalogo: string | null;
+  /** E49 PR 2: "para que o vídeo parece feito" (leitura nossa, não um número da rede); nulo antes da reclassificação. */
+  fichaCatalogo: Ficha | null;
   /** E45 PR 3: o setor do vídeo; a tela mostra o nome do ramo no cartão quando não é o principal. */
   nichoId: number | null;
   plataforma: Plataforma;
@@ -944,6 +947,8 @@ export type TipoConteudoFiltravel = Extract<TipoConteudo, "meme" | "recorte">;
 export type FiltrosReferencias = {
   /** E44 PR 1: os formatos ligados da marca; só entra vídeo de formato ligado (os três segmentos), e com resposta dela o corte global de meme e recorte da H4 sai. */
   formatosDaMarca?: FiltroDeFormatosDaMarca;
+  /** E49 PR 2: "Parece feito para": só os vídeos que a extração classificou numa destas fichas (`videos.ficha_catalogo`); vídeo sem ficha não conta. */
+  fichas?: Ficha[];
   /** 7, 30 ou 90; padrão 7, como o design. */
   periodoDias?: number;
   /** Assunto ou conta (V6, item 1): a coluna `busca` (tsvector) mais `contas.nome`. */
@@ -1044,6 +1049,7 @@ function condicoesReferencias(nichoId: number, filtros: FiltrosReferencias, regu
   if (filtros.plataformas && filtros.plataformas.length > 0) {
     condicoes.push(inArray(videos.plataforma, filtros.plataformas));
   }
+  if (filtros.fichas && filtros.fichas.length > 0) condicoes.push(inArray(videos.fichaCatalogo, filtros.fichas));
   const temFormatos = filtros.formatos && filtros.formatos.length > 0;
   const temTipos = filtros.tiposConteudo && filtros.tiposConteudo.length > 0;
   if (temFormatos || temTipos) {
@@ -1123,6 +1129,7 @@ const CAMPOS_VIDEO_REFERENCIA = {
   capaUrl: videos.capaUrl,
   semFala: videos.semFala,
   formatoCatalogo: videos.formatoCatalogo,
+  fichaCatalogo: videos.fichaCatalogo,
   analiseVisual: videos.analiseVisual,
   tipoConteudo: videos.tipoConteudo,
 } as const;
@@ -1130,6 +1137,7 @@ const CAMPOS_VIDEO_REFERENCIA = {
 type LinhaVideoReferencia = {
   id: number;
   formatoCatalogo: string | null;
+  fichaCatalogo: Ficha | null;
   nichoId: number | null;
   plataforma: Plataforma;
   url: string;
@@ -1165,6 +1173,7 @@ function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor, setores
   return {
     id: l.id,
     formatoCatalogo: l.formatoCatalogo,
+    fichaCatalogo: l.fichaCatalogo,
     nichoId: l.nichoId,
     plataforma: l.plataforma,
     url: l.url,
@@ -1291,6 +1300,8 @@ export type ContagensFiltroReferencias = {
   porBrasil: { brasil: number; fora: number };
   /** R2b, item 2: os dois valores de `tipoConteudo` que entram no filtro combinado "Tipo de vídeo". */
   porTipoConteudo: Record<TipoConteudoFiltravel, number>;
+  /** E49 PR 2: quantos vídeos "parecem feitos para" cada ficha (mantendo os outros filtros, menos o da própria ficha). */
+  porFicha: Record<Ficha, number>;
 };
 
 const FAIXAS_VIEWS = [
@@ -1332,6 +1343,7 @@ export async function contagensPorFiltroReferencias(
     porPlataformaLinhas,
     porFormatoLinhas,
     porTipoConteudoLinhas,
+    porFichaLinhas,
     qualquer,
     dezMil,
     cinquentaMil,
@@ -1367,6 +1379,12 @@ export async function contagensPorFiltroReferencias(
         and(...condicoesReferencias(nichoId, { ...filtros, formatos: undefined, tiposConteudo: undefined }, regua, semRegua)),
       )
       .groupBy(videos.tipoConteudo),
+    db()
+      .select({ ficha: videos.fichaCatalogo, total: sql<number>`count(*)::int` })
+      .from(videos)
+      .leftJoin(contas, eq(contas.id, videos.contaId))
+      .where(and(...condicoesReferencias(nichoId, { ...filtros, fichas: undefined }, regua, semRegua)))
+      .groupBy(videos.fichaCatalogo),
     contar({ ...filtros, viewsMin: undefined }),
     contar({ ...filtros, viewsMin: FAIXAS_VIEWS[0].min }),
     contar({ ...filtros, viewsMin: FAIXAS_VIEWS[1].min }),
@@ -1402,10 +1420,14 @@ export async function contagensPorFiltroReferencias(
     }
   }
 
+  const porFicha = { veja: 0, guardem: 0, mandem: 0, comentem: 0, me_chamem: 0 } as Record<Ficha, number>;
+  for (const linha of porFichaLinhas) if (linha.ficha && linha.ficha in porFicha) porFicha[linha.ficha] = linha.total;
+
   return {
     porPlataforma,
     porFormato,
     porTipoConteudo,
+    porFicha,
     porViewsMin: { qualquer, dezMil, cinquentaMil, cemMil, umMilhao },
     porPeriodo: { sete, trinta, noventa },
     porFala: { comFala, semFala },
@@ -1675,4 +1697,19 @@ export async function setorAindaLendo(nichoId: number): Promise<boolean> {
 export async function setorSemBase(nichoId: number): Promise<boolean> {
   const [linha] = await db().select({ total: sql<number>`count(*)::int` }).from(videos).where(eq(videos.nichoId, nichoId));
   return (linha?.total ?? 0) === 0;
+}
+
+/**
+ * "Exemplos que fazem isso" no Criar (E49 PR 2): até `limite` vídeos dos ramos da conta que a extração leu como feitos para a ficha escolhida. É a mesma consulta das
+ * Referências (a mesma régua do setor e o mesmo corte), com os mesmos filtros de tipo da marca e o corte duro de recorte e notícia (`exigirServeDeModelo`), e só olha os últimos 90
+ * dias. Vídeo sem ficha classificada não conta. Os melhores primeiro (fora da curva, depois views).
+ */
+export async function exemplosPorFicha(
+  nichoId: number,
+  ficha: Ficha,
+  opcoes: { setores?: SetorDaBusca[]; formatosDaMarca?: FiltroDeFormatosDaMarca; limite?: number } = {},
+): Promise<VideoReferencia[]> {
+  const filtros: FiltrosReferencias = { fichas: [ficha], periodoDias: 90, setores: opcoes.setores, formatosDaMarca: opcoes.formatosDaMarca, ordem: "multiplo", limite: opcoes.limite ?? 3 };
+  const resultado = await referenciasDoNicho(nichoId, filtros);
+  return resultado.videos.slice(0, opcoes.limite ?? 3);
 }

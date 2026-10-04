@@ -250,10 +250,15 @@ describe("a extração grava o formato", () => {
       tipoConteudo: "original",
       serveDeModelo: true,
       formatoCatalogo: "antes_e_depois",
+      fichaCatalogo: "me_chamem",
     });
     const [video] = await db().select({ formato: videos.formatoCatalogo, analise: videos.analise }).from(videos).where(eq(videos.id, id));
     expect(video.formato).toBe("antes_e_depois");
     expect(video.analise).not.toHaveProperty("formatoCatalogo");
+    // E49 PR 2: a ficha também sai em coluna própria, nunca dentro do jsonb.
+    expect(video.analise).not.toHaveProperty("fichaCatalogo");
+    const [comFicha] = await db().select({ ficha: videos.fichaCatalogo }).from(videos).where(eq(videos.id, id));
+    expect(comFicha.ficha).toBe("me_chamem");
   });
 
   it("uma ficha sem tipo (o modelo errou ou omitiu) grava NULO, e o vídeo segue a regra antiga em vez de sumir da evidência", async () => {
@@ -274,6 +279,7 @@ describe("a extração grava o formato", () => {
       tipoConteudo: "original",
       serveDeModelo: true,
       formatoCatalogo: null,
+      fichaCatalogo: null,
     });
     const [video] = await db().select({ formato: videos.formatoCatalogo }).from(videos).where(eq(videos.id, id));
     expect(video.formato).toBeNull();

@@ -4,125 +4,143 @@
     "titulo": "Como tirar mancha de vinho do sofá",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Primeiro você tira o excesso com papel, sem esfregar. Depois mistura uma colher de detergente neutro com água morna. Aplica com um pano branco, de fora para dentro. Deixa agir cinco minutos e seca com outro pano. Pronto, a mancha saiu."
+    "transcricao": "Primeiro você tira o excesso com papel, sem esfregar. Depois mistura uma colher de detergente neutro com água morna. Aplica com um pano branco, de fora para dentro. Deixa agir cinco minutos e seca com outro pano. Pronto, a mancha saiu.",
+    "fichaEsperada": "guardem"
   },
   {
     "formatoEsperado": "passo_a_passo",
     "titulo": "Passo a passo para lavar o tênis branco",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Tira o cadarço e a palmilha. Passa a escova com sabão neutro, na sola e no cabedal. Enxágua com pouca água. Deixa secar à sombra, nunca no sol forte. E por último põe o cadarço de volta."
+    "transcricao": "Tira o cadarço e a palmilha. Passa a escova com sabão neutro, na sola e no cabedal. Enxágua com pouca água. Deixa secar à sombra, nunca no sol forte. E por último põe o cadarço de volta.",
+    "fichaEsperada": "guardem"
   },
   {
     "formatoEsperado": "passo_a_passo",
     "titulo": "Como montar o kit de limpeza do carro",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Você vai precisar de dois baldes, um pano de microfibra e xampu automotivo. Passo um, enxágua o carro. Passo dois, lava de cima para baixo. Passo três, seca com a microfibra para não deixar marca."
+    "transcricao": "Você vai precisar de dois baldes, um pano de microfibra e xampu automotivo. Passo um, enxágua o carro. Passo dois, lava de cima para baixo. Passo três, seca com a microfibra para não deixar marca.",
+    "fichaEsperada": "guardem"
   },
   {
     "formatoEsperado": "antes_e_depois",
     "titulo": "Antes e depois do sofá de três lugares",
     "descricao": "antes e depois",
     "handle": "conta_exemplo",
-    "transcricao": "Olha como esse sofá chegou aqui, cheio de mancha e com cheiro forte. A gente aplicou o produto, deixou agir e extraiu a sujeira. E agora olha como ficou, sem mancha nenhuma e com cheiro de limpo."
+    "transcricao": "Olha como esse sofá chegou aqui, cheio de mancha e com cheiro forte. A gente aplicou o produto, deixou agir e extraiu a sujeira. E agora olha como ficou, sem mancha nenhuma e com cheiro de limpo.",
+    "fichaEsperada": "me_chamem"
   },
   {
     "formatoEsperado": "antes_e_depois",
     "titulo": "Antes e depois do box do banheiro",
     "descricao": "antes e depois",
     "handle": "conta_exemplo",
-    "transcricao": "Esse era o box do cliente, todo amarelado de calcário. Passei o removedor, esperei dez minutos e esfreguei. Olha o resultado, o vidro transparente de novo."
+    "transcricao": "Esse era o box do cliente, todo amarelado de calcário. Passei o removedor, esperei dez minutos e esfreguei. Olha o resultado, o vidro transparente de novo.",
+    "fichaEsperada": "me_chamem"
   },
   {
     "formatoEsperado": "antes_e_depois",
     "titulo": "Antes e depois da lavagem do carpete",
     "descricao": "antes e depois",
     "handle": "conta_exemplo",
-    "transcricao": "O carpete estava escuro, parecia cinza. Fiz a lavagem a seco e a extração. Compara aí, antes e depois, a cor voltou ao que era."
+    "transcricao": "O carpete estava escuro, parecia cinza. Fiz a lavagem a seco e a extração. Compara aí, antes e depois, a cor voltou ao que era.",
+    "fichaEsperada": "me_chamem"
   },
   {
     "formatoEsperado": "lista",
     "titulo": "3 jeitos de tirar cheiro de mofo do guarda-roupa",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Número um, deixa uma caixinha de bicarbonato aberta no fundo. Número dois, abre as portas num dia de sol. Número três, usa vinagre branco num pano para limpar as prateleiras."
+    "transcricao": "Número um, deixa uma caixinha de bicarbonato aberta no fundo. Número dois, abre as portas num dia de sol. Número três, usa vinagre branco num pano para limpar as prateleiras.",
+    "fichaEsperada": "guardem"
   },
   {
     "formatoEsperado": "lista",
     "titulo": "5 dicas para o piso brilhar mais tempo",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Primeira dica, varre antes de passar o pano. Segunda, usa pouco produto. Terceira, troca a água sempre. Quarta, seca com pano limpo. Quinta, não mistura produtos diferentes."
+    "transcricao": "Primeira dica, varre antes de passar o pano. Segunda, usa pouco produto. Terceira, troca a água sempre. Quarta, seca com pano limpo. Quinta, não mistura produtos diferentes.",
+    "fichaEsperada": "guardem"
   },
   {
     "formatoEsperado": "lista",
     "titulo": "7 erros que estragam o seu estofado",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Erro um, esfregar a mancha. Erro dois, usar água quente. Erro três, deixar o sofá molhado. Erro quatro, produto forte demais. E ainda tem mais três que eu vou te contar agora."
+    "transcricao": "Erro um, esfregar a mancha. Erro dois, usar água quente. Erro três, deixar o sofá molhado. Erro quatro, produto forte demais. E ainda tem mais três que eu vou te contar agora.",
+    "fichaEsperada": "comentem"
   },
   {
     "formatoEsperado": "erro_comum",
     "titulo": "O erro que todo mundo comete ao lavar o tênis",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Muita gente joga o tênis na máquina de lavar. Isso é errado, porque a cola descola e a forma estraga. O jeito certo é lavar à mão, com escova macia e sabão neutro."
+    "transcricao": "Muita gente joga o tênis na máquina de lavar. Isso é errado, porque a cola descola e a forma estraga. O jeito certo é lavar à mão, com escova macia e sabão neutro.",
+    "fichaEsperada": "mandem"
   },
   {
     "formatoEsperado": "erro_comum",
     "titulo": "Erro comum na limpeza do inox",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Quase todo mundo passa palha de aço no inox e risca tudo. O certo é usar esponja macia e seguir o sentido do escovado do metal."
+    "transcricao": "Quase todo mundo passa palha de aço no inox e risca tudo. O certo é usar esponja macia e seguir o sentido do escovado do metal.",
+    "fichaEsperada": "comentem"
   },
   {
     "formatoEsperado": "erro_comum",
     "titulo": "Nunca faça isso com o colchão, é um erro sério",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Você molha o colchão inteiro para limpar. Errado, ele leva dias para secar e cria mofo. O certo é aplicar pouco produto e aspirar."
+    "transcricao": "Você molha o colchão inteiro para limpar. Errado, ele leva dias para secar e cria mofo. O certo é aplicar pouco produto e aspirar.",
+    "fichaEsperada": "comentem"
   },
   {
     "formatoEsperado": "humor_e_meme",
     "titulo": "POV: você descobre que a visita chega em dez minutos",
     "descricao": "POV humor",
     "handle": "conta_exemplo",
-    "transcricao": "Corre, esconde tudo embaixo do sofá. Passa o pano só na parte que aparece. Borrifa o aromatizador na casa inteira. Abre a porta com cara de quem vive assim sempre."
+    "transcricao": "Corre, esconde tudo embaixo do sofá. Passa o pano só na parte que aparece. Borrifa o aromatizador na casa inteira. Abre a porta com cara de quem vive assim sempre.",
+    "fichaEsperada": "mandem"
   },
   {
     "formatoEsperado": "humor_e_meme",
     "titulo": "Meme da faxina de domingo",
     "descricao": "POV humor",
     "handle": "conta_exemplo",
-    "transcricao": "Eu falando que vou fazer só uma limpeza rápida. Três horas depois, desmontando o armário da cozinha. Ninguém me avisa que isso acontece toda vez."
+    "transcricao": "Eu falando que vou fazer só uma limpeza rápida. Três horas depois, desmontando o armário da cozinha. Ninguém me avisa que isso acontece toda vez.",
+    "fichaEsperada": "veja"
   },
   {
     "formatoEsperado": "humor_e_meme",
     "titulo": "POV: o cliente pergunta se a mancha sai",
     "descricao": "POV humor",
     "handle": "conta_exemplo",
-    "transcricao": "Ele chega com o sofá enrolado numa manta. Eu olho a mancha de dez anos e digo, claro que sai. Por dentro eu rezando, brincadeira, quase sempre sai."
+    "transcricao": "Ele chega com o sofá enrolado numa manta. Eu olho a mancha de dez anos e digo, claro que sai. Por dentro eu rezando, brincadeira, quase sempre sai.",
+    "fichaEsperada": "mandem"
   },
   {
     "formatoEsperado": "respondendo_pergunta",
     "titulo": "Respondendo a pergunta: dá para lavar sofá de linho em casa?",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Uma pessoa me perguntou nos comentários se dá para lavar sofá de linho em casa. Dá, mas com cuidado. Teste o produto num cantinho escondido antes e não molhe demais."
+    "transcricao": "Uma pessoa me perguntou nos comentários se dá para lavar sofá de linho em casa. Dá, mas com cuidado. Teste o produto num cantinho escondido antes e não molhe demais.",
+    "fichaEsperada": "comentem"
   },
   {
     "formatoEsperado": "respondendo_pergunta",
     "titulo": "Respondendo a caixinha de perguntas: quanto custa a higienização",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Vocês me mandaram na caixinha quanto custa a higienização de um sofá. Depende do tamanho e do estado. Em média, de cento e vinte a duzentos reais. Posso fazer um orçamento pelo WhatsApp."
+    "transcricao": "Vocês me mandaram na caixinha quanto custa a higienização de um sofá. Depende do tamanho e do estado. Em média, de cento e vinte a duzentos reais. Posso fazer um orçamento pelo WhatsApp.",
+    "fichaEsperada": "me_chamem"
   },
   {
     "formatoEsperado": "respondendo_pergunta",
     "titulo": "Respondendo uma dúvida de cliente sobre cheiro de mofo",
     "descricao": "",
     "handle": "conta_exemplo",
-    "transcricao": "Um cliente me perguntou por que o cheiro de mofo volta. É porque a umidade fica guardada. Precisa secar bem e ventilar o ambiente, só perfume não resolve."
+    "transcricao": "Um cliente me perguntou por que o cheiro de mofo volta. É porque a umidade fica guardada. Precisa secar bem e ventilar o ambiente, só perfume não resolve.",
+    "fichaEsperada": "comentem"
   }
 ]

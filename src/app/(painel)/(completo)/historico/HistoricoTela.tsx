@@ -55,12 +55,16 @@ function textoCurva(curva: CurvaDeVideo | null, postadoEm: Date | null): string 
     })
     .join(" · ");
 
+  // E49 PR 2: guardados e mandados da última medição, só se a rede devolveu (o laço da ficha com o resultado real).
+  const ultimo = curva.pontos[curva.pontos.length - 1];
+  const guardadoMandado = ultimo && (ultimo.saves !== null || ultimo.shares !== null) ? textosHistorico.guardadoMandado(ultimo.saves, ultimo.shares) : null;
+
   if (curva.status === "aprendendo") {
-    return [pontos, textosHistorico.aprendendo].filter(Boolean).join(" · ");
+    return [pontos, guardadoMandado, textosHistorico.aprendendo].filter(Boolean).join(" · ");
   }
 
   const aviso = curva.acimaDoNormal ? textosHistorico.acimaDoNormal(formatarVezes(curva.multiplicador)) : null;
-  return [pontos, aviso].filter(Boolean).join(" · ");
+  return [pontos, guardadoMandado, aviso].filter(Boolean).join(" · ");
 }
 
 /**

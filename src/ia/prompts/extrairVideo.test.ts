@@ -144,3 +144,35 @@ describe("formatoCatalogo", () => {
     expect(schema.parse({ ...FICHA, formatoCatalogo: "outro" })).toMatchObject({ formatoCatalogo: "outro" });
   });
 });
+
+/** E49 PR 2: "para que o vídeo parece feito" (as cinco fichas), do mesmo jeito que o formato: valor fora da lista ou ausente vira nulo. */
+describe("fichaCatalogo", () => {
+  const BASE = {
+    assunto: "a",
+    gancho: "g",
+    estrutura: "e",
+    fechamento: "f",
+    chamadaFinal: "c",
+    formato: "fala_para_camera",
+    porQueFuncionou: "p",
+    etiquetas: [],
+    pertenceAoNicho: true,
+    motivoNicho: "m",
+    idioma: "pt-BR",
+    tipoAbertura: "outro",
+    tipoConteudo: "original",
+    serveDeModelo: true,
+  };
+
+  it("o prompt traz a definição de uma frase de cada uma das cinco fichas", () => {
+    const sistema = montarSistemaEstavel();
+    for (const chave of ["guardem", "mandem", "comentem", "me_chamem", "veja"]) expect(sistema, chave).toContain(`"${chave}":`);
+    expect(sistema).toContain("estimativa sua, não um número da rede");
+  });
+
+  it("um valor da lista passa; fora da lista ou ausente vira NULO e a análise continua aprovada", () => {
+    expect(schema.parse({ ...BASE, fichaCatalogo: "guardem" })).toMatchObject({ fichaCatalogo: "guardem" });
+    expect(schema.parse({ ...BASE, fichaCatalogo: "salvamento" })).toMatchObject({ fichaCatalogo: null, assunto: "a" });
+    expect(schema.parse(BASE)).toMatchObject({ fichaCatalogo: null, assunto: "a" });
+  });
+});

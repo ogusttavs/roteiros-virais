@@ -147,3 +147,24 @@ export function fichaRecomendadaParaTema(tema: { titulo: string; descricao?: str
 
 /** O objetivo que se grava num Reels sem fala (a ficha não vale nele): o de mais gente te conhecer. */
 export const OBJETIVO_DO_SEM_FALA: Objetivo = "alcance";
+
+/**
+ * Os nomes curtos do filtro "Parece feito para" nas Referências (E49 PR 2, `Referencias.dc.html`): o desenho diz "Que chamem" (o vídeo de outra pessoa não chama ninguém
+ * para a gente), e "Que me chamem" é do Criar. A ordem é a das fichas.
+ */
+export const NOME_CURTO_DA_FICHA: Record<Ficha, string> = {
+  veja: "Que muita gente veja",
+  guardem: "Que guardem",
+  mandem: "Que mandem",
+  comentem: "Que comentem",
+  me_chamem: "Que chamem",
+};
+
+/** O complemento de "parecem feitos para ..." e de "Vídeos do seu setor que parecem feitos para ..." (minúscula). */
+export const PARECE_FEITO_PARA: Record<Ficha, string> = {
+  veja: "que muita gente veja",
+  guardem: "que guardem",
+  mandem: "que mandem para alguém",
+  comentem: "que comentem",
+  me_chamem: "que chamem",
+};

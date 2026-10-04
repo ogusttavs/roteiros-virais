@@ -4,9 +4,10 @@ import { Filter, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
+import { NOME_CURTO_DA_FICHA, PARECE_FEITO_PARA } from "@/config/fichas";
 import { formatoPorChave } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
-import type { AnaliseVideo, Plataforma } from "@/db/schema";
+import type { AnaliseVideo, Ficha, Plataforma } from "@/db/schema";
 import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
@@ -21,6 +22,7 @@ import { desfavoritarAction, favoritarAction } from "./acoes";
 import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
 import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
 import { PilulaDeRamo } from "./PilulaDeRamo";
+import { PilulaFeitoPara } from "./PilulaFeitoPara";
 import { PilulaOrdem, PilulasFiltroReferencias } from "./PilulasFiltroReferencias";
 import styles from "./ReferenciasTela.module.css";
 
@@ -52,6 +54,8 @@ type Props = {
   ramos?: { id: number; nome: string; principal: boolean }[];
   /** E45 PR 3: o ramo que a pílula escolheu (`?ramo=` na URL); `undefined` é "todos os ramos". */
   ramoAtivo?: number;
+  /** E49 PR 2: a ficha escolhida em "Parece feito para" (`?feitoPara=`). */
+  feitoPara?: Ficha;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -94,6 +98,7 @@ function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<number, str
     ramoNome: v.nichoId === null ? undefined : nomesDosAlternativos.get(v.nichoId),
     // E44 PR 2: o tipo de vídeo, só para os treze do cliente (recorte de outro, notícia, ao vivo e "outro" não ganham selo).
     tipoDeVideo: formatoPorChave(v.formatoCatalogo)?.nome,
+    feitoPara: v.fichaCatalogo ? NOME_CURTO_DA_FICHA[v.fichaCatalogo] : undefined,
   };
 }
 
@@ -120,6 +125,8 @@ type Filtros = {
   quantidade: number;
   /** E45 PR 3: a pílula "Ramo" (o id do setor); `undefined` é todos. */
   ramo?: number;
+  /** E49 PR 2: a pílula "Parece feito para"; `undefined` é todas. */
+  feitoPara?: Ficha;
 };
 
 /** "sim"/"nao" na URL, mesma codificação de `page.tsx`. */
@@ -152,6 +159,7 @@ function montarUrl(filtros: Filtros): string {
   if (brasil) params.set("brasil", brasil);
   if (filtros.tiposConteudo.length > 0) params.set("tipo", filtros.tiposConteudo.join(","));
   if (filtros.ramo !== undefined) params.set("ramo", String(filtros.ramo));
+  if (filtros.feitoPara) params.set("feitoPara", filtros.feitoPara);
   if (filtros.segmento === "todos" && filtros.quantidade !== TAMANHO_PAGINA_TODOS_PADRAO) {
     params.set("quantidade", String(filtros.quantidade));
   }
@@ -190,6 +198,7 @@ export function ReferenciasTela({
   aindaLendo,
   ramos,
   ramoAtivo,
+  feitoPara,
 }: Props) {
   const router = useRouter();
   const { semConexao, avisarRedeOk } = useConexao();
@@ -241,6 +250,7 @@ export function ReferenciasTela({
   const [brasilExibido, setBrasilOtimista] = useOptimistic(brasil);
   const [tiposConteudoExibidos, setTiposConteudoOtimista] = useOptimistic(tiposConteudo);
   const [quantidadeExibida, setQuantidadeOtimista] = useOptimistic(quantidade);
+  const [feitoParaExibido, setFeitoParaOtimista] = useOptimistic(feitoPara);
   const urlPendente = useRef<string | null>(null);
   /**
    * F1, ajuste A da revisão do PR #71: a rede de segurança do item 2 (mais abaixo, em `navegar`) nunca
@@ -301,6 +311,7 @@ export function ReferenciasTela({
     tiposConteudo,
     quantidade,
     ramoAtivo,
+    feitoPara,
     limparRedeDeSeguranca,
   ]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
@@ -331,7 +342,8 @@ export function ReferenciasTela({
     tiposConteudoExibidos.length +
     (viewsMinExibido !== undefined ? 1 : 0) +
     (comFalaExibido !== undefined ? 1 : 0) +
-    (brasilExibido !== undefined ? 1 : 0);
+    (brasilExibido !== undefined ? 1 : 0) +
+    (feitoParaExibido ? 1 : 0);
 
   /**
    * R2b, item 4 (revisão do Fable no PR #100, `.fichas-filtro` do desenho): uma ficha por filtro
@@ -383,10 +395,19 @@ export function ReferenciasTela({
           },
         ]
       : []),
+    ...(feitoParaExibido
+      ? [
+          {
+            chave: "feito-para",
+            rotulo: NOME_CURTO_DA_FICHA[feitoParaExibido],
+            aoRemover: () => navegar({ feitoPara: undefined }),
+          },
+        ]
+      : []),
   ];
 
   function tirarOsFiltros() {
-    navegar({ plataformas: [], formatos: [], ordem: undefined, viewsMin: undefined, comFala: undefined, brasil: undefined, tiposConteudo: [] });
+    navegar({ plataformas: [], formatos: [], ordem: undefined, viewsMin: undefined, comFala: undefined, brasil: undefined, tiposConteudo: [], feitoPara: undefined });
   }
 
   /**
@@ -430,6 +451,7 @@ export function ReferenciasTela({
       // pede a própria quantidade maior explicitamente em `mudanca`.
       quantidade: TAMANHO_PAGINA_TODOS_PADRAO,
       ramo: ramoAtivo,
+      feitoPara: feitoParaExibido,
       ...mudanca,
     };
     const url = montarUrl(filtros);
@@ -449,6 +471,7 @@ export function ReferenciasTela({
       setBrasilOtimista(filtros.brasil);
       setTiposConteudoOtimista(filtros.tiposConteudo);
       setQuantidadeOtimista(filtros.quantidade);
+      setFeitoParaOtimista(filtros.feitoPara);
       // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
       // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
       // navegação da pessoa e continua entrando no histórico como sempre.
@@ -663,6 +686,14 @@ export function ReferenciasTela({
             onFechar={() => setPilulaAberta(null)}
             onMudar={(mudanca) => navegar(mudanca)}
           />
+          <PilulaFeitoPara
+            feitoPara={feitoParaExibido}
+            contagens={contagensFiltro.porFicha}
+            pilulaAberta={pilulaAberta}
+            onAbrir={setPilulaAberta}
+            onFechar={() => setPilulaAberta(null)}
+            onEscolher={(ficha) => navegar({ feitoPara: ficha })}
+          />
           {ramos && ramos.length > 1 ? (
             <PilulaDeRamo
               ramos={ramos}
@@ -722,14 +753,21 @@ export function ReferenciasTela({
           </div>
         ) : (
           <div className={styles.blocoVazio}>
-            <h3>{segmento === "todos" ? textosReferencias.vazioTituloTodos : textosReferencias.vazioTitulo}</h3>
+            <h3>{feitoPara ? textosReferencias.vazioFeitoParaTitulo : segmento === "todos" ? textosReferencias.vazioTituloTodos : textosReferencias.vazioTitulo}</h3>
             <p>
-              {segmento === "todos"
-                ? textosReferencias.vazioTextoTodos(periodoDias, juntarPlataformas(plataformasAtivas))
-                : textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}
+              {feitoPara
+                ? textosReferencias.vazioFeitoParaTexto(periodoDias, PARECE_FEITO_PARA[feitoPara])
+                : segmento === "todos"
+                  ? textosReferencias.vazioTextoTodos(periodoDias, juntarPlataformas(plataformasAtivas))
+                  : textosReferencias.vazioTexto(periodoDias, juntarPlataformas(plataformasAtivas))}
             </p>
             <div className={styles.blocoVazioAcoes}>
-              <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ periodoDias: 30 })}>
+              {feitoPara ? (
+                <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ feitoPara: undefined })}>
+                  {textosReferencias.verTodos}
+                </Botao>
+              ) : null}
+              <Botao variante={feitoPara ? "secundario" : "primario"} tamanho="lg" carregando={navegando} onClick={() => navegar({ periodoDias: 30 })}>
                 {textosReferencias.ver30Dias}
               </Botao>
               <Botao
@@ -747,6 +785,7 @@ export function ReferenciasTela({
                     comFala: undefined,
                     brasil: undefined,
                     tiposConteudo: [],
+                    feitoPara: undefined,
                   });
                 }}
               >
@@ -762,9 +801,11 @@ export function ReferenciasTela({
               <p className={styles.contagem}>
                 {segmento === "salvos"
                   ? textosReferencias.contagemSalvos(total)
-                  : segmento === "todos"
-                    ? textosReferencias.contagemTodos(total, periodoDias)
-                    : textosReferencias.contagem(total, periodoDias)}
+                  : feitoPara
+                    ? textosReferencias.contagemFeitoPara(total, periodoDias, PARECE_FEITO_PARA[feitoPara])
+                    : segmento === "todos"
+                      ? textosReferencias.contagemTodos(total, periodoDias)
+                      : textosReferencias.contagem(total, periodoDias)}
                 {/* Passo 14: a partir de 1024px a pílula de Ordem já diz a ordem; o sufixo some (`.ladoContagem` abaixo). */}
                 {segmento !== "salvos" ? (
                   <span className={styles.ordemSufixo}>{`, ${textosReferencias.ordemSufixo[ordemExibida ?? "recentes"]}`}</span>

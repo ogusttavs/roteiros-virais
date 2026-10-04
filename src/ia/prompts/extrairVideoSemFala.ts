@@ -1,11 +1,13 @@
 import { z } from "zod";
 
+import { FICHAS_EM_ORDEM } from "@/config/fichas";
 import { FORMATOS_DO_VIDEO } from "@/config/formatos";
-import { TIPOS_CONTEUDO } from "@/db/schema";
+import { TIPOS_CONTEUDO, type Ficha } from "@/db/schema";
 
 import { corrigirTipoConteudoInvalido } from "../tipo-video-seguro";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { definicoesFicha } from "./definicoesFicha";
 import { definicoesFormato } from "./definicoesFormato";
 
 /**
@@ -40,7 +42,7 @@ import { definicoesFormato } from "./definicoesFormato";
  * reprovar a ficha inteira ou confiar num `serveDeModelo` que o modelo escreveu junto de uma
  * classificação inventada.
  */
-export const versao = "1.5.0";
+export const versao = "1.6.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
@@ -68,6 +70,8 @@ const schemaBruto = z.object({
   // Valor fora da lista ou ausente vira NULO (a ficha continua aprovada): "outro" é um valor legítimo quando o modelo o escolhe, e gravá-lo no lugar de um erro tiraria o vídeo
   // da evidência de toda marca sem que nada o reclassificasse. Nulo passa pelo corte da H4 e a reclassificação o pega de volta.
   formatoCatalogo: z.enum(FORMATOS_DO_VIDEO).nullable().catch(null),
+  // E49 PR 2: para que o vídeo parece feito (as cinco fichas); fora da lista ou ausente vira nulo.
+  fichaCatalogo: z.enum(FICHAS_EM_ORDEM as [Ficha, ...Ficha[]]).nullable().catch(null),
 });
 
 export const schema = z.preprocess(corrigirTipoConteudoInvalido, schemaBruto);
@@ -114,6 +118,10 @@ mais a legenda que a pessoa escreveu no post, e extrai uma ficha fixa:
 ${definicoesFormato()}
 
   Na dúvida, o formato mais próximo; "outro" só quando nada descreve o vídeo.
+- fichaCatalogo: para que o vídeo parece feito, UM destes valores exatos (pelos quadros, o título e a
+  legenda; é uma estimativa sua, não um número da rede):
+
+${definicoesFicha()}
 
 Sem travessão, sem emoji. Escreva em português do Brasil, com acentuação correta.`;
 }

@@ -170,7 +170,7 @@ export async function resolverIdioma(
  * um video em outro idioma e a conta virar `pais = 'BR'` para sempre (`pontuar.ts`).
  */
 export async function aplicarResultadoExtracao(videoId: number, dados: extrairVideo.SaidaExtrairVideo): Promise<void> {
-  const { etiquetas, idioma, tipoAbertura, formatoCatalogo, ...analise } = dados;
+  const { etiquetas, idioma, tipoAbertura, formatoCatalogo, fichaCatalogo, ...analise } = dados;
   const analiseVideo: AnaliseVideo = analise;
   // M4, item 1: este caminho sempre lê a transcrição, nunca é o caminho sem fala.
   await db()
@@ -188,6 +188,8 @@ export async function aplicarResultadoExtracao(videoId: number, dados: extrairVi
       serveDeModelo: dados.serveDeModelo,
       // E44 PR 1: o formato pela lista fechada, em coluna própria (o filtro por formato ligado da marca é em SQL).
       formatoCatalogo,
+      // E49 PR 2: para que o vídeo parece feito, em coluna própria (os exemplos por ficha e o filtro das Referências são em SQL).
+      fichaCatalogo,
       semFala: false,
     })
     .where(eq(videos.id, videoId));

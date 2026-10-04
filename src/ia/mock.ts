@@ -513,6 +513,16 @@ function formatoCatalogoMock(texto: string, semFala: boolean): string {
   return "passo_a_passo";
 }
 
+/** E49 PR 2: a ficha que o mock dá ("para que o vídeo parece feito"), pelo formato e pelo texto, para os testes e os ensaios exercitarem mais de um valor. */
+function fichaCatalogoMock(texto: string, formato: string): string {
+  const minusculo = texto.toLowerCase();
+  if (["passo_a_passo", "lista"].includes(formato) || /receita|passo a passo|como fazer/.test(minusculo)) return "guardem";
+  if (["erro_comum", "respondendo_pergunta"].includes(formato) || /opini|pergunta|polêmic/.test(minusculo)) return "comentem";
+  if (formato === "humor_e_meme" || /pov|aquela pessoa|todo mundo/.test(minusculo)) return "mandem";
+  if (["antes_e_depois", "emUso", "em_uso", "bastidor", "produto_em_uso"].includes(formato) || /preço|valor|orçamento/.test(minusculo)) return "me_chamem";
+  return "veja";
+}
+
 function mockExtrairVideo(entrada: string) {
   const titulo = extrairCampo(entrada, "Titulo:") || "video simulado";
   // M5b, achado 7 da revisão do motor (01/10/2026): "POV" e outros sinais de recorte ou meme
@@ -548,6 +558,7 @@ function mockExtrairVideo(entrada: string) {
     tipoAbertura: "outro" as const,
     ...tipoConteudoMock(`${titulo} ${legenda}`),
     formatoCatalogo: formatoCatalogoMock(`${titulo} ${legenda}`, false),
+    fichaCatalogo: fichaCatalogoMock(`${titulo} ${legenda}`, formatoCatalogoMock(`${titulo} ${legenda}`, false)),
   };
 }
 
@@ -579,6 +590,7 @@ function mockExtrairVideoSemFala(entrada: string) {
     motivoNicho: pertenceAoNicho ? "a legenda cita termo do nicho" : "a legenda não cita nenhum termo do nicho",
     ...tipoConteudoMock(titulo),
     formatoCatalogo: formatoCatalogoMock(titulo, true),
+    fichaCatalogo: fichaCatalogoMock(titulo, formatoCatalogoMock(titulo, true)),
   };
 }
 
