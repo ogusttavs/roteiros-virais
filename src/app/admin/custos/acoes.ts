@@ -38,7 +38,7 @@ export async function adicionarFixoAction(dados: DadosDoFixo): Promise<Resultado
 
 export async function editarFixoAction(id: number, dados: DadosDoFixo): Promise<ResultadoAcao<null>> {
   return comAdmin(async () => {
-    if (!Number.isInteger(id)) throw new ErroCusto("esse custo não existe mais.");
+    if (!Number.isInteger(id) || id < 1 || id > 2_000_000_000) throw new ErroCusto("esse custo não existe mais.");
     await editarFixo(id, dados);
     return null;
   });
@@ -46,7 +46,7 @@ export async function editarFixoAction(id: number, dados: DadosDoFixo): Promise<
 
 export async function tirarFixoAction(id: number): Promise<ResultadoAcao<null>> {
   return comAdmin(async () => {
-    if (!Number.isInteger(id)) throw new ErroCusto("esse custo não existe mais.");
+    if (!Number.isInteger(id) || id < 1 || id > 2_000_000_000) throw new ErroCusto("esse custo não existe mais.");
     await tirarFixo(id);
     return null;
   });

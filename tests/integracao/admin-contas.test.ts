@@ -226,7 +226,8 @@ describe("inicioDoAdmin", () => {
     expect(inicio.produto.reprovados).toBe(2);
     expect(inicio.produto.motivoMaisComum?.vezes).toBe(2);
     expect(inicio.dinheiro.saiuHojeUsd).toBeCloseTo(2, 5);
-    expect(inicio.dinheiro.saiu30dUsd).toBeCloseTo(2, 5);
+    // Os 30 dias vão até ontem (como em Custos): o gasto de hoje fica só em "saiu hoje".
+    expect(inicio.dinheiro.saiu30dUsd).toBeCloseTo(0, 5);
     expect(inicio.erros.hoje).toBe(1);
     // O erro da busca é de todos os ramos: aparece uma vez em rotinas e não marca ramo nenhum como problema.
     expect(inicio.madrugada.rotinas.busca).toBe("erro");

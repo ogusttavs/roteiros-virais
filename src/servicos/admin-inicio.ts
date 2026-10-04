@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { usdParaBrl } from "@/config/dinheiro";
 import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
@@ -136,7 +136,7 @@ async function dinheiro(agora: Date): Promise<InicioAdmin["dinheiro"]> {
   const inicio = inicioDoDia(hojeISO(agora));
   const [[hoje], [mes]] = await Promise.all([
     db().select({ total: sql<string>`coalesce(sum(${geracoesIA.custoUsd}), 0)` }).from(geracoesIA).where(gte(geracoesIA.criadoEm, inicio)),
-    db().select({ total: sql<string>`coalesce(sum(${geracoesIA.custoUsd}), 0)` }).from(geracoesIA).where(gte(geracoesIA.criadoEm, new Date(agora.getTime() - 30 * DIA_MS))),
+    db().select({ total: sql<string>`coalesce(sum(${geracoesIA.custoUsd}), 0)` }).from(geracoesIA).where(and(gte(geracoesIA.criadoEm, new Date(inicio.getTime() - 30 * DIA_MS)), lt(geracoesIA.criadoEm, inicio))),
   ]);
   const saiuHojeUsd = Number(hoje?.total ?? 0);
   const saiu30dUsd = Number(mes?.total ?? 0);

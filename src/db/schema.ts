@@ -1716,7 +1716,7 @@ export const execucoesJob = pgTable("execucoes_job", {
   status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
   resumo: jsonb("resumo").$type<Record<string, unknown>>(),
   erro: text("erro"),
-}, (t) => [index("execucoes_job_iniciado_em").on(t.iniciadoEm)]);
+}, (t) => [index("execucoes_job_iniciado_em").on(t.iniciadoEm), index("execucoes_job_nome_id").on(t.nome, t.id)]);
 
 /**
  * Um lote pendente na API de lote da Anthropic (etapa 8): a API e assincrona

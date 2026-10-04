@@ -51,7 +51,7 @@ export async function tetoDiarioEmReais(): Promise<number> {
 }
 
 export async function definirTetoDiario(reais: number, porUsuarioId: string): Promise<void> {
-  if (!Number.isFinite(reais) || reais <= 0 || reais > 100000) throw new ErroCusto("o teto precisa ser um valor maior que zero.");
+  if (typeof reais !== "number" || !Number.isFinite(reais) || reais < 0.01 || reais > 100000) throw new ErroCusto("o teto precisa ser um valor maior que zero.");
   await db()
     .insert(configuracaoAdmin)
     .values({ chave: CHAVE_TETO, valor: String(reais), atualizadoPorUsuarioId: porUsuarioId })
@@ -74,6 +74,7 @@ export async function fixoMensalEmReais(): Promise<{ total: number; cadastrados:
 export type DadosDoFixo = { nome: string; valor: number; moeda: "brl" | "usd"; periodo: "mensal" | "anual"; cobra?: string };
 
 function validarFixo(d: DadosDoFixo): DadosDoFixo {
+  if (typeof d?.nome !== "string" || typeof d.valor !== "number") throw new ErroCusto("confira o nome e o valor.");
   const nome = d.nome.trim();
   if (!nome || nome.length > 80) throw new ErroCusto("escreva o nome do custo, em até 80 letras.");
   if (!Number.isFinite(d.valor) || d.valor < 0 || d.valor > 10_000_000) throw new ErroCusto("o valor precisa ser um número, zero ou mais.");

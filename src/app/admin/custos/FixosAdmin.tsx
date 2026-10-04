@@ -3,11 +3,16 @@
 import { useRouter } from "next/navigation";
 import { Fragment, useState, type FormEvent } from "react";
 
+import { lerNumeroBr } from "@/lib/numero-br";
 import { textosCustosAdmin } from "@/textos/admin-custos";
 import { Botao } from "@/ui/componentes/Botao";
 
+import comum from "../comum.module.css";
+
 import { adicionarFixoAction, editarFixoAction, tirarFixoAction } from "./acoes";
-import styles from "./custos.module.css";
+import proprio from "./custos.module.css";
+
+const styles = { ...comum, ...proprio };
 
 const t = textosCustosAdmin.fixos;
 
@@ -17,12 +22,8 @@ type Rascunho = { id: number | null; nome: string; valor: string; moeda: "brl" |
 
 const VAZIO: Rascunho = { id: null, nome: "", valor: "", moeda: "brl", periodo: "mensal", cobra: "" };
 
-function numeroDe(texto: string): number {
-  return Number(texto.replace(/\./g, "").replace(",", "."));
-}
-
 /** Os fixos (E46 PR 3): cadastro na própria tabela. "Adicionar" e "Editar" abrem a mesma linha de formulário; "Tirar" confirma na linha e não apaga o passado. */
-export function FixosAdmin({ fixos, totalTexto, abrirAoMontar = false }: { fixos: FixoNaTela[]; totalTexto: string; abrirAoMontar?: boolean }) {
+export function FixosAdmin({ fixos, totalTexto, padraoTexto, abrirAoMontar = false }: { fixos: FixoNaTela[]; totalTexto: string; padraoTexto: string; abrirAoMontar?: boolean }) {
   const router = useRouter();
   const [rascunho, setRascunho] = useState<Rascunho | null>(abrirAoMontar ? VAZIO : null);
   const [tirando, setTirando] = useState<number | null>(null);
@@ -50,7 +51,7 @@ export function FixosAdmin({ fixos, totalTexto, abrirAoMontar = false }: { fixos
   function salvar(e: FormEvent) {
     e.preventDefault();
     if (!rascunho) return;
-    const dados = { nome: rascunho.nome, valor: numeroDe(rascunho.valor), moeda: rascunho.moeda, periodo: rascunho.periodo, cobra: rascunho.cobra };
+    const dados = { nome: rascunho.nome, valor: lerNumeroBr(rascunho.valor), moeda: rascunho.moeda, periodo: rascunho.periodo, cobra: rascunho.cobra };
     const id = rascunho.id;
     void executar(
       () => (id === null ? adicionarFixoAction(dados) : editarFixoAction(id, dados)),
@@ -123,7 +124,7 @@ export function FixosAdmin({ fixos, totalTexto, abrirAoMontar = false }: { fixos
             {fixos.length === 0 && !rascunho ? (
               <tr>
                 <td colSpan={5} className={styles.semDado}>
-                  {t.vazio}
+                  {t.vazio(padraoTexto)}
                 </td>
               </tr>
             ) : null}

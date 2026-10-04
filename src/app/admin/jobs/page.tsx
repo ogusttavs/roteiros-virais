@@ -6,7 +6,7 @@ import { FILAS, FILAS_POR_EVENTO } from "@/jobs/fila";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao, type ExecucaoResumo } from "@/servicos/admin-coleta";
 import { inicioDoAdmin } from "@/servicos/admin-inicio";
-import { quandoPorExtenso } from "@/textos/admin-contas";
+import { quandoPorExtenso, textosInicioAdmin as tc } from "@/textos/admin-contas";
 import { textosRotinasAdmin as t } from "@/textos/admin-custos";
 
 import { BotaoRodarJob } from "../_jobs/BotaoRodarJob";
@@ -37,10 +37,11 @@ function dataHora(d: Date | null): string {
 }
 
 /** O pior estado entre a última execução de cada fila da rotina: falhou vence rodando, que vence deu certo. Sem nenhuma execução: nunca rodou. */
-function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[]): EstadoDaRotina {
+function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): EstadoDaRotina {
   const existentes = ultimas.filter((e): e is ExecucaoResumo => Boolean(e));
   if (existentes.length === 0) return "nunca";
-  if (existentes.some((e) => e.status === "erro")) return "erro";
+  // Um erro de mais de 3 dias numa fila rara (a mensal, a semanal) não faz a rotina inteira falhar para sempre: ela só aparece com o erro à mostra no detalhe.
+  if (existentes.some((e) => e.status === "erro" && agora.getTime() - e.iniciadoEm.getTime() < 3 * 24 * 60 * 60 * 1000)) return "erro";
   if (existentes.some((e) => e.status === "rodando")) return "rodando";
   return "ok";
 }
@@ -49,8 +50,8 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[]): EstadoDaRotina
 function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return (e.erro ?? "").slice(0, 160) || t.rotinas.estado.erro;
-  const numeros = Object.entries(e.resumo ?? {}).filter(([, v]) => typeof v === "number").slice(0, 3);
-  return numeros.length === 0 ? t.rotinas.estado[e.status === "rodando" ? "rodando" : "ok"] : numeros.map(([k, v]) => `${k}: ${v}`).join(", ");
+  // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
+  return e.status === "rodando" ? t.rotinas.estado.rodando : `${t.rotinas.estado.ok}, em ${duracao(e.duracaoMs)}`;
 }
 
 function diaPorExtenso(d: Date): string {
@@ -82,7 +83,10 @@ export default async function Rotinas() {
           <h2 id="t-madrugada">{t.madrugada.titulo}</h2>
           <span className={styles.quantos}>{t.madrugada.legenda(madrugada.comProblema.length, madrugada.totalDeRamos, diaPorExtenso(inicio.agora))}</span>
         </div>
-        <p className={styles.nota}>{t.madrugada.rotinasGlobais}</p>
+        <p className={styles.nota} data-rotinas-globais>
+          {t.madrugada.rotinasGlobais}: {t.madrugada.buscaGlobal} {tc.madrugada.estadoRotina[madrugada.rotinas.busca]}, {t.madrugada.transcricaoGlobal} {tc.madrugada.estadoRotina[madrugada.rotinas.transcricao]}.
+          {madrugada.rotinas.erroDaBusca ? ` ${madrugada.rotinas.erroDaBusca.slice(0, 160)}` : ""}
+        </p>
         {madrugada.linhas.length === 0 ? (
           <p className={styles.semDado}>{t.madrugada.vazio}</p>
         ) : (
@@ -150,7 +154,7 @@ export default async function Rotinas() {
         <div className={styles.cartoes}>
           {ROTINAS.map((r: Rotina) => {
             const ultimas = r.filas.map((f) => recentes.get(f)?.[0]);
-            const estado = estadoDaRotina(ultimas);
+            const estado = estadoDaRotina(ultimas, inicio.agora);
             const maisRecente = ultimas.filter((e): e is ExecucaoResumo => Boolean(e)).sort((a, b) => b.iniciadoEm.getTime() - a.iniciadoEm.getTime())[0];
             const quando = agendas(r.filas);
             const soPorEvento = r.filas.every((f) => FILAS_POR_EVENTO.has(f));

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
+import { lerNumeroBr } from "@/lib/numero-br";
 import { textosCustosAdmin } from "@/textos/admin-custos";
 import { Botao } from "@/ui/componentes/Botao";
 
@@ -23,7 +24,7 @@ export function TetoAdmin({ tetoBrl }: { tetoBrl: number }) {
     e.preventDefault();
     setOcupado(true);
     setErro(null);
-    const numero = Number(valor.replace(/\./g, "").replace(",", "."));
+    const numero = lerNumeroBr(valor);
     try {
       const r = await trocarTetoAction(numero);
       if (!r.ok) {

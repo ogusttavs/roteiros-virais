@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, usdParaBrl } from "@/config/dinheiro";
+import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, usdParaBrl } from "@/config/dinheiro";
 import { exigirAdmin } from "@/lib/sessao";
 import { custosDoAdmin } from "@/servicos/admin-custos";
 import { dolares, reais } from "@/textos/admin-contas";
@@ -172,7 +172,7 @@ export default async function CustosDoAdmin() {
           <h2 id="t-fixos">{t.fixos.titulo}</h2>
           <span className={styles.quantos}>{t.fixos.legenda}</span>
         </div>
-        <FixosAdmin fixos={fixos} totalTexto={reais(c.fixos.totalPorMesBrl)} />
+        <FixosAdmin fixos={fixos} totalTexto={reais(c.fixos.totalPorMesBrl)} padraoTexto={reais(CUSTO_FIXO_MENSAL_BRL)} />
       </section>
     </div>
   );
