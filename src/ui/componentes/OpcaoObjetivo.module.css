@@ -80,3 +80,20 @@
   line-height: 1.45;
   color: var(--cor-texto-suave);
 }
+
+/* E49 PR 1, as fichas: o exemplo e, discreto, o objetivo antigo em que a ficha ajuda. */
+.exemplo {
+  font-size: var(--tamanho-secundario);
+  line-height: 1.45;
+  color: var(--cor-texto);
+}
+
+.prefixo {
+  color: var(--cor-texto-suave);
+}
+
+.ajudaEm {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}

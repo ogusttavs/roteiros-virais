@@ -4,7 +4,7 @@ import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { rotuloParaQue } from "@/config/fichas";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAtrasado } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
@@ -200,7 +200,7 @@ export function DiaConteudo({
                 <article className={styles.reelsDia}>
                   <div className={styles.linhaTopo}>
                     <span className={styles.objetivoDoDia}>
-                      {ROTULO_TEMA_CARTAO[agenda.reels[0].objetivo]} · {agenda.reels[0].duracaoS} segundos
+                      {rotuloParaQue(agenda.reels[0])} · {agenda.reels[0].duracaoS} segundos
                     </span>
                     <EstadoItem item={agenda.reels[0]} ehHoje={ehHoje} />
                   </div>
@@ -235,7 +235,7 @@ export function DiaConteudo({
                             aria-busy={acao === `item-${item.id}` || undefined}
                             onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                           >
-                            <span className={styles.momento}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                            <span className={styles.momento}>{rotuloParaQue(item)}</span>
                             <span className={styles.tituloItem}>{item.titulo}</span>
                             <EstadoItem item={item} ehHoje={ehHoje} />
                           </button>

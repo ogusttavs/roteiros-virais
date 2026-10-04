@@ -4,7 +4,7 @@ import { ChevronRight, Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
-import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import { rotuloParaQue } from "@/config/fichas";
 import type { ItemPlano } from "@/servicos/plano";
 import type { AgendaDoDia, DiaDoMes } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
@@ -206,7 +206,7 @@ export function MesConteudo({
                   <span className={styles.itemPlanoEstado}>{textosPlano.rotuloPlanejado}</span>
                 </div>
                 <p className={styles.itemPlanoSituacao}>{item.situacao}</p>
-                <span className={styles.itemPlanoObjetivo}>{ROTULO_TEMA_CARTAO[item.objetivo]}</span>
+                <span className={styles.itemPlanoObjetivo}>{rotuloParaQue({ objetivo: item.objetivo, formato: item.formato })}</span>
               </div>
             ))}
           </div>

@@ -9,8 +9,8 @@
  */
 import { and, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { objetivoDaFicha } from "@/config/fichas";
+import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { formatoPorChave } from "@/config/formatos";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
@@ -1754,6 +1754,8 @@ export type ItemAgendaDoDia = {
   status: "gerado" | "gravado" | "postado";
   momentoDoDia: MomentoDoDia | null;
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha do roteiro (nula no Story e nos de antes das fichas). */
+  ficha: Ficha | null;
   duracaoS: number;
   criadoEm: Date;
   /** E39b, item (a): nulo até a pessoa tocar em "Conferir" (só preenchido no destaque do Reels). */
@@ -1772,6 +1774,7 @@ function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
     status: linha.status,
     momentoDoDia: linha.momentoDoDia,
     objetivo: linha.objetivo,
+    ficha: linha.ficha,
     duracaoS: corpoDoRoteiro(linha).duracaoS,
     criadoEm: linha.criadoEm,
     aindaValeResultado: aindaValeDeHoje(linha),
@@ -2057,6 +2060,8 @@ export type ItemSemanaPlano = {
   titulo: string;
   status: "gerado" | "gravado" | "postado";
   objetivo: Objetivo;
+  /** E49 PR 1: a ficha do roteiro já escrito; o item sugerido do plano só guarda o objetivo (`null`). */
+  ficha: Ficha | null;
 };
 export type DiaSemanaPlano = {
   data: string;
@@ -2118,6 +2123,7 @@ export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: str
       titulo: corpoDoRoteiro(linha).titulo,
       status: linha.status,
       objetivo: linha.objetivo,
+      ficha: linha.formato === "story" ? null : linha.ficha,
     });
     porDia.set(linha.data, atual);
   }
@@ -2132,6 +2138,7 @@ export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: str
       titulo: linha.situacao,
       status: "gerado",
       objetivo: linha.objetivo,
+      ficha: null,
     });
     porDia.set(linha.dia, atual);
   }

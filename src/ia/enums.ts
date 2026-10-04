@@ -41,9 +41,9 @@ export const NOME_OBJETIVO: Record<Objetivo, string> = {
  * seção 3, revisão do lote 6).
  */
 export const ROTULO_TEMA_CARTAO: Record<Objetivo, string> = {
-  alcance: "Para mais gente te conhecer",
-  engajamento: "Para lembrarem de você",
-  conversao: "Para te chamarem para comprar",
+  alcance: "Para que muita gente veja",
+  engajamento: "Para que guardem para depois",
+  conversao: "Para que te chamem",
 };
 
 /**

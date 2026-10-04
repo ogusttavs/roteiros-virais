@@ -103,3 +103,15 @@ export const ESTRUTURA_DA_FICHA: Record<Ficha, string> = {
   me_chamem:
     "Que me chamem: o corpo é a prova, o resultado de verdade, o trabalho acontecendo, o bastidor ou o preço, com dado concreto. Feche com um convite claro para chamar (direct, link ou mensagem). O ramo da pessoa é o centro: nunca entretenimento solto.",
 };
+
+/** "Com quem já segue": o que o Story mostra no lugar da ficha (ele não pergunta para que é o vídeo). */
+export const ROTULO_STORY_PARA_QUEM = "Com quem já segue";
+
+/**
+ * O rótulo que a tela mostra de um item: a ficha dele quando tem, senão a ficha padrão do objetivo; um Story mostra "Com quem já segue". Os roteiros de antes das fichas e os itens do
+ * plano (que só guardam o objetivo) caem na ficha padrão.
+ */
+export function rotuloParaQue(item: { ficha?: Ficha | null; objetivo: Objetivo; formato?: "reels" | "story" }): string {
+  if (item.formato === "story") return ROTULO_STORY_PARA_QUEM;
+  return ROTULO_PARA_QUE[fichaDoRoteiro(item)];
+}
