@@ -14,9 +14,9 @@ import { z } from "zod";
 
 import { FICHAS_EM_ORDEM } from "../src/config/fichas";
 import { FORMATOS_DO_VIDEO } from "../src/config/formatos";
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as extrairVideoIA from "../src/ia/prompts/extrairVideo";
-import { calcularCustoUsd } from "../src/ia/registro";
+
+import { custoDoResultado, gerarVarios } from "./golden-lote";
 
 const casoSchema = z.object({
   formatoEsperado: z.enum(FORMATOS_DO_VIDEO),
@@ -64,8 +64,10 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
   let custoTotalUsd = 0;
   const erros: ResultadoAvaliarExtrair["erros"] = [];
 
-  for (const caso of conjunto) {
-    const resultado = await gerarEstruturado({
+  // O golden set pelo lote (`golden-lote.ts`): todos os casos num lote só, e só então a leitura, caso a caso.
+  const resultados = await gerarVarios(
+    conjunto.map((caso) => (
+{
       tarefa: "extrairVideo",
       nivel: extrairVideoIA.nivel,
       effort: extrairVideoIA.esforco,
@@ -79,8 +81,14 @@ export async function avaliarExtrair(): Promise<ResultadoAvaliarExtrair> {
         nomeNicho: "limpeza e organização da casa",
         termosNicho: ["limpeza", "sofá", "mancha", "faxina"],
       }),
-    });
-    custoTotalUsd += calcularCustoUsd(extrairVideoIA.nivel, resultado);
+    }
+    )),
+    "extração",
+  );
+
+  for (const [indice, caso] of conjunto.entries()) {
+    const resultado = resultados[indice];
+    custoTotalUsd += custoDoResultado(extrairVideoIA.nivel, resultado);
     const devolvido = resultado.dados.formatoCatalogo ?? "(nulo)";
     if (devolvido === "outro" || devolvido === "(nulo)") comoOutro += 1;
     const bateu = devolvido === caso.formatoEsperado;

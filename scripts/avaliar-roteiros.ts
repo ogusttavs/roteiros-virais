@@ -16,12 +16,12 @@ import path from "node:path";
 import { z } from "zod";
 
 import { ESTILOS_ROTEIRO, FORMATOS_ROTEIRO, TIPOS_ABERTURA } from "../src/db/schema";
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
+
+import { custoDoResultado, gerarVarios, type PedidoGolden } from "./golden-lote";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -113,6 +113,67 @@ function linha(rotulo: string, texto: string): string {
   return `  ${rotulo}: ${texto}`;
 }
 
+type Caso = z.infer<typeof casoSchema>;
+
+/** O pedido do roteiro de um caso, exatamente como a produção o monta (`servicos/roteiro.ts`). */
+function pedidoDoRoteiro(caso: Caso): PedidoGolden<roteiroIA.SaidaRoteiro> {
+  return {
+      tarefa: "roteiro",
+      nivel: roteiroIA.nivel,
+      effort: roteiroIA.esforco,
+      schema: roteiroIA.schema,
+      sistemaEstavel: roteiroIA.montarSistemaEstavel({
+        perfilCompilado: caso.perfilCompilado,
+        camadaExclusiva: caso.camadaExclusiva,
+        modeloNicho: caso.modeloNicho,
+        regrasCliente: caso.regrasCliente,
+        tipo: caso.tipo,
+        formato: caso.formato,
+        estilo: caso.estilo,
+      }),
+      entrada: roteiroIA.montarEntrada({
+        tema: caso.tema,
+        objetivo: caso.objetivo,
+        ficha: caso.ficha,
+        formato: caso.formato,
+        estilo: caso.estilo,
+        evidencias: caso.evidencias,
+        roteirosRecentes: caso.roteirosRecentes,
+        instrucaoAbertura: caso.instrucaoAbertura,
+        anguloParaEvitar: caso.anguloParaEvitar,
+      }),
+    };
+}
+
+/**
+ * O mesmo verificador de producao (checagem local mais verificarTexto, `generoTexto: "roteiro"`), rodado aqui so para saber se aprovaria, sem repetir nem gravar em
+ * geracoes_ia (dia 1 da etapa 14, item 5); esta e a parte local. R1, item 0c: `formato`/`estilo`/`cartoes`/`legenda`/`porQueAssim`/`narrativa` espelham exatamente o que
+ * `servicos/roteiro.ts` passa para `gerarComVerificacao` em producao (inclusive a regra de `porQueAssim` so valer fora de Story falado).
+ */
+function verificarLocal(caso: Caso, saida: roteiroIA.SaidaRoteiro) {
+    const usaPorQueAssim = caso.formato === "story" && caso.estilo !== "sem_fala";
+    const campos = extrairCamposRoteiro(saida);
+    const local = verificarLocalmente(campos, {
+      // O gancho reprovado entra junto (mesmo raciocinio de `servicos/roteiro.ts`,
+      // `gerarConteudo`): nunca repetir o gancho que acabou de ser reprovado.
+      ganchosRecentes: caso.anguloParaEvitar
+        ? [...caso.roteirosRecentes.map((r) => r.gancho), caso.anguloParaEvitar.gancho]
+        : caso.roteirosRecentes.map((r) => r.gancho),
+      duracaoParaMuitoLongo:
+        caso.anguloParaEvitar?.duracaoAnteriorS !== undefined
+          ? { anteriorS: caso.anguloParaEvitar.duracaoAnteriorS, novaS: saida.duracaoS }
+          : undefined,
+      formato: caso.formato,
+      estilo: caso.estilo,
+      ficha: caso.ficha,
+      cartoes: saida.cartoes,
+      legenda: saida.legenda,
+      porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
+      narrativa: { gancho: saida.gancho, corpo: saida.corpo, chamadaFinal: saida.chamadaFinal },
+    });
+  return local;
+}
+
 export type ResultadoAvaliarRoteiros = {
   conjunto: string;
   ehExemplo: boolean;
@@ -145,42 +206,49 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
+  // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; depois o verificador (checagem local aqui, e o `verificarTexto` num segundo lote
+  // só para os casos que a checagem local aprovou); e só então a leitura, caso a caso, na ordem de sempre.
+  const geradas = await gerarVarios(conjunto.map((caso) => pedidoDoRoteiro(caso)), "roteiros");
+  const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
+  const camposPorCaso: Record<string, string>[] = [];
+  conjunto.forEach((caso, indice) => {
+    const saida = geradas[indice].dados;
+    const campos = extrairCamposRoteiro(saida);
+    camposPorCaso.push(campos);
+    verificacoes.push(verificarLocal(caso, saida));
+  });
+  const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
+  const respostasDoLote = await gerarVarios(
+    indicesAprovadosLocal.map((indice) => ({
+      tarefa: "verificarTexto" as const,
+      nivel: verificarTextoIA.nivel,
+      effort: verificarTextoIA.esforco,
+      schema: verificarTextoIA.schema,
+      sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
+      entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [] }),
+    })),
+    "verificador dos roteiros",
+  );
+  const respostasVerificador = new Map<number, (typeof respostasDoLote)[number]>();
+  indicesAprovadosLocal.forEach((indice, posicao) => {
+    const resposta = respostasDoLote[posicao];
+    respostasVerificador.set(indice, resposta);
+    verificacoes[indice] = {
+      aprovado: resposta.dados.aprovado,
+      motivos: resposta.dados.aprovado ? [] : [resposta.dados.motivo ?? "reprovado"],
+    };
+  });
+
   for (const [indice, caso] of conjunto.entries()) {
     console.log(`${"=".repeat(70)}`);
     console.log(`caso ${indice + 1}/${conjunto.length}: "${caso.tema}"`);
     console.log(`ponto principal: ${caso.pontoPrincipal}`);
     console.log(`${"-".repeat(70)}\n`);
 
-    const resultado = await gerarEstruturado({
-      tarefa: "roteiro",
-      nivel: roteiroIA.nivel,
-      effort: roteiroIA.esforco,
-      schema: roteiroIA.schema,
-      sistemaEstavel: roteiroIA.montarSistemaEstavel({
-        perfilCompilado: caso.perfilCompilado,
-        camadaExclusiva: caso.camadaExclusiva,
-        modeloNicho: caso.modeloNicho,
-        regrasCliente: caso.regrasCliente,
-        tipo: caso.tipo,
-        formato: caso.formato,
-        estilo: caso.estilo,
-      }),
-      entrada: roteiroIA.montarEntrada({
-        tema: caso.tema,
-        objetivo: caso.objetivo,
-        ficha: caso.ficha,
-        formato: caso.formato,
-        estilo: caso.estilo,
-        evidencias: caso.evidencias,
-        roteirosRecentes: caso.roteirosRecentes,
-        instrucaoAbertura: caso.instrucaoAbertura,
-        anguloParaEvitar: caso.anguloParaEvitar,
-      }),
-    });
-
+    const resultado = geradas[indice];
     const saida = resultado.dados;
     titulos.push(saida.titulo);
-    let custoDoCasoUsd = calcularCustoUsd(roteiroIA.nivel, resultado);
+    let custoDoCasoUsd = custoDoResultado(roteiroIA.nivel, resultado);
 
     /**
      * O gancho reprovado e o novo lado a lado (E27, parte 1, item 7): para
@@ -279,47 +347,9 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
      * nunca reprovaria o que reprovou em produção no hotfix `fdac7ea` (Reels com `porQueAssim`
      * preenchido por engano), porque a checagem de formato simplesmente não rodava aqui.
      */
-    const usaPorQueAssim = caso.formato === "story" && caso.estilo !== "sem_fala";
-    const campos = extrairCamposRoteiro(saida);
-    const local = verificarLocalmente(campos, {
-      // O gancho reprovado entra junto (mesmo raciocinio de `servicos/roteiro.ts`,
-      // `gerarConteudo`): nunca repetir o gancho que acabou de ser reprovado.
-      ganchosRecentes: caso.anguloParaEvitar
-        ? [...caso.roteirosRecentes.map((r) => r.gancho), caso.anguloParaEvitar.gancho]
-        : caso.roteirosRecentes.map((r) => r.gancho),
-      duracaoParaMuitoLongo:
-        caso.anguloParaEvitar?.duracaoAnteriorS !== undefined
-          ? { anteriorS: caso.anguloParaEvitar.duracaoAnteriorS, novaS: saida.duracaoS }
-          : undefined,
-      formato: caso.formato,
-      estilo: caso.estilo,
-      ficha: caso.ficha,
-      cartoes: saida.cartoes,
-      legenda: saida.legenda,
-      porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
-      narrativa: { gancho: saida.gancho, corpo: saida.corpo, chamadaFinal: saida.chamadaFinal },
-    });
-    let verificacao = local;
-    if (local.aprovado) {
-      const saidaVerificacao = await gerarEstruturado({
-        tarefa: "verificarTexto",
-        nivel: verificarTextoIA.nivel,
-        effort: verificarTextoIA.esforco,
-        schema: verificarTextoIA.schema,
-        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
-        entrada: verificarTextoIA.montarEntrada({
-          texto: Object.values(campos).join("\n"),
-          proibicoes: [],
-        }),
-      });
-      custoDoCasoUsd += calcularCustoUsd(verificarTextoIA.nivel, saidaVerificacao);
-      verificacao = {
-        aprovado: saidaVerificacao.dados.aprovado,
-        motivos: saidaVerificacao.dados.aprovado
-          ? []
-          : [saidaVerificacao.dados.motivo ?? "reprovado"],
-      };
-    }
+    const verificacao = verificacoes[indice];
+    const saidaVerificacao = respostasVerificador.get(indice);
+    if (saidaVerificacao) custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
       console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]\n`);

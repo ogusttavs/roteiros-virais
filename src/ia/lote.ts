@@ -14,7 +14,7 @@ import type { z } from "zod";
 import { config } from "@/lib/config";
 
 import { construirSaidaMock } from "./mock";
-import type { NivelIA, TarefaIA } from "./tipos";
+import type { EsforcoIA, NivelIA, TarefaIA } from "./tipos";
 
 const MAX_TOKENS_LOTE_PADRAO = 4000;
 
@@ -33,6 +33,8 @@ export type ItemLote<T> = {
   sistemaEstavel: string;
   entrada: string;
   maxTokens?: number;
+  /** O esforço do modelo forte, igual ao de `gerarEstruturado` (o golden set pelo lote precisa do mesmo que a produção usa); ignorado no barato. */
+  effort?: EsforcoIA;
 };
 
 const lotesMock = new Map<string, ItemLote<unknown>[]>();
@@ -54,7 +56,10 @@ export async function criarLote<T>(itens: ItemLote<T>[]): Promise<string> {
           { type: "text" as const, text: item.sistemaEstavel, cache_control: { type: "ephemeral" as const } },
         ],
         messages: [{ role: "user" as const, content: item.entrada }],
-        output_config: { format: zodOutputFormat(item.schema) },
+        output_config: {
+          format: zodOutputFormat(item.schema),
+          ...(item.effort && item.nivel === "forte" ? { effort: item.effort } : {}),
+        },
       },
     })),
   });
@@ -91,7 +96,7 @@ export async function coletarResultadosLote<T>(
     return itens.map((item) => ({
       customId: item.customId,
       status: "sucesso" as const,
-      dados: schema.parse(construirSaidaMock(item.tarefa, item.entrada)),
+      dados: schema.parse(construirSaidaMock(item.tarefa, item.entrada, item.sistemaEstavel)),
       modelo: "mock",
       tokensEntrada: 0,
       tokensSaida: 0,

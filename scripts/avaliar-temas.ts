@@ -17,8 +17,9 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as avaliarTemaIA from "../src/ia/prompts/avaliarTema";
+
+import { gerarVarios } from "./golden-lote";
 
 const PILARES = ["viralizar", "gerarCliente", "encaixe", "novidade", "facilidade"] as const;
 
@@ -74,8 +75,10 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
   let somaDiferencas = 0;
   let comparacoes = 0;
 
-  for (const caso of conjunto) {
-    const resultado = await gerarEstruturado({
+  // O golden set pelo lote (`golden-lote.ts`): todos os casos num lote só, e só então a leitura, caso a caso.
+  const resultados = await gerarVarios(
+    conjunto.map((caso) => (
+{
       tarefa: "avaliarTema",
       nivel: avaliarTemaIA.nivel,
       effort: avaliarTemaIA.esforco,
@@ -87,7 +90,13 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
         regrasCliente: caso.regrasCliente,
       }),
       entrada: avaliarTemaIA.montarEntrada({ tema: caso.tema, evidencias: caso.evidencias }),
-    });
+    }
+    )),
+    "temas",
+  );
+
+  for (const [indice, caso] of conjunto.entries()) {
+    const resultado = resultados[indice];
 
     console.log(`"${caso.tema}" (${caso.pontoPrincipal})`);
     if (caso.regrasCliente.length > 0) {

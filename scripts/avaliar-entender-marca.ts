@@ -32,12 +32,12 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as entenderMarcaIA from "../src/ia/prompts/entenderMarca";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { verificarLocalmente } from "../src/ia/verificador";
 import { LIMIAR_MESMO_ASSUNTO, lerIdAnterior, resumirVideosParaIA, similaridade } from "../src/servicos/contexto-marca-regras";
+
+import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
 
 const casoSchema = z.object({
   nome: z.string(),
@@ -146,40 +146,73 @@ export async function avaliarEntenderMarca(): Promise<ResultadoAvaliarEntenderMa
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
-  for (const [indice, caso] of conjunto.entries()) {
-    console.log("=".repeat(70));
-    console.log(`caso ${indice + 1}/${conjunto.length}: ${caso.nome}`);
-
+  // O golden set pelo lote (`golden-lote.ts`): a leitura da marca de todos os casos num lote, o verificador (checagem local aqui, e o `verificarTexto` num segundo lote só para
+  // os casos que a local aprovou), e só então as conferências, caso a caso. Um caso que o lote devolve com erro conta como erro de avaliação, como sempre.
+  const preparados = conjunto.map((caso) => {
     const redes = caso.redes.map((rede) => {
       const resumo = resumirVideosParaIA(rede.videos);
       return { rede: rede.rede, handle: rede.handle, medianaVisualizacoes: resumo.medianaVisualizacoes, videos: resumo.videos };
     });
+    const entrada = entenderMarcaIA.montarEntrada({
+      nomeDaMarca: caso.nomeDaMarca,
+      tipo: caso.tipo,
+      resumoDoBriefing: caso.resumoDoBriefing,
+      itensAtuais: caso.itensAtuais ?? [],
+      itensTirados: caso.itensTirados ?? [],
+      site: caso.site,
+      redes,
+    });
+    return { redes, entrada };
+  });
+  const leituras = await gerarVariosOuErro(
+    preparados.map(({ entrada }) => ({
+      tarefa: "entenderMarca" as const,
+      nivel: entenderMarcaIA.nivel,
+      effort: entenderMarcaIA.esforco,
+      schema: entenderMarcaIA.schema,
+      sistemaEstavel: entenderMarcaIA.montarSistemaEstavel(),
+      // O lembrete de acentuação vai por último, como `gerarComVerificacao` faz em produção.
+      entrada: `${entrada}\n\n${entenderMarcaIA.LEMBRETE_ACENTUACAO}`,
+      maxTokens: 2_500,
+    })),
+    "o que entendemos da marca",
+  );
+  const camposDoCaso = new Map<number, Record<string, string>>();
+  const locais = new Map<number, { aprovado: boolean; motivos: string[] }>();
+  leituras.forEach((leitura, indice) => {
+    if (leitura instanceof Error) return;
+    const campos = Object.fromEntries(leitura.dados.itens.map((item, i) => [`item${i + 1}`, item.texto]));
+    camposDoCaso.set(indice, campos);
+    locais.set(indice, verificarLocalmente(campos));
+  });
+  const indicesParaVerificador = [...locais].flatMap(([indice, local]) => (local.aprovado && Object.keys(camposDoCaso.get(indice)!).length > 0 ? [indice] : []));
+  const respostasDoVerificador = await gerarVariosOuErro(
+    indicesParaVerificador.map((indice) => ({
+      tarefa: "verificarTexto" as const,
+      nivel: verificarTextoIA.nivel,
+      effort: verificarTextoIA.esforco,
+      schema: verificarTextoIA.schema,
+      sistemaEstavel: verificarTextoIA.montarSistemaEstavel("padrao"),
+      entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposDoCaso.get(indice)!).join("\n"), proibicoes: [] }),
+    })),
+    "verificador (o que entendemos da marca)",
+  );
+  const verificadorDoCaso = new Map(indicesParaVerificador.map((indice, i) => [indice, respostasDoVerificador[i]] as const));
+
+  for (const [indice, caso] of conjunto.entries()) {
+    console.log("=".repeat(70));
+    console.log(`caso ${indice + 1}/${conjunto.length}: ${caso.nome}`);
+
+    const { redes } = preparados[indice];
     const temNumeroDeVideo = redes.some((r) => r.videos.some((v) => v.vezesAMediana !== null));
     const fontesLidas = new Set<string>([...(caso.site && caso.site.paginas.length > 0 ? ["site"] : []), ...redes.map((r) => r.rede)]);
     const idsDados = new Set((caso.itensAtuais ?? []).map((i) => i.id));
     const numerosVistos = numerosDaEntrada(redes);
 
     try {
-      const entrada = entenderMarcaIA.montarEntrada({
-        nomeDaMarca: caso.nomeDaMarca,
-        tipo: caso.tipo,
-        resumoDoBriefing: caso.resumoDoBriefing,
-        itensAtuais: caso.itensAtuais ?? [],
-        itensTirados: caso.itensTirados ?? [],
-        site: caso.site,
-        redes,
-      });
-      // O lembrete de acentuação vai por último, como `gerarComVerificacao` faz em produção.
-      const resultado = await gerarEstruturado({
-        tarefa: "entenderMarca",
-        nivel: entenderMarcaIA.nivel,
-        effort: entenderMarcaIA.esforco,
-        schema: entenderMarcaIA.schema,
-        sistemaEstavel: entenderMarcaIA.montarSistemaEstavel(),
-        entrada: `${entrada}\n\n${entenderMarcaIA.LEMBRETE_ACENTUACAO}`,
-        maxTokens: 2_500,
-      });
-      total.custoTotalUsd += calcularCustoUsd(entenderMarcaIA.nivel, resultado);
+      const resultado = leituras[indice];
+      if (resultado instanceof Error) throw resultado;
+      total.custoTotalUsd += custoDoResultado(entenderMarcaIA.nivel, resultado);
 
       const problemas: string[] = [];
       for (const item of resultado.dados.itens) {
@@ -228,18 +261,11 @@ export async function avaliarEntenderMarca(): Promise<ResultadoAvaliarEntenderMa
         }
       }
 
-      const campos = Object.fromEntries(resultado.dados.itens.map((item, i) => [`item${i + 1}`, item.texto]));
-      let verificacao = verificarLocalmente(campos);
-      if (verificacao.aprovado && Object.keys(campos).length > 0) {
-        const saida = await gerarEstruturado({
-          tarefa: "verificarTexto",
-          nivel: verificarTextoIA.nivel,
-          effort: verificarTextoIA.esforco,
-          schema: verificarTextoIA.schema,
-          sistemaEstavel: verificarTextoIA.montarSistemaEstavel("padrao"),
-          entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
-        });
-        total.custoTotalUsd += calcularCustoUsd(verificarTextoIA.nivel, saida);
+      let verificacao = locais.get(indice)!;
+      const saida = verificadorDoCaso.get(indice);
+      if (saida instanceof Error) throw saida;
+      if (saida) {
+        total.custoTotalUsd += custoDoResultado(verificarTextoIA.nivel, saida);
         verificacao = { aprovado: saida.dados.aprovado, motivos: saida.dados.aprovado ? [] : [saida.dados.motivo ?? "reprovado"] };
       }
       if (!verificacao.aprovado) {

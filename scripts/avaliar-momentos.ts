@@ -16,12 +16,12 @@ import path from "node:path";
 
 import { z } from "zod";
 
-import { gerarEstruturado } from "../src/ia/cliente";
 import * as roteiroIA from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
-import { calcularCustoUsd } from "../src/ia/registro";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
+
+import { custoDoResultado, gerarVarios } from "./golden-lote";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -75,13 +75,11 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
-  for (const [indice, caso] of conjunto.entries()) {
-    console.log(`${"=".repeat(70)}`);
-    console.log(`caso ${indice + 1}/${conjunto.length}: onde "${caso.onde}", tipo "${caso.tipo}"`);
-    console.log(`ponto principal: ${caso.pontoPrincipal}`);
-    console.log(`${"-".repeat(70)}\n`);
-
-    const resultado = await gerarEstruturado({
+  // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; a checagem local, e o `verificarTexto` num segundo lote só para os casos que a
+  // local aprovou; e só então a leitura, caso a caso, na ordem de sempre.
+  const geradas = await gerarVarios(
+    conjunto.map((caso) => (
+{
       tarefa: "roteiro",
       nivel: roteiroIA.nivel,
       effort: roteiroIA.esforco,
@@ -107,11 +105,55 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
         contextoDeSerie: caso.contextoDeSerie,
         marcaCitada: caso.marcaCitada,
       }),
-    });
+    }
+    )),
+    "momentos",
+  );
+  const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
+  const camposPorCaso: Record<string, string>[] = [];
+  conjunto.forEach((caso, indice) => {
+    const saida = geradas[indice].dados;
+      const campos = extrairCamposRoteiro(saida);
+      const palavrasDoMomento = palavrasDeConteudo(`${caso.onde} ${caso.oQueEstaAcontecendo}`);
+      const local = verificarLocalmente(campos, { palavrasDoMomento });
+    camposPorCaso.push(campos);
+    verificacoes.push(local);
+  });
+  const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
+  const respostasDoLote = await gerarVarios(
+    indicesAprovadosLocal.map((indice) => (
+{
+        tarefa: "verificarTexto",
+        nivel: verificarTextoIA.nivel,
+        effort: verificarTextoIA.esforco,
+        schema: verificarTextoIA.schema,
+        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
+        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [] }),
+      }
+    )),
+    "verificador (momentos)",
+  );
+  const respostasVerificador = new Map<number, (typeof respostasDoLote)[number]>();
+  indicesAprovadosLocal.forEach((indice, posicao) => {
+    const resposta = respostasDoLote[posicao];
+    respostasVerificador.set(indice, resposta);
+    verificacoes[indice] = {
+      aprovado: resposta.dados.aprovado,
+      motivos: resposta.dados.aprovado ? [] : [resposta.dados.motivo ?? "reprovado"],
+    };
+  });
+
+  for (const [indice, caso] of conjunto.entries()) {
+    console.log(`${"=".repeat(70)}`);
+    console.log(`caso ${indice + 1}/${conjunto.length}: onde "${caso.onde}", tipo "${caso.tipo}"`);
+    console.log(`ponto principal: ${caso.pontoPrincipal}`);
+    console.log(`${"-".repeat(70)}\n`);
+
+    const resultado = geradas[indice];
 
     const saida = resultado.dados;
     titulos.push(saida.titulo);
-    let custoDoCasoUsd = calcularCustoUsd(roteiroIA.nivel, resultado);
+    let custoDoCasoUsd = custoDoResultado(roteiroIA.nivel, resultado);
 
     console.log(`tema curto: ${saida.temaCurto ?? "(nulo)"}`);
     console.log(`titulo: ${saida.titulo}`);
@@ -133,25 +175,9 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
       console.log(`\nmarca citada no caso: ${caso.marcaCitada.nome} (confira se o gancho/corpo nao vira anuncio dela)`);
     }
 
-    const campos = extrairCamposRoteiro(saida);
-    const palavrasDoMomento = palavrasDeConteudo(`${caso.onde} ${caso.oQueEstaAcontecendo}`);
-    const local = verificarLocalmente(campos, { palavrasDoMomento });
-    let verificacao = local;
-    if (local.aprovado) {
-      const saidaVerificacao = await gerarEstruturado({
-        tarefa: "verificarTexto",
-        nivel: verificarTextoIA.nivel,
-        effort: verificarTextoIA.esforco,
-        schema: verificarTextoIA.schema,
-        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [] }),
-      });
-      custoDoCasoUsd += calcularCustoUsd(verificarTextoIA.nivel, saidaVerificacao);
-      verificacao = {
-        aprovado: saidaVerificacao.dados.aprovado,
-        motivos: saidaVerificacao.dados.aprovado ? [] : [saidaVerificacao.dados.motivo ?? "reprovado"],
-      };
-    }
+    const verificacao = verificacoes[indice];
+    const saidaVerificacao = respostasVerificador.get(indice);
+    if (saidaVerificacao) custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
       console.log(`\n[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`);
