@@ -55,6 +55,10 @@ async function main(): Promise<void> {
   await db().execute(sql`
     update videos set ficha_catalogo = (array['veja','guardem','mandem','comentem'])[1 + (id % 4)]
     where nicho_id = ${marca.nichoId} and analise is not null`);
+  // Três vídeos "que guardem" que passam a régua (recentes, acima do normal, servem de modelo): sem eles os exemplos do Criar ficam vazios na captura.
+  await db().execute(sql`
+    update videos set views = 250000, fora_da_curva = 8, publicado_em = now() - interval '2 days', serve_de_modelo = true, idioma = 'pt'
+    where id in (select id from videos where nicho_id = ${marca.nichoId} and ficha_catalogo = 'guardem' and analise is not null order by id limit 3)`);
   const base = process.env.CAPTURAS_URL ?? "http://localhost:3000";
   const pasta = path.resolve(__dirname, "..", "..", "entregaveis", "design", "capturas", nomePasta);
   await mkdir(pasta, { recursive: true });
