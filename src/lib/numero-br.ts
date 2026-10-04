@@ -9,7 +9,7 @@ export function lerNumeroBr(texto: string): number {
     if (t.split(",").length > 2) return Number.NaN;
     return Number(t.replace(/\./g, "").replace(",", "."));
   }
-  if (/^\d{1,3}(\.\d{3})+$/.test(t)) return Number(t.replace(/\./g, ""));
+  if (/^[1-9]\d{0,2}(\.\d{3})+$/.test(t)) return Number(t.replace(/\./g, ""));
   if ((t.match(/\./g) ?? []).length > 1) return Number.NaN;
   return Number(t);
 }

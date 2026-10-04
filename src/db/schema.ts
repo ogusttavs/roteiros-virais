@@ -747,6 +747,19 @@ export const custosFixos = pgTable("custos_fixos", {
 });
 export type CustoFixo = typeof custosFixos.$inferSelect;
 
+/** E46 PR 3: cada "rodar agora" que o admin dispara em Rotinas (quem, qual fila, quando), para o detalhe da rotina dizer "rodada à mão por fulano às 07:23". */
+export const disparosDoAdmin = pgTable(
+  "disparos_do_admin",
+  {
+    id: id(),
+    fila: text("fila").notNull(),
+    porUsuarioId: text("por_usuario_id").references(() => user.id, { onDelete: "set null" }),
+    em: timestamp("em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("disparos_do_admin_fila_em").on(t.fila, t.em)],
+);
+export type DisparoDoAdmin = typeof disparosDoAdmin.$inferSelect;
+
 /** E46 PR 3: ajustes do admin que valem para o sistema todo, uma linha por chave ("teto_diario_brl"). Texto, para qualquer valor caber. */
 export const configuracaoAdmin = pgTable("configuracao_admin", {
   chave: text("chave").primaryKey(),

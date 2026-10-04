@@ -12,6 +12,8 @@ describe("lerNumeroBr", () => {
     expect(lerNumeroBr("1.234.567")).toBe(1234567);
     expect(lerNumeroBr("109")).toBe(109);
     expect(lerNumeroBr("0,5")).toBe(0.5);
+    expect(lerNumeroBr("0.500")).toBe(0.5);
+    expect(lerNumeroBr("0.123")).toBe(0.123);
   });
 
   it("o que não entende volta NaN", () => {

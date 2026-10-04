@@ -96,6 +96,7 @@ export const textosRotinasAdmin = {
     semExecucao: "Ainda não rodou.",
     porEvento: "roda quando acontece o evento, não por horário",
     tentarDeNovo: "Rodar agora",
+    rodadaAMao: (quem: string | null, quando: string) => `Rodada à mão por ${quem ?? "alguém da equipe"}, ${quando}.`,
     aindaRodando: "rodando",
     taxa: (dev: number, cons: number, novos: number, fora: number, pct: string) => `devolvidos ${dev}, consumidos ${cons}, novos ${novos}, fora da curva ${fora}, taxa de acerto ${pct}`,
   },

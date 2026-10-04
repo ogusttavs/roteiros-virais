@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { config } from "@/lib/config";
 import { sessaoAtual } from "@/lib/sessao";
+import { registrarDisparo } from "@/servicos/admin-rotinas";
 import { garantirSessaoAdmin } from "@/servicos/clientes";
 
 /**
@@ -20,7 +21,8 @@ export async function dispararJobAction(
   nome: string,
   dados?: { nichoId: number },
 ): Promise<{ ok: boolean; mensagem: string; duplicado?: boolean }> {
-  garantirSessaoAdmin(await sessaoAtual());
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
 
   try {
     const resposta = await fetch(`${config.appUrl}/api/jobs/${nome}`, {
@@ -40,6 +42,8 @@ export async function dispararJobAction(
     if (!resposta.ok) {
       return { ok: false, mensagem: corpo.erro ?? `a rota respondeu ${resposta.status}` };
     }
+    // O registro do "rodar agora" (quem, qual fila, quando): só o que de fato entrou na fila. Nunca derruba um disparo que já valeu.
+    if (!corpo.duplicado) await registrarDisparo(nome, sessao!.user.id).catch((erro) => Sentry.captureException(erro, { tags: { job: nome } }));
     return { ok: true, mensagem: "", duplicado: corpo.duplicado };
   } catch (erro) {
     Sentry.captureException(erro, { tags: { job: nome } });

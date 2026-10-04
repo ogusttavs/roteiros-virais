@@ -6,8 +6,10 @@ import { FILAS, FILAS_POR_EVENTO } from "@/jobs/fila";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao, type ExecucaoResumo } from "@/servicos/admin-coleta";
 import { inicioDoAdmin } from "@/servicos/admin-inicio";
+import { ultimosDisparos } from "@/servicos/admin-rotinas";
 import { quandoPorExtenso, textosInicioAdmin as tc } from "@/textos/admin-contas";
 import { textosRotinasAdmin as t } from "@/textos/admin-custos";
+import { fraseDoErro } from "@/textos/rotinas";
 
 import { BotaoRodarJob } from "../_jobs/BotaoRodarJob";
 import comum from "../comum.module.css";
@@ -49,7 +51,7 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 /** O resultado em uma frase: o erro, ou os três primeiros números do resumo da execução. */
 function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
   if (!e) return t.rotinas.semExecucao;
-  if (e.status === "erro") return (e.erro ?? "").slice(0, 160) || t.rotinas.estado.erro;
+  if (e.status === "erro") return fraseDoErro(e.erro);
   // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
   return e.status === "rodando" ? t.rotinas.estado.rodando : `${t.rotinas.estado.ok}, em ${duracao(e.duracaoMs)}`;
 }
@@ -67,6 +69,7 @@ export default async function Rotinas() {
   const recentes = new Map(await Promise.all(todasAsFilas.map(async (nome) => [nome, await listarExecucoesRecentes(nome, 3)] as const)));
   const idsPagos = [...recentes.entries()].filter(([nome]) => FILAS_DE_COLETA_PAGA.has(nome)).flatMap(([, lista]) => lista.map((e) => e.id));
   const taxas = new Map((await taxaDeAcertoPorExecucao(idsPagos)).map((x) => [x.execucaoId, x]));
+  const disparos = await ultimosDisparos(todasAsFilas);
   const agendas = (filas: string[]) => AGENDAMENTOS.filter((a) => filas.includes(a.fila));
 
   return (
@@ -85,7 +88,7 @@ export default async function Rotinas() {
         </div>
         <p className={styles.nota} data-rotinas-globais>
           {t.madrugada.rotinasGlobais}: {t.madrugada.buscaGlobal} {tc.madrugada.estadoRotina[madrugada.rotinas.busca]}, {t.madrugada.transcricaoGlobal} {tc.madrugada.estadoRotina[madrugada.rotinas.transcricao]}.
-          {madrugada.rotinas.erroDaBusca ? ` ${madrugada.rotinas.erroDaBusca.slice(0, 160)}` : ""}
+          {madrugada.rotinas.erroDaBusca ? ` ${fraseDoErro(madrugada.rotinas.erroDaBusca)}` : ""}
         </p>
         {madrugada.linhas.length === 0 ? (
           <p className={styles.semDado}>{t.madrugada.vazio}</p>
@@ -192,8 +195,13 @@ export default async function Rotinas() {
                             <span className={styles.nomeTecnico}>
                               {t.rotinas.nomeNoSistema}: {fila}
                             </span>
-                            {FILAS_POR_EVENTO.has(fila) ? null : <BotaoRodarJob nome={fila} />}
+                            {FILAS_POR_EVENTO.has(fila) ? null : <BotaoRodarJob nome={fila} rotulo={t.rotinas.tentarDeNovo} />}
                           </div>
+                          {disparos.get(fila) ? (
+                            <p className={styles.nota} data-disparo={fila}>
+                              {t.rotinas.rodadaAMao(disparos.get(fila)!.porNome, quandoPorExtenso(disparos.get(fila)!.em, inicio.agora))}
+                            </p>
+                          ) : null}
                           {ultima ? (
                             <dl className={styles.dadosRotina}>
                               <div>
