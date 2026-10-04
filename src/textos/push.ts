@@ -2,6 +2,8 @@
  * O aviso de manhã por push (E48 PR 2): o texto da notificação e o pedido de permissão. O que a pessoa lê, em língua de gente.
  */
 export const textosPush = {
+  /** So para quem tem sessao de admin: o passo e o motivo, embaixo da frase de erro (item 0d). */
+  motivoDoErro: (etapa: string, motivo: string) => `Para o admin: ${etapa}, ${motivo}`,
   /** A notificação do lembrete: com roteiro marcado na agenda do dia, ou só os temas. */
   roteiroPronto: "O seu roteiro de hoje está pronto",
   temasChegaram: "Os temas de hoje chegaram",

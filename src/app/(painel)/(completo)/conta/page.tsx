@@ -87,7 +87,7 @@ export default async function Conta() {
       ) : null}
       <div className={styles.colunaPrincipal}>
         <InstalarNoCelular />
-        <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} />
+        <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} ehAdmin={sessao.user.role === "admin"} />
         <InformacoesDoAparelhoAdmin ehAdmin={sessao.user.role === "admin"} versaoPainel={config.gitSha} />
         <BotaoSair />
       </div>
