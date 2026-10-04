@@ -41,7 +41,15 @@
   transition:
     background var(--duracao-rapida) var(--curva-saida),
     color var(--duracao-rapida) var(--curva-saida),
-    border-color var(--duracao-rapida) var(--curva-saida);
+    border-color var(--duracao-rapida) var(--curva-saida),
+    transform var(--duracao-soltar) var(--curva-mola);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Pílula e chip apertam mais que botão (passo 16, capítulo 6). */
+.chip:active {
+  transform: scale(var(--escala-toque-pilula));
+  transition-duration: var(--duracao-toque);
 }
 
 .chip:hover {

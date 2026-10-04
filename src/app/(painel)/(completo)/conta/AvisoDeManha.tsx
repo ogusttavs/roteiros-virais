@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-import { apagarInscricaoPushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
+import { apagarInscricaoPushAction, registrarFalhaDePushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { sistemaDeInstalacao } from "@/lib/convite-instalar";
 import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { jaEstaInstalado } from "@/ui/instalacao";
-import { desligarAviso, estadoDoAviso, inscricaoAtualDoAparelho, ligarAviso, type EstadoDoAviso } from "@/ui/push";
+import { descreverErro, desligarAviso, estadoDoAviso, inscricaoAtualDoAparelho, ligarAviso, type EstadoDoAviso } from "@/ui/push";
 
 import styles from "./AvisoDeManha.module.css";
 
@@ -21,6 +21,8 @@ type Props = {
   chavePublica: string;
   /** O horário do lembrete que a pessoa escolheu em "lembrete" (`HH:00`); o aviso chega nele. */
   horaLembrete: string;
+  /** Sessão de admin: o passo e o motivo da falha aparecem embaixo da frase (item 0d); o cliente comum vê só a frase. */
+  ehAdmin?: boolean;
 };
 
 /**
@@ -28,10 +30,11 @@ type Props = {
  * botão para ligar ou desligar. O horário é o do campo de lembrete de sempre. Começa em "carregando" e decide depois de montar, porque só o
  * navegador sabe se está instalado, se suporta e em que estado está a permissão (o servidor daria diferença na hidratação).
  */
-export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
+export function AvisoDeManha({ chavePublica, horaLembrete, ehAdmin = false }: Props) {
   const [estado, setEstado] = useState<Estado>("carregando");
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState<{ etapa: string; texto: string } | null>(null);
 
   useEffect(() => {
     let cancelado = false;
@@ -59,25 +62,37 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
 
   if (!chavePublica || estado === "carregando") return null;
 
+  /** Mostra a frase de sempre e, para o admin, o passo e o motivo; o log do servidor guarda os dois (sem endereço nem chave). */
+  function falhou(etapa: string, texto: string) {
+    setErro(t.erro);
+    setMotivo({ etapa, texto });
+    void registrarFalhaDePushAction(texto, etapa, sistemaDeInstalacao(navigator.userAgent)).catch(() => undefined);
+  }
+
   async function ligar() {
     setOcupado(true);
     setErro(null);
+    setMotivo(null);
     try {
       const resultado = await ligarAviso(chavePublica);
       if (resultado.tipo === "negado") {
         setEstado("sem_permissao");
         return;
       }
-      if (resultado.tipo === "erro" || !(await registrarInscricaoPushAction(resultado.inscricao, sistemaDeInstalacao(navigator.userAgent)))) {
+      if (resultado.tipo === "erro") {
+        falhou(resultado.etapa, resultado.motivo);
+        return;
+      }
+      if (!(await registrarInscricaoPushAction(resultado.inscricao, sistemaDeInstalacao(navigator.userAgent)))) {
         // O servidor não guardou: tira a inscrição do navegador também, para o cartão não dizer "ligado" sem aviso nenhum.
-        if (resultado.tipo === "ligado") await desligarAviso().catch(() => null);
-        setErro(t.erro);
+        await desligarAviso().catch(() => null);
+        falhou("servidor", "o servidor recusou a inscrição");
         return;
       }
       if (resultado.endpointAntigo && resultado.endpointAntigo !== resultado.inscricao.endpoint) void apagarInscricaoPushAction(resultado.endpointAntigo).catch(() => undefined);
       setEstado("ligado");
-    } catch {
-      setErro(t.erro);
+    } catch (erro) {
+      falhou("servidor", descreverErro(erro));
     } finally {
       setOcupado(false);
     }
@@ -126,6 +141,7 @@ export function AvisoDeManha({ chavePublica, horaLembrete }: Props) {
       {erro ? (
         <p className={styles.erro} role="alert">
           {erro}
+          {ehAdmin && motivo ? <span className={styles.motivo}>{textosPush.motivoDoErro(motivo.etapa, motivo.texto)}</span> : null}
         </p>
       ) : null}
     </Cartao>

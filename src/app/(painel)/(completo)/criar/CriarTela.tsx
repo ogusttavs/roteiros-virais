@@ -210,7 +210,7 @@ export function CriarTela({
           <div className={styles.caminhos}>
             <button
               type="button"
-              className={styles.porta}
+              className={`${styles.porta} cartao-toque`}
               disabled={ocupado}
               aria-busy={acao === "temas" || undefined}
               onClick={() => ir("temas", dataInicial ? `/criar/temas?data=${dataInicial}` : "/criar/temas")}
@@ -227,7 +227,7 @@ export function CriarTela({
 
             <button
               type="button"
-              className={styles.porta}
+              className={`${styles.porta} cartao-toque`}
               disabled={ocupado}
               aria-busy={acao === "tema-livre" || undefined}
               onClick={() => ir("tema-livre", dataInicial ? `/criar/tema-livre?data=${dataInicial}` : "/criar/tema-livre")}
@@ -244,7 +244,7 @@ export function CriarTela({
 
             <button
               type="button"
-              className={styles.porta}
+              className={`${styles.porta} cartao-toque`}
               disabled={semConexao}
               aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}
               onClick={() => setFolhaMomentoAberta(true)}
@@ -262,7 +262,7 @@ export function CriarTela({
 
             <button
               type="button"
-              className={styles.porta}
+              className={`${styles.porta} cartao-toque`}
               disabled={ocupado || semConexao}
               aria-busy={acao === "plano" || undefined}
               aria-describedby={semConexao ? ID_FAIXA_SEM_CONEXAO : undefined}

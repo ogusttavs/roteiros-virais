@@ -61,6 +61,7 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
       <PedidoDeAviso
         podeAparecer={pedidoDePushPodeAparecer(preferencias, aparelhosDoAviso, new Date())}
         chavePublica={config.push.publicKey}
+        ehAdmin={sessao.user.role === "admin"}
       />
       {children}
     </>

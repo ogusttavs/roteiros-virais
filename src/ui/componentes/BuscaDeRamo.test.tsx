@@ -3,7 +3,7 @@
  * opção destacada vão a cada tecla, o que o Enter faz com um formulário em volta). Posição, 44 pontos e rolagem dependem de layout,
  * que o jsdom não tem: ficam para o e2e.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -66,7 +66,7 @@ function opcaoAtiva(): string | null {
 }
 
 describe("BuscaDeRamo", () => {
-  it("é um combobox com rótulo; fechado no começo, e ao receber o foco abre a lista com o catálogo inteiro, em grupos", () => {
+  it("é um combobox com rótulo; fechado no começo, e ao receber o foco mostra a dica e a porta para a lista, sem abrir os 44 ramos", () => {
     render(<Exemplo />);
     const campo = campoDeBusca();
     expect(campo.getAttribute("aria-expanded")).toBe("false");
@@ -74,12 +74,29 @@ describe("BuscaDeRamo", () => {
 
     fireEvent.focus(campo);
 
-    expect(campo.getAttribute("aria-expanded")).toBe("true");
-    expect(screen.getByRole("listbox", { name: "Ramos" })).toBeTruthy();
-    expect(screen.getAllByRole("option")).toHaveLength(44);
-    expect(screen.getAllByRole("group")).toHaveLength(9);
-    // Sem digitar, não há "Não achei o meu" (a pessoa ainda nem procurou).
+    // Passo 16: o campo vazio não abre o catálogo inteiro dentro do cartão; mostra a dica e "Ver a lista de ramos".
+    expect(screen.getByText("Escreva o que você faz, com as suas palavras.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ver a lista de ramos" })).toBeTruthy();
+    expect(screen.queryByRole("listbox")).toBeNull();
     expect(screen.queryByText(NAO_ACHEI)).toBeNull();
+  });
+
+  it("'Ver a lista de ramos' abre a folha 'Os ramos' com os 44 ramos em nove grupos, e escolher um fecha a folha e preenche o campo", () => {
+    const aoEscolher = vi.fn();
+    render(<Exemplo onEscolher={aoEscolher} />);
+    fireEvent.focus(campoDeBusca());
+    fireEvent.click(screen.getByRole("button", { name: "Ver a lista de ramos" }));
+
+    const folha = screen.getByRole("dialog", { name: "Os ramos" });
+    expect(within(folha).getAllByRole("option")).toHaveLength(44);
+    expect(within(folha).getAllByRole("group")).toHaveLength(9);
+    expect(within(folha).getByRole("button", { name: NAO_ACHEI })).toBeTruthy();
+
+    // A busca do alto filtra a mesma lista.
+    fireEvent.change(within(folha).getByLabelText("Buscar um ramo"), { target: { value: "dentista" } });
+    expect(within(folha).getAllByRole("option")).toHaveLength(1);
+    fireEvent.click(within(folha).getByRole("option", { name: /Odontologia/ }));
+    return waitFor(() => expect(aoEscolher).toHaveBeenCalledWith("odontologia"));
   });
 
   it("a palavra 'dentista' põe Odontologia em primeiro, destacada, e o leitor de tela ouve quantos ramos achou", () => {
@@ -138,10 +155,12 @@ describe("BuscaDeRamo", () => {
     expect(opcaoAtiva()).toBe(opcoes[0]);
   });
 
-  it("a seta para baixo com a lista fechada abre a lista", () => {
+  it("a seta para baixo com o campo fechado abre a dica; com ela aberta e nada digitado, abre a folha 'Os ramos'", () => {
     render(<Exemplo valorInicial="odontologia" />);
     fireEvent.keyDown(campoDeBusca(), { key: "ArrowDown" });
-    expect(campoDeBusca().getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByText("Escreva o que você faz, com as suas palavras.")).toBeTruthy();
+    fireEvent.keyDown(campoDeBusca(), { key: "ArrowDown" });
+    expect(screen.getByRole("dialog", { name: "Os ramos" })).toBeTruthy();
   });
 
   it("o Esc fecha só a lista (não sobe para a folha ou a tela) e o campo volta ao ramo escolhido", () => {
@@ -177,7 +196,7 @@ describe("BuscaDeRamo", () => {
     render(<Exemplo onNaoAchei={aoNaoAchar} />);
     digitar("xyzw");
 
-    expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
+    expect(screen.getByText(/Nenhum ramo com “xyzw”\. Escolha abaixo e escreva do seu jeito; a gente confere\./)).toBeTruthy();
     expect(screen.getAllByRole("option")).toHaveLength(1);
     expect(opcaoAtiva()).toContain(NAO_ACHEI);
     expect(falado()).toBe("Nenhum ramo encontrado.");
@@ -194,7 +213,7 @@ describe("BuscaDeRamo", () => {
     render(<Exemplo semNaoAchei onNaoAchei={aoNaoAchar} />);
     digitar("xyzw");
 
-    expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
+    expect(screen.getByText("Nenhum ramo com “xyzw”.")).toBeTruthy();
     expect(screen.queryAllByRole("option")).toHaveLength(0);
     expect(screen.queryByText(NAO_ACHEI)).toBeNull();
 
@@ -214,7 +233,7 @@ describe("BuscaDeRamo", () => {
   it("o clique numa opção escolhe, e o mousedown nas opções não tira o foco do campo", () => {
     const aoEscolher = vi.fn();
     render(<Exemplo onEscolher={aoEscolher} />);
-    fireEvent.focus(campoDeBusca());
+    digitar("nutri");
     const opcao = screen.getAllByRole("option").find((o) => o.textContent?.includes("Nutrição"))!;
 
     const naoCancelado = fireEvent.mouseDown(opcao);
@@ -258,12 +277,18 @@ describe("BuscaDeRamo", () => {
 
   it("marca, para o leitor de tela, qual opção é o ramo de hoje", () => {
     render(<Exemplo valorInicial="nutricao" />);
-    fireEvent.focus(campoDeBusca());
+    digitar("nutri");
     const atual = screen.getAllByRole("option").find((o) => o.textContent?.includes("Nutrição"))!;
     expect(atual.textContent).toContain("o ramo de hoje");
     expect(screen.getAllByText("o ramo de hoje")).toHaveLength(1);
-    // Ao abrir sem digitar, a opção destacada é a do ramo de hoje.
-    expect(campoDeBusca().getAttribute("aria-activedescendant")).toBe(atual.id);
+  });
+
+  it("o ramo escolhido mostra a linha de exemplos e o 'Trocar o ramo', que devolve o foco ao campo", () => {
+    render(<Exemplo valorInicial="odontologia" />);
+    const trocar = screen.getByRole("button", { name: "Trocar o ramo" });
+    expect(trocar.textContent).toBe("Trocar");
+    fireEvent.click(trocar);
+    expect(document.activeElement).toBe(campoDeBusca());
   });
 
   it("o erro aparece embaixo, como alerta, e o campo se declara inválido e ligado a ele", () => {
@@ -282,7 +307,7 @@ describe("BuscaDeRamo", () => {
 
 /** Achados da revisão independente da E45 PR 1 (o que o primeiro teste não olhava). */
 describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
-  it("com a lista aberta e nada digitado, nada está destacado, e o Enter não escolhe um ramo que ninguém olhou", () => {
+  it("com o campo aberto e nada digitado, nada está destacado, e o Enter não escolhe um ramo que ninguém olhou", () => {
     const aoEscolher = vi.fn();
     render(<Exemplo onEscolher={aoEscolher} />);
     fireEvent.focus(campoDeBusca());
@@ -290,23 +315,14 @@ describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
 
     const naoCancelado = fireEvent.keyDown(campoDeBusca(), { key: "Enter" });
 
-    // O Enter com a lista aberta nunca envia o formulário (cancelado), mas também não escolhe nada.
+    // O Enter com o campo aberto nunca envia o formulário (cancelado), mas também não escolhe nada.
     expect(naoCancelado).toBe(false);
     expect(aoEscolher).not.toHaveBeenCalled();
-    expect(campoDeBusca().getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("a seta para baixo, sem nada destacado, vai ao primeiro; a seta para cima, à última", () => {
+  it("com resultados, a seta para cima, do primeiro, vai à última opção (o 'Não achei o meu')", () => {
     render(<Exemplo />);
-    fireEvent.focus(campoDeBusca());
-    const opcoes = screen.getAllByRole("option");
-
-    fireEvent.keyDown(campoDeBusca(), { key: "ArrowDown" });
-    expect(campoDeBusca().getAttribute("aria-activedescendant")).toBe(opcoes[0].id);
-
-    cleanup();
-    render(<Exemplo />);
-    fireEvent.focus(campoDeBusca());
+    digitar("est");
     fireEvent.keyDown(campoDeBusca(), { key: "ArrowUp" });
     const todas = screen.getAllByRole("option");
     expect(campoDeBusca().getAttribute("aria-activedescendant")).toBe(todas[todas.length - 1].id);
@@ -327,12 +343,13 @@ describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
     expect(aoEscolher).toHaveBeenCalledWith("automobilismo-e-pilotagem");
   });
 
-  it("texto que é só pontuação ou espaço mostra o catálogo inteiro, sem destacar nada e sem 'Não achei o meu'", () => {
+  it("texto que é só pontuação ou espaço não busca nada: fica a dica, sem destacar nada e sem 'Não achei o meu'", () => {
     const aoEscolher = vi.fn();
     render(<Exemplo onEscolher={aoEscolher} />);
     digitar("---");
 
-    expect(screen.getAllByRole("option")).toHaveLength(44);
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(screen.getByText("Escreva o que você faz, com as suas palavras.")).toBeTruthy();
     expect(campoDeBusca().getAttribute("aria-activedescendant")).toBeNull();
     expect(screen.queryByText(NAO_ACHEI)).toBeNull();
     fireEvent.keyDown(campoDeBusca(), { key: "Enter" });
@@ -344,7 +361,7 @@ describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
     digitar("xyzw");
 
     expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
+    expect(screen.getByText("Nenhum ramo com “xyzw”.")).toBeTruthy();
     expect(campoDeBusca().getAttribute("aria-expanded")).toBe("false");
   });
 
@@ -355,7 +372,7 @@ describe("BuscaDeRamo: o Enter, o destaque e a lista sem resultado", () => {
     const lista = screen.getByRole("listbox");
     expect(lista.querySelector("p")).toBeNull();
     expect(Array.from(lista.children).every((filho) => ["option", "group"].includes(filho.getAttribute("role") ?? ""))).toBe(true);
-    expect(screen.getByText("Nenhum ramo começa com “xyzw”.")).toBeTruthy();
+    expect(screen.getByText(/Nenhum ramo com “xyzw”\./)).toBeTruthy();
   });
 
   it("o plural e uma palavra que o catálogo não conhece não esvaziam a lista: 'salão de beleza' mostra Cabelo e barbearia em primeiro", () => {
@@ -380,9 +397,16 @@ describe("BuscaDeRamo: ramos escondidos (E45 PR 3, o admin liga um alternativo)"
   it("o ramo principal e os já ligados não aparecem como opção, nem no catálogo inteiro nem na busca", () => {
     render(<BuscaDeRamo rotulo="Ramo" valor={null} ramosEscondidos={["odontologia", "nutricao"]} onEscolher={() => {}} />);
     fireEvent.focus(campoDeBusca());
+    fireEvent.click(screen.getByRole("button", { name: "Ver a lista de ramos" }));
 
-    expect(screen.getAllByRole("option")).toHaveLength(42);
-    expect(screen.queryByRole("option", { name: /Odontologia/ })).toBeNull();
+    // Na folha "Os ramos" também.
+    const folha = screen.getByRole("dialog", { name: "Os ramos" });
+    expect(within(folha).getAllByRole("option")).toHaveLength(42);
+    expect(within(folha).queryByRole("option", { name: /Odontologia/ })).toBeNull();
+    cleanup();
+
+    render(<BuscaDeRamo rotulo="Ramo" valor={null} ramosEscondidos={["odontologia", "nutricao"]} onEscolher={() => {}} />);
+    fireEvent.focus(campoDeBusca());
 
     fireEvent.change(campoDeBusca(), { target: { value: "dentista" } });
     expect(screen.queryByRole("option", { name: /Odontologia/ })).toBeNull();
@@ -392,6 +416,7 @@ describe("BuscaDeRamo: ramos escondidos (E45 PR 3, o admin liga um alternativo)"
   it("sem ramos escondidos, o catálogo inteiro (44) continua aparecendo", () => {
     render(<BuscaDeRamo rotulo="Ramo" valor={null} ramosEscondidos={[]} onEscolher={() => {}} />);
     fireEvent.focus(campoDeBusca());
-    expect(screen.getAllByRole("option")).toHaveLength(44);
+    fireEvent.click(screen.getByRole("button", { name: "Ver a lista de ramos" }));
+    expect(within(screen.getByRole("dialog", { name: "Os ramos" })).getAllByRole("option")).toHaveLength(44);
   });
 });

@@ -2,13 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { adiarPedidoDePushAction, apagarInscricaoPushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
+import { adiarPedidoDePushAction, apagarInscricaoPushAction, registrarFalhaDePushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { sistemaDoAparelho, type SistemaDoAparelho } from "@/lib/convite-instalar";
 import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
 import { Folha } from "@/ui/componentes/Folha";
 import { jaEstaInstalado } from "@/ui/instalacao";
-import { desligarAviso, ligarAviso, suportaPush } from "@/ui/push";
+import { descreverErro, desligarAviso, ligarAviso, suportaPush } from "@/ui/push";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import styles from "./PedidoDeAviso.module.css";
@@ -26,6 +26,8 @@ type Props = {
   podeAparecer: boolean;
   /** A chave pública VAPID, lida do servidor em tempo de execução; vazia, nada é pedido. */
   chavePublica: string;
+  /** Sessão de admin: o passo e o motivo da falha aparecem embaixo da frase (item 0d). */
+  ehAdmin?: boolean;
 };
 
 /**
@@ -33,12 +35,13 @@ type Props = {
  * navegador (em resposta ao toque), registra o service worker, inscreve o aparelho e manda a inscrição ao servidor. Nunca fora do aplicativo instalado
  * (no iPhone a permissão só existe lá) e nunca sem toque. "Agora não" adia sete dias no servidor, em qualquer aparelho da pessoa.
  */
-export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
+export function PedidoDeAviso({ podeAparecer, chavePublica, ehAdmin = false }: Props) {
   const [sistema, setSistema] = useState<SistemaDoAparelho>("outro");
   const [elegivel, setElegivel] = useState(false);
   const [aberto, setAberto] = useState(false);
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [motivo, setMotivo] = useState<{ etapa: string; texto: string } | null>(null);
   const [dispensado, setDispensado] = useState(dispensadoNestaVisita);
   /** Fechar depois de ligar o aviso não é "agora não": não grava os sete dias, mas passa pelo mesmo caminho (que também desfaz a entrada do histórico). */
   const ligouAgora = useRef(false);
@@ -66,9 +69,17 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
 
   const { fechar } = useFolhaNoHistorico(aberto, adiar);
 
+  /** Mostra a frase de sempre e, para o admin, o passo e o motivo; o log do servidor guarda os dois (sem endereço nem chave). */
+  function falhou(etapa: string, texto: string) {
+    setErro(t.erro);
+    setMotivo({ etapa, texto });
+    void registrarFalhaDePushAction(texto, etapa, sistema).catch(() => undefined);
+  }
+
   async function quero() {
     setOcupado(true);
     setErro(null);
+    setMotivo(null);
     try {
       const resultado = await ligarAviso(chavePublica);
       if (resultado.tipo === "negado") {
@@ -76,18 +87,22 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
         fechar();
         return;
       }
-      if (resultado.tipo === "erro" || !(await registrarInscricaoPushAction(resultado.inscricao, sistema))) {
+      if (resultado.tipo === "erro") {
+        falhou(resultado.etapa, resultado.motivo);
+        return;
+      }
+      if (!(await registrarInscricaoPushAction(resultado.inscricao, sistema))) {
         // O servidor não guardou: tira a inscrição do navegador também (a permissão ficou dada, e o pedido não voltaria a aparecer).
-        if (resultado.tipo === "ligado") await desligarAviso().catch(() => null);
-        setErro(t.erro);
+        await desligarAviso().catch(() => null);
+        falhou("servidor", "o servidor recusou a inscrição");
         return;
       }
       // A inscrição que o navegador tinha (a que foi trocada) sai do servidor: sem isto ela ficava órfã até o primeiro 404 ou 410 de um envio.
       if (resultado.endpointAntigo && resultado.endpointAntigo !== resultado.inscricao.endpoint) void apagarInscricaoPushAction(resultado.endpointAntigo).catch(() => undefined);
       ligouAgora.current = true;
       fechar();
-    } catch {
-      setErro(t.erro);
+    } catch (erro) {
+      falhou("servidor", descreverErro(erro));
     } finally {
       setOcupado(false);
     }
@@ -114,6 +129,7 @@ export function PedidoDeAviso({ podeAparecer, chavePublica }: Props) {
         {erro ? (
           <p className={styles.erro} role="alert">
             {erro}
+            {ehAdmin && motivo ? <span className={styles.motivo}>{textosPush.motivoDoErro(motivo.etapa, motivo.texto)}</span> : null}
           </p>
         ) : null}
       </div>

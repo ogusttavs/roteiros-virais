@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 import { textosComuns } from "@/textos/comuns";
+import { useFolhaAnimada } from "@/ui/useFolhaAnimada";
 import { usePuxarParaFechar } from "@/ui/usePuxarParaFechar";
 
 import styles from "./Folha.module.css";
@@ -45,6 +46,8 @@ type Props = {
  */
 export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, children }: Props) {
   const { folhaRef, alca } = usePuxarParaFechar(aoFechar);
+  const { montada, saindo } = useFolhaAnimada(aberto);
+  const tituloRef = useRef<HTMLHeadingElement>(null);
 
   // O ouvinte do Escape lê o `aoFechar` mais recente por uma ref: quem passa uma função nova a cada
   // renderização não faz o efeito rodar de novo, o que devolveria o foco à folha toda vez (mesmo padrão do
@@ -56,19 +59,45 @@ export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, childre
 
   useEffect(() => {
     if (!aberto) return;
+    // Passo 16, capítulo 4: o foco vai ao título ao abrir, fica preso na folha e volta ao botão que abriu. Celular nunca abre o teclado sozinho (o título não é um campo).
+    const quemAbriu = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     function aoTeclar(evento: KeyboardEvent) {
-      if (evento.key === "Escape") aoFecharRef.current();
+      if (evento.key === "Escape") {
+        aoFecharRef.current();
+        return;
+      }
+      if (evento.key !== "Tab" || !folhaRef.current) return;
+      const alvos = Array.from(
+        folhaRef.current.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+      ).filter((alvo) => alvo.offsetParent !== null || alvo === document.activeElement);
+      if (alvos.length === 0) return;
+      const primeiro = alvos[0];
+      const ultimo = alvos[alvos.length - 1];
+      const atual = document.activeElement;
+      if (evento.shiftKey && (atual === primeiro || atual === folhaRef.current || atual === tituloRef.current)) {
+        evento.preventDefault();
+        ultimo.focus();
+      } else if (!evento.shiftKey && atual === ultimo) {
+        evento.preventDefault();
+        primeiro.focus();
+      } else if (!folhaRef.current.contains(atual)) {
+        evento.preventDefault();
+        primeiro.focus();
+      }
     }
     document.addEventListener("keydown", aoTeclar);
-    folhaRef.current?.focus();
-    return () => document.removeEventListener("keydown", aoTeclar);
+    (tituloRef.current ?? folhaRef.current)?.focus();
+    return () => {
+      document.removeEventListener("keydown", aoTeclar);
+      if (quemAbriu?.isConnected) quemAbriu.focus({ preventScroll: true });
+    };
   }, [aberto, folhaRef]);
 
-  if (!aberto) return null;
+  if (!montada) return null;
 
   return createPortal(
     <>
-      <div className={styles.folhaFundo} data-folha-aberta="" aria-hidden="true" onClick={aoFechar} />
+      <div className={[styles.folhaFundo, saindo ? styles.saindo : ""].filter(Boolean).join(" ")} data-folha-aberta="" data-veu="" aria-hidden="true" onClick={aoFechar} />
       <div
         ref={folhaRef}
         role="dialog"
@@ -76,7 +105,8 @@ export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, childre
         aria-label={titulo}
         tabIndex={-1}
         data-folha-aberta=""
-        className={[styles.folha, largo ? styles.folhaLarga : ""].filter(Boolean).join(" ")}
+        data-saindo={saindo ? "" : undefined}
+        className={[styles.folha, largo ? styles.folhaLarga : "", saindo ? styles.saindo : ""].filter(Boolean).join(" ")}
       >
         <button type="button" className={styles.folhaFechar} onClick={aoFechar} aria-label={textosComuns.fechar}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -86,7 +116,9 @@ export function Folha({ titulo, aberto, aoFechar, rodape, largo = false, childre
         </button>
         <div className={styles.folhaTopo} {...alca}>
           <span className={styles.folhaAlca} aria-hidden="true" />
-          <h3 className={styles.folhaTitulo}>{titulo}</h3>
+          <h3 ref={tituloRef} tabIndex={-1} className={styles.folhaTitulo}>
+            {titulo}
+          </h3>
         </div>
         <div className={styles.folhaCorpo}>{children}</div>
         {rodape ? <div className={styles.folhaPe}>{rodape}</div> : null}

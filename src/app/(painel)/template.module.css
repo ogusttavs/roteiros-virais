@@ -1,0 +1,44 @@
+/*
+ * A tela que chega (`template.tsx`, passo 16 do Opus, capítulo 3). Só `opacity`, de propósito: um `transform` no embrulho da tela, mesmo por 360 ms, vira o bloco
+ * contenedor dos elementos `position: fixed` de dentro dela (a barra de ações do roteiro, os painéis) e os faz saltar. O deslizar de verdade (da direita, com a tela de
+ * baixo recuando) pede a API de transição de view, que o roteador do Next 15 ainda não chama; os tempos de cada sentido (180, 360 e 280 ms) já são os do desenho.
+ */
+.troca {
+  animation: tela-esmaece var(--duracao-troca) var(--curva-padrao) backwards;
+}
+
+.entra {
+  animation: tela-entra var(--duracao-tela) var(--curva-mola-suave) backwards;
+}
+
+.volta {
+  animation: tela-volta var(--duracao-tela-volta) var(--curva-saida) backwards;
+}
+
+@keyframes tela-esmaece {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tela-entra {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes tela-volta {
+  from {
+    opacity: 0;
+  }
+}
+
+/* "Reduzir movimento": nada anda pelo espaço, só o esmaecer curto (150 ms nos tokens). */
+@media (prefers-reduced-motion: reduce) {
+  .entra,
+  .volta {
+    animation-name: tela-esmaece;
+    animation-duration: 150ms;
+    animation-timing-function: var(--curva-padrao);
+  }
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
+import { useNotaContada } from "@/ui/useNotaContada";
 
 import styles from "./BarraNotaGeral.module.css";
 import { faixaMeta } from "./notaFaixaMeta";
@@ -63,6 +64,7 @@ export function BarraNotaGeral({
   const gatilhoRef = useRef<HTMLButtonElement>(null);
   const folhaRef = useRef<HTMLDivElement>(null);
   const atingiu = notaAtual >= meta;
+  const notaMostrada = useNotaContada(notaAtual);
 
   /**
    * Fecha ao rolar a pagina de tras (brief-frontend.md 6.2, "Ajuste de
@@ -142,7 +144,7 @@ export function BarraNotaGeral({
           <span>
             {rotuloNotaAtual}{" "}
             <strong className={[styles.numeroResumo, atingiu ? styles.atingiu : ""].filter(Boolean).join(" ")}>
-              {formatarNota(notaAtual)}
+              {formatarNota(notaMostrada)}
             </strong>
           </span>
           <span className={styles.metaResumo}>{rotuloMeta}</span>
@@ -164,7 +166,7 @@ export function BarraNotaGeral({
           >
             <div className={styles.cabecalhoFolha}>
               <span className={[styles.numeroFolha, atingiu ? styles.atingiu : ""].filter(Boolean).join(" ")}>
-                {formatarNota(notaAtual)}
+                {formatarNota(notaMostrada)}
               </span>
               <span className={styles.metaResumo}>{rotuloMeta}</span>
             </div>
@@ -177,7 +179,7 @@ export function BarraNotaGeral({
         <span className={styles.rotuloCartao}>{rotuloNotaAtual}</span>
         <div className={styles.cabecalhoFolha}>
           <span className={[styles.numeroFolha, atingiu ? styles.atingiu : ""].filter(Boolean).join(" ")}>
-            {formatarNota(notaAtual)}
+            {formatarNota(notaMostrada)}
           </span>
           <span className={styles.metaResumo}>{rotuloMeta}</span>
         </div>

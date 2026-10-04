@@ -11,6 +11,8 @@
 export const textosComuns = {
   exemplo: "Exemplo",
   voltar: "Voltar",
+  /** Passo 16, capítulo 5: aos 8 segundos de esqueleto, uma linha embaixo dele; nunca erro antes de erro. */
+  demorandoMaisQueNormal: "Está demorando mais que o normal",
   tentarDeNovo: "Tentar de novo",
   /** Repetido em mais de uma lista do admin ate a etapa 12 (limpeza da decisao 9). */
   erroCarregarLista: "Não conseguimos carregar a lista agora; tente de novo em um minuto",

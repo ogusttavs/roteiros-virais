@@ -1,6 +1,7 @@
 "use server";
 
 import type { SistemaInstalado } from "@/db/schema";
+import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 import { adiarPedidoDePush, apagarInscricaoDaPessoa, ErroInscricaoPush, registrarInscricaoPush } from "@/servicos/push";
@@ -52,4 +53,15 @@ export async function adiarPedidoDePushAction(): Promise<void> {
   const sessao = await sessaoAtual();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   await adiarPedidoDePush(sessao.user.id);
+}
+
+/**
+ * O aparelho não conseguiu ligar o aviso (item 0d): só grava no log, no nível de aviso, com o id da pessoa, o passo em que falhou e o motivo do navegador.
+ * Nunca o endereço da inscrição nem uma chave. Não lança: quem chama já está mostrando o erro.
+ */
+export async function registrarFalhaDePushAction(motivo: unknown, etapa: unknown, sistema: unknown): Promise<void> {
+  const sessao = await sessaoAtual();
+  if (!sessao) return;
+  const limpo = (valor: unknown, tamanho: number) => (typeof valor === "string" ? valor.replace(/[\r\n]+/g, " ").slice(0, tamanho) : "?");
+  logger.warn({ usuarioId: sessao.user.id, etapa: limpo(etapa, 20), sistema: limpo(sistema, 20), motivo: limpo(motivo, 300) }, "push: o aparelho nao conseguiu ligar o aviso");
 }

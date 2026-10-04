@@ -12,6 +12,7 @@ import { textosNav } from "@/textos/nav";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
 
 import { SeletorMarcaCelular, type MarcaResumo } from "../../_casca/SeletorMarcaCelular";
 import { useTrocaMarca } from "../../_casca/TrocaMarcaContext";
@@ -377,6 +378,7 @@ export function HojeTela({
   const [ocupado, iniciarTransicao] = useTransition();
   const [acao, setAcao] = useState<string | null>(null);
   const atualizando = ocupado && acao === "atualizar";
+  const emDia = useJaEstavaEmDia(atualizando);
   const { arquivar: arquivarComDesfazer, toast: toastArquivar } = useDesfazerArquivar();
 
   function ir(chave: string, destino: string) {
@@ -467,7 +469,7 @@ export function HojeTela({
               onClick={atualizar}
             >
               <RefreshCw size={18} strokeWidth={1.75} aria-hidden="true" className={atualizando ? styles.girando : undefined} />
-              {marcas.length <= 1 ? <span>{textosHoje.atualizar}</span> : null}
+              {marcas.length <= 1 || emDia ? <span aria-live="polite">{emDia ? textosNav.jaEstavaEmDia : textosHoje.atualizar}</span> : null}
             </button>
           </>
         }
@@ -539,7 +541,7 @@ export function HojeTela({
                 </button>
               </div>
             </div>
-            <div className={styles.diasAgenda} role="group" aria-label="Os dias da semana">
+            <div className={styles.diasAgenda} role="group" aria-label="Os próximos 7 dias">
               {semana.map((dia) => (
                 <button
                   key={dia.data}
@@ -663,7 +665,7 @@ export function HojeTela({
                             <li key={item.id} className={styles.linhaComMenu}>
                               <button
                                 type="button"
-                                className={styles.itemAgenda}
+                                className={`${styles.itemAgenda} cartao-toque`}
                                 aria-busy={acao === `item-${item.id}` || undefined}
                                 onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                               >
@@ -693,7 +695,7 @@ export function HojeTela({
                         <li key={item.id} className={styles.linhaComMenu}>
                           <button
                             type="button"
-                            className={styles.itemAgenda}
+                            className={`${styles.itemAgenda} cartao-toque`}
                             aria-busy={acao === `item-${item.id}` || undefined}
                             onClick={() => ir(`item-${item.id}`, `/roteiros/${item.id}`)}
                           >

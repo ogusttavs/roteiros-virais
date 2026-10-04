@@ -151,3 +151,86 @@
     right: var(--espaco-10);
   }
 }
+
+/*
+ * Passo 16 do Opus, capítulo 4: o mesmo movimento das folhas (`Folha.module.css`). No celular sobe na mola e desce com a curva de entrada, acompanhando o dedo
+ * (`--arrasto`); do tablet para cima, o painel ancorado só esmaece e cresce de 96%. Com "reduzir movimento" só esmaece.
+ */
+.painel,
+.painelComRodape {
+  transform: translateY(var(--arrasto, 0px));
+  animation: painel-sobe var(--duracao-folha) var(--curva-mola) backwards;
+}
+.veu {
+  animation: veu-aparece var(--duracao-lista) var(--curva-padrao) backwards;
+}
+.painel.saindo,
+.painelComRodape.saindo {
+  pointer-events: none;
+  animation: painel-desce var(--duracao-folha-sai) var(--curva-entrada) both;
+}
+.veu.saindo {
+  pointer-events: none;
+  animation: veu-some var(--duracao-folha-sai) var(--curva-entrada) both;
+}
+@keyframes painel-sobe {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes painel-desce {
+  from {
+    transform: translateY(var(--arrasto, 0px));
+  }
+  to {
+    transform: translateY(110%);
+  }
+}
+@keyframes veu-aparece {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes veu-some {
+  from {
+    opacity: var(--opacidade-veu, 1);
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes painel-aparece {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes painel-some {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@media (min-width: 768px) {
+  .painel,
+  .painelComRodape {
+    transform: none;
+    animation-name: painel-aparece;
+    animation-timing-function: var(--curva-padrao);
+    animation-duration: var(--duracao-troca);
+  }
+  .painel.saindo,
+  .painelComRodape.saindo {
+    animation-name: painel-some;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .painel,
+  .painelComRodape {
+    animation-name: veu-aparece;
+  }
+  .painel.saindo,
+  .painelComRodape.saindo {
+    animation-name: veu-some;
+  }
+}

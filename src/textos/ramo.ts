@@ -3,7 +3,7 @@
  * ramo na lista. O que a pessoa lê, em língua de gente: sempre "ramo", nunca "setor", "nicho" nem "catálogo".
  */
 export const textosRamo = {
-  placeholder: "Digite uma palavra ou uma letra do seu ramo",
+  placeholder: "Dentista, academia, pet shop",
   /** O nome acessível da lista de resultados. */
   rotuloLista: "Ramos",
   /** Falado a quem usa leitor de tela, a cada tecla. */
@@ -11,9 +11,21 @@ export const textosRamo = {
   nenhum: "Nenhum ramo encontrado.",
   escolhido: (nome: string) => `${nome} escolhido.`,
   /** Sem resultado: o que a pessoa digitou, de volta, para ela ver o que não casou. */
-  semResultado: (texto: string) => `Nenhum ramo começa com “${texto}”.`,
+  semResultado: (texto: string) => `Nenhum ramo com “${texto}”.`,
+  /** Passo 16 (dúvida 8): depois do "Nenhum ramo com ...", a saída, quando a tela oferece o "Não achei o meu". */
+  semResultadoSaida: "Escolha abaixo e escreva do seu jeito; a gente confere.",
   /** A linha de baixo do "Não achei o meu": o que acontece ao escolhê-la. */
-  naoAcheiAjuda: "Escreva o seu ramo com as suas palavras.",
+  naoAcheiAjuda: "Escrever o meu ramo com as minhas palavras.",
+  /** O campo vazio (passo 16): em vez de abrir os 44 ramos, a dica e a porta para a lista inteira. */
+  dica: "Escreva o que você faz, com as suas palavras.",
+  verALista: "Ver a lista de ramos",
+  /** A folha com os ramos todos. */
+  tituloFolha: "Os ramos",
+  buscarUmRamo: "Buscar um ramo",
+  apagarBusca: "Apagar a busca",
+  /** O ramo escolhido: o botão que volta a abrir a busca (o nome acessível é a frase inteira). */
+  trocar: "Trocar",
+  trocarORamo: "Trocar o ramo",
   /** Lido pelo leitor de tela dentro da opção do ramo que a marca já tem. */
   ramoAtual: "o ramo de hoje",
   /**

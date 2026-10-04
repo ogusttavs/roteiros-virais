@@ -1,0 +1,17 @@
+/*
+ * Passo 16, capítulo 5: aos 8 segundos de espera, uma linha embaixo do esqueleto ("Está demorando mais que o normal"). O componente (`FraseDemora.tsx`) só
+ * a monta quando o tempo chega, e ela esmaece ao entrar.
+ */
+.frase {
+  margin: var(--espaco-4) 0 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+  text-align: center;
+  animation: frase-aparece var(--duracao-troca) var(--curva-padrao) backwards;
+}
+
+@keyframes frase-aparece {
+  from {
+    opacity: 0;
+  }
+}

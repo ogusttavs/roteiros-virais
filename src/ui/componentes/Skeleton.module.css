@@ -3,7 +3,17 @@
   border-radius: var(--raio-sm);
   background: linear-gradient(90deg, var(--cor-esqueleto-base), var(--cor-esqueleto-luz), var(--cor-esqueleto-base));
   background-size: 200% 100%;
-  animation: brilho var(--duracao-skeleton) linear infinite;
+  /* Passo 16, capítulo 5: nos primeiros 300 ms não aparece nada (a tela de antes ou o toque apertado seguram a vista); depois esmaece em 150 ms e o brilho
+     passa devagar (1,6 s). Quase toda espera some antes disso e não pisca esqueleto nenhum. */
+  animation:
+    esqueleto-aparece var(--duracao-rapida) var(--curva-padrao) var(--espera-esqueleto) both,
+    brilho var(--duracao-brilho) linear var(--espera-esqueleto) infinite;
+}
+
+@keyframes esqueleto-aparece {
+  from {
+    opacity: 0;
+  }
 }
 
 .titulo {
@@ -35,7 +45,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton {
-    animation: none;
+    animation: esqueleto-aparece var(--duracao-rapida) var(--curva-padrao) var(--espera-esqueleto) both;
     background: var(--cor-esqueleto-base);
   }
 }

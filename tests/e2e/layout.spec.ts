@@ -104,6 +104,10 @@ async function entrar(page: Page) {
  */
 async function conferirLayout(page: Page) {
   await page.waitForLoadState("networkidle");
+  // Passo 16: as folhas e as telas agora chegam animadas (440 ms na mola); mede-se depois que a animação acaba, nunca no meio dela. As infinitas (o brilho do esqueleto) ficam de fora.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity),
+  );
 
   const semRolagemHorizontal = await page.evaluate(
     () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
@@ -199,11 +203,15 @@ async function conferirFolhaFecha(
   if (arrasta) {
     await abrir();
     await expect(dialogo).toBeVisible();
+    // A folha sobe na mola (440 ms): a caixa só vale depois que ela assentou.
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
     const caixa = (await dialogo.boundingBox())!;
     const x = caixa.x + caixa.width / 2;
     await page.mouse.move(x, caixa.y + 14);
     await page.mouse.down();
-    for (let passo = 1; passo <= 8; passo++) await page.mouse.move(x, caixa.y + 14 + passo * 25);
+    // Passo 16: a folha fecha ao passar de 30% da altura dela (ou rápido); arrasta 45% da altura para cruzar o limite com folga.
+    const descida = Math.max(200, caixa.height * 0.45);
+    for (let passo = 1; passo <= 8; passo++) await page.mouse.move(x, caixa.y + 14 + (passo * descida) / 8);
     await page.mouse.up();
     await expect(dialogo).toBeHidden();
     expect(page.url()).toBe(urlAntes);

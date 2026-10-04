@@ -7,6 +7,7 @@ import { useTransition } from "react";
 import { textosNav } from "@/textos/nav";
 import { useConexao } from "@/ui/ConexaoContext";
 import { Simbolo } from "@/ui/Logo";
+import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
 
 import styles from "./CabecalhoCelular.module.css";
 import { SeletorMarcaCelular, type MarcaResumo } from "./SeletorMarcaCelular";
@@ -36,6 +37,7 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
   const router = useRouter();
   const { avisarFalhaDeRede } = useConexao();
   const [atualizando, iniciarAtualizacao] = useTransition();
+  const emDia = useJaEstavaEmDia(atualizando);
 
   function atualizar() {
     if (!navigator.onLine) {
@@ -72,7 +74,9 @@ export function CabecalhoCelular({ nomeProduto, marcaAtiva, marcas, nomePessoa }
             aria-hidden="true"
             className={atualizando ? styles.girando : undefined}
           />
-          <span className={styles.cede}>{textosNav.atualizar}</span>
+          <span className={styles.cede} aria-live="polite">
+            {emDia ? textosNav.jaEstavaEmDia : textosNav.atualizar}
+          </span>
         </button>
       </div>
     </header>

@@ -356,3 +356,22 @@
   font-weight: var(--peso-medio);
   font-size: var(--tamanho-secundario);
 }
+
+/*
+ * Passo 16, capítulo 5: a lista que chegou. Cada cartão esmaece e sobe meio rem, 30 ms depois do anterior, só os seis primeiros (o resto chega junto com o
+ * sexto). Sem "reduzir movimento" o deslocamento some (`--desloca-lista: 0` em `tokens.css`) e fica só o esmaecer.
+ */
+.grade > * {
+  animation: itemChega var(--duracao-lista) var(--curva-saida) backwards;
+}
+.grade > :nth-child(2) { animation-delay: calc(1 * var(--atraso-lista)); }
+.grade > :nth-child(3) { animation-delay: calc(2 * var(--atraso-lista)); }
+.grade > :nth-child(4) { animation-delay: calc(3 * var(--atraso-lista)); }
+.grade > :nth-child(5) { animation-delay: calc(4 * var(--atraso-lista)); }
+.grade > :nth-child(n + 6) { animation-delay: calc(5 * var(--atraso-lista)); }
+@keyframes itemChega {
+  from {
+    opacity: 0;
+    transform: translateY(var(--desloca-lista));
+  }
+}

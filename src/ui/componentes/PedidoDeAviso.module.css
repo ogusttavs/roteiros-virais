@@ -18,3 +18,12 @@
   color: var(--cor-erro);
   font-size: var(--tamanho-secundario);
 }
+
+/* Só para o admin (item 0d): o passo e o motivo que o navegador deu, em letra de código, embaixo da frase. */
+.motivo {
+  display: block;
+  margin-top: var(--espaco-2);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  overflow-wrap: anywhere;
+}
