@@ -15,6 +15,14 @@ import {
 } from "@/ia/enums";
 import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
+import {
+  apagarRascunhoDoMomento,
+  armazenamentoDaSessao,
+  chaveDoRascunhoDoMomento,
+  gravarRascunhoDoMomento,
+  lerRascunhoDoMomento,
+  rascunhoEstaVazio,
+} from "@/lib/rascunho-momento";
 import { textosMomento } from "@/textos/momento";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
@@ -45,6 +53,11 @@ export type ValoresIniciaisMomento = {
   marcaId: number | null;
   /** E40, item 2: "o que este vídeo precisa comunicar?", quando o dia do plano já trouxe um. */
   objetivoDoVideo?: string | null;
+  /** O momento que volta preenchido: quando a pessoa reescreve o que contou, a folha abre com tudo o que ela tinha escolhido (o estilo, a ficha, quem aparece, a fala inteira). */
+  estilo?: EstiloRoteiro;
+  ficha?: Ficha | null;
+  quemAparece?: QuemGrava | null;
+  transcricao?: string | null;
 };
 
 type Props = {
@@ -78,6 +91,11 @@ type Props = {
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio que não
    * é hoje; ignorado quando `planoItemId` existe (o dia do item do plano manda). */
   dataInicial?: string;
+  /**
+   * O rascunho do momento: a marca ativa. Presente, e sem `valoresIniciais` nem `planoItemId` (aí o que manda é o dia do plano ou o momento guardado), o que a pessoa escreve fica
+   * no aparelho (sessionStorage, por marca) até gerar o roteiro ou limpar.
+   */
+  marcaAtivaId?: number;
 };
 
 /**
@@ -99,6 +117,7 @@ export function FolhaGravarAgora({
   tipo,
   quemGravaPadrao,
   dataInicial,
+  marcaAtivaId,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -106,15 +125,19 @@ export function FolhaGravarAgora({
   // V12c, item 3: pessoa tem "quem aparece" fixo; o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
 
-  const [transcricao, setTranscricao] = useState<string | null>(null);
+  // O rascunho só vale para "Contar o momento" puro: vindo de um item do plano ou de um momento guardado, os valores iniciais mandam.
+  const chaveRascunho = marcaAtivaId !== undefined && valoresIniciais === undefined && planoItemId === undefined ? chaveDoRascunhoDoMomento(marcaAtivaId) : null;
+  const [rascunhoInicial] = useState(() => (chaveRascunho ? lerRascunhoDoMomento(armazenamentoDaSessao(), chaveRascunho) : null));
 
-  const [onde, setOnde] = useState(valoresIniciais?.onde ?? "");
-  const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? "");
-  const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? "");
+  const [transcricao, setTranscricao] = useState<string | null>(valoresIniciais?.transcricao ?? rascunhoInicial?.transcricao ?? null);
+
+  const [onde, setOnde] = useState(valoresIniciais?.onde ?? rascunhoInicial?.onde ?? "");
+  const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? rascunhoInicial?.oQueEstaAcontecendo ?? "");
+  const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? rascunhoInicial?.oQueDaParaMostrar ?? "");
   // E49 PR 1 (passo 18b): o formato vem ANTES da pergunta; no Reels, as cinco fichas em chips só pelo nome, a recomendada marcada; no Story, nenhuma pergunta.
   const objetivoInicial = valoresIniciais?.objetivo ?? objetivoRecomendado;
   const fichaRecomendada: Ficha | null = objetivoRecomendado ? fichaPadraoDoObjetivo(objetivoRecomendado) : null;
-  const [ficha, setFicha] = useState<Ficha | null>(objetivoInicial ? fichaPadraoDoObjetivo(objetivoInicial) : null);
+  const [ficha, setFicha] = useState<Ficha | null>(valoresIniciais?.ficha !== undefined ? valoresIniciais.ficha : objetivoInicial ? fichaPadraoDoObjetivo(objetivoInicial) : null);
   // Vindo de um item do plano, o formato começa no que `planejarDia` já sugeriu; senão, o da porta que abriu a folha, ou Reels.
   const [formato, setFormato] = useState<FormatoRoteiro>(valoresIniciais?.formato ?? formatoInicial ?? "reels");
   /**
@@ -122,14 +145,14 @@ export function FolhaGravarAgora({
    * nunca busca evidência no banco, `gerarRoteiro` pula essa busca de propósito para esta origem);
    * começa em "falado" e a pessoa troca se quiser.
    */
-  const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
+  const [estilo, setEstilo] = useState<EstiloRoteiro>(valoresIniciais?.estilo ?? "falado");
   // A pergunta das fichas só existe no Reels falado: o Story não pergunta e o sem fala segue o roteiro de cenas. Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
   const perguntaDasFichas = formato === "reels" && estilo === "falado";
   const objetivo: Objetivo | null = formato === "story" ? OBJETIVO_DO_STORY : !perguntaDasFichas ? OBJETIVO_DO_SEM_FALA : ficha ? objetivoDaFicha(ficha) : null;
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
-  const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? "");
+  const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? rascunhoInicial?.objetivoDoVideo ?? "");
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
-  const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
+  const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(valoresIniciais?.quemAparece ?? quemGravaPadrao ?? "");
   /**
    * E39a: "para quando é?" só aparece vindo de "Contar o momento" (`planoItemId` ausente); vindo
    * de um item do plano o dia já é o do próprio item (dúvida 10, "cada dia já vem com a data").
@@ -152,6 +175,22 @@ export function FolhaGravarAgora({
    * `escrever()` precisa ler o valor mais recente mesmo depois do componente sair da tela.
    */
   const saiuRef = useRef(false);
+
+  // O que a pessoa escreve fica no aparelho até gerar o roteiro ou limpar (sessionStorage, por marca); campos vazios apagam a chave.
+  useEffect(() => {
+    if (!chaveRascunho) return;
+    gravarRascunhoDoMomento(armazenamentoDaSessao(), chaveRascunho, { onde, oQueEstaAcontecendo, oQueDaParaMostrar, objetivoDoVideo, transcricao });
+  }, [chaveRascunho, onde, oQueEstaAcontecendo, oQueDaParaMostrar, objetivoDoVideo, transcricao]);
+
+  function limparRascunho() {
+    setOnde("");
+    setOQueEstaAcontecendo("");
+    setOQueDaParaMostrar("");
+    setObjetivoDoVideo("");
+    setTranscricao(null);
+    setCamposFaltando(false);
+    if (chaveRascunho) apagarRascunhoDoMomento(armazenamentoDaSessao(), chaveRascunho);
+  }
 
   const {
     fase: faseAudio,
@@ -230,6 +269,8 @@ export function FolhaGravarAgora({
         setErroEnvio(resultado.erro);
         return;
       }
+      // O roteiro já está gravado: o rascunho cumpriu o que era (gerar ou limpar).
+      if (chaveRascunho) apagarRascunhoDoMomento(armazenamentoDaSessao(), chaveRascunho);
       fecharENavegar(() => router.replace(`/roteiros/${resultado.dado.id}`));
     } catch (falha) {
       if (saiuRef.current) return;
@@ -244,6 +285,7 @@ export function FolhaGravarAgora({
           if (saiuRef.current) return;
           if (recuperado) {
             avisarRedeOk();
+            if (chaveRascunho) apagarRascunhoDoMomento(armazenamentoDaSessao(), chaveRascunho);
             fecharENavegar(() => router.replace(`/roteiros/${recuperado.id}`));
             return;
           }
@@ -312,6 +354,12 @@ export function FolhaGravarAgora({
         ) : null}
 
         <div className={styles.divisor}>{textosMomento.ouEscreva}</div>
+
+        {chaveRascunho && !rascunhoEstaVazio({ onde, oQueEstaAcontecendo, oQueDaParaMostrar, objetivoDoVideo }) ? (
+          <button type="button" className={styles.limparRascunho} onClick={limparRascunho}>
+            {textosMomento.limparRascunho}
+          </button>
+        ) : null}
 
         <AreaTexto
           rotulo={textosMomento.rotuloOnde}

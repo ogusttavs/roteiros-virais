@@ -64,6 +64,7 @@ export default async function TemaLivre({ searchParams }: Props) {
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
       noticia={noticia}
+      marcaAtivaId={cliente.id}
     />
   );
 }

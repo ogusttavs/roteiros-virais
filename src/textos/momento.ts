@@ -25,6 +25,8 @@ export const textosMomento = {
   falarDe: "Falar de outra marca sua também?",
   falarDeAjuda: "Se este vídeo também vai citar outra marca sua, escolha aqui. A marca do vídeo continua sendo a que está aberta.",
   falarDeNenhuma: "Nenhuma",
+  /** O momento que volta preenchido: apaga o que ficou escrito (e guardado no aparelho). */
+  limparRascunho: "Limpar o que escrevi",
   campoVazio: "conte onde você está, o que está acontecendo e o que dá para mostrar",
   escreverRoteiro: "Escrever o roteiro",
   escrevendo: "Escrevendo",

@@ -83,6 +83,8 @@ type Props = {
   dataInicial?: string;
   /** E43: presente quando a tela abriu a partir de "Criar vídeo com esta notícia", em `/noticias`. */
   noticia?: NoticiaOrigem;
+  /** O rascunho do momento é por marca (a folha "Gravar agora" guarda o que a pessoa escreveu no aparelho). */
+  marcaAtivaId?: number;
 };
 
 /**
@@ -101,6 +103,7 @@ export function TemaLivreTela({
   quemGravaPadrao,
   dataInicial,
   noticia,
+  marcaAtivaId,
 }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
@@ -476,6 +479,7 @@ export function TemaLivreTela({
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
           dataInicial={dataInicial}
+          marcaAtivaId={marcaAtivaId}
         />
       ) : null}
     </div>

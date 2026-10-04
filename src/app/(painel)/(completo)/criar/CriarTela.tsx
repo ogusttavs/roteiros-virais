@@ -44,6 +44,8 @@ type Props = {
   itemPlanoInicial?: ItemPlano | null;
   /** A2, item 7: veio do atalho "Criar um Story para hoje" de Hoje (`?formato=story`): abre "Gravar agora" já em Story, com o dia que veio em `dataInicial`. */
   abrirEmStory?: boolean;
+  /** O momento que volta preenchido (`?momento=<roteiro>`): abre "Gravar agora" com o que a pessoa tinha contado, editável. */
+  momentoInicial?: ValoresIniciaisMomento | null;
 };
 
 /**
@@ -65,6 +67,7 @@ export function CriarTela({
   dataInicial,
   itemPlanoInicial,
   abrirEmStory = false,
+  momentoInicial = null,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -126,6 +129,11 @@ export function CriarTela({
   useEffect(() => {
     if (abrirEmStory && !itemPlanoInicial) setFolhaMomentoAberta(true);
   }, [abrirEmStory, itemPlanoInicial]);
+
+  /** O momento que volta preenchido: vindo de "Reescrever o que contei" (`?momento=`), a folha abre sozinha, uma vez, com o texto guardado. */
+  useEffect(() => {
+    if (momentoInicial && !itemPlanoInicial) setFolhaMomentoAberta(true);
+  }, [momentoInicial, itemPlanoInicial]);
 
   async function pularItemDoPlano(item: ItemPlano) {
     if (pulandoId !== null) return;
@@ -292,6 +300,7 @@ export function CriarTela({
           marcas={outrasMarcas}
           planoItemId={itemPlanoParaFolha?.id}
           dataInicial={itemPlanoParaFolha ? undefined : dataInicial}
+          marcaAtivaId={marcaAtiva.id}
           formatoInicial={abrirEmStory ? "story" : undefined}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
@@ -305,7 +314,7 @@ export function CriarTela({
                   formato: itemPlanoParaFolha.formato,
                   marcaId: itemPlanoParaFolha.marcaId,
                 } satisfies ValoresIniciaisMomento)
-              : undefined
+              : (momentoInicial ?? undefined)
           }
         />
       ) : null}

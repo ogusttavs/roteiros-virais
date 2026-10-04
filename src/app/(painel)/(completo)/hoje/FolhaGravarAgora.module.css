@@ -154,3 +154,16 @@
   font-size: var(--tamanho-legenda);
   color: var(--cor-texto-suave);
 }
+
+/* O momento que volta preenchido: "Limpar o que escrevi", discreto, acima dos campos. */
+.limparRascunho {
+  align-self: flex-start;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  background: none;
+  color: var(--cor-acao);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  cursor: pointer;
+}
