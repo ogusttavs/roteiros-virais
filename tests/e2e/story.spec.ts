@@ -96,7 +96,7 @@ test.describe("V9c, Story como formato", () => {
     await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
   });
 
-  test("objetivo 'que te chamem para comprar' sugere Story, gera cartões com 'Por que assim', e o modo gravação mostra um cartão por vez", async ({
+  test("Story escolhido na folha gera cartões com 'Por que assim', e o modo gravação mostra um cartão por vez", async ({
     page,
   }) => {
     await entrar(page);
@@ -109,7 +109,8 @@ test.describe("V9c, Story como formato", () => {
     await folha.getByLabel("Onde você está").fill("na loja");
     await folha.getByLabel("O que está acontecendo").fill("terminando de secar um sofa");
     await folha.getByLabel("O que dá para mostrar").fill("o sofa limpo e seco");
-    await folha.getByRole("radio", { name: "Gente me chamar para comprar" }).click();
+    // E49 PR 1: o Story é uma escolha do formato, que vem antes da pergunta; no Story não há pergunta.
+    await folha.getByRole("tab", { name: "Story" }).click();
 
     const controleFormato = folha.getByRole("tablist", { name: "Formato" });
     await expect(controleFormato.getByRole("tab", { name: "Story" })).toHaveAttribute("aria-selected", "true");
@@ -140,7 +141,8 @@ test.describe("V9c, Story como formato", () => {
     await folha.getByLabel("Onde você está").fill("na loja");
     await folha.getByLabel("O que está acontecendo").fill("mostrando como tirar uma mancha nova");
     await folha.getByLabel("O que dá para mostrar").fill("o produto agindo na mancha");
-    await folha.getByRole("radio", { name: "Gente me chamar para comprar" }).click();
+    // E49 PR 1: o Story é uma escolha do formato, que vem antes da pergunta; no Story não há pergunta.
+    await folha.getByRole("tab", { name: "Story" }).click();
 
     const controleFormato = folha.getByRole("tablist", { name: "Formato" });
     await expect(controleFormato.getByRole("tab", { name: "Story" })).toHaveAttribute("aria-selected", "true");
@@ -164,7 +166,7 @@ test.describe("V9c, Story como formato", () => {
     await folha.getByLabel("Onde você está").fill("na loja");
     await folha.getByLabel("O que está acontecendo").fill("mostrando o antes e o depois");
     await folha.getByLabel("O que dá para mostrar").fill("o sofa manchado e depois limpo");
-    await folha.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     const controleFormato = folha.getByRole("tablist", { name: "Formato" });
     await expect(controleFormato.getByRole("tab", { name: "Reels" })).toHaveAttribute("aria-selected", "true");

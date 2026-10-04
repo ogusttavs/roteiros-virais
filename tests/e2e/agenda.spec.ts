@@ -194,7 +194,7 @@ test.describe("/hoje, a Agenda", () => {
       .click();
     await expect(page).toHaveURL(new RegExp(`/criar/objetivo\\?tema=0&data=${dia}$`));
 
-    await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
 
     // A pessoa tocou em "Criar roteiro" no dia outroDia: "para quando é" já nasce marcado nele,
     // sem precisar escolher a data de novo (decisão 5 do Fable no PR #90).
@@ -334,7 +334,7 @@ test.describe("/hoje, a Agenda", () => {
     await entrar(page, email);
 
     await page.goto("/criar/objetivo?tema=0");
-    await page.getByRole("radio", { name: "Mais gente me conhecer" }).click();
+    await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
     await page.getByRole("button", { name: "Amanhã", exact: true }).click();
     await expect(page.getByText("Ele vai ser escrito com o que está subindo hoje.")).toBeVisible();
 

@@ -260,7 +260,7 @@ test.describe("/noticias", () => {
     await page.getByRole("button", { name: "Escrever o roteiro" }).click();
 
     await expect(page).toHaveURL(/\/criar\/objetivo\?livre=.*noticiaId=\d+/);
-    await page.getByRole("radio", { name: /gente me chamar para comprar/i }).click();
+    await page.getByRole("radio", { name: /Que me chamem/ }).click();
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
