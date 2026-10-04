@@ -19,13 +19,21 @@ export const textosObjetivo = {
   /** E49 PR 1: o apoio abaixo da pergunta das cinco fichas. */
   apoio: "A resposta muda o texto inteiro, não só o final: o começo, o jeito de contar e o que você pede no fim. Dá para trocar depois.",
   /** E49 PR 1: por que a ficha recomendada, uma frase por ficha. */
-  porqueRecomendada: {
-    veja: "A gente recomenda pelo tema: um assunto em alta no seu ramo, com um começo forte, faz muita gente parar para ver.",
-    guardem: "A gente recomenda pelo tema: um erro com o jeito certo é coisa que as pessoas guardam para usar depois.",
-    mandem: "A gente recomenda pelo tema: é uma situação que a pessoa reconhece na hora e manda para quem precisa ver.",
-    comentem: "A gente recomenda pelo tema: é um assunto que divide opinião e faz muita gente querer responder.",
-    me_chamem: "A gente recomenda pelo tema: quem está quase decidindo precisa ver a prova de que funciona.",
+  recomendaPeloTema: "A gente recomenda pelo tema: ",
+  recomendaPeloHistorico: "A gente recomenda pelo que você tem postado: ",
+  razaoDaRecomendada: {
+    veja: "um assunto em alta no seu ramo, com um começo forte, faz muita gente parar para ver.",
+    guardem: "um erro com o jeito certo é coisa que as pessoas guardam para usar depois.",
+    mandem: "é uma situação que a pessoa reconhece na hora e manda para quem precisa ver.",
+    comentem: "é um assunto que divide opinião e faz muita gente querer responder.",
+    me_chamem: "quem está quase decidindo precisa ver a prova de que funciona.",
   },
+  /** E49 PR 1: os prefixos das linhas das fichas ("Por exemplo: ...", "Ajuda em: ..."). */
+  exemploPrefixo: "Por exemplo: ",
+  ajudaEmPrefixo: "Ajuda em: ",
+  /** E49 PR 1: no vídeo sem fala as fichas somem (a estrutura delas pressupõe fala), com a linha que diz por quê. */
+  semFalaTitulo: "No vídeo sem fala, a conversa é feita de cenas",
+  semFalaTexto: "O vídeo sem fala segue o roteiro de cenas: o que mostrar e o texto na tela. Por isso ele não pergunta para que é o vídeo.",
   /** E49 PR 1, o Story não pergunta: o título, o apoio e o cartão que explica por quê. */
   storyTitulo: "Antes de escrever o seu Story",
   storyApoio: "Só falta dizer quem aparece.",

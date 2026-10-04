@@ -183,9 +183,8 @@ test.describe("roteiro pela tela", () => {
 
     await expect(page).toHaveURL(/\/criar\/objetivo/);
     await page.getByRole("radio", { name: /Que me chamem/ }).click();
-    // V9c, item 1: esse objetivo sugere Story por padrao (R-IG-STORY-10); este teste cobre o
-    // fluxo classico de Reels (reprovar, versoes, PDF), Story tem o proprio em story.spec.ts.
-    await page.getByRole("tablist", { name: "Formato" }).getByRole("tab", { name: "Reels" }).click();
+    // Este teste cobre o fluxo classico de Reels (reprovar, versoes, PDF); Story tem o proprio em story.spec.ts.
+    // E49 PR 1: o formato nao vem mais do objetivo, Reels ja e o padrao.
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { textosObjetivo } from "@/textos/objetivo";
+
 import styles from "./OpcaoObjetivo.module.css";
 
 type Props = {
@@ -37,11 +39,14 @@ export function OpcaoObjetivo({ titulo, ajuda, exemplo, ajudaEm, marcada, recome
         {ajuda ? <span className={styles.ajuda}>{ajuda}</span> : null}
         {exemplo ? (
           <span className={styles.exemplo}>
-            <span className={styles.prefixo}>Por exemplo: </span>
+            <span className={styles.prefixo}>{textosObjetivo.exemploPrefixo}</span>
             {exemplo}
           </span>
         ) : null}
-        {ajudaEm ? <span className={styles.ajudaEm}>Ajuda em: {ajudaEm}</span> : null}
+        {ajudaEm ? <span className={styles.ajudaEm}>
+            {textosObjetivo.ajudaEmPrefixo}
+            {ajudaEm}
+          </span> : null}
       </span>
     </button>
   );

@@ -812,6 +812,25 @@ describe("gerarComVerificacao", () => {
     );
   });
 
+  it("a heurística da ficha 'guardem' vale só na primeira tentativa: a segunda, mesmo sem nada para guardar, é aceita", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "uma explicação corrida sem nada para usar depois" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "outra explicação simples e direta" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+    const resultado = await gerarComVerificacao({
+      ...parametrosBase,
+      entrada: "entrada original",
+      formato: "reels",
+      estilo: "falado",
+      ficha: "guardem",
+      extrairNarrativa: (d: { corpo: string }) => ({ gancho: "gancho", corpo: d.corpo, chamadaFinal: "guarda este vídeo" }),
+    });
+
+    expect(resultado.dados.corpo).toBe("outra explicação simples e direta");
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+  });
+
   it("sem lembreteFinal, a entrada segue exatamente como veio (comportamento de sempre)", async () => {
     gerarEstruturadoMock
       .mockResolvedValueOnce({ dados: { corpo: "texto limpo" }, modelo: "mock", ...usoZero })
@@ -932,7 +951,7 @@ describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
   });
 
   it("aprova passo numerado, lista com contagem, receita e passo a passo escrito", () => {
-    for (const corpo of ["1. separa o material 2. aplica 3. espera", "Três erros que quase todo mundo comete", "Anota a receita aqui", "Primeiro faz a base, depois a cobertura, por fim o acabamento"]) {
+    for (const corpo of ["1. separa o material 2. aplica 3. espera", "Três erros que quase todo mundo comete", "Copia e cola esse modelo pronto", "Primeiro faz a base, depois a cobertura, por fim o acabamento", "Dois erros que você comete", "Oito jeitos de tirar a mancha", "Três cuidados que ninguém conta", "Lava, enxágua e seca, nessa ordem", "Cinco hábitos que salvam o sofá"]) {
       expect(verificarLocalmente({}, { ...base, narrativa: narrativa(corpo) }).aprovado).toBe(true);
     }
   });
@@ -947,6 +966,8 @@ describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
     expect(temAlgoParaGuardar("O orçamento ficou em R$ 2.500 e depois eu expliquei tudo")).toBe(false);
     expect(temAlgoParaGuardar("Primeiro eu acordei cedo e fui trabalhar")).toBe(false);
     expect(temAlgoParaGuardar("A lista de espera estava grande hoje")).toBe(false);
+    expect(temAlgoParaGuardar("Eu gosto da receita da minha avó")).toBe(false);
+    expect(temAlgoParaGuardar("Um checklist de ideias soltas")).toBe(false);
   });
 
   it("aceita etapa, dica e primeiro passo escritos de outro jeito", () => {

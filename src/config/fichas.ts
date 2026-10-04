@@ -91,6 +91,17 @@ export function fichaDoRoteiro(roteiro: { ficha?: Ficha | null; objetivo: Objeti
  * A estrutura que o roteiro segue em cada ficha (entra no pedido ao modelo, `prompts/roteiro.ts`). Fica aqui, fora de `prompts/`, porque os nomes dos objetivos que ela cita
  * coincidem com jargão que o `checar-texto` proíbe no que o cliente lê; esta frase é do pedido ao modelo, não da tela.
  */
+/**
+ * A estrutura da ficha para o pedido: a de "veja" só fala em assunto em alta quando a entrada traz evidência (vídeos do banco que provam a tendência); sem ela (momento, tema livre
+ * sem prova) o pedido diz para não afirmar tendência nenhuma.
+ */
+export function estruturaDaFicha(ficha: Ficha, temEvidencia: boolean): string {
+  if (ficha === "veja" && !temEvidencia) {
+    return "Que muita gente veja: o gancho precisa segurar qualquer pessoa nos primeiros três segundos, e o vídeo é feito para ser mandado para os amigos. Não afirme que o assunto está em alta: esta entrada não traz prova de tendência nenhuma. O ramo da pessoa fica no meio do assunto: nunca entretenimento solto.";
+  }
+  return ESTRUTURA_DA_FICHA[ficha];
+}
+
 export const ESTRUTURA_DA_FICHA: Record<Ficha, string> = {
   veja:
     "Que muita gente veja: o gancho precisa segurar qualquer pessoa nos primeiros três segundos, o assunto é o que está em alta agora, e o vídeo é feito para ser mandado para os amigos. O ramo da pessoa fica no meio do assunto: nunca entretenimento solto.",
@@ -118,3 +129,21 @@ export function rotuloParaQue(item: { ficha?: Ficha | null; objetivo: Objetivo; 
 
 /** O objetivo que se grava num Story (ele não pergunta para que é o vídeo): falar com quem já segue. */
 export const OBJETIVO_DO_STORY: Objetivo = "engajamento";
+
+/**
+ * A ficha que a tela recomenda para um tema do dia (E49 PR 1, revisão do #122): o `puxaPara` do tema dá o objetivo, e o texto do tema escolhe entre as duas fichas de cada objetivo. Em
+ * "lembrarem de você", um tema de erro, opinião, pergunta ou mito pede resposta ("comentem"; senão, "guardem"); em "mais gente te conhecer", um tema de situação que todo mundo
+ * reconhece ("quem nunca", "todo mundo", "aquela pessoa") é para mandar ("mandem"; senão, "veja"). Heurística de texto, só para vir marcada: a pessoa troca.
+ */
+export function fichaRecomendadaParaTema(tema: { titulo: string; descricao?: string | null; puxaPara: Objetivo }): Ficha {
+  const t = `${tema.titulo} ${tema.descricao ?? ""}`
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+  if (tema.puxaPara === "conversao") return "me_chamem";
+  if (tema.puxaPara === "engajamento") return /\b(erro|errado|errada|opiniao|polemic|pergunta|mito|verdade|depende|ou)\b|\?/.test(t) ? "comentem" : "guardem";
+  return /\b(quem nunca|todo mundo|toda vez|aquela pessoa|aquele amigo|sempre|todo dia)\b/.test(t) ? "mandem" : "veja";
+}
+
+/** O objetivo que se grava num Reels sem fala (a ficha não vale nele): o de mais gente te conhecer. */
+export const OBJETIVO_DO_SEM_FALA: Objetivo = "alcance";

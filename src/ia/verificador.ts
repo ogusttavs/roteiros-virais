@@ -29,19 +29,26 @@ export type ResultadoVerificacaoLocal = {
 export function temAlgoParaGuardar(corpo: string): boolean {
   const t = corpo
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
   // Passos numerados: o 1 e o 2 (um "R$ 2.500" ou um "em 3. Depois" sozinhos não bastam).
   if (/(^|[^\d.,$])1\s*[.):-]\s*\S[\s\S]*?(^|[^\d.,$])2\s*[.):-]\s*\S/.test(t)) return true;
   // "Passo 1", "etapa 1", "dica 1", "1o passo", "passo a passo".
   if (/\b(passo|etapa|dica)\s*(1|um)\b|\b1(o|a)?\s*(passo|etapa|dica)\b|\bpasso a passo\b|\bprimeiro passo\b/.test(t)) return true;
-  // Na ordem, escrito: pelo menos dois marcadores de ordem diferentes ("primeiro ... depois ... por fim").
+  // Na ordem, escrito: pelo menos dois marcadores de ordem diferentes ("primeiro ... depois ... por fim"), ou a ordem dita ("nessa ordem").
+  if (/\b(nessa|nesta|na|essa|esta) ordem\b|\bordem certa\b/.test(t)) return true;
   const ordem = ["primeiro", "segundo", "terceiro", "depois", "em seguida", "por fim", "por ultimo", "no final"].filter((m) => new RegExp(String.raw`\b${m}\b`).test(t));
   if (ordem.length >= 2) return true;
-  // Lista anunciada com contagem: "três erros", "cinco dicas".
-  if (/\b(duas|tres|quatro|cinco|seis|sete|2|3|4|5|6|7)\s+(dicas?|passos?|erros?|jeitos?|maneiras?|coisas?|itens?|truques?|motivos?|sinais?|ingredientes?|etapas?)\b/.test(t)) return true;
+  // Lista anunciada com contagem: "dois erros", "oito jeitos", "5 dicas", "tres cuidados".
+  if (
+    /\b(dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|[2-9]|10)\s+(dicas?|passos?|erros?|jeitos?|formas?|maneiras?|coisas?|itens?|truques?|motivos?|sinais?|ingredientes?|etapas?|regras?|habitos?|cuidados?|produtos?|perguntas?|mitos?|segredos?|razoes|ideias?|opcoes|exemplos?|situacoes|mudancas?)\b/.test(t)
+  ) {
+    return true;
+  }
+  // Três verbos seguidos no imperativo, em sequência ("lava, enxagua e seca"): uma sequência de ações para repetir.
+  if (/\b[a-z]{3,}(a|e|i)\s*,\s*[a-z]{3,}(a|e|i)\s+e\s+[a-z]{3,}(a|e|i)\b/.test(t) && /\b(ordem|depois|sequencia|assim)\b/.test(t)) return true;
   // Algo para copiar.
-  if (/\b(receita|modelo pronto|copia e cola|prompt pronto|checklist)\b/.test(t)) return true;
+  if (/\b(modelo pronto|copia e cola|copie e cole|prompt pronto)\b/.test(t)) return true;
   return false;
 }
 
@@ -665,6 +672,8 @@ export async function gerarComVerificacao<T>(
   const segunda = await tentarGerarEVerificar({
     ...params,
     faixaDuracaoNicho: undefined,
+    // E49 PR 1: a heurística da ficha "que guardem" vale só na primeira tentativa, como a faixa de duração: nunca derruba a geração sozinha.
+    ficha: undefined,
     entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
   });
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };

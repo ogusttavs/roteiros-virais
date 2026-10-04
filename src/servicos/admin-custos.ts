@@ -93,7 +93,7 @@ export async function editarFixo(id: number, dados: DadosDoFixo, porUsuarioId: s
   const d = validarFixo(dados);
   const [linha] = await db()
     .update(custosFixos)
-    .set({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null, atualizadoPorUsuarioId: porUsuarioId })
+    .set({ nome: d.nome, valor: d.valor.toFixed(2), moeda: d.moeda, periodo: d.periodo, cobra: d.cobra ?? null, ...(porUsuarioId ? { atualizadoPorUsuarioId: porUsuarioId } : {}) })
     .where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true)))
     .returning();
   if (!linha) throw new ErroCusto("esse custo não existe mais.");
@@ -102,7 +102,7 @@ export async function editarFixo(id: number, dados: DadosDoFixo, porUsuarioId: s
 
 /** Tirar não apaga: o custo sai dos fixos de agora e continua na linha, com a data. */
 export async function tirarFixo(id: number, porUsuarioId: string | null = null): Promise<void> {
-  const tirados = await db().update(custosFixos).set({ ativo: false, tiradoEm: new Date(), tiradoPorUsuarioId: porUsuarioId }).where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true))).returning({ id: custosFixos.id });
+  const tirados = await db().update(custosFixos).set({ ativo: false, tiradoEm: new Date(), ...(porUsuarioId ? { tiradoPorUsuarioId: porUsuarioId } : {}) }).where(and(eq(custosFixos.id, id), eq(custosFixos.ativo, true))).returning({ id: custosFixos.id });
   if (tirados.length === 0) throw new ErroCusto("esse custo não existe mais.");
 }
 

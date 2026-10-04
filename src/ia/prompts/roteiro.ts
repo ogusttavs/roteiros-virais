@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { ESTRUTURA_DA_FICHA } from "@/config/fichas";
+import { estruturaDaFicha } from "@/config/fichas";
 import {
   FIGURINHAS_STORY,
   TIPOS_ABERTURA,
@@ -14,7 +14,6 @@ import {
   type TipoMarca,
 } from "@/db/schema";
 import { JARGAO } from "@/lib/regras-de-texto";
-
 
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
@@ -727,7 +726,7 @@ export function montarEntrada(dados: {
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     blocoNoticia,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
-    dados.ficha && dados.formato === "reels" && dados.estilo === "falado" ? `Ficha do vídeo: ${ESTRUTURA_DA_FICHA[dados.ficha]}` : null,
+    dados.ficha && dados.formato === "reels" && dados.estilo === "falado" ? `Ficha do vídeo: ${estruturaDaFicha(dados.ficha, dados.evidencias.length > 0)}` : null,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
     dados.anguloParaEvitar
       ? `O cliente reprovou a versão anterior por: ${dados.anguloParaEvitar.motivos.join(", ")}.` +

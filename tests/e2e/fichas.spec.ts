@@ -77,10 +77,10 @@ test.describe("as cinco fichas", () => {
     const grupo = page.locator("[data-fichas]");
     for (const nome of FICHAS) await expect(grupo.getByRole("radio", { name: new RegExp(nome) })).toBeVisible();
 
-    // A ficha recomendada pelo tema vem marcada, com o selo e o porquê.
+    // O tema 0 puxa para lembrarem de você, sem pergunta nem erro no texto: a ficha "Que guardem para depois" vem marcada, com o selo e o porquê "pelo tema".
     await expect(grupo.getByRole("radio", { name: /Recomendado hoje/ })).toHaveAttribute("aria-checked", "true");
-    await expect(grupo).toContainText("Recomendado hoje");
-    await expect(grupo).toContainText("A gente recomenda pelo tema");
+    await expect(grupo.getByRole("radio", { name: /Que guardem para depois/ })).toHaveAttribute("aria-checked", "true");
+    await expect(grupo).toContainText("A gente recomenda pelo tema:");
     await expect(grupo).toContainText("Por exemplo:");
     await expect(grupo).toContainText("Ajuda em:");
 
@@ -96,6 +96,26 @@ test.describe("as cinco fichas", () => {
     const r = await ultimoRoteiro();
     expect(r.ficha).toBe("me_chamem");
     expect(r.objetivo).toBe("conversao");
+  });
+
+  test("o tema de erro ou pergunta recomenda 'Que comentem'; sem tema, a recomendação é 'pelo que você tem postado'", async ({ page }) => {
+    await entrar(page);
+    // Tema livre: não há tema do dia, a recomendação vem do que a pessoa tem postado.
+    await page.goto(`/criar/objetivo?livre=${encodeURIComponent("um assunto novo")}`);
+    await expect(page.locator("[data-recomendada-por]")).toHaveAttribute("data-recomendada-por", "historico");
+    await expect(page.locator("[data-recomendada-por]")).toContainText("A gente recomenda pelo que você tem postado:");
+  });
+
+  test("Reels sem fala: as fichas somem, com a linha que diz que o sem fala segue o roteiro de cenas", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    await expect(page.locator("[data-fichas]")).toBeVisible();
+    await page.getByRole("tablist", { name: "Como você aparece" }).getByRole("tab", { name: "Sem fala" }).click();
+    await expect(page.locator("[data-fichas]")).toHaveCount(0);
+    await expect(page.locator("[data-story-sem-pergunta]")).toContainText("O vídeo sem fala segue o roteiro de cenas");
+    await expect(page.getByRole("button", { name: "escrever o roteiro" })).toBeEnabled();
+    await page.getByRole("tablist", { name: "Como você aparece" }).getByRole("tab", { name: "Falando" }).click();
+    await expect(page.locator("[data-fichas]")).toBeVisible();
   });
 
   test("Story: sem fichas, com o cartão que explica, e o roteiro sai sem ficha", async ({ page }) => {

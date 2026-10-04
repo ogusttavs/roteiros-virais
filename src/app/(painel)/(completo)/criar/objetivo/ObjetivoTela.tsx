@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
-import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha, OBJETIVO_DO_STORY } from "@/config/fichas";
+import { AJUDA_EM_DA_FICHA, EXEMPLO_DA_FICHA, FICHAS_EM_ORDEM, FRASE_DA_FICHA, NOME_DA_FICHA, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY } from "@/config/fichas";
 import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   DESCRICAO_ESTILO_ROTEIRO,
@@ -34,7 +34,9 @@ import styles from "./ObjetivoTela.module.css";
 type Props = {
   origem: OrigemRoteiro;
   temaEscolhidoTexto: string;
-  objetivoRecomendado: Objetivo | null;
+  /** E49 PR 1: a ficha que já vem marcada, e de onde veio a recomendação (o tema escolhido, ou o que a pessoa tem postado). */
+  fichaRecomendada: Ficha | null;
+  recomendadaPor: "tema" | "historico";
   tipo: TipoMarca;
   /** V12c, item 3, a E37b: o `quemGrava` do briefing, para o controle já nascer marcado nele. */
   quemGravaPadrao: QuemGrava | null;
@@ -49,7 +51,8 @@ type Props = {
 export function ObjetivoTela({
   origem,
   temaEscolhidoTexto,
-  objetivoRecomendado,
+  fichaRecomendada,
+  recomendadaPor,
   tipo,
   quemGravaPadrao,
   dataInicial,
@@ -59,7 +62,6 @@ export function ObjetivoTela({
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
   const router = useRouter();
   // E49 PR 1: a ficha recomendada pelo tema já vem marcada; a pessoa troca. O Story não pergunta.
-  const fichaRecomendada: Ficha | null = objetivoRecomendado ? fichaPadraoDoObjetivo(objetivoRecomendado) : null;
   const [ficha, setFicha] = useState<Ficha | null>(fichaRecomendada);
   // O formato vem ANTES da pergunta (passo 18b): Reels é o padrão, e a pessoa escolhe Story se quiser.
   const [formato, setFormato] = useState<FormatoRoteiro>("reels");
@@ -69,6 +71,8 @@ export function ObjetivoTela({
    * sugestão chega por uma Server Action (`sugerirEstiloAction`) assim que a tela monta.
    */
   const [estilo, setEstilo] = useState<EstiloRoteiro>("falado");
+  // A pergunta das fichas só existe no Reels falado: o Story não pergunta, e o sem fala segue o roteiro de cenas (a estrutura das fichas pressupõe fala).
+  const pergunta = formato === "reels" && estilo === "falado";
   const [estiloTocado, setEstiloTocado] = useState(false);
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
   const [objetivoDoVideo, setObjetivoDoVideo] = useState("");
@@ -112,9 +116,9 @@ export function ObjetivoTela({
   }, [temaEscolhidoTexto]);
 
   function escrever() {
-    if (formato === "reels" && !ficha) return;
-    // O Story não tem ficha: o objetivo gravado é o de falar com quem já segue (lembrarem de você).
-    const objetivo: Objetivo = formato === "story" || !ficha ? OBJETIVO_DO_STORY : objetivoDaFicha(ficha);
+    if (pergunta && !ficha) return;
+    // O Story e o sem fala não têm ficha: o Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
+    const objetivo: Objetivo = formato === "story" ? OBJETIVO_DO_STORY : !pergunta || !ficha ? OBJETIVO_DO_SEM_FALA : objetivoDaFicha(ficha);
     setErro(null);
     const desdeMs = Date.now();
     iniciarTransicao(async () => {
@@ -129,7 +133,7 @@ export function ObjetivoTela({
           data,
           formato === "story" ? (momentoDoDia ?? undefined) : undefined,
           noticiaId,
-          formato === "reels" ? (ficha ?? undefined) : undefined,
+          pergunta ? (ficha ?? undefined) : undefined,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {
@@ -189,7 +193,7 @@ export function ObjetivoTela({
             <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
             <span className={styles.tema}>{temaEscolhidoTexto}</span>
           </div>
-          {formato === "reels" && ficha ? (
+          {pergunta && ficha ? (
             <div className={styles.temaEscolhido}>
               <span className={styles.rotulo}>{textosObjetivo.objetivoEscolhido}</span>
               <span className={styles.tema}>{NOME_DA_FICHA[ficha]}</span>
@@ -220,8 +224,8 @@ export function ObjetivoTela({
         <span className={styles.tema}>{temaEscolhidoTexto}</span>
       </div>
       <div className={styles.colunaPrincipal}>
-      <h1 className={styles.pergunta}>{formato === "story" ? textosObjetivo.storyTitulo : textosObjetivo.pergunta}</h1>
-      <p className={styles.apoio}>{formato === "story" ? textosObjetivo.storyApoio : textosObjetivo.apoio}</p>
+      <h1 className={styles.pergunta}>{formato === "story" ? textosObjetivo.storyTitulo : pergunta ? textosObjetivo.pergunta : textosObjetivo.semFalaTitulo}</h1>
+      <p className={styles.apoio}>{formato === "story" ? textosObjetivo.storyApoio : pergunta ? textosObjetivo.apoio : textosObjetivo.semFalaTexto}</p>
 
       <div className={styles.grupoFormato}>
         <span className={styles.rotulo}>{textosObjetivo.formato}</span>
@@ -244,9 +248,14 @@ export function ObjetivoTela({
         <p className={styles.formatoAjuda}>{textosObjetivo.formatoAjuda[formato]}</p>
       </div>
 
-      {formato === "reels" ? (
+      {pergunta ? (
         <div data-fichas>
-          {fichaRecomendada ? <p className={styles.porque}>{textosObjetivo.porqueRecomendada[fichaRecomendada]}</p> : null}
+          {fichaRecomendada ? (
+            <p className={styles.porque} data-recomendada-por={recomendadaPor}>
+              {recomendadaPor === "tema" ? textosObjetivo.recomendaPeloTema : textosObjetivo.recomendaPeloHistorico}
+              {textosObjetivo.razaoDaRecomendada[fichaRecomendada]}
+            </p>
+          ) : null}
           <div role="radiogroup" aria-label={textosObjetivo.pergunta} className={styles.opcoes}>
             {FICHAS_EM_ORDEM.map((f) => (
               <OpcaoObjetivo
@@ -265,8 +274,8 @@ export function ObjetivoTela({
         </div>
       ) : (
         <div className={styles.cartaoStory} data-story-sem-pergunta>
-          <h3>{textosObjetivo.storyCartaoTitulo}</h3>
-          <p>{textosObjetivo.storyCartaoTexto}</p>
+          <h3>{formato === "story" ? textosObjetivo.storyCartaoTitulo : textosObjetivo.semFalaTitulo}</h3>
+          <p>{formato === "story" ? textosObjetivo.storyCartaoTexto : textosObjetivo.semFalaTexto}</p>
         </div>
       )}
 
@@ -328,7 +337,7 @@ export function ObjetivoTela({
 
       <BarraAcao
         secundaria={{ rotulo: textosComuns.voltar, onClick: () => router.back() }}
-        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: formato === "reels" && !ficha, precisaDeRede: true }}
+        primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: pergunta && !ficha, precisaDeRede: true }}
       />
       </div>
     </div>

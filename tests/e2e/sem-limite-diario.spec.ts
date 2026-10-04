@@ -90,8 +90,8 @@ async function escolherTemaEGerar(page: Page, tituloTema: string) {
   await cartao.locator("../..").getByRole("button", { name: "Quero esse" }).click();
 
   await expect(page).toHaveURL(/\/criar\/objetivo/);
-  // "Que muita gente veja" (alcance) é uma das fichas do Reels
-  // (`sugerirFormatoPeloObjetivo`); este teste prova o destaque de Reels da Agenda.
+  // "Que muita gente veja" é uma das fichas do Reels (o formato não vem mais do objetivo, E49 PR 1);
+  // este teste prova o destaque de Reels da Agenda.
   await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
   await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
   await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
