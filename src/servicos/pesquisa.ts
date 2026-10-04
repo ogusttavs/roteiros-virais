@@ -873,6 +873,8 @@ export async function evidenciaResumoPorIds(ids: number[]): Promise<EvidenciaRes
 
 export type VideoReferencia = {
   id: number;
+  /** E44 PR 2: o tipo de vídeo pela lista fechada (`config/formatos.ts`), para o selo do cartão; nulo antes da reclassificação. */
+  formatoCatalogo: string | null;
   /** E45 PR 3: o setor do vídeo; a tela mostra o nome do ramo no cartão quando não é o principal. */
   nichoId: number | null;
   plataforma: Plataforma;
@@ -1119,12 +1121,14 @@ const CAMPOS_VIDEO_REFERENCIA = {
   contaIdiomaPrincipal: contas.idiomaPrincipal,
   capaUrl: videos.capaUrl,
   semFala: videos.semFala,
+  formatoCatalogo: videos.formatoCatalogo,
   analiseVisual: videos.analiseVisual,
   tipoConteudo: videos.tipoConteudo,
 } as const;
 
 type LinhaVideoReferencia = {
   id: number;
+  formatoCatalogo: string | null;
   nichoId: number | null;
   plataforma: Plataforma;
   url: string;
@@ -1159,6 +1163,7 @@ function paraVideoReferencia(l: LinhaVideoReferencia, regua: ReguaSetor, setores
   const reguaDoVideo = { ...regua, pisoViews: setores?.find((s) => s.id === l.nichoId)?.pisoViews ?? regua.pisoViews };
   return {
     id: l.id,
+    formatoCatalogo: l.formatoCatalogo,
     nichoId: l.nichoId,
     plataforma: l.plataforma,
     url: l.url,
@@ -1449,6 +1454,8 @@ export type VideoParaEmbed = {
   porQueFuncionou: string | null;
   /** R2a: a capa do vídeo, para a moldura do reserva quando a rede não deixa mostrar o embed. */
   capaUrl: string | null;
+  /** E44 PR 2: o tipo de vídeo da referência, para o selo "Tipo: ..." do roteiro. */
+  formatoCatalogo: string | null;
 };
 
 /**
@@ -1468,6 +1475,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
       foraDaCurva: videos.foraDaCurva,
       analise: videos.analise,
       capaUrl: videos.capaUrl,
+      formatoCatalogo: videos.formatoCatalogo,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -1484,6 +1492,7 @@ export async function videoPorId(id: number): Promise<VideoParaEmbed | null> {
     foraDaCurva: linha.foraDaCurva === null ? 0 : Number(linha.foraDaCurva),
     porQueFuncionou: linha.analise?.porQueFuncionou ?? null,
     capaUrl: linha.capaUrl,
+    formatoCatalogo: linha.formatoCatalogo,
   };
 }
 

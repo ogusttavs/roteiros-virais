@@ -28,6 +28,7 @@ import {
   type MouseEvent as EventoMouse,
 } from "react";
 
+import { seloDoTipo } from "@/config/formatos";
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA, ROTULO_OBJETIVO_TRAVADO, ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -670,6 +671,8 @@ export function RoteiroTela({
             ) : null}
           </div>
           <p className={styles.metaRoteiro}>
+            {/* E44 PR 2: "Tipo: erro comum", o tipo do vídeo de referência (não aparece em Story nem sem referência classificada). */}
+            {seloDoTipo(video?.formatoCatalogo) && roteiro.formato !== "story" ? <span className={styles.seloTipo} data-selo-tipo>{seloDoTipo(video?.formatoCatalogo)}</span> : null}
             <span>{ROTULO_TEMA_CARTAO[roteiro.objetivo]}</span>
             <span className={styles.num}>{corpo.duracaoS} s</span>
             <span className={styles.num}>{formatarData(roteiro.data)}</span>

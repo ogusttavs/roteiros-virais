@@ -784,3 +784,17 @@
   color: var(--cor-texto-suave);
   font-weight: var(--peso-regular);
 }
+
+/* E44 PR 2: o selo "Tipo: erro comum" (`.selo-formato` do passo 17), o primeiro item da linha de meta do roteiro. */
+.seloTipo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.2;
+}

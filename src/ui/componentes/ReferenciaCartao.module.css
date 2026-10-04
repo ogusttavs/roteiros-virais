@@ -190,3 +190,10 @@
   outline: none;
   box-shadow: var(--sombra-foco);
 }
+
+/* E44 PR 2: o selo do tipo de vídeo (`.selo-formato` do passo 17): a pílula recuada com o nome do tipo, ao lado dos outros selos. */
+.seloTipo {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+  font-weight: var(--peso-medio);
+}

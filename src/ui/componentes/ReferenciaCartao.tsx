@@ -43,6 +43,8 @@ export type VideoFormatado = {
   tipoConteudo: TipoConteudo | null;
   /** E45 PR 3: o nome do ramo do vídeo quando é um ramo alternativo da marca (o do ramo principal não leva nome). */
   ramoNome?: string;
+  /** E44 PR 2: o nome do tipo de vídeo ("Erro comum"), para o selo ao lado dos outros; ausente se ainda não foi classificado ou não é um dos treze. */
+  tipoDeVideo?: string;
 };
 
 type Props = {
@@ -84,7 +86,7 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
   const [capaComErro, setCapaComErro] = useState(false);
   const mostrarCapa = video.capaUrl !== null && !capaComErro;
   const rotuloTipo = rotuloTipoConteudo(video.tipoConteudo);
-  const temSelo = video.abaixoDaRegua || rotuloTipo !== null || Boolean(video.ramoNome);
+  const temSelo = video.abaixoDaRegua || rotuloTipo !== null || Boolean(video.ramoNome) || Boolean(video.tipoDeVideo);
 
   return (
     <article className={styles.cartao}>
@@ -130,6 +132,7 @@ export function ReferenciaCartao({ video, salvo, salvando = false, semRede = fal
 
       {temSelo ? (
         <div className={styles.selos}>
+          {video.tipoDeVideo ? <span className={[styles.selo, styles.seloTipo].join(" ")} data-selo-tipo>{video.tipoDeVideo}</span> : null}
           {video.ramoNome ? <span className={styles.selo} data-selo-ramo>{video.ramoNome}</span> : null}
           {rotuloTipo ? <span className={styles.selo}>{rotuloTipo}</span> : null}
           {video.abaixoDaRegua ? (

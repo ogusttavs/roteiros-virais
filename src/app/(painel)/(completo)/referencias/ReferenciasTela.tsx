@@ -4,6 +4,7 @@ import { Filter, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
+import { formatoPorChave } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo, Plataforma } from "@/db/schema";
 import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
@@ -91,6 +92,8 @@ function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<number, str
     abaixoDaRegua: v.abaixoDaRegua,
     tipoConteudo: v.tipoConteudo,
     ramoNome: v.nichoId === null ? undefined : nomesDosAlternativos.get(v.nichoId),
+    // E44 PR 2: o tipo de vídeo, só para os treze do cliente (recorte de outro, notícia, ao vivo e "outro" não ganham selo).
+    tipoDeVideo: formatoPorChave(v.formatoCatalogo)?.nome,
   };
 }
 
