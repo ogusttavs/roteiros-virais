@@ -1,0 +1,58 @@
+/**
+ * A faixa do "ver como" (E46 PR 2): colada no topo, com o recorte do aparelho por cima, no escuro das ações do produto para não se confundir com a faixa "Sem conexão". A altura
+ * (2,5 rem mais o recorte) entra em `--area-topo` por `html:has([data-faixa-ver-como])` em `base.css`, e o cabeçalho, o corpo e a barra lateral descem juntos.
+ */
+.faixa {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 45;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  height: calc(2.5rem + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) var(--margem-celular) 0;
+  background: var(--cor-titulo);
+  color: var(--cor-fundo);
+  font-size: var(--tamanho-rodape);
+}
+
+.quemVe {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resta {
+  flex: 0 0 auto;
+  font-family: var(--fonte-mono);
+  opacity: 0.8;
+}
+
+.sair {
+  flex: 0 0 auto;
+  min-height: 1.75rem;
+  padding: 0 var(--espaco-3);
+  border: 1px solid currentColor;
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.sair:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+@media (max-width: 480px) {
+  .resta {
+    display: none;
+  }
+}

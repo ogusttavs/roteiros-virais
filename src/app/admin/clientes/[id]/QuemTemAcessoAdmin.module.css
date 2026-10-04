@@ -229,3 +229,35 @@
   justify-content: flex-end;
   gap: var(--espaco-2);
 }
+
+/* E46 PR 2: a folha "Ver o painel como" (escolha da pessoa e o aviso de que fica registrado). */
+.escolhaPessoa {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
+.opcaoPessoa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  min-height: var(--altura-toque);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.opcaoPessoa[aria-checked="true"] {
+  border-color: var(--cor-acao);
+  background: var(--cor-superficie-recuada);
+}
+
+.avisoVerComo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+}

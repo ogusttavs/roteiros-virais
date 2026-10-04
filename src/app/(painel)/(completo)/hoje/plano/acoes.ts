@@ -5,7 +5,7 @@ import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { hojeISO } from "@/lib/config";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import {
   aceitar,
@@ -27,7 +27,8 @@ import { ErroRoteiro, validarEstilo, validarFormato, validarMomentoDoDia, valida
  * entendi este dia" em vez de descartar em silêncio.
  */
 export async function lerAgendaAction(texto: string): Promise<ResultadoLerAgenda> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -39,7 +40,8 @@ export async function lerAgendaAction(texto: string): Promise<ResultadoLerAgenda
  * sessão, nunca de um parâmetro, mesmo padrão do resto do painel.
  */
 export async function criarPlanoAction(dias: DiaAgenda[]): Promise<ItemPlano[]> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -83,7 +85,9 @@ export async function aceitarPlanoAction(
   itemId: number,
   dados: DadosAceitarPlano,
 ): Promise<ResultadoAcao<{ id: number }>> {
-  const sessao = await sessaoAtual();
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -124,7 +128,8 @@ export async function aceitarPlanoAction(
 
 /** "Pular" um item do plano (item 3): some do bloco, sem gerar roteiro. */
 export async function pularPlanoAction(itemId: number): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -134,7 +139,8 @@ export async function pularPlanoAction(itemId: number): Promise<void> {
 
 /** "Tirar este plano" (V12, item 4b): apaga os próximos dias ainda não aceitos; os já aceitos continuam. */
 export async function removerPlanoAction(): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }

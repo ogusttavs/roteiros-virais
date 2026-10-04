@@ -1,6 +1,6 @@
 "use server";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual } from "@/servicos/clientes";
 import { noticiaPorId } from "@/servicos/noticias";
 import { avaliarTema, salvarRascunhoTemaLivre, type ResultadoAvaliarTema } from "@/servicos/temas";
@@ -11,7 +11,8 @@ import { avaliarTema, salvarRascunhoTemaLivre, type ResultadoAvaliarTema } from 
  * no client trata a rejeição em silêncio).
  */
 export async function salvarRascunhoAction(texto: string): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -31,7 +32,8 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  * confiando num id de outro setor vindo do client.
  */
 export async function avaliarTemaAction(texto: string, noticiaId?: number): Promise<ResultadoAvaliarTema> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }

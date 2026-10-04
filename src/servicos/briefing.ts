@@ -22,6 +22,7 @@ import * as organizarFalaBriefingIA from "@/ia/prompts/organizarFalaBriefing";
 import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
+import { modoVerComoLigado } from "@/lib/ver-como";
 
 import { perguntaPorId, perguntasDoBriefing } from "../config/briefing";
 
@@ -40,6 +41,8 @@ export class ErroBriefing extends Error {}
 export async function garantirBriefing(clienteId: number): Promise<Briefing> {
   const existente = await buscarBriefing(clienteId);
   if (existente) return existente;
+  // E46 PR 2: no "ver como" ler nunca cria a linha da pessoa; sem briefing ainda, o admin não tem o que ver.
+  if (await modoVerComoLigado()) throw new ErroBriefing("A pessoa ainda não abriu o briefing; não há o que ver.");
 
   const [criado] = await db()
     .insert(briefings)
@@ -51,6 +54,11 @@ export async function garantirBriefing(clienteId: number): Promise<Briefing> {
   const linha = await buscarBriefing(clienteId);
   if (!linha) throw new ErroBriefing("nao foi possivel criar o briefing.");
   return linha;
+}
+
+/** Lê o briefing sem criar a linha (o "ver como" nunca grava em nome da pessoa). */
+export async function lerBriefing(clienteId: number): Promise<Briefing | null> {
+  return buscarBriefing(clienteId);
 }
 
 async function buscarBriefing(clienteId: number): Promise<Briefing | null> {

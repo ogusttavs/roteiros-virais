@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, trocarMarca } from "@/servicos/clientes";
 
 /**
@@ -11,7 +11,8 @@ import { ErroAcessoNegado, trocarMarca } from "@/servicos/clientes";
  * O usuario sempre vem da sessao, nunca de um parametro.
  */
 export async function trocarMarcaAction(clienteId: number): Promise<void> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   await trocarMarca(sessao.user.id, clienteId);
   revalidatePath("/", "layout");

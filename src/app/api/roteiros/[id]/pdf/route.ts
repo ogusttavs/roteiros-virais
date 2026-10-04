@@ -4,8 +4,8 @@ import { chromium } from "playwright";
 
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { logger } from "@/lib/log";
-import { sessaoAtual } from "@/lib/sessao";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { roteiroPorId } from "@/servicos/roteiro";
 
@@ -65,7 +65,7 @@ function comTempoLimite<T>(promessa: Promise<T>, mensagem: string): Promise<T> {
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }

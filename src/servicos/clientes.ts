@@ -38,8 +38,8 @@ import {
 } from "@/lib/marca-ativa";
 import { semBarrasNoFim, TAMANHO_MAXIMO_DO_CAMPO_DE_PERFIL } from "@/lib/perfil-redes";
 import { gerarSenhaLegivel } from "@/lib/senha-legivel";
-import { sessaoAtual } from "@/lib/sessao";
 import { normalizarSite, siteValido, TAMANHO_MAXIMO_DO_SITE } from "@/lib/site-valido";
+import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { enfileirarEntenderMarca } from "@/servicos/contexto-marca";
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-de-ramo";
@@ -181,6 +181,11 @@ async function resolverMarcaAtiva(marcas: Cliente[]): Promise<Cliente | null> {
  * 2: "um cliente por usuario" deixou de existir).
  */
 export async function clienteAtivoDoUsuario(usuarioId: string): Promise<Cliente | null> {
+  // E46 PR 2, regra 7: no "ver como", a conta é a do cookie assinado (conferida no banco), nunca a que o cookie `marca_ativa` do navegador do admin escolhe.
+  const verComo = await lerEstadoVerComo();
+  if (verComo.estado === "ativo" && verComo.modo.pessoa.id === usuarioId) {
+    return garantirMembroDaMarca(usuarioId, verComo.modo.clienteId);
+  }
   const marcas = await marcasDoUsuario(usuarioId);
   return resolverMarcaAtiva(marcas);
 }
@@ -220,7 +225,7 @@ export async function garantirClientePermitido(clienteIdPedido: number, usuarioI
  * o usuario pertence, nunca so por um id que ele mandou).
  */
 export async function clienteDaSessaoAtual(): Promise<Cliente> {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }

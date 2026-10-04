@@ -1,12 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { ZodError } from "zod";
 
 import { CUSTO_DIARIO_DE_SETOR_NOVO_USD } from "@/config/precos-ia";
 import type { Alcance, Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
+import { NOME_COOKIE_VER_COMO, DURACAO_VER_COMO_MS, opcoesCookieVerComo, valorCookieVerComo } from "@/lib/ver-como-cookie";
 import { trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
 import {
   clientePorId,
@@ -23,6 +26,7 @@ import { definirFormato, ErroFormato, voltarFormatoAoDoCliente } from "@/servico
 import { ErroNicho } from "@/servicos/nichos";
 import { ErroLimiteDeSetores } from "@/servicos/ramos";
 import { ErroRamosDaConta, ligarRamoAlternativo, previaDeLigarRamo, tirarRamoAlternativo } from "@/servicos/ramos-da-conta";
+import { ErroVerComo, registrarEntradaVerComo } from "@/servicos/ver-como";
 import { textosRamo } from "@/textos/ramo";
 
 /** V12b, item 4: a folha "Dar acesso" pede o nome também, não só o e-mail. */
@@ -233,4 +237,28 @@ export async function trocarPublicoDaContaAction(clienteId: number, dados: { alc
     if (erro instanceof ZodError) return { ok: false, erro: erro.issues[0]?.message ?? "confira o que foi escrito." };
     throw erro;
   }
+}
+
+/**
+ * E46 PR 2: entra no "ver como". Só admin (`garantirSessaoAdmin` na primeira linha, e `registrarEntradaVerComo` confere o papel de novo no banco); a pessoa tem de ser membro da
+ * conta e não ser admin. A sessão do admin NÃO é trocada: grava a entrada em `ver_como_entradas` e um cookie próprio, assinado, com a hora de expiração (30 minutos). Em seguida
+ * leva ao painel (`/hoje`), onde a faixa fica fixa no alto.
+ */
+export async function entrarVerComoAction(clienteId: number, pessoaId: string): Promise<ResultadoAcao<null>> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  if (!Number.isInteger(clienteId) || typeof pessoaId !== "string" || pessoaId === "") return { ok: false, erro: "pedido invalido." };
+  try {
+    const entrada = await registrarEntradaVerComo(sessao!.user.id, clienteId, pessoaId);
+    const jar = await cookies();
+    jar.set(
+      NOME_COOKIE_VER_COMO,
+      valorCookieVerComo({ a: sessao!.user.id, p: pessoaId, c: clienteId, r: entrada.id, e: entrada.expiraEm.getTime() }),
+      opcoesCookieVerComo(Math.round(DURACAO_VER_COMO_MS / 1000)),
+    );
+  } catch (erro) {
+    if (erro instanceof ErroVerComo) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+  redirect("/hoje");
 }

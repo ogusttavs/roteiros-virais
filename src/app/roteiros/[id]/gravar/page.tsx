@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 
@@ -18,7 +19,7 @@ export default async function Gravar({ params }: Props) {
   const { id } = await params;
   const roteiroId = Number(id);
 
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }
@@ -40,12 +41,15 @@ export default async function Gravar({ params }: Props) {
   const corpo = corpoDoRoteiro(roteiro);
 
   return (
-    <GravacaoTela
-      roteiroId={roteiro.id}
-      titulo={corpo.titulo}
-      jaGravado={roteiro.gravadoEm !== null}
-      blocos={blocosParaLeitura(roteiro)}
-      nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
-    />
+    <>
+      <FaixaDoModo verComo={sessao.verComo} pessoa={sessao.user.name} conta={cliente.nome} />
+      <GravacaoTela
+        roteiroId={roteiro.id}
+        titulo={corpo.titulo}
+        jaGravado={roteiro.gravadoEm !== null}
+        blocos={blocosParaLeitura(roteiro)}
+        nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
+      />
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { hojeISO } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { temasParaCliente } from "@/servicos/temas";
@@ -22,7 +22,7 @@ type Props = { searchParams: Promise<{ data?: string; plano?: string; formato?: 
  * naquele dia porque quer um roteiro para ele.
  */
 export default async function Criar({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

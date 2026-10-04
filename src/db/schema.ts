@@ -751,6 +751,30 @@ export const custosFixos = pgTable("custos_fixos", {
 });
 export type CustoFixo = typeof custosFixos.$inferSelect;
 
+/**
+ * E46 PR 2: o registro do "ver como". Cada entrada do admin no painel de uma conta, como uma pessoa dela: quem (o admin), em qual pessoa e conta, quando entrou, quando o modo acaba
+ * por si (30 minutos) e, quando termina, quando e por quê (`saiu` pelo botão, `expirou`, `trocou` por outra entrada do mesmo admin, `sessao` quando o cookie sobrou sem a sessão do admin).
+ * Nunca se apaga: é o rastro de quem olhou o quê.
+ */
+export const verComoEntradas = pgTable("ver_como_entradas", {
+  id: id(),
+  // `restrict`: o rastro de quem olhou o quê não some junto com a pessoa, o admin ou a conta (nenhum fluxo do produto apaga usuário ou conta; quem precisar apagar decide à mão).
+  adminId: text("admin_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "restrict" }),
+  pessoaId: text("pessoa_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "restrict" }),
+  clienteId: integer("cliente_id")
+    .notNull()
+    .references(() => clientes.id, { onDelete: "restrict" }),
+  entrouEm: timestamp("entrou_em", { withTimezone: true }).notNull().defaultNow(),
+  expiraEm: timestamp("expira_em", { withTimezone: true }).notNull(),
+  saiuEm: timestamp("saiu_em", { withTimezone: true }),
+  motivoSaida: text("motivo_saida").$type<"saiu" | "expirou" | "trocou" | "sessao">(),
+}, (t) => [index("ver_como_entradas_conta").on(t.clienteId, t.entrouEm), index("ver_como_entradas_admin").on(t.adminId, t.saiuEm)]);
+export type VerComoEntrada = typeof verComoEntradas.$inferSelect;
+
 /** E46 PR 3: cada "rodar agora" que o admin dispara em Rotinas (quem, qual fila, quando), para o detalhe da rotina dizer "rodada à mão por fulano às 07:23". */
 export const disparosDoAdmin = pgTable(
   "disparos_do_admin",

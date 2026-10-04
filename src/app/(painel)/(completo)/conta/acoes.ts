@@ -1,7 +1,7 @@
 "use server";
 
 import type { ResultadoAcao } from "@/lib/resultado-acao";
-import { sessaoAtual } from "@/lib/sessao";
+import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import {
   clienteDaSessaoAtual,
   ErroAcessoNegado,
@@ -38,7 +38,9 @@ export async function salvarContaAction(dados: {
   /** E45 PR 2: "Não achei o meu": o que a pessoa escreveu; abre (ou atualiza) o pedido de ramo e põe a marca no ramo provisório. */
   ramoOutro?: string;
 }): Promise<ResultadoAcao<{ pedidoDeRamo: PedidoDeRamoNaTela | null | undefined }>> {
-  const sessao = await sessaoAtual();
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  const sessao = await sessaoDoPainel();
   if (!sessao) throw new ErroAcessoNegado("E preciso entrar de novo.");
   const cliente = await clienteDaSessaoAtual();
 

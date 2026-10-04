@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
@@ -35,7 +35,7 @@ type Props = { searchParams: Promise<{ data?: string }> };
  * escolher um tema, para `/criar/objetivo` já nascer com aquele dia marcado.
  */
 export default async function Temas({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { regrasDoCliente } from "@/servicos/aprendizado";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -12,7 +12,7 @@ import { leiturasDoCliente } from "@/servicos/perfis-analisados";
 import { BriefingVivo } from "./BriefingVivo";
 
 export default async function Briefing() {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

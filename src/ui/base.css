@@ -37,6 +37,15 @@ html[data-sem-conexao="true"] {
   --area-topo: calc(env(safe-area-inset-top, 0px) + var(--altura-faixa-conexao));
 }
 
+/* E46 PR 2: a faixa do "ver como" (2,5 rem) desce o topo como a faixa "Sem conexão"; com as duas, as duas somam e a do "ver como" fica por cima (`FaixaVerComo.module.css`). */
+html:has([data-faixa-ver-como]) {
+  --area-topo: calc(env(safe-area-inset-top, 0px) + 2.5rem);
+}
+
+html[data-sem-conexao="true"]:has([data-faixa-ver-como]) {
+  --area-topo: calc(env(safe-area-inset-top, 0px) + 2.5rem + var(--altura-faixa-conexao));
+}
+
 /**
  * As outras três áreas seguras (H3, item 4: a folha "Informações do aparelho",
  * em Conta, lê as quatro por `getComputedStyle`). Nenhuma tela usa estas três

@@ -4,7 +4,7 @@ import { ehFicha } from "@/config/fichas";
 import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
-import { sessaoAtual } from "@/lib/sessao";
+import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
 import { lerMomentoDeTexto, type CamposMomento } from "@/servicos/momento";
 import {
@@ -25,7 +25,8 @@ import {
  * marca nenhuma.
  */
 export async function lerMomentoDeTextoAction(texto: string): Promise<CamposMomento> {
-  const sessao = await sessaoAtual();
+  await exigirForaDoVerComo();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }
@@ -76,7 +77,9 @@ function textoObrigatorio(valor: string): string {
  * lançados; sessão ausente continua lançando `ErroAcessoNegado` (raro, pede entrar de novo).
  */
 export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<ResultadoAcao<{ id: number }>> {
-  const sessao = await sessaoAtual();
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");
   }

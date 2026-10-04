@@ -2,7 +2,7 @@ import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { formatarDataHoraPorExtenso, formatarFonteEData } from "@/lib/formatarNumero";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { contagemNoticiasNaSemana, noticiasDoSetor, type NoticiaListada, type PeriodoNoticias } from "@/servicos/noticias";
 import { textosNoticias } from "@/textos/noticias";
@@ -36,7 +36,7 @@ function formatarNoticia(n: NoticiaListada): NoticiaFormatada {
  * de Referências; a tela é só leitura, a coleta e o filtro de relevância rodam em `jobs/`.
  */
 export default async function Noticias({ searchParams }: Props) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }

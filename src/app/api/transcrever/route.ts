@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { logger } from "@/lib/log";
 import { sessaoAtual } from "@/lib/sessao";
+import { MENSAGEM_VER_COMO_DESLIGADO, modoVerComoLigado } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { ErroMomento, LIMITE_TAMANHO_AUDIO_BYTES, transcreverAudioEnviado } from "@/servicos/momento";
 
@@ -46,6 +47,8 @@ function dentroDoLimite(mapa: Map<string, number[]>, usuarioId: string, maximoNa
  * (`lerMomentoDeTextoAction`, `lerAgendaAction`, `organizarFalaBriefingAction`).
  */
 export async function POST(request: Request) {
+  // E46 PR 2, regra 5: gasta a transcrição em nome da pessoa; recusa no "ver como".
+  if (await modoVerComoLigado()) return NextResponse.json({ erro: MENSAGEM_VER_COMO_DESLIGADO }, { status: 403 });
   const sessao = await sessaoAtual();
   if (!sessao) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });

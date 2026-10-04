@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { lerEstadoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { textosNav } from "@/textos/nav";
 import { Nav } from "@/ui/componentes/Nav";
@@ -12,6 +12,7 @@ import { BarraLateralToggle } from "./_casca/BarraLateralToggle";
 import { CapsulaAbas } from "./_casca/CapsulaAbas";
 import { CascaCabecalhoCelular } from "./_casca/CascaCabecalhoCelular";
 import { Conexao } from "./_casca/Conexao";
+import { FaixaDoModo } from "./_casca/FaixaVerComo";
 import { SeletorMarcaDesktop } from "./_casca/SeletorMarcaDesktop";
 import { TrocaMarcaProvider } from "./_casca/TrocaMarcaContext";
 import styles from "./layout.module.css";
@@ -27,9 +28,14 @@ import styles from "./layout.module.css";
  * direto para Conta.
  */
 export default async function LayoutPainel({ children }: { children: ReactNode }) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
+  }
+
+  // E46 PR 2, regra 2: um cookie do "ver como" que sobrou (expirou, ficou sem a sessão do admin, é de outro admin, está estragado, a entrada já fechou) é ignorado e apagado.
+  if ((await lerEstadoVerComo()).estado === "limpar") {
+    redirect("/api/ver-como/limpar");
   }
 
   // clienteAtivoDoUsuario resolve pelo cookie marca_ativa (V3, item 2), nao pela
@@ -45,7 +51,8 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   const marcaAtiva = marcaAtivaResolvida ?? marcas[0] ?? { id: 0, nome: "" };
 
   return (
-    <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id}>
+    <Conexao usuarioId={sessao.user.id} marcaId={marcaAtiva.id} verComo={sessao.verComo !== null}>
+      <FaixaDoModo verComo={sessao.verComo} pessoa={sessao.user.name} conta={marcaAtiva.nome} />
       <TrocaMarcaProvider>
         <div className={styles.pagina}>
           <CascaCabecalhoCelular

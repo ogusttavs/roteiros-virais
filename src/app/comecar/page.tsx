@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 
+import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
 import { TrocaMarcaProvider } from "@/app/(painel)/_casca/TrocaMarcaContext";
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
-import { blocoInicial, garantirBriefing } from "@/servicos/briefing";
+import { sessaoDoPainel } from "@/lib/ver-como";
+import { blocoInicial, garantirBriefing, lerBriefing } from "@/servicos/briefing";
 import {
   clienteAtivoDoUsuario,
   clienteTemOndeEscolhido,
@@ -13,12 +14,13 @@ import {
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
+import { textosVerComo } from "@/textos/ver-como";
 import { ConexaoDaTela } from "@/ui/ConexaoDaTela";
 
 import { ComecarWizard } from "./ComecarWizard";
 
 export default async function Comecar() {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }
@@ -26,6 +28,21 @@ export default async function Comecar() {
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) {
     redirect("/entrar");
+  }
+
+  // E46 PR 2: no "ver como" esta tela nunca é o assistente (ele grava em nome da pessoa) nem um erro: briefing completo vai ao Hoje, e o resto mostra o aviso com a saída do modo.
+  if (sessao.verComo) {
+    const existente = await lerBriefing(cliente.id);
+    if (existente?.completo) redirect("/hoje");
+    return (
+      <>
+        <FaixaDoModo verComo={sessao.verComo} pessoa={sessao.user.name} conta={cliente.nome} />
+        <main style={{ padding: "calc(var(--area-topo) + 2rem) var(--margem-celular) 2rem", maxWidth: "36rem", margin: "0 auto" }} data-ver-como-sem-briefing="">
+          <h1>{textosVerComo.semBriefingTitulo(sessao.user.name)}</h1>
+          <p>{textosVerComo.semBriefingTexto}</p>
+        </main>
+      </>
+    );
   }
 
   /**

@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { organizarFalaBriefing } from "@/servicos/briefing";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import {
@@ -16,6 +17,7 @@ import {
  * `registrarGeracao`, para o custo aparecer nela (antes, a geração ficava sem dono).
  */
 export async function organizarFalaBriefingAction(pergunta: string, textoFalado: string): Promise<string> {
+  await exigirForaDoVerComo();
   const cliente = await clienteDaSessaoAtual();
   return organizarFalaBriefing(pergunta, textoFalado, cliente.id);
 }
@@ -30,11 +32,13 @@ export async function listarPerfisCitadosAction(): Promise<{ concorrentes: Perfi
 }
 
 export async function adicionarPerfilCitadoAction(tipo: TipoPerfilCitado, dados: unknown): Promise<PerfilCitado> {
+  await exigirForaDoVerComo();
   const cliente = await clienteDaSessaoAtual();
   return adicionarPerfilCitado(cliente.id, tipo, dados);
 }
 
 export async function removerPerfilCitadoAction(id: number): Promise<void> {
+  await exigirForaDoVerComo();
   const cliente = await clienteDaSessaoAtual();
   await removerPerfilCitado(id, cliente.id);
 }

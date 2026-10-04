@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import {
   acessouHoje,
   briefingCompleto,
@@ -34,7 +34,7 @@ import { OuvinteInstalacao } from "../_casca/OuvinteInstalacao";
  * linha (`aceitarTermos`, servicos/clientes.ts).
  */
 export default async function LayoutCompleto({ children }: { children: ReactNode }) {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }
@@ -44,11 +44,15 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
     redirect("/comecar");
   }
 
-  if (!acessouHoje(cliente.ultimoAcessoEm)) {
+  // E46 PR 2, regra 6: no "ver como" a visita do admin não conta como acesso da pessoa (o lembrete do dia continua chegando a ela), e nada que grava em nome dela roda: nem o
+  // acesso, nem o aceite dos termos, nem o pedido do aviso, nem o convite de instalar. O admin só lê.
+  const verComo = sessao.verComo !== null;
+  if (!verComo && !acessouHoje(cliente.ultimoAcessoEm)) {
     await registrarAcessoHoje(sessao.user.id, cliente.id);
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
+  if (verComo) return <>{children}</>;
   if (!preferencias?.aceitouTermosEm || preferencias.aceitouTermosEm < VERSAO_TERMOS_EM) {
     return <FolhaAceiteTermos />;
   }

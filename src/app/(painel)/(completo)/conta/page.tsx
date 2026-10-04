@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { HORA_LEMBRETE_PADRAO } from "@/config/lembrete";
 import { config } from "@/lib/config";
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, dadosOndeIniciais, membrosDaMarca, preferenciasDoUsuario } from "@/servicos/clientes";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
@@ -10,6 +10,7 @@ import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { textosConta } from "@/textos/conta";
+import { textosVerComo } from "@/textos/ver-como";
 
 import { AvisoDeManha } from "./AvisoDeManha";
 import { BotaoSair } from "./BotaoSair";
@@ -22,7 +23,7 @@ import { QuemTemAcesso } from "./QuemTemAcesso";
 import { TiposDeVideoConta } from "./TiposDeVideoConta";
 
 export default async function Conta() {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }
@@ -84,16 +85,18 @@ export default async function Conta() {
           regiaoInicial={onde?.regiao ?? null}
           paisInicial={onde?.pais ?? null}
           paisesInicial={onde?.paises ?? null}
+          desligadoVerComo={sessao.verComo ? textosVerComo.contaSalvarDesligado(sessao.user.name) : undefined}
         />
       </div>
       {cliente ? (
         <QuemTemAcesso nomeMarca={cliente.nome} membros={membros} usuarioIdAtual={sessao.user.id} />
       ) : null}
       <div className={styles.colunaPrincipal}>
-        <InstalarNoCelular />
-        <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} ehAdmin={sessao.user.role === "admin"} />
+        {/* E46 PR 2: no "ver como" nada que inscreve, instala ou sai em nome da pessoa aparece (o aviso de manhã, o convite de instalar e o Sair são do aparelho e da sessão de quem está olhando). */}
+        {sessao.verComo ? null : <InstalarNoCelular />}
+        {sessao.verComo ? null : <AvisoDeManha chavePublica={config.push.publicKey} horaLembrete={preferencias?.horaLembrete ?? HORA_LEMBRETE_PADRAO} ehAdmin={sessao.user.role === "admin"} />}
         <InformacoesDoAparelhoAdmin ehAdmin={sessao.user.role === "admin"} versaoPainel={config.gitSha} />
-        <BotaoSair />
+        {sessao.verComo ? null : <BotaoSair />}
       </div>
     </div>
   );

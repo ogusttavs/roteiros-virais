@@ -116,3 +116,10 @@
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* E46 PR 2: o motivo de o salvar estar desligado no "ver como" (Conta.dc.html, `.motivo-desligado`). */
+.motivoDesligado {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}

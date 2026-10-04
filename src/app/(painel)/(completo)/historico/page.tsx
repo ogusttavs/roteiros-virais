@@ -1,7 +1,7 @@
 import { History } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { sessaoAtual } from "@/lib/sessao";
+import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { curvasDoHistorico } from "@/servicos/curva";
 import { agruparPorSemana } from "@/servicos/historico-regras";
@@ -13,7 +13,7 @@ import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 import { HistoricoTela } from "./HistoricoTela";
 
 export default async function Historico() {
-  const sessao = await sessaoAtual();
+  const sessao = await sessaoDoPainel();
   if (!sessao) {
     redirect("/entrar");
   }
