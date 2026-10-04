@@ -16,5 +16,5 @@ export default async function AdminContas({ searchParams }: { searchParams: Prom
   const [contas, nichosListados] = await Promise.all([listarContasAdmin(), db().select({ id: nichos.id, nome: nichos.nome }).from(nichos)]);
   const filtroInicial = FILTROS_VALIDOS.find((f) => f === filtro) ?? "todas";
 
-  return <TabelaContas contas={contas} nichos={nichosListados} filtroInicial={filtroInicial} />;
+  return <TabelaContas key={filtroInicial} contas={contas} nichos={nichosListados} filtroInicial={filtroInicial} />;
 }

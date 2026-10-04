@@ -89,7 +89,7 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
 
   const [detalhes, pessoas, roteirosDosDias, sessoes, briefingsDeTodos] = await Promise.all([
     db()
-      .select({ id: clientes.id, tipo: clientes.tipo, ultimoAcessoEm: clientes.ultimoAcessoEm, ramoCatalogo: nichos.ramoCatalogo, nichoNome: nichos.nome })
+      .select({ id: clientes.id, tipo: clientes.tipo, ultimoAcessoEm: clientes.ultimoAcessoEm, ramoCatalogo: nichos.ramoCatalogo, nichoNome: nichos.nome, criadoEm: clientes.criadoEm })
       .from(clientes)
       .leftJoin(nichos, eq(nichos.id, clientes.nichoId)),
     pessoasPorConta(),
@@ -137,6 +137,10 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
     const respondidas = b ? Object.values(b.respostas).filter((r) => typeof r === "string" && r.trim().length > 0).length : 0;
     const briefingEstado: ContaAdmin["briefingEstado"] =
       !b || (!b.completo && respondidas === 0) ? { tipo: "sem" } : b.completo && b.nota !== null ? { tipo: "pronto", nota: Number(b.nota), abaixo: Number(b.nota) < NOTA_MINIMA_DO_BRIEFING } : { tipo: "incompleto", respondidas };
+    const nuncaEntrou = !detalhe?.ultimoAcessoEm && gente.every((p) => !p.ultimoAcessoEm && !sessaoAlgumaVez.has(p.usuarioId));
+    const uso = classificarUso(ultimos7);
+    // Conta nova, sem entrada nem roteiro, ainda não "parou": nunca começou.
+    const contaNovaSemUso = nuncaEntrou && !conta.ultimoRoteiro && detalhe !== undefined && agora.getTime() - detalhe.criadoEm.getTime() < DIAS_PARA_PARAR * 24 * 60 * 60 * 1000;
     const ramo = ramoPorSlug(detalhe?.ramoCatalogo ?? null);
     return {
       ...conta,
@@ -145,8 +149,9 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
       quemTemAcesso: gente,
       briefingEstado,
       ultimos7,
-      nuncaEntrou: !detalhe?.ultimoAcessoEm && gente.every((p) => !p.ultimoAcessoEm && !sessaoAlgumaVez.has(p.usuarioId)),
-      ...classificarUso(ultimos7),
+      nuncaEntrou,
+      usando: uso.usando,
+      parou: uso.parou && !contaNovaSemUso,
     };
   });
 }

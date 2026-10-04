@@ -93,7 +93,8 @@ export default async function InicioDoAdmin() {
   const inicio = await inicioDoAdmin();
   const itens = itensDeAtencao(inicio);
   const { madrugada, dinheiro } = inicio;
-  const tudoCerto = itens.length === 0;
+  const semTemasAinda = madrugada.linhas.filter((l) => l.temas.quantos === 0).length;
+  const tudoCerto = itens.length === 0 && madrugada.totalDeRamos > 0 && semTemasAinda === 0;
   const linhasVisiveis = madrugada.totalDeRamos <= RAMOS_POR_LINHA ? madrugada.linhas : madrugada.comProblema;
   const gastoHojeBrl = usdParaBrl(dinheiro.saiuHojeUsd);
 
@@ -109,10 +110,12 @@ export default async function InicioDoAdmin() {
           <section className={[styles.cartao, styles.estadoManha].join(" ")} aria-label={t.estado.aria} data-bloco="estado">
             <p className={[styles.fraseEstado, tudoCerto ? styles.fraseCerta : styles.fraseAtencao].join(" ")} data-estado={tudoCerto ? "certo" : "atencao"}>
               {tudoCerto ? <CheckCircle2 aria-hidden="true" /> : <AlertTriangle aria-hidden="true" />}
-              {tudoCerto ? t.estado.certo : t.estado.atencao(itens.length)}
+              {tudoCerto ? t.estado.certo : itens.length === 0 ? t.estado.nadaAindaMas : t.estado.atencao(itens.length)}
             </p>
             {tudoCerto ? (
               <p className={styles.tudoCertoLinha}>{t.estado.tudoCertoLinha(madrugada.totalDeRamos)}</p>
+            ) : itens.length === 0 ? (
+              <p className={styles.tudoCertoLinha}>{t.estado.aindaSemTemas(semTemasAinda, madrugada.totalDeRamos)}</p>
             ) : (
               <ul className={styles.listaAtencao}>
                 {itens.map((item) => (

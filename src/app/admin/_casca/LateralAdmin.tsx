@@ -50,7 +50,7 @@ export function LateralAdmin({
           const ativo = chave === "inicio" ? pathname === "/admin" : pathname.startsWith(href);
           const seloDoItem = selos[chave];
           return (
-            <Link key={chave} href={href} aria-current={ativo ? "page" : undefined} aria-label={rotulos[chave]} title={rotulos[chave]} className={[styles.item, ativo ? styles.ativo : ""].filter(Boolean).join(" ")}>
+            <Link key={chave} href={href} aria-current={ativo ? "page" : undefined} title={rotulos[chave]} className={[styles.item, ativo ? styles.ativo : ""].filter(Boolean).join(" ")}>
               <Icone size={20} strokeWidth={1.5} aria-hidden="true" />
               <span className={styles.rotulo}>{rotulos[chave]}</span>
               {seloDoItem && seloDoItem.quantos > 0 ? (

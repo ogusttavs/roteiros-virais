@@ -210,11 +210,14 @@
 }
 
 .pessoasCelula {
+  min-width: 11rem;
   max-width: 13rem;
+  white-space: normal !important;
 }
 
 .nomePessoa {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--espaco-2);
   color: var(--cor-titulo);

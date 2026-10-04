@@ -65,6 +65,7 @@ export async function tirarAcessoAction(clienteId: number, usuarioId: string): P
 export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): Promise<void> {
   const sessao = await sessaoAtual();
   garantirSessaoAdmin(sessao);
+  if (!Number.isInteger(clienteId) || (plano !== "padrao" && plano !== "sem_limite")) throw new ErroCliente("pedido invalido.");
   await trocarPlanoDaConta(clienteId, plano, sessao!.user.id);
   revalidatePath(`/admin/clientes/${clienteId}`);
 }

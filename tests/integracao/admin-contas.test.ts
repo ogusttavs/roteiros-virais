@@ -96,6 +96,11 @@ describe("listarContasAdmin", () => {
     expect(a.parou).toBe(false);
     expect(a.nuncaEntrou).toBe(false);
 
+    // Conta nova sem uso ainda não "parou": nunca começou.
+    const novaSemUso = (await listarContasAdmin()).find((c) => c.id === contaB)!;
+    expect(novaSemUso.parou).toBe(false);
+    expect(novaSemUso.nuncaEntrou).toBe(true);
+    await db().update(clientes).set({ criadoEm: new Date(hoje.getTime() - 10 * DIA) }).where(eq(clientes.id, contaB));
     const b = (await listarContasAdmin()).find((c) => c.id === contaB)!;
     expect(b.ultimos7.every((d) => d.estado === "nada")).toBe(true);
     expect(b.parou).toBe(true);
@@ -209,7 +214,7 @@ describe("inicioDoAdmin", () => {
 
     expect(inicio.contas.ativas).toBe(2);
     expect(inicio.contas.pararam).toBe(1);
-    expect(inicio.contas.novasNaSemana).toBe(2);
+    expect(inicio.contas.novasNaSemana).toBe(1);
     expect(inicio.contas.briefingIncompleto).toBe(2);
     expect(inicio.produto.escritos).toBe(2);
     expect(inicio.produto.gravados).toBe(1);

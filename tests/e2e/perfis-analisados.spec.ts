@@ -148,7 +148,7 @@ test.describe("admin do setor, perfis indicados", () => {
     ]);
 
     await entrar(page, "admin@exemplo.teste");
-    await expect(page).toHaveURL(/\/admin\/clientes/);
+    await expect(page).toHaveURL(/\/admin\/?$/);
     await page.goto(`/admin/nichos/${nicho.slug}`);
 
     await expect(page.getByRole("heading", { name: "perfis indicados pelos clientes" })).toBeVisible();

@@ -232,7 +232,7 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
                     <tr>
                       {diaADia.map((d) => (
                         <td key={d.dia} title={`${formatarData(d.dia)}: ${d.gravados > 0 ? "gravou" : d.escritos > 0 ? "gerou roteiro" : "nada"}`} data-dia={d.dia} data-estado={d.gravados > 0 ? "gravou" : d.escritos > 0 ? "gerou" : "nada"}>
-                          <i className={d.gravados > 0 ? conta.gravou : d.escritos > 0 ? conta.gerou : undefined} />
+                          <i role="img" aria-label={`${formatarData(d.dia)}: ${d.gravados > 0 ? "gravou" : d.escritos > 0 ? "gerou roteiro" : "nada"}`} className={d.gravados > 0 ? conta.gravou : d.escritos > 0 ? conta.gerou : undefined} />
                         </td>
                       ))}
                     </tr>

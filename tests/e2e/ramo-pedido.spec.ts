@@ -124,7 +124,7 @@ async function semearPedidoAberto(usuarioId: string, texto: string, provisorioId
 
 async function entrarComoAdmin(page: Page) {
   await entrar(page, EMAIL_ADMIN);
-  await expect(page).toHaveURL(/\/admin\/clientes/);
+  await expect(page).toHaveURL(/\/admin\/?$/);
 }
 
 function linhaDoPedido(page: Page, nomeDaMarca: string) {

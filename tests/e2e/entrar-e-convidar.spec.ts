@@ -32,11 +32,12 @@ test("admin entra, cria cliente, cliente entra com a senha gerada e cai em /come
   await page.getByLabel("Senha").fill(SENHA_ADMIN);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
 
-  await expect(page).toHaveURL(/\/admin\/clientes/);
+  await expect(page).toHaveURL(/\/admin\/?$/);
 
-  await page.getByRole("button", { name: "nova marca" }).click();
+  await page.goto("/admin/clientes");
+  await page.getByRole("button", { name: "nova conta" }).click();
   await page.getByLabel("nome", { exact: true }).fill("[exemplo] Cliente e2e");
-  await page.getByRole("button", { name: "criar marca" }).click();
+  await page.getByRole("button", { name: "criar conta" }).click();
 
   await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);
   await page.getByRole("button", { name: "dar acesso" }).click();

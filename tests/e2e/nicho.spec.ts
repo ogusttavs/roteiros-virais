@@ -31,7 +31,7 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
   await page.getByLabel("Senha").fill(SENHA_ADMIN);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
-  await expect(page).toHaveURL(/\/admin\/clientes/);
+  await expect(page).toHaveURL(/\/admin\/?$/);
 
   await page.goto("/admin/nichos");
   await page.getByRole("button", { name: "novo nicho" }).click();

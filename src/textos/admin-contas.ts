@@ -42,6 +42,8 @@ export const textosInicioAdmin = {
     aria: "Esta manhã",
     atencao: (n: number) => (n === 1 ? "1 coisa pede atenção" : `${n} coisas pedem atenção`),
     certo: "Tudo certo esta manhã",
+    nadaAindaMas: "Nada pede atenção por enquanto",
+    aindaSemTemas: (semTemas: number, ramos: number) => (ramos === 0 ? "Nenhum ramo ativo ainda." : `Os temas de hoje ainda não saíram em ${semTemas} de ${ramos} ramos; a madrugada pode ainda estar rodando.`),
     tudoCertoLinha: (ramos: number) => `A madrugada rodou ${ramos === 1 ? "no único ramo" : `nos ${ramos} ramos`}, os temas de hoje saíram e nenhuma conta parou de gravar.`,
   },
   atencao: {
@@ -228,6 +230,8 @@ export const textosContaAdmin = {
     erroRamo: "Não deu para trocar o ramo. Ele continua o de antes.",
     erroTipo: "Não deu para trocar o tipo. Ele continua o de antes.",
     erroLimite: "Não deu para salvar o limite. Ele continua o de antes.",
+    erroNome: "Não deu para salvar o nome. Ele continua o de antes.",
+    publicoErroGenerico: "Não deu para salvar. O público continua o de antes.",
   },
   registro: {
     titulo: "O que o admin trocou aqui",

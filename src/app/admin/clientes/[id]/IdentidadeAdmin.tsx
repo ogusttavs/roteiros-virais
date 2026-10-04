@@ -139,12 +139,12 @@ export function IdentidadeAdmin({ clienteId, nome, tipo, ramo, rede, publico, pu
 
   return (
     <dl className={styles.campos} data-identidade>
-      <Linha chave="nome" rotulo={t.nome} valor={nome} salvoAgora={salvoAgora === "nome"} editando={editando === "nome"} aoTrocar={() => abrir("nome")} rotuloBotao="Editar nome" comErro={Boolean(erro)}>
+      <Linha chave="nome" rotulo={t.nome} valor={nome} salvoAgora={salvoAgora === "nome"} editando={editando === "nome"} aoTrocar={() => abrir("nome")} rotuloBotao="Trocar nome" comErro={Boolean(erro)}>
         <form
           className={styles.formulario}
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            void executar("nome", () => renomearClienteAction(clienteId, nomeNovo), tr.erroLimite);
+            void executar("nome", () => renomearClienteAction(clienteId, nomeNovo), tr.erroNome);
           }}
         >
           <input className={styles.entrada} aria-label={t.nome} value={nomeNovo} onChange={(e) => setNomeNovo(e.target.value)} maxLength={80} autoFocus />
@@ -227,7 +227,7 @@ export function IdentidadeAdmin({ clienteId, nome, tipo, ramo, rede, publico, pu
         {alcanceNovo === "local" ? <input className={styles.entrada} aria-label={tr.campoRegiao} placeholder={tr.campoRegiao} value={regiaoNova} onChange={(e) => setRegiaoNova(e.target.value)} /> : null}
         {alcanceNovo === "outro_pais" ? <input className={styles.entrada} aria-label={tr.campoPais} placeholder={tr.campoPais} value={paisNovo} onChange={(e) => setPaisNovo(e.target.value)} /> : null}
         {alcanceNovo === "mais_de_um_pais" ? <input className={styles.entrada} aria-label={tr.campoPaises} placeholder={tr.campoPaises} value={paisesNovos} onChange={(e) => setPaisesNovos(e.target.value)} /> : null}
-        {erro ? <p className={styles.erroCampo} role="alert"><AlertTriangle size={16} strokeWidth={1.5} aria-hidden="true" />{erro === tr.erroLimite ? tr.publicoErro : erro}</p> : null}
+        {erro ? <p className={styles.erroCampo} role="alert"><AlertTriangle size={16} strokeWidth={1.5} aria-hidden="true" />{erro}</p> : null}
         <div className={styles.acoes}>
           <Botao tamanho="md" carregando={ocupado} onClick={() => void executar("publico", () => trocarPublicoDaContaAction(clienteId, { alcance: alcanceNovo, regiao: regiaoNova, pais: paisNovo, paises: paisesNovos }), tr.publicoErro)}>
             {tr.salvar}
