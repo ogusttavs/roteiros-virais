@@ -100,6 +100,18 @@ export async function inscricoesDaPessoa(usuarioId: string): Promise<InscricaoPu
   return db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, usuarioId));
 }
 
+/** A pessoa tem uma inscrição com este endereço? O endereço é comparado como o servidor o grava (normalizado). */
+export async function inscricaoDaPessoaExiste(usuarioId: string, endpoint: string): Promise<boolean> {
+  let href: string;
+  try {
+    href = new URL(endpoint).href;
+  } catch {
+    return false;
+  }
+  const [linha] = await db().select({ id: inscricoesPush.id }).from(inscricoesPush).where(and(eq(inscricoesPush.usuarioId, usuarioId), eq(inscricoesPush.endpoint, href)));
+  return Boolean(linha);
+}
+
 /** A pessoa tira o aviso deste aparelho (a Conta, "desligar"). Só apaga a inscrição dela. */
 export async function apagarInscricaoDaPessoa(usuarioId: string, endpoint: string): Promise<void> {
   await db().delete(inscricoesPush).where(and(eq(inscricoesPush.usuarioId, usuarioId), eq(inscricoesPush.endpoint, endpoint)));

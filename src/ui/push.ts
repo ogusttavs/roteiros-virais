@@ -29,6 +29,45 @@ export function chaveParaBytes(chave: string): Uint8Array<ArrayBuffer> {
   return bytes;
 }
 
+/** O que a Conta lembra deste aparelho: o aviso foi ligado aqui e a pessoa não o desligou. Sem isto, um aviso que morreu em silêncio é igual a um que nunca foi ligado. */
+const CHAVE_AVISO_LIGADO = "aviso-de-manha-ligado";
+
+function lembrarAviso(ligado: boolean): void {
+  try {
+    if (ligado) localStorage.setItem(CHAVE_AVISO_LIGADO, "1");
+    else localStorage.removeItem(CHAVE_AVISO_LIGADO);
+  } catch {
+    // Sem armazenamento (janela privada, dados bloqueados): a Conta só não sabe dizer que o aviso parou.
+  }
+}
+
+/** A pessoa ligou o aviso neste aparelho e não o desligou (a Conta usa para dizer "parou de chegar" quando a inscrição sumiu). */
+export function avisoDeveEstarLigado(): boolean {
+  try {
+    return localStorage.getItem(CHAVE_AVISO_LIGADO) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * A inscrição guardada no aparelho foi feita com a chave pública que o servidor usa hoje? Compara os bytes da `applicationServerKey` da inscrição com a
+ * chave atual. Sem chave guardada (o navegador não a devolve) não dá para saber: confere (não força uma nova inscrição à toa).
+ */
+export function chaveDaInscricaoConfere(chaveDaInscricao: ArrayBuffer | null | undefined, chavePublica: string): boolean {
+  if (!chaveDaInscricao) return true;
+  let atual: Uint8Array;
+  try {
+    atual = chaveParaBytes(chavePublica.trim());
+  } catch {
+    return true;
+  }
+  const guardada = new Uint8Array(chaveDaInscricao);
+  if (guardada.length !== atual.length) return false;
+  for (let i = 0; i < atual.length; i += 1) if (guardada[i] !== atual[i]) return false;
+  return true;
+}
+
 /** A inscrição deste aparelho, se houver (precisa do service worker pronto). */
 async function inscricaoDesteAparelho(): Promise<PushSubscription | null> {
   const registro = await navigator.serviceWorker.getRegistration("/");
@@ -101,6 +140,7 @@ export async function ligarAviso(chavePublica: string): Promise<ResultadoDeLigar
     etapa = "inscricao";
     const json = inscricao.toJSON();
     if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return { tipo: "erro", etapa, motivo: "sem chaves na inscrição" };
+    lembrarAviso(true);
     return { tipo: "ligado", inscricao: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }, endpointAntigo };
   } catch (erro) {
     return { tipo: "erro", etapa, motivo: descreverErro(erro) };
@@ -113,7 +153,43 @@ export async function desligarAviso(): Promise<string | null> {
   if (!inscricao) return null;
   const endpoint = inscricao.endpoint;
   await inscricao.unsubscribe().catch(() => false);
+  lembrarAviso(false);
   return endpoint;
+}
+
+/**
+ * Reinscreve o aparelho sozinho, sem perguntar (a permissão já foi dada): vale quando a inscrição guardada foi feita com outra chave pública que a de hoje
+ * (o navegador não a entrega mais) ou quando o servidor já não tem a inscrição (apagada por falha). `nada` quando está tudo certo, ou quando o aparelho não
+ * tem permissão ou inscrição (quem desligou de propósito não é religado). `servidorTem` diz se o servidor guarda aquele endereço.
+ */
+export async function reinscreverAvisoSeFaltar(
+  chavePublica: string,
+  servidorTem: (endpoint: string) => Promise<boolean>,
+): Promise<ResultadoDeLigar | { tipo: "nada" }> {
+  if (!suportaPush() || Notification.permission !== "granted" || !chavePublica.trim()) return { tipo: "nada" };
+  let etapa: EtapaDoAviso = "pronto";
+  try {
+    const registro = await navigator.serviceWorker.getRegistration("/");
+    const atual = registro ? await registro.pushManager.getSubscription() : null;
+    if (!registro || !atual) return { tipo: "nada" };
+    if (chaveDaInscricaoConfere(atual.options?.applicationServerKey, chavePublica) && (await servidorTem(atual.endpoint))) {
+      lembrarAviso(true);
+      return { tipo: "nada" };
+    }
+    etapa = "chave";
+    const aplicacao = chaveParaBytes(chavePublica.trim());
+    etapa = "assinatura";
+    const endpointAntigo = atual.endpoint;
+    await atual.unsubscribe().catch(() => false);
+    const nova = await registro.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: aplicacao });
+    etapa = "inscricao";
+    const json = nova.toJSON();
+    if (!json.endpoint || !json.keys?.p256dh || !json.keys?.auth) return { tipo: "erro", etapa, motivo: "sem chaves na inscrição" };
+    lembrarAviso(true);
+    return { tipo: "ligado", inscricao: { endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth }, endpointAntigo };
+  } catch (erro) {
+    return { tipo: "erro", etapa, motivo: descreverErro(erro) };
+  }
 }
 
 /** Os dados da inscrição deste aparelho no navegador (se houver), para reconciliar com o servidor quando a Conta abre. */

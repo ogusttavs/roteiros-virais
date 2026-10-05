@@ -404,3 +404,72 @@ self.addEventListener("notificationclick", function (event) {
       }),
   );
 });
+
+/*
+ * `pushsubscriptionchange`: o navegador troca ou perde a inscricao de push sozinho (o servico de push renovou, ou a chave publica do servidor mudou) e avisa o
+ * service worker, com a pagina fechada. Sem este evento o aviso morria em silencio: o servidor seguia mandando para um endereco que ja nao valia, a segunda falha
+ * apagava a inscricao e a pessoa ficava so com o e-mail. Aqui: pega a chave publica de hoje (/api/push/chave), se inscreve de novo (a permissao ja foi dada, nao
+ * se pergunta nada) e manda a inscricao nova ao servidor (/api/push/inscricao, com o cookie de sessao). Se nao houver sessao ou rede, nada a fazer: a pagina
+ * confere e reinscreve na proxima vez que abrir (src/ui/push.ts, `reinscreverAvisoSeFaltar`).
+ */
+function bytesDaChave(chave) {
+  var preenchida = (chave + "=".repeat((4 - (chave.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  var bruto = atob(preenchida);
+  var bytes = new Uint8Array(bruto.length);
+  for (var i = 0; i < bruto.length; i++) bytes[i] = bruto.charCodeAt(i);
+  return bytes;
+}
+
+function mesmaChave(guardada, atual) {
+  if (!guardada) return true;
+  var a = new Uint8Array(guardada);
+  if (a.length !== atual.length) return false;
+  for (var i = 0; i < a.length; i++) if (a[i] !== atual[i]) return false;
+  return true;
+}
+
+function sistemaDoAparelho() {
+  var ua = self.navigator && self.navigator.userAgent ? self.navigator.userAgent : "";
+  if (/iPhone|iPad|iPod/i.test(ua)) return "iphone";
+  if (/Android/i.test(ua)) return "android";
+  return "computador";
+}
+
+function reinscreverPush(event) {
+  return fetch("/api/push/chave", { credentials: "same-origin", cache: "no-store" })
+    .then(function (r) {
+      return r.ok ? r.json() : null;
+    })
+    .then(function (dados) {
+      if (!dados || typeof dados.chave !== "string" || !dados.chave) return undefined;
+      var atual = bytesDaChave(dados.chave);
+      var antiga = event.oldSubscription || null;
+      var aproveita = event.newSubscription && mesmaChave(event.newSubscription.options && event.newSubscription.options.applicationServerKey, atual);
+      var nova = aproveita
+        ? Promise.resolve(event.newSubscription)
+        : self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: atual });
+      return nova.then(function (inscricao) {
+        var json = inscricao.toJSON();
+        if (!json.endpoint || !json.keys) return undefined;
+        return fetch("/api/push/inscricao", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            endpoint: json.endpoint,
+            p256dh: json.keys.p256dh,
+            auth: json.keys.auth,
+            sistema: sistemaDoAparelho(),
+            endpointAntigo: antiga ? antiga.endpoint : null,
+          }),
+        });
+      });
+    })
+    .catch(function () {
+      // Sem rede, sem sessao ou o navegador recusou: a pagina tenta de novo ao abrir.
+    });
+}
+
+self.addEventListener("pushsubscriptionchange", function (event) {
+  event.waitUntil(reinscreverPush(event));
+});

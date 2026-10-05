@@ -4,7 +4,7 @@ import type { SistemaInstalado } from "@/db/schema";
 import { logger } from "@/lib/log";
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado } from "@/servicos/clientes";
-import { adiarPedidoDePush, apagarInscricaoDaPessoa, ErroInscricaoPush, registrarInscricaoPush } from "@/servicos/push";
+import { adiarPedidoDePush, apagarInscricaoDaPessoa, inscricaoDaPessoaExiste, ErroInscricaoPush, registrarInscricaoPush } from "@/servicos/push";
 
 function textoNaoVazio(valor: unknown): valor is string {
   return typeof valor === "string" && valor.trim().length > 0;
@@ -39,6 +39,13 @@ export async function registrarInscricaoPushAction(dados: unknown, sistema: unkn
     if (erro instanceof ErroInscricaoPush) return false;
     throw erro;
   }
+}
+
+/** O servidor guarda uma inscrição desta pessoa com este endereço? (O aparelho confere ao abrir o painel: se não, o aviso morreu e ele se reinscreve.) */
+export async function inscricaoRegistradaAction(endpoint: unknown): Promise<boolean> {
+  const sessao = await sessaoDoPainel();
+  if (!sessao || !textoNaoVazio(endpoint)) return false;
+  return inscricaoDaPessoaExiste(sessao.user.id, endpoint);
 }
 
 /** A pessoa desliga o aviso neste aparelho (só apaga uma inscrição dela). */

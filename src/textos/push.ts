@@ -21,6 +21,7 @@ export const textosPush = {
     titulo: "Aviso de manhã",
     ligado: "Ligado neste aparelho. Chega no horário do lembrete.",
     desligado: "Desligado neste aparelho.",
+    parou: "O aviso no celular parou de chegar. Ligue de novo, é só um toque.",
     semPermissao: "Este aparelho não deixa o aplicativo avisar. Nos ajustes do celular, procure o aplicativo e ligue as notificações.",
     precisaInstalar: "Para receber o aviso, instale o aplicativo na tela de início do celular e abra por ele.",
     semSuporte: "Este navegador não recebe avisos. No iPhone, instale o aplicativo na tela de início primeiro.",

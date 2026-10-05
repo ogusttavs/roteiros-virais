@@ -1,6 +1,6 @@
 /**
- * O `public/sw.js` depois do aviso por push (E48 PR 2): continua registrando tudo o que registrava (quem já instalou não pode quebrar) e ganha `push` e
- * `notificationclick`. O arquivo roda numa caixa de areia (`vm`) com um `self` falso que só guarda os ouvintes.
+ * `public/sw.js`, o evento `pushsubscriptionchange` (a inscrição de push que morria em silêncio): roda o arquivo de verdade num sandbox com um `self` falso e
+ * confere o que ele pede ao servidor e ao navegador quando o navegador troca a inscrição sozinho.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -8,150 +8,90 @@ import vm from "node:vm";
 
 import { describe, expect, it, vi } from "vitest";
 
-const SW = readFileSync(path.join(__dirname, "..", "..", "public", "sw.js"), "utf8");
+const CHAVE = "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U";
+const CODIGO = readFileSync(path.join(process.cwd(), "public", "sw.js"), "utf8");
 
-type Ouvinte = (evento: Record<string, unknown>) => void;
+type Chamada = { url: string; init?: { method?: string; body?: string } };
 
-function carregarSw() {
-  const ouvintes = new Map<string, Ouvinte>();
-  const notificacoes: { titulo: string; opcoes: Record<string, unknown> }[] = [];
-  const abertas: string[] = [];
-  const focadas: { url: string | null }[] = [];
-  let janelas: { focus: () => Promise<{ navigate: (url: string) => Promise<void> }> }[] = [];
-
+function carregar(opcoes: { chaveDoServidor?: string | null; subscribe?: () => Promise<unknown>; userAgent?: string }) {
+  const ouvintes: Record<string, (evento: unknown) => void> = {};
+  const chamadas: Chamada[] = [];
+  const subscribe = vi.fn(opcoes.subscribe ?? (async (..._args: unknown[]) => ({ toJSON: () => ({ endpoint: "https://web.push.apple.com/novo", keys: { p256dh: "a", auth: "b" } }) })));
   const self = {
-    location: { origin: "https://app.exemplo.test" },
-    addEventListener: (tipo: string, ouvinte: Ouvinte) => ouvintes.set(tipo, ouvinte),
-    skipWaiting: () => Promise.resolve(),
-    registration: {
-      showNotification: (titulo: string, opcoes: Record<string, unknown>) => {
-        notificacoes.push({ titulo, opcoes });
-        return Promise.resolve();
-      },
-    },
-    clients: {
-      claim: () => Promise.resolve(),
-      matchAll: () => Promise.resolve(janelas),
-      openWindow: (url: string) => {
-        abertas.push(url);
-        return Promise.resolve(null);
-      },
+    location: { origin: "https://app.exemplo.teste" },
+    navigator: { userAgent: opcoes.userAgent ?? "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)" },
+    registration: { pushManager: { subscribe } },
+    addEventListener: (nome: string, fn: (evento: unknown) => void) => {
+      ouvintes[nome] = fn;
     },
   };
-  const caixa = vm.createContext({ self, caches: {}, fetch: () => Promise.reject(new Error("sem rede")), URL, Promise, console });
-  vm.runInContext(SW, caixa);
-  return {
-    ouvintes,
-    notificacoes,
-    abertas,
-    focadas,
-    comJanelas(lista: typeof janelas) {
-      janelas = lista;
-    },
+  const fetchFalso = async (url: string, init?: Chamada["init"]) => {
+    chamadas.push({ url, init });
+    if (url === "/api/push/chave") {
+      return opcoes.chaveDoServidor === null
+        ? { ok: false, json: async () => ({}) }
+        : { ok: true, json: async () => ({ chave: opcoes.chaveDoServidor ?? CHAVE }) };
+    }
+    return { ok: true, json: async () => ({ ok: true }) };
   };
+  vm.runInNewContext(CODIGO, { self, fetch: fetchFalso, URL, Headers, Response, Uint8Array, atob, caches: {}, console });
+  return { ouvintes, chamadas, subscribe };
 }
 
-function eventoPush(dados: unknown, semDados = false) {
-  const esperas: Promise<unknown>[] = [];
-  return {
-    evento: {
-      data: semDados ? null : { json: () => dados },
-      waitUntil: (p: Promise<unknown>) => esperas.push(p),
-    },
-    esperar: () => Promise.all(esperas),
-  };
+async function disparar(ouvintes: Record<string, (evento: unknown) => void>, evento: Record<string, unknown>) {
+  let espera: Promise<unknown> = Promise.resolve();
+  ouvintes["pushsubscriptionchange"]({ ...evento, waitUntil: (p: Promise<unknown>) => (espera = p) });
+  await espera;
 }
 
-describe("public/sw.js: o que já existia continua", () => {
-  it("registra install, activate, fetch e message, além do push e do notificationclick", () => {
-    const { ouvintes } = carregarSw();
-    for (const tipo of ["install", "activate", "fetch", "message", "push", "notificationclick"]) {
-      expect(ouvintes.has(tipo), tipo).toBe(true);
-    }
+describe("sw.js: pushsubscriptionchange", () => {
+  it("o service worker escuta o evento", () => {
+    expect(carregar({}).ouvintes["pushsubscriptionchange"]).toBeTypeOf("function");
   });
 
-  it("os nomes de cache e a lista fechada de páginas seguem os de antes (a versão do cache não mudou)", () => {
-    expect(SW).toContain('var VERSAO = "v1";');
-    expect(SW).toContain('var PREFIXO_PAGINAS = "roteiros-paginas";');
-    expect(SW).toContain("/^\\/roteiros\\/\\d+(\\/gravar)?$/");
-    expect(SW).toContain("NUNCA guarda: /admin, /api");
-  });
-});
+  it("sem inscrição nova do navegador: pede a chave de hoje, se inscreve com ela e manda a inscrição ao servidor, com o endereço antigo e o sistema", async () => {
+    const { ouvintes, chamadas, subscribe } = carregar({});
+    await disparar(ouvintes, { oldSubscription: { endpoint: "https://web.push.apple.com/velho" }, newSubscription: null });
 
-describe("push", () => {
-  it("mostra a notificação com o título e o corpo do aviso, o ícone do app e a url no dado", async () => {
-    const sw = carregarSw();
-    const { evento, esperar } = eventoPush({ titulo: "Klaki", corpo: "O seu roteiro de hoje está pronto", url: "/hoje" });
+    expect(subscribe).toHaveBeenCalledTimes(1);
+    const pedido = subscribe.mock.calls[0][0] as { userVisibleOnly: boolean; applicationServerKey: Uint8Array };
+    expect(pedido.userVisibleOnly).toBe(true);
+    expect(pedido.applicationServerKey.length).toBe(65);
+    expect(pedido.applicationServerKey[0]).toBe(4);
 
-    sw.ouvintes.get("push")!(evento);
-    await esperar();
-
-    expect(sw.notificacoes).toHaveLength(1);
-    expect(sw.notificacoes[0].titulo).toBe("Klaki");
-    expect(sw.notificacoes[0].opcoes).toMatchObject({ body: "O seu roteiro de hoje está pronto", icon: "/icone-192.png", data: { url: "/hoje" } });
-  });
-
-  it("push vazio ou com dado quebrado ainda mostra uma notificação (o navegador exige), com o aviso genérico", async () => {
-    const sw = carregarSw();
-    const vazio = eventoPush(null, true);
-    sw.ouvintes.get("push")!(vazio.evento);
-    await vazio.esperar();
-    const quebrado = { data: { json: () => { throw new Error("json ruim"); } }, waitUntil: vi.fn() };
-    sw.ouvintes.get("push")!(quebrado);
-
-    expect(sw.notificacoes).toHaveLength(2);
-    expect(sw.notificacoes[0].titulo).toBe("Aviso");
-  });
-
-  it("a url do aviso só vale se for um caminho do próprio app: endereço de fora e '//' viram /hoje", async () => {
-    const sw = carregarSw();
-    for (const url of ["https://outro.exemplo/x", "//outro.exemplo/x", "/\\outro.exemplo", "/\t/outro.exemplo", "/\n/outro.exemplo", "hoje", 42, undefined]) {
-      const { evento, esperar } = eventoPush({ titulo: "t", corpo: "c", url });
-      sw.ouvintes.get("push")!(evento);
-      await esperar();
-    }
-    expect(sw.notificacoes.map((n) => (n.opcoes.data as { url: string }).url)).toEqual(Array(8).fill("/hoje"));
-  });
-});
-
-describe("notificationclick", () => {
-  it("fecha a notificação e foca a janela do app que já está aberta, levando-a ao caminho", async () => {
-    const sw = carregarSw();
-    const navegou: string[] = [];
-    sw.comJanelas([{ focus: () => Promise.resolve({ navigate: (url: string) => (navegou.push(url), Promise.resolve()) }) }]);
-    const esperas: Promise<unknown>[] = [];
-    const fechou = vi.fn();
-
-    sw.ouvintes.get("notificationclick")!({
-      notification: { close: fechou, data: { url: "/roteiros/7" } },
-      waitUntil: (p: Promise<unknown>) => esperas.push(p),
+    const envio = chamadas.find((c) => c.url === "/api/push/inscricao")!;
+    expect(envio.init?.method).toBe("POST");
+    expect(JSON.parse(envio.init!.body!)).toEqual({
+      endpoint: "https://web.push.apple.com/novo",
+      p256dh: "a",
+      auth: "b",
+      sistema: "iphone",
+      endpointAntigo: "https://web.push.apple.com/velho",
     });
-    await Promise.all(esperas);
-
-    expect(fechou).toHaveBeenCalled();
-    expect(navegou).toEqual(["/roteiros/7"]);
-    expect(sw.abertas).toEqual([]);
   });
 
-  it("um caminho do app com parâmetros vale como veio; e se focar ou navegar rejeitar (janela que o service worker não controla), abre uma nova", async () => {
-    const sw = carregarSw();
-    sw.comJanelas([{ focus: () => Promise.reject(new Error("janela nao controlada")) }]);
-    const esperas: Promise<unknown>[] = [];
-
-    sw.ouvintes.get("notificationclick")!({ notification: { close: vi.fn(), data: { url: "/roteiros/7?de=push" } }, waitUntil: (p: Promise<unknown>) => esperas.push(p) });
-    await Promise.all(esperas);
-
-    expect(sw.abertas).toEqual(["/roteiros/7?de=push"]);
+  it("a inscrição nova que o navegador já trouxe, com a chave de hoje, é aproveitada (não se inscreve de novo)", async () => {
+    const { ouvintes, chamadas, subscribe } = carregar({});
+    const bytes = Buffer.from(CHAVE.replace(/-/g, "+").replace(/_/g, "/") + "=", "base64");
+    await disparar(ouvintes, {
+      oldSubscription: null,
+      newSubscription: {
+        options: { applicationServerKey: bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) },
+        toJSON: () => ({ endpoint: "https://web.push.apple.com/da-troca", keys: { p256dh: "c", auth: "d" } }),
+      },
+    });
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(JSON.parse(chamadas.find((c) => c.url === "/api/push/inscricao")!.init!.body!)).toMatchObject({ endpoint: "https://web.push.apple.com/da-troca", endpointAntigo: null });
   });
 
-  it("sem janela aberta, abre uma nova em /hoje", async () => {
-    const sw = carregarSw();
-    sw.comJanelas([]);
-    const esperas: Promise<unknown>[] = [];
+  it("sem chave do servidor (sem sessão), ou com o navegador recusando, não envia nada e não quebra", async () => {
+    const semSessao = carregar({ chaveDoServidor: null });
+    await disparar(semSessao.ouvintes, { oldSubscription: null, newSubscription: null });
+    expect(semSessao.subscribe).not.toHaveBeenCalled();
+    expect(semSessao.chamadas.some((c) => c.url === "/api/push/inscricao")).toBe(false);
 
-    sw.ouvintes.get("notificationclick")!({ notification: { close: vi.fn(), data: {} }, waitUntil: (p: Promise<unknown>) => esperas.push(p) });
-    await Promise.all(esperas);
-
-    expect(sw.abertas).toEqual(["/hoje"]);
+    const recusado = carregar({ subscribe: async () => Promise.reject(new Error("push service error")) });
+    await disparar(recusado.ouvintes, { oldSubscription: null, newSubscription: null });
+    expect(recusado.chamadas.some((c) => c.url === "/api/push/inscricao")).toBe(false);
   });
 });
