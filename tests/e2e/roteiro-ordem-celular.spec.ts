@@ -193,7 +193,8 @@ test.describe("Roteiro a 390px: a ordem dos blocos não muda com o lado (V15, it
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 
     const texto = await page.locator("body").innerText();
-    const marcos = ["Onde gravar e o que mostrar", "Como editar", "Referência", "Outras versões deste tema"];
+    // A cena do Reels falado agora está no bloco da fala (a seção "Onde gravar e o que mostrar" não existe mais aqui): é ela o primeiro marco.
+    const marcos = ["mostrar o produto", "Como editar", "Referência", "Outras versões deste tema"];
     confereCrescente(indiceDeTodos(texto, marcos), marcos);
   });
 

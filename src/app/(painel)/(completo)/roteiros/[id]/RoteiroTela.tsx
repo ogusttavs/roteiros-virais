@@ -819,7 +819,7 @@ export function RoteiroTela({
         ) : (
           <>
             <article className={styles.blocos}>
-              <RoteiroTexto blocos={blocos} />
+              <RoteiroTexto blocos={blocos} comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"} />
               {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
               <p className={styles.julgar}>
                 {textosRoteiro.reprovar.naoFicouBom}{" "}
@@ -836,7 +836,8 @@ export function RoteiroTela({
               </p>
             </article>
 
-            <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
+            {/* Em Reels falado a cena de cada bloco já está junto da fala (`RoteiroTexto comCenas`); a seção separada só continua onde o bloco não a traz (Story e sem fala). */}
+            {roteiro.formato === "story" || roteiro.estilo === "sem_fala" ? <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} /> : null}
 
             {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
               corpo.cartoes.map((cartao, indice) => (
