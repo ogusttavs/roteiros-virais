@@ -189,7 +189,9 @@ test.describe("roteiro pela tela", () => {
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByText("Onde gravar e o que mostrar")).toBeVisible();
+    // A fala e a cena juntas: a cena do roteiro (mock) está no bloco da fala, e a seção separada não existe mais na leitura de Reels.
+    await expect(page.getByText("mostrar o local de verdade")).toBeVisible();
+    await expect(page.getByText("Onde gravar e o que mostrar")).toHaveCount(0);
     await expect(page.getByText("Como editar")).toBeVisible();
     await expect(page.getByText("Para que te chamem")).toBeVisible();
     // R1, item 2 e 4: o Reels falado agora também segue regra de plataforma (antes só Story), e a

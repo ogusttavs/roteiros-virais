@@ -46,6 +46,61 @@
   color: var(--cor-titulo);
 }
 
+/* A fala e a cena do mesmo bloco, juntas (a leitura do roteiro): empilhadas no celular, lado a lado do tablet para cima. */
+.fala {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-2);
+}
+
+.cena {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-1);
+  padding: var(--espaco-3);
+  border-radius: var(--raio-md);
+  background: var(--cor-selecao-suave);
+  border-left: 2px solid var(--cor-selecao-borda);
+}
+
+.rotuloCena {
+  font: var(--peso-semibold) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-destaque);
+}
+
+.textoCena {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: var(--altura-corpo);
+  color: var(--cor-titulo);
+}
+
+.momentoCena {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-destaque);
+}
+
+@media (min-width: 1024px) {
+  .roteiro:has(.comCena) {
+    max-width: none;
+  }
+
+  .comCena {
+    display: grid;
+    grid-template-columns: minmax(0, 34ch) minmax(0, 1fr);
+    column-gap: var(--espaco-6);
+    align-items: start;
+  }
+
+  .comCena > .rotulo {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+
 .gravacao {
   gap: var(--espaco-8);
   max-width: 26ch;

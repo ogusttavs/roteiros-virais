@@ -292,7 +292,7 @@ test.describe("painel sem rede", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: TITULO_ROTEIRO, level: 1 })).toBeVisible();
     await expect(page.getByText(GANCHO)).toBeVisible();
-    await expect(page.getByText("Onde gravar e o que mostrar")).toBeVisible();
+    await expect(page.getByText("mostrar a mancha")).toBeVisible();
     await expect(faixaSemConexao(page)).toBeVisible();
 
     // O que precisa do servidor fica desabilitado, com o motivo escrito.

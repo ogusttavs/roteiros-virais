@@ -210,6 +210,23 @@ function mostrarNoBlocoReels(
     .map((item) => textosRoteiro.mostrar.textoNaTelaComQuando(item.quando, item.oQue));
 }
 
+/**
+ * As cenas de um Reels falado que caem em um bloco (a fala e a cena juntas na leitura, achado do Gustavo em 05/10/2026): cada cena entra no bloco do segundo em que começa
+ * (`momento`, o mesmo casamento por posição do texto na tela); uma cena sem número no `momento` entra pela posição dela na lista. Nenhuma cena se perde: todas caem em algum bloco.
+ */
+export function cenasDoBloco(
+  cenas: ConteudoRoteiro["cenas"],
+  duracaoS: number,
+  bloco: BlocoReels,
+): { momento: string; oQueFazer: string }[] {
+  const ordem: BlocoReels[] = ["abertura", "meio", "fechamento", "chamada"];
+  return cenas.filter((cena, indice) => {
+    const segundo = primeiroSegundo(cena.momento);
+    const dela = segundo === null ? ordem[Math.min(ordem.length - 1, Math.floor((indice * ordem.length) / cenas.length))] : blocoDoSegundo(segundo, duracaoS);
+    return dela === bloco;
+  });
+}
+
 /** O que mostrar num cartão de Story (V11, item 6a): sempre as três linhas, a figurinha só quando pedida. */
 function mostrarNoCartao(cartao: NonNullable<ConteudoRoteiro["cartoes"]>[number]): string[] {
   const linhas = [
@@ -233,7 +250,7 @@ function mostrarNoCartao(cartao: NonNullable<ConteudoRoteiro["cartoes"]>[number]
  */
 export function blocosParaLeitura(
   roteiro: RoteiroLinha,
-): { rotulo: string; paragrafos: string[]; mostrar?: string[] }[] {
+): { rotulo: string; paragrafos: string[]; mostrar?: string[]; cenas?: { momento: string; oQueFazer: string }[] }[] {
   const corpo = corpoDoRoteiro(roteiro);
   /**
    * M4, item 5: sem fala sempre usa `cartoes` (a mesma estrutura de Story), nos dois formatos, por
@@ -260,21 +277,25 @@ export function blocosParaLeitura(
       rotulo: textosRoteiro.blocos.abertura,
       paragrafos: [corpo.gancho],
       mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "abertura"),
+      cenas: cenasDoBloco(corpo.cenas, corpo.duracaoS, "abertura"),
     },
     {
       rotulo: textosRoteiro.blocos.meio,
       paragrafos: splitParagrafos(corpo.corpo),
       mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "meio"),
+      cenas: cenasDoBloco(corpo.cenas, corpo.duracaoS, "meio"),
     },
     {
       rotulo: textosRoteiro.blocos.fechamento,
       paragrafos: splitParagrafos(corpo.fechamento),
       mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "fechamento"),
+      cenas: cenasDoBloco(corpo.cenas, corpo.duracaoS, "fechamento"),
     },
     {
       rotulo: textosRoteiro.blocos.chamada,
       paragrafos: [corpo.chamadaFinal],
       mostrar: mostrarNoBlocoReels(corpo.edicao, corpo.duracaoS, "chamada"),
+      cenas: cenasDoBloco(corpo.cenas, corpo.duracaoS, "chamada"),
     },
   ];
 }
