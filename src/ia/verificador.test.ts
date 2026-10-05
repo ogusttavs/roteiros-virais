@@ -976,6 +976,27 @@ describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
     expect(temAlgoParaGuardar("Dica 1 é não esfregar")).toBe(true);
   });
 
+  it("a lista numerada aparece de vários jeitos (o caso 15 do golden set, 'cinco coisas'): em linhas, em negrito, entre parênteses, fora de sequência, em tópicos e contada em voz alta", () => {
+    const corpos = [
+      "Cinco coisas que você limpa errado:\n1. A esponja de cozinha\n2. O pano de chão\n3. O ralo\n4. O controle\n5. O celular",
+      "**1.** A esponja de cozinha. **2.** O pano de chão. **3.** O ralo.",
+      "(1) esponja (2) pano (3) ralo",
+      "Número 1: a esponja. Número 2: o pano.",
+      "As coisas são estas. 3) o ralo, 4) o controle, 5) o celular",
+      "- a esponja\n- o pano\n- o ralo",
+      "Um: a esponja. Dois: o pano de chão. Três: o ralo.",
+      "1º a esponja, 2º o pano, 3º o ralo",
+      "Erro 1 é a esponja. O segundo é o pano.",
+    ];
+    for (const corpo of corpos) expect(temAlgoParaGuardar(corpo), corpo).toBe(true);
+  });
+
+  it("dinheiro, decimal, intervalo e uma conta solta continuam não sendo lista", () => {
+    for (const corpo of ["O orçamento ficou em R$ 2.500 e R$ 3.200 no total", "A fila tinha de 5 a 10 pessoas e demorou 1,5 hora", "Fechei em 12 meses e 3 parcelas sem juros", "Foram 2 dias, 1 sofá e muita pressa"]) {
+      expect(temAlgoParaGuardar(corpo), corpo).toBe(false);
+    }
+  });
+
   it("temAlgoParaGuardar lê o texto sem acento", () => {
     expect(temAlgoParaGuardar("Cinco dicas rápidas")).toBe(true);
     expect(temAlgoParaGuardar("Eu gosto muito disso")).toBe(false);

@@ -33,11 +33,24 @@ export function temAlgoParaGuardar(corpo: string): boolean {
     .toLowerCase();
   // Passos numerados: o 1 e o 2 (um "R$ 2.500" ou um "em 3. Depois" sozinhos não bastam).
   if (/(^|[^\d.,$])1\s*[.):-]\s*\S[\s\S]*?(^|[^\d.,$])2\s*[.):-]\s*\S/.test(t)) return true;
-  // "Passo 1", "etapa 1", "dica 1", "1o passo", "passo a passo".
-  if (/\b(passo|etapa|dica)\s*(1|um)\b|\b1(o|a)?\s*(passo|etapa|dica)\b|\bpasso a passo\b|\bprimeiro passo\b/.test(t)) return true;
+  // Marcadores de lista com dois números diferentes de 1 a 9, em qualquer formato ("1.", "2)", "3 -", "4:", "5º", em negrito ou entre parênteses), sem exigir que sejam o 1 e o 2 nem que venham em
+  // sequência: o falso positivo do caso 15 do golden set ("cinco coisas", corpo com lista numerada de 1 a 5, reprovado como "sem lista"). Dinheiro ("R$ 2.500") e decimais não contam.
+  const marcadores = new Set<string>();
+  for (const m of t.matchAll(/(?:^|[\s*_(>])([1-9])(?:\s*[.):\-]|[oa]\b|[ºª°])\s*(?=\S)/g)) {
+    const depois = t.slice((m.index ?? 0) + m[0].length - 1, (m.index ?? 0) + m[0].length + 2);
+    if (/^\d/.test(depois) || /^[.,]\d/.test(depois)) continue;
+    marcadores.add(m[1]);
+  }
+  if (marcadores.size >= 2) return true;
+  // "Passo 1", "etapa 1", "dica 1", "erro 1", "coisa 1", "número 1", "1o passo", "passo a passo".
+  if (/\b(passo|etapa|dica|erro|coisa|item|motivo|jeito|forma|cuidado|truque|mito|sinal|regra|numero)\s*(1|um)\b|\b1(o|a)?\s*(passo|etapa|dica)\b|\bpasso a passo\b|\bprimeiro passo\b/.test(t)) return true;
+  // Contagem falada ("um: a esponja. dois: o pano."): dois números por extenso em marcador, no começo de frase.
+  if (/(^|[.!?\n]\s*)(um|uma)\s*[:,]\s*\S[\s\S]*?(^|[.!?\n]\s*)(dois|duas)\s*[:,]\s*\S/.test(t)) return true;
+  // Lista em tópicos: três linhas ou mais começando com marcador.
+  if ((t.match(/^\s*[-*•]\s+\S/gm) ?? []).length >= 3) return true;
   // Na ordem, escrito: pelo menos dois marcadores de ordem diferentes ("primeiro ... depois ... por fim"), ou a ordem dita ("nessa ordem").
   if (/\b(nessa|nesta|na|essa|esta) ordem\b|\bordem certa\b/.test(t)) return true;
-  const ordem = ["primeiro", "segundo", "terceiro", "depois", "em seguida", "por fim", "por ultimo", "no final"].filter((m) => new RegExp(String.raw`\b${m}\b`).test(t));
+  const ordem = ["primeiro", "primeira", "segundo", "segunda", "terceiro", "terceira", "depois", "em seguida", "por fim", "por ultimo", "no final"].filter((m) => new RegExp(String.raw`\b${m}\b`).test(t));
   if (ordem.length >= 2) return true;
   // Lista anunciada com contagem: "dois erros", "oito jeitos", "5 dicas", "tres cuidados".
   if (
@@ -779,7 +792,8 @@ async function tentarGerarEVerificar<T>(
       }),
     });
     aprovado = verificacao.dados.aprovado;
-    motivos = verificacao.dados.aprovado ? [] : [verificacao.dados.motivo ?? "reprovado"];
+    // Reprovando por fato, o motivo carrega o fato e a frase mais próxima das fontes (`motivoDaConferencia`): é o que a segunda tentativa recebe para corrigir.
+    motivos = verificacao.dados.aprovado ? [] : [verificarTexto.motivoDaConferencia(verificacao.dados)];
 
     await registrarGeracao({
       tarefa: "verificarTexto",

@@ -36,7 +36,7 @@ function parametros(fontesDosFatos: string | undefined, marcador: boolean) {
 
 describe("fontesDosFatos no verificador", () => {
   it("com fontes, o fato fora delas reprova as duas tentativas e a geração falha dizendo o motivo", async () => {
-    await expect(gerarComVerificacao(parametros("Perfil: lava estofado.\n\nTema: a mancha", true))).rejects.toThrow(/reprovada duas vezes.*fato que não está nas fontes/);
+    await expect(gerarComVerificacao(parametros("Perfil: lava estofado.\n\nTema: a mancha", true))).rejects.toThrow(/reprovada duas vezes.*nada nas fontes o sustenta.*fonte mais próxima: nenhuma/);
     const linhas = await db().select().from(geracoesIA);
     // As duas tentativas, cada uma com o seu verificarTexto, ficaram registradas.
     expect(linhas.filter((l) => l.tarefa === "verificarTexto").length).toBeGreaterThanOrEqual(2);

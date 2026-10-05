@@ -178,7 +178,7 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
     if (resposta instanceof Error) return;
     verificacoes[indice] = {
       aprovado: resposta.dados.aprovado,
-      motivos: resposta.dados.aprovado ? [] : [resposta.dados.motivo ?? "reprovado"],
+      motivos: resposta.dados.aprovado ? [] : [verificarTextoIA.motivoDaConferencia(resposta.dados)],
     };
   });
 

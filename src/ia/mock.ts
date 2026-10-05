@@ -426,7 +426,9 @@ function mockVerificarTexto(entrada: string) {
   const inventou = entrada.includes("FONTES (") && texto.includes("[mock:fato-inventado]");
   return {
     aprovado: !gritando && !inventou,
-    motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato que não está nas fontes" : null,
+    motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato específico que nada nas fontes sustenta" : null,
+    fatoEspecifico: inventou ? "o Uli está do meu lado" : null,
+    fonteMaisProxima: inventou ? "nenhuma" : null,
   };
 }
 
