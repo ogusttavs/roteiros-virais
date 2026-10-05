@@ -12,9 +12,12 @@
  * 1), 5 minutos depois de `lembrete` so para nao competir pelo mesmo minuto
  * exato.
  *
- * `contasBase` (E6 parte 3, item 5) roda as 03:40, depois das duas coletas
- * (03:00 e 03:30) e antes de `pontuar` (03:45): o catch-up de ate 10 videos
- * por conta precisa estar gravado antes da mediana do dia ser calculada.
+ * `contasBase` (E6 parte 3, item 5) roda as 02:35 (era 03:40 ate 05/10/2026: o aplicativo
+ * da Meta, sem aprovacao, tem um limite por hora e `meta-contas` e `contas-base` pediam
+ * dezenas de contas a cinco minutos uma da outra; agora ha uma hora entre as duas) e
+ * antes de `pontuar` (03:45): o catch-up de ate 10 videos por conta precisa estar gravado
+ * antes da mediana do dia ser calculada. Contraponto: a conta que a coleta das 03:00
+ * descobre ganha a base na noite seguinte, nao na mesma.
  *
  * `metaContas` (E6 parte 3, segunda rodada, item 2) roda as 03:35, entre a
  * coleta do Apify (03:30) e o `contasBase` (03:40): a Business Discovery
@@ -113,8 +116,8 @@ export const AGENDAMENTOS: Agendamento[] = [
   },
   {
     fila: FILAS.contasBase,
-    cron: "40 3 * * *",
-    descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 03:40, depois das coletas",
+    cron: "35 2 * * *",
+    descricao: "catch-up de contas sem base (ate 10 videos cada), todo dia as 02:35, uma hora antes do meta-contas (limite do aplicativo na Meta) e antes de pontuar",
   },
   {
     fila: FILAS.descobertaInstagram,

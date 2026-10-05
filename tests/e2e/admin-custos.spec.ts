@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { configuracaoAdmin, custosExternos, custosFixos, geracoesIA, nichos } from "../../src/db/schema";
+import { configuracaoAdmin, custosExternos, custosFixos, execucoesJob, geracoesIA, nichos } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA = "ExemploSenha123";
@@ -115,6 +115,31 @@ test.describe("custos e rotinas", () => {
     const [linhaNoBanco] = await db().select().from(custosFixos).where(eq(custosFixos.nome, "E2E Servidor de teste"));
     expect(linhaNoBanco.ativo).toBe(false);
     expect(linhaNoBanco.tiradoEm).not.toBeNull();
+  });
+
+  test("Rotinas: o cartão do grupo em que um job falhou e outro deu certo diz qual falhou, quando e por quê, e o resultado é o do que falhou", async ({ page }) => {
+    const agora = Date.now();
+    const [falhou, deuCerto] = await db()
+      .insert(execucoesJob)
+      .values([
+        { nome: "coleta-meio-dia", status: "erro", iniciadoEm: new Date(agora - 3 * 60 * 60 * 1000), terminadoEm: new Date(agora - 3 * 60 * 60 * 1000 + 5000), erro: "meta api indisponivel (codigo 4): (#4) Application request limit reached" },
+        { nome: "coleta-apify", status: "ok", iniciadoEm: new Date(agora - 60 * 60 * 1000), terminadoEm: new Date(agora - 60 * 60 * 1000 + 49_900) },
+      ])
+      .returning({ id: execucoesJob.id });
+    try {
+      await entrarAdmin(page);
+      await page.goto("/admin/jobs");
+      const cartao = page.locator('[data-rotina="buscar"]');
+      await expect(cartao).toHaveAttribute("data-estado", "erro");
+      const resultado = cartao.locator("[data-resultado]");
+      await expect(resultado).toHaveAttribute("data-resultado", "falhou");
+      await expect(resultado).toContainText("A coleta do meio-dia falhou");
+      await expect(resultado).toContainText("O limite da Meta (Instagram) foi atingido; a rotina continua na hora seguinte.");
+      await expect(resultado).not.toContainText("deu certo");
+    } finally {
+      await db().delete(execucoesJob).where(eq(execucoesJob.id, falhou.id));
+      await db().delete(execucoesJob).where(eq(execucoesJob.id, deuCerto.id));
+    }
   });
 
   test("Rotinas: a madrugada por ramo e um cartão por rotina, com o detalhe técnico dentro", async ({ page }) => {

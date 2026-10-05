@@ -50,7 +50,7 @@ import { and, eq, gte } from "drizzle-orm";
 import { temIndicioDeBrasil } from "@/config/brasil";
 import { db } from "@/db";
 import { hashtagsMetaUsadas, nichos, videos } from "@/db/schema";
-import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, ErroMetaApi, erroMetaEhHashtagInexistente } from "@/jobs/meta-api";
+import { buscarIdDaHashtag, buscarRecentMediaDaHashtag, ErroMetaApi, erroMetaEhHashtagInexistente, PausaDaMeta } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta";
@@ -163,8 +163,11 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
    */
   const hashtagsInexistentes: string[] = [];
   const erros: string[] = [];
+  // O limite do aplicativo na Meta: a rotina para sem erro (as hashtags de hoje que faltaram voltam na rodada de amanhã, que olha as mesmas 24 horas de `recent_media`).
+  const estadoDaMeta: { pausa: PausaDaMeta | null } = { pausa: null };
 
   for (const nicho of nichosAtivos) {
+    if (estadoDaMeta.pausa) break;
     definirRamoDoContexto(nicho.id);
     for (const termo of termosDaSemana(nicho.termos, quantidadeTermosPorNicho, semanaAtual)) {
       let hashtagId = mapaResolvidos.get(termo);
@@ -191,6 +194,10 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
           mapaResolvidos.set(termo, hashtagId);
           usadosNaSemana += 1;
         } catch (erro) {
+          if (erro instanceof PausaDaMeta) {
+            estadoDaMeta.pausa = erro;
+            break;
+          }
           /**
            * `buscarIdDaHashtag` ja devolve `null` para o `code 24` (achado
            * da prova do PR #38, 10/09/2026); esta checagem e so defesa a
@@ -238,13 +245,19 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
           }
         }
       } catch (erro) {
+        if (erro instanceof PausaDaMeta) {
+          estadoDaMeta.pausa = erro;
+          break;
+        }
         erros.push(`hashtag "${termo}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }
     }
   }
   restaurarRamoDoContexto();
 
+  const pausa = estadoDaMeta.pausa;
   return {
+    ...(pausa ? { pausadoPorLimite: true, motivo: pausa.motivo, retomaEm: pausa.retomaEm.toISOString() } : {}),
     nichos: nichosAtivos.length,
     videosNovos,
     videosAtualizados,

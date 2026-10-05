@@ -38,7 +38,8 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { consumoApi, contas, nichos } from "@/db/schema";
-import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi } from "@/jobs/meta-api";
+import { FILAS } from "@/jobs/fila";
+import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
 import { config, hojeISO } from "@/lib/config";
 import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
@@ -48,6 +49,7 @@ import { normalizarVideoYoutube } from "@/servicos/normalizadores/youtube";
 import { buscarInstagram, buscarTiktokVigilancia } from "./apify-api";
 import { upsertConta, upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
+import { agendarRetomadaDaMeta } from "./meta-retomada";
 import { MINIMO_VIDEOS_MEDIANA } from "./pontuar";
 import { buscarCanal, buscarUploadsDoCanal, buscarVideosPorId, CUSTO_LISTA } from "./youtube-api";
 
@@ -283,6 +285,8 @@ async function catchUpInstagram(
       return await catchUpInstagramMeta(nichoId, candidata);
     } catch (erro) {
       if (!(erro instanceof ErroMetaApi)) throw erro;
+      // O limite do aplicativo (80% de uso, ou o código 4): a rotina para sem erro e continua na hora seguinte.
+      if (erro instanceof PausaDaMeta) throw erro;
       /**
        * Classificacao do erro (achado da leitura previa do Fable, correcao
        * 1): token vencido ou limite de taxa afeta a chamada inteira, entao
@@ -379,6 +383,7 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
   let videosNovos = 0;
   let videosAtualizados = 0;
   let tetoAtingido = false;
+  const estadoDaMeta: { pausa: PausaDaMeta | null } = { pausa: null };
   const erros: string[] = [];
 
   /**
@@ -389,6 +394,8 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
    * foi feita).
    */
   async function processarCandidata(nichoId: number, candidata: ContaCandidata): Promise<void> {
+    // Com a Meta em pausa só o Instagram pela Meta espera; as outras plataformas seguem.
+    if (estadoDaMeta.pausa && candidata.plataforma === "instagram" && !instagramUsaApify(candidata)) return;
     if (usaApify(candidata) && !apifyCabe()) {
       tetoAtingido = true;
       return;
@@ -418,6 +425,10 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
        * previa): para o job na hora, em vez de engolir e seguir tentando
        * as outras candidatas, que falhariam do mesmo jeito.
        */
+      if (erro instanceof PausaDaMeta) {
+        estadoDaMeta.pausa = erro;
+        return;
+      }
       if (erro instanceof ErroColeta) throw erro;
       erros.push(
         `${candidata.plataforma} "${candidata.handle}": ${erro instanceof Error ? erro.message : String(erro)}`,
@@ -444,6 +455,24 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
 
   if (nichosAtivos.length === 0) {
     throw new ErroColeta("nenhum nicho ativo para o job contas-base", false);
+  }
+
+  const pausa = estadoDaMeta.pausa;
+  if (pausa) {
+    const agendou = await agendarRetomadaDaMeta(FILAS.contasBase, {}, pausa.retomaEm);
+    return {
+      pausadoPorLimite: true,
+      motivo: pausa.motivo,
+      retomaEm: pausa.retomaEm.toISOString(),
+      retomadaAgendada: agendou,
+      nichos: nichosAtivos.length,
+      contasProcessadas,
+      videosNovos,
+      videosAtualizados,
+      resultadosApifyDevolvidos,
+      tetoAtingido,
+      erros: erros.length > 0 ? erros : undefined,
+    };
   }
 
   return {

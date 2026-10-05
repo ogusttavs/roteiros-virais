@@ -10,10 +10,10 @@
  * de graca, `estrategia/plano-de-execucao.md`, item i) e Hashtag Search
  * (`top_media`, sinal de assunto, sem conta dona nem views).
  */
-import { asc, count, gte, lt } from "drizzle-orm";
+import { asc, count, eq, gte, lt } from "drizzle-orm";
 
 import { db } from "@/db";
-import { chamadasMetaApi } from "@/db/schema";
+import { chamadasMetaApi, configuracaoAdmin } from "@/db/schema";
 import { config } from "@/lib/config";
 
 const BASE = "https://graph.facebook.com/v26.0";
@@ -87,6 +87,119 @@ export function erroMetaEhTokenOuLimite(erro: ErroMetaApi): boolean {
 
 export function erroMetaEhHashtagInexistente(erro: ErroMetaApi): boolean {
   return erro.codigo === CODIGO_HASHTAG_INEXISTENTE && erro.subcodigo === SUBCODIGO_HASHTAG_INEXISTENTE;
+}
+
+/**
+ * O limite do aplicativo na Meta (achado de 05/10/2026, madrugada): `meta-contas` e `contas-base` falharam com "(#4) Application request limit reached", porque o aplicativo
+ * sem aprovação tem o limite de desenvolvimento por hora e as duas rotinas pediam dezenas de contas a cinco minutos uma da outra. A Meta diz o quanto do limite já foi usado em
+ * toda resposta, nos cabeçalhos `x-app-usage` e `x-business-use-case-usage` (porcentagens de 0 a 100). Passando de `LIMITE_DE_USO_PERCENTUAL`, a próxima chamada já nem sai:
+ * lança `PausaDaMeta`, que as rotinas tratam como "limite da Meta, continua na próxima hora" (não é erro) em vez de esbarrar no código 4.
+ */
+export const LIMITE_DE_USO_PERCENTUAL = 80;
+/** Quanto a Meta fica em pausa depois de passar do limite (ou de um erro de limite): a hora seguinte. */
+export const PAUSA_DA_META_MS = 60 * 60 * 1000;
+const CHAVE_PAUSA_DA_META = "meta_pausa_ate";
+export const MOTIVO_DA_PAUSA = "limite da Meta, continua na próxima hora";
+
+/** Quanto do limite já foi usado, na maior das medidas, e (quando a Meta diz) em quantos minutos o acesso volta. */
+export type UsoDaMeta = { percentual: number; medida: string; esperaMin: number | null };
+
+type Cabecalhos = { get(nome: string): string | null };
+
+function medidasDe(objeto: unknown): { medida: string; valor: number }[] {
+  if (typeof objeto !== "object" || objeto === null) return [];
+  const saida: { medida: string; valor: number }[] = [];
+  for (const medida of ["call_count", "total_time", "total_cputime"]) {
+    const valor = (objeto as Record<string, unknown>)[medida];
+    if (typeof valor === "number" && Number.isFinite(valor)) saida.push({ medida, valor });
+  }
+  return saida;
+}
+
+/**
+ * Lê `x-app-usage` ({"call_count":12,"total_time":3,"total_cputime":5}) e `x-business-use-case-usage` ({"<id>":[{"call_count":..,"estimated_time_to_regain_access":0}]}) e devolve a maior
+ * medida. Cabeçalho ausente ou que não é JSON não derruba nada: sem leitura, `null`.
+ */
+export function lerUsoDaMeta(cabecalhos: Cabecalhos): UsoDaMeta | null {
+  const medidas: { medida: string; valor: number }[] = [];
+  let esperaMin: number | null = null;
+  const considerar = (alvo: unknown) => {
+    medidas.push(...medidasDe(alvo));
+    const espera = (alvo as { estimated_time_to_regain_access?: unknown } | null)?.estimated_time_to_regain_access;
+    if (typeof espera === "number" && espera > 0) esperaMin = Math.max(esperaMin ?? 0, espera);
+  };
+  for (const nome of ["x-app-usage", "x-business-use-case-usage"]) {
+    const cru = cabecalhos.get(nome);
+    if (!cru) continue;
+    try {
+      const dado: unknown = JSON.parse(cru);
+      if (nome === "x-app-usage") considerar(dado);
+      else if (typeof dado === "object" && dado !== null) {
+        for (const lista of Object.values(dado)) if (Array.isArray(lista)) for (const item of lista) considerar(item);
+      }
+    } catch {
+      // Cabeçalho que não é JSON: ignora.
+    }
+  }
+  if (medidas.length === 0) return null;
+  const maior = medidas.reduce((a, b) => (b.valor > a.valor ? b : a));
+  return { percentual: maior.valor, medida: maior.medida, esperaMin };
+}
+
+/** A Meta está em pausa por limite até `retomaEm`. */
+export class PausaDaMeta extends ErroMetaApi {
+  constructor(
+    public readonly retomaEm: Date,
+    public readonly motivo: string = MOTIVO_DA_PAUSA,
+  ) {
+    // Código 4 (limite do aplicativo): quem ainda trata `ErroMetaApi` de limite (a curva do cliente) continua tratando esta pausa como limite.
+    super(`${motivo} (pausa até ${retomaEm.toISOString()})`, 4);
+  }
+}
+
+export async function pausaDaMetaAte(): Promise<Date | null> {
+  const [linha] = await db().select({ valor: configuracaoAdmin.valor }).from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, CHAVE_PAUSA_DA_META));
+  if (!linha) return null;
+  const data = new Date(linha.valor);
+  return Number.isNaN(data.getTime()) ? null : data;
+}
+
+/** Põe a Meta em pausa até `ate` (nunca encurta uma pausa que já vale por mais tempo). Devolve até quando ela vale. */
+export async function pausarMeta(ate: Date): Promise<Date> {
+  const atual = await pausaDaMetaAte();
+  const valor = atual && atual > ate ? atual : ate;
+  await db()
+    .insert(configuracaoAdmin)
+    .values({ chave: CHAVE_PAUSA_DA_META, valor: valor.toISOString() })
+    .onConflictDoUpdate({ target: configuracaoAdmin.chave, set: { valor: valor.toISOString(), atualizadoEm: new Date() } });
+  return valor;
+}
+
+/** A pausa que vale agora, ou nulo: as rotinas conferem antes de cada chamada. */
+export async function pausaVigenteDaMeta(agora: Date = new Date()): Promise<Date | null> {
+  const ate = await pausaDaMetaAte();
+  return ate && ate > agora ? ate : null;
+}
+
+/**
+ * Quanto esperar entre duas chamadas da Meta: espalha os pedidos ao longo da janela em vez de despejar as 200 da hora em poucos minutos. Padrão 2 s (`META_INTERVALO_MS`
+ * muda; o teste põe 0). Estado do processo: dois jobs ao mesmo tempo no worker dividem o mesmo ritmo.
+ */
+let ultimaChamadaEm = 0;
+export function intervaloEntreChamadasMs(): number {
+  const cru = process.env.META_INTERVALO_MS;
+  const dado = Number(cru);
+  return cru !== undefined && cru !== "" && Number.isFinite(dado) ? dado : 2000;
+}
+
+async function esperarRitmo(): Promise<void> {
+  const intervalo = intervaloEntreChamadasMs();
+  if (intervalo <= 0) return;
+  const agora = Date.now();
+  const minha = Math.max(agora, ultimaChamadaEm + intervalo);
+  // Reserva a vez antes de dormir: dois pedidos ao mesmo tempo não acordam juntos.
+  ultimaChamadaEm = minha;
+  if (minha > agora) await new Promise((resolve) => setTimeout(resolve, minha - agora));
 }
 
 /**
@@ -169,7 +282,10 @@ export async function aguardarJanela(opts?: {
 }
 
 async function chamar<T>(caminho: string, parametros: Record<string, string>): Promise<T> {
+  const pausa = await pausaVigenteDaMeta();
+  if (pausa) throw new PausaDaMeta(pausa);
   await aguardarJanela();
+  await esperarRitmo();
 
   const url = new URL(`${BASE}/${caminho}`);
   for (const [chave, valor] of Object.entries(parametros)) {
@@ -184,6 +300,12 @@ async function chamar<T>(caminho: string, parametros: Record<string, string>): P
    */
   await registrarChamada();
   const resposta = await fetch(url);
+
+  // O quanto do limite do aplicativo já foi usado: passou do limite, a pausa começa agora (esta resposta ainda vale; a próxima chamada é que não sai).
+  const uso = lerUsoDaMeta(resposta.headers);
+  if (uso && uso.percentual >= LIMITE_DE_USO_PERCENTUAL) {
+    await pausarMeta(new Date(Date.now() + Math.max(PAUSA_DA_META_MS, (uso.esperaMin ?? 0) * 60_000)));
+  }
 
   let corpo: { error?: ErroMeta } & Record<string, unknown>;
   try {
@@ -200,6 +322,11 @@ async function chamar<T>(caminho: string, parametros: Record<string, string>): P
   }
   if (!resposta.ok || corpo.error) {
     const erro = corpo.error ?? {};
+    // O 4 (e os outros de limite de taxa, menos o token vencido) é o aplicativo no limite: pausa a hora seguinte e sai como pausa, não como erro.
+    if (erro.code !== undefined && erro.code !== 190 && CODIGOS_TOKEN_OU_LIMITE.includes(erro.code)) {
+      const ate = await pausarMeta(new Date(Date.now() + PAUSA_DA_META_MS));
+      throw new PausaDaMeta(ate, `${MOTIVO_DA_PAUSA} (a Meta devolveu o código ${erro.code})`);
+    }
     throw new ErroMetaApi(erro.message ?? `Meta API respondeu ${resposta.status}`, erro.code, erro.error_subcode);
   }
   return corpo as T;

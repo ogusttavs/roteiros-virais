@@ -3,13 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import { FILAS } from "@/jobs/fila";
 
-import { quandoDoCron, ROTINAS } from "./rotinas";
+import { NOME_DA_FILA, quandoDoCron, ROTINAS } from "./rotinas";
 
 describe("ROTINAS", () => {
   it("toda fila está em exatamente uma rotina", () => {
     const todas = ROTINAS.flatMap((r) => r.filas);
     expect(new Set(todas).size).toBe(todas.length);
     expect([...todas].sort()).toEqual(Object.values(FILAS).sort());
+  });
+});
+
+describe("NOME_DA_FILA", () => {
+  it("toda fila tem o nome em língua de gente, e só as filas que existem", () => {
+    expect(Object.keys(NOME_DA_FILA).sort()).toEqual(Object.values(FILAS).sort());
   });
 });
 

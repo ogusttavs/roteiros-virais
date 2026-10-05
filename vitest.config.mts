@@ -33,6 +33,8 @@ const envDeTeste = {
   GROQ_LIMITE_S: "60",
   ORCAMENTO_TRANSCREVER_SETOR_MIN: "30",
   ORCAMENTO_TRANSCREVER_TOTAL_MIN: "210",
+  // O ritmo entre chamadas da Meta (padrao 2 s) so atrapalha o teste.
+  META_INTERVALO_MS: "0",
 };
 
 export default defineConfig({

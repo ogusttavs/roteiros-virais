@@ -2,6 +2,7 @@
 export const FRASE_DE_ERRO_GENERICA = "Não terminou; veja o detalhe técnico.";
 
 const CASOS: { quando: RegExp; frase: string }[] = [
+  { quando: /request limit reached|limite da meta|meta api indisponivel \(codigo (4|17|32|613)\)|\(#4\)/i, frase: "O limite da Meta (Instagram) foi atingido; a rotina continua na hora seguinte." },
   { quando: /credit balance|cr[eé]dito|insufficient (funds|credit)/i, frase: "O crédito da API de IA acabou." },
   { quando: /apify.*(limit|limite|usage|quota|monthly|exceed)|(limit|limite|quota).*apify/i, frase: "O limite da conta de coleta (Apify) acabou." },
   { quando: /youtube.*(bot|sign in|bloque|403|cookies|po token|quota|cota)|(quota|cota).*youtube/i, frase: "O YouTube bloqueou ou esgotou a cota da busca." },

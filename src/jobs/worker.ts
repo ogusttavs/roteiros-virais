@@ -90,8 +90,8 @@ async function main(): Promise<void> {
   await boss().work(FILAS.contasBase, async () => {
     await executarComRegistro(FILAS.contasBase, rodarContasBase);
   });
-  await boss().work<{ nichoId?: number }>(FILAS.metaContas, async (job) => {
-    await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+  await boss().work<{ nichoId?: number; retomadaDesde?: string }>(FILAS.metaContas, async (job) => {
+    await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId, { desde: job[0]?.data?.retomadaDesde }), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
     await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });

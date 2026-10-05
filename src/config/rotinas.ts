@@ -22,6 +22,35 @@ export const ROTINAS: Rotina[] = [
   { chave: "email", titulo: "Mandar o e-mail de acompanhamento", faz: "Resume o dia do sistema para quem acompanha.", filas: [FILAS.emailAcompanhamento] },
 ];
 
+/** O nome de cada fila em língua de gente, com artigo, para dizer qual falhou ("a coleta do meio-dia falhou hoje às 12:00"). Toda fila tem um (provado em teste). */
+export const NOME_DA_FILA: Record<string, string> = {
+  [FILAS.coletaYoutube]: "a busca no YouTube",
+  [FILAS.coletaApify]: "a coleta do TikTok e do Instagram",
+  [FILAS.coletaMeioDia]: "a coleta do meio-dia",
+  [FILAS.coletaNoticias]: "a leitura das notícias",
+  [FILAS.contasBase]: "a base das contas novas",
+  [FILAS.metaContas]: "a leitura do Instagram pela Meta",
+  [FILAS.metaHashtags]: "a busca por hashtag na Meta",
+  [FILAS.descobertaInstagram]: "a descoberta de contas no Instagram",
+  [FILAS.pontuar]: "a pontuação dos vídeos",
+  [FILAS.vigilancia]: "a lista de vigilância",
+  [FILAS.transcrever]: "a transcrição",
+  [FILAS.extrair]: "o lote de análise",
+  [FILAS.extrairColeta]: "a busca do resultado da análise",
+  [FILAS.extrairAgora]: "a análise imediata",
+  [FILAS.analisarVisual]: "a análise das imagens",
+  [FILAS.extrairSemFala]: "a análise dos vídeos sem fala",
+  [FILAS.modeloNicho]: "o modelo do ramo",
+  [FILAS.temasDoDia]: "os temas do dia",
+  [FILAS.pesquisaDeSetor]: "a pesquisa do mercado",
+  [FILAS.lembrete]: "o lembrete",
+  [FILAS.curvaCliente]: "a medição dos vídeos postados",
+  [FILAS.emailAcompanhamento]: "o e-mail de acompanhamento",
+  [FILAS.aprenderCliente]: "o aprendizado com as reprovações",
+  [FILAS.entenderMarca]: "a leitura da marca",
+  [FILAS.analisarPerfil]: "a leitura do perfil",
+};
+
 /** "30 3 * * *" em língua de gente. O que não cabe nos formatos que o agendamento usa volta cru, para nunca mentir. */
 export function quandoDoCron(cron: string): string {
   const [min, hora, dia, mes, semana] = cron.trim().split(/\s+/);
