@@ -54,7 +54,7 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  */
 
 /**
- * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 06/10/2026: o roteiro do momento trouxe "o Uli está aqui do meu lado com a mochila", "uma mesa de hotel com café
+ * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 04/10/2026: o roteiro do momento trouxe "o Uli está aqui do meu lado com a mochila", "uma mesa de hotel com café
  * já frio", coisas que ninguém contou). Com `fontes`, o verificador confere também que o texto não AFIRMA fato concreto (pessoa, lugar, objeto, número, data, acontecimento) fora delas; um
  * espaço marcado entre colchetes para a pessoa preencher não é fato. Sem `fontes`, nada muda. Versão 1.6.0.
  */

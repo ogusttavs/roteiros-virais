@@ -23,7 +23,7 @@ describe("verificarTexto, gênero tema", () => {
   });
 });
 
-describe("verificarTexto com fontes (o roteiro não inventa fato, 06/10/2026)", () => {
+describe("verificarTexto com fontes (o roteiro não inventa fato, 04/10/2026)", () => {
   it("sem fontes nada muda: nem o critério de fato, nem o bloco FONTES", () => {
     expect(montarSistemaEstavel("roteiro")).not.toContain("FONTES");
     expect(montarEntrada({ texto: "t", proibicoes: [] })).not.toContain("FONTES");

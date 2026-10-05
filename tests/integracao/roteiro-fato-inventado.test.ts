@@ -1,5 +1,5 @@
 /**
- * O roteiro não inventa fato (06/10/2026), pelo caminho de produção (`gerarComVerificacao`, mock): com `fontesDosFatos` o verificador manda as fontes ao `verificarTexto`; o mock reprova o
+ * O roteiro não inventa fato (04/10/2026), pelo caminho de produção (`gerarComVerificacao`, mock): com `fontesDosFatos` o verificador manda as fontes ao `verificarTexto`; o mock reprova o
  * marcador de teste de fato inventado, as duas tentativas reprovam e a geração falha com o motivo; sem fontes (as outras tarefas) a mesma saída passa. A prova de verdade é a chave real.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

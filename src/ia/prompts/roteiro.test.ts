@@ -426,7 +426,7 @@ describe("montarSistemaEstavel, regras de plataforma no Reels falado (R1, item 2
   });
 });
 
-describe("o roteiro não inventa fato (06/10/2026)", () => {
+describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {

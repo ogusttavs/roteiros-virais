@@ -234,7 +234,7 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * depois do bloco do objetivo diz que a ficha manda no começo, no jeito de contar e no pedido do fim; o verificador local reprova a ficha "que guardem" sem passo a passo, lista ou
  * algo para copiar. Sem a linha (Story, roteiros de antes), tudo segue como na 2.9.0. Versão 2.10.0.
  *
- * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 06/10/2026: do momento do plano da viagem, o roteiro trouxe "o Uli está aqui do meu lado com a mochila nas costas",
+ * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 04/10/2026: do momento do plano da viagem, o roteiro trouxe "o Uli está aqui do meu lado com a mochila nas costas",
  * "uma mesa de hotel com café já frio", "um país quase caiu do roteiro porque a feira repetia o que vejo no Brasil", "uma parada ganhou dois dias a mais por causa da fábrica", e o modelo
  * misturou o motivo da reprovação anterior com o assunto do roteiro). **Um**, um parágrafo novo (não é regra numerada, para o `porQueAssim` continuar citando só as listas): todo fato concreto
  * tem de estar no momento, no perfil, no tema, na notícia, no pedido do cliente ou na evidência; o que faltar vira um espaço marcado entre colchetes, nunca cena inventada. **Dois**, o motivo
