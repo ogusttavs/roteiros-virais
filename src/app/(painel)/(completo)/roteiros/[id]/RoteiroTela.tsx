@@ -279,6 +279,8 @@ export function RoteiroTela({
   const [baixandoPdf, setBaixandoPdf] = useState(false);
   /** E40, item 1: liga o modo de edição; `draft` só existe enquanto ele está ligado. */
   const [editando, setEditando] = useState(false);
+  /** "Como editar" (e, junto dele, "Por que assim") na caixa do lado: só no Reels falado em leitura; em Story, sem fala e em edição, "Por que assim" fica sozinho depois da legenda. */
+  const comoEditarNoLado = !editando && !(roteiro.estilo === "sem_fala" && corpo.cartoes) && !(roteiro.formato === "story" && corpo.cartoes);
   const [draft, setDraft] = useState<DraftEdicao | null>(null);
   const [erroEdicao, setErroEdicao] = useState<string | null>(null);
   // Uma transição por ação (V7, item 4 do PROXIMO.md): com uma só, "Já gravei" ficava morto e sem motivo
@@ -859,7 +861,11 @@ export function RoteiroTela({
                * visualmente a partir de 1024px, por CSS.
                */
               <div className={styles.ladoGrudado}>
-                <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+                <div className={styles.pilhaDoLado}>
+                  <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+                  {/* Hotfix de 05/10/2026: no Reels falado "Por que assim" vem junto de "Como editar", na MESMA caixa do lado (eram dois `.ladoGrudado` na mesma área da grade, uma por cima da outra). */}
+                  {corpo.porQueAssim.length > 0 ? <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} /> : null}
+                </div>
               </div>
             )}
           </>
@@ -882,7 +888,7 @@ export function RoteiroTela({
 
         {/* V15, item 4: mesma posição de sempre (depois da legenda); sempre que a lista tiver
             item, em qualquer formato e estilo (Reels sem fala com cartões também pode ter). */}
-        {corpo.porQueAssim.length > 0 ? (
+        {corpo.porQueAssim.length > 0 && !comoEditarNoLado ? (
           <div className={styles.ladoGrudado}>
             <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} />
           </div>
