@@ -41,20 +41,68 @@ export async function rodarAtor<T>(
   ator: string,
   input: Record<string, unknown>,
   maxItems: number,
+  opcoes: { ramoDoItem?: (item: T) => number | null | undefined } = {},
 ): Promise<{ itens: T[]; devolvidos: number }> {
-  const execucao = await cliente().actor(ator).call(input, { maxItems });
-  const { items } = await cliente().dataset(execucao.defaultDatasetId).listItems();
+  let execucao: Awaited<ReturnType<ReturnType<ApifyClient["actor"]>["call"]>>;
+  try {
+    execucao = await cliente().actor(ator).call(input, { maxItems });
+  } catch (erro) {
+    // A chamada falhou (tempo limite, ator que caiu) e não se sabe quantos resultados já tinham sido cobrados: o custo vai como estimativa pelo máximo pedido (`maxItems`), para o gasto
+    // não sumir da tela; o detalhe diz que é o teto.
+    await registrarCustoExterno({
+      fonte: "apify",
+      custoUsd: custoEstimadoDoApifyUsd(ator, maxItems),
+      unidades: maxItems,
+      unidade: "resultados",
+      origemDoCusto: "estimado",
+      detalhe: { ator, falhou: true, motivo: "a chamada falhou; estimado pelo maximo pedido" },
+    });
+    throw erro;
+  }
   // O custo da coleta (custo que falta no admin): o que a API do Apify diz que a execução custou (`usageTotalUsd`); sem isso, o preço do ator por resultado, da data de `config/precos-ia.ts`, marcado como estimado.
   const doApify = (execucao as { usageTotalUsd?: unknown }).usageTotalUsd;
   const veioDaApi = typeof doApify === "number" && Number.isFinite(doApify);
-  await registrarCustoExterno({
-    fonte: "apify",
-    custoUsd: veioDaApi ? doApify : custoEstimadoDoApifyUsd(ator, items.length),
-    unidades: items.length,
-    unidade: "resultados",
-    origemDoCusto: veioDaApi ? "api" : "estimado",
-    detalhe: { ator },
-  });
+  let items: unknown[] = [];
+  try {
+    ({ items } = await cliente().dataset(execucao.defaultDatasetId).listItems());
+  } catch (erro) {
+    // A execução rodou e custou, mas o dataset não veio: o custo que a API disse (ou o máximo pedido) fica registrado do mesmo jeito.
+    await registrarCustoExterno({
+      fonte: "apify",
+      custoUsd: veioDaApi ? doApify : custoEstimadoDoApifyUsd(ator, maxItems),
+      unidades: veioDaApi ? 0 : maxItems,
+      unidade: "resultados",
+      origemDoCusto: veioDaApi ? "api" : "estimado",
+      detalhe: { ator, falhou: true, motivo: "o dataset nao veio" },
+    });
+    throw erro;
+  }
+  // Cobra-se até `maxItems`: a estimativa conta o que foi cobrado, não tudo o que o dataset trouxe a mais.
+  const cobrados = Math.min(items.length, maxItems);
+  const custoUsd = veioDaApi ? doApify : custoEstimadoDoApifyUsd(ator, cobrados);
+  const origemDoCusto = veioDaApi ? "api" : "estimado";
+  const ramoDoItem = opcoes.ramoDoItem;
+  if (!ramoDoItem || cobrados === 0) {
+    await registrarCustoExterno({ fonte: "apify", custoUsd, unidades: cobrados, unidade: "resultados", origemDoCusto, detalhe: { ator } });
+  } else {
+    // Uma chamada para vários ramos de uma vez (a passada do meio-dia): o custo se reparte entre os ramos pelos resultados de cada um, para cada ramo pagar o seu.
+    const porRamo = new Map<number | null | undefined, number>();
+    for (const item of (items as T[]).slice(0, cobrados)) {
+      const ramo = ramoDoItem(item);
+      porRamo.set(ramo, (porRamo.get(ramo) ?? 0) + 1);
+    }
+    for (const [ramo, quantos] of porRamo) {
+      await registrarCustoExterno({
+        fonte: "apify",
+        custoUsd: (custoUsd * quantos) / cobrados,
+        unidades: quantos,
+        unidade: "resultados",
+        origemDoCusto,
+        ramoId: ramo,
+        detalhe: { ator, repartido: true },
+      });
+    }
+  }
   return { itens: (items as T[]).slice(0, maxItems), devolvidos: items.length };
 }
 
@@ -159,6 +207,8 @@ export async function buscarTiktokVigilancia(
   perfis: string[],
   videosPorPerfil: number,
   maxItems: number,
+  /** O ramo de cada item, quando a chamada junta contas de vários ramos (o custo se reparte entre eles). */
+  ramoDoItem?: (item: TiktokItemBruto) => number | null | undefined,
 ): Promise<{ itens: TiktokItemBruto[]; devolvidos: number }> {
   if (perfis.length === 0) return { itens: [], devolvidos: 0 };
   const input: Record<string, unknown> = {
@@ -166,7 +216,7 @@ export async function buscarTiktokVigilancia(
     resultsPerPage: videosPorPerfil,
     profileSorting: "latest",
   };
-  return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems);
+  return rodarAtor<TiktokItemBruto>(config.coleta.atorTiktok, input, maxItems, { ramoDoItem });
 }
 
 /**

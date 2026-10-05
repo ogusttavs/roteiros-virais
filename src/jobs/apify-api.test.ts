@@ -11,6 +11,12 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const custosRegistrados = vi.hoisted(() => [] as Record<string, unknown>[]);
+vi.mock("@/servicos/custos-externos", async (importarOriginal) => {
+  const original = await importarOriginal<typeof import("@/servicos/custos-externos")>();
+  return { ...original, registrarCustoExterno: async (dados: Record<string, unknown>) => void custosRegistrados.push(dados) };
+});
+
 const actorCall = vi.fn();
 const datasetListItems = vi.fn();
 
@@ -36,6 +42,7 @@ import {
 } from "./apify-api";
 
 beforeEach(() => {
+  custosRegistrados.length = 0;
   actorCall.mockReset().mockResolvedValue({ defaultDatasetId: "ds1" });
   datasetListItems.mockReset().mockResolvedValue({ items: [] });
 });
@@ -60,6 +67,47 @@ describe("rodarAtor", () => {
     const { itens, devolvidos } = await rodarAtor("algum/ator", {}, 3);
     expect(itens).toEqual([1, 2, 3]);
     expect(devolvidos).toBe(5);
+  });
+});
+
+describe("rodarAtor: o custo (custo que falta no admin)", () => {
+  it("sem o custo da API, estima pelo que foi COBRADO (no máximo maxItems), não por tudo o que o dataset trouxe a mais", async () => {
+    datasetListItems.mockResolvedValue({ items: Array.from({ length: 50 }, (_, i) => i) });
+    await rodarAtor("clockworks/tiktok-scraper", {}, 10);
+    expect(custosRegistrados).toHaveLength(1);
+    expect(custosRegistrados[0]).toMatchObject({ fonte: "apify", unidades: 10, origemDoCusto: "estimado" });
+    expect(custosRegistrados[0].custoUsd).toBeCloseTo((10 / 1000) * 1.7, 10);
+  });
+
+  it("com o custo da API (usageTotalUsd), é o da API e marcado assim", async () => {
+    actorCall.mockResolvedValue({ defaultDatasetId: "ds1", usageTotalUsd: 0.042 });
+    datasetListItems.mockResolvedValue({ items: [1, 2, 3] });
+    await rodarAtor("apify/instagram-scraper", {}, 10);
+    expect(custosRegistrados[0]).toMatchObject({ custoUsd: 0.042, unidades: 3, origemDoCusto: "api" });
+  });
+
+  it("uma chamada para vários ramos reparte o custo pelos resultados de cada um", async () => {
+    datasetListItems.mockResolvedValue({ items: [{ r: 1 }, { r: 1 }, { r: 1 }, { r: 2 }] });
+    actorCall.mockResolvedValue({ defaultDatasetId: "ds1", usageTotalUsd: 0.4 });
+    await rodarAtor<{ r: number }>("algum/ator", {}, 10, { ramoDoItem: (item) => item.r });
+    const porRamo = Object.fromEntries(custosRegistrados.map((c) => [String(c.ramoId), c]));
+    expect(porRamo["1"]).toMatchObject({ unidades: 3, origemDoCusto: "api" });
+    expect(porRamo["1"].custoUsd).toBeCloseTo(0.3, 10);
+    expect(porRamo["2"].custoUsd).toBeCloseTo(0.1, 10);
+  });
+
+  it("a chamada que lança depois de cobrar registra o custo estimado (pelo máximo pedido) e relança o erro", async () => {
+    actorCall.mockRejectedValue(new Error("tempo limite do ator"));
+    await expect(rodarAtor("clockworks/tiktok-scraper", {}, 20)).rejects.toThrow("tempo limite do ator");
+    expect(custosRegistrados[0]).toMatchObject({ fonte: "apify", unidades: 20, origemDoCusto: "estimado" });
+    expect((custosRegistrados[0].detalhe as { falhou: boolean }).falhou).toBe(true);
+  });
+
+  it("o dataset que não vem depois de a execução custar também registra o custo", async () => {
+    actorCall.mockResolvedValue({ defaultDatasetId: "ds1", usageTotalUsd: 0.05 });
+    datasetListItems.mockRejectedValue(new Error("dataset indisponivel"));
+    await expect(rodarAtor("algum/ator", {}, 5)).rejects.toThrow("dataset indisponivel");
+    expect(custosRegistrados[0]).toMatchObject({ custoUsd: 0.05, origemDoCusto: "api" });
   });
 });
 

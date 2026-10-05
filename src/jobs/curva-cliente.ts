@@ -36,12 +36,23 @@ import { estaNaHoraDeMedir, shortcodeDoPermalink, videosParaMedir, type VideoPar
 import { resolverMetaIgId } from "@/servicos/meta-ig-cliente";
 
 import { buscarInstagramPorUrl, buscarTiktokPorUrl } from "./apify-api";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { buscarMediaDaConta, buscarMediaPorId, ErroMetaApi, erroMetaEhTokenOuLimite, type MetaMediaItem } from "./meta-api";
 import { buscarVideosPorId, CUSTO_LISTA } from "./youtube-api";
 
 const FONTE_YOUTUBE = "youtube";
 const FONTE_APIFY = "apify";
 const FONTE_META = "meta";
+
+/** O ramo da marca de cada vídeo medido, para o gasto do Apify ser do ramo dela (uma consulta por marca por rodada). */
+const ramosPorMarca = new Map<number, number | null>();
+async function ramoDaMarca(clienteId: number): Promise<number | null> {
+  if (!ramosPorMarca.has(clienteId)) {
+    const [marca] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId));
+    ramosPorMarca.set(clienteId, marca?.nichoId ?? null);
+  }
+  return ramosPorMarca.get(clienteId) ?? null;
+}
 
 async function consumoDeHoje(fonte: string): Promise<number> {
   const [linha] = await db()
@@ -127,6 +138,7 @@ async function medirTiktok(videos: VideoParaMedir[], agora: Date, erros: string[
       continue;
     }
     try {
+      definirRamoDoContexto(await ramoDaMarca(video.clienteId));
       const {
         itens: [item],
       } = await buscarTiktokPorUrl([`https://www.tiktok.com/@x/video/${video.idExterno}`]);
@@ -147,6 +159,7 @@ async function medirTiktok(videos: VideoParaMedir[], agora: Date, erros: string[
       erros.push(`tiktok ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   }
+  restaurarRamoDoContexto();
   return medidos;
 }
 
@@ -163,6 +176,7 @@ async function medirInstagramApify(videos: VideoParaMedir[], agora: Date, erros:
     }
     try {
       const url = `https://www.instagram.com/reel/${video.idExterno}/`;
+      definirRamoDoContexto(await ramoDaMarca(video.clienteId));
       const {
         itens: [item],
       } = await buscarInstagramPorUrl([url]);
@@ -183,6 +197,7 @@ async function medirInstagramApify(videos: VideoParaMedir[], agora: Date, erros:
       erros.push(`instagram ${video.idExterno}: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   }
+  restaurarRamoDoContexto();
   return medidos;
 }
 

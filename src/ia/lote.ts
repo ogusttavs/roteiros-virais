@@ -46,25 +46,29 @@ export async function criarLote<T>(itens: ItemLote<T>[]): Promise<string> {
     return id;
   }
 
-  const lote = await anthropic().messages.batches.create({
-    requests: itens.map((item) => ({
-      custom_id: item.customId,
-      params: {
-        model: item.nivel === "forte" ? config.ia.modeloForte : config.ia.modeloBarato,
-        max_tokens: item.maxTokens ?? MAX_TOKENS_LOTE_PADRAO,
-        system: [
-          { type: "text" as const, text: item.sistemaEstavel, cache_control: { type: "ephemeral" as const } },
-        ],
-        messages: [{ role: "user" as const, content: item.entrada }],
-        output_config: {
-          format: zodOutputFormat(item.schema),
-          ...(item.effort && item.nivel === "forte" ? { effort: item.effort } : {}),
-        },
-      },
-    })),
-  });
+  const lote = await anthropic().messages.batches.create({ requests: itens.map(montarRequisicaoDoLote) });
 
   return lote.id;
+}
+
+/**
+ * O pedido de um item do lote. O texto passa por `toWellFormed()` como em `gerarReal` (hotfix de 30/09): uma meia-surrogata solta (um emoji cortado ao meio na legenda ou na
+ * transcrição) faz o `batches.create` recusar o lote INTEIRO com 400, e é o `extrair` de produção que monta o lote com texto de terceiros. O `effort` só vale no modelo forte.
+ */
+export function montarRequisicaoDoLote<T>(item: ItemLote<T>) {
+  return {
+    custom_id: item.customId,
+    params: {
+      model: item.nivel === "forte" ? config.ia.modeloForte : config.ia.modeloBarato,
+      max_tokens: item.maxTokens ?? MAX_TOKENS_LOTE_PADRAO,
+      system: [{ type: "text" as const, text: item.sistemaEstavel.toWellFormed(), cache_control: { type: "ephemeral" as const } }],
+      messages: [{ role: "user" as const, content: item.entrada.toWellFormed() }],
+      output_config: {
+        format: zodOutputFormat(item.schema),
+        ...(item.effort && item.nivel === "forte" ? { effort: item.effort } : {}),
+      },
+    },
+  };
 }
 
 export type EstadoLote = "em_andamento" | "concluido";
