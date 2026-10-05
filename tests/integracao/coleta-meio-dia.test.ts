@@ -75,7 +75,7 @@ describe("rodarColetaMeioDia", () => {
 
     await rodarColetaMeioDia();
 
-    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-alta", "conta-media"], 5, 10);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-alta", "conta-media"], 5, 10, expect.any(Function));
   });
 
   it("grava o video na conta certa (por handle) e com o execucaoId, sem duplicar a conta", async () => {
@@ -174,7 +174,7 @@ describe("rodarColetaMeioDia", () => {
 
     await rodarColetaMeioDia();
 
-    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-1", "conta-2"], 5, 3);
+    expect(buscarTiktokVigilancia).toHaveBeenCalledWith(["conta-1", "conta-2"], 5, 3, expect.any(Function));
   });
 
   it("sem conta vigiada do tiktok, sem chamada ao apify, sem erro, e a velocidade roda do mesmo jeito (ajuste 2 da revisao do PR #36)", async () => {
