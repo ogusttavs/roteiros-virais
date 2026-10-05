@@ -3,6 +3,8 @@
  * formula de estrategia/referencia-sdk-anthropic.md. Inclusive chamadas em
  * mock (custo zero) e reprovadas pelo verificador.
  */
+import { eq } from "drizzle-orm";
+
 import {
   FATOR_CACHE_ESCRITA,
   FATOR_CACHE_LEITURA,
@@ -10,7 +12,8 @@ import {
   PRECOS_POR_NIVEL,
 } from "@/config/precos-ia";
 import { db } from "@/db";
-import { geracoesIA, type AvaliacaoGeracao } from "@/db/schema";
+import { clientes, geracoesIA, nichos, videos, type AvaliacaoGeracao } from "@/db/schema";
+import { contextoDaExecucao } from "@/jobs/contexto-execucao";
 
 import type { NivelIA, TarefaIA } from "./tipos";
 
@@ -60,10 +63,52 @@ export type DadosRegistro = {
    * estimativa; nulo quando quem registra não mediu (a maioria das tarefas, por enquanto).
    */
   duracaoMs?: number;
+  /** O ramo (setor) a que o gasto pertence. Sem ele, `ramoDaGeracao` descobre pelo que a chamada já traz (veja lá). */
+  ramoId?: number | null;
 };
+
+/**
+ * De que ramo é esta geração (custo que falta no admin), na ordem do mais certo ao menos certo: o que quem
+ * registra disse; o `nichoId` nas entradas; o ramo do vídeo analisado (`videoId` nas entradas); o ramo da
+ * execução em andamento (job disparado por um ramo); o ramo da conta do cliente. Sem nenhum, fica nulo
+ * (gasto que não é de um ramo só, como o das telas de lembrar a agenda).
+ */
+async function descobrirRamo(dados: Pick<DadosRegistro, "ramoId" | "entradas" | "clienteId">): Promise<number | null> {
+  if (dados.ramoId !== undefined) return dados.ramoId;
+  const doNicho = dados.entradas?.nichoId;
+  if (typeof doNicho === "number") return doNicho;
+  const doVideo = dados.entradas?.videoId;
+  if (typeof doVideo === "number") {
+    const [video] = await db().select({ nichoId: videos.nichoId }).from(videos).where(eq(videos.id, doVideo));
+    if (video?.nichoId != null) return video.nichoId;
+  }
+  const doContexto = contextoDaExecucao()?.ramoId;
+  if (doContexto != null) return doContexto;
+  if (dados.clienteId !== undefined) {
+    const [cliente] = await db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, dados.clienteId));
+    if (cliente?.nichoId != null) return cliente.nichoId;
+  }
+  return null;
+}
+
+/**
+ * O ramo da geração, nunca derrubando o registro: qualquer erro da descoberta vira "sem ramo", e um ramo que não existe (um `nichoId`
+ * pendurado nas entradas) também, porque a chave estrangeira recusaria a linha inteira e a geração, que não depende de ramo, ficaria sem registro.
+ */
+export async function ramoDaGeracao(dados: Pick<DadosRegistro, "ramoId" | "entradas" | "clienteId">): Promise<number | null> {
+  try {
+    const ramo = await descobrirRamo(dados);
+    if (ramo === null) return null;
+    const [existe] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.id, ramo));
+    return existe ? ramo : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function registrarGeracao(dados: DadosRegistro): Promise<number> {
   const custoUsd = calcularCustoUsd(dados.nivel, dados.uso, dados.emLote ?? false);
+  const ramoId = await ramoDaGeracao(dados);
 
   const [linha] = await db()
     .insert(geracoesIA)
@@ -72,6 +117,7 @@ export async function registrarGeracao(dados: DadosRegistro): Promise<number> {
       versaoPrompt: dados.versaoPrompt,
       modelo: dados.modelo,
       clienteId: dados.clienteId,
+      ramoId,
       entradas: dados.entradas,
       evidencias: dados.evidencias ?? [],
       saida: dados.saida ?? null,

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, usdParaBrl } from "@/config/dinheiro";
+import { DATA_PRECO_APIFY } from "@/config/precos-ia";
 import { exigirAdmin } from "@/lib/sessao";
 import { custosDoAdmin } from "@/servicos/admin-custos";
 import { dolares, reais } from "@/textos/admin-contas";
@@ -28,7 +29,7 @@ export default async function CustosDoAdmin() {
   const c = await custosDoAdmin();
   const hojeBrl = usdParaBrl(c.hoje.usd);
   const pctTeto = c.tetoBrl > 0 ? (hojeBrl / c.tetoBrl) * 100 : 0;
-  const variaMes = usdParaBrl(c.ultimos30Usd);
+  const variaMes = usdParaBrl(c.ultimos30Usd + c.foraDaIA.totalUsd);
   const totalMes = variaMes + c.fixos.totalPorMesBrl;
   const maiorConta = c.porConta[0]?.usd ?? 0;
   const fixos: FixoNaTela[] = c.fixos.lista.map((f) => ({
@@ -42,6 +43,9 @@ export default async function CustosDoAdmin() {
     porMesTexto: reais(f.porMesBrl),
   }));
   const maiorTarefa = c.porOndeVai[0]?.usd ?? 0;
+  const maiorRamo = c.porRamo[0]?.usd ?? 0;
+  const maiorFora = c.foraDaIA.linhas[0]?.usd ?? 0;
+  const [anoApify, mesApify, diaApify] = DATA_PRECO_APIFY.split("-");
 
   return (
     <div className={styles.pagina}>
@@ -75,7 +79,7 @@ export default async function CustosDoAdmin() {
         <div className={styles.contador} data-contador="30dias">
           <span className={styles.valor}>{reais(totalMes)}</span>
           <span className={styles.doQue}>
-            {t.contadores.dias30}; {t.contadores.doQueVaria(reais(variaMes))}
+            {t.contadores.dias30}; {t.contadores.doQueVaria(reais(variaMes))}{c.foraDaIA.linhas.some((l) => l.algumEstimado) ? `, ${t.contadores.incluiEstimado}` : ""}
           </span>
         </div>
         <div className={styles.contador} data-contador="por-roteiro">
@@ -164,6 +168,64 @@ export default async function CustosDoAdmin() {
             </ul>
           )}
           <p className={styles.nota}>{t.ondeVai.semRegistro}</p>
+        </section>
+      </div>
+
+      <div className={styles.duas}>
+        <section className={styles.cartao} aria-labelledby="t-ramo" data-bloco="por-ramo">
+          <div className={styles.tabelaTitulo}>
+            <h2 id="t-ramo">{t.porRamo.titulo}</h2>
+            <span className={styles.quantos}>{t.porRamo.legenda}</span>
+          </div>
+          {c.porRamo.length === 0 ? (
+            <p className={styles.semDado}>{t.porRamo.vazio}</p>
+          ) : (
+            <ul className={styles.lista}>
+              {c.porRamo.map((ramo) => (
+                <li key={ramo.nichoId} className={styles.itemCusto} data-ramo={ramo.nichoId}>
+                  <span className={styles.nomeCusto}>
+                    {ramo.nome}
+                    <span className={styles.detalheCusto}>{t.porRamo.detalhe(reais(usdParaBrl(ramo.iaUsd)), reais(usdParaBrl(ramo.foraUsd)))}{ramo.foraUsd > 0 ? `, ${t.porRamo.incluiEstimado}` : ""}</span>
+                  </span>
+                  <span className={styles.valorCusto}>
+                    {reais(usdParaBrl(ramo.usd))}
+                    <span className={styles.detalheCusto}>{dolares(ramo.usd)}</span>
+                  </span>
+                  <Barra pct={maiorRamo > 0 ? (ramo.usd / maiorRamo) * 100 : 0} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {c.semRamoUsd > 0 ? <p className={styles.nota}>{t.porRamo.semRamo(reais(usdParaBrl(c.semRamoUsd)))}</p> : null}
+        </section>
+
+        <section className={styles.cartao} aria-labelledby="t-fora" data-bloco="fora-da-ia">
+          <div className={styles.tabelaTitulo}>
+            <h2 id="t-fora">{t.foraDaIA.titulo}</h2>
+            <span className={styles.quantos}>{t.foraDaIA.legenda}</span>
+          </div>
+          {c.foraDaIA.linhas.length === 0 ? (
+            <p className={styles.semDado}>{t.foraDaIA.vazio}</p>
+          ) : (
+            <ul className={styles.lista}>
+              {c.foraDaIA.linhas.map((l) => (
+                <li key={l.fonte} className={styles.itemCusto} data-fonte={l.fonte}>
+                  <span className={styles.nomeCusto}>
+                    {l.rotulo}
+                    <span className={styles.detalheCusto}>
+                      {l.unidade === "minutos" ? t.foraDaIA.minutos(l.unidades) : t.foraDaIA.resultados(l.unidades)}, {t.foraDaIA.vezes(l.execucoes)}, {l.algumEstimado ? t.foraDaIA.estimado : t.foraDaIA.daApi}
+                    </span>
+                  </span>
+                  <span className={styles.valorCusto}>
+                    {reais(usdParaBrl(l.usd))}
+                    <span className={styles.detalheCusto}>{dolares(l.usd)}</span>
+                  </span>
+                  <Barra pct={maiorFora > 0 ? (l.usd / maiorFora) * 100 : 0} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className={styles.nota}>{t.foraDaIA.nota(`${diaApify}/${mesApify}/${anoApify}`)}</p>
         </section>
       </div>
 

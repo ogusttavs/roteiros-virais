@@ -13,6 +13,8 @@ import { db } from "@/db";
 import { execucoesJob } from "@/db/schema";
 import { mascararSegredos } from "@/lib/log";
 
+import { comContextoDaExecucao } from "./contexto-execucao";
+
 /**
  * Erro nomeado de uma coleta, com uma decisao explicita: `retentavel: true`
  * (erro de rede, o pg-boss deve tentar de novo) ou `retentavel: false` (erro
@@ -48,8 +50,11 @@ export type ResultadoExecucao =
 export async function executarComRegistro(
   nome: string,
   tarefa: (execucaoId: number) => Promise<Record<string, unknown>>,
+  /** O ramo, quando o job roda por um ramo só (`nichoId` no disparo): fica em `execucoes_job.ramo_id` e vale para o custo gravado durante a execução. */
+  opcoes: { ramoId?: number | null } = {},
 ): Promise<ResultadoExecucao> {
-  const [execucao] = await db().insert(execucoesJob).values({ nome, status: "rodando" }).returning();
+  const ramoId = opcoes.ramoId ?? null;
+  const [execucao] = await db().insert(execucoesJob).values({ nome, status: "rodando", ramoId }).returning();
 
   try {
     /**
@@ -59,7 +64,7 @@ export async function executarComRegistro(
      * aqui para qualquer job, de uma vez: o que vai para `execucoes_job.resumo` e o que volta para
      * quem chamou (o `npm run job` imprime) passam por `mascararSegredos`.
      */
-    const resumo = mascararSegredos(await tarefa(execucao.id)) as Record<string, unknown>;
+    const resumo = mascararSegredos(await comContextoDaExecucao({ execucaoId: execucao.id, ramoId }, () => tarefa(execucao.id))) as Record<string, unknown>;
     await db()
       .update(execucoesJob)
       .set({ status: "ok", resumo, terminadoEm: new Date() })

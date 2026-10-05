@@ -775,6 +775,33 @@ export const verComoEntradas = pgTable("ver_como_entradas", {
 }, (t) => [index("ver_como_entradas_conta").on(t.clienteId, t.entrouEm), index("ver_como_entradas_admin").on(t.adminId, t.saiuEm)]);
 export type VerComoEntrada = typeof verComoEntradas.$inferSelect;
 
+/**
+ * Custo que falta no admin: o que o sistema paga fora da IA e hoje só aparecia como unidade (a transcrição pela Groq, por minuto de áudio; a coleta pelo Apify, por execução). Uma linha por chamada
+ * paga, com o custo em dólar (da API quando ela devolve, senão pelo preço da data em `config/precos-ia.ts`), a unidade medida e, quando se sabe, a execução e o ramo.
+ */
+export const custosExternos = pgTable(
+  "custos_externos",
+  {
+    id: id(),
+    /** De onde veio o gasto: "groq" (transcrição) ou "apify" (coleta). */
+    fonte: text("fonte").$type<"groq" | "apify">().notNull(),
+    custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    /** Quantas unidades a chamada gastou: minutos de áudio na Groq, resultados no Apify. */
+    unidades: numeric("unidades", { precision: 12, scale: 3 }).notNull().default("0"),
+    unidade: text("unidade").$type<"minutos" | "resultados">().notNull(),
+    /** O ramo do gasto, quando se sabe (nulo na rodada de todos os ramos e no que não é de ramo). */
+    ramoId: integer("ramo_id").references(() => nichos.id, { onDelete: "set null" }),
+    /** A execução (`execucoes_job`) em que o gasto aconteceu, quando houve. */
+    execucaoId: integer("execucao_id").references(() => execucoesJob.id, { onDelete: "set null" }),
+    /** Se o custo veio da API ("api") ou foi estimado pelo preço da data ("estimado"). */
+    origemDoCusto: text("origem_do_custo").$type<"api" | "estimado">().notNull().default("estimado"),
+    detalhe: jsonb("detalhe").$type<Record<string, unknown>>(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("custos_externos_criado_em").on(t.criadoEm), index("custos_externos_ramo").on(t.ramoId, t.criadoEm)],
+);
+export type CustoExterno = typeof custosExternos.$inferSelect;
+
 /** E46 PR 3: cada "rodar agora" que o admin dispara em Rotinas (quem, qual fila, quando), para o detalhe da rotina dizer "rodada à mão por fulano às 07:23". */
 export const disparosDoAdmin = pgTable(
   "disparos_do_admin",
@@ -1775,6 +1802,8 @@ export const execucoesJob = pgTable("execucoes_job", {
   status: text("status").$type<"rodando" | "ok" | "erro">().notNull().default("rodando"),
   resumo: jsonb("resumo").$type<Record<string, unknown>>(),
   erro: text("erro"),
+  /** Custo que falta no admin: o ramo da execução, quando ela é de um ramo só (o job rodou com `nichoId`); nulo na rodada de todos os ramos e nos jobs que não são por ramo. */
+  ramoId: integer("ramo_id").references(() => nichos.id, { onDelete: "set null" }),
 }, (t) => [index("execucoes_job_iniciado_em").on(t.iniciadoEm), index("execucoes_job_nome_id").on(t.nome, t.id)]);
 
 /**
@@ -1879,6 +1908,11 @@ export const geracoesIA = pgTable("geracoes_ia", {
   tokensCache: integer("tokens_cache").notNull().default(0),
   custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
   /**
+   * Custo que falta no admin: o ramo (setor) da geração, para a aba Custos separar o custo por ramo de verdade. Preenchido por `registrarGeracao`: o que a chamada diz, senão o `nichoId` das
+   * entradas (tarefas de ramo), senão o ramo do vídeo (`entradas.videoId`), senão o ramo da conta (`clienteId`). Nulo em toda geração anterior a esta coluna e nas que não são de ramo.
+   */
+  ramoId: integer("ramo_id").references(() => nichos.id, { onDelete: "set null" }),
+  /**
    * R1, item 0b (pedido do Gustavo em 01/10, captura do celular, "sempre demora mais"): quanto
    * tempo a chamada à IA levou, do pedido à resposta. Nulo em toda geração registrada antes
    * desta coluna existir. Fonte de dado real para calibrar a frase de espera (`TelaEscrevendo`,
@@ -1895,7 +1929,7 @@ export const geracoesIA = pgTable("geracoes_ia", {
    */
   motivosAvaliacao: jsonb("motivos_avaliacao").$type<string[]>(),
   criadoEm: criadoEm(),
-}, (t) => [index("geracoes_ia_criado_em").on(t.criadoEm)]);
+}, (t) => [index("geracoes_ia_criado_em").on(t.criadoEm), index("geracoes_ia_ramo").on(t.ramoId, t.criadoEm)]);
 
 /**
  * A memória do cliente (E27, parte 2): o que ele reprovou vira regra dele.

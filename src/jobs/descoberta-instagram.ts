@@ -24,6 +24,7 @@ import { normalizarVideoInstagram } from "@/servicos/normalizadores/instagram";
 
 import { buscarInstagram } from "./apify-api";
 import { upsertConta, upsertVideo } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { ErroColeta } from "./execucoes";
 
 const FONTE = "apify";
@@ -76,6 +77,7 @@ export async function rodarDescobertaInstagram(nichoId?: number): Promise<Record
 
   for (const nicho of nichosAtivos) {
     if (!cabe()) break;
+    definirRamoDoContexto(nicho.id);
 
     for (const termo of nicho.termos) {
       if (!cabe()) break;
@@ -119,6 +121,7 @@ export async function rodarDescobertaInstagram(nichoId?: number): Promise<Record
       }
     }
   }
+  restaurarRamoDoContexto();
 
   if (!apifyDesligado && tinhaOrcamentoNoInicio && termosBuscados === 0) {
     throw new ErroColeta(

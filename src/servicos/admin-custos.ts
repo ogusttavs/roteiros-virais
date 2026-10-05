@@ -1,8 +1,8 @@
-import { and, desc, eq, gte, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 
 import { CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, TETO_DIARIO_BRL, usdParaBrl } from "@/config/dinheiro";
 import { db } from "@/db";
-import { clientes, configuracaoAdmin, custosFixos, geracoesIA, roteiros, type CustoFixo } from "@/db/schema";
+import { clientes, configuracaoAdmin, custosExternos, custosFixos, geracoesIA, nichos, roteiros, type CustoFixo } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
@@ -106,6 +106,15 @@ export async function tirarFixo(id: number, porUsuarioId: string | null = null):
   if (tirados.length === 0) throw new ErroCusto("esse custo não existe mais.");
 }
 
+/** O que cada serviço pago fora da IA é, em língua de gente. */
+export const ROTULO_DA_FONTE_EXTERNA: Record<string, string> = {
+  groq: "Transcrever os vídeos (Groq)",
+  apify: "Buscar vídeos no TikTok e no Instagram (Apify)",
+};
+
+export type LinhaForaDaIA = { fonte: string; rotulo: string; usd: number; unidades: number; unidade: "minutos" | "resultados"; execucoes: number; algumEstimado: boolean };
+export type LinhaDoRamo = { nichoId: number; nome: string; iaUsd: number; foraUsd: number; usd: number };
+
 export type LinhaDeCusto = { chave: string; rotulo: string; usd: number; vezes: number };
 
 export type CustosDoAdmin = {
@@ -119,6 +128,10 @@ export type CustosDoAdmin = {
   porRoteiroUsd: number | null;
   porConta: { clienteId: number; nome: string; usd: number; roteiros: number }[];
   baseDosRamosUsd: number;
+  /** O custo de 30 dias por ramo: a IA mais o que se paga fora dela (Groq e Apify). `semRamoUsd` é o que não é de um ramo só. */
+  porRamo: LinhaDoRamo[];
+  semRamoUsd: number;
+  foraDaIA: { linhas: LinhaForaDaIA[]; totalUsd: number };
   porOndeVai: LinhaDeCusto[];
   fixos: { lista: (CustoFixo & { porMesBrl: number })[]; totalPorMesBrl: number; cadastrados: boolean };
 };
@@ -131,7 +144,7 @@ export async function custosDoAdmin(agora: Date = new Date()): Promise<CustosDoA
   const desde7 = new Date(inicioHoje.getTime() - 7 * DIA_MS);
   const soma = sql<string>`coalesce(sum(${geracoesIA.custoUsd}), 0)`;
 
-  const [[doDia], [de7], [de30], tarefasHoje, tarefas30, contas30, [semConta], roteirosPorConta, [temAlgo], tetoBrl, fixos] = await Promise.all([
+  const [[doDia], [de7], [de30], tarefasHoje, tarefas30, contas30, [semConta], roteirosPorConta, [temAlgo], tetoBrl, fixos, iaPorRamo, foraPorRamo, foraPorFonte] = await Promise.all([
     db().select({ total: soma }).from(geracoesIA).where(gte(geracoesIA.criadoEm, inicioHoje)),
     db().select({ total: soma }).from(geracoesIA).where(and(gte(geracoesIA.criadoEm, desde7), lt(geracoesIA.criadoEm, inicioHoje))),
     db().select({ total: soma }).from(geracoesIA).where(and(gte(geracoesIA.criadoEm, desde30), lt(geracoesIA.criadoEm, inicioHoje))),
@@ -149,7 +162,49 @@ export async function custosDoAdmin(agora: Date = new Date()): Promise<CustosDoA
     db().select({ n: sql<number>`count(*)::int` }).from(geracoesIA).limit(1),
     tetoDiarioEmReais(),
     fixosAtivos(),
+    db()
+      .select({ nichoId: geracoesIA.ramoId, usd: soma })
+      .from(geracoesIA)
+      .where(and(gte(geracoesIA.criadoEm, desde30), lt(geracoesIA.criadoEm, inicioHoje)))
+      .groupBy(geracoesIA.ramoId),
+    db()
+      .select({ nichoId: custosExternos.ramoId, usd: sql<string>`coalesce(sum(${custosExternos.custoUsd}), 0)` })
+      .from(custosExternos)
+      .where(and(gte(custosExternos.criadoEm, desde30), lt(custosExternos.criadoEm, inicioHoje)))
+      .groupBy(custosExternos.ramoId),
+    db()
+      .select({
+        fonte: custosExternos.fonte,
+        unidade: custosExternos.unidade,
+        usd: sql<string>`coalesce(sum(${custosExternos.custoUsd}), 0)`,
+        unidades: sql<string>`coalesce(sum(${custosExternos.unidades}), 0)`,
+        execucoes: sql<number>`count(*)::int`,
+        estimados: sql<number>`count(*) filter (where ${custosExternos.origemDoCusto} = 'estimado')::int`,
+      })
+      .from(custosExternos)
+      .where(and(gte(custosExternos.criadoEm, desde30), lt(custosExternos.criadoEm, inicioHoje)))
+      .groupBy(custosExternos.fonte, custosExternos.unidade),
   ]);
+
+  const idsDosRamos = [...new Set([...iaPorRamo, ...foraPorRamo].map((x) => x.nichoId).filter((x): x is number => x !== null))];
+  const nomesDosRamos = idsDosRamos.length > 0 ? await db().select({ id: nichos.id, nome: nichos.nome }).from(nichos).where(inArray(nichos.id, idsDosRamos)) : [];
+  const nomeDoRamo = new Map(nomesDosRamos.map((n) => [n.id, n.nome]));
+  const porRamoMapa = new Map<number, LinhaDoRamo>();
+  let semRamoUsd = 0;
+  for (const [lista, campo] of [[iaPorRamo, "iaUsd"], [foraPorRamo, "foraUsd"]] as const) {
+    for (const x of lista) {
+      const valor = Number(x.usd);
+      if (x.nichoId === null) {
+        semRamoUsd += valor;
+        continue;
+      }
+      const atual = porRamoMapa.get(x.nichoId) ?? { nichoId: x.nichoId, nome: nomeDoRamo.get(x.nichoId) ?? `Ramo ${x.nichoId}`, iaUsd: 0, foraUsd: 0, usd: 0 };
+      atual[campo] += valor;
+      atual.usd += valor;
+      porRamoMapa.set(x.nichoId, atual);
+    }
+  }
+  const foraLinhas: LinhaForaDaIA[] = foraPorFonte.map((f) => ({ fonte: f.fonte, rotulo: ROTULO_DA_FONTE_EXTERNA[f.fonte] ?? f.fonte, usd: Number(f.usd), unidades: Number(f.unidades), unidade: f.unidade, execucoes: f.execucoes, algumEstimado: f.estimados > 0 })).sort((a, b) => b.usd - a.usd);
 
   const roteirosDe = new Map(roteirosPorConta.map((r) => [r.clienteId, r.total]));
   const roteiros30 = roteirosPorConta.reduce((a, r) => a + r.total, 0);
@@ -180,6 +235,9 @@ export async function custosDoAdmin(agora: Date = new Date()): Promise<CustosDoA
     porRoteiroUsd: roteiros30 > 0 ? ultimos30Usd / roteiros30 : null,
     porConta: contas30.map((c) => ({ clienteId: c.clienteId!, nome: c.nome, usd: Number(c.usd), roteiros: roteirosDe.get(c.clienteId!) ?? 0 })),
     baseDosRamosUsd: Number(semConta?.total ?? 0),
+    porRamo: [...porRamoMapa.values()].sort((a, b) => b.usd - a.usd),
+    semRamoUsd,
+    foraDaIA: { linhas: foraLinhas, totalUsd: foraLinhas.reduce((a, l) => a + l.usd, 0) },
     porOndeVai: linhas(tarefas30),
     fixos: { lista: listaFixos, totalPorMesBrl: listaFixos.reduce((a, f) => a + f.porMesBrl, 0), cadastrados: listaFixos.length > 0 },
   };

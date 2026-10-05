@@ -197,6 +197,8 @@ export type ExecucaoResumo = {
   duracaoMs: number | null;
   resumo: Record<string, unknown> | null;
   erro: string | null;
+  /** O ramo, quando a execução foi só de um ramo (nulo quando rodou para todos). */
+  ramoId: number | null;
 };
 
 function mapearExecucao(linha: typeof execucoesJob.$inferSelect): ExecucaoResumo {
@@ -209,6 +211,7 @@ function mapearExecucao(linha: typeof execucoesJob.$inferSelect): ExecucaoResumo
     duracaoMs: linha.terminadoEm ? linha.terminadoEm.getTime() - linha.iniciadoEm.getTime() : null,
     resumo: linha.resumo,
     erro: linha.erro,
+    ramoId: linha.ramoId,
   };
 }
 

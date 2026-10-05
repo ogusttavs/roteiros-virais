@@ -505,6 +505,13 @@
       "when": 1791135719990,
       "tag": "0071_ver-como",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1791209375141,
+      "tag": "0072_custo-que-falta",
+      "breakpoints": true
     }
   ]
 }
