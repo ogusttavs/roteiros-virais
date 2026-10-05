@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { montarSistemaEstavel } from "./verificarTexto";
+import { montarEntrada, montarSistemaEstavel, versao } from "./verificarTexto";
 
 /**
  * 29/09/2026, achado do Gustavo em produção: a recomendação de `avaliarTema`
@@ -20,5 +20,27 @@ describe("verificarTexto, gênero tema", () => {
     const sistema = montarSistemaEstavel();
     expect(sistema).toContain("uma pessoa falando com outra pessoa");
     expect(sistema).not.toContain("recomendação sobre um tema");
+  });
+});
+
+describe("verificarTexto com fontes (o roteiro não inventa fato, 06/10/2026)", () => {
+  it("sem fontes nada muda: nem o critério de fato, nem o bloco FONTES", () => {
+    expect(montarSistemaEstavel("roteiro")).not.toContain("FONTES");
+    expect(montarEntrada({ texto: "t", proibicoes: [] })).not.toContain("FONTES");
+  });
+
+  it("com fontes, o sistema reprova fato concreto fora delas, aceita o espaço marcado entre colchetes e não pede que o jeito de falar esteja nas fontes", () => {
+    const sistema = montarSistemaEstavel("roteiro", true);
+    expect(versao).toBe("1.6.0");
+    expect(sistema).toContain("não afirma nenhum fato concreto");
+    expect(sistema).toContain("[diga aqui onde você está]");
+    expect(sistema).toContain("não é fato, é o certo");
+    expect(sistema).toContain("o jeito de falar, a estrutura e as instruções de gravação não precisam estar nas fontes");
+  });
+
+  it("a entrada leva as fontes depois do texto e das proibições", () => {
+    const entrada = montarEntrada({ texto: "o texto", proibicoes: ["x"], fontes: "o momento: na oficina" });
+    expect(entrada.indexOf("o texto")).toBeLessThan(entrada.indexOf("FONTES"));
+    expect(entrada).toContain("o momento: na oficina");
   });
 });

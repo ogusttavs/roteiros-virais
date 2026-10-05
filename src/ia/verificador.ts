@@ -595,6 +595,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   generoTexto?: GeneroTexto;
   /** V9a, item 2: as palavras de conteúdo do momento, para `verificarLocalmente` (ver lá). */
   palavrasDoMomento?: string[];
+  /**
+   * O roteiro não inventa fato: tudo o que foi dito ou escrito para o texto (o momento, o perfil, o tema, a evidência), para o `verificarTexto` reprovar o fato concreto que não
+   * está aqui (ver `prompts/verificarTexto.ts`). Ausente, a conferência não roda (as outras tarefas não mudam).
+   */
+  fontesDosFatos?: string;
   /** V9c, item 3: o formato do roteiro, e como extrair os cartões e o "por que assim" da saída, quando houver. */
   formato?: FormatoRoteiro;
   /** M4, item 4: o estilo do roteiro; sem fala troca a checagem de cartões (ver `verificarLocalmente`). */
@@ -766,10 +771,11 @@ async function tentarGerarEVerificar<T>(
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
-      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto),
+      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos)),
       entrada: verificarTexto.montarEntrada({
         texto: textoJunto,
         proibicoes: params.proibicoes ?? [],
+        fontes: params.fontesDosFatos,
       }),
     });
     aprovado = verificacao.dados.aprovado;

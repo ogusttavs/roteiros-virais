@@ -15,6 +15,7 @@ import path from "node:path";
 import { z } from "zod";
 
 import * as roteiroIA from "../src/ia/prompts/roteiro";
+import { montarFontesDosFatos } from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
@@ -164,8 +165,8 @@ export async function avaliarRoteirosSemFala(): Promise<ResultadoAvaliarRoteiros
         nivel: verificarTextoIA.nivel,
         effort: verificarTextoIA.esforco,
         schema: verificarTextoIA.schema,
-        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro"),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [] }),
+        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
+        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: conjunto[indice].perfilCompilado, camadaExclusiva: conjunto[indice].camadaExclusiva, tema: conjunto[indice].tema, momento: conjunto[indice].momento, evidencias: conjunto[indice].evidencias }) }),
       }
     )),
     "verificador (roteiros sem fala)",

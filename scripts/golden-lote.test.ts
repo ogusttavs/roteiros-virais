@@ -71,11 +71,11 @@ describe("os scripts avaliar:* pelo lote (mock)", () => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
   }
 
-  it("roteiros: os 21 casos do exemplo, um reprovado no verificador (o de sempre), custo zero no mock", async () => {
+  it("roteiros: os 22 casos do exemplo, um reprovado no verificador (o de sempre), custo zero no mock", async () => {
     calar();
     const resultado = await avaliarRoteiros();
-    expect(resultado.casos).toBe(21);
-    expect(resultado.titulos).toHaveLength(21);
+    expect(resultado.casos).toBe(22);
+    expect(resultado.titulos).toHaveLength(22);
     expect(resultado.reprovadosNoVerificador).toBe(1);
     expect(resultado.custoTotalUsd).toBe(0);
   });

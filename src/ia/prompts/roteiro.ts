@@ -233,8 +233,15 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * E49 PR 1 (as fichas): no Reels a entrada traz a linha "Ficha do vídeo" (as cinco fichas do "O que você quer que esse vídeo faça?", `config/fichas.ts`) com a estrutura dela, e um parágrafo
  * depois do bloco do objetivo diz que a ficha manda no começo, no jeito de contar e no pedido do fim; o verificador local reprova a ficha "que guardem" sem passo a passo, lista ou
  * algo para copiar. Sem a linha (Story, roteiros de antes), tudo segue como na 2.9.0. Versão 2.10.0.
+ *
+ * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 06/10/2026: do momento do plano da viagem, o roteiro trouxe "o Uli está aqui do meu lado com a mochila nas costas",
+ * "uma mesa de hotel com café já frio", "um país quase caiu do roteiro porque a feira repetia o que vejo no Brasil", "uma parada ganhou dois dias a mais por causa da fábrica", e o modelo
+ * misturou o motivo da reprovação anterior com o assunto do roteiro). **Um**, um parágrafo novo (não é regra numerada, para o `porQueAssim` continuar citando só as listas): todo fato concreto
+ * tem de estar no momento, no perfil, no tema, na notícia, no pedido do cliente ou na evidência; o que faltar vira um espaço marcado entre colchetes, nunca cena inventada. **Dois**, o motivo
+ * da reprovação e a versão reprovada entram na entrada como "só sobre a FORMA, nunca fonte de fato". **Três**, `montarFontesDosFatos` monta o que vale como fato para o verificador
+ * (`verificarTexto` 1.6.0 reprova o fato fora das fontes). Versão 2.11.0.
  */
-export const versao = "2.10.0";
+export const versao = "2.11.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -540,6 +547,17 @@ versão desta marca: o negócio, a voz e a cara de quem grava, nunca o vídeo de
 repostado nem a mesma piada copiada. Um meme vira a sua versão do assunto, gravada pela
 pessoa, com o que só ela tem (o local, o produto, o cliente). Sem a linha, escolha o formato
 que melhor serve ao tema.
+Nenhum fato que ninguém contou (esta não é uma das regras numeradas acima, para o porQueAssim
+continuar citando só as listas): todo fato concreto do roteiro (uma pessoa, um lugar, um objeto,
+um número, uma data, uma cena, uma coisa que aconteceu) tem de estar no momento que a pessoa
+descreveu, no perfil do cliente, no tema, na notícia, no que o cliente pediu ou na evidência.
+O que o roteiro precisaria e não tem, você não inventa: deixa um espaço marcado entre colchetes,
+com a instrução para quem grava, como "[diga aqui onde você está]" ou "[o número real do seu
+preço]". Nunca invente cena para dar vida ao texto (quem está do lado, o que tem na mesa, o tempo
+que faz, o que aconteceu antes). Entrada curta é normal: um roteiro curto, com espaços marcados,
+vale mais que um roteiro cheio de detalhe que ninguém contou. O motivo que o cliente deu ao
+reprovar uma versão, e o texto da versão reprovada, dizem só como NÃO escrever; nunca são fonte
+de fato.
 ${regraVoz}${regraQuemAparece}${regraPersonaConhecido}
 
 O objetivo escolhido muda o roteiro:
@@ -731,11 +749,13 @@ export function montarEntrada(dados: {
     dados.anguloParaEvitar
       ? `O cliente reprovou a versão anterior por: ${dados.anguloParaEvitar.motivos.join(", ")}.` +
         (dados.anguloParaEvitar.motivoTexto
-          ? ` O que ele escreveu: ${dados.anguloParaEvitar.motivoTexto}.`
+          ? ` O que ele escreveu (é uma crítica ao jeito do texto, nunca uma informação nova: não vira fato do roteiro): "${dados.anguloParaEvitar.motivoTexto}".`
           : "") +
         ` A nova versão precisa resolver isso sem mudar o objetivo (continua: ` +
-        `${NOME_OBJETIVO[dados.objetivo]}). Não repita o gancho nem a estrutura dela:\n` +
-        `gancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
+        `${NOME_OBJETIVO[dados.objetivo]}). Isto vale só para a FORMA (o jeito de abrir, de contar, o tamanho): ` +
+        `a versão reprovada abaixo é só para você NÃO repetir o gancho nem a estrutura dela, e nada do que ela afirma ` +
+        `vale como fato; se ela trazia cena, pessoa, lugar ou número que o momento, o perfil, o tema e a evidência não trazem, era invenção e não volta.\n` +
+        `Versão reprovada (não repetir):\ngancho: ${dados.anguloParaEvitar.gancho}\ncorpo: ${dados.anguloParaEvitar.corpo}`
       : null,
     blocoMomento,
     blocoSerie,
@@ -748,4 +768,38 @@ export function montarEntrada(dados: {
   ].filter((parte): parte is string => Boolean(parte));
 
   return partes.join("\n\n");
+}
+
+/**
+ * O que vale como fato para este roteiro (O roteiro não inventa fato): o perfil, o que só este cliente tem, o tema ou o momento, o que o vídeo precisa comunicar, o pedido do cliente, a notícia,
+ * a marca citada e a evidência. Fica de fora o que NÃO é fonte: o motivo da reprovação, a versão reprovada, os roteiros recentes e as regras. É o que o `verificarTexto` recebe como `fontes`.
+ */
+export function montarFontesDosFatos(dados: {
+  perfilCompilado: string;
+  camadaExclusiva: string;
+  tema?: string;
+  momento?: { onde: string; oQueEstaAcontecendo: string; oQueDaParaMostrar: string };
+  objetivoDoVideo?: string | null;
+  observacao?: string;
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null };
+  marcaCitada?: { nome: string; perfilCompilado: string };
+  evidencias?: { assunto: string; gancho: string; estrutura: string; fechamento: string; chamadaFinal: string }[];
+}): string {
+  const partes = [
+    `Perfil do cliente:\n${dados.perfilCompilado}`,
+    dados.camadaExclusiva ? `O que só este cliente tem:\n${dados.camadaExclusiva}` : null,
+    dados.momento
+      ? `O momento que a pessoa descreveu:\nOnde: ${dados.momento.onde}\nO que está acontecendo: ${dados.momento.oQueEstaAcontecendo}\nO que dá para mostrar: ${dados.momento.oQueDaParaMostrar}`
+      : dados.tema
+        ? `Tema: ${dados.tema}`
+        : null,
+    dados.objetivoDoVideo ? `O que o vídeo precisa comunicar: ${dados.objetivoDoVideo}` : null,
+    dados.observacao ? `O que o cliente pediu: ${dados.observacao}` : null,
+    dados.noticia ? `Notícia: ${dados.noticia.titulo}${dados.noticia.resumo ? `. ${dados.noticia.resumo}` : ""}${dados.noticia.angulo ? `. ${dados.noticia.angulo}` : ""}` : null,
+    dados.marcaCitada ? `Marca citada: ${dados.marcaCitada.nome}: ${dados.marcaCitada.perfilCompilado}` : null,
+    dados.evidencias && dados.evidencias.length > 0
+      ? `Evidência (vídeos de outras pessoas, para o jeito de contar, não para fato do cliente):\n${dados.evidencias.map((v) => `${v.assunto}. ${v.gancho}. ${v.estrutura}`).join("\n")}`
+      : null,
+  ];
+  return partes.filter((p): p is string => Boolean(p)).join("\n\n");
 }

@@ -52,7 +52,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * certo desta recomendação, e o verificador precisa saber disso para não
  * transformar uma avaliação boa (nota 8,6) num erro na tela.
  */
-export const versao = "1.5.0";
+
+/**
+ * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 06/10/2026: o roteiro do momento trouxe "o Uli está aqui do meu lado com a mochila", "uma mesa de hotel com café
+ * já frio", coisas que ninguém contou). Com `fontes`, o verificador confere também que o texto não AFIRMA fato concreto (pessoa, lugar, objeto, número, data, acontecimento) fora delas; um
+ * espaço marcado entre colchetes para a pessoa preencher não é fato. Sem `fontes`, nada muda. Versão 1.6.0.
+ */
+export const versao = "1.6.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -107,11 +113,16 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "cliente vê, isso não é um erro de gênero.\n",
 };
 
-export function montarSistemaEstavel(genero: GeneroTexto = "padrao"): string {
+const CRITERIO_FATOS =
+  "\n- o texto não afirma nenhum fato concreto (uma pessoa, um lugar, um objeto, um número, uma data, uma cena, uma coisa que aconteceu) que não esteja nas FONTES que vêm depois do texto. " +
+  "Só o que o texto AFIRMA como real conta: o jeito de falar, a estrutura e as instruções de gravação não precisam estar nas fontes. Um espaço marcado entre colchetes para a pessoa " +
+  'preencher (por exemplo "[diga aqui onde você está]") não é fato, é o certo quando a fonte não traz a informação. Se houver um fato fora das fontes, reprove e diga qual é, em uma frase;';
+
+export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}
 - nenhuma proibição que o cliente listou no briefing foi ferida.
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
@@ -120,9 +131,10 @@ Não repita o texto inteiro na resposta, só o motivo.
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
-export function montarEntrada(dados: { texto: string; proibicoes: string[] }): string {
+export function montarEntrada(dados: { texto: string; proibicoes: string[]; fontes?: string }): string {
   const listaProibicoes =
     dados.proibicoes.length > 0 ? dados.proibicoes.join("; ") : "nenhuma proibicao registrada";
+  const blocoFontes = dados.fontes ? `\n\nFONTES (tudo o que foi dito ou escrito para este texto; só isto vale como fato):\n${dados.fontes}` : "";
 
-  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}`;
+  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
 }

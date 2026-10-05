@@ -422,9 +422,11 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
 function mockVerificarTexto(entrada: string) {
   const texto = extrairCampo(entrada, "Texto a conferir:") || entrada;
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
+  // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).
+  const inventou = entrada.includes("FONTES (") && texto.includes("[mock:fato-inventado]");
   return {
-    aprovado: !gritando,
-    motivo: gritando ? "tom exagerado para o texto de tela" : null,
+    aprovado: !gritando && !inventou,
+    motivo: gritando ? "tom exagerado para o texto de tela" : inventou ? "o texto afirma um fato que não está nas fontes" : null,
   };
 }
 

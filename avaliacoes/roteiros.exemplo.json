@@ -569,5 +569,33 @@
     "roteirosRecentes": [],
     "pontoPrincipal": "ficha me_chamem: bastidor com preco e convite para chamar; sem prometer o que nao pode cumprir",
     "ficha": "me_chamem"
+  },
+  {
+    "tema": "o jeito de tirar mancha de gordura do sofá sem espalhar",
+    "objetivo": "conversao",
+    "perfilCompilado": "Marca própria de produtos de limpeza (Dr.Wash). Vende o kit multiuso por R$ 65. Cliente ideal tem filho pequeno ou animal de estimação e evita produto tóxico. Medo do cliente: pagar mais caro por um produto que não limpa igual ao de mercado. Nunca recomenda produto tóxico perto de criança ou pet.",
+    "camadaExclusiva": "Concorrente citado pelo cliente: marca de limpeza de mercado com cheiro forte.",
+    "modeloNicho": "Duração típica: 25 a 40 segundos. Assuntos quentes: cheiro que dura, produto que faz mal para pet. Ganchos que funcionam: comparação direta entre dois produtos (alta frequência). Estruturas comuns: mostrar o mito, explicar por que é mito, mostrar a prova. Fechamentos comuns: mostrar o resultado lado a lado. Chamadas finais comuns: chama aqui se quiser o que eu uso.",
+    "evidencias": [
+      {
+        "id": 302,
+        "assunto": "erro que todo mundo comete ao limpar",
+        "gancho": "voce ta cometendo esse erro ao limpar a casa",
+        "estrutura": "mostra o erro, explica a causa, mostra o certo",
+        "fechamento": "casa limpa, produto na mao",
+        "chamadaFinal": "chama aqui se quiser o que eu uso",
+        "foraDaCurva": 5.5
+      }
+    ],
+    "roteirosRecentes": [],
+    "anguloParaEvitar": {
+      "gancho": "Eu estava ontem na casa da dona Marlene, em Campinas, e ela me mostrou uma mancha de gordura no sofá de couro.",
+      "corpo": "A dona Marlene, de Campinas, tinha tentado tudo; passei o kit, em três minutos a mancha saiu e ela chorou de alegria.",
+      "motivos": [
+        "Não é assim que eu falo"
+      ],
+      "motivoTexto": "Eu nunca atendi dona Marlene nenhuma e nem tenho cliente em Campinas, e eu não falo assim, soa como propaganda de TV"
+    },
+    "pontoPrincipal": "REPROVAÇÃO ANTERIOR com conteúdo inventado e um motivo que cita nomes: a nova versão resolve o JEITO (voz do perfil, sem propaganda) e NÃO reaproveita dona Marlene, Campinas, o sofá de couro nem o \"chorou de alegria\" como se fossem fato; o que faltar vira espaço marcado entre colchetes. Critério: zero fato fora da entrada, e nada vindo do texto reprovado nem do motivo."
   }
 ]

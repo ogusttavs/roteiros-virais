@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { JARGAO } from "@/lib/regras-de-texto";
 
-import { LEMBRETE_ACENTUACAO, montarEntrada, montarSistemaEstavel, type InstrucaoAbertura } from "./roteiro";
+import { LEMBRETE_ACENTUACAO, montarEntrada, montarFontesDosFatos, montarSistemaEstavel, type InstrucaoAbertura, versao } from "./roteiro";
 
 // OBJETIVOS_EM_ORDEM[2] (nao o literal, checar-texto varre este diretorio): o objetivo
 // "gente me chamar para comprar" (`NOME_OBJETIVO`), o mesmo que a asserção abaixo confere.
@@ -41,7 +41,8 @@ describe("montarEntrada", () => {
     });
 
     expect(entrada).toContain("O cliente reprovou a versão anterior por: Gancho fraco, Muito longo.");
-    expect(entrada).toContain("O que ele escreveu: comeca devagar demais.");
+    expect(entrada).toContain("O que ele escreveu");
+    expect(entrada).toContain('"comeca devagar demais"');
     expect(entrada).toContain("continua: gente me chamar para comprar");
     expect(entrada).toContain("gancho: gancho antigo");
     expect(entrada).toContain("corpo: corpo antigo");
@@ -422,5 +423,52 @@ describe("montarSistemaEstavel, regras de plataforma no Reels falado (R1, item 2
     const sistema = montarSistemaEstavel({ ...BASE_SISTEMA });
     expect(sistema).toContain("porQueAssim");
     expect(sistema).not.toContain("ainda não há regras numeradas de plataforma");
+  });
+});
+
+describe("o roteiro não inventa fato (06/10/2026)", () => {
+  const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
+
+  it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
+    expect(versao).toBe("2.11.0");
+    expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
+    expect(SISTEMA).toContain("[diga aqui onde você está]");
+    expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");
+    // Não é regra numerada: o porQueAssim continua citando só as listas.
+    expect(SISTEMA).toContain("esta não é uma das regras numeradas acima");
+  });
+
+  it("o mesmo parágrafo vale no Story e no sem fala (é a mesma base do prompt)", () => {
+    for (const formato of ["reels", "story"] as const) {
+      for (const estilo of ["falado", "sem_fala"] as const) {
+        const s = montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", formato, estilo });
+        expect(s).toContain("Nenhum fato que ninguém contou");
+      }
+    }
+  });
+
+  it("o motivo da reprovação entra como crítica à forma, a versão reprovada como 'não repetir' e nunca como fonte de fato", () => {
+    const entrada = montarEntrada({
+      ...BASE,
+      anguloParaEvitar: { gancho: "ontem na casa da dona Marlene", corpo: "ela chorou de alegria", motivos: ["Não é assim que eu falo"], motivoTexto: "eu nunca atendi dona Marlene" },
+    });
+    expect(entrada).toContain("é uma crítica ao jeito do texto, nunca uma informação nova");
+    expect(entrada).toContain("Isto vale só para a FORMA");
+    expect(entrada).toContain("nada do que ela afirma vale como fato");
+    expect(entrada).toContain("Versão reprovada (não repetir):");
+  });
+
+  it("montarFontesDosFatos junta o que vale como fato e deixa de fora o motivo, a versão reprovada e os roteiros recentes", () => {
+    const fontes = montarFontesDosFatos({
+      perfilCompilado: "Vende lavagem de estofado por R$ 180.",
+      camadaExclusiva: "Cidade: Santos.",
+      momento: { onde: "na oficina", oQueEstaAcontecendo: "chegou um sofá manchado", oQueDaParaMostrar: "o antes e o depois" },
+      objetivoDoVideo: "avisar do horário novo",
+    });
+    for (const trecho of ["R$ 180", "Santos", "na oficina", "chegou um sofá manchado", "o antes e o depois", "avisar do horário novo"]) expect(fontes).toContain(trecho);
+    expect(fontes).not.toContain("Tema:");
+    const comTema = montarFontesDosFatos({ perfilCompilado: "p", camadaExclusiva: "", tema: "o erro que faz a mancha voltar", evidencias: [{ assunto: "mancha", gancho: "g", estrutura: "e", fechamento: "f", chamadaFinal: "c" }] });
+    expect(comTema).toContain("Tema: o erro que faz a mancha voltar");
+    expect(comTema).toContain("Evidência");
   });
 });
