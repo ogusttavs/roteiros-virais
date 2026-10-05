@@ -1,5 +1,3 @@
-import { db } from "@/db";
-import { nichos } from "@/db/schema";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarContasAdmin } from "@/servicos/admin-contas";
 
@@ -13,8 +11,8 @@ export default async function AdminContas({ searchParams }: { searchParams: Prom
   await exigirAdmin();
   const { filtro } = await searchParams;
 
-  const [contas, nichosListados] = await Promise.all([listarContasAdmin(), db().select({ id: nichos.id, nome: nichos.nome }).from(nichos)]);
+  const contas = await listarContasAdmin();
   const filtroInicial = FILTROS_VALIDOS.find((f) => f === filtro) ?? "todas";
 
-  return <TabelaContas key={filtroInicial} contas={contas} nichos={nichosListados} filtroInicial={filtroInicial} />;
+  return <TabelaContas key={filtroInicial} contas={contas} filtroInicial={filtroInicial} />;
 }

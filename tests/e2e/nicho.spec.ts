@@ -11,7 +11,7 @@ import { expect, test } from "@playwright/test";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { contas, nichos } from "../../src/db/schema";
+import { clientes, contas, nichos, pedidosDeRamo } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA_ADMIN = "ExemploSenha123";
@@ -34,14 +34,14 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await expect(page).toHaveURL(/\/admin\/?$/);
 
   await page.goto("/admin/nichos");
-  await page.getByRole("button", { name: "novo nicho" }).click();
-  const modalNovoNicho = page.getByRole("dialog", { name: "Novo nicho" });
+  await page.getByRole("button", { name: "novo ramo" }).click();
+  const modalNovoNicho = page.getByRole("dialog", { name: "Novo ramo" });
   await modalNovoNicho.getByLabel("nome", { exact: true }).fill(NOME_NICHO);
   await modalNovoNicho.getByLabel("descrição curta").fill("[exemplo e2e] nicho criado pelo teste automatizado");
   await modalNovoNicho
     .getByLabel("termos de busca")
     .fill("termo um\ntermo dois\ntermo tres\ntermo quatro\ntermo cinco");
-  await modalNovoNicho.getByRole("button", { name: "criar nicho" }).click();
+  await modalNovoNicho.getByRole("button", { name: "criar ramo" }).click();
 
   await expect(page.getByRole("link", { name: NOME_NICHO })).toBeVisible();
 
@@ -97,13 +97,25 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   // antigo atalho por getByRole("combobox") (o unico da modal) deixou de resolver so um
   // elemento; os selects tem aria-label igual ao rotulo visivel (mesma regra dos demais,
   // plataforma/CLAUDE.md).
-  await modalNovaMarca.getByLabel("nicho", { exact: true }).selectOption({ label: NOME_NICHO });
+  // A folha usa a busca de ramo do catálogo (E45), a mesma do Começar: o ramo que ainda não tem setor ganha o setor ao criar a conta (o "criar um nicho" saiu da folha).
+  expect(await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "academia-e-treino"))).toHaveLength(0);
+  await modalNovaMarca.getByRole("button", { name: "criar conta" }).click();
+  await expect(modalNovaMarca.getByText("Escolha o ramo na lista, ou escreva qual é.")).toBeVisible();
+  const campoRamo = modalNovaMarca.getByRole("combobox", { name: "ramo", exact: true });
+  await campoRamo.fill("academia");
+  await campoRamo.press("Enter");
+  await expect(campoRamo).toHaveValue("Academia e treino");
   await modalNovaMarca.getByRole("button", { name: "criar conta" }).click();
 
   // V12b, item 2: a marca nasce sem ninguem; a pessoa entra depois, na propria pagina da
   // marca, por "dar acesso" (item 4), com a mesma senha gerada de sempre (V3, item 5; mesmo
   // caminho de entrar-e-convidar.spec.ts), nao mais por link magico.
   await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);
+  const [setorDoRamo] = await db().select().from(nichos).where(eq(nichos.ramoCatalogo, "academia-e-treino"));
+  expect(setorDoRamo, "o setor do ramo devia ter nascido").toBeTruthy();
+  expect(setorDoRamo.nome).toBe("Academia e treino");
+  const [contaCriada] = await db().select().from(clientes).where(eq(clientes.nome, "[exemplo e2e] Cliente do nicho novo"));
+  expect(contaCriada.nichoId).toBe(setorDoRamo.id);
   await page.getByRole("button", { name: "dar acesso" }).click();
   const folhaDarAcesso = page.getByRole("dialog", { name: /^Dar acesso a/ });
   await folhaDarAcesso.getByLabel("nome da pessoa", { exact: true }).fill("[exemplo e2e] Cliente do nicho novo");
@@ -129,4 +141,35 @@ test("admin cria nicho, o nicho aparece na lista e serve para criar um cliente",
   await expect(paginaCliente.getByText("Antes de escrever, a gente precisa te conhecer")).toBeVisible();
 
   await contextoCliente.close();
+});
+
+test("admin: Nova conta com 'Não achei o ramo' cria a conta sem setor e deixa o pedido aberto para o admin decidir", async ({ page }) => {
+  await page.goto("/entrar");
+  await page.getByLabel("E-mail").fill(EMAIL_ADMIN);
+  await page.getByLabel("Senha").fill(SENHA_ADMIN);
+  await page.getByRole("button", { name: "entrar", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin\/?$/);
+
+  const TEXTO = "xyzw abcd e2e";
+  await page.goto("/admin/clientes");
+  await page.getByRole("button", { name: "nova conta" }).click();
+  const modal = page.getByRole("dialog", { name: "Nova conta" });
+  await modal.getByLabel("nome", { exact: true }).fill("[exemplo e2e] Conta com ramo escrito");
+  const campoRamo = modal.getByRole("combobox", { name: "ramo", exact: true });
+  await campoRamo.fill(TEXTO);
+  await modal.getByRole("option", { name: /Não achei o ramo/ }).click();
+  const campoTexto = modal.getByLabel("Qual é o ramo");
+  await expect(campoTexto).toHaveValue(TEXTO);
+  await campoTexto.fill("");
+  await modal.getByRole("button", { name: "criar conta" }).click();
+  await expect(modal.getByText("Escolha o ramo na lista, ou escreva qual é.").first()).toBeVisible();
+  await campoTexto.fill(TEXTO);
+  await modal.getByRole("button", { name: "criar conta" }).click();
+
+  await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);
+  const [conta] = await db().select().from(clientes).where(eq(clientes.nome, "[exemplo e2e] Conta com ramo escrito"));
+  expect(conta.ramoOutro).toBe(TEXTO);
+  const pedidos = await db().select().from(pedidosDeRamo).where(eq(pedidosDeRamo.clienteId, conta.id));
+  expect(pedidos).toHaveLength(1);
+  expect(pedidos[0]).toMatchObject({ texto: TEXTO, estado: "aberto" });
 });

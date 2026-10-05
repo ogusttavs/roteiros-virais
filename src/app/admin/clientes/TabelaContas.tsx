@@ -86,11 +86,10 @@ function SemanaDeUso({ conta }: { conta: ContaAdmin }) {
 
 type Props = {
   contas: ContaAdmin[];
-  nichos: { id: number; nome: string }[];
   filtroInicial?: FiltroDeContas;
 };
 
-export function TabelaContas({ contas, nichos, filtroInicial = "todas" }: Props) {
+export function TabelaContas({ contas, filtroInicial = "todas" }: Props) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroDeContas>(filtroInicial);
   const [modalAberto, setModalAberto] = useState(false);
@@ -252,7 +251,7 @@ export function TabelaContas({ contas, nichos, filtroInicial = "todas" }: Props)
         </div>
       )}
 
-      <ModalNovaMarca nichos={nichos} aberto={modalAberto} onFechar={() => setModalAberto(false)} />
+      <ModalNovaMarca aberto={modalAberto} onFechar={() => setModalAberto(false)} />
     </div>
   );
 }

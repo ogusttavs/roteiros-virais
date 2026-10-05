@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import { textosAdmin } from "@/textos/admin";
 import { Botao } from "@/ui/componentes/Botao";
+import { BuscaDeRamo } from "@/ui/componentes/BuscaDeRamo";
 import { Campo } from "@/ui/componentes/Campo";
 
 import { criarMarcaAction } from "./acoes";
@@ -14,21 +14,25 @@ import styles from "./ModalNovaMarca.module.css";
 const t = textosAdmin.clientes;
 
 type Props = {
-  nichos: { id: number; nome: string }[];
   aberto: boolean;
   onFechar: () => void;
 };
 
 /**
- * "Nova marca" (V12b, item 2): só o que é da marca, nome, nicho, tipo de
- * conteúdo e roteiros por dia, sem e-mail. Ao criar, sai desta tela para
+ * "Nova conta" (V12b, item 2): só o que é da conta, nome, ramo, tipo de
+ * conteúdo e roteiros por dia, sem e-mail. O ramo vem da mesma busca instantânea do
+ * Começar (o catálogo de ramos, E45): o setor dele nasce ao criar a conta quando ainda
+ * não existe, e "Não achei o ramo" deixa o admin escrever o ramo com as próprias palavras. Ao criar, sai desta tela para
  * `/admin/clientes/[id]`, onde "Quem tem acesso" está vazio e "dar acesso"
  * em destaque é o próximo passo (a pessoa entra depois, dentro da marca).
  */
-export function ModalNovaMarca({ nichos, aberto, onFechar }: Props) {
+export function ModalNovaMarca({ aberto, onFechar }: Props) {
   const router = useRouter();
   const [nome, setNome] = useState("");
-  const [nichoId, setNichoId] = useState(nichos[0]?.id ?? 0);
+  const [ramoSlug, setRamoSlug] = useState<string | null>(null);
+  /** "Não achei o ramo": o texto escrito à mão (nulo: o ramo é o da lista). */
+  const [ramoOutro, setRamoOutro] = useState<string | null>(null);
+  const [tentou, setTentou] = useState(false);
   const [tipo, setTipo] = useState<"negocio" | "pessoa">("negocio");
   const [plano, setPlano] = useState<"padrao" | "sem_limite">("padrao");
   const [criando, setCriando] = useState(false);
@@ -36,12 +40,20 @@ export function ModalNovaMarca({ nichos, aberto, onFechar }: Props) {
 
   async function criar(evento: FormEvent) {
     evento.preventDefault();
+    setTentou(true);
+    const escrito = ramoOutro?.trim() ?? "";
+    if (!ramoSlug && !escrito) return;
     setCriando(true);
     setErro(null);
     try {
-      const marca = await criarMarcaAction({ nome, nichoId, tipo, plano });
+      const resultado = await criarMarcaAction({ nome, ramoSlug: ramoOutro === null ? ramoSlug : null, ramoOutro: ramoOutro === null ? null : escrito, tipo, plano });
+      if (!resultado.ok) {
+        setErro(resultado.erro || t.erroCriar);
+        setCriando(false);
+        return;
+      }
       onFechar();
-      router.push(`/admin/clientes/${marca.id}`);
+      router.push(`/admin/clientes/${resultado.dado.id}`);
     } catch {
       setErro(t.erroCriar);
       setCriando(false);
@@ -62,24 +74,33 @@ export function ModalNovaMarca({ nichos, aberto, onFechar }: Props) {
         <h2 className={styles.titulo}>{t.modalTitulo}</h2>
         <form className={styles.forma} onSubmit={criar}>
           <Campo rotulo={t.campoNome} required value={nome} onChange={(e) => setNome(e.target.value)} />
-          <label className={styles.rotuloSelect}>
-            {t.campoNicho}
-            <select
-              className={styles.select}
-              aria-label={t.campoNicho}
-              value={nichoId}
-              onChange={(e) => setNichoId(Number(e.target.value))}
-            >
-              {nichos.map((nicho) => (
-                <option key={nicho.id} value={nicho.id}>
-                  {nicho.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Link href="/admin/nichos" className={styles.linkNicho}>
-            {t.criarUmNicho}
-          </Link>
+          <div className={styles.campoRamo}>
+            <BuscaDeRamo
+              rotulo={t.campoNicho}
+              ajuda={t.ajudaRamo}
+              valor={ramoOutro === null ? ramoSlug : null}
+              nomeForaDoCatalogo={ramoOutro !== null ? t.naoAcheiRamo : null}
+              textoNaoAchei={t.naoAcheiRamo}
+              erro={tentou && !ramoSlug && ramoOutro === null ? t.ramoObrigatorio : undefined}
+              onEscolher={(slug) => {
+                setRamoSlug(slug);
+                setRamoOutro(null);
+              }}
+              onNaoAchei={(digitado) => {
+                setRamoSlug(null);
+                setRamoOutro(digitado || ramoOutro || "");
+              }}
+            />
+          </div>
+          {ramoOutro !== null ? (
+            <Campo
+              rotulo={t.campoRamoOutro}
+              ajuda={t.ajudaRamoOutro}
+              value={ramoOutro}
+              onChange={(e) => setRamoOutro(e.target.value)}
+              erro={tentou && ramoOutro.trim().length === 0 ? t.ramoObrigatorio : undefined}
+            />
+          ) : null}
           <label className={styles.rotuloSelect}>
             {t.campoTipo}
             <select
