@@ -265,6 +265,13 @@
   }
 }
 
+/* "Como editar" e "Por que assim" do Reels falado, empilhados na mesma caixa do lado (uma depois da outra, nunca na mesma área). */
+.pilhaDoLado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-6);
+}
+
 .referenciaVazia {
   display: grid;
   gap: var(--espaco-3);
