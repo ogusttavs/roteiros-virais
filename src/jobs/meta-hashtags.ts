@@ -57,6 +57,7 @@ import { ehVideo, normalizarHashtagMedia } from "@/servicos/normalizadores/meta"
 
 import { apagarAudio, baixarAudio, ErroAudio } from "./audio";
 import { upsertVideo } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { ErroColeta } from "./execucoes";
 import { ErroGroq, transcreverAudio } from "./groq-api";
 
@@ -164,6 +165,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
+    definirRamoDoContexto(nicho.id);
     for (const termo of termosDaSemana(nicho.termos, quantidadeTermosPorNicho, semanaAtual)) {
       let hashtagId = mapaResolvidos.get(termo);
 
@@ -240,6 +242,7 @@ export async function rodarMetaHashtags(nichoId?: number): Promise<Record<string
       }
     }
   }
+  restaurarRamoDoContexto();
 
   return {
     nichos: nichosAtivos.length,

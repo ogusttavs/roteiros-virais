@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { configuracaoAdmin, custosFixos } from "../../src/db/schema";
+import { configuracaoAdmin, custosExternos, custosFixos, geracoesIA, nichos } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA = "ExemploSenha123";
@@ -23,6 +23,43 @@ test.describe("custos e rotinas", () => {
   test.afterAll(async () => {
     await db().delete(configuracaoAdmin).where(eq(configuracaoAdmin.chave, "teto_diario_brl"));
     await db().delete(custosFixos).where(eq(custosFixos.nome, "E2E Servidor de teste"));
+    const [ramo] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.slug, "e2e-custo-ramo"));
+    if (ramo) {
+      await db().delete(custosExternos).where(eq(custosExternos.ramoId, ramo.id));
+      await db().delete(geracoesIA).where(eq(geracoesIA.ramoId, ramo.id));
+      await db().delete(nichos).where(eq(nichos.id, ramo.id));
+    }
+  });
+
+  test("Custos: o custo por ramo e o que se paga fora da IA aparecem, e as rotinas deixam rodar só um ramo", async ({ page }) => {
+    const ontem = new Date(Date.now() - 36 * 60 * 60 * 1000);
+    const [ramo] = await db().insert(nichos).values({ slug: "e2e-custo-ramo", nome: "E2E Ramo de custo", termos: [] }).returning();
+    await db().insert(geracoesIA).values({ tarefa: "modeloNicho", versaoPrompt: "0", modelo: "mock", entradas: {}, ramoId: ramo.id, custoUsd: "0.500000", criadoEm: ontem } as never);
+    await db().insert(custosExternos).values([
+      { fonte: "groq", custoUsd: "0.020000", unidades: "30.000", unidade: "minutos", origemDoCusto: "estimado", ramoId: ramo.id, criadoEm: ontem },
+      { fonte: "apify", custoUsd: "0.040000", unidades: "200.000", unidade: "resultados", origemDoCusto: "api", ramoId: ramo.id, criadoEm: ontem },
+    ]);
+
+    await entrarAdmin(page);
+    await page.goto("/admin/custos");
+    const porRamo = page.locator('[data-bloco="por-ramo"]');
+    const linhaDoRamo = porRamo.locator(`[data-ramo="${ramo.id}"]`);
+    await expect(linhaDoRamo).toContainText("E2E Ramo de custo");
+    await expect(linhaDoRamo).toContainText("IA R$ 2,75, fora da IA R$ 0,33, inclui valores estimados");
+    await expect(page.locator('[data-contador="30dias"]')).toContainText("inclui valores estimados");
+    const fora = page.locator('[data-bloco="fora-da-ia"]');
+    await expect(fora.locator('[data-fonte="groq"]')).toContainText("30 minutos de áudio");
+    await expect(fora.locator('[data-fonte="groq"]')).toContainText("valor estimado pelo preço de tabela");
+    await expect(fora.locator('[data-fonte="apify"]')).toContainText("200 resultados");
+    await expect(fora.locator('[data-fonte="apify"]')).toContainText("valor que o próprio serviço informou");
+
+    await page.goto("/admin/jobs");
+    const rotina = page.locator('[data-rotina="transcrever"]');
+    await rotina.getByText("Ver o detalhe").click();
+    await expect(rotina.locator("[data-rodar-ramo]").first()).toBeVisible();
+    await expect(rotina.getByRole("button", { name: "Rodar só este ramo" }).first()).toBeDisabled();
+    await rotina.getByLabel("Escolha o ramo").first().selectOption({ label: "E2E Ramo de custo" });
+    await expect(rotina.getByRole("button", { name: "Rodar só este ramo" }).first()).toBeEnabled();
   });
 
   test("Custos: a navegação leva a eles, com o câmbio escrito, e o teto se troca ali mesmo", async ({ page }) => {

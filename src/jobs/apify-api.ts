@@ -12,6 +12,7 @@
 import { ApifyClient } from "apify-client";
 
 import { config } from "@/lib/config";
+import { custoEstimadoDoApifyUsd, registrarCustoExterno } from "@/servicos/custos-externos";
 import { normalizarHashtag } from "@/servicos/normalizadores/hashtag";
 
 let instancia: ApifyClient | null = null;
@@ -43,6 +44,17 @@ export async function rodarAtor<T>(
 ): Promise<{ itens: T[]; devolvidos: number }> {
   const execucao = await cliente().actor(ator).call(input, { maxItems });
   const { items } = await cliente().dataset(execucao.defaultDatasetId).listItems();
+  // O custo da coleta (custo que falta no admin): o que a API do Apify diz que a execução custou (`usageTotalUsd`); sem isso, o preço do ator por resultado, da data de `config/precos-ia.ts`, marcado como estimado.
+  const doApify = (execucao as { usageTotalUsd?: unknown }).usageTotalUsd;
+  const veioDaApi = typeof doApify === "number" && Number.isFinite(doApify);
+  await registrarCustoExterno({
+    fonte: "apify",
+    custoUsd: veioDaApi ? doApify : custoEstimadoDoApifyUsd(ator, items.length),
+    unidades: items.length,
+    unidade: "resultados",
+    origemDoCusto: veioDaApi ? "api" : "estimado",
+    detalhe: { ator },
+  });
   return { itens: (items as T[]).slice(0, maxItems), devolvidos: items.length };
 }
 

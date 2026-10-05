@@ -64,6 +64,7 @@ import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
 
 import { midiaUrlFresca } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { ErroGroq, ErroGroqTempoLimite, transcreverAudio } from "./groq-api";
 
 const SETE_DIAS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -409,6 +410,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
 
   try {
     for (const [indiceDoSetor, nicho] of nichosAtivos.entries()) {
+      definirRamoDoContexto(nicho.id);
       const inicioDoSetor = agora();
       const orcamentoMs = orcamentoDoSetor(porSetorMs, totalMs, inicioDoSetor - inicioDoJob, nichosAtivos.length - indiceDoSetor);
       const tetoDiario = config.regras.transcricoesPorDia;
@@ -502,6 +504,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       if (tiktokPausadoNoNicho) tiktokPausado = true;
       segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
     }
+    restaurarRamoDoContexto();
   } finally {
     /**
      * M5b, item 1: a ordem dos jobs da madrugada, encadeada (achado da conferência de 02/10, com a

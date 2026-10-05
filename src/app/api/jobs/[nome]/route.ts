@@ -1,7 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+
+import { db } from "@/db";
+import { nichos } from "@/db/schema";
 import { boss, existeJobPendente, FILAS, FILAS_POR_EVENTO, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 
@@ -62,6 +66,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ nom
   }
 
   const { nichoId } = await corpoOpcional(request);
+  // Um ramo que não existe não entra na fila: o worker falharia na chave estrangeira ao registrar a execução.
+  if (nichoId !== undefined) {
+    const [ramo] = await db().select({ id: nichos.id }).from(nichos).where(eq(nichos.id, nichoId));
+    if (!ramo) return NextResponse.json({ erro: `ramo desconhecido: ${nichoId}` }, { status: 400 });
+  }
 
   try {
     await garantirBossPronto();

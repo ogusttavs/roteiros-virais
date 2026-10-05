@@ -15,6 +15,7 @@ import Groq from "groq-sdk";
 
 import { type Idioma } from "@/config/idioma";
 import { config } from "@/lib/config";
+import { custoDaTranscricaoGroqUsd, registrarCustoExterno } from "@/servicos/custos-externos";
 
 export class ErroGroq extends Error {}
 
@@ -54,9 +55,9 @@ function idiomaDoRotuloGroq(rotulo: string | undefined): Idioma {
  */
 const LIMIAR_SEM_FALA = 0.6;
 
-type SegmentoVerboseJson = { no_speech_prob: number };
+type SegmentoVerboseJson = { no_speech_prob: number; end?: number };
 /** O SDK da Groq só declara `{ text }` no tipo `Transcription`, mesmo para `verbose_json`; o resto vem a mais, sem tipo (confirmado rodando contra a API de verdade). */
-type RespostaVerboseJson = { text: string; language?: string; segments?: SegmentoVerboseJson[] };
+type RespostaVerboseJson = { text: string; language?: string; duration?: number; segments?: SegmentoVerboseJson[] };
 
 export type ResultadoTranscricaoGroq = {
   texto: string;
@@ -103,6 +104,16 @@ export async function transcreverAudio(
     const resultado = (await Promise.race([chamada, corte])) as unknown as RespostaVerboseJson;
 
     const segmentos = resultado.segments ?? [];
+    // O custo da transcrição (custo que falta no admin): por segundo de áudio, que a Groq devolve em `duration`; sem ele, o fim do último trecho. Registrar nunca derruba a transcrição.
+    const duracaoS = typeof resultado.duration === "number" ? resultado.duration : Math.max(0, ...segmentos.map((s) => s.end ?? 0));
+    await registrarCustoExterno({
+      fonte: "groq",
+      custoUsd: custoDaTranscricaoGroqUsd(duracaoS),
+      unidades: duracaoS / 60,
+      unidade: "minutos",
+      origemDoCusto: "estimado",
+      detalhe: { modelo: config.transcricao.groqModel, segundos: Math.round(duracaoS) },
+    });
     const mediaSemFala = segmentos.length > 0 ? segmentos.reduce((soma, s) => soma + s.no_speech_prob, 0) / segmentos.length : 0;
     const semFala = mediaSemFala >= LIMIAR_SEM_FALA;
 

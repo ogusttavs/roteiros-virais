@@ -69,6 +69,25 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  */
 export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil]);
 
+/**
+ * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em
+ * `execucoes_job.ramo_id` (custo que falta no admin). É o que o botão "rodar de novo só este ramo"
+ * do cartão da rotina oferece; as outras rodam sempre para todos os ramos de uma vez.
+ */
+export const FILAS_POR_RAMO = new Set<string>([
+  FILAS.coletaYoutube,
+  FILAS.coletaApify,
+  FILAS.coletaNoticias,
+  FILAS.metaContas,
+  FILAS.metaHashtags,
+  FILAS.descobertaInstagram,
+  FILAS.transcrever,
+  FILAS.extrairAgora,
+  FILAS.extrairSemFala,
+  FILAS.temasDoDia,
+  FILAS.pesquisaDeSetor,
+]);
+
 let instancia: PgBoss | null = null;
 
 function url(): string {

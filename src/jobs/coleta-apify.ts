@@ -37,6 +37,7 @@ import {
   VIDEOS_POR_PERFIL_VIGILANCIA,
 } from "./apify-api";
 import { upsertConta, upsertVideo } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { ErroColeta } from "./execucoes";
 
 const FONTE = "apify";
@@ -118,6 +119,7 @@ export async function rodarColetaApify(nichoId?: number, execucaoId?: number): P
 
   for (const nicho of nichosAtivos) {
     if (!cabe()) break;
+    definirRamoDoContexto(nicho.id);
 
     const termosRodada = termosDaRodada(nicho.termos, agora);
     if (termosRodada.length > 0 && cabe()) {
@@ -269,6 +271,7 @@ export async function rodarColetaApify(nichoId?: number, execucaoId?: number): P
       }
     }
   }
+  restaurarRamoDoContexto();
 
   /**
    * Ajuste 4 da revisão do PR #36: com `apifyDesligado` ou sem orçamento

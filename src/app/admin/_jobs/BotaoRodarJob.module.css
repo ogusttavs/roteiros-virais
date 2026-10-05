@@ -1,7 +1,14 @@
 .envoltorio {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: var(--espaco-3);
+}
+
+.envoltorio select {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .sucesso {

@@ -2,7 +2,7 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
 import { ROTINAS, quandoDoCron, type Rotina } from "@/config/rotinas";
 import { AGENDAMENTOS } from "@/jobs/agenda";
-import { FILAS, FILAS_POR_EVENTO } from "@/jobs/fila";
+import { FILAS, FILAS_POR_EVENTO, FILAS_POR_RAMO } from "@/jobs/fila";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao, type ExecucaoResumo } from "@/servicos/admin-coleta";
 import { inicioDoAdmin } from "@/servicos/admin-inicio";
@@ -12,6 +12,7 @@ import { textosRotinasAdmin as t } from "@/textos/admin-custos";
 import { fraseDoErro } from "@/textos/rotinas";
 
 import { BotaoRodarJob } from "../_jobs/BotaoRodarJob";
+import { BotaoRodarRamo } from "../_jobs/BotaoRodarRamo";
 import comum from "../comum.module.css";
 
 import proprio from "./rotinas.module.css";
@@ -70,6 +71,8 @@ export default async function Rotinas() {
   const idsPagos = [...recentes.entries()].filter(([nome]) => FILAS_DE_COLETA_PAGA.has(nome)).flatMap(([, lista]) => lista.map((e) => e.id));
   const taxas = new Map((await taxaDeAcertoPorExecucao(idsPagos)).map((x) => [x.execucaoId, x]));
   const disparos = await ultimosDisparos(todasAsFilas);
+  const ramosDoAdmin = madrugada.linhas.map((l) => ({ id: l.nichoId, nome: l.nome }));
+  const nomeDoRamo = new Map(ramosDoAdmin.map((x) => [x.id, x.nome]));
   const agendas = (filas: string[]) => AGENDAMENTOS.filter((a) => filas.includes(a.fila));
 
   return (
@@ -197,6 +200,12 @@ export default async function Rotinas() {
                             </span>
                             {FILAS_POR_EVENTO.has(fila) ? null : <BotaoRodarJob nome={fila} rotulo={t.rotinas.tentarDeNovo} />}
                           </div>
+                          {FILAS_POR_RAMO.has(fila) && ramosDoAdmin.length > 0 ? (
+                            <div className={styles.cabecaFila}>
+                              <span className={styles.nomeTecnico}>{t.rotinas.soUmRamo}</span>
+                              <BotaoRodarRamo fila={fila} ramos={ramosDoAdmin} />
+                            </div>
+                          ) : null}
                           {disparos.get(fila) ? (
                             <p className={styles.nota} data-disparo={fila}>
                               {t.rotinas.rodadaAMao(disparos.get(fila)!.porNome, quandoPorExtenso(disparos.get(fila)!.em, inicio.agora))}
@@ -243,7 +252,7 @@ export default async function Rotinas() {
                               <ul className={styles.ultimasVezes}>
                                 {lista.map((e) => (
                                   <li key={e.id}>
-                                    {dataHora(e.iniciadoEm)}, {t.rotinas.estado[e.status === "ok" ? "ok" : e.status === "erro" ? "erro" : "rodando"]}, {duracao(e.duracaoMs)}
+                                    {dataHora(e.iniciadoEm)}, {e.ramoId !== null ? t.rotinas.deUmRamo(nomeDoRamo.get(e.ramoId) ?? `ramo ${e.ramoId}`) : t.rotinas.deTodosOsRamos}, {t.rotinas.estado[e.status === "ok" ? "ok" : e.status === "erro" ? "erro" : "rodando"]}, {duracao(e.duracaoMs)}
                                   </li>
                                 ))}
                               </ul>
