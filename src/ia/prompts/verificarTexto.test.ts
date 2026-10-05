@@ -32,7 +32,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.7.2");
+    expect(versao).toBe("1.7.3");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -92,6 +92,17 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
     expect(CRITERIO_FATOS).toContain("repetir ou reformular o TEMA ou o momento (eles são fonte)");
     expect(CRITERIO_FATOS).toContain("a frase ou o assunto que o cliente pediu para dizer");
     expect(CRITERIO_FATOS).toContain("instruções de gravação (sugerir como ou onde gravar");
+  });
+
+  it("os falsos positivos da revisão do #127 aparecem como APROVADOS: frase literal do perfil, espaço marcado entre colchetes e pergunta (não é afirmação)", () => {
+    const aprovam = CRITERIO_FATOS.slice(CRITERIO_FATOS.indexOf("Exemplos que APROVAM"), CRITERIO_FATOS.indexOf("Exemplos que REPROVAM"));
+    expect(aprovam).toContain("nunca promete resultado que não pode cumprir");
+    expect(aprovam).toContain("eu nunca prometo resultado");
+    expect(aprovam).toContain("aqui a gente aplica igual fábrica, sem bolha");
+    expect(aprovam).toContain("sempre faço [conte aqui como você faz isso]");
+    expect(aprovam).toContain("qual dura mais, o produto A ou o B?");
+    expect(CRITERIO_FATOS).toContain("perguntas (uma pergunta, mesmo comparando dois produtos, não afirma nada)");
+    expect(CRITERIO_FATOS).toContain("frase que está literalmente nas fontes");
   });
 
   it("a entrada leva as fontes depois do texto e das proibições", () => {

@@ -85,7 +85,7 @@ import { definicoesTipoAbertura } from "./definicoesTipoAbertura";
  * os valores que nunca servem de modelo, `config/formatos.ts`), gravado em `videos.formato_catalogo` por `extracao-comum.ts`. Valor fora da lista ou ausente vira nulo (a ficha
  * continua aprovada, como no M5b; "outro" fica só para quando o modelo o escolhe); o `formato` antigo de cinco valores e o `tipoConteudo` continuam até o PR 2.
  */
-export const versao = "1.12.0";
+export const versao = "1.12.1";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 

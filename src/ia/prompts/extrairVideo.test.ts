@@ -167,6 +167,12 @@ describe("fichaCatalogo", () => {
   it("o prompt traz a definição de uma frase de cada uma das cinco fichas", () => {
     const sistema = montarSistemaEstavel();
     for (const chave of ["guardem", "mandem", "comentem", "me_chamem", "veja"]) expect(sistema, chave).toContain(`"${chave}":`);
+    // 05/10/2026 (golden de extração: 9 de 18, puxando para "guardem"): critério pelo que se vê, um exemplo por ficha e a ordem de decisão.
+    expect(sistema.match(/Exemplo[s]?: /g)?.length).toBeGreaterThanOrEqual(5);
+    expect(sistema).toContain("Como decidir, nesta ordem");
+    expect(sistema).toContain("Nunca use guardem por padrão");
+    expect(sistema).toContain("lista de erros não é guardem");
+    expect(sistema).toContain("resultado entregue, preço ou orçamento: me_chamem");
     expect(sistema).toContain("estimativa sua, não um número da rede");
   });
 
