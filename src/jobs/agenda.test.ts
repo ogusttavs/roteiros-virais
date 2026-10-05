@@ -18,8 +18,8 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.temasDoDia)).toBe("30 6 * * *");
   });
 
-  it("contasBase roda as 03:40, antes de pontuar as 03:45 (E6 parte 3, item 5: catch-up antes da mediana do dia)", () => {
-    expect(cronDe(FILAS.contasBase)).toBe("40 3 * * *");
+  it("contasBase roda as 02:35, antes de pontuar as 03:45 (E6 parte 3, item 5: catch-up antes da mediana do dia)", () => {
+    expect(cronDe(FILAS.contasBase)).toBe("35 2 * * *");
     expect(cronDe(FILAS.pontuar)).toBe("45 3 * * *");
   });
 
@@ -38,10 +38,10 @@ describe("AGENDAMENTOS", () => {
     expect(new Set(chaves).size).toBe(chaves.length);
   });
 
-  it("metaContas roda as 03:35, entre a coleta do apify (03:30) e o contas-base (03:40)", () => {
+  it("metaContas roda as 03:35, depois da coleta do apify (03:30), e o contas-base roda uma hora antes (02:35): o limite do aplicativo na Meta e por hora", () => {
     expect(cronDe(FILAS.coletaApify)).toBe("30 3 * * *");
     expect(cronDe(FILAS.metaContas)).toBe("35 3 * * *");
-    expect(cronDe(FILAS.contasBase)).toBe("40 3 * * *");
+    expect(cronDe(FILAS.contasBase)).toBe("35 2 * * *");
   });
 
   it("metaHashtags roda todo dia as 04:20, entre transcrever (04:00) e extrair (05:00) (ajuste 2 da revisao do PR #35: recent_media e janela de 24h)", () => {

@@ -9,6 +9,9 @@ describe("fraseDoErro", () => {
     expect(fraseDoErro("youtube: Sign in to confirm you are not a bot")).toContain("YouTube");
     expect(fraseDoErro("Error: ETIMEDOUT")).toContain("tempo limite");
     expect(fraseDoErro("connect ECONNREFUSED 127.0.0.1:5432")).toContain("banco de dados");
+    // O limite do aplicativo na Meta, como o erro chega (o código 4 cru, a pausa, ou o erro da rotina).
+    expect(fraseDoErro("meta api indisponivel (codigo 4): (#4) Application request limit reached")).toContain("limite da Meta");
+    expect(fraseDoErro("limite da Meta, continua na próxima hora")).toContain("limite da Meta");
   });
 
   it("o resto é a frase genérica, e nunca o texto cru", () => {

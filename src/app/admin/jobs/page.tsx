@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { ROTINAS, quandoDoCron, type Rotina } from "@/config/rotinas";
+import { NOME_DA_FILA, ROTINAS, quandoDoCron, type Rotina } from "@/config/rotinas";
 import { AGENDAMENTOS } from "@/jobs/agenda";
 import { FILAS, FILAS_POR_EVENTO, FILAS_POR_RAMO } from "@/jobs/fila";
 import { exigirAdmin } from "@/lib/sessao";
@@ -39,6 +39,18 @@ function dataHora(d: Date | null): string {
   return d ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "medium", timeZone: "America/Sao_Paulo" }).format(d) : "-";
 }
 
+const TRES_DIAS_MS = 3 * 24 * 60 * 60 * 1000;
+
+/**
+ * A execução que faz o cartão dizer "falhou": a última de cada fila que terminou em erro faz menos de 3 dias (a mesma regra da etiqueta). A mais recente delas. O cartão diz qual foi
+ * e por quê, em vez de mostrar o resultado de outra fila da mesma rotina que deu certo depois.
+ */
+function execucaoQueFalhou(ultimas: (ExecucaoResumo | undefined)[], agora: Date): ExecucaoResumo | undefined {
+  return ultimas
+    .filter((e): e is ExecucaoResumo => Boolean(e) && e!.status === "erro" && agora.getTime() - e!.iniciadoEm.getTime() < TRES_DIAS_MS)
+    .sort((a, b) => b.iniciadoEm.getTime() - a.iniciadoEm.getTime())[0];
+}
+
 /** O pior estado entre a última execução de cada fila da rotina: falhou vence rodando, que vence deu certo. Sem nenhuma execução: nunca rodou. */
 function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): EstadoDaRotina {
   const existentes = ultimas.filter((e): e is ExecucaoResumo => Boolean(e));
@@ -53,6 +65,8 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return fraseDoErro(e.erro);
+  // A rotina da Meta que parou no limite do aplicativo não é erro: o resumo diz que continua na hora seguinte.
+  if (e.resumo?.pausadoPorLimite === true) return t.rotinas.paradoNoLimite;
   // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
   return e.status === "rodando" ? t.rotinas.estado.rodando : `${t.rotinas.estado.ok}, em ${duracao(e.duracaoMs)}`;
 }
@@ -162,6 +176,7 @@ export default async function Rotinas() {
             const ultimas = r.filas.map((f) => recentes.get(f)?.[0]);
             const estado = estadoDaRotina(ultimas, inicio.agora);
             const maisRecente = ultimas.filter((e): e is ExecucaoResumo => Boolean(e)).sort((a, b) => b.iniciadoEm.getTime() - a.iniciadoEm.getTime())[0];
+            const falhou = execucaoQueFalhou(ultimas, inicio.agora);
             const quando = agendas(r.filas);
             const soPorEvento = r.filas.every((f) => FILAS_POR_EVENTO.has(f));
             return (
@@ -182,7 +197,9 @@ export default async function Rotinas() {
                   </div>
                   <div>
                     <dt>{t.rotinas.resultado}</dt>
-                    <dd>{resultadoEmFrase(maisRecente)}</dd>
+                    <dd data-resultado={falhou ? "falhou" : "ultima"}>
+                      {falhou ? t.rotinas.falhouEm(NOME_DA_FILA[falhou.nome] ?? falhou.nome, quandoPorExtenso(falhou.iniciadoEm, inicio.agora), fraseDoErro(falhou.erro)) : resultadoEmFrase(maisRecente)}
+                    </dd>
                   </div>
                 </dl>
                 <details className={styles.detalhe}>

@@ -11,19 +11,26 @@
  * erro (`ErroMetaApi`), marca `contas.api_indisponivel_em` e a conta volta
  * a ser coberta pelo Apify no `coleta-apify.ts` normal.
  */
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, lt, or } from "drizzle-orm";
 
 import { db } from "@/db";
 import { contas, nichos } from "@/db/schema";
-import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi } from "@/jobs/meta-api";
+import { FILAS } from "@/jobs/fila";
+import { buscarBusinessDiscovery, erroMetaEhDaConta, erroMetaEhTokenOuLimite, ErroMetaApi, PausaDaMeta } from "@/jobs/meta-api";
 import { config } from "@/lib/config";
 import { normalizarBusinessDiscovery } from "@/servicos/normalizadores/meta";
 
 import { upsertConta, upsertVideo } from "./coleta-comum";
 import { ErroColeta } from "./execucoes";
+import { agendarRetomadaDaMeta } from "./meta-retomada";
 
-/** `nichoId` (etapa 24, parte 1): mesmo raciocinio de `rodarColetaYoutube`. */
-export async function rodarMetaContas(nichoId?: number): Promise<Record<string, unknown>> {
+/**
+ * `nichoId` (etapa 24, parte 1): mesmo raciocinio de `rodarColetaYoutube`.
+ *
+ * `retomada` (o limite do aplicativo na Meta): quando a Meta passa de 80% do limite, a rotina para com o motivo "limite da Meta, continua na próxima hora" (não é erro),
+ * enfileira a si mesma para depois da pausa e a retomada pula as contas que já foram lidas desde o começo da primeira passada (`desde`), em vez de recomeçar do zero.
+ */
+export async function rodarMetaContas(nichoId?: number, retomada?: { desde?: string }): Promise<Record<string, unknown>> {
   if (!config.coleta.metaAtivo) {
     throw new ErroColeta(
       "META_ATIVO nao esta ligado (ou faltam META_IG_ID/META_TOKEN); o Instagram continua pelo Apify",
@@ -33,6 +40,9 @@ export async function rodarMetaContas(nichoId?: number): Promise<Record<string, 
 
   const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
   const nichosAtivos = await db().select().from(nichos).where(condicao);
+  const desdeDaPassada = retomada?.desde && !Number.isNaN(new Date(retomada.desde).getTime()) ? new Date(retomada.desde) : new Date();
+  let pausa: PausaDaMeta | null = null;
+  let contasQueFaltam = 0;
 
   let contasLidas = 0;
   let videosNovos = 0;
@@ -50,10 +60,17 @@ export async function rodarMetaContas(nichoId?: number): Promise<Record<string, 
           eq(contas.nichoId, nicho.id),
           eq(contas.vigiada, true),
           isNull(contas.apiIndisponivelEm),
+          // Na retomada, quem já foi lido desde o começo da primeira passada fica para a próxima rotina.
+          retomada?.desde ? or(isNull(contas.ultimaLeituraMetaEm), lt(contas.ultimaLeituraMetaEm, desdeDaPassada)) : undefined,
         ),
-      );
+      )
+      .orderBy(asc(contas.id));
 
     for (const conta of vigiadas) {
+      if (pausa) {
+        contasQueFaltam += 1;
+        continue;
+      }
       try {
         const discovery = await buscarBusinessDiscovery(conta.handle);
         if (!discovery) {
@@ -84,6 +101,12 @@ export async function rodarMetaContas(nichoId?: number): Promise<Record<string, 
          * contas vigiadas uma a uma. So um erro da propria conta (pessoal
          * ou com restricao de idade) marca ela como indisponivel.
          */
+        if (erro instanceof PausaDaMeta) {
+          // Não é erro: a conta atual não foi lida e a rotina continua na hora seguinte.
+          pausa = erro;
+          contasQueFaltam += 1;
+          continue;
+        }
         if (erro instanceof ErroMetaApi) {
           if (erroMetaEhTokenOuLimite(erro)) {
             throw new ErroColeta(`meta api indisponivel (codigo ${erro.codigo}): ${erro.message}`, true);
@@ -95,6 +118,23 @@ export async function rodarMetaContas(nichoId?: number): Promise<Record<string, 
         erros.push(`instagram / "${conta.handle}": ${erro instanceof Error ? erro.message : String(erro)}`);
       }
     }
+  }
+
+  if (pausa) {
+    const agendou = await agendarRetomadaDaMeta(FILAS.metaContas, { ...(nichoId ? { nichoId } : {}), retomadaDesde: desdeDaPassada.toISOString() }, pausa.retomaEm);
+    return {
+      pausadoPorLimite: true,
+      motivo: pausa.motivo,
+      retomaEm: pausa.retomaEm.toISOString(),
+      retomadaAgendada: agendou,
+      contasQueFaltam,
+      nichos: nichosAtivos.length,
+      contasLidas,
+      videosNovos,
+      videosAtualizados,
+      viewsTotais,
+      erros: erros.length > 0 ? erros : undefined,
+    };
   }
 
   return {
