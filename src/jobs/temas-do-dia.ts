@@ -32,10 +32,10 @@
  * ela. Tema que não passa é descartado, não corrigido: o nicho fecha o dia
  * com menos de três temas quando for o caso.
  */
-import { and, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { clientes, nichos, noticias, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
+import { clientes, nichos, noticias, ramosDaConta, roteiros, temasDia, type TemaDoDia } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
@@ -420,9 +420,38 @@ async function gerarTemasDoNicho(
  * segurança de não piorar o que já está lá continua em `podeSobrescreverTemasDoDia`, que roda
  * de qualquer jeito na escrita.
  */
+/** Há quantos dias, no máximo, uma marca do setor precisa ter gerado roteiro para o setor ganhar tema de madrugada (decisão do Gustavo, 05/10/2026). */
+export const DIAS_DE_USO_PARA_TEMA = 3;
+
+/** A frase do resumo da rotina quando um setor fica sem tema por falta de uso (o cartão de Rotinas a mostra em língua de gente). */
+export const MOTIVO_SEM_USO = "sem tema hoje: ninguém gerou roteiro em 3 dias";
+
+/**
+ * Os setores "em uso": os que têm ao menos uma marca ATIVA com roteiro gerado nos últimos `DIAS_DE_USO_PARA_TEMA` dias (a marca conta pelo ramo principal e pelos alternativos que o
+ * admin ligou). Só esses ganham tema novo de madrugada (o tema é o item mais caro do dia e ninguém lê o de um setor que ninguém abre); a coleta, a transcrição, a extração e o modelo
+ * do setor continuam todos os dias, porque a base não pode envelhecer. Quem abre o Hoje ou o Criar num setor sem tema gera na hora (`opts.aoAbrir`).
+ */
+export async function setoresEmUso(agora: Date = new Date()): Promise<Set<number>> {
+  const desde = new Date(agora.getTime() - DIAS_DE_USO_PARA_TEMA * 24 * 60 * 60 * 1000);
+  const marcasComRoteiro = db()
+    .selectDistinct({ clienteId: roteiros.clienteId })
+    .from(roteiros)
+    .where(gte(roteiros.criadoEm, desde));
+  const principais = await db()
+    .selectDistinct({ nichoId: clientes.nichoId })
+    .from(clientes)
+    .where(and(eq(clientes.ativo, true), isNotNull(clientes.nichoId), inArray(clientes.id, marcasComRoteiro)));
+  const alternativos = await db()
+    .selectDistinct({ nichoId: ramosDaConta.nichoId })
+    .from(ramosDaConta)
+    .innerJoin(clientes, eq(clientes.id, ramosDaConta.clienteId))
+    .where(and(eq(clientes.ativo, true), inArray(clientes.id, marcasComRoteiro)));
+  return new Set([...principais, ...alternativos].map((l) => l.nichoId).filter((id): id is number => id !== null));
+}
+
 export async function rodarTemasDoDia(
   nichoId?: number,
-  opts?: { forcar?: boolean },
+  opts?: { forcar?: boolean; aoAbrir?: boolean },
 ): Promise<Record<string, unknown>> {
   if (nichoId !== undefined && !opts?.forcar) {
     const [existente] = await db()
@@ -446,10 +475,15 @@ export async function rodarTemasDoDia(
 
   const condicoes = [eq(nichos.ativo, true)];
   if (nichoId !== undefined) condicoes.push(eq(nichos.id, nichoId));
-  const nichosAtivos = await db()
+  const todosAtivos = await db()
     .select()
     .from(nichos)
     .where(and(...condicoes));
+  // Só a rodada da madrugada (e o tema imediato que a cadeia da análise enfileira) respeita o uso; quem pediu à mão (`forcar`) ou quem abriu a tela (`aoAbrir`) tem tema na hora.
+  const respeitaUso = !opts?.forcar && !opts?.aoAbrir;
+  const emUso = respeitaUso ? await setoresEmUso() : null;
+  const nichosAtivos = emUso ? todosAtivos.filter((n) => emUso.has(n.id)) : todosAtivos;
+  const semUso = todosAtivos.length - nichosAtivos.length;
 
   let gerados = 0;
   let mantidos = 0;
@@ -484,6 +518,9 @@ export async function rodarTemasDoDia(
     semNovidade,
     temasSemProva,
     falhas,
+    // Os setores que ficaram sem tema novo por falta de uso (ninguém gerou roteiro em 3 dias): o admin vê quantos em Rotinas.
+    semUso,
+    motivoSemUso: semUso > 0 ? MOTIVO_SEM_USO : undefined,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

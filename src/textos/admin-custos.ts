@@ -116,6 +116,8 @@ export const textosRotinasAdmin = {
     porEvento: "roda quando acontece o evento, não por horário",
     tentarDeNovo: "Rodar agora",
     falhouEm: (nome: string, quando: string, frase: string) => `${nome.charAt(0).toUpperCase()}${nome.slice(1)} falhou ${quando}. ${frase}`,
+    temasDoDia: (comTema: number, semUso: number) => `${comTema === 1 ? "1 ramo com tema" : `${comTema} ramos com tema`}, ${semUso === 1 ? "1 sem uso" : `${semUso} sem uso`}`,
+    semTemaPorFaltaDeUso: "sem tema hoje: ninguém gerou roteiro em 3 dias",
     paradoNoLimite: "Parou no limite da Meta e continua na hora seguinte.",
     soUmRamo: "Rodar de novo só um ramo",
     escolhaORamo: "Escolha o ramo",

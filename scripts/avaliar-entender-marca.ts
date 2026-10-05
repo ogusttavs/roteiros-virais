@@ -27,6 +27,7 @@
  * `avaliacoes/entender-marca.exemplo.json` e avisa que é exemplo. Prova com chave real é do Fable
  * (`FLUXO.md`, "Golden set com chave real: uma vez por rodada"); a CI roda tudo em `AI_PROVIDER=mock`.
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

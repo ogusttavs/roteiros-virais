@@ -7,6 +7,7 @@
  *
  *   npm run avaliar:extrair
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

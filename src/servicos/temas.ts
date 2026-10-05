@@ -19,7 +19,9 @@ import {
 } from "@/db/schema";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
 import { gerarComVerificacao } from "@/ia/verificador";
+import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { evidenciaParaTema, formatarModeloNicho, modeloNichoAtual, reguaDoSetor } from "@/servicos/pesquisa";
 import { buscarVideosParaProva, janelaDeProva, temaTemProvaSuficiente, type RegraDoSetor } from "@/servicos/prova-tema";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
@@ -194,6 +196,26 @@ export async function temasDoDiaOuRecente(
 
   if (!linha) return null;
   return { temas: linha.temas, dataUsada: linha.data };
+}
+
+/**
+ * Quem abre o Criar num setor sem tema de hoje (o tema de madrugada só sai para setor em uso, decisão do Gustavo de 05/10/2026) faz o tema nascer na hora, pelo mesmo caminho do tema
+ * imediato da M1: enfileira `temas-do-dia` para o setor, com `aoAbrir` (que não respeita o critério de uso). Devolve "gerando" quando há um pedido em andamento (a tela espera e
+ * se atualiza) e "nao" quando nada foi pedido: o setor já tentou hoje (existe a linha do dia, inclusive a vazia que marca "ficou sem prova"), ou a fila não respondeu.
+ * No máximo um pedido por setor a cada 10 minutos, para uma tela que se atualiza sozinha nunca encher a fila.
+ */
+export async function pedirTemaDeHoje(nichoId: number, data: string = hojeISO()): Promise<"gerando" | "nao"> {
+  const [jaTentou] = await db().select({ id: temasDia.id }).from(temasDia).where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, data)));
+  if (jaTentou) return "nao";
+  try {
+    await garantirBossPronto();
+    if (await existeJobPendente(FILAS.temasDoDia, nichoId)) return "gerando";
+    const id = await boss().send(FILAS.temasDoDia, { nichoId, aoAbrir: true }, { singletonKey: `tema-ao-abrir-${nichoId}`, singletonSeconds: 600 });
+    return id === null ? "nao" : "gerando";
+  } catch (erro) {
+    logger.error({ err: erro, nichoId }, "nao foi possivel pedir o tema de hoje ao abrir a tela");
+    return "nao";
+  }
 }
 
 export type ResultadoTemasHoje =
