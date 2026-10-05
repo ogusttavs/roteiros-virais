@@ -7,7 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import {
@@ -18,6 +18,7 @@ import {
   membrosMarca,
   nichos,
   preferenciasUsuario,
+  roteiros,
   temasDia,
   user,
   videos,
@@ -290,5 +291,67 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
+  });
+
+  // O momento que volta preenchido (achado do Bruno, 06/10): o roteiro nasceu do que a pessoa contou; ela volta, vê o texto dela, edita e gera de novo.
+  test("o roteiro do momento tem 'Reescrever o que contei': volta ao Criar com o texto guardado, editável, e gera de novo", async ({ page }) => {
+    await entrar(page);
+    await abrirGravarAgora(page);
+    const folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await folha.getByLabel("Onde você está").fill("na oficina, de manhã cedo");
+    await folha.getByLabel("O que está acontecendo").fill("chegou um sofá muito manchado");
+    await folha.getByLabel("O que dá para mostrar").fill("o antes e o depois");
+    await folha.getByRole("button", { name: "Que me chamem" }).click();
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/);
+    const urlDoRoteiro = page.url();
+
+    await page.getByRole("link", { name: "Reescrever o que contei" }).first().click();
+    await expect(page).toHaveURL(/\/criar\?momento=\d+/);
+    const volta = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(volta).toBeVisible();
+    await expect(volta.getByLabel("Onde você está")).toHaveValue("na oficina, de manhã cedo");
+    await expect(volta.getByLabel("O que está acontecendo")).toHaveValue("chegou um sofá muito manchado");
+    await expect(volta.getByLabel("O que dá para mostrar")).toHaveValue("o antes e o depois");
+
+    await volta.getByLabel("Onde você está").fill("na oficina, de tarde");
+    await volta.getByRole("button", { name: "Escrever o roteiro" }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/);
+    expect(page.url()).not.toBe(urlDoRoteiro);
+    const [novo] = await db().select().from(roteiros).orderBy(desc(roteiros.id)).limit(1);
+    expect(novo.momento?.onde).toBe("na oficina, de tarde");
+    expect(novo.momento?.oQueDaParaMostrar).toBe("o antes e o depois");
+  });
+
+  test("?momento= de um roteiro que não existe (ou que não é da conta) não abre nada", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/criar?momento=999999999");
+    await expect(page.getByRole("button", { name: "Contar o momento" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Gravar agora" })).toHaveCount(0);
+  });
+
+  // O que a pessoa escreveu fica no aparelho até gerar ou limpar.
+  test("o que foi escrito e não gerado fica no aparelho ao voltar, e 'Limpar o que escrevi' apaga", async ({ page }) => {
+    await entrar(page);
+    await abrirGravarAgora(page);
+    let folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await folha.getByLabel("Onde você está").fill("na loja, atendendo");
+    await folha.getByLabel("O que está acontecendo").fill("um cliente pediu orçamento");
+    await folha.getByRole("button", { name: "Fechar" }).click();
+    await expect(folha).toBeHidden();
+
+    // Sai do Criar e volta (a mesma aba): o texto está lá.
+    await page.goto("/hoje");
+    await abrirGravarAgora(page);
+    folha = page.getByRole("dialog", { name: "Gravar agora" });
+    await expect(folha.getByLabel("Onde você está")).toHaveValue("na loja, atendendo");
+    await expect(folha.getByLabel("O que está acontecendo")).toHaveValue("um cliente pediu orçamento");
+
+    await folha.getByRole("button", { name: "Limpar o que escrevi" }).click();
+    await expect(folha.getByLabel("Onde você está")).toHaveValue("");
+    await folha.getByRole("button", { name: "Fechar" }).click();
+    await page.goto("/hoje");
+    await abrirGravarAgora(page);
+    await expect(page.getByRole("dialog", { name: "Gravar agora" }).getByLabel("Onde você está")).toHaveValue("");
   });
 });

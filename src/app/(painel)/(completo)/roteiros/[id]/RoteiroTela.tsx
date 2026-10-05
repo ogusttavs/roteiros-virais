@@ -9,6 +9,7 @@ import {
   HelpCircle,
   History,
   Music,
+  Pencil,
   RotateCcw,
   Scissors,
   Sparkles,
@@ -262,6 +263,8 @@ export function RoteiroTela({
   );
   const [motivoTexto, setMotivoTexto] = useState("");
   const [erroReprovar, setErroReprovar] = useState<string | null>(null);
+  // O momento que volta preenchido: só para o roteiro que nasceu do que a pessoa contou e ainda tem o texto guardado.
+  const reescreverMomentoHref = roteiro.origem === "momento" && roteiro.momento ? `/criar?momento=${roteiro.id}` : null;
   const [demorando, setDemorando] = useState(false);
   const [versoesDesatualizadas, setVersoesDesatualizadas] = useState(false);
   const [toast, setToast] = useState(false);
@@ -988,6 +991,12 @@ export function RoteiroTela({
               {textosRoteiro.postado}
             </a>
           )}
+          {/* O momento que volta preenchido: o roteiro nasceu do que a pessoa contou, então ela volta ao Criar com o texto dela. Não precisa de rede para abrir. */}
+          {reescreverMomentoHref ? (
+            <Link href={reescreverMomentoHref} className={`${styles.btnVazio} ${styles.somenteTablet}`}>
+              {textosRoteiro.menu.reescreverMomento}
+            </Link>
+          ) : null}
           {/* "Reprovar" só do tablet para cima; no celular é a linha .julgar no fim do cartão (design v2). */}
           <button
             type="button"
@@ -1038,6 +1047,12 @@ export function RoteiroTela({
           {textosRoteiro.menu.reprovar}
           <MotivoSemRede className={styles.motivoItem} />
         </button>
+        {reescreverMomentoHref ? (
+          <Link href={reescreverMomentoHref} role="menuitem" className={styles.itemMenu}>
+            <Pencil size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosRoteiro.menu.reescreverMomento}
+          </Link>
+        ) : null}
         <button type="button" role="menuitem" onClick={copiarTexto} className={styles.itemMenu}>
           <Copy size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosRoteiro.menu.copiar}

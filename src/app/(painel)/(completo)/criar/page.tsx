@@ -4,11 +4,12 @@ import { hojeISO } from "@/lib/config";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
+import { roteiroPorId } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
 
 import { CriarTela } from "./CriarTela";
 
-type Props = { searchParams: Promise<{ data?: string; plano?: string; formato?: string }> };
+type Props = { searchParams: Promise<{ data?: string; plano?: string; formato?: string; momento?: string }> };
 
 /**
  * `/criar` (E39a, design v2, `Criar.dc.html`, estado `inicio`): a oficina. Os quatro caminhos sem
@@ -33,9 +34,29 @@ export default async function Criar({ searchParams }: Props) {
   }
 
   const hoje = hojeISO();
-  const { data, plano, formato } = await searchParams;
+  const { data, plano, formato, momento } = await searchParams;
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) && data >= hoje ? data : undefined;
   const planoItemId = plano && /^\d+$/.test(plano) ? Number(plano) : undefined;
+
+  // O momento que volta preenchido: `?momento=<roteiro>` abre "Gravar agora" com o que a pessoa tinha contado naquele roteiro. O roteiro é conferido na conta ativa (`roteiroPorId` filtra pelo
+  // cliente): o id de outra conta nunca abre; roteiro que não nasceu de um momento, ou sem o texto guardado, vale como se o parâmetro não existisse.
+  const roteiroDoMomento = momento && /^\d+$/.test(momento) ? await roteiroPorId(Number(momento), cliente.id) : null;
+  const momentoInicial =
+    roteiroDoMomento?.origem === "momento" && roteiroDoMomento.momento
+      ? {
+          onde: roteiroDoMomento.momento.onde,
+          oQueEstaAcontecendo: roteiroDoMomento.momento.oQueEstaAcontecendo,
+          oQueDaParaMostrar: roteiroDoMomento.momento.oQueDaParaMostrar,
+          objetivoDoVideo: roteiroDoMomento.momento.objetivoDoVideo ?? roteiroDoMomento.objetivoDoVideo ?? null,
+          transcricao: roteiroDoMomento.momento.transcricao ?? null,
+          marcaId: roteiroDoMomento.momento.marcaId ?? null,
+          objetivo: roteiroDoMomento.objetivo,
+          formato: roteiroDoMomento.formato,
+          estilo: roteiroDoMomento.estilo,
+          ficha: roteiroDoMomento.ficha,
+          quemAparece: roteiroDoMomento.quemAparece,
+        }
+      : null;
 
   const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
@@ -60,6 +81,7 @@ export default async function Criar({ searchParams }: Props) {
       dataInicial={dataInicial}
       itemPlanoInicial={itemPlanoInicial}
       abrirEmStory={formato === "story"}
+      momentoInicial={momentoInicial}
     />
   );
 }

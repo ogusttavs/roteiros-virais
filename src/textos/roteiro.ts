@@ -117,6 +117,8 @@ export const textosRoteiro = {
   linkInvalido: "Esse link não parece certo. Confira se colou o endereço inteiro do vídeo.",
   menu: {
     reprovar: "Reprovar",
+    /** O roteiro nasceu do que a pessoa contou (o momento): volta ao Criar com o texto dela preenchido, para reescrever. */
+    reescreverMomento: "Reescrever o que contei",
     copiar: "Copiar texto",
     versoes: "Versões",
     baixarPdf: "Baixar em PDF",
