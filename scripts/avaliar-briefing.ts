@@ -145,6 +145,8 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
 
     const resultado = notaDoCaso.get(indice)!;
     const saida = verificadorDoCaso.get(indice);
+    // A nota já foi paga, mesmo que o verificador deste caso falhe: o custo entra no total do mesmo jeito.
+    if (!(resultado instanceof Error)) custoTotalUsd += custoDoResultado(avaliarRespostaIA.nivel, resultado);
     if (resultado instanceof Error || saida instanceof Error) {
       const erro = resultado instanceof Error ? resultado : (saida as Error);
       casosFalhos += 1;
@@ -155,7 +157,6 @@ export async function avaliarBriefing(tipo: TipoMarca = "negocio"): Promise<Resu
     const diferenca = Math.abs(resultado.dados.nota - caso.notaEsperada);
     somaDiferencas += diferenca;
     casosAvaliados += 1;
-    custoTotalUsd += custoDoResultado(avaliarRespostaIA.nivel, resultado);
 
     /**
      * O mesmo verificador de producao (checagem local mais verificarTexto,

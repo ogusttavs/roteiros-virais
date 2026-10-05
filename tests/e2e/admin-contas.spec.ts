@@ -151,14 +151,17 @@ test.describe("admin de contas", () => {
     await page.getByRole("button", { name: "Trocar público" }).click();
     await page.getByRole("radio", { name: "Brasil todo" }).click();
     await page.getByRole("button", { name: "Salvar" }).click();
-    await expect(page.locator('[data-campo="publico"]')).toContainText("Brasil todo");
+    // Só vale quando o campo SAIU da edição e já mostra o texto novo: dentro da edição o "Brasil todo" é o nome do botão de rádio (a asserção passava antes de a ação terminar), e abrir
+    // o campo outra vez antes de o servidor devolver a página nova começa o rascunho dos dados antigos (a conta nasce "local, em Campinas e região": o segundo "Salvar" gravava "local" de verdade).
+    await expect(page.locator('[data-campo="publico"]:not([data-editando])')).toContainText("Brasil todo");
     await expect.poll(async () => (await db().select({ a: clientes.alcance }).from(clientes).where(eq(clientes.id, contaDois)))[0].a).toBe("brasil");
 
     // Local sem a cidade: a frase de erro, e o público continua o de antes.
     await page.getByRole("button", { name: "Trocar público" }).click();
     await page.getByRole("radio", { name: "Uma cidade ou região" }).click();
     await page.getByRole("button", { name: "Salvar" }).click();
-    await expect(page.getByRole("alert")).toBeVisible();
+    // O alerta do campo, e não "qualquer alerta da página": o anunciador de rota do Next também tem role="alert" e aparece depois de uma navegação.
+    await expect(page.locator('[data-campo="publico"]').getByRole("alert")).toBeVisible();
     expect((await db().select({ a: clientes.alcance }).from(clientes).where(eq(clientes.id, contaDois)))[0].a).toBe("brasil");
     await page.getByRole("button", { name: "Cancelar" }).first().click();
 

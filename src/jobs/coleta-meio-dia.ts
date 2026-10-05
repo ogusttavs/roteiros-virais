@@ -67,10 +67,20 @@ export async function rodarColetaMeioDia(execucaoId?: number): Promise<Record<st
   // mesmo jeito (ajuste 2).
   if (contasDaPassada.length > 0 && espaco > 0) {
     const maxItens = Math.min(VIDEOS_POR_CONTA * contasDaPassada.length, espaco);
+    // Uma chamada junta contas de vários ramos: o custo se reparte pelo ramo da conta de cada item.
+    const ramoDoItem = (item: Parameters<typeof normalizarVideoTiktok>[0]) => {
+      try {
+        const handle = normalizarVideoTiktok(item)?.conta.handle;
+        return contasDaPassada.find((c) => c.handle === handle)?.nichoId ?? null;
+      } catch {
+        return null;
+      }
+    };
     const { itens, devolvidos } = await buscarTiktokVigilancia(
       contasDaPassada.map((c) => c.handle),
       VIDEOS_POR_CONTA,
       maxItens,
+      ramoDoItem,
     );
     resultadosDevolvidos = devolvidos;
     resultadosConsumidos = itens.length;

@@ -48,6 +48,7 @@ import { normalizarVideoYoutube } from "@/servicos/normalizadores/youtube";
 
 import { buscarInstagram, buscarTiktokVigilancia } from "./apify-api";
 import { upsertConta, upsertVideo } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { ErroColeta } from "./execucoes";
 import { agendarRetomadaDaMeta } from "./meta-retomada";
 import { MINIMO_VIDEOS_MEDIANA } from "./pontuar";
@@ -394,6 +395,8 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
    * foi feita).
    */
   async function processarCandidata(nichoId: number, candidata: ContaCandidata): Promise<void> {
+    // O gasto desta conta (Apify, Groq) é do ramo dela, não do último ramo do laço.
+    definirRamoDoContexto(nichoId);
     // Com a Meta em pausa só o Instagram pela Meta espera; as outras plataformas seguem.
     if (estadoDaMeta.pausa && candidata.plataforma === "instagram" && !instagramUsaApify(candidata)) return;
     if (usaApify(candidata) && !apifyCabe()) {
@@ -452,6 +455,8 @@ export async function rodarContasBase(): Promise<Record<string, unknown>> {
       }
     }
   }
+
+  restaurarRamoDoContexto();
 
   if (nichosAtivos.length === 0) {
     throw new ErroColeta("nenhum nicho ativo para o job contas-base", false);

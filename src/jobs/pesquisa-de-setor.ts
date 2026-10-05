@@ -40,6 +40,7 @@ import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 
 import { buscarTiktokVigilancia } from "./apify-api";
 import { upsertConta, upsertVideo, type VideoParaGravar } from "./coleta-comum";
+import { definirRamoDoContexto, restaurarRamoDoContexto } from "./contexto-execucao";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
@@ -598,6 +599,8 @@ export async function rodarPesquisaDeSetor(nichoId?: number): Promise<Record<str
   const erros: string[] = [];
 
   for (const nicho of nichosAtivos) {
+    // O gasto de cada setor (Apify, IA) é dele, não do último da rodada mensal.
+    definirRamoDoContexto(nicho.id);
     try {
       porNicho.push(await pesquisarUmSetor(nicho.id));
     } catch (erro) {
@@ -605,5 +608,6 @@ export async function rodarPesquisaDeSetor(nichoId?: number): Promise<Record<str
     }
   }
 
+  restaurarRamoDoContexto();
   return { nichos: nichosAtivos.length, porNicho, erros: erros.length > 0 ? erros : undefined };
 }
