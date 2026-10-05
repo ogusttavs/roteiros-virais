@@ -73,30 +73,31 @@ async function main(): Promise<void> {
    * todos os nichos ativos, igual sempre foi.
    */
   await boss().work<{ nichoId?: number }>(FILAS.coletaYoutube, async (job) => {
-    await executarComRegistro(FILAS.coletaYoutube, () => rodarColetaYoutube(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.coletaYoutube, () => rodarColetaYoutube(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaApify, async (job) => {
     await executarComRegistro(FILAS.coletaApify, (execucaoId) =>
       rodarColetaApify(job[0]?.data?.nichoId, execucaoId),
+      { ramoId: job[0]?.data?.nichoId ?? null },
     );
   });
   await boss().work(FILAS.coletaMeioDia, async () => {
     await executarComRegistro(FILAS.coletaMeioDia, (execucaoId) => rodarColetaMeioDia(execucaoId));
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
-    await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.contasBase, async () => {
     await executarComRegistro(FILAS.contasBase, rodarContasBase);
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaContas, async (job) => {
-    await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.metaContas, () => rodarMetaContas(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work<{ nichoId?: number }>(FILAS.metaHashtags, async (job) => {
-    await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.metaHashtags, () => rodarMetaHashtags(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work<{ nichoId?: number }>(FILAS.descobertaInstagram, async (job) => {
-    await executarComRegistro(FILAS.descobertaInstagram, () => rodarDescobertaInstagram(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.descobertaInstagram, () => rodarDescobertaInstagram(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.pontuar, async () => {
     await executarComRegistro(FILAS.pontuar, rodarPontuar);
@@ -106,14 +107,14 @@ async function main(): Promise<void> {
   });
   /** M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor (a cadeia da primeira carga). */
   await boss().work<{ nichoId?: number }>(FILAS.transcrever, async (job) => {
-    await executarComRegistro(FILAS.transcrever, () => rodarTranscrever(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.transcrever, () => rodarTranscrever(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.extrair, async () => {
     await executarComRegistro(FILAS.extrair, rodarExtrair);
   });
   /** M1, item 1 e 4: sem `nichoId`, roda para todo setor novo (o cron não manda nada); com, só aquele setor ("rodar a primeira coleta agora" do admin). */
   await boss().work<{ nichoId?: number }>(FILAS.extrairAgora, async (job) => {
-    await executarComRegistro(FILAS.extrairAgora, () => rodarExtrairAgora(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.extrairAgora, () => rodarExtrairAgora(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.extrairColeta, async () => {
     await executarComRegistro(FILAS.extrairColeta, rodarExtrairColeta);
@@ -123,18 +124,18 @@ async function main(): Promise<void> {
   });
   /** M3, item 2: sem `nichoId`, roda para todo setor ativo que aceita "vídeo sem fala vale" (o cron diário). */
   await boss().work<{ nichoId?: number; soFicha?: boolean }>(FILAS.extrairSemFala, async (job) => {
-    await executarComRegistro(FILAS.extrairSemFala, () => rodarExtrairSemFala(job[0]?.data?.nichoId, job[0]?.data?.soFicha === true));
+    await executarComRegistro(FILAS.extrairSemFala, () => rodarExtrairSemFala(job[0]?.data?.nichoId, job[0]?.data?.soFicha === true), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.modeloNicho, async () => {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);
   });
   /** M1, item 2: com `nichoId`, só aquele setor, e só se ele ainda não tem tema hoje; sem, comportamento de sempre. */
   await boss().work<{ nichoId?: number }>(FILAS.temasDoDia, async (job) => {
-    await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   /** M2: sem `nichoId`, roda para todos os nichos ativos (o cron mensal); com, só aquele setor (criação ou "Pesquisar de novo"). */
   await boss().work<{ nichoId?: number }>(FILAS.pesquisaDeSetor, async (job) => {
-    await executarComRegistro(FILAS.pesquisaDeSetor, () => rodarPesquisaDeSetor(job[0]?.data?.nichoId));
+    await executarComRegistro(FILAS.pesquisaDeSetor, () => rodarPesquisaDeSetor(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   await boss().work(FILAS.lembrete, async () => {
     await executarComRegistro(FILAS.lembrete, () => rodarLembrete());

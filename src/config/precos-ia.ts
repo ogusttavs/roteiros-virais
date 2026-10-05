@@ -35,6 +35,24 @@ export const FATOR_LOTE = 0.5;
  */
 export const DATA_PRECO_GROQ = "2026-09-03";
 export const PRECO_GROQ_USD_POR_HORA = 0.04;
+/** A Groq cobra no mínimo 10 segundos de áudio por pedido (console.groq.com/docs/speech-to-text, 03/09/2026). */
+export const SEGUNDOS_MINIMOS_COBRADOS_GROQ = 10;
+
+/**
+ * O que o Apify cobra por mil resultados de cada ator (a loja da Apify em 02/09/2026, `HISTORICO.md`; o do Instagram no plano gratuito). Só vale quando a API não devolve o custo da execução
+ * (`usageTotalUsd`): aí o custo é estimado por este preço e marcado como "estimado". Mudou o preço, atualiza aqui e a data.
+ */
+export const DATA_PRECO_APIFY = "2026-09-02";
+export const PRECOS_APIFY_USD_POR_MIL_RESULTADOS = { tiktok: 1.7, instagram: 2.7 } as const;
+/** O preço de um ator que não é nenhum dos dois conhecidos (a média dos dois, arredondada). */
+const PRECO_APIFY_PADRAO_USD_POR_MIL = 2.2;
+
+export function precoApifyPorMilResultados(ator: string): number {
+  const nome = ator.toLowerCase();
+  if (nome.includes("tiktok")) return PRECOS_APIFY_USD_POR_MIL_RESULTADOS.tiktok;
+  if (nome.includes("instagram")) return PRECOS_APIFY_USD_POR_MIL_RESULTADOS.instagram;
+  return PRECO_APIFY_PADRAO_USD_POR_MIL;
+}
 
 /**
  * E45 PR 3: o que custa por dia manter um setor novo sendo pesquisado (coleta, transcrição, análise e temas), em dólar, medido em 02/10/2026.
