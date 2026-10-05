@@ -243,8 +243,11 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  *
  * 2.11.1 (golden set com chave, 04/10/2026: os momentos reprovados eram todos de prática do negócio inventada, "testo no quarto do hotel", "anoto a pergunta ao lado do fornecedor", "mala de amostras na
  * feira"): o parágrafo diz explicitamente que o fato inclui COMO a pessoa trabalha e o que ela oferece; se o momento ou o perfil não disseram, não existe e vira "[conte aqui como você faz isso]". Versão 2.11.1.
+ *
+ * 2.11.2 (revisão do PR #127, 05/10/2026): no sem fala uma 1ª tentativa veio sem `cartoes` (o schema deixa o campo nulável para o Story e o Reels); o bloco do sem fala passa a dizer que `cartoes` é obrigatório, de 2 a 5, nunca
+ * nulo nem vazio, com gancho, corpo, fechamento e chamada final nulos. Versão 2.11.2.
  */
-export const versao = "2.11.1";
+export const versao = "2.11.2";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -447,7 +450,7 @@ export function montarSistemaEstavel(dados: {
    * os campos de texto de tela.
    */
   const blocoEstrutura = ehSemFala
-    ? `Estrutura do roteiro sem fala: cenas numeradas, de 2 a 5. Nenhuma cena tem fala, em campo
+    ? `Estrutura do roteiro sem fala: o campo cartoes é OBRIGATÓRIO e é onde mora todo o roteiro: de 2 a 5 cenas, nunca nulo nem vazio; gancho, corpo, fechamento e chamadaFinal ficam nulos. Nenhuma cena tem fala, em campo
 nenhum: deixe oQueFalar sempre como string vazia. Cada cena tem o que mostrar (a cena, o que
 filmar) e o texto curto que entra na tela (no máximo 8 palavras por vez; pode trocar mais de uma
 vez dentro da mesma cena, descreva as trocas em oQueMostrar). A figurinha de interação é opcional,

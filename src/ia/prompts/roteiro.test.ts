@@ -430,7 +430,7 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
-    expect(versao).toBe("2.11.1");
+    expect(versao).toBe("2.11.2");
     expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
     expect(SISTEMA).toContain("[diga aqui onde você está]");
     expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");
@@ -474,5 +474,14 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
     const comTema = montarFontesDosFatos({ perfilCompilado: "p", camadaExclusiva: "", tema: "o erro que faz a mancha voltar", evidencias: [{ assunto: "mancha", gancho: "g", estrutura: "e", fechamento: "f", chamadaFinal: "c" }] });
     expect(comTema).toContain("Tema: o erro que faz a mancha voltar");
     expect(comTema).toContain("Evidência");
+  });
+
+  it("no sem fala o campo cartoes é obrigatório e é onde mora o roteiro (uma 1ª tentativa veio sem cartões)", () => {
+    const sem = montarSistemaEstavel({ perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "sem_fala" });
+    expect(sem).toContain("o campo cartoes é OBRIGATÓRIO");
+    expect(sem).toContain("nunca nulo nem vazio");
+    expect(sem).toContain("gancho, corpo, fechamento e chamadaFinal ficam nulos");
+    // O Reels falado não ganha essa instrução (nele cartoes continua nulo).
+    expect(SISTEMA).not.toContain("o campo cartoes é OBRIGATÓRIO");
   });
 });

@@ -42,7 +42,7 @@ import { definicoesFormato } from "./definicoesFormato";
  * reprovar a ficha inteira ou confiar num `serveDeModelo` que o modelo escreveu junto de uma
  * classificação inventada.
  */
-export const versao = "1.6.0";
+export const versao = "1.6.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "medium";
 
