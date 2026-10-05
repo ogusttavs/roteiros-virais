@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 
+import { conferirAviso } from "@/app/(painel)/_casca/conferir-aviso";
 import { apagarInscricaoPushAction, registrarFalhaDePushAction, registrarInscricaoPushAction } from "@/app/(painel)/_casca/push-acoes";
 import { sistemaDeInstalacao } from "@/lib/convite-instalar";
 import { textosPush } from "@/textos/push";
 import { Botao } from "@/ui/componentes/Botao";
 import { Cartao } from "@/ui/componentes/Cartao";
 import { jaEstaInstalado } from "@/ui/instalacao";
-import { descreverErro, desligarAviso, estadoDoAviso, inscricaoAtualDoAparelho, ligarAviso, type EstadoDoAviso } from "@/ui/push";
+import { avisoDeveEstarLigado, descreverErro, desligarAviso, estadoDoAviso, inscricaoAtualDoAparelho, ligarAviso, type EstadoDoAviso } from "@/ui/push";
 
 import styles from "./AvisoDeManha.module.css";
 
@@ -35,13 +36,18 @@ export function AvisoDeManha({ chavePublica, horaLembrete, ehAdmin = false }: Pr
   const [ocupado, setOcupado] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [motivo, setMotivo] = useState<{ etapa: string; texto: string } | null>(null);
+  /** O aviso estava ligado neste aparelho e a pessoa não o desligou, mas ele sumiu: o aviso parou de chegar sem ela saber. */
+  const [parou, setParou] = useState(false);
 
   useEffect(() => {
     let cancelado = false;
     void (async () => {
+      // Primeiro a conferência (reinscreve sozinho se a inscrição morreu): o cartão diz o estado de depois dela, e a reconciliação abaixo nunca ressuscita um endereço morto.
+      if (jaEstaInstalado() && chavePublica) await conferirAviso(chavePublica);
       const novo: Estado = jaEstaInstalado() ? await estadoDoAviso() : "precisa_instalar";
       if (cancelado) return;
       setEstado(novo);
+      if (novo === "desligado" && avisoDeveEstarLigado()) setParou(true);
       // Ligado no navegador: reconcilia com o servidor (registrar é idempotente, e só aceita o aparelho de quem já o tem ou com chaves novas). Se o servidor recusar
       // (o aparelho é de outra pessoa que não saiu, ou a inscrição é inválida), o cartão não pode dizer "ligado": tira a inscrição do navegador e mostra "desligado".
       if (novo === "ligado") {
@@ -50,6 +56,7 @@ export function AvisoDeManha({ chavePublica, horaLembrete, ehAdmin = false }: Pr
           const guardou = await registrarInscricaoPushAction(dados, sistemaDeInstalacao(navigator.userAgent)).catch(() => true);
           if (!guardou && !cancelado) {
             await desligarAviso().catch(() => null);
+            setParou(true);
             setEstado("desligado");
           }
         }
@@ -90,6 +97,7 @@ export function AvisoDeManha({ chavePublica, horaLembrete, ehAdmin = false }: Pr
         return;
       }
       if (resultado.endpointAntigo && resultado.endpointAntigo !== resultado.inscricao.endpoint) void apagarInscricaoPushAction(resultado.endpointAntigo).catch(() => undefined);
+      setParou(false);
       setEstado("ligado");
     } catch (erro) {
       falhou("servidor", descreverErro(erro));
@@ -116,7 +124,9 @@ export function AvisoDeManha({ chavePublica, horaLembrete, ehAdmin = false }: Pr
     estado === "ligado"
       ? t.ligado
       : estado === "desligado"
-        ? t.desligado
+        ? parou
+          ? t.parou
+          : t.desligado
         : estado === "sem_permissao"
           ? t.semPermissao
           : estado === "precisa_instalar"

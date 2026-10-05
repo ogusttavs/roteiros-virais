@@ -105,6 +105,8 @@ async function prepararAparelho(page: Page, opcoes: { instalado: boolean; permis
         return id ? montar(id) : null;
       },
       subscribe: async () => {
+        // O teste da inscrição que não volta liga esta chave: o navegador recusa a nova inscrição.
+        if (localStorage.getItem("e2e-push-subscribe-falha")) throw new DOMException("push service error", "AbortError");
         const id = Math.random().toString(36).slice(2);
         localStorage.setItem(chave, id);
         return montar(id);
@@ -222,7 +224,7 @@ test.describe("aviso de manhã: o cartão da Conta", () => {
   test.use({ userAgent: UA_ANDROID, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
   test.beforeAll(async () => {
-    for (const id of ["e2e-push-conta", "e2e-push-conta-negada", "e2e-push-conta-fora"]) await criarUsuario(id);
+    for (const id of ["e2e-push-conta", "e2e-push-conta-negada", "e2e-push-conta-fora", "e2e-push-morreu", "e2e-push-parou"]) await criarUsuario(id);
   });
 
   test("desligado: o botão liga, o cartão vira ligado (e a inscrição fica no servidor); desligar a apaga", async ({ page }) => {
@@ -274,5 +276,61 @@ test.describe("aviso de manhã: o cartão da Conta", () => {
     await expect(cartao).toHaveAttribute("data-estado-do-aviso", "precisa_instalar");
     await expect(cartao.getByText("instale o aplicativo na tela de início do celular", { exact: false })).toBeVisible();
     await expect(cartao.getByRole("button")).toHaveCount(0);
+  });
+
+  /** O aparelho já tinha permissão e inscrição (do dia em que a pessoa ligou o aviso), mas o servidor a apagou por falha: o painel reinscreve sozinho ao abrir. */
+  async function aparelhoDeQuemLigouOAviso(page: Page, usuarioId: string, subscribeFalha = false) {
+    await criarUsuario(usuarioId);
+    await db().update(preferenciasUsuario).set({ pushAdiadoAte: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }).where(eq(preferenciasUsuario.usuarioId, usuarioId));
+    await prepararAparelho(page, { instalado: true, permissao: "default" });
+    await entrar(page, usuarioId);
+    await page.evaluate((falha) => {
+      localStorage.setItem("e2e-push-permissao", "granted");
+      localStorage.setItem("e2e-push-inscricao", "antiga");
+      localStorage.setItem("aviso-de-manha-ligado", "1");
+      if (falha) localStorage.setItem("e2e-push-subscribe-falha", "1");
+    }, subscribeFalha);
+  }
+
+  test("a inscrição que o servidor apagou volta sozinha ao abrir o painel, sem pergunta, e a Conta diz ligado", async ({ page }) => {
+    await aparelhoDeQuemLigouOAviso(page, "e2e-push-morreu");
+    expect(await db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-morreu"))).toEqual([]);
+
+    await page.goto("/conta");
+    await expect.poll(async () => (await db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-morreu"))).length, { timeout: 20_000 }).toBe(1);
+    const cartao = page.getByTestId("aviso-de-manha");
+    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "ligado");
+    await expect(cartao.getByText("parou de chegar")).toHaveCount(0);
+  });
+
+  test("se não dá para reinscrever, a Conta avisa que o aviso parou de chegar e o botão liga de novo", async ({ page }) => {
+    await aparelhoDeQuemLigouOAviso(page, "e2e-push-parou", true);
+
+    await page.goto("/conta");
+    const cartao = page.getByTestId("aviso-de-manha");
+    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "desligado", { timeout: 20_000 });
+    await expect(cartao.getByText("O aviso no celular parou de chegar. Ligue de novo, é só um toque.")).toBeVisible();
+    expect(await db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-parou"))).toEqual([]);
+
+    // O navegador volta a aceitar: um toque liga, e o aviso de "parou" some.
+    await page.evaluate(() => localStorage.removeItem("e2e-push-subscribe-falha"));
+    await cartao.getByRole("button", { name: "Ligar o aviso" }).click();
+    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "ligado", { timeout: 20_000 });
+    await expect(cartao.getByText("parou de chegar")).toHaveCount(0);
+  });
+
+  test("quem desligou de propósito não é religado nem ouve que o aviso parou", async ({ page }) => {
+    await aparelhoDeQuemLigouOAviso(page, "e2e-push-parou");
+    await page.evaluate(() => {
+      localStorage.removeItem("e2e-push-inscricao");
+      localStorage.removeItem("aviso-de-manha-ligado");
+    });
+    await db().delete(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-parou"));
+    await page.goto("/conta");
+    const cartao = page.getByTestId("aviso-de-manha");
+    await expect(cartao).toHaveAttribute("data-estado-do-aviso", "desligado");
+    await expect(cartao.getByText("Desligado neste aparelho.")).toBeVisible();
+    await page.waitForTimeout(2000);
+    expect(await db().select().from(inscricoesPush).where(eq(inscricoesPush.usuarioId, "e2e-push-parou"))).toEqual([]);
   });
 });

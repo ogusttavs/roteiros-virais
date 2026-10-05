@@ -16,6 +16,7 @@ import { PedidoDeAviso } from "@/ui/componentes/PedidoDeAviso";
 
 import { FolhaAceiteTermos } from "../_casca/FolhaAceiteTermos";
 import { OuvinteInstalacao } from "../_casca/OuvinteInstalacao";
+import { ReinscreverAviso } from "../_casca/ReinscreverAviso";
 
 /**
  * Cliente sem briefing completo cai em /comecar em qualquer rota do painel
@@ -62,6 +63,7 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
   return (
     <>
       <OuvinteInstalacao instalado={Boolean(preferencias.instaladoEm)} />
+      <ReinscreverAviso chavePublica={config.push.publicKey} />
       <PedidoDeAviso
         podeAparecer={pedidoDePushPodeAparecer(preferencias, aparelhosDoAviso, new Date())}
         chavePublica={config.push.publicKey}
