@@ -22,7 +22,7 @@ import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
-import { custoDoResultado, gerarVariosOuErro } from "./golden-lote";
+import { rodarComoEmProducao, linhaDoResumo, resumirProducao } from "./golden-producao";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -62,7 +62,10 @@ export type ResultadoAvaliarMomentos = {
   casos: number;
   titulos: string[];
   /** Reprovado no verificador de produção OU na checagem do item 2 (gancho sem elemento concreto do momento). */
+  /** Reprovados nas DUAS tentativas (em produção, `ErroIA`): o número que decide o deploy. */
   reprovadosNoVerificador: number;
+  /** Reprovados na 1ª tentativa (a 2ª refaz com o motivo). */
+  reprovadosNa1aTentativa: number;
   /** Casos (ou verificadores) que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
   casosFalhos: number;
   custoTotalUsd: number;
@@ -79,11 +82,13 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
-  // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; a checagem local, e o `verificarTexto` num segundo lote só para os casos que a
-  // local aprovou; e só então a leitura, caso a caso, na ordem de sempre.
-  const geradas = await gerarVariosOuErro(
-    conjunto.map((caso) => (
-{
+  // Pelo MESMO caminho de produção (`golden-producao.ts`): 1ª tentativa de todos os casos, a conferência local e a do `verificarTexto` com as fontes, e os reprovados refazem
+  // com o motivo (2ª tentativa); reprovar nas duas é o `ErroIA` que a pessoa veria. Cada etapa em lote (ou `--direto`).
+  const producao = await rodarComoEmProducao<roteiroIA.SaidaRoteiro>({
+    rotulo: "momentos",
+    lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
+    casos: conjunto.map((caso) => ({
+      pedido: () => ({
       tarefa: "roteiro",
       nivel: roteiroIA.nivel,
       effort: roteiroIA.esforco,
@@ -109,50 +114,25 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
         contextoDeSerie: caso.contextoDeSerie,
         marcaCitada: caso.marcaCitada,
       }),
-    }
-    )),
-    "momentos",
-  );
-  const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
-  const camposPorCaso: Record<string, string>[] = [];
-  conjunto.forEach((caso, indice) => {
-    const gerada = geradas[indice];
-    if (gerada instanceof Error) {
-      camposPorCaso.push({});
-      verificacoes.push({ aprovado: false, motivos: [] });
-      return;
-    }
-    const saida = gerada.dados;
+    }),
+      local: (saida) => {
       const campos = extrairCamposRoteiro(saida);
       const palavrasDoMomento = palavrasDeConteudo(`${caso.onde} ${caso.oQueEstaAcontecendo}`);
       const local = verificarLocalmente(campos, { palavrasDoMomento });
-    camposPorCaso.push(campos);
-    verificacoes.push(local);
-  });
-  const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
-  const respostasDoLote = await gerarVariosOuErro(
-    indicesAprovadosLocal.map((indice) => (
-{
+        return local;
+      },
+      campos: (saida) => extrairCamposRoteiro(saida),
+      pedidoVerificador: (campos) => ({
         tarefa: "verificarTexto",
         nivel: verificarTextoIA.nivel,
         effort: verificarTextoIA.esforco,
         schema: verificarTextoIA.schema,
         sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
-        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: conjunto[indice].perfilCompilado, camadaExclusiva: conjunto[indice].camadaExclusiva, momento: { onde: conjunto[indice].onde, oQueEstaAcontecendo: conjunto[indice].oQueEstaAcontecendo, oQueDaParaMostrar: conjunto[indice].oQueDaParaMostrar }, marcaCitada: conjunto[indice].marcaCitada }) }),
-      }
-    )),
-    "verificador (momentos)",
-  );
-  const respostasVerificador = new Map<number, (typeof respostasDoLote)[number]>();
-  indicesAprovadosLocal.forEach((indice, posicao) => {
-    const resposta = respostasDoLote[posicao];
-    respostasVerificador.set(indice, resposta);
-    if (resposta instanceof Error) return;
-    verificacoes[indice] = {
-      aprovado: resposta.dados.aprovado,
-      motivos: resposta.dados.aprovado ? [] : [verificarTextoIA.motivoDaConferencia(resposta.dados)],
-    };
+        entrada: verificarTextoIA.montarEntrada({ texto: Object.values(campos).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, momento: { onde: caso.onde, oQueEstaAcontecendo: caso.oQueEstaAcontecendo, oQueDaParaMostrar: caso.oQueDaParaMostrar }, marcaCitada: caso.marcaCitada }) }),
+      }),
+    })),
   });
+  const resumo = resumirProducao(producao);
 
   for (const [indice, caso] of conjunto.entries()) {
     console.log(`${"=".repeat(70)}`);
@@ -160,16 +140,17 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
     console.log(`ponto principal: ${caso.pontoPrincipal}`);
     console.log(`${"-".repeat(70)}\n`);
 
-    const resultado = geradas[indice];
-    if (resultado instanceof Error) {
+    const prod = producao[indice];
+    if (prod.falhou && !prod.gerada) {
       casosFalhos += 1;
-      console.log(`[FALHOU: ${resultado.message}]\n`);
+      console.log(`[FALHOU: ${prod.falhou.message}]\n`);
       continue;
     }
+    const resultado = prod.gerada!;
 
     const saida = resultado.dados;
     titulos.push(saida.titulo);
-    let custoDoCasoUsd = custoDoResultado(roteiroIA.nivel, resultado);
+    const custoDoCasoUsd = prod.custoUsd;
 
     console.log(`tema curto: ${saida.temaCurto ?? "(nulo)"}`);
     console.log(`titulo: ${saida.titulo}`);
@@ -191,28 +172,27 @@ export async function avaliarMomentos(): Promise<ResultadoAvaliarMomentos> {
       console.log(`\nmarca citada no caso: ${caso.marcaCitada.nome} (confira se o gancho/corpo nao vira anuncio dela)`);
     }
 
-    const verificacao = verificacoes[indice];
-    const saidaVerificacao = respostasVerificador.get(indice);
-    if (saidaVerificacao instanceof Error) {
+    const verificacao = prod.verificacao;
+    if (prod.falhou) {
       casosFalhos += 1;
-      console.log(`[VERIFICADOR FALHOU: ${saidaVerificacao.message}]`);
-    } else if (saidaVerificacao) {
-      custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
+      console.log(`[VERIFICADOR FALHOU: ${prod.falhou.message}]`);
     }
+    if (prod.reprovouNa1a) console.log(`[1ª TENTATIVA REPROVADA: ${prod.motivosDa1a.join("; ")}]${prod.tentativas === 2 ? " (a 2ª tentativa foi escrita com este motivo)" : ""}`);
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
-      console.log(`\n[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]`);
+      console.log(`\n[REPROVADO NAS DUAS TENTATIVAS (ErroIA em produção): ${verificacao.motivos.join("; ")}]`);
     }
 
     custoTotalUsd += custoDoCasoUsd;
     console.log(`\ncusto deste caso: US$ ${custoDoCasoUsd.toFixed(4)} (${resultado.modelo})\n`);
   }
 
+  console.log(linhaDoResumo(conjunto.length, resumo));
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
   if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
 
-  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, casosFalhos, custoTotalUsd };
+  return { conjunto: caminho, ehExemplo, casos: conjunto.length, titulos, reprovadosNoVerificador, reprovadosNa1aTentativa: resumo.reprovadosNa1a, casosFalhos, custoTotalUsd };
 }
 
 if (require.main === module) {

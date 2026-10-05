@@ -22,7 +22,8 @@ import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
-import { custoDoResultado, gerarVariosOuErro, type PedidoGolden } from "./golden-lote";
+import type { PedidoGolden } from "./golden-lote";
+import { linhaDoResumo, resumirProducao, rodarComoEmProducao } from "./golden-producao";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
 
@@ -151,7 +152,7 @@ function pedidoDoRoteiro(caso: Caso): PedidoGolden<roteiroIA.SaidaRoteiro> {
  * geracoes_ia (dia 1 da etapa 14, item 5); esta e a parte local. R1, item 0c: `formato`/`estilo`/`cartoes`/`legenda`/`porQueAssim`/`narrativa` espelham exatamente o que
  * `servicos/roteiro.ts` passa para `gerarComVerificacao` em producao (inclusive a regra de `porQueAssim` so valer fora de Story falado).
  */
-function verificarLocal(caso: Caso, saida: roteiroIA.SaidaRoteiro) {
+function verificarLocal(caso: Caso, saida: roteiroIA.SaidaRoteiro, tentativa: 1 | 2) {
     const usaPorQueAssim = caso.formato === "story" && caso.estilo !== "sem_fala";
     const campos = extrairCamposRoteiro(saida);
     const local = verificarLocalmente(campos, {
@@ -166,7 +167,8 @@ function verificarLocal(caso: Caso, saida: roteiroIA.SaidaRoteiro) {
           : undefined,
       formato: caso.formato,
       estilo: caso.estilo,
-      ficha: caso.ficha,
+      // A heurística da ficha "guardem" vale só na 1ª tentativa, como na produção (`gerarComVerificacao`).
+      ficha: tentativa === 1 ? caso.ficha : undefined,
       cartoes: saida.cartoes,
       legenda: saida.legenda,
       porQueAssim: usaPorQueAssim ? saida.porQueAssim : [],
@@ -187,7 +189,10 @@ export type ResultadoAvaliarRoteiros = {
    * tentativa (dia 1 da etapa 14, item 5: meta e zero, e nenhuma
    * reprovacao pode ser "nao e o texto que o cliente ve").
    */
+  /** Reprovados nas DUAS tentativas (em produção, `ErroIA`): o número que decide o deploy. */
   reprovadosNoVerificador: number;
+  /** Reprovados na 1ª tentativa (a 2ª refaz com o motivo). */
+  reprovadosNa1aTentativa: number;
   /** Casos (ou verificadores) que o lote devolveu com falha: impressos com o motivo, e os outros seguem. */
   casosFalhos: number;
   /** Soma do custo de todas as chamadas (roteiro e verificarTexto), em dolares. */
@@ -210,45 +215,30 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
   console.log(`conjunto: ${caminho}${ehExemplo ? " (exemplo, nao e o golden set real)" : ""}`);
   console.log(`${conjunto.length} caso(s)\n`);
 
-  // O golden set pelo lote (`golden-lote.ts`): os roteiros de todos os casos num lote só; depois o verificador (checagem local aqui, e o `verificarTexto` num segundo lote
-  // só para os casos que a checagem local aprovou); e só então a leitura, caso a caso, na ordem de sempre.
-  const geradas = await gerarVariosOuErro(conjunto.map((caso) => pedidoDoRoteiro(caso)), "roteiros");
-  const verificacoes: { aprovado: boolean; motivos: string[] }[] = [];
-  const camposPorCaso: Record<string, string>[] = [];
-  conjunto.forEach((caso, indice) => {
-    const gerada = geradas[indice];
-    if (gerada instanceof Error) {
-      camposPorCaso.push({});
-      verificacoes.push({ aprovado: false, motivos: [] });
-      return;
-    }
-    const saida = gerada.dados;
-    const campos = extrairCamposRoteiro(saida);
-    camposPorCaso.push(campos);
-    verificacoes.push(verificarLocal(caso, saida));
-  });
-  const indicesAprovadosLocal = verificacoes.flatMap((v, indice) => (v.aprovado ? [indice] : []));
-  const respostasDoLote = await gerarVariosOuErro(
-    indicesAprovadosLocal.map((indice) => ({
-      tarefa: "verificarTexto" as const,
-      nivel: verificarTextoIA.nivel,
-      effort: verificarTextoIA.esforco,
-      schema: verificarTextoIA.schema,
-      sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
-      entrada: verificarTextoIA.montarEntrada({ texto: Object.values(camposPorCaso[indice]).join("\n"), proibicoes: [], fontes: montarFontesDosFatos({ perfilCompilado: conjunto[indice].perfilCompilado, camadaExclusiva: conjunto[indice].camadaExclusiva, tema: conjunto[indice].tema, evidencias: conjunto[indice].evidencias }) }),
+  // Pelo MESMO caminho de produção (`golden-producao.ts`): 1ª tentativa de todos os casos, a conferência local e a do `verificarTexto` com as fontes, e os reprovados refazem
+  // com o motivo (2ª tentativa); reprovar nas duas é o `ErroIA` que a pessoa veria. Cada etapa em lote (ou `--direto`).
+  const producao = await rodarComoEmProducao<roteiroIA.SaidaRoteiro>({
+    rotulo: "roteiros",
+    lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
+    casos: conjunto.map((caso) => ({
+      pedido: () => pedidoDoRoteiro(caso),
+      local: (saida, tentativa) => verificarLocal(caso, saida, tentativa),
+      campos: (saida) => extrairCamposRoteiro(saida),
+      pedidoVerificador: (campos) => ({
+        tarefa: "verificarTexto" as const,
+        nivel: verificarTextoIA.nivel,
+        effort: verificarTextoIA.esforco,
+        schema: verificarTextoIA.schema,
+        sistemaEstavel: verificarTextoIA.montarSistemaEstavel("roteiro", true),
+        entrada: verificarTextoIA.montarEntrada({
+          texto: Object.values(campos).join("\n"),
+          proibicoes: [],
+          fontes: montarFontesDosFatos({ perfilCompilado: caso.perfilCompilado, camadaExclusiva: caso.camadaExclusiva, tema: caso.tema, evidencias: caso.evidencias }),
+        }),
+      }),
     })),
-    "verificador dos roteiros",
-  );
-  const respostasVerificador = new Map<number, (typeof respostasDoLote)[number]>();
-  indicesAprovadosLocal.forEach((indice, posicao) => {
-    const resposta = respostasDoLote[posicao];
-    respostasVerificador.set(indice, resposta);
-    if (resposta instanceof Error) return;
-    verificacoes[indice] = {
-      aprovado: resposta.dados.aprovado,
-      motivos: resposta.dados.aprovado ? [] : [verificarTextoIA.motivoDaConferencia(resposta.dados)],
-    };
   });
+  const resumo = resumirProducao(producao);
 
   for (const [indice, caso] of conjunto.entries()) {
     console.log(`${"=".repeat(70)}`);
@@ -256,15 +246,16 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     console.log(`ponto principal: ${caso.pontoPrincipal}`);
     console.log(`${"-".repeat(70)}\n`);
 
-    const resultado = geradas[indice];
-    if (resultado instanceof Error) {
+    const prod = producao[indice];
+    if (prod.falhou && !prod.gerada) {
       casosFalhos += 1;
-      console.log(`[FALHOU: ${resultado.message}]\n`);
+      console.log(`[FALHOU: ${prod.falhou.message}]\n`);
       continue;
     }
+    const resultado = prod.gerada!;
     const saida = resultado.dados;
     titulos.push(saida.titulo);
-    let custoDoCasoUsd = custoDoResultado(roteiroIA.nivel, resultado);
+    const custoDoCasoUsd = prod.custoUsd;
 
     /**
      * O gancho reprovado e o novo lado a lado (E27, parte 1, item 7): para
@@ -363,23 +354,22 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
      * nunca reprovaria o que reprovou em produção no hotfix `fdac7ea` (Reels com `porQueAssim`
      * preenchido por engano), porque a checagem de formato simplesmente não rodava aqui.
      */
-    const verificacao = verificacoes[indice];
-    const saidaVerificacao = respostasVerificador.get(indice);
-    if (saidaVerificacao instanceof Error) {
+    const verificacao = prod.verificacao;
+    if (prod.falhou) {
       casosFalhos += 1;
-      console.log(`[VERIFICADOR FALHOU: ${saidaVerificacao.message}]`);
-    } else if (saidaVerificacao) {
-      custoDoCasoUsd += custoDoResultado(verificarTextoIA.nivel, saidaVerificacao);
+      console.log(`[VERIFICADOR FALHOU: ${prod.falhou.message}]`);
     }
+    if (prod.reprovouNa1a) console.log(`[1ª TENTATIVA REPROVADA: ${prod.motivosDa1a.join("; ")}]${prod.tentativas === 2 ? " (a 2ª tentativa foi escrita com este motivo)" : ""}`);
     if (!verificacao.aprovado) {
       reprovadosNoVerificador += 1;
-      console.log(`[REPROVADO NO VERIFICADOR: ${verificacao.motivos.join("; ")}]\n`);
+      console.log(`[REPROVADO NAS DUAS TENTATIVAS (ErroIA em produção): ${verificacao.motivos.join("; ")}]\n`);
     }
 
     custoTotalUsd += custoDoCasoUsd;
     console.log(`custo deste caso: US$ ${custoDoCasoUsd.toFixed(4)} (${resultado.modelo})\n`);
   }
 
+  console.log(linhaDoResumo(conjunto.length, resumo));
   console.log(`reprovados no verificador: ${reprovadosNoVerificador} de ${conjunto.length}`);
   if (casosFalhos > 0) console.log(`casos que falharam no lote: ${casosFalhos} de ${conjunto.length}`);
   console.log(`custo total: US$ ${custoTotalUsd.toFixed(4)}`);
@@ -390,6 +380,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     casos: conjunto.length,
     titulos,
     reprovadosNoVerificador,
+    reprovadosNa1aTentativa: resumo.reprovadosNa1a,
     casosFalhos,
     custoTotalUsd,
   };

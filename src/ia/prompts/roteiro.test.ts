@@ -430,10 +430,14 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
-    expect(versao).toBe("2.11.0");
+    expect(versao).toBe("2.11.1");
     expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
     expect(SISTEMA).toContain("[diga aqui onde você está]");
     expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");
+    // O que sobrava no golden set com chave: prática do negócio inventada (como a pessoa trabalha, o que ela oferece).
+    expect(SISTEMA).toContain("Isso inclui COMO a pessoa trabalha e o que ela oferece");
+    for (const pratica of ["eu testo", "anoto a pergunta de cada fornecedor", "respondo no direct", "levei a mala de amostras", "na nossa loja"]) expect(SISTEMA).toContain(pratica);
+    expect(SISTEMA).toContain("[conte aqui como você faz isso]");
     // Não é regra numerada: o porQueAssim continua citando só as listas.
     expect(SISTEMA).toContain("esta não é uma das regras numeradas acima");
   });

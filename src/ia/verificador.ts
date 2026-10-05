@@ -840,7 +840,7 @@ async function tentarGerarEVerificar<T>(
  * uma reformulação, então não entra aqui; o segundo ramo de `problemaDeAcentuacao`, "200
  * caracteres sem nenhum acento", também não, porque não diz onde o acento falta).
  */
-function ehMotivoMecanico(motivo: string): boolean {
+export function ehMotivoMecanico(motivo: string): boolean {
   return motivo.includes(MOTIVO_TRAVESSAO) || motivo.includes(MOTIVO_EMOJI) || motivo.includes(MOTIVO_PALAVRA_SEM_ACENTO);
 }
 
@@ -892,7 +892,7 @@ function corrigirTextoMecanicamente(texto: string): string {
  * tarefa. As três transformações nunca dependem de qual campo é, então são seguras em qualquer
  * folha. Devolve um valor novo, nunca muta `dados`.
  */
-function corrigirMecanicamente<T>(dados: T): T {
+export function corrigirMecanicamente<T>(dados: T): T {
   return corrigirValorMecanicamente(dados) as T;
 }
 

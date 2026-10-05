@@ -240,8 +240,11 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * tem de estar no momento, no perfil, no tema, na notícia, no pedido do cliente ou na evidência; o que faltar vira um espaço marcado entre colchetes, nunca cena inventada. **Dois**, o motivo
  * da reprovação e a versão reprovada entram na entrada como "só sobre a FORMA, nunca fonte de fato". **Três**, `montarFontesDosFatos` monta o que vale como fato para o verificador
  * (`verificarTexto` 1.6.0 reprova o fato fora das fontes). Versão 2.11.0.
+ *
+ * 2.11.1 (golden set com chave, 04/10/2026: os momentos reprovados eram todos de prática do negócio inventada, "testo no quarto do hotel", "anoto a pergunta ao lado do fornecedor", "mala de amostras na
+ * feira"): o parágrafo diz explicitamente que o fato inclui COMO a pessoa trabalha e o que ela oferece; se o momento ou o perfil não disseram, não existe e vira "[conte aqui como você faz isso]". Versão 2.11.1.
  */
-export const versao = "2.11.0";
+export const versao = "2.11.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -554,7 +557,10 @@ descreveu, no perfil do cliente, no tema, na notícia, no que o cliente pediu ou
 O que o roteiro precisaria e não tem, você não inventa: deixa um espaço marcado entre colchetes,
 com a instrução para quem grava, como "[diga aqui onde você está]" ou "[o número real do seu
 preço]". Nunca invente cena para dar vida ao texto (quem está do lado, o que tem na mesa, o tempo
-que faz, o que aconteceu antes). Entrada curta é normal: um roteiro curto, com espaços marcados,
+que faz, o que aconteceu antes). Isso inclui COMO a pessoa trabalha e o que ela oferece ("eu testo
+antes", "anoto a pergunta de cada fornecedor", "respondo no direct", "levei a mala de amostras",
+"na nossa loja"): se o momento ou o perfil não disseram, não existe, e vira um espaço marcado como
+"[conte aqui como você faz isso]". Entrada curta é normal: um roteiro curto, com espaços marcados,
 vale mais que um roteiro cheio de detalhe que ninguém contou. O motivo que o cliente deu ao
 reprovar uma versão, e o texto da versão reprovada, dizem só como NÃO escrever; nunca são fonte
 de fato.

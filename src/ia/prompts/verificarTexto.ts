@@ -69,8 +69,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * 1.7.1 (juiz independente sobre os 34 roteiros do golden set, 04/10/2026): o que sobrava era "prática do negócio" inventada ("testo antes de entrar no kit", "anoto a pergunta ao lado de cada
  * fornecedor", "a gente responde uma por uma", "na nossa loja" numa marca sem loja). O fato específico passa a incluir como a pessoa trabalha, o que ela faz ou oferece; o conhecimento geral do
  * ofício continua livre. Versão 1.7.1.
+ *
+ * 1.7.2 (golden set com chave, depois do 1.7.1): três falsos positivos que sobraram viram exemplos que APROVAM e saem da regra: a instrução de gravação ("gravar parado no sinal ou estacionado" quando o
+ * momento diz "no carro, parado no sinal"), a repetição ou paráfrase do TEMA ou do momento (são fonte) e a frase que o cliente pediu para falar ("o que o vídeo precisa comunicar", o pedido). Versão 1.7.2.
  */
-export const versao = "1.7.1";
+export const versao = "1.7.2";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -148,11 +151,14 @@ export const CRITERIO_FATOS =
   "negócio que as fontes não trazem é invenção, mesmo parecendo detalhe inocente. NÃO é fato que precise de fonte, e nunca é " +
   "motivo de reprovação: conhecimento geral do ramo (como a gordura espalha, o que mancha o dente), opinião, frase de efeito (\"o passo que quase todo mundo pula\"), generalização (\"muita " +
   "gente\"), paráfrase ou reformulação de algo que está nas fontes (o mesmo número escrito de outro jeito, o mesmo lugar dito de outro jeito), inferência óbvia das fontes (clínica em um bairro " +
-  "\"fica\" nesse bairro), hashtags, instruções de gravação e o jeito de falar. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\") não é fato, é o " +
+  "\"fica\" nesse bairro), repetir ou reformular o TEMA ou o momento (eles são fonte), a frase ou o assunto que o cliente pediu para dizer (\"o que o vídeo precisa comunicar\", o pedido), " +
+  "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz) e o jeito de falar. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\") não é fato, é o " +
   "certo quando a fonte não traz a informação. NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
   "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
   "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
-  "\"esfregar a mancha espalha a gordura\" (conhecimento do ofício).\n" +
+  "\"esfregar a mancha espalha a gordura\" (conhecimento do ofício); o momento diz \"no carro, parado no sinal\" e o texto manda \"gravar parado no sinal ou estacionado\" (instrução de gravação); " +
+  "o tema é \"o sofá da cliente de ontem\" e o texto diz \"o sofá da cliente de ontem\"; o tema é \"o erro que apareceu em todo vídeo da semana\" e o texto diz \"você viu esse erro em vídeo atrás de " +
+  "vídeo\" (repetição ou paráfrase do tema); o cliente pediu para comunicar \"o horário mudou\" e o texto diz que o horário mudou (a frase que ele pediu para falar).\n" +
   "  Exemplos que REPROVAM, quando as fontes não os trazem: \"o Uli está aqui do meu lado com a mochila nas costas\"; \"numa mesa de hotel com café já frio\"; \"um país quase caiu do roteiro " +
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
   "perfil não traz);"
