@@ -293,7 +293,7 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
   });
 
-  // O momento que volta preenchido (achado do Bruno, 06/10): o roteiro nasceu do que a pessoa contou; ela volta, vê o texto dela, edita e gera de novo.
+  // O momento que volta preenchido (achado do Bruno, 04/10): o roteiro nasceu do que a pessoa contou; ela volta, vê o texto dela, edita e gera de novo.
   test("o roteiro do momento tem 'Reescrever o que contei': volta ao Criar com o texto guardado, editável, e gera de novo", async ({ page }) => {
     await entrar(page);
     await abrirGravarAgora(page);

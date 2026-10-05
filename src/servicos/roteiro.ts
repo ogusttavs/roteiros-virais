@@ -1027,6 +1027,20 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       marcaCitada,
       noticia: dados.noticia,
     }),
+    // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
+    fontesDosFatos: roteiroIA.montarFontesDosFatos({
+      perfilCompilado,
+      camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
+      tema: dados.momento ? undefined : dados.tema,
+      momento: dados.momento
+        ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
+        : undefined,
+      objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+      observacao: dados.observacao,
+      noticia: dados.noticia,
+      marcaCitada,
+      evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
+    }),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
     lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,

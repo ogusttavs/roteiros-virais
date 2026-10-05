@@ -52,7 +52,28 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * certo desta recomendação, e o verificador precisa saber disso para não
  * transformar uma avaliação boa (nota 8,6) num erro na tela.
  */
-export const versao = "1.5.0";
+
+/**
+ * O roteiro não inventa fato (achado do Bruno e do Gustavo no teste de 04/10/2026: o roteiro do momento trouxe "o Uli está aqui do meu lado com a mochila", "uma mesa de hotel com café
+ * já frio", coisas que ninguém contou). Com `fontes`, o verificador confere também que o texto não AFIRMA fato concreto (pessoa, lugar, objeto, número, data, acontecimento) fora delas; um
+ * espaço marcado entre colchetes para a pessoa preencher não é fato. Sem `fontes`, nada muda. Versão 1.6.0.
+ *
+ * 1.7.0 (golden set com chave, 04/10/2026: o 1.6.0 reprovou 7 de 7 momentos, 5 de 5 stories e 21 de 22 roteiros, o que em produção seria `ErroIA` em quase toda geração): o critério era largo
+ * demais e reprovava paráfrase ("89 reais" para "R$ 89"), inferência óbvia ("a clínica fica na Vila Sorriso" para "bairro Vila Sorriso, São Paulo"), conhecimento geral do ofício ("esfregar
+ * espalha a gordura"), frase de efeito e até hashtag. Agora só conta o fato ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento (quem está junto, onde, o que
+ * aconteceu, quando, quanto custa, nome de produto, de cliente, de cidade, uma cena vivida); fora da regra, e nunca motivo de reprovação: conhecimento do ramo, opinião, frase de efeito,
+ * generalização, paráfrase, inferência óbvia da fonte e hashtag. Na dúvida, aprova: só reprova quando aponta o fato específico E afirma que nada na fonte o sustenta, e a saída lista o fato
+ * (`fatoEspecifico`) e a frase da fonte mais próxima (`fonteMaisProxima`, ou nenhuma). Os exemplos do prompt são os três casos de paráfrase, inferência e ofício (aprovados) e os quatro fatos
+ * do achado do Bruno (reprovados). Versão 1.7.0.
+ *
+ * 1.7.1 (juiz independente sobre os 34 roteiros do golden set, 04/10/2026): o que sobrava era "prática do negócio" inventada ("testo antes de entrar no kit", "anoto a pergunta ao lado de cada
+ * fornecedor", "a gente responde uma por uma", "na nossa loja" numa marca sem loja). O fato específico passa a incluir como a pessoa trabalha, o que ela faz ou oferece; o conhecimento geral do
+ * ofício continua livre. Versão 1.7.1.
+ *
+ * 1.7.2 (golden set com chave, depois do 1.7.1): três falsos positivos que sobraram viram exemplos que APROVAM e saem da regra: a instrução de gravação ("gravar parado no sinal ou estacionado" quando o
+ * momento diz "no carro, parado no sinal"), a repetição ou paráfrase do TEMA ou do momento (são fonte) e a frase que o cliente pediu para falar ("o que o vídeo precisa comunicar", o pedido). Versão 1.7.2.
+ */
+export const versao = "1.7.2";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -61,9 +82,21 @@ export type GeneroTexto = "padrao" | "analise" | "roteiro" | "regra" | "tema";
 export const schema = z.object({
   aprovado: z.boolean(),
   motivo: z.string().nullable(),
+  /** Só na conferência de fatos (com fontes), quando reprova: o fato específico que o texto afirma sem apoio. Nulo nos outros casos. */
+  fatoEspecifico: z.string().nullable().catch(null),
+  /** Só na conferência de fatos: a frase da fonte mais próxima desse fato, ou "nenhuma". Nulo nos outros casos. */
+  fonteMaisProxima: z.string().nullable().catch(null),
 });
 
 export type SaidaVerificarTexto = z.infer<typeof schema>;
+
+/** O motivo da reprovação: por fato, leva o fato e a frase das fontes mais próxima (o que a segunda tentativa recebe); senão, o motivo de sempre. */
+export function motivoDaConferencia(dados: SaidaVerificarTexto): string {
+  if (dados.fatoEspecifico) {
+    return `o texto afirma "${dados.fatoEspecifico}" e nada nas fontes o sustenta (fonte mais próxima: ${dados.fonteMaisProxima ?? "nenhuma"})`;
+  }
+  return dados.motivo ?? "reprovado";
+}
 
 const CRITERIO_TOM: Record<GeneroTexto, string> = {
   padrao: "o texto soa como uma pessoa falando com outra pessoa, não como propaganda;",
@@ -107,11 +140,34 @@ const CONTEXTO_GENERO: Partial<Record<GeneroTexto, string>> = {
     "cliente vê, isso não é um erro de gênero.\n",
 };
 
-export function montarSistemaEstavel(genero: GeneroTexto = "padrao"): string {
+/**
+ * A definição estreita de "fato que precisa de fonte" (1.7.0). Os exemplos são os sete casos do golden set com chave: três que o 1.6.0 reprovou e NÃO são fato (paráfrase, inferência, ofício) e os
+ * quatro fatos do achado do Bruno, que são. Exportada para o teste conferir o texto.
+ */
+export const CRITERIO_FATOS =
+  "\n- o texto não afirma, como real, um fato ESPECÍFICO que as FONTES (depois do texto) não sustentam. Fato específico é o que diz respeito à pessoa, ao negócio, ao lugar, ao momento ou a " +
+  "um acontecimento: quem está junto, onde está, o que aconteceu, quando, quanto custa, nome de produto, de cliente ou de cidade, uma cena vivida, e também COMO A PESSOA TRABALHA e o que ela " +
+  "faz ou oferece (\"respondo no direct\", \"testo na mão antes\", \"anoto a pergunta de cada fornecedor\", \"tenho loja\", \"na nossa loja\", \"a gente responde uma por uma\"): uma prática do " +
+  "negócio que as fontes não trazem é invenção, mesmo parecendo detalhe inocente. NÃO é fato que precise de fonte, e nunca é " +
+  "motivo de reprovação: conhecimento geral do ramo (como a gordura espalha, o que mancha o dente), opinião, frase de efeito (\"o passo que quase todo mundo pula\"), generalização (\"muita " +
+  "gente\"), paráfrase ou reformulação de algo que está nas fontes (o mesmo número escrito de outro jeito, o mesmo lugar dito de outro jeito), inferência óbvia das fontes (clínica em um bairro " +
+  "\"fica\" nesse bairro), repetir ou reformular o TEMA ou o momento (eles são fonte), a frase ou o assunto que o cliente pediu para dizer (\"o que o vídeo precisa comunicar\", o pedido), " +
+  "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz) e o jeito de falar. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\") não é fato, é o " +
+  "certo quando a fonte não traz a informação. NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
+  "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
+  "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
+  "\"esfregar a mancha espalha a gordura\" (conhecimento do ofício); o momento diz \"no carro, parado no sinal\" e o texto manda \"gravar parado no sinal ou estacionado\" (instrução de gravação); " +
+  "o tema é \"o sofá da cliente de ontem\" e o texto diz \"o sofá da cliente de ontem\"; o tema é \"o erro que apareceu em todo vídeo da semana\" e o texto diz \"você viu esse erro em vídeo atrás de " +
+  "vídeo\" (repetição ou paráfrase do tema); o cliente pediu para comunicar \"o horário mudou\" e o texto diz que o horário mudou (a frase que ele pediu para falar).\n" +
+  "  Exemplos que REPROVAM, quando as fontes não os trazem: \"o Uli está aqui do meu lado com a mochila nas costas\"; \"numa mesa de hotel com café já frio\"; \"um país quase caiu do roteiro " +
+  "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
+  "perfil não traz);"
+
+export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
-- ${CRITERIO_TOM[genero]}
+- ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}
 - nenhuma proibição que o cliente listou no briefing foi ferida.
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
@@ -120,9 +176,10 @@ Não repita o texto inteiro na resposta, só o motivo.
 Escreva em português do Brasil, com acentuação correta.`;
 }
 
-export function montarEntrada(dados: { texto: string; proibicoes: string[] }): string {
+export function montarEntrada(dados: { texto: string; proibicoes: string[]; fontes?: string }): string {
   const listaProibicoes =
     dados.proibicoes.length > 0 ? dados.proibicoes.join("; ") : "nenhuma proibicao registrada";
+  const blocoFontes = dados.fontes ? `\n\nFONTES (tudo o que foi dito ou escrito para este texto; só isto vale como fato):\n${dados.fontes}` : "";
 
-  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}`;
+  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
 }

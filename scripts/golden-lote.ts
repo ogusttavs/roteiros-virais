@@ -7,6 +7,8 @@
  * prompt (que o preço cheio da chamada um por vez conta com desconto), então o número impresso pode ficar acima do que o console da Anthropic cobra de verdade; na dúvida, vale o console.
  *
  * `GOLDEN_SEM_LOTE=1` volta à chamada um por vez (para depurar um caso, ou quando a pessoa quer o resultado agora e aceita pagar o preço cheio).
+ * `--direto` (ou `GOLDEN_SET_DIRETO=1`), em qualquer `avaliar:*`: as mesmas chamadas, mas pelo caminho normal (`src/ia/cliente.ts`), até 4 em paralelo, sem esperar a fila do lote. Para quando o
+ * lote está parado na fila da API e o resultado é preciso agora. **O custo é o cheio, o dobro do lote**, e o cabeçalho avisa; o padrão continua sendo o lote.
  * Um lote pode levar até 24 h; em geral, minutos. O ajudante consulta de 30 em 30 segundos.
  */
 import { gerarEstruturado, type ParametrosGeracao } from "../src/ia/cliente";
@@ -21,8 +23,24 @@ const LIMITE_ESPERA_MS = 26 * 60 * 60 * 1000;
 /** O pedido de um caso: os mesmos campos de `gerarEstruturado` (sem imagens nem bloco variável, que o lote não leva). */
 export type PedidoGolden<T> = Omit<ParametrosGeracao<T>, "imagens" | "sistemaVariavel">;
 
+/** O caminho direto (`--direto` na linha de comando ou `GOLDEN_SET_DIRETO=1`): paralelo de até 4, preço cheio. */
+export function goldenDireto(): boolean {
+  return process.env.GOLDEN_SET_DIRETO === "1" || process.argv.includes("--direto");
+}
+
+/** Só o lote tem o desconto: a chamada um por vez (`GOLDEN_SEM_LOTE=1`) e a direta pagam o preço cheio. */
 export function goldenEmLote(): boolean {
-  return process.env.GOLDEN_SEM_LOTE !== "1";
+  return process.env.GOLDEN_SEM_LOTE !== "1" && !goldenDireto();
+}
+
+const PARALELO_DIRETO = 4;
+let avisouDireto = false;
+
+/** O aviso do custo cheio, uma vez por rodada, antes da primeira chamada direta. */
+function avisarCaminhoDireto(): void {
+  if (avisouDireto) return;
+  avisouDireto = true;
+  console.log(`[direto] as chamadas vão pelo caminho normal, até ${PARALELO_DIRETO} em paralelo, sem a fila do lote: o custo é o preço CHEIO (o dobro do lote).\n`);
 }
 
 const pausa = (ms: number) => new Promise((resolver) => setTimeout(resolver, ms));
@@ -59,6 +77,23 @@ export async function gerarVarios<T>(pedidos: PedidoGolden<T>[], rotulo: string)
  */
 export async function gerarVariosOuErro<T>(pedidos: PedidoGolden<T>[], rotulo: string): Promise<(ResultadoGeracao<T> | Error)[]> {
   if (pedidos.length === 0) return [];
+  if (goldenDireto()) {
+    avisarCaminhoDireto();
+    // Um grupo de até 4 chamadas por vez, cada uma com o seu erro à parte, na mesma ordem dos pedidos.
+    const resultados: (ResultadoGeracao<T> | Error)[] = new Array(pedidos.length);
+    let proximo = 0;
+    const trabalhador = async () => {
+      for (let indice = proximo++; indice < pedidos.length; indice = proximo++) {
+        try {
+          resultados[indice] = await gerarEstruturado(pedidos[indice]);
+        } catch (erro) {
+          resultados[indice] = erro instanceof Error ? erro : new Error(String(erro));
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(PARALELO_DIRETO, pedidos.length) }, trabalhador));
+    return resultados;
+  }
   if (!goldenEmLote()) {
     const resultados: (ResultadoGeracao<T> | Error)[] = [];
     for (const pedido of pedidos) {
