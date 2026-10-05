@@ -256,6 +256,8 @@ test.describe("marca sem tema, as portas de Criar continuam funcionando", () => 
       nichoId: nicho.id,
       analise: { assunto: "um jeito novo de organizar recibos", pertenceAoNicho: true } as never,
     });
+    // O tema de hoje já foi TENTADO e ficou sem prova (a linha vazia do dia): sem ela, quem abre a tela pede o tema na hora (tema só para quem usa) e vê a espera, não o aviso.
+    await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas: [] });
   });
 
   test("a 390px: /criar/temas mostra o aviso no lugar dos temas, e 'Contar o momento' gera um roteiro normalmente", async ({

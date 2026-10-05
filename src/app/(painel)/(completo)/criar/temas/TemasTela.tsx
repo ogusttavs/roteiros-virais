@@ -2,7 +2,7 @@
 
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import type { Plataforma, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
@@ -10,6 +10,7 @@ import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Chips } from "@/ui/componentes/Chips";
+import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 import { salvarRedePrincipalAction } from "../../hoje/acoes";
@@ -29,6 +30,8 @@ type Props = {
   evidenciasTemas: (EvidenciaTema | null)[];
   avisoLinhaEditorial: string | null;
   aviso: AvisoSemTema | null;
+  /** O tema de hoje está sendo escolhido agora (o ramo não estava em uso de madrugada): mostra a espera e se atualiza sozinha. */
+  gerando?: boolean;
   redePrincipal: Plataforma | null;
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
   dataInicial?: string;
@@ -40,8 +43,15 @@ type Props = {
  * portas de Criar (assunto seu, contar o momento, planejar) viraram rotas à parte: esta tela cuida
  * só de escolher um tema.
  */
-export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, redePrincipal, dataInicial }: Props) {
+export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial }: Props) {
   const router = useRouter();
+
+  // Enquanto o tema é escolhido, a página pergunta ao servidor de novo a cada poucos segundos; o servidor só devolve "gerando" enquanto há pedido em andamento, então isto para sozinho.
+  useEffect(() => {
+    if (!gerando) return;
+    const intervalo = setInterval(() => router.refresh(), 5000);
+    return () => clearInterval(intervalo);
+  }, [gerando, router]);
   const [redeAtual, setRedeAtual] = useState(redePrincipal);
   const [destino, setDestino] = useState<string | null>(null);
   const [abrindo, iniciarTransicao] = useTransition();
@@ -91,7 +101,13 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
           <p className={styles.dicaRede}>{textosHoje.dicaRedePrincipal}</p>
         </div>
 
-        {aviso ? (
+        {gerando ? (
+          <div className={styles.estadoVazio} role="status" data-gerando-temas>
+            <ClaqueteAnimada altura={72} />
+            <h2>{textosHoje.gerandoTitulo}</h2>
+            <p>{textosHoje.gerando}</p>
+          </div>
+        ) : aviso ? (
           <div className={styles.estadoVazio}>
             <h2>{aviso.titulo}</h2>
             <p>{aviso.texto}</p>

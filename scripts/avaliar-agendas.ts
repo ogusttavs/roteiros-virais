@@ -12,6 +12,7 @@
  * `GOLDEN_SET_DIR` aponta para a pasta que tem `agendas.json`; sem o arquivo
  * real lá, roda com `avaliacoes/agendas.exemplo.json` e avisa que é exemplo.
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

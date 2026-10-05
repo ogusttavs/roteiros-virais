@@ -66,6 +66,9 @@ export const textosHoje = {
    * demais" (`vazioTitulo`/`vazio` continuam valendo antes desse horário): o tema de hoje já devia ter
    * saído e não saiu. Mostrado dentro da porta Reels, no lugar dos três temas.
    */
+  /** Quem abre o Criar num ramo sem tema de hoje: o tema nasce na hora (o de madrugada só sai para ramo em uso). */
+  gerandoTitulo: "Estamos escolhendo os temas de hoje para você",
+  gerando: "Leva menos de um minuto. A tela se atualiza sozinha.",
   semTemaDepoisTitulo: "Hoje não saiu tema para o seu setor",
   semTemaDepois: "Dá para gravar do mesmo jeito: conte o que está acontecendo ou escreva o seu assunto.",
   /** M1, item 5: mesmo espírito do aviso de Referências, aqui na porta Reels, no lugar dos três temas. */

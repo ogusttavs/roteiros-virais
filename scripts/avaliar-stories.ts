@@ -13,6 +13,7 @@
  * `stories.json`; sem o arquivo real lá, roda com
  * `avaliacoes/stories.exemplo.json` e avisa que é exemplo.
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

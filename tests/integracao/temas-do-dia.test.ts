@@ -141,6 +141,17 @@ beforeAll(async () => {
     ])
     .returning({ id: contas.id });
   [contaAId, contaBId, contaCId] = contasCriadas.map((c) => c.id);
+
+  // O tema de madrugada só sai para setor em uso (decisão do Gustavo, 05/10/2026): uma marca ativa deste setor gerou roteiro hoje.
+  const [marcaEmUso] = await db().insert(clientes).values({ nome: "[teste] marca em uso", nichoId }).returning();
+  await db().insert(roteiros).values({
+    clienteId: marcaEmUso.id,
+    data: hojeISO(),
+    tema: "em uso",
+    origem: "livre",
+    objetivo: "reconhecimento",
+    conteudo: { gancho: "g", corpo: "c", fechamento: "f", chamadaFinal: "x" },
+  } as never);
 }, 30_000);
 
 afterAll(async () => {

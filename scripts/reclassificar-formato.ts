@@ -16,6 +16,7 @@
  *   npx tsx scripts/reclassificar-formato.ts              # dry run, não gasta nada
  *   npx tsx scripts/reclassificar-formato.ts --confirmar   # envia o lote de verdade
  */
+import "./chave-de-testes";
 import { and, avg, count, eq, gte, isNotNull, isNull, lt, ne, not, or, sql, type SQL } from "drizzle-orm";
 
 import { db } from "../src/db";

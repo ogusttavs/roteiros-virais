@@ -9,6 +9,7 @@
  * `GOLDEN_SET_DIR` aponta para a pasta que tem `roteiros-sem-fala.json`; sem o arquivo real lá,
  * roda com `avaliacoes/roteiros-sem-fala.exemplo.json` e avisa que é exemplo.
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

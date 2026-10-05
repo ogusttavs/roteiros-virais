@@ -9,6 +9,7 @@
  * GOLDEN_SET_DIR aponta para a pasta que tem briefing.json; sem o arquivo
  * real la, roda com avaliacoes/briefing.exemplo.json e avisa que e exemplo.
  */
+import "./chave-de-testes";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 

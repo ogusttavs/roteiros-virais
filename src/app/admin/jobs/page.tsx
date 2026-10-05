@@ -65,6 +65,11 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return fraseDoErro(e.erro);
+  // Os temas do dia só saem para ramo em uso (alguma marca gerou roteiro nos últimos 3 dias): o cartão diz quantos ramos tiveram tema e quantos ficaram sem uso.
+  if (e.nome === "temas-do-dia" && typeof e.resumo?.semUso === "number" && typeof e.resumo?.nichos === "number") {
+    const sem = e.resumo.semUso;
+    return `${t.rotinas.temasDoDia(e.resumo.nichos, sem)}${sem > 0 ? `: ${t.rotinas.semTemaPorFaltaDeUso}` : ""}`;
+  }
   // A rotina da Meta que parou no limite do aplicativo não é erro: o resumo diz que continua na hora seguinte.
   if (e.resumo?.pausadoPorLimite === true) return t.rotinas.paradoNoLimite;
   // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.

@@ -130,8 +130,8 @@ async function main(): Promise<void> {
     await executarComRegistro(FILAS.modeloNicho, rodarModeloNicho);
   });
   /** M1, item 2: com `nichoId`, só aquele setor, e só se ele ainda não tem tema hoje; sem, comportamento de sempre. */
-  await boss().work<{ nichoId?: number }>(FILAS.temasDoDia, async (job) => {
-    await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+  await boss().work<{ nichoId?: number; aoAbrir?: boolean }>(FILAS.temasDoDia, async (job) => {
+    await executarComRegistro(FILAS.temasDoDia, () => rodarTemasDoDia(job[0]?.data?.nichoId, { aoAbrir: job[0]?.data?.aoAbrir === true }), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   /** M2: sem `nichoId`, roda para todos os nichos ativos (o cron mensal); com, só aquele setor (criação ou "Pesquisar de novo"). */
   await boss().work<{ nichoId?: number }>(FILAS.pesquisaDeSetor, async (job) => {

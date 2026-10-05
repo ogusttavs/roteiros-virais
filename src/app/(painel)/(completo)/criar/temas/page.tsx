@@ -5,7 +5,7 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
-import { temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
+import { pedirTemaDeHoje, temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 import { avisoSemTema } from "./aviso-sem-tema";
@@ -64,7 +64,11 @@ export default async function Temas({ searchParams }: Props) {
       : cliente.nichoId
         ? { aindaLendo: await setorAindaLendo(cliente.nichoId), semBase: await setorSemBase(cliente.nichoId) }
         : { emConferencia: (await pedidoAbertoDaMarca(cliente.id)) !== null };
-  const aviso = avisoSemTema(resultado, new Date(), estadoDoRamo);
+  // O tema de madrugada só sai para ramo em uso: sem tema de hoje e com o ramo já lido, o tema nasce agora (a tela espera e se atualiza sozinha).
+  const podePedirTema =
+    resultado.status === "sem_tema" && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
+  const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" : false;
+  const aviso = gerando ? null : avisoSemTema(resultado, new Date(), estadoDoRamo);
 
   return (
     <TemasTela
@@ -72,6 +76,7 @@ export default async function Temas({ searchParams }: Props) {
       evidenciasTemas={evidenciasTemas}
       avisoLinhaEditorial={resultado.status === "ok" ? resultado.avisoLinhaEditorial : null}
       aviso={aviso}
+      gerando={gerando}
       redePrincipal={cliente.redePrincipal}
       dataInicial={dataInicial}
     />
