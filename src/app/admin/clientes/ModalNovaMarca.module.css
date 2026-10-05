@@ -55,13 +55,9 @@
   font-size: var(--tamanho-corpo);
 }
 
-/* V12b, item 2: o atalho "criar um nicho", ao lado do select, quando o setor da marca ainda não existe. */
-.linkNicho {
-  align-self: flex-start;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-acao);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+/* A busca de ramo: a lista abre por cima do resto da folha. */
+.campoRamo {
+  position: relative;
 }
 
 .erro {

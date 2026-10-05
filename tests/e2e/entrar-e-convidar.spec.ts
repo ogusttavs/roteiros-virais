@@ -37,6 +37,9 @@ test("admin entra, cria cliente, cliente entra com a senha gerada e cai em /come
   await page.goto("/admin/clientes");
   await page.getByRole("button", { name: "nova conta" }).click();
   await page.getByLabel("nome", { exact: true }).fill("[exemplo] Cliente e2e");
+  // O ramo é obrigatório e vem do catálogo (a mesma busca do Começar).
+  await page.getByRole("combobox", { name: "ramo", exact: true }).fill("unhas");
+  await page.getByRole("combobox", { name: "ramo", exact: true }).press("Enter");
   await page.getByRole("button", { name: "criar conta" }).click();
 
   await expect(page).toHaveURL(/\/admin\/clientes\/\d+/);

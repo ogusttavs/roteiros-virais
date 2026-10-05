@@ -3,8 +3,12 @@
 import { revalidatePath } from "next/cache";
 
 import type { Cliente } from "@/db/schema";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
-import { criarMarca, garantirSessaoAdmin } from "@/servicos/clientes";
+import { criarMarcaDoCatalogo, ErroCliente, garantirSessaoAdmin } from "@/servicos/clientes";
+import { ErroNicho } from "@/servicos/nichos";
+import { ErroLimiteDeSetores } from "@/servicos/ramos";
+import { textosRamo } from "@/textos/ramo";
 
 /**
  * Defesa em duas camadas (revisao da etapa 3, PROXIMO.md): a Server Action
@@ -14,13 +18,22 @@ import { criarMarca, garantirSessaoAdmin } from "@/servicos/clientes";
  */
 export async function criarMarcaAction(dados: {
   nome: string;
-  nichoId: number;
+  /** O ramo do catálogo (o `slug`), ou nulo quando o admin escreveu o ramo à mão (`ramoOutro`). */
+  ramoSlug: string | null;
+  ramoOutro: string | null;
   tipo: "negocio" | "pessoa";
   plano: "padrao" | "sem_limite";
-}): Promise<Cliente> {
+}): Promise<ResultadoAcao<Cliente>> {
   garantirSessaoAdmin(await sessaoAtual());
 
-  const marca = await criarMarca(dados);
-  revalidatePath("/admin/clientes");
-  return marca;
+  try {
+    const marca = await criarMarcaDoCatalogo(dados);
+    revalidatePath("/admin/clientes");
+    revalidatePath("/admin/nichos");
+    return { ok: true, dado: marca };
+  } catch (erro) {
+    if (erro instanceof ErroLimiteDeSetores) return { ok: false, erro: textosRamo.limiteDeRamosNovos };
+    if (erro instanceof ErroCliente || erro instanceof ErroNicho) return { ok: false, erro: erro.message };
+    throw erro;
+  }
 }

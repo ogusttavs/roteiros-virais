@@ -357,7 +357,7 @@ async function mandarConviteMagico(email: string): Promise<void> {
  */
 export async function criarMarca(dados: {
   nome: string;
-  nichoId: number;
+  nichoId: number | null;
   /** V9a, item 4: o admin escolhe ao criar a marca; "negocio" é o padrão, sem tela nova. */
   tipo?: TipoMarca;
   /** V9b-0, item 1: o admin escolhe ao criar a marca; "padrao" é o padrão, sem tela nova. */
@@ -367,6 +367,34 @@ export async function criarMarca(dados: {
   const plano = dados.plano ?? "padrao";
   const [cliente] = await db().insert(clientes).values({ nome: dados.nome, nichoId: dados.nichoId, tipo, plano }).returning();
   return cliente;
+}
+
+/**
+ * "Nova conta" do admin nascendo do catálogo de ramos (E45): o ramo vem do catálogo (`ramoSlug`), e o setor dele nasce ou volta a ser pesquisado como no Começar
+ * (`setorParaAMarca`); ou o admin escreve o ramo com as próprias palavras (`ramoOutro`, o "Não achei o meu"): a conta nasce no ramo mais próximo do texto e o pedido
+ * fica aberto para o admin decidir em Ramos. O setor é preparado antes de a conta existir: se o teto de setores novos do dia segurar, nada é criado.
+ */
+export async function criarMarcaDoCatalogo(dados: {
+  nome: string;
+  ramoSlug?: string | null;
+  ramoOutro?: string | null;
+  tipo?: TipoMarca;
+  plano?: PlanoMarca;
+}): Promise<Cliente> {
+  const nome = dados.nome.trim();
+  if (!nome) throw new ErroCliente("o nome da marca nao pode ficar vazio.");
+  if (nome.length > 80) throw new ErroCliente("o nome da marca pode ter ate 80 caracteres.");
+  const ramoOutro = dados.ramoOutro?.trim() ?? "";
+  if (!dados.ramoSlug && !ramoOutro) throw new ErroCliente("escolha o ramo.");
+
+  if (dados.ramoSlug) {
+    const { nichoId } = await setorParaAMarca(null, dados.ramoSlug);
+    return criarMarca({ nome, nichoId, tipo: dados.tipo, plano: dados.plano });
+  }
+  const marca = await criarMarca({ nome, nichoId: null, tipo: dados.tipo, plano: dados.plano });
+  await registrarPedidoDeRamo(marca.id, ramoOutro);
+  const [atual] = await db().select().from(clientes).where(eq(clientes.id, marca.id));
+  return atual ?? marca;
 }
 
 /**
