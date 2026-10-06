@@ -10,6 +10,7 @@ import { META_CUSTO_CLIENTE_USD, clienteDetalheAdmin } from "@/servicos/admin-co
 import { alteracoesDaConta, pessoasDaConta, usoDosUltimosDias } from "@/servicos/admin-contas";
 import { descreverPublico } from "@/servicos/admin-trocas";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
+import { assuntosAtivosDaMarca, contarNoticiasPorAssunto } from "@/servicos/assuntos";
 import { clientePorId, membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import { fontesDoHistorico } from "@/servicos/curva";
 import { formatosDaMarcaComEstado } from "@/servicos/formatos";
@@ -23,6 +24,7 @@ import { textosHistorico } from "@/textos/historico";
 
 import comum from "../../comum.module.css";
 
+import { AssuntosAdmin } from "./AssuntosAdmin";
 import conta from "./conta.module.css";
 import { IdentidadeAdmin } from "./IdentidadeAdmin";
 import antigo from "./page.module.css";
@@ -70,6 +72,8 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
   const pessoas = await pessoasDaConta(detalhe.id);
   const principal = await ramoAtualDoCliente(cliente.nichoId);
   const alternativos = await ramosAlternativosDaMarca(detalhe.id);
+  const assuntos = await assuntosAtivosDaMarca(detalhe.id);
+  const noticiasPorAssunto = await contarNoticiasPorAssunto(assuntos.map((a) => a.id));
   const tiposDaMarca = await formatosDaMarcaComEstado(detalhe.id);
   const diaADia = await usoDosUltimosDias(detalhe.id, 14);
   const alteracoes = await alteracoesDaConta(detalhe.id, 8);
@@ -196,6 +200,18 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
                 nomeMarca={detalhe.nome}
                 principal={principal ? { nome: principal.nome, slug: principal.ramoSlug } : null}
                 alternativos={alternativos.map((a) => ({ id: a.id, nome: a.nome, slug: a.ramoSlug, ligadoEm: a.ligadoEm.toISOString() }))}
+              />
+              <AssuntosAdmin
+                clienteId={detalhe.id}
+                assuntos={assuntos.map((a) => ({
+                  id: a.id,
+                  texto: a.texto,
+                  termos: a.termos,
+                  fixado: a.fixado,
+                  criadoEm: a.criadoEm.toISOString(),
+                  ultimoAbertoEm: a.ultimoAbertoEm?.toISOString() ?? null,
+                  noticias: noticiasPorAssunto.get(a.id) ?? 0,
+                }))}
               />
               <div className={conta.linhaAjuste} data-registro>
                 <span className={comum.rotulo}>{t.registro.titulo}</span>

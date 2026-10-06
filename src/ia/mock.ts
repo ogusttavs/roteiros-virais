@@ -55,6 +55,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockModeloNicho(entrada);
     case "filtrarNoticias":
       return mockFiltrarNoticias(entrada);
+    case "resumirNoticia":
+      return mockResumirNoticia(entrada);
     case "aprenderCliente":
       return mockAprenderCliente(entrada);
     case "classificarAbertura":
@@ -367,6 +369,10 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
   const tipoAbertura = ehStory || ehSemFala ? null : tipoAberturaEscolhidoPeloMock(entrada);
   const primeiraPalavra = tipoAbertura ? PRIMEIRA_PALAVRA_MOCK_POR_TIPO[tipoAbertura] : "";
 
+  // E53: com notícias do assunto na entrada, o mock cita o veículo e o dia da primeira (o roteiro de verdade faz o mesmo: "segundo o G1, ontem").
+  const noticiaDoAssunto = /Notícias de hoje do assunto que a pessoa acompanha[^\n]*:\n([^,\n]+), ([^:\n]+): ([^\n]+)/.exec(entrada) ?? /Notícias de hoje de um assunto que a pessoa acompanha[^\n]*\n(?:<noticias_do_assunto>\n)?- ([^,\n]+), ([^:\n]+): ([^\n]+)/.exec(entrada);
+  const citacaoDaNoticia = noticiaDoAssunto ? ` Segundo o ${noticiaDoAssunto[1]}, em ${noticiaDoAssunto[2]}, ${noticiaDoAssunto[3].split(". ")[0].replace(/\.$/, "")}.` : "";
+
   const narrativa = ehSemFala
     ? { gancho: null, corpo: null, fechamento: null, chamadaFinal: null, ...mockCenasSemFala(tema, reprovado) }
     : ehStory
@@ -379,8 +385,8 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
           corpo: entrada.includes("Ficha do vídeo: Que guardem para depois")
             ? `Passo 1: separe o que precisa. Passo 2: faça na ordem certa sobre ${tema}. Passo 3: confira o resultado.`
             : reprovado
-              ? `Outro angulo sobre ${tema}, com uma cena real do negocio.`
-              : `Explicacao direta sobre ${tema}, com uma cena real do negocio.`,
+              ? `Outro angulo sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}`
+              : `Explicacao direta sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}`,
           fechamento: "resumo do que foi mostrado",
           chamadaFinal: "comenta se você já passou por isso",
           cartoes: null,
@@ -433,6 +439,12 @@ function mockVerificarTexto(entrada: string) {
 }
 
 /** As primeiras 8 noticias numeradas da entrada, com um angulo derivado do titulo. */
+/** E53: um resumo curto a partir do título que a entrada traz (sem inventar nada além dele). */
+function mockResumirNoticia(entrada: string) {
+  const titulo = /Título: (.*)/.exec(entrada)?.[1]?.trim() ?? "a notícia";
+  return { resumo: `Resumo: ${titulo}.` };
+}
+
 function mockFiltrarNoticias(entrada: string) {
   const blocoNoticias = entrada.split("Noticias:\n")[1] ?? "";
   const linhas = blocoNoticias.split("\n").filter((l) => /^\d+\./.test(l));

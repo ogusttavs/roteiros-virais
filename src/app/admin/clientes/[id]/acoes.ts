@@ -11,6 +11,7 @@ import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import { NOME_COOKIE_VER_COMO, DURACAO_VER_COMO_MS, opcoesCookieVerComo, valorCookieVerComo } from "@/lib/ver-como-cookie";
 import { trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
+import { adicionarAssunto, ErroAssunto, fixarAssunto, removerAssunto } from "@/servicos/assuntos";
 import {
   clientePorId,
   darAcesso,
@@ -261,4 +262,41 @@ export async function entrarVerComoAction(clienteId: number, pessoaId: string): 
     throw erro;
   }
   redirect("/hoje");
+}
+
+/** E53: o admin põe um assunto para a marca acompanhar (até cinco; o texto e, se quiser, os termos). */
+export async function adicionarAssuntoAction(clienteId: number, texto: string, termos: string): Promise<ResultadoAcao<null>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    await adicionarAssunto(clienteId, texto, termos);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroAssunto) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+export async function removerAssuntoAction(clienteId: number, assuntoId: number): Promise<ResultadoAcao<null>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    await removerAssunto(clienteId, assuntoId);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroAssunto) return { ok: false, erro: erro.message };
+    throw erro;
+  }
+}
+
+export async function fixarAssuntoAction(clienteId: number, assuntoId: number, fixado: boolean): Promise<ResultadoAcao<null>> {
+  garantirSessaoAdmin(await sessaoAtual());
+  try {
+    await fixarAssunto(clienteId, assuntoId, fixado);
+    revalidatePath(`/admin/clientes/${clienteId}`);
+    return { ok: true, dado: null };
+  } catch (erro) {
+    if (erro instanceof ErroAssunto) return { ok: false, erro: erro.message };
+    throw erro;
+  }
 }
