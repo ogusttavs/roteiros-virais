@@ -75,4 +75,23 @@ describe("CorDaBarraDoSistema", () => {
 
     await waitFor(() => expect(metaAtual()).toEqual(["#fbfbf9"]));
   });
+
+  it("rolar a tela nunca mexe na theme-color nem escuta a rolagem (no iPhone instalado isso deixava os elementos fixos parados no meio da tela)", () => {
+    document.body.style.background = "rgb(5, 5, 6)";
+    document.body.innerHTML = '<header data-barra-topo="" style="background: rgba(28, 28, 32, 0.82)"></header>';
+    const meta = document.createElement("meta");
+    meta.name = "theme-color";
+    meta.content = "#f7f7f5";
+    document.head.appendChild(meta);
+    const escuta = vi.spyOn(window, "addEventListener");
+    render(<CorDaBarraDoSistema />);
+    expect(escuta.mock.calls.some(([tipo]) => tipo === "scroll")).toBe(false);
+    escuta.mockRestore();
+
+    const antes = metaAtual();
+    Object.defineProperty(window, "scrollY", { value: 400, configurable: true });
+    window.dispatchEvent(new Event("scroll"));
+    document.body.innerHTML = '<header data-barra-topo="" style="background: rgba(255, 255, 255, 0.9)"></header>';
+    expect(metaAtual()).toEqual(antes);
+  });
 });

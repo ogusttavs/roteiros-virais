@@ -41,6 +41,11 @@ function corDaFaixa(): string | null {
  * mede a cor de verdade do cabeçalho (`[data-barra-topo]`) sobre o fundo, em cada tema, e põe a cor nas metas `theme-color` (tirando o `media` das do servidor, que só
  * seguem o tema do aparelho e não a escolha da Conta). Refaz quando o tema muda (`data-tema` no `<html>`), quando o aparelho troca de claro para escuro e a cada tela.
  * Sem cabeçalho fixo (modo gravação, Começar, Entrar) a cor é a do fundo daquela tela. O texto do relógio o próprio iOS escolhe (`statusBarStyle: "default"`).
+ *
+ * NUNCA mexe nas metas enquanto a pessoa rola (hotfix de 06/10/2026): antes, ao cruzar 4 px de rolagem o efeito media o cabeçalho de vidro de novo e trocava a `theme-color`; no
+ * iPhone instalado isso refazia a faixa de cima do sistema no meio da rolagem e os elementos fixos (a barra de ações do roteiro, a cápsula de abas) ficavam parados a ~57% da tela, subindo
+ * com a página, até a pessoa fechar e abrir o aplicativo (achado do Gustavo, 06/10, "só quando eu rolei para baixo"). A cor é a do cabeçalho em repouso, medida na entrada da tela;
+ * o preço é uma diferença de tom mínima na faixa quando o cabeçalho de vidro muda ao rolar.
  */
 export function CorDaBarraDoSistema() {
   const caminho = usePathname();
@@ -67,25 +72,12 @@ export function CorDaBarraDoSistema() {
     aplicar();
     // A tela nova pode demorar um quadro para trazer o cabeçalho: mede de novo logo depois.
     const depois = setTimeout(aplicar, 400);
-    // O cabeçalho de vidro (passo 17b) muda de cor quando a tela rola além de 4 px: mede de novo depois da transição de 180 ms.
-    let rolada = window.scrollY > 4;
-    let depoisDaRolagem: ReturnType<typeof setTimeout> | undefined;
-    function aoRolar() {
-      const agora = window.scrollY > 4;
-      if (agora === rolada) return;
-      rolada = agora;
-      clearTimeout(depoisDaRolagem);
-      depoisDaRolagem = setTimeout(aplicar, 260);
-    }
-    window.addEventListener("scroll", aoRolar, { passive: true });
     const observador = new MutationObserver(aplicar);
     observador.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });
     const escuro = window.matchMedia?.("(prefers-color-scheme: dark)");
     escuro?.addEventListener?.("change", aplicar);
     return () => {
       clearTimeout(depois);
-      clearTimeout(depoisDaRolagem);
-      window.removeEventListener("scroll", aoRolar);
       observador.disconnect();
       escuro?.removeEventListener?.("change", aplicar);
     };
