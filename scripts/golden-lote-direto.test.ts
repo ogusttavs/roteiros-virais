@@ -54,6 +54,8 @@ beforeEach(() => {
   estado.lotes = 0;
   estado.falhar = new Set();
   vi.spyOn(console, "log").mockImplementation(() => undefined);
+  // Estes testes medem o ajudante, não o modelo: liberam o simulador com `--direto` (ver `golden-lote.ts`).
+  vi.stubEnv("GOLDEN_PERMITE_SIMULADO", "1");
 });
 afterEach(() => {
   vi.unstubAllEnvs();
