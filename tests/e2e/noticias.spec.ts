@@ -1,18 +1,16 @@
 /**
- * `/noticias` (E43, design v2, `entrega/telas/Noticias.dc.html`): a lista por período, abrir a
- * folha de detalhe, "Criar vídeo com esta notícia" até um roteiro gerado, "virou roteiro"
- * isolado por marca. Mesma lição de `referencias.spec.ts` e `tema-livre.spec.ts`: grava notícia,
- * briefing e vídeo direto no banco, e deixa só a avaliação do tema e a geração do roteiro
- * passarem pelo navegador, contra o `AI_PROVIDER=mock` do servidor. Roteiro próprio
- * ("e2e-noticias"), sem `resetarSchema` (mesma lição de `roteiro.spec.ts`): o seed roda uma vez
- * só, no globalSetup.
+ * `/noticias`, as Notícias como blog do dia (E53, passo 20; design v2, `entrega/telas/Noticias.dc.html`): a capa com o destaque e os cartões, a foto do veículo com o crédito e sem `referer`,
+ * o título que abre o original numa aba (e só se o endereço for https), as pílulas de origem, a folha dos assuntos (acrescentar, repetido, manter, tirar), abrir uma notícia de assunto
+ * mantendo o assunto vivo, "Criar roteiro com esta notícia" até um roteiro gerado e "virou roteiro" isolado por marca. Grava notícia, assunto, briefing e foto direto no banco; só a avaliação do
+ * tema e a geração do roteiro passam pelo navegador, contra o `AI_PROVIDER=mock` do servidor. Seguro para a repetição automática do Playwright: cada teste põe os assuntos da marca no estado de partida.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, membrosMarca, nichos, noticias, preferenciasUsuario, user } from "../../src/db/schema";
+import { account, assuntosDaMarca, briefings, clientes, membrosMarca, nichos, noticias, noticiasDoAssunto, preferenciasUsuario, user } from "../../src/db/schema";
+import { inicioDoDiaEmSaoPaulo } from "../../src/servicos/noticias-do-dia";
 import { textosNav } from "../../src/textos/nav";
 
 const SENHA = "ExemploSenha123";
@@ -21,9 +19,11 @@ const NOME_MARCA_UM = "[teste] Notícias Um";
 const NOME_MARCA_DOIS = "[teste] Notícias Dois";
 const MARCADOR_NOTA_ALTA = "aprova este tema de teste sem ressalva";
 
-const TITULO_COM_ANGULO = "[teste] venda de produto multiuso cresce no trimestre";
-const TITULO_SEM_RESUMO = "[teste] notícia sem resumo, só o título";
-const TITULO_ANTIGO = "[teste] notícia de um mês atrás, só no período Mês";
+const TITULO_SETOR_HOJE = "[teste] venda de produto multiuso cresce no trimestre";
+const TITULO_SETOR_ONTEM = "[teste] notícia de ontem, só aparece embaixo";
+const TITULO_ANTIGO = "[teste] notícia de três semanas atrás, nunca aparece";
+const TITULO_ASSUNTO_FOTO = "[teste] debate esquenta a eleição e divide os candidatos";
+const TITULO_ASSUNTO_INSEGURO = "[teste] eleição: notícia com endereço que não é seguro";
 
 async function entrar(page: Page) {
   await page.goto("/entrar");
@@ -70,190 +70,279 @@ function briefingCompletoExemplo() {
   };
 }
 
+let marcaUmId = 0;
+let nichoId = 0;
+
+/** Um instante de hoje (no fuso de São Paulo): trinta minutos atrás, mas nunca antes da meia-noite, para o teste não depender da hora em que roda. */
+function hoje(): Date {
+  return new Date(Math.max(Date.now() - 30 * 60 * 1000, inicioDoDiaEmSaoPaulo(new Date()).getTime() + 60 * 1000));
+}
+
+/** O estado de partida de cada teste: um assunto "política" com duas notícias (uma com foto https, uma com foto e link que não são seguros) e outro parado há 25 dias. */
+async function prepararAssuntos(): Promise<{ politicaId: number; paradoId: number }> {
+  await db().delete(assuntosDaMarca).where(eq(assuntosDaMarca.clienteId, marcaUmId));
+  const [politica] = await db().insert(assuntosDaMarca).values({ clienteId: marcaUmId, texto: "política", termos: ["eleição", "Câmara"] }).returning();
+  const vinteECinco = new Date(Date.now() - 25 * 24 * 60 * 60 * 1000);
+  const [parado] = await db().insert(assuntosDaMarca).values({ clienteId: marcaUmId, texto: "esporte", termos: ["copa"], criadoEm: vinteECinco, ultimoAbertoEm: vinteECinco }).returning();
+  await db()
+    .insert(noticiasDoAssunto)
+    .values([
+      {
+        assuntoId: politica.id,
+        titulo: TITULO_ASSUNTO_FOTO,
+        veiculo: "[teste] Diário Exemplo",
+        url: "https://exemplo.invalido/e2e-noticias-eleicao",
+        publicadoEm: hoje(),
+        imagemUrl: "https://exemplo.invalido/e2e-noticias-foto.jpg",
+        imagemCredito: "Foto: [teste] Diário Exemplo",
+        resumoNosso: "Os candidatos se enfrentaram em um debate com troca de acusações.",
+        origem: "rss",
+      },
+      {
+        assuntoId: politica.id,
+        titulo: TITULO_ASSUNTO_INSEGURO,
+        veiculo: "[teste] Rádio Exemplo",
+        url: "javascript:alert(1)",
+        publicadoEm: new Date(hoje().getTime() - 60_000),
+        imagemUrl: "http://exemplo.invalido/foto-sem-https.jpg",
+        imagemCredito: "Foto: [teste] Rádio Exemplo",
+        resumoNosso: "Esta notícia veio com um endereço que não é seguro.",
+        origem: "rss",
+      },
+    ]);
+  return { politicaId: politica.id, paradoId: parado.id };
+}
+
 test.describe("/noticias", () => {
   test.beforeAll(async () => {
     // Seguro para a repetição automática do Playwright (F1, item 4): ver `aceite-termos.spec.ts`.
     const [jaExiste] = await db().select({ id: user.id }).from(user).where(eq(user.id, "e2e-noticias"));
-    if (jaExiste) return;
+    if (!jaExiste) {
+      const [nicho] = await db().insert(nichos).values({ slug: "e2e-noticias", nome: "[teste] Notícias" }).returning();
 
-    const [nicho] = await db().insert(nichos).values({ slug: "e2e-noticias", nome: "[teste] Notícias" }).returning();
+      await db().insert(user).values({ id: "e2e-noticias", name: "[teste] Notícias", email: EMAIL });
+      await db()
+        .insert(account)
+        .values({
+          id: "e2e-noticias-credential",
+          issuer: "local:credential",
+          accountId: "e2e-noticias",
+          providerId: "credential",
+          userId: "e2e-noticias",
+          password: await hashPassword(SENHA),
+        });
+      await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-noticias", aceitouTermosEm: new Date() });
 
-    await db().insert(user).values({ id: "e2e-noticias", name: "[teste] Notícias", email: EMAIL });
-    await db()
-      .insert(account)
-      .values({
-        id: "e2e-noticias-credential",
-        issuer: "local:credential",
-        accountId: "e2e-noticias",
-        providerId: "credential",
-        userId: "e2e-noticias",
-        password: await hashPassword(SENHA),
-      });
-    await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-noticias", aceitouTermosEm: new Date() });
+      // Dois primeiro, Um depois: a marca ativa no primeiro login (sem cookie ainda) é a de criação mais recente.
+      const [marcaDois] = await db().insert(clientes).values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_DOIS, nichoId: nicho.id }).returning();
+      const [marcaUm] = await db().insert(clientes).values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_UM, nichoId: nicho.id }).returning();
+      await db()
+        .insert(membrosMarca)
+        .values([
+          { usuarioId: "e2e-noticias", clienteId: marcaUm.id, papel: "dono" },
+          { usuarioId: "e2e-noticias", clienteId: marcaDois.id, papel: "dono" },
+        ]);
+      await db()
+        .insert(briefings)
+        .values([
+          { clienteId: marcaUm.id, ...briefingCompletoExemplo() },
+          { clienteId: marcaDois.id, ...briefingCompletoExemplo() },
+        ]);
 
-    // Dois primeiro, Um depois: a marca ativa no primeiro login (sem cookie ainda) é a de
-    // criação mais recente, mesmo raciocínio de `referencias.spec.ts`/`tema-livre.spec.ts`.
-    const [marcaDois] = await db()
-      .insert(clientes)
-      .values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_DOIS, nichoId: nicho.id })
-      .returning();
-    const [marcaUm] = await db()
-      .insert(clientes)
-      .values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_UM, nichoId: nicho.id })
-      .returning();
-    await db()
-      .insert(membrosMarca)
-      .values([
-        { usuarioId: "e2e-noticias", clienteId: marcaUm.id, papel: "dono" },
-        { usuarioId: "e2e-noticias", clienteId: marcaDois.id, papel: "dono" },
-      ]);
-    await db()
-      .insert(briefings)
-      .values([
-        { clienteId: marcaUm.id, ...briefingCompletoExemplo() },
-        { clienteId: marcaDois.id, ...briefingCompletoExemplo() },
-      ]);
+      const agora = Date.now();
+      await db()
+        .insert(noticias)
+        .values([
+          {
+            nichoId: nicho.id,
+            titulo: TITULO_SETOR_HOJE,
+            url: "https://exemplo.invalido/e2e-noticias-setor-hoje",
+            fonte: "[teste] Jornal Exemplo",
+            publicadoEm: hoje(),
+            resumo: "Associação do setor registrou alta nas vendas de produtos multiuso no trimestre.",
+            relevante: true,
+            angulo: "Mostre a sua rotina usando o produto e explique o que faz ele render mais.",
+          },
+          {
+            nichoId: nicho.id,
+            titulo: TITULO_SETOR_ONTEM,
+            url: "https://exemplo.invalido/e2e-noticias-setor-ontem",
+            fonte: "[teste] Jornal Exemplo",
+            publicadoEm: new Date(inicioDoDiaEmSaoPaulo(new Date()).getTime() - 3 * 60 * 60 * 1000),
+            resumo: null,
+            relevante: true,
+            angulo: null,
+          },
+          {
+            nichoId: nicho.id,
+            titulo: TITULO_ANTIGO,
+            url: "https://exemplo.invalido/e2e-noticias-antiga",
+            fonte: null,
+            publicadoEm: new Date(agora - 20 * 24 * 60 * 60 * 1000),
+            resumo: "Notícia de três semanas atrás.",
+            relevante: true,
+            angulo: null,
+          },
+          {
+            nichoId: nicho.id,
+            titulo: "[teste] notícia não relevante, nunca aparece",
+            url: "https://exemplo.invalido/e2e-noticias-nao-relevante",
+            fonte: "[teste] Jornal Exemplo",
+            publicadoEm: hoje(),
+            resumo: null,
+            relevante: false,
+            angulo: null,
+          },
+        ]);
+    }
+    const [marcaUm] = await db().select().from(clientes).where(eq(clientes.nome, NOME_MARCA_UM));
+    marcaUmId = marcaUm.id;
+    nichoId = marcaUm.nichoId!;
+    // Se a repetição automática rodou o cadastro antes, a notícia de hoje precisa continuar sendo "de hoje".
+    await db().update(noticias).set({ publicadoEm: hoje() }).where(and(eq(noticias.nichoId, nichoId), eq(noticias.titulo, TITULO_SETOR_HOJE)));
+  });
 
-    const agora = Date.now();
-    await db()
-      .insert(noticias)
-      .values([
-        {
-          nichoId: nicho.id,
-          titulo: TITULO_COM_ANGULO,
-          url: "https://exemplo.invalido/e2e-noticias-com-angulo",
-          fonte: "[teste] Jornal Exemplo",
-          // Fora das ultimas 24h de proposito: o periodo "hoje" fica vazio neste fixture (o teste
-          // do estado vazio depende disso), mas dentro da semana.
-          publicadoEm: new Date(agora - 30 * 60 * 60 * 1000),
-          resumo: "Associação do setor registrou alta nas vendas de produtos multiuso no trimestre.",
-          relevante: true,
-          angulo: "Mostre a sua rotina usando o produto e explique o que faz ele render mais.",
-        },
-        {
-          nichoId: nicho.id,
-          titulo: TITULO_SEM_RESUMO,
-          url: "https://exemplo.invalido/e2e-noticias-sem-resumo",
-          fonte: "[teste] Jornal Exemplo",
-          publicadoEm: new Date(agora - 50 * 60 * 60 * 1000),
-          resumo: null,
-          relevante: true,
-          angulo: null,
-        },
-        {
-          nichoId: nicho.id,
-          titulo: TITULO_ANTIGO,
-          url: "https://exemplo.invalido/e2e-noticias-antiga",
-          fonte: null,
-          publicadoEm: new Date(agora - 20 * 24 * 60 * 60 * 1000),
-          resumo: "Notícia de três semanas atrás.",
-          relevante: true,
-          angulo: null,
-        },
-        {
-          nichoId: nicho.id,
-          titulo: "[teste] notícia não relevante, nunca aparece",
-          url: "https://exemplo.invalido/e2e-noticias-nao-relevante",
-          fonte: "[teste] Jornal Exemplo",
-          publicadoEm: new Date(agora - 1 * 60 * 60 * 1000),
-          resumo: null,
-          relevante: false,
-          angulo: null,
-        },
-      ]);
+  test.beforeEach(async () => {
+    await prepararAssuntos();
   });
 
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
-  test("mostra as notícias relevantes da semana, mais recente primeiro, nunca a não relevante", async ({ page }) => {
+  test("a capa do dia: destaque com a foto e o crédito, a etiqueta de onde veio, as de ontem embaixo, nunca a antiga nem a não relevante", async ({ page }) => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await expect(page.getByRole("heading", { name: "Notícias do seu setor" })).toBeVisible();
-    await expect(page.getByText("2 notícias do seu setor nesta semana")).toBeVisible();
-    await expect(page.getByText(TITULO_COM_ANGULO)).toBeVisible();
-    await expect(page.getByText(TITULO_SEM_RESUMO)).toBeVisible();
-    await expect(page.getByText(TITULO_ANTIGO)).not.toBeVisible();
-    await expect(page.getByText("não relevante")).not.toBeVisible();
+    await expect(page.getByRole("heading", { name: "Notícias do dia" })).toBeVisible();
+    await expect(page.getByText(/notícias novas desde ontem, do seu setor e dos assuntos que você acompanha/)).toBeVisible();
 
-    await expect(page.getByText("Como isso vira vídeo seu")).toBeVisible();
+    // O destaque é a mais nova que tem foto: a do assunto, com a foto do veículo e o crédito, sem `referer`.
+    const destaque = page.locator("article[data-noticia^='a-']").first();
+    await expect(destaque.getByRole("heading", { level: 2 })).toContainText(TITULO_ASSUNTO_FOTO);
+    const foto = destaque.locator("img");
+    await expect(foto).toHaveAttribute("src", "https://exemplo.invalido/e2e-noticias-foto.jpg");
+    await expect(foto).toHaveAttribute("referrerpolicy", "no-referrer");
+    await expect(destaque.getByText("Foto: [teste] Diário Exemplo")).toBeVisible();
+    await expect(destaque.getByText("política", { exact: true })).toBeVisible();
+    const link = destaque.getByRole("link", { name: TITULO_ASSUNTO_FOTO });
+    await expect(link).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-eleicao");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+
+    // A do setor, sem foto: o bloco de tipografia com o veículo, e o link para o original.
+    const doSetor = page.locator("article", { hasText: TITULO_SETOR_HOJE });
+    await expect(doSetor.getByText("[teste] Notícias", { exact: true })).toBeVisible();
+    await expect(doSetor.locator("img")).toHaveCount(0);
+    await expect(doSetor.getByRole("link", { name: TITULO_SETOR_HOJE })).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-setor-hoje");
+
+    // O endereço que não é https nunca vira link, e a foto que não é https nunca vira imagem.
+    const inseguro = page.locator("article", { hasText: TITULO_ASSUNTO_INSEGURO });
+    await expect(inseguro).toBeVisible();
+    await expect(inseguro.getByRole("link", { name: TITULO_ASSUNTO_INSEGURO })).toHaveCount(0);
+    await expect(inseguro.locator("img")).toHaveCount(0);
+
+    // De ontem, embaixo; a antiga e a não relevante nunca.
+    await expect(page.getByRole("heading", { name: "De ontem", exact: true })).toBeVisible();
+    await expect(page.locator("article", { hasText: TITULO_SETOR_ONTEM })).toBeVisible();
+    await expect(page.getByText(TITULO_ANTIGO)).toHaveCount(0);
+    await expect(page.getByText("não relevante")).toHaveCount(0);
   });
 
-  test("trocar para Mês mostra a notícia antiga também, e a URL guarda o período", async ({ page }) => {
+  test("as pílulas de origem: o setor, cada assunto e Tudo", async ({ page }) => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByRole("radio", { name: "Mês" }).click();
-    await expect(page).toHaveURL(/periodo=mes/);
-    await expect(page.getByText(TITULO_ANTIGO)).toBeVisible();
+    const grupo = page.getByRole("group", { name: "De onde vêm as notícias" });
+    await expect(grupo.getByRole("button", { name: "Tudo" })).toHaveAttribute("aria-pressed", "true");
+    await grupo.getByRole("button", { name: "política" }).click();
+    await expect(page.locator("article", { hasText: TITULO_ASSUNTO_FOTO })).toBeVisible();
+    await expect(page.locator("article", { hasText: TITULO_SETOR_HOJE })).toHaveCount(0);
+
+    await grupo.getByRole("button", { name: "[teste] Notícias" }).click();
+    await expect(page.locator("article", { hasText: TITULO_SETOR_HOJE })).toBeVisible();
+    await expect(page.locator("article", { hasText: TITULO_ASSUNTO_FOTO })).toHaveCount(0);
+
+    await grupo.getByRole("button", { name: "esporte" }).click();
+    await expect(page.locator("[data-sem-novidade]")).toBeVisible();
+    await grupo.getByRole("button", { name: "Tudo" }).click();
+    await expect(page.locator("article", { hasText: TITULO_SETOR_HOJE })).toBeVisible();
   });
 
-  test("abrir a notícia mostra a data e hora exatas, o resumo inteiro e os dois links do rodapé", async ({ page }) => {
+  test("a folha dos assuntos: acrescentar, recusar o repetido, manter o parado e tirar", async ({ page }) => {
     await entrar(page);
     await page.goto("/noticias");
 
-    // E42a, item 2: o cartão virou `<article>` com um botão cobrindo (aria-label com o título) em
-    // vez do cartão inteiro ser o botão; o alvo do clique agora é esse botão, não o texto do título.
-    await page.getByRole("button", { name: TITULO_COM_ANGULO }).click();
-    const folha = page.getByRole("dialog", { name: TITULO_COM_ANGULO });
+    await expect(page.getByText("2 de 5")).toBeVisible();
+    await page.getByRole("button", { name: "Editar" }).click();
+    const folha = page.getByRole("dialog", { name: "Os assuntos que você acompanha" });
     await expect(folha).toBeVisible();
-    await expect(folha.getByText("Este é o nosso resumo. A matéria inteira fica no site de quem publicou.")).toBeVisible();
-    await expect(folha.getByRole("button", { name: "Criar vídeo com esta notícia" })).toBeVisible();
-    const linkLerNoSite = folha.getByRole("link", { name: "Ler no site" });
-    await expect(linkLerNoSite).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-com-angulo");
-    await expect(linkLerNoSite).toHaveAttribute("target", "_blank");
+    await expect(folha.getByText("eleição")).toBeVisible();
+    await expect(folha.getByText("Sem notícia aberta há 25 dias. Sai em 5.")).toBeVisible();
+    await expect(folha.getByText("Isso vai aparecer nas suas notícias e nos seus roteiros.")).toBeVisible();
+
+    await folha.getByLabel("Assunto", { exact: true }).fill("economia");
+    await folha.getByLabel("Palavras que ajudam a achar (opcional)").fill("juros, dólar");
+    await folha.getByRole("button", { name: "Acrescentar", exact: true }).click();
+    await expect(folha.locator("[data-assunto]").filter({ hasText: "economia" })).toBeVisible();
+    await expect(folha.locator("[data-assunto]").filter({ hasText: "juros" })).toBeVisible();
+
+    await folha.getByLabel("Assunto", { exact: true }).fill("ECONOMIA");
+    await folha.getByRole("button", { name: "Acrescentar", exact: true }).click();
+    await expect(folha.getByRole("alert")).toContainText("já está sendo acompanhado");
+
+    await folha.getByRole("button", { name: "Manter esporte" }).click();
+    await expect(folha.getByText("Sem notícia aberta há 25 dias. Sai em 5.")).toHaveCount(0);
+    await expect(folha.getByText("Mantido")).toBeVisible();
+
+    await folha.getByRole("button", { name: "Tirar economia" }).click();
+    await expect(folha.locator("[data-assunto]").filter({ hasText: "economia" })).toHaveCount(0);
+
+    await folha.getByRole("button", { name: "Pronto" }).click();
+    await expect(folha).toHaveCount(0);
+    await expect(page.getByText("2 de 5")).toBeVisible();
   });
 
-  test("o estado vazio do dia aponta o total da semana e 'Ver a semana' muda o período", async ({ page }) => {
-    await entrar(page);
-    await page.goto("/noticias?periodo=hoje");
-
-    await expect(page.getByRole("heading", { name: "Nenhuma notícia do seu setor hoje" })).toBeVisible();
-    await expect(page.getByText("Na semana tem 2.")).toBeVisible();
-    await page.getByRole("button", { name: "Ver a semana" }).click();
-    await expect(page).toHaveURL(/periodo=semana/);
-    await expect(page.getByText(TITULO_COM_ANGULO)).toBeVisible();
-  });
-
-  test("criar vídeo com esta notícia: a tela de tema livre nasce presa à notícia, e 'Tirar a notícia' solta", async ({
-    page,
-  }) => {
+  test("abrir uma notícia de um assunto mantém o assunto vivo: a abertura fica registrada", async ({ page, context }) => {
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByRole("button", { name: TITULO_SEM_RESUMO }).click();
-    await page.getByRole("dialog", { name: TITULO_SEM_RESUMO }).getByRole("button", { name: "Criar vídeo com esta notícia" }).click();
+    const [antes] = await db().select().from(assuntosDaMarca).where(and(eq(assuntosDaMarca.clienteId, marcaUmId), eq(assuntosDaMarca.texto, "política")));
+    expect(antes.ultimoAbertoEm).toBeNull();
 
+    // O original abre numa aba nova (o endereço de teste não existe: a aba só precisa abrir).
+    const abaNova = context.waitForEvent("page");
+    await page.locator("article", { hasText: TITULO_ASSUNTO_FOTO }).getByRole("link", { name: TITULO_ASSUNTO_FOTO }).click();
+    await (await abaNova).close();
+
+    await expect.poll(async () => (await db().select().from(assuntosDaMarca).where(eq(assuntosDaMarca.id, antes.id)))[0].ultimoAbertoEm).not.toBeNull();
+  });
+
+  test("criar roteiro com esta notícia: a do setor vai presa pelo id, a de assunto leva o título ao Tema livre", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/noticias");
+
+    await page.locator("article", { hasText: TITULO_SETOR_HOJE }).getByRole("button", { name: "Criar roteiro com esta notícia" }).click();
     await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaId=\d+/);
     await expect(page.getByRole("heading", { name: "Criar vídeo com esta notícia" })).toBeVisible();
-    await expect(page.getByText(TITULO_SEM_RESUMO)).toBeVisible();
-    await expect(page.getByLabel("O que você pensou?")).toBeVisible();
-
-    // O X desta tela volta para Notícias, não para Hoje (dúvida 7 do passo 11).
+    await expect(page.getByText(TITULO_SETOR_HOJE)).toBeVisible();
     await expect(page.getByRole("button", { name: "Voltar para as notícias" })).toBeVisible();
 
-    await page.getByRole("button", { name: "Tirar a notícia" }).click();
-    await expect(page.getByRole("heading", { name: "Sobre o que você quer falar?" })).toBeVisible();
-    await expect(page.getByText(TITULO_SEM_RESUMO)).not.toBeVisible();
+    await page.goto("/noticias");
+    await page.locator("article[data-noticia^='a-']").first().getByRole("button", { name: "Criar roteiro com esta notícia" }).click();
+    await expect(page).toHaveURL(/\/criar\/tema-livre\?tema=/);
+    await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(TITULO_ASSUNTO_FOTO);
   });
 
-  test("fluxo inteiro: notícia até o roteiro, e a notícia volta marcada 'virou roteiro' só para esta marca", async ({
-    page,
-  }) => {
+  test("fluxo inteiro: notícia até o roteiro, e a notícia volta marcada 'virou roteiro' só para esta marca", async ({ page }) => {
     test.setTimeout(90_000);
-    // O seletor de marca só vira a folha com botões no celular (`garantirMarcaDoisAtiva`,
-    // abaixo); no desktop é um menu da barra lateral, com outros papéis de acessibilidade.
+    // O seletor de marca só vira a folha com botões no celular (`garantirMarcaDoisAtiva`); no desktop é um menu da barra lateral.
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page);
     await page.goto("/noticias");
 
-    await page.getByRole("button", { name: TITULO_COM_ANGULO }).click();
-    await page.getByRole("dialog", { name: TITULO_COM_ANGULO }).getByRole("button", { name: "Criar vídeo com esta notícia" }).click();
+    await page.locator("article", { hasText: TITULO_SETOR_HOJE }).getByRole("button", { name: "Criar roteiro com esta notícia" }).click();
     await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaId=\d+/);
 
-    await page
-      .getByLabel("O que você pensou?")
-      .fill(`Aqui na loja a gente vê isso toda semana. ${MARCADOR_NOTA_ALTA}`);
+    await page.getByLabel("O que você pensou?").fill(`Aqui na loja a gente vê isso toda semana. ${MARCADOR_NOTA_ALTA}`);
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
     await expect(page.getByRole("heading", { name: "Pode gravar esse" })).toBeVisible();
@@ -267,19 +356,21 @@ test.describe("/noticias", () => {
 
     // De volta a Notícias, a marca que gerou o roteiro vê "virou roteiro" com o link certo.
     await page.goto("/noticias");
-    const cartao = page.locator("article", { hasText: TITULO_COM_ANGULO });
+    const cartao = page.locator("article", { hasText: TITULO_SETOR_HOJE });
     await expect(cartao.getByText("virou roteiro")).toBeVisible();
     const linkRoteiro = cartao.getByRole("link", { name: "Ver o roteiro" });
     await expect(linkRoteiro).toBeVisible();
     await linkRoteiro.click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
 
-    // A mesma notícia, para a outra marca do mesmo setor, continua sem "virou roteiro" (isolamento).
+    // A mesma notícia, para a outra marca do mesmo setor, continua sem "virou roteiro" (isolamento), e sem os assuntos da primeira.
     await garantirMarcaDoisAtiva(page);
     await page.goto("/noticias");
-    const cartaoOutraMarca = page.locator("article", { hasText: TITULO_COM_ANGULO });
+    const cartaoOutraMarca = page.locator("article", { hasText: TITULO_SETOR_HOJE });
     await expect(cartaoOutraMarca).toBeVisible();
-    await expect(cartaoOutraMarca.getByText("virou roteiro")).not.toBeVisible();
-    await expect(cartaoOutraMarca.getByText("Abrir")).toBeVisible();
+    await expect(cartaoOutraMarca.getByText("virou roteiro")).toHaveCount(0);
+    await expect(cartaoOutraMarca.getByRole("button", { name: "Criar roteiro com esta notícia" })).toBeVisible();
+    await expect(page.getByText(TITULO_ASSUNTO_FOTO)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Acompanhe um assunto" })).toBeVisible();
   });
 });

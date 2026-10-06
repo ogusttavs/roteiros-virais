@@ -1,7 +1,6 @@
 /**
- * `/noticias` (E43, design v2, `entrega/telas/Noticias.dc.html`). Mesma base de `.pagina`/
- * `.cabecalhoTela`/`.cartao` de `ReferenciasTela.module.css`, para as duas telas de lista não
- * divergirem na moldura.
+ * `/noticias`, as Notícias como blog do dia (E53, passo 20, design v2, `entrega/telas/Noticias.dc.html`). A capa usa a largura do painel inteira, como Referências: uma capa, não um texto.
+ * O destaque tem a foto grande; os cartões, uma coluna no celular (foto quadrada à esquerda), duas colunas de 768 e três de 1180.
  */
 .pagina {
   display: grid;
@@ -19,6 +18,14 @@
   gap: var(--espaco-1);
 }
 
+.data {
+  font: var(--peso-medio) var(--tamanho-legenda) / 1 var(--fonte-mono);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+  color: var(--cor-texto-dica);
+  margin-bottom: var(--espaco-1);
+}
+
 .cabecalhoTela h1 {
   margin: 0;
   font-size: var(--tamanho-titulo);
@@ -30,49 +37,71 @@
   color: var(--cor-texto-suave);
 }
 
-/* ---------- O filtro de período (dúvida 2 do passo 11: Semana é o padrão) ---------- */
+/* ---------- A linha dos assuntos ---------- */
 
-.filtro {
-  display: flex;
-  gap: var(--espaco-2);
+.acompanha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-2) var(--espaco-2) var(--espaco-2) var(--espaco-4);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie-recuada);
 }
 
-.chip {
-  padding: var(--espaco-2) var(--espaco-4);
-  border: var(--largura-borda) solid var(--cor-borda-forte);
-  border-radius: var(--raio-pill);
-  background: transparent;
+.acompanha svg {
+  width: 1.125rem;
+  height: 1.125rem;
   color: var(--cor-texto-suave);
+}
+
+.acompanha p {
+  margin: 0;
   font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.acompanha b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.quantos {
+  white-space: nowrap;
+  margin-left: var(--espaco-2);
+  font: var(--peso-medio) var(--tamanho-legenda) / 1 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+  letter-spacing: var(--espacamento-legenda);
+  text-transform: uppercase;
+}
+
+.chegando {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin: 0;
+  padding: 0 var(--espaco-4);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.chegando svg {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.15rem;
+}
+
+.chegando b {
+  color: var(--cor-titulo);
   font-weight: var(--peso-medio);
-  cursor: pointer;
-  transition:
-    background var(--duracao-rapida) var(--curva-saida),
-    color var(--duracao-rapida) var(--curva-saida);
 }
-
-.chip:hover {
-  background: var(--cor-superficie-hover);
-}
-
-.chip:disabled {
-  opacity: var(--opacidade-desabilitado);
-  cursor: not-allowed;
-}
-
-.chipAtivo,
-.chipAtivo:hover {
-  background: var(--cor-titulo);
-  border-color: var(--cor-titulo);
-  color: var(--cor-fundo);
-}
-
-/* ---------- Cartão base (mesmo tom de `ReferenciaCartao.module.css`) ---------- */
 
 .cartao {
   display: grid;
   gap: var(--espaco-3);
   align-content: start;
+  justify-items: start;
   min-width: 0;
   background: var(--cor-superficie);
   border: var(--largura-borda) solid var(--cor-borda);
@@ -81,83 +110,199 @@
   text-align: left;
 }
 
-.estado {
-  justify-items: start;
-}
-
-.estado h2 {
-  margin: 0;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-titulo);
-}
-
-.aviso,
-.avisoSuave {
+.convite {
   background: var(--cor-superficie-recuada);
   border-color: transparent;
 }
 
-.avisoTitulo {
+.convite h2,
+.semNovidade h2 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+  color: var(--cor-titulo);
+}
+
+.convite p,
+.semNovidade p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+/* ---------- As pílulas de origem ---------- */
+
+.pilulas {
   display: flex;
+  gap: var(--espaco-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: calc(var(--margem-celular) * -1);
+  padding-inline: var(--margem-celular);
+}
+
+.pilulas::-webkit-scrollbar {
+  display: none;
+}
+
+.pilula {
+  display: inline-flex;
   align-items: center;
   gap: var(--espaco-2);
-  font-weight: var(--peso-semibold);
-  color: var(--cor-titulo);
-}
-
-.avisoDescricao {
-  color: var(--cor-texto-suave);
-  font-size: var(--tamanho-secundario);
-}
-
-.rotuloQuantidade {
-  margin: 0;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
-}
-
-/* ---------- A grade de notícias ---------- */
-
-.grade {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
-  gap: var(--espaco-4);
-}
-
-.noticia {
-  width: 100%;
-  position: relative;
-  transition: border-color var(--duracao-rapida) var(--curva-saida);
-}
-
-.noticia:hover {
-  border-color: var(--cor-borda-forte);
-}
-
-/* O botão que cobre o cartão inteiro (só abre a folha); "Ver o roteiro" fica por cima, independente. */
-.coberturaNoticia {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  width: 100%;
+  flex: 0 0 auto;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
   background: transparent;
-  border: none;
-  border-radius: inherit;
-  padding: 0;
-  margin: 0;
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
   cursor: pointer;
+  transition:
+    background var(--duracao-rapida) var(--curva-saida),
+    border-color var(--duracao-rapida) var(--curva-saida);
 }
+
+.pilula:hover {
+  background: var(--cor-superficie-hover);
+}
+
+.pilula svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.pilulaAtiva,
+.pilulaAtiva:hover {
+  border-color: var(--cor-acao);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-weight: var(--peso-semibold);
+}
+
+@media (min-width: 768px) {
+  .pilulas {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
+
+/* ---------- De onde veio: a etiqueta, o veículo e a hora ---------- */
 
 .fonte {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-1) var(--espaco-2);
   font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.veiculo {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-texto);
+}
+
+.hora {
+  font-family: var(--fonte-mono);
   color: var(--cor-texto-dica);
 }
 
-.tituloNoticia {
-  margin: 0;
-  font-size: var(--tamanho-secundario);
+.origem {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.375rem;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-legenda);
   font-weight: var(--peso-semibold);
+  letter-spacing: 0.01em;
+}
+
+.origemSetor {
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto);
+}
+
+.origemAssunto {
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  box-shadow: inset 0 0 0 var(--largura-borda) var(--cor-selecao-borda);
+}
+
+/* ---------- A foto do veículo, com o crédito ---------- */
+
+.foto {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--raio-md);
+  background: var(--cor-video);
+  aspect-ratio: 16 / 9;
+}
+
+.foto img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.foto figcaption {
+  position: absolute;
+  left: var(--espaco-2);
+  bottom: var(--espaco-2);
+  padding: 2px var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: color-mix(in srgb, var(--cor-video) 62%, transparent);
+  color: var(--cor-video-texto);
+  font-size: var(--tamanho-legenda);
+}
+
+/* Sem foto: um bloco de tipografia, com o nome do veículo grande e as aspas. */
+.semFoto {
+  position: relative;
+  display: grid;
+  align-content: end;
+  aspect-ratio: 16 / 9;
+  padding: var(--espaco-4);
+  overflow: hidden;
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.veiculoGrande {
+  font-weight: var(--peso-forte);
+  font-stretch: var(--largura-titulo);
+  font-size: var(--tamanho-titulo-2);
+  line-height: var(--altura-titulo);
+  letter-spacing: -0.02em;
   color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.aspas {
+  position: absolute;
+  top: -1.2rem;
+  right: var(--espaco-3);
+  font: 700 7rem / 1 var(--fonte-titulo);
+  color: var(--cor-borda-forte);
+}
+
+/* O título abre o original numa aba: a área de toque passa de 44 px mesmo com uma linha só. */
+.linkOriginal {
+  display: block;
+  padding-block: 0.6875rem;
+  margin-block: -0.6875rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.linkOriginal:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .resumo {
@@ -165,102 +310,387 @@
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-/* ---------- "Como isso vira vídeo seu" (dúvida 4 do passo 11: visual da sugestão do briefing) ---------- */
-
-.angulo {
-  display: grid;
-  gap: var(--espaco-1);
-  padding: var(--espaco-3) var(--espaco-4);
-  border: var(--largura-borda) dashed var(--cor-borda-forte);
-  border-radius: var(--raio-md);
-  background: var(--cor-superficie-recuada);
+.acoes button.botaoTexto {
+  width: auto;
+  padding-inline: 0;
+  justify-content: flex-start;
 }
 
-.anguloRotulo {
+.acoes {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--espaco-1);
-  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
-  letter-spacing: var(--espacamento-legenda);
-  text-transform: uppercase;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+/* ---------- O destaque e a grade de cartões ---------- */
+
+.capa {
+  display: grid;
+  gap: var(--espaco-6);
+}
+
+.destaque {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.textoDestaque {
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+}
+
+.textoDestaque h2 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-1);
+}
+
+.textoDestaque h2,
+.textoCartao h3 {
+  font-family: var(--fonte-titulo);
+  font-weight: var(--peso-forte);
+  font-stretch: var(--largura-titulo);
+  letter-spacing: -0.02em;
+  color: var(--cor-titulo);
+}
+
+.externo {
+  display: inline-grid;
+  vertical-align: middle;
+  margin-left: var(--espaco-2);
   color: var(--cor-texto-dica);
 }
 
-.anguloTexto {
-  margin: 0;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-texto-suave);
+.externo svg {
+  width: 1rem;
+  height: 1rem;
 }
 
-.peNoticia {
-  display: flex;
-  align-items: center;
+@media (min-width: 1024px) {
+  .destaque {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: var(--espaco-6);
+    align-items: center;
+  }
+}
+
+.grade {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.noticia {
+  display: grid;
+  grid-template-columns: 6rem minmax(0, 1fr);
   gap: var(--espaco-3);
-  margin-top: auto;
+  align-items: start;
+  padding-bottom: var(--espaco-4);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
 }
 
-.abrirRotulo {
-  font-size: var(--tamanho-secundario);
+.noticia .foto,
+.noticia .semFoto {
+  aspect-ratio: 1;
+  border-radius: var(--raio-sm);
+}
+
+/* Na foto pequena o crédito é uma linha só, cortada com reticências; o veículo inteiro está ao lado. */
+.noticia .foto figcaption {
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 6px;
+  font-size: 0.625rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  justify-self: start;
+  max-width: max-content;
+}
+
+.noticia .semFoto {
+  padding: var(--espaco-2);
+}
+
+.noticia .veiculoGrande {
+  font-size: var(--tamanho-rodape);
+  line-height: 1.15;
+}
+
+.noticia .aspas {
+  font-size: 4rem;
+  top: -0.8rem;
+  right: var(--espaco-2);
+}
+
+.textoCartao {
+  display: grid;
+  gap: var(--espaco-2);
+  min-width: 0;
+  justify-items: start;
+}
+
+.textoCartao h3 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+  line-height: var(--altura-compacta);
+}
+
+@media (min-width: 768px) {
+  .grade {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--espaco-6) var(--espaco-5);
+  }
+
+  .noticia {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--espaco-3);
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  .noticia .foto,
+  .noticia .semFoto {
+    aspect-ratio: 16 / 9;
+    border-radius: var(--raio-md);
+  }
+
+  .noticia .foto figcaption {
+    left: var(--espaco-2);
+    right: auto;
+    bottom: var(--espaco-2);
+    padding: 2px var(--espaco-2);
+    font-size: var(--tamanho-legenda);
+  }
+
+  .noticia .semFoto {
+    padding: var(--espaco-4);
+  }
+
+  .noticia .veiculoGrande {
+    font-size: var(--tamanho-titulo-2);
+  }
+
+  .noticia .aspas {
+    font-size: 7rem;
+    top: -1.2rem;
+    right: var(--espaco-3);
+  }
+}
+
+@media (min-width: 1180px) {
+  .grade {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.secao {
+  display: grid;
+  gap: var(--espaco-4);
+}
+
+.secao h2 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
   color: var(--cor-titulo);
-  font-weight: var(--peso-medio);
 }
 
 .virouRoteiro {
   display: inline-flex;
   align-items: center;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
+  gap: var(--espaco-1);
+  padding: var(--espaco-1) var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.2 var(--fonte-mono);
+  color: var(--cor-destaque);
+}
+
+.virouRoteiro svg {
+  width: 0.875rem;
+  height: 0.875rem;
 }
 
 .verRoteiro {
-  position: relative;
-  z-index: 2;
   font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
-  font-weight: var(--peso-medio);
 }
 
-/* ---------- A folha "a notícia aberta" ---------- */
+/* ---------- Estados ---------- */
 
-.corpoFolha {
+.semNovidade {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  background: var(--cor-superficie-recuada);
+  border-color: transparent;
+}
+
+.semNovidade > div {
+  flex: 1 1 auto;
+  min-width: 0;
   display: grid;
-  gap: var(--espaco-4);
+  gap: var(--espaco-1);
 }
 
-.fonteCompleta {
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
+.semNovidade svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.15rem;
+  color: var(--cor-texto-suave);
 }
 
-.resumoInteiro {
-  margin: 0;
-  font-size: var(--tamanho-secundario);
-  color: var(--cor-titulo);
-  white-space: pre-wrap;
+.erro {
+  background: var(--cor-superficie-recuada);
+  border-color: transparent;
 }
 
-.deQuem {
-  margin: 0;
-  font-size: var(--tamanho-rodape);
-  color: var(--cor-texto-dica);
-}
-
-.lerNoSite {
+.erroTitulo {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: var(--espaco-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.erro p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+/* ---------- A folha dos assuntos ---------- */
+
+.corpoAssuntos {
+  display: grid;
+  gap: var(--espaco-5);
+  padding-block: var(--espaco-5);
+}
+
+.explica {
+  margin: 0;
   font-size: var(--tamanho-secundario);
   color: var(--cor-texto-suave);
-  text-decoration: none;
+}
+
+.listaAssuntos {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assunto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-2) var(--espaco-3);
+  align-items: start;
   padding: var(--espaco-3) 0;
 }
 
-.lerNoSite:hover {
+.assunto + .assunto {
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.sobreAssunto {
+  display: grid;
+  gap: var(--espaco-2);
+  min-width: 0;
+}
+
+.sobreAssunto b {
   color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  overflow-wrap: anywhere;
+}
+
+.termos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1);
+}
+
+.termo {
+  padding: 2px var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.avisoParado {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-atencao);
+}
+
+.avisoParado svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.acoesAssunto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+  justify-content: flex-end;
+}
+
+.mantido {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.novoAssunto {
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.novoAssunto h3 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+}
+
+.avisoAssunto {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin: 0;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-sm);
+  background: var(--cor-atencao-fundo);
+  color: var(--cor-texto);
+  font-size: var(--tamanho-secundario);
+}
+
+.avisoAssunto svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  color: var(--cor-atencao);
+}
+
+.erroAssunto {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+}
+
+.rodapeFolha {
+  display: flex;
+  justify-content: flex-end;
 }
