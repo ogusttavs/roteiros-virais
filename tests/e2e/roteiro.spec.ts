@@ -213,12 +213,14 @@ test.describe("roteiro pela tela", () => {
     await folhaReprovar
       .getByLabel("Se quiser, diga com as suas palavras")
       .fill("o gancho comecava com pergunta e o angulo ja tinha aparecido antes");
-    await folhaReprovar.getByRole("button", { name: "Reescrever com isso em mente" }).click();
+    await folhaReprovar.getByRole("button", { name: "Reescrever o roteiro" }).click();
 
     await expect(page).not.toHaveURL(urlDaV1, { timeout: 15_000 });
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.getByText("versão 2 de 2")).toBeVisible();
     await expect(page.getByText("Para que te chamem")).toBeVisible();
+    // O roteiro novo diz por que foi refeito (passo 19 do Opus).
+    await expect(page.locator("[data-refeito-porque]")).toContainText("Refeito porque: gancho fraco e já falei disso.");
 
     await page.getByText("versão 2 de 2").click();
     const folhaVersoes = page.getByRole("dialog", { name: "Versões" });

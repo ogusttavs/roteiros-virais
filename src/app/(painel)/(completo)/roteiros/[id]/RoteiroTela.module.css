@@ -697,6 +697,117 @@
 
 /* ---------- Painel de reprovar (E27, parte 1) ---------- */
 
+/* O cabeçalho do painel de reprovar: o título e o X (passo 19 do Opus). */
+.cabecaReprovar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-3);
+  padding-block: var(--espaco-2);
+  background: var(--cor-material-menu);
+}
+
+.fecharReprovar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--altura-toque);
+  height: var(--altura-toque);
+  border: 0;
+  border-radius: 50%;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  cursor: pointer;
+}
+
+.fecharReprovar:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/*
+ * Os motivos em duas colunas na folha (abaixo de 1024px) e numa coluna só, como lista de caixas de marcar, no painel lateral (1024px para cima): passo 19 do Opus, `reprovarFolha` e
+ * `reprovarPainel`. Continuam os mesmos botões `aria-pressed` de sempre.
+ */
+.motivosReprovar {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--espaco-2);
+}
+
+.motivosReprovar .motivoChip {
+  width: 100%;
+  height: auto;
+  padding-block: var(--espaco-2);
+  white-space: normal;
+  text-align: left;
+  justify-content: flex-start;
+  border-radius: var(--raio-xl, 1.5rem);
+}
+
+@media (min-width: 1024px) {
+  .motivosReprovar {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--espaco-1);
+  }
+
+  .motivosReprovar .motivoChip {
+    gap: var(--espaco-3);
+    border-color: transparent;
+    border-radius: var(--raio-md);
+  }
+
+  .motivosReprovar .motivoChip::before {
+    content: "";
+    flex: none;
+    width: 1.25rem;
+    height: 1.25rem;
+    border: 1.5px solid var(--cor-borda-forte);
+    border-radius: 0.35rem;
+    background: transparent;
+  }
+
+  .motivosReprovar .motivoChip[aria-pressed="true"]::before {
+    border-color: var(--cor-titulo);
+    background: var(--cor-titulo) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E") center / 80% no-repeat;
+  }
+}
+
+/* Com o painel lateral de reprovar aberto (1024px para cima), o lado da tela e a barra de ações saem: o painel é a única coisa a fazer (passo 19 do Opus, `reprovarPainel`). */
+@media (min-width: 1024px) {
+  .corpoComLado[data-reprovando] .ladoGrudado,
+  .corpoComLado[data-reprovando] .ladoDeOndeVeio,
+  .barraAcoes[data-reprovando] {
+    visibility: hidden;
+  }
+}
+
+/* "Refeito porque: ..." logo abaixo da linha do tipo e da ficha (passo 19 do Opus, estado `refeito`). */
+.refeitoPorque {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  margin: var(--espaco-2) 0 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.5;
+  color: var(--cor-texto-suave);
+}
+
+.refeitoPorque svg {
+  flex: none;
+  margin-top: 0.2rem;
+  color: var(--cor-positivo);
+}
+
+.refeitoPorque strong {
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
 .ajudaReprovar {
   margin: 0;
   font-size: var(--tamanho-secundario);

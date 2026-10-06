@@ -153,6 +153,59 @@
 }
 
 /*
+ * Passo 19 do Opus, `reprovarPainel`: do desktop para cima o painel de reprovar é uma coluna de 25rem na direita, de ponta a ponta, que entra da direita com a mola (o lado da tela e a barra de
+ * ações saem enquanto ele está aberto: `RoteiroTela.module.css`). Sem fundo escurecido (o véu já é transparente do tablet para cima), e sem a alça.
+ */
+@media (min-width: 1024px) {
+  .painelComRodape.lateral {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 25rem;
+    max-height: none;
+    padding-top: var(--espaco-4);
+    border-radius: 0;
+    border-width: 0 0 0 var(--largura-borda);
+    animation-name: painel-lateral-entra;
+    transform: translateX(0);
+  }
+
+  .painelComRodape.lateral.saindo {
+    animation-name: painel-lateral-sai;
+  }
+
+  .painelComRodape.lateral .areaAlca {
+    display: none;
+  }
+
+  /* Sem a alça (que não ocupa linha), são só duas linhas: o corpo rola e o rodapé fica à vista, mesmo numa janela baixa. */
+  .painelComRodape.lateral {
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .painelComRodape.lateral .corpo {
+    padding: 0 var(--espaco-6);
+  }
+
+  .painelComRodape.lateral .rodape {
+    padding: var(--espaco-4) var(--espaco-6) var(--espaco-5);
+  }
+}
+
+@keyframes painel-lateral-entra {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes painel-lateral-sai {
+  to {
+    transform: translateX(110%);
+  }
+}
+
+/*
  * Passo 16 do Opus, capítulo 4: o mesmo movimento das folhas (`Folha.module.css`). No celular sobe na mola e desce com a curva de entrada, acompanhando o dedo
  * (`--arrasto`); do tablet para cima, o painel ancorado só esmaece e cresce de 96%. Com "reduzir movimento" só esmaece.
  */

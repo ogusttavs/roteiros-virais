@@ -1118,7 +1118,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
     },
     {
       rotulo: "Roteiro, folha reprovar",
-      nome: "Reescrever com isso em mente",
+      nome: "Reescrever o roteiro",
       ir: async (page: Page) => {
         await entrar(page);
         await page.goto(`/roteiros/${roteiroId}`);
@@ -1126,7 +1126,7 @@ test.describe("layout: Hoje, Roteiro e Gravação em 390, 1024 e 1280", () => {
         await page.getByRole("menuitem", { name: "Reprovar" }).click();
         await expect(page.getByRole("dialog", { name: "O que não ficou bom?" })).toBeVisible();
       },
-      botao: "Reescrever com isso em mente",
+      botao: "Reescrever o roteiro",
     },
   ]) {
     test(`${rotulo}, botão "${nome}" visível a 390x500`, async ({ page }) => {
