@@ -1,5 +1,5 @@
 /**
- * Roda os oito golden sets em sequencia (etapa 18, decisao 4 do
+ * Roda os nove golden sets em sequencia (etapa 18, decisao 4 do
  * `PROXIMO.md`; momentos desde a V9a, agendas desde a V9b, stories desde a V9c, roteiros sem
  * fala desde a M4, o que entendemos da marca desde a E38 PR 2) e grava o resultado num JSON, porque a CI nao tem chave de producao
  * (etapa 13) e cada rodada custa credito: o PR que muda um prompt traz esse arquivo (ou o
@@ -19,6 +19,7 @@ import { avaliarMomentos } from "./avaliar-momentos";
 import { avaliarRoteiros } from "./avaliar-roteiros";
 import { avaliarRoteirosSemFala } from "./avaliar-roteiros-sem-fala";
 import { avaliarStories } from "./avaliar-stories";
+import { avaliarTemaDoMomento } from "./avaliar-tema-do-momento";
 import { avaliarTemas } from "./avaliar-temas";
 
 function shaCurto(): string {
@@ -54,6 +55,9 @@ async function avaliarTudo() {
   console.log("\n=== o que entendemos da marca ===\n");
   const entenderMarca = await avaliarEntenderMarca();
 
+  console.log("\n=== tema do momento ===\n");
+  const temaDoMomento = await avaliarTemaDoMomento();
+
   const resultado = {
     data: hojeAAAAMMDD(),
     sha: shaCurto(),
@@ -65,6 +69,7 @@ async function avaliarTudo() {
     stories,
     roteirosSemFala,
     entenderMarca,
+    temaDoMomento,
   };
 
   const dirResultados = path.resolve(process.cwd(), process.env.GOLDEN_SET_DIR ?? "../avaliacoes-privadas", "resultados");

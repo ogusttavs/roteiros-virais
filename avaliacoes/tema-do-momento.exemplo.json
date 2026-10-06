@@ -1,0 +1,92 @@
+[
+  {
+    "nome": "tendência que cabe no setor",
+    "setor": {
+      "nome": "Produtos de limpeza",
+      "termos": ["limpeza", "estofado", "mancha", "lavagem a seco"],
+      "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar. Formatos: fala para câmera, mostrar o produto agindo."
+    },
+    "assuntos": [
+      { "assunto": "Jogo do Flamengo", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "flamengo hoje" }] },
+      { "assunto": "Vídeo viral de cachorro que fez xixi no sofá e como tirar o cheiro", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "como tirar cheiro de xixi do sofá" }, { "fonte": "google", "titulo": "limpeza de estofado com cheiro" }] },
+      { "assunto": "Fim da escala 6x1", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "fim da escala 6x1" }] }
+    ],
+    "deveGerar": true,
+    "assuntoCerto": 2,
+    "pontoPrincipal": "a busca sobre cheiro de xixi no sofá é do assunto do setor: gera, com encaixe alto, e o ângulo é do estofado"
+  },
+  {
+    "nome": "tendência que não cabe no setor",
+    "setor": {
+      "nome": "Clínica odontológica",
+      "termos": ["dentista", "clareamento", "aparelho", "limpeza dental"],
+      "modeloNicho": "Assuntos quentes: clareamento, aparelho invisível, medo de dentista, antes e depois. Ganchos: perguntas que o paciente tem medo de fazer. Formatos: fala para câmera."
+    },
+    "assuntos": [
+      { "assunto": "Jogo do Flamengo", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "flamengo x palmeiras" }, { "fonte": "youtube", "titulo": "Melhores momentos do jogo" }] },
+      { "assunto": "Lançamento do novo iPhone", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "iphone novo preço" }] },
+      { "assunto": "Final de temporada de uma série de TV", "sensivel": false, "fontes": [{ "fonte": "youtube", "titulo": "Trailer da última temporada" }] }
+    ],
+    "deveGerar": false,
+    "pontoPrincipal": "futebol, celular e série não têm ligação com uma clínica odontológica: em alta no país não quer dizer que cabe, melhor nenhum tema do que um forçado"
+  },
+  {
+    "nome": "tendência sensível",
+    "setor": {
+      "nome": "Produtos de limpeza",
+      "termos": ["limpeza", "estofado", "mancha"],
+      "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois."
+    },
+    "assuntos": [
+      { "assunto": "Acidente de ônibus deixa mortos em rodovia", "sensivel": true, "fontes": [{ "fonte": "google", "titulo": "acidente ônibus rodovia" }] },
+      { "assunto": "Debate entre candidatos à prefeitura", "sensivel": true, "fontes": [{ "fonte": "google", "titulo": "debate candidatos prefeitura" }] }
+    ],
+    "deveGerar": false,
+    "pontoPrincipal": "tragédia e política partidária nunca viram tema sugerido sozinhos: o modelo devolve nenhum, e a trava do código barra de qualquer jeito"
+  },
+  {
+    "nome": "ruído de música e futebol",
+    "setor": {
+      "nome": "Escola de idiomas",
+      "termos": ["inglês", "aula", "intercâmbio", "conversação"],
+      "modeloNicho": "Assuntos quentes: sotaque, erro comum em inglês, aprender sem viajar, vocabulário do dia a dia. Ganchos: errei isso por anos. Formatos: fala para câmera."
+    },
+    "assuntos": [
+      { "assunto": "Clipe novo de um cantor sertanejo", "sensivel": false, "fontes": [{ "fonte": "youtube", "titulo": "Clipe oficial" }] },
+      { "assunto": "Gol de falta na rodada do campeonato", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "gol de falta" }, { "fonte": "youtube", "titulo": "Melhores momentos" }] },
+      { "assunto": "Show de uma banda internacional em São Paulo", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "show banda são paulo ingressos" }] }
+    ],
+    "deveGerar": false,
+    "pontoPrincipal": "música e futebol são o ruído que a lista do YouTube costuma trazer; nenhum cabe de verdade numa escola de idiomas (o show até tem um ângulo fraco: inglês nas letras, mas o encaixe não passa do mínimo)"
+  },
+  {
+    "nome": "tendência que cabe em parte",
+    "setor": {
+      "nome": "Produtos de limpeza",
+      "termos": ["limpeza", "estofado", "mancha", "lavagem a seco"],
+      "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar. Formatos: fala para câmera, mostrar o produto agindo."
+    },
+    "assuntos": [
+      { "assunto": "Onda de calor e chuva forte no fim de semana", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "previsão do tempo fim de semana" }, { "fonte": "google", "titulo": "chuva forte alagamento previsão" }] },
+      { "assunto": "Lançamento de um filme de super-herói", "sensivel": false, "fontes": [{ "fonte": "youtube", "titulo": "Trailer oficial" }] }
+    ],
+    "deveGerar": true,
+    "assuntoCerto": 1,
+    "pontoPrincipal": "a chuva forte não é do setor, mas tem um ângulo claro (sofá e tapete molhados, mofo, cheiro): gera, com o ângulo do estofado, e o filme não"
+  },
+  {
+    "nome": "serviço (clínica) com tendência de preço e economia",
+    "setor": {
+      "nome": "Clínica de estética",
+      "termos": ["estética", "limpeza de pele", "botox", "depilação a laser"],
+      "modeloNicho": "Assuntos quentes: preço de procedimento, o que vale a pena, o que é golpe, antes e depois. Ganchos: quanto custa de verdade. Formatos: fala para câmera."
+    },
+    "assuntos": [
+      { "assunto": "Alta do dólar e preço dos importados sobem", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "dólar hoje" }, { "fonte": "google", "titulo": "preço dos importados sobe" }] },
+      { "assunto": "Jogo da seleção", "sensivel": false, "fontes": [{ "fonte": "google", "titulo": "jogo da seleção hoje" }] }
+    ],
+    "deveGerar": true,
+    "assuntoCerto": 1,
+    "pontoPrincipal": "o dólar e o preço dos importados mexem com o preço dos produtos e dos procedimentos de uma clínica (botox, aparelhos): o ângulo de preço serve, e o jogo não"
+  }
+]
