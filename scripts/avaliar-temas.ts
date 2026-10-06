@@ -29,7 +29,9 @@ const casoSchema = z.object({
   perfilCompilado: z.string(),
   modeloNicho: z.string(),
   persona: z.enum(["negocio", "criador"]),
-  evidencias: z.array(z.object({ id: z.number(), assunto: z.string(), gancho: z.string(), foraDaCurva: z.number() })),
+  evidencias: z.array(z.object({ id: z.number(), assunto: z.string(), gancho: z.string(), foraDaCurva: z.number(), conta: z.string().nullable().optional() })),
+  /** O sinal de momento (06/10/2026): as notícias de hoje que tocam o tema; ausente, a entrada não traz o bloco; lista vazia, o bloco diz que nenhuma foi encontrada. */
+  noticiasDoDia: z.array(z.object({ titulo: z.string(), veiculo: z.string(), dia: z.string(), resumo: z.string().nullable() })).optional(),
   /** A memória do cliente (E27, parte 2, item 7): casos com regras ativas de rodadas anteriores. */
   regrasCliente: z.array(z.object({ regra: z.string(), contagem: z.number() })).default([]),
   notaEsperada: z.object({
@@ -93,7 +95,7 @@ export async function avaliarTemas(): Promise<ResultadoAvaliarTemas> {
         persona: caso.persona,
         regrasCliente: caso.regrasCliente,
       }),
-      entrada: avaliarTemaIA.montarEntrada({ tema: caso.tema, evidencias: caso.evidencias }),
+      entrada: avaliarTemaIA.montarEntrada({ tema: caso.tema, evidencias: caso.evidencias, noticiasDoDia: caso.noticiasDoDia }),
     }
     )),
     "temas",

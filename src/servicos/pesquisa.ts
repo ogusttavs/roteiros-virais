@@ -601,7 +601,7 @@ function principalPrimeiro(nichoId: number, alternativos: number[]): SQL[] {
   return alternativos.length === 0 ? [] : [sql`case when ${videos.nichoId} = ${nichoId} then 0 else 1 end`];
 }
 
-export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number; /** E45 PR 3: o setor do vídeo (o principal ou um alternativo da conta). */ nichoId: number | null };
+export type VideoEvidenciaTema = { id: number; assunto: string; gancho: string; foraDaCurva: number; /** E45 PR 3: o setor do vídeo (o principal ou um alternativo da conta). */ nichoId: number | null; /** A conta que postou (o `@`), para a nota do tema se referir ao vídeo pela conta e pelo assunto, nunca por número. */ conta: string | null };
 
 /**
  * Evidência de um tema proposto pelo cliente (etapa 10, decisão 5 do
@@ -641,6 +641,7 @@ export async function evidenciaParaTema(
       idioma: videos.idioma,
       contaPais: contas.pais,
       contaIdiomaPrincipal: contas.idiomaPrincipal,
+      contaHandle: contas.handle,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -662,6 +663,7 @@ export async function evidenciaParaTema(
     assunto: l.analise.assunto,
     gancho: l.analise.gancho,
     foraDaCurva: l.foraDaCurva === null ? 0 : Number(l.foraDaCurva),
+    conta: l.contaHandle ?? null,
   }));
 }
 
