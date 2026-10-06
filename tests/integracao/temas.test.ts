@@ -233,7 +233,7 @@ describe("temasParaCliente: aviso da linha editorial", () => {
 });
 
 describe("avaliarTema", () => {
-  it("sem evidencia nenhuma e sem noticia: a ausencia nao pune (nota neutra, nunca 4 ou menos), e sugere angulo vizinho", async () => {
+  it("sem evidencia nenhuma e sem noticia (o mock trata como tema de fora do setor: nota neutra), e sugere angulo vizinho", async () => {
     clienteId = await criarCliente();
     const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
 

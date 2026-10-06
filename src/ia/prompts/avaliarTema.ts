@@ -61,7 +61,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * e o dia); (2) nunca um número de identificação no texto: o vídeo se refere pela conta e pelo assunto (os ids vão só na lista `evidencias`); (3) sempre "você", nunca terceira pessoa. Os dois
  * últimos também são conferidos por código (`verificador.ts`). Versão 1.9.0.
  */
-export const versao = "1.9.0";
+/**
+ * 1.9.1 (revisão do golden set com chave, 06/10/2026): a 1.9.0 tratava TODA ausência no banco como neutra, e dois casos do próprio setor subiram de 4 para 6. A ausência passa a ter dois sentidos,
+ * e o modelo diz no texto qual é o caso: (a) tema do assunto do setor da pessoa (o banco cobre esse assunto): nenhum vídeo fora da curva É sinal de que não pega no setor, 4 ou menos, como antes;
+ * (b) tema de fora do setor (política, acontecimento do país, outro mercado): a ausência não diz nada, vale a notícia do dia, e sem ela a nota é neutra, 6 a 7.
+ */
+export const versao = "1.9.1";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -123,13 +128,20 @@ Os cinco pilares:
 - Chance de viralizar: três ou mais vídeos fora da curva (3x a mediana da conta ou mais)
   sobre o assunto nos últimos 90 dias valem 9 a 10. Um ou dois valem 7 a 8. Só assuntos
   vizinhos valem 5 a 6. Vídeos do assunto no banco e nenhum fora da curva valem 4 ou menos.
-  ATENÇÃO: o banco de vídeos só cobre o setor da pessoa. Se não há vídeo do assunto nele, isso
-  é só um fato ("o banco do seu setor ainda não tem vídeo sobre isso"): nunca conclua que o
-  assunto não está em alta e nunca baixe a nota por causa disso. Nesse caso julgue o momento
-  pelas notícias de hoje que vêm na entrada: uma notícia que toca o tema (do setor ou de um
-  assunto que a pessoa acompanha) mostra que o assunto está no noticiário hoje e vale 8 a 10,
-  citada pelo veículo e o dia ("segundo o G1, hoje"). Sem vídeo e sem notícia que toque o
-  tema, não há como saber: nota 6 a 7, dizendo que falta sinal, nunca 4 ou menos.
+  ATENÇÃO: o banco de vídeos só cobre o setor da pessoa. Antes de dar a nota, decida e diga na
+  justificativa qual dos dois casos é este tema, pelo modelo do nicho e pelo perfil abaixo:
+  (a) O tema é do assunto do setor da pessoa (o que o modelo do nicho e o perfil descrevem: o
+  produto, o serviço, o cliente, os medos e as dúvidas dela). O banco cobre esse assunto há 90
+  dias, então nenhum vídeo fora da curva sobre ele É sinal de que não pega no setor: nota 4 ou
+  menos, e diga isso ("o banco do seu setor cobre esse assunto e nenhum vídeo passou da curva").
+  (b) O tema é de fora do assunto do setor (política, um acontecimento do país, outro mercado).
+  Aí o banco não diz nada: é só um fato ("o banco do seu setor ainda não tem vídeo sobre
+  isso"), nunca conclua que o assunto não está em alta e nunca baixe a nota por causa disso.
+  Julgue o momento pelas notícias de hoje que vêm na entrada: uma notícia que toca o tema (do
+  setor ou de um assunto que a pessoa acompanha) mostra que o assunto está no noticiário hoje
+  e vale 8 a 10, citada pelo veículo e o dia ("segundo o G1, hoje"). Sem vídeo e sem notícia que
+  toque o tema, não há como saber: nota 6 a 7, dizendo que falta sinal, nunca 4 ou menos.
+  Na dúvida entre (a) e (b), o tema que fala do produto, do serviço ou do cliente da pessoa é (a).
 - Chance de gerar cliente: responde um medo ou pergunta pré compra do cliente vale 9 a 10.
   Educa sobre o serviço vale 7 a 8. Curiosidade ou entretenimento sem ligação com a compra
   vale 6 ou menos. Para quem escolheu virar criador, gerar cliente significa virar candidato

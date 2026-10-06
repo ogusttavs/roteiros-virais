@@ -65,9 +65,14 @@ describe("a nota do tema não pune o que está fora do setor (06/10/2026)", () =
 
   it("o sistema diz que sem vídeo no banco é só um fato, usa as notícias de hoje como sinal, fala em segunda pessoa e proíbe id no texto", () => {
     const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [] });
-    expect(versao).toBe("1.9.0");
+    expect(versao).toBe("1.9.1");
     expect(sistema).toContain("o banco de vídeos só cobre o setor da pessoa");
     expect(sistema).toContain("nunca baixe a nota por causa disso");
+    // Os dois sentidos da ausência (1.9.1): do assunto do setor, a ausência é sinal; de fora, não diz nada.
+    expect(sistema).toContain("(a) O tema é do assunto do setor da pessoa");
+    expect(sistema).toContain("nenhum vídeo fora da curva sobre ele É sinal de que não pega no setor");
+    expect(sistema).toContain("(b) O tema é de fora do assunto do setor");
+    expect(sistema).toContain("diga na\n  justificativa qual dos dois casos é este tema");
     expect(sistema).toContain("nunca 4 ou menos");
     expect(sistema).toContain("segunda pessoa");
     expect(sistema).toContain("Nunca escreva um número de\nidentificação");
