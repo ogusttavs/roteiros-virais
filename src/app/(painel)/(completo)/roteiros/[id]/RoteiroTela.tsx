@@ -1233,6 +1233,7 @@ export function RoteiroTela({
                   .filter(Boolean)
                   .join(" ")}
               >
+                {ativo ? <Check size={14} strokeWidth={2.25} className={styles.tiqueMotivo} aria-hidden="true" /> : null}
                 {motivo.rotulo}
               </button>
             );

@@ -535,12 +535,15 @@
 }
 
 /** Modo gravação some da barra do topo no celular, fica no tablet e no desktop (item 7). */
-.somenteTablet {
+/* Dois seletores de classe (e não um): `.botaoBarra` também define `display`, e a ordem dos módulos no pacote do navegador não pode decidir quem ganha (o texto "Modo gravação" aparecia no celular). */
+.somenteTablet,
+.botaoBarra.somenteTablet {
   display: none;
 }
 
 @media (min-width: 768px) {
-  .somenteTablet {
+  .somenteTablet,
+  .botaoBarra.somenteTablet {
     display: inline-flex;
   }
 }
@@ -761,6 +764,10 @@
     border-radius: var(--raio-md);
   }
 
+  .motivosReprovar .motivoChip {
+    position: relative;
+  }
+
   .motivosReprovar .motivoChip::before {
     content: "";
     flex: none;
@@ -771,9 +778,31 @@
     background: transparent;
   }
 
+  /* Marcado (passo 19, `reprovarPainel`, nos dois temas): a linha ganha um fundo tingido discreto e o quadrado enche com a cor de ação, com o tique na cor do texto de ação (some no escuro se for a mesma cor do fundo). */
+  .motivosReprovar .motivoChip[aria-pressed="true"] {
+    background: var(--cor-selecao-suave);
+    color: var(--cor-titulo);
+    border-color: transparent;
+  }
+
   .motivosReprovar .motivoChip[aria-pressed="true"]::before {
-    border-color: var(--cor-titulo);
-    background: var(--cor-titulo) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-7'/%3E%3C/svg%3E") center / 80% no-repeat;
+    border-color: var(--cor-acao);
+    background: var(--cor-acao);
+  }
+
+  .motivosReprovar .motivoChip .tiqueMotivo {
+    position: absolute;
+    left: calc(var(--espaco-4) + 0.1875rem);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--cor-acao-texto);
+  }
+}
+
+/* Abaixo de 1024px (a folha) o chip marcado já é o preenchido de sempre: o tique é só do painel lateral. */
+@media (max-width: 1023px) {
+  .tiqueMotivo {
+    display: none;
   }
 }
 
