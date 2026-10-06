@@ -179,7 +179,9 @@ function mockAvaliarTema(entrada: string) {
   const tema = extrairCampo(entrada, "Tema proposto:");
   const notaAlta = tema.includes(MARCADOR_NOTA_ALTA);
   const evidencias = contarOcorrencias(entrada, /\bid \d+:/g);
-  const notaViralizar = notaAlta ? 9.4 : evidencias >= 3 ? 9 : evidencias >= 1 ? 7 : 4;
+  // O sinal de momento (06/10/2026): sem vídeo no banco, uma notícia de hoje que toca o tema vale mais que a ausência, e a ausência de tudo nunca vira nota baixa.
+  const comNoticiaDoDia = entrada.includes("<noticias_do_dia>");
+  const notaViralizar = notaAlta ? 9.4 : evidencias >= 3 ? 9 : evidencias >= 1 ? 7 : comNoticiaDoDia ? 8 : 6;
   const pilarPadrao = notaAlta ? { ...PILAR_PADRAO, nota: 9.4 } : PILAR_PADRAO;
   const pilares = {
     viralizar: {

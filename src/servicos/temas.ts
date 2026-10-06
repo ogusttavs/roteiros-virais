@@ -30,6 +30,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
+import { noticiasQueTocamOTema } from "./noticias-do-tema";
 
 export class ErroTemas extends Error {}
 
@@ -411,6 +412,8 @@ export async function avaliarTema(
   ]);
 
   const nomesDosAlternativos = new Map(alternativosDaMarca.map((a) => [a.nichoId, a.nome]));
+  // O sinal de momento: as notícias de hoje (setor e assuntos da marca) que tocam o tema. O banco de vídeos só cobre o setor; ausência dele não é sinal contra o assunto.
+  const noticiasDoDia = await noticiasQueTocamOTema(cliente, texto);
 
   const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",
@@ -429,6 +432,7 @@ export async function avaliarTema(
       tema: texto,
       evidencias: evidencias.map((v) => ({ ...v, ramo: nomesDosAlternativos.get(v.nichoId ?? -1) })),
       noticia,
+      noticiasDoDia,
     }),
     // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
     // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).
@@ -436,6 +440,9 @@ export async function avaliarTema(
     proibicoes: perfil.fatos.proibicoes,
     exigeEvidencia: false,
     evidenciasFornecidas: evidencias.map((v) => v.id),
+    // Achado do Gustavo (06/10/2026): nenhum id de vídeo solto no texto, e sempre "você".
+    semIdInterno: true,
+    soSegundaPessoa: true,
     // A recomendação traz instrução de gravação de propósito (29/09/2026, `verificarTexto.ts`, gênero "tema").
     generoTexto: "tema",
     extrairCampos: extrairCamposAvaliarTema,

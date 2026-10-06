@@ -17,6 +17,33 @@ import * as verificarTexto from "./prompts/verificarTexto";
 import type { GeneroTexto } from "./prompts/verificarTexto";
 import { registrarGeracao } from "./registro";
 
+/**
+ * A nota do tema (06/10/2026, achado do Gustavo): a justificativa citava ids internos de vídeo ("o 109181 do Luan Santana") na tela. Um número solto de cinco dígitos ou mais não é um
+ * dado que a pessoa entenda; o vídeo se refere pela conta e pelo assunto. Números com separador ("45.000") e anos nunca casam. Devolve o primeiro achado, ou nulo.
+ */
+export function acharIdSolto(texto: string): string | null {
+  return /(?<![\d.,])\d{5,}(?!\d)/.exec(texto)?.[0] ?? null;
+}
+
+const SUBSTANTIVOS_DA_PESSOA =
+  "experiencia|perfil|autoridade|tom|briefing|negocio|marca|publico|cliente|jeito|estilo|historia|rotina|produto|servico|audiencia|canal|conta|objetivo|nicho|setor|equipe|loja|empresa|trabalho|fala";
+const TERCEIRA_PESSOA = new RegExp(
+  [
+    // "ele quer ficar conhecido", "ela se posiciona".
+    String.raw`\b(ele|ela)\s+(quer|precisa|fez|se|usa|fala|disse|prefere|gosta|trabalha|vende|atende|ja\s+fez|nao\s+quer)\b`,
+    // "a experiência dele", "o tom dela".
+    String.raw`\b(${SUBSTANTIVOS_DA_PESSOA})s?\s+(dele|dela)\b`,
+    // "este cliente quer", "a pessoa precisa".
+    String.raw`\b(este|esse|o|um)\s+cliente\s+(quer|e|esta|ja|tem|precisa|se|pode|vai|usa|fala|disse|prefere|gosta|vende|atende)\b`,
+    String.raw`\b(a|esta|essa)\s+pessoa\s+(quer|esta|ja|tem|precisa|se|pode|vai|usa|fala|disse|prefere|gosta|vende|atende)\b`,
+  ].join('|'),
+);
+
+/** A nota do tema fala com a pessoa em segunda pessoa ("você", "seu"); terceira ("ele quer", "a experiência dele", "o cliente tem") reprova. Devolve o trecho, ou nulo. */
+export function acharTerceiraPessoa(texto: string): string | null {
+  return TERCEIRA_PESSOA.exec(normalizar(texto))?.[0] ?? null;
+}
+
 export type ResultadoVerificacaoLocal = {
   aprovado: boolean;
   motivos: string[];
@@ -95,6 +122,9 @@ export function verificarLocalmente(
      * tarefas sem esse campo ignoram a checagem mesmo se a lista vier.
      */
     ganchosRecentes?: string[];
+    /** A nota do tema (06/10/2026): nenhum campo de texto pode ter um número de identificação solto (cinco dígitos ou mais) nem falar da pessoa em terceira pessoa. */
+    semIdInterno?: boolean;
+    soSegundaPessoa?: boolean;
     /**
      * V4, item 5, roteiro sem vício: a primeira palavra do gancho (sem
      * acento, minúscula) não pode repetir a de nenhum dos últimos 5
@@ -196,6 +226,14 @@ export function verificarLocalmente(
     const semAcento = problemaDeAcentuacao(valor);
     if (semAcento) {
       motivos.push(`${nomeCampo}: ${semAcento}`);
+    }
+    if (opcoes.semIdInterno) {
+      const id = acharIdSolto(valor);
+      if (id) motivos.push(`${nomeCampo}: tem um número de identificação solto ("${id}"); refira-se ao vídeo pela conta e pelo assunto, nunca por número`);
+    }
+    if (opcoes.soSegundaPessoa) {
+      const trecho = acharTerceiraPessoa(valor);
+      if (trecho) motivos.push(`${nomeCampo}: fala da pessoa em terceira pessoa ("${trecho}"); escreva sempre com "você", "seu" e "sua"`);
     }
   }
 
@@ -583,6 +621,9 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   evidenciasFornecidas?: number[];
   /** O gancho dos roteiros recentes do mesmo cliente (ver `verificarLocalmente`). */
   ganchosRecentes?: string[];
+  /** A nota do tema: sem id solto e só em segunda pessoa (ver `verificarLocalmente`). */
+  semIdInterno?: boolean;
+  soSegundaPessoa?: boolean;
   /** V4, item 5: o gancho dos últimos 5 roteiros do cliente, para a checagem de primeira palavra (ver `verificarLocalmente`). */
   ganchosUltimos5?: string[];
   /** V4, item 5: o tipo de abertura do roteiro anterior do cliente (ver `verificarLocalmente`). */
@@ -711,6 +752,8 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,
     ganchosRecentes: params.ganchosRecentes,
+    semIdInterno: params.semIdInterno,
+    soSegundaPessoa: params.soSegundaPessoa,
     ganchosUltimos5: params.ganchosUltimos5,
     tipoAberturaAtual: params.extrairTipoAbertura?.(dados),
     tipoAberturaAnterior: params.tipoAberturaAnterior,

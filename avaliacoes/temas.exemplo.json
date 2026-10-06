@@ -5,11 +5,32 @@
     "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 101, "assunto": "o produto que tira qualquer mancha do estofado", "gancho": "esse produto tira qualquer mancha do estofado", "foraDaCurva": 6.2 },
-      { "id": 102, "assunto": "antes e depois da mancha de vinho no sofá", "gancho": "olha o antes e depois dessa mancha de vinho", "foraDaCurva": 5.1 },
-      { "id": 103, "assunto": "erro que todo mundo comete ao tentar tirar mancha", "gancho": "voce ta cometendo esse erro ao tentar tirar mancha", "foraDaCurva": 4.3 }
+      {
+        "id": 101,
+        "assunto": "o produto que tira qualquer mancha do estofado",
+        "gancho": "esse produto tira qualquer mancha do estofado",
+        "foraDaCurva": 6.2
+      },
+      {
+        "id": 102,
+        "assunto": "antes e depois da mancha de vinho no sofá",
+        "gancho": "olha o antes e depois dessa mancha de vinho",
+        "foraDaCurva": 5.1
+      },
+      {
+        "id": 103,
+        "assunto": "erro que todo mundo comete ao tentar tirar mancha",
+        "gancho": "voce ta cometendo esse erro ao tentar tirar mancha",
+        "foraDaCurva": 4.3
+      }
     ],
-    "notaEsperada": { "viralizar": 9, "gerarCliente": 8, "encaixe": 8, "novidade": 6, "facilidade": 9 },
+    "notaEsperada": {
+      "viralizar": 9,
+      "gerarCliente": 8,
+      "encaixe": 8,
+      "novidade": 6,
+      "facilidade": 9
+    },
     "pontoPrincipal": "tres videos fora da curva sobre o mesmo assunto, responde o medo do briefing, facil de gravar"
   },
   {
@@ -18,7 +39,13 @@
     "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação. Ganchos: mostrar o produto agindo antes de explicar.",
     "persona": "negocio",
     "evidencias": [],
-    "notaEsperada": { "viralizar": 3, "gerarCliente": 7, "encaixe": 6, "novidade": 7, "facilidade": 8 },
+    "notaEsperada": {
+      "viralizar": 3,
+      "gerarCliente": 7,
+      "encaixe": 6,
+      "novidade": 7,
+      "facilidade": 8
+    },
     "pontoPrincipal": "sem nenhum video fora da curva sobre o assunto nos ultimos 90 dias, viralizar fica baixo mesmo respondendo um medo real"
   },
   {
@@ -27,9 +54,20 @@
     "modeloNicho": "Formatos: fala para câmera, 60%; making of do equipamento, 20%.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 104, "assunto": "por dentro da maquina que tira mancha sem molhar", "gancho": "por dentro da maquina que tira mancha sem molhar", "foraDaCurva": 7.5 }
+      {
+        "id": 104,
+        "assunto": "por dentro da maquina que tira mancha sem molhar",
+        "gancho": "por dentro da maquina que tira mancha sem molhar",
+        "foraDaCurva": 7.5
+      }
     ],
-    "notaEsperada": { "viralizar": 7, "gerarCliente": 5, "encaixe": 9, "novidade": 8, "facilidade": 8 },
+    "notaEsperada": {
+      "viralizar": 7,
+      "gerarCliente": 5,
+      "encaixe": 9,
+      "novidade": 8,
+      "facilidade": 8
+    },
     "pontoPrincipal": "curiosidade sobre o equipamento, nao responde medo de compra direto, encaixa bem na autoridade dele"
   },
   {
@@ -38,12 +76,38 @@
     "modeloNicho": "Assuntos quentes: clareamento, aparelho, dor de dente. Ganchos: comparação antes e depois, alta frequência.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 201, "assunto": "como clarear os dentes em casa", "gancho": "assim voce clareia os dentes em casa", "foraDaCurva": 8.9 },
-      { "id": 202, "assunto": "antes e depois do clareamento", "gancho": "olha o antes e depois desse clareamento", "foraDaCurva": 6.4 },
-      { "id": 203, "assunto": "mito ou verdade sobre clareamento caseiro", "gancho": "mito ou verdade sobre clareamento caseiro", "foraDaCurva": 5.0 },
-      { "id": 204, "assunto": "paciente reagindo ao resultado do clareamento", "gancho": "olha a reacao dela ao ver o resultado do clareamento", "foraDaCurva": 4.2 }
+      {
+        "id": 201,
+        "assunto": "como clarear os dentes em casa",
+        "gancho": "assim voce clareia os dentes em casa",
+        "foraDaCurva": 8.9
+      },
+      {
+        "id": 202,
+        "assunto": "antes e depois do clareamento",
+        "gancho": "olha o antes e depois desse clareamento",
+        "foraDaCurva": 6.4
+      },
+      {
+        "id": 203,
+        "assunto": "mito ou verdade sobre clareamento caseiro",
+        "gancho": "mito ou verdade sobre clareamento caseiro",
+        "foraDaCurva": 5.0
+      },
+      {
+        "id": 204,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "foraDaCurva": 4.2
+      }
     ],
-    "notaEsperada": { "viralizar": 10, "gerarCliente": 9, "encaixe": 9, "novidade": 5, "facilidade": 9 },
+    "notaEsperada": {
+      "viralizar": 10,
+      "gerarCliente": 9,
+      "encaixe": 9,
+      "novidade": 5,
+      "facilidade": 9
+    },
     "pontoPrincipal": "quatro videos fora da curva, mas o angulo de clareamento ja apareceu tres vezes na evidencia, novidade cai"
   },
   {
@@ -52,7 +116,13 @@
     "modeloNicho": "Assuntos quentes: clareamento, aparelho, dor de dente.",
     "persona": "negocio",
     "evidencias": [],
-    "notaEsperada": { "viralizar": 4, "gerarCliente": 3, "encaixe": 4, "novidade": 7, "facilidade": 8 },
+    "notaEsperada": {
+      "viralizar": 4,
+      "gerarCliente": 3,
+      "encaixe": 4,
+      "novidade": 7,
+      "facilidade": 8
+    },
     "pontoPrincipal": "compara preco em vez de resolver medo do cliente, sem evidencia de que esse assunto funciona no nicho"
   },
   {
@@ -61,9 +131,20 @@
     "modeloNicho": "Assuntos quentes: bastidor do consultório, reação a comentário. Ganchos: reação de humor, media frequência.",
     "persona": "criador",
     "evidencias": [
-      { "id": 205, "assunto": "paciente reagindo ao resultado do clareamento", "gancho": "olha a reacao dela ao ver o resultado do clareamento", "foraDaCurva": 4.2 }
+      {
+        "id": 205,
+        "assunto": "paciente reagindo ao resultado do clareamento",
+        "gancho": "olha a reacao dela ao ver o resultado do clareamento",
+        "foraDaCurva": 4.2
+      }
     ],
-    "notaEsperada": { "viralizar": 6, "gerarCliente": 4, "encaixe": 7, "novidade": 7, "facilidade": 9 },
+    "notaEsperada": {
+      "viralizar": 6,
+      "gerarCliente": 4,
+      "encaixe": 7,
+      "novidade": 7,
+      "facilidade": 9
+    },
     "pontoPrincipal": "para quem quer virar criador, gerar cliente significa aproximar de marca, entretenimento puro fica no meio da nota"
   },
   {
@@ -72,9 +153,20 @@
     "modeloNicho": "Formatos: fala para câmera, 55%; making of do procedimento, 25%.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 206, "assunto": "implante dentario, vale a pena", "gancho": "vale a pena fazer implante dentario", "foraDaCurva": 5.8 }
+      {
+        "id": 206,
+        "assunto": "implante dentario, vale a pena",
+        "gancho": "vale a pena fazer implante dentario",
+        "foraDaCurva": 5.8
+      }
     ],
-    "notaEsperada": { "viralizar": 7, "gerarCliente": 8, "encaixe": 8, "novidade": 8, "facilidade": 3 },
+    "notaEsperada": {
+      "viralizar": 7,
+      "gerarCliente": 8,
+      "encaixe": 8,
+      "novidade": 8,
+      "facilidade": 3
+    },
     "pontoPrincipal": "precisa de outra pessoa filmando um procedimento longo, sozinho no consultorio a facilidade cai bastante"
   },
   {
@@ -83,10 +175,26 @@
     "modeloNicho": "Assuntos quentes: faxina rápida, organização de armário, cheiro que dura. Ganchos: comparação antes e depois.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 301, "assunto": "faxina de 15 minutos por comodo", "gancho": "faxina completa em 15 minutos por comodo", "foraDaCurva": 6.7 },
-      { "id": 302, "assunto": "erro que todo mundo comete ao limpar", "gancho": "voce ta cometendo esse erro ao limpar a casa", "foraDaCurva": 5.5 }
+      {
+        "id": 301,
+        "assunto": "faxina de 15 minutos por comodo",
+        "gancho": "faxina completa em 15 minutos por comodo",
+        "foraDaCurva": 6.7
+      },
+      {
+        "id": 302,
+        "assunto": "erro que todo mundo comete ao limpar",
+        "gancho": "voce ta cometendo esse erro ao limpar a casa",
+        "foraDaCurva": 5.5
+      }
     ],
-    "notaEsperada": { "viralizar": 9, "gerarCliente": 7, "encaixe": 8, "novidade": 8, "facilidade": 10 },
+    "notaEsperada": {
+      "viralizar": 9,
+      "gerarCliente": 7,
+      "encaixe": 8,
+      "novidade": 8,
+      "facilidade": 10
+    },
     "pontoPrincipal": "assunto quente com evidencia boa, facil de gravar sozinho em casa, angulo ainda pouco repetido"
   },
   {
@@ -95,9 +203,20 @@
     "modeloNicho": "Assuntos quentes: cheiro que dura, organização de armário.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 303, "assunto": "como deixar a casa cheirosa por dias", "gancho": "assim a casa fica cheirosa por dias", "foraDaCurva": 4.1 }
+      {
+        "id": 303,
+        "assunto": "como deixar a casa cheirosa por dias",
+        "gancho": "assim a casa fica cheirosa por dias",
+        "foraDaCurva": 4.1
+      }
     ],
-    "notaEsperada": { "viralizar": 7, "gerarCliente": 8, "encaixe": 9, "novidade": 7, "facilidade": 9 },
+    "notaEsperada": {
+      "viralizar": 7,
+      "gerarCliente": 8,
+      "encaixe": 9,
+      "novidade": 7,
+      "facilidade": 9
+    },
     "pontoPrincipal": "um video fora da curva sobre o mesmo assunto, tema encaixa direto na proibicao dura do briefing sobre produto toxico"
   },
   {
@@ -106,10 +225,26 @@
     "modeloNicho": "Assuntos quentes: organização de armário, faxina rápida.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 304, "assunto": "organizando o armario da cozinha", "gancho": "organizando o armario da cozinha do zero", "foraDaCurva": 3.9 },
-      { "id": 305, "assunto": "antes e depois da organização da despensa", "gancho": "olha o antes e depois dessa despensa", "foraDaCurva": 3.2 }
+      {
+        "id": 304,
+        "assunto": "organizando o armario da cozinha",
+        "gancho": "organizando o armario da cozinha do zero",
+        "foraDaCurva": 3.9
+      },
+      {
+        "id": 305,
+        "assunto": "antes e depois da organização da despensa",
+        "gancho": "olha o antes e depois dessa despensa",
+        "foraDaCurva": 3.2
+      }
     ],
-    "notaEsperada": { "viralizar": 7, "gerarCliente": 6, "encaixe": 8, "novidade": 6, "facilidade": 7 },
+    "notaEsperada": {
+      "viralizar": 7,
+      "gerarCliente": 6,
+      "encaixe": 8,
+      "novidade": 6,
+      "facilidade": 7
+    },
     "pontoPrincipal": "evidencia sobre organizacao de outros comodos, nao do guarda roupa exato, projeto longo pesa um pouco na facilidade"
   },
   {
@@ -118,12 +253,87 @@
     "modeloNicho": "Assuntos quentes: faxina rápida, organização de armário, cheiro que dura. Ganchos: comparação antes e depois.",
     "persona": "negocio",
     "evidencias": [
-      { "id": 306, "assunto": "por que cobro mais caro que a faxina da vizinha", "gancho": "e por isso que eu cobro mais caro", "foraDaCurva": 5.4 }
+      {
+        "id": 306,
+        "assunto": "por que cobro mais caro que a faxina da vizinha",
+        "gancho": "e por isso que eu cobro mais caro",
+        "foraDaCurva": 5.4
+      }
     ],
     "regrasCliente": [
-      { "regra": "Não gosta de comparar preço com concorrente, fica sem graça e não é assim que ele fala.", "contagem": 3 }
+      {
+        "regra": "Não gosta de comparar preço com concorrente, fica sem graça e não é assim que ele fala.",
+        "contagem": 3
+      }
     ],
-    "notaEsperada": { "viralizar": 6, "gerarCliente": 5, "encaixe": 4, "novidade": 6, "facilidade": 9 },
+    "notaEsperada": {
+      "viralizar": 6,
+      "gerarCliente": 5,
+      "encaixe": 4,
+      "novidade": 6,
+      "facilidade": 9
+    },
     "pontoPrincipal": "tema com bom encaixe em outras dimensoes, mas o angulo de comparar preco com concorrente cai numa regra firme deste cliente, entao encaixe fica 4 ou menos"
+  },
+  {
+    "tema": "o que a eleição muda para o meu negócio de limpeza de estofados",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180, colchão de casal por R$ 150. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já mandou fazer em outro lugar e o sofá ficou manchado. Nunca promete tirar mancha de vinho tinto sem ver foto antes.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
+    "persona": "negocio",
+    "evidencias": [],
+    "noticiasDoDia": [
+      {
+        "titulo": "Debate esquenta a eleição 2026 e divide os candidatos",
+        "veiculo": "G1",
+        "dia": "6 de outubro",
+        "resumo": "Os candidatos se enfrentaram em um debate com troca de acusações."
+      },
+      {
+        "titulo": "Eleição municipal: o que muda para o pequeno comerciante",
+        "veiculo": "Folha de S.Paulo",
+        "dia": "6 de outubro",
+        "resumo": null
+      }
+    ],
+    "notaEsperada": {
+      "viralizar": 8,
+      "gerarCliente": 6,
+      "encaixe": 6,
+      "novidade": 8,
+      "facilidade": 8
+    },
+    "pontoPrincipal": "assunto fora do setor, sem vídeo no banco, mas no noticiário de hoje: a ausência de vídeo não pune, a notícia conta a favor (8 a 10)"
+  },
+  {
+    "tema": "o que o novo imposto de importação muda para quem vende produto de limpeza",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180, colchão de casal por R$ 150. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já mandou fazer em outro lugar e o sofá ficou manchado. Nunca promete tirar mancha de vinho tinto sem ver foto antes.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
+    "persona": "negocio",
+    "evidencias": [],
+    "noticiasDoDia": [],
+    "notaEsperada": {
+      "viralizar": 6,
+      "gerarCliente": 7,
+      "encaixe": 7,
+      "novidade": 8,
+      "facilidade": 8
+    },
+    "pontoPrincipal": "assunto fora do setor, sem vídeo e sem notícia: não há como saber, nota neutra de 6 a 7 dizendo que falta sinal, nunca 4 ou menos por ausência"
+  },
+  {
+    "tema": "como escolher o melhor produto para tirar mancha de gordura do sofá",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180, colchão de casal por R$ 150. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já mandou fazer em outro lugar e o sofá ficou manchado. Nunca promete tirar mancha de vinho tinto sem ver foto antes.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
+    "persona": "negocio",
+    "evidencias": [],
+    "noticiasDoDia": [],
+    "notaEsperada": {
+      "viralizar": 4,
+      "gerarCliente": 8,
+      "encaixe": 8,
+      "novidade": 8,
+      "facilidade": 9
+    },
+    "pontoPrincipal": "tema do assunto do próprio setor, sem vídeo fora da curva no banco: a ausência É sinal de que não pega no setor, viralizar 4 ou menos, e o texto diz que é o caso (a)"
   }
 ]

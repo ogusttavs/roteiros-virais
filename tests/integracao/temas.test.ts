@@ -4,7 +4,7 @@
  * `gerarEstruturado` cair no mock de `avaliarTema`, sem chamar a Anthropic
  * de verdade.
  */
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -12,7 +12,9 @@ import {
   avaliacoesTema,
   briefings,
   clientes,
+  geracoesIA,
   nichos,
+  noticias,
   roteiros,
   temasDia,
   user,
@@ -231,17 +233,37 @@ describe("temasParaCliente: aviso da linha editorial", () => {
 });
 
 describe("avaliarTema", () => {
-  it("sem evidencia nenhuma: nota de viralizar 4 ou menos, e sugere angulo vizinho", async () => {
+  it("sem evidencia nenhuma e sem noticia (o mock trata como tema de fora do setor: nota neutra), e sugere angulo vizinho", async () => {
     clienteId = await criarCliente();
     const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
 
     const resultado = await avaliarTema(cliente, "assunto sem nenhum video parecido no banco");
 
-    expect(resultado.pilares.viralizar.nota).toBeLessThanOrEqual(4);
+    expect(resultado.pilares.viralizar.nota).toBeGreaterThan(4);
     expect(resultado.anguloSugerido).not.toBeNull();
 
     const [linha] = await db().select().from(avaliacoesTema).where(eq(avaliacoesTema.clienteId, clienteId));
     expect(linha.tema).toBe("assunto sem nenhum video parecido no banco");
+  });
+
+  it("sem video no banco mas com uma noticia de hoje do setor que toca o tema: a noticia entra na entrada e conta a favor", async () => {
+    clienteId = await criarCliente();
+    const cliente = (await db().select().from(clientes).where(eq(clientes.id, clienteId)))[0];
+    await db().insert(noticias).values({
+      nichoId,
+      titulo: "Eleicao movimenta o comercio e muda a rotina das lojas",
+      url: "https://g1.globo.com/eleicao-comercio",
+      fonte: "G1",
+      publicadoEm: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      resumo: "Lojistas contam como a eleicao mexe com as vendas.",
+      relevante: true,
+    });
+
+    const resultado = await avaliarTema(cliente, "o que a eleicao muda para o meu negocio");
+    expect(resultado.pilares.viralizar.nota).toBeGreaterThanOrEqual(8);
+
+    const [geracao] = await db().select().from(geracoesIA).where(and(eq(geracoesIA.clienteId, clienteId), eq(geracoesIA.tarefa, "avaliarTema")));
+    expect(JSON.stringify(geracao.entradas)).toContain("noticias_do_dia");
   });
 
   it("com evidencia clara: nota de viralizar mais alta, e a avaliacao fica gravada", async () => {
