@@ -15,7 +15,6 @@ describe("o golden set do tema do momento (E55)", () => {
     expect(resultado.casosFalhos).toBe(0);
     expect(resultado.custoUsd).toBe(0);
     const impresso = log.mock.calls.map((c) => String(c[0])).join("\n");
-").filter((l) => l.includes("IA")).join(" // "));
     expect(impresso).toContain("IA: simulada");
     expect(impresso).toContain("acertos:");
   });
