@@ -10,6 +10,10 @@
  * `--direto` (ou `GOLDEN_SET_DIRETO=1`), em qualquer `avaliar:*`: as mesmas chamadas, mas pelo caminho normal (`src/ia/cliente.ts`), até 4 em paralelo, sem esperar a fila do lote. Para quando o
  * lote está parado na fila da API e o resultado é preciso agora. **O custo é o cheio, o dobro do lote**, e o cabeçalho avisa; o padrão continua sendo o lote.
  * Um lote pode levar até 24 h; em geral, minutos. O ajudante consulta de 30 em 30 segundos.
+ *
+ * **Qual IA responde (06/10/2026, o golden set do PR #142 rodou "simulado" sem ninguém ver):** toda rodada imprime, no cabeçalho, `IA: simulada` (o simulador, `AI_PROVIDER=mock`, sem chave ou com
+ * o provedor forçado) ou `IA: real (modelo forte X, barato Y)`. E `--direto` com o simulador é RECUSADO: o `--direto` existe para medir o modelo de verdade com o resultado na hora, e o simulador
+ * devolve notas fixas que parecem uma medida. Os testes do próprio ajudante liberam o simulador com `GOLDEN_PERMITE_SIMULADO=1`.
  */
 import { gerarEstruturado, type ParametrosGeracao } from "../src/ia/cliente";
 import { coletarResultadosLote, criarLote, statusLote } from "../src/ia/lote";
@@ -31,6 +35,32 @@ export function goldenDireto(): boolean {
 /** Só o lote tem o desconto: a chamada um por vez (`GOLDEN_SEM_LOTE=1`) e a direta pagam o preço cheio. */
 export function goldenEmLote(): boolean {
   return process.env.GOLDEN_SEM_LOTE !== "1" && !goldenDireto();
+}
+
+/** O cabeçalho que diz qual IA responde: o simulador ou o provedor real, com os modelos. Puro, para testar. */
+export function descricaoDaIA(provedor: string, modeloForte: string, modeloBarato: string): string {
+  return provedor === "mock"
+    ? "IA: simulada (AI_PROVIDER=mock: nenhuma chamada de verdade, nenhum custo; as notas NÃO medem o modelo)"
+    : `IA: real (modelo forte ${modeloForte}, barato ${modeloBarato})`;
+}
+
+/** A recusa de `--direto` com o simulador, ou nulo quando pode seguir. `permiteSimulado` é só para os testes do ajudante. Pura, para testar. */
+export function recusaDoSimulado(provedor: string, direto: boolean, permiteSimulado: boolean): string | null {
+  if (provedor === "mock" && direto && !permiteSimulado) {
+    return "recusado: --direto (ou GOLDEN_SET_DIRETO=1) com a IA simulada. O simulador devolve notas fixas e não mede o modelo. Rode com AI_PROVIDER=anthropic e uma chave (ANTHROPIC_API_KEY_TESTES), ou tire o --direto para o ensaio sem custo.";
+  }
+  return null;
+}
+
+let anunciouIA = false;
+
+/** O cabeçalho da IA, uma vez por rodada, antes da primeira chamada; recusa o `--direto` com o simulador. */
+function anunciarIA(): void {
+  const recusa = recusaDoSimulado(config.ia.provedor, goldenDireto(), process.env.GOLDEN_PERMITE_SIMULADO === "1");
+  if (recusa) throw new Error(recusa);
+  if (anunciouIA) return;
+  anunciouIA = true;
+  console.log(`[${descricaoDaIA(config.ia.provedor, config.ia.modeloForte, config.ia.modeloBarato)}]\n`);
 }
 
 const PARALELO_DIRETO = 4;
@@ -77,6 +107,7 @@ export async function gerarVarios<T>(pedidos: PedidoGolden<T>[], rotulo: string)
  */
 export async function gerarVariosOuErro<T>(pedidos: PedidoGolden<T>[], rotulo: string): Promise<(ResultadoGeracao<T> | Error)[]> {
   if (pedidos.length === 0) return [];
+  anunciarIA();
   if (goldenDireto()) {
     avisarCaminhoDireto();
     // Um grupo de até 4 chamadas por vez, cada uma com o seu erro à parte, na mesma ordem dos pedidos.
