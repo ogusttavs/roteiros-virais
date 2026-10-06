@@ -81,6 +81,10 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockAnalisarPerfilCitado(entrada);
     case "entenderMarca":
       return mockEntenderMarca(entrada);
+    case "agruparTendencias":
+      return mockAgruparTendencias(entrada);
+    case "temaDoMomento":
+      return mockTemaDoMomento(entrada);
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
@@ -440,13 +444,49 @@ function mockVerificarTexto(entrada: string) {
   };
 }
 
-/** As primeiras 8 noticias numeradas da entrada, com um angulo derivado do titulo. */
+/** E55: cada item da lista vira um assunto (as primeiras quatro palavras do texto); nenhum é sensível (o código confere por palavras). */
+function mockAgruparTendencias(entrada: string) {
+  const bloco = /<itens_em_alta>\n([\s\S]*?)\n<\/itens_em_alta>/.exec(entrada)?.[1] ?? "";
+  const assuntos = bloco
+    .split("\n")
+    .map((linha) => /^(\d+) \| [^|]+ \| (.*)$/.exec(linha))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => {
+      const palavras = m[2].replace(/\(.*$/, "").trim().split(/\s+/).slice(0, 4);
+      return { assunto: palavras.join(" ") || "assunto", termos: palavras.slice(0, 2), itens: [Number(m[1])], sensivel: false };
+    });
+  return { assuntos };
+}
+
+/** E55: escolhe o primeiro assunto que não é sensível, com encaixe 8; o marcador SEM_ENCAIXE_TESTE na lista devolve nenhum. */
+function mockTemaDoMomento(entrada: string) {
+  if (entrada.includes("SEM_ENCAIXE_TESTE")) return { escolha: null };
+  const bloco = /<assuntos_em_alta>\n([\s\S]*?)\n<\/assuntos_em_alta>/.exec(entrada)?.[1] ?? "";
+  for (const linha of bloco.split("\n")) {
+    const m = /^(\d+) \| ([^|]+?)( \| SENSÍVEL)? \|/.exec(linha);
+    if (m && !m[3]) {
+      return {
+        escolha: {
+          indice: Number(m[1]),
+          encaixe: 8,
+          titulo: `Tema do momento: ${m[2].trim()}`,
+          descricao: `O que ${m[2].trim()} muda para o seu cliente, em um vídeo curto gravado hoje no celular.`,
+          porQue: `${m[2].trim()} está em alta no Google no Brasil hoje, e o seu cliente está falando disso.`,
+          puxaPara: "alcance" as const,
+        },
+      };
+    }
+  }
+  return { escolha: null };
+}
+
 /** E53: um resumo curto a partir do título que a entrada traz (sem inventar nada além dele). */
 function mockResumirNoticia(entrada: string) {
   const titulo = /Título: (.*)/.exec(entrada)?.[1]?.trim() ?? "a notícia";
   return { resumo: `Resumo: ${titulo}.` };
 }
 
+/** As primeiras 8 noticias numeradas da entrada, com um angulo derivado do titulo. */
 function mockFiltrarNoticias(entrada: string) {
   const blocoNoticias = entrada.split("Noticias:\n")[1] ?? "";
   const linhas = blocoNoticias.split("\n").filter((l) => /^\d+\./.test(l));

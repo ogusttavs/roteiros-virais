@@ -19,6 +19,8 @@ export const FILAS = {
   /** Passada leve do meio-dia (E6 parte 3, terceira rodada, item 6); so agenda com config.coleta.coletaMeioDia. */
   coletaMeioDia: "coleta-meio-dia",
   coletaNoticias: "coleta-noticias",
+  /** E55: o que está em alta no Brasil (buscas do Google e vídeos do YouTube), compartilhado por todos os setores; de madrugada e ao meio-dia. */
+  tendenciasBrasil: "tendencias-brasil",
   contasBase: "contas-base",
   /** Instagram pela API oficial da Meta (E6 parte 3, segunda rodada, item 2); so agenda com config.coleta.metaAtivo. */
   metaContas: "meta-contas",

@@ -9,6 +9,7 @@ export type Rotina = { chave: string; titulo: string; faz: string; filas: string
 export const ROTINAS: Rotina[] = [
   { chave: "buscar", titulo: "Buscar vídeos novos", faz: "Procura, em cada rede, os vídeos novos das contas que a gente acompanha.", filas: [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaMeioDia, FILAS.contasBase, FILAS.metaContas, FILAS.metaHashtags, FILAS.descobertaInstagram] },
   { chave: "noticias", titulo: "Ler as notícias do ramo", faz: "Junta as notícias do dia de cada ramo.", filas: [FILAS.coletaNoticias] },
+  { chave: "tendencias", titulo: "Ver o que está em alta no Brasil", faz: "Junta as buscas e os vídeos em alta no país, para todos os ramos, e põe o tema do momento no dia de cada ramo.", filas: [FILAS.tendenciasBrasil] },
   { chave: "pontuar", titulo: "Ver quais vídeos estão indo bem", faz: "Compara cada vídeo com a conta dele e separa os que passaram da média.", filas: [FILAS.pontuar, FILAS.vigilancia] },
   { chave: "transcrever", titulo: "Transcrever", faz: "Escreve o que é dito nos vídeos que passaram no filtro.", filas: [FILAS.transcrever] },
   { chave: "analisar", titulo: "Analisar os vídeos", faz: "Lê cada vídeo: assunto, abertura, estrutura e fechamento.", filas: [FILAS.extrair, FILAS.extrairColeta, FILAS.extrairAgora, FILAS.analisarVisual, FILAS.extrairSemFala] },
@@ -28,6 +29,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.coletaApify]: "a coleta do TikTok e do Instagram",
   [FILAS.coletaMeioDia]: "a coleta do meio-dia",
   [FILAS.coletaNoticias]: "a leitura das notícias",
+  [FILAS.tendenciasBrasil]: "a leitura do que está em alta no Brasil",
   [FILAS.contasBase]: "a base das contas novas",
   [FILAS.metaContas]: "a leitura do Instagram pela Meta",
   [FILAS.metaHashtags]: "a busca por hashtag na Meta",
