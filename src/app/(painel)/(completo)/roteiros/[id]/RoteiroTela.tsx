@@ -3,6 +3,7 @@
 import {
   ArrowLeft,
   Copy,
+  Check,
   Download,
   Ellipsis,
   Eye,
@@ -15,6 +16,7 @@ import {
   Sparkles,
   Type,
   Video,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,6 +55,7 @@ import { ConviteInstalar } from "@/ui/componentes/ConviteInstalar";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
+import { TelaReescrevendo } from "@/ui/componentes/TelaReescrevendo";
 import { Toast } from "@/ui/componentes/Toast";
 import { VideoEmbed } from "@/ui/componentes/VideoEmbed";
 import { ID_FAIXA_SEM_CONEXAO, useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -123,6 +126,13 @@ function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
       texto: edicao.audio ?? textosRoteiro.edicao.semAudio,
     },
   ];
+}
+
+/** "a, b e c" (os rótulos dos motivos, com a primeira letra em minúscula, no meio de uma frase). */
+function juntarMotivos(motivos: string[]): string {
+  const minusculos = motivos.map((m) => m.charAt(0).toLowerCase() + m.slice(1));
+  if (minusculos.length <= 1) return minusculos.join("");
+  return `${minusculos.slice(0, -1).join(", ")} e ${minusculos[minusculos.length - 1]}`;
 }
 
 function textoParaCopiar(blocos: BlocoRoteiro[]): string {
@@ -363,6 +373,8 @@ export function RoteiroTela({
 
   const versaoAtual = versoes.find((v) => v.id === roteiro.id);
   const idVersaoAtual = versoes.find((v) => v.atual)?.id;
+  /** A versão anterior, se foi reprovada com motivos: é por causa dela que este roteiro foi refeito. */
+  const versaoReprovada = versoes.find((v) => v.versao === roteiro.versao - 1 && v.reprovadoEm !== null && v.motivos && v.motivos.length > 0) ?? null;
   const descricaoSemRede = semConexao ? ID_FAIXA_SEM_CONEXAO : undefined;
 
   /**
@@ -666,7 +678,7 @@ export function RoteiroTela({
           </div>
         ) : null}
 
-        <div className={styles.corpoComLado} ref={refCorpoComLado}>
+        <div className={styles.corpoComLado} ref={refCorpoComLado} data-reprovando={painel === "reprovar" ? "" : undefined}>
         <div className={styles.cabecalhoTela}>
           <div className={styles.topoRoteiro}>
             <h1>{corpo.titulo}</h1>
@@ -693,6 +705,16 @@ export function RoteiroTela({
               </button>
             ) : null}
           </p>
+          {/* Passo 19 do Opus, estado `refeito`: o roteiro novo diz por que foi refeito (os motivos da versão anterior e, se a pessoa escreveu, o que ela disse). */}
+          {versaoReprovada ? (
+            <p className={styles.refeitoPorque} data-refeito-porque>
+              <Check size={16} strokeWidth={1.5} aria-hidden="true" />
+              <span>
+                {textosRoteiro.reprovar.refeitoPorque} <strong>{juntarMotivos(versaoReprovada.motivos ?? [])}</strong>.
+                {versaoReprovada.motivoTexto ? ` ${textosRoteiro.reprovar.voceDisse} “${versaoReprovada.motivoTexto}”` : ""}
+              </span>
+            </p>
+          ) : null}
         </div>
 
         {roteiro.objetivoDoVideo ? (
@@ -945,7 +967,7 @@ export function RoteiroTela({
       {/* `data-barra-acoes-propria`, sem valor: o gancho para a cápsula de abas (layout.module.css)
           sumir aqui (V5, item 5, IDENTIDADE.md item 8), para uma não flutuar sobre a outra. */}
       {editando ? (
-        <div className={styles.barraAcoes} data-barra-acoes-propria="">
+        <div className={styles.barraAcoes} data-barra-acoes-propria="" data-reprovando={painel === "reprovar" ? "" : undefined}>
           <button
             type="button"
             onClick={salvarEdicao}
@@ -967,7 +989,7 @@ export function RoteiroTela({
           <MotivoSemRede className={styles.motivoBarra} />
         </div>
       ) : (
-        <div className={styles.barraAcoes} data-barra-acoes-propria="">
+        <div className={styles.barraAcoes} data-barra-acoes-propria="" data-reprovando={painel === "reprovar" ? "" : undefined}>
           <Link href={`/roteiros/${roteiro.id}/gravar`} className={styles.btn}>
             <Video size={18} strokeWidth={1.75} aria-hidden="true" />
             {textosRoteiro.modoGravacao}
@@ -1137,11 +1159,18 @@ export function RoteiroTela({
         </form>
       </PainelFlutuante>
 
+      {/* A espera da claquete assume enquanto a reescrita roda (o painel some, e volta com a frase de erro se ela falhar): passo 19 do Opus. */}
+      <TelaReescrevendo
+        aberto={reescrevendo}
+        motivos={MOTIVOS_REPROVACAO.filter((m) => motivosSelecionados.has(m.id)).map((m) => m.rotulo)}
+        continuaSendo={roteiro.formato === "story" ? "um Story, para quem já te segue" : `para que ${COMPLEMENTO_PARA_QUE[fichaDoRoteiro(roteiro)]}`}
+        aoVoltarDepois={() => router.push("/hoje")}
+      />
+
       <PainelFlutuante
-        titulo={
-          reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha
-        }
-        aberto={painel === "reprovar"}
+        titulo={textosRoteiro.reprovar.tituloFolha}
+        aberto={painel === "reprovar" && !reescrevendo}
+        lateral
         aoFechar={fecharSeLivre}
         rodape={
           <>
@@ -1158,9 +1187,7 @@ export function RoteiroTela({
               aria-describedby={descricaoSemRede}
               className={styles.btn}
             >
-              {reescrevendo
-                ? textosRoteiro.reprovar.reescrevendo
-                : textosRoteiro.reprovar.reescrever}
+              {textosRoteiro.reprovar.reescrever}
             </button>
             <MotivoSemRede />
             <p className={styles.avisoTempoReprovar} aria-live="polite">
@@ -1181,14 +1208,18 @@ export function RoteiroTela({
           </>
         }
       >
-        <h2 className={styles.tituloPainel}>
-          {reescrevendo ? textosRoteiro.reprovar.reescrevendo : textosRoteiro.reprovar.tituloFolha}
-        </h2>
+        <div className={styles.cabecaReprovar}>
+          <h2 className={styles.tituloPainel}>{textosRoteiro.reprovar.tituloFolha}</h2>
+          <button type="button" onClick={fecharSeLivre} disabled={reescrevendo} className={styles.fecharReprovar} aria-label={textosRoteiro.reprovar.fechar}>
+            <X size={20} strokeWidth={1.5} aria-hidden="true" />
+          </button>
+        </div>
         <p className={styles.ajudaReprovar}>{textosRoteiro.reprovar.ajudaMotivos}</p>
         <div
           role="group"
           aria-label={textosRoteiro.reprovar.rotuloMotivos}
-          className={chipStyles.grupo}
+          className={[chipStyles.grupo, styles.motivosReprovar].join(" ")}
+          data-motivos-reprovar
         >
           {MOTIVOS_REPROVACAO.map((motivo) => {
             const ativo = motivosSelecionados.has(motivo.id);
@@ -1198,10 +1229,11 @@ export function RoteiroTela({
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => alternarMotivo(motivo.id)}
-                className={[chipStyles.chip, ativo ? chipStyles.ativo : ""]
+                className={[chipStyles.chip, styles.motivoChip, ativo ? chipStyles.ativo : ""]
                   .filter(Boolean)
                   .join(" ")}
               >
+                {ativo ? <Check size={14} strokeWidth={2.25} className={styles.tiqueMotivo} aria-hidden="true" /> : null}
                 {motivo.rotulo}
               </button>
             );

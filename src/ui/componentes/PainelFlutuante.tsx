@@ -28,6 +28,11 @@ type Props = {
    * tudo dentro de `children`, que ainda rola inteiro se passar de 80dvh.
    */
   rodape?: ReactNode;
+  /**
+   * Do desktop (1024px) para cima, o painel vira uma coluna de 25rem encostada na direita, de ponta a ponta da altura, entrando da direita (passo 19 do Opus, `reprovarPainel`); abaixo disso
+   * continua a folha de baixo. Só vale com `rodape`.
+   */
+  lateral?: boolean;
   children: ReactNode;
 };
 
@@ -63,7 +68,7 @@ type Props = {
  * regra global de `base.css` lê para travar a rolagem da página de trás
  * enquanto uma folha está aberta.
  */
-export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rodape, children }: Props) {
+export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rodape, lateral = false, children }: Props) {
   const arrasto = usePuxarParaFechar(aoFechar);
   const painelRef = arrasto.folhaRef;
   const { montada, saindo } = useFolhaAnimada(aberto);
@@ -111,7 +116,8 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rod
         tabIndex={-1}
         data-folha-aberta=""
         data-saindo={saindo ? "" : undefined}
-        className={[rodape ? styles.painelComRodape : styles.painel, saindo ? styles.saindo : ""].filter(Boolean).join(" ")}
+        className={[rodape ? styles.painelComRodape : styles.painel, rodape && lateral ? styles.lateral : "", saindo ? styles.saindo : ""].filter(Boolean).join(" ")}
+        data-painel-lateral={rodape && lateral ? "" : undefined}
       >
         {/* A alça desenhada tem 5px; quem agarra é esta área de 44px em volta dela (some do tablet para cima). */}
         <div className={styles.areaAlca} {...arrasto.alca}>

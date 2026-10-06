@@ -1,0 +1,64 @@
+/* Os três passos da espera da reescrita (passo 19 do Opus): feito, agora, depois. */
+.passos {
+  display: grid;
+  gap: var(--espaco-3);
+  width: 100%;
+  margin: var(--espaco-2) 0 0;
+  padding: var(--espaco-4) var(--espaco-5);
+  list-style: none;
+  text-align: left;
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.passo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-3);
+  font-size: var(--tamanho-corpo);
+  line-height: 1.4;
+  color: var(--cor-texto-dica);
+}
+
+.passo[data-passo="agora"] {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.passo[data-passo="feito"] {
+  color: var(--cor-texto-suave);
+}
+
+.marca {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.1rem;
+  border: 2px solid var(--cor-borda-forte);
+  border-radius: 50%;
+}
+
+.passo[data-passo="feito"] .marca {
+  border-color: var(--cor-positivo);
+  color: var(--cor-positivo);
+}
+
+.passo[data-passo="agora"] .marca {
+  border-color: var(--cor-titulo);
+  background: radial-gradient(circle, var(--cor-titulo) 40%, transparent 45%);
+}
+
+.marcou {
+  margin: 0;
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.marcou strong {
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}

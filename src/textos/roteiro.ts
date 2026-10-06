@@ -162,10 +162,11 @@ export const textosRoteiro = {
     textoLivrePlaceholder: "Opcional",
     objetivoContinua: (paraQue: string) => `Continua sendo para que: ${paraQue}`,
     storyContinua: "Continua sendo um Story, para quem já te segue",
-    reescrever: "Reescrever com isso em mente",
+    reescrever: "Reescrever o roteiro",
+    fechar: "Fechar",
     reescrevendo: "Reescrevendo o roteiro",
     semMotivoMarcado: "Marque pelo menos um motivo para reescrever",
-    tempoEstimado: "Leva de 30 segundos a 3 minutos. O tema e o objetivo continuam os mesmos.",
+    tempoEstimado: "Pode levar até 3 minutos. O tema e o objetivo continuam os mesmos.",
     /**
      * Depois de uns 10 segundos escrevendo (V7, item 4 do PROXIMO.md): sem dizer "mais que o normal", porque a
      * estimativa acima já vai a 3 minutos.
@@ -175,6 +176,20 @@ export const textosRoteiro = {
     erro: "Não deu para reescrever agora. A falha foi nossa; o que você marcou continua aqui.",
     cancelar: "Cancelar",
     etiqueta: "reprovada",
+    /** A espera da reescrita (passo 19 do Opus, `Roteiro.dc.html`, estado `reescrevendo`): a claquete, os três passos e o que a pessoa marcou. */
+    espera: {
+      titulo: "Reescrevendo o seu roteiro",
+      subtitulo: "Reescrevendo com o que você disse",
+      passoGuardando: "Guardando o que você não gostou",
+      passoReescrevendo: "Reescrevendo sem o que você marcou",
+      passoConferindo: (continuaSendo: string) => `Conferindo se continua sendo ${continuaSendo}`,
+      voceMarcou: "Você marcou:",
+      duracao: "Pode levar até 3 minutos",
+      voltarDepois: "Voltar depois",
+    },
+    /** O roteiro novo diz por que foi refeito (passo 19, estado `refeito`): os motivos e, se a pessoa escreveu, o que ela disse. */
+    refeitoPorque: "Refeito porque:",
+    voceDisse: "Você disse:",
     motivosLinha: (motivos: string, data: string) => `Você reprovou por: ${motivos}, em ${data}`,
   },
 };
