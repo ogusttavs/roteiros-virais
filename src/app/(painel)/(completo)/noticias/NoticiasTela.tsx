@@ -1,208 +1,196 @@
 "use client";
 
-import { CircleAlert, ExternalLink, Zap } from "lucide-react";
-import Link from "next/link";
+import { Check, CircleAlert, Newspaper, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 
-import type { PeriodoNoticias } from "@/servicos/noticias";
 import { textosNoticias } from "@/textos/noticias";
 import { Botao } from "@/ui/componentes/Botao";
-import { Folha } from "@/ui/componentes/Folha";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
+import { abrirNoticiaDoAssuntoAction } from "./acoes";
+import { CartaoDeNoticia, type NoticiaNaTela } from "./CartaoDeNoticia";
+import { FolhaDosAssuntos, type AssuntoNaFolha } from "./FolhaDosAssuntos";
 import styles from "./NoticiasTela.module.css";
 
-export type NoticiaFormatada = {
-  id: number;
-  titulo: string;
-  /** "Ler no site": nunca a matéria inteira, só o link para o original (cuidado 1 do escopo da E43). */
-  url: string;
-  resumo: string | null;
-  angulo: string | null;
-  /** Pronta do servidor: "Portal do Varejo · há 3 horas" (`formatarFonteEData`). */
-  fonteEDataRelativa: string;
-  /** Pronta do servidor, com a hora exata: só para a folha aberta (dúvida 3 do passo 11). */
-  fonteEDataCompleta: string;
-  virouRoteiro: boolean;
-  roteiroId: number | null;
-};
-
 type Props = {
-  noticias: NoticiaFormatada[];
-  periodo: PeriodoNoticias;
-  contagemSemana: number;
-  /** A coleta de hoje falhou; a lista mostrada é a de semana mesmo assim (dúvida 12 do passo 11). */
-  falhaNaColeta: boolean;
+  /** "terça-feira, 6 de outubro", pronta do servidor. */
+  dataPorExtenso: string;
+  nomeDoSetor: string;
+  deHoje: NoticiaNaTela[];
+  deOntem: NoticiaNaTela[];
+  assuntos: AssuntoNaFolha[];
+  novasDesdeOntem: number;
+  /** A coleta ou a leitura falhou; o que já estava guardado continua (se houver). */
+  falha: boolean;
+  /** O "ver como" só olha. */
+  somenteLeitura: boolean;
 };
 
-const PERIODOS: { valor: PeriodoNoticias; rotulo: string }[] = [
-  { valor: "hoje", rotulo: textosNoticias.periodoHoje },
-  { valor: "semana", rotulo: textosNoticias.periodoSemana },
-  { valor: "mes", rotulo: textosNoticias.periodoMes },
-];
+type Filtro = "tudo" | "setor" | `a-${number}`;
 
-/** O bloco "Como isso vira vídeo seu" (dúvida 4 do passo 11: mesmo visual da sugestão do briefing, só leitura aqui). */
-function BlocoAngulo({ angulo }: { angulo: string }) {
-  return (
-    <div className={styles.angulo}>
-      <span className={styles.anguloRotulo}>
-        <Zap size={14} strokeWidth={1.75} aria-hidden="true" />
-        {textosNoticias.comoViraVideo}
-      </span>
-      <p className={styles.anguloTexto}>{angulo}</p>
-    </div>
-  );
+/** Quando chega a próxima coleta (06:00 e 14:00, no fuso de São Paulo), em texto. */
+function quandoChega(agora: Date): string {
+  const hora = Number(new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", hour12: false, timeZone: "America/Sao_Paulo" }).format(agora)) % 24;
+  if (hora < 6) return textosNoticias.quandoHoje06;
+  if (hora < 14) return textosNoticias.quandoHoje14;
+  return textosNoticias.quandoAmanha06;
+}
+
+function passa(n: NoticiaNaTela, filtro: Filtro): boolean {
+  if (filtro === "tudo") return true;
+  if (filtro === "setor") return n.tipo === "setor";
+  return n.assuntoId === Number(filtro.slice(2));
 }
 
 /**
- * `/noticias` (E43): o filtro de período é navegação de servidor comum (sem o otimismo de
- * Referências, a lista é bem mais leve). A notícia aberta é uma folha (dúvida 6 do passo 11), com
- * "Criar vídeo com esta notícia" e "Ler no site"; a primeira leva para `/criar/tema-livre`.
+ * `/noticias` (E53, passo 20): a capa do dia. A data, a linha dos assuntos que a pessoa acompanha (com "Editar", que abre a folha), as pílulas de origem, o destaque com a foto grande e os
+ * cartões. Sem notícia nova hoje, o aviso e as de ontem embaixo. Abrir o original ou pedir o roteiro de uma notícia de assunto mantém o assunto vivo (a recusa do "ver como" é ignorada).
  */
-export function NoticiasTela({ noticias, periodo, contagemSemana, falhaNaColeta }: Props) {
+export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, assuntos, novasDesdeOntem, falha, somenteLeitura }: Props) {
   const router = useRouter();
-  const [trocandoPeriodo, iniciarTransicao] = useTransition();
-  const [noticiaAbertaId, setNoticiaAbertaId] = useState<number | null>(null);
-  const { fechar: fecharFolha, fecharENavegar } = useFolhaNoHistorico(noticiaAbertaId !== null, () =>
-    setNoticiaAbertaId(null),
-  );
+  const [folhaAberta, setFolhaAberta] = useState(false);
+  const [filtro, setFiltro] = useState<Filtro>("tudo");
+  const [chegando, setChegando] = useState<{ assunto: string; quando: string } | null>(null);
+  const { fechar: fecharFolha } = useFolhaNoHistorico(folhaAberta, () => setFolhaAberta(false));
 
-  function trocarPeriodo(novo: PeriodoNoticias) {
-    iniciarTransicao(() => router.push(`/noticias?periodo=${novo}`));
+  // Um filtro que apontava para um assunto que saiu volta para "Tudo".
+  const filtroValido: Filtro = filtro.startsWith("a-") && !assuntos.some((a) => `a-${a.id}` === filtro) ? "tudo" : filtro;
+  const hoje = deHoje.filter((n) => passa(n, filtroValido));
+  const ontem = deOntem.filter((n) => passa(n, filtroValido));
+  // O destaque é a mais nova com foto; sem nenhuma com foto, a mais nova.
+  const destaque = hoje.find((n) => n.imagemUrl) ?? hoje[0] ?? null;
+  const restoDeHoje = hoje.filter((n) => n !== destaque);
+
+  function abrir(noticia: NoticiaNaTela) {
+    if (noticia.tipo === "assunto") void abrirNoticiaDoAssuntoAction(noticia.noticiaId).catch(() => undefined);
   }
 
-  const noticiaAberta = noticias.find((n) => n.id === noticiaAbertaId) ?? null;
-  const poucaNoticia = periodo === "semana" && noticias.length > 0 && contagemSemana < 3;
-  const vazio = noticias.length === 0;
+  function criarRoteiro(noticia: NoticiaNaTela) {
+    abrir(noticia);
+    // A do setor vai presa pelo id (`comNoticia`); a de assunto vai pelo título, e o roteiro já usa as notícias do assunto quando o texto o toca.
+    router.push(noticia.tipo === "setor" ? `/criar/tema-livre?noticiaId=${noticia.noticiaId}` : `/criar/tema-livre?tema=${encodeURIComponent(noticia.titulo)}`);
+  }
+
+  const pilulas: { chave: Filtro; rotulo: string }[] = [
+    { chave: "tudo", rotulo: textosNoticias.tudo },
+    ...(nomeDoSetor ? [{ chave: "setor" as const, rotulo: nomeDoSetor }] : []),
+    ...assuntos.map((a) => ({ chave: `a-${a.id}` as const, rotulo: a.texto })),
+  ];
 
   return (
     <div className={styles.pagina}>
       <div className={styles.cabecalhoTela}>
+        <span className={styles.data}>{dataPorExtenso}</span>
         <h1>{textosNoticias.titulo}</h1>
-        <p>{textosNoticias.subtitulo}</p>
+        <p>{novasDesdeOntem > 0 ? textosNoticias.novasDesdeOntem(novasDesdeOntem, assuntos.length > 0) : textosNoticias.nenhumaNova}</p>
       </div>
 
-      <div className={styles.filtro} role="radiogroup" aria-label={textosNoticias.tituloCompacto}>
-        {PERIODOS.map(({ valor, rotulo }) => (
-          <button
-            key={valor}
-            type="button"
-            role="radio"
-            aria-checked={periodo === valor}
-            className={[styles.chip, periodo === valor ? styles.chipAtivo : ""].filter(Boolean).join(" ")}
-            disabled={trocandoPeriodo}
-            onClick={() => trocarPeriodo(valor)}
-          >
-            {rotulo}
-          </button>
-        ))}
-      </div>
+      {assuntos.length > 0 ? (
+        <div>
+          <div className={styles.acompanha}>
+            <Newspaper aria-hidden="true" strokeWidth={1.5} />
+            <p>
+              {textosNoticias.voceAcompanha}{" "}
+              {assuntos.map((a, i) => (
+                <span key={a.id}>
+                  <b>{a.texto}</b>
+                  {i < assuntos.length - 1 ? ", " : ""}
+                </span>
+              ))}
+              <span className={styles.quantos}>{textosNoticias.ateCinco(assuntos.length)}</span>
+            </p>
+            <Botao variante="ghost" tamanho="md" onClick={() => setFolhaAberta(true)} aria-haspopup="dialog">
+              {textosNoticias.editar}
+            </Botao>
+          </div>
+          {chegando ? (
+            <p className={styles.chegando} role="status">
+              <RefreshCw aria-hidden="true" strokeWidth={1.75} />
+              <span>{textosNoticias.assuntoChegando(chegando.assunto, chegando.quando)}</span>
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <section className={[styles.cartao, styles.convite].join(" ")} aria-labelledby="convite-assunto">
+          <h2 id="convite-assunto">{textosNoticias.semAssuntoLinha}</h2>
+          <p>{textosNoticias.semAssuntoFrase}</p>
+          <Botao variante="secundario" tamanho="md" onClick={() => setFolhaAberta(true)} aria-haspopup="dialog">
+            {textosNoticias.acompanhar}
+          </Botao>
+        </section>
+      )}
 
-      {falhaNaColeta ? (
-        <div className={[styles.cartao, styles.aviso].join(" ")}>
-          <span className={styles.avisoTitulo}>
+      {pilulas.length > 1 ? (
+        <div className={styles.pilulas} role="group" aria-label={textosNoticias.filtroAria}>
+          {pilulas.map((p) => (
+            <button
+              key={p.chave}
+              type="button"
+              aria-pressed={filtroValido === p.chave}
+              className={[styles.pilula, filtroValido === p.chave ? styles.pilulaAtiva : ""].filter(Boolean).join(" ")}
+              onClick={() => setFiltro(p.chave)}
+            >
+              {filtroValido === p.chave ? <Check aria-hidden="true" strokeWidth={2} /> : null}
+              {p.rotulo}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {falha ? (
+        <div className={[styles.cartao, styles.erro].join(" ")}>
+          <span className={styles.erroTitulo}>
             <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
             {textosNoticias.erroTitulo}
           </span>
           <p>{textosNoticias.erroFrase}</p>
-          <p className={styles.avisoDescricao}>{textosNoticias.erroDescricao}</p>
+          <p>{textosNoticias.erroDescricao}</p>
+          <Botao variante="secundario" tamanho="md" onClick={() => router.refresh()}>
+            {textosNoticias.tentarDeNovo}
+          </Botao>
         </div>
       ) : null}
 
-      {vazio ? (
-        periodo === "hoje" ? (
-          <div className={[styles.cartao, styles.estado].join(" ")}>
-            <h2>{textosNoticias.vazioTitulo}</h2>
-            <p>{textosNoticias.vazioFrase(contagemSemana)}</p>
-            <Botao variante="secundario" tamanho="md" onClick={() => trocarPeriodo("semana")}>
-              {textosNoticias.verASemana}
-            </Botao>
+      {hoje.length === 0 ? (
+        <div className={[styles.cartao, styles.semNovidade].join(" ")} data-sem-novidade>
+          <Newspaper aria-hidden="true" strokeWidth={1.5} />
+          <div>
+            <h2>{textosNoticias.nadaNovoTitulo}</h2>
+            <p>{ontem.length > 0 ? textosNoticias.nadaNovoFrase : textosNoticias.nadaNovoSemOntem}</p>
           </div>
-        ) : (
-          <div className={[styles.cartao, styles.estado].join(" ")}>
-            <h2>{textosNoticias.vazioTitulo}</h2>
-          </div>
-        )
+        </div>
       ) : (
-        <>
-          {poucaNoticia ? (
-            <div className={[styles.cartao, styles.avisoSuave].join(" ")}>
-              <span className={styles.avisoTitulo}>{textosNoticias.poucaNoticiaTitulo}</span>
-              <p>{textosNoticias.poucaNoticiaFrase(contagemSemana)}</p>
+        <div className={styles.capa}>
+          {destaque ? <CartaoDeNoticia noticia={destaque} destaque aoAbrir={abrir} aoCriarRoteiro={criarRoteiro} /> : null}
+          {restoDeHoje.length > 0 ? (
+            <div className={styles.grade}>
+              {restoDeHoje.map((n) => (
+                <CartaoDeNoticia key={n.chave} noticia={n} aoAbrir={abrir} aoCriarRoteiro={criarRoteiro} />
+              ))}
             </div>
           ) : null}
-
-          <p className={styles.rotuloQuantidade}>{textosNoticias.quantasNestePeriodo(noticias.length, periodo)}</p>
-
-          <div className={styles.grade}>
-            {/*
-              Acabamento da E43 (achado de acessibilidade, revisão do Fable em 02/10): um `<button>`
-              não pode conter um `<Link>` (vira `<a>` dentro de `<button>`, HTML inválido e ruim para
-              leitor de tela). O cartão vira `<article>` com um botão cobrindo tudo (só a abertura da
-              folha) e o "Ver o roteiro" como link irmão, por cima, independente, sem mudar a aparência.
-            */}
-            {noticias.map((noticia) => (
-              <article key={noticia.id} className={[styles.cartao, styles.noticia].join(" ")}>
-                <button
-                  type="button"
-                  className={styles.coberturaNoticia}
-                  aria-label={noticia.titulo}
-                  onClick={() => setNoticiaAbertaId(noticia.id)}
-                />
-                <div className={styles.fonte}>
-                  <span>{noticia.fonteEDataRelativa}</span>
-                </div>
-                <h3 className={styles.tituloNoticia}>{noticia.titulo}</h3>
-                {noticia.resumo ? <p className={styles.resumo}>{noticia.resumo}</p> : null}
-                {noticia.angulo ? <BlocoAngulo angulo={noticia.angulo} /> : null}
-                <div className={styles.peNoticia}>
-                  {noticia.virouRoteiro && noticia.roteiroId ? (
-                    <>
-                      <span className={styles.virouRoteiro}>{textosNoticias.virouRoteiro}</span>
-                      <Link href={`/roteiros/${noticia.roteiroId}`} className={styles.verRoteiro}>
-                        {textosNoticias.verORoteiro}
-                      </Link>
-                    </>
-                  ) : (
-                    <span className={styles.abrirRotulo}>{textosNoticias.abrir}</span>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
-        </>
+        </div>
       )}
 
-      {noticiaAberta ? (
-        <Folha
-          titulo={noticiaAberta.titulo}
-          aberto={noticiaAbertaId !== null}
-          aoFechar={fecharFolha}
-          rodape={
-            <>
-              <Botao
-                variante="primario"
-                tamanho="lg"
-                onClick={() => fecharENavegar(() => router.push(`/criar/tema-livre?noticiaId=${noticiaAberta.id}`))}
-              >
-                {textosNoticias.criarVideoComEstaNoticia}
-              </Botao>
-              <a href={noticiaAberta.url} target="_blank" rel="noopener noreferrer" className={styles.lerNoSite}>
-                <ExternalLink size={16} strokeWidth={1.5} aria-hidden="true" />
-                {textosNoticias.lerNoSite}
-              </a>
-            </>
-          }
-        >
-          <div className={styles.corpoFolha}>
-            <span className={styles.fonteCompleta}>{noticiaAberta.fonteEDataCompleta}</span>
-            <p className={styles.resumoInteiro}>{noticiaAberta.resumo}</p>
-            <p className={styles.deQuem}>{textosNoticias.resumoNosso}</p>
-            {noticiaAberta.angulo ? <BlocoAngulo angulo={noticiaAberta.angulo} /> : null}
+      {ontem.length > 0 ? (
+        <section className={styles.secao} aria-labelledby="titulo-de-ontem">
+          <h2 id="titulo-de-ontem">{textosNoticias.deOntem}</h2>
+          <div className={styles.grade}>
+            {ontem.map((n) => (
+              <CartaoDeNoticia key={n.chave} noticia={n} aoAbrir={abrir} aoCriarRoteiro={criarRoteiro} />
+            ))}
           </div>
-        </Folha>
+        </section>
       ) : null}
+
+      <FolhaDosAssuntos
+        aberto={folhaAberta}
+        aoFechar={fecharFolha}
+        assuntos={assuntos}
+        somenteLeitura={somenteLeitura}
+        aoAcrescentar={(assunto) => setChegando({ assunto, quando: quandoChega(new Date()) })}
+      />
     </div>
   );
 }

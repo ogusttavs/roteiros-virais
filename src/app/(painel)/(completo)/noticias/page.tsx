@@ -1,77 +1,82 @@
 import { Newspaper } from "lucide-react";
 import { redirect } from "next/navigation";
 
-import { formatarDataHoraPorExtenso, formatarFonteEData } from "@/lib/formatarNumero";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { contagemNoticiasNaSemana, noticiasDoSetor, type NoticiaListada, type PeriodoNoticias } from "@/servicos/noticias";
+import { capaDoDia, type CapaDoDia, type NoticiaDaCapa } from "@/servicos/noticias-do-dia";
 import { textosNoticias } from "@/textos/noticias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
-import { NoticiasTela, type NoticiaFormatada } from "./NoticiasTela";
+import type { NoticiaNaTela } from "./CartaoDeNoticia";
+import { NoticiasTela } from "./NoticiasTela";
 
-const PERIODOS_VALIDOS = new Set<string>(["hoje", "semana", "mes"]);
+const FUSO = "America/Sao_Paulo";
+const DIA_MS = 24 * 60 * 60 * 1000;
 
-type Props = { searchParams: Promise<{ periodo?: string }> };
+function dataPorExtenso(agora: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone: FUSO }).format(agora);
+}
 
-function formatarNoticia(n: NoticiaListada): NoticiaFormatada {
+/** "07:40" para as de hoje; "ontem" ou "anteontem" para as outras. */
+function quando(n: NoticiaDaCapa, agora: Date): string {
+  if (!n.publicadoEm) return "";
+  const dia = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: FUSO }).format(d);
+  if (dia(n.publicadoEm) === dia(agora)) return new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO }).format(n.publicadoEm);
+  return dia(n.publicadoEm) === dia(new Date(agora.getTime() - DIA_MS)) ? "ontem" : "anteontem";
+}
+
+function paraATela(n: NoticiaDaCapa, agora: Date): NoticiaNaTela {
   return {
-    id: n.id,
+    chave: n.chave,
+    tipo: n.tipo,
+    noticiaId: n.noticiaId,
+    assuntoId: n.assuntoId,
+    origemRotulo: n.origemRotulo,
     titulo: n.titulo,
-    url: n.url,
+    veiculo: n.veiculo,
+    quando: quando(n, agora),
     resumo: n.resumo,
-    angulo: n.angulo,
-    fonteEDataRelativa: formatarFonteEData(n.fonte, n.publicadoEm),
-    fonteEDataCompleta: n.fonte && n.publicadoEm
-      ? `${n.fonte} · ${formatarDataHoraPorExtenso(n.publicadoEm)}`
-      : (n.publicadoEm ? formatarDataHoraPorExtenso(n.publicadoEm) : (n.fonte ?? "")),
-    virouRoteiro: n.virouRoteiro,
+    url: n.url,
+    imagemUrl: n.imagemUrl,
+    imagemCredito: n.imagemCredito,
     roteiroId: n.roteiroId,
   };
 }
 
 /**
- * `/noticias` (E43, decisão do Gustavo em 01/10, 22:20: aba própria, não um segmento de
- * Referências). O filtro Hoje/Semana/Mês é navegação de servidor (`?periodo=`), igual ao período
- * de Referências; a tela é só leitura, a coleta e o filtro de relevância rodam em `jobs/`.
+ * `/noticias` (E53, passo 20): a capa do dia, o blog que a pessoa abre todo dia. Só leitura; os assuntos mudam por Server Actions (`acoes.ts`) que o "ver como" recusa. Falha ao ler não
+ * derruba a tela: sem notícia, o aviso e o "Tentar de novo".
  */
-export default async function Noticias({ searchParams }: Props) {
+export default async function Noticias() {
   const sessao = await sessaoDoPainel();
-  if (!sessao) {
-    redirect("/entrar");
-  }
+  if (!sessao) redirect("/entrar");
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) {
-    redirect("/entrar");
-  }
+  if (!cliente) redirect("/entrar");
 
   if (!cliente.nichoId) {
     return <EstadoVazio icone={<Newspaper size={24} strokeWidth={1.5} aria-hidden="true" />} frase={textosNoticias.semNicho} />;
   }
 
-  const params = await searchParams;
-  // Dúvida 2 do passo 11: Semana é o período de entrada (Hoje vazio é o caso comum).
-  const periodo: PeriodoNoticias = PERIODOS_VALIDOS.has(params.periodo ?? "") ? (params.periodo as PeriodoNoticias) : "semana";
-
-  let noticias: NoticiaListada[];
-  let falhaNaColeta = false;
+  const agora = new Date();
+  let capa: CapaDoDia = { nomeDoSetor: "", deHoje: [], deOntem: [], assuntos: [], novasDesdeOntem: 0 };
+  let falha = false;
   try {
-    noticias = await noticiasDoSetor(cliente.nichoId, cliente.id, periodo);
+    capa = await capaDoDia(cliente, agora);
   } catch {
-    // Dúvida 12 do passo 11: a falha não esconde o que já tínhamos; cai para a semana, sem filtro.
-    falhaNaColeta = true;
-    noticias = periodo === "semana" ? [] : await noticiasDoSetor(cliente.nichoId, cliente.id, "semana");
+    falha = true;
   }
-
-  const contagemSemana = await contagemNoticiasNaSemana(cliente.nichoId);
 
   return (
     <NoticiasTela
-      noticias={noticias.map(formatarNoticia)}
-      periodo={periodo}
-      contagemSemana={contagemSemana}
-      falhaNaColeta={falhaNaColeta}
+      dataPorExtenso={dataPorExtenso(agora)}
+      nomeDoSetor={capa.nomeDoSetor}
+      deHoje={capa.deHoje.map((n) => paraATela(n, agora))}
+      deOntem={capa.deOntem.map((n) => paraATela(n, agora))}
+      assuntos={capa.assuntos}
+      novasDesdeOntem={capa.novasDesdeOntem}
+      falha={falha}
+      somenteLeitura={sessao.verComo !== null}
     />
   );
 }
