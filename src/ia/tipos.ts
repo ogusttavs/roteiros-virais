@@ -28,6 +28,8 @@ export type TarefaIA =
   | "analisarVisual"
   | "modeloNicho"
   | "filtrarNoticias"
+  /** E53: o resumo nosso, em duas frases, de uma notícia de um assunto que a pessoa acompanha. */
+  | "resumirNoticia"
   | "temasDoDia"
   | "avaliarTema"
   | "roteiro"

@@ -29,6 +29,7 @@ import { inArray } from "drizzle-orm";
 import { db } from "../../src/db";
 import {
   account,
+  avaliacoesTema,
   briefings,
   clientes,
   membrosMarca,
@@ -206,6 +207,8 @@ test.describe("painel sem rede", () => {
       .where(inArray(clientes.usuarioId, IDS_USUARIO));
     const idsMarcas = existentes.map((m) => m.id);
     if (idsMarcas.length > 0) {
+      // As avaliações de tema apontam para a marca: sem apagá-las antes, uma falha de um teste derrubaria a limpeza do seguinte.
+      await db().delete(avaliacoesTema).where(inArray(avaliacoesTema.clienteId, idsMarcas));
       await db().delete(roteiros).where(inArray(roteiros.clienteId, idsMarcas));
       await db().delete(briefings).where(inArray(briefings.clienteId, idsMarcas));
     }

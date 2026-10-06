@@ -1303,6 +1303,66 @@ export const noticias = pgTable("noticias", {
   coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * E53, assuntos que eu acompanho: até cinco por marca (texto livre mais os termos que a pessoa deu), acompanhados todo dia pelas notícias, nunca por vídeo. O sistema nunca sugere
+ * assunto sozinho. Some sozinho depois de 30 dias sem a pessoa abrir uma notícia dele (`ultimoAbertoEm`, ou `criadoEm` se nunca abriu), a não ser que esteja fixado.
+ */
+export const assuntosDaMarca = pgTable(
+  "assuntos_da_marca",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    /** O que a pessoa escreveu ("política", "eleição 2026"). */
+    texto: text("texto").notNull(),
+    /** O que casa com uma notícia: o texto e os termos dados, todos comparados sem acento e sem maiúscula. */
+    termos: jsonb("termos").$type<string[]>().notNull().default([]),
+    fixado: boolean("fixado").notNull().default(false),
+    ativo: boolean("ativo").notNull().default(true),
+    criadoEm: criadoEm(),
+    ultimoAbertoEm: timestamp("ultimo_aberto_em", { withTimezone: true }),
+    /** Quando o assunto saiu sozinho por falta de uso (nulo: ainda ativo ou tirado à mão). */
+    expiradoEm: timestamp("expirado_em", { withTimezone: true }),
+  },
+  (t) => [
+    index("assuntos_da_marca_cliente").on(t.clienteId, t.ativo),
+    // Um assunto ativo por texto (sem diferença de maiúscula) em cada marca: o que a tela confere, o banco garante.
+    uniqueIndex("assuntos_da_marca_texto_unico").on(t.clienteId, sql`lower(${t.texto})`).where(sql`${t.ativo}`),
+  ],
+);
+export type AssuntoDaMarca = typeof assuntosDaMarca.$inferSelect;
+
+/**
+ * E53: a notícia de um assunto. NUNCA o texto da matéria: o título, o veículo, a hora, o link para o original, a foto do veículo com o crédito (do RSS ou do `og:image` da página) e o resumo
+ * NOSSO de duas linhas. Uma por assunto e por endereço.
+ */
+export const noticiasDoAssunto = pgTable(
+  "noticias_do_assunto",
+  {
+    id: id(),
+    assuntoId: integer("assunto_id")
+      .notNull()
+      .references(() => assuntosDaMarca.id, { onDelete: "cascade" }),
+    titulo: text("titulo").notNull(),
+    veiculo: text("veiculo").notNull(),
+    url: text("url").notNull(),
+    publicadoEm: timestamp("publicado_em", { withTimezone: true }),
+    imagemUrl: text("imagem_url"),
+    /** "Foto: G1" (o veículo da notícia, nunca a nossa). */
+    imagemCredito: text("imagem_credito"),
+    /** O resumo nosso, em duas linhas, escrito pelo modelo barato a partir do título e do trecho que o próprio feed oferece. */
+    resumoNosso: text("resumo_nosso"),
+    /** De onde veio: o RSS direto do veículo ou a busca do Google News. */
+    origem: text("origem").$type<"rss" | "google">().notNull(),
+    coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
+    /** A pessoa abriu esta notícia (mantém o assunto vivo). */
+    abertaEm: timestamp("aberta_em", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("noticias_do_assunto_url").on(t.assuntoId, t.url), index("noticias_do_assunto_recentes").on(t.assuntoId, t.publicadoEm)],
+);
+export type NoticiaDoAssunto = typeof noticiasDoAssunto.$inferSelect;
+
 export type ModeloNicho = {
   resumo: string;
   ganchos: { tipo: string; exemplo: string; frequencia: string }[];

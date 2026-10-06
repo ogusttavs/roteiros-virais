@@ -52,6 +52,7 @@ import { comArroba } from "@/lib/perfil-redes";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
+import { noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { filtroDeFormatosDaMarca } from "./formatos";
@@ -984,6 +985,16 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     .filter((l) => l.existeNaRede && l.leitura)
     .map((l) => ({ handle: l.handle, leitura: l.leitura as string }));
 
+  // E53: as notícias de hoje dos assuntos que a marca acompanha, quando o tema, o momento ou o pedido da pessoa tocam em algum; marca sem assunto não recebe nada.
+  const noticiasDoAssunto = (
+    await noticiasDeHojeDosAssuntos(
+      dados.clienteId,
+      [dados.tema, dados.momento?.onde, dados.momento?.oQueEstaAcontecendo, dados.momento?.oQueDaParaMostrar, dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo, dados.observacao]
+        .filter(Boolean)
+        .join(" "),
+    )
+  ).map((n) => ({ titulo: n.titulo, veiculo: n.veiculo, dia: n.dia, resumo: n.resumo }));
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -1047,6 +1058,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       contextoDeSerie,
       marcaCitada,
       noticia: dados.noticia,
+      noticiasDoAssunto,
     }),
     // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
     fontesDosFatos: roteiroIA.montarFontesDosFatos({
@@ -1060,6 +1072,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       observacao: dados.observacao,
       noticia: dados.noticia,
       marcaCitada,
+      noticiasDoAssunto,
       evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
     }),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais

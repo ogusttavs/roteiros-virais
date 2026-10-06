@@ -327,6 +327,26 @@ export const textosAdmin = {
     erroDisparar: (mensagem: string) => `não conseguimos disparar o job: ${mensagem}`,
   },
   /** E45 PR 3: o bloco "Ramos alternativos" na página da marca (só o admin liga e desliga; o cliente só lê na Conta). */
+  /** E53: "Assuntos que a marca acompanha", pelo admin (a tela da pessoa vem com o desenho). */
+  assuntos: {
+    titulo: "Assuntos que a marca acompanha",
+    ajuda: "Até cinco por marca. Todo dia o sistema lê as notícias de cada um e, quando um roteiro toca no assunto, usa as notícias de hoje como fonte. Só notícia, nunca vídeo. Sai sozinho depois de 30 dias sem a pessoa abrir uma notícia dele, a não ser que esteja fixado.",
+    aviso: "Isso vai aparecer nas notícias e nos roteiros desta marca. O sistema nunca sugere assunto sozinho: só entra o que a pessoa pediu.",
+    vazio: "Nenhum assunto acompanhado.",
+    campoAssunto: "Assunto",
+    campoTermos: "Termos (separados por vírgula, opcional)",
+    adicionar: "acompanhar este assunto",
+    tirar: "tirar",
+    tirarAssunto: (a: string) => `tirar ${a}`,
+    fixar: "fixar",
+    desafixar: "desafixar",
+    fixado: "fixado",
+    desde: (data: string) => `desde ${data}`,
+    semAberturas: "nenhuma notícia aberta ainda",
+    ultimaAbertura: (data: string) => `última notícia aberta em ${data}`,
+    noticias: (n: number) => (n === 1 ? "1 notícia coletada" : `${n} notícias coletadas`),
+    termos: (t: string) => `termos: ${t}`,
+  },
   ramosAlternativos: {
     titulo: "Ramos alternativos",
     ajuda:

@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { nichos, noticias } from "@/db/schema";
 import { normalizarNoticiaRss } from "@/servicos/normalizadores/noticias";
 
+import { coletarNoticiasDosAssuntos, type ResumoColetaAssuntos } from "./coleta-assuntos";
 import { ErroColeta } from "./execucoes";
 
 const parser = new Parser();
@@ -56,10 +57,20 @@ export async function rodarColetaNoticias(nichoId?: number): Promise<Record<stri
     }
   }
 
-  if (termosBuscados === 0) {
+  // E53: as notícias dos assuntos que as marcas acompanham, no mesmo job (só na rodada de todos os setores). Nunca derruba a coleta por setor: se falhar, o erro vai para o resumo.
+  let assuntosColetados: ResumoColetaAssuntos | undefined;
+  if (nichoId === undefined) {
+    try {
+      assuntosColetados = await coletarNoticiasDosAssuntos();
+    } catch (erro) {
+      erros.push(`assuntos: ${erro instanceof Error ? erro.message : String(erro)}`);
+    }
+  }
+
+  if (termosBuscados === 0 && !assuntosColetados?.assuntos) {
     throw new ErroColeta("nenhum termo para coletar (sem nichos ativos)", false);
   }
-  if (noticiasProcessadas === 0 && erros.length > 0) {
+  if (noticiasProcessadas === 0 && termosBuscados > 0 && erros.length > 0 && !assuntosColetados?.noticiasNovas) {
     throw new ErroColeta(`coleta de noticias falhou em tudo: ${erros.join("; ")}`, true);
   }
 
@@ -67,6 +78,7 @@ export async function rodarColetaNoticias(nichoId?: number): Promise<Record<stri
     nichos: nichosAtivos.length,
     termosBuscados,
     noticiasProcessadas,
+    assuntos: assuntosColetados,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

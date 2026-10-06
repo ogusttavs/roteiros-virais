@@ -512,6 +512,13 @@
       "when": 1791209375141,
       "tag": "0072_custo-que-falta",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1791294156547,
+      "tag": "0073_assuntos-da-marca",
+      "breakpoints": true
     }
   ]
 }
