@@ -92,11 +92,12 @@ async function main(): Promise<void> {
         const nomeDe = (tela: string, estado: string) => path.join(pastaDestino, `${tela}.${estado}.${tamanho.rotulo}.${modo.rotulo}.png`);
         const contexto = await browser.newContext({ viewport: { width: tamanho.largura, height: tamanho.altura }, colorScheme: modo.colorScheme });
         const page = await contexto.newPage();
+        // O servidor de desenvolvimento compila cada tela na primeira visita (e a máquina pode estar ocupada com outra coisa): 30 s é pouco.
+        page.setDefaultTimeout(120_000);
         await entrar(page, baseUrl);
 
         await page.goto(`${baseUrl}/admin`);
         const estado = page.locator('[data-bloco="estado"]');
-        if (process.env.DEPURAR) console.log(page.url(), "|", (await page.locator("main").innerText()).slice(0, 900));
         await page.locator('[data-atencao="proxy"]').waitFor({ state: "visible" });
         const inicio = nomeDe("AdminInicio", "ProxySemTrafego");
         await fotografarElemento(page, estado, inicio);
