@@ -359,6 +359,11 @@ async function transcreverUm(
 const MAX_FALHAS_SEGUIDAS_FREIO = 10;
 
 /**
+ * O proxy "fora do ar" (não conectou) é, uma vez, só um engasgo: parar a noite inteira do YouTube por uma falha de conexão perderia a leitura do dia à toa. Três seguidas, sem nenhum
+ * download bom no meio, é o proxy que caiu. O "sem tráfego" (o 407 do pacote que acabou) não espera: é definitivo até alguém recarregar, e para na hora.
+ */
+const MAX_PROXY_FORA_SEGUIDOS = 3;
+/**
  * O relógio e os orçamentos do `rodarTranscrever` (M5c). Só o teste passa algo aqui; o job de verdade usa `Date.now` e os
  * dois números de `config.regras`.
  */
@@ -428,6 +433,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   let proxyParado: { motivo: MotivoDoProxy; desde: Date } | null = null;
   /** Vídeos que o proxy recusou, contados à parte (não somam em `falhas`: não são falha do vídeo). */
   let falhasPorProxy = 0;
+  /** Falhas "fora do ar" seguidas, sem um download bom no meio (zera a cada YouTube ou TikTok que sai). */
+  let proxyForaSeguidos = 0;
   /** Bytes dos áudios baixados, por plataforma, para o resumo e para o custo do proxy (YouTube e TikTok passam por ele; o Instagram baixa direto da Meta). */
   const bytesBaixados: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
   const setoresParadosPeloOrcamento: { slug: string; ficaramParaDepois: number }[] = [];
@@ -479,6 +486,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
           });          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
             sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
             sucessosNoNicho += 1;
+            if (passaPeloProxy) proxyForaSeguidos = 0;
             if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
             if (info.plataforma === "tiktok") falhasSeguidasTiktok = 0;
 
@@ -491,7 +499,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
             pulados += 1;
           } else if (resultado.tipo === "proxyFora") {
             falhasPorProxy += 1;
-            if (!proxyParado) {
+            proxyForaSeguidos = resultado.motivo === "proxy fora do ar" ? proxyForaSeguidos + 1 : MAX_PROXY_FORA_SEGUIDOS;
+            if (!proxyParado && proxyForaSeguidos >= MAX_PROXY_FORA_SEGUIDOS) {
               proxyParado = { motivo: resultado.motivo, desde: new Date(agora()) };
               erros.push(`${resultado.motivo}: o YouTube e o TikTok ficam parados no resto desta noite (video ${videoId} / nicho "${nicho.slug}")`);
             }

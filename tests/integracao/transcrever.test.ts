@@ -1090,14 +1090,38 @@ describe("rodarTranscrever, hotfix do proxy: o proxy que falha pausa o job intei
     expect(linhas.every((l) => l.proximaTentativaTranscricao === null && l.falhaDeInfraEm === null)).toBe(true);
   });
 
-  it("o proxy fora do ar tem o motivo proprio no resumo", async () => {
-    await criarVideo("yt-proxy-fora", { velocidadeRelativa: 1, publicadoEm: diasAtras(3), semDono: true });
+  it("o proxy fora do ar (nao conectou) so pausa depois de tres seguidos, com o motivo proprio no resumo: uma falha de conexao, sozinha, nao para a noite", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-fora-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
     vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou"));
 
     const resumo = await rodarTranscrever();
 
+    expect(baixarAudio).toHaveBeenCalledTimes(3);
     expect(resumo.youtubePausadoMotivo).toBe("proxy fora do ar");
+    expect(resumo.falhasPorProxy).toBe(3);
+    expect(resumo.falhas).toBe(0);
+  });
+
+  it("o proxy fora do ar duas vezes e um download bom no meio zera a contagem: nao pausa, e nenhum video fica marcado", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-intercalado-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
+    // Falha, falha, legenda boa, falha, falha: nunca tres seguidas.
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async (url: string) => {
+      if (url.endsWith("intercalado-2")) return LEGENDA_LONGA;
+      throw new ErroLegendaDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou");
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(5);
+    expect(resumo.youtubePausado).toBe(false);
+    expect(resumo.youtubePausadoMotivo).toBeUndefined();
+    expect(resumo.falhasPorProxy).toBe(4);
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoId));
+    expect(linhas.filter((l) => l.proximaTentativaTranscricao !== null || l.falhaDeInfraEm !== null)).toHaveLength(0);
   });
 
   it("a pausa vale para o job inteiro: o segundo setor nem tenta o YouTube nem o TikTok, e o Instagram (que baixa direto da Meta) segue", async () => {
