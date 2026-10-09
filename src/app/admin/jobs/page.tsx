@@ -5,7 +5,7 @@ import { AGENDAMENTOS } from "@/jobs/agenda";
 import { FILAS, FILAS_POR_EVENTO, FILAS_POR_RAMO } from "@/jobs/fila";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao, type ExecucaoResumo } from "@/servicos/admin-coleta";
-import { inicioDoAdmin } from "@/servicos/admin-inicio";
+import { inicioDoAdmin, type ProxyParado } from "@/servicos/admin-inicio";
 import { ultimosDisparos } from "@/servicos/admin-rotinas";
 import { quandoPorExtenso, textosInicioAdmin as tc } from "@/textos/admin-contas";
 import { textosRotinasAdmin as t } from "@/textos/admin-custos";
@@ -62,7 +62,7 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 }
 
 /** O resultado em uma frase: o erro, ou os três primeiros números do resumo da execução. */
-function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
+function resultadoEmFrase(e: ExecucaoResumo | undefined, proxy: ProxyParado | null): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return fraseDoErro(e.erro);
   // Os temas do dia só saem para ramo em uso (alguma marca gerou roteiro nos últimos 3 dias): o cartão diz quantos ramos tiveram tema e quantos ficaram sem uso.
@@ -72,8 +72,14 @@ function resultadoEmFrase(e: ExecucaoResumo | undefined): string {
   }
   // A rotina da Meta que parou no limite do aplicativo não é erro: o resumo diz que continua na hora seguinte.
   if (e.resumo?.pausadoPorLimite === true) return t.rotinas.paradoNoLimite;
-  // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
+  // O proxy do YouTube parou nesta noite (sem tráfego ou fora do ar): a transcrição terminou, mas o YouTube e o TikTok esperaram. O "desde" conta as noites seguidas.
+  if (typeof e.resumo?.youtubePausadoMotivo === "string" && proxy) return t.rotinas.proxyParado(proxy.motivo, diaDoMes(proxy.desde));  // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
   return e.status === "rodando" ? t.rotinas.estado.rodando : `${t.rotinas.estado.ok}, em ${duracao(e.duracaoMs)}`;
+}
+
+/** "3 de outubro": o dia em que o proxy parou, no fuso do Brasil. */
+function diaDoMes(d: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(d);
 }
 
 function diaPorExtenso(d: Date): string {
@@ -203,7 +209,7 @@ export default async function Rotinas() {
                   <div>
                     <dt>{t.rotinas.resultado}</dt>
                     <dd data-resultado={falhou ? "falhou" : "ultima"}>
-                      {falhou ? t.rotinas.falhouEm(NOME_DA_FILA[falhou.nome] ?? falhou.nome, quandoPorExtenso(falhou.iniciadoEm, inicio.agora), fraseDoErro(falhou.erro)) : resultadoEmFrase(maisRecente)}
+                      {falhou ? t.rotinas.falhouEm(NOME_DA_FILA[falhou.nome] ?? falhou.nome, quandoPorExtenso(falhou.iniciadoEm, inicio.agora), fraseDoErro(falhou.erro)) : resultadoEmFrase(maisRecente, inicio.atencao.proxy)}
                     </dd>
                   </div>
                 </dl>

@@ -3,7 +3,7 @@
  * dólar (o que a API devolve, ou o preço da data de `config/precos-ia.ts` quando ela não devolve), a unidade medida e, quando se sabe, a execução e o ramo. Registrar nunca derruba o que
  * está sendo feito: se o banco falhar, o gasto só fica sem linha e o log avisa.
  */
-import { precoApifyPorMilResultados, PRECO_GROQ_USD_POR_HORA, SEGUNDOS_MINIMOS_COBRADOS_GROQ } from "@/config/precos-ia";
+import { precoApifyPorMilResultados, PRECO_GROQ_USD_POR_HORA, PRECO_PROXY_USD_POR_GB, SEGUNDOS_MINIMOS_COBRADOS_GROQ } from "@/config/precos-ia";
 import { db } from "@/db";
 import { custosExternos, type CustoExterno } from "@/db/schema";
 import { contextoDaExecucao } from "@/jobs/contexto-execucao";
@@ -18,6 +18,11 @@ export function custoDaTranscricaoGroqUsd(duracaoS: number): number {
 /** O custo estimado de uma coleta no Apify pelo preço do ator da data (US$ por mil resultados), quando a API não devolve o custo da execução. */
 export function custoEstimadoDoApifyUsd(ator: string, resultados: number): number {
   return (resultados / 1000) * precoApifyPorMilResultados(ator);
+}
+
+/** O custo estimado do tráfego do proxy do YouTube: megabytes baixados a US$ por gigabyte (o pacote do DataImpulse; 1 GB = 1.000 MB, como ele conta). */
+export function custoDoProxyUsd(megabytes: number): number {
+  return (megabytes / 1000) * PRECO_PROXY_USD_POR_GB;
 }
 
 type NovoCusto = {

@@ -101,6 +101,35 @@ export async function pausaEntreVideosYoutube(
   await esperar(config.transcricao.youtubePausaS * 1000);
 }
 
+/** Por que o proxy não serviu: sem tráfego (o saldo do pacote acabou) ou fora do ar (não conectou). */
+export type MotivoDoProxy = "proxy sem trafego" | "proxy fora do ar";
+
+/**
+ * Hotfix do proxy (09/10/2026): o DataImpulse responde `407 TRAFFIC_EXHAUSTED` quando o pacote de gigabytes acaba, e o `yt-dlp` o repete como "Unable to connect to proxy"
+ * com o "Tunnel connection failed: 407" por dentro. Só as frases do próprio erro contam (nunca a palavra "proxy" solta: a linha de comando que o erro repete leva
+ * `--proxy http://...`, e uma busca larga casaria com ela em toda falha).
+ */
+const PROXY_SEM_TRAFEGO = /TRAFFIC_EXHAUSTED|Tunnel connection failed: 407|Proxy Authentication Required/i;
+const PROXY_FORA_DO_AR = /Unable to connect to proxy|ProxyError/i;
+
+/** O erro do `yt-dlp` (o texto dele inteiro) é do proxy, e não do vídeo? Devolve o motivo, ou nulo quando o vídeo é que falhou. */
+export function motivoDaFalhaDoProxy(texto: string): MotivoDoProxy | null {
+  if (PROXY_SEM_TRAFEGO.test(texto)) return "proxy sem trafego";
+  if (PROXY_FORA_DO_AR.test(texto)) return "proxy fora do ar";
+  return null;
+}
+
+/** O proxy falhou no download: o vídeo não tem culpa, nenhuma nova tentativa fica marcada nele. */
+export class ErroDoProxy extends Error {
+  constructor(
+    readonly motivo: MotivoDoProxy,
+    mensagem: string,
+  ) {
+    super(mensagem);
+    this.name = "ErroDoProxy";
+  }
+}
+
 const HOSTS_YOUTUBE = ["youtube.com", "youtu.be"];
 
 /**

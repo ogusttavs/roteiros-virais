@@ -47,18 +47,25 @@
  * orçamento de cada setor é também limitado por um teto do job inteiro dividido pelos setores que faltam
  * (`orcamentoTranscreverTotalMin`, 3h30, abaixo das 4 h da fila), então o job sempre termina; (3) a cadeia
  * `extrair-sem-fala` e `extrair` dispara no fim do job SEMPRE (num `finally`), parou pelo orçamento ou não.
+ *
+ * Hotfix do proxy (achado do Fable em 09/10/2026: o proxy do YouTube, cobrado por gigabyte, gastou os 5 GB em 12 dias, e desde 03/10 responde `407 TRAFFIC_EXHAUSTED` enquanto o job
+ * tentava 109 vídeos por noite): (1) o áudio sai mais leve e com teto de tamanho (`audio.ts`); (2) quando o proxy é que falha (sem tráfego ou fora do ar), o YouTube e o TikTok, que
+ * passam por ele, ficam parados no resto do job inteiro, em todos os setores, com o motivo no resumo (`youtubePausadoMotivo`), sem gastar o orçamento do setor e sem marcar o
+ * vídeo como falha dele (nenhuma nova tentativa nem `falhaDeInfraEm`: ele volta à fila na noite seguinte); (3) o job mede o que baixou (`megabytesBaixados`, `megabytesPeloProxy`)
+ * e grava o custo estimado do tráfego por setor (`custos_externos`, fonte `proxy`).
  */
 import { and, eq, inArray } from "drizzle-orm";
 
 import { PRECO_GROQ_USD_POR_HORA } from "@/config/precos-ia";
 import { db } from "@/db";
 import { contas, nichos, videos, type Plataforma } from "@/db/schema";
-import { apagarAudio, baixarAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
+import { apagarAudio, baixarAudio, bytesDoAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
-import { ehUrlDoYoutube, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
+import { ehUrlDoYoutube, ErroDoProxy, type MotivoDoProxy, pausaEntreVideosYoutube } from "@/jobs/youtube-cliente";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { custoDoProxyUsd, registrarCustoExterno } from "@/servicos/custos-externos";
 import { foraDaCurvaDoNicho, subindoHoje } from "@/servicos/pesquisa";
 import { contaEhBrasileira } from "@/servicos/proporcao-brasil";
 import { MAX_POR_CONTA, selecionarParaTranscrever, type VideoParaSelecionar } from "@/servicos/selecionar-transcricao";
@@ -204,7 +211,9 @@ type ResultadoVideo =
   | { tipo: "falhou"; motivo: string }
   | { tipo: "falhouYoutubeBot"; motivo: string }
   /** O `yt-dlp` ou a Groq passou do tempo limite por vídeo e foi encerrado (M5c). */
-  | { tipo: "falhouTempoLimite"; motivo: string };
+  | { tipo: "falhouTempoLimite"; motivo: string }
+  /** O proxy recusou (sem tráfego) ou não conectou: a falha é do proxy, e o vídeo fica como estava (hotfix do proxy, 09/10/2026). */
+  | { tipo: "proxyFora"; motivo: MotivoDoProxy };
 
 /**
  * Legenda automatica curta demais ("E ai", ou uma legenda confusa que virou
@@ -225,6 +234,8 @@ async function transcreverUm(
   plataforma: Plataforma,
   duracaoS: number | null,
   idiomaConhecido: string | null,
+  /** Recebe os bytes do áudio baixado, para o job medir o tráfego (hotfix do proxy). */
+  medirBytes?: (bytes: number) => void,
 ): Promise<ResultadoVideo> {
   const idiomaParaBuscar = idiomaParaForcar(idiomaConhecido);
 
@@ -236,6 +247,8 @@ async function transcreverUm(
     try {
       legenda = await baixarLegendaYoutube(url, idiomaParaBuscar);
     } catch (erro) {
+      // O proxy falhou: o áudio passaria por ele e falharia igual, e o vídeo não tem culpa (nada é gravado nele).
+      if (erro instanceof ErroDoProxy) return { tipo: "proxyFora", motivo: erro.motivo };
       // O `yt-dlp` pendurou na legenda (proxy engasgado): o áudio penduraria pelo mesmo motivo, então o vídeo fica para daqui a
       // alguns dias em vez de gastar o limite uma segunda vez neste mesmo vídeo.
       if (erro instanceof ErroLegendaTempoLimite) {
@@ -263,6 +276,7 @@ async function transcreverUm(
   let caminhoAudio: string | null = null;
   try {
     caminhoAudio = await baixarAudio(url, plataforma);
+    medirBytes?.(await bytesDoAudio(caminhoAudio));
     const { texto, idiomaDetectado, semFala } = await transcreverAudio(caminhoAudio, idiomaParaBuscar);
 
     // Achado 13 da revisão do motor (01/10/2026): vazia sem a Groq confirmar ausência de fala
@@ -301,6 +315,8 @@ async function transcreverUm(
       .where(eq(videos.id, videoId));
     return { tipo: "groq", duracaoS };
   } catch (erro) {
+    // O proxy falhou no áudio: o vídeo não tem culpa, nenhuma nova tentativa fica marcada nele.
+    if (erro instanceof ErroDoProxy) return { tipo: "proxyFora", motivo: erro.motivo };
     // O tempo limite vem antes do resto (`ErroAudioTempoLimite` e `ErroGroqTempoLimite` herdam dos erros comuns): tempo
     // perdido, falha transitória, nova tentativa em 3 dias, e contada à parte.
     if (erro instanceof ErroAudioTempoLimite || erro instanceof ErroGroqTempoLimite) {
@@ -370,6 +386,11 @@ export function orcamentoDoSetor(porSetorMs: number, totalMs: number, decorridoM
   return Math.min(porSetorMs, Math.floor(restante / Math.max(1, setoresQueFaltam)));
 }
 
+/** Bytes em megabytes decimais (1 MB = 1.000.000 bytes, como o proxy conta), com duas casas. */
+function megabytes(bytes: number): number {
+  return Number((bytes / 1_000_000).toFixed(2));
+}
+
 /**
  * M2, item 0a2 da revisão do PR #73: com `nichoId`, só aquele setor, sem esperar o `for` percorrer
  * todo o resto dos nichos ativos antes de chegar nele (a "cadeia de verdade" da primeira carga,
@@ -403,7 +424,12 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   const sucessos: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
   let youtubePausado = false;
   let tiktokPausado = false;
-  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
+  /** O proxy falhou nesta noite (o primeiro que falhou): vale para o job inteiro e para todos os setores, e é o que o resumo diz. */
+  let proxyParado: { motivo: MotivoDoProxy; desde: Date } | null = null;
+  /** Vídeos que o proxy recusou, contados à parte (não somam em `falhas`: não são falha do vídeo). */
+  let falhasPorProxy = 0;
+  /** Bytes dos áudios baixados, por plataforma, para o resumo e para o custo do proxy (YouTube e TikTok passam por ele; o Instagram baixa direto da Meta). */
+  const bytesBaixados: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
   const setoresParadosPeloOrcamento: { slug: string; ficaramParaDepois: number }[] = [];
   /** Quanto cada setor levou, em segundos (para calibrar o orçamento olhando o resumo, sem abrir log). */
   const segundosPorSetor: Record<string, number> = {};
@@ -421,6 +447,7 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       let falhasSeguidasTiktok = 0;
       let youtubePausadoNoNicho = false;
       let tiktokPausadoNoNicho = false;
+      let bytesDoProxyNoSetor = 0;
 
       for (const [indiceDoVideo, videoId] of selecionados.entries()) {
         if (sucessosNoNicho >= tetoDiario) break;
@@ -440,12 +467,16 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
         if (!info) continue;
         if (info.plataforma === "youtube" && youtubePausadoNoNicho) continue;
         if (info.plataforma === "tiktok" && tiktokPausadoNoNicho) continue;
-
+        // O proxy parou nesta noite: o que passa por ele (YouTube e TikTok) espera a noite seguinte, sem gastar tentativa, orçamento nem marca no vídeo.
+        const passaPeloProxy = info.plataforma === "youtube" || info.plataforma === "tiktok";
+        if (passaPeloProxy && proxyParado) continue;
         tentativas[info.plataforma] = (tentativas[info.plataforma] ?? 0) + 1;
 
         try {
-          const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma);
-          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
+          const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma, (bytes) => {
+            bytesBaixados[info.plataforma] = (bytesBaixados[info.plataforma] ?? 0) + bytes;
+            if (passaPeloProxy) bytesDoProxyNoSetor += bytes;
+          });          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
             sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
             sucessosNoNicho += 1;
             if (info.plataforma === "youtube") falhasSeguidasBotYoutube = 0;
@@ -458,6 +489,12 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
             }
           } else if (resultado.tipo === "pulado") {
             pulados += 1;
+          } else if (resultado.tipo === "proxyFora") {
+            falhasPorProxy += 1;
+            if (!proxyParado) {
+              proxyParado = { motivo: resultado.motivo, desde: new Date(agora()) };
+              erros.push(`${resultado.motivo}: o YouTube e o TikTok ficam parados no resto desta noite (video ${videoId} / nicho "${nicho.slug}")`);
+            }
           } else if (resultado.tipo === "falhou") {
             falhas += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
@@ -497,12 +534,16 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
         // O download em si decide por plataforma (`argumentosPorPlataforma`,
         // `audio.ts` e `video.ts`), não por host; `ehUrlDoYoutube` ficou só
         // para esta pausa.
-        if (ehUrlDoYoutube(info.url)) await pausaEntreVideosYoutube();
+        if (ehUrlDoYoutube(info.url) && !proxyParado) await pausaEntreVideosYoutube();
       }
 
-      if (youtubePausadoNoNicho) youtubePausado = true;
-      if (tiktokPausadoNoNicho) tiktokPausado = true;
-      segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
+      if (youtubePausadoNoNicho || proxyParado) youtubePausado = true;
+      if (tiktokPausadoNoNicho || proxyParado) tiktokPausado = true;
+      // O tráfego do proxy deste setor, em dólar estimado (o contexto ainda é o do setor: o custo vai para o ramo certo).
+      if (bytesDoProxyNoSetor > 0) {
+        const megabytes = bytesDoProxyNoSetor / 1_000_000;
+        await registrarCustoExterno({ fonte: "proxy", custoUsd: custoDoProxyUsd(megabytes), unidades: megabytes, unidade: "megabytes", origemDoCusto: "estimado", detalhe: { setor: nicho.slug } });
+      }      segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
     }
     restaurarRamoDoContexto();
   } finally {
@@ -542,12 +583,18 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
     falhas,
     falhasYoutubeBot,
     falhasPorTempoLimite,
+    falhasPorProxy,
+    megabytesBaixados: megabytes(bytesBaixados.youtube + bytesBaixados.tiktok + bytesBaixados.instagram),
+    megabytesPeloProxy: megabytes(bytesBaixados.youtube + bytesBaixados.tiktok),
     segundosAudioGroq,
     custoEstimadoGroqUsd: Number(((segundosAudioGroq / 3600) * PRECO_GROQ_USD_POR_HORA).toFixed(4)),
     tentativas,
     sucessos,
     youtubePausado,
     tiktokPausado,
+    // O motivo e o instante em que o proxy parou, para o admin dizer "o proxy do YouTube está sem tráfego desde ..." (cartão da rotina e Início).
+    youtubePausadoMotivo: proxyParado?.motivo,
+    proxyPausadoDesde: proxyParado?.desde.toISOString(),
     segundosPorSetor,
     setoresParadosPeloOrcamento: setoresParadosPeloOrcamento.length > 0 ? setoresParadosPeloOrcamento : undefined,
     erros: erros.length > 0 ? erros : undefined,
