@@ -7,6 +7,8 @@ import {
   argumentosProxy,
   argumentosYoutube,
   ehUrlDoYoutube,
+  ErroDoProxy,
+  motivoDaFalhaDoProxy,
   pausaEntreVideosYoutube,
 } from "./youtube-cliente";
 
@@ -114,5 +116,40 @@ describe("ehUrlDoYoutube", () => {
 
   it("url invalida devolve falso, sem lancar", () => {
     expect(ehUrlDoYoutube("nao e uma url")).toBe(false);
+  });
+});
+
+/**
+ * Hotfix do proxy (09/10/2026): o proxy do YouTube, cobrado por gigabyte, acabou, e o job tentava 109 videos por noite contra um 407. So as frases do proprio erro do proxy contam: a linha de
+ * comando que o erro repete leva "--proxy http://...", e uma busca larga pela palavra casaria com toda falha.
+ */
+describe("motivoDaFalhaDoProxy", () => {
+  it("o 407 TRAFFIC_EXHAUSTED do pacote que acabou e \"proxy sem trafego\", com o texto completo que o yt-dlp devolve", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: Unable to download webpage: ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 407 TRAFFIC_EXHAUSTED'))")).toBe("proxy sem trafego");
+    expect(motivoDaFalhaDoProxy("HTTP Error 407: Proxy Authentication Required")).toBe("proxy sem trafego");
+    expect(motivoDaFalhaDoProxy("traffic_exhausted")).toBe("proxy sem trafego");
+  });
+
+  it("o proxy que nao conecta, sem o 407, e \"proxy fora do ar\"", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: ProxyError('Unable to connect to proxy', ConnectionRefusedError(10061))")).toBe("proxy fora do ar");
+  });
+
+  it("o erro do video (privado, removido, bloqueio do robo) nao e do proxy, mesmo com --proxy na linha de comando", () => {
+    expect(motivoDaFalhaDoProxy("Command failed: yt-dlp --proxy http://[oculto]@proxy.exemplo.invalido:823 -x https://www.youtube.com/watch?v=abc\nERROR: Video unavailable")).toBeNull();
+    expect(motivoDaFalhaDoProxy("ERROR: Sign in to confirm you're not a bot")).toBeNull();
+    expect(motivoDaFalhaDoProxy("")).toBeNull();
+  });
+
+  it("o numero 407 solto no id de um video nao e erro de proxy", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: [youtube] 407abcdefgh: Video unavailable")).toBeNull();
+  });
+});
+
+describe("ErroDoProxy", () => {
+  it("carrega o motivo, e e um Error com nome", () => {
+    const erro = new ErroDoProxy("proxy sem trafego", "o proxy recusou");
+    expect(erro).toBeInstanceOf(Error);
+    expect(erro.motivo).toBe("proxy sem trafego");
+    expect(erro.name).toBe("ErroDoProxy");
   });
 });

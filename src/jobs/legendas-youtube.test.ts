@@ -3,7 +3,8 @@ import { basename, dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { baixarLegendaYoutube, ErroLegendaTempoLimite, interpretarVtt } from "./legendas-youtube";
+import { baixarLegendaYoutube, ErroLegendaDoProxy, ErroLegendaTempoLimite, interpretarVtt } from "./legendas-youtube";
+import { ErroDoProxy } from "./youtube-cliente";
 
 describe("interpretarVtt", () => {
   it("junta so o texto, pulando cabecalho e timestamp", () => {
@@ -88,6 +89,19 @@ describe("baixarLegendaYoutube, tempo limite por vídeo", () => {
       },
     });
     expect(legenda).toBeNull();
+  });
+
+  /** Hotfix do proxy (09/10/2026): o proxy sem trafego nao e "sem legenda" (null, comum): quem chama precisa saber, e nao tentar o audio, que passaria pelo mesmo proxy. */
+  it("o proxy que recusa (407 TRAFFIC_EXHAUSTED) vira ErroLegendaDoProxy, e nao null", async () => {
+    const chamada = baixarLegendaYoutube("https://www.youtube.com/watch?v=abc", "pt", {
+      executar: async () => {
+        throw new Error("Command failed: yt-dlp --proxy http://usuario:senha@proxy.exemplo.invalido:823 --write-auto-sub\nERROR: ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 407 TRAFFIC_EXHAUSTED'))");
+      },
+    });
+    await expect(chamada).rejects.toBeInstanceOf(ErroLegendaDoProxy);
+    await expect(chamada).rejects.toBeInstanceOf(ErroDoProxy);
+    await expect(chamada).rejects.toMatchObject({ motivo: "proxy sem trafego" });
+    await expect(chamada).rejects.not.toThrow("senha");
   });
 
   it("sem limiteMs, vale YTDLP_LIMITE_S (90 s): é o caminho de produção, que nunca passa o limite à mão", async () => {
