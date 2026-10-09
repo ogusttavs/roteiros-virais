@@ -23,6 +23,8 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   modeloNicho: "Montar o modelo do ramo",
   filtrarNoticias: "Escolher as notícias",
   resumirNoticia: "Resumir as notícias dos assuntos",
+  agruparTendencias: "Agrupar o que está em alta no Brasil",
+  temaDoMomento: "Escrever o tema do momento",
   sugerirContasDoSetor: "Pesquisar o mercado do ramo",
   classificarContaDoSetor: "Pesquisar o mercado do ramo",
   entenderMarca: "Entender a marca",

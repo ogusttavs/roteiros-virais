@@ -335,5 +335,27 @@
       "facilidade": 9
     },
     "pontoPrincipal": "tema do assunto do próprio setor, sem vídeo fora da curva no banco: a ausência É sinal de que não pega no setor, viralizar 4 ou menos, e o texto diz que é o caso (a)"
+  },
+  {
+    "tema": "o que o fim da escala 6x1 muda para a minha equipe de limpeza",
+    "perfilCompilado": "Lavagem a seco de estofados a domicílio. Vende sofá de 3 lugares por R$ 180, colchão de casal por R$ 150. Cliente ideal mora em apartamento, tem filho pequeno ou animal de estimação. Medo do cliente: já mandou fazer em outro lugar e o sofá ficou manchado. Nunca promete tirar mancha de vinho tinto sem ver foto antes.",
+    "modeloNicho": "Assuntos quentes: mancha em estofado, cheiro de bicho de estimação, antes e depois. Ganchos: mostrar o produto agindo na mancha antes de explicar, alta frequência. Formatos: fala para câmera, 60%.",
+    "persona": "negocio",
+    "evidencias": [],
+    "noticiasDoDia": [],
+    "tendenciasDoBrasil": [
+      {
+        "assunto": "Fim da escala 6x1",
+        "fonte": "google"
+      }
+    ],
+    "notaEsperada": {
+      "viralizar": 9,
+      "gerarCliente": 6,
+      "encaixe": 7,
+      "novidade": 8,
+      "facilidade": 8
+    },
+    "pontoPrincipal": "assunto de fora do setor, sem vídeo no banco, mas em alta no Google no Brasil hoje: viralizar 8 a 10, e a justificativa cita a fonte (em alta no Google no Brasil hoje)"
   }
 ]

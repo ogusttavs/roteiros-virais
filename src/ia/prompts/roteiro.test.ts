@@ -430,7 +430,7 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
-    expect(versao).toBe("2.12.1");
+    expect(versao).toBe("2.13.0");
     expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
     expect(SISTEMA).toContain("[diga aqui onde você está]");
     expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");

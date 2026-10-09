@@ -1432,6 +1432,22 @@ export type TemaDoDia = {
   evidenciasNoticias?: number[];
   /** objetivo que o tema puxa mais: alcance, engajamento ou conversao (taxonomia interna, escopo 4.3) */
   puxaPara: "alcance" | "engajamento" | "conversao";
+  /**
+   * E55: o tema "do momento", nascido de um assunto em alta no Brasil (`tendencias_brasil`). É para o mesmo dia: só vale enquanto o assunto continua na lista do que está em alta, some do Hoje e
+   * do Criar quando sai, e não vai para outro dia. Guarda de onde veio (o assunto, as palavras dele e a fonte) para conferir se ele ainda vale.
+   */
+  doMomento?: {
+    chave: string;
+    assunto: string;
+    termos: string[];
+    /** "Em alta no Google no Brasil" ou "Em alta no YouTube no Brasil", para a tela citar a fonte. */
+    fonte: string;
+    url: string | null;
+    /** A rodada de tendências (ISO) de onde o tema nasceu. */
+    coletadaEm: string;
+    /** O encaixe com o setor, de 0 a 10, que o modelo deu e passou do mínimo. */
+    encaixe: number;
+  };
 };
 
 export const temasDia = pgTable(
@@ -1458,6 +1474,50 @@ export const temasDia = pgTable(
     criadoEm: criadoEm(),
   },
   (t) => [uniqueIndex("temas_dia_nicho_data").on(t.nichoId, t.data)],
+);
+
+/** Uma fonte de um assunto em alta: a busca do Google ou o vídeo do YouTube que o trouxe (título e link de fora: dado, nunca instrução). */
+export type FonteDaTendencia = { fonte: "google" | "youtube"; titulo: string; url: string | null; trafego: string | null; posicao: number };
+
+/**
+ * E55: o que está em alta no Brasil, para todos os setores (coleta compartilhada, sem dono). Cada rodada da coleta grava os assuntos todos com a MESMA `coletada_em`; "a lista de agora" é a
+ * rodada mais recente. Os títulos das duas fontes (buscas em alta do Google, vídeos em alta do YouTube) são agrupados em assuntos pelo modelo barato.
+ */
+export const tendenciasBrasil = pgTable(
+  "tendencias_brasil",
+  {
+    id: id(),
+    /** A rodada: todas as linhas da mesma coleta dividem este instante. */
+    coletadaEm: timestamp("coletada_em", { withTimezone: true }).notNull(),
+    assunto: text("assunto").notNull(),
+    /** O assunto sem acento, minúsculo, para conferir se o mesmo assunto segue em alta na rodada seguinte. */
+    chave: text("chave").notNull(),
+    termos: jsonb("termos").$type<string[]>().notNull().default([]),
+    fontes: jsonb("fontes").$type<FonteDaTendencia[]>().notNull().default([]),
+    /** 1 é o mais alto da lista. */
+    posicao: integer("posicao").notNull(),
+    /** Tragédia, morte, política partidária: entra como sinal na nota do tema, nunca vira tema sugerido sozinho. */
+    sensivel: boolean("sensivel").notNull().default(false),
+    criadoEm: criadoEm(),
+  },
+  (t) => [index("tendencias_brasil_rodada").on(t.coletadaEm)],
+);
+export type TendenciaBrasil = typeof tendenciasBrasil.$inferSelect;
+
+/** E55: a rodada de tendências que o setor já avaliou para o tema do momento (com tema ou sem encaixe), para não chamar o modelo de novo pela mesma lista. */
+export const tendenciasAvaliadas = pgTable(
+  "tendencias_avaliadas",
+  {
+    id: id(),
+    nichoId: integer("nicho_id")
+      .notNull()
+      .references(() => nichos.id, { onDelete: "cascade" }),
+    rodadaEm: timestamp("rodada_em", { withTimezone: true }).notNull(),
+    /** "tema" (nasceu um tema do momento), "sem_encaixe" (nenhum assunto passou do mínimo) ou "sem_assunto" (só havia assunto sensível). */
+    resultado: text("resultado").notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("tendencias_avaliadas_nicho_rodada").on(t.nichoId, t.rodadaEm)],
 );
 
 // ---------------------------------------------------------------------------

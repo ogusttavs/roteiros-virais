@@ -194,3 +194,24 @@ export async function buscarUploadsDoCanal(playlistId: string): Promise<YoutubeP
     maxResults: "50",
   });
 }
+
+export type YoutubeVideoPopular = {
+  id: string;
+  snippet: { title: string; channelTitle: string; channelId?: string; categoryId?: string; publishedAt?: string };
+  statistics?: { viewCount?: string };
+};
+
+export type YoutubePopularesResponse = { items?: YoutubeVideoPopular[] };
+
+/**
+ * videos.list com `chart=mostPopular` e `regionCode=BR` (E55): os vídeos em alta no YouTube no Brasil, de todas as categorias. Custa 1 unidade de cota (como todo `videos.list`). `categoryId` vem
+ * junto, para o job tirar música e jogo (que não servem de assunto para um dono de negócio).
+ */
+export async function buscarMaisPopularesNoBrasil(): Promise<YoutubePopularesResponse> {
+  return chamar<YoutubePopularesResponse>("videos", {
+    part: "snippet,statistics",
+    chart: "mostPopular",
+    regionCode: "BR",
+    maxResults: "50",
+  });
+}

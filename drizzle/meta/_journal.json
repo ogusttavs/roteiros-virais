@@ -519,6 +519,13 @@
       "when": 1791294156547,
       "tag": "0073_assuntos-da-marca",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1791306956914,
+      "tag": "0074_tendencias-brasil",
+      "breakpoints": true
     }
   ]
 }

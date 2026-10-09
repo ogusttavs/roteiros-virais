@@ -109,6 +109,18 @@ export const AGENDAMENTOS: Agendamento[] = [
     chave: "tarde",
   },
   {
+    fila: FILAS.tendenciasBrasil,
+    cron: "50 5 * * *",
+    descricao: "tendencias do Brasil (buscas em alta do Google e videos em alta do YouTube), todo dia as 05:50, antes dos temas do dia (06:30)",
+    chave: "madrugada",
+  },
+  {
+    fila: FILAS.tendenciasBrasil,
+    cron: "0 12 * * *",
+    descricao: "tendencias do Brasil, segunda vez do dia, as 12:00: pega o que estourou de manha e tira o tema do momento cujo assunto saiu da lista",
+    chave: "meio-dia",
+  },
+  {
     fila: FILAS.metaContas,
     cron: "35 3 * * *",
     descricao: "instagram pela api da meta (contas vigiadas), todo dia as 03:35, depois do apify",

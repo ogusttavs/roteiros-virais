@@ -38,6 +38,7 @@
     "ia:fumaca": "tsx scripts/ia-fumaca.ts",
     "avaliar:briefing": "tsx scripts/avaliar-briefing.ts",
     "avaliar:temas": "tsx scripts/avaliar-temas.ts",
+    "avaliar:tema-do-momento": "tsx scripts/avaliar-tema-do-momento.ts",
     "avaliar:extrair": "tsx scripts/avaliar-extrair.ts",
     "avaliar:roteiros": "tsx scripts/avaliar-roteiros.ts",
     "avaliar:momentos": "tsx scripts/avaliar-momentos.ts",

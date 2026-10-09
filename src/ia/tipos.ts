@@ -30,6 +30,10 @@ export type TarefaIA =
   | "filtrarNoticias"
   /** E53: o resumo nosso, em duas frases, de uma notícia de um assunto que a pessoa acompanha. */
   | "resumirNoticia"
+  /** E55: junta os títulos das buscas em alta do Google e dos vídeos em alta do YouTube no Brasil em assuntos. */
+  | "agruparTendencias"
+  /** E55: escolhe, entre os assuntos em alta no Brasil, o que cabe no setor e escreve o tema do momento. */
+  | "temaDoMomento"
   | "temasDoDia"
   | "avaliarTema"
   | "roteiro"

@@ -42,6 +42,7 @@ import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
+import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
@@ -86,6 +87,9 @@ async function main(): Promise<void> {
   });
   await boss().work<{ nichoId?: number }>(FILAS.coletaNoticias, async (job) => {
     await executarComRegistro(FILAS.coletaNoticias, () => rodarColetaNoticias(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+  });
+  await boss().work(FILAS.tendenciasBrasil, async () => {
+    await executarComRegistro(FILAS.tendenciasBrasil, () => rodarTendenciasBrasil());
   });
   await boss().work(FILAS.contasBase, async () => {
     await executarComRegistro(FILAS.contasBase, rodarContasBase);
