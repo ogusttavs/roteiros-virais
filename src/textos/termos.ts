@@ -17,11 +17,17 @@ import { config } from "@/lib/config";
  * esta data) vê a folha de aceite de novo no próximo acesso, como a regra
  * dos termos já previa (`LayoutCompleto`, `(painel)/layout.tsx`).
  */
-export const VERSAO_TERMOS_EM = new Date("2026-10-01T00:00:00Z");
+/**
+ * E38 PR 2, item 1b (aprovado pelo Gustavo em 09/10/2026): versão nova, com a linha do site e das redes (a leitura das páginas públicas do
+ * site e dos títulos dos vídeos, o resumo que a pessoa confirma, o que guardamos e o que é apagado). O instante é o desta mudança, e não a
+ * meia-noite, para quem aceitou hoje antes do deploy ver o aceite novo também; precisa ser anterior ao deploy, senão quem aceita logo
+ * depois de subir seria perguntado de novo a cada visita até a data chegar.
+ */
+export const VERSAO_TERMOS_EM = new Date("2026-10-09T14:00:00Z");
 
 export const textosTermos = {
   avisoRevisaoPendente: "texto base, revisão jurídica pendente",
-  atualizadoEm: "atualizado em 1 de outubro de 2026",
+  atualizadoEm: "atualizado em 9 de outubro de 2026",
   voltar: "voltar",
 
   termos: {
@@ -39,6 +45,7 @@ export const textosTermos = {
         paragrafos: [
           "O que você escreve no briefing é usado para escrever os seus roteiros e para acompanhar o seu negócio. Você pode editar as respostas quando quiser, em Briefing e em Conta.",
           "Quando você responde falando, a prévia do texto que aparece na tela pode usar o reconhecimento de voz do seu aparelho ou navegador, que é um serviço do fabricante. O texto definitivo é sempre feito pela nossa transcrição.",
+          "Quando você informa o site ou o perfil da sua marca, lemos até cinco páginas públicas do site e os títulos dos vídeos mais recentes, e mandamos esse texto à IA para escrever um resumo que você confirma ou corrige. Só o que você confirma entra nos seus roteiros.",
         ],
       },
       {
@@ -68,6 +75,7 @@ export const textosTermos = {
         titulo: "1. O que guardamos",
         paragrafos: [
           "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, e os links dos vídeos que você marca como postado. Guardamos também os perfis que você informa em Conta (Instagram, TikTok, YouTube).",
+          "Guardamos também o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou.",
         ],
       },
       {
@@ -80,6 +88,7 @@ export const textosTermos = {
         titulo: "3. Uso de inteligência artificial",
         paragrafos: [
           "Usamos modelos de IA (da Anthropic) para escrever os seus roteiros e avaliar os seus temas, a partir do seu briefing e da pesquisa do nicho. As suas respostas não são usadas para treinar modelo nenhum; são contexto de uma chamada, como uma pergunta feita à IA a cada roteiro.",
+          "Quando você informa o site ou o perfil da sua marca, lemos até cinco páginas públicas do site e os títulos dos vídeos mais recentes, e mandamos esse texto à IA para escrever um resumo que você confirma ou corrige. Só o que você confirma entra nos seus roteiros.",
         ],
       },
       {
@@ -113,7 +122,7 @@ export const textosTermos = {
       {
         titulo: "2. O que é apagado",
         paragrafos: [
-          "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, os perfis informados em Conta (Instagram, TikTok, YouTube) e os links dos vídeos que você marcou como postado.",
+          "O briefing (as respostas sobre o seu negócio), os roteiros gerados para você, os perfis informados em Conta (Instagram, TikTok, YouTube) e os links dos vídeos que você marcou como postado. O que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou também é apagado.",
         ],
       },
       {
