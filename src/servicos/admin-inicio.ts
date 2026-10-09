@@ -30,6 +30,65 @@ export type LinhaDaMadrugada = {
 /** O estado de hoje das rotinas que são de todos os ramos de uma vez (a busca junta sete jobs globais; a transcrição é uma só): mostrado uma vez, fora da tabela por ramo. */
 export type RotinasDoDia = { busca: EstadoAgregado; transcricao: EstadoAgregado; erroDaBusca: string | null; erroDaTranscricao: string | null };
 
+/** O proxy do YouTube (que o TikTok também usa) parou: o motivo e desde quando, contando as noites seguidas. */
+export type ProxyParado = { motivo: "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar"; desde: Date };
+
+const MOTIVOS_DO_PROXY = new Set<string>(["proxy sem trafego", "proxy recusou o acesso", "proxy fora do ar"]);
+
+function motivoDoResumo(resumo: Record<string, unknown> | null): ProxyParado["motivo"] | null {
+  const motivo = resumo?.youtubePausadoMotivo;
+  return typeof motivo === "string" && MOTIVOS_DO_PROXY.has(motivo) ? (motivo as ProxyParado["motivo"]) : null;
+}
+
+/**
+ * O proxy respondeu nesta rodada? Houve pelo menos uma tentativa de YouTube ou TikTok (os dois passam por ele) em que ele não foi o que falhou: um vídeo lido, ou um vídeo que falhou
+ * por culpa dele mesmo (privado, removido, bloqueio do robô). Rodada sem tentativa pelo proxy (só Instagram, fila vazia) não prova nada, e as de antes deste aviso, sem `tentativas`, tampouco.
+ */
+function proxyRespondeu(resumo: Record<string, unknown> | null): boolean {
+  const tentativas = resumo?.tentativas as Record<string, unknown> | undefined;
+  const sucessos = resumo?.sucessos as Record<string, unknown> | undefined;
+  const pelaRede = Number(tentativas?.youtube ?? 0) + Number(tentativas?.tiktok ?? 0);
+  const falhasDoProxy = Number(resumo?.falhasPorProxy ?? 0);
+  const lidos = Number(sucessos?.youtube ?? 0) + Number(sucessos?.tiktok ?? 0);
+  return lidos > 0 || pelaRede - falhasDoProxy > 0;
+}
+
+/**
+ * O proxy do YouTube está parado agora? Pura, para testar: as execuções do `transcrever` que terminaram, da mais nova para a mais velha. Vale a última rodada que disse alguma coisa:
+ * se ela parou pelo proxy, ele está parado, e "desde" é a mais antiga das rodadas seguidas que pararam pelo proxy (o instante em que o job anotou, ou o início da rodada). Uma rodada
+ * em que o proxy respondeu diz que ele voltou: se ela mesma parou no fim da noite (baixou uma parte e o proxy acabou de novo), conta como parada e a contagem das noites termina nela;
+ * se não parou, o proxy não está parado. Uma rodada que não tentou nada pelo proxy não diz nada.
+ */
+export function proxyParadoDasExecucoes(execucoes: { iniciadoEm: Date; resumo: Record<string, unknown> | null }[]): ProxyParado | null {
+  const paradas: { iniciadoEm: Date; resumo: Record<string, unknown> | null; motivo: ProxyParado["motivo"] }[] = [];
+  for (const e of execucoes) {
+    const motivo = motivoDoResumo(e.resumo);
+    if (motivo) paradas.push({ ...e, motivo });
+    if (proxyRespondeu(e.resumo)) break;
+  }
+  if (paradas.length === 0) return null;
+  const maisAntiga = paradas[paradas.length - 1];
+  const anotado = typeof maisAntiga.resumo?.proxyPausadoDesde === "string" ? new Date(maisAntiga.resumo.proxyPausadoDesde) : null;
+  return { motivo: paradas[0].motivo, desde: anotado && !Number.isNaN(anotado.getTime()) ? anotado : maisAntiga.iniciadoEm };
+}
+
+/**
+ * As últimas rodadas do `transcrever` que terminaram bem (o resumo diz se o proxy parou), da mais nova para a mais velha. Só as chaves de que a conta precisa saem do banco: o resumo inteiro
+ * leva a lista de erros da noite, e esta consulta roda a cada carga do Início e das Rotinas. Rodadas de um ramo só (a primeira carga, "rodar só um ramo") têm o mesmo nome, por isso o limite é folgado.
+ */
+async function proxyDoYoutubeParado(): Promise<ProxyParado | null> {
+  const execucoes = await db()
+    .select({
+      iniciadoEm: execucoesJob.iniciadoEm,
+      resumo: sql<Record<string, unknown>>`jsonb_build_object('youtubePausadoMotivo', ${execucoesJob.resumo}->'youtubePausadoMotivo', 'proxyPausadoDesde', ${execucoesJob.resumo}->'proxyPausadoDesde', 'sucessos', ${execucoesJob.resumo}->'sucessos', 'tentativas', ${execucoesJob.resumo}->'tentativas', 'falhasPorProxy', ${execucoesJob.resumo}->'falhasPorProxy')`,
+    })
+    .from(execucoesJob)
+    .where(and(eq(execucoesJob.nome, FILAS.transcrever), eq(execucoesJob.status, "ok")))
+    .orderBy(desc(execucoesJob.id))
+    .limit(60);
+  return proxyParadoDasExecucoes(execucoes);
+}
+
 export type ErroRecente = { id: number; nome: string; quando: Date; mensagem: string; continua: boolean };
 
 export type InicioAdmin = {
@@ -39,7 +98,7 @@ export type InicioAdmin = {
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; fixosBrl: number; fixosCadastrados: number; tetoBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
   produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
-  atencao: { pedidosDeRamo: number };
+  atencao: { pedidosDeRamo: number; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null };
 };
 
 /** Depois desta hora (Brasil) um ramo sem tema do dia já é problema; antes, a madrugada ainda pode estar rodando. */
@@ -190,6 +249,6 @@ async function contas(agora: Date): Promise<InicioAdmin["contas"]> {
 
 /** Tudo o que o Início do admin mostra (E46 PR 1), de uma vez. */
 export async function inicioDoAdmin(agora: Date = new Date()): Promise<InicioAdmin> {
-  const [m, e, d, c, p, pedidos] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos()]);
-  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos } };
+  const [m, e, d, c, p, pedidos, proxy] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), proxyDoYoutubeParado()]);
+  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, proxy } };
 }

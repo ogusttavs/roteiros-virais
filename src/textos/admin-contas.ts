@@ -50,6 +50,11 @@ export const textosInicioAdmin = {
     rotinaGlobalErro: (quais: string[]) => ({ titulo: `Hoje deu erro em ${listar(quais)}`, detalhe: "vale para todos os ramos; veja em Rotinas" }),
     semTemas: (nomes: string[]) => ({ titulo: nomes.length === 1 ? `Os temas de hoje não saíram no ramo ${nomes[0]}` : `Os temas de hoje não saíram em ${nomes.length} ramos`, detalhe: listar(nomes) }),
     contasPararam: (n: number) => ({ titulo: n === 1 ? "1 conta parou de gravar há 4 dias ou mais" : `${n} contas pararam de gravar há 4 dias ou mais`, detalhe: "nada gerado nem aberto no período" }),
+    // Hotfix do proxy (09/10/2026): o proxy do YouTube, comprado por gigabyte, acabou ou não responde. Sem ele nenhum vídeo do YouTube (nem do TikTok) é transcrito.
+    proxyParado: (motivo: "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar", desde: string) => ({
+      titulo: { "proxy sem trafego": "O proxy do YouTube está sem tráfego", "proxy recusou o acesso": "O proxy do YouTube recusou o acesso", "proxy fora do ar": "O proxy do YouTube não está respondendo" }[motivo],
+      detalhe: `desde ${desde}; nenhum vídeo do YouTube nem do TikTok é transcrito enquanto isso${{ "proxy sem trafego": "; recarregue o pacote no DataImpulse", "proxy recusou o acesso": "; confira a senha e o pacote no DataImpulse e o YTDLP_PROXY da máquina", "proxy fora do ar": "; veja se o DataImpulse está no ar" }[motivo]}`,
+    }),
     pedidosDeRamo: (n: number) => ({ titulo: n === 1 ? "1 pedido de ramo espera você" : `${n} pedidos de ramo esperam você`, detalhe: "a pessoa não achou o ramo na lista" }),
     teto: (reaisHoje: string, teto: string) => ({ titulo: "O gasto de hoje passou do teto do dia", detalhe: `${reaisHoje} de ${teto}` }),
     errosContinuam: (n: number) => ({ titulo: n === 1 ? "1 rotina com erro continua sem rodar certo" : `${n} rotinas com erro continuam sem rodar certo`, detalhe: "o último erro de cada uma segue sem uma execução boa depois" }),

@@ -101,6 +101,52 @@ export async function pausaEntreVideosYoutube(
   await esperar(config.transcricao.youtubePausaS * 1000);
 }
 
+/**
+ * Por que o proxy não serviu: sem tráfego (o saldo do pacote acabou), recusou o acesso (outro 407: a senha trocada ou errada, a conta suspensa) ou fora do ar (não conectou).
+ * Os dois primeiros duram até alguém agir; o terceiro pode ser um engasgo.
+ */
+export type MotivoDoProxy = "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar";
+
+/**
+ * Hotfix do proxy (09/10/2026): o DataImpulse responde `407 TRAFFIC_EXHAUSTED` quando o pacote de gigabytes acaba, e o `yt-dlp` o repete como "Unable to connect to proxy"
+ * com o "Tunnel connection failed: 407" por dentro. Só as frases do próprio erro contam (nunca a palavra "proxy" solta: a linha de comando que o erro repete leva
+ * `--proxy http://...`, e uma busca larga casaria com ela em toda falha).
+ */
+const PROXY_SEM_TRAFEGO = /TRAFFIC_EXHAUSTED/i;
+// Qualquer outro 407: o do `requests` ("Tunnel connection failed: 407", "Proxy Authentication Required") e o do libcurl, que o `yt-dlp` usa para o TikTok com `curl-cffi`
+// ("Received HTTP code 407 from proxy after CONNECT").
+const PROXY_RECUSOU = /Tunnel connection failed: 407|Proxy Authentication Required|HTTP code 407 from proxy/i;
+const PROXY_FORA_DO_AR = /Unable to connect to proxy|ProxyError/i;
+
+/**
+ * O que vale do erro do `yt-dlp`: as linhas `ERROR:`, que dizem por que o download acabou falhando. Um `WARNING:` do proxy que se recuperou na nova tentativa (o `yt-dlp` repete o
+ * aviso mesmo quando dá certo depois) não pode fazer um vídeo privado parecer falha do proxy. Sem nenhuma linha `ERROR:` (outro formato), vale o texto inteiro.
+ */
+function linhasDeErro(texto: string): string {
+  const linhas = texto.split(/\r?\n/).filter((linha) => linha.trim().startsWith("ERROR:"));
+  return linhas.length > 0 ? linhas.join("\n") : texto;
+}
+
+/** O erro do `yt-dlp` (o texto dele inteiro) é do proxy, e não do vídeo? Devolve o motivo, ou nulo quando o vídeo é que falhou. */
+export function motivoDaFalhaDoProxy(texto: string): MotivoDoProxy | null {
+  const valido = linhasDeErro(texto);
+  if (PROXY_SEM_TRAFEGO.test(valido)) return "proxy sem trafego";
+  if (PROXY_RECUSOU.test(valido)) return "proxy recusou o acesso";
+  if (PROXY_FORA_DO_AR.test(valido)) return "proxy fora do ar";
+  return null;
+}
+
+/** O proxy falhou no download: o vídeo não tem culpa, nenhuma nova tentativa fica marcada nele. */
+export class ErroDoProxy extends Error {
+  constructor(
+    readonly motivo: MotivoDoProxy,
+    mensagem: string,
+  ) {
+    super(mensagem);
+    this.name = "ErroDoProxy";
+  }
+}
+
 const HOSTS_YOUTUBE = ["youtube.com", "youtu.be"];
 
 /**

@@ -15,6 +15,11 @@ const styles = { ...comum, ...proprio };
 /** Quantos ramos cabem um por linha antes de a tabela mostrar só os que têm algo que não saiu (dúvida do desenho: "a tela nunca vira uma lista sem fim"). */
 const RAMOS_POR_LINHA = 8;
 
+/** "3 de outubro": o dia em que o proxy parou, no fuso do Brasil. */
+function diaDoMes(d: Date): string {
+  return new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(d);
+}
+
 type ItemDeAtencao = { chave: string; titulo: string; detalhe: string; href: string; rotulo: string };
 
 function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
@@ -30,6 +35,7 @@ function itensDeAtencao(inicio: InicioAdmin): ItemDeAtencao[] {
     itens.push({ chave: "teto", ...t.atencao.teto(reais(usdParaBrl(inicio.dinheiro.saiuHojeUsd)), reais(inicio.dinheiro.tetoBrl)), href: "/admin/custos", rotulo: t.atencao.verCustos });
   }
   if (inicio.contas.pararam > 0) itens.push({ chave: "pararam", ...t.atencao.contasPararam(inicio.contas.pararam), href: "/admin/clientes?filtro=parou", rotulo: t.atencao.verContas });
+  if (inicio.atencao.proxy) itens.push({ chave: "proxy", ...t.atencao.proxyParado(inicio.atencao.proxy.motivo, diaDoMes(inicio.atencao.proxy.desde)), href: "/admin/jobs", rotulo: t.atencao.verRotinas });
   if (inicio.atencao.pedidosDeRamo > 0) itens.push({ chave: "pedidos", ...t.atencao.pedidosDeRamo(inicio.atencao.pedidosDeRamo), href: "/admin/nichos", rotulo: t.atencao.verRamos });
   return itens;
 }

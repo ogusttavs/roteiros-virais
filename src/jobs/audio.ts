@@ -5,7 +5,7 @@
  * de qualquer uma das tres plataformas com a mesma chamada.
  */
 import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -13,7 +13,7 @@ import type { Plataforma } from "@/db/schema";
 import { config } from "@/lib/config";
 
 import { apagarSobrasDoDownload, type ExecutorDeProcesso, ErroTempoLimite, executarComLimite } from "./processo";
-import { argumentosPorPlataforma } from "./youtube-cliente";
+import { argumentosPorPlataforma, ErroDoProxy, motivoDaFalhaDoProxy } from "./youtube-cliente";
 
 export class ErroAudio extends Error {}
 
@@ -24,11 +24,30 @@ export class ErroAudio extends Error {}
 export class ErroAudioTempoLimite extends ErroAudio {}
 
 /**
+ * O proxy recusou o download (sem tráfego) ou não conectou (hotfix do proxy, 09/10/2026). Herda de `ErroDoProxy` para o `transcrever` tratar áudio e legenda do mesmo jeito, e de
+ * `ErroAudio` não: um vídeo que não baixou por culpa do proxy nunca vira "falha do vídeo" (nada de nova tentativa em 3 ou 7 dias).
+ */
+export class ErroAudioDoProxy extends ErroDoProxy {}
+
+/**
+ * Hotfix do proxy (09/10/2026): o proxy se paga por gigabyte, e o `yt-dlp -x` sem `-f` baixava o áudio na melhor qualidade (uns 3,8 MB por vídeo) para só depois converter para
+ * 64 kbps: 1.301 áudios em 12 dias esgotaram o pacote de 5 GB. No YouTube, que tem faixa só de áudio, pede-se a mais leve que serve (até 64 kbps, e na falta dela a pior
+ * faixa só de áudio, e na falta de faixa só de áudio a pior que tenha áudio): a Groq transcreve bem a esse peso. TikTok e Instagram só têm faixa com vídeo, e um seletor
+ * só de áudio recusaria o download inteiro ("Requested format is not available"): ficam como estavam.
+ */
+export const FORMATO_DE_AUDIO_LEVE_YOUTUBE = "ba[abr<=64]/wa/wa*";
+
+/** O teto de tamanho do que o `yt-dlp` baixa por proxy: um vídeo longo (uma hora a 64 kbps já passa dos 25 MB) não engole o pacote do mês. */
+export const TAMANHO_MAXIMO_DO_DOWNLOAD = "25M";
+
+/**
  * Os argumentos do yt-dlp para baixar so o audio. Pura, para testar sem
  * abrir processo (mesmo padrao de `argumentosDeVideo480p` em `video.ts`).
  */
 export function argumentosDeAudio(url: string, plataforma: Plataforma, modeloDeSaida: string): string[] {
   return [
+    ...(plataforma === "youtube" ? ["-f", FORMATO_DE_AUDIO_LEVE_YOUTUBE] : []),
+    ...(plataforma === "instagram" ? [] : ["--max-filesize", TAMANHO_MAXIMO_DO_DOWNLOAD]),
     "-x",
     "--audio-format",
     "mp3",
@@ -84,10 +103,24 @@ export async function baixarAudio(
     if (erro instanceof ErroTempoLimite) {
       throw new ErroAudioTempoLimite(`o yt-dlp passou de ${Math.round(limiteMs / 1000)} s baixando o audio de ${url} (tempo limite por video)`);
     }
+    // O proxy é que falhou (sem tráfego ou fora do ar): o vídeo não tem culpa, e quem chama não marca nova tentativa nele.
+    const motivoDoProxy = motivoDaFalhaDoProxy(String(erro));
+    if (motivoDoProxy) throw new ErroAudioDoProxy(motivoDoProxy, `${motivoDoProxy}: o download de ${url} passou pelo proxy e ele recusou`);
     throw new ErroAudio(`nao foi possivel baixar o audio de ${url}: ${ocultarSegredos(String(erro))}`);
   }
 
+  // O `--max-filesize` faz o `yt-dlp` desistir de um arquivo grande demais sem erro, e então não há mp3: é falha do vídeo, e não um arquivo que some depois.
+  if (!(await stat(caminho).catch(() => null))) {
+    await apagarSobrasDoDownload(pasta, prefixo);
+    throw new ErroAudio(`o yt-dlp nao deixou o audio de ${url} (arquivo maior que o limite de ${TAMANHO_MAXIMO_DO_DOWNLOAD} ou download recusado)`);
+  }
+
   return caminho;
+}
+
+/** Quantos bytes o áudio baixado tem (o que o proxy carregou, em boa aproximação); 0 se o arquivo já não existe. Nunca lança. */
+export async function bytesDoAudio(caminho: string): Promise<number> {
+  return (await stat(caminho).catch(() => null))?.size ?? 0;
 }
 
 export async function apagarAudio(caminho: string): Promise<void> {

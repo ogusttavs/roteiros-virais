@@ -55,6 +55,13 @@ export function precoApifyPorMilResultados(ator: string): number {
 }
 
 /**
+ * O proxy do YouTube (DataImpulse, `YTDLP_PROXY`): cobrado por gigabyte de tráfego, comprado em pacote (US$ 5 = 5 GB, não é plano mensal; achado do Fable em 09/10/2026:
+ * os 5 GB acabaram em 12 dias). O custo do que o `transcrever` baixa é estimado por este preço e marcado como "estimado". Mudou o preço, atualiza aqui e a data.
+ */
+export const DATA_PRECO_PROXY = "2026-10-09";
+export const PRECO_PROXY_USD_POR_GB = 1;
+
+/**
  * E45 PR 3: o que custa por dia manter um setor novo sendo pesquisado (coleta, transcrição, análise e temas), em dólar, medido em 02/10/2026.
  * Aparece no admin antes de ligar um ramo alternativo a uma marca (o setor que ainda não é pesquisado passa a ser, e a conta é diária
  * enquanto ele tiver marca). Mudou a medição, atualiza aqui e a data.

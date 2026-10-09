@@ -6,11 +6,15 @@
 /* eslint-disable import/order -- quatro vi.mock intercalados com os imports que
    precisam vir depois deles confundem a regra (ela conta a linha em branco entre
    os imports do bloco de cima e os de baixo como "dentro do mesmo grupo"). */
+import { rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { eq, sql } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { contas, nichos, videos } from "@/db/schema";
+import { contas, custosExternos, nichos, videos } from "@/db/schema";
 import { FILAS } from "@/jobs/fila";
 
 vi.mock("@/jobs/legendas-youtube", async (importarOriginal) => {
@@ -37,8 +41,8 @@ vi.mock("@/lib/config", async (importarOriginal) => {
   };
 });
 
-import { baixarLegendaYoutube, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
-import { apagarAudio, baixarAudio, ErroAudio, ErroAudioTempoLimite } from "@/jobs/audio";
+import { baixarLegendaYoutube, ErroLegendaDoProxy, ErroLegendaTempoLimite } from "@/jobs/legendas-youtube";
+import { apagarAudio, baixarAudio, ErroAudio, ErroAudioDoProxy, ErroAudioTempoLimite } from "@/jobs/audio";
 import { ErroGroq, ErroGroqTempoLimite, transcreverAudio } from "@/jobs/groq-api";
 import { rodarTranscrever } from "@/jobs/transcrever";
 import { config } from "@/lib/config";
@@ -995,5 +999,230 @@ describe("rodarTranscrever, M5c: o orçamento de tempo por setor e a cadeia", ()
     expect(resumo.setoresParadosPeloOrcamento).toEqual([{ slug: "transcrever-teste", ficaramParaDepois: 3 }]);
     const jobs = await db().execute(sql`select 1 from pgboss.job where name = ${FILAS.extrairSemFala}`);
     expect(jobs.rows.length).toBe(0);
+  });
+});
+
+/**
+ * Hotfix do proxy (09/10/2026): o proxy do YouTube, cobrado por gigabyte, acabou (407 TRAFFIC_EXHAUSTED) e o job tentava 109 videos por noite contra ele, gastando o orcamento de cada
+ * setor a toa. Agora o primeiro erro do proxy para o YouTube e o TikTok (que passam por ele) no resto do job, em todos os setores, sem marcar o video como falha dele.
+ */
+describe("rodarTranscrever, hotfix do proxy: o proxy que falha pausa o job inteiro", () => {
+  const MIL_BYTES = 1_000_000;
+  const arquivosTemporarios: string[] = [];
+
+  /** Um mp3 de verdade, com o tamanho pedido: `bytesDoAudio` mede o arquivo, e os testes provam a medida. */
+  function audioDe(bytes: number): string {
+    const caminhoDoAudio = join(tmpdir(), `audio-teste-proxy-${Date.now()}-${arquivosTemporarios.length}.mp3`);
+    writeFileSync(caminhoDoAudio, Buffer.alloc(bytes));
+    arquivosTemporarios.push(caminhoDoAudio);
+    return caminhoDoAudio;
+  }
+
+  async function criarSetorComVideos(slug: string, ids: string[], plataforma: "youtube" | "tiktok" | "instagram" = "youtube") {
+    const [setor] = await db().insert(nichos).values({ slug, nome: slug, termos: [] }).returning();
+    for (const [i, idExterno] of ids.entries()) {
+      await db()
+        .insert(videos)
+        .values({
+          plataforma,
+          idExterno,
+          url: `https://exemplo.invalido/${idExterno}`,
+          contaId: null,
+          nichoId: setor.id,
+          views: 100,
+          publicadoEm: diasAtras(3),
+          velocidadeRelativa: String(ids.length - i),
+          idioma: "pt",
+        });
+    }
+    return setor;
+  }
+
+  afterEach(async () => {
+    for (const arquivo of arquivosTemporarios.splice(0)) rmSync(arquivo, { force: true });
+    await db().delete(videos).where(sql`${videos.nichoId} in (select id from nichos where slug like 'proxy-%')`);
+    await db().delete(nichos).where(sql`${nichos.slug} like 'proxy-%'`);
+    await db().delete(custosExternos).where(eq(custosExternos.fonte, "proxy"));
+    config.regras.transcricoesPorDia = 2;
+  });
+
+  it("o proxy sem trafego na legenda: o YouTube para no primeiro video, nada e marcado nele, e o resumo diz o motivo e desde quando", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 6; i += 1) await criarVideo(`yt-proxy-${i}`, { velocidadeRelativa: 6 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockRejectedValue(new ErroLegendaDoProxy("proxy sem trafego", "proxy sem trafego: a legenda passou pelo proxy e ele recusou"));
+
+    const antes = Date.now();
+    const resumo = await rodarTranscrever();
+
+    // So o primeiro video bateu no proxy: os outros cinco nem foram tentados (nem a legenda nem o audio).
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(1);
+    expect(baixarAudio).not.toHaveBeenCalled();
+    expect(resumo.youtubePausado).toBe(true);
+    expect(resumo.tiktokPausado).toBe(true);
+    expect(resumo.youtubePausadoMotivo).toBe("proxy sem trafego");
+    expect(new Date(resumo.proxyPausadoDesde as string).getTime()).toBeGreaterThanOrEqual(antes - 1000);
+    // O proxy e que falhou: nao e falha do video, nao entra em `falhas`, e a tentativa do video nao e consumida.
+    expect(resumo.falhas).toBe(0);
+    expect(resumo.falhasPorProxy).toBe(1);
+    expect(resumo.erros).toEqual([expect.stringContaining("proxy sem trafego")]);
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoId));
+    expect(linhas).toHaveLength(6);
+    for (const linha of linhas) {
+      expect(linha.transcricao).toBeNull();
+      expect(linha.proximaTentativaTranscricao).toBeNull();
+      expect(linha.falhaDeInfraEm).toBeNull();
+    }
+  });
+
+  it("o proxy sem trafego no audio (a legenda nao existe): o mesmo, e o audio baixado nao fica de resto", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 4; i += 1) await criarVideo(`yt-proxy-audio-${i}`, { velocidadeRelativa: 4 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioDoProxy("proxy sem trafego", "proxy sem trafego: o download passou pelo proxy e ele recusou"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarAudio).toHaveBeenCalledTimes(1);
+    expect(resumo.youtubePausadoMotivo).toBe("proxy sem trafego");
+    expect(resumo.falhas).toBe(0);
+    expect(resumo.falhasPorProxy).toBe(1);
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoId));
+    expect(linhas.every((l) => l.proximaTentativaTranscricao === null && l.falhaDeInfraEm === null)).toBe(true);
+  });
+
+  it("o proxy fora do ar (nao conectou) so pausa depois de tres seguidos, com o motivo proprio no resumo: uma falha de conexao, sozinha, nao para a noite", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-fora-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarAudio).toHaveBeenCalledTimes(3);
+    expect(resumo.youtubePausadoMotivo).toBe("proxy fora do ar");
+    expect(resumo.falhasPorProxy).toBe(3);
+    expect(resumo.falhas).toBe(0);
+  });
+
+  it("o proxy fora do ar duas vezes e um download bom no meio zera a contagem: nao pausa, e nenhum video fica marcado", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-intercalado-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
+    // Falha, falha, legenda boa, falha, falha: nunca tres seguidas.
+    vi.mocked(baixarLegendaYoutube).mockImplementation(async (url: string) => {
+      if (url.endsWith("intercalado-2")) return LEGENDA_LONGA;
+      throw new ErroLegendaDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou");
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(5);
+    expect(resumo.youtubePausado).toBe(false);
+    expect(resumo.youtubePausadoMotivo).toBeUndefined();
+    expect(resumo.falhasPorProxy).toBe(4);
+    expect(resumo.transcritosPorLegenda).toBe(1);
+    const linhas = await db().select().from(videos).where(eq(videos.nichoId, nichoId));
+    expect(linhas.filter((l) => l.proximaTentativaTranscricao !== null || l.falhaDeInfraEm !== null)).toHaveLength(0);
+  });
+
+  it("a pausa vale para o job inteiro: o segundo setor nem tenta o YouTube nem o TikTok, e o Instagram (que baixa direto da Meta) segue", async () => {
+    config.regras.transcricoesPorDia = 40;
+    await criarVideo("yt-primeiro-setor", { velocidadeRelativa: 5, publicadoEm: diasAtras(3), semDono: true });
+    const segundo = await criarSetorComVideos("proxy-segundo-setor", ["yt-segundo-1", "yt-segundo-2"]);
+    await criarSetorComVideos("proxy-terceiro-setor", ["ig-terceiro-1"], "instagram");
+    vi.mocked(baixarLegendaYoutube).mockRejectedValue(new ErroLegendaDoProxy("proxy sem trafego", "proxy sem trafego: a legenda passou pelo proxy e ele recusou"));
+    vi.mocked(baixarAudio).mockImplementation(async () => audioDe(MIL_BYTES));
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto do instagram", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+
+    // O YouTube do primeiro setor bateu no proxy uma vez; os dois do segundo setor nao foram tentados.
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(1);
+    const doSegundo = await db().select().from(videos).where(eq(videos.nichoId, segundo.id));
+    expect(doSegundo.every((v) => v.proximaTentativaTranscricao === null && v.transcricao === null)).toBe(true);
+    // O Instagram do terceiro setor foi lido normalmente, pela Groq.
+    expect(resumo.transcritosPorGroq).toBe(1);
+    expect((resumo.sucessos as Record<string, number>).instagram).toBe(1);
+  });
+
+  it("o TikTok tambem passa pelo proxy: o erro dele pausa o YouTube e o proprio TikTok, no resto do job", async () => {
+    config.regras.transcricoesPorDia = 40;
+    await criarVideo("tt-proxy-1", { plataforma: "tiktok", foraDaCurva: 5, publicadoEm: diasAtras(10), semDono: true });
+    await criarVideo("tt-proxy-2", { plataforma: "tiktok", foraDaCurva: 4, publicadoEm: diasAtras(10), semDono: true });
+    // O YouTube vem de um setor depois do TikTok (a fila de cada setor poe o YouTube em alta antes do TikTok): o erro do TikTok no primeiro setor o pausa no segundo.
+    await criarSetorComVideos("proxy-yt-depois-do-tiktok", ["yt-depois-do-tiktok"]);
+    vi.mocked(baixarAudio).mockRejectedValue(new ErroAudioDoProxy("proxy sem trafego", "proxy sem trafego: o download passou pelo proxy e ele recusou"));
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.youtubePausadoMotivo).toBe("proxy sem trafego");
+    expect(baixarAudio).toHaveBeenCalledTimes(1);
+    expect(baixarLegendaYoutube).not.toHaveBeenCalled();
+    expect(resumo.falhasPorProxy).toBe(1);
+  });
+
+  it("o proxy que recusa o acesso (outro 407, a senha) pausa na hora, como o sem trafego, com o motivo proprio", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 4; i += 1) await criarVideo(`yt-proxy-recusou-${i}`, { velocidadeRelativa: 4 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockRejectedValue(new ErroLegendaDoProxy("proxy recusou o acesso", "proxy recusou o acesso: a legenda passou pelo proxy e ele recusou"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(1);
+    expect(resumo.youtubePausadoMotivo).toBe("proxy recusou o acesso");
+  });
+
+  it("o proxy fora do ar, um video que falha por culpa dele (privado), fora do ar de novo: o proxy respondeu no meio, a contagem recomeca e nao pausa", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-respondeu-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    // Fora, fora, privado (o proxy respondeu), fora, fora: nunca tres seguidas sem uma resposta no meio.
+    vi.mocked(baixarAudio).mockImplementation(async (url: string) => {
+      if (url.endsWith("respondeu-2")) throw new ErroAudio("video privado ou removido");
+      throw new ErroAudioDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou");
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarAudio).toHaveBeenCalledTimes(5);
+    expect(resumo.youtubePausadoMotivo).toBeUndefined();
+    expect(resumo.falhasPorProxy).toBe(4);
+    expect(resumo.falhas).toBe(1);
+  });
+  it("uma noite sem falha do proxy nao diz nada dele no resumo", async () => {
+    await criarVideo("yt-proxy-ok", { velocidadeRelativa: 1, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);
+
+    const resumo = await rodarTranscrever();
+
+    expect(resumo.youtubePausado).toBe(false);
+    expect(resumo.youtubePausadoMotivo).toBeUndefined();
+    expect(resumo.proxyPausadoDesde).toBeUndefined();
+    expect(resumo.falhasPorProxy).toBe(0);
+    expect(resumo.megabytesBaixados).toBe(0);
+  });
+
+  it("os megabytes baixados entram no resumo (o total e o que passou pelo proxy), e o custo estimado do proxy e gravado por setor (US$ 1 por GB)", async () => {
+    config.regras.transcricoesPorDia = 40;
+    await criarSetorComVideos("proxy-medicao-yt", ["yt-medido-1", "yt-medido-2"]);
+    await criarSetorComVideos("proxy-medicao-tt", ["tt-medido-1"], "tiktok");
+    await criarSetorComVideos("proxy-medicao-ig", ["ig-medido-1"], "instagram");
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    vi.mocked(baixarAudio).mockImplementation(async (url: string) => audioDe(url.includes("/ig-") ? 2 * MIL_BYTES : url.includes("/tt-") ? 1_500_000 : 3 * MIL_BYTES));
+    vi.mocked(transcreverAudio).mockResolvedValue({ texto: "texto transcrito pela groq", idiomaDetectado: "pt", semFala: false });
+
+    const resumo = await rodarTranscrever();
+
+    // youtube: 2 x 3 MB; tiktok: 1,5 MB; instagram: 2 MB (direto da Meta, sem proxy).
+    expect(resumo.megabytesBaixados).toBeCloseTo(9.5, 2);
+    expect(resumo.megabytesPeloProxy).toBeCloseTo(7.5, 2);
+    const linhas = await db().select().from(custosExternos).where(eq(custosExternos.fonte, "proxy"));
+    // Uma linha por setor que baixou pelo proxy: o do YouTube e o do TikTok (o do Instagram nao gastou proxy).
+    expect(linhas).toHaveLength(2);
+    expect(linhas.every((l) => l.unidade === "megabytes" && l.origemDoCusto === "estimado")).toBe(true);
+    const totalMb = linhas.reduce((soma, l) => soma + Number(l.unidades), 0);
+    const totalUsd = linhas.reduce((soma, l) => soma + Number(l.custoUsd), 0);
+    expect(totalMb).toBeCloseTo(7.5, 2);
+    expect(totalUsd).toBeCloseTo(0.0075, 5);
   });
 });

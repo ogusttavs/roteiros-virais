@@ -46,10 +46,12 @@ export const textosCustosAdmin = {
     vazio: "Nada registrado ainda. A transcrição e a busca de vídeos passam a aparecer aqui a partir da próxima madrugada.",
     minutos: (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} minutos de áudio`,
     resultados: (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} resultados`,
+    // Menos de 10 MB tem uma casa (0,4 MB não vira "0 MB"), e quando o arredondamento chega a 1.000 MB já é 1 GB.
+    megabytes: (n: number) => (Math.round(n) >= 1000 ? `${(n / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 2 })} GB baixados` : `${n.toLocaleString("pt-BR", { maximumFractionDigits: n < 10 ? 1 : 0 })} MB baixados`),
     vezes: (n: number) => (n === 1 ? "1 chamada" : `${n} chamadas`),
     estimado: "valor estimado pelo preço de tabela",
     daApi: "valor que o próprio serviço informou",
-    nota: (dataApify: string) => `Transcrição: US$ 0,04 por hora de áudio, com o mínimo de 10 segundos por pedido. Busca de vídeos: o que o Apify informa por execução; quando ele não informa, o preço do ator (tabela de ${dataApify}). O teto do dia continua contando só a IA.`,
+    nota: (dataApify: string, dataProxy: string, usdPorGbDoProxy: number) => `Transcrição: US$ 0,04 por hora de áudio, com o mínimo de 10 segundos por pedido. Busca de vídeos: o que o Apify informa por execução; quando ele não informa, o preço do ator (tabela de ${dataApify}). Proxy do YouTube: US$ ${usdPorGbDoProxy.toLocaleString("pt-BR")} por gigabyte (pacote do DataImpulse, preço de ${dataProxy}), estimado pelo tamanho dos áudios baixados; é um piso, porque a legenda e as páginas que o proxy também carrega não entram na conta, e o painel do DataImpulse é o número de verdade. O teto do dia continua contando só a IA.`,
   },
   ondeVai: { titulo: "Por onde o dinheiro vai", legenda: "30 dias, o que varia", vazio: "Nada ainda.", vezes: (n: number) => (n === 1 ? "1 vez" : `${n} vezes`), semRegistro: "Só a IA entra nesta lista; o que se paga por uso fora dela está em Fora da IA." },
   fixos: {
@@ -119,6 +121,8 @@ export const textosRotinasAdmin = {
     temasDoDia: (comTema: number, semUso: number) => `${comTema === 1 ? "1 ramo com tema" : `${comTema} ramos com tema`}, ${semUso === 1 ? "1 sem uso" : `${semUso} sem uso`}`,
     semTemaPorFaltaDeUso: "sem tema hoje: ninguém gerou roteiro em 3 dias",
     paradoNoLimite: "Parou no limite da Meta e continua na hora seguinte.",
+    // Hotfix do proxy (09/10/2026): a transcrição terminou, mas o proxy do YouTube não serviu, e o YouTube e o TikTok esperaram a noite seguinte.
+    proxyParado: (motivo: "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar", desde: string) => `${{ "proxy sem trafego": "O proxy do YouTube está sem tráfego", "proxy recusou o acesso": "O proxy do YouTube recusou o acesso", "proxy fora do ar": "O proxy do YouTube não está respondendo" }[motivo]} desde ${desde}: o YouTube e o TikTok esperaram a noite seguinte.`,
     soUmRamo: "Rodar de novo só um ramo",
     escolhaORamo: "Escolha o ramo",
     rodarRamo: "Rodar só este ramo",

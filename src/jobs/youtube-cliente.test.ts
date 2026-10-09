@@ -7,6 +7,8 @@ import {
   argumentosProxy,
   argumentosYoutube,
   ehUrlDoYoutube,
+  ErroDoProxy,
+  motivoDaFalhaDoProxy,
   pausaEntreVideosYoutube,
 } from "./youtube-cliente";
 
@@ -114,5 +116,57 @@ describe("ehUrlDoYoutube", () => {
 
   it("url invalida devolve falso, sem lancar", () => {
     expect(ehUrlDoYoutube("nao e uma url")).toBe(false);
+  });
+});
+
+/**
+ * Hotfix do proxy (09/10/2026): o proxy do YouTube, cobrado por gigabyte, acabou, e o job tentava 109 videos por noite contra um 407. So as frases do proprio erro do proxy contam: a linha de
+ * comando que o erro repete leva "--proxy http://...", e uma busca larga pela palavra casaria com toda falha.
+ */
+describe("motivoDaFalhaDoProxy", () => {
+  it("o 407 TRAFFIC_EXHAUSTED do pacote que acabou e \"proxy sem trafego\", com o texto completo que o yt-dlp devolve", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: Unable to download webpage: ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 407 TRAFFIC_EXHAUSTED'))")).toBe("proxy sem trafego");
+    expect(motivoDaFalhaDoProxy("ERROR: traffic_exhausted")).toBe("proxy sem trafego");
+  });
+
+  it("qualquer outro 407 (a senha trocada, a conta suspensa) e \"proxy recusou o acesso\", e nunca \"sem trafego\": o admin nao pode mandar comprar gigabyte quando e a senha", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: HTTP Error 407: Proxy Authentication Required")).toBe("proxy recusou o acesso");
+    expect(motivoDaFalhaDoProxy("ERROR: Unable to download webpage: ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 407 Proxy Authentication Required'))")).toBe("proxy recusou o acesso");
+    // O TikTok baixa a pagina com o curl-cffi, que diz o 407 com outras palavras.
+    expect(motivoDaFalhaDoProxy("ERROR: [TikTok] 123: Unable to download webpage: curl: (56) Received HTTP code 407 from proxy after CONNECT")).toBe("proxy recusou o acesso");
+  });
+
+  it("o proxy que nao conecta, sem o 407, e \"proxy fora do ar\"", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: ProxyError('Unable to connect to proxy', ConnectionRefusedError(10061))")).toBe("proxy fora do ar");
+  });
+
+  it("o erro do video (privado, removido, bloqueio do robo) nao e do proxy, mesmo com --proxy na linha de comando", () => {
+    expect(motivoDaFalhaDoProxy("Command failed: yt-dlp --proxy http://[oculto]@proxy.exemplo.invalido:823 -x https://www.youtube.com/watch?v=abc\nERROR: Video unavailable")).toBeNull();
+    expect(motivoDaFalhaDoProxy("ERROR: Sign in to confirm you're not a bot")).toBeNull();
+    expect(motivoDaFalhaDoProxy("")).toBeNull();
+  });
+
+  it("so as linhas ERROR contam: o aviso do proxy que o yt-dlp repete e se recupera na nova tentativa nao faz um video privado parecer falha do proxy", () => {
+    const texto = [
+      "Command failed: yt-dlp --proxy http://[oculto]@proxy.exemplo.invalido:823 -x https://www.youtube.com/watch?v=privado",
+      "WARNING: Unable to download webpage: ProxyError('Unable to connect to proxy', OSError('Tunnel connection failed: 407 TRAFFIC_EXHAUSTED')). Retrying (1/3)...",
+      "ERROR: [youtube] privado: Private video. Sign in if you've been granted access to this video",
+    ].join("\n");
+    expect(motivoDaFalhaDoProxy(texto)).toBeNull();
+    // E a mesma falha com o ERROR do proxy volta a valer.
+    expect(motivoDaFalhaDoProxy(texto.replace("ERROR: [youtube] privado: Private video. Sign in if you've been granted access to this video", "ERROR: Unable to connect to proxy"))).toBe("proxy fora do ar");
+  });
+
+  it("o numero 407 solto no id de um video nao e erro de proxy", () => {
+    expect(motivoDaFalhaDoProxy("ERROR: [youtube] 407abcdefgh: Video unavailable")).toBeNull();
+  });
+});
+
+describe("ErroDoProxy", () => {
+  it("carrega o motivo, e e um Error com nome", () => {
+    const erro = new ErroDoProxy("proxy sem trafego", "o proxy recusou");
+    expect(erro).toBeInstanceOf(Error);
+    expect(erro.motivo).toBe("proxy sem trafego");
+    expect(erro.name).toBe("ErroDoProxy");
   });
 });

@@ -13,7 +13,7 @@ import { join } from "node:path";
 import { config } from "@/lib/config";
 
 import { apagarSobrasDoDownload, type ExecutorDeProcesso, ErroTempoLimite, executarComLimite } from "./processo";
-import { argumentosYoutube } from "./youtube-cliente";
+import { argumentosYoutube, ErroDoProxy, motivoDaFalhaDoProxy } from "./youtube-cliente";
 
 /**
  * O `yt-dlp` passou do tempo limite por vídeo (M5c) e foi morto, buscando a legenda. Diferente de "sem legenda" (que é
@@ -21,6 +21,9 @@ import { argumentosYoutube } from "./youtube-cliente";
  * penduraria pelo mesmo motivo, dobrando o tempo perdido neste vídeo).
  */
 export class ErroLegendaTempoLimite extends Error {}
+
+/** O proxy recusou ou não conectou ao buscar a legenda (hotfix do proxy, 09/10/2026): o vídeo não tem culpa, e o áudio passaria pelo mesmo proxy. */
+export class ErroLegendaDoProxy extends ErroDoProxy {}
 
 const ENTIDADES_HTML: Record<string, string> = {
   "&gt;": ">",
@@ -112,6 +115,9 @@ export async function baixarLegendaYoutube(
       if (erro instanceof ErroTempoLimite) {
         throw new ErroLegendaTempoLimite(`o yt-dlp passou de ${Math.round(limiteMs / 1000)} s buscando a legenda de ${url} (tempo limite por video)`);
       }
+      // A legenda ausente (comum) e o erro do próprio vídeo seguem como "sem legenda"; o proxy fora do ar é outra coisa, e quem chama precisa saber.
+      const motivoDoProxy = motivoDaFalhaDoProxy(String(erro));
+      if (motivoDoProxy) throw new ErroLegendaDoProxy(motivoDoProxy, `${motivoDoProxy}: a legenda de ${url} passou pelo proxy e ele recusou`);
       return null;
     }
 

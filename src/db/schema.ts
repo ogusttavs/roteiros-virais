@@ -783,12 +783,12 @@ export const custosExternos = pgTable(
   "custos_externos",
   {
     id: id(),
-    /** De onde veio o gasto: "groq" (transcrição) ou "apify" (coleta). */
-    fonte: text("fonte").$type<"groq" | "apify">().notNull(),
+    /** De onde veio o gasto: "groq" (transcrição), "apify" (coleta) ou "proxy" (o tráfego do proxy do YouTube, por gigabyte). */
+    fonte: text("fonte").$type<"groq" | "apify" | "proxy">().notNull(),
     custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
-    /** Quantas unidades a chamada gastou: minutos de áudio na Groq, resultados no Apify. */
+    /** Quantas unidades a chamada gastou: minutos de áudio na Groq, resultados no Apify, megabytes no proxy. */
     unidades: numeric("unidades", { precision: 12, scale: 3 }).notNull().default("0"),
-    unidade: text("unidade").$type<"minutos" | "resultados">().notNull(),
+    unidade: text("unidade").$type<"minutos" | "resultados" | "megabytes">().notNull(),
     /** O ramo do gasto, quando se sabe (nulo na rodada de todos os ramos e no que não é de ramo). */
     ramoId: integer("ramo_id").references(() => nichos.id, { onDelete: "set null" }),
     /** A execução (`execucoes_job`) em que o gasto aconteceu, quando houve. */
