@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, usdParaBrl } from "@/config/dinheiro";
-import { DATA_PRECO_APIFY, DATA_PRECO_PROXY } from "@/config/precos-ia";
+import { DATA_PRECO_APIFY, DATA_PRECO_PROXY, PRECO_PROXY_USD_POR_GB } from "@/config/precos-ia";
 import { exigirAdmin } from "@/lib/sessao";
 import { custosDoAdmin } from "@/servicos/admin-custos";
 import { dolares, reais } from "@/textos/admin-contas";
@@ -214,7 +214,7 @@ export default async function CustosDoAdmin() {
                   <span className={styles.nomeCusto}>
                     {l.rotulo}
                     <span className={styles.detalheCusto}>
-                      {l.unidade === "minutos" ? t.foraDaIA.minutos(l.unidades) : l.unidade === "megabytes" ? t.foraDaIA.megabytes(l.unidades) : t.foraDaIA.resultados(l.unidades)}, {t.foraDaIA.vezes(l.execucoes)}, {l.algumEstimado ? t.foraDaIA.estimado : t.foraDaIA.daApi}
+                      {l.unidade === "minutos" ? t.foraDaIA.minutos(l.unidades) : l.unidade === "megabytes" ? t.foraDaIA.megabytes(l.unidades) : t.foraDaIA.resultados(l.unidades)}, {l.unidade === "megabytes" ? null : `${t.foraDaIA.vezes(l.execucoes)}, `}{l.algumEstimado ? t.foraDaIA.estimado : t.foraDaIA.daApi}
                     </span>
                   </span>
                   <span className={styles.valorCusto}>
@@ -226,7 +226,7 @@ export default async function CustosDoAdmin() {
               ))}
             </ul>
           )}
-          <p className={styles.nota}>{t.foraDaIA.nota(`${diaApify}/${mesApify}/${anoApify}`, `${diaProxy}/${mesProxy}/${anoProxy}`)}</p>
+          <p className={styles.nota}>{t.foraDaIA.nota(`${diaApify}/${mesApify}/${anoApify}`, `${diaProxy}/${mesProxy}/${anoProxy}`, PRECO_PROXY_USD_POR_GB)}</p>
         </section>
       </div>
 

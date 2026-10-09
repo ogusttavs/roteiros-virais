@@ -85,6 +85,34 @@ describe("proxyParadoDasExecucoes", () => {
     expect(proxyParadoDasExecucoes([parada(9), semProxy(8), parada(7)])?.desde).toEqual(dia(7));
   });
 
+  it("a rodada que baixou uma parte e depois o proxy acabou de novo conta como parada e encerra a contagem: o desde nao recua para noites em que ele ja tinha voltado", () => {
+    const baixouAteAcabar = (d: number, extra: Record<string, unknown> = {}) => parada(d, "proxy sem trafego", { sucessos: { youtube: 20, tiktok: 0, instagram: 0 }, tentativas: { youtube: 21, tiktok: 0, instagram: 0 }, falhasPorProxy: 1, ...extra });
+    const anotado = "2026-10-03T09:00:00.000Z";
+    const resultado = proxyParadoDasExecucoes([parada(4), baixouAteAcabar(3, { proxyPausadoDesde: anotado }), parada(2), parada(1)]);
+    expect(resultado).toEqual({ motivo: "proxy sem trafego", desde: new Date(anotado) });
+  });
+
+  it("a noite so de falhas por video (privado, robo) com o proxy respondendo diz que ele voltou, mesmo sem nenhum video lido", () => {
+    const soFalhasDosVideos = { iniciadoEm: dia(9), resumo: { youtubePausado: false, sucessos: { youtube: 0, tiktok: 0, instagram: 0 }, tentativas: { youtube: 4, tiktok: 0, instagram: 0 }, falhasPorProxy: 0 } };
+    expect(proxyParadoDasExecucoes([soFalhasDosVideos, parada(8)])).toBeNull();
+  });
+
+  it("a noite em que toda tentativa foi recusada pelo proxy nao prova que ele voltou (tentativas igual a falhasPorProxy)", () => {
+    const recusadas = parada(9, "proxy fora do ar", { tentativas: { youtube: 3, tiktok: 0, instagram: 0 }, falhasPorProxy: 3 });
+    expect(proxyParadoDasExecucoes([recusadas, parada(8, "proxy fora do ar")])).toEqual({ motivo: "proxy fora do ar", desde: dia(8) });
+  });
+
+  it("so o TikTok lido tambem prova que o proxy voltou (os dois passam por ele), e o Instagram nao", () => {
+    const soTiktok = { iniciadoEm: dia(9), resumo: { sucessos: { youtube: 0, tiktok: 2, instagram: 0 } } };
+    const soInstagram = { iniciadoEm: dia(9), resumo: { sucessos: { youtube: 0, tiktok: 0, instagram: 5 }, tentativas: { youtube: 0, tiktok: 0, instagram: 5 } } };
+    expect(proxyParadoDasExecucoes([soTiktok, parada(8)])).toBeNull();
+    expect(proxyParadoDasExecucoes([soInstagram, parada(8)])).toEqual({ motivo: "proxy sem trafego", desde: dia(8) });
+  });
+
+  it("o resumo malformado (sucessos que nao e objeto, numero em texto) nao quebra", () => {
+    expect(proxyParadoDasExecucoes([{ iniciadoEm: dia(9), resumo: { sucessos: "nada", tentativas: 7, falhasPorProxy: "x" } }])).toBeNull();
+    expect(proxyParadoDasExecucoes([{ iniciadoEm: dia(9), resumo: { youtubePausadoMotivo: "proxy recusou o acesso", sucessos: "nada" } }])).toEqual({ motivo: "proxy recusou o acesso", desde: dia(9) });
+  });
   it("um motivo que o admin nao conhece nao acende o aviso", () => {
     expect(proxyParadoDasExecucoes([{ iniciadoEm: dia(9), resumo: { youtubePausadoMotivo: "outra coisa" } }])).toBeNull();
   });

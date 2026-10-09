@@ -1161,6 +1161,34 @@ describe("rodarTranscrever, hotfix do proxy: o proxy que falha pausa o job intei
     expect(resumo.falhasPorProxy).toBe(1);
   });
 
+  it("o proxy que recusa o acesso (outro 407, a senha) pausa na hora, como o sem trafego, com o motivo proprio", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 4; i += 1) await criarVideo(`yt-proxy-recusou-${i}`, { velocidadeRelativa: 4 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockRejectedValue(new ErroLegendaDoProxy("proxy recusou o acesso", "proxy recusou o acesso: a legenda passou pelo proxy e ele recusou"));
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarLegendaYoutube).toHaveBeenCalledTimes(1);
+    expect(resumo.youtubePausadoMotivo).toBe("proxy recusou o acesso");
+  });
+
+  it("o proxy fora do ar, um video que falha por culpa dele (privado), fora do ar de novo: o proxy respondeu no meio, a contagem recomeca e nao pausa", async () => {
+    config.regras.transcricoesPorDia = 40;
+    for (let i = 0; i < 5; i += 1) await criarVideo(`yt-proxy-respondeu-${i}`, { velocidadeRelativa: 5 - i, publicadoEm: diasAtras(3), semDono: true });
+    vi.mocked(baixarLegendaYoutube).mockResolvedValue(null);
+    // Fora, fora, privado (o proxy respondeu), fora, fora: nunca tres seguidas sem uma resposta no meio.
+    vi.mocked(baixarAudio).mockImplementation(async (url: string) => {
+      if (url.endsWith("respondeu-2")) throw new ErroAudio("video privado ou removido");
+      throw new ErroAudioDoProxy("proxy fora do ar", "proxy fora do ar: nao conectou");
+    });
+
+    const resumo = await rodarTranscrever();
+
+    expect(baixarAudio).toHaveBeenCalledTimes(5);
+    expect(resumo.youtubePausadoMotivo).toBeUndefined();
+    expect(resumo.falhasPorProxy).toBe(4);
+    expect(resumo.falhas).toBe(1);
+  });
   it("uma noite sem falha do proxy nao diz nada dele no resumo", async () => {
     await criarVideo("yt-proxy-ok", { velocidadeRelativa: 1, publicadoEm: diasAtras(3), semDono: true });
     vi.mocked(baixarLegendaYoutube).mockResolvedValue(LEGENDA_LONGA);

@@ -436,7 +436,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
   /** Falhas "fora do ar" seguidas, sem um download bom no meio (zera a cada YouTube ou TikTok que sai). */
   let proxyForaSeguidos = 0;
   /** Bytes dos áudios baixados, por plataforma, para o resumo e para o custo do proxy (YouTube e TikTok passam por ele; o Instagram baixa direto da Meta). */
-  const bytesBaixados: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
+  const bytesBaixados: Record<string, number> = { youtube: 0, tiktok: 0, instagram: 0 };
+  /** Os setores que pararam pelo orçamento de tempo, com quantos vídeos da fila ficaram para a noite seguinte. */
   const setoresParadosPeloOrcamento: { slug: string; ficaramParaDepois: number }[] = [];
   /** Quanto cada setor levou, em segundos (para calibrar o orçamento olhando o resumo, sem abrir log). */
   const segundosPorSetor: Record<string, number> = {};
@@ -483,7 +484,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
           const resultado = await transcreverUm(videoId, info.urlParaBaixar, info.plataforma, info.duracaoS, info.idioma, (bytes) => {
             bytesBaixados[info.plataforma] = (bytesBaixados[info.plataforma] ?? 0) + bytes;
             if (passaPeloProxy) bytesDoProxyNoSetor += bytes;
-          });          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
+          });
+          if (resultado.tipo === "legenda" || resultado.tipo === "groq") {
             sucessos[info.plataforma] = (sucessos[info.plataforma] ?? 0) + 1;
             sucessosNoNicho += 1;
             if (passaPeloProxy) proxyForaSeguidos = 0;
@@ -505,6 +507,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
               erros.push(`${resultado.motivo}: o YouTube e o TikTok ficam parados no resto desta noite (video ${videoId} / nicho "${nicho.slug}")`);
             }
           } else if (resultado.tipo === "falhou") {
+            // O proxy respondeu (o vídeo é que falhou): não era engasgo de conexão, a contagem do "fora do ar" recomeça.
+            if (passaPeloProxy) proxyForaSeguidos = 0;
             falhas += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
             if (info.plataforma === "tiktok") {
@@ -512,6 +516,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
               if (falhasSeguidasTiktok >= MAX_FALHAS_SEGUIDAS_FREIO) tiktokPausadoNoNicho = true;
             }
           } else if (resultado.tipo === "falhouYoutubeBot") {
+            // O YouTube respondeu pelo proxy (e barrou o robô): o proxy não está fora do ar.
+            proxyForaSeguidos = 0;
             falhas += 1;
             falhasYoutubeBot += 1;
             erros.push(`video ${videoId} / nicho "${nicho.slug}": ${resultado.motivo}`);
@@ -552,7 +558,8 @@ export async function rodarTranscrever(nichoId?: number, opcoes: OpcoesTranscrev
       if (bytesDoProxyNoSetor > 0) {
         const megabytes = bytesDoProxyNoSetor / 1_000_000;
         await registrarCustoExterno({ fonte: "proxy", custoUsd: custoDoProxyUsd(megabytes), unidades: megabytes, unidade: "megabytes", origemDoCusto: "estimado", detalhe: { setor: nicho.slug } });
-      }      segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
+      }
+      segundosPorSetor[nicho.slug] = Math.round((agora() - inicioDoSetor) / 1000);
     }
     restaurarRamoDoContexto();
   } finally {

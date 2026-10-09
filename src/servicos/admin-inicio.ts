@@ -31,35 +31,40 @@ export type LinhaDaMadrugada = {
 export type RotinasDoDia = { busca: EstadoAgregado; transcricao: EstadoAgregado; erroDaBusca: string | null; erroDaTranscricao: string | null };
 
 /** O proxy do YouTube (que o TikTok também usa) parou: o motivo e desde quando, contando as noites seguidas. */
-export type ProxyParado = { motivo: "proxy sem trafego" | "proxy fora do ar"; desde: Date };
+export type ProxyParado = { motivo: "proxy sem trafego" | "proxy recusou o acesso" | "proxy fora do ar"; desde: Date };
 
-const MOTIVOS_DO_PROXY = new Set<string>(["proxy sem trafego", "proxy fora do ar"]);
+const MOTIVOS_DO_PROXY = new Set<string>(["proxy sem trafego", "proxy recusou o acesso", "proxy fora do ar"]);
 
 function motivoDoResumo(resumo: Record<string, unknown> | null): ProxyParado["motivo"] | null {
   const motivo = resumo?.youtubePausadoMotivo;
   return typeof motivo === "string" && MOTIVOS_DO_PROXY.has(motivo) ? (motivo as ProxyParado["motivo"]) : null;
 }
 
-/** A rodada baixou alguma coisa pelo proxy com sucesso (um YouTube ou TikTok transcrito): prova que ele voltou. */
-function baixouPeloProxy(resumo: Record<string, unknown> | null): boolean {
+/**
+ * O proxy respondeu nesta rodada? Houve pelo menos uma tentativa de YouTube ou TikTok (os dois passam por ele) em que ele não foi o que falhou: um vídeo lido, ou um vídeo que falhou
+ * por culpa dele mesmo (privado, removido, bloqueio do robô). Rodada sem tentativa pelo proxy (só Instagram, fila vazia) não prova nada, e as de antes deste aviso, sem `tentativas`, tampouco.
+ */
+function proxyRespondeu(resumo: Record<string, unknown> | null): boolean {
+  const tentativas = resumo?.tentativas as Record<string, unknown> | undefined;
   const sucessos = resumo?.sucessos as Record<string, unknown> | undefined;
-  return Number(sucessos?.youtube ?? 0) + Number(sucessos?.tiktok ?? 0) > 0;
+  const pelaRede = Number(tentativas?.youtube ?? 0) + Number(tentativas?.tiktok ?? 0);
+  const falhasDoProxy = Number(resumo?.falhasPorProxy ?? 0);
+  const lidos = Number(sucessos?.youtube ?? 0) + Number(sucessos?.tiktok ?? 0);
+  return lidos > 0 || pelaRede - falhasDoProxy > 0;
 }
 
 /**
  * O proxy do YouTube está parado agora? Pura, para testar: as execuções do `transcrever` que terminaram, da mais nova para a mais velha. Vale a última rodada que disse alguma coisa:
- * se ela parou pelo proxy, ele está parado, e "desde" é a mais antiga das rodadas seguidas que pararam pelo proxy (o instante em que o job anotou, ou o início da rodada);
- * uma rodada que baixou algo pelo proxy com sucesso diz que ele voltou; uma rodada que não tentou nada pelo proxy (só Instagram, ou nada na fila) não diz nada.
+ * se ela parou pelo proxy, ele está parado, e "desde" é a mais antiga das rodadas seguidas que pararam pelo proxy (o instante em que o job anotou, ou o início da rodada). Uma rodada
+ * em que o proxy respondeu diz que ele voltou: se ela mesma parou no fim da noite (baixou uma parte e o proxy acabou de novo), conta como parada e a contagem das noites termina nela;
+ * se não parou, o proxy não está parado. Uma rodada que não tentou nada pelo proxy não diz nada.
  */
 export function proxyParadoDasExecucoes(execucoes: { iniciadoEm: Date; resumo: Record<string, unknown> | null }[]): ProxyParado | null {
   const paradas: { iniciadoEm: Date; resumo: Record<string, unknown> | null; motivo: ProxyParado["motivo"] }[] = [];
   for (const e of execucoes) {
     const motivo = motivoDoResumo(e.resumo);
-    if (motivo) {
-      paradas.push({ ...e, motivo });
-      continue;
-    }
-    if (baixouPeloProxy(e.resumo)) break;
+    if (motivo) paradas.push({ ...e, motivo });
+    if (proxyRespondeu(e.resumo)) break;
   }
   if (paradas.length === 0) return null;
   const maisAntiga = paradas[paradas.length - 1];
@@ -67,14 +72,20 @@ export function proxyParadoDasExecucoes(execucoes: { iniciadoEm: Date; resumo: R
   return { motivo: paradas[0].motivo, desde: anotado && !Number.isNaN(anotado.getTime()) ? anotado : maisAntiga.iniciadoEm };
 }
 
-/** As últimas rodadas do `transcrever` que terminaram bem (o resumo diz se o proxy parou), da mais nova para a mais velha. */
+/**
+ * As últimas rodadas do `transcrever` que terminaram bem (o resumo diz se o proxy parou), da mais nova para a mais velha. Só as chaves de que a conta precisa saem do banco: o resumo inteiro
+ * leva a lista de erros da noite, e esta consulta roda a cada carga do Início e das Rotinas. Rodadas de um ramo só (a primeira carga, "rodar só um ramo") têm o mesmo nome, por isso o limite é folgado.
+ */
 async function proxyDoYoutubeParado(): Promise<ProxyParado | null> {
   const execucoes = await db()
-    .select({ iniciadoEm: execucoesJob.iniciadoEm, resumo: execucoesJob.resumo })
+    .select({
+      iniciadoEm: execucoesJob.iniciadoEm,
+      resumo: sql<Record<string, unknown>>`jsonb_build_object('youtubePausadoMotivo', ${execucoesJob.resumo}->'youtubePausadoMotivo', 'proxyPausadoDesde', ${execucoesJob.resumo}->'proxyPausadoDesde', 'sucessos', ${execucoesJob.resumo}->'sucessos', 'tentativas', ${execucoesJob.resumo}->'tentativas', 'falhasPorProxy', ${execucoesJob.resumo}->'falhasPorProxy')`,
+    })
     .from(execucoesJob)
     .where(and(eq(execucoesJob.nome, FILAS.transcrever), eq(execucoesJob.status, "ok")))
     .orderBy(desc(execucoesJob.id))
-    .limit(30);
+    .limit(60);
   return proxyParadoDasExecucoes(execucoes);
 }
 

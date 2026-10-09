@@ -72,8 +72,9 @@ function resultadoEmFrase(e: ExecucaoResumo | undefined, proxy: ProxyParado | nu
   }
   // A rotina da Meta que parou no limite do aplicativo não é erro: o resumo diz que continua na hora seguinte.
   if (e.resumo?.pausadoPorLimite === true) return t.rotinas.paradoNoLimite;
-  // O proxy do YouTube parou nesta noite (sem tráfego ou fora do ar): a transcrição terminou, mas o YouTube e o TikTok esperaram. O "desde" conta as noites seguidas.
-  if (typeof e.resumo?.youtubePausadoMotivo === "string" && proxy) return t.rotinas.proxyParado(proxy.motivo, diaDoMes(proxy.desde));  // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
+  // O proxy do YouTube está parado (a mesma conta do Início: a última rodada que disse algo parou por ele): a transcrição terminou, mas o YouTube e o TikTok esperaram. O "desde" conta as noites seguidas.
+  if (e.nome === FILAS.transcrever && proxy) return t.rotinas.proxyParado(proxy.motivo, diaDoMes(proxy.desde));
+  // Sem as chaves cruas do resumo (nome técnico): o cartão diz como terminou, e os números ficam no detalhe.
   return e.status === "rodando" ? t.rotinas.estado.rodando : `${t.rotinas.estado.ok}, em ${duracao(e.duracaoMs)}`;
 }
 
