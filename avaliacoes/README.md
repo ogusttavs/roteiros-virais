@@ -148,3 +148,8 @@ tirou voltando, instrução escondida obedecida, reprovação no verificador de 
 o texto que o caso exige em algum item, `deveConter`). Cada uma tem de dar zero. **Um caso que dá erro ao
 avaliar conta como erro (não como "sem problema"), e qualquer erro ou conferência vermelha deixa o resultado
 vermelho e o código de saída em 1.** Prova com chave real é do Fable.
+
+## O tema do momento (E55)
+
+`npm run avaliar:tema-do-momento` mede o `temaDoMomento` (prompt novo no modelo forte): cada caso traz um setor e uma lista de assuntos em alta no Brasil, e diz se o código de produção deve gerar um tema do momento ou não (encaixe de pelo menos 7, assunto que existe, nunca sensível). O resumo imprime os acertos e, para cada tema gerado, o título e o porquê, para o revisor ler. O arquivo real é `GOLDEN_SET_DIR/tema-do-momento.json`; sem ele, roda com `tema-do-momento.exemplo.json`. Os casos do exemplo: tendência que cabe, que não cabe, sensível, ruído de futebol, reality e celular numa clínica, a escola de idiomas com o show de uma banda internacional (gera, adaptando), que cabe em parte e um serviço (clínica) com tendência de preço. `temas.exemplo.json` ganhou um caso de tema que toca um assunto em alta no Brasil (`tendenciasDoBrasil`).
+

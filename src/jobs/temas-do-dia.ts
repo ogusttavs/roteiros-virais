@@ -50,6 +50,8 @@ import {
 } from "@/servicos/pesquisa";
 import { buscarVideosParaProva, janelaDeProva, minimoBrasileirosNaProva, motivoSemProva } from "@/servicos/prova-tema";
 
+import { atualizarTemaDoMomento } from "./tema-do-momento";
+
 const VINTE_QUATRO_HORAS_MS = 24 * 60 * 60 * 1000;
 const LIMITE_NOTICIAS = 60;
 const LIMITE_SUBINDO = 30;
@@ -225,6 +227,21 @@ async function filtrarTemasComProva(
 const TEMAS_POR_DIA = 3;
 
 /**
+ * E55: o tema "do momento" (`doMomento`) vive na mesma linha do dia, mas não é um dos temas com prova de vídeo: gerar os três de novo nunca o apaga (ele sai quando o assunto sai da lista de
+ * tendências, `tema-do-momento.ts`), e a contagem de "já tem tema" olha só os temas de verdade.
+ */
+export function semOMomento(temas: TemaDoDia[]): TemaDoDia[] {
+  return temas.filter((t) => !t.doMomento);
+}
+
+/** Os temas novos com o do momento que já estava na linha do dia na terceira vaga (no máximo três ao todo). */
+export function comOMomentoQueJaEstava(novos: TemaDoDia[], existentes: TemaDoDia[]): TemaDoDia[] {
+  const momento = existentes.filter((t) => t.doMomento);
+  if (momento.length === 0) return novos;
+  return [...novos.slice(0, TEMAS_POR_DIA - momento.length), ...momento];
+}
+
+/**
  * R1, item 0 (achado de produção em 01/10, `temas-do-dia`): rodar o job de novo no mesmo dia
  * não pode piorar o que já está lá. Duas condições, qualquer uma basta para não sobrescrever:
  * (1) o conjunto novo tem menos temas com prova que o que já existe (o setor 5 caiu de 2 para 1,
@@ -239,7 +256,8 @@ export async function podeSobrescreverTemasDoDia(nichoId: number, temasNovos: Te
     .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
   if (!existente) return true;
 
-  if (temasNovos.length < existente.temas.length) return false;
+  const reais = semOMomento(existente.temas);
+  if (temasNovos.length < reais.length) return false;
 
   const titulosExistentes = existente.temas.map((t) => t.titulo);
   if (titulosExistentes.length === 0) return true;
@@ -289,7 +307,7 @@ async function gerarTemasDoNicho(
   const candidatosAgora = subindo.length + semDono.length;
   if (
     existente &&
-    existente.temas.length === 0 &&
+    semOMomento(existente.temas).length === 0 &&
     existente.candidatosNaUltimaTentativa !== null &&
     candidatosAgora <= existente.candidatosNaUltimaTentativa
   ) {
@@ -378,13 +396,15 @@ async function gerarTemasDoNicho(
      * defesa é só por segurança, porque o `existente` já buscado acima teria desviado para
      * "sem_novidade" antes de chegar aqui quando havia um tema real e nenhum vídeo novo).
      */
-    if (!existente || existente.temas.length === 0) {
+    if (!existente || semOMomento(existente.temas).length === 0) {
+      // E55: o tema do momento que já estava na linha do dia continua (só os temas de verdade ficam vazios).
+      const momentoQueJaEstava = existente ? existente.temas.filter((t) => t.doMomento) : [];
       await db()
         .insert(temasDia)
-        .values({ nichoId: nicho.id, data: hojeISO(), temas: [], candidatosNaUltimaTentativa: candidatosAgora })
+        .values({ nichoId: nicho.id, data: hojeISO(), temas: momentoQueJaEstava, candidatosNaUltimaTentativa: candidatosAgora })
         .onConflictDoUpdate({
           target: [temasDia.nichoId, temasDia.data],
-          set: { temas: [], candidatosNaUltimaTentativa: candidatosAgora },
+          set: { temas: momentoQueJaEstava, candidatosNaUltimaTentativa: candidatosAgora },
         });
     }
     return { status: "sem_prova", temasSemProva };
@@ -394,12 +414,13 @@ async function gerarTemasDoNicho(
     return { status: "mantido", temasSemProva };
   }
 
+  const temasDaLinha = comOMomentoQueJaEstava(temasComProva, existente?.temas ?? []);
   await db()
     .insert(temasDia)
-    .values({ nichoId: nicho.id, data: hojeISO(), temas: temasComProva })
+    .values({ nichoId: nicho.id, data: hojeISO(), temas: temasDaLinha })
     .onConflictDoUpdate({
       target: [temasDia.nichoId, temasDia.data],
-      set: { temas: temasComProva },
+      set: { temas: temasDaLinha },
     });
 
   return { status: "gerado", temasSemProva };
@@ -458,7 +479,7 @@ export async function rodarTemasDoDia(
       .select({ temas: temasDia.temas })
       .from(temasDia)
       .where(and(eq(temasDia.nichoId, nichoId), eq(temasDia.data, hojeISO())));
-    if (existente && existente.temas.length > 0) {
+    if (existente && semOMomento(existente.temas).length > 0) {
       return {
         nichos: 1,
         gerados: 0,
@@ -493,10 +514,18 @@ export async function rodarTemasDoDia(
   let temasSemProva = 0;
   let falhas = 0;
   const erros: string[] = [];
+  const temasDoMomento: Record<string, number> = {};
 
   for (const nicho of nichosAtivos) {
     try {
       const resultado = await gerarTemasDoNicho(nicho);
+      // E55: depois dos temas do dia, o tema do momento (tira o que saiu da lista de tendências e, sem um, tenta criar). Falha dele nunca derruba os temas.
+      try {
+        const momento = await atualizarTemaDoMomento(nicho);
+        temasDoMomento[momento] = (temasDoMomento[momento] ?? 0) + 1;
+      } catch (erro) {
+        erros.push(`tema do momento do nicho "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
+      }
       temasSemProva += resultado.temasSemProva;
       if (resultado.status === "gerado") gerados += 1;
       else if (resultado.status === "mantido") mantidos += 1;
@@ -520,6 +549,7 @@ export async function rodarTemasDoDia(
     falhas,
     // Os setores que ficaram sem tema novo por falta de uso (ninguém gerou roteiro em 3 dias): o admin vê quantos em Rotinas.
     semUso,
+    temasDoMomento,
     motivoSemUso: semUso > 0 ? MOTIVO_SEM_USO : undefined,
     erros: erros.length > 0 ? erros : undefined,
   };

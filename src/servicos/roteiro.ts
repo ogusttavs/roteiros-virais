@@ -666,9 +666,9 @@ function combinarEvidencias(
 async function resolverTema(
   cliente: Cliente,
   params: ParametrosGerarRoteiro,
-): Promise<{ tema: string; evidenciasPrevistas: number[] }> {
+): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: boolean }> {
   if (params.origem === "livre") {
-    return { tema: params.textoTema, evidenciasPrevistas: [] };
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: false };
   }
 
   /**
@@ -680,7 +680,7 @@ async function resolverTema(
    */
   if (params.origem === "momento") {
     const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
-    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [] };
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: false };
   }
 
   const resultado = await temasParaCliente(cliente);
@@ -691,7 +691,7 @@ async function resolverTema(
   if (!tema) {
     throw new ErroRoteiro("tema nao encontrado para o indice pedido.");
   }
-  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias };
+  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento !== undefined };
 }
 
 /**
@@ -847,6 +847,8 @@ type MontarERoteiroDados = {
    * notícia na entrada do prompt.
    */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null };
+  /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
+  temaDoMomento?: boolean;
 };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
@@ -1059,6 +1061,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       marcaCitada,
       noticia: dados.noticia,
       noticiasDoAssunto,
+      temaDoMomento: dados.temaDoMomento,
     }),
     // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
     fontesDosFatos: roteiroIA.montarFontesDosFatos({
@@ -1197,7 +1200,11 @@ export async function gerarRoteiro(
   const cliente = await clientePorId(clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
-  const { tema, evidenciasPrevistas } = await resolverTema(cliente, params);
+  const { tema, evidenciasPrevistas, doMomento } = await resolverTema(cliente, params);
+  // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
+  if (doMomento && params.data && params.data !== hojeISO()) {
+    throw new ErroRoteiro("Tendência é para hoje: grave este vídeo hoje, enquanto o assunto está em alta.");
+  }
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
   const estilo = params.estilo ?? "falado";
@@ -1225,6 +1232,7 @@ export async function gerarRoteiro(
     evidenciasPrevistas,
     momento,
     noticia,
+    temaDoMomento: doMomento,
   });
 
   const [roteiro] = await db()

@@ -255,7 +255,11 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * E53 (06/10/2026), versão 2.12.0: as notícias de hoje dos assuntos que a marca acompanha entram como FONTE do roteiro quando o tema, o momento ou o assunto livre tocam nelas (entrada e
  * `montarFontesDosFatos`, para o verificador). O roteiro cita o veículo e o dia ao usar um fato delas; nunca copia o texto da matéria; opinião sobre pessoa real só vem do que a pessoa disser.
  */
-export const versao = "2.12.1";
+/**
+ * 2.13.0 (E55, o tema do momento): quando o tema nasceu de um assunto em alta no Brasil (`doMomento`), a ENTRADA ganha um bloco que pede o roteiro mais fácil de gravar HOJE (curto, uma pessoa falando
+ * ao celular, um take só, sem produção). Só a entrada muda: sem tema do momento ela é a de antes, e o sistema não mudou.
+ */
+export const versao = "2.13.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -706,6 +710,8 @@ export function montarEntrada(dados: {
   noticia?: { titulo: string; resumo: string | null; angulo: string | null };
   /** E53: as notícias de hoje de um assunto que a marca acompanha e que o tema toca (fonte de fato; o roteiro cita veículo e dia). */
   noticiasDoAssunto?: NoticiaDoAssuntoNaEntrada[];
+  /** E55: o tema nasceu de um assunto em alta no Brasil: o roteiro é para gravar hoje, o mais fácil de gravar. */
+  temaDoMomento?: boolean;
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -757,6 +763,7 @@ export function montarEntrada(dados: {
     : null;
 
   const blocoNoticiasDoAssunto = blocoDasNoticiasDoAssunto(dados.noticiasDoAssunto);
+  const blocoDoMomento = dados.temaDoMomento ? BLOCO_DO_TEMA_DO_MOMENTO : null;
 
   const partes = [
     dados.objetivoDoVideo
@@ -765,6 +772,7 @@ export function montarEntrada(dados: {
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
     blocoNoticia,
     blocoNoticiasDoAssunto,
+    blocoDoMomento,
     `Objetivo: ${NOME_OBJETIVO[dados.objetivo]}`,
     dados.ficha && dados.formato === "reels" && dados.estilo === "falado" ? `Ficha do vídeo: ${estruturaDaFicha(dados.ficha, dados.evidencias.length > 0)}` : null,
     dados.observacao ? `O que o cliente pediu de diferente: ${dados.observacao}` : null,
@@ -791,6 +799,10 @@ export function montarEntrada(dados: {
 
   return partes.join("\n\n");
 }
+
+/** E55: o pedido de um roteiro para gravar HOJE, o mais fácil de gravar, quando o tema é do momento. */
+export const BLOCO_DO_TEMA_DO_MOMENTO =
+  "Este é um tema do momento: o assunto está em alta hoje e a pessoa vai gravar HOJE. Faça o roteiro mais fácil de gravar que existir: curto, uma pessoa falando para o celular, um take só, sem produção, sem cena que precise de outra pessoa, de objeto que ela não tem ou de edição difícil. Fale do assunto do ponto de vista do negócio dela e não opine sobre pessoa real.";
 
 /** E53: uma notícia de um assunto que a marca acompanha, como o roteiro a recebe. */
 export type NoticiaDoAssuntoNaEntrada = { titulo: string; veiculo: string; dia: string; resumo: string | null };

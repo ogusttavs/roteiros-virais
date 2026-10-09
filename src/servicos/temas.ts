@@ -31,6 +31,7 @@ import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
 import { noticiasQueTocamOTema } from "./noticias-do-tema";
+import { listaDeTendenciasDeAgora, temasQueAindaValem, tendenciasQueTocamOTema } from "./tendencias";
 
 export class ErroTemas extends Error {}
 
@@ -196,7 +197,11 @@ export async function temasDoDiaOuRecente(
     .limit(1);
 
   if (!linha) return null;
-  return { temas: linha.temas, dataUsada: linha.data };
+  // E55: o tema do momento é para o mesmo dia e só vale enquanto o assunto segue na lista do que está em alta; o de um dia que já passou nunca vale, e o de hoje some quando o assunto sai.
+  const lista = linha.data === hojeISO() ? await listaDeTendenciasDeAgora() : null;
+  const temas = temasQueAindaValem(linha.temas, lista);
+  if (temas.length === 0) return null;
+  return { temas, dataUsada: linha.data };
 }
 
 /**
@@ -414,6 +419,8 @@ export async function avaliarTema(
   const nomesDosAlternativos = new Map(alternativosDaMarca.map((a) => [a.nichoId, a.nome]));
   // O sinal de momento: as notícias de hoje (setor e assuntos da marca) que tocam o tema. O banco de vídeos só cobre o setor; ausência dele não é sinal contra o assunto.
   const noticiasDoDia = await noticiasQueTocamOTema(cliente, texto);
+  // E55: e os assuntos em alta no Brasil hoje que tocam o tema (o segundo sinal de momento).
+  const tendenciasDoBrasil = tendenciasQueTocamOTema(texto, await listaDeTendenciasDeAgora());
 
   const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",
@@ -433,6 +440,7 @@ export async function avaliarTema(
       evidencias: evidencias.map((v) => ({ ...v, ramo: nomesDosAlternativos.get(v.nichoId ?? -1) })),
       noticia,
       noticiasDoDia,
+      tendenciasDoBrasil,
     }),
     // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
     // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).

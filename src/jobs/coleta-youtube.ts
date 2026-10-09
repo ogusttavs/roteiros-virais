@@ -30,7 +30,7 @@ export const LIMITE_DIARIO_UNIDADES = 9000;
 const JANELA_DIAS = 7;
 const FONTE = "youtube";
 
-async function consumoDeHoje(): Promise<number> {
+export async function consumoDeHoje(): Promise<number> {
   const [linha] = await db()
     .select({ unidades: consumoApi.unidades })
     .from(consumoApi)
@@ -38,7 +38,7 @@ async function consumoDeHoje(): Promise<number> {
   return linha?.unidades ?? 0;
 }
 
-async function registrarConsumo(unidades: number): Promise<void> {
+export async function registrarConsumo(unidades: number): Promise<void> {
   await db()
     .insert(consumoApi)
     .values({ fonte: FONTE, data: hojeISO(), unidades })

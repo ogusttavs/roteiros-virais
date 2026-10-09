@@ -14,7 +14,7 @@ import { diaPorExtenso, normalizarTexto } from "./noticias-assuntos";
 const DIA_MS = 24 * 60 * 60 * 1000;
 
 /** As palavras de um texto que valem para casar com uma manchete: sem acento, de 5 letras ou mais e fora da lista de palavras vazias; comparadas pelos 5 primeiros caracteres ("eleição" casa com "eleições"). */
-function raizesDoTexto(texto: string): Set<string> {
+export function raizesDoTexto(texto: string): Set<string> {
   const vazias = new Set([...PALAVRAS_VAZIAS].map((p) => normalizarTexto(p)));
   return new Set(
     normalizarTexto(texto)

@@ -36,6 +36,7 @@ import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
+import { rodarTendenciasBrasil } from "./tendencias-brasil";
 import { rodarTranscrever } from "./transcrever";
 import { rodarVigilancia } from "./vigilancia";
 
@@ -56,6 +57,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.coletaApify]: (execucaoId) => rodarColetaApify(undefined, execucaoId),
   [FILAS.coletaMeioDia]: (execucaoId) => rodarColetaMeioDia(execucaoId),
   [FILAS.coletaNoticias]: () => rodarColetaNoticias(),
+  [FILAS.tendenciasBrasil]: () => rodarTendenciasBrasil(),
   [FILAS.contasBase]: () => rodarContasBase(),
   [FILAS.metaContas]: () => rodarMetaContas(),
   [FILAS.metaHashtags]: () => rodarMetaHashtags(),
