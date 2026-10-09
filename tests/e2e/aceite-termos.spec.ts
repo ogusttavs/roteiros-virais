@@ -143,4 +143,56 @@ test.describe("aceite dos termos no primeiro acesso", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
   });
+
+  /**
+   * E38 PR 2, item 1b (09/10/2026): a versao com a linha do site e das redes. Quem aceitou a versao de 01/10 (a anterior) ve a folha de novo;
+   * quem aceita agora segue para a rota pedida, sem ser perguntado a cada visita.
+   */
+  test("a versao de 09/10 pede aceite de novo de quem aceitou a de 01/10, e depois de aceitar nao pergunta mais", async ({ page }) => {
+    const id = "e2e-aceite-termos-versao-0110";
+    const email = "e2e-aceite-termos-versao-0110@exemplo.teste";
+    const [existe] = await db().select({ id: user.id }).from(user).where(eq(user.id, id));
+    if (!existe) {
+      const [nicho] = await db().select().from(nichos).where(eq(nichos.slug, "limpeza-e-organizacao-da-casa"));
+      await db().insert(user).values({ id, name: "[teste] Aceite Termos 01/10", email });
+      await db()
+        .insert(account)
+        .values({ id: `${id}-credential`, issuer: "local:credential", accountId: id, providerId: "credential", userId: id, password: await hashPassword(SENHA) });
+      const [cliente] = await db().insert(clientes).values({ usuarioId: id, nome: "[teste] Aceite Termos 01/10", nichoId: nicho.id }).returning();
+      await db().insert(membrosMarca).values({ usuarioId: id, clienteId: cliente.id, papel: "dono" });
+      await db().insert(briefings).values({ clienteId: cliente.id, completo: true });
+    }
+    // A versao de 01/10 era a anterior: aceitou no dia 5, depois dela e antes desta.
+    await db()
+      .insert(preferenciasUsuario)
+      .values({ usuarioId: id, aceitouTermosEm: new Date("2026-10-05T12:00:00Z") })
+      .onConflictDoUpdate({ target: preferenciasUsuario.usuarioId, set: { aceitouTermosEm: new Date("2026-10-05T12:00:00Z") } });
+
+    await entrar(page, email);
+    await expect(page).toHaveURL(/\/hoje/);
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).toBeVisible();
+    await page.getByRole("button", { name: "li e aceito" }).click();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "O que gravar hoje" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Antes de entrar" })).not.toBeVisible();
+  });
+
+  test("as paginas publicas dizem que o site e os videos recentes sao lidos, o que guardamos e o que e apagado", async ({ page }) => {
+    const leitura = "lemos até cinco páginas públicas do site e os títulos dos vídeos mais recentes";
+    const guardamos = "o que a nossa leitura entendeu da sua marca e o que você confirmou, corrigiu ou tirou";
+
+    await page.goto("/termos");
+    await expect(page.getByText("atualizado em 9 de outubro de 2026")).toBeVisible();
+    await expect(page.getByText(leitura)).toBeVisible();
+
+    await page.goto("/privacidade");
+    await expect(page.getByText(leitura)).toBeVisible();
+    await expect(page.getByText(guardamos)).toBeVisible();
+
+    await page.goto("/dados");
+    await expect(page.getByText(guardamos)).toBeVisible();
+    await expect(page.getByText("também é apagado")).toBeVisible();
+  });
 });
