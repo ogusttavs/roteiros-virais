@@ -12,7 +12,7 @@ type Props = {
  * O desenho da chave sem ser um botão (E41 2c): dentro de um item de menu que já é o botão (`role="menuitemcheckbox"`), a chave só mostra o estado. `aria-hidden`: quem lê é o item.
  */
 export function TrilhoDaChave({ ligada }: { ligada: boolean }) {
-  return <span aria-hidden="true" aria-checked={ligada} className={`${styles.chave} ${styles.trilho}`} />;
+  return <span aria-hidden="true" data-ligada={ligada} className={`${styles.chave} ${styles.trilho}`} />;
 }
 
 /**

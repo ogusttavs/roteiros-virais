@@ -10,7 +10,7 @@ import { briefings, clientes, geracoesIA, nichos, roteiros, user, type ConteudoR
 import * as cliente from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { config } from "@/lib/config";
-import { pedidoComMarcas, urlDeImpressao } from "@/lib/impressao-de-roteiro";
+import { pedidoComMarcas, respostaDeMarcasQueFalharam, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
 import { blocosFalados, falaDoRoteiro, marcarBloco, marcarFalaDoRoteiro, marcasParaATela, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
 import { editarRoteiro, ErroRoteiro, roteiroPorId } from "@/servicos/roteiro";
@@ -547,6 +547,40 @@ describe("o PDF e a imagem com as marcas (E41 2c)", () => {
       throw new ErroIA("erro da API (429): limite.");
     });
     await expect(pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).rejects.toBeInstanceOf(ErroIA);
+  });
+
+  it("uma navegação que veio de outro site não escreve marcas: lê as que existem, e só", async () => {
+    const id = await criarRoteiro();
+    const deOutroSite = new Request("http://localhost/api/roteiros/1/pdf?marcas=1", { headers: { "sec-fetch-site": "cross-site" } });
+    expect(await pedidoComMarcas(deOutroSite, await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(false);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+    // Com as marcas já guardadas lê e vai com elas; a tela da própria pessoa (mesma origem) escreve.
+    const daTela = new Request("http://localhost/api/roteiros/1/pdf?marcas=1", { headers: { "sec-fetch-site": "same-origin" } });
+    expect(await pedidoComMarcas(daTela, await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(true);
+    expect(await pedidoComMarcas(deOutroSite, await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(true);
+  });
+
+  it("se o texto mudou no meio da marcação, tenta de novo com o texto de agora em vez de sair sem as marcas", async () => {
+    const id = await criarRoteiro();
+    const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      await db().update(roteiros).set({ conteudo: conteudo({ gancho: "Um começo novo, escrito no meio." }), editadoEm: new Date() }).where(eq(roteiros.id, id));
+      return real(parametros);
+    });
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(true);
+    const guardadas = await marcasGuardadas(id);
+    expect(textoSemMarcas(guardadas!.blocos[0].marcado)).toBe("Um começo novo, escrito no meio.");
+  });
+
+  it("a resposta das marcas que falharam: a frase vai à tela (502 na IA, 429 no teto do dia), e outro erro não é desta rota", async () => {
+    const ia = respostaDeMarcasQueFalharam(new ErroIA("erro da API (429): limite."));
+    expect(ia?.status).toBe(502);
+    expect(await ia?.json()).toEqual({ erro: "marcas", mensagem: textosMarcasDeFala.erros.naoNoPapel });
+    const teto = respostaDeMarcasQueFalharam(new ErroRoteiro(textosMarcasDeFala.erros.limiteDoDia));
+    expect(teto?.status).toBe(429);
+    expect(await teto?.json()).toEqual({ erro: "marcas", mensagem: `${textosMarcasDeFala.erros.limiteDoDia} ${textosMarcasDeFala.erros.desligueParaBaixar}` });
+    expect(respostaDeMarcasQueFalharam(new Error("outro"))).toBeNull();
   });
 
   it("o endereço de impressão leva ?marcas=1 só quando a folha vai com as marcas", async () => {

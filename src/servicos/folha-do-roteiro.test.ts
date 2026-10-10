@@ -61,6 +61,47 @@ const MARCAS = {
   avisos: [],
 };
 
+describe("partirFala nunca descarta texto", () => {
+  const enchimento = "Esta é uma frase comum que enche o parágrafo até passar do limite de letras da unidade.";
+
+  it("'Dr.Wash' e 'R$ 1.000' (ponto sem espaço depois) ficam inteiros", () => {
+    const texto = `A Dr.Wash vende produto de limpeza para casa. ${enchimento} ${enchimento} O pacote custa R$ 1.000 por mês. Fale comigo.`;
+    const pedacos = partirFala(texto, 120);
+    expect(pedacos.length).toBeGreaterThan(1);
+    expect(pedacos.join(" ")).toBe(texto);
+    expect(pedacos[0].startsWith("A Dr.Wash vende")).toBe(true);
+    expect(pedacos.join(" ")).toContain("R$ 1.000 por mês.");
+  });
+
+  it("reticências no começo e no meio também não tiram nada", () => {
+    const texto = `... ${enchimento} Será que sim... ${enchimento} Talvez!? ${enchimento}`;
+    const pedacos = partirFala(texto, 100);
+    expect(pedacos.join(" ")).toBe(texto);
+  });
+
+  it("um parágrafo sem pontuação e um que cabe no limite saem como estavam", () => {
+    expect(partirFala("sem ponto nenhum aqui", 12)).toEqual(["sem ponto", "nenhum aqui"]);
+    expect(partirFala("Cabe inteiro.", 420)).toEqual(["Cabe inteiro."]);
+  });
+
+  it("a soma de palavras dos pedaços é a do parágrafo, qualquer que seja a pontuação (sorteio)", () => {
+    const pecas = ["Dr.Wash", "R$ 1.000", "Olha...", "isso?!", "fim.", "3.5", "e.g.", "mais um", "texto"];
+    let semente = 7;
+    const aleatorio = () => {
+      semente = (Math.imul(semente, 1664525) + 1013904223) >>> 0;
+      return semente / 2 ** 32;
+    };
+    for (let n = 0; n < 200; n += 1) {
+      const palavras: string[] = [];
+      for (let i = 0; i < 60 + Math.floor(aleatorio() * 120); i += 1) palavras.push(pecas[Math.floor(aleatorio() * pecas.length)]);
+      const texto = palavras.join(" ");
+      const pedacos = partirFala(texto, 90);
+      expect(pedacos.join(" ").split(" ").length, `caso ${n}`).toBe(texto.split(" ").length);
+      expect(pedacos.join(" ")).toBe(texto);
+    }
+  });
+});
+
 describe("folhaDoRoteiro com as marcas de fala (E41 2c)", () => {
   it("cada fala leva a sua versão marcada, e o tom do bloco vai na primeira unidade dele", () => {
     const folha = folhaDoRoteiro(roteiro(), "Casa em Ordem", null, MARCAS);

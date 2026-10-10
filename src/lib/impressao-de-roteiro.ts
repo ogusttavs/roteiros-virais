@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
 
 import type { Cliente } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
+import { logger } from "@/lib/log";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { falaDoRoteiro, marcarFalaDoRoteiro } from "@/servicos/marcar-fala";
-import { roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
+import { ErroRoteiro, roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
+import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 
 /**
  * O que o PDF (`/api/roteiros/[id]/pdf`) e a imagem para o celular (`/api/roteiros/[id]/imagem`) têm em comum (E26): a checagem de sessão e de posse do roteiro e o endereço da página de
@@ -50,12 +53,32 @@ export async function roteiroDeQuemPediu(
  */
 export async function pedidoComMarcas(request: Request, roteiro: RoteiroLinha, cliente: Cliente, somenteLeitura: boolean): Promise<boolean> {
   if (new URL(request.url).searchParams.get("marcas") !== "1") return false;
-  const fala = falaDoRoteiro(roteiro, somenteLeitura);
+  // Quem escreve é a tela da própria pessoa (fetch da mesma origem) ou o endereço digitado: uma navegação que veio de outro site não gasta uma marcação (`Sec-Fetch-Site`).
+  const origem = request.headers.get("sec-fetch-site");
+  const podeEscrever = !somenteLeitura && (origem === null || origem === "same-origin" || origem === "none");
+  const fala = falaDoRoteiro(roteiro, !podeEscrever);
   if (!fala.podeMarcar) return false;
   if (fala.marcas) return true;
-  if (somenteLeitura) return false;
-  const resultado = await marcarFalaDoRoteiro(cliente.id, roteiro.id);
-  return resultado.ok;
+  if (!podeEscrever) return false;
+  // Duas tentativas: se o texto mudou no meio da marcação ("editado_no_meio"), a segunda já pega o texto de agora.
+  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+    const resultado = await marcarFalaDoRoteiro(cliente.id, roteiro.id);
+    if (resultado.ok) return true;
+    if (resultado.motivo !== "editado_no_meio") return false;
+  }
+  return false;
+}
+
+/** A resposta da rota quando as marcas pedidas não puderam ser escritas (a IA caiu, ou o teto do dia): a frase vai à tela, sem Sentry (é esperado), e o PDF não sai sem avisar. */
+export function respostaDeMarcasQueFalharam(erro: unknown): NextResponse | null {
+  if (erro instanceof ErroIA) {
+    logger.warn({ err: erro }, "as marcas de fala do pdf ou da imagem nao puderam ser escritas");
+    return NextResponse.json({ erro: "marcas", mensagem: textosMarcasDeFala.erros.naoNoPapel }, { status: 502 });
+  }
+  if (erro instanceof ErroRoteiro) {
+    return NextResponse.json({ erro: "marcas", mensagem: `${erro.message} ${textosMarcasDeFala.erros.desligueParaBaixar}` }, { status: 429 });
+  }
+  return null;
 }
 
 /**

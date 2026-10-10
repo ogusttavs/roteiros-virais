@@ -76,8 +76,9 @@ export function rodapeDoPdf(marca: string, dataPorExtenso: string, comLegendaDas
     `<span>${l.a}${barra(false)}${l.pausa}</span>`,
     `<span>${l.a}${barra(true)}${l.pausaLonga}</span>`,
     `<span style="text-decoration:underline wavy #5f7a00">${l.devagar}</span>`,
-    `<span>&#8600; ${l.tomDesce}</span>`,
-    `<span>&#8599; ${l.tomSobe}</span>`,
+    // A seta é a flecha para a direita (que toda fonte tem) girada: o glifo diagonal pode faltar na fonte do servidor, e viraria um quadrado.
+    `<span><span style="display:inline-block;transform:rotate(45deg)">&#8594;</span> ${l.tomDesce}</span>`,
+    `<span><span style="display:inline-block;transform:rotate(-45deg)">&#8594;</span> ${l.tomSobe}</span>`,
   ].join('<span style="margin:0 5px"></span>');
   return `<div style="${quadro};font-family:sans-serif;font-size:8px;color:${cinza}"><div style="padding-bottom:3px;margin-bottom:3px;border-bottom:1px solid #dcdcdc;white-space:nowrap">${legenda}</div><div style="${estiloDaLinha}">${conteudoDaLinha}</div></div>`;
 }

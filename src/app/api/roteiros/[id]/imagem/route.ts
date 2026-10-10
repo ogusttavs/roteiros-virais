@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
 import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
-import { pedidoComMarcas, roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
+import { pedidoComMarcas, respostaDeMarcasQueFalharam, roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
 import { MAXIMO_DE_QUADROS, PAGINAR_QUADROS } from "@/lib/paginar-quadros";
 
@@ -25,7 +25,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     // E41 2c: com `?marcas=1` as marcas de fala são escritas aqui, antes da vaga do Chromium.
-    const comMarcas = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
+    let comMarcas = false;
+    try {
+      comMarcas = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
+    } catch (erro) {
+      const resposta = respostaDeMarcasQueFalharam(erro);
+      if (resposta) return resposta;
+      throw erro;
+    }
     const resultado = await comLimiteDeChromium(async () => {
       const navegador = await chromium.launch();
       try {

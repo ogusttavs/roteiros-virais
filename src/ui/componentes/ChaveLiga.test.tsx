@@ -2,9 +2,24 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { ChaveLiga } from "./ChaveLiga";
+import { ChaveLiga, TrilhoDaChave } from "./ChaveLiga";
 
 afterEach(cleanup);
+
+describe("TrilhoDaChave (só desenhada, dentro de um item de menu)", () => {
+  it("é escondida do leitor de tela, não é botão nem switch, e guarda o estado em data-ligada (aria-checked num elemento sem papel não vale)", () => {
+    const { container } = render(<TrilhoDaChave ligada />);
+    const trilho = container.firstElementChild as HTMLElement;
+    expect(trilho.getAttribute("aria-hidden")).toBe("true");
+    expect(trilho.getAttribute("data-ligada")).toBe("true");
+    expect(trilho.hasAttribute("aria-checked")).toBe(false);
+    expect(trilho.getAttribute("role")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    cleanup();
+    const { container: desligada } = render(<TrilhoDaChave ligada={false} />);
+    expect((desligada.firstElementChild as HTMLElement).getAttribute("data-ligada")).toBe("false");
+  });
+});
 
 describe("ChaveLiga", () => {
   it("é um switch com o nome do rótulo e o estado em aria-checked", () => {

@@ -68,6 +68,16 @@ describe("rodapeDoPdf: o pé de cada página", () => {
     expect(com).toContain('<span class="pageNumber"></span>');
   });
 
+  it("as setas do pé são a flecha para a direita girada (o glifo diagonal pode faltar na fonte do servidor)", () => {
+    const com = rodapeDoPdf("Casa em Ordem", "7 de setembro de 2026", true);
+    expect(com).toContain("rotate(45deg)");
+    expect(com).toContain("rotate(-45deg)");
+    expect(com).not.toContain("&#8600;");
+    expect(com).not.toContain("&#8599;");
+    expect(com).not.toContain("↘");
+    expect(com).not.toContain("↗");
+  });
+
   it("o nome da marca, que é texto da pessoa, não abre marcação no HTML do pé", () => {
     const pe = rodapeDoPdf('<img src=x onerror="alert(1)"> & Cia', "7 de setembro de 2026");
     expect(pe).not.toContain("<img");

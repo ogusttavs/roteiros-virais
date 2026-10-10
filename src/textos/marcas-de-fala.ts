@@ -73,6 +73,10 @@ export const textosMarcasDeFala = {
     naoEncontrado: "Não achei este roteiro.",
     /** Story e vídeo sem fala não têm fala para marcar. */
     semFala: "Este vídeo não tem fala para marcar.",
+    /** O PDF ou a imagem pediram as marcas e a IA não respondeu: a pessoa pode tentar de novo ou desligar a chave e baixar sem elas. */
+    naoNoPapel: "Não consegui marcar a fala agora. Tente de novo em instantes, ou desligue as marcas para baixar sem elas.",
+    /** Vai depois da frase do limite do dia, na rota do PDF e da imagem. */
+    desligueParaBaixar: "Desligue as marcas para baixar sem elas.",
     /** O limite de marcações do dia (laço ou abuso); sem número, a pessoa não vê contador. */
     limiteDoDia: "Você chegou ao limite de marcações de hoje. Amanhã a conta volta ao normal.",
     /** O roteiro foi editado enquanto as marcas eram escritas: a tela pede de novo. */

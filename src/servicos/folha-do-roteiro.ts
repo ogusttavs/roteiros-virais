@@ -91,7 +91,9 @@ const LINHAS_DE_MOSTRAR_POR_UNIDADE = 4;
 export function partirFala(paragrafo: string, limite = LIMITE_DA_FALA_POR_UNIDADE): string[] {
   const texto = paragrafo.trim();
   if (texto.length <= limite) return [texto];
-  const frases = texto.match(/[^.!?]+[.!?]+(?:\s+|$)|[^.!?]+$/g) ?? [texto];
+  // Parte só onde há pontuação seguida de espaço: "Dr.Wash" e "R$ 1.000" ficam inteiros, e nenhuma letra do parágrafo fica de fora (a regra antiga descartava o texto até o próximo
+  // ponto com espaço).
+  const frases = texto.split(/(?<=[.!?])\s+/).filter((f) => f.length > 0);
   const pedacos: string[] = [];
   let atual = "";
   const fechar = () => {
@@ -111,8 +113,8 @@ export function partirFala(paragrafo: string, limite = LIMITE_DA_FALA_POR_UNIDAD
       atual = resto;
       continue;
     }
-    if (atual.length + frase.length > limite) fechar();
-    atual += frase;
+    if (atual && atual.length + 1 + frase.length > limite) fechar();
+    atual = atual ? `${atual} ${frase}` : frase;
   }
   fechar();
   return pedacos;
@@ -167,7 +169,7 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
         rotulo: i === 0 ? bloco.rotulo : null,
         fala: unidade.fala || null,
         falaMarcada: unidade.marcada ?? null,
-        tom: i === 0 ? tomDoBloco : null,
+        tom: i === 0 && falasMarcadas.some((m) => m !== null) ? tomDoBloco : null,
         mostrar: unidade.mostrar,
         fimDoBloco: i === unidadesDoBloco.length - 1,
       });
