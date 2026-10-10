@@ -5,6 +5,7 @@ import { formatoPorChave } from "@/config/formatos";
 import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
+import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -56,6 +57,8 @@ export async function gerarVersoesAction(
   assuntoEmAlta?: string,
   /** E53 (parte 3): o id da notícia de um assunto da marca (Tema livre `?noticiaAssuntoId=`); `gerarRoteiro` confere que é desta marca. */
   noticiaAssuntoId?: number,
+  /** E28 (parte 3): a chave da pergunta do público (Tema livre `?pergunta=`); só 12 caracteres hexadecimais valem, e `gerarRoteiro` a acha de novo nas vozes do setor da marca. */
+  perguntaChave?: string,
 ): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
@@ -77,6 +80,7 @@ export async function gerarVersoesAction(
       noticiaId,
       assuntoEmAlta: origemValida.origem === "livre" ? assuntoEmAlta : undefined,
       noticiaAssuntoId: origemValida.origem === "livre" ? noticiaAssuntoId : undefined,
+      perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
     });
     return { ok: true, dado: { grupo } };
   } catch (falha) {

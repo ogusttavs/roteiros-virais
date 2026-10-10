@@ -7,12 +7,15 @@ import { useEffect, useState, useTransition } from "react";
 import type { Plataforma, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
+import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
+import { textosVozes } from "@/textos/vozes-do-publico";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { Chips } from "@/ui/componentes/Chips";
 import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
+import { BlocoDePerguntas } from "@/ui/componentes/PerguntasDoPublico";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 import { salvarRedePrincipalAction } from "../../hoje/acoes";
@@ -39,6 +42,8 @@ type Props = {
   dataInicial?: string;
   /** E55 PR 2b: o assunto em alta hoje, no alto da lista, com "Quero esse"; nulo sem tema do momento, ou quando se escolhe o tema para outro dia. */
   emAlta?: DadosEmAlta | null;
+  /** E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana, depois dos três temas; nulo no setor sem leitura (o bloco nem aparece). */
+  perguntas?: PerguntasDaTela | null;
 };
 
 /**
@@ -47,7 +52,7 @@ type Props = {
  * portas de Criar (assunto seu, contar o momento, planejar) viraram rotas à parte: esta tela cuida
  * só de escolher um tema.
  */
-export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null }: Props) {
+export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null, perguntas = null }: Props) {
   const router = useRouter();
 
   // Enquanto o tema é escolhido, a página pergunta ao servidor de novo a cada poucos segundos; o servidor só devolve "gerando" enquanto há pedido em andamento, então isto para sozinho.
@@ -158,6 +163,22 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
                   />
                 ))}
             </div>
+            {/* E28 (passo 25, estado `reels`): o que o público do setor pergunta nos comentários, depois dos três temas; cada pergunta leva ao Tema livre com ela presa. */}
+            {perguntas ? (
+              <BlocoDePerguntas
+                id="t-perguntas-hoje"
+                rotulo={textosVozes.rotulo}
+                titulo={textosVozes.titulo}
+                leitura={textosVozes.leitura(perguntas.videos, perguntas.plataformas, perguntas.lidasEm)}
+                perguntas={perguntas.perguntas.map((p) => ({ chave: p.chave, texto: p.texto, vezesTexto: textosVozes.vezes(p.tipo, p.vezes) }))}
+                rotuloDoBotao={textosVozes.responderEmVideo}
+                nomeDoBotao={textosVozes.responderEmVideoDe}
+                textoAbrindo={textosHoje.abrindo}
+                abrindo={destino?.startsWith("pergunta-") && abrindo ? destino.slice("pergunta-".length) : null}
+                desabilitado={abrindo}
+                aoResponder={(chave) => abrir(`pergunta-${chave}`, `/criar/tema-livre?pergunta=${chave}${dataInicial ? `&data=${dataInicial}` : ""}`)}
+              />
+            ) : null}
           </>
         )}
       </div>

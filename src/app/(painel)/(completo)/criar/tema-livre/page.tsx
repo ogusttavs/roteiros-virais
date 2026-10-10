@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { config, hojeISO } from "@/lib/config";
 import { formatarFonteEData } from "@/lib/formatarNumero";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
@@ -8,12 +9,16 @@ import { noticiaDoAssuntoDaMarca } from "@/servicos/assuntos";
 import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
 import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
+import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
+import { listaDePlataformas, perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
+import { textosTemaLivre } from "@/textos/tema-livre";
+import { textosVozes } from "@/textos/vozes-do-publico";
 
 import { TemaLivreTela } from "./TemaLivreTela";
 
-type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; pergunta?: string }> };
 
 /**
  * `?tema=<assunto>` vem de `/referencias`, "usar como referência" (etapa 12,
@@ -27,6 +32,10 @@ type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?:
  *
  * `?alta=<chave>` vem do Criar (E55 PR 2b), "Trazer para o meu ramo": o assunto em alta fica preso no alto, como a notícia, e vale só se ele ainda está na lista de agora (e não é delicado);
  * sem rascunho nem `?tema=` junto, pelo mesmo motivo da notícia. O assunto é para hoje: quem chega com `?data=` de outro dia abre o Tema livre comum.
+ *
+ * `?pergunta=<chave>` vem do Hoje, de Referências e do Criar (E28, parte 3), "Responder em vídeo": a pergunta do público fica presa no alto, como a notícia. A chave é achada de novo nas vozes DO
+ * SETOR da marca (a do navegador sozinha não vale) e só enquanto passa do piso e a leitura é válida; chave que não acha nada abre o Tema livre comum. Vale para qualquer dia (a pergunta não
+ * é de hoje); sem rascunho nem `?tema=` junto, pelo mesmo motivo da notícia.
  */
 export default async function TemaLivre({ searchParams }: Props) {
   const sessao = await sessaoDoPainel();
@@ -35,7 +44,7 @@ export default async function TemaLivre({ searchParams }: Props) {
   }
 
   const cliente = await clienteDaSessaoAtual();
-  const [{ tema, data, noticiaId, noticiaAssuntoId, alta }, rascunho, marcas, resultadoTemas] = await Promise.all([
+  const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas] = await Promise.all([
     searchParams,
     rascunhoTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
@@ -75,10 +84,26 @@ export default async function TemaLivre({ searchParams }: Props) {
     ? { chave: assuntoPreso.chave, assunto: assuntoPreso.assunto, linha: textosHoje.emAlta.linhaDaFonte(assuntoPreso.doGoogle, assuntoPreso.doYoutube, assuntoPreso.desde) }
     : undefined;
 
+  // E28 (parte 3): a pergunta do público presa (uma origem só: a notícia e o assunto em alta têm a vez antes).
+  const perguntaAchada = chaveDeVozValida(pergunta) && !noticia && !emAlta ? await perguntaDoPublicoPelaChave(cliente.nichoId, pergunta).catch(() => null) : null;
+  const perguntaGuardada = perguntaAchada;
+  const perguntaPreso = perguntaGuardada
+    ? {
+        chave: perguntaGuardada.chave,
+        texto: perguntaGuardada.texto,
+        reclamacao: perguntaGuardada.tipo === "objecao",
+        linha: textosTemaLivre.comPergunta.origem(
+          textosVozes.vezes(perguntaGuardada.tipo, perguntaGuardada.vezes),
+          listaDePlataformas(perguntaGuardada.plataformas),
+          diaPorExtenso(new Date(perguntaGuardada.lidaEm)),
+        ),
+      }
+    : undefined;
+
   return (
     <TemaLivreTela
       notaMinima={config.regras.notaMinimaTema}
-      temaInicial={noticia || emAlta ? "" : (tema ?? rascunho ?? "")}
+      temaInicial={noticia || emAlta || perguntaPreso ? "" : (tema ?? rascunho ?? "")}
       objetivoRecomendado={objetivoRecomendado}
       outrasMarcas={outrasMarcas}
       tipo={cliente.tipo}
@@ -86,6 +111,7 @@ export default async function TemaLivre({ searchParams }: Props) {
       dataInicial={dataInicial}
       noticia={noticia}
       emAlta={emAlta}
+      pergunta={perguntaPreso}
       marcaAtivaId={cliente.id}
     />
   );

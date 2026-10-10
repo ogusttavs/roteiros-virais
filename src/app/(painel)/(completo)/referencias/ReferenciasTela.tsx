@@ -11,8 +11,12 @@ import type { AnaliseVideo, Ficha, Plataforma } from "@/db/schema";
 import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
+import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
+import { textosHoje } from "@/textos/hoje";
 import { textosReferencias } from "@/textos/referencias";
+import { textosVozes } from "@/textos/vozes-do-publico";
 import { Botao } from "@/ui/componentes/Botao";
+import { BlocoDePerguntas } from "@/ui/componentes/PerguntasDoPublico";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
@@ -56,6 +60,8 @@ type Props = {
   ramoAtivo?: number;
   /** E49 PR 2: a ficha escolhida em "Parece feito para" (`?feitoPara=`). */
   feitoPara?: Ficha;
+  /** E28 (parte 3b): as perguntas do público do setor desta semana; nulo no setor sem leitura (a linha nem aparece). */
+  perguntas?: PerguntasDaTela | null;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -199,8 +205,24 @@ export function ReferenciasTela({
   ramos,
   ramoAtivo,
   feitoPara,
+  perguntas = null,
 }: Props) {
   const router = useRouter();
+  /** E28 (parte 3b): a linha das perguntas do público abre na lista; ao responder, a chave que está abrindo o Tema livre. */
+  const [perguntasAbertas, setPerguntasAbertas] = useState(false);
+  const [perguntaAbrindo, setPerguntaAbrindo] = useState<string | null>(null);
+  // A transição própria da ida ao Tema livre: o botão só diz "Abrindo" enquanto a navegação anda, e volta ao normal se ela falhar.
+  const [abrindoPergunta, iniciarAberturaDaPergunta] = useTransition();
+  // O foco acompanha o botão que trocou de lugar (ver e recolher são o mesmo gesto): só depois da primeira troca, nunca ao carregar a tela.
+  const alternouPerguntas = useRef(false);
+  useEffect(() => {
+    if (!alternouPerguntas.current) return;
+    document.getElementById(perguntasAbertas ? "t-perguntas-recolher" : "t-perguntas-ver")?.focus();
+  }, [perguntasAbertas]);
+  function alternarPerguntas(abrir: boolean) {
+    alternouPerguntas.current = true;
+    setPerguntasAbertas(abrir);
+  }
   const { semConexao, avisarRedeOk } = useConexao();
   const tratarFalha = useTratarFalha();
   const [campoBusca, setCampoBusca] = useState(busca);
@@ -727,6 +749,47 @@ export function ReferenciasTela({
           </div>
         ) : null}
       </div>
+
+      {/* E28 (passo 25): "O que o público pergunta", fechado numa linha no alto (a mais perguntada e "Ver as perguntas"), aberto na lista; fica fora da aba de salvos. */}
+      {perguntas && segmento !== "salvos" ? (
+        perguntasAbertas ? (
+          <BlocoDePerguntas
+            id="t-perguntas-ref"
+            nivelDoTitulo={2}
+            rotulo={textosVozes.rotulo}
+            titulo={textosVozes.titulo}
+            leitura={textosVozes.leitura(perguntas.videos, perguntas.plataformas, perguntas.lidasEm)}
+            acao={
+              <Botao id="t-perguntas-recolher" variante="ghost" tamanho="md" aria-expanded={true} onClick={() => alternarPerguntas(false)}>
+                {textosVozes.linha.recolher}
+              </Botao>
+            }
+            perguntas={perguntas.perguntas.map((p) => ({ chave: p.chave, texto: p.texto, vezesTexto: textosVozes.vezes(p.tipo, p.vezes) }))}
+            rotuloDoBotao={textosVozes.responderEmVideo}
+            nomeDoBotao={textosVozes.responderEmVideoDe}
+            textoAbrindo={textosHoje.abrindo}
+            abrindo={abrindoPergunta ? perguntaAbrindo : null}
+            desabilitado={abrindoPergunta}
+            aoResponder={(chave) => {
+              if (abrindoPergunta) return;
+              setPerguntaAbrindo(chave);
+              iniciarAberturaDaPergunta(() => router.push(`/criar/tema-livre?pergunta=${chave}`));
+            }}
+          />
+        ) : (
+          <section className={styles.perguntasLinha} aria-label={textosVozes.titulo} data-perguntas-linha>
+            <p>
+              <span className={styles.perguntasRotulo}>{textosVozes.rotulo}</span>
+              <span>
+                {textosVozes.linha.quantas(perguntas.perguntas.length)}; {textosVozes.linha.maisFeita(perguntas.perguntas[0].vezes)}: <b>{perguntas.perguntas[0].texto}</b>
+              </span>
+            </p>
+            <Botao id="t-perguntas-ver" variante="ghost" tamanho="md" aria-expanded={false} onClick={() => alternarPerguntas(true)}>
+              {textosVozes.linha.ver}
+            </Botao>
+          </section>
+        )
+      ) : null}
 
       {redePrincipalSemVideo && segmento !== "salvos" && !navegando ? (
         <p className={styles.avisoRedePrincipal} role="status">

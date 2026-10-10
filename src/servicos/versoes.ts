@@ -390,6 +390,8 @@ export function enderecoParaTrocarOObjetivo(pedido: ParametrosGerarRoteiro, grup
     if (pedido.assuntoEmAlta) consulta.set("alta", pedido.assuntoEmAlta);
     if (pedido.noticiaId) consulta.set("noticiaId", String(pedido.noticiaId));
     if (pedido.noticiaAssuntoId) consulta.set("noticiaAssuntoId", String(pedido.noticiaAssuntoId));
+    // E28 (parte 3): a pergunta do público que a pessoa quer responder volta presa ao tema.
+    if (pedido.perguntaChave) consulta.set("pergunta", pedido.perguntaChave);
   } else if (pedido.origem === "sugerido") {
     if (pedido.temaChave) consulta.set("momento", pedido.temaChave);
     // O índice é o da lista do dia em que o grupo foi escrito: de outro dia, ele apontaria para outro tema, e o tema é que a pessoa quer de volta.

@@ -62,9 +62,9 @@ describe("perguntasDoPublico (a tela)", () => {
 });
 
 describe("vozPelaChave", () => {
-  it("acha a voz pela chave em qualquer das três listas, e só se passou do piso", () => {
+  it("acha a pergunta e a reclamação pela chave, só se passou do piso; o pedido, mesmo valendo, não prende nada", () => {
     expect(vozPelaChave(VOZES, chaveDaVoz("duvida", "Serve em tecido de camurça?"))?.vezes).toBe(14);
-    expect(vozPelaChave(VOZES, chaveDaVoz("pedido", "Mostrar o passo a passo no colchão"))?.tipo).toBe("pedido");
+    expect(vozPelaChave(VOZES, chaveDaVoz("pedido", "Mostrar o passo a passo no colchão"))).toBeNull();
     expect(vozPelaChave(VOZES, chaveDaVoz("duvida", "Pergunta de quatro comentários?"))).toBeNull();
     expect(vozPelaChave(VOZES, "000000000000")).toBeNull();
     expect(vozPelaChave(null, chaveDaVoz("duvida", "Serve em tecido de camurça?"))).toBeNull();

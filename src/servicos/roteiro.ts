@@ -34,6 +34,7 @@ import {
   type MomentoDoDia,
   type Ficha,
   type Objetivo,
+  type PerguntaDeOrigemGuardada,
   type Plataforma,
   type QuemGrava,
   type TemaDoDia,
@@ -82,7 +83,7 @@ import {
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { temasParaCliente } from "./temas";
 import { assuntoEmAltaDaLista, type AssuntoEmAlta } from "./tendencias";
-import { vozesDoSetor, vozesParaOPrompt } from "./vozes-do-publico";
+import { perguntaDoPublicoPelaChave, vozesDoSetor, vozesParaOPrompt } from "./vozes-do-publico";
 
 export class ErroRoteiro extends Error {}
 
@@ -418,6 +419,11 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * ainda em alta, o roteiro nasce do momento (guarda o assunto, não muda de dia); já fora da lista, é um tema livre comum.
    */
   assuntoEmAlta?: string;
+  /**
+   * E28 (parte 3): a chave da pergunta do público que a pessoa quer responder em vídeo (Tema livre, `?pergunta=`). Só vale com `origem: "livre"`. A voz é achada de novo nas vozes DO SETOR da
+   * marca (nunca confiando no texto que veio do navegador) e só enquanto passa do piso; chave que não acha nada é um tema livre comum. O roteiro guarda a cópia (`roteiros.pergunta_do_publico`).
+   */
+  perguntaChave?: string;
 };
 
 /**
@@ -734,11 +740,14 @@ function combinarEvidencias(
 async function resolverTema(
   cliente: Cliente,
   params: ParametrosGerarRoteiro,
-): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: TemaDoMomentoGuardado | null }> {
+): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: TemaDoMomentoGuardado | null; pergunta: PerguntaDeOrigemGuardada | null }> {
   if (params.origem === "livre") {
     // E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela: o roteiro nasce do momento só se o assunto ainda está na lista de agora.
     const assunto = params.assuntoEmAlta ? await assuntoEmAltaDaLista(params.assuntoEmAlta) : null;
-    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null };
+    // E28 (parte 3): a pergunta do público que a pessoa prendeu, achada de novo nas vozes do setor da marca (a chave do navegador sozinha não vale) UMA vez, junto do tema: as versões de um
+    // grupo e as de "Gerar outra" depois são da mesma pergunta, mesmo que a leitura da semana mude no meio (o tema resolvido é o que as versões guardam).
+    const pergunta = await perguntaDoPublicoPelaChave(cliente.nichoId, params.perguntaChave);
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null, pergunta };
   }
 
   /**
@@ -750,7 +759,7 @@ async function resolverTema(
    */
   if (params.origem === "momento") {
     const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
-    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null };
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null, pergunta: null };
   }
 
   const resultado = await temasParaCliente(cliente);
@@ -761,7 +770,7 @@ async function resolverTema(
   if (!tema) {
     throw new ErroRoteiro(params.temaChave ? textosHoje.emAlta.saiuNaHora : "tema nao encontrado para o indice pedido.");
   }
-  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null };
+  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null, pergunta: null };
 }
 
 /** O tema de um pedido, já resolvido: o título, as evidências que o tema do dia validou e, quando nasceu de um assunto em alta, o assunto. */
@@ -938,6 +947,8 @@ type MontarERoteiroDados = {
    * notícia na entrada do prompt. Com o veículo e o dia (E53, 3b: as duas origens, setor e assunto, chegam assim), ela também entra na lista das notícias, na frente, com o aviso de texto de terceiros.
    */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
+  /** E28 (parte 3): a pergunta do público que o roteiro responde, como a vimos (a do Tema livre, ou a cópia guardada na reescrita); entra na entrada e nas fontes dos fatos. */
+  perguntaPresa?: PerguntaDeOrigemGuardada;
   /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
   temaDoMomento?: boolean;
   /**
@@ -1115,7 +1126,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   );
 
   // E28: até 3 dúvidas, 2 reclamações e 2 pedidos, só os que passaram do piso de comentários iguais.
-  const vozesDoPublico = vozesParaOPrompt(vozesDoSetorAtual?.vozes ?? null);
+  // Com a pergunta presa (a pessoa quer responder UMA), o bloco geral das vozes não entra: o roteiro é sobre aquela.
+  const vozesDoPublico = dados.perguntaPresa ? [] : vozesParaOPrompt(vozesDoSetorAtual?.vozes ?? null);
   const lidasEm = vozesDoSetorAtual && vozesDoPublico.length > 0 ? diaPorExtenso(vozesDoSetorAtual.em) : undefined;
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
@@ -1185,6 +1197,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       temaDoMomento: dados.temaDoMomento,
       vozesDoPublico,
       lidasEm,
+      perguntaPresa: dados.perguntaPresa
+        ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
+        : undefined,
     }),
     // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
     fontesDosFatos: roteiroIA.montarFontesDosFatos({
@@ -1202,6 +1217,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
       vozesDoPublico,
       lidasEm,
+      perguntaPresa: dados.perguntaPresa
+        ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
+        : undefined,
     }),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
@@ -1344,7 +1362,7 @@ export async function montarRoteiro(
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
   // As versões de um mesmo grupo recebem o tema já resolvido uma vez (E26, 4b): "sugerido" é um índice na lista do dia, que muda de um instante para o outro, e "outra versão" tem de ser do mesmo tema.
-  const { tema, evidenciasPrevistas, doMomento } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
+  const { tema, evidenciasPrevistas, doMomento, pergunta } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
   if (doMomento && params.data && params.data !== hojeISO()) {
     throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
@@ -1361,6 +1379,9 @@ export async function montarRoteiro(
   // E53 (parte 3): a notícia de um assunto da marca, no lugar da do setor (uma só ponto de partida por roteiro).
   const noticiaDoAssuntoLinha = !noticiaLinha && params.origem === "livre" && params.noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(clienteId, params.noticiaAssuntoId) : null;
   const noticia = noticiaLinha ? noticiaDoSetorComoPontoDePartida(noticiaLinha) : noticiaDoAssuntoLinha ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssuntoLinha) : undefined;
+  // E28 (parte 3): a pergunta do público que a pessoa prendeu, já resolvida com o tema (nunca achada de novo aqui): só em tema livre e uma origem só por roteiro (a notícia e o assunto em alta
+  // têm a vez antes). Um grupo antigo, sem o campo, vale como sem pergunta.
+  const perguntaPresa = params.origem === "livre" && !noticia && !doMomento ? (pergunta ?? null) : null;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
@@ -1376,6 +1397,7 @@ export async function montarRoteiro(
     evidenciasPrevistas,
     momento,
     noticia,
+    perguntaPresa: perguntaPresa ?? undefined,
     temaDoMomento: doMomento !== null,
     versoesDoMesmoTema,
   });
@@ -1399,6 +1421,8 @@ export async function montarRoteiro(
       noticiaId: noticiaLinha?.id ?? null,
       // E53 (parte 3): a notícia do assunto de onde o roteiro nasceu, copiada (o "De onde veio" não some quando o assunto sai).
       noticiaDoAssunto: noticiaDoAssuntoLinha ? noticiaDeOrigemGuardada(noticiaDoAssuntoLinha) : null,
+      // E28 (parte 3): a pergunta do público de onde o roteiro nasceu, copiada (a leitura de amanhã pode não ter mais a mesma).
+      perguntaDoPublico: perguntaPresa,
       // E55 PR 2: o assunto em alta de onde o tema nasceu, para o resto do produto saber (selo, "já passou", Histórico, recusa de mudar de dia, reescrita).
       temaDoMomento: doMomento,
       conteudo,
@@ -1485,6 +1509,8 @@ export async function reprovarERescrever(
     },
     momento,
     noticia,
+    // E28 (parte 3): a reescrita mantém a pergunta do público de origem, a cópia guardada (as vozes de hoje podem não ter mais a mesma).
+    perguntaPresa: atual.perguntaDoPublico ?? undefined,
     // E55 PR 2 (a decisão 272 do PR 1): a reescrita de um roteiro do momento continua sendo do momento, com o mesmo pedido de ser curto e fácil de gravar hoje.
     temaDoMomento: atual.temaDoMomento !== null,
   });
@@ -1508,6 +1534,8 @@ export async function reprovarERescrever(
       // E43: idem, a reescrita mantém a notícia de origem.
       noticiaId: atual.noticiaId,
       noticiaDoAssunto: atual.noticiaDoAssunto,
+      // E28 (parte 3): idem, a reescrita mantém a pergunta do público de origem.
+      perguntaDoPublico: atual.perguntaDoPublico,
       // E55 PR 2: idem, a reescrita mantém o assunto em alta de origem.
       temaDoMomento: atual.temaDoMomento,
       conteudo,

@@ -7,6 +7,7 @@ import { assuntosSemEncaixeSemFalha, cartaoEmAltaSemFalha } from "@/servicos/em-
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { roteiroPorId } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
+import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 
 import { CriarTela } from "./CriarTela";
 
@@ -61,7 +62,7 @@ export default async function Criar({ searchParams }: Props) {
 
   // E55 PR 2b: o assunto em alta hoje é para hoje: quem veio criar para outro dia (`?data=`) não o vê, nem a lista do que não coube no ramo.
   const paraHoje = !dataInicial || dataInicial === hoje;
-  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe] = await Promise.all([
+  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe, perguntas] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
     planoDoDia(cliente.id, hoje),
     planoQueVem(cliente.id, hoje),
@@ -69,6 +70,8 @@ export default async function Criar({ searchParams }: Props) {
     paraHoje
       ? cartaoEmAltaSemFalha(cliente, hoje).then(async (cartao) => ({ cartao, semEncaixe: cartao ? [] : await assuntosSemEncaixeSemFalha(cliente, hoje) }))
       : Promise.resolve({ cartao: null, semEncaixe: [] }),
+    // E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana; nulo (sem erro) no setor que fechou a semana sem voz.
+    perguntasDaTelaSemFalha(cliente.nichoId),
   ]);
   const objetivoRecomendado = resultadoTemas?.status === "ok" ? resultadoTemas.objetivoRecomendado : null;
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
@@ -90,6 +93,7 @@ export default async function Criar({ searchParams }: Props) {
       momentoInicial={momentoInicial}
       emAlta={emAltaECemEncaixe.cartao}
       semEncaixe={emAltaECemEncaixe.semEncaixe}
+      perguntas={perguntas}
     />
   );
 }

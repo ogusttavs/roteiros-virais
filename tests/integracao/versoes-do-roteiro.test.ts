@@ -528,6 +528,16 @@ describe("enderecoParaTrocarOObjetivo", () => {
     expect(enderecoParaTrocarOObjetivo({ ...pedidoSugerido, temaChave: "frente fria" }, { tema: "x", criadoEm: ontem })).toBe("/criar/objetivo?momento=frente+fria");
   });
 
+  it("a pergunta do público volta presa ao tema livre (E28, parte 3); sem ela, o endereço é o de antes", () => {
+    const livre = { origem: "livre" as const, textoTema: "mancha", objetivo: "conversao" as const };
+    expect(enderecoParaTrocarOObjetivo({ ...livre, perguntaChave: "a1b2c3d4e5f6" }, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha&pergunta=a1b2c3d4e5f6");
+    expect(enderecoParaTrocarOObjetivo(livre, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha");
+    // junto da data, a pergunta vem antes dela e as duas voltam
+    expect(enderecoParaTrocarOObjetivo({ ...livre, perguntaChave: "a1b2c3d4e5f6", data: hojeISO() }, { tema: "mancha", criadoEm: hoje })).toBe(
+      `/criar/objetivo?livre=mancha&pergunta=a1b2c3d4e5f6&data=${hojeISO()}`,
+    );
+  });
+
   it("o dia que já passou não vai para a tela do objetivo (ela recusa data no passado); o de hoje ou de depois vai", () => {
     const livre = { origem: "livre" as const, textoTema: "mancha", objetivo: "conversao" as const };
     expect(enderecoParaTrocarOObjetivo({ ...livre, data: "2020-01-01" }, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha");

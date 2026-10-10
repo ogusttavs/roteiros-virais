@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Mic, Pencil, Zap } from "lucide-react";
+import { CalendarDays, ChevronRight, Mic, Pencil, UserRound, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -9,13 +9,16 @@ import { rotuloParaQue } from "@/config/fichas";
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import type { AssuntoSemEncaixe, CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { ItemPlano } from "@/servicos/plano";
+import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { textosPlano } from "@/textos/plano";
+import { textosVozes } from "@/textos/vozes-do-publico";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
+import { ListaDePerguntas } from "@/ui/componentes/PerguntasDoPublico";
 import { SemEncaixeEmAlta } from "@/ui/componentes/SemEncaixeEmAlta";
 import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
@@ -54,6 +57,8 @@ type Props = {
   emAlta?: DadosEmAlta | null;
   /** E55 PR 2b: sem tema do momento, até três assuntos em alta que não couberam no ramo (nunca os delicados). */
   semEncaixe?: AssuntoSemEncaixe[];
+  /** E28 (parte 3b): as perguntas do público desta semana (a quinta porta); nulo no setor sem leitura, e a porta mostra o estado calmo de "ainda sem perguntas". */
+  perguntas?: PerguntasDaTela | null;
 };
 
 /**
@@ -78,6 +83,7 @@ export function CriarTela({
   momentoInicial = null,
   emAlta = null,
   semEncaixe = [],
+  perguntas = null,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -323,6 +329,33 @@ export function CriarTela({
               </span>
               <MotivoSemRede className={styles.motivoNaPorta} />
             </button>
+
+            {/* E28 (passo 25): responder o que estão perguntando nos comentários do setor; cada pergunta leva ao Tema livre com ela presa. Sem leitura da semana, o estado calmo (sem aparência de erro). */}
+            <section className={styles.portaPerguntas} aria-labelledby="t-porta-perguntas" data-porta-perguntas={perguntas ? "com" : "sem"}>
+              <div className={styles.cabecaPorta}>
+                <span className={styles.marcaPorta} aria-hidden="true">
+                  <UserRound size={20} strokeWidth={1.75} aria-hidden="true" />
+                </span>
+                <strong id="t-porta-perguntas">{textosVozes.porta.titulo}</strong>
+                <span className={styles.ajuda}>{textosVozes.porta.ajuda}</span>
+              </div>
+              {perguntas ? (
+                <>
+                  <ListaDePerguntas
+                    perguntas={perguntas.perguntas.map((p) => ({ chave: p.chave, texto: p.texto, vezesTexto: textosVozes.vezes(p.tipo, p.vezes) }))}
+                    rotuloDoBotao={textosVozes.porta.responder}
+                    nomeDoBotao={textosVozes.porta.responderDe}
+                    textoAbrindo={textosHoje.abrindo}
+                    abrindo={ocupado && acao?.startsWith("pergunta-") ? acao.slice("pergunta-".length) : null}
+                    desabilitado={ocupado}
+                    aoResponder={(chave) => ir(`pergunta-${chave}`, `/criar/tema-livre?pergunta=${chave}${dataInicial ? `&data=${dataInicial}` : ""}`)}
+                  />
+                  <p className={styles.leituraPerguntas}>{textosVozes.leitura(perguntas.videos, perguntas.plataformas, perguntas.lidasEm)}</p>
+                </>
+              ) : (
+                <p className={styles.semPerguntas}>{textosVozes.porta.semPerguntas}</p>
+              )}
+            </section>
           </div>
 
           <p className={styles.notaAgenda}>{textosCriar.notaAgenda}</p>

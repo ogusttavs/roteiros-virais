@@ -1,0 +1,93 @@
+/**
+ * "O que o público pergunta" (E28, passo 25 do Opus, `entrega/telas/base.css`, `.perguntas-publico` e `.lista-perguntas`): três perguntas ou reclamações tiradas dos comentários dos vídeos mais
+ * vistos do setor, com quantas vezes apareceram. É a nossa leitura dos comentários públicos: nunca o comentário de uma pessoa, nunca um nome.
+ */
+.bloco {
+  display: grid;
+  gap: var(--espaco-3);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.topo {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.topoComAcao {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+  font-weight: var(--peso-semibold);
+  line-height: 1.25;
+  color: var(--cor-titulo);
+}
+
+.lista {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A pergunta e o botão na mesma linha quando cabem; no celular, o botão desce para baixo da pergunta. */
+.item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2) var(--espaco-3);
+  padding: var(--espaco-3) 0;
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.item:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.texto {
+  flex: 1 1 15rem;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.vezes {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.3;
+  color: var(--cor-texto-dica);
+}
+
+.leitura {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+/* O estado calmo, sem perguntas ainda: uma frase, sem aparência de erro. */
+.semPerguntas {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}

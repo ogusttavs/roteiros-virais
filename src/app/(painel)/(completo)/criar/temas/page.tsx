@@ -8,6 +8,7 @@ import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { pedirTemaDeHoje, temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
+import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
@@ -76,6 +77,8 @@ export default async function Temas({ searchParams }: Props) {
   // Se o dia só tinha o assunto do momento e o cartão não vem (já foi usado e arquivado, ou se escolhe para outro dia), a lista ficaria em branco: o aviso entra no lugar, com o caminho do assunto próprio.
   const soSobrouOMomento = resultado.status === "ok" && !emAlta && !temas.some((tema) => !tema.doMomento);
   const aviso = gerando ? null : soSobrouOMomento ? textosHoje.emAlta.soOMomento : avisoSemTema(resultado, new Date(), estadoDoRamo);
+  // E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana, depois dos três temas (nulo, sem erro, no setor sem leitura).
+  const perguntas = await perguntasDaTelaSemFalha(cliente.nichoId);
 
   return (
     <TemasTela
@@ -87,6 +90,7 @@ export default async function Temas({ searchParams }: Props) {
       redePrincipal={cliente.redePrincipal}
       dataInicial={dataInicial}
       emAlta={emAlta}
+      perguntas={perguntas}
     />
   );
 }
