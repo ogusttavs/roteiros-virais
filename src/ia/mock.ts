@@ -5,6 +5,8 @@
  * mesmo schema Zod que a chamada real usaria, entao um mock mal formado
  * quebra o teste que o usa, não passa disfarcado.
  */
+import { pesoPelaMaisComprida, TOM_PADRAO_DO_BLOCO, type BlocoFalado, type TomDoBloco } from "@/lib/marcas-de-fala";
+
 import type { ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
 import type { ResultadoGeracao, TarefaIA } from "./tipos";
@@ -79,6 +81,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockAindaValeRoteiro(entrada);
     case "notaDaVersao":
       return mockNotaDaVersao(entrada);
+    case "marcarFala":
+      return mockMarcarFala(entrada);
     case "analisarPerfilCitado":
       return mockAnalisarPerfilCitado(entrada);
     case "entenderMarca":
@@ -956,6 +960,25 @@ function mockNotaDaVersao(entrada: string) {
     fraseDoObjetivo: "responde uma dúvida que aparece bem antes da compra.",
     jeitoDiferente: "começa pelo problema e só explica depois que a pessoa já o viu.",
   };
+}
+
+/**
+ * E41 (2a): a marcação de fala, determinística, sem chave real. Põe peso na palavra mais comprida de cada frase e devolve o texto de cada bloco SEM mudar uma letra (o tom é o padrão do
+ * bloco). Dois marcadores no texto do roteiro simulam o modelo desobediente: `ZZESTRAGA` troca a primeira palavra em toda tentativa (o bloco cai para o conserto só por código) e `ZZUMAVEZ`
+ * troca só na primeira tentativa (a segunda, que traz o aviso "ATENÇÃO", sai certa).
+ */
+function mockMarcarFala(entrada: string) {
+  const segundaTentativa = entrada.includes("ATENÇÃO: na tentativa anterior");
+  const blocos: { bloco: BlocoFalado; texto: string; tom: TomDoBloco }[] = [];
+  for (const m of entrada.matchAll(/### (gancho|corpo|fechamento|chamadaFinal)\n([\s\S]*?)(?=\n\n### |$)/g)) {
+    const bloco = m[1] as BlocoFalado;
+    const original = m[2];
+    let texto = pesoPelaMaisComprida(original);
+    const estraga = original.includes("ZZESTRAGA") || (original.includes("ZZUMAVEZ") && !segundaTentativa);
+    if (estraga) texto = `ESTRAGADO ${texto}`;
+    blocos.push({ bloco, texto, tom: TOM_PADRAO_DO_BLOCO[bloco] });
+  }
+  return { blocos };
 }
 
 function mockAprenderCliente(entrada: string) {

@@ -16,6 +16,7 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   avaliarTema: "IA: notas dos temas",
   avaliarResposta: "IA: notas do briefing",
   notaDaVersao: "IA: notas das versões do roteiro",
+  marcarFala: "IA: marcar a fala dos roteiros",
   compilarPerfil: "IA: perfil da marca",
   aprenderCliente: "IA: aprender com as reprovações",
   extrairVideo: "Analisar os vídeos",

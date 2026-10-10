@@ -1710,6 +1710,24 @@ export type Momento = {
  */
 export type AindaValeResultado = { vale: true } | { vale: false; videoId: number; assunto: string };
 
+/**
+ * E41 (2a): as marcas de fala de um roteiro Reels falado, escritas uma vez, sob demanda (`servicos/marcar-fala.ts`), e guardadas em `roteiros.marcas_de_fala`. Cada bloco guarda o texto
+ * marcado (`marcado`: o texto do bloco com `{p:}`, `{d:}`, `{/}`, `{//}`, `{v}` e `{^}`, ver `lib/marcas-de-fala.ts`) e o tom do bloco numa palavra. A trava: o texto sem as marcas é
+ * idêntico ao do bloco, na hora de escrever (o serviço confere) e na hora de ler (`marcasValidas` confere de novo contra o roteiro de agora).
+ */
+export type MarcasDeFala = {
+  versaoPrompt: string;
+  /** ISO, de quando as marcas foram escritas. */
+  geradoEm: string;
+  blocos: { bloco: "gancho" | "corpo" | "fechamento" | "chamadaFinal"; marcado: string; tom: "direto" | "perto" | "calmo" | "firme" }[];
+  /** As conferências por código que não mudam o texto (`R-FALA-01`, `04`, `14`, `15`): texto de apoio da tela, nunca marca. */
+  avisos: { regra: string; texto: string }[];
+  /** O que o conserto por código pôs ou tirou (uma linha por conserto): auditoria e conferência humana. */
+  correcoes: string[];
+  /** Os blocos em que o modelo não acertou a trava nas duas tentativas: as marcas deles vieram só do código. */
+  semModelo: ("gancho" | "corpo" | "fechamento" | "chamadaFinal")[];
+};
+
 export const roteiros = pgTable(
   "roteiros",
   {
@@ -1823,6 +1841,11 @@ export const roteiros = pgTable(
     temaDoMomento: jsonb("tema_do_momento").$type<TemaDoMomentoGuardado>(),
     /** E53 (parte 3): nulo, salvo no roteiro que nasceu de uma notícia de um assunto da marca (ver `NoticiaDeOrigemGuardada`). */
     noticiaDoAssunto: jsonb("noticia_do_assunto").$type<NoticiaDeOrigemGuardada>(),
+    /**
+     * E41 (2a): as marcas de fala (peso, pausa, devagar, tom), escritas na primeira vez que a pessoa liga "Marcas de fala" ou abre o modo gravação (nunca na geração, nunca nas versões que
+     * ninguém escolheu). Nulo até lá, em Story, em vídeo sem fala e depois de uma edição do texto (a edição apaga as marcas; elas são refeitas na próxima vez que a pessoa ligar).
+     */
+    marcasDeFala: jsonb("marcas_de_fala").$type<MarcasDeFala>(),
     criadoEm: criadoEm(),
   },
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data), index("roteiros_data").on(t.data)],
