@@ -8,9 +8,10 @@ import { eq } from "drizzle-orm";
 import Parser from "rss-parser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { FONTES_DE_NOTICIAS } from "@/config/fontes-noticias";
 import { db, getPool } from "@/db";
 import { nichos, noticias } from "@/db/schema";
-import { rodarColetaNoticias } from "@/jobs/coleta-noticias";
+import { rodarColetaNoticias, type DependenciasDaColeta } from "@/jobs/coleta-noticias";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
@@ -32,6 +33,23 @@ const parseURL = (new Parser() as unknown as { parseURL: ReturnType<typeof vi.fn
 
 let nichoId: number;
 
+/**
+ * A rodada de todos os setores também lê os feeds dos portais curados (os assuntos e a foto do setor): o teste nunca vai à internet. O `baixar` daqui registra o endereço e responde que o feed
+ * está fora do ar (o job continua e só anota a falha); o `buscarPagina` registra e não acha foto. Quem quiser provar que a rede NÃO foi tocada confere as duas listas vazias.
+ */
+const baixados: string[] = [];
+const paginasLidas: string[] = [];
+const SEM_REDE: DependenciasDaColeta = {
+  baixar: async (url) => {
+    baixados.push(url);
+    throw new Error("sem rede nos testes");
+  },
+  buscarPagina: async (url) => {
+    paginasLidas.push(url);
+    return null;
+  },
+};
+
 beforeAll(async () => {
   await resetarSchema(db());
   const [nicho] = await db()
@@ -47,6 +65,8 @@ afterAll(async () => {
 
 beforeEach(() => {
   parseURL.mockReset();
+  baixados.length = 0;
+  paginasLidas.length = 0;
 });
 
 afterEach(async () => {
@@ -71,7 +91,7 @@ describe("rodarColetaNoticias (RSS mockado, banco real)", () => {
       ],
     });
 
-    const resumo = await rodarColetaNoticias();
+    const resumo = await rodarColetaNoticias(undefined, SEM_REDE);
     expect(resumo.noticiasProcessadas).toBe(2);
 
     const linhas = await db().select().from(noticias).where(eq(noticias.nichoId, nichoId));
@@ -83,12 +103,12 @@ describe("rodarColetaNoticias (RSS mockado, banco real)", () => {
     parseURL.mockResolvedValue({
       items: [itemFeed("[exemplo] titulo antigo", "https://exemplo.invalid/repetida")],
     });
-    await rodarColetaNoticias();
+    await rodarColetaNoticias(undefined, SEM_REDE);
 
     parseURL.mockResolvedValue({
       items: [itemFeed("[exemplo] titulo atualizado", "https://exemplo.invalid/repetida")],
     });
-    await rodarColetaNoticias();
+    await rodarColetaNoticias(undefined, SEM_REDE);
 
     const linhas = await db().select().from(noticias).where(eq(noticias.url, "https://exemplo.invalid/repetida"));
     expect(linhas).toHaveLength(1);
@@ -110,12 +130,29 @@ describe("rodarColetaNoticias (RSS mockado, banco real)", () => {
       return { items: [itemFeed("[exemplo] noticia do termo bom", "https://exemplo.invalid/termo-bom")] };
     });
 
-    const resumo = await rodarColetaNoticias();
+    const resumo = await rodarColetaNoticias(undefined, SEM_REDE);
     expect(resumo.noticiasProcessadas).toBeGreaterThanOrEqual(1);
     expect((resumo.erros as string[] | undefined)?.length).toBe(1);
 
     await db().delete(noticias).where(eq(noticias.nichoId, outroNicho.id));
     await db().delete(nichos).where(eq(nichos.id, outroNicho.id));
+  });
+
+  it("a rodada de todos os setores lê cada feed dos portais curados uma vez, pelo `baixar` injetado, e um feed fora do ar não derruba a coleta (E53, foto do setor)", async () => {
+    parseURL.mockResolvedValue({ items: [itemFeed("[exemplo] noticia que espera foto", "https://exemplo.invalid/espera-foto")] });
+
+    const resumo = await rodarColetaNoticias(undefined, SEM_REDE);
+
+    expect(resumo.noticiasProcessadas).toBe(1);
+    // Sem assunto ativo, a coleta dos assuntos sai antes de baixar; quem baixa é a foto do setor, e só ela: cada um dos feeds, uma vez.
+    const feeds = FONTES_DE_NOTICIAS.flatMap((fonte) => fonte.feeds.map((feed) => feed.url));
+    expect([...baixados].sort()).toEqual([...feeds].sort());
+    expect(paginasLidas).toEqual([]);
+    // Os feeds que não responderam só viram falha no resumo das fotos; a coleta seguiu e gravou.
+    const fotos = resumo.fotos as { feedsLidos: number; fotosDoFeed: number; falhas?: string[] };
+    expect(fotos).toMatchObject({ feedsLidos: 0, fotosDoFeed: 0 });
+    expect(fotos.falhas).toHaveLength(feeds.length);
+    expect(resumo.erros).toBeUndefined();
   });
 
   it("com nichoId, roda so para aquele nicho (etapa 24, parte 1: coletar agora)", async () => {
@@ -129,7 +166,10 @@ describe("rodarColetaNoticias (RSS mockado, banco real)", () => {
         items: [itemFeed("[exemplo] noticia escopada", "https://exemplo.invalid/escopada")],
       });
 
-      const resumo = await rodarColetaNoticias(nichoId);
+      const resumo = await rodarColetaNoticias(nichoId, SEM_REDE);
+      // A coleta de um ramo só (o "coletar agora" do admin) não lê feed de portal nenhum: nem a dos assuntos nem a das fotos.
+      expect(baixados).toEqual([]);
+      expect(paginasLidas).toEqual([]);
       expect(resumo.nichos).toBe(1);
       expect(parseURL).toHaveBeenCalledTimes(1);
       expect(decodeURIComponent(String(parseURL.mock.calls[0][0]))).toContain("dentista");

@@ -1,6 +1,7 @@
 "use server";
 
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
+import { noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca } from "@/servicos/assuntos";
 import { ErroAcessoNegado, clienteDaSessaoAtual } from "@/servicos/clientes";
 import { noticiaPorId } from "@/servicos/noticias";
 import { avaliarTema, salvarRascunhoTemaLivre, type ResultadoAvaliarTema } from "@/servicos/temas";
@@ -34,7 +35,7 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  * E55 PR 2b: `assuntoEmAlta` é a chave do assunto em alta trazido para o ramo (o Tema livre
  * `?alta=`); `tendenciasQueTocamOTema` só o aceita se ele está na lista de agora e não é delicado.
  */
-export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string): Promise<ResultadoAvaliarTema> {
+export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string, noticiaAssuntoId?: number): Promise<ResultadoAvaliarTema> {
   await exigirForaDoVerComo();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
@@ -42,5 +43,12 @@ export async function avaliarTemaAction(texto: string, noticiaId?: number, assun
   }
   const cliente = await clienteDaSessaoAtual();
   const noticia = noticiaId && cliente.nichoId ? await noticiaPorId(noticiaId, cliente.nichoId) : null;
-  return avaliarTema(cliente, texto, noticia ? { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo } : undefined, assuntoEmAlta);
+  // E53 (parte 3): a notícia de um assunto DESTA marca (a de outra nunca vem): o título e o resumo nosso, como a do setor.
+  const noticiaDoAssunto = !noticia && noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(cliente.id, noticiaAssuntoId) : null;
+  const origem = noticia
+    ? { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo }
+    : noticiaDoAssunto
+      ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssunto)
+      : undefined;
+  return avaliarTema(cliente, texto, origem, assuntoEmAlta);
 }

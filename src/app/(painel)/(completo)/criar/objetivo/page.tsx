@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { fichaPadraoDoObjetivo, fichaRecomendadaParaTema, type Ficha } from "@/config/fichas";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
@@ -9,7 +10,7 @@ import { assuntoEmAltaDaLista } from "@/servicos/tendencias";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; alta?: string; momento?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string }> };
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -29,7 +30,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre, data, noticiaId, alta, momento } = await searchParams;
+  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
@@ -38,8 +39,9 @@ export default async function Objetivo({ searchParams }: Props) {
   // Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio.
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
   // E43: "Criar vídeo com esta notícia" carrega o id até aqui; `gerarRoteiro` confere de novo contra o setor do cliente.
-  const noticiaIdNumero = Number(noticiaId);
-  const noticiaIdValida = noticiaId && Number.isInteger(noticiaIdNumero) ? noticiaIdNumero : undefined;
+  const noticiaIdValida = idDoBancoOuNulo(noticiaId) ?? undefined;
+  // E53 (parte 3): idem para a notícia de um assunto da marca; `gerarRoteiro` confere de novo que ela é desta marca.
+  const noticiaAssuntoIdValida = idDoBancoOuNulo(noticiaAssuntoId) ?? undefined;
 
   let origem: OrigemRoteiro;
   let temaEscolhidoTexto: string;
@@ -79,6 +81,7 @@ export default async function Objetivo({ searchParams }: Props) {
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
       noticiaId={noticiaIdValida}
+      noticiaAssuntoId={noticiaAssuntoIdValida}
       paraHoje={paraHoje}
       assuntoEmAlta={assuntoEmAlta}
     />

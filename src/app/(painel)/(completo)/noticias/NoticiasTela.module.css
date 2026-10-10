@@ -280,7 +280,14 @@
   line-height: var(--altura-titulo);
   letter-spacing: -0.02em;
   color: var(--cor-titulo);
-  overflow-wrap: anywhere;
+  /* Só entre palavras: uma palavra maior que a linha só quebra se não houver outro jeito (e o nome comprido ganha letra menor, `.veiculoLongo`). */
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: manual;
+}
+
+.veiculoLongo {
+  font-size: var(--tamanho-cabecalho);
 }
 
 .aspas {
@@ -400,18 +407,17 @@
   border-radius: var(--raio-sm);
 }
 
-/* Na foto pequena o crédito é uma linha só, cortada com reticências; o veículo inteiro está ao lado. */
+/* Na foto pequena o crédito é uma linha só, cortada com reticências; o veículo inteiro está ao lado. O teto é a largura da foto menos as margens: com `white-space: nowrap` o encolher-para-caber não encolhe (o menor tamanho é o do texto inteiro), e o crédito longo vazava e era cortado sem reticências. */
 .noticia .foto figcaption {
   left: 4px;
-  right: 4px;
+  right: auto;
   bottom: 4px;
   padding: 1px 6px;
   font-size: 0.625rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  justify-self: start;
-  max-width: max-content;
+  max-width: calc(100% - 8px);
 }
 
 .noticia .semFoto {
@@ -421,6 +427,10 @@
 .noticia .veiculoGrande {
   font-size: var(--tamanho-rodape);
   line-height: 1.15;
+}
+
+.noticia .veiculoLongo {
+  font-size: 0.6875rem;
 }
 
 .noticia .aspas {
@@ -475,6 +485,10 @@
 
   .noticia .veiculoGrande {
     font-size: var(--tamanho-titulo-2);
+  }
+
+  .noticia .veiculoLongo {
+    font-size: var(--tamanho-cabecalho);
   }
 
   .noticia .aspas {

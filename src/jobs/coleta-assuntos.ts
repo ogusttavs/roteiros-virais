@@ -83,6 +83,19 @@ export async function baixarFeed(url: string): Promise<string> {
   return decodificarFeed(bytes);
 }
 
+/** Um `baixarFeed` que lembra a resposta de cada endereço, inclusive a falha, enquanto durar a rodada: o mesmo feed não é baixado duas vezes (nem espera o prazo de novo quando não responde). */
+export function baixarFeedUmaVezPorRodada(baixar: (url: string) => Promise<string> = baixarFeed): (url: string) => Promise<string> {
+  const lembrados = new Map<string, Promise<string>>();
+  return (url) => {
+    let feed = lembrados.get(url);
+    if (!feed) {
+      feed = baixar(url);
+      lembrados.set(url, feed);
+    }
+    return feed;
+  };
+}
+
 /** O `og:image` de uma página, lendo só o começo dela; nulo se a página não responder ou não tiver. */
 export async function baixarFotoDaPagina(url: string): Promise<string | null> {
   try {
