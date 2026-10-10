@@ -9,9 +9,10 @@ import { db, getPool } from "@/db";
 import { briefings, clientes, geracoesIA, nichos, roteiros, user, type ConteudoRoteiro, type MarcasDeFala } from "@/db/schema";
 import * as cliente from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
+import { config } from "@/lib/config";
 import { normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
 import { blocosFalados, marcarBloco, marcarFalaDoRoteiro, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
-import { editarRoteiro, ErroRoteiro } from "@/servicos/roteiro";
+import { editarRoteiro, ErroRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -19,6 +20,12 @@ import { resetarSchema } from "../../scripts/resetar-schema";
 vi.mock("@/ia/cliente", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/ia/cliente")>();
   return { ...original, gerarEstruturado: vi.fn(original.gerarEstruturado) };
+});
+
+// Um espião na leitura do roteiro: um teste simula "outra marcação gravou logo depois da minha leitura".
+vi.mock("@/servicos/roteiro", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/servicos/roteiro")>();
+  return { ...original, roteiroPorId: vi.fn(original.roteiroPorId) };
 });
 
 // O `editarRoteiro` enfileira a aprendizagem; aqui só interessa a coluna, então a fila é um espião.
@@ -103,6 +110,7 @@ beforeEach(async () => {
   await db().delete(roteiros);
   await db().delete(geracoesIA).where(eq(geracoesIA.tarefa, "marcarFala"));
   vi.mocked(cliente.gerarEstruturado).mockClear();
+  vi.mocked(roteiroPorId).mockClear();
 });
 
 afterAll(async () => {
@@ -284,16 +292,81 @@ describe("o modelo desobediente: a trava segura", () => {
     expect(r.ok).toBe(true);
   });
 
-  it("o roteiro editado enquanto o modelo escrevia não recebe marca velha", async () => {
+  it("o texto falado editado enquanto o modelo escrevia não recebe marca velha", async () => {
     const id = await criarRoteiro();
     const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
     vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
-      await db().update(roteiros).set({ editadoEm: new Date() }).where(eq(roteiros.id, id));
+      await db().update(roteiros).set({ conteudo: conteudo({ gancho: "Outro começo, escrito agora." }), editadoEm: new Date() }).where(eq(roteiros.id, id));
       return real(parametros);
     });
     const r = await marcarFalaDoRoteiro(clienteId, id);
     expect(r).toEqual({ ok: false, motivo: "editado_no_meio" });
     expect(await marcasGuardadas(id)).toBeNull();
+  });
+
+  it("a legenda editada enquanto o modelo escrevia não derruba a marcação (o texto falado é o mesmo)", async () => {
+    const id = await criarRoteiro();
+    const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      await db()
+        .update(roteiros)
+        .set({ conteudo: conteudo({ legenda: "uma legenda nova" }), editadoEm: new Date() })
+        .where(eq(roteiros.id, id));
+      return real(parametros);
+    });
+    const r = await marcarFalaDoRoteiro(clienteId, id);
+    expect(r.ok).toBe(true);
+    expect(await marcasGuardadas(id)).not.toBeNull();
+  });
+
+  it("a segunda tentativa que falha não joga fora o que a primeira já pagou", async () => {
+    const id = await criarRoteiro({ conteudo: conteudo({ gancho: "A mancha voltou ZZESTRAGA depois da limpeza." }) });
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+      return real(parametros);
+    });
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async () => {
+      throw new ErroIA("erro da API (429): limite.");
+    });
+    const r = await marcarFalaDoRoteiro(clienteId, id);
+    if (!r.ok) throw new Error("devia marcar");
+    expect(r.marcas.semModelo).toEqual(["gancho"]);
+    // Os outros três blocos ficaram com o que o modelo devolveu na primeira chamada.
+    expect(r.marcas.blocos.slice(1).every((b) => b.marcado.includes("{p:"))).toBe(true);
+    expect(await chamadasDeMarcarFala()).toBe(1);
+    expect(await marcasGuardadas(id)).not.toBeNull();
+  });
+
+  it("quem leu antes da marcação anterior gravar encontra as marcas prontas e não paga outra chamada", async () => {
+    const id = await criarRoteiro();
+    await marcarFalaDoRoteiro(clienteId, id);
+    const prontas = await marcasGuardadas(id);
+    await db().update(roteiros).set({ marcasDeFala: null }).where(eq(roteiros.id, id));
+    vi.mocked(cliente.gerarEstruturado).mockClear();
+
+    // A primeira leitura vê o roteiro sem marcas; logo depois, "outra marcação" grava as marcas.
+    const real = (await vi.importActual<typeof import("@/servicos/roteiro")>("@/servicos/roteiro")).roteiroPorId;
+    vi.mocked(roteiroPorId).mockImplementationOnce(async (roteiroId, dono) => {
+      const linha = await real(roteiroId, dono);
+      await db().update(roteiros).set({ marcasDeFala: prontas }).where(eq(roteiros.id, id));
+      return linha;
+    });
+    const r = await marcarFalaDoRoteiro(clienteId, id);
+    expect(r.ok && r.novas).toBe(false);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("o teto do dia recusa antes de gastar uma chamada", async () => {
+    const id = await criarRoteiro();
+    const teto = config.regras.roteirosPorDiaMax * 4;
+    await db()
+      .insert(geracoesIA)
+      .values(Array.from({ length: teto }, () => ({ tarefa: "marcarFala", versaoPrompt: "1.0.0", modelo: "mock", clienteId, entradas: {} })));
+    await expect(marcarFalaDoRoteiro(clienteId, id)).rejects.toThrow(textosMarcasDeFala.erros.limiteDoDia);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    // De outra marca não conta.
+    const outro = await criarRoteiro({ clienteId: outraMarcaId });
+    expect((await marcarFalaDoRoteiro(outraMarcaId, outro)).ok).toBe(true);
   });
 });
 
@@ -314,6 +387,14 @@ describe("editar o texto apaga as marcas", () => {
     if (!r.ok) throw new Error("devia marcar");
     expect(r.novas).toBe(true);
     expect(textoSemMarcas(r.marcas.blocos[0].marcado)).toBe("A mancha voltou e agora eu explico o porquê.");
+  });
+
+  it("editar só a quebra de linha também apaga: as marcas guardam a quebra do texto de que saíram", async () => {
+    const id = await criarRoteiro();
+    await marcarFalaDoRoteiro(clienteId, id);
+    expect(await marcasGuardadas(id)).not.toBeNull();
+    await editarRoteiro(id, { corpo: conteudo().corpo.replace(". Passe", ".\nPasse") });
+    expect(await marcasGuardadas(id)).toBeNull();
   });
 
   it("marca velha sobre texto novo (uma edição que não passou por editarRoteiro) não vale e é refeita", async () => {
@@ -347,7 +428,7 @@ describe("as peças do serviço", () => {
     expect(bom.usouModelo).toBe(true);
     expect(bom.marcado).toBe("A {p:mancha} voltou depois da limpeza.{//}");
     // Duas palavras de peso numa frase curta: a segunda é tirada pela R-FALA-05.
-    expect(bom.correcoes).toEqual(['R-FALA-05: peso tirado de "limpeza."', 'R-FALA-03: pausa no fim da frase "...limpeza."']);
+    expect(bom.correcoes).toEqual(['R-FALA-05: peso tirado de "limpeza."', 'R-FALA-03: pausa longa no fim da frase "...limpeza."']);
 
     const ruim = marcarBloco(original, "A {p:nódoa} voltou depois da limpeza.", { chamadaFinal: false, maisDevagar: false });
     expect(ruim.usouModelo).toBe(false);

@@ -7,13 +7,14 @@
  * põe e tira o que as regras que "conferem por código" mandam (`consertarMarcas`) e guarda as conferências que não mexem em marca como aviso (`conferirFala`). Um bloco que o modelo não acerta
  * em duas tentativas fica só com as marcas do código, nunca com texto mudado. A frase fixa da R-FALA-24 não passa por aqui (`textos/marcas-de-fala.ts`).
  */
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { roteiros, type ConteudoRoteiro, type MarcasDeFala } from "@/db/schema";
+import { geracoesIA, roteiros, type ConteudoRoteiro, type MarcasDeFala } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as marcarIA from "@/ia/prompts/marcarFala";
 import { registrarGeracao } from "@/ia/registro";
+import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import {
   ambienteComBarulho,
@@ -36,6 +37,7 @@ import {
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 
 import { perfilDoCliente } from "./briefing";
+import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import { ErroRoteiro, roteiroPorId } from "./roteiro";
 
 export type MotivoSemMarcas = "story" | "sem_fala" | "sem_texto" | "chave_no_texto" | "editado_no_meio";
@@ -143,8 +145,22 @@ function tomValido(tom: string | undefined, bloco: BlocoFalado): TomDoBloco {
 const EM_ANDAMENTO = new Map<string, Promise<ResultadoDaMarcacao>>();
 
 /**
+ * O teto de segurança do dia para a marcação: o teto de roteiros do dia (`ROTEIROS_POR_DIA_MAX`) vezes quatro (marcar, editar o texto, marcar de novo, e a segunda tentativa de cada uma).
+ * Só contra laço ou abuso: editar uma palavra é de graça e apaga as marcas, então sem teto dava para repetir a chamada sem fim. Conta as chamadas registradas hoje, no fuso de São Paulo.
+ */
+const CHAMADAS_POR_ROTEIRO_DO_DIA = 4;
+
+async function exigirFolgaDoDia(clienteId: number): Promise<void> {
+  const [{ total }] = await db()
+    .select({ total: sql<number>`count(*)::int` })
+    .from(geracoesIA)
+    .where(and(eq(geracoesIA.tarefa, "marcarFala"), eq(geracoesIA.clienteId, clienteId), gte(geracoesIA.criadoEm, inicioDoDiaEmSaoPaulo(new Date()))));
+  if (total >= config.regras.roteirosPorDiaMax * CHAMADAS_POR_ROTEIRO_DO_DIA) throw new ErroRoteiro(textosMarcasDeFala.erros.limiteDoDia);
+}
+
+/**
  * Devolve as marcas de fala do roteiro, escrevendo-as na primeira vez. Idempotente: com marcas válidas guardadas, não chama IA. O roteiro é conferido por dono (`roteiroPorId(id,
- * clienteId)`): de outra marca é "não achei". Erro da IA sobe como `ErroIA` (nada é guardado, a pessoa tenta de novo).
+ * clienteId)`): de outra marca é "não achei". Erro da IA na primeira chamada sobe como `ErroIA` (nada é guardado, a pessoa tenta de novo).
  */
 export async function marcarFalaDoRoteiro(clienteId: number, roteiroId: number): Promise<ResultadoDaMarcacao> {
   const roteiro = await roteiroPorId(roteiroId, clienteId);
@@ -159,12 +175,21 @@ export async function marcarFalaDoRoteiro(clienteId: number, roteiroId: number):
   const chave = `${clienteId}:${roteiroId}`;
   const emAndamento = EM_ANDAMENTO.get(chave);
   if (emAndamento) return emAndamento;
-  const trabalho = escreverMarcas(clienteId, roteiro).finally(() => EM_ANDAMENTO.delete(chave));
+  const trabalho = escreverMarcas(clienteId, roteiroId).finally(() => EM_ANDAMENTO.delete(chave));
   EM_ANDAMENTO.set(chave, trabalho);
   return trabalho;
 }
 
-async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<ReturnType<typeof roteiroPorId>>>): Promise<ResultadoDaMarcacao> {
+async function escreverMarcas(clienteId: number, roteiroId: number): Promise<ResultadoDaMarcacao> {
+  // Lê de novo, já como o único da vez neste roteiro: quem leu antes de a marcação anterior gravar encontra as marcas prontas aqui, e o texto usado é sempre o de agora.
+  const roteiro = await roteiroPorId(roteiroId, clienteId);
+  if (!roteiro) throw new ErroRoteiro(textosMarcasDeFala.erros.naoEncontrado);
+  const motivo = motivoDeNaoMarcar(roteiro);
+  if (motivo) return { ok: false, motivo };
+  const jaGuardadas = marcasValidas(roteiro.marcasDeFala, roteiro.conteudo);
+  if (jaGuardadas) return { ok: true, marcas: jaGuardadas, novas: false };
+  await exigirFolgaDoDia(clienteId);
+
   const conteudo = roteiro.conteudo;
   const blocos = blocosFalados(conteudo);
 
@@ -194,7 +219,13 @@ async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<Re
         publicoMaisVelho: velho,
         falhouNaTentativaAnterior: falhouAntes,
       }),
+    }).catch((erro: unknown) => {
+      // A primeira chamada que falha sobe (nada foi pago nem guardado). A segunda não derruba o que a primeira já pagou: os blocos que faltam ficam só com as marcas do código.
+      if (tentativa === 1) throw erro;
+      logger.warn({ err: erro, clienteId, roteiroId }, "a segunda tentativa da marcacao de fala falhou: os blocos que faltam ficam so com as marcas do codigo");
+      return null;
     });
+    if (saida === null) break;
     // O registro é do custo e da auditoria: se ele falhar, a marcação que já foi paga não se perde.
     try {
       await registrarGeracao({
@@ -203,7 +234,7 @@ async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<Re
         modelo: saida.modelo,
         nivel: marcarIA.nivel,
         clienteId,
-        entradas: { roteiroId: roteiro.id, tentativa, blocos: pendentes },
+        entradas: { roteiroId, tentativa, blocos: pendentes },
         saida: saida.dados,
         uso: {
           tokensEntrada: saida.tokensEntrada,
@@ -214,7 +245,7 @@ async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<Re
         duracaoMs: Date.now() - inicio,
       });
     } catch (erro) {
-      logger.warn({ err: erro, clienteId, roteiroId: roteiro.id }, "nao foi possivel registrar a marcacao de fala");
+      logger.warn({ err: erro, clienteId, roteiroId }, "nao foi possivel registrar a marcacao de fala");
     }
 
     const falharam: BlocoFalado[] = [];
@@ -247,11 +278,15 @@ async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<Re
   }
   marcas.avisos = conferirFala(sem, { ambienteComBarulho: barulho, publicoMaisVelho: velho }).map((c) => ({ regra: c.regra, texto: textoDoAviso(c) }));
 
-  // Só grava se o roteiro não foi editado enquanto o modelo escrevia (a edição apaga as marcas e muda `editado_em`); senão, a tela pede de novo.
+  // Só grava se o texto falado continua o de que as marcas saíram (a edição dos quatro blocos apaga as marcas; a de uma legenda ou de uma cena não precisa derrubar a marcação em curso).
+  const mesmoTexto = sql.join(
+    BLOCOS_FALADOS.map((bloco) => sql`coalesce(${roteiros.conteudo}->>${sql.raw(`'${bloco}'`)}, '') = ${conteudo[bloco] ?? ""}`),
+    sql` and `,
+  );
   const gravadas = await db()
     .update(roteiros)
     .set({ marcasDeFala: marcas })
-    .where(and(eq(roteiros.id, roteiro.id), eq(roteiros.clienteId, clienteId), sql`${roteiros.editadoEm} is not distinct from ${roteiro.editadoEm}`))
+    .where(and(eq(roteiros.id, roteiro.id), eq(roteiros.clienteId, clienteId), mesmoTexto))
     .returning({ id: roteiros.id });
   if (gravadas.length === 0) return { ok: false, motivo: "editado_no_meio" };
   return { ok: true, marcas, novas: true };

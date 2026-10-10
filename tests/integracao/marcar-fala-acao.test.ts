@@ -122,7 +122,7 @@ describe("marcarFalaAction", () => {
   });
 
   it("um id que não existe, ou que não é um inteiro positivo, é 'não achei'", async () => {
-    for (const id of [987654, 0, -3, 1.5, Number.NaN]) {
+    for (const id of [987654, 0, -3, 1.5, Number.NaN, 3_000_000_000]) {
       expect(await marcarFalaAction(id)).toEqual({ ok: false, erro: textosMarcasDeFala.erros.naoEncontrado });
     }
     expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();

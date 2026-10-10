@@ -36,7 +36,7 @@ const NOME_DO_BLOCO: Record<BlocoFalado, string> = {
   gancho: "gancho (os 3 primeiros segundos)",
   corpo: "corpo",
   fechamento: "fechamento",
-  chamadaFinal: "chamada final",
+  chamadaFinal: "chamadaFinal, a chamada final",
 };
 
 export function montarSistemaEstavel(): string {
@@ -53,7 +53,7 @@ As marcas (a sintaxe é exata, com estas chaves e estas letras):
 - {^}           O TOM SOBE: SÓ no fim de uma pergunta de verdade (a frase termina em "?"). Vem logo antes da pausa.
 
 Um exemplo completo. Texto recebido: Essa mancha saiu em dois minutos e custou R$ 49. Quer ver como?
-Texto devolvido: Essa {p:mancha} saiu em {d:dois minutos} e custou {d:R$ 49}.{v}{//} Quer ver {p:como}?{^}{//}
+Texto devolvido: Essa {p:mancha} saiu em {d:dois minutos}{/} e custou {d:R$ 49}.{v}{//} Quer ver {p:como}?{^}{//}
 
 Como marcar:
 1. Pausa. Toda frase termina com pausa longa {//} depois do ponto, da exclamação ou da interrogação. Pausa curta {/} onde a frase pede fôlego: depois de uma vírgula, ou antes de "e", "mas", "porque". Nenhum trecho passa de 12 palavras sem uma pausa. Uma frase que não cabe num fôlego recebe pausa curta no meio, nunca é cortada.

@@ -28,6 +28,8 @@ export const textosMarcasDeFala = {
     naoEncontrado: "Não achei este roteiro.",
     /** Story e vídeo sem fala não têm fala para marcar. */
     semFala: "Este vídeo não tem fala para marcar.",
+    /** O limite de marcações do dia (laço ou abuso); sem número, a pessoa não vê contador. */
+    limiteDoDia: "Você chegou ao limite de marcações de hoje. Amanhã a conta volta ao normal.",
     /** O roteiro foi editado enquanto as marcas eram escritas: a tela pede de novo. */
     editadoNoMeio: "O roteiro mudou enquanto marcávamos a fala. Tente de novo.",
     /** A IA falhou (saldo, limite, fora do ar): o roteiro continua inteiro, só sem as marcas. */

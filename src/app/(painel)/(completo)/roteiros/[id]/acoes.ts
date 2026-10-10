@@ -87,8 +87,8 @@ export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
-  // O id chega do navegador: algo que não é um inteiro positivo é "não achei", nunca um erro do banco.
-  if (!Number.isInteger(roteiroId) || roteiroId <= 0) return { ok: false, erro: textosMarcasDeFala.erros.naoEncontrado };
+  // O id chega do navegador: algo que não é um inteiro positivo de 32 bits (o tipo da coluna) é "não achei", nunca um erro do banco.
+  if (!Number.isInteger(roteiroId) || roteiroId <= 0 || roteiroId > 2_147_483_647) return { ok: false, erro: textosMarcasDeFala.erros.naoEncontrado };
   try {
     const r = await marcarFalaDoRoteiro(cliente.id, roteiroId);
     return r.ok ? { ok: true, dado: { marcas: r.marcas, motivo: null, novas: r.novas } } : { ok: true, dado: { marcas: null, motivo: r.motivo, novas: false } };

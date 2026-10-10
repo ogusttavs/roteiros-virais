@@ -151,9 +151,50 @@ describe("lerPalavras e escreverPalavras", () => {
 });
 
 describe("consertarMarcas: o que as regras que conferem por código põem e tiram", () => {
-  it("R-FALA-03: toda frase termina em pausa longa, e a que o modelo já pôs fica", () => {
-    const { texto } = consertarMarcas("Chegou cedo. Saiu tarde!{/} E voltou?");
-    expect(texto).toBe("Chegou cedo.{//} Saiu tarde!{/} E voltou?{//}");
+  it("R-FALA-03: toda frase termina em pausa longa; a curta que o modelo pôs no fim da frase vira longa", () => {
+    const { texto } = consertarMarcas("Chegou cedo. Saiu tarde!{/} E voltou?{//}");
+    expect(texto).toBe("Chegou cedo.{//} Saiu tarde!{//} E voltou?{//}");
+  });
+
+  it("R-FALA-03: a frase de 13 palavras com a pausa longa na 13ª também passa do limite de 12 (e de 9 com barulho)", () => {
+    const treze = Array.from({ length: 13 }, (_, i) => `p${i + 1}`).join(" ") + ".";
+    const normal = consertarMarcas(treze).texto;
+    expect(normal).toContain("{/}");
+    for (const d of pausasEPalavras(normal)) expect(d).toBeLessThanOrEqual(MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS);
+    // 12 palavras cabem sem pausa curta
+    expect(consertarMarcas(Array.from({ length: 12 }, (_, i) => `p${i + 1}`).join(" ") + ".").texto).not.toContain("{/}");
+    // 10 palavras passam do limite de 9
+    const dez = Array.from({ length: 10 }, (_, i) => `p${i + 1}`).join(" ") + ".";
+    expect(consertarMarcas(dez).texto).not.toContain("{/}");
+    const devagar = consertarMarcas(dez, { maisDevagar: true }).texto;
+    expect(devagar).toContain("{/}");
+    for (const d of pausasEPalavras(devagar)) expect(d).toBeLessThanOrEqual(MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS_MAIS_DEVAGAR);
+  });
+
+  it("R-FALA-03: o número de lista, a rua e a abreviatura não terminam a frase; o 'etc.' termina", () => {
+    expect(consertarMarcas("1. Tire o excesso.").texto).toBe("{d:1}. Tire o excesso.{//}");
+    expect(consertarMarcas("Venha na R. Augusta hoje.").texto).toBe("Venha na R. Augusta hoje.{//}");
+    expect(consertarMarcas("Tel. 3333 agora.").texto).toBe("Tel. {d:3333} agora.{//}");
+    expect(consertarMarcas("Tem pano, balde, etc. Venha conhecer.").texto).toBe("Tem pano, balde, etc.{//} Venha conhecer.{//}");
+    // um número no fim da frase continua terminando a frase
+    expect(consertarMarcas("Custa 30. Venha.").texto).toBe("Custa {d:30}.{//} Venha.{//}");
+  });
+
+  it("R-FALA-03: sem vírgula nem conjunção, a pausa não cai depois do artigo nem da preposição", () => {
+    // 14 palavras, a 7ª é "o": o meio cairia depois dela, e a pausa recua para depois de "seis".
+    const original = "um dois três quatro cinco seis o carro novo chegou ontem na loja hoje.";
+    const { texto } = consertarMarcas(original);
+    expect(texto).toContain("seis{/}");
+    expect(texto).not.toContain("o{/}");
+    expect(textoIdentico(original, texto)).toBe(true);
+  });
+
+  it("R-FALA-03: a pausa curta não parte 'tudo o que eu fiz' nem 'a verdade é que'", () => {
+    const original = "Eu quero que você saiba tudo o que eu fiz para resolver aquilo que ninguém queria resolver nesta casa.";
+    const { texto } = consertarMarcas(original);
+    expect(texto).not.toMatch(/\bo\{\/\} que\b/);
+    expect(texto).not.toMatch(/\{\/\} que\b/);
+    expect(textoIdentico(original, texto)).toBe(true);
   });
 
   it("R-FALA-03: um trecho comprido sem pausa ganha uma pausa curta onde a frase já respira", () => {
@@ -205,6 +246,8 @@ describe("consertarMarcas: o que as regras que conferem por código põem e tira
     expect(texto).toBe("Isso funciona?{^}{//} Funciona sim.{//} Quer ver agora?{//}");
     // a pergunta no meio do texto continua com o tom que sobe só no último
     expect(consertarMarcas("Quer ver{^} agora?{^}").texto).toBe("Quer ver agora?{^}{//}");
+    // "?!" é pergunta
+    expect(consertarMarcas("Sério?!{^}").texto).toBe("Sério?!{^}{//}");
   });
 
   it("R-FALA-08: número e preço ficam devagar com a unidade, sem peso", () => {
@@ -223,8 +266,11 @@ describe("consertarMarcas: o que as regras que conferem por código põem e tira
   it("R-FALA-08 e 09: a chamada final é dita devagar e termina com o tom descendo", () => {
     const { texto } = consertarMarcas("Chame no WhatsApp agora.", { chamadaFinal: true });
     expect(texto).toBe("{d:Chame no WhatsApp agora}.{v}{//}");
-    // a chamada que é pergunta não recebe o tom que desce
-    expect(consertarMarcas("Vamos conversar?", { chamadaFinal: true }).texto).not.toContain("{v}");
+    // a chamada final é sempre afirmação (R-FALA-09): mesmo escrita como pergunta, ou com o tom que sobe, termina descendo
+    expect(consertarMarcas("Vamos conversar?", { chamadaFinal: true }).texto).toBe("{d:Vamos conversar}?{v}{//}");
+    expect(consertarMarcas("Chame agora.{^}", { chamadaFinal: true }).texto).toBe("{d:Chame agora}.{v}{//}");
+    // um fecho curto depois do pedido não leva o devagar sozinho: o pedido também
+    expect(consertarMarcas("Chame no WhatsApp agora. Obrigado!", { chamadaFinal: true }).texto).toBe("{d:Chame no WhatsApp agora}.{//} {d:Obrigado}!{v}{//}");
     // quem já disse devagar no fim não é refeito
     const feito = consertarMarcas("Chame no {d:WhatsApp} agora.", { chamadaFinal: true }).texto;
     expect(feito).toBe("Chame no {d:WhatsApp} agora.{v}{//}");
@@ -290,6 +336,10 @@ describe("conferirFala: o que vira texto de apoio, nunca marca", () => {
     expect(conferirFala({ gancho: "Então, hoje eu vou mostrar uma coisa.", corpo: "x." })).toEqual([{ regra: "R-FALA-01", muleta: "Então" }]);
     expect(conferirFala({ gancho: "É isso que ninguém te conta.", corpo: "x." })).toEqual([{ regra: "R-FALA-01", muleta: "É" }]);
     expect(conferirFala({ gancho: "Ninguém te conta isso.", corpo: "x." })).toEqual([]);
+    // "E" e "Assim" começam muita frase boa: só o "É" com acento é a muleta da regra
+    expect(conferirFala({ gancho: "E se eu te contasse o que ninguém conta?", corpo: "x." })).toEqual([]);
+    expect(conferirFala({ gancho: "Assim que cheguei, a mancha voltou.", corpo: "x." })).toEqual([]);
+    expect(conferirFala({ gancho: "Olha isso aqui.", corpo: "x." })).toEqual([]);
     // a muleta no meio do vídeo não conta
     expect(conferirFala({ gancho: "Isso é um segredo.", corpo: "Então veja." })).toEqual([]);
   });
@@ -311,10 +361,15 @@ describe("conferirFala: o que vira texto de apoio, nunca marca", () => {
     expect(ambienteComBarulho(["Gravar na oficina, com as máquinas ligadas"])).toBe(true);
     expect(ambienteComBarulho(["Gravar em casa, na sala"])).toBe(false);
     expect(ambienteComBarulho(["Na avenida ao lado da loja"])).toBe(true);
+    expect(ambienteComBarulho(["Na feira de domingo", "no canteiro de obra"])).toBe(true);
+    // palavras que contêm a palavra, mas não são o lugar
+    expect(ambienteComBarulho(["Toda segunda-feira eu mostro a mão de obra e a máquina de lavar"])).toBe(false);
     expect(publicoMaisVelho(["Clientes idosos que moram sozinhos"])).toBe(true);
     expect(publicoMaisVelho(["Homens de 60 a 75 anos"])).toBe(true);
     expect(publicoMaisVelho(["Mulheres de 30 a 45 anos"])).toBe(false);
     expect(publicoMaisVelho(["Pessoas com 65 anos ou mais"])).toBe(true);
+    // 60 anos de mercado é da empresa, não do público
+    expect(publicoMaisVelho(["Empresa com 60 anos de mercado, clientes de 30 a 45 anos"])).toBe(false);
   });
 });
 

@@ -182,16 +182,35 @@ export function contarPalavras(texto: string): number {
 // O conserto mecânico (as regras que "conferem por código")
 // ---------------------------------------------------------------------------------------------------------------------------------
 
-const ABREVIATURAS = /^(dr|dra|sr|sra|prof|profa|etc|av|ex|obs)\.$/i;
+/** Abreviatura com ponto: não termina a frase ("Dra. Ana", "R. Augusta", "Tel. 3333"). "etc." fica de fora de propósito: quase sempre fecha a frase. */
+const ABREVIATURAS = /^(dr|dra|sr|sra|prof|profa|av|ex|obs|r|tel|cel|apt|apto|jr|pág|pag)\.$/i;
+/** "1." no começo de uma frase é o número de uma lista, não o fim dela. */
+const NUMERO_DE_LISTA = /^\d{1,2}\.$/;
 const FIM_DE_FRASE = /[.!?…]["')\]”’»]*$/;
+const PERGUNTA = /\?[!?"')\]”’»]*$/;
 const ABERTURA_E_FECHAMENTO = /^["'(\[“‘«¿¡]+|["')\]”’»]+$/g;
 const NUMERO_OU_PRECO = /\d|^R\$$|%$/;
 const UNIDADE_DEPOIS_DO_NUMERO =
   /^(reais?|real|centavos?|mil|milh(?:ão|ões|ao|oes)|%|por|cento|dias?|horas?|minutos?|segundos?|semanas?|anos?|meses|mês|mes|km|kg|g|m|cm|mm|litros?|ml|vezes|unidades?|metros?)[.,;:!?]*$/i;
-const CONJUNCOES_DE_QUEBRA = /^(e|mas|porque|que|ou|então|entao|quando|se|só|so)$/i;
+/** Onde a frase já respira: antes de "e", "mas", "porque" e parecidas. "que" e "se" ficam de fora ("tudo o que eu fiz" não se parte). */
+const CONJUNCOES_DE_QUEBRA = /^(e|mas|porque|pois|porém|porem|ou|então|entao|quando)$/i;
+/** Palavra que não fica sozinha no fim de um trecho: artigo, preposição, "que", "se", "e"... A pausa não vai depois dela. */
+const PALAVRA_DE_LIGACAO = /^(o|a|os|as|um|uma|uns|umas|de|do|da|dos|das|em|no|na|nos|nas|ao|aos|à|às|para|pra|por|pelo|pela|com|sem|que|se|me|te|lhe|e|ou|mas|não|nao)$/i;
+
+/** A palavra sem pontuação nem aspas. */
+function limpa(texto: string): string {
+  return texto.replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** Dá para respirar logo depois da palavra `k`? Não, se ela é de ligação (artigo, preposição) ou se a próxima é "que" ou "se" ("tudo o | que eu fiz"). */
+function podeRespirarDepois(palavras: Palavra[], k: number): boolean {
+  if (PALAVRA_DE_LIGACAO.test(limpa(palavras[k].texto))) return false;
+  const proxima = palavras[k + 1];
+  return !(proxima && /^(que|se)$/i.test(limpa(proxima.texto)));
+}
 
 /** As muletas de abertura (R-FALA-01): a primeira palavra do vídeo não pode ser uma delas. */
-export const MULETAS_DE_ABERTURA = ["é", "e", "então", "entao", "bom", "tipo", "né", "ne", "olha", "ah", "hum", "eh", "assim", "aí", "ai"];
+export const MULETAS_DE_ABERTURA = ["é", "então", "entao", "bom", "tipo", "né", "ne", "ah", "hum", "eh"];
 
 /** O que o conserto precisa saber do roteiro (R-FALA-14 e 15 trocam a distância máxima entre pausas). */
 export type ContextoDasMarcas = {
@@ -213,7 +232,8 @@ function frases(palavras: Palavra[]): { de: number; ate: number }[] {
   const resultado: { de: number; ate: number }[] = [];
   let inicio = 0;
   palavras.forEach((p, i) => {
-    if (FIM_DE_FRASE.test(p.texto) && !ABREVIATURAS.test(p.texto)) {
+    const marcadorDeLista = i === inicio && NUMERO_DE_LISTA.test(p.texto);
+    if (FIM_DE_FRASE.test(p.texto) && !ABREVIATURAS.test(p.texto) && !marcadorDeLista) {
       resultado.push({ de: inicio, ate: i });
       inicio = i + 1;
     }
@@ -252,19 +272,21 @@ export function consertarMarcas(marcado: string, contexto: ContextoDasMarcas = {
     if (mudou) correcoes.push(`R-FALA-08: "${p.texto}" dito devagar`);
   });
 
-  // R-FALA-08: a chamada final é dita devagar (a última frase do bloco).
+  // R-FALA-08: a chamada final é dita devagar: a última frase do bloco, e a anterior quando a última é só um fecho curto ("Obrigado!"), porque o pedido está nela.
   if (contexto.chamadaFinal) {
     const ultima = sentencas[sentencas.length - 1];
-    const temDevagar = palavras.slice(ultima.de, ultima.ate + 1).some((p) => p.devagar);
-    if (!temDevagar) {
-      for (let i = ultima.de; i <= ultima.ate; i++) devagar(i);
+    const alvos = ultima.ate - ultima.de + 1 <= 3 && sentencas.length > 1 ? [sentencas[sentencas.length - 2], ultima] : [ultima];
+    for (const alvo of alvos) {
+      const temDevagar = palavras.slice(alvo.de, alvo.ate + 1).some((p) => p.devagar);
+      if (temDevagar) continue;
+      for (let i = alvo.de; i <= alvo.ate; i++) devagar(i);
       correcoes.push("R-FALA-08: a chamada final dita devagar");
     }
   }
 
   for (const { de, ate } of sentencas) {
     const fim = palavras[ate];
-    const ehPergunta = /\?["')\]”’»]*$/.test(fim.texto);
+    const ehPergunta = PERGUNTA.test(fim.texto);
 
     // R-FALA-05: no máximo um peso por frase curta (dois, não colados, por frase comprida), nunca duas palavras de peso seguidas.
     const maximoDePeso = ate - de + 1 <= 10 ? 1 : 2;
@@ -288,49 +310,60 @@ export function consertarMarcas(marcado: string, contexto: ContextoDasMarcas = {
       }
     }
 
-    // R-FALA-03: toda frase termina em pausa (longa no fim da frase).
-    if (!fim.pausa) {
+    // R-FALA-03: toda frase termina em pausa longa (a curta é do meio da frase).
+    if (fim.pausa !== "longa") {
       fim.pausa = "longa";
-      correcoes.push(`R-FALA-03: pausa no fim da frase "...${fim.texto}"`);
+      correcoes.push(`R-FALA-03: pausa longa no fim da frase "...${fim.texto}"`);
     }
   }
 
-  // R-FALA-09: a chamada final é afirmação e termina com o tom descendo.
+  // R-FALA-09: a chamada final é sempre afirmação e termina com o tom descendo (mesmo que o modelo tenha posto o tom que sobe).
   if (contexto.chamadaFinal) {
     const ultima = sentencas[sentencas.length - 1];
     const fim = palavras[ultima.ate];
-    if (fim.tom !== "desce" && !/\?["')\]”’»]*$/.test(fim.texto)) {
+    if (fim.tom !== "desce") {
       fim.tom = "desce";
       correcoes.push("R-FALA-09: a chamada final termina com o tom descendo");
     }
   }
 
   // R-FALA-03: nenhum trecho passa do máximo de palavras sem uma pausa (a pausa curta vai onde a frase já respira: vírgula, ou antes de uma conjunção; senão, no meio).
+  // A palavra que fecha o trecho conta (com a pausa dela): "um dois ... treze." com 13 palavras e a pausa longa na 13ª também passa do limite de 12.
   let desdeAPausa = 0;
   for (let i = 0; i < palavras.length; i++) {
     desdeAPausa += 1;
-    if (palavras[i].pausa) {
-      desdeAPausa = 0;
-      continue;
-    }
-    if (desdeAPausa <= limite) continue;
-    const inicio = i - desdeAPausa + 1;
-    const meio = inicio + Math.floor(desdeAPausa / 2);
-    let melhor = -1;
-    let distanciaMelhor = Infinity;
-    for (let k = inicio + 2; k < i; k++) {
-      const quebraNatural = /[,;:]["')\]”’»]*$/.test(palavras[k].texto) || (palavras[k + 1] !== undefined && CONJUNCOES_DE_QUEBRA.test(palavras[k + 1].texto));
-      if (!quebraNatural || palavras[k].pausa) continue;
-      const distancia = Math.abs(k - meio);
-      if (distancia < distanciaMelhor) {
-        melhor = k;
-        distanciaMelhor = distancia;
+    if (desdeAPausa > limite) {
+      const inicio = i - desdeAPausa + 1;
+      const meio = inicio + Math.floor(desdeAPausa / 2);
+      let melhor = -1;
+      let distanciaMelhor = Infinity;
+      for (let k = inicio + 2; k < i; k++) {
+        const aposVirgula = /[,;:]["')\]”’»]*$/.test(palavras[k].texto);
+        const antesDeConjuncao = palavras[k + 1] !== undefined && CONJUNCOES_DE_QUEBRA.test(limpa(palavras[k + 1].texto)) && podeRespirarDepois(palavras, k);
+        if (!(aposVirgula || antesDeConjuncao) || palavras[k].pausa) continue;
+        const distancia = Math.abs(k - meio);
+        if (distancia < distanciaMelhor) {
+          melhor = k;
+          distanciaMelhor = distancia;
+        }
       }
+      // Sem vírgula nem conjunção, o ponto mais perto do meio onde a frase pode respirar (nunca entre o artigo e o nome, nem antes de "que").
+      if (melhor < 0) {
+        for (let d = 0; d < desdeAPausa && melhor < 0; d++) {
+          for (const k of d === 0 ? [meio] : [meio - d, meio + d]) {
+            if (k > inicio && k < i && !palavras[k].pausa && podeRespirarDepois(palavras, k)) {
+              melhor = k;
+              break;
+            }
+          }
+        }
+      }
+      const onde = melhor >= 0 ? melhor : meio;
+      palavras[onde].pausa = "curta";
+      correcoes.push(`R-FALA-03: pausa curta depois de "${palavras[onde].texto}" (trecho comprido)`);
+      desdeAPausa = i - onde;
     }
-    const onde = melhor >= 0 ? melhor : meio;
-    palavras[onde].pausa = "curta";
-    correcoes.push(`R-FALA-03: pausa curta depois de "${palavras[onde].texto}" (trecho comprido)`);
-    desdeAPausa = i - onde;
+    if (palavras[i].pausa) desdeAPausa = 0;
   }
 
   return { texto: escreverPalavras(palavras), correcoes };
@@ -349,24 +382,32 @@ export type ConferenciaDeFala =
 
 const SEM_ACENTO = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "");
 
-/** R-FALA-14: o lugar onde se grava tem barulho (oficina, rua, obra, feira, fábrica...). */
+/**
+ * R-FALA-14: o lugar onde se grava tem barulho (oficina, rua, obra, feira, fábrica...). "Segunda-feira" e "mão de obra" não são lugar, e "máquina" fica de fora (máquina de lavar é o
+ * produto de muita marca, não o barulho).
+ */
 export function ambienteComBarulho(textos: string[]): boolean {
   const junto = SEM_ACENTO(textos.join(" ").toLowerCase());
-  return /\b(oficina|rua|obra|transito|barulh\w*|ruido|maquinas?|feira|galpao|fabrica|estacionamento|ao ar livre|cozinha industrial|trem|onibus|avenida)\b/.test(junto);
+  return /\b(oficina|rua|transito|barulh\w*|ruido|galpao|fabrica|estacionamento|ao ar livre|cozinha industrial|trem|onibus|avenida)\b|(?<!mao de )\bobras?\b|(?<!-)\bfeira\b/.test(junto);
 }
 
 /** R-FALA-15: o briefing descreve um público acima de 60 anos. */
 export function publicoMaisVelho(textos: string[]): boolean {
   const junto = SEM_ACENTO(textos.join(" ").toLowerCase());
   if (/\b(idos[oa]s?|terceira idade|melhor idade|aposentad[oa]s?|maiores de 60|acima de 60|60 anos ou mais|60 ?\+)/.test(junto)) return true;
-  for (const m of junto.matchAll(/\b(\d{2})\s*(?:anos|a\s*\d{2}\s*anos)/g)) if (Number(m[1]) >= 60) return true;
+  // "60 anos de mercado" é da empresa, não do público.
+  const daEmpresa = /^\s+de\s+(?:mercado|experiencia|estrada|historia|tradicao|existencia|fundacao|atuacao)/;
+  for (const m of junto.matchAll(/\b(\d{2})\s*(?:anos|a\s*\d{2}\s*anos)/g)) {
+    const depois = junto.slice((m.index ?? 0) + m[0].length);
+    if (Number(m[1]) >= 60 && !daEmpresa.test(depois)) return true;
+  }
   return false;
 }
 
-/** A primeira palavra de um texto, sem pontuação nem maiúscula nem acento. */
+/** A primeira palavra de um texto, sem pontuação nem maiúscula e COM o acento ("É" é muleta, "E" não é). */
 function primeiraPalavra(texto: string): string {
   const palavra = normalizar(textoSemMarcas(texto)).split(" ")[0] ?? "";
-  return SEM_ACENTO(palavra.toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""));
+  return palavra.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
 }
 
 /**
@@ -378,7 +419,7 @@ export function conferirFala(textos: Partial<Record<BlocoFalado, string>>, conte
   const primeiro = BLOCOS_FALADOS.map((b) => textos[b]).find((t) => t && t.trim() !== "");
   if (primeiro) {
     const palavra = primeiraPalavra(primeiro);
-    if (palavra && MULETAS_DE_ABERTURA.map(SEM_ACENTO).includes(palavra)) {
+    if (palavra && MULETAS_DE_ABERTURA.includes(palavra)) {
       lista.push({ regra: "R-FALA-01", muleta: normalizar(primeiro).split(" ")[0].replace(/[^\p{L}\p{N}]/gu, "") });
     }
   }
