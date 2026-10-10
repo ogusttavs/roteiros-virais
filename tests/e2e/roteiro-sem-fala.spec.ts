@@ -100,7 +100,7 @@ test.describe("M4, o roteiro sem fala", () => {
     await expect(page.getByRole("heading", { name: "Como editar" })).toHaveCount(0);
 
     await expect(page.getByRole("heading", { name: "Legenda do post" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Copiar" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copiar a legenda" })).toBeVisible();
   });
 
   test("falando (padrão) continua gerando um roteiro normal, sem legenda nenhuma", async ({ page }) => {
