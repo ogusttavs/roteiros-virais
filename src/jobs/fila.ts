@@ -63,6 +63,11 @@ export const FILAS = {
    * um prazo de 15 minutos com repetição leria o site do cliente de novo por cima do primeiro.
    */
   entenderMarca: "entender-marca",
+  /**
+   * E54, a pesquisa na hora: por evento (a pessoa pediu "Pesquisar antes de escrever"), `{ pesquisaId }`. Sem repetição automática
+   * (cada tentativa gasta buscas pagas; a que cai vira "a pesquisa não terminou" e a pessoa decide) e sem horário.
+   */
+  pesquisaNaHora: "pesquisa-na-hora",
 } as const;
 
 export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
@@ -73,7 +78,7 @@ export type NomeFila = (typeof FILAS)[keyof typeof FILAS];
  * `clienteId`, que só `reprovarERescrever` sabe qual é; disparada sem isso,
  * o worker chama o job com `clienteId` indefinido e ele sempre quebra.
  */
-export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil]);
+export const FILAS_POR_EVENTO = new Set<string>([FILAS.aprenderCliente, FILAS.analisarPerfil, FILAS.pesquisaNaHora]);
 
 /**
  * As filas que aceitam rodar só para um ramo (`{ nichoId }` no disparo) e gravam o ramo em

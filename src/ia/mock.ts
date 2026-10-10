@@ -106,11 +106,51 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockJuntarVozes(entrada);
     case "temaDoMomento":
       return mockTemaDoMomento(entrada);
+    case "conferirPremissa":
+      return mockConferirPremissa(entrada);
+    case "pesquisaNaHora":
+      // A busca na web não é saída estruturada: ela tem a própria porta (`busca-na-web.ts`, simulada em `mock-busca.ts`).
+      throw new ErroIA('a tarefa "pesquisaNaHora" nao usa saida estruturada; use buscarNaWeb()');
     default: {
       const _exaustivo: never = tarefa;
       throw new Error(`tarefa sem mock: ${String(_exaustivo)}`);
     }
   }
+}
+
+/**
+ * E54, a conferência da premissa, determinística: "decreto" no tema com um dado que fala de PEC é a premissa errada do plano
+ * (o "decreto da 6x1"); `[mock:sem-opiniao]` pede a pergunta de posição; sem nada disso, "confere". Sem dado nenhum, "sem premissa".
+ */
+function mockConferirPremissa(entrada: string): unknown {
+  const tema = /<tema_da_pessoa>([\s\S]*?)<\/tema_da_pessoa>/.exec(entrada)?.[1] ?? "";
+  const dados = [...entrada.matchAll(/^dado (\d+) \| ([^|]*)\| ([^|]*)\| ([^|]*)\| trecho: (.*)$/gm)].map((m) => ({ id: Number(m[1]), texto: m[4].trim() }));
+  const perguntaDePosicao = tema.includes("[mock:sem-opiniao]")
+    ? { pergunta: "Para você, de quem é a culpa da alta?", opcoes: ["Do fabricante", "Do imposto e do frete", "Dos dois", "Prefiro não dar opinião"] }
+    : null;
+
+  if (/decreto/i.test(tema)) {
+    const pec = dados.filter((d) => /\bPEC\b/.test(d.texto));
+    if (pec.length > 0) {
+      return {
+        premissa: {
+          situacao: "nao_confere",
+          aviso: "O que você escreveu não bate com as fontes: você chamou de decreto, e a fonte diz que é uma PEC, que ainda tramita na Câmara dos Deputados.",
+          anguloSugerido: "Explicar o que a PEC propõe e em que pé ela está, sem tratar como decisão já tomada.",
+          achadoIds: pec.map((d) => d.id),
+        },
+        perguntaDePosicao,
+      };
+    }
+  }
+  if (dados.length === 0 || tema.trim() === "") {
+    return { premissa: { situacao: "sem_premissa", aviso: null, anguloSugerido: null, achadoIds: [] }, perguntaDePosicao };
+  }
+  if (tema.includes("[mock:premissa-sem-prova]")) {
+    // O modelo acusou sem apontar nenhum dado: o código descarta o aviso.
+    return { premissa: { situacao: "nao_confere", aviso: "O que você escreveu não bate com as fontes: sem prova.", anguloSugerido: "Outro ângulo.", achadoIds: [] }, perguntaDePosicao };
+  }
+  return { premissa: { situacao: "confere", aviso: null, anguloSugerido: null, achadoIds: [] }, perguntaDePosicao };
 }
 
 /** Extrai o texto depois de um rotulo tipo "Resposta do cliente: X" da entrada montada. */

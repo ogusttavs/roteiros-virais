@@ -20,6 +20,7 @@ export const ROTINAS: Rotina[] = [
   { chave: "lembrete", titulo: "Mandar o lembrete", faz: "Avisa cada pessoa, na hora dela, que o roteiro do dia está pronto.", filas: [FILAS.lembrete] },
   { chave: "curva", titulo: "Medir os vídeos postados", faz: "Segue o desempenho dos vídeos que as contas postaram.", filas: [FILAS.curvaCliente] },
   { chave: "marca", titulo: "Entender a marca", faz: "Lê o site e as redes da marca para ela confirmar o que entendemos.", filas: [FILAS.entenderMarca, FILAS.analisarPerfil] },
+  { chave: "pesquisa", titulo: "Pesquisar na hora para um vídeo", faz: "Busca, em portais grandes e órgãos oficiais, os dados de verdade que a pessoa pediu antes de escrever um roteiro.", filas: [FILAS.pesquisaNaHora] },
   { chave: "aprender", titulo: "Aprender com as reprovações", faz: "Transforma o que a pessoa reprovou em regras daquela conta.", filas: [FILAS.aprenderCliente] },
   { chave: "faxina", titulo: "Limpar as versões que ninguém escolheu", faz: "Apaga as versões de roteiro que ficaram sem escolha em grupos parados há mais de 30 dias.", filas: [FILAS.faxinaVersoes] },
   { chave: "email", titulo: "Mandar o e-mail de acompanhamento", faz: "Resume o dia do sistema para quem acompanha.", filas: [FILAS.emailAcompanhamento] },
@@ -55,6 +56,7 @@ export const NOME_DA_FILA: Record<string, string> = {
   [FILAS.aprenderCliente]: "o aprendizado com as reprovações",
   [FILAS.entenderMarca]: "a leitura da marca",
   [FILAS.analisarPerfil]: "a leitura do perfil",
+  [FILAS.pesquisaNaHora]: "a pesquisa na hora",
 };
 
 /** "30 3 * * *" em língua de gente. O que não cabe nos formatos que o agendamento usa volta cru, para nunca mentir. */

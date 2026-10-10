@@ -275,6 +275,16 @@ export const config = {
      * alguém liberar (a leitura por evento, quando a pessoa salva o site ou um perfil, continua).
      */
     leituraDaMarcaPeloDespachante: env("LEITURA_MARCA_DESPACHO", "1") !== "0",
+    /**
+     * E54, a pesquisa na hora (estrategia/plano-de-execucao.md): o teto de buscas por pesquisa (`max_uses` da ferramenta),
+     * normal e aprofundada; quantas pesquisas uma marca faz por dia (cada uma custa de R$ 0,50 a R$ 0,95 no modelo barato);
+     * quantos dados a pessoa vê, e a idade, em meses, a partir da qual um dado vem marcado como antigo.
+     */
+    pesquisaNaHoraBuscas: envNumero("PESQUISA_NA_HORA_BUSCAS", 5),
+    pesquisaNaHoraBuscasAprofundada: envNumero("PESQUISA_NA_HORA_BUSCAS_APROFUNDADA", 10),
+    pesquisasNaHoraPorMarcaPorDia: envNumero("PESQUISAS_NA_HORA_MARCA_DIA", 3),
+    pesquisaNaHoraDadosMax: 8,
+    pesquisaNaHoraDadoAntigoMeses: 12,
   },
 };
 

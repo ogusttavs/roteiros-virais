@@ -9,6 +9,7 @@ import {
   FATOR_CACHE_ESCRITA,
   FATOR_CACHE_LEITURA,
   FATOR_LOTE,
+  PRECO_BUSCA_WEB_USD,
   PRECOS_POR_NIVEL,
 } from "@/config/precos-ia";
 import { db } from "@/db";
@@ -22,6 +23,8 @@ export type UsoTokens = {
   tokensSaida: number;
   tokensCacheLeitura: number;
   tokensCacheEscrita: number;
+  /** E54: buscas na web feitas pela ferramenta da Anthropic (`usage.server_tool_use.web_search_requests`), US$ 0,01 cada, fora do desconto do lote. */
+  buscasNaWeb?: number;
 };
 
 /**
@@ -30,6 +33,7 @@ export type UsoTokens = {
  *       + cache_read_input_tokens * p_entrada * 0.10
  *       + output_tokens * p_saida
  * Em lote, tudo dividido por 2 (estrategia/referencia-sdk-anthropic.md).
+ * A busca na web (E54) soma `buscasNaWeb * US$ 0,01` por fora: o lote nao a descontaria.
  */
 export function calcularCustoUsd(nivel: NivelIA, uso: UsoTokens, emLote = false): number {
   const preco = PRECOS_POR_NIVEL[nivel];
@@ -40,7 +44,8 @@ export function calcularCustoUsd(nivel: NivelIA, uso: UsoTokens, emLote = false)
     (uso.tokensCacheLeitura * preco.entrada * FATOR_CACHE_LEITURA) / 1_000_000 +
     (uso.tokensSaida * preco.saida) / 1_000_000;
 
-  return emLote ? custo * FATOR_LOTE : custo;
+  const buscas = (uso.buscasNaWeb ?? 0) * PRECO_BUSCA_WEB_USD;
+  return (emLote ? custo * FATOR_LOTE : custo) + buscas;
 }
 
 export type DadosRegistro = {

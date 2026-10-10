@@ -575,6 +575,13 @@
       "when": 1791661465704,
       "tag": "0081_pergunta-do-publico-no-roteiro",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1791670431919,
+      "tag": "0082_pesquisas-na-hora",
+      "breakpoints": true
     }
   ]
 }

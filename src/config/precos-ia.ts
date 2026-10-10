@@ -29,6 +29,15 @@ export const FATOR_CACHE_ESCRITA = 1.25;
 export const FATOR_LOTE = 0.5;
 
 /**
+ * E54: busca na web do lado da Anthropic, US$ 10 por 1.000 buscas (US$ 0,01 cada), alem dos tokens. No lote custa o mesmo
+ * (o desconto do lote nao vale para a busca). Conferido em `estrategia/referencia-sdk-anthropic.md`, secao "Busca na web".
+ */
+export const PRECO_BUSCA_WEB_USD = 0.01;
+export const DATA_PRECO_BUSCA_WEB = "2026-10-06";
+/** O conteudo achado entra como entrada: no exemplo da documentacao, uma busca gerou uns 6.000 tokens (so para a estimativa na tela). */
+export const TOKENS_DE_ENTRADA_POR_BUSCA = 6_000;
+
+/**
  * Preco da transcricao pela Groq (etapa 8, ajuste da revisao pedido na
  * etapa 9: nao ha tabela dedicada para isso, so essa constante). Confirmado
  * em console.groq.com/docs/model/whisper-large-v3-turbo em 03/09/2026.
