@@ -1,103 +1,29 @@
-import { Music, Scissors, Type, Eye, Sparkles, HelpCircle } from "lucide-react";
 import { notFound } from "next/navigation";
 
-import { fichaDoRoteiro, ROTULO_PARA_QUE } from "@/config/fichas";
-import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
-import { ROTULO_FIGURINHA } from "@/ia/enums";
+import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { validarTokenImpressao } from "@/lib/tokenImpressao";
-import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
-import { textosRoteiro } from "@/textos/roteiro";
-import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
-import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
-import { RoteiroTexto } from "@/ui/componentes/RoteiroTexto";
+import { clientePorId } from "@/servicos/clientes";
+import { folhaDoRoteiro } from "@/servicos/folha-do-roteiro";
+import { videoPorId } from "@/servicos/pesquisa";
+import { roteiroPorId } from "@/servicos/roteiro";
 
-import styles from "./ImpressaoRoteiro.module.css";
+import { FolhaA4, QuadroDoCelular } from "./FolhaImpressa";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string }> };
-type Edicao = ReturnType<typeof corpoDoRoteiro>["edicao"];
-
-function formatarData(dataISO: string): string {
-  return new Intl.DateTimeFormat("pt-BR", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "America/Sao_Paulo",
-  }).format(new Date(`${dataISO}T12:00:00`));
-}
-
-/** Mesma composição de `RoteiroTela.tsx`, item a item (sem depender da tela em si). */
-function itensEdicao(edicao: Edicao): ItemEdicao[] {
-  const textoNaTela =
-    edicao.textoNaTela.length > 0
-      ? edicao.textoNaTela.map((item) => `${item.quando}, "${item.oQue}", ${item.onde}`).join("; ")
-      : textosRoteiro.edicao.semTexto;
-  const recursos =
-    edicao.recursos.length > 0 ? edicao.recursos.join("; ") : textosRoteiro.edicao.semRecurso;
-
-  return [
-    { icone: Type, rotulo: textosRoteiro.edicao.texto, texto: textoNaTela },
-    { icone: Scissors, rotulo: textosRoteiro.edicao.corte, texto: edicao.ritmoDeCorte },
-    { icone: Eye, rotulo: textosRoteiro.edicao.recursos, texto: recursos },
-    {
-      icone: Music,
-      rotulo: textosRoteiro.edicao.audio,
-      texto: edicao.audio ?? textosRoteiro.edicao.semAudio,
-    },
-  ];
-}
-
-/** Mesma composição de `RoteiroTela.tsx`, item a item (V9c, item 4). */
-function itensCartaoStory(cartao: CartaoStory): ItemEdicao[] {
-  return [
-    { icone: Eye, rotulo: textosRoteiro.cartaoStory.oQueMostrar, texto: cartao.oQueMostrar },
-    { icone: Type, rotulo: textosRoteiro.cartaoStory.textoNaTela, texto: cartao.textoNaTela },
-    {
-      icone: Sparkles,
-      rotulo: textosRoteiro.cartaoStory.figurinha,
-      texto:
-        cartao.figurinha === "nenhuma"
-          ? textosRoteiro.cartaoStory.semFigurinha
-          : ROTULO_FIGURINHA[cartao.figurinha],
-    },
-  ];
-}
-
-function itensPorQueAssim(porQueAssim: ConteudoRoteiro["porQueAssim"]): ItemEdicao[] {
-  return porQueAssim.map((item) => ({
-    icone: HelpCircle,
-    rotulo: "",
-    texto: item.motivo,
-    mono: item.regra,
-  }));
-}
-
-/** Mesma composição de `RoteiroTela.tsx`, item a item (M4, item 5): nunca "o que falar" nem figurinha. */
-function itensCartaoSemFala(cartao: CartaoStory): ItemEdicao[] {
-  return [
-    { icone: Eye, rotulo: textosRoteiro.cartaoSemFala.oQueMostrar, texto: cartao.oQueMostrar },
-    { icone: Type, rotulo: textosRoteiro.cartaoSemFala.textoNaTela, texto: cartao.textoNaTela },
-  ];
-}
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string; formato?: string }> };
 
 /**
- * A página que o Playwright abre para virar PDF (rota `/api/roteiros/[id]/pdf`,
- * achado do primeiro uso no iPad, item 5): fora de `(painel)/`, sem sidebar
- * nem barra de ações, só o roteiro no visual do painel (tokens e fontes do
- * `layout.tsx` raiz, que continuam valendo aqui). Uma página só de leitura,
- * sem a referência (o cartão manda abrir o vídeo numa aba, o que não faz
- * sentido no papel) nem outros estados da tela; título, objetivo, duração,
- * gancho, corpo, fechamento, chamada final, cenas e o bloco de edição, que é
- * o que sobra para o cliente seguir gravando com o papel na mão.
+ * A página que o Playwright abre para virar PDF (rota `/api/roteiros/[id]/pdf`, `formato=a4`) ou imagem para o celular (rota `/api/roteiros/[id]/imagem`, `formato=celular`), E26, passo 23 do
+ * Opus: fora de `(painel)/`, sem barra lateral nem barra de ações, só o roteiro no visual do painel (tokens e fontes do `layout.tsx` raiz, que continuam valendo aqui). Uma página só de
+ * leitura, a mesma folha nos dois formatos (`folhaDoRoteiro`): o nome da marca da pessoa e a data no alto (sem a marca do aplicativo, regra 3), o título, o recado do vídeo, o roteiro em
+ * blocos com o tempo, "Como editar" e "De onde veio" com o link no segundo.
  *
- * Só abre com o token de impressão (`tokenImpressao.ts`): não existe fluxo
- * de sessão de navegador para esta rota, ela nasce e morre dentro da mesma
- * requisição do servidor que gera o PDF.
+ * Só abre com o token de impressão (`tokenImpressao.ts`): não existe fluxo de sessão de navegador para esta rota, ela nasce e morre dentro da mesma requisição do servidor que gera o arquivo.
  */
 export default async function ImprimirRoteiro({ params, searchParams }: Props) {
   const { id } = await params;
-  const { token } = await searchParams;
-  const roteiroId = Number(id);
-  if (!Number.isFinite(roteiroId) || !token) notFound();
+  const { token, formato } = await searchParams;
+  const roteiroId = idDaRotaOuNulo(id);
+  if (roteiroId === null || !token) notFound();
 
   const validado = validarTokenImpressao(token, roteiroId);
   if (!validado) notFound();
@@ -105,56 +31,11 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
   const roteiro = await roteiroPorId(roteiroId, validado.clienteId);
   if (!roteiro) notFound();
 
-  const corpo = corpoDoRoteiro(roteiro);
+  const [cliente, video] = await Promise.all([
+    clientePorId(validado.clienteId),
+    roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
+  ]);
+  const folha = folhaDoRoteiro(roteiro, cliente?.nome ?? "", video);
 
-  return (
-    <main className={styles.pagina}>
-      <header className={styles.cabecalho}>
-        <h1 className={styles.titulo}>{corpo.titulo}</h1>
-        <p className={styles.meta}>
-          {roteiro.formato !== "story" ? <span>{ROTULO_PARA_QUE[fichaDoRoteiro(roteiro)]}</span> : null}
-          <span>{corpo.duracaoS} s</span>
-          <span>{formatarData(roteiro.data)}</span>
-        </p>
-      </header>
-
-      <RoteiroTexto blocos={blocosParaLeitura(roteiro)} />
-
-      <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} />
-
-      {roteiro.estilo === "sem_fala" && corpo.cartoes ? (
-        corpo.cartoes.map((cartao, indice) => (
-          <BlocoEdicao
-            key={indice}
-            titulo={textosRoteiro.blocos.cena(indice + 1, corpo.cartoes!.length)}
-            itens={itensCartaoSemFala(cartao)}
-          />
-        ))
-      ) : roteiro.formato === "story" && corpo.cartoes ? (
-        corpo.cartoes.map((cartao, indice) => (
-          <BlocoEdicao
-            key={indice}
-            titulo={textosRoteiro.blocos.story(indice + 1, corpo.cartoes!.length)}
-            itens={itensCartaoStory(cartao)}
-          />
-        ))
-      ) : (
-        <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
-      )}
-
-      {corpo.legenda ? (
-        <BlocoEdicao
-          titulo={textosRoteiro.legenda}
-          itens={[{ icone: Type, rotulo: "", texto: corpo.legenda }]}
-        />
-      ) : null}
-
-      {corpo.porQueAssim.length > 0 ? (
-        <BlocoEdicao
-          titulo={textosRoteiro.porQueAssim}
-          itens={itensPorQueAssim(corpo.porQueAssim)}
-        />
-      ) : null}
-    </main>
-  );
+  return formato === "celular" ? <QuadroDoCelular folha={folha} /> : <FolhaA4 folha={folha} />;
 }

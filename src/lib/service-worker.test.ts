@@ -297,6 +297,7 @@ describe("o que NUNCA guarda", () => {
     redeResponde();
 
     expect((await sw.pedir("/api/roteiros/5/pdf")).interceptou).toBe(false);
+    expect((await sw.pedir("/api/roteiros/5/imagem")).interceptou).toBe(false);
     expect((await sw.pedir("/api/saude", { mode: "cors" })).interceptou).toBe(false);
   });
 
