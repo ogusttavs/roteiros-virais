@@ -15,8 +15,14 @@ export const textosRoteiro = {
   /** Só aparece quando o segundo é maior que zero (achado do primeiro uso no iPad, item 2). */
   trechoComeca: (t: string) => `O trecho que interessa começa em ${t}`,
   outrasVersoes: "Outras versões deste tema",
-  outrasVersoesEmBreve:
-    "Em breve você vai poder comparar até três versões com nota antes de escolher qual gravar.",
+  /** E26 4b: o roteiro que veio de uma comparação diz que as outras versões continuam guardadas; o que não veio de uma diz onde elas ficam. */
+  outrasVersoesGuardadas: (total: number) => {
+    const palavras = ["", "", "duas", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"];
+    const quantas = palavras[total] || String(total);
+    return `Você recebeu ${quantas} versões deste tema e ficou com esta. ${total - 1 === 1 ? "A outra continua guardada" : `As outras ${palavras[total - 1] || total - 1} continuam guardadas`}, com as notas.`;
+  },
+  outrasVersoesSemComparacao: "Quando você pede um roteiro pelo Criar, as versões que não escolher ficam guardadas aqui.",
+  verAsOutrasVersoes: "Ver as outras versões",
   blocos: {
     abertura: "Os 3 primeiros segundos",
     meio: "O meio",

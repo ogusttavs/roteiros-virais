@@ -245,6 +245,8 @@ type Props = {
   versoes: VersaoRoteiro[];
   /** E55 PR 2b: o assunto em alta de onde o roteiro nasceu (nulo nos outros): o selo, a linha de prazo ou o aviso de que passou, e o "De onde veio" próprio. */
   momento?: MomentoDoRoteiro | null;
+  /** E26 4b: o grupo de versões de que o roteiro nasceu (e quantas tinha); nulo nos que não vieram de uma comparação. */
+  grupoDeVersoes?: { grupo: string; total: number } | null;
   /** E53 (parte 3): a notícia de onde o roteiro veio (do setor ou de um assunto da marca), com o link revalidado; nula nos outros. */
   noticiaDeOrigem?: { titulo: string; veiculo: string; url: string | null; dia: string | null } | null;
   /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
@@ -267,6 +269,7 @@ export function RoteiroTela({
   video,
   versoes,
   momento = null,
+  grupoDeVersoes = null,
   noticiaDeOrigem = null,
   marcaAtiva,
   marcas,
@@ -1072,11 +1075,19 @@ export function RoteiroTela({
           </section>
         ) : null}
 
-        {/* Outras versões deste tema (design v2): a comparação com nota é a E26, ainda não construída.
-            Só a marcação, no estado vazio (PROXIMO.md, D2 parte 1, item 6). */}
+        {/* Outras versões deste tema (design v2; E26 4b): as que a pessoa não escolheu continuam guardadas, com as notas, na tela de comparar. */}
         <section className={styles.versoesVazio}>
           <h2>{textosRoteiro.outrasVersoes}</h2>
-          <p>{textosRoteiro.outrasVersoesEmBreve}</p>
+          {grupoDeVersoes ? (
+            <>
+              <p>{textosRoteiro.outrasVersoesGuardadas(grupoDeVersoes.total)}</p>
+              <Link className={styles.linkVersoes} href={`/criar/versoes/${grupoDeVersoes.grupo}`}>
+                {textosRoteiro.verAsOutrasVersoes}
+              </Link>
+            </>
+          ) : (
+            <p>{textosRoteiro.outrasVersoesSemComparacao}</p>
+          )}
         </section>
         </div>
       </div>

@@ -1,0 +1,431 @@
+/*
+ * `/criar/versoes/[grupo]` (E26 4b, parte 2; `entrega/telas/Objetivo.dc.html`, estados `comparar`, `gerandoOutra` e `quatroVersoes`).
+ * O roteiro inteiro de cada versão, não só o começo: é o que a pessoa compara. Do 1180 para cima, três colunas (com mais de três, o trilho rola de lado com três à vista); do tablet em pé ao
+ * deitado, folhas que passam de lado; no celular, lista: o roteiro de cada versão recolhido, uma aberta por vez.
+ */
+
+.pagina {
+  display: grid;
+  gap: var(--espaco-5);
+  min-width: 0;
+  padding-bottom: var(--espaco-10);
+}
+
+/* O tema e o objetivo que a pessoa escolheu continuam à vista, na largura da lista. */
+.tema {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-5);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  min-width: 0;
+}
+
+.rotulo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rotulo);
+  letter-spacing: var(--espacamento-rotulo);
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+}
+
+.temaTitulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.formato,
+.paraQue {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+/* No celular o tema encolhe para o título e o objetivo: as folhas é que precisam da tela. */
+@media (max-width: 767px) {
+  .formato {
+    display: none;
+  }
+
+  .tema {
+    gap: var(--espaco-1);
+    padding: var(--espaco-4);
+  }
+}
+
+.titulo {
+  margin: 0;
+  font-family: var(--fonte-titulo);
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-titulo);
+  color: var(--cor-titulo);
+}
+
+.resumoOrdem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.resumoOrdem p {
+  flex: 1 1 16rem;
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.link {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-acao);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ---------- o trilho das folhas ---------- */
+
+.trilho {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: calc(100% - var(--espaco-8));
+  gap: var(--espaco-3);
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  margin-inline: calc(var(--margem-celular) * -1);
+  padding: var(--espaco-1) var(--margem-celular) var(--espaco-2);
+  scroll-padding-inline: var(--margem-celular);
+  align-items: start;
+}
+
+.trilho::-webkit-scrollbar {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .trilho {
+    grid-auto-columns: 21rem;
+    margin-inline: 0;
+    padding-inline: 0;
+    scroll-padding-inline: 0;
+  }
+}
+
+@media (min-width: 1180px) {
+  .trilho {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
+  }
+
+  .trilhoMaisDeTres {
+    grid-auto-flow: column;
+    grid-template-columns: none;
+    grid-auto-columns: calc((100% - 2 * var(--espaco-3)) / 3 - 2rem);
+    overflow-x: auto;
+  }
+}
+
+/* No celular: lista, não folhas de lado. Cada versão mostra o nome e a nota; o roteiro abre num toque, uma por vez, e "Ficar com esta" vem com ele. */
+@media (max-width: 767px) {
+  .trilho {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    overflow: visible;
+    scroll-snap-type: none;
+    margin-inline: 0;
+    padding: 0;
+  }
+}
+
+.folha {
+  display: grid;
+  gap: var(--espaco-4);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-5);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  scroll-snap-align: start;
+}
+
+.escolhida {
+  border-color: var(--cor-acao);
+  background: var(--cor-selecao-suave);
+}
+
+.cabeca {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-2);
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  padding: 2px var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-legenda);
+  font-weight: var(--peso-semibold);
+}
+
+.folha h3 {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.destaque {
+  display: grid;
+  gap: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.marcaEscolha {
+  font-size: var(--tamanho-legenda);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-destaque);
+}
+
+.semNota {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.notasLeves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-1) var(--espaco-4);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.notasLeves b {
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.lerVersao {
+  display: none;
+}
+
+.roteiro {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: var(--espaco-3) 0 0;
+  list-style: none;
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.roteiro li {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.tempo {
+  justify-self: start;
+  padding: 3px 6px;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-titulo);
+  font: var(--peso-semibold) var(--tamanho-legenda) / 1 var(--fonte-mono);
+}
+
+.nomeDoBloco {
+  font-size: var(--tamanho-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.roteiro p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
+.angulo {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.angulo strong {
+  color: var(--cor-titulo);
+}
+
+.acao {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .acao {
+    display: grid;
+    justify-items: start;
+  }
+}
+
+.abrindo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  color: var(--cor-destaque);
+  font-weight: var(--peso-semibold);
+}
+
+@media (max-width: 767px) {
+  .lerVersao {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--espaco-2);
+    justify-self: start;
+    min-height: var(--altura-toque);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font-family: var(--fonte-texto);
+    font-size: var(--tamanho-secundario);
+    font-weight: var(--peso-semibold);
+    color: var(--cor-titulo);
+    cursor: pointer;
+  }
+
+  .folha:not(.aberta) .roteiro,
+  .folha:not(.aberta) .angulo,
+  .folha:not(.aberta) .acao {
+    display: none;
+  }
+
+  .folha.aberta .acao {
+    display: grid;
+  }
+}
+
+/* A versão sendo escrita: a claquete pequena e o esqueleto do roteiro. */
+.escrevendo {
+  justify-items: start;
+}
+
+.escrevendo p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.esqueleto {
+  display: block;
+  width: 100%;
+  height: 1rem;
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+}
+
+.pontos {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.pontos i {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-borda-forte);
+}
+
+.pontos i.agora {
+  width: 1.25rem;
+  background: var(--cor-acao);
+}
+
+.pontos .qual {
+  margin-left: var(--espaco-2);
+}
+
+@media (max-width: 767px) {
+  .pontos {
+    display: none;
+  }
+}
+
+@media (min-width: 1180px) {
+  .pontosSoAteTres {
+    display: none;
+  }
+}
+
+.maisVersoes {
+  display: grid;
+  gap: var(--espaco-3);
+  justify-items: start;
+  padding: var(--espaco-5);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+}
+
+.maisVersoes h2 {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+}
+
+.acoesDoFim {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-3);
+}
+
+/* O que só o leitor de tela precisa ouvir. */
+.somenteLeitor {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.maisVersoes p {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.erro {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-atencao);
+}

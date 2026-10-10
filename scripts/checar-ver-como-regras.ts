@@ -14,6 +14,7 @@ export const LEITURA_LIVRE: Record<string, string> = {
   "src/app/(painel)/(completo)/criar/objetivo/acoes.ts:exemplosDaFichaAction": "só lê os exemplos do setor",
   "src/app/(painel)/(completo)/criar/objetivo/acoes.ts:sugerirEstiloAction": "só lê a sugestão de estilo pela evidência",
   "src/app/(painel)/(completo)/hoje/acoes.ts:roteiroRecenteDesdeAction": "só lê se há roteiro recente",
+  "src/app/(painel)/(completo)/hoje/acoes.ts:grupoRecenteDesdeAction": "só lê se há versões recentes",
   "src/app/(painel)/_briefing/acoes.ts:listarPerfisCitadosAction": "só lê os perfis citados",
   "src/app/(painel)/_casca/push-acoes.ts:inscricaoRegistradaAction": "só lê se a pessoa tem aquela inscrição de push",
   "src/app/(painel)/_casca/ver-como-acoes.ts:sairDoVerComoAction": "é a própria saída do modo",

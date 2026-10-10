@@ -12,7 +12,7 @@ import * as registro from "@/ia/registro";
 import * as verificador from "@/ia/verificador";
 import { config, hojeISO } from "@/lib/config";
 import { ErroRoteiro, gerarRoteiro, roteirosDoCliente } from "@/servicos/roteiro";
-import { ficarComVersao, gerarOutraVersao, gerarVersoes, gruposEmAberto, notaDoObjetivo, ordenarVersoes, versoesDoGrupo, type VersaoDoGrupo } from "@/servicos/versoes";
+import { enderecoParaTrocarOObjetivo, ficarComVersao, gerarOutraVersao, gerarVersoes, grupoDoRoteiro, grupoEmAberto, notaDoObjetivo, ordenarVersoes, paraVersaoDaTela, versoesDoGrupo, type VersaoDoGrupo } from "@/servicos/versoes";
 import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -92,6 +92,7 @@ function versaoFalsa(ordem: number, n: ReturnType<typeof notas> | null): VersaoD
     ordem,
     tema: "t",
     objetivo: "conversao",
+    ficha: null,
     formato: "reels",
     estilo: "falado",
     conteudo: {} as VersaoDoGrupo["conteudo"],
@@ -452,25 +453,85 @@ describe("gerarOutraVersao", () => {
   });
 });
 
-describe("gruposEmAberto", () => {
-  it("lista os grupos da marca em que nada virou roteiro, o mais novo primeiro, e some com o grupo que a pessoa resolveu", async () => {
+describe("grupoEmAberto", () => {
+  /** "Daqui a dez minutos": o grupo de uma versão só deixa de ser "ainda escrevendo" (a segunda falhou). */
+  const depois = () => new Date(Date.now() + 10 * 60_000);
+
+  it("é o grupo mais novo da marca, se a pessoa não ficou com nenhuma versão dele; os mais velhos foram abandonados", async () => {
     const primeiro = await gerarVersoes(clienteId, pedido(`${TEMA} um`), 2);
     const segundo = await gerarVersoes(clienteId, pedido(`${TEMA} dois`), 3);
     await gerarVersoes(outraMarcaId, pedido(`${TEMA} da outra`), 1);
 
-    const abertos = await gruposEmAberto(clienteId);
-    expect(abertos.map((g) => g.grupo)).toEqual([segundo.grupo, primeiro.grupo]);
-    expect(abertos[0]).toMatchObject({ tema: expect.stringContaining("dois"), objetivo: "conversao", quantidade: 3 });
-    expect(abertos[1].quantidade).toBe(2);
+    const aberto = await grupoEmAberto(clienteId);
+    expect(aberto).toMatchObject({ grupo: segundo.grupo, tema: expect.stringContaining("dois"), objetivo: "conversao", quantidade: 3, emEscrita: false });
 
+    // Ficar com uma do mais novo fecha: o mais velho, que ficou sem escolha, não volta no lugar dele ("Trocar o objetivo" deixa um grupo abandonado).
+    await ficarComVersao(clienteId, segundo.versoes[0].id);
+    expect(await grupoEmAberto(clienteId)).toBeNull();
+    // Escolher no mais velho não muda quem é o mais novo.
     await ficarComVersao(clienteId, primeiro.versoes[0].id);
-    expect((await gruposEmAberto(clienteId)).map((g) => g.grupo)).toEqual([segundo.grupo]);
+    expect(await grupoEmAberto(clienteId)).toBeNull();
+  });
+
+  it("um grupo com menos de três versões e a última de agora ainda está sendo escrito; passados alguns minutos é o que deu certo", async () => {
+    const { grupo } = await gerarVersoes(clienteId, pedido(TEMA), 2);
+
+    expect(await grupoEmAberto(clienteId)).toMatchObject({ grupo, quantidade: 2, emEscrita: true });
+    expect(await grupoEmAberto(clienteId, depois())).toMatchObject({ grupo, quantidade: 2, emEscrita: false });
+  });
+
+  it("um grupo resolvido que ganhou 'Gerar outra' depois não volta como aberto, mesmo com as versões antigas fora da janela", async () => {
+    const { grupo, versoes } = await gerarVersoes(clienteId, pedido(TEMA), 3);
+    await ficarComVersao(clienteId, versoes[0].id);
+    // As três antigas ficam velhas; a nova (de agora) é a única dentro da janela de dois dias.
+    await db().update(versoesDoRoteiro).set({ criadoEm: new Date(Date.now() - 3 * 86_400_000) }).where(eq(versoesDoRoteiro.grupo, grupo));
+    await gerarOutraVersao(clienteId, grupo);
+
+    expect(await grupoEmAberto(clienteId)).toBeNull();
   });
 
   it("o grupo de três dias atrás já não é 'em aberto'", async () => {
-    const { grupo } = await gerarVersoes(clienteId, pedido(), 1);
+    const { grupo } = await gerarVersoes(clienteId, pedido(TEMA), 3);
     await db().update(versoesDoRoteiro).set({ criadoEm: new Date(Date.now() - 3 * 86_400_000) }).where(eq(versoesDoRoteiro.grupo, grupo));
-    expect(await gruposEmAberto(clienteId)).toEqual([]);
+    expect(await grupoEmAberto(clienteId)).toBeNull();
+  });
+});
+
+describe("paraVersaoDaTela", () => {
+  it("a versão sem nota e de agora é 'nota em andamento'; a de uns minutos atrás é 'o juiz falhou'; a com nota nunca", async () => {
+    const original = vi.mocked(cliente.gerarEstruturado).getMockImplementation()!;
+    vi.mocked(cliente.gerarEstruturado).mockImplementation(async (params) => {
+      if (params.tarefa === "notaDaVersao") throw new Error("juiz fora do ar");
+      return original(params);
+    });
+    try {
+      const { versoes } = await gerarVersoes(clienteId, pedido(TEMA), 1);
+      expect(paraVersaoDaTela(versoes[0]).notaEmAndamento).toBe(true);
+      expect(paraVersaoDaTela(versoes[0], new Date(Date.now() + 10 * 60_000)).notaEmAndamento).toBe(false);
+    } finally {
+      vi.mocked(cliente.gerarEstruturado).mockImplementation(original);
+    }
+    const { versoes: comNota } = await gerarVersoes(clienteId, pedido(`${TEMA} com nota`), 1);
+    expect(paraVersaoDaTela(comNota[0]).notaEmAndamento).toBe(false);
+  });
+});
+
+describe("enderecoParaTrocarOObjetivo", () => {
+  const hoje = new Date();
+  const ontem = new Date(Date.now() - 36 * 3_600_000);
+
+  it("o tema do dia volta pelo índice só quando o grupo é de hoje; de outro dia volta pelo texto do tema", () => {
+    const pedidoSugerido = { origem: "sugerido" as const, temaIndice: 2, objetivo: "conversao" as const };
+    expect(enderecoParaTrocarOObjetivo(pedidoSugerido, { tema: "o erro da mancha", criadoEm: hoje })).toBe("/criar/objetivo?tema=2");
+    expect(enderecoParaTrocarOObjetivo(pedidoSugerido, { tema: "o erro da mancha", criadoEm: ontem })).toBe("/criar/objetivo?livre=o+erro+da+mancha");
+    // O assunto em alta volta pela chave dele, que não depende do dia.
+    expect(enderecoParaTrocarOObjetivo({ ...pedidoSugerido, temaChave: "frente fria" }, { tema: "x", criadoEm: ontem })).toBe("/criar/objetivo?momento=frente+fria");
+  });
+
+  it("o dia que já passou não vai para a tela do objetivo (ela recusa data no passado); o de hoje ou de depois vai", () => {
+    const livre = { origem: "livre" as const, textoTema: "mancha", objetivo: "conversao" as const };
+    expect(enderecoParaTrocarOObjetivo({ ...livre, data: "2020-01-01" }, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha");
+    expect(enderecoParaTrocarOObjetivo({ ...livre, data: hojeISO() }, { tema: "mancha", criadoEm: hoje })).toBe(`/criar/objetivo?livre=mancha&data=${hojeISO()}`);
   });
 });
 
@@ -558,6 +619,19 @@ describe("ficarComVersao", () => {
     const segundo = await ficarComVersao(clienteId, versoes[0].id);
     expect(segundo.id).not.toBe(primeiro.id);
     expect(await db().select().from(roteiros)).toHaveLength(1);
+  });
+
+  it("o roteiro diz de que grupo nasceu e quantas versões ele tinha; o avulso e o de outra marca, não", async () => {
+    const { grupo, versoes } = await gerarVersoes(clienteId, pedido(), 3);
+    const roteiro = await ficarComVersao(clienteId, versoes[1].id);
+    expect(await grupoDoRoteiro(clienteId, roteiro.id)).toEqual({ grupo, total: 3 });
+    // Mais uma versão no grupo entra na conta.
+    await gerarOutraVersao(clienteId, grupo);
+    expect(await grupoDoRoteiro(clienteId, roteiro.id)).toEqual({ grupo, total: 4 });
+    // O roteiro que não veio de uma comparação, e o roteiro visto por outra marca.
+    const avulso = await gerarRoteiro(clienteId, pedido(`${TEMA} avulso`));
+    expect(await grupoDoRoteiro(clienteId, avulso.id)).toBeNull();
+    expect(await grupoDoRoteiro(outraMarcaId, roteiro.id)).toBeNull();
   });
 
   it("dois pedidos ao mesmo tempo criam um roteiro só", async () => {
