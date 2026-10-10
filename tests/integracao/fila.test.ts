@@ -32,7 +32,7 @@ describe("opcoesDaFila", () => {
   });
 
   it("job curto: 2 repeticoes com espera crescente e o prazo de 15 minutos", () => {
-    for (const nome of [FILAS.lembrete, FILAS.curvaCliente, FILAS.emailAcompanhamento, FILAS.aprenderCliente]) {
+    for (const nome of [FILAS.lembrete, FILAS.curvaCliente, FILAS.emailAcompanhamento, FILAS.faxinaVersoes, FILAS.aprenderCliente]) {
       expect(opcoesDaFila(nome)).toEqual({ retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60 });
     }
   });
