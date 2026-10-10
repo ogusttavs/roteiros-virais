@@ -596,6 +596,9 @@ function mockTemasDoDia(entrada: string) {
   const ids = extrairIds(entrada);
   const idsNoticias = extrairIdsNoticias(entrada);
   const puxaPara = ["alcance", "engajamento", "conversao"] as const;
+  // E28: com o bloco das vozes do público, o primeiro tema responde à primeira pergunta da lista; o marcador manda um número que não existe.
+  const numerosDasVozes = [...entrada.matchAll(/^(?:pergunta|reclamação|pedido) (\d+) \|/gm)].map((m) => Number(m[1]));
+  const perguntaDoPrimeiro = entrada.includes("[mock:numero-inexistente]") ? 99 : (numerosDasVozes[0] ?? null);
 
   if (entrada.includes(MARCADOR_EVIDENCIA_INVENTADA_TEMA)) {
     return {
@@ -622,6 +625,7 @@ function mockTemasDoDia(entrada: string) {
       evidencias: ids,
       evidenciasNoticias: idsNoticias.length > 0 ? [idsNoticias[i % idsNoticias.length]] : [],
       puxaPara: puxaPara[i],
+      perguntaNumero: i === 0 ? perguntaDoPrimeiro : null,
     })),
   };
 }

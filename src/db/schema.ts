@@ -1519,6 +1519,18 @@ export type TemaDoDia = {
   /** objetivo que o tema puxa mais: alcance, engajamento ou conversao (taxonomia interna, escopo 4.3) */
   puxaPara: "alcance" | "engajamento" | "conversao";
   /**
+   * E28: a pergunta (ou reclamação, ou pedido) do público que o tema responde, nascida dos comentários de vídeos do YouTube do setor.
+   * Guardada como a vimos na hora (a frase, quantos comentários, de que plataformas), com a chave para achar a voz de novo; o tema
+   * continua com a prova de vídeo de sempre. Opcional: temas de antes e setores sem vozes não têm.
+   */
+  perguntaDoPublico?: {
+    chave: string;
+    tipo: "duvida" | "objecao" | "pedido";
+    texto: string;
+    vezes: number;
+    plataformas: Plataforma[];
+  };
+  /**
    * E55: o tema "do momento", nascido de um assunto em alta no Brasil (`tendencias_brasil`). É para o mesmo dia: só vale enquanto o assunto continua na lista do que está em alta, some do Hoje e
    * do Criar quando sai, e não vai para outro dia. Guarda de onde veio (o assunto, as palavras dele e a fonte) para conferir se ele ainda vale.
    */

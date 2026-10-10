@@ -81,6 +81,7 @@ import {
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { temasParaCliente } from "./temas";
 import { assuntoEmAltaDaLista, type AssuntoEmAlta } from "./tendencias";
+import { vozesDoSetor, vozesParaOPrompt } from "./vozes-do-publico";
 
 export class ErroRoteiro extends Error {}
 
@@ -983,6 +984,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     regrasCliente,
     ultimosRoteirosDoBanco,
     marcaCitada,
+    vozesDoSetorAtual,
   ] = await Promise.all([
     // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
     ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos, formatosDaMarca),
@@ -994,6 +996,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     regrasAtivasDoCliente(dados.clienteId),
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
+    // E28: o que o público do setor perguntou nos comentários de vídeos do YouTube esta semana (vazio sem leitura ou com a leitura velha).
+    vozesDoSetor(nichoId),
   ]);
 
   // E26 (4b): as versões deste mesmo tema já escritas agora entram na frente do que o banco lembra (elas ainda não são roteiro), a mais recente primeiro, como as listas do banco: o
@@ -1109,6 +1113,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     casadasDoAssunto,
   );
 
+  // E28: até 3 dúvidas, 2 reclamações e 2 pedidos, só os que passaram do piso de comentários iguais.
+  const vozesDoPublico = vozesParaOPrompt(vozesDoSetorAtual);
+
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
@@ -1174,6 +1181,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       noticia: dados.noticia,
       noticiasDoAssunto,
       temaDoMomento: dados.temaDoMomento,
+      vozesDoPublico,
     }),
     // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
     fontesDosFatos: roteiroIA.montarFontesDosFatos({
@@ -1189,6 +1197,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       marcaCitada,
       noticiasDoAssunto,
       evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
+      vozesDoPublico,
     }),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
