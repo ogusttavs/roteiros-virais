@@ -43,6 +43,9 @@ type Props = {
    * e voltar depois é seguro; sem isto, o botão não aparece.
    */
   aoVoltarDepois?: () => void;
+  /** E26 4b: o título e o prazo de quem escreve as três versões (o padrão é o do roteiro único). */
+  titulo?: string;
+  duracao?: string;
 };
 
 /**
@@ -58,6 +61,8 @@ export function ConteudoTelaEscrevendo({
   demorando,
   frase,
   segundosDecorridos,
+  titulo = textosComuns.esperaTitulo,
+  duracao = textosComuns.esperaDuracao,
 }: {
   fraseDemorando: string;
   erro: string | null;
@@ -66,6 +71,8 @@ export function ConteudoTelaEscrevendo({
   demorando: boolean;
   frase: string;
   segundosDecorridos: number;
+  titulo?: string;
+  duracao?: string;
 }) {
   return (
     <div className={styles.tela} role="status" aria-live="polite">
@@ -82,9 +89,9 @@ export function ConteudoTelaEscrevendo({
           </>
         ) : (
           <>
-            <h2 className={styles.titulo}>{textosComuns.esperaTitulo}</h2>
+            <h2 className={styles.titulo}>{titulo}</h2>
             <p className={styles.frase}>{frase}</p>
-            <p className={styles.duracao}>{textosComuns.esperaDuracao}</p>
+            <p className={styles.duracao}>{duracao}</p>
             {/*
               R1, item 0b: o contador não é anunciado a cada segundo (o `role="status"` da tela
               inteira já é `aria-live="polite"`; `aria-live="off"` aqui, mais específico, sobrepõe
@@ -113,7 +120,7 @@ export function ConteudoTelaEscrevendo({
  * tela inteira, sem barra de abas, no lugar do círculo girando que cada tela
  * montava sozinha antes.
  */
-export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDeNovo, aoVoltarDepois }: Props) {
+export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDeNovo, aoVoltarDepois, titulo, duracao }: Props) {
   const [indiceFrase, setIndiceFrase] = useState(0);
   const [demorando, setDemorando] = useState(false);
   const [segundosDecorridos, setSegundosDecorridos] = useState(0);
@@ -161,6 +168,8 @@ export function TelaEscrevendo({ aberto, fraseDemorando, erro = null, aoTentarDe
       demorando={demorando}
       frase={textosComuns.espera[indiceFrase]}
       segundosDecorridos={segundosDecorridos}
+      titulo={titulo}
+      duracao={duracao}
     />,
     document.body,
   );

@@ -8,7 +8,7 @@ import { hashPassword } from "better-auth/crypto";
 import { count, desc, eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, roteiros, session, temasDia, user, verComoEntradas, type TemaDoDia } from "../../src/db/schema";
+import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, roteiros, session, temasDia, user, verComoEntradas, versoesDoRoteiro, type TemaDoDia } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
@@ -88,6 +88,8 @@ test.describe("ver como", () => {
   test("o admin liga o modo, vê o painel da pessoa com a faixa, a recusa vale no servidor, e sai", async ({ page }) => {
     await entrar(page, EMAIL_ADMIN, /\/admin\/?$/);
     const roteirosAntes = (await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total;
+    // "Escrever o roteiro" escreve versões (E26 4b): é nelas que a recusa tem de aparecer como "nenhuma escrita", além do roteiro que nunca nasce.
+    const versoesAntes = (await db().select({ total: count() }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteId)))[0].total;
     const sessoesDaPessoaAntes = (await db().select({ total: count() }).from(session).where(eq(session.userId, PESSOA)))[0].total;
 
     await page.goto(`/admin/clientes/${clienteId}`);
@@ -126,6 +128,7 @@ test.describe("ver como", () => {
     await expect(page.getByText(/Desligado no modo ver como/)).toBeVisible();
     await expect(page).toHaveURL(/\/criar\/objetivo/);
     expect((await db().select({ total: count() }).from(roteiros).where(eq(roteiros.clienteId, clienteId)))[0].total).toBe(roteirosAntes);
+    expect((await db().select({ total: count() }).from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, clienteId)))[0].total).toBe(versoesAntes);
 
     // Conta: o salvar desligado, com o motivo; Sair e o aviso de manhã não aparecem.
     await page.goto("/conta");

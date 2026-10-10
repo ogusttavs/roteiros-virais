@@ -115,7 +115,7 @@ test.describe("revisão do PR #62, item 2: Voltar depois no caminho do tema não
     await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
 
-    await expect(page.getByText("Escrevendo o seu roteiro")).toBeVisible();
+    await expect(page.getByText("Escrevendo as três versões")).toBeVisible();
     const voltarDepois = page.getByRole("button", { name: "Voltar depois" });
     await expect(voltarDepois).toBeVisible({ timeout: 12_000 });
     await voltarDepois.click();

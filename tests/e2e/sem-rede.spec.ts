@@ -45,8 +45,11 @@ import { hojeISO } from "../../src/lib/config";
 import { textosConexao } from "../../src/textos/conexao";
 import { textosGravacao } from "../../src/textos/gravacao";
 import { textosNav } from "../../src/textos/nav";
+import { textosObjetivo } from "../../src/textos/objetivo";
 import { textosRoteiro } from "../../src/textos/roteiro";
 import { textosTemaLivre } from "../../src/textos/tema-livre";
+
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
 
 const SLUGS_NICHO = ["e2e-semrede-um", "e2e-semrede-dois"];
 const IDS_USUARIO = ["e2e-semrede-a", "e2e-semrede-b", "e2e-semrede-c", "e2e-semrede-d"];
@@ -506,7 +509,7 @@ test.describe("painel sem rede", () => {
     await expect(page.getByText(textosTemaLivre.tituloCompactoResultado)).toBeVisible({ timeout: 20_000 });
   });
 
-  test("gerar o roteiro: a conexao cai no meio, a frase manda olhar o Historico, e tentar de novo funciona", async ({
+  test("gerar as versoes: a conexao cai no meio, a frase manda olhar o Hoje, e tentar de novo funciona", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
@@ -517,12 +520,13 @@ test.describe("painel sem rede", () => {
     await cortarRedeNaProximaAcao(page);
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
 
-    await expect(page.getByText(textosConexao.conexaoCaiuNoMeio)).toBeVisible();
+    await expect(page.getByText(textosObjetivo.conexaoCaiuNoMeio)).toBeVisible();
     await expect(faixaSemConexao(page)).toBeVisible();
 
     await restaurarRede(page);
     await expect(faixaSemConexao(page)).toHaveCount(0);
     await page.getByRole("button", { name: "Tentar de novo" }).click();
+    await ficarComAPrimeiraVersao(page, 20_000);
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 20_000 });
   });
 

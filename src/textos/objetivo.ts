@@ -50,7 +50,12 @@ export const textosObjetivo = {
   reelsCartao: "Reels, para o Instagram, o TikTok e o Shorts",
   storyCartao: "Story, para quem já te segue",
   escrever: "escrever o roteiro",
-  demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, o roteiro vai estar em Histórico",
+  demorando: "Está demorando mais que o normal; você pode esperar ou voltar depois, as versões vão estar em Hoje",
+  /** E26 4b: a espera das três versões (a tela de espera é a mesma do roteiro único, só o título e o prazo mudam). */
+  esperaVersoesTitulo: "Escrevendo as três versões",
+  esperaVersoesDuracao: "Pode levar até 3 minutos",
+  /** E26 4b: a resposta que se perde na rede não perde as versões, que ficam em Hoje. */
+  conexaoCaiuNoMeio: "A conexão caiu no meio. Pode ser que as versões já tenham ficado prontas: olhe em Hoje antes de tentar de novo.",
   erro: "Não conseguimos escrever agora. O tema e o objetivo continuam aqui; tente de novo.",
   /** V9c, item 1: o controle segmentado Reels/Story; E49 PR 1: agora vem antes da pergunta das fichas. */
   formato: "Formato",

@@ -13,7 +13,6 @@ import { evidenciaParaRoteiro, exemplosPorFicha, setoresComPiso } from "@/servic
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import {
   ErroRoteiro,
-  gerarRoteiro,
   validarData,
   validarEstilo,
   validarFormato,
@@ -23,10 +22,12 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
+import { gerarVersoes } from "@/servicos/versoes";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
- * o segundo controle). O cliente sempre vem da sessão. `formato`, `estilo` e `quemAparece` chegam
+ * o segundo controle; E26 4b: escreve as três versões, não um roteiro, e devolve o grupo para a
+ * tela de comparar). O cliente sempre vem da sessão. `formato`, `estilo` e `quemAparece` chegam
  * como texto livre do navegador (V9d, item 2): `validarFormato`/`validarEstilo`/`validarQuemAparece`
  * conferem contra a lista antes de chegar ao banco.
  *
@@ -34,7 +35,7 @@ import {
  * (Next.js troca a mensagem de uma exceção por um texto genérico em produção); erro de outra
  * natureza (rede, bug) continua subindo, para a tela de espera cair no caminho de sempre.
  */
-export async function gerarRoteiroAction(
+export async function gerarVersoesAction(
   origem: OrigemRoteiro,
   objetivo: Objetivo,
   formato?: string,
@@ -55,14 +56,15 @@ export async function gerarRoteiroAction(
   assuntoEmAlta?: string,
   /** E53 (parte 3): o id da notícia de um assunto da marca (Tema livre `?noticiaAssuntoId=`); `gerarRoteiro` confere que é desta marca. */
   noticiaAssuntoId?: number,
-): Promise<ResultadoAcao<{ id: number }>> {
+): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
   try {
-    // O que chega do navegador é texto livre: a origem é reconstruída campo a campo (nunca espalhada, `validarOrigemDaTelaDoObjetivo`) e o objetivo é um dos três.
+    // O que chega do navegador é texto livre: a origem é reconstruída campo a campo (nunca espalhada, `validarOrigemDaTelaDoObjetivo`: "momento" é da folha "Gravar agora", que confere
+    // a marca citada) e o objetivo é um dos três.
     const origemValida = validarOrigemDaTelaDoObjetivo(origem);
-    const roteiro = await gerarRoteiro(cliente.id, {
+    const { grupo } = await gerarVersoes(cliente.id, {
       ...origemValida,
       objetivo: validarObjetivo(objetivo),
       ficha: ehFicha(ficha) ? ficha : undefined,
@@ -76,7 +78,7 @@ export async function gerarRoteiroAction(
       assuntoEmAlta: origemValida.origem === "livre" ? assuntoEmAlta : undefined,
       noticiaAssuntoId: origemValida.origem === "livre" ? noticiaAssuntoId : undefined,
     });
-    return { ok: true, dado: { id: roteiro.id } };
+    return { ok: true, dado: { grupo } };
   } catch (falha) {
     if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };

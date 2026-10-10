@@ -36,6 +36,8 @@ import {
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
+
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-roteiro@exemplo.teste";
 
@@ -186,6 +188,7 @@ test.describe("roteiro pela tela", () => {
     // Este teste cobre o fluxo classico de Reels (reprovar, versoes, PDF); Story tem o proprio em story.spec.ts.
     // E49 PR 1: o formato nao vem mais do objetivo, Reels ja e o padrao.
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await ficarComAPrimeiraVersao(page);
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();

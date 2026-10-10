@@ -18,7 +18,6 @@ import { hojeISO } from "@/lib/config";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
-import { textosConexao } from "@/textos/conexao";
 import { textosObjetivo } from "@/textos/objetivo";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
@@ -27,9 +26,9 @@ import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/Pergu
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 
-import { roteiroRecenteDesdeAction } from "../../hoje/acoes";
+import { grupoRecenteDesdeAction } from "../../hoje/acoes";
 
-import { exemplosDaFichaAction, gerarRoteiroAction, sugerirEstiloAction, type ExemploDaFicha } from "./acoes";
+import { exemplosDaFichaAction, gerarVersoesAction, sugerirEstiloAction, type ExemploDaFicha } from "./acoes";
 import styles from "./ObjetivoTela.module.css";
 
 type Props = {
@@ -123,7 +122,7 @@ export function ObjetivoTela({
   const { avisarRedeOk } = useConexao();
   /**
    * Revisão do PR #62, item 2: "Voltar depois" navegava para o Hoje, mas a transição continuava
-   * rodando, e quando `gerarRoteiroAction` terminava, o `router.push` para o roteiro disparava de
+   * rodando, e quando `gerarVersoesAction` terminava, o `router.push` para o roteiro disparava de
    * onde a pessoa estivesse (achado do Fable). Mesma ref que `FolhaGravarAgora` já usa: marcada no
    * clique, o sucesso (ou o erro) depois dela não navega nem escreve na tela mais.
    */
@@ -156,7 +155,7 @@ export function ObjetivoTela({
     const desdeMs = Date.now();
     iniciarTransicao(async () => {
       try {
-        const resultado = await gerarRoteiroAction(
+        const resultado = await gerarVersoesAction(
           origem,
           objetivo,
           formato,
@@ -177,22 +176,24 @@ export function ObjetivoTela({
           return;
         }
         avisarRedeOk();
-        router.push(`/roteiros/${resultado.dado.id}`);
+        // E26 4b: o que nasce são as três versões do tema; o roteiro só existe depois de "Ficar com esta".
+        router.push(`/criar/versoes/${resultado.dado.grupo}`);
       } catch (falha) {
         if (saiuRef.current) return;
         /**
          * R1, item 0c: a geração não depende da aba continuar aberta (o servidor termina mesmo
          * sem ninguém esperando). Uma falha que parece de rede pode ser só a resposta que não
          * voltou, não a geração que não aconteceu: antes de assumir que precisa repetir, confere
-         * se já existe um roteiro novo desta marca criado desde que a espera começou.
+         * se já existem versões novas desta marca escritas desde que a espera começou (cada versão
+         * é gravada assim que fica pronta).
          */
         if (ehFalhaDeRede(falha)) {
           try {
-            const recuperado = await roteiroRecenteDesdeAction(desdeMs);
+            const recuperado = await grupoRecenteDesdeAction(desdeMs);
             if (saiuRef.current) return;
             if (recuperado) {
               avisarRedeOk();
-              router.push(`/roteiros/${recuperado.id}`);
+              router.push(`/criar/versoes/${recuperado.grupo}`);
               return;
             }
           } catch {
@@ -200,9 +201,9 @@ export function ObjetivoTela({
           }
         }
         if (saiuRef.current) return;
-        // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir cria outro roteiro,
-        // então a frase de rede manda olhar o Histórico primeiro (V7, item 4 do PROXIMO.md).
-        setErro(tratarFalha(falha, textosObjetivo.erro, textosConexao.conexaoCaiuNoMeio));
+        // Gerar demora e o servidor pode ter terminado antes de a conexão cair: repetir escreve outras versões,
+        // então a frase de rede manda olhar o Hoje primeiro (V7, item 4 do PROXIMO.md; E26 4b: as versões prontas aparecem lá).
+        setErro(tratarFalha(falha, textosObjetivo.erro, textosObjetivo.conexaoCaiuNoMeio));
       }
     });
   }
@@ -214,7 +215,7 @@ export function ObjetivoTela({
   }
 
   if (pendente) {
-    return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} />;
+    return <TelaEscrevendo aberto fraseDemorando={textosObjetivo.demorando} aoVoltarDepois={voltarDepois} titulo={textosObjetivo.esperaVersoesTitulo} duracao={textosObjetivo.esperaVersoesDuracao} />;
   }
 
   if (erro !== null) {

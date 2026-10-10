@@ -11,6 +11,7 @@ import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAgendaDoDia, ItemAtrasado } fr
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
+import { textosVersoesNoHoje } from "@/textos/versoes";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
@@ -34,6 +35,8 @@ import { useDesfazerArquivar } from "./useDesfazerArquivar";
 
 export type AvisoBriefingAgenda = { nota: string; meta: string };
 export type ProximoMarcado = { quando: string; rotuloFormato: string };
+/** E26 4b: o grupo de versões que a pessoa pediu e ainda não resolveu (o cartão "Suas versões estão prontas"). */
+export type VersoesProntasHoje = { grupo: string; tema: string; quantidade: number; paraQue: string };
 
 /** E39b, item (a): a situação do "ainda vale?" do Reels em destaque, já resolvida pelo servidor (a
  * formatação da evidência precisa do banco, não dá para fazer no cliente). `null` quando o Reels de
@@ -57,6 +60,8 @@ type Props = {
   avisoVideoSubindo: string | null;
   /** E55 PR 2: o assunto em alta hoje trazido para o ramo da marca (só em hoje); o roteiro dele, se já criado, vem dentro do cartão e não em "Reels de hoje". */
   emAlta: DadosEmAlta | null;
+  /** E26 4b: as versões prontas e não escolhidas (só em hoje). */
+  versoesProntas: VersoesProntasHoje | null;
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
@@ -377,6 +382,7 @@ export function HojeTela({
   avisoBriefing,
   avisoVideoSubindo,
   emAlta,
+  versoesProntas,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -593,12 +599,32 @@ export function HojeTela({
             </p>
           </section>
 
+          {ehHoje && versoesProntas ? (
+            <section className={styles.secaoDia} aria-labelledby="t-versoes-prontas" data-versoes-prontas>
+              <h2 id="t-versoes-prontas">{textosVersoesNoHoje.titulo}</h2>
+              <article className={styles.cartaoVersoes}>
+                <span className={styles.seloVersoes}>{textosVersoesNoHoje.selo(versoesProntas.quantidade)}</span>
+                <h3>{versoesProntas.tema}</h3>
+                <p>{textosVersoesNoHoje.texto}</p>
+                <p className={styles.paraQueVersoes}>{versoesProntas.paraQue}</p>
+                <button
+                  type="button"
+                  className={styles.botaoPrimario}
+                  aria-busy={acao === "versoes" || undefined}
+                  onClick={() => ir("versoes", `/criar/versoes/${versoesProntas.grupo}`)}
+                >
+                  {textosVersoesNoHoje.escolher}
+                </button>
+              </article>
+            </section>
+          ) : null}
+
           {ehHoje && emAlta ? (
             <section className={styles.secaoDia} aria-labelledby="t-em-alta">
               <h2 id="t-em-alta">{textosHoje.emAlta.titulo}</h2>
               <CartaoEmAlta
                 cartao={emAlta}
-                destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 ? "principal" : "secundario"}
+                destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 && !versoesProntas ? "principal" : "secundario"}
                 ocupado={ocupado && acao === "em-alta"}
                 aoClicar={() => ir("em-alta", destinoDoCartao(emAlta))}
                 estado={emAlta.roteiro ? textosHoje.agenda.estadoReels[emAlta.roteiro.status] : undefined}
@@ -634,7 +660,16 @@ export function HojeTela({
             </section>
           ) : null}
 
-          {diaVazio && ehHoje && atrasadosVisiveis.length > 0 ? (
+          {diaVazio && ehHoje && versoesProntas && atrasadosVisiveis.length === 0 ? (
+            // Com as versões prontas o dia não está "livre", mas criar outro continua à mão: o atalho do Criar e o do Story, sem o "Nada marcado".
+            <section className={styles.diaLivre}>
+              <p>{textosVersoesNoHoje.outroTema}</p>
+              <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("criar", `/criar?data=${diaVisualizado}`)}>
+                {textosHoje.agenda.criarRoteiro}
+              </button>
+              {botaoCriarStory}
+            </section>
+          ) : diaVazio && ehHoje && atrasadosVisiveis.length > 0 ? (
             <section className={styles.diaLivre}>
               <p>{textosHoje.agenda.atrasado.foraOAtrasadoNadaMarcado}</p>
               <button type="button" className={styles.botaoSecundarioSm} onClick={() => ir("criar", `/criar?data=${diaVisualizado}`)}>

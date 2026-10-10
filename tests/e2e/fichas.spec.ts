@@ -10,6 +10,8 @@ import { db } from "../../src/db";
 import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, roteiros, temasDia, user, type TemaDoDia } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
+
 const SENHA = "ExemploSenha123";
 const ID = "e2e-fichas";
 const EMAIL = "e2e-fichas@exemplo.teste";
@@ -91,6 +93,7 @@ test.describe("as cinco fichas", () => {
     await grupo.getByRole("radio", { name: /Que me chamem/ }).click();
     await expect(grupo.getByRole("radio", { name: /Que me chamem/ })).toHaveAttribute("aria-checked", "true");
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.locator("[data-ficha-do-roteiro]")).toHaveText("Para que te chamem");
     const r = await ultimoRoteiro();
@@ -131,6 +134,7 @@ test.describe("as cinco fichas", () => {
     await expect(page.locator("[data-fichas]")).toBeVisible();
     await page.getByRole("tab", { name: "Story" }).click();
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
     await expect(page.locator("[data-ficha-do-roteiro]")).toHaveCount(0);
     const r = await ultimoRoteiro();

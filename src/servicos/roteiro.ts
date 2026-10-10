@@ -182,7 +182,7 @@ export type RoteiroLinha = typeof roteiros.$inferSelect;
  * como jargão de marketing, brief-frontend.md seção 8; o nome da coluna é
  * o termo de domínio certo em `roteiro.ts`, só não pode ecoar em tela).
  */
-export function corpoDoRoteiro(roteiro: RoteiroLinha): ConteudoRoteiro {
+export function corpoDoRoteiro(roteiro: Pick<RoteiroLinha, "conteudo">): ConteudoRoteiro {
   return roteiro.conteudo;
 }
 
@@ -281,7 +281,7 @@ function mostrarNoCartao(cartao: NonNullable<ConteudoRoteiro["cartoes"]>[number]
  * `/roteiros/[id]/gravar` e `/roteiros/[id]/imprimir`.
  */
 export function blocosParaLeitura(
-  roteiro: RoteiroLinha,
+  roteiro: Pick<RoteiroLinha, "conteudo" | "estilo" | "formato">,
 ): { rotulo: string; paragrafos: string[]; mostrar?: string[]; cenas?: { momento: string; oQueFazer: string }[] }[] {
   const corpo = corpoDoRoteiro(roteiro);
   /**
