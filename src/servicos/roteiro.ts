@@ -15,9 +15,11 @@ import { formatoPorChave } from "@/config/formatos";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { db } from "@/db";
 import {
+  clientes,
   ESTILOS_ROTEIRO,
   FORMATOS_ROTEIRO,
   geracoesIA,
+  membrosMarca,
   MOMENTOS_DO_DIA,
   planoGravacoes,
   roteiros,
@@ -93,6 +95,31 @@ export function validarFormato(valor: string | undefined): FormatoRoteiro | unde
     throw new ErroRoteiro("formato de roteiro invalido.");
   }
   return valor as FormatoRoteiro;
+}
+
+/** As duas origens que a tela do objetivo (`/criar/objetivo`) manda: um tema do dia (pelo índice, ou pela chave do assunto em alta) ou um tema livre. */
+export type OrigemDaTelaDoObjetivo = Extract<OrigemRoteiro, { origem: "sugerido" | "livre" }>;
+
+/**
+ * O objeto de origem que chega do navegador numa Server Action é texto livre, não um tipo: espalhá-lo (`...origem`) deixava um POST forjado mandar `origem: "momento"` com a `marcaId` de OUTRA
+ * marca, e `marcaCitadaPorId` põe o perfil compilado dessa marca no prompt de quem chamou (achado da revisão do PR #154, 10/10/2026). Aqui só as duas origens da tela do objetivo valem,
+ * reconstruídas campo a campo; "momento" é da folha "Gravar agora", que confere a posse da marca citada (`garantirMembroDaMarca`) antes de gerar.
+ */
+export function validarOrigemDaTelaDoObjetivo(valor: unknown): OrigemDaTelaDoObjetivo {
+  const v = (valor ?? {}) as Record<string, unknown>;
+  if (v.origem === "sugerido" && typeof v.temaIndice === "number" && Number.isInteger(v.temaIndice) && v.temaIndice >= 0) {
+    return { origem: "sugerido", temaIndice: v.temaIndice, temaChave: typeof v.temaChave === "string" && v.temaChave.length > 0 ? v.temaChave : undefined };
+  }
+  if (v.origem === "livre" && typeof v.textoTema === "string") {
+    return { origem: "livre", textoTema: v.textoTema };
+  }
+  throw new ErroRoteiro("origem de roteiro invalida.");
+}
+
+/** O objetivo também chega como texto livre: um de três, ou recusa antes de gastar uma geração. */
+export function validarObjetivo(valor: unknown): Objetivo {
+  if (valor === "alcance" || valor === "engajamento" || valor === "conversao") return valor;
+  throw new ErroRoteiro("objetivo de roteiro invalido.");
 }
 
 /** M4, item 2: mesmo cuidado de `validarFormato`, para o estilo que chega como texto livre do navegador. */
@@ -448,6 +475,19 @@ export function formatarCamadaExclusiva(
     : "nenhum dado exclusivo deste cliente registrado ainda.";
 }
 
+/** As pessoas de uma marca: a dona do cadastro e as que entraram como membro (`membros_marca`). */
+async function pessoasDaMarca(clienteId: number): Promise<Set<string>> {
+  const [dona] = await db().select({ usuarioId: clientes.usuarioId }).from(clientes).where(eq(clientes.id, clienteId));
+  const membros = await db().select({ usuarioId: membrosMarca.usuarioId }).from(membrosMarca).where(eq(membrosMarca.clienteId, clienteId));
+  return new Set([dona?.usuarioId, ...membros.map((m) => m.usuarioId)].filter((u): u is string => typeof u === "string" && u.length > 0));
+}
+
+/** Duas marcas são "da mesma pessoa" quando alguém é dona ou membro das duas (é o que `garantirMembroDaMarca` confere na Server Action de quem cita a marca). */
+async function marcasDaMesmaPessoa(a: number, b: number): Promise<boolean> {
+  const [pessoasA, pessoasB] = await Promise.all([pessoasDaMarca(a), pessoasDaMarca(b)]);
+  return [...pessoasA].some((u) => pessoasB.has(u));
+}
+
 /**
  * Nome e perfil compilado da marca que a pessoa citou durante o momento
  * (V9a, item 4, `momento.marcaId`). `undefined` sem `marcaId`, ou se a marca
@@ -457,8 +497,15 @@ export function formatarCamadaExclusiva(
  */
 async function marcaCitadaPorId(
   marcaId: number | undefined,
+  clienteId: number,
 ): Promise<{ nome: string; perfilCompilado: string } | undefined> {
   if (!marcaId) return undefined;
+  // A posse também é conferida AQUI, não só na Server Action: o `marcaId` fica gravado em `roteiros.momento` e é repassado a cada "Reprovar e reescrever" (e a uma versão nova), e uma marca
+  // citada que a pessoa deixou de ter (ou que um POST forjado trouxe) não pode pôr o perfil de outra marca no prompt de quem gera. Sem posse, o roteiro sai sem a camada secundária.
+  if (marcaId !== clienteId && !(await marcasDaMesmaPessoa(clienteId, marcaId))) {
+    logger.warn({ clienteId, marcaId }, "marca citada que nao e da mesma pessoa: ignorada");
+    return undefined;
+  }
   const marca = await clientePorId(marcaId);
   if (!marca) return undefined;
   const perfil = await perfilDoCliente(marcaId);
@@ -945,7 +992,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
     ultimosRoteirosParaAbertura(dados.clienteId),
-    marcaCitadaPorId(dados.momento?.marcaId),
+    marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
   ]);
 
   // E26 (4b): as versões deste mesmo tema já escritas agora entram na frente do que o banco lembra (elas ainda não são roteiro), a mais recente primeiro, como as listas do banco: o
