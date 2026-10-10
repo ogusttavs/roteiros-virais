@@ -3,12 +3,17 @@
 import { redirect } from "next/navigation";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
-import { exigirForaDoVerComo } from "@/lib/ver-como";
+import type { MarcasDeFala } from "@/db/schema";
+import { ErroIA } from "@/ia/erro";
+import { type ResultadoAcao } from "@/lib/resultado-acao";
+import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
+import { marcarFalaDoRoteiro, type MotivoSemMarcas } from "@/servicos/marcar-fala";
 import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
   avaliarRoteiro,
   editarRoteiro,
+  ErroRoteiro,
   marcarGravado,
   marcarPostado,
   reprovarERescrever,
@@ -70,4 +75,23 @@ export async function salvarEdicaoAction(
   await roteiroDoClienteOuFalha(roteiroId);
   const atualizado = await editarRoteiro(roteiroId, campos);
   return { id: atualizado.id };
+}
+
+/**
+ * E41 (2a): escreve, na primeira vez, e devolve as marcas de fala do roteiro (`servicos/marcar-fala.ts`). Chamada quando a pessoa liga "Marcas de fala" ou abre o modo gravação, nunca na
+ * geração. O roteiro é conferido por dono dentro do serviço (`roteiroPorId(id, clienteId)`); "ver como" não escreve (a leitura das marcas já guardadas é da tela). O erro esperado volta
+ * como resultado, para a frase chegar inteira (Next.js troca a mensagem de uma exceção por um texto genérico em produção).
+ */
+export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao<{ marcas: MarcasDeFala | null; motivo: MotivoSemMarcas | null; novas: boolean }>> {
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  const cliente = await clienteDaSessaoAtual();
+  try {
+    const r = await marcarFalaDoRoteiro(cliente.id, roteiroId);
+    return r.ok ? { ok: true, dado: { marcas: r.marcas, motivo: null, novas: r.novas } } : { ok: true, dado: { marcas: null, motivo: r.motivo, novas: false } };
+  } catch (falha) {
+    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
+    throw falha;
+  }
 }

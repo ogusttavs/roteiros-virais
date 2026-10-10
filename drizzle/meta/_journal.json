@@ -554,6 +554,13 @@
       "when": 1791628270969,
       "tag": "0078_versoes-do-roteiro",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1791643078429,
+      "tag": "0079_marcas-de-fala-no-roteiro",
+      "breakpoints": true
     }
   ]
 }

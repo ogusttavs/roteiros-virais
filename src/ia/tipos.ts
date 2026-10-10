@@ -50,6 +50,8 @@ export type TarefaIA =
   | "aindaValeRoteiro"
   /** E26 (4b): as três notas de uma versão do roteiro (viralizar, te chamarem, lembrarem de você), por um juiz separado, o mesmo para todas as versões. */
   | "notaDaVersao"
+  /** E41 (2a): as marcas de fala (peso, pausa, devagar, tom) de um roteiro Reels falado; o modelo só coloca marcas, o texto não muda. */
+  | "marcarFala"
   /** E38, partes 2 e 3: a leitura curta de um perfil citado pelo cliente ou da própria marca. */
   | "analisarPerfilCitado"
   /** E38 PR 2: "o que entendemos da sua marca", do site e das redes dela, para ela confirmar. */
