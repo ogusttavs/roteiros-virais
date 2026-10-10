@@ -1,0 +1,1 @@
+ALTER TABLE "roteiros" ADD COLUMN "tema_do_momento" jsonb;

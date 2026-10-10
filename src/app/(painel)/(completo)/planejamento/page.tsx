@@ -14,6 +14,7 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { garantirBriefing } from "@/servicos/briefing";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { videoSubindoParaAviso } from "@/servicos/curva";
+import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { planoDoDia } from "@/servicos/plano";
 import {
@@ -228,13 +229,23 @@ export default async function Planejamento({ searchParams }: Props) {
       />
     );
   } else if (visao === "dia") {
-    const [semana, agenda, videoSubindo, briefing, atrasadosDoDia] = await Promise.all([
+    const [semana, agendaDoDiaTodo, videoSubindo, briefing, atrasadosDoDia, emAlta] = await Promise.all([
       semanaDaAgenda(cliente.id, diaVisualizado),
       agendaDoDia(cliente.id, diaVisualizado),
       videoSubindoParaAviso(cliente.id),
       garantirBriefing(cliente.id),
       ehHoje ? atrasados(cliente.id, hoje) : Promise.resolve([]),
+      // E55 PR 2: o mesmo cartão "Em alta hoje" da aba Hoje (as peças são as mesmas, muda a casa); uma falha aqui só tira o cartão (e vai para o log).
+      ehHoje ? cartaoEmAltaSemFalha(cliente, hoje) : Promise.resolve(null),
     ]);
+    // O roteiro do cartão pode ser um Reels ou um Story (o Criar deixa escolher), então sai das duas listas.
+    const agenda = emAlta?.roteiro
+      ? {
+          ...agendaDoDiaTodo,
+          reels: agendaDoDiaTodo.reels.filter((item) => item.id !== emAlta.roteiro?.id),
+          stories: agendaDoDiaTodo.stories.filter((item) => item.id !== emAlta.roteiro?.id),
+        }
+      : agendaDoDiaTodo;
 
     const proximoBruto =
       agenda.reels.length === 0 && agenda.stories.length === 0 && ehHoje
@@ -299,6 +310,7 @@ export default async function Planejamento({ searchParams }: Props) {
         proximoMarcado={proximoMarcado}
         avisoBriefing={avisoBriefing}
         avisoVideoSubindo={avisoVideoSubindo}
+        emAlta={emAlta}
       />
     );
   } else {

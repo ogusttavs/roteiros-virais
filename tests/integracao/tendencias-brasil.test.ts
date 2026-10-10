@@ -226,7 +226,7 @@ describe("o tema do momento nos temas do dia", () => {
     expect(indice).toBeGreaterThanOrEqual(0);
 
     const amanha = new Date(Date.now() + 24 * HORA).toISOString().slice(0, 10);
-    await expect(gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance", data: amanha })).rejects.toThrow("Tendência é para hoje");
+    await expect(gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance", data: amanha })).rejects.toThrow("Não muda de dia");
     await expect(gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance", data: amanha })).rejects.toBeInstanceOf(ErroRoteiro);
 
     const hoje = await gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: indice, objetivo: "alcance" });

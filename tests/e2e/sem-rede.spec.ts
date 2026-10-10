@@ -135,8 +135,8 @@ async function criarUsuario(id: string, nome: string) {
   await db().insert(preferenciasUsuario).values({ usuarioId: id, aceitouTermosEm: new Date() });
 }
 
-async function criarMarca(usuarioId: string, nome: string, nichoId: number) {
-  const [marca] = await db().insert(clientes).values({ usuarioId, nome, nichoId }).returning();
+async function criarMarca(usuarioId: string, nome: string, nichoId: number, criadoEm?: Date) {
+  const [marca] = await db().insert(clientes).values({ usuarioId, nome, nichoId, ...(criadoEm ? { criadoEm } : {}) }).returning();
   await db().insert(membrosMarca).values({ usuarioId, clienteId: marca.id, papel: "dono" });
   await db()
     .insert(briefings)
@@ -236,7 +236,8 @@ test.describe("painel sem rede", () => {
     // Pessoa A: duas marcas. A Dois primeiro e a Um por ultimo, porque a marca mais nova e a ativa no
     // primeiro login (`marcaPadrao`, `criadoEm desc`). So a Um tem roteiro do dia.
     await criarUsuario("e2e-semrede-a", "Sem rede A");
-    await criarMarca("e2e-semrede-a", NOME_MARCA_DOIS, nichoDois.id);
+    // A Dois leva um criadoEm de um minuto atras: duas marcas criadas em seguida podem empatar no milissegundo, e o empate cai na ordem do nome (a Dois abriria primeiro).
+    await criarMarca("e2e-semrede-a", NOME_MARCA_DOIS, nichoDois.id, new Date(Date.now() - 60_000));
     const marcaUm = await criarMarca("e2e-semrede-a", NOME_MARCA_UM, nichoUm.id);
     const [roteiro] = await db()
       .insert(roteiros)

@@ -2,9 +2,10 @@
 
 import { Ellipsis, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
+import { dadoOuErro } from "@/lib/resultado-acao";
 import { textosComuns } from "@/textos/comuns";
 import { textosHoje } from "@/textos/hoje";
 import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
@@ -42,6 +43,11 @@ type Props = {
    * etapa), o "Mudar o dia" salva direto, como sempre foi.
    */
   perguntaSeConflito?: (novaData: string) => string | null;
+  /**
+   * E55 PR 2 (dúvida 5 do passo 21): o roteiro do tema do momento é para hoje. O menu não oferece "Não vou gravar hoje" e diz por quê; a saída é "Arquivar" (e "Não gostei, quero outro" continua,
+   * porque a versão nova também é do momento).
+   */
+  doMomento?: boolean;
 };
 
 /**
@@ -51,9 +57,10 @@ type Props = {
  * as folhas que já existem (`FolhaMudarDia`, `FolhaReprovarAgenda`) e as ações que já existem
  * (`arquivarAtrasadoAction`, apesar do nome, serve qualquer roteiro, não só atrasado).
  */
-export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", aoArquivar, perguntaSeConflito }: Props) {
+export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", aoArquivar, perguntaSeConflito, doMomento = false }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
+  const idDaNota = useId();
   const [menuAberto, setMenuAberto] = useState(false);
   const { fechar: fecharMenu } = useFolhaNoHistorico(menuAberto, () => setMenuAberto(false));
   const [folhaMudarDiaAberta, setFolhaMudarDiaAberta] = useState(false);
@@ -69,7 +76,7 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
   }
 
   async function efetivarMudarDia(novaData: string) {
-    await mudarDataAtrasadoAction(roteiroId, novaData);
+    dadoOuErro(await mudarDataAtrasadoAction(roteiroId, novaData));
     setFolhaMudarDiaAberta(false);
     setConfirmarMudarDia(null);
     router.refresh();
@@ -132,22 +139,29 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
         {variante === "destaque" ? <span className={styles.rotuloDestaque}>{textosHoje.agenda.menu.abrir}</span> : null}
       </button>
 
-      <PainelFlutuante titulo={textosHoje.agenda.menu.abrirRotulo(titulo)} aberto={menuAberto} aoFechar={fecharMenu} role="menu">
+      <PainelFlutuante titulo={textosHoje.agenda.menu.abrirRotulo(titulo)} aberto={menuAberto} aoFechar={fecharMenu} role="menu" descricaoId={doMomento ? idDaNota : undefined}>
         <div className={styles.cabecalho}>
           <h2 className={styles.titulo}>{textosHoje.agenda.menu.abrirRotulo(titulo)}</h2>
           <button type="button" className={styles.fechar} onClick={fecharMenu} aria-label={textosComuns.fechar}>
             <X size={20} strokeWidth={1.75} aria-hidden="true" />
           </button>
         </div>
-        <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoVouGravarHoje}>
-          {textosHoje.agenda.menu.naoVouGravarHoje}
-        </button>
+        {doMomento ? null : (
+          <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoVouGravarHoje}>
+            {textosHoje.agenda.menu.naoVouGravarHoje}
+          </button>
+        )}
         <button type="button" role="menuitem" className={styles.itemMenu} onClick={arquivar} disabled={ocupado}>
           {textosHoje.agenda.menu.arquivar}
         </button>
         <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoGosteiQueroOutro}>
           {textosHoje.agenda.menu.naoGosteiQueroOutro}
         </button>
+        {doMomento ? (
+          <p id={idDaNota} className={styles.notaMomento}>
+            {textosHoje.emAlta.naoMudaDeDia}
+          </p>
+        ) : null}
         {erro ? (
           <p role="alert" className={styles.erro}>
             {erro}

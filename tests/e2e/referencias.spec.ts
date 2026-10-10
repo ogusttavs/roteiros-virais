@@ -91,12 +91,13 @@ test.describe("/referencias no design v2", () => {
 
     // Dois primeiro, Um depois: marcaPadrao (sem cookie ainda) usa a de criacao mais
     // recente, e os testes abaixo pressupoe que a marca ativa no primeiro login e a Um
-    // (mesmo raciocinio de tema-livre.spec.ts).
+    // (mesmo raciocinio de tema-livre.spec.ts). A Dois leva um criadoEm de um minuto atras: duas marcas criadas em seguida
+    // podem empatar no milissegundo, e o empate cai na ordem do nome (a Dois abriria primeiro).
     const [marcaDois] = await db()
       .insert(clientes)
       // Item 8, V12b: "tiktok" nao tem nenhum video no nicho de dentistas (so
       // youtube abaixo), a rede principal sem video do teste do prefiltro.
-      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id, redePrincipal: "tiktok" })
+      .values({ usuarioId: "e2e-referencias", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id, redePrincipal: "tiktok", criadoEm: new Date(Date.now() - 60_000) })
       .returning();
     const [cliente] = await db()
       .insert(clientes)

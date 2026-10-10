@@ -133,8 +133,12 @@ test.describe("/noticias", () => {
         });
       await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-noticias", aceitouTermosEm: new Date() });
 
-      // Dois primeiro, Um depois: a marca ativa no primeiro login (sem cookie ainda) é a de criação mais recente.
-      const [marcaDois] = await db().insert(clientes).values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_DOIS, nichoId: nicho.id }).returning();
+      // Dois primeiro, Um depois: a marca ativa no primeiro login (sem cookie ainda) é a de criação mais recente. A Dois leva um criadoEm de um minuto atrás: duas marcas
+      // criadas em seguida podem empatar no milissegundo, e o empate cai na ordem do nome (a Dois abriria primeiro).
+      const [marcaDois] = await db()
+        .insert(clientes)
+        .values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_DOIS, nichoId: nicho.id, criadoEm: new Date(Date.now() - 60_000) })
+        .returning();
       const [marcaUm] = await db().insert(clientes).values({ usuarioId: "e2e-noticias", nome: NOME_MARCA_UM, nichoId: nicho.id }).returning();
       await db()
         .insert(membrosMarca)

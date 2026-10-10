@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { rotuloParaQue } from "@/config/fichas";
+import { dadoOuErro } from "@/lib/resultado-acao";
+import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAgendaDoDia, ItemAtrasado } from "@/servicos/roteiro";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { CartaoEmAlta } from "@/ui/componentes/CartaoEmAlta";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
@@ -52,6 +55,8 @@ type Props = {
   proximoMarcado: ProximoMarcado | null;
   avisoBriefing: AvisoBriefingAgenda | null;
   avisoVideoSubindo: string | null;
+  /** E55 PR 2: o assunto em alta hoje trazido para o ramo da marca (só em hoje); o roteiro dele, se já criado, vem dentro do cartão e não em "Reels de hoje". */
+  emAlta: DadosEmAlta | null;
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
   nomePessoa: string;
@@ -176,7 +181,7 @@ export function AtrasadoCard({
 
   /** A folha tem o próprio "salvando"/erro (`FolhaMudarDia`); aqui só falta fechar ao terminar. */
   async function salvarNovaData(novaData: string) {
-    await mudarDataAtrasadoAction(item.id, novaData);
+    dadoOuErro(await mudarDataAtrasadoAction(item.id, novaData));
     aoResolver();
     aoMudouAlgo();
     setFolhaMudarDiaAberta(false);
@@ -199,14 +204,17 @@ export function AtrasadoCard({
             className={styles.botaoPrimario}
             disabled={ocupado}
             aria-busy={chaveOcupada === "gravar" && ocupado}
-            onClick={() => executar("gravar", () => mudarDataAtrasadoAction(item.id, hoje), () => aoGravarHoje(item))}
+            onClick={() => executar("gravar", async () => dadoOuErro(await mudarDataAtrasadoAction(item.id, hoje)), () => aoGravarHoje(item))}
           >
             {textosHoje.agenda.atrasado.gravarHoje}
           </button>
         ) : null}
-        <button type="button" className={styles.botaoSecundarioSm} disabled={ocupado} onClick={() => setFolhaMudarDiaAberta(true)}>
-          {textosHoje.agenda.atrasado.mudarODia}
-        </button>
+        {/* E55 PR 2: o roteiro do tema do momento é para hoje: não tem "Mudar o dia" (grava hoje ou arquiva). */}
+        {item.doMomento ? null : (
+          <button type="button" className={styles.botaoSecundarioSm} disabled={ocupado} onClick={() => setFolhaMudarDiaAberta(true)}>
+            {textosHoje.agenda.atrasado.mudarODia}
+          </button>
+        )}
         <button
           type="button"
           className={styles.botaoBarra}
@@ -368,6 +376,7 @@ export function HojeTela({
   proximoMarcado,
   avisoBriefing,
   avisoVideoSubindo,
+  emAlta,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -423,7 +432,7 @@ export function HojeTela({
     setAgenda((atual) => ({ ...atual, reels: [item] }));
   }
 
-  const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0;
+  const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0 && !emAlta?.roteiro;
 
   /**
    * A2, item 7 (pedido do Gustavo no iPhone): Story a pessoa cria na hora, na maioria das vezes, então "Criar um Story para hoje" fica sempre à mão, com ou sem Story
@@ -584,6 +593,30 @@ export function HojeTela({
             </p>
           </section>
 
+          {ehHoje && emAlta ? (
+            <section className={styles.secaoDia} aria-labelledby="t-em-alta">
+              <h2 id="t-em-alta">{textosHoje.emAlta.titulo}</h2>
+              <CartaoEmAlta
+                cartao={emAlta}
+                destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 ? "principal" : "secundario"}
+                ocupado={ocupado && acao === "em-alta"}
+                aoClicar={() => ir("em-alta", emAlta.roteiro ? `/roteiros/${emAlta.roteiro.id}` : `/criar/objetivo?tema=${emAlta.tema.indice}`)}
+                estado={emAlta.roteiro ? textosHoje.agenda.estadoReels[emAlta.roteiro.status] : undefined}
+                menu={
+                  emAlta.roteiro ? (
+                    <MenuAcoesAgenda
+                      roteiroId={emAlta.roteiro.id}
+                      titulo={emAlta.tema.titulo}
+                      data={diaVisualizado}
+                      aoArquivar={arquivarComDesfazer}
+                      doMomento
+                    />
+                  ) : undefined
+                }
+              />
+            </section>
+          ) : null}
+
           {ehHoje && atrasadosVisiveis.length > 0 ? (
             <section className={styles.secaoDia} aria-labelledby="t-atrasado">
               <h2 id="t-atrasado">{textosHoje.agenda.atrasado.titulo}</h2>
@@ -629,6 +662,8 @@ export function HojeTela({
             </section>
           ) : (
             <div className={styles.diaColunas}>
+              {/* O Reels do dia que está dentro do cartão "Em alta hoje" não deixa a coluna dizer "Nada marcado" logo abaixo dele. */}
+              {agenda.reels.length === 0 && emAlta?.roteiro ? null : (
               <section className={styles.secaoDia} aria-labelledby="t-reels">
                 <h2 id="t-reels">{ehHoje ? textosHoje.agenda.reels.hoje : textosHoje.agenda.reels.outroDia}</h2>
                 {agenda.reels.length > 0 ? (
@@ -659,6 +694,7 @@ export function HojeTela({
                           data={diaVisualizado}
                           variante="destaque"
                           aoArquivar={arquivarComDesfazer}
+                          doMomento={agenda.reels[0].doMomento}
                         />
                       </div>
                     </article>
@@ -677,7 +713,7 @@ export function HojeTela({
                                 <span className={styles.tituloItem}>{item.titulo}</span>
                                 <EstadoItem item={item} ehHoje={ehHoje} />
                               </button>
-                              <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
+                              <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} doMomento={item.doMomento} />
                             </li>
                           ))}
                         </ol>
@@ -688,6 +724,7 @@ export function HojeTela({
                   <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
                 )}
               </section>
+              )}
 
               <section className={styles.secaoDia} aria-labelledby="t-stories">
                 <h2 id="t-stories">{ehHoje ? textosHoje.agenda.stories.hoje : textosHoje.agenda.stories.outroDia}</h2>
@@ -709,7 +746,7 @@ export function HojeTela({
                             <span className={styles.tituloItem}>{item.titulo}</span>
                             <EstadoItem item={item} ehHoje={ehHoje} />
                           </button>
-                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
+                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} doMomento={item.doMomento} />
                         </li>
                       ))}
                     </ol>

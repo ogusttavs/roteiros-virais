@@ -262,8 +262,8 @@ function DiasGrade({
                       className={[styles.linhaPlano, mover.itemArrastando?.id === item.id ? styles.linhaPlanoArrastando : ""]
                         .filter(Boolean)
                         .join(" ")}
-                      draggable={podeArrastar}
-                      onDragStart={(evento) => podeArrastar && mover.aoComecarArrasto(evento, item, dia.data)}
+                      draggable={podeArrastar && !item.doMomento}
+                      onDragStart={(evento) => podeArrastar && !item.doMomento && mover.aoComecarArrasto(evento, item, dia.data)}
                       onDragEnd={mover.aoTerminarArrasto}
                     >
                       <button
@@ -287,6 +287,7 @@ function DiasGrade({
                           titulo={item.titulo}
                           data={dia.data}
                           aoArquivar={aoArquivar}
+                          doMomento={item.doMomento}
                           perguntaSeConflito={(novaData) => perguntaSeConflitoSemana(dias, item, novaData)}
                         />
                       ) : null}
