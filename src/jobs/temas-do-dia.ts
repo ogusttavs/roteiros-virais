@@ -41,6 +41,7 @@ import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
+import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import {
   formatarModeloNicho,
   modeloNichoAtual,
@@ -49,6 +50,7 @@ import {
   subindoHojeComAnalise,
 } from "@/servicos/pesquisa";
 import { buscarVideosParaProva, janelaDeProva, minimoBrasileirosNaProva, motivoSemProva } from "@/servicos/prova-tema";
+import { vozesDoSetor, vozesParaOPrompt, type VozNumerada } from "@/servicos/vozes-do-publico";
 
 import { atualizarTemaDoMomento } from "./tema-do-momento";
 
@@ -162,6 +164,8 @@ async function tentarGerarTemas(dados: {
   idsValidosNoticias: Set<number>;
   subindoCount: number;
   noticiasCount: number;
+  /** E28: as vozes que foram para a entrada, para traduzir de volta o número que o modelo devolveu. */
+  vozes?: VozNumerada[];
 }): Promise<{ valido: boolean; temas: TemaDoDia[] }> {
   const resultado = await gerarEstruturado({
     tarefa: "temasDoDia",
@@ -172,7 +176,14 @@ async function tentarGerarTemas(dados: {
     entrada: dados.entrada,
   });
 
-  const valido = evidenciaValida(resultado.dados.temas, dados.idsValidos, dados.idsValidosNoticias);
+  // E28: o número da pergunta vira a pergunta que vimos (frase, vezes, plataformas); número que não está na lista é descartado, e o tema segue sem ela.
+  const porNumero = new Map((dados.vozes ?? []).map((v) => [v.numero, v]));
+  const temasDoModelo: TemaDoDia[] = resultado.dados.temas.map(({ perguntaNumero, ...tema }) => {
+    const voz = perguntaNumero === null ? undefined : porNumero.get(perguntaNumero);
+    return voz ? { ...tema, perguntaDoPublico: { chave: voz.chave, tipo: voz.tipo, texto: voz.texto, vezes: voz.vezes, plataformas: voz.plataformas } } : tema;
+  });
+
+  const valido = evidenciaValida(temasDoModelo, dados.idsValidos, dados.idsValidosNoticias);
 
   await registrarGeracao({
     tarefa: "temasDoDia",
@@ -183,6 +194,8 @@ async function tentarGerarTemas(dados: {
       nichoId: dados.nicho.id,
       subindoHoje: dados.subindoCount,
       noticias: dados.noticiasCount,
+      // E28: quantas perguntas do público foram para a entrada (zero sem leitura da semana).
+      vozesDoPublico: dados.vozes?.length ?? 0,
       evidenciaValida: valido,
     },
     saida: resultado.dados,
@@ -194,7 +207,7 @@ async function tentarGerarTemas(dados: {
     },
   });
 
-  return { valido, temas: resultado.dados.temas };
+  return { valido, temas: temasDoModelo };
 }
 
 /**
@@ -323,6 +336,11 @@ async function gerarTemasDoNicho(
   const modeloNicho = await modeloNichoAtual(nicho.id);
   const idsValidos = new Set([...subindo.map((v) => v.id), ...semDono.map((v) => v.id)]);
   const idsValidosNoticias = new Set(noticiasRelevantes.map((n) => n.id));
+  // E28: o que o público do setor perguntou nos comentários do YouTube esta semana (vazio sem leitura ou com a leitura velha: a entrada é a de antes).
+  // O tema do dia responde a pergunta ou reclamação (pedido não entra), e a voz vai datada ("lido em 11 de outubro").
+  const vozesLidas = await vozesDoSetor(nicho.id);
+  const vozesDoPublico = vozesParaOPrompt(vozesLidas?.vozes ?? null, { pedidos: false });
+  const lidasEm = vozesLidas && vozesDoPublico.length > 0 ? diaPorExtenso(vozesLidas.em) : undefined;
   const sistemaEstavel = temasDoDiaIA.montarSistemaEstavel({
     modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
   });
@@ -330,6 +348,8 @@ async function gerarTemasDoNicho(
     subindoHoje: subindo,
     semDono,
     noticias: noticiasRelevantes.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
+    vozesDoPublico,
+    lidasEm,
     minimoBrasilEmTres: minimoBrasileirosNaProva(3, regua.proporcaoBrasil),
   };
   const entrada = temasDoDiaIA.montarEntrada(dadosEntrada);
@@ -342,6 +362,7 @@ async function gerarTemasDoNicho(
     idsValidosNoticias,
     subindoCount: subindo.length + semDono.length,
     noticiasCount: noticiasRelevantes.length,
+    vozes: vozesDoPublico,
   };
 
   let tentativa = await tentarGerarTemas(parametrosTentativa);

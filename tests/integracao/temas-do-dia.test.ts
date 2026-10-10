@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, user, videos } from "@/db/schema";
-import { podeSobrescreverTemasDoDia, rodarTemasDoDia } from "@/jobs/temas-do-dia";
+import { podeSobrescreverTemasDoDia, rodarTemasDoDia, semOMomento } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
 
@@ -653,5 +653,80 @@ describe("podeSobrescreverTemasDoDia (R1, item 0)", () => {
     await db().delete(roteiros).where(eq(roteiros.clienteId, cliente.id));
     await db().delete(clientes).where(eq(clientes.id, cliente.id));
     await db().delete(user).where(eq(user.id, usuarioId));
+  });
+});
+
+describe("as vozes do público nos temas do dia (E28)", () => {
+  const voz = (texto: string, vezes: number) => ({ texto, vezes, videos: [1, 2], plataformas: ["youtube" as const] });
+  const vozes = (duvidas: ReturnType<typeof voz>[]) => ({ duvidas, objecoes: [], pedidos: [], videos: 2, comentarios: 120, plataformas: ["youtube" as const] });
+
+  async function poVozes(v: ReturnType<typeof vozes> | null, vozesEm: Date | null = new Date()) {
+    await db().update(nichos).set({ vozes: v, vozesEm: v ? vozesEm : null }).where(eq(nichos.id, nichoId));
+  }
+
+  afterEach(async () => {
+    await poVozes(null);
+  });
+
+  it("com vozes frescas, o primeiro tema leva a pergunta que respondeu (frase, comentários e plataforma); a prova de vídeo continua", async () => {
+    await criarVideosComProva("assunto de tecido");
+    await poVozes(vozes([voz("Serve em tecido de camurça?", 14), voz("Quanto tempo tem que esperar?", 9)]));
+
+    await rodarTemasDoDia();
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    const [primeiro, segundo] = linha.temas;
+    expect(primeiro.perguntaDoPublico).toMatchObject({ texto: "Serve em tecido de camurça?", vezes: 14, tipo: "duvida", plataformas: ["youtube"] });
+    expect(primeiro.perguntaDoPublico?.chave).toMatch(/^[0-9a-f]{12}$/);
+    expect(primeiro.evidencias.length).toBeGreaterThan(0);
+    expect(segundo.perguntaDoPublico).toBeUndefined();
+
+    // o registro da geração diz a versão do prompt e quantas perguntas do público foram para a entrada
+    const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
+    expect(geracao.versaoPrompt).toBe("1.8.0");
+    expect(geracao.entradas).toMatchObject({ vozesDoPublico: 2 });
+  });
+
+  it("a pergunta não afrouxa a prova: com vozes boas e só dois vídeos, o tema continua barrado", async () => {
+    await criarVideosComProva("assunto de tecido", 2);
+    await poVozes(vozes([voz("Serve em tecido de camurça?", 14)]));
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.semProva).toBe(1);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(semOMomento(linha.temas)).toHaveLength(0);
+  });
+
+  it("a pergunta que não passou do piso de comentários iguais não vai para o prompt nem para o tema", async () => {
+    await criarVideosComProva("assunto de tecido");
+    await poVozes(vozes([voz("Pergunta de poucos comentários?", 4)]));
+
+    await rodarTemasDoDia();
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas.every((tema) => tema.perguntaDoPublico === undefined)).toBe(true);
+  });
+
+  it("as vozes velhas (mais de duas semanas) não valem: o tema sai como antes, sem pergunta", async () => {
+    await criarVideosComProva("assunto de tecido");
+    await poVozes(vozes([voz("Serve em tecido de camurça?", 14)]), diasAtras(20));
+
+    await rodarTemasDoDia();
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas.length).toBeGreaterThan(0);
+    expect(linha.temas.every((tema) => tema.perguntaDoPublico === undefined)).toBe(true);
+  });
+
+  it("o número que o modelo inventa é descartado: o tema fica, sem pergunta", async () => {
+    await criarVideosComProva("assunto de tecido");
+    await poVozes(vozes([voz("Serve em tecido de camurça? [mock:numero-inexistente]", 14)]));
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.gerados).toBe(1);
+
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(linha.temas).toHaveLength(3);
+    expect(linha.temas.every((tema) => tema.perguntaDoPublico === undefined)).toBe(true);
   });
 });
