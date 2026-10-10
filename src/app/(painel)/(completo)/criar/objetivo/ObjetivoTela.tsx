@@ -46,6 +46,8 @@ type Props = {
   dataInicial?: string;
   /** E43: presente quando o tema veio de "Criar vídeo com esta notícia". */
   noticiaId?: number;
+  /** E53 (parte 3): idem, quando a notícia é de um assunto que a marca acompanha. */
+  noticiaAssuntoId?: number;
   /** E55 PR 2b: o roteiro é de um assunto em alta, para hoje: a pergunta "Para quando é?" some e a data vai fixa em hoje (o servidor recusa outro dia). */
   paraHoje?: boolean;
   /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; vai ao servidor junto, para o roteiro nascer do momento. */
@@ -62,6 +64,7 @@ export function ObjetivoTela({
   quemGravaPadrao,
   dataInicial,
   noticiaId,
+  noticiaAssuntoId,
   paraHoje = false,
   assuntoEmAlta,
 }: Props) {
@@ -166,6 +169,7 @@ export function ObjetivoTela({
           noticiaId,
           pergunta ? (ficha ?? undefined) : undefined,
           assuntoEmAlta,
+          noticiaAssuntoId,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {

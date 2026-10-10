@@ -55,7 +55,7 @@ import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
-import { noticiasDeHojeDosAssuntos } from "./assuntos";
+import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { filtroDeFormatosDaMarca } from "./formatos";
@@ -378,6 +378,11 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * ponto de partida), a notícia vira um campo próprio em vez de uma quarta origem.
    */
   noticiaId?: number;
+  /**
+   * E53 (parte 3): o id da notícia de um assunto que a marca acompanha ("Criar roteiro com esta notícia" na capa, Tema livre, estado `comNoticia`). Resolvida aqui, só se for de um assunto DESTA
+   * marca (nunca a de outra); o roteiro guarda a cópia (`roteiros.noticia_do_assunto`) e o prompt vê o título e o resumo nosso, como na notícia do setor. Vale com `origem: "livre"`.
+   */
+  noticiaAssuntoId?: number;
   /**
    * E55 PR 2b: a chave do assunto em alta que a pessoa trouxe para o ramo dela (Tema livre, `?alta=`). Só vale com `origem: "livre"`. O assunto é conferido contra a lista de agora (`resolverTema`):
    * ainda em alta, o roteiro nasce do momento (guarda o assunto, não muda de dia); já fora da lista, é um tema livre comum.
@@ -872,7 +877,7 @@ type MontarERoteiroDados = {
    * momento, não muda a busca de evidência (continua normal, pelo tema); só acrescenta o bloco da
    * notícia na entrada do prompt.
    */
-  noticia?: { titulo: string; resumo: string | null; angulo: string | null };
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
   /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
   temaDoMomento?: boolean;
 };
@@ -1013,8 +1018,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     .filter((l) => l.existeNaRede && l.leitura)
     .map((l) => ({ handle: l.handle, leitura: l.leitura as string }));
 
-  // E53: as notícias de hoje dos assuntos que a marca acompanha, quando o tema, o momento ou o pedido da pessoa tocam em algum; marca sem assunto não recebe nada.
-  const noticiasDoAssunto = (
+  // E53: as notícias de hoje dos assuntos que a marca acompanha, quando o tema, o momento ou o pedido da pessoa tocam em algum; marca sem assunto não recebe nada. A notícia de assunto que a
+  // pessoa prendeu ("Criar roteiro com esta notícia") entra sempre, na frente, com o veículo e o dia (E53, parte 3): sem isso ela chegaria só como o título solto.
+  const casadasDoAssunto = (
     await noticiasDeHojeDosAssuntos(
       dados.clienteId,
       [dados.tema, dados.momento?.onde, dados.momento?.oQueEstaAcontecendo, dados.momento?.oQueDaParaMostrar, dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo, dados.observacao]
@@ -1022,6 +1028,10 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         .join(" "),
     )
   ).map((n) => ({ titulo: n.titulo, veiculo: n.veiculo, dia: n.dia, resumo: n.resumo }));
+  const noticiasDoAssunto = comANoticiaPresa(
+    dados.noticia?.veiculo ? { titulo: dados.noticia.titulo, veiculo: dados.noticia.veiculo, dia: dados.noticia.dia ?? "", resumo: dados.noticia.resumo } : null,
+    casadasDoAssunto,
+  );
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -1240,9 +1250,13 @@ export async function gerarRoteiro(
   // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
   const noticiaLinha =
     params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;
+  // E53 (parte 3): a notícia de um assunto da marca, no lugar da do setor (uma só ponto de partida por roteiro).
+  const noticiaDoAssuntoLinha = !noticiaLinha && params.origem === "livre" && params.noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(clienteId, params.noticiaAssuntoId) : null;
   const noticia = noticiaLinha
     ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
-    : undefined;
+    : noticiaDoAssuntoLinha
+      ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssuntoLinha)
+      : undefined;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
@@ -1281,6 +1295,8 @@ export async function gerarRoteiro(
       quemAparece: params.quemAparece ?? null,
       // E43: só quando a notícia foi de fato encontrada no setor do cliente (nunca um id solto).
       noticiaId: noticiaLinha?.id ?? null,
+      // E53 (parte 3): a notícia do assunto de onde o roteiro nasceu, copiada (o "De onde veio" não some quando o assunto sai).
+      noticiaDoAssunto: noticiaDoAssuntoLinha ? noticiaDeOrigemGuardada(noticiaDoAssuntoLinha) : null,
       // E55 PR 2: o assunto em alta de onde o tema nasceu, para o resto do produto saber (selo, "já passou", Histórico, recusa de mudar de dia, reescrita).
       temaDoMomento: doMomento,
       conteudo,
@@ -1332,9 +1348,18 @@ export async function reprovarERescrever(
   // E43: idem, a reescrita mantém a notícia de origem da versão anterior.
   const noticiaLinha =
     atual.noticiaId && cliente.nichoId ? await noticiaPorId(atual.noticiaId, cliente.nichoId) : null;
+  // E53 (parte 3): idem para a notícia de um assunto; o resumo nosso vem da linha se ela ainda existe (a cópia só guarda o título).
+  const resumoDaNoticiaDoAssunto = atual.noticiaDoAssunto ? ((await noticiaDoAssuntoDaMarca(atual.clienteId, atual.noticiaDoAssunto.id))?.resumoNosso ?? null) : null;
   const noticia = noticiaLinha
     ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
-    : undefined;
+    : atual.noticiaDoAssunto
+      ? noticiaDoAssuntoComoPontoDePartida({
+          titulo: atual.noticiaDoAssunto.titulo,
+          resumoNosso: resumoDaNoticiaDoAssunto,
+          veiculo: atual.noticiaDoAssunto.veiculo,
+          publicadoEm: atual.noticiaDoAssunto.publicadoEm ? new Date(atual.noticiaDoAssunto.publicadoEm) : null,
+        })
+      : undefined;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId: atual.clienteId,
@@ -1383,6 +1408,7 @@ export async function reprovarERescrever(
       quemAparece: atual.quemAparece,
       // E43: idem, a reescrita mantém a notícia de origem.
       noticiaId: atual.noticiaId,
+      noticiaDoAssunto: atual.noticiaDoAssunto,
       // E55 PR 2: idem, a reescrita mantém o assunto em alta de origem.
       temaDoMomento: atual.temaDoMomento,
       conteudo,

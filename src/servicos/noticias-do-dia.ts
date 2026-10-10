@@ -96,8 +96,9 @@ export async function capaDoDia(cliente: { id: number; nichoId: number | null },
           publicadoEm: n.publicadoEm,
           resumo: n.resumo,
           url: enderecoHttpsSeguro(n.url),
-          imagemUrl: null,
-          imagemCredito: null,
+          // E53 (foto do setor): a foto do RSS direto do portal, revalidada na saída como a dos assuntos; sem ela, o bloco de tipografia.
+          imagemUrl: enderecoHttpsSeguro(n.imagemUrl),
+          imagemCredito: enderecoHttpsSeguro(n.imagemUrl) ? n.imagemCredito : null,
           roteiroId: n.roteiroId,
         },
       });

@@ -51,6 +51,8 @@ export async function gerarRoteiroAction(
   ficha?: string,
   /** E55 PR 2b: a chave do assunto em alta trazido para o ramo (Tema livre `?alta=`); o servidor confere que ele ainda está na lista de agora. */
   assuntoEmAlta?: string,
+  /** E53 (parte 3): o id da notícia de um assunto da marca (Tema livre `?noticiaAssuntoId=`); `gerarRoteiro` confere que é desta marca. */
+  noticiaAssuntoId?: number,
 ): Promise<ResultadoAcao<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
@@ -68,6 +70,7 @@ export async function gerarRoteiroAction(
       momentoDoDia: validarMomentoDoDia(momentoDoDia),
       noticiaId,
       assuntoEmAlta: origem.origem === "livre" ? assuntoEmAlta : undefined,
+      noticiaAssuntoId: origem.origem === "livre" ? noticiaAssuntoId : undefined,
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

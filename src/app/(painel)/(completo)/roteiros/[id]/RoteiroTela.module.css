@@ -959,6 +959,35 @@
   font-weight: var(--peso-medio);
 }
 
+/* E53 (parte 3): a linha de qual notícia o roteiro veio, logo abaixo da meta. */
+.linhaNoticia {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin: var(--espaco-3) 0 var(--espaco-5);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.linhaNoticia svg {
+  margin-top: 1px;
+}
+
+.linhaNoticia a {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.dadoDaNoticia {
+  display: block;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
 /* A linha de prazo logo abaixo da meta: de onde o assunto veio e por que gravar hoje. */
 .linhaMomento {
   display: grid;

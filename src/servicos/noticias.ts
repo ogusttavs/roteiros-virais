@@ -8,6 +8,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 
 import { db } from "@/db";
 import { noticias, roteiros, type Noticia } from "@/db/schema";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 
 export type PeriodoNoticias = "hoje" | "semana" | "mes";
 
@@ -27,6 +28,9 @@ export type NoticiaListada = {
   publicadoEm: Date | null;
   resumo: string | null;
   angulo: string | null;
+  /** E53 (foto do setor): a foto do veículo e o crédito ("Foto: G1"), quando o RSS direto do portal trouxe; nulos sem foto. */
+  imagemUrl: string | null;
+  imagemCredito: string | null;
   /** A marca ativa já transformou esta notícia num roteiro (isolado por marca: outra marca do mesmo setor não conta). */
   virouRoteiro: boolean;
   /** O roteiro mais recente desta marca a partir desta notícia; "Ver o roteiro" leva até ele. */
@@ -74,6 +78,8 @@ export async function noticiasDoSetor(
     publicadoEm: n.publicadoEm,
     resumo: n.resumo,
     angulo: n.angulo,
+    imagemUrl: n.imagemUrl,
+    imagemCredito: n.imagemCredito,
     virouRoteiro: roteiroMaisRecentePorNoticia.has(n.id),
     roteiroId: roteiroMaisRecentePorNoticia.get(n.id) ?? null,
   }));
@@ -90,9 +96,21 @@ export async function contagemNoticiasNaSemana(nichoId: number, agora = new Date
 
 /** A notícia aberta (a folha) e o ponto de partida do Tema livre (`comNoticia`); escopada pelo setor da marca. */
 export async function noticiaPorId(id: number, nichoId: number): Promise<Noticia | null> {
+  // Um id que não cabe na coluna lançaria em vez de voltar vazio (e derrubaria a tela de quem digitou o endereço).
+  if (idDoBancoOuNulo(id) === null) return null;
   const [linha] = await db()
     .select()
     .from(noticias)
     .where(and(eq(noticias.id, id), eq(noticias.nichoId, nichoId)));
+  return linha ?? null;
+}
+
+/**
+ * A notícia do setor de onde um roteiro nasceu, para a linha "Veio de uma notícia" da tela do roteiro: só o título, o veículo, o link e a hora (nunca o resumo). Lida só pelo id que o roteiro
+ * guardou: o `noticia_id` só é gravado depois de uma busca escopada pelo setor da marca, e o roteiro já é da marca, então esta leitura não precisa do setor atual (que pode ter mudado desde então).
+ */
+export async function noticiaDeOrigemDoRoteiro(id: number): Promise<{ titulo: string; fonte: string | null; url: string; publicadoEm: Date | null } | null> {
+  if (idDoBancoOuNulo(id) === null) return null;
+  const [linha] = await db().select({ titulo: noticias.titulo, fonte: noticias.fonte, url: noticias.url, publicadoEm: noticias.publicadoEm }).from(noticias).where(eq(noticias.id, id));
   return linha ?? null;
 }

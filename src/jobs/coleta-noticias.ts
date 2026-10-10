@@ -10,8 +10,9 @@ import { db } from "@/db";
 import { nichos, noticias } from "@/db/schema";
 import { normalizarNoticiaRss } from "@/servicos/normalizadores/noticias";
 
-import { coletarNoticiasDosAssuntos, type ResumoColetaAssuntos } from "./coleta-assuntos";
+import { baixarFeedUmaVezPorRodada, coletarNoticiasDosAssuntos, type ResumoColetaAssuntos } from "./coleta-assuntos";
 import { ErroColeta } from "./execucoes";
+import { juntarFotosDasNoticiasDoSetor, type ResumoFotosDoSetor } from "./foto-das-noticias-do-setor";
 
 const parser = new Parser();
 
@@ -57,13 +58,26 @@ export async function rodarColetaNoticias(nichoId?: number): Promise<Record<stri
     }
   }
 
+  // Cada feed dos portais é baixado uma vez por rodada: os assuntos e as fotos do setor leem os mesmos endereços (e um feed que não responde falha rápido na segunda vez, em vez de esperar o prazo de novo).
+  const baixarDaRodada = baixarFeedUmaVezPorRodada();
+
   // E53: as notícias dos assuntos que as marcas acompanham, no mesmo job (só na rodada de todos os setores). Nunca derruba a coleta por setor: se falhar, o erro vai para o resumo.
   let assuntosColetados: ResumoColetaAssuntos | undefined;
   if (nichoId === undefined) {
     try {
-      assuntosColetados = await coletarNoticiasDosAssuntos();
+      assuntosColetados = await coletarNoticiasDosAssuntos({ baixar: baixarDaRodada });
     } catch (erro) {
       erros.push(`assuntos: ${erro instanceof Error ? erro.message : String(erro)}`);
+    }
+  }
+
+  // E53 (foto do setor): as notícias do setor ganham a foto do RSS direto dos portais curados, quando o título bate. Também só na rodada de todos os setores, e nunca derruba a coleta.
+  let fotos: ResumoFotosDoSetor | undefined;
+  if (nichoId === undefined) {
+    try {
+      fotos = await juntarFotosDasNoticiasDoSetor({ baixar: baixarDaRodada });
+    } catch (erro) {
+      erros.push(`fotos do setor: ${erro instanceof Error ? erro.message : String(erro)}`);
     }
   }
 
@@ -79,6 +93,7 @@ export async function rodarColetaNoticias(nichoId?: number): Promise<Record<stri
     termosBuscados,
     noticiasProcessadas,
     assuntos: assuntosColetados,
+    fotos,
     erros: erros.length > 0 ? erros : undefined,
   };
 }

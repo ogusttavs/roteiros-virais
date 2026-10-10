@@ -34,6 +34,15 @@ type Props = {
   aoCriarRoteiro: (noticia: NoticiaNaTela) => void;
 };
 
+/**
+ * O nome do veículo no bloco de tipografia quebra só ENTRE palavras (nunca "Consumido / r" no meio de uma): um nome comprido ou com uma palavra grande ganha letra menor, para caber no cartão estreito.
+ * A medida é a do que cabe a 390 px de largura no cartão de duas colunas.
+ */
+export function veiculoEhLongo(veiculo: string): boolean {
+  const nome = veiculo.trim();
+  return nome.length > 18 || nome.split(/\s+/).some((palavra) => palavra.length > 11);
+}
+
 function Foto({ noticia }: { noticia: NoticiaNaTela }) {
   if (noticia.imagemUrl) {
     return (
@@ -47,7 +56,7 @@ function Foto({ noticia }: { noticia: NoticiaNaTela }) {
   }
   return (
     <div className={styles.semFoto} aria-hidden="true">
-      <span className={styles.veiculoGrande}>{noticia.veiculo || textosNoticias.veiculoDesconhecido}</span>
+      <span className={[styles.veiculoGrande, veiculoEhLongo(noticia.veiculo) ? styles.veiculoLongo : ""].filter(Boolean).join(" ")}>{noticia.veiculo || textosNoticias.veiculoDesconhecido}</span>
       <span className={styles.aspas}>&ldquo;</span>
     </div>
   );

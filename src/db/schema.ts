@@ -1300,6 +1300,9 @@ export const noticias = pgTable("noticias", {
   relevante: boolean("relevante"),
   /** Angulo sugerido para virar roteiro ("saiu hoje que X, explique o que muda para o seu cliente") */
   angulo: text("angulo"),
+  /** E53 (foto do setor): a foto do veículo, só do que o RSS direto do portal traz (a notícia do Google News não tem foto, o link é um redirecionador), e o crédito ("Foto: G1"). Nulos sem foto. */
+  imagemUrl: text("imagem_url"),
+  imagemCredito: text("imagem_credito"),
   coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -1332,6 +1335,13 @@ export const assuntosDaMarca = pgTable(
   ],
 );
 export type AssuntoDaMarca = typeof assuntosDaMarca.$inferSelect;
+
+/**
+ * E53 (parte 3): a notícia de um assunto da marca que deu origem a um roteiro ("Criar roteiro com esta notícia" na capa), guardada como cópia no roteiro: o título, o veículo, o link e o dia. Sem
+ * chave estrangeira de propósito: tirar o assunto ou ele expirar só o marca como inativo (a linha da notícia fica), mas excluir a marca apaga tudo em cascata e uma limpeza futura de notícias
+ * antigas também apagaria, e o "De onde veio" do roteiro não pode sumir junto. (A do setor tem a chave `roteiros.noticia_id`, que o setor mantém.)
+ */
+export type NoticiaDeOrigemGuardada = { id: number; titulo: string; veiculo: string; url: string | null; publicadoEm: string | null };
 
 /**
  * E53: a notícia de um assunto. NUNCA o texto da matéria: o título, o veículo, a hora, o link para o original, a foto do veículo com o crédito (do RSS ou do `og:image` da página) e o resumo
@@ -1811,6 +1821,8 @@ export const roteiros = pgTable(
     noticiaId: integer("noticia_id").references(() => noticias.id),
     /** E55 PR 2: nulo, salvo no roteiro que nasceu do tema do momento (ver `TemaDoMomentoGuardado`). */
     temaDoMomento: jsonb("tema_do_momento").$type<TemaDoMomentoGuardado>(),
+    /** E53 (parte 3): nulo, salvo no roteiro que nasceu de uma notícia de um assunto da marca (ver `NoticiaDeOrigemGuardada`). */
+    noticiaDoAssunto: jsonb("noticia_do_assunto").$type<NoticiaDeOrigemGuardada>(),
     criadoEm: criadoEm(),
   },
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data), index("roteiros_data").on(t.data)],
