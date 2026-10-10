@@ -7,6 +7,13 @@ export const textosPush = {
   /** A notificação do lembrete: com roteiro marcado na agenda do dia, ou só os temas. */
   roteiroPronto: "O seu roteiro de hoje está pronto",
   temasChegaram: "Os temas de hoje chegaram",
+  /** E55 PR 2c: quando uma marca da pessoa tem o assunto do momento, ele vem na frente (é a única coisa do dia que tem prazo): o título é o assunto, e o toque abre o Hoje, com o cartão no alto. */
+  emAlta: {
+    titulo: (assunto: string) => `Em alta hoje: ${assunto}`,
+    corpo: "Tem um tema pronto para o seu ramo, para gravar hoje.",
+    /** Para quem cuida de mais de uma marca: o toque abre a marca ativa, então o corpo diz qual tem o assunto. */
+    corpoDaMarca: (marca: string) => `Tem um tema pronto para ${marca}, para gravar hoje.`,
+  },
   /** A folha do pedido de permissão, na primeira abertura do aplicativo instalado. */
   pedido: {
     titulo: "Quer o aviso de manhã?",

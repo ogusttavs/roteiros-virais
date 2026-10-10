@@ -65,6 +65,19 @@
   background: var(--cor-superficie-hover);
 }
 
+/* E55 PR 2c: "1 do momento: frente fria" embaixo da última leitura do ramo. */
+.linhaMomento {
+  display: flex;
+  max-width: 28rem;
+  white-space: normal;
+  align-items: center;
+  gap: var(--espaco-1);
+  margin-top: var(--espaco-1);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-destaque);
+}
+
 .mono {
   font-family: var(--fonte-mono);
   color: var(--cor-titulo);

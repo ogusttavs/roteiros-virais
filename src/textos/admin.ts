@@ -83,6 +83,8 @@ export const textosAdmin = {
     colunaUltimaLeitura: "última leitura",
     colunaEstado: "estado",
     nuncaLeu: "ainda não leu",
+    /** E55 PR 2c: a linha embaixo da última leitura do ramo que ganhou tema do momento hoje ("1 do momento: frente fria"). */
+    doMomento: (assuntos: string[]) => `${assuntos.length} do momento: ${assuntos.join(", ")}`,
     ativo: "ativo",
     inativo: "inativo",
     vazio: "Um ramo reúne os clientes de um mesmo setor e define de onde vêm os temas do dia.",

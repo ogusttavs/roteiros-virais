@@ -36,6 +36,7 @@ import {
 import { chamadasDesde, JANELA_MS, LIMITE_CHAMADAS_HORA } from "@/jobs/meta-api";
 import { JANELA_SEMANA_MS, LIMITE_HASHTAGS_SEMANA } from "@/jobs/meta-hashtags";
 import { config, hojeISO } from "@/lib/config";
+import { assuntosDoMomentoPorRamoSemFalha } from "@/servicos/em-alta";
 import { aparelhosAtivosPorPessoa } from "@/servicos/push";
 import { constanciaDoCliente } from "@/servicos/temas";
 
@@ -54,10 +55,12 @@ export type NichoComContagem = {
   videosPorPlataforma: ContagemPlataforma;
   contasVigiadas: number;
   ultimaLeitura: Date | null;
+  /** E55 PR 2c: o assunto do momento do ramo hoje (o tema do momento nos temas de hoje, enquanto o assunto segue em alta); vazio se o ramo não tem. */
+  assuntosDoMomento: string[];
 };
 
 export async function listarNichosComContagem(): Promise<NichoComContagem[]> {
-  const [listaNichos, contagensVideos, contagensVigiadas, ultimasLeituras] = await Promise.all([
+  const [listaNichos, contagensVideos, contagensVigiadas, ultimasLeituras, momentoPorRamo] = await Promise.all([
     db().select().from(nichos),
     db()
       .select({ nichoId: videos.nichoId, plataforma: videos.plataforma, total: count() })
@@ -79,6 +82,7 @@ export async function listarNichosComContagem(): Promise<NichoComContagem[]> {
       .select({ nichoId: videos.nichoId, ultima: max(videos.coletadoEm) })
       .from(videos)
       .groupBy(videos.nichoId),
+    assuntosDoMomentoPorRamoSemFalha(hojeISO()),
   ]);
 
   return listaNichos.map((nicho) => {
@@ -96,6 +100,7 @@ export async function listarNichosComContagem(): Promise<NichoComContagem[]> {
       videosPorPlataforma,
       contasVigiadas,
       ultimaLeitura: ultimaLeituraTexto ? new Date(ultimaLeituraTexto) : null,
+      assuntosDoMomento: momentoPorRamo.get(nicho.id) ?? [],
     };
   });
 }

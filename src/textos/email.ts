@@ -30,6 +30,8 @@ import { envolverEmail, linkEmail } from "./casca-email";
 export type ItemAgendaPendente = { titulo: string; status: "gerado" | "gravado" | "postado" };
 export type MarcaPendente = {
   nome: string;
+  /** E55 PR 2c: o assunto do momento do ramo da marca hoje e o título do tema trazido para o ramo; ausente quando o ramo não tem tema do momento. */
+  emAlta?: { assunto: string; tituloDoTema: string } | null;
   atrasados: string[];
   planoHoje: { lugar: string; situacao: string }[];
   agendaHoje: ItemAgendaPendente[];
@@ -53,8 +55,8 @@ function blocoPlano(marcas: MarcaPendente[]): string {
   if (comPlano.length === 0) return "";
   return comPlano
     .map((marca) => {
-      const itens = marca.planoHoje.map((item) => `${item.lugar}: ${item.situacao}`).join("<br>");
-      const titulo = marcas.length > 1 ? `<p><strong>${marca.nome}</strong></p>` : "";
+      const itens = marca.planoHoje.map((item) => `${escaparHtml(item.lugar)}: ${escaparHtml(item.situacao)}`).join("<br>");
+      const titulo = marcas.length > 1 ? `<p><strong>${escaparHtml(marca.nome)}</strong></p>` : "";
       return `${titulo}<p>${itens}</p>`;
     })
     .join("");
@@ -65,8 +67,8 @@ function blocoAtrasado(marcas: MarcaPendente[]): string {
   if (comAtrasado.length === 0) return "";
   return comAtrasado
     .map((marca) => {
-      const itens = marca.atrasados.join("<br>");
-      const titulo = marcas.length > 1 ? `<p><strong>${marca.nome}: atrasado</strong></p>` : "<p><strong>Atrasado</strong></p>";
+      const itens = marca.atrasados.map(escaparHtml).join("<br>");
+      const titulo = marcas.length > 1 ? `<p><strong>${escaparHtml(marca.nome)}: atrasado</strong></p>` : "<p><strong>Atrasado</strong></p>";
       return `${titulo}<p>${itens}</p>`;
     })
     .join("");
@@ -78,24 +80,51 @@ function blocoAgenda(marcas: MarcaPendente[]): string {
   return comAgenda
     .map((marca) => {
       const itens = marca.agendaHoje
-        .map((item) => `${item.titulo} (${ROTULO_ESTADO_AGENDA[item.status]})`)
+        .map((item) => `${escaparHtml(item.titulo)} (${ROTULO_ESTADO_AGENDA[item.status]})`)
         .join("<br>");
-      const titulo = marcas.length > 1 ? `<p><strong>${marca.nome}</strong></p>` : "";
+      const titulo = marcas.length > 1 ? `<p><strong>${escaparHtml(marca.nome)}</strong></p>` : "";
       return `${titulo}<p>${itens}</p>`;
     })
     .join("");
 }
 
+/** O assunto vem de um feed público (Google, YouTube): nunca entra no HTML do e-mail sem escapar. */
+function escaparHtml(texto: string): string {
+  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+type MarcaComAlta = MarcaPendente & { emAlta: NonNullable<MarcaPendente["emAlta"]> };
+
+/** As marcas da pessoa que têm o assunto do momento hoje, na ordem em que vêm (o lembrete as ordena pelo nome). A primeira dá o assunto do aviso. */
+export function marcasComAssuntoDoMomento(marcas: MarcaPendente[]): MarcaComAlta[] {
+  return marcas.filter((marca): marca is MarcaComAlta => Boolean(marca.emAlta));
+}
+
 export const textosEmail = {
   assuntoLembrete: "O seu tema está pronto para gravar",
+  /** E55 PR 2c: com o assunto do momento no ramo de uma das marcas, o assunto do e-mail é ele (a mesma frase do push). */
+  assuntoDoLembrete: (marcas: MarcaPendente[]): string => {
+    const [primeira] = marcasComAssuntoDoMomento(marcas);
+    return primeira ? `Em alta hoje: ${primeira.emAlta.assunto}` : textosEmail.assuntoLembrete;
+  },
   corpoLembrete: (marcas: MarcaPendente[]) => {
-    const nomes = marcas.map((marca) => marca.nome);
+    const comAlta = marcasComAssuntoDoMomento(marcas);
+    // O assunto do momento vem na frente, antes de tudo: é a única coisa do dia que tem prazo. Uma linha por marca que o tem (cada ramo tem o seu tema), e a frase do prazo uma vez só; as outras marcas seguem com o texto de sempre.
+    const blocoEmAlta =
+      comAlta.length > 0
+        ? `${comAlta
+            .map((marca) => `<p><strong>Em alta hoje no Brasil: ${escaparHtml(marca.emAlta.assunto)}.</strong> Tem um tema pronto para ${escaparHtml(marca.nome)}: "${escaparHtml(marca.emAlta.tituloDoTema)}".</p>`)
+            .join("")}<p>Ele vale enquanto o assunto estiver em alta. O roteiro sai em poucos minutos e é curto: dá para gravar no celular, hoje.</p>`
+        : "";
+    const nomes = marcas.filter((marca) => !comAlta.includes(marca as MarcaComAlta)).map((marca) => escaparHtml(marca.nome));
     const textoDeSempre =
-      nomes.length === 1
-        ? `<p>O tema de <strong>${nomes[0]}</strong> está pronto para gravar.</p>`
-        : `<p>O tema está pronto para gravar em ${listaMarcas(nomes)}.</p>`;
+      nomes.length === 0
+        ? ""
+        : nomes.length === 1
+          ? `<p>O tema de <strong>${nomes[0]}</strong> está pronto para gravar.</p>`
+          : `<p>O tema está pronto para gravar em ${listaMarcas(nomes)}.</p>`;
     return envolverEmail(
-      `${blocoAtrasado(marcas)}${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
+      `${blocoEmAlta}${blocoAtrasado(marcas)}${blocoPlano(marcas)}${blocoAgenda(marcas)}${textoDeSempre}<p>${linkEmail(`${config.appUrl}/hoje`, "abrir o painel")}</p>`,
     );
   },
 };
