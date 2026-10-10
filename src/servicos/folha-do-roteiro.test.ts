@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConteudoRoteiro } from "@/db/schema";
+import { textoSemMarcas } from "@/lib/marcas-de-fala";
 
 import { dataPorExtenso, folhaDoRoteiro, LIMITE_DA_FALA_POR_UNIDADE, partirFala, temposDosBlocosReels } from "./folha-do-roteiro";
 import type { VideoParaEmbed } from "./pesquisa";
@@ -49,6 +50,74 @@ function roteiro(parcial: Partial<RoteiroLinha> = {}, conteudo: Partial<Conteudo
     ...parcial,
   } as unknown as RoteiroLinha;
 }
+
+const MARCAS = {
+  blocos: [
+    { bloco: "gancho" as const, marcado: "Se a mancha volta dois dias depois,{/} o problema é a {p:ordem}.{v}{//}", tom: "direto" as const },
+    { bloco: "corpo" as const, marcado: "Mostre a peça com a mancha de {p:volta}.{//}" + String.fromCharCode(10) + "Explique a ordem certa enquanto faz.{v}{//}", tom: "perto" as const },
+    { bloco: "fechamento" as const, marcado: "Mostre a peça {p:limpa}.{v}{//}", tom: "calmo" as const },
+    { bloco: "chamadaFinal" as const, marcado: "{d:Me manda uma mensagem que eu te digo qual produto usar}.{v}{//}", tom: "firme" as const },
+  ],
+  avisos: [],
+};
+
+describe("folhaDoRoteiro com as marcas de fala (E41 2c)", () => {
+  it("cada fala leva a sua versão marcada, e o tom do bloco vai na primeira unidade dele", () => {
+    const folha = folhaDoRoteiro(roteiro(), "Casa em Ordem", null, MARCAS);
+    expect(folha.comMarcas).toBe(true);
+    const falas = folha.unidades.filter((u) => u.fala);
+    expect(falas.map((u) => u.fala)).toEqual([
+      "Se a mancha volta dois dias depois, o problema é a ordem.",
+      "Mostre a peça com a mancha de volta.",
+      "Explique a ordem certa enquanto faz.",
+      "Mostre a peça limpa.",
+      "Me manda uma mensagem que eu te digo qual produto usar.",
+    ]);
+    expect(falas.map((u) => u.falaMarcada)).toEqual([
+      "Se a mancha volta dois dias depois,{/} o problema é a {p:ordem}.{v}{//}",
+      "Mostre a peça com a mancha de {p:volta}.{//}",
+      "Explique a ordem certa enquanto faz.{v}{//}",
+      "Mostre a peça {p:limpa}.{v}{//}",
+      "{d:Me manda uma mensagem que eu te digo qual produto usar}.{v}{//}",
+    ]);
+    // O tom só na primeira unidade de cada bloco.
+    expect(folha.unidades.map((u) => u.tom).filter(Boolean)).toEqual(["direto", "perto", "calmo", "firme"]);
+    // O texto sem as marcas é o texto da folha de sempre, unidade por unidade.
+    for (const u of falas) expect(textoSemMarcas(u.falaMarcada!)).toBe(u.fala);
+  });
+
+  it("sem as marcas, a folha é a de sempre: nenhuma unidade leva fala marcada nem tom", () => {
+    const folha = folhaDoRoteiro(roteiro(), "Casa em Ordem", null);
+    expect(folha.comMarcas).toBe(false);
+    expect(folha.unidades.every((u) => u.falaMarcada === null && u.tom === null)).toBe(true);
+  });
+
+  it("uma fala comprida partida em pedaços leva um marcado em cada", () => {
+    const frase = "Esta é uma frase comprida que fala da mancha e do que fazer com ela no dia a dia de quem cuida da casa com carinho e com pressa.";
+    const longa = `${frase} ${frase} ${frase} ${frase}`;
+    const marcado = `${frase.replace("mancha", "{p:mancha}")}{//} ${frase}{//} ${frase}{//} ${frase}{v}{//}`;
+    const folha = folhaDoRoteiro(roteiro({}, { gancho: longa }), "Casa em Ordem", null, { blocos: [{ bloco: "gancho", marcado, tom: "direto" }], avisos: [] });
+    const falas = folha.unidades.filter((u) => u.fala);
+    const doGancho = falas.slice(0, falas.findIndex((u) => u.fala === "Mostre a peça com a mancha de volta."));
+    expect(doGancho.length).toBeGreaterThan(1);
+    expect(doGancho.every((u) => u.falaMarcada !== null)).toBe(true);
+    expect(doGancho.map((u) => u.fala).join(" ")).toBe(longa);
+    expect(doGancho[0].falaMarcada).toContain("{p:mancha}");
+  });
+
+  it("um bloco cujo marcado não é do texto sai sem marcas, e os outros mantêm as suas", () => {
+    const torto = { ...MARCAS, blocos: MARCAS.blocos.map((b) => (b.bloco === "corpo" ? { ...b, marcado: "Outro texto qualquer.{//}" } : b)) };
+    const folha = folhaDoRoteiro(roteiro(), "Casa em Ordem", null, torto);
+    const doCorpo = folha.unidades.filter((u) => u.fala === "Mostre a peça com a mancha de volta." || u.fala === "Explique a ordem certa enquanto faz.");
+    expect(doCorpo.every((u) => u.falaMarcada === null && u.tom === null)).toBe(true);
+    expect(folha.unidades.filter((u) => u.fala === "Mostre a peça limpa.")[0].falaMarcada).toBe("Mostre a peça {p:limpa}.{v}{//}");
+  });
+
+  it("Story não leva marcas, mesmo com marcas na mão", () => {
+    const story = roteiro({ formato: "story" }, { cartoes: [{ oQueFalar: "Olha esta mancha", oQueMostrar: "o banco", textoNaTela: "mancha", figurinha: "nenhuma" }] });
+    expect(folhaDoRoteiro(story, "Casa em Ordem", null, MARCAS).comMarcas).toBe(false);
+  });
+});
 
 const video: VideoParaEmbed = {
   id: 3,
@@ -154,7 +223,7 @@ describe("folhaDoRoteiro: o roteiro como se imprime", () => {
     expect(folha.unidades.map((u) => u.tempo)).toEqual([null, null, null]);
     expect(folha.unidades[0].fala).toBe("Bom dia, hoje tem mancha teimosa.");
     expect(folha.unidades[1].mostrar.some((linha) => linha.startsWith("Figurinha:"))).toBe(true);
-    expect(folha.unidades[2]).toEqual({ tempo: null, rotulo: "Onde gravar e o que mostrar", fala: null, mostrar: ["0 a 3 s: a peça com a mancha, em primeiro plano"], fimDoBloco: true });
+    expect(folha.unidades[2]).toEqual({ tempo: null, rotulo: "Onde gravar e o que mostrar", fala: null, falaMarcada: null, tom: null, mostrar: ["0 a 3 s: a peça com a mancha, em primeiro plano"], fimDoBloco: true });
   });
 
   it("vídeo sem fala: os cartões só com o que mostrar (nenhuma fala) e a legenda do post", () => {

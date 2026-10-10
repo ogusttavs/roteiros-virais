@@ -1,3 +1,4 @@
+import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
 
 /**
@@ -53,10 +54,32 @@ export function escaparHtml(texto: string): string {
   return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-/** O pé de cada página do PDF (`footerTemplate` do Chromium): "Roteiro de <marca>, <data>" e "página X de Y". O nome da marca é de quem a pessoa digitou, então vai escapado. */
-export function rodapeDoPdf(marca: string, dataPorExtenso: string): string {
+/**
+ * O pé de cada página do PDF (`footerTemplate` do Chromium): "Roteiro de <marca>, <data>" e "página X de Y". O nome da marca é de quem a pessoa digitou, então vai escapado. Com as marcas
+ * de fala (E41 2c), uma linha de legenda em cima, em cada página: o papel não abre a folha "Como ler as marcas". O pé do Chromium não recebe o CSS da página, então a legenda é HTML com
+ * estilo na própria linha, com as mesmas seis marcas do painel.
+ */
+export function rodapeDoPdf(marca: string, dataPorExtenso: string, comLegendaDasMarcas = false): string {
   const { peEsquerda, pePagina, peDe } = textosRoteiro.folha;
-  return `<div style="width:100%;box-sizing:border-box;padding:0 16mm;display:flex;justify-content:space-between;font-family:monospace;font-size:8px;color:#8a8a8a"><span>${escaparHtml(peEsquerda(marca, dataPorExtenso))}</span><span>${pePagina} <span class="pageNumber"></span> ${peDe} <span class="totalPages"></span></span></div>`;
+  const estiloDaLinha = "display:flex;justify-content:space-between;font-family:monospace;font-size:8px;color:#8a8a8a";
+  const conteudoDaLinha = `<span>${escaparHtml(peEsquerda(marca, dataPorExtenso))}</span><span>${pePagina} <span class="pageNumber"></span> ${peDe} <span class="totalPages"></span></span>`;
+  const quadro = "width:100%;box-sizing:border-box;padding:0 16mm";
+  if (!comLegendaDasMarcas) return `<div style="${quadro};${estiloDaLinha}">${conteudoDaLinha}</div>`;
+  const l = textosMarcasDeFala.legendaDoPapel;
+  const cinza = "#6b6b6b";
+  const barra = (longa: boolean) =>
+    `<span style="display:inline-block;width:${longa ? "8px" : "2px"};height:8px;margin:0 3px;vertical-align:-1px;border-radius:1px;background:${
+      longa ? `linear-gradient(90deg,${cinza} 0 30%,transparent 30% 70%,${cinza} 70% 100%)` : cinza
+    }"></span>`;
+  const legenda = [
+    `<b style="padding:0 3px;border-radius:2px;background:#e3edc2;color:#1c1c1c">${l.peso}</b>`,
+    `<span>${l.a}${barra(false)}${l.pausa}</span>`,
+    `<span>${l.a}${barra(true)}${l.pausaLonga}</span>`,
+    `<span style="text-decoration:underline wavy #5f7a00">${l.devagar}</span>`,
+    `<span>&#8600; ${l.tomDesce}</span>`,
+    `<span>&#8599; ${l.tomSobe}</span>`,
+  ].join('<span style="margin:0 5px"></span>');
+  return `<div style="${quadro};font-family:sans-serif;font-size:8px;color:${cinza}"><div style="padding-bottom:3px;margin-bottom:3px;border-bottom:1px solid #dcdcdc;white-space:nowrap">${legenda}</div><div style="${estiloDaLinha}">${conteudoDaLinha}</div></div>`;
 }
 
 /** Uma resposta que não é 2xx do Playwright (o token vencido, o roteiro que sumiu) não é a página de impressão: vira erro, nunca um PDF da página de erro. */

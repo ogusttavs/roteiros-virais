@@ -10,6 +10,7 @@ import {
   HelpCircle,
   History,
   ImageDown,
+  Mic,
   Music,
   Newspaper,
   Pencil,
@@ -51,6 +52,7 @@ import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
+import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -58,6 +60,7 @@ import { BlocoCenas } from "@/ui/componentes/BlocoCenas";
 import { BlocoEdicao, type ItemEdicao } from "@/ui/componentes/BlocoEdicao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
+import { TrilhoDaChave } from "@/ui/componentes/ChaveLiga";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { ConviteInstalar } from "@/ui/componentes/ConviteInstalar";
 import { LinhaMarcasDeFala } from "@/ui/componentes/LinhaMarcasDeFala";
@@ -362,6 +365,9 @@ export function RoteiroTela({
       })
     : blocos;
   const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);
+  // E41 2c: "No PDF e na imagem, com as marcas de fala", no menu "Mais opções": desligada por padrão, vale para o PDF e para a imagem (as marcas que ainda não existem são escritas na hora do pedido).
+  const [exportarComMarcas, setExportarComMarcas] = useState(false);
+  const pedirComMarcas = exportarComMarcas && temChaveDeMarcas;
   /** Igual a `reescrevendo`, mas lido na hora nos fechamentos e solto antes de navegar (o estado só solta no fim). */
   const reescritaEmCursoRef = useRef(false);
   /** Qual painel está aberto agora: uma ação que termina depois precisa saber se o painel dela ainda está na tela. */
@@ -650,7 +656,7 @@ export function RoteiroTela({
     setErroToast(null);
     try {
       // Login vencido volta como a página de entrada com status 200: só serve o que veio como PDF de verdade.
-      const pdf = await pedirPdfDoRoteiro(roteiro.id);
+      const pdf = await pedirPdfDoRoteiro(roteiro.id, { comMarcas: pedirComMarcas });
       // Mesmo nome que a rota manda em `Content-Disposition`.
       baixarArquivo(pdf, `roteiro-${roteiro.data}.pdf`);
       // E26 (passo 23): o toast "PDF do roteiro pronto, Abrir" fica para quem não viu o download cair (o iPad abre o arquivo em outra aba).
@@ -676,7 +682,7 @@ export function RoteiroTela({
     setErroMenu(null);
     setErroToast(null);
     try {
-      const arquivos = await pedirImagensDoRoteiro(roteiro.id);
+      const arquivos = await pedirImagensDoRoteiro(roteiro.id, { comMarcas: pedirComMarcas });
       avisarRedeOk();
       if (painelAbertoRef.current === "menu") fechar();
       // O "gerando" acaba aqui: a folha de compartilhar pode ficar aberta o quanto a pessoa quiser, e o menu não deve dizer "Gerando a imagem" enquanto isso.
@@ -1286,6 +1292,20 @@ export function RoteiroTela({
           {guardandoImagem ? textosRoteiro.gerandoImagem : textosRoteiro.menu.guardarImagem}
           <MotivoSemRede className={styles.motivoItem} />
         </button>
+        {temChaveDeMarcas ? (
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={exportarComMarcas}
+            onClick={() => setExportarComMarcas((ligada) => !ligada)}
+            className={styles.itemMenu}
+            data-marcas-no-papel
+          >
+            <Mic size={20} strokeWidth={1.5} aria-hidden="true" />
+            {textosMarcasDeFala.noPdfEImagem}
+            <TrilhoDaChave ligada={exportarComMarcas} />
+          </button>
+        ) : null}
         {versoes.length > 1 ? (
           <button
             type="button"

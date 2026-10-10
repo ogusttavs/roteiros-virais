@@ -5,8 +5,8 @@
  */
 
 /** O arquivo PDF do roteiro, gerado no servidor (leva alguns segundos). Falha com o erro da rede, que quem chama distingue de "o servidor não conseguiu". */
-export async function pedirPdfDoRoteiro(roteiroId: number): Promise<Blob> {
-  const resposta = await fetch(`/api/roteiros/${roteiroId}/pdf`);
+export async function pedirPdfDoRoteiro(roteiroId: number, opcoes: { comMarcas?: boolean } = {}): Promise<Blob> {
+  const resposta = await fetch(`/api/roteiros/${roteiroId}/pdf${opcoes.comMarcas ? "?marcas=1" : ""}`);
   if (!resposta.ok || !resposta.headers.get("content-type")?.includes("application/pdf")) {
     throw new Error("o pdf nao veio");
   }
@@ -14,8 +14,8 @@ export async function pedirPdfDoRoteiro(roteiroId: number): Promise<Blob> {
 }
 
 /** As imagens 9:16 do roteiro (uma por quadro; um roteiro longo vira duas ou mais), já como arquivos PNG com o nome `roteiro-<data>-1.png`. */
-export async function pedirImagensDoRoteiro(roteiroId: number): Promise<File[]> {
-  const resposta = await fetch(`/api/roteiros/${roteiroId}/imagem`);
+export async function pedirImagensDoRoteiro(roteiroId: number, opcoes: { comMarcas?: boolean } = {}): Promise<File[]> {
+  const resposta = await fetch(`/api/roteiros/${roteiroId}/imagem${opcoes.comMarcas ? "?marcas=1" : ""}`);
   if (!resposta.ok || !resposta.headers.get("content-type")?.includes("application/json")) {
     throw new Error("a imagem nao veio");
   }

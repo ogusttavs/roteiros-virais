@@ -214,6 +214,24 @@ export function marcadoParaOsParagrafos(paragrafos: string[], marcado: string[] 
   return null;
 }
 
+/**
+ * O parágrafo marcado partido nos mesmos pedaços em que o texto simples foi partido (a imagem 9:16 parte uma fala comprida em quadros): o pedaço `i` do marcado tem as mesmas palavras do
+ * pedaço `i` do texto, por contagem. Nulo se as palavras não batem (o marcado não é deste texto): quem chama volta ao texto simples.
+ */
+export function fatiarMarcado(marcado: string, pedacos: string[]): string[] | null {
+  const palavras = lerPalavras(marcado);
+  const contagens = pedacos.map(contarPalavras);
+  if (contagens.reduce((soma, n) => soma + n, 0) !== palavras.length) return null;
+  const fatias: string[] = [];
+  let inicio = 0;
+  for (const n of contagens) {
+    fatias.push(escreverPalavras(palavras.slice(inicio, inicio + n)));
+    inicio += n;
+  }
+  // A trava, pedaço a pedaço: o que sobra sem as marcas é o texto do pedaço.
+  return fatias.every((fatia, i) => textoSemMarcas(fatia) === normalizar(pedacos[i])) ? fatias : null;
+}
+
 /** Um pedaço do texto marcado, na ordem, para a tela desenhar (E41 parte 2b). */
 export type TrechoDaFala =
   | { tipo: "texto"; texto: string }

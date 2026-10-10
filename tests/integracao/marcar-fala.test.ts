@@ -10,6 +10,7 @@ import { briefings, clientes, geracoesIA, nichos, roteiros, user, type ConteudoR
 import * as cliente from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { config } from "@/lib/config";
+import { pedidoComMarcas, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
 import { blocosFalados, falaDoRoteiro, marcarBloco, marcarFalaDoRoteiro, marcasParaATela, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
 import { editarRoteiro, ErroRoteiro, roteiroPorId } from "@/servicos/roteiro";
@@ -489,6 +490,73 @@ describe("o que a tela recebe (E41 2b)", () => {
 
   it("marcasParaATela de nulo é nulo", () => {
     expect(marcasParaATela(null)).toBeNull();
+  });
+});
+
+describe("o PDF e a imagem com as marcas (E41 2c)", () => {
+  async function linhaDoRoteiro(id: number) {
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    return linha;
+  }
+  async function marcaDoTeste() {
+    const [c] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    return c;
+  }
+  const pedido = (marcas: boolean) => new Request(`http://localhost/api/roteiros/1/pdf${marcas ? "?marcas=1" : ""}`);
+
+  it("sem ?marcas=1 não faz nada: nenhuma marca é escrita nem pedida", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(false), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(false);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+  });
+
+  it("com ?marcas=1 e sem marcas, escreve na hora (uma chamada) e diz que a folha vai com elas", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(true);
+    expect(vi.mocked(cliente.gerarEstruturado)).toHaveBeenCalledTimes(1);
+    expect(await marcasGuardadas(id)).not.toBeNull();
+  });
+
+  it("com as marcas já guardadas, não chama a IA de novo", async () => {
+    const id = await criarRoteiro();
+    await marcarFalaDoRoteiro(clienteId, id);
+    vi.mocked(cliente.gerarEstruturado).mockClear();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toBe(true);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("no 'ver como' nada é escrito: sem marcas prontas a folha sai como sempre; com elas, vai com elas", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), true)).toBe(false);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+    await marcarFalaDoRoteiro(clienteId, id);
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), true)).toBe(true);
+  });
+
+  it("Story e vídeo sem fala saem sem marcas, sem chamar a IA", async () => {
+    const story = await criarRoteiro({ formato: "story" });
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(story), await marcaDoTeste(), false)).toBe(false);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("o erro da IA sobe: o PDF não sai sem as marcas que a pessoa pediu, sem avisar", async () => {
+    const id = await criarRoteiro();
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async () => {
+      throw new ErroIA("erro da API (429): limite.");
+    });
+    await expect(pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).rejects.toBeInstanceOf(ErroIA);
+  });
+
+  it("o endereço de impressão leva ?marcas=1 só quando a folha vai com as marcas", async () => {
+    const id = await criarRoteiro();
+    const linha = await linhaDoRoteiro(id);
+    const c = await marcaDoTeste();
+    expect(urlDeImpressao(linha, c, "a4")).not.toContain("marcas=1");
+    expect(urlDeImpressao(linha, c, "celular", false)).not.toContain("marcas=1");
+    expect(urlDeImpressao(linha, c, "a4", true)).toContain("&marcas=1");
+    expect(urlDeImpressao(linha, c, "celular", true)).toContain("formato=celular&marcas=1");
   });
 });
 

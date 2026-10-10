@@ -162,6 +162,72 @@ test.describe("exportar o roteiro", () => {
     expect(await page.evaluate(() => (window as unknown as { __compartilhou?: boolean }).__compartilhou)).toBeUndefined();
   });
 
+  test("a chave 'No PDF e na imagem, com as marcas de fala' leva as marcas ao pedido do PDF e ao da imagem (E41 2c)", async ({ page }) => {
+    test.setTimeout(120_000);
+    const id = await criarRoteiro("exportar com marcas");
+    await entrar(page);
+    await page.goto(`/roteiros/${id}`);
+
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    const menu = page.getByRole("menu");
+    const chave = menu.getByRole("menuitemcheckbox", { name: "No PDF e na imagem, com as marcas de fala" });
+    await expect(chave).toBeVisible();
+    // Desligada por padrão: o pedido do PDF não leva as marcas.
+    await expect(chave).toHaveAttribute("aria-checked", "false");
+    const pedidoSem = page.waitForRequest((r) => r.url().includes(`/api/roteiros/${id}/pdf`));
+    const downloadSem = page.waitForEvent("download");
+    await menu.getByRole("menuitem", { name: "Baixar em PDF" }).click();
+    expect((await pedidoSem).url()).not.toContain("marcas=1");
+    await downloadSem;
+
+    // Ligada, vale para o PDF e para a imagem (e a chave não fecha o menu).
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    await chave.click();
+    await expect(chave).toHaveAttribute("aria-checked", "true");
+    await expect(menu).toBeVisible();
+    const pedidoCom = page.waitForRequest((r) => r.url().includes(`/api/roteiros/${id}/pdf?marcas=1`));
+    const downloadCom = page.waitForEvent("download");
+    await menu.getByRole("menuitem", { name: "Baixar em PDF" }).click();
+    await pedidoCom;
+    const pdf = await readFile((await (await downloadCom).path())!);
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    const pedidoDaImagem = page.waitForRequest((r) => r.url().includes(`/api/roteiros/${id}/imagem?marcas=1`));
+    const downloadDaImagem = page.waitForEvent("download");
+    await page.getByRole("menu").getByRole("menuitem", { name: "Guardar como imagem no celular" }).click();
+    await pedidoDaImagem;
+    const imagem = await downloadDaImagem;
+    const { largura, altura } = dimensoesDoPng(await readFile((await imagem.path())!));
+    expect({ largura, altura }).toEqual({ largura: 1080, altura: 1920 });
+
+    // As marcas existem no roteiro (escritas ao abrir ou na hora do pedido).
+    const [linha] = await db().select({ marcas: roteiros.marcasDeFala }).from(roteiros).where(eq(roteiros.id, id));
+    expect(linha.marcas?.blocos.length).toBeGreaterThan(0);
+
+    // A página de impressão recebe mesmo as marcas: a imagem com elas (a legenda no pé, a fala marcada) é outra imagem, e sem elas continua a de sempre.
+    const sem = (await (await page.request.get(`/api/roteiros/${id}/imagem`)).json()) as { imagens: string[] };
+    const com = (await (await page.request.get(`/api/roteiros/${id}/imagem?marcas=1`)).json()) as { imagens: string[] };
+    expect(sem.imagens.length).toBeGreaterThan(0);
+    expect(com.imagens.length).toBeGreaterThan(0);
+    expect(com.imagens[0]).not.toBe(sem.imagens[0]);
+    const semDeNovo = (await (await page.request.get(`/api/roteiros/${id}/imagem`)).json()) as { imagens: string[] };
+    expect(semDeNovo.imagens[0]).toBe(sem.imagens[0]);
+  });
+
+  test("em Story a chave das marcas não aparece no menu", async ({ page }) => {
+    const id = await criarRoteiro(
+      "exportar story sem marcas",
+      { gancho: "", corpo: "", fechamento: "", chamadaFinal: "", cartoes: [{ oQueFalar: "Olha esta mancha", oQueMostrar: "o banco", textoNaTela: "mancha", figurinha: "nenhuma" }] },
+      { formato: "story" },
+    );
+    await entrar(page);
+    await page.goto(`/roteiros/${id}`);
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    await expect(page.getByRole("menu").getByRole("menuitem", { name: "Baixar em PDF" })).toBeVisible();
+    await expect(page.getByRole("menu").getByRole("menuitemcheckbox")).toHaveCount(0);
+  });
+
   // A folha de compartilhar só vale em aparelho de toque (o celular e o tablet): `(pointer: coarse)`.
   test.describe("no aparelho de toque", () => {
     test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });

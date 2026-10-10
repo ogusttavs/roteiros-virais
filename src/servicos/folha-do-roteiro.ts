@@ -5,6 +5,7 @@
 import { fichaDoRoteiro, ROTULO_PARA_QUE } from "@/config/fichas";
 import { seloDoTipo } from "@/config/formatos";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
+import { BLOCOS_FALADOS, fatiarMarcado, marcadoParaOsParagrafos, paragrafosMarcados, type MarcasParaATela, type TomDoBloco } from "@/lib/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import type { VideoParaEmbed } from "./pesquisa";
@@ -18,6 +19,10 @@ export type UnidadeDaFolha = {
   rotulo: string | null;
   /** Um parágrafo da fala; nulo na unidade que só traz o que mostrar (Story e vídeo sem fala sem texto). */
   fala: string | null;
+  /** E41 2c: a mesma fala com as marcas (`{p:}`, `{//}`...), quando a folha vai com as marcas; o texto sem elas é `fala`. */
+  falaMarcada: string | null;
+  /** E41 2c: o tom do bloco ("direto", "perto", "calmo", "firme"), só na primeira unidade dele e só com as marcas. */
+  tom: TomDoBloco | null;
   /** O texto na tela e as cenas do bloco, uma linha cada, só na última unidade dele ("Na tela (0 a 2 s): ..."). */
   mostrar: string[];
   /** A última unidade do bloco: leva o filete embaixo. */
@@ -34,6 +39,8 @@ export type FolhaDoRoteiro = {
   /** "O recado deste vídeo": o que a pessoa disse que o vídeo precisa comunicar, quando disse. */
   recado: string | null;
   unidades: UnidadeDaFolha[];
+  /** E41 2c: a folha leva as marcas de fala (a legenda curta no pé, porque o papel não abre a folha "Como ler as marcas"). */
+  comMarcas: boolean;
   /** "Como editar", só em Reels falado (nos outros formatos o que editar já está em cada cartão). */
   comoEditar: { rotulo: string; texto: string }[] | null;
   /** "De onde veio", só quando o roteiro nasceu de um vídeo do banco. */
@@ -121,7 +128,7 @@ function primeiraFrase(texto: string, limite = 90): string | null {
   return `${frase.slice(0, limite - 1).trimEnd()}…`;
 }
 
-export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: VideoParaEmbed | null): FolhaDoRoteiro {
+export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: VideoParaEmbed | null, marcas: MarcasParaATela | null = null): FolhaDoRoteiro {
   const corpo = corpoDoRoteiro(roteiro);
   const ehStory = roteiro.formato === "story";
   const reelsFalado = !ehStory && roteiro.estilo !== "sem_fala";
@@ -131,21 +138,36 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
   blocosParaLeitura(roteiro).forEach((bloco, indice) => {
     const mostrar = [...(bloco.mostrar ?? []), ...(bloco.cenas ?? []).map((cena) => textosRoteiro.mostrar.oQueMostrar(`${cena.momento}, ${cena.oQueFazer}`))];
     // Cada pedaço da fala é uma unidade (um parágrafo, ou uma parte dele quando é comprido): a imagem 9:16 parte um bloco entre dois quadros sem cortar uma frase no meio.
-    const falas = bloco.paragrafos.flatMap((p) => (p.trim().length > 0 ? partirFala(p) : []));
+    // Com as marcas (E41 2c), cada pedaço leva o seu marcado: o parágrafo marcado é partido nas mesmas palavras; um bloco cujo marcado não bate com o texto sai sem marcas.
+    const nomeDoBloco = reelsFalado && marcas ? BLOCOS_FALADOS[indice] : undefined;
+    const marcadoDoBloco = nomeDoBloco ? marcadoParaOsParagrafos(bloco.paragrafos, paragrafosMarcados(marcas ?? null, nomeDoBloco)) : null;
+    const tomDoBloco = marcadoDoBloco && nomeDoBloco ? (marcas?.blocos.find((b) => b.bloco === nomeDoBloco)?.tom ?? null) : null;
+    const falasMarcadas: (string | null)[] = [];
+    const falas = bloco.paragrafos.flatMap((p, iParagrafo) => {
+      if (p.trim().length === 0) return [];
+      const pedacos = partirFala(p);
+      const fatias = marcadoDoBloco && marcadoDoBloco.length === bloco.paragrafos.length ? fatiarMarcado(marcadoDoBloco[iParagrafo], pedacos) : null;
+      pedacos.forEach((_, i) => falasMarcadas.push(fatias ? fatias[i] : null));
+      return pedacos;
+    });
     // O que mostrar vai junto da última fala; quando são muitas linhas (várias cenas), as que passam de quatro viram unidades próprias, para nenhuma unidade passar do quadro.
     const grupos: string[][] = [];
     for (let i = 0; i < mostrar.length; i += LINHAS_DE_MOSTRAR_POR_UNIDADE) grupos.push(mostrar.slice(i, i + LINHAS_DE_MOSTRAR_POR_UNIDADE));
-    const unidadesDoBloco: Omit<UnidadeDaFolha, "tempo" | "rotulo" | "fimDoBloco">[] =
+    const unidadesDoBloco: (Omit<UnidadeDaFolha, "tempo" | "rotulo" | "fimDoBloco" | "tom" | "falaMarcada"> & { marcada?: string | null })[] =
       falas.length > 0
-        ? falas.map((fala, i) => ({ fala, mostrar: i === falas.length - 1 ? (grupos[0] ?? []) : [] })).concat(grupos.slice(1).map((linhas) => ({ fala: "", mostrar: linhas })))
+        ? falas
+            .map((fala, i) => ({ fala, marcada: falasMarcadas[i] ?? null, mostrar: i === falas.length - 1 ? (grupos[0] ?? []) : [] }))
+            .concat(grupos.slice(1).map((linhas) => ({ fala: "", marcada: null, mostrar: linhas })))
         : grupos.length > 0
-          ? grupos.map((linhas) => ({ fala: "", mostrar: linhas }))
-          : [{ fala: "", mostrar: [] }];
+          ? grupos.map((linhas) => ({ fala: "", marcada: null, mostrar: linhas }))
+          : [{ fala: "", marcada: null, mostrar: [] }];
     unidadesDoBloco.forEach((unidade, i) => {
       unidades.push({
         tempo: i === 0 && tempos ? (tempos[indice] ?? null) : null,
         rotulo: i === 0 ? bloco.rotulo : null,
         fala: unidade.fala || null,
+        falaMarcada: unidade.marcada ?? null,
+        tom: i === 0 ? tomDoBloco : null,
         mostrar: unidade.mostrar,
         fimDoBloco: i === unidadesDoBloco.length - 1,
       });
@@ -155,7 +177,15 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
   if (!reelsFalado && corpo.cenas.length > 0) {
     const linhas = corpo.cenas.map((cena) => `${cena.momento}: ${cena.oQueFazer}`);
     for (let i = 0; i < linhas.length; i += LINHAS_DE_MOSTRAR_POR_UNIDADE) {
-      unidades.push({ tempo: null, rotulo: i === 0 ? textosRoteiro.ondeGravar : null, fala: null, mostrar: linhas.slice(i, i + LINHAS_DE_MOSTRAR_POR_UNIDADE), fimDoBloco: i + LINHAS_DE_MOSTRAR_POR_UNIDADE >= linhas.length });
+      unidades.push({
+        tempo: null,
+        rotulo: i === 0 ? textosRoteiro.ondeGravar : null,
+        fala: null,
+        falaMarcada: null,
+        tom: null,
+        mostrar: linhas.slice(i, i + LINHAS_DE_MOSTRAR_POR_UNIDADE),
+        fimDoBloco: i + LINHAS_DE_MOSTRAR_POR_UNIDADE >= linhas.length,
+      });
     }
   }
 
@@ -201,6 +231,7 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
     chips,
     recado: roteiro.objetivoDoVideo?.trim() || null,
     unidades,
+    comMarcas: unidades.some((u) => u.falaMarcada !== null),
     comoEditar,
     deOndeVeio,
     legenda: corpo.legenda?.trim() || null,

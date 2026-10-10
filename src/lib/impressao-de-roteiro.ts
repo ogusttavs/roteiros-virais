@@ -5,6 +5,7 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { falaDoRoteiro, marcarFalaDoRoteiro } from "@/servicos/marcar-fala";
 import { roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
 
 /**
@@ -12,8 +13,13 @@ import { roteiroPorId, type RoteiroLinha } from "@/servicos/roteiro";
  * impressão com o token. A guarda no Chromium, o tempo limite e o pé do PDF estão em `chromium-de-impressao.ts` (puros, com teste).
  */
 
-/** O roteiro e a marca de quem pediu, ou a resposta de erro que a rota devolve (sem sessão, id inválido, roteiro de outra marca). */
-export async function roteiroDeQuemPediu(params: Promise<{ id: string }>): Promise<{ roteiro: RoteiroLinha; cliente: Cliente } | NextResponse> {
+/**
+ * O roteiro e a marca de quem pediu, ou a resposta de erro que a rota devolve (sem sessão, id inválido, roteiro de outra marca). `somenteLeitura` é o "ver como": a rota só lê, nada se
+ * escreve em nome de outra pessoa (nem as marcas de fala que o PDF pediu).
+ */
+export async function roteiroDeQuemPediu(
+  params: Promise<{ id: string }>,
+): Promise<{ roteiro: RoteiroLinha; cliente: Cliente; somenteLeitura: boolean } | NextResponse> {
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
@@ -34,7 +40,22 @@ export async function roteiroDeQuemPediu(params: Promise<{ id: string }>): Promi
   if (!roteiro) {
     return NextResponse.json({ erro: "roteiro nao encontrado" }, { status: 404 });
   }
-  return { roteiro, cliente };
+  return { roteiro, cliente, somenteLeitura: sessao.verComo != null };
+}
+
+/**
+ * "No PDF e na imagem, com as marcas de fala" (E41 2c): o pedido leva `?marcas=1`. Devolve se a folha vai com as marcas. Só vai com as marcas quando o roteiro tem fala para marcar
+ * (Reels falado) e elas existem para o texto de agora; se ainda não existem, escreve na hora (a pessoa pediu: uma chamada, uma vez, como em `marcarFalaDoRoteiro`). No "ver como" nada é
+ * escrito: sem marcas prontas, a folha sai como sempre. Erro da IA sobe: o PDF não sai sem as marcas que a pessoa pediu, sem avisar.
+ */
+export async function pedidoComMarcas(request: Request, roteiro: RoteiroLinha, cliente: Cliente, somenteLeitura: boolean): Promise<boolean> {
+  if (new URL(request.url).searchParams.get("marcas") !== "1") return false;
+  const fala = falaDoRoteiro(roteiro, somenteLeitura);
+  if (!fala.podeMarcar) return false;
+  if (fala.marcas) return true;
+  if (somenteLeitura) return false;
+  const resultado = await marcarFalaDoRoteiro(cliente.id, roteiro.id);
+  return resultado.ok;
 }
 
 /**
@@ -44,7 +65,7 @@ export async function roteiroDeQuemPediu(params: Promise<{ id: string }>): Promi
  * O token vale 60 s: as rotas chamam isto DENTRO da vaga do Chromium (`comLimiteDeChromium`), logo antes de navegar, e não antes de esperar na fila; senão um pedido que esperou mais que isso
  * navegaria com o token vencido e receberia a página 404 no lugar do roteiro.
  */
-export function urlDeImpressao(roteiro: RoteiroLinha, cliente: Cliente, formato: "a4" | "celular"): string {
+export function urlDeImpressao(roteiro: RoteiroLinha, cliente: Cliente, formato: "a4" | "celular", comMarcas = false): string {
   const token = criarTokenImpressao(roteiro.id, cliente.id);
-  return `http://127.0.0.1:${process.env.PORT ?? 3000}/roteiros/${roteiro.id}/imprimir?token=${encodeURIComponent(token)}&formato=${formato}`;
+  return `http://127.0.0.1:${process.env.PORT ?? 3000}/roteiros/${roteiro.id}/imprimir?token=${encodeURIComponent(token)}&formato=${formato}${comMarcas ? "&marcas=1" : ""}`;
 }

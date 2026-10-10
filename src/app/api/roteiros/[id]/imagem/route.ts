@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
 import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
-import { roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
+import { pedidoComMarcas, roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
 import { MAXIMO_DE_QUADROS, PAGINAR_QUADROS } from "@/lib/paginar-quadros";
 
@@ -18,19 +18,21 @@ const LARGURA = 360;
 const ALTURA = 640;
 const ESCALA = 3;
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const doRoteiro = await roteiroDeQuemPediu(params);
   if (doRoteiro instanceof NextResponse) return doRoteiro;
-  const { roteiro, cliente } = doRoteiro;
+  const { roteiro, cliente, somenteLeitura } = doRoteiro;
 
   try {
+    // E41 2c: com `?marcas=1` as marcas de fala são escritas aqui, antes da vaga do Chromium.
+    const comMarcas = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
     const resultado = await comLimiteDeChromium(async () => {
       const navegador = await chromium.launch();
       try {
         const pagina = await navegador.newPage({ viewport: { width: LARGURA + 48, height: ALTURA + 48 }, deviceScaleFactor: ESCALA });
         await pagina.emulateMedia({ colorScheme: "light" });
         // O token nasce aqui, dentro da vaga: depois de esperar na fila ele já podia estar vencido (vale 60 s).
-        const resposta = await pagina.goto(urlDeImpressao(roteiro, cliente, "celular"), { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
+        const resposta = await pagina.goto(urlDeImpressao(roteiro, cliente, "celular", comMarcas), { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
         conferirPaginaDeImpressao(resposta);
         // As fontes do painel têm de estar carregadas antes de medir o que cabe.
         await comTempoLimite(pagina.evaluate("document.fonts.ready.then(() => true)"), "tempo esgotado esperando as fontes");

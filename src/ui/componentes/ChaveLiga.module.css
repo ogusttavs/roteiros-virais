@@ -90,3 +90,10 @@
     transition: none;
   }
 }
+
+/* A chave só desenhada (`TrilhoDaChave`), no fim de uma linha de menu: não é botão, o item inteiro é. */
+.trilho {
+  display: block;
+  margin-left: auto;
+  cursor: inherit;
+}
