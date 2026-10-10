@@ -70,6 +70,29 @@ export const textosTemaLivre = {
     placeholder: "Conte como esse assunto aparece no seu trabalho, com um caso de hoje.",
   },
 
+  /**
+   * E28 (parte 3), "Responder em vídeo" (design v2, `TemaLivre.dc.html`, estado `comPergunta`): a pergunta do público é o ponto de partida, presa no alto como a notícia (a pessoa pode tirá-la).
+   * O rótulo e a linha de origem dizem de onde ela vem e de quando é (o desenho dizia "nesta semana"; aqui, a plataforma e o dia da leitura). Reclamação tem o mesmo desenho, com o rótulo dela.
+   */
+  comPergunta: {
+    tituloCompacto: "Seu assunto",
+    titulo: "Responder o que estão perguntando",
+    tituloReclamacao: "Responder o que estão reclamando",
+    subtitulo: "A pergunta é o ponto de partida. Conte como você responde quando um cliente pergunta isso, e a gente dá a nota antes de escrever.",
+    subtituloReclamacao: "A reclamação é o ponto de partida. Conte como você responde quando um cliente reclama disso, e a gente dá a nota antes de escrever.",
+    rotulo: "O público pergunta",
+    rotuloReclamacao: "O público reclama",
+    tirar: "Tirar a pergunta",
+    tirarReclamacao: "Tirar a reclamação",
+    pergunta: "Como você responde?",
+    dica: "A resposta que você daria, do seu jeito, para quem te pergunta isso. Pode escrever ou falar.",
+    dicaReclamacao: "O que você diria, do seu jeito, para quem reclama disso. Pode escrever ou falar.",
+    placeholder: "Escreva a resposta do jeito que você explicaria para um cliente, com um exemplo do seu trabalho.",
+    placeholderReclamacao: "Escreva do jeito que você explicaria para um cliente, com um exemplo do que dá certo no seu trabalho.",
+    /** "perguntado 14 vezes · nos comentários de vídeos do YouTube do seu setor, lidos em 11 de outubro". */
+    origem: (vezes: string, plataformas: string, dia: string): string => `${vezes} · nos comentários de vídeos do ${plataformas} do seu setor, lidos em ${dia}`,
+  },
+
   tituloEsperando: "Avaliando o seu tema",
   subtituloEsperando: "Procurando no que já está guardado do seu setor se esse assunto tem chance.",
   esperandoTopo: "Costuma levar menos de 10 segundos.",

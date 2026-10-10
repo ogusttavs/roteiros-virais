@@ -73,6 +73,12 @@ type NoticiaOrigem = { id: number; titulo: string; fonteEData: string; /** De on
 /** E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela ("Trazer para o meu ramo"); `linha` já vem pronta do servidor (de onde vem e desde quando). */
 type AssuntoEmAltaPreso = { chave: string; assunto: string; linha: string };
 
+/**
+ * E28 (parte 3): a pergunta (ou reclamação) do público que a pessoa trouxe com "Responder em vídeo" (`?pergunta=`); `linha` já vem pronta do servidor ("perguntado 14 vezes · nos comentários de
+ * vídeos do YouTube do seu setor, lidos em 11 de outubro"). `reclamacao` troca o rótulo e os textos do campo; o desenho é o mesmo.
+ */
+type PerguntaPreso = { chave: string; texto: string; linha: string; reclamacao: boolean };
+
 type Props = {
   notaMinima: number;
   temaInicial?: string;
@@ -88,6 +94,8 @@ type Props = {
   noticia?: NoticiaOrigem;
   /** E55 PR 2b: presente quando a tela abriu a partir do Criar, "Trazer para o meu ramo" (`?alta=`). */
   emAlta?: AssuntoEmAltaPreso;
+  /** E28 (parte 3): presente quando a tela abriu a partir de "Responder em vídeo" (`?pergunta=`). */
+  pergunta?: PerguntaPreso;
   /** O rascunho do momento é por marca (a folha "Gravar agora" guarda o que a pessoa escreveu no aparelho). */
   marcaAtivaId?: number;
 };
@@ -109,6 +117,7 @@ export function TemaLivreTela({
   dataInicial,
   noticia,
   emAlta,
+  pergunta,
   marcaAtivaId,
 }: Props) {
   const router = useRouter();
@@ -125,6 +134,11 @@ export function TemaLivreTela({
   const [assuntoPreso, setAssuntoPreso] = useState(emAlta !== undefined);
   const comAlta = fase === "proposta" && assuntoPreso && emAlta !== undefined;
   const chaveParaEnviar = assuntoPreso ? emAlta?.chave : undefined;
+  /** E28 (parte 3): "Tirar a pergunta" devolve o Tema livre comum, com o texto preservado; uma vez tirada, ela não entra mais na nota nem no roteiro. */
+  const [perguntaPresa, setPerguntaPresa] = useState(pergunta !== undefined);
+  const comPergunta = fase === "proposta" && perguntaPresa && pergunta !== undefined;
+  const perguntaParaEnviar = perguntaPresa ? pergunta?.chave : undefined;
+  const textosPergunta = textosTemaLivre.comPergunta;
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
@@ -151,7 +165,7 @@ export function TemaLivreTela({
   // (que também exige `fase === "proposta"`; aqui a tela já pode estar em "naMeta").
   const noticiaIdParaEnviar = noticiaPresa && noticia?.origem === "setor" ? noticia.id : undefined;
   const noticiaAssuntoIdParaEnviar = noticiaPresa && noticia?.origem === "assunto" ? noticia.id : undefined;
-  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${noticiaAssuntoIdParaEnviar ? `&noticiaAssuntoId=${noticiaAssuntoIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}`;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${noticiaAssuntoIdParaEnviar ? `&noticiaAssuntoId=${noticiaAssuntoIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}${perguntaParaEnviar ? `&pergunta=${encodeURIComponent(perguntaParaEnviar)}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -213,7 +227,7 @@ export function TemaLivreTela({
     setFase("esperando");
     // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
-    avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar, noticiaAssuntoIdParaEnviar)
+    avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar, noticiaAssuntoIdParaEnviar, perguntaParaEnviar)
       .then((dados) => {
         avisarRedeOk();
         setTexto(limpo);
@@ -258,7 +272,7 @@ export function TemaLivreTela({
   return (
     <div className={styles.pagina}>
       <BarraTopo
-        titulo={comAlta ? textosTemaLivre.comAlta.tituloCompacto : TITULO_COMPACTO[fase]}
+        titulo={comAlta ? textosTemaLivre.comAlta.tituloCompacto : comPergunta ? textosPergunta.tituloCompacto : TITULO_COMPACTO[fase]}
         esquerda={
           <button
             type="button"
@@ -275,8 +289,28 @@ export function TemaLivreTela({
 
       <div className={styles.miolo}>
         <div className={styles.cabecalhoTela}>
-          <h1 className={styles.titulo}>{comNoticia ? textosTemaLivre.tituloComNoticia : comAlta ? textosTemaLivre.comAlta.titulo : TITULO[fase]}</h1>
-          <p className={styles.subtitulo}>{comNoticia ? textosTemaLivre.subtituloComNoticia : comAlta ? textosTemaLivre.comAlta.subtitulo : SUBTITULO[fase]}</p>
+          <h1 className={styles.titulo}>
+            {comNoticia
+              ? textosTemaLivre.tituloComNoticia
+              : comAlta
+                ? textosTemaLivre.comAlta.titulo
+                : comPergunta
+                  ? pergunta?.reclamacao
+                    ? textosPergunta.tituloReclamacao
+                    : textosPergunta.titulo
+                  : TITULO[fase]}
+          </h1>
+          <p className={styles.subtitulo}>
+            {comNoticia
+              ? textosTemaLivre.subtituloComNoticia
+              : comAlta
+                ? textosTemaLivre.comAlta.subtitulo
+                : comPergunta
+                  ? pergunta?.reclamacao
+                    ? textosPergunta.subtituloReclamacao
+                    : textosPergunta.subtitulo
+                  : SUBTITULO[fase]}
+          </p>
         </div>
 
         {/*
@@ -343,6 +377,17 @@ export function TemaLivreTela({
                 <h3 className={styles.tituloNoticiaPresa}>{emAlta.assunto}</h3>
                 <span className={styles.fonteENoticiaPresa}>{emAlta.linha}</span>
               </section>
+            ) : comPergunta && pergunta ? (
+              <section className={[styles.cartao, styles.cartaoRecuado, styles.noticiaPresa].join(" ")} aria-label={pergunta.reclamacao ? textosPergunta.rotuloReclamacao : textosPergunta.rotulo} data-pergunta-presa={pergunta.chave}>
+                <div className={styles.topoNoticiaPresa}>
+                  <span className={styles.rotulo}>{pergunta.reclamacao ? textosPergunta.rotuloReclamacao : textosPergunta.rotulo}</span>
+                  <Botao variante="ghost" tamanho="md" onClick={() => setPerguntaPresa(false)}>
+                    {pergunta.reclamacao ? textosPergunta.tirarReclamacao : textosPergunta.tirar}
+                  </Botao>
+                </div>
+                <h3 className={styles.tituloNoticiaPresa}>{pergunta.texto}</h3>
+                <span className={styles.fonteENoticiaPresa}>{pergunta.linha}</span>
+              </section>
             ) : (
               <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
                 {textosMomento.botaoAbrirTemaLivre}
@@ -350,15 +395,35 @@ export function TemaLivreTela({
             )}
             <section className={[styles.cartao, styles.campo].join(" ")}>
               <CampoComFala
-                rotulo={comNoticia ? textosTemaLivre.oQueVocePensou : comAlta ? textosTemaLivre.comAlta.pergunta : textosTemaLivre.titulo}
-                rotuloOculto={!comNoticia && !comAlta}
-                ajuda={comNoticia ? textosTemaLivre.dicaOQueVocePensou : comAlta ? textosTemaLivre.comAlta.dica : undefined}
-                placeholder={comNoticia ? textosTemaLivre.placeholderComNoticia : comAlta ? textosTemaLivre.comAlta.placeholder : textosTemaLivre.placeholder}
+                rotulo={comNoticia ? textosTemaLivre.oQueVocePensou : comAlta ? textosTemaLivre.comAlta.pergunta : comPergunta ? textosPergunta.pergunta : textosTemaLivre.titulo}
+                rotuloOculto={!comNoticia && !comAlta && !comPergunta}
+                ajuda={
+                  comNoticia
+                    ? textosTemaLivre.dicaOQueVocePensou
+                    : comAlta
+                      ? textosTemaLivre.comAlta.dica
+                      : comPergunta
+                        ? pergunta?.reclamacao
+                          ? textosPergunta.dicaReclamacao
+                          : textosPergunta.dica
+                        : undefined
+                }
+                placeholder={
+                  comNoticia
+                    ? textosTemaLivre.placeholderComNoticia
+                    : comAlta
+                      ? textosTemaLivre.comAlta.placeholder
+                      : comPergunta
+                        ? pergunta?.reclamacao
+                          ? textosPergunta.placeholderReclamacao
+                          : textosPergunta.placeholder
+                        : textosTemaLivre.placeholder
+                }
                 erro={campoVazio ? textosTemaLivre.campoVazio : undefined}
                 value={texto}
                 onChange={aoMudarTexto}
                 caixaAlta="longa"
-                nomeArquivo={comNoticia ? "tema-livre-noticia" : comAlta ? "tema-livre-alta" : "tema-livre"}
+                nomeArquivo={comNoticia ? "tema-livre-noticia" : comAlta ? "tema-livre-alta" : comPergunta ? "tema-livre-pergunta" : "tema-livre"}
               />
               <div className={styles.campoRodape}>
                 <span className={rascunhoComErro ? styles.rascunhoComErro : undefined} aria-live="polite">

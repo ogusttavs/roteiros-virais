@@ -31,8 +31,10 @@ import { comANoticiaPresa } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { avisoLinhaEditorial, fraseAvisoLinhaEditorial } from "./linha-editorial";
+import { diaPorExtenso } from "./noticias-assuntos";
 import { noticiasQueTocamOTema } from "./noticias-do-tema";
-import { listaDeTendenciasDeAgora, temasQueAindaValem, tendenciasQueTocamOTema } from "./tendencias";
+import { assuntoEmAltaDaLista, listaDeTendenciasDeAgora, temasQueAindaValem, tendenciasQueTocamOTema } from "./tendencias";
+import { listaDePlataformas, perguntaDoPublicoPelaChave } from "./vozes-do-publico";
 
 export class ErroTemas extends Error {}
 
@@ -397,6 +399,8 @@ export async function avaliarTema(
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string; origem?: "setor" | "assunto" },
   /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; ele entra sempre no que a nota vê do momento, mesmo que o texto dela não repita nenhuma palavra dele. */
   assuntoEmAlta?: string,
+  /** E28 (parte 3): a chave da pergunta do público que a pessoa prendeu ao Tema livre; achada de novo nas vozes DO SETOR da marca (nunca confiando no navegador). Chave que não acha nada: nota como antes. */
+  perguntaChave?: string,
 ): Promise<ResultadoAvaliarTema> {
   if (!cliente.nichoId) {
     throw new ErroTemas("este cliente ainda nao tem um nicho definido.");
@@ -434,6 +438,9 @@ export async function avaliarTema(
   );
   // E55: e os assuntos em alta no Brasil hoje que tocam o tema (o segundo sinal de momento).
   const tendenciasDoBrasil = tendenciasQueTocamOTema(texto, await listaDeTendenciasDeAgora(), assuntoEmAlta);
+  // E28 (parte 3): a pergunta do público que a pessoa quer responder (uma origem só: a notícia presa e o assunto em alta que AINDA está na lista têm a vez antes, como na geração do roteiro).
+  const assuntoPreso = assuntoEmAlta ? await assuntoEmAltaDaLista(assuntoEmAlta).catch(() => null) : null;
+  const perguntaPresa = !noticia && !assuntoPreso ? await perguntaDoPublicoPelaChave(cliente.nichoId, perguntaChave) : null;
 
   const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",
@@ -454,6 +461,15 @@ export async function avaliarTema(
       noticia,
       noticiasDoDia,
       tendenciasDoBrasil,
+      perguntaDoPublico: perguntaPresa
+        ? {
+            texto: perguntaPresa.texto,
+            tipo: perguntaPresa.tipo,
+            vezes: perguntaPresa.vezes,
+            plataformas: listaDePlataformas(perguntaPresa.plataformas),
+            lidaEm: diaPorExtenso(new Date(perguntaPresa.lidaEm)),
+          }
+        : undefined,
     }),
     // Achado 11 da revisão do motor (01/10/2026): garante o lembrete de acentuação por último
     // mesmo na segunda tentativa (mesmo raciocínio de `servicos/roteiro.ts`).

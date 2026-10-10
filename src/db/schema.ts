@@ -1420,6 +1420,21 @@ export type AssuntoDaMarca = typeof assuntosDaMarca.$inferSelect;
 export type NoticiaDeOrigemGuardada = { id: number; titulo: string; veiculo: string; url: string | null; publicadoEm: string | null };
 
 /**
+ * E28 (parte 3): a pergunta (ou reclamação, ou pedido) do público a que um roteiro responde, como a vimos quando a pessoa a prendeu ao Tema livre ("Responder em vídeo"): a frase, o tipo,
+ * quantos comentários, de que plataformas e o dia em que foi lida. Cópia de propósito (as vozes do setor mudam toda semana): o roteiro reescrito e o "De onde veio" continuam com a pergunta que
+ * a motivou.
+ */
+export type PerguntaDeOrigemGuardada = {
+  chave: string;
+  tipo: "duvida" | "objecao" | "pedido";
+  texto: string;
+  vezes: number;
+  plataformas: Plataforma[];
+  /** O dia da leitura (ISO), de `nichos.vozes_em`. */
+  lidaEm: string;
+};
+
+/**
  * E53: a notícia de um assunto. NUNCA o texto da matéria: o título, o veículo, a hora, o link para o original, a foto do veículo com o crédito (do RSS ou do `og:image` da página) e o resumo
  * NOSSO de duas linhas. Uma por assunto e por endereço.
  */
@@ -1929,6 +1944,8 @@ export const roteiros = pgTable(
     temaDoMomento: jsonb("tema_do_momento").$type<TemaDoMomentoGuardado>(),
     /** E53 (parte 3): nulo, salvo no roteiro que nasceu de uma notícia de um assunto da marca (ver `NoticiaDeOrigemGuardada`). */
     noticiaDoAssunto: jsonb("noticia_do_assunto").$type<NoticiaDeOrigemGuardada>(),
+    /** E28 (parte 3): nulo, salvo no roteiro que nasceu de "Responder em vídeo" uma pergunta do público (ver `PerguntaDeOrigemGuardada`). */
+    perguntaDoPublico: jsonb("pergunta_do_publico").$type<PerguntaDeOrigemGuardada>(),
     /**
      * E41 (2a): as marcas de fala (peso, pausa, devagar, tom), escritas na primeira vez que a pessoa liga "Marcas de fala" ou abre o modo gravação (nunca na geração, nunca nas versões que
      * ninguém escolheu). Nulo até lá, em Story, em vídeo sem fala e depois de uma edição do texto (a edição apaga as marcas; elas são refeitas na próxima vez que a pessoa ligar).

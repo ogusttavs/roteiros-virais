@@ -1,5 +1,6 @@
 "use server";
 
+import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida } from "@/servicos/assuntos";
 import { ErroAcessoNegado, clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -34,8 +35,12 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  *
  * E55 PR 2b: `assuntoEmAlta` é a chave do assunto em alta trazido para o ramo (o Tema livre
  * `?alta=`); `tendenciasQueTocamOTema` só o aceita se ele está na lista de agora e não é delicado.
+ *
+ * E28 (parte 3): `perguntaChave` é a chave da pergunta do público que a pessoa prendeu (o Tema livre
+ * `?pergunta=`); `avaliarTema` a acha de novo nas vozes do setor da marca da sessão (a chave do
+ * navegador sozinha não vale: chave que não acha nada é uma nota como antes).
  */
-export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string, noticiaAssuntoId?: number): Promise<ResultadoAvaliarTema> {
+export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string, noticiaAssuntoId?: number, perguntaChave?: string): Promise<ResultadoAvaliarTema> {
   await exigirForaDoVerComo();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
@@ -46,5 +51,5 @@ export async function avaliarTemaAction(texto: string, noticiaId?: number, assun
   // E53 (parte 3): a notícia de um assunto DESTA marca (a de outra nunca vem): o título e o resumo nosso, como a do setor.
   const noticiaDoAssunto = !noticia && noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(cliente.id, noticiaAssuntoId) : null;
   const origem = noticia ? noticiaDoSetorComoPontoDePartida(noticia) : noticiaDoAssunto ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssunto) : undefined;
-  return avaliarTema(cliente, texto, origem, assuntoEmAlta);
+  return avaliarTema(cliente, texto, origem, assuntoEmAlta, chaveDeVozValida(perguntaChave));
 }

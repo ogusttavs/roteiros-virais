@@ -178,5 +178,10 @@ export function limparParaPrompt(texto: string | null | undefined, limite: numbe
   return limpo.length > limite ? limpo.slice(0, limite).trimEnd() : limpo;
 }
 
+/** Como `limparParaPrompt`, e troca as aspas por apóstrofo: o texto de fora entra dentro de uma tag, como dado, e uma aspa solta não fecha nem abre nada. */
+export function limparParaPromptSemAspas(texto: string | null | undefined, limite: number): string {
+  return limparParaPrompt(texto, limite).replace(/["“”]/g, "'");
+}
+
 export const LIMITE_DO_TITULO = 200;
 export const LIMITE_DO_VEICULO = 60;

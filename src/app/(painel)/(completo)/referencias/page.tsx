@@ -20,6 +20,7 @@ import {
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { favoritosDoCliente } from "@/servicos/referencias";
+import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 import { textosReferencias } from "@/textos/referencias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
@@ -172,6 +173,8 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
    * não ter favorito nenhum, o que não tem relação com a análise do setor).
    */
   const aindaLendo = segmento !== "salvos" && resultado.total === 0 ? await setorAindaLendo(cliente.nichoId) : false;
+  // E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana (nulo, sem erro, no setor sem leitura); o segmento de salvos não o mostra.
+  const perguntas = segmento === "salvos" ? null : await perguntasDaTelaSemFalha(cliente.nichoId);
 
   return (
     <ReferenciasTela
@@ -195,6 +198,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       aindaLendo={aindaLendo}
       ramos={ramos.length > 1 ? ramos : undefined}
       ramoAtivo={ramoAtivo}
+      perguntas={perguntas}
     />
   );
 }

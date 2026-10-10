@@ -51,6 +51,8 @@ type Props = {
   paraHoje?: boolean;
   /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; vai ao servidor junto, para o roteiro nascer do momento. */
   assuntoEmAlta?: string;
+  /** E28 (parte 3): a chave da pergunta do público que a pessoa trouxe presa ao Tema livre; vai ao servidor junto, para o roteiro responder a ela. */
+  perguntaChave?: string;
 };
 
 /** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
@@ -66,6 +68,7 @@ export function ObjetivoTela({
   noticiaAssuntoId,
   paraHoje = false,
   assuntoEmAlta,
+  perguntaChave,
 }: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
@@ -169,6 +172,7 @@ export function ObjetivoTela({
           pergunta ? (ficha ?? undefined) : undefined,
           assuntoEmAlta,
           noticiaAssuntoId,
+          perguntaChave,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {

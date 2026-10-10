@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { nichos, type Plataforma, type VozDoPublico, type VozesDoSetor } from "@/db/schema";
+import { nichos, type PerguntaDeOrigemGuardada, type Plataforma, type VozDoPublico, type VozesDoSetor } from "@/db/schema";
 import { formaDeComparar } from "@/lib/comentarios";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
@@ -110,10 +110,27 @@ export function perguntasDoPublico(vozes: VozesDoSetor | null, maximo = 3): VozC
   return passaramDoPiso(vozes, ["duvida", "objecao"]).slice(0, maximo);
 }
 
-/** A voz de uma chave, nas três listas, passando do piso (a chave que veio de um navegador não vale sozinha). */
+/**
+ * A pergunta que a pessoa prendeu ao Tema livre, achada de novo nas vozes DO SETOR (`nichoId` é o da marca, nunca o que veio do navegador), passando do piso e ainda dentro da validade:
+ * a cópia que o roteiro guarda (`PerguntaDeOrigemGuardada`) ou nulo. Sem chave, sem setor ou sem voz, nulo: o tema segue como um tema livre comum.
+ */
+export async function perguntaDoPublicoPelaChave(nichoId: number | null, chave: string | undefined, agora: Date = new Date()): Promise<PerguntaDeOrigemGuardada | null> {
+  if (!nichoId || !chave) return null;
+  const lidas = await vozesDoSetor(nichoId, agora);
+  const voz = vozPelaChave(lidas?.vozes ?? null, chave);
+  if (!lidas || !voz) return null;
+  // A voz sem plataforma gravada (uma leitura antiga) herda a do setor; nunca fica sem dizer de onde vem.
+  const plataformas = voz.plataformas.length > 0 ? voz.plataformas : (lidas.vozes.plataformas ?? []);
+  return { chave: voz.chave, tipo: voz.tipo, texto: voz.texto, vezes: voz.vezes, plataformas, lidaEm: lidas.em.toISOString() };
+}
+
+/**
+ * A voz de uma chave que a pessoa pode prender a um vídeo, passando do piso (a chave que veio de um navegador não vale sozinha). Só pergunta e reclamação: são as duas que a tela oferece
+ * ("Responder em vídeo"); um pedido ("faz um sobre X") serve ao prompt geral, mas uma chave dele forjada não prende nada.
+ */
 export function vozPelaChave(vozes: VozesDoSetor | null, chave: string): VozComChave | null {
   if (!vozes) return null;
-  return passaramDoPiso(vozes, ["duvida", "objecao", "pedido"]).find((v) => v.chave === chave) ?? null;
+  return passaramDoPiso(vozes, ["duvida", "objecao"]).find((v) => v.chave === chave) ?? null;
 }
 
 /** Uma voz numerada para o prompt: o número é o que o modelo devolve, e o código o traduz de volta. */
@@ -146,4 +163,38 @@ export function vozesParaOPrompt(vozes: VozesDoSetor | null, opcoes: { pedidos?:
 /** De que plataformas vieram as vozes de um bloco de prompt, sem repetir ("YouTube" ou "YouTube e Instagram"). */
 export function plataformasDasVozes(vozes: VozNumerada[]): string {
   return listaDePlataformas(vozes.flatMap((v) => v.plataformas));
+}
+
+/**
+ * O que as telas (Hoje, Referências e Criar) recebem de "O que o público pergunta": as perguntas e reclamações que passaram do piso (no máximo três), e o que a frase do pé precisa para contar a
+ * verdade (quantos vídeos entraram, de que plataformas, e o dia da leitura por extenso). Dados simples, para atravessar de Server Component para Client Component.
+ */
+export type PerguntasDaTela = {
+  perguntas: { chave: string; texto: string; tipo: "duvida" | "objecao"; vezes: number }[];
+  videos: number;
+  plataformas: Plataforma[];
+  lidasEm: string;
+};
+
+/**
+ * As perguntas da semana para uma tela. Nunca lança: sem setor, sem leitura, com a leitura velha, sem nenhuma que passou do piso, ou com qualquer falha, devolve nulo e a tela segue sem o
+ * bloco (o setor pequeno que fechou a semana sem voz não vê erro, vê a tela de sempre).
+ */
+export async function perguntasDaTelaSemFalha(nichoId: number | null, agora: Date = new Date()): Promise<PerguntasDaTela | null> {
+  if (!nichoId) return null;
+  try {
+    const lidas = await vozesDoSetor(nichoId, agora);
+    const perguntas = perguntasDoPublico(lidas?.vozes ?? null);
+    if (!lidas || perguntas.length === 0) return null;
+    const plataformas = lidas.vozes.plataformas?.length ? lidas.vozes.plataformas : [...new Set(perguntas.flatMap((p) => p.plataformas))];
+    return {
+      perguntas: perguntas.map((p) => ({ chave: p.chave, texto: p.texto, tipo: p.tipo === "objecao" ? "objecao" : "duvida", vezes: p.vezes })),
+      videos: lidas.vozes.videos,
+      plataformas,
+      lidasEm: new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(lidas.em),
+    };
+  } catch (erro) {
+    logger.warn({ err: erro, nichoId }, "nao foi possivel montar as perguntas do publico para a tela; a tela segue sem elas");
+    return null;
+  }
 }

@@ -1,16 +1,18 @@
 import { redirect } from "next/navigation";
 
 import { fichaPadraoDoObjetivo, fichaRecomendadaParaTema, type Ficha } from "@/config/fichas";
+import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
 import { assuntoEmAltaDaLista } from "@/servicos/tendencias";
+import { perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string; pergunta?: string }> };
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -30,7 +32,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento } = await searchParams;
+  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
@@ -48,6 +50,8 @@ export default async function Objetivo({ searchParams }: Props) {
   // E55 PR 2b: o assunto em alta (o tema do momento, ou o que a pessoa trouxe preso ao Tema livre) é para hoje: a pergunta "Para quando é?" some e o roteiro vai para hoje.
   let paraHoje = false;
   let assuntoEmAlta: string | undefined;
+  // E28 (parte 3): a chave da pergunta do público que a pessoa quer responder; só vale se ainda é uma voz do setor da marca (o servidor confere de novo ao escrever).
+  let perguntaChave: string | undefined;
 
   if (livre) {
     origem = { origem: "livre", textoTema: livre };
@@ -56,6 +60,8 @@ export default async function Objetivo({ searchParams }: Props) {
     if (alta && (await assuntoEmAltaDaLista(alta).catch(() => null))) {
       paraHoje = true;
       assuntoEmAlta = alta;
+    } else if (chaveDeVozValida(pergunta) && !noticiaIdValida && !noticiaAssuntoIdValida && (await perguntaDoPublicoPelaChave(cliente.nichoId, pergunta).catch(() => null))) {
+      perguntaChave = pergunta;
     }
   } else {
     // E55 PR 2b: vindo de um cartão "Em alta hoje", o tema é o do assunto (`?momento=<chave>`): se o assunto saiu da lista, a pessoa volta ao Criar em vez de cair em outro tema na mesma posição.
@@ -84,6 +90,7 @@ export default async function Objetivo({ searchParams }: Props) {
       noticiaAssuntoId={noticiaAssuntoIdValida}
       paraHoje={paraHoje}
       assuntoEmAlta={assuntoEmAlta}
+      perguntaChave={perguntaChave}
     />
   );
 }

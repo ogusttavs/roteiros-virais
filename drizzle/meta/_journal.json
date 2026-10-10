@@ -568,6 +568,13 @@
       "when": 1791656520446,
       "tag": "0080_comentarios-do-publico",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1791661465704,
+      "tag": "0081_pergunta-do-publico-no-roteiro",
+      "breakpoints": true
     }
   ]
 }
