@@ -109,6 +109,8 @@ describe("marcarFalaAction", () => {
     expect(r.dado.novas).toBe(true);
     expect(r.dado.motivo).toBeNull();
     expect(r.dado.marcas?.blocos.map((b) => b.bloco)).toEqual(["gancho", "corpo", "fechamento", "chamadaFinal"]);
+    // A tela recebe os blocos e os avisos, nunca o registro do conserto nem o que o modelo errou.
+    expect(Object.keys(r.dado.marcas ?? {}).sort()).toEqual(["avisos", "blocos"]);
     const [linha] = await db().select({ marcas: roteiros.marcasDeFala }).from(roteiros).where(eq(roteiros.id, id));
     expect(linha.marcas?.blocos).toHaveLength(4);
   });

@@ -1,0 +1,83 @@
+/*
+ * "Como ler as marcas" (design v2, `base.css` do passo 24: `.lista-marcas-fala`, `.nota-marcas`): uma marca por linha, com o exemplo desenhado ao lado do nome.
+ */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  font: var(--peso-medio) var(--tamanho-secundario) / 1 var(--fonte-texto);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.botaoPequeno {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.lista {
+  display: grid;
+  gap: var(--espaco-4);
+  margin: 0;
+  padding: var(--espaco-4) 0;
+  list-style: none;
+}
+
+.lista li {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--espaco-1) var(--espaco-4);
+  align-items: baseline;
+}
+
+.exemplo {
+  grid-row: 1 / span 2;
+  font-size: var(--tamanho-cabecalho);
+  color: var(--cor-titulo);
+}
+
+.lista strong {
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+}
+
+.lista p {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.nota {
+  margin: 0;
+  padding-bottom: var(--espaco-4);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.paraEsteRoteiro {
+  display: grid;
+  gap: var(--espaco-2);
+  margin-bottom: var(--espaco-4);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.paraEsteRoteiro h4 {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.paraEsteRoteiro p {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto);
+}

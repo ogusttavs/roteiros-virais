@@ -315,3 +315,29 @@
     padding-right: max(var(--espaco-8), env(safe-area-inset-right, 0px));
   }
 }
+
+/* E41 parte 2b (passo 24): o tempo do bloco e o tom ao lado, acima da fala; as marcas crescem junto com a letra (medidas em "em"). */
+.tomGravacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.tom {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.tom svg {
+  flex: none;
+  margin-top: 0.15em;
+}
+
+.tom b {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}

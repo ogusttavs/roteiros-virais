@@ -8,10 +8,12 @@ import {
   contarPalavras,
   escreverPalavras,
   lerPalavras,
+  marcadoParaOsParagrafos,
   marcasBemFormadas,
   MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS,
   MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS_MAIS_DEVAGAR,
   normalizar,
+  paragrafosMarcados,
   pesoPelaMaisComprida,
   publicoMaisVelho,
   temChaveNoTexto,
@@ -19,6 +21,7 @@ import {
   textoSemMarcas,
   TOM_PADRAO_DO_BLOCO,
   TONS_DO_BLOCO,
+  trechosDaFala,
 } from "./marcas-de-fala";
 
 /** O texto marcado depois da leitura e da escrita: a marca nunca pode mudar o que se diz. */
@@ -373,6 +376,67 @@ describe("conferirFala: o que vira texto de apoio, nunca marca", () => {
   });
 });
 
+describe("trechosDaFala e paragrafosMarcados (a tela)", () => {
+  it("cada marca vira um trecho, na ordem, e o texto dos trechos de texto, peso e devagar é o do roteiro", () => {
+    const marcado = "Se volta,{/} o problema é a {p:ordem}.{v}{//} Custa {d:R$ 49}?{^}{//}";
+    const trechos = trechosDaFala(marcado);
+    expect(trechos.map((t) => t.tipo)).toEqual(["texto", "pausa", "texto", "peso", "texto", "tom", "pausa", "texto", "devagar", "texto", "tom", "pausa"]);
+    expect(trechos[1]).toEqual({ tipo: "pausa", duracao: "curta" });
+    expect(trechos[5]).toEqual({ tipo: "tom", direcao: "desce" });
+    expect(trechos[6]).toEqual({ tipo: "pausa", duracao: "longa" });
+    expect(trechos[10]).toEqual({ tipo: "tom", direcao: "sobe" });
+    const lido = trechos
+      .filter((t) => t.tipo === "texto" || t.tipo === "peso" || t.tipo === "devagar")
+      .map((t) => (t as { texto: string }).texto)
+      .join("");
+    // Nenhum espaço sai nem entra: o que se lê é o texto do roteiro.
+    expect(lido).toBe("Se volta, o problema é a ordem. Custa R$ 49?");
+    expect(normalizar(lido)).toBe(textoSemMarcas(marcado));
+  });
+
+  it("texto sem marca é um trecho só, e vazio não tem trecho", () => {
+    expect(trechosDaFala("Uma frase.")).toEqual([{ tipo: "texto", texto: "Uma frase." }]);
+    expect(trechosDaFala("")).toEqual([]);
+  });
+
+  it("os parágrafos marcados de um bloco voltam por quebra de linha, sem os vazios", () => {
+    const marcas = {
+      blocos: [
+        { bloco: "gancho" as const, marcado: "Oi.{//}", tom: "direto" as const },
+        { bloco: "corpo" as const, marcado: "Um.{//}\nDois.{//}", tom: "perto" as const },
+      ],
+      avisos: [],
+    };
+    expect(paragrafosMarcados(marcas, "corpo")).toEqual(["Um.{//}", "Dois.{//}"]);
+    expect(paragrafosMarcados(marcas, "gancho")).toEqual(["Oi.{//}"]);
+    expect(paragrafosMarcados(marcas, "fechamento")).toBeNull();
+    expect(paragrafosMarcados(null, "gancho")).toBeNull();
+  });
+});
+
+describe("marcadoParaOsParagrafos: a trava, repetida na hora de desenhar", () => {
+  it("devolve o marcado quando o texto e a quantidade de parágrafos batem", () => {
+    const marcado = ["Um {p:dia}.{//}", "Dois.{//}"];
+    expect(marcadoParaOsParagrafos(["Um dia.", "Dois."], marcado)).toEqual(marcado);
+  });
+
+  it("recusa marca de texto velho: o texto da tela é outro", () => {
+    expect(marcadoParaOsParagrafos(["Outro dia.", "Dois."], ["Um {p:dia}.{//}", "Dois.{//}"])).toBeNull();
+    expect(marcadoParaOsParagrafos(["Um dia.", "Dois."], null)).toBeNull();
+    expect(marcadoParaOsParagrafos(["Um dia."], [])).toBeNull();
+  });
+
+  it("a tela mostra um parágrafo só e o servidor dividiu por quebra de linha: junta com espaço, como o HTML faria", () => {
+    expect(marcadoParaOsParagrafos(["A mancha voltou. Ninguém conta."], ["A mancha voltou.{//}", "Ninguém conta.{//}"])).toEqual([
+      "A mancha voltou.{//} Ninguém conta.{//}",
+    ]);
+  });
+
+  it("a quantidade de parágrafos não bate e a tela mostra mais de um: recusa", () => {
+    expect(marcadoParaOsParagrafos(["Um.", "Dois.", "Três."], ["Um.{//}", "Dois. Três.{//}"])).toBeNull();
+  });
+});
+
 describe("o resto da biblioteca", () => {
   it("os quatro blocos têm os nomes do conteúdo do roteiro e cada um tem o seu tom padrão", () => {
     expect(BLOCOS_FALADOS).toEqual(["gancho", "corpo", "fechamento", "chamadaFinal"]);
@@ -385,5 +449,7 @@ describe("o resto da biblioteca", () => {
     const marcado = pesoPelaMaisComprida(original);
     expect(marcado).toBe("A {p:mancha} saiu. Foi {p:rápido}!");
     expect(textoIdentico(original, marcado)).toBe(true);
+    // O tom que sobe vai no fim da pergunta.
+    expect(pesoPelaMaisComprida("Você já passou por isso?")).toBe("Você já {p:passou} por isso?{^}");
   });
 });

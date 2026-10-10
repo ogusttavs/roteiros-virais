@@ -6,6 +6,7 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
 import { videoPorId } from "@/servicos/pesquisa";
@@ -68,7 +69,8 @@ export default async function Roteiro({ params }: Props) {
 
   return (
     <RoteiroTela
-      roteiro={roteiro}
+      // As marcas guardadas (com o registro do conserto) ficam no servidor: a tela recebe só `fala`.
+      roteiro={{ ...roteiro, marcasDeFala: null }}
       noticiaDeOrigem={noticiaDeOrigem}
       corpo={corpoDoRoteiro(roteiro)}
       blocos={blocosParaLeitura(roteiro)}
@@ -76,6 +78,7 @@ export default async function Roteiro({ params }: Props) {
       versoes={versoes}
       momento={momento}
       grupoDeVersoes={grupoDeVersoes}
+      fala={falaDoRoteiro(roteiro, sessao.verComo != null)}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}

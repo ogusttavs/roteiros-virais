@@ -1,0 +1,58 @@
+/*
+ * A linha das chaves do roteiro e a do modo gravação (design v2, `base.css` do passo 24: `.chaves-roteiro`, `.linha-chave`, `.marcas-gravacao`): o nome da chave, a chave, "Como ler"
+ * e, quando falta, a espera ou o erro, embaixo.
+ */
+.linha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-4);
+}
+
+.roteiro {
+  padding-bottom: var(--espaco-4);
+  border-bottom: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.gravacao {
+  justify-content: center;
+  gap: var(--espaco-1) var(--espaco-4);
+}
+
+.rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.espera {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.espera strong {
+  display: block;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.espera svg {
+  flex: none;
+  color: var(--cor-titulo);
+}
+
+.erro {
+  width: 100%;
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-erro);
+}
