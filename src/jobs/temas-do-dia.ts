@@ -41,6 +41,7 @@ import * as filtrarNoticiasIA from "@/ia/prompts/filtrarNoticias";
 import * as temasDoDiaIA from "@/ia/prompts/temasDoDia";
 import { registrarGeracao } from "@/ia/registro";
 import { hojeISO } from "@/lib/config";
+import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import {
   formatarModeloNicho,
   modeloNichoAtual,
@@ -336,7 +337,10 @@ async function gerarTemasDoNicho(
   const idsValidos = new Set([...subindo.map((v) => v.id), ...semDono.map((v) => v.id)]);
   const idsValidosNoticias = new Set(noticiasRelevantes.map((n) => n.id));
   // E28: o que o público do setor perguntou nos comentários do YouTube esta semana (vazio sem leitura ou com a leitura velha: a entrada é a de antes).
-  const vozesDoPublico = vozesParaOPrompt(await vozesDoSetor(nicho.id));
+  // O tema do dia responde a pergunta ou reclamação (pedido não entra), e a voz vai datada ("lido em 11 de outubro").
+  const vozesLidas = await vozesDoSetor(nicho.id);
+  const vozesDoPublico = vozesParaOPrompt(vozesLidas?.vozes ?? null, { pedidos: false });
+  const lidasEm = vozesLidas && vozesDoPublico.length > 0 ? diaPorExtenso(vozesLidas.em) : undefined;
   const sistemaEstavel = temasDoDiaIA.montarSistemaEstavel({
     modeloNicho: formatarModeloNicho(modeloNicho?.modelo ?? null),
   });
@@ -345,6 +349,7 @@ async function gerarTemasDoNicho(
     semDono,
     noticias: noticiasRelevantes.map((n) => ({ id: n.id, titulo: n.titulo, resumo: n.resumo ?? "" })),
     vozesDoPublico,
+    lidasEm,
     minimoBrasilEmTres: minimoBrasileirosNaProva(3, regua.proporcaoBrasil),
   };
   const entrada = temasDoDiaIA.montarEntrada(dadosEntrada);

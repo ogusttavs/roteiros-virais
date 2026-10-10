@@ -9,7 +9,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
 import { clientes, contas, geracoesIA, nichos, noticias, roteiros, temasDia, user, videos } from "@/db/schema";
-import { podeSobrescreverTemasDoDia, rodarTemasDoDia } from "@/jobs/temas-do-dia";
+import { podeSobrescreverTemasDoDia, rodarTemasDoDia, semOMomento } from "@/jobs/temas-do-dia";
 import { hojeISO } from "@/lib/config";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
 
@@ -685,6 +685,16 @@ describe("as vozes do público nos temas do dia (E28)", () => {
     const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "temasDoDia"));
     expect(geracao.versaoPrompt).toBe("1.8.0");
     expect(geracao.entradas).toMatchObject({ vozesDoPublico: 2 });
+  });
+
+  it("a pergunta não afrouxa a prova: com vozes boas e só dois vídeos, o tema continua barrado", async () => {
+    await criarVideosComProva("assunto de tecido", 2);
+    await poVozes(vozes([voz("Serve em tecido de camurça?", 14)]));
+
+    const resumo = await rodarTemasDoDia();
+    expect(resumo.semProva).toBe(1);
+    const [linha] = await db().select().from(temasDia).where(eq(temasDia.nichoId, nichoId));
+    expect(semOMomento(linha.temas)).toHaveLength(0);
   });
 
   it("a pergunta que não passou do piso de comentários iguais não vai para o prompt nem para o tema", async () => {

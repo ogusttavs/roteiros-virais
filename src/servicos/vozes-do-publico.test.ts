@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { VozDoPublico, VozesDoSetor } from "@/db/schema";
 
-import { chaveDaVoz, linhasDasVozes, listaDePlataformas, perguntasDoPublico, vozesParaOPrompt, vozesValidas, vozPelaChave } from "./vozes-do-publico";
+import { chaveDaVoz, linhasDasVozes, listaDePlataformas, perguntasDoPublico, plataformasDasVozes, vozesParaOPrompt, vozesValidas, vozPelaChave } from "./vozes-do-publico";
 
 const voz = (texto: string, vezes: number, plataformas: VozDoPublico["plataformas"] = ["youtube"]): VozDoPublico => ({ texto, vezes, videos: [1, 2], plataformas });
 
@@ -86,6 +86,39 @@ describe("vozesParaOPrompt", () => {
 
   it("sem vozes, vem vazio", () => {
     expect(vozesParaOPrompt(null)).toEqual([]);
+  });
+
+  it("o tema do dia pede sem pedidos: só pergunta e reclamação", () => {
+    const lista = vozesParaOPrompt(VOZES, { pedidos: false });
+    expect(lista.some((v) => v.tipo === "pedido")).toBe(false);
+    expect(lista.map((v) => v.numero)).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("a mesma frase em dois grupos soma antes do piso: duas partes que sozinhas não passariam passam juntas", () => {
+    const dividida: VozesDoSetor = {
+      ...VOZES,
+      duvidas: [voz("Serve em tecido de camurça?", 3, ["youtube"]), voz("serve em tecido de camurca", 3, ["instagram"]), voz("Outra pergunta qualquer?", 2)],
+      objecoes: [],
+      pedidos: [],
+    };
+    const lista = vozesParaOPrompt(dividida);
+    expect(lista).toHaveLength(1);
+    expect(lista[0]).toMatchObject({ texto: "Serve em tecido de camurça?", vezes: 6, plataformas: ["instagram", "youtube"] });
+    expect(perguntasDoPublico(dividida)).toHaveLength(1);
+  });
+
+  it("uma leitura malformada (listas que faltam) não quebra: vem vazio", () => {
+    const quebrada = { videos: 1, comentarios: 1, plataformas: ["youtube"] } as unknown as VozesDoSetor;
+    expect(vozesParaOPrompt(quebrada)).toEqual([]);
+    expect(perguntasDoPublico(quebrada)).toEqual([]);
+    expect(vozPelaChave(quebrada, "abc")).toBeNull();
+  });
+});
+
+describe("plataformasDasVozes", () => {
+  it("junta as plataformas das linhas do bloco, sem repetir", () => {
+    const lista = vozesParaOPrompt({ ...VOZES, duvidas: [voz("Uma?", 8, ["youtube"]), voz("Outra?", 7, ["instagram", "youtube"])], objecoes: [], pedidos: [] });
+    expect(plataformasDasVozes(lista)).toBe("YouTube e Instagram");
   });
 });
 

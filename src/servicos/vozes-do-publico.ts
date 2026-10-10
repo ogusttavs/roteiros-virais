@@ -16,6 +16,7 @@ import { db } from "@/db";
 import { nichos, type Plataforma, type VozDoPublico, type VozesDoSetor } from "@/db/schema";
 import { formaDeComparar } from "@/lib/comentarios";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 
 import { limparParaPrompt } from "./noticias-assuntos";
 
@@ -52,23 +53,52 @@ export function vozesValidas(vozes: VozesDoSetor | null, vozesEm: Date | null, a
   return vozes;
 }
 
-/** As vozes do setor, enquanto valem. Nulo sem leitura ainda, ou com a leitura velha. */
-export async function vozesDoSetor(nichoId: number, agora: Date = new Date()): Promise<VozesDoSetor | null> {
-  const [linha] = await db().select({ vozes: nichos.vozes, vozesEm: nichos.vozesEm }).from(nichos).where(eq(nichos.id, nichoId));
-  return vozesValidas(linha?.vozes ?? null, linha?.vozesEm ?? null, agora);
+/** As vozes de um setor e de quando foram lidas. */
+export type VozesLidas = { vozes: VozesDoSetor; em: Date };
+
+/**
+ * As vozes do setor, enquanto valem, com a data da leitura (os prompts dizem "lidos em 11 de outubro": a voz é um retrato daquela semana, nunca um fato do setor). Nulo sem leitura
+ * ainda, com a leitura velha, e se a leitura vier malformada: um setor sem vozes (a Overtake, com poucos vídeos do YouTube acima do piso, pode fechar a semana sem nenhuma) segue
+ * como antes, e nunca é isto que impede um roteiro.
+ */
+export async function vozesDoSetor(nichoId: number, agora: Date = new Date()): Promise<VozesLidas | null> {
+  try {
+    const [linha] = await db().select({ vozes: nichos.vozes, vozesEm: nichos.vozesEm }).from(nichos).where(eq(nichos.id, nichoId));
+    const vozes = vozesValidas(linha?.vozes ?? null, linha?.vozesEm ?? null, agora);
+    if (!vozes || !linha?.vozesEm) return null;
+    // Devolve só o que tem a forma esperada: listas que faltam viram vazias, e a voz sem frase ou sem número sai.
+    const inteiras = (lista: VozDoPublico[] | undefined) => (Array.isArray(lista) ? lista.filter((v) => typeof v?.texto === "string" && Number.isFinite(v?.vezes)) : []);
+    return { vozes: { ...vozes, duvidas: inteiras(vozes.duvidas), objecoes: inteiras(vozes.objecoes), pedidos: inteiras(vozes.pedidos) }, em: linha.vozesEm };
+  } catch (erro) {
+    logger.warn({ err: erro, nichoId }, "nao foi possivel ler as vozes do publico do setor; segue sem elas");
+    return null;
+  }
 }
 
 function comChave(tipo: TipoDaVoz, v: VozDoPublico): VozComChave {
   return { chave: chaveDaVoz(tipo, v.texto), tipo, texto: v.texto, vezes: v.vezes, plataformas: v.plataformas ?? [] };
 }
 
-/** Das três listas, só o que passou do piso de comentários iguais (a pergunta de um comentário só nunca aparece), do mais repetido para o menos. */
+/**
+ * Das três listas, só o que passou do piso de comentários iguais (a pergunta de um comentário só nunca aparece), do mais repetido para o menos. Duas vozes de mesma chave (a mesma
+ * frase, que o modelo deixou em grupos separados) somam antes de olhar o piso: a soma dividida não pode derrubar uma pergunta que passaria.
+ */
 function passaramDoPiso(vozes: VozesDoSetor, tipos: TipoDaVoz[]): VozComChave[] {
   const lista: VozComChave[] = [];
-  if (tipos.includes("duvida")) lista.push(...vozes.duvidas.map((v) => comChave("duvida", v)));
-  if (tipos.includes("objecao")) lista.push(...vozes.objecoes.map((v) => comChave("objecao", v)));
-  if (tipos.includes("pedido")) lista.push(...vozes.pedidos.map((v) => comChave("pedido", v)));
-  return lista.filter((v) => v.vezes >= config.regras.vozesMinimoDeComentarios).sort((a, b) => b.vezes - a.vezes || a.texto.localeCompare(b.texto));
+  if (tipos.includes("duvida")) lista.push(...(vozes.duvidas ?? []).map((v) => comChave("duvida", v)));
+  if (tipos.includes("objecao")) lista.push(...(vozes.objecoes ?? []).map((v) => comChave("objecao", v)));
+  if (tipos.includes("pedido")) lista.push(...(vozes.pedidos ?? []).map((v) => comChave("pedido", v)));
+  const porChave = new Map<string, VozComChave>();
+  for (const v of lista) {
+    const atual = porChave.get(v.chave);
+    if (atual) {
+      atual.vezes += v.vezes;
+      atual.plataformas = [...new Set([...atual.plataformas, ...v.plataformas])].sort();
+    } else {
+      porChave.set(v.chave, { ...v, plataformas: [...v.plataformas] });
+    }
+  }
+  return [...porChave.values()].filter((v) => v.vezes >= config.regras.vozesMinimoDeComentarios).sort((a, b) => b.vezes - a.vezes || a.texto.localeCompare(b.texto));
 }
 
 /**
@@ -101,11 +131,19 @@ export function linhasDasVozes(vozes: VozNumerada[]): string {
     .join("\n");
 }
 
-/** As vozes que entram nos prompts: até 3 dúvidas, 2 reclamações e 2 pedidos, numeradas de 1, as mais repetidas primeiro. */
-export function vozesParaOPrompt(vozes: VozesDoSetor | null): VozNumerada[] {
+/**
+ * As vozes que entram nos prompts: até 3 dúvidas, 2 reclamações e 2 pedidos, numeradas de 1, as mais repetidas primeiro. O tema do dia pede `pedidos: false`: ele responde a uma
+ * pergunta ou a uma reclamação, e "faz um sobre X" não é pergunta que um tema responda.
+ */
+export function vozesParaOPrompt(vozes: VozesDoSetor | null, opcoes: { pedidos?: boolean } = {}): VozNumerada[] {
   if (!vozes) return [];
   const duvidas = passaramDoPiso(vozes, ["duvida"]).slice(0, 3);
   const objecoes = passaramDoPiso(vozes, ["objecao"]).slice(0, 2);
-  const pedidos = passaramDoPiso(vozes, ["pedido"]).slice(0, 2);
+  const pedidos = opcoes.pedidos === false ? [] : passaramDoPiso(vozes, ["pedido"]).slice(0, 2);
   return [...duvidas, ...objecoes, ...pedidos].map((v, i) => ({ ...v, numero: i + 1 }));
+}
+
+/** De que plataformas vieram as vozes de um bloco de prompt, sem repetir ("YouTube" ou "YouTube e Instagram"). */
+export function plataformasDasVozes(vozes: VozNumerada[]): string {
+  return listaDePlataformas(vozes.flatMap((v) => v.plataformas));
 }

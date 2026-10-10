@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { db, getPool } from "@/db";
 import { briefings, clientes, nichos, roteiros, user, type VozesDoSetor } from "@/db/schema";
 import * as verificador from "@/ia/verificador";
+import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import { gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -83,7 +84,8 @@ afterAll(async () => {
 
 describe("as vozes do público no roteiro", () => {
   it("com a leitura da semana, a entrada traz o bloco numerado, com os comentários e a plataforma, e as fontes dos fatos também", async () => {
-    await porVozes(nichoId, vozes([voz("Serve em tecido de camurça?", 14), voz("Quanto tempo tem que esperar?", 9)], [voz("Mostrar o passo a passo no colchão", 6)]), new Date(Date.now() - 3 * DIA_MS));
+    const leitura = new Date(Date.now() - 3 * DIA_MS);
+    await porVozes(nichoId, vozes([voz("Serve em tecido de camurça?", 14), voz("Quanto tempo tem que esperar?", 9)], [voz("Mostrar o passo a passo no colchão", 6)]), leitura);
     await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
 
     const { entrada, fontes } = ultimaChamada();
@@ -92,7 +94,10 @@ describe("as vozes do público no roteiro", () => {
     expect(entrada).toContain("pergunta 2 | 9 comentários | YouTube | Quanto tempo tem que esperar?");
     expect(entrada).toContain("pedido 3 | 6 comentários | YouTube | Mostrar o passo a passo no colchão");
     expect(entrada).toContain("nunca escreva \"o público pergunta X\" sem dizer onde");
-    expect(fontes).toContain("comentários de vídeos do YouTube");
+    // datado: "lidos em <dia>" (o dia da leitura, não o de hoje), nunca como fato do setor
+    expect(entrada).toContain(`Lido nos comentários de vídeos do YouTube do setor em ${diaPorExtenso(leitura)}`);
+    expect(entrada).toContain("nunca um fato do setor");
+    expect(fontes).toContain("Lido nos comentários de vídeos do YouTube do setor");
     expect(fontes).toContain("pergunta 1 | 14 comentários | YouTube | Serve em tecido de camurça?");
   });
 
@@ -119,6 +124,25 @@ describe("as vozes do público no roteiro", () => {
     await porVozes(outroNichoId, vozes([voz("Pergunta do outro setor?", 20)]));
     await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
     expect(ultimaChamada().entrada).not.toContain("Pergunta do outro setor");
+    expect(ultimaChamada().entrada).not.toContain("vozes_do_publico");
+  });
+
+  it("o roteiro do momento nunca recebe o bloco: a cena é a única fonte", async () => {
+    await porVozes(nichoId, vozes([voz("Serve em tecido de camurça?", 14)]));
+    await gerarRoteiro(clienteId, {
+      origem: "momento",
+      momento: { onde: "no balcão da loja", oQueEstaAcontecendo: "uma cliente está escolhendo o produto", oQueDaParaMostrar: "o kit na prateleira" },
+      objetivo: "alcance",
+    });
+    const { entrada, fontes } = ultimaChamada();
+    expect(entrada).not.toContain("vozes_do_publico");
+    expect(fontes).not.toContain("Serve em tecido de camurça?");
+  });
+
+  it("uma leitura malformada no banco não impede o roteiro: segue sem as vozes", async () => {
+    await db().update(nichos).set({ vozes: { videos: 1 } as never, vozesEm: new Date() }).where(eq(nichos.id, nichoId));
+    const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+    expect(roteiro.id).toBeGreaterThan(0);
     expect(ultimaChamada().entrada).not.toContain("vozes_do_publico");
   });
 
