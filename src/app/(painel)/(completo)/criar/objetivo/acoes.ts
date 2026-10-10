@@ -18,6 +18,8 @@ import {
   validarEstilo,
   validarFormato,
   validarMomentoDoDia,
+  validarObjetivo,
+  validarOrigemDaTelaDoObjetivo,
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
@@ -58,9 +60,11 @@ export async function gerarRoteiroAction(
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
   try {
+    // O que chega do navegador é texto livre: a origem é reconstruída campo a campo (nunca espalhada, `validarOrigemDaTelaDoObjetivo`) e o objetivo é um dos três.
+    const origemValida = validarOrigemDaTelaDoObjetivo(origem);
     const roteiro = await gerarRoteiro(cliente.id, {
-      ...origem,
-      objetivo,
+      ...origemValida,
+      objetivo: validarObjetivo(objetivo),
       ficha: ehFicha(ficha) ? ficha : undefined,
       formato: validarFormato(formato),
       estilo: validarEstilo(estilo),
@@ -69,8 +73,8 @@ export async function gerarRoteiroAction(
       data: validarData(data),
       momentoDoDia: validarMomentoDoDia(momentoDoDia),
       noticiaId,
-      assuntoEmAlta: origem.origem === "livre" ? assuntoEmAlta : undefined,
-      noticiaAssuntoId: origem.origem === "livre" ? noticiaAssuntoId : undefined,
+      assuntoEmAlta: origemValida.origem === "livre" ? assuntoEmAlta : undefined,
+      noticiaAssuntoId: origemValida.origem === "livre" ? noticiaAssuntoId : undefined,
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

@@ -105,6 +105,57 @@ describe("gerarRoteiroAction", () => {
   });
 });
 
+/**
+ * Hotfix de segurança (10/10/2026, achado da revisão do PR #154): o objeto de origem que chega do navegador era espalhado (`...origem`), e um POST forjado com `origem: "momento"` e a `marcaId`
+ * de OUTRA marca passava sem conferir a posse: `marcaCitadaPorId` põe o perfil compilado dessa marca no prompt de quem chamou. Agora só as duas origens da tela do objetivo valem,
+ * reconstruídas campo a campo, e o que sobra no objeto é ignorado.
+ */
+describe("gerarRoteiroAction com o que o navegador manda", () => {
+  async function marcaDeOutraPessoa() {
+    const [nicho] = await db().select().from(nichos).limit(1);
+    await db().insert(user).values({ id: "objetivo-b-forja", name: "[teste] Outra pessoa", email: "b@objetivo-acoes.teste" });
+    const [m] = await db().insert(clientes).values({ usuarioId: "objetivo-b-forja", nome: "[teste] Marca da outra pessoa", nichoId: nicho.id }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: "objetivo-b-forja", clienteId: m.id, papel: "dono" });
+    await db().insert(briefings).values({ clienteId: m.id, completo: true, perfil: PERFIL });
+    return m;
+  }
+
+  it("a origem 'momento' com a marca de outra pessoa é recusada antes de gastar uma geração", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const outra = await marcaDeOutraPessoa();
+    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    const forjada = { origem: "momento", momento: { onde: "x", oQueEstaAcontecendo: "y", oQueDaParaMostrar: "z", marcaId: outra.id } };
+
+    const resultado = await gerarRoteiroAction(forjada as never, "alcance");
+
+    expect(resultado).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id))).toHaveLength(antes.length);
+  });
+
+  it("o que sobra no objeto de uma origem válida é ignorado: a marca citada de outra pessoa não entra no roteiro", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const outra = await marcaDeOutraPessoa().catch(async () => (await db().select().from(clientes).where(eq(clientes.usuarioId, "objetivo-b-forja")))[0]);
+    const comSobra = { origem: "livre", textoTema: "tema com sobra no objeto", momento: { marcaId: outra.id }, marcaId: outra.id };
+
+    const resultado = await gerarRoteiroAction(comSobra as never, "alcance");
+
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    expect(roteiro.clienteId).toBe(marcaA.id);
+    expect(roteiro.origem).toBe("livre");
+    expect(roteiro.momento).toBeNull();
+  });
+
+  it("um objetivo fora da lista, ou um índice que não é um número, também é recusado", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+
+    expect(await gerarRoteiroAction({ origem: "livre", textoTema: "x" }, "vendas" as never)).toEqual({ ok: false, erro: "objetivo de roteiro invalido." });
+    expect(await gerarRoteiroAction({ origem: "sugerido", temaIndice: "0" as never }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await gerarRoteiroAction({ origem: "sugerido", temaIndice: -1 }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await gerarRoteiroAction(null as never, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+  });
+});
+
 /** E49 PR 1: as cinco fichas decidem o objetivo que se grava, valem só no Reels, e a reescrita mantém a ficha. */
 describe("gerarRoteiroAction com ficha", () => {
   let contador = 0;

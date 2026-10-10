@@ -17,7 +17,7 @@ import {
   type ItemPlano,
   type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro, validarEstilo, validarFormato, validarMomentoDoDia, validarQuemAparece } from "@/servicos/roteiro";
+import { ErroRoteiro, validarEstilo, validarFormato, validarMomentoDoDia, validarObjetivo, validarQuemAparece } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
@@ -109,7 +109,8 @@ export async function aceitarPlanoAction(
       onde,
       oQueEstaAcontecendo,
       oQueDaParaMostrar,
-      objetivo: dados.objetivo,
+      // Texto livre do navegador: um dos três, ou recusa antes de gastar uma geração (`validarObjetivo`).
+      objetivo: validarObjetivo(dados.objetivo),
       ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),

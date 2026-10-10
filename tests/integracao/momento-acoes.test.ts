@@ -108,6 +108,17 @@ describe("gerarRoteiroMomentoAction", () => {
     expect(depois.length).toBe(antes.length);
   });
 
+  /** Hotfix de segurança: o objetivo chega como texto livre do navegador; fora dos três, recusa antes de gastar uma geração. */
+  it("com um objetivo fora da lista (um POST forjado), recusa antes de gerar", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "vendas" as never });
+
+    expect(resultado).toEqual({ ok: false, erro: "objetivo de roteiro invalido." });
+    expect(await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id))).toHaveLength(antes.length);
+  });
+
   it("com marcaId da propria marca ativa (sempre membro dela), gera normalmente", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaB.usuarioId));
 

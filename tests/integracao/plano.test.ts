@@ -143,6 +143,22 @@ describe("criarPlano", () => {
     expect(itens.every((item) => item.roteiroId === null)).toBe(true);
   });
 
+  it("uma agenda forjada (dias demais, data que não é data, texto enorme, forma errada) é recusada antes de gastar uma chamada de IA", async () => {
+    const cliente = await criarCliente();
+    gerarEstruturadoMock.mockClear();
+    const dia = (data: string): DiaAgenda => ({ data, lugar: "feira", compromissos: ["estande"] });
+
+    const dezenasDeDias = Array.from({ length: 40 }, (_, i) => dia(`2026-10-${String((i % 28) + 1).padStart(2, "0")}`));
+    await expect(criarPlano(cliente, dezenasDeDias, HOJE)).rejects.toThrow(ErroPlano);
+    await expect(criarPlano(cliente, [dia("amanha")], HOJE)).rejects.toThrow(ErroPlano);
+    await expect(criarPlano(cliente, [{ data: HOJE, lugar: "x".repeat(5000), compromissos: ["estande"] }], HOJE)).rejects.toThrow(ErroPlano);
+    await expect(criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: "estande" as never }], HOJE)).rejects.toThrow(ErroPlano);
+    await expect(criarPlano(cliente, { data: HOJE } as never, HOJE)).rejects.toThrow(ErroPlano);
+
+    expect(gerarEstruturadoMock).not.toHaveBeenCalled();
+    expect(await db().select().from(planoGravacoes).where(eq(planoGravacoes.clienteId, cliente.id))).toHaveLength(0);
+  });
+
   it("sem nenhum dia hoje ou depois, erro nomeado, sem criar nada", async () => {
     const cliente = await criarCliente();
     await expect(

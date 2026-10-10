@@ -14,6 +14,7 @@ import {
   validarEstilo,
   validarFormato,
   validarMomentoDoDia,
+  validarObjetivo,
   validarQuemAparece,
 } from "@/servicos/roteiro";
 
@@ -107,7 +108,8 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
         transcricao: dados.transcricao?.trim() || undefined,
         objetivoDoVideo: dados.objetivoDoVideo?.trim() || undefined,
       },
-      objetivo: dados.objetivo,
+      // Texto livre do navegador: um dos três, ou recusa antes de gastar uma geração (`validarObjetivo`).
+      objetivo: validarObjetivo(dados.objetivo),
       ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
