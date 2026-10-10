@@ -55,7 +55,7 @@ import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
-import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiasDeHojeDosAssuntos } from "./assuntos";
+import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
 import { filtroDeFormatosDaMarca } from "./formatos";
@@ -875,7 +875,7 @@ type MontarERoteiroDados = {
   /**
    * E43: presente quando o tema nasceu de "Criar vídeo com esta notícia". Ao contrário do
    * momento, não muda a busca de evidência (continua normal, pelo tema); só acrescenta o bloco da
-   * notícia na entrada do prompt.
+   * notícia na entrada do prompt. Com o veículo e o dia (E53, 3b: as duas origens, setor e assunto, chegam assim), ela também entra na lista das notícias, na frente, com o aviso de texto de terceiros.
    */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
   /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
@@ -1252,11 +1252,7 @@ export async function gerarRoteiro(
     params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;
   // E53 (parte 3): a notícia de um assunto da marca, no lugar da do setor (uma só ponto de partida por roteiro).
   const noticiaDoAssuntoLinha = !noticiaLinha && params.origem === "livre" && params.noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(clienteId, params.noticiaAssuntoId) : null;
-  const noticia = noticiaLinha
-    ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
-    : noticiaDoAssuntoLinha
-      ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssuntoLinha)
-      : undefined;
+  const noticia = noticiaLinha ? noticiaDoSetorComoPontoDePartida(noticiaLinha) : noticiaDoAssuntoLinha ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssuntoLinha) : undefined;
 
   const { conteudo, geracaoId, referenciaVideoId, tipoAbertura, temaCurto } = await gerarConteudo({
     clienteId,
@@ -1351,7 +1347,7 @@ export async function reprovarERescrever(
   // E53 (parte 3): idem para a notícia de um assunto; o resumo nosso vem da linha se ela ainda existe (a cópia só guarda o título).
   const resumoDaNoticiaDoAssunto = atual.noticiaDoAssunto ? ((await noticiaDoAssuntoDaMarca(atual.clienteId, atual.noticiaDoAssunto.id))?.resumoNosso ?? null) : null;
   const noticia = noticiaLinha
-    ? { titulo: noticiaLinha.titulo, resumo: noticiaLinha.resumo, angulo: noticiaLinha.angulo }
+    ? noticiaDoSetorComoPontoDePartida(noticiaLinha)
     : atual.noticiaDoAssunto
       ? noticiaDoAssuntoComoPontoDePartida({
           titulo: atual.noticiaDoAssunto.titulo,
