@@ -394,7 +394,7 @@ export async function avaliarTema(
   cliente: Cliente,
   texto: string,
   /** E43: já resolvida por quem chama (a ação sabe o `clienteId`, então confere o setor dela ao buscar). */
-  noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string },
+  noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string; origem?: "setor" | "assunto" },
   /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; ele entra sempre no que a nota vê do momento, mesmo que o texto dela não repita nenhuma palavra dele. */
   assuntoEmAlta?: string,
 ): Promise<ResultadoAvaliarTema> {
@@ -426,9 +426,9 @@ export async function avaliarTema(
   const nomesDosAlternativos = new Map(alternativosDaMarca.map((a) => [a.nichoId, a.nome]));
   // O sinal de momento: as notícias de hoje (setor e assuntos da marca) que tocam o tema. O banco de vídeos só cobre o setor; ausência dele não é sinal contra o assunto.
   const noticiasQueTocam = await noticiasQueTocamOTema(cliente, texto);
-  // E53 (parte 3): a notícia de assunto que a pessoa prendeu entra sempre no sinal de momento, com o veículo e o dia, mesmo que o texto dela não toque o assunto.
+  // E53 (parte 3 e 3b): a notícia que a pessoa prendeu, do setor ou de um assunto, entra sempre no sinal de momento, com o veículo e o dia, mesmo que o texto dela não toque nada.
   const noticiasDoDia = comANoticiaPresa(
-    noticia?.veiculo ? { titulo: noticia.titulo, veiculo: noticia.veiculo, dia: noticia.dia ?? "", resumo: noticia.resumo, origem: "assunto" as const } : null,
+    noticia?.veiculo ? { titulo: noticia.titulo, veiculo: noticia.veiculo, dia: noticia.dia ?? "", resumo: noticia.resumo, origem: noticia.origem ?? ("assunto" as const) } : null,
     noticiasQueTocam,
     6,
   );

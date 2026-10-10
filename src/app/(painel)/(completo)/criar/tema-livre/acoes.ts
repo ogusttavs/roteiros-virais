@@ -1,7 +1,7 @@
 "use server";
 
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
-import { noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca } from "@/servicos/assuntos";
+import { noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida } from "@/servicos/assuntos";
 import { ErroAcessoNegado, clienteDaSessaoAtual } from "@/servicos/clientes";
 import { noticiaPorId } from "@/servicos/noticias";
 import { avaliarTema, salvarRascunhoTemaLivre, type ResultadoAvaliarTema } from "@/servicos/temas";
@@ -45,10 +45,6 @@ export async function avaliarTemaAction(texto: string, noticiaId?: number, assun
   const noticia = noticiaId && cliente.nichoId ? await noticiaPorId(noticiaId, cliente.nichoId) : null;
   // E53 (parte 3): a notícia de um assunto DESTA marca (a de outra nunca vem): o título e o resumo nosso, como a do setor.
   const noticiaDoAssunto = !noticia && noticiaAssuntoId ? await noticiaDoAssuntoDaMarca(cliente.id, noticiaAssuntoId) : null;
-  const origem = noticia
-    ? { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo }
-    : noticiaDoAssunto
-      ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssunto)
-      : undefined;
+  const origem = noticia ? noticiaDoSetorComoPontoDePartida(noticia) : noticiaDoAssunto ? noticiaDoAssuntoComoPontoDePartida(noticiaDoAssunto) : undefined;
   return avaliarTema(cliente, texto, origem, assuntoEmAlta);
 }

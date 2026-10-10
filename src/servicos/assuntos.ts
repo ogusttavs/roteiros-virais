@@ -104,22 +104,42 @@ export async function noticiaDoAssuntoDaMarca(clienteId: number, noticiaId: numb
   return linha?.noticia ?? null;
 }
 
+/** O que o prompt diz quando a notícia não traz o veículo ou o dia: nunca uma linha com buraco ("- , : título"), e o roteiro não cita um veículo que não existe. */
+const SEM_VEICULO = "uma notícia do dia";
+const SEM_DIA = "dia não informado";
+
 /**
- * A notícia de um assunto como ponto de partida do roteiro e da avaliação do tema (a mesma forma da notícia do setor, sem ângulo): o título e o resumo nosso vêm de fora, então entram no prompt
- * limpos como dado (sem quebra de linha nem `<` `>`, com limite).
+ * O ponto de partida do roteiro e da avaliação do tema vindo de uma notícia (do setor ou de um assunto da marca): o título, o resumo e o ângulo, mais o veículo e o dia, que o roteiro e a nota
+ * do tema precisam para citar a fonte ("segundo o G1, ontem"). Tudo vem de fora e entra no prompt limpo como dado (sem quebra de linha nem `<` `>`, com limite).
  */
-export function noticiaDoAssuntoComoPontoDePartida(noticia: { titulo: string; resumoNosso: string | null; veiculo: string; publicadoEm: Date | null }): PontoDePartidaDeNoticiaDeAssunto {
+export type PontoDePartidaDeNoticia = { titulo: string; resumo: string | null; angulo: string | null; veiculo: string; dia: string; origem: "setor" | "assunto" };
+
+/** A notícia de um assunto como ponto de partida: o título e o resumo nosso, sem ângulo. */
+export function noticiaDoAssuntoComoPontoDePartida(noticia: { titulo: string; resumoNosso: string | null; veiculo: string; publicadoEm: Date | null }): PontoDePartidaDeNoticia {
   return {
     titulo: limparParaPrompt(noticia.titulo, LIMITE_DO_TITULO),
     resumo: limparParaPrompt(noticia.resumoNosso, 300) || null,
     angulo: null,
-    veiculo: limparParaPrompt(noticia.veiculo, LIMITE_DO_VEICULO),
-    dia: noticia.publicadoEm ? diaPorExtenso(noticia.publicadoEm) : "",
+    veiculo: limparParaPrompt(noticia.veiculo, LIMITE_DO_VEICULO) || SEM_VEICULO,
+    dia: noticia.publicadoEm ? diaPorExtenso(noticia.publicadoEm) : SEM_DIA,
+    origem: "assunto",
   };
 }
 
-/** O ponto de partida vindo de uma notícia de assunto: a forma da notícia do setor mais o veículo e o dia, que o roteiro e a nota do tema precisam para citar a fonte ("segundo o G1, ontem"). */
-export type PontoDePartidaDeNoticiaDeAssunto = { titulo: string; resumo: string | null; angulo: null; veiculo: string; dia: string };
+/**
+ * A notícia do SETOR (E43, "Criar roteiro com esta notícia" nas Notícias) como ponto de partida, como a de assunto: com o veículo (o `fonte` dela), o dia, a limpeza e o ângulo que o sistema
+ * sugeriu. Antes entrava só como o título e o resumo soltos, sem veículo, dia nem o aviso de texto de terceiros.
+ */
+export function noticiaDoSetorComoPontoDePartida(noticia: { titulo: string; resumo: string | null; angulo: string | null; fonte: string | null; publicadoEm: Date | null }): PontoDePartidaDeNoticia {
+  return {
+    titulo: limparParaPrompt(noticia.titulo, LIMITE_DO_TITULO),
+    resumo: limparParaPrompt(noticia.resumo, 300) || null,
+    angulo: limparParaPrompt(noticia.angulo, 300) || null,
+    veiculo: limparParaPrompt(noticia.fonte, LIMITE_DO_VEICULO) || SEM_VEICULO,
+    dia: noticia.publicadoEm ? diaPorExtenso(noticia.publicadoEm) : SEM_DIA,
+    origem: "setor",
+  };
+}
 
 /**
  * A notícia que a pessoa prendeu entra SEMPRE na lista de notícias de assunto do roteiro (e da nota do tema), na frente, mesmo que o texto do tema não toque o assunto: é a que ela leu e quis

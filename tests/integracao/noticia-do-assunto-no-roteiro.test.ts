@@ -150,7 +150,7 @@ describe("a notícia de um assunto da marca", () => {
     expect(ponto.resumo).not.toMatch(/[<>\r\n\t]/);
     expect(ponto.resumo!.length).toBeLessThanOrEqual(300);
     expect(noticiaDoAssuntoComoPontoDePartida({ titulo: "t", resumoNosso: null, veiculo: "v", publicadoEm: null }).resumo).toBeNull();
-    expect(noticiaDoAssuntoComoPontoDePartida({ titulo: "t", resumoNosso: "  \n ", veiculo: "v", publicadoEm: null })).toMatchObject({ resumo: null, dia: "" });
+    expect(noticiaDoAssuntoComoPontoDePartida({ titulo: "t", resumoNosso: "  \n ", veiculo: "v", publicadoEm: null })).toMatchObject({ resumo: null, dia: "dia não informado" });
   });
 
   it("a notícia presa entra na frente das que casam, sem repetir a mesma manchete (sem acento), e respeita o limite", () => {
