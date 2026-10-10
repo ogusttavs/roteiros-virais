@@ -33,6 +33,11 @@ describe("AGENDAMENTOS", () => {
     expect(cronDe(FILAS.pesquisaDeSetor)).toBe("0 2 1 * *");
   });
 
+  /** E26 4c: a faxina das versoes e leve (so apaga linhas), roda depois dos jobs pesados da madrugada e antes do e-mail das 08:00. */
+  it("faxinaVersoes roda todo dia as 07:15", () => {
+    expect(cronDe(FILAS.faxinaVersoes)).toBe("15 7 * * *");
+  });
+
   it("cada fila e chave aparecem no maximo uma vez", () => {
     const chaves = AGENDAMENTOS.map((a) => `${a.fila}::${a.chave ?? ""}`);
     expect(new Set(chaves).size).toBe(chaves.length);

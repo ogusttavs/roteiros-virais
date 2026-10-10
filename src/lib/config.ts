@@ -203,6 +203,8 @@ export const config = {
      * quem chega nele lê uma frase própria. `ROTEIROS_POR_DIA_MAX` ajusta. Hoje a geração do roteiro único não passa por aqui.
      */
     roteirosPorDiaMax: envNumero("ROTEIROS_POR_DIA_MAX", 20),
+    /** E26 4c: depois de quantos dias sem nenhuma versão nova um grupo deixa de guardar as versões que ninguém escolheu (a faxina diária de `versoes_do_roteiro`). */
+    diasDasVersoesGuardadas: envNumero("DIAS_DAS_VERSOES_GUARDADAS", 30),
     /**
      * Hotfix de 30/09/2026 (achado do Gustavo): vídeo longo não é referência de vídeo curto. 180
      * segundos é o limite do Shorts e do Reels gravado no aplicativo; acima disso o vídeo fica fora

@@ -46,6 +46,8 @@ export const FILAS = {
   curvaCliente: "curva-cliente",
   /** V10, item 4: e-mail diario para o Fable com o acompanhamento da viagem. */
   emailAcompanhamento: "email-acompanhamento",
+  /** E26 4c: a faxina diaria das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias. */
+  faxinaVersoes: "faxina-versoes",
   /** Por evento, nao por horario (E27, parte 2, item 2): reprovarERescrever enfileira depois de gravar a reprovacao. */
   aprenderCliente: "aprender-cliente",
   /** Por evento (E38, partes 2 e 3): um perfil citado foi adicionado, ou o perfil da propria marca mudou. */
@@ -116,6 +118,7 @@ const FILAS_CURTAS = new Set<string>([
   FILAS.lembrete,
   FILAS.curvaCliente,
   FILAS.emailAcompanhamento,
+  FILAS.faxinaVersoes,
   FILAS.aprenderCliente,
   FILAS.analisarPerfil,
 ]);
