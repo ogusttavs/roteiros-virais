@@ -23,6 +23,10 @@ export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<Result
   if (params.tarefa === "entenderMarca" && params.entrada.includes("[mock:api-fora]")) {
     throw new ErroIA("erro da API (402): saldo insuficiente.");
   }
+  // "[mock:marcar-fora]" no texto do roteiro: a IA da marcação de fala falha (o PDF e a imagem saem sem as marcas, e a tela diz).
+  if (params.tarefa === "marcarFala" && params.entrada.includes("[mock:marcar-fora]")) {
+    throw new ErroIA("erro da API (402): saldo insuficiente.");
+  }
   const dados = params.schema.parse(construirSaidaMock(params.tarefa, params.entrada, params.sistemaEstavel));
   return { dados, modelo: "mock", ...USO_ZERO };
 }

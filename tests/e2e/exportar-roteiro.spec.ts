@@ -215,6 +215,39 @@ test.describe("exportar o roteiro", () => {
     expect(semDeNovo.imagens[0]).toBe(sem.imagens[0]);
   });
 
+  test("se as marcas não vêm, o PDF e a imagem saem sem elas e a tela diz em uma frase (E41 2c)", async ({ page }) => {
+    test.setTimeout(120_000);
+    // "[mock:marcar-fora]" no texto faz a IA simulada da marcação de fala falhar.
+    const id = await criarRoteiro("exportar sem marcas", { gancho: "A mancha voltou depois da limpeza [mock:marcar-fora] e ninguém te conta o porquê." });
+    await entrar(page);
+    await page.goto(`/roteiros/${id}`);
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    await page.getByRole("menu").getByRole("menuitemcheckbox", { name: "No PDF e na imagem, com as marcas de fala" }).click();
+
+    const downloadDoPdf = page.waitForEvent("download");
+    await page.getByRole("menu").getByRole("menuitem", { name: "Baixar em PDF" }).click();
+    const pdf = await readFile((await (await downloadDoPdf).path())!);
+    // O PDF SEMPRE sai.
+    expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
+    const aviso = page.getByRole("status").filter({ hasText: "Não deu para marcar a fala agora. O PDF saiu sem as marcas." });
+    await expect(aviso).toBeVisible();
+    await expect(aviso.getByRole("button", { name: "Abrir" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "PDF do roteiro pronto" })).toHaveCount(0);
+
+    // E a imagem também, com a frase dela.
+    await page.getByRole("button", { name: "Mais opções" }).click();
+    const downloadDaImagem = page.waitForEvent("download");
+    await page.getByRole("menu").getByRole("menuitem", { name: "Guardar como imagem no celular" }).click();
+    const imagem = await downloadDaImagem;
+    const { largura, altura } = dimensoesDoPng(await readFile((await imagem.path())!));
+    expect({ largura, altura }).toEqual({ largura: 1080, altura: 1920 });
+    await expect(page.getByRole("status").filter({ hasText: "Não deu para marcar a fala agora. A imagem saiu sem as marcas." })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Imagem do roteiro pronta" })).toHaveCount(0);
+    // Nada de marcas guardadas: a marcação falhou de verdade.
+    const [linha] = await db().select({ marcas: roteiros.marcasDeFala }).from(roteiros).where(eq(roteiros.id, id));
+    expect(linha.marcas).toBeNull();
+  });
+
   test("em Story a chave das marcas não aparece no menu", async ({ page }) => {
     const id = await criarRoteiro(
       "exportar story sem marcas",

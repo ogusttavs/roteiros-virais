@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
 import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
-import { pedidoComMarcas, respostaDeMarcasQueFalharam, roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
+import { CABECALHO_DAS_MARCAS, pedidoComMarcas, roteiroDeQuemPediu, urlDeImpressao, VALOR_NAO_DEU } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
 import { MAXIMO_DE_QUADROS, PAGINAR_QUADROS } from "@/lib/paginar-quadros";
 
@@ -25,14 +25,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     // E41 2c: com `?marcas=1` as marcas de fala são escritas aqui, antes da vaga do Chromium.
-    let comMarcas = false;
-    try {
-      comMarcas = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
-    } catch (erro) {
-      const resposta = respostaDeMarcasQueFalharam(erro);
-      if (resposta) return resposta;
-      throw erro;
-    }
+    // A imagem sempre sai: se as marcas não puderam ser escritas, ela sai sem elas e o cabeçalho `X-Marcas` avisa a tela.
+    const { comMarcas, naoDeu } = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
     const resultado = await comLimiteDeChromium(async () => {
       const navegador = await chromium.launch();
       try {
@@ -57,7 +51,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     });
     if (resultado.cortados > 0) logger.warn({ roteiroId: roteiro.id, clienteId: cliente.id, cortados: resultado.cortados }, "imagem do roteiro com quadro cortado");
 
-    return NextResponse.json({ nome: `roteiro-${roteiro.data}`, imagens: resultado.imagens, cortados: resultado.cortados }, { headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ nome: `roteiro-${roteiro.data}`, imagens: resultado.imagens, cortados: resultado.cortados }, {
+      headers: { "Cache-Control": "private, no-store", ...(naoDeu ? { [CABECALHO_DAS_MARCAS]: VALOR_NAO_DEU } : {}) },
+    });
   } catch (erro) {
     if (erro instanceof ErroFilaCheia) {
       return NextResponse.json({ erro: "muitos pedidos agora, tente de novo em instantes" }, { status: 503 });

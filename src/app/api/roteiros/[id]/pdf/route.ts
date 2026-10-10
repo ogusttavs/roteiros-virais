@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
 import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, rodapeDoPdf, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
-import { pedidoComMarcas, respostaDeMarcasQueFalharam, roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
+import { CABECALHO_DAS_MARCAS, pedidoComMarcas, roteiroDeQuemPediu, urlDeImpressao, VALOR_NAO_DEU } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
 import { dataPorExtenso } from "@/servicos/folha-do-roteiro";
 
@@ -22,15 +22,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
   try {
     // E41 2c: com `?marcas=1` as marcas de fala são escritas aqui, antes da vaga do Chromium (uma chamada de IA que demora não segura a fila do navegador).
-    let comMarcas = false;
-    try {
-      comMarcas = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
-    } catch (erro) {
-      // A IA caiu ou o teto do dia chegou: a frase vai à tela (a pessoa desliga a chave e baixa sem as marcas), sem Sentry, que é esperado.
-      const resposta = respostaDeMarcasQueFalharam(erro);
-      if (resposta) return resposta;
-      throw erro;
-    }
+    // O PDF sempre sai: se as marcas não puderam ser escritas, ele sai sem elas e o cabeçalho `X-Marcas` avisa a tela.
+    const { comMarcas, naoDeu } = await pedidoComMarcas(request, roteiro, cliente, somenteLeitura);
     const pdf = await comLimiteDeChromium(async () => {
       const navegador = await chromium.launch();
       try {
@@ -61,6 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="roteiro-${roteiro.data}.pdf"`,
         "Cache-Control": "private, no-store",
+        ...(naoDeu ? { [CABECALHO_DAS_MARCAS]: VALOR_NAO_DEU } : {}),
       },
     });
   } catch (erro) {
