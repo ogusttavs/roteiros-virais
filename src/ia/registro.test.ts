@@ -50,4 +50,17 @@ describe("calcularCustoUsd", () => {
     });
     expect(custo).toBe(0);
   });
+
+  it("a busca na web soma US$ 0,01 por busca, por fora dos tokens", () => {
+    const uso = { tokensEntrada: 30_000, tokensSaida: 1_500, tokensCacheLeitura: 0, tokensCacheEscrita: 0 };
+    const semBusca = calcularCustoUsd("barato", uso);
+    expect(calcularCustoUsd("barato", { ...uso, buscasNaWeb: 5 })).toBeCloseTo(semBusca + 0.05, 10);
+    expect(calcularCustoUsd("barato", { ...uso, buscasNaWeb: 0 })).toBe(semBusca);
+  });
+
+  it("o desconto do lote não vale para a busca (na documentação, no lote custa o mesmo)", () => {
+    const uso = { tokensEntrada: 1_000_000, tokensSaida: 0, tokensCacheLeitura: 0, tokensCacheEscrita: 0, buscasNaWeb: 4 };
+    // US$ 1 de entrada no barato, metade no lote, mais as 4 buscas inteiras
+    expect(calcularCustoUsd("barato", uso, true)).toBeCloseTo(0.5 + 0.04, 10);
+  });
 });

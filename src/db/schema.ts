@@ -1365,6 +1365,85 @@ export const comentariosVideo = pgTable(
 );
 export type ComentarioVideo = typeof comentariosVideo.$inferSelect;
 
+/** E54: um dado achado pela pesquisa na hora, já conferido por código (fonte da lista, citação, números no trecho, data). */
+export type AchadoDaPesquisa = {
+  /** 1, 2, 3... dentro da pesquisa: o que a pessoa marca e o que o roteiro cita. */
+  id: number;
+  /** A afirmação, uma frase nossa, que a citação sustenta. */
+  texto: string;
+  /** "IBGE", "G1": quem publicou (da lista curada, nunca o que o modelo disse). */
+  fonteNome: string;
+  fonteTipo: "oficial" | "imprensa";
+  url: string;
+  /** O título da página, como a ferramenta devolveu. */
+  titulo: string | null;
+  /** A data da página (AAAA-MM-DD) quando a ferramenta a deu e deu para ler; nula sem data. */
+  dataDaPagina: string | null;
+  /** A data como a ferramenta devolveu, para a pessoa ver o que não deu para ler. */
+  dataTexto: string | null;
+  /** Mais velho que `pesquisaNaHoraDadoAntigoMeses`: aparece marcado como antigo, e o roteiro só o usa se a pessoa marcar. */
+  antigo: boolean;
+  /** O trecho literal da página que sustenta o dado (`cited_text`, até 150 caracteres). */
+  citacao: string;
+};
+
+/** E54: o que a conferência da premissa achou. `nao_confere` só existe com pelo menos um dado que o sustente. */
+export type PremissaDaPesquisa = {
+  situacao: "sem_premissa" | "confere" | "nao_confere";
+  /** "O que você escreveu não bate com as fontes: ..." (só em `nao_confere`). */
+  aviso: string | null;
+  /** O ângulo que fica de pé com o que as fontes dizem (só em `nao_confere`). */
+  anguloSugerido: string | null;
+  /** Os dados (`AchadoDaPesquisa.id`) que sustentam o aviso. */
+  achadoIds: number[];
+};
+
+/** E54: a pergunta, em uma frase, que a pesquisa faz quando falta a posição da pessoa sobre o tema (nunca inventar a opinião dela). */
+export type PerguntaDePosicao = { pergunta: string; opcoes: string[] };
+
+/** `pesquisando` está na fila; `executando` foi reivindicada por um worker (uma segunda execução não paga de novo). */
+export type StatusDaPesquisa = "pesquisando" | "executando" | "pronta" | "sem_achados" | "erro";
+
+/**
+ * E54: uma pesquisa na hora, pedida pela pessoa para um vídeo só ("Pesquisar antes de escrever"): a ferramenta de busca na web da
+ * Anthropic, só nas fontes da lista curada, no modelo barato. Os dados voltam conferidos por código e a pessoa marca os que usa; só
+ * esses entram como fonte do roteiro (parte 2). É a única parte do produto em que o roteiro não nasce só do banco, por isso opcional,
+ * pedida e aprovada pela pessoa, com teto por pesquisa e por marca por dia.
+ */
+export const pesquisasNaHora = pgTable(
+  "pesquisas_na_hora",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    /** O que a pessoa pediu para pesquisar, como escreveu. */
+    pedido: text("pedido").notNull(),
+    /** O assunto do vídeo (o tema livre, o momento), com a premissa da pessoa dentro; é o que a conferência compara com os dados. */
+    tema: text("tema"),
+    profundidade: text("profundidade").$type<"normal" | "aprofundada">().notNull().default("normal"),
+    status: text("status").$type<StatusDaPesquisa>().notNull().default("pesquisando"),
+    achados: jsonb("achados").$type<AchadoDaPesquisa[]>().notNull().default([]),
+    /** Os `AchadoDaPesquisa.id` que a pessoa marcou para o roteiro. */
+    selecionados: jsonb("selecionados").$type<number[]>().notNull().default([]),
+    premissa: jsonb("premissa").$type<PremissaDaPesquisa>(),
+    perguntaDePosicao: jsonb("pergunta_de_posicao").$type<PerguntaDePosicao>(),
+    /** A resposta da pessoa à pergunta de posição (a opção que ela marcou ou o que ela escreveu). */
+    posicaoDaPessoa: text("posicao_da_pessoa"),
+    /** O que a pessoa decidiu diante de "as fontes dizem outra coisa". */
+    decisaoDaPremissa: text("decisao_da_premissa").$type<"fontes" | "mudar" | "manter">(),
+    /** Buscas que a ferramenta fez de verdade (`usage.server_tool_use.web_search_requests`). */
+    buscas: integer("buscas").notNull().default(0),
+    custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
+    /** Em língua de gente, quando a pesquisa não deu dado ou não terminou. */
+    motivo: text("motivo"),
+    criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
+    terminadoEm: timestamp("terminado_em", { withTimezone: true }),
+  },
+  (t) => [index("pesquisas_na_hora_cliente").on(t.clienteId, t.criadoEm)],
+);
+export type PesquisaNaHora = typeof pesquisasNaHora.$inferSelect;
+
 export const noticias = pgTable("noticias", {
   id: id(),
   nichoId: integer("nicho_id").references(() => nichos.id),

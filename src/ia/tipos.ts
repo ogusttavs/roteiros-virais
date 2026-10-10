@@ -59,7 +59,11 @@ export type TarefaIA =
   /** E38, partes 2 e 3: a leitura curta de um perfil citado pelo cliente ou da própria marca. */
   | "analisarPerfilCitado"
   /** E38 PR 2: "o que entendemos da sua marca", do site e das redes dela, para ela confirmar. */
-  | "entenderMarca";
+  | "entenderMarca"
+  /** E54: a pesquisa na hora, pela ferramenta de busca na web da Anthropic (só fontes da lista curada), para um vídeo. */
+  | "pesquisaNaHora"
+  /** E54: confere a premissa que a pessoa escreveu contra os dados achados e, se falta a posição dela, pergunta em uma frase. */
+  | "conferirPremissa";
 
 export type ImagemEntrada = {
   base64: string;

@@ -42,6 +42,7 @@ import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
 import { rodarPesquisaDeSetor } from "./pesquisa-de-setor";
+import { type PayloadPesquisaNaHora, rodarPesquisaNaHora } from "./pesquisa-na-hora";
 import { rodarPontuar } from "./pontuar";
 import { rodarTemasDoDia } from "./temas-do-dia";
 import { rodarTendenciasBrasil } from "./tendencias-brasil";
@@ -173,6 +174,11 @@ async function main(): Promise<void> {
    */
   await boss().work<PayloadEntenderMarca>(FILAS.entenderMarca, async (job) => {
     await tratarJobEntenderMarca(job, FILAS.entenderMarca);
+  });
+
+  /** Por evento (E54): `criarPesquisa` manda `{ pesquisaId }`. Sem repetição da fila: cada tentativa gasta buscas pagas. */
+  await boss().work<PayloadPesquisaNaHora>(FILAS.pesquisaNaHora, async (job) => {
+    await executarComRegistro(FILAS.pesquisaNaHora, () => rodarPesquisaNaHora(job[0].data.pesquisaId));
   });
 
   console.log("worker no ar.");

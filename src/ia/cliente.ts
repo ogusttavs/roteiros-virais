@@ -18,7 +18,8 @@ const MAX_TOKENS_PADRAO = 16000;
 
 let clienteAnthropic: Anthropic | null = null;
 
-function anthropic(): Anthropic {
+/** O cliente do SDK, um só por processo. Exportado só para `busca-na-web.ts` (a busca na web não é saída estruturada), que também mora em `src/ia/`. */
+export function anthropic(): Anthropic {
   if (!clienteAnthropic) clienteAnthropic = new Anthropic();
   return clienteAnthropic;
 }
@@ -117,7 +118,8 @@ async function gerarReal<T>(params: ParametrosGeracao<T>): Promise<ResultadoGera
   };
 }
 
-function traduzirErro(erro: unknown, tarefa: TarefaIA): ErroIA {
+/** Exportado para `busca-na-web.ts`: o mesmo texto de erro das outras tarefas. */
+export function traduzirErro(erro: unknown, tarefa: TarefaIA): ErroIA {
   if (erro instanceof RateLimitError) {
     return new ErroIA(`limite de taxa da API na tarefa "${tarefa}": ${erro.message}`);
   }

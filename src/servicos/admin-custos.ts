@@ -33,6 +33,8 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   classificarContaDoSetor: "Pesquisar o mercado do ramo",
   entenderMarca: "Entender a marca",
   analisarPerfilCitado: "Entender a marca",
+  pesquisaNaHora: "Pesquisar na hora (busca na web)",
+  conferirPremissa: "Pesquisar na hora (conferir a premissa)",
 };
 
 export function rotuloDaTarefa(tarefa: string): string {
