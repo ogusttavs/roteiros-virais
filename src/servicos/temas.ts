@@ -390,6 +390,8 @@ export async function avaliarTema(
   texto: string,
   /** E43: já resolvida por quem chama (a ação sabe o `clienteId`, então confere o setor dela ao buscar). */
   noticia?: { titulo: string; resumo: string | null; angulo: string | null },
+  /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; ele entra sempre no que a nota vê do momento, mesmo que o texto dela não repita nenhuma palavra dele. */
+  assuntoEmAlta?: string,
 ): Promise<ResultadoAvaliarTema> {
   if (!cliente.nichoId) {
     throw new ErroTemas("este cliente ainda nao tem um nicho definido.");
@@ -420,7 +422,7 @@ export async function avaliarTema(
   // O sinal de momento: as notícias de hoje (setor e assuntos da marca) que tocam o tema. O banco de vídeos só cobre o setor; ausência dele não é sinal contra o assunto.
   const noticiasDoDia = await noticiasQueTocamOTema(cliente, texto);
   // E55: e os assuntos em alta no Brasil hoje que tocam o tema (o segundo sinal de momento).
-  const tendenciasDoBrasil = tendenciasQueTocamOTema(texto, await listaDeTendenciasDeAgora());
+  const tendenciasDoBrasil = tendenciasQueTocamOTema(texto, await listaDeTendenciasDeAgora(), assuntoEmAlta);
 
   const { dados } = await gerarComVerificacao({
     tarefa: "avaliarTema",

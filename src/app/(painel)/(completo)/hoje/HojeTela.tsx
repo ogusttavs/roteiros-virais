@@ -12,7 +12,7 @@ import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
-import { CartaoEmAlta } from "@/ui/componentes/CartaoEmAlta";
+import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useJaEstavaEmDia } from "@/ui/useJaEstavaEmDia";
@@ -600,7 +600,7 @@ export function HojeTela({
                 cartao={emAlta}
                 destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 ? "principal" : "secundario"}
                 ocupado={ocupado && acao === "em-alta"}
-                aoClicar={() => ir("em-alta", emAlta.roteiro ? `/roteiros/${emAlta.roteiro.id}` : `/criar/objetivo?tema=${emAlta.tema.indice}`)}
+                aoClicar={() => ir("em-alta", destinoDoCartao(emAlta))}
                 estado={emAlta.roteiro ? textosHoje.agenda.estadoReels[emAlta.roteiro.status] : undefined}
                 menu={
                   emAlta.roteiro ? (

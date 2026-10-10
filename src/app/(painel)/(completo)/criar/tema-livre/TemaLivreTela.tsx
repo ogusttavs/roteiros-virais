@@ -70,6 +70,9 @@ type MarcaResumo = { id: number; nome: string };
  */
 type NoticiaOrigem = { id: number; titulo: string; fonteEData: string };
 
+/** E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela ("Trazer para o meu ramo"); `linha` já vem pronta do servidor (de onde vem e desde quando). */
+type AssuntoEmAltaPreso = { chave: string; assunto: string; linha: string };
+
 type Props = {
   notaMinima: number;
   temaInicial?: string;
@@ -83,6 +86,8 @@ type Props = {
   dataInicial?: string;
   /** E43: presente quando a tela abriu a partir de "Criar vídeo com esta notícia", em `/noticias`. */
   noticia?: NoticiaOrigem;
+  /** E55 PR 2b: presente quando a tela abriu a partir do Criar, "Trazer para o meu ramo" (`?alta=`). */
+  emAlta?: AssuntoEmAltaPreso;
   /** O rascunho do momento é por marca (a folha "Gravar agora" guarda o que a pessoa escreveu no aparelho). */
   marcaAtivaId?: number;
 };
@@ -103,6 +108,7 @@ export function TemaLivreTela({
   quemGravaPadrao,
   dataInicial,
   noticia,
+  emAlta,
   marcaAtivaId,
 }: Props) {
   const router = useRouter();
@@ -115,6 +121,10 @@ export function TemaLivreTela({
    */
   const [noticiaPresa, setNoticiaPresa] = useState(noticia !== undefined);
   const comNoticia = fase === "proposta" && noticiaPresa && noticia !== undefined;
+  /** E55 PR 2b: "Tirar o assunto" devolve o Tema livre comum, com o texto preservado; uma vez tirado, o assunto não entra mais na nota nem no roteiro (nem a trava de dia). */
+  const [assuntoPreso, setAssuntoPreso] = useState(emAlta !== undefined);
+  const comAlta = fase === "proposta" && assuntoPreso && emAlta !== undefined;
+  const chaveParaEnviar = assuntoPreso ? emAlta?.chave : undefined;
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
@@ -140,7 +150,7 @@ export function TemaLivreTela({
   // E43: a notícia segue até o roteiro só enquanto a pessoa não a tirou (`noticiaPresa`), não `comNoticia`
   // (que também exige `fase === "proposta"`; aqui a tela já pode estar em "naMeta").
   const noticiaIdParaEnviar = noticiaPresa ? noticia?.id : undefined;
-  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}`;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -202,7 +212,7 @@ export function TemaLivreTela({
     setFase("esperando");
     // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
-    avaliarTemaAction(limpo, noticiaIdParaEnviar)
+    avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar)
       .then((dados) => {
         avisarRedeOk();
         setTexto(limpo);
@@ -247,7 +257,7 @@ export function TemaLivreTela({
   return (
     <div className={styles.pagina}>
       <BarraTopo
-        titulo={TITULO_COMPACTO[fase]}
+        titulo={comAlta ? textosTemaLivre.comAlta.tituloCompacto : TITULO_COMPACTO[fase]}
         esquerda={
           <button
             type="button"
@@ -264,8 +274,8 @@ export function TemaLivreTela({
 
       <div className={styles.miolo}>
         <div className={styles.cabecalhoTela}>
-          <h1 className={styles.titulo}>{comNoticia ? textosTemaLivre.tituloComNoticia : TITULO[fase]}</h1>
-          <p className={styles.subtitulo}>{comNoticia ? textosTemaLivre.subtituloComNoticia : SUBTITULO[fase]}</p>
+          <h1 className={styles.titulo}>{comNoticia ? textosTemaLivre.tituloComNoticia : comAlta ? textosTemaLivre.comAlta.titulo : TITULO[fase]}</h1>
+          <p className={styles.subtitulo}>{comNoticia ? textosTemaLivre.subtituloComNoticia : comAlta ? textosTemaLivre.comAlta.subtitulo : SUBTITULO[fase]}</p>
         </div>
 
         {/*
@@ -321,6 +331,17 @@ export function TemaLivreTela({
                 <h3 className={styles.tituloNoticiaPresa}>{noticia.titulo}</h3>
                 <span className={styles.fonteENoticiaPresa}>{noticia.fonteEData}</span>
               </section>
+            ) : comAlta && emAlta ? (
+              <section className={[styles.cartao, styles.cartaoRecuado, styles.noticiaPresa].join(" ")} aria-label={textosTemaLivre.comAlta.rotulo} data-assunto-preso={emAlta.assunto}>
+                <div className={styles.topoNoticiaPresa}>
+                  <span className={styles.rotulo}>{textosTemaLivre.comAlta.rotulo}</span>
+                  <Botao variante="ghost" tamanho="md" onClick={() => setAssuntoPreso(false)}>
+                    {textosTemaLivre.comAlta.tirar}
+                  </Botao>
+                </div>
+                <h3 className={styles.tituloNoticiaPresa}>{emAlta.assunto}</h3>
+                <span className={styles.fonteENoticiaPresa}>{emAlta.linha}</span>
+              </section>
             ) : (
               <Botao variante="ghost" tamanho="md" onClick={() => setFolhaMomentoAberta(true)}>
                 {textosMomento.botaoAbrirTemaLivre}
@@ -328,15 +349,15 @@ export function TemaLivreTela({
             )}
             <section className={[styles.cartao, styles.campo].join(" ")}>
               <CampoComFala
-                rotulo={comNoticia ? textosTemaLivre.oQueVocePensou : textosTemaLivre.titulo}
-                rotuloOculto={!comNoticia}
-                ajuda={comNoticia ? textosTemaLivre.dicaOQueVocePensou : undefined}
-                placeholder={comNoticia ? textosTemaLivre.placeholderComNoticia : textosTemaLivre.placeholder}
+                rotulo={comNoticia ? textosTemaLivre.oQueVocePensou : comAlta ? textosTemaLivre.comAlta.pergunta : textosTemaLivre.titulo}
+                rotuloOculto={!comNoticia && !comAlta}
+                ajuda={comNoticia ? textosTemaLivre.dicaOQueVocePensou : comAlta ? textosTemaLivre.comAlta.dica : undefined}
+                placeholder={comNoticia ? textosTemaLivre.placeholderComNoticia : comAlta ? textosTemaLivre.comAlta.placeholder : textosTemaLivre.placeholder}
                 erro={campoVazio ? textosTemaLivre.campoVazio : undefined}
                 value={texto}
                 onChange={aoMudarTexto}
                 caixaAlta="longa"
-                nomeArquivo={comNoticia ? "tema-livre-noticia" : "tema-livre"}
+                nomeArquivo={comNoticia ? "tema-livre-noticia" : comAlta ? "tema-livre-alta" : "tema-livre"}
               />
               <div className={styles.campoRodape}>
                 <span className={rascunhoComErro ? styles.rascunhoComErro : undefined} aria-live="polite">

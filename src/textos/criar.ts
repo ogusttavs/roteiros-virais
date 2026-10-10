@@ -27,6 +27,22 @@ export const textosCriar = {
   },
   notaAgenda: "Tudo o que você cria fica marcado no dia, em Hoje.",
 
+  /**
+   * E55 PR 2b (passo 21 do Opus, `Criar.dc.html`, estados `inicioEmAlta` e `inicioSemEncaixe`): o cartão do assunto do momento no alto da oficina, e a lista dos assuntos que não couberam no
+   * ramo. Nunca a palavra "tendência" na tela.
+   */
+  emAlta: {
+    trazerDeOutroJeito: "Trazer para o meu ramo de outro jeito",
+    semEncaixe: {
+      origem: "Em alta no Brasil hoje",
+      titulo: "Nada disso cabe bem no seu ramo hoje",
+      trazer: "Trazer para o meu ramo",
+      trazerAria: (assunto: string) => `Trazer para o meu ramo: ${assunto}`,
+      explicacao: "Por isso a gente não sugeriu tema. Se você vê um jeito, ele abre em \"Um assunto seu\", já escrito, e recebe a nota antes do roteiro.",
+      delicado: "Assunto delicado, como política e tragédia, não aparece aqui. Se quiser falar de um, escreva o seu assunto.",
+    },
+  },
+
   /** O bloco "Para quando é?" (dúvida 12): o momento do dia completa o rótulo que aparece em Hoje. */
   paraQuando: "Para quando é?",
   hoje: "Hoje",

@@ -11,9 +11,12 @@ import {
   History,
   Music,
   Pencil,
+  Play,
   RotateCcw,
   Scissors,
+  Search,
   Sparkles,
+  TrendingUp,
   Type,
   Video,
   X,
@@ -38,6 +41,7 @@ import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { ehFalhaDeRede } from "@/lib/offline";
+import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
@@ -236,6 +240,8 @@ type Props = {
   blocos: BlocoRoteiro[];
   video: VideoParaEmbed | null;
   versoes: VersaoRoteiro[];
+  /** E55 PR 2b: o assunto em alta de onde o roteiro nasceu (nulo nos outros): o selo, a linha de prazo ou o aviso de que passou, e o "De onde veio" próprio. */
+  momento?: MomentoDoRoteiro | null;
   /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
@@ -255,6 +261,7 @@ export function RoteiroTela({
   blocos,
   video,
   versoes,
+  momento = null,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -689,6 +696,13 @@ export function RoteiroTela({
             ) : null}
           </div>
           <p className={styles.metaRoteiro}>
+            {/* E55 PR 2b (passo 21): "Assunto do momento", vivo enquanto o assunto está em alta e neutro ("O assunto já passou") depois. */}
+            {momento ? (
+              <span className={[styles.seloMomento, momento.estado === "vivo" ? "" : styles.seloMomentoPassou].filter(Boolean).join(" ")} data-selo-momento={momento.estado}>
+                {momento.estado === "vivo" ? <TrendingUp size={14} strokeWidth={1.75} aria-hidden="true" /> : <History size={14} strokeWidth={1.75} aria-hidden="true" />}
+                {momento.estado === "vivo" ? textosRoteiro.doMomento.selo : momento.estado === "outroDia" ? textosRoteiro.doMomento.seloOutroDia : textosRoteiro.doMomento.seloPassou}
+              </span>
+            ) : null}
             {/* E44 PR 2: "Tipo: erro comum", o tipo do vídeo de referência (não aparece em Story nem sem referência classificada). */}
             {seloDoTipo(video?.formatoCatalogo) && roteiro.formato !== "story" ? <span className={styles.seloTipo} data-selo-tipo>{seloDoTipo(video?.formatoCatalogo)}</span> : null}
             {/* E49 PR 1: "Para que te chamem" ao lado do tipo; no Story a linha sai (ele não pergunta para que é o vídeo). */}
@@ -705,6 +719,28 @@ export function RoteiroTela({
               </button>
             ) : null}
           </p>
+          {/* E55 PR 2b: a linha de onde o assunto veio e por que gravar hoje; depois que ele passa, o aviso (o roteiro continua da pessoa). */}
+          {momento && momento.estado === "vivo" ? (
+            <p className={styles.linhaMomento} data-linha-momento>
+              <TrendingUp size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>
+                <b>{momento.assunto}</b>
+                {textosRoteiro.doMomento.linhaDepois(momento.desde, momento.fonteGoogle !== null, momento.doYoutube)}
+              </span>
+            </p>
+          ) : null}
+          {momento && momento.estado !== "vivo" ? (
+            <div className={styles.avisoPassou} role="status" data-aviso-passou>
+              <History size={20} strokeWidth={1.75} aria-hidden="true" />
+              <div>
+                <strong>{momento.estado === "outroDia" ? textosRoteiro.doMomento.avisoOutroDiaTitulo(momento.assunto) : textosRoteiro.doMomento.avisoTitulo(momento.assunto)}</strong>
+                <p>{momento.estado === "outroDia" ? textosRoteiro.doMomento.avisoOutroDiaTexto : textosRoteiro.doMomento.avisoTexto(momento.saiuEm)}</p>
+              </div>
+              <Link href="/criar/temas" className={styles.avisoPassouBotao}>
+                {textosRoteiro.doMomento.verTemas}
+              </Link>
+            </div>
+          ) : null}
           {/* Passo 19 do Opus, estado `refeito`: o roteiro novo diz por que foi refeito (os motivos da versão anterior e, se a pessoa escreveu, o que ela disse). */}
           {versaoReprovada ? (
             <p className={styles.refeitoPorque} data-refeito-porque>
@@ -917,7 +953,33 @@ export function RoteiroTela({
           </div>
         ) : null}
 
-        {referencia && video ? (
+        {/* E55 PR 2b (passo 21): o roteiro do momento não veio de um vídeo do banco, veio de um assunto: o "De onde veio" mostra as fontes dele e a ligação com o ramo, que é do sistema. */}
+        {momento ? (
+          <section className={[styles.referenciaVazia, styles.ladoDeOndeVeio, styles.deOndeVeioMomento].join(" ")} ref={definirRefDeOndeVeio} aria-label={textosRoteiro.doMomento.deOndeVeioAria} data-de-onde-veio-momento>
+            <h2>{textosRoteiro.doMomento.deOndeVeioTitulo}</h2>
+            <ul className={styles.fontesMomento}>
+              {momento.fonteGoogle ? (
+                <li>
+                  <Search size={20} strokeWidth={1.75} aria-hidden="true" />
+                  <span>
+                    <b>{textosRoteiro.doMomento.google}</b>
+                    <span className={styles.dadoMomento}>{textosRoteiro.doMomento.dadoGoogle(momento.fonteGoogle.termo, momento.fonteGoogle.buscas)}</span>
+                  </span>
+                </li>
+              ) : null}
+              {momento.doYoutube ? (
+                <li>
+                  <Play size={20} strokeWidth={1.75} aria-hidden="true" />
+                  <span>
+                    <b>{textosRoteiro.doMomento.youtube}</b>
+                    <span className={styles.dadoMomento}>{textosRoteiro.doMomento.dadoYoutube}</span>
+                  </span>
+                </li>
+              ) : null}
+            </ul>
+            {momento.ligacao ? <p className={styles.ligacaoRamo}>{textosRoteiro.doMomento.ligacao(momento.ligacao)}</p> : null}
+          </section>
+        ) : referencia && video ? (
           <div className={styles.ladoDeOndeVeio} ref={definirRefDeOndeVeio}>
             <CartaoDeOndeVeio
               titulo={textosRoteiro.referencia}

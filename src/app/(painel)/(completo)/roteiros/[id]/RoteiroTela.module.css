@@ -932,6 +932,153 @@
   font-weight: var(--peso-regular);
 }
 
+/* E55 PR 2b (passo 21, `base.css` `.selo-alta`): o selo do assunto do momento: vivo (na cor de seleção) enquanto o assunto está em alta, neutro depois que passou. */
+.seloMomento {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  line-height: 1.2;
+}
+
+.seloMomento svg {
+  flex: 0 0 auto;
+}
+
+.seloMomentoPassou {
+  border-color: transparent;
+  background: var(--cor-superficie-recuada);
+  color: var(--cor-texto-suave);
+  font-weight: var(--peso-medio);
+}
+
+/* A linha de prazo logo abaixo da meta: de onde o assunto veio e por que gravar hoje. */
+.linhaMomento {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin: var(--espaco-3) 0 var(--espaco-5);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.linhaMomento svg {
+  margin-top: 1px;
+  color: var(--cor-destaque);
+}
+
+.linhaMomento b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+/* O aviso de que o assunto passou: o roteiro continua da pessoa, e o botão leva aos temas de hoje. */
+.avisoPassou {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2) var(--espaco-3);
+  align-items: start;
+  margin: var(--espaco-4) 0 var(--espaco-5);
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.avisoPassou > svg {
+  margin-top: 0.1rem;
+  color: var(--cor-texto-suave);
+}
+
+.avisoPassou strong {
+  display: block;
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.avisoPassou p {
+  margin: 0;
+  color: var(--cor-texto-suave);
+}
+
+.avisoPassouBotao {
+  grid-column: 2;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  text-decoration: none;
+}
+
+.avisoPassouBotao:hover {
+  background: var(--cor-superficie-hover);
+}
+
+/* O "De onde veio" do momento: uma linha por fonte do assunto, e a ligação com o ramo. Até 1023px os blocos fluem na ordem do documento: o espaço vem de cima, como o de "Como editar". */
+@media (max-width: 1023px) {
+  .deOndeVeioMomento {
+    margin: var(--espaco-6) 0;
+  }
+}
+
+.fontesMomento {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fontesMomento li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-3);
+  align-items: start;
+}
+
+.fontesMomento li > svg {
+  margin-top: 0.1rem;
+  color: var(--cor-texto-suave);
+}
+
+.fontesMomento b {
+  display: block;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.dadoMomento {
+  display: block;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.4;
+  color: var(--cor-texto-dica);
+  overflow-wrap: anywhere;
+}
+
+.ligacaoRamo {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
 /* E44 PR 2: o selo "Tipo: erro comum" (`.selo-formato` do passo 17), o primeiro item da linha de meta do roteiro. */
 .seloTipo {
   display: inline-flex;

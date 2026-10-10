@@ -46,6 +46,10 @@ type Props = {
   dataInicial?: string;
   /** E43: presente quando o tema veio de "Criar vídeo com esta notícia". */
   noticiaId?: number;
+  /** E55 PR 2b: o roteiro é de um assunto em alta, para hoje: a pergunta "Para quando é?" some e a data vai fixa em hoje (o servidor recusa outro dia). */
+  paraHoje?: boolean;
+  /** E55 PR 2b: a chave do assunto em alta que a pessoa trouxe preso ao Tema livre; vai ao servidor junto, para o roteiro nascer do momento. */
+  assuntoEmAlta?: string;
 };
 
 /** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
@@ -58,6 +62,8 @@ export function ObjetivoTela({
   quemGravaPadrao,
   dataInicial,
   noticiaId,
+  paraHoje = false,
+  assuntoEmAlta,
 }: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
@@ -103,7 +109,7 @@ export function ObjetivoTela({
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
   const [quemAparece, setQuemAparece] = useState<QuemGrava | "">(quemGravaPadrao ?? "");
   /** E39a: "para quando é?" (dúvida 10: nos temas de hoje e no assunto seu, depois do tema escolhido). */
-  const [data, setData] = useState(() => dataInicial ?? hojeISO());
+  const [data, setData] = useState(() => (paraHoje ? hojeISO() : (dataInicial ?? hojeISO())));
   const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);
@@ -154,10 +160,12 @@ export function ObjetivoTela({
           estilo,
           objetivoDoVideo.trim() || undefined,
           quemAparece || undefined,
-          data,
+          // O assunto do momento é para hoje e a pergunta não existe: sem data, o servidor usa o hoje dele (a data calculada ao montar a tela seria a de ontem se a pessoa a deixasse aberta até a meia-noite).
+          paraHoje ? undefined : data,
           formato === "story" ? (momentoDoDia ?? undefined) : undefined,
           noticiaId,
           pergunta ? (ficha ?? undefined) : undefined,
+          assuntoEmAlta,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {
@@ -371,7 +379,7 @@ export function ObjetivoTela({
         {!estiloTocado ? <p className={styles.formatoAjuda}>{textosObjetivo.estiloAjuda[estilo]}</p> : null}
       </div>
 
-      <PerguntaParaQuando data={data} onChange={setData} />
+      {paraHoje ? null : <PerguntaParaQuando data={data} onChange={setData} />}
       {formato === "story" ? <PerguntaMomentoDoDia valor={momentoDoDia} onChange={setMomentoDoDia} /> : null}
 
       {opcoesQuemAparece.fixoEmPropriaPessoa ? null : (

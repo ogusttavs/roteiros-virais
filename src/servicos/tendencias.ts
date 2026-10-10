@@ -46,6 +46,25 @@ export function assuntoSegueEmAlta(
 
 export type ListaDeAgora = { coletadaEm: Date; assuntos: TendenciaBrasil[] };
 
+/** Um assunto da lista de agora, na forma que o roteiro guarda (a `fonte` e a `url` são as da primeira fonte, como no tema do momento). */
+export type AssuntoEmAlta = { chave: string; assunto: string; termos: string[]; fonte: string; url: string | null; coletadaEm: string };
+
+/** O assunto de uma chave na lista de agora, ou nulo se ele já saiu dela (ou a lista passou de 18 horas) ou é delicado (política, tragédia: nunca vira assunto do momento, nem pela mão da pessoa). */
+export async function assuntoEmAltaDaLista(chave: string, agora: Date = new Date()): Promise<AssuntoEmAlta | null> {
+  const lista = await listaDeTendenciasDeAgora(agora);
+  const achado = lista?.assuntos.find((a) => a.chave === chave && !a.sensivel);
+  if (!lista || !achado) return null;
+  const primeira = achado.fontes[0];
+  return {
+    chave: achado.chave,
+    assunto: achado.assunto,
+    termos: achado.termos,
+    fonte: primeira?.fonte === "youtube" ? "Em alta no YouTube no Brasil" : "Em alta no Google no Brasil",
+    url: primeira?.url ?? null,
+    coletadaEm: lista.coletadaEm.toISOString(),
+  };
+}
+
 /** A rodada mais recente de tendências, ou nulo quando não há nenhuma ou ela já passou de `HORAS_DA_LISTA_DE_AGORA`. Os assuntos vêm do mais alto (posição 1) para o mais baixo. */
 export async function listaDeTendenciasDeAgora(agora: Date = new Date()): Promise<ListaDeAgora | null> {
   const [ultima] = await db().select({ coletadaEm: tendenciasBrasil.coletadaEm }).from(tendenciasBrasil).orderBy(desc(tendenciasBrasil.coletadaEm)).limit(1);
@@ -69,19 +88,22 @@ export function temasQueAindaValem(temas: TemaDoDia[], lista: ListaDeAgora | nul
 export type TendenciaQueToca = { assunto: string; fonte: "google" | "youtube"; sensivel: boolean };
 
 /**
- * Os assuntos em alta no Brasil agora que tocam um texto (o tema que a pessoa propôs): os que dividem uma palavra com ele (raiz de 5 letras, como as notícias do dia). Todos entram, inclusive os
+ * Os assuntos em alta no Brasil agora que tocam um texto (o tema que a pessoa propôs): os que dividem uma palavra com ele (raiz de 5 letras, como as notícias do dia), e o que ela trouxe preso (`chavePresa`). Todos entram, inclusive os
  * sensíveis: aqui o assunto é só sinal de momento para a nota do tema, nunca um tema sugerido. No máximo 5, do mais alto para o mais baixo.
  */
-export function tendenciasQueTocamOTema(texto: string, lista: ListaDeAgora | null): TendenciaQueToca[] {
+export function tendenciasQueTocamOTema(texto: string, lista: ListaDeAgora | null, chavePresa?: string): TendenciaQueToca[] {
   if (!lista) return [];
   const raizes = raizesDoTexto(texto);
-  if (raizes.size === 0) return [];
-  return lista.assuntos
-    .filter((a) => {
-      const doAssunto = raizesDoTexto(`${a.assunto} ${a.termos.join(" ")}`);
-      return [...raizes].some((r) => doAssunto.has(r));
-    })
-    .slice(0, 5)
-    .map((a) => ({ assunto: a.assunto, fonte: a.fontes[0]?.fonte ?? "google", sensivel: a.sensivel }));
+  const paraTocar = (a: TendenciaBrasil): TendenciaQueToca => ({ assunto: a.assunto, fonte: a.fontes[0]?.fonte ?? "google", sensivel: a.sensivel });
+  const toca = raizes.size === 0
+    ? []
+    : lista.assuntos.filter((a) => {
+        const doAssunto = raizesDoTexto(`${a.assunto} ${a.termos.join(" ")}`);
+        return [...raizes].some((r) => doAssunto.has(r));
+      });
+  // E55 PR 2b: o assunto que a pessoa trouxe preso ao Tema livre entra sempre, mesmo que o texto dela não repita nenhuma palavra dele, e na frente (é o ponto de partida da nota).
+  const presa = chavePresa ? lista.assuntos.find((a) => a.chave === chavePresa && !a.sensivel) : undefined;
+  const todos = presa ? [presa, ...toca.filter((a) => a.chave !== presa.chave)] : toca;
+  return todos.slice(0, 5).map(paraTocar);
 }
 

@@ -9,7 +9,7 @@ import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAtrasado } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
-import { CartaoEmAlta } from "@/ui/componentes/CartaoEmAlta";
+import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 
 import {
   AindaValeBloco,
@@ -168,7 +168,7 @@ export function DiaConteudo({
             cartao={emAlta}
             destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 ? "principal" : "secundario"}
             ocupado={ocupado && acao === "em-alta"}
-            aoClicar={() => ir("em-alta", emAlta.roteiro ? `/roteiros/${emAlta.roteiro.id}` : `/criar/objetivo?tema=${emAlta.tema.indice}`)}
+            aoClicar={() => ir("em-alta", destinoDoCartao(emAlta))}
             estado={emAlta.roteiro ? textosHoje.agenda.estadoReels[emAlta.roteiro.status] : undefined}
             menu={
               emAlta.roteiro ? (

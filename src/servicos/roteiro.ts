@@ -77,6 +77,7 @@ import {
 } from "./proporcao-brasil";
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { temasParaCliente } from "./temas";
+import { assuntoEmAltaDaLista, type AssuntoEmAlta } from "./tendencias";
 
 export class ErroRoteiro extends Error {}
 
@@ -325,7 +326,11 @@ export function textoNarrativo(
 }
 
 export type OrigemRoteiro =
-  | { origem: "sugerido"; temaIndice: number }
+  /**
+   * `temaChave` (E55 PR 2b): a chave do assunto do momento, quando o tema veio de um cartão "Em alta hoje". O índice é a posição na lista de hoje e muda se o assunto sai ou outro entra na vaga;
+   * com a chave, o tema é o do assunto que a pessoa viu, ou nenhum (`textosHoje.emAlta.saiuNaHora`), nunca outro.
+   */
+  | { origem: "sugerido"; temaIndice: number; temaChave?: string }
   | { origem: "livre"; textoTema: string }
   /**
    * V9a, item 1: a pessoa contou o momento (por áudio ou por texto) em vez
@@ -373,6 +378,11 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * ponto de partida), a notícia vira um campo próprio em vez de uma quarta origem.
    */
   noticiaId?: number;
+  /**
+   * E55 PR 2b: a chave do assunto em alta que a pessoa trouxe para o ramo dela (Tema livre, `?alta=`). Só vale com `origem: "livre"`. O assunto é conferido contra a lista de agora (`resolverTema`):
+   * ainda em alta, o roteiro nasce do momento (guarda o assunto, não muda de dia); já fora da lista, é um tema livre comum.
+   */
+  assuntoEmAlta?: string;
 };
 
 /**
@@ -671,7 +681,9 @@ async function resolverTema(
   params: ParametrosGerarRoteiro,
 ): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: TemaDoMomentoGuardado | null }> {
   if (params.origem === "livre") {
-    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: null };
+    // E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela: o roteiro nasce do momento só se o assunto ainda está na lista de agora.
+    const assunto = params.assuntoEmAlta ? await assuntoEmAltaDaLista(params.assuntoEmAlta) : null;
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null };
   }
 
   /**
@@ -690,17 +702,22 @@ async function resolverTema(
   if (resultado.status !== "ok") {
     throw new ErroRoteiro("nao ha tema do dia disponivel para este cliente.");
   }
-  const tema = resultado.temas[params.temaIndice];
+  const tema = params.temaChave ? resultado.temas.find((t) => t.doMomento?.chave === params.temaChave) : resultado.temas[params.temaIndice];
   if (!tema) {
-    throw new ErroRoteiro("tema nao encontrado para o indice pedido.");
+    throw new ErroRoteiro(params.temaChave ? textosHoje.emAlta.saiuNaHora : "tema nao encontrado para o indice pedido.");
   }
-  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento) : null };
+  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null };
 }
 
-/** O que o roteiro guarda do assunto em alta (o `doMomento` do tema sem o encaixe, que só serve para escolher). */
-function guardarTemaDoMomento(doMomento: NonNullable<TemaDoDia["doMomento"]>): TemaDoMomentoGuardado {
+/** O que o roteiro guarda do assunto em alta (o `doMomento` do tema sem o encaixe, que só serve para escolher), mais a ligação com o ramo que o modelo escreveu. */
+function guardarTemaDoMomento(doMomento: NonNullable<TemaDoDia["doMomento"]>, ligacao: string | null): TemaDoMomentoGuardado {
   const { chave, assunto, termos, fonte, url, coletadaEm } = doMomento;
-  return { chave, assunto, termos: [...termos], fonte, url, coletadaEm };
+  return { chave, assunto, termos: [...termos], fonte, url, coletadaEm, ligacao };
+}
+
+/** O assunto da lista de agora que a pessoa trouxe para o ramo dela (o tema livre não tem tema do dia por trás): a mesma forma do snapshot, sem ligação (ela escreveu a dela). */
+function guardarAssuntoDaLista(assunto: AssuntoEmAlta): TemaDoMomentoGuardado {
+  return { chave: assunto.chave, assunto: assunto.assunto, termos: [...assunto.termos], fonte: assunto.fonte, url: assunto.url, coletadaEm: assunto.coletadaEm, ligacao: null };
 }
 
 /**
@@ -2310,6 +2327,8 @@ export type RoteiroHistoricoLinha = {
   origem: OrigemRoteiro["origem"];
   /** V9c, item 4: `HistoricoTela` mostra "· story" ao lado da data, como "· momento". */
   formato: FormatoRoteiro;
+  /** E55 PR 2b: o nome do assunto em alta de onde o roteiro nasceu (o selo "do momento: ..."); nulo nos outros. */
+  assuntoDoMomento: string | null;
 };
 
 /**
@@ -2331,6 +2350,8 @@ export async function roteirosDoCliente(
       postadoEm: roteiros.postadoEm,
       origem: roteiros.origem,
       formato: roteiros.formato,
+      // E55 PR 2b: o selo "do momento: <assunto>" do Histórico (o nome do assunto fica gravado no roteiro mesmo depois que ele sai da lista).
+      assuntoDoMomento: sql<string | null>`${roteiros.temaDoMomento}->>'assunto'`,
     })
     .from(roteiros)
     .where(and(eq(roteiros.clienteId, clienteId), SEM_VERSAO_MAIS_NOVA))

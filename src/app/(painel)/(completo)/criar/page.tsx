@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { hojeISO } from "@/lib/config";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
+import { assuntosSemEncaixeSemFalha, cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { roteiroPorId } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
@@ -58,11 +59,16 @@ export default async function Criar({ searchParams }: Props) {
         }
       : null;
 
-  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial] = await Promise.all([
+  // E55 PR 2b: o assunto em alta hoje é para hoje: quem veio criar para outro dia (`?data=`) não o vê, nem a lista do que não coube no ramo.
+  const paraHoje = !dataInicial || dataInicial === hoje;
+  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
     planoDoDia(cliente.id, hoje),
     planoQueVem(cliente.id, hoje),
     planoItemId ? itemPlanoPorId(planoItemId, cliente.id) : Promise.resolve(null),
+    paraHoje
+      ? cartaoEmAltaSemFalha(cliente, hoje).then(async (cartao) => ({ cartao, semEncaixe: cartao ? [] : await assuntosSemEncaixeSemFalha(cliente, hoje) }))
+      : Promise.resolve({ cartao: null, semEncaixe: [] }),
   ]);
   const objetivoRecomendado = resultadoTemas?.status === "ok" ? resultadoTemas.objetivoRecomendado : null;
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
@@ -82,6 +88,8 @@ export default async function Criar({ searchParams }: Props) {
       itemPlanoInicial={itemPlanoInicial}
       abrirEmStory={formato === "story"}
       momentoInicial={momentoInicial}
+      emAlta={emAltaECemEncaixe.cartao}
+      semEncaixe={emAltaECemEncaixe.semEncaixe}
     />
   );
 }

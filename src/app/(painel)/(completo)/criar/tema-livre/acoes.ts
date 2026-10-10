@@ -30,8 +30,11 @@ export async function salvarRascunhoAction(texto: string): Promise<void> {
  * E43: `noticiaId` presente quando o tema nasceu de "Criar vídeo com esta
  * notícia". A notícia é resolvida aqui, escopada pelo setor do cliente, nunca
  * confiando num id de outro setor vindo do client.
+ *
+ * E55 PR 2b: `assuntoEmAlta` é a chave do assunto em alta trazido para o ramo (o Tema livre
+ * `?alta=`); `tendenciasQueTocamOTema` só o aceita se ele está na lista de agora e não é delicado.
  */
-export async function avaliarTemaAction(texto: string, noticiaId?: number): Promise<ResultadoAvaliarTema> {
+export async function avaliarTemaAction(texto: string, noticiaId?: number, assuntoEmAlta?: string): Promise<ResultadoAvaliarTema> {
   await exigirForaDoVerComo();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
@@ -39,5 +42,5 @@ export async function avaliarTemaAction(texto: string, noticiaId?: number): Prom
   }
   const cliente = await clienteDaSessaoAtual();
   const noticia = noticiaId && cliente.nichoId ? await noticiaPorId(noticiaId, cliente.nichoId) : null;
-  return avaliarTema(cliente, texto, noticia ? { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo } : undefined);
+  return avaliarTema(cliente, texto, noticia ? { titulo: noticia.titulo, resumo: noticia.resumo, angulo: noticia.angulo } : undefined, assuntoEmAlta);
 }

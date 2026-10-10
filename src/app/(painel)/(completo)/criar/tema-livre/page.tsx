@@ -1,15 +1,17 @@
 import { redirect } from "next/navigation";
 
-import { config } from "@/lib/config";
+import { config, hojeISO } from "@/lib/config";
 import { formatarFonteEData } from "@/lib/formatarNumero";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
+import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
 import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
+import { textosHoje } from "@/textos/hoje";
 
 import { TemaLivreTela } from "./TemaLivreTela";
 
-type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string; alta?: string }> };
 
 /**
  * `?tema=<assunto>` vem de `/referencias`, "usar como referência" (etapa 12,
@@ -20,6 +22,9 @@ type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?:
  * `?noticiaId=<id>` vem de `/noticias`, "Criar vídeo com esta notícia" (E43): escopado pelo nicho
  * do cliente (`noticiaPorId`), nunca confiando num id de outro setor vindo da URL; sem rascunho
  * nem `?tema=` junto (o campo nasce vazio, a pergunta é "o que você pensou", não um assunto).
+ *
+ * `?alta=<chave>` vem do Criar (E55 PR 2b), "Trazer para o meu ramo": o assunto em alta fica preso no alto, como a notícia, e vale só se ele ainda está na lista de agora (e não é delicado);
+ * sem rascunho nem `?tema=` junto, pelo mesmo motivo da notícia. O assunto é para hoje: quem chega com `?data=` de outro dia abre o Tema livre comum.
  */
 export default async function TemaLivre({ searchParams }: Props) {
   const sessao = await sessaoDoPainel();
@@ -28,7 +33,7 @@ export default async function TemaLivre({ searchParams }: Props) {
   }
 
   const cliente = await clienteDaSessaoAtual();
-  const [{ tema, data, noticiaId }, rascunho, marcas, resultadoTemas] = await Promise.all([
+  const [{ tema, data, noticiaId, alta }, rascunho, marcas, resultadoTemas] = await Promise.all([
     searchParams,
     rascunhoTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
@@ -54,16 +59,23 @@ export default async function TemaLivre({ searchParams }: Props) {
       }
     : undefined;
 
+  const hoje = hojeISO();
+  const assuntoPreso = alta && !noticia && (!dataInicial || dataInicial === hoje) ? await assuntoPresoDaLista(alta, hoje).catch(() => null) : null;
+  const emAlta = assuntoPreso
+    ? { chave: assuntoPreso.chave, assunto: assuntoPreso.assunto, linha: textosHoje.emAlta.linhaDaFonte(assuntoPreso.doGoogle, assuntoPreso.doYoutube, assuntoPreso.desde) }
+    : undefined;
+
   return (
     <TemaLivreTela
       notaMinima={config.regras.notaMinimaTema}
-      temaInicial={noticia ? "" : (tema ?? rascunho ?? "")}
+      temaInicial={noticia || emAlta ? "" : (tema ?? rascunho ?? "")}
       objetivoRecomendado={objetivoRecomendado}
       outrasMarcas={outrasMarcas}
       tipo={cliente.tipo}
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
       noticia={noticia}
+      emAlta={emAlta}
       marcaAtivaId={cliente.id}
     />
   );

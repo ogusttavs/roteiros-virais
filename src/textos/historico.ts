@@ -23,4 +23,6 @@ export const textosHistorico = {
   semAcompanhamento: "sem acompanhamento",
   vazio: "O seu primeiro roteiro aparece aqui depois que você gravar. O tema de hoje está pronto.",
   verTema: "ver o tema de hoje",
+  /** E55 PR 2b: o roteiro que nasceu de um assunto em alta; no Histórico o assunto sempre já passou, então o selo é o neutro. */
+  seloDoMomento: (assunto: string) => `do momento: ${assunto}`,
 };
