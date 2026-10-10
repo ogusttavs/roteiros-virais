@@ -1,9 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 
+import { hojeISO } from "@/lib/config";
 import { conviteDeInstalarPodeAparecer } from "@/lib/convite-instalar";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
+import { momentoDoRoteiro } from "@/servicos/em-alta";
 import { videoPorId } from "@/servicos/pesquisa";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
@@ -36,9 +38,13 @@ export default async function Roteiro({ params }: Props) {
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  const [video, versoes] = await Promise.all([
+  const [video, versoes, momento] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
+    // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
+    roteiro.temaDoMomento
+      ? momentoDoRoteiro({ data: roteiro.data, temaDoMomento: roteiro.temaDoMomento }, hojeISO()).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   return (
@@ -48,6 +54,7 @@ export default async function Roteiro({ params }: Props) {
       blocos={blocosParaLeitura(roteiro)}
       video={video}
       versoes={versoes}
+      momento={momento}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}

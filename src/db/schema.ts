@@ -1454,7 +1454,10 @@ export type TemaDoDia = {
  * E55 PR 2: o que o roteiro guarda do assunto em alta de onde nasceu (a cópia do `doMomento` do tema, sem o encaixe, no instante de criar). O tema some de `temas_dia` quando o assunto sai da
  * lista, então só o roteiro lembra: é daqui que vêm o selo "Assunto do momento", o "já passou", o selo do Histórico, a recusa de mudar de dia e o pedido de "mais fácil de gravar hoje" na reescrita.
  */
-export type TemaDoMomentoGuardado = Pick<NonNullable<TemaDoDia["doMomento"]>, "chave" | "assunto" | "termos" | "fonte" | "url" | "coletadaEm">;
+export type TemaDoMomentoGuardado = Pick<NonNullable<TemaDoDia["doMomento"]>, "chave" | "assunto" | "termos" | "fonte" | "url" | "coletadaEm"> & {
+  /** O "por que este assunto serve a este setor hoje" que o modelo escreveu para o tema; fica para o "De onde veio" do roteiro depois que o tema some. Nulo no tema livre (a ligação é a que a pessoa escreveu). */
+  ligacao?: string | null;
+};
 
 export const temasDia = pgTable(
   "temas_dia",

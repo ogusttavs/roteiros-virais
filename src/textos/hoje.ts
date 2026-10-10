@@ -340,5 +340,26 @@ export const textosHoje = {
     /** Só quando o Google trouxe o número; sem ele, o cartão não inventa. */
     buscas: (numero: string) => `Mais de ${numero} buscas no Google hoje.`,
     soYoutube: "Entre os vídeos mais vistos do YouTube no Brasil hoje.",
+    /** A linha mono do cartão e do assunto preso no Tema livre: de onde vem o assunto e desde quando está em alta. */
+    linhaDaFonte: (google: boolean, youtube: boolean, desde: { dia: "hoje" | "ontem" | "antes"; hora: number } | null) => {
+      const fonte = google && youtube ? "Buscas do Google e vídeos do YouTube no Brasil" : youtube ? "Vídeos do YouTube no Brasil" : "Buscas do Google no Brasil";
+      if (!desde) return fonte;
+      return `${fonte} · ${desde.dia === "antes" ? "em alta desde antes de ontem" : `em alta desde ${desde.dia}, ${desde.hora}h`}`;
+    },
+    /** A fonte em duas ou três palavras, para as listas ("Google e YouTube · desde hoje, 8h"). */
+    fonteCurta: (google: boolean, youtube: boolean) => (google && youtube ? "Google e YouTube" : youtube ? "YouTube" : "Google"),
+    /** A linha de um assunto da lista do que não coube no ramo: a fonte curta e desde quando. */
+    linhaCurta: (google: boolean, youtube: boolean, desde: { dia: "hoje" | "ontem" | "antes"; hora: number } | null) => {
+      const fonte = google && youtube ? "Google e YouTube" : youtube ? "YouTube" : "Google";
+      if (!desde) return fonte;
+      return `${fonte} · ${desde.dia === "antes" ? "desde antes de ontem" : `desde ${desde.dia}, ${desde.hora}h`}`;
+    },
+    /** A porta dos temas quando só havia o assunto do momento e ele não está mais à mão (já usado, ou para outro dia): o aviso no lugar da lista vazia. */
+    soOMomento: {
+      titulo: "Hoje só há o assunto do momento",
+      texto: "Ele vale só para hoje e já foi usado, ou não cabe no dia que você escolheu. Escreva o seu assunto, que a gente dá a nota antes do roteiro.",
+    },
+    /** O assunto do momento saiu da lista entre a pessoa abrir a tela e escrever o roteiro: a frase da tela, no lugar de um tema errado ou de um erro técnico. */
+    saiuNaHora: "O assunto saiu do que está em alta antes de o roteiro sair. Escolha outro tema ou escreva o seu.",
   },
 };

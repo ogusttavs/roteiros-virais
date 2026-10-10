@@ -105,6 +105,8 @@ export function HistoricoTela({ resumo, grupos }: Props) {
                       {item.formato === "story" ? ` · ${textosHistorico.formatoStory}` : ""}
                     </span>
                     <span className={styles.itemTema}>{item.tema}</span>
+                    {/* E55 PR 2b: o roteiro que nasceu de um assunto em alta; no Histórico o assunto sempre já passou, então o selo é o neutro. */}
+                    {item.assuntoDoMomento ? <span className={styles.seloDoMomento} data-selo-do-momento>{textosHistorico.seloDoMomento(item.assuntoDoMomento)}</span> : null}
                     {medida ? <span className={styles.itemMedida}>{medida}</span> : null}
                   </span>
                   <span className={styles.itemStatus}>{textosHistorico.status[item.status]}</span>

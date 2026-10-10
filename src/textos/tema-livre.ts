@@ -54,6 +54,22 @@ export const textosTemaLivre = {
   placeholderComNoticia:
     "Aqui a gente vê isso todo dia: o cliente leva o mais barato e volta na semana seguinte porque não rendeu.",
 
+  /**
+   * E55 PR 2b, "Trazer para o meu ramo" (design v2, `TemaLivre.dc.html`, estado `comAlta`): o assunto em alta é o ponto de partida, preso no alto como a notícia (a pessoa pode tirá-lo).
+   * A dica e o placeholder do desenho citavam o frio; aqui são genéricos, porque o assunto muda todo dia.
+   */
+  comAlta: {
+    tituloCompacto: "Seu assunto",
+    titulo: "Trazer para o seu ramo",
+    subtitulo:
+      "O assunto em alta é o ponto de partida. Conte como ele aparece no seu trabalho ou na vida do seu cliente, e a gente dá a nota antes de escrever.",
+    rotulo: "Em alta no Brasil, para hoje",
+    tirar: "Tirar o assunto",
+    pergunta: "Como esse assunto cabe no seu ramo?",
+    dica: "O que esse assunto muda no seu trabalho, a pergunta que o cliente faz agora, um caso de hoje. Pode escrever ou falar.",
+    placeholder: "Conte como esse assunto aparece no seu trabalho, com um caso de hoje.",
+  },
+
   tituloEsperando: "Avaliando o seu tema",
   subtituloEsperando: "Procurando no que já está guardado do seu setor se esse assunto tem chance.",
   esperandoTopo: "Costuma levar menos de 10 segundos.",

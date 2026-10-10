@@ -5,120 +5,11 @@
  * Mesmo cuidado dos outros specs de agenda: um ramo, uma marca e uma rodada de tendências por teste (a "lista de agora" é a rodada mais recente, então cada teste põe a sua por último), com
  * o id do usuário trazendo o número da tentativa (o retry do Playwright insere de novo). O que o teste gravou em `tendencias_brasil` sai no fim.
  */
-import { expect, test, type Page } from "@playwright/test";
-import { hashPassword } from "better-auth/crypto";
-import { like } from "drizzle-orm";
+import { expect, test } from "@playwright/test";
 
-import { db } from "../../src/db";
-import { account, briefings, clientes, membrosMarca, nichos, preferenciasUsuario, roteiros, temasDia, tendenciasBrasil, user, type TemaDoDia } from "../../src/db/schema";
-import { hojeISO } from "../../src/lib/config";
-import { somarDiasISO } from "../../src/servicos/roteiro";
+import { entrar, limparTendencias, prepararMarca, TITULO_DO_ROTEIRO, TITULO_DO_TEMA } from "./ajudas-em-alta";
 
-const SENHA = "ExemploSenha123";
-const PREFIXO = "E2E em alta";
-const TITULO_DO_TEMA = "O mofo que a frente fria traz para o armário, e como tirar hoje";
-
-const CONTEUDO_MINIMO = {
-  titulo: "Mofo no armário: o que fazer hoje",
-  duracaoS: 30,
-  gancho: "gancho",
-  corpo: "corpo",
-  fechamento: "fechamento",
-  chamadaFinal: "chamada final",
-  cartoes: null,
-  porQueAssim: [],
-  cenas: [],
-  ondeGravar: "no armário",
-  edicao: { textoNaTela: [], ritmoDeCorte: "moderado", recursos: [], audio: null, referencia: null },
-  evidencias: [],
-  semEvidencia: true,
-  forcaEvidencia: null,
-};
-
-async function entrar(page: Page, email: string) {
-  await page.goto("/entrar");
-  await page.getByLabel("E-mail").fill(email);
-  await page.getByLabel("Senha").fill(SENHA);
-  await page.getByRole("button", { name: "entrar", exact: true }).click();
-  await expect(page).toHaveURL(/\/hoje/);
-}
-
-type Preparo = {
-  assunto: string;
-  /** O roteiro já criado do assunto: de hoje, ou de ontem (atrasado). */
-  roteiro?: { data: "hoje" | "ontem"; formato?: "reels" | "story" };
-  /** A rodada de agora tem o assunto? (`false` põe outro assunto na rodada mais recente.) */
-  naLista?: boolean;
-  trafego?: string | null;
-};
-
-/** Uma marca num ramo só dela, com o tema do momento do dia (dois temas: um comum e o do momento) e a rodada de tendências de agora. */
-async function prepararMarca(opcoes: Preparo) {
-  const sufixo = `${test.info().testId}-r${test.info().retry}`;
-  const usuarioId = `e2e-em-alta-${sufixo}`;
-  const [nicho] = await db().insert(nichos).values({ slug: `e2e-em-alta-${sufixo}`, nome: `${PREFIXO} ${sufixo}`, termos: [] }).returning();
-  await db().insert(user).values({ id: usuarioId, name: "[teste] Em alta", email: `${usuarioId}@exemplo.teste` });
-  await db()
-    .insert(account)
-    .values({ id: `${usuarioId}-credential`, issuer: "local:credential", accountId: usuarioId, providerId: "credential", userId: usuarioId, password: await hashPassword(SENHA) });
-  await db().insert(preferenciasUsuario).values({ usuarioId, aceitouTermosEm: new Date() });
-  const [marca] = await db().insert(clientes).values({ usuarioId, nome: "[teste] Em alta", nichoId: nicho.id }).returning();
-  await db().insert(membrosMarca).values({ usuarioId, clienteId: marca.id, papel: "dono" });
-  await db().insert(briefings).values({
-    clienteId: marca.id,
-    completo: true,
-    notaGeral: "8.50",
-    perfil: {
-      fatos: { oQueVende: "lavagem de estofados", preco: "sofá de 3 lugares por R$ 180", clienteIdeal: "mora em apartamento", medos: [], frasesDaFala: [], proibicoes: [], cenasFilmaveis: [], concorrentes: [], perfisAdmirados: [] },
-      resumo: "lava estofados em domicílio",
-      referencias: [],
-    },
-  });
-
-  const assunto = `${PREFIXO} ${opcoes.assunto} ${sufixo}`;
-  const chave = assunto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-  const doMomento = { chave, assunto, termos: [assunto], fonte: "Em alta no Google no Brasil", url: null, coletadaEm: new Date().toISOString(), encaixe: 8 };
-  const temas: TemaDoDia[] = [
-    { titulo: "Um tema comum do setor", descricao: "d", porQue: "p", evidencias: [], puxaPara: "alcance" },
-    { titulo: TITULO_DO_TEMA, descricao: "Curto e fácil de gravar: 30 segundos, no celular, na frente do armário.", porQue: "p", evidencias: [], puxaPara: "alcance", doMomento },
-  ];
-  await db().insert(temasDia).values({ nichoId: nicho.id, data: hojeISO(), temas });
-
-  const agora = Date.now();
-  const naLista = opcoes.naLista !== false;
-  await db()
-    .insert(tendenciasBrasil)
-    .values({
-      coletadaEm: new Date(agora - 60_000),
-      assunto: naLista ? assunto : `${PREFIXO} outro assunto ${sufixo}`,
-      chave: naLista ? chave : `outro ${chave}`,
-      termos: [naLista ? assunto : `${PREFIXO} outro assunto ${sufixo}`],
-      fontes: [{ fonte: "google", titulo: assunto, url: null, trafego: opcoes.trafego === undefined ? "2000+" : opcoes.trafego, posicao: 1 }],
-      posicao: 1,
-      sensivel: false,
-    });
-
-  if (opcoes.roteiro) {
-    await db()
-      .insert(roteiros)
-      .values({
-        clienteId: marca.id,
-        data: opcoes.roteiro.data === "hoje" ? hojeISO() : somarDiasISO(hojeISO(), -1),
-        tema: TITULO_DO_TEMA,
-        origem: "sugerido",
-        objetivo: "alcance",
-        formato: opcoes.roteiro.formato ?? "reels",
-        conteudo: CONTEUDO_MINIMO,
-        status: "gerado",
-        temaDoMomento: { chave, assunto, termos: [assunto], fonte: "Em alta no Google no Brasil", url: null, coletadaEm: new Date().toISOString() },
-      });
-  }
-  return { email: `${usuarioId}@exemplo.teste`, assunto };
-}
-
-test.afterAll(async () => {
-  await db().delete(tendenciasBrasil).where(like(tendenciasBrasil.assunto, `${PREFIXO}%`));
-});
+test.afterAll(limparTendencias);
 
 test.describe("o cartão Em alta hoje", () => {
   test("Hoje mostra o assunto, de onde vem, o número do Google e o tema do ramo; Criar o roteiro leva ao Objetivo com o tema do momento", async ({ page }) => {
@@ -161,7 +52,7 @@ test.describe("o cartão Em alta hoje", () => {
     await expect(cartao.getByRole("button", { name: "Abrir o roteiro" })).toBeVisible();
     await expect(cartao).toContainText("a gravar");
     // O título do roteiro (não o do tema) aparece só se o item estivesse também na lista de Reels: não está.
-    await expect(page.getByRole("heading", { name: "Mofo no armário: o que fazer hoje" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: TITULO_DO_ROTEIRO })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Abrir o roteiro" })).toHaveCount(1);
 
     await cartao.getByRole("button", { name: `Mais opções: ${TITULO_DO_TEMA}` }).click();
@@ -205,7 +96,7 @@ test.describe("o cartão Em alta hoje", () => {
     const cartao = page.locator("[data-em-alta]");
     await expect(cartao.getByRole("button", { name: "Abrir o roteiro" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Abrir o roteiro" })).toHaveCount(1);
-    await expect(page.getByText("Mofo no armário: o que fazer hoje")).toHaveCount(0);
+    await expect(page.getByText(TITULO_DO_ROTEIRO)).toHaveCount(0);
   });
 
   test("o assunto que sai do que está em alta tira o cartão sozinho", async ({ page }) => {
@@ -220,7 +111,7 @@ test.describe("o cartão Em alta hoje", () => {
     const { email } = await prepararMarca({ assunto: "Frente fria", roteiro: { data: "ontem" }, naLista: false });
     await entrar(page, email);
 
-    const atrasado = page.getByRole("article").filter({ hasText: "Mofo no armário: o que fazer hoje" });
+    const atrasado = page.getByRole("article").filter({ hasText: TITULO_DO_ROTEIRO });
     await expect(atrasado).toBeVisible();
     await expect(atrasado.getByRole("button", { name: "Arquivar" })).toBeVisible();
     await expect(atrasado.getByRole("button", { name: "Mudar o dia" })).toHaveCount(0);
@@ -235,7 +126,7 @@ test.describe("o cartão Em alta hoje", () => {
     await expect(page.locator("[data-em-alta]")).toHaveCount(1);
 
     await page.goto("/planejamento?visao=semana");
-    const linha = page.getByRole("listitem").filter({ hasText: "Mofo no armário: o que fazer hoje" });
+    const linha = page.getByRole("listitem").filter({ hasText: TITULO_DO_ROTEIRO });
     await expect(linha).toBeVisible();
     await expect(linha).toHaveAttribute("draggable", "false");
     await linha.getByRole("button", { name: /^Mais opções/ }).click();

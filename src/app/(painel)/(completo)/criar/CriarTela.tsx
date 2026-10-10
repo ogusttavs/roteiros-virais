@@ -7,12 +7,16 @@ import { useEffect, useState, useTransition } from "react";
 
 import { rotuloParaQue } from "@/config/fichas";
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import type { AssuntoSemEncaixe, CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { ItemPlano } from "@/servicos/plano";
 import { textosCriar } from "@/textos/criar";
+import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
 import { textosPlano } from "@/textos/plano";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
+import { SemEncaixeEmAlta } from "@/ui/componentes/SemEncaixeEmAlta";
 import { ID_FAIXA_SEM_CONEXAO, useConexao } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
@@ -46,6 +50,10 @@ type Props = {
   abrirEmStory?: boolean;
   /** O momento que volta preenchido (`?momento=<roteiro>`): abre "Gravar agora" com o que a pessoa tinha contado, editável. */
   momentoInicial?: ValoresIniciaisMomento | null;
+  /** E55 PR 2b: o assunto em alta hoje trazido para o ramo da marca, no alto da oficina (nulo sem tema do momento, ou quando se cria para outro dia). */
+  emAlta?: DadosEmAlta | null;
+  /** E55 PR 2b: sem tema do momento, até três assuntos em alta que não couberam no ramo (nunca os delicados). */
+  semEncaixe?: AssuntoSemEncaixe[];
 };
 
 /**
@@ -68,6 +76,8 @@ export function CriarTela({
   itemPlanoInicial,
   abrirEmStory = false,
   momentoInicial = null,
+  emAlta = null,
+  semEncaixe = [],
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -169,6 +179,33 @@ export function CriarTela({
             <h1>{textosCriar.titulo}</h1>
             <p>{textosCriar.subtitulo}</p>
           </div>
+
+          {/* E55 PR 2b: o assunto do momento no alto da oficina, antes dos caminhos: é a única coisa do Criar que tem prazo. Aqui o botão é o principal da tela. */}
+          {emAlta ? (
+            <section className={styles.emAlta} aria-labelledby="t-em-alta">
+              <h2 id="t-em-alta" className="so-leitor">
+                {textosHoje.emAlta.titulo}
+              </h2>
+              <CartaoEmAlta
+                cartao={emAlta}
+                destaque="principal"
+                ocupado={ocupado && acao === "em-alta"}
+                desabilitado={ocupado}
+                aoClicar={() => ir("em-alta", destinoDoCartao(emAlta))}
+                acaoExtra={
+                  emAlta.roteiro
+                    ? undefined
+                    : { rotulo: textosCriar.emAlta.trazerDeOutroJeito, aoClicar: () => ir("em-alta-livre", `/criar/tema-livre?alta=${encodeURIComponent(emAlta.chave)}`) }
+                }
+              />
+            </section>
+          ) : null}
+
+          <SemEncaixeEmAlta
+            assuntos={semEncaixe}
+            desabilitado={ocupado}
+            aoTrazer={(assunto) => ir(`sem-encaixe-${assunto.chave}`, `/criar/tema-livre?alta=${encodeURIComponent(assunto.chave)}`)}
+          />
 
           {planoDeHoje.length > 0 ? (
             <section className={styles.planoHoje}>

@@ -192,6 +192,33 @@
   cursor: progress;
 }
 
+.botaoTexto {
+  flex: none;
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  padding: 0 var(--espaco-2);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.botaoTexto:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoTexto:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
 .vale {
   display: flex;
   align-items: center;

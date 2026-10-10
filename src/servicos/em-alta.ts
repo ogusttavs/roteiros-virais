@@ -3,10 +3,10 @@
  * dentro de `temas_dia`, a lista de agora em `tendencias_brasil`, o roteiro que a marca já criou dele); aqui só se juntam e se medem as duas coisas que o desenho pede e o motor não tinha:
  * desde quando o assunto está em alta e o número de buscas do Google. Nenhum custo de modelo: tudo é leitura do banco.
  */
-import { gte } from "drizzle-orm";
+import { and, desc, eq, gte } from "drizzle-orm";
 
 import { db } from "@/db";
-import { tendenciasBrasil, type Cliente } from "@/db/schema";
+import { tendenciasAvaliadas, tendenciasBrasil, type Cliente, type FonteDaTendencia, type TemaDoMomentoGuardado } from "@/db/schema";
 import { logger } from "@/lib/log";
 
 import { roteiroDoMomentoDeHoje, somarDiasISO } from "./roteiro";
@@ -21,6 +21,8 @@ const HORAS_PARA_TRAS = 60;
 export type DesdeQuando = { dia: "hoje" | "ontem" | "antes"; hora: number };
 
 export type CartaoEmAlta = {
+  /** A chave do assunto: o que o "Trazer para o meu ramo de outro jeito" leva ao Tema livre (`?alta=`). */
+  chave: string;
   assunto: string;
   /** De onde vem o assunto agora: a rodada de agora o traz pelas buscas do Google, pelos vídeos do YouTube, ou pelos dois. */
   doGoogle: boolean;
@@ -100,6 +102,129 @@ function assuntoDeAgora(doMomento: AssuntoDaRodada, lista: ListaDeAgora) {
   return lista.assuntos.find((a) => a.chave === doMomento.chave) ?? lista.assuntos.find((a) => assuntoSegueEmAlta(doMomento, [a])) ?? null;
 }
 
+/** Das fontes de um assunto: se vem do Google, do YouTube, e o número de buscas do Google já escrito. */
+function lerFontes(fontes: FonteDaTendencia[]): { doGoogle: boolean; doYoutube: boolean; buscas: string | null } {
+  return {
+    doGoogle: fontes.some((f) => f.fonte === "google"),
+    doYoutube: fontes.some((f) => f.fonte === "youtube"),
+    buscas: formatarBuscasDoGoogle(fontes.find((f) => f.fonte === "google" && f.trafego)?.trafego ?? null),
+  };
+}
+
+/** Um assunto em alta que a marca ainda pode trazer para o ramo dela por conta própria (o Tema livre com o assunto preso). */
+export type AssuntoPreso = { chave: string; assunto: string; doGoogle: boolean; doYoutube: boolean; desde: DesdeQuando | null };
+
+/**
+ * O assunto de uma chave na lista de agora, para o Tema livre mostrar "Em alta no Brasil, para hoje" com a fonte e desde quando: nulo se ele já saiu da lista (a tela abre como um Tema livre
+ * comum). Sensível não entra aqui: o assunto delicado nunca é oferecido, e quem chega com a chave dele na mão (um endereço colado) também não o recebe preso.
+ */
+export async function assuntoPresoDaLista(chave: string, hoje: string, agora: Date = new Date()): Promise<AssuntoPreso | null> {
+  const lista = await listaDeTendenciasDeAgora(agora);
+  const achado = lista?.assuntos.find((a) => a.chave === chave && !a.sensivel);
+  if (!achado) return null;
+  const { doGoogle, doYoutube } = lerFontes(achado.fontes);
+  const primeira = rodadaMaisAntigaSeguida(achado, await rodadasRecentes(agora));
+  return { chave: achado.chave, assunto: achado.assunto, doGoogle, doYoutube, desde: primeira ? desdeQuandoDe(primeira, hoje) : null };
+}
+
+/** Um dos três assuntos que o Criar mostra quando nenhum cabe no ramo (o botão "Trazer para o meu ramo" leva a chave dele ao Tema livre). */
+export type AssuntoSemEncaixe = AssuntoPreso;
+
+/**
+ * Os assuntos em alta que não couberam no ramo (nenhum tema do momento nasceu na rodada de agora): até três, do mais alto para baixo, sem os delicados (política, tragédia). Só quando o setor avaliou
+ * a lista de agora e a resposta foi "sem encaixe": sem avaliação ainda (ou com só assunto delicado na lista), o Criar não tem o que dizer. Leitura do banco, sem custo.
+ */
+export async function assuntosSemEncaixe(cliente: Cliente, hoje: string, agora: Date = new Date()): Promise<AssuntoSemEncaixe[]> {
+  if (!cliente.nichoId) return [];
+  const lista = await listaDeTendenciasDeAgora(agora);
+  if (!lista) return [];
+  const [avaliada] = await db()
+    .select({ resultado: tendenciasAvaliadas.resultado })
+    .from(tendenciasAvaliadas)
+    .where(and(eq(tendenciasAvaliadas.nichoId, cliente.nichoId), eq(tendenciasAvaliadas.rodadaEm, lista.coletadaEm)));
+  if (avaliada?.resultado !== "sem_encaixe") return [];
+  const rodadas = await rodadasRecentes(agora);
+  return lista.assuntos
+    .filter((a) => !a.sensivel)
+    .slice(0, 3)
+    .map((a) => {
+      const { doGoogle, doYoutube } = lerFontes(a.fontes);
+      const primeira = rodadaMaisAntigaSeguida(a, rodadas);
+      return { chave: a.chave, assunto: a.assunto, doGoogle, doYoutube, desde: primeira ? desdeQuandoDe(primeira, hoje) : null };
+    });
+}
+
+/** O que a tela do roteiro diz do assunto de onde ele nasceu: se ainda está em alta, de onde vem, desde quando e, se já passou, quando saiu. */
+export type MomentoDoRoteiro = {
+  assunto: string;
+  /**
+   * "vivo": o roteiro é de hoje e o assunto segue na lista de agora. "outroDia": o assunto segue na lista, mas o roteiro é de outro dia (o assunto do momento vale no próprio dia: nunca "vivo", e também
+   * não "passou", porque o assunto não saiu). "passou": o assunto já saiu da lista.
+   */
+  estado: "vivo" | "outroDia" | "passou";
+  /** A busca do Google que trouxe o assunto (o termo como o Google o escreve e o número de buscas já escrito), ou nulo se o Google não o trouxe. */
+  fonteGoogle: { termo: string; buscas: string | null } | null;
+  doYoutube: boolean;
+  desde: DesdeQuando | null;
+  /** Só quando já passou: a primeira rodada sem o assunto depois das que o tinham; nulo se não deu para saber. */
+  saiuEm: DesdeQuando | null;
+  /** A frase do sistema que liga o assunto ao ramo; nula no Tema livre (a ligação é a que a pessoa escreveu). */
+  ligacao: string | null;
+};
+
+/**
+ * O momento de um roteiro que nasceu de um assunto em alta, na hora de abrir a tela dele. Tudo vem do que o roteiro guardou e do banco de tendências (sem modelo): as fontes do assunto são as da
+ * lista de agora, ou, se ele já passou, as da última rodada em que ele apareceu.
+ */
+export async function momentoDoRoteiro(roteiro: { data: string; temaDoMomento: TemaDoMomentoGuardado }, hoje: string, agora: Date = new Date()): Promise<MomentoDoRoteiro> {
+  const guardado = roteiro.temaDoMomento;
+  const [lista, rodadas] = await Promise.all([listaDeTendenciasDeAgora(agora), rodadasRecentes(agora)]);
+  const naLista = lista !== null && assuntoSegueEmAlta(guardado, lista.assuntos);
+  const estado: MomentoDoRoteiro["estado"] = naLista ? (roteiro.data === hoje ? "vivo" : "outroDia") : "passou";
+
+  // As fontes: o assunto de agora na lista, ou a última linha que ele teve no banco.
+  let fontes: FonteDaTendencia[] = [];
+  if (naLista && lista) fontes = assuntoDeAgora(guardado, lista)?.fontes ?? [];
+  if (fontes.length === 0) {
+    const [ultima] = await db().select({ fontes: tendenciasBrasil.fontes }).from(tendenciasBrasil).where(eq(tendenciasBrasil.chave, guardado.chave)).orderBy(desc(tendenciasBrasil.coletadaEm)).limit(1);
+    fontes = ultima?.fontes ?? [];
+  }
+  const { doYoutube, buscas } = lerFontes(fontes);
+  const google = fontes.find((f) => f.fonte === "google");
+
+  const primeira = rodadaMaisAntigaSeguida(guardado, rodadas);
+  let saiuEm: DesdeQuando | null = null;
+  if (estado === "passou") {
+    const emOrdem = [...rodadas].sort((a, b) => a.coletadaEm.getTime() - b.coletadaEm.getTime());
+    let ultimaComOAssunto = -1;
+    emOrdem.forEach((rodada, i) => {
+      if (assuntoSegueEmAlta(guardado, rodada.assuntos)) ultimaComOAssunto = i;
+    });
+    const seguinte = ultimaComOAssunto >= 0 ? emOrdem[ultimaComOAssunto + 1] : undefined;
+    if (seguinte) saiuEm = desdeQuandoDe(seguinte.coletadaEm, hoje);
+  }
+
+  return {
+    assunto: guardado.assunto,
+    estado,
+    fonteGoogle: google ? { termo: google.titulo, buscas } : null,
+    doYoutube,
+    desde: primeira ? desdeQuandoDe(primeira, hoje) : null,
+    saiuEm,
+    ligacao: guardado.ligacao ?? null,
+  };
+}
+
+/** Os assuntos sem encaixe para as telas: uma falha ao montá-los nunca derruba o Criar (a lista só não aparece), mas vai para o log. */
+export async function assuntosSemEncaixeSemFalha(cliente: Cliente, hoje: string): Promise<AssuntoSemEncaixe[]> {
+  try {
+    return await assuntosSemEncaixe(cliente, hoje);
+  } catch (erro) {
+    logger.warn({ err: erro, clienteId: cliente.id }, "em-alta: a lista sem encaixe nao saiu");
+    return [];
+  }
+}
+
 /**
  * O mesmo cartão, para as telas: uma falha ao montá-lo nunca derruba a agenda (o cartão só não aparece), mas vai para o log, para não sumir em silêncio.
  */
@@ -137,6 +262,7 @@ export async function cartaoEmAltaDaMarca(cliente: Cliente, hoje: string, agora:
   const primeira = rodadaMaisAntigaSeguida(doMomento, rodadas);
 
   return {
+    chave: doMomento.chave,
     assunto: doMomento.assunto,
     doGoogle: doGoogle || nenhuma,
     doYoutube,

@@ -49,6 +49,8 @@ export async function gerarRoteiroAction(
   noticiaId?: number,
   /** E49 PR 1: a ficha do "O que você quer que esse vídeo faça?" (só Reels); valor que não é uma das cinco vale como ausente. */
   ficha?: string,
+  /** E55 PR 2b: a chave do assunto em alta trazido para o ramo (Tema livre `?alta=`); o servidor confere que ele ainda está na lista de agora. */
+  assuntoEmAlta?: string,
 ): Promise<ResultadoAcao<{ id: number }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
@@ -65,6 +67,7 @@ export async function gerarRoteiroAction(
       data: validarData(data),
       momentoDoDia: validarMomentoDoDia(momentoDoDia),
       noticiaId,
+      assuntoEmAlta: origem.origem === "livre" ? assuntoEmAlta : undefined,
     });
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {

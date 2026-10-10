@@ -50,6 +50,11 @@
 
 /* ---------- O seu plano de hoje (V9b, herdado de Hoje) ---------- */
 
+/* E55 PR 2b: o cartão do assunto do momento é o dele (`CartaoEmAlta`); aqui só o espaço em volta. */
+.emAlta {
+  display: grid;
+}
+
 .planoHoje {
   display: grid;
   gap: var(--espaco-3);

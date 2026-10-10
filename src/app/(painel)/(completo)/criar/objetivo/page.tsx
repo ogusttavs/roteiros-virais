@@ -5,10 +5,11 @@ import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
+import { assuntoEmAltaDaLista } from "@/servicos/tendencias";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; alta?: string; momento?: string }> };
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -28,7 +29,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre, data, noticiaId } = await searchParams;
+  const { tema, livre, data, noticiaId, alta, momento } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
@@ -42,20 +43,30 @@ export default async function Objetivo({ searchParams }: Props) {
 
   let origem: OrigemRoteiro;
   let temaEscolhidoTexto: string;
+  // E55 PR 2b: o assunto em alta (o tema do momento, ou o que a pessoa trouxe preso ao Tema livre) é para hoje: a pergunta "Para quando é?" some e o roteiro vai para hoje.
+  let paraHoje = false;
+  let assuntoEmAlta: string | undefined;
 
   if (livre) {
     origem = { origem: "livre", textoTema: livre };
     temaEscolhidoTexto = livre;
+    // A chave só vale se o assunto ainda está na lista de agora; fora dela, é um tema livre comum (o servidor confere de novo).
+    if (alta && (await assuntoEmAltaDaLista(alta).catch(() => null))) {
+      paraHoje = true;
+      assuntoEmAlta = alta;
+    }
   } else {
-    const indice = Number(tema);
+    // E55 PR 2b: vindo de um cartão "Em alta hoje", o tema é o do assunto (`?momento=<chave>`): se o assunto saiu da lista, a pessoa volta ao Criar em vez de cair em outro tema na mesma posição.
+    const indice = momento && resultado.status === "ok" ? resultado.temas.findIndex((t) => t.doMomento?.chave === momento) : Number(tema);
     const temaDoDia = resultado.status === "ok" ? resultado.temas[indice] : undefined;
     if (!temaDoDia) {
       redirect("/criar");
     }
-    origem = { origem: "sugerido", temaIndice: indice };
+    origem = momento ? { origem: "sugerido", temaIndice: indice, temaChave: momento } : { origem: "sugerido", temaIndice: indice };
     temaEscolhidoTexto = temaDoDia.titulo;
     fichaRecomendada = fichaRecomendadaParaTema(temaDoDia);
     recomendadaPor = "tema";
+    paraHoje = temaDoDia.doMomento !== undefined;
   }
 
   return (
@@ -68,6 +79,8 @@ export default async function Objetivo({ searchParams }: Props) {
       quemGravaPadrao={cliente.quemGrava}
       dataInicial={dataInicial}
       noticiaId={noticiaIdValida}
+      paraHoje={paraHoje}
+      assuntoEmAlta={assuntoEmAlta}
     />
   );
 }

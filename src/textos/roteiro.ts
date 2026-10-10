@@ -192,4 +192,33 @@ export const textosRoteiro = {
     voceDisse: "Você disse:",
     motivosLinha: (motivos: string, data: string) => `Você reprovou por: ${motivos}, em ${data}`,
   },
+
+  /**
+   * E55 PR 2b (passo 21 do Opus, `Roteiro.dc.html`, estados `doMomento` e `momentoPassou`): o roteiro que nasceu de um assunto em alta. O selo e a linha de prazo dizem que o vídeo é do dia; o
+   * "De onde veio" mostra as duas fontes do assunto no lugar do vídeo de referência; quando o assunto sai da lista, o selo vira neutro e entra o aviso.
+   */
+  doMomento: {
+    selo: "Assunto do momento",
+    seloPassou: "O assunto já passou",
+    /** O roteiro é de outro dia e o assunto segue em alta: o selo neutro não diz que o assunto saiu (ele não saiu). */
+    seloOutroDia: "Era um assunto do momento",
+    /** O que vem depois do assunto (em negrito, fora daqui) na linha de prazo: desde quando e por onde. */
+    linhaDepois: (desde: { dia: "hoje" | "ontem" | "antes"; hora: number } | null, doGoogle: boolean, doYoutube: boolean) =>
+      `, em alta no Brasil${desde ? (desde.dia === "antes" ? " desde antes de ontem" : ` desde ${desde.dia}, ${desde.hora}h`) : ""}, ${
+        doGoogle && doYoutube ? "nas buscas do Google e nos vídeos do YouTube" : doYoutube ? "nos vídeos do YouTube" : "nas buscas do Google"
+      }. Grave hoje: amanhã o assunto pode já ter passado.`,
+    avisoTitulo: (assunto: string) => `${assunto} saiu do que está em alta`,
+    avisoTexto: (saiu: { dia: "hoje" | "ontem" | "antes"; hora: number } | null) =>
+      `${saiu ? `Saiu ${saiu.dia === "antes" ? "antes de ontem" : saiu.dia}, às ${saiu.hora}h. ` : ""}O roteiro continua seu, mas gravado agora tende a render menos do que renderia no dia.`,
+    avisoOutroDiaTitulo: (assunto: string) => `${assunto} era o assunto do dia em que o roteiro foi escrito`,
+    avisoOutroDiaTexto: "O assunto do momento vale no próprio dia. O roteiro continua seu, mas gravado agora tende a render menos do que renderia naquele dia.",
+    verTemas: "Ver os temas de hoje",
+    deOndeVeioTitulo: "De onde veio",
+    deOndeVeioAria: "De onde veio o assunto",
+    google: "Buscas do Google no Brasil",
+    dadoGoogle: (termo: string, buscas: string | null) => (buscas ? `"${termo}", mais de ${buscas} buscas` : `"${termo}"`),
+    youtube: "Vídeos em alta do YouTube no Brasil",
+    dadoYoutube: "Entre os vídeos mais vistos do YouTube no Brasil",
+    ligacao: (frase: string) => `A ligação com o seu ramo é nossa: ${frase}`,
+  },
 };

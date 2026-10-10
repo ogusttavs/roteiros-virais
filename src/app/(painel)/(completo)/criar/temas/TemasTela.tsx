@@ -6,9 +6,11 @@ import { useEffect, useState, useTransition } from "react";
 
 import type { Plataforma, TemaDoDia } from "@/db/schema";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
+import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
+import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 import { Chips } from "@/ui/componentes/Chips";
 import { ClaqueteAnimada } from "@/ui/componentes/ClaqueteAnimada";
 import { TemaCartao, type EvidenciaTema } from "@/ui/componentes/TemaCartao";
@@ -35,6 +37,8 @@ type Props = {
   redePrincipal: Plataforma | null;
   /** Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio. */
   dataInicial?: string;
+  /** E55 PR 2b: o assunto em alta hoje, no alto da lista, com "Quero esse"; nulo sem tema do momento, ou quando se escolhe o tema para outro dia. */
+  emAlta?: DadosEmAlta | null;
 };
 
 /**
@@ -43,7 +47,7 @@ type Props = {
  * portas de Criar (assunto seu, contar o momento, planejar) viraram rotas à parte: esta tela cuida
  * só de escolher um tema.
  */
-export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial }: Props) {
+export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, gerando = false, redePrincipal, dataInicial, emAlta = null }: Props) {
   const router = useRouter();
 
   // Enquanto o tema é escolhido, a página pergunta ao servidor de novo a cada poucos segundos; o servidor só devolve "gerando" enquanto há pedido em andamento, então isto para sozinho.
@@ -122,23 +126,39 @@ export function TemasTela({ temas, evidenciasTemas, avisoLinhaEditorial, aviso, 
             </button>
           </div>
         ) : (
-          <div className={styles.temasTres}>
-            {temas.map((tema, indice) => (
-              <TemaCartao
-                key={`${tema.titulo}-${indice}`}
-                rotulo={ROTULO_TEMA_CARTAO[tema.puxaPara]}
-                tema={tema.titulo}
-                porque={tema.porQue}
-                evidencia={evidenciasTemas[indice] ?? null}
-                primario={indice === 0}
-                rotuloBotao={textosHoje.queroEsse}
-                abrindo={destino === `tema-${indice}` && abrindo}
+          <>
+            {/* E55 PR 2b (passo 21, estado `reelsEmAlta`): o assunto do momento sai da lista comum (a posição dele nela, o `?tema=`, é a de antes) e vem aqui, com o prazo. Todos os botões do cartão são secundários. */}
+            {emAlta ? (
+              <CartaoEmAlta
+                cartao={emAlta}
+                destaque="secundario"
+                rotuloDoBotao={emAlta.roteiro ? undefined : textosHoje.emAlta.queroEsse}
+                ocupado={abrindo && destino === "em-alta"}
                 desabilitado={abrindo}
-                precisaDeRede
-                onEscolher={() => abrir(`tema-${indice}`, comData(`/criar/objetivo?tema=${indice}`))}
+                aoClicar={() => abrir("em-alta", destinoDoCartao(emAlta))}
               />
-            ))}
-          </div>
+            ) : null}
+            <div className={styles.temasTres}>
+              {temas
+                .map((tema, indice) => ({ tema, indice }))
+                .filter(({ tema }) => !tema.doMomento)
+                .map(({ tema, indice }, posicao) => (
+                  <TemaCartao
+                    key={`${tema.titulo}-${indice}`}
+                    rotulo={ROTULO_TEMA_CARTAO[tema.puxaPara]}
+                    tema={tema.titulo}
+                    porque={tema.porQue}
+                    evidencia={evidenciasTemas[indice] ?? null}
+                    primario={posicao === 0}
+                    rotuloBotao={textosHoje.queroEsse}
+                    abrindo={destino === `tema-${indice}` && abrindo}
+                    desabilitado={abrindo}
+                    precisaDeRede
+                    onEscolher={() => abrir(`tema-${indice}`, comData(`/criar/objetivo?tema=${indice}`))}
+                  />
+                ))}
+            </div>
+          </>
         )}
       </div>
     </div>

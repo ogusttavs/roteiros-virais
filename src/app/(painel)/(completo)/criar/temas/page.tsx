@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
+import { hojeISO } from "@/lib/config";
 import { classificarMultiplo, formatarMultiplo, formatarViewsCompacto, diasDesde, fraseDiasAtras, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { pedidoAbertoDaMarca } from "@/servicos/pedidos-de-ramo";
 import { evidenciaResumoPorIds, setorAindaLendo, setorSemBase, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { pedirTemaDeHoje, temasParaCliente, type ResultadoTemasHoje } from "@/servicos/temas";
+import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 import { avisoSemTema } from "./aviso-sem-tema";
@@ -68,7 +71,11 @@ export default async function Temas({ searchParams }: Props) {
   const podePedirTema =
     resultado.status === "sem_tema" && cliente.nichoId !== null && !("aindaLendo" in estadoDoRamo && (estadoDoRamo.aindaLendo || estadoDoRamo.semBase));
   const gerando = podePedirTema ? (await pedirTemaDeHoje(cliente.nichoId!)) === "gerando" : false;
-  const aviso = gerando ? null : avisoSemTema(resultado, new Date(), estadoDoRamo);
+  // E55 PR 2b: o assunto em alta hoje (o tema do momento) sai da lista comum e vira o cartão, só para hoje: quem escolhe o tema para outro dia (`?data=`) não o recebe.
+  const emAlta = resultado.status === "ok" && (!dataInicial || dataInicial === hojeISO()) ? await cartaoEmAltaSemFalha(cliente, hojeISO()) : null;
+  // Se o dia só tinha o assunto do momento e o cartão não vem (já foi usado e arquivado, ou se escolhe para outro dia), a lista ficaria em branco: o aviso entra no lugar, com o caminho do assunto próprio.
+  const soSobrouOMomento = resultado.status === "ok" && !emAlta && !temas.some((tema) => !tema.doMomento);
+  const aviso = gerando ? null : soSobrouOMomento ? textosHoje.emAlta.soOMomento : avisoSemTema(resultado, new Date(), estadoDoRamo);
 
   return (
     <TemasTela
@@ -79,6 +86,7 @@ export default async function Temas({ searchParams }: Props) {
       gerando={gerando}
       redePrincipal={cliente.redePrincipal}
       dataInicial={dataInicial}
+      emAlta={emAlta}
     />
   );
 }

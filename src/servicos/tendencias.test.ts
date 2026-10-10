@@ -64,4 +64,15 @@ describe("os assuntos em alta que tocam o tema da nota", () => {
     expect(tendenciasQueTocamOTema("a eleição", null)).toEqual([]);
     expect(tendenciasQueTocamOTema("de um", l)).toEqual([]);
   });
+
+  it("o assunto trazido preso ao Tema livre entra sempre e na frente, mesmo sem palavra em comum; o delicado e o que saiu da lista não entram (E55 PR 2b)", () => {
+    const l = lista(assunto("Eleições 2026", ["eleição"], true), assunto("Jogo do Flamengo"), assunto("Fim da escala 6x1", ["jornada de trabalho"]));
+    // O texto da pessoa não repete nenhuma palavra do assunto preso: ele entra do mesmo jeito, na frente do que casa.
+    expect(tendenciasQueTocamOTema("como a jornada de trabalho muda a minha equipe", l, "jogo do flamengo").map((t) => t.assunto)).toEqual(["Jogo do Flamengo", "Fim da escala 6x1"]);
+    // Já casando pelo texto, não duplica.
+    expect(tendenciasQueTocamOTema("como a jornada de trabalho muda a minha equipe", l, "fim da escala 6x1").map((t) => t.assunto)).toEqual(["Fim da escala 6x1"]);
+    // O delicado nunca é aceito como assunto preso, e a chave de um assunto que já saiu da lista é ignorada.
+    expect(tendenciasQueTocamOTema("como limpar sofá", l, "eleicoes 2026")).toEqual([]);
+    expect(tendenciasQueTocamOTema("como limpar sofá", l, "assunto que saiu")).toEqual([]);
+  });
 });
