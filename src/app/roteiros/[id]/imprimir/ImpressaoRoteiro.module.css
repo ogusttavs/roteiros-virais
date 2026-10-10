@@ -310,3 +310,35 @@
   font: var(--peso-medio) 9px/1.2 var(--fonte-mono);
   color: var(--cor-texto-dica);
 }
+
+/*
+ * E41 2c, as marcas de fala no papel: o tom do bloco ao lado do tempo (`.tom-pdf` do desenho) e a legenda curta no pé (`.legenda-pdf`), porque o papel não abre a folha "Como ler as
+ * marcas". As seis marcas são as de `FalaMarcada` (medidas em "em": acompanham o corpo da letra de cada formato).
+ */
+.tomDoBloco {
+  margin-left: auto;
+  font: var(--peso-medio) 11px/1 var(--fonte-texto);
+  color: var(--cor-texto-suave);
+}
+
+.quadro .tomDoBloco {
+  font-size: calc(10px * var(--escala, 1));
+}
+
+.peComLegenda {
+  flex-wrap: wrap;
+}
+
+.legendaDasMarcas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  width: 100%;
+  font: var(--peso-medio) 9px/1.4 var(--fonte-texto);
+}
+
+.legendaDasMarcas > span {
+  display: inline-flex;
+  align-items: center;
+}

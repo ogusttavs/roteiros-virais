@@ -58,6 +58,26 @@ describe("rodapeDoPdf: o pé de cada página", () => {
     expect(pe).toContain('página <span class="pageNumber"></span> de <span class="totalPages"></span>');
   });
 
+  it("com as marcas de fala, uma linha de legenda em cima, com as seis marcas; sem elas, o pé de sempre", () => {
+    const sem = rodapeDoPdf("Casa em Ordem", "7 de setembro de 2026");
+    const com = rodapeDoPdf("Casa em Ordem", "7 de setembro de 2026", true);
+    expect(sem).not.toContain("tom desce");
+    for (const palavra of ["peso", "pausa longa", "devagar", "tom desce", "tom sobe"]) expect(com).toContain(palavra);
+    // O pé de sempre continua dentro, com a página que o Chromium preenche.
+    expect(com).toContain("Roteiro de Casa em Ordem, 7 de setembro de 2026");
+    expect(com).toContain('<span class="pageNumber"></span>');
+  });
+
+  it("as setas do pé são a flecha para a direita girada (o glifo diagonal pode faltar na fonte do servidor)", () => {
+    const com = rodapeDoPdf("Casa em Ordem", "7 de setembro de 2026", true);
+    expect(com).toContain("rotate(45deg)");
+    expect(com).toContain("rotate(-45deg)");
+    expect(com).not.toContain("&#8600;");
+    expect(com).not.toContain("&#8599;");
+    expect(com).not.toContain("↘");
+    expect(com).not.toContain("↗");
+  });
+
   it("o nome da marca, que é texto da pessoa, não abre marcação no HTML do pé", () => {
     const pe = rodapeDoPdf('<img src=x onerror="alert(1)"> & Cia', "7 de setembro de 2026");
     expect(pe).not.toContain("<img");

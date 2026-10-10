@@ -4,12 +4,13 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { validarTokenImpressao } from "@/lib/tokenImpressao";
 import { clientePorId } from "@/servicos/clientes";
 import { folhaDoRoteiro } from "@/servicos/folha-do-roteiro";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { videoPorId } from "@/servicos/pesquisa";
 import { roteiroPorId } from "@/servicos/roteiro";
 
 import { FolhaA4, QuadroDoCelular } from "./FolhaImpressa";
 
-type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string; formato?: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: string; formato?: string; marcas?: string }> };
 
 /**
  * A página que o Playwright abre para virar PDF (rota `/api/roteiros/[id]/pdf`, `formato=a4`) ou imagem para o celular (rota `/api/roteiros/[id]/imagem`, `formato=celular`), E26, passo 23 do
@@ -21,7 +22,7 @@ type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ token?: 
  */
 export default async function ImprimirRoteiro({ params, searchParams }: Props) {
   const { id } = await params;
-  const { token, formato } = await searchParams;
+  const { token, formato, marcas } = await searchParams;
   const roteiroId = idDaRotaOuNulo(id);
   if (roteiroId === null || !token) notFound();
 
@@ -35,7 +36,9 @@ export default async function ImprimirRoteiro({ params, searchParams }: Props) {
     clientePorId(validado.clienteId),
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
   ]);
-  const folha = folhaDoRoteiro(roteiro, cliente?.nome ?? "", video);
+  // E41 2c: com `?marcas=1` a folha vai com as marcas de fala que valem para o texto de agora (a rota já as escreveu antes de abrir esta página); sem elas, a folha de sempre.
+  const marcasDaFolha = marcas === "1" ? falaDoRoteiro(roteiro, true).marcas : null;
+  const folha = folhaDoRoteiro(roteiro, cliente?.nome ?? "", video, marcasDaFolha);
 
   return formato === "celular" ? <QuadroDoCelular folha={folha} /> : <FolhaA4 folha={folha} />;
 }

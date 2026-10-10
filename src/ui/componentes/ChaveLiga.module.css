@@ -44,18 +44,21 @@
     background-color var(--duracao-troca) var(--curva-padrao);
 }
 
-.chave[aria-checked="true"]::before {
+.chave[aria-checked="true"]::before,
+.chave[data-ligada="true"]::before {
   background: var(--cor-destaque);
   box-shadow: none;
 }
 
-.chave[aria-checked="true"]::after {
+.chave[aria-checked="true"]::after,
+.chave[data-ligada="true"]::after {
   /* A bolinha anda 1,25 rem para a direita (trilho 3,1875 menos bolinha 1,6875 menos as duas folgas de 0,125). */
   translate: 1.25rem -50%;
   background: var(--cor-acao-texto);
 }
 
-:global([data-tema="escuro"]) .chave[aria-checked="false"]::after {
+:global([data-tema="escuro"]) .chave[aria-checked="false"]::after,
+:global([data-tema="escuro"]) .chave[data-ligada="false"]::after {
   background: var(--cor-texto-suave);
 }
 
@@ -89,4 +92,11 @@
   .chave::after {
     transition: none;
   }
+}
+
+/* A chave só desenhada (`TrilhoDaChave`), no fim de uma linha de menu: não é botão, o item inteiro é. */
+.trilho {
+  display: block;
+  margin-left: auto;
+  cursor: inherit;
 }

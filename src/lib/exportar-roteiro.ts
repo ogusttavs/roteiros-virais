@@ -3,22 +3,28 @@
  * "gerando", do aviso de falha e do toast. As duas rotas (`/api/roteiros/[id]/pdf` e `/imagem`) fazem a checagem de sessão no servidor; aqui só se confere que veio o que foi pedido, porque
  * um login vencido volta como a página de entrada com status 200.
  */
+/** O arquivo sempre vem; quando as marcas pedidas não puderam ser escritas, o cabeçalho `X-Marcas: nao-deu` avisa, e quem chamou diz em uma frase que o arquivo saiu sem elas. */
+function avisarSeSemMarcas(resposta: Response, aoNaoDarParaMarcar?: () => void): void {
+  if (resposta.headers.get("x-marcas") === "nao-deu") aoNaoDarParaMarcar?.();
+}
 
 /** O arquivo PDF do roteiro, gerado no servidor (leva alguns segundos). Falha com o erro da rede, que quem chama distingue de "o servidor não conseguiu". */
-export async function pedirPdfDoRoteiro(roteiroId: number): Promise<Blob> {
-  const resposta = await fetch(`/api/roteiros/${roteiroId}/pdf`);
+export async function pedirPdfDoRoteiro(roteiroId: number, opcoes: { comMarcas?: boolean; aoNaoDarParaMarcar?: () => void } = {}): Promise<Blob> {
+  const resposta = await fetch(`/api/roteiros/${roteiroId}/pdf${opcoes.comMarcas ? "?marcas=1" : ""}`);
   if (!resposta.ok || !resposta.headers.get("content-type")?.includes("application/pdf")) {
     throw new Error("o pdf nao veio");
   }
+  avisarSeSemMarcas(resposta, opcoes.aoNaoDarParaMarcar);
   return resposta.blob();
 }
 
 /** As imagens 9:16 do roteiro (uma por quadro; um roteiro longo vira duas ou mais), já como arquivos PNG com o nome `roteiro-<data>-1.png`. */
-export async function pedirImagensDoRoteiro(roteiroId: number): Promise<File[]> {
-  const resposta = await fetch(`/api/roteiros/${roteiroId}/imagem`);
+export async function pedirImagensDoRoteiro(roteiroId: number, opcoes: { comMarcas?: boolean; aoNaoDarParaMarcar?: () => void } = {}): Promise<File[]> {
+  const resposta = await fetch(`/api/roteiros/${roteiroId}/imagem${opcoes.comMarcas ? "?marcas=1" : ""}`);
   if (!resposta.ok || !resposta.headers.get("content-type")?.includes("application/json")) {
     throw new Error("a imagem nao veio");
   }
+  avisarSeSemMarcas(resposta, opcoes.aoNaoDarParaMarcar);
   const corpo = (await resposta.json()) as { nome?: string; imagens?: string[] };
   if (!Array.isArray(corpo.imagens) || corpo.imagens.length === 0 || typeof corpo.nome !== "string") {
     throw new Error("a imagem nao veio");

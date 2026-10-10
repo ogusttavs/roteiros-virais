@@ -18,6 +18,13 @@ export const textosMarcasDeFala = {
   /** A espera da primeira vez (a claquete e a frase), com o texto do roteiro já à vista. */
   marcando: "Marcando a fala",
   marcandoDetalhe: "Leva alguns segundos. O texto continua aí.",
+  /** A chave do menu "Mais opções" do roteiro: as marcas no PDF e na imagem (desligada por padrão; vale para os dois). */
+  noPdfEImagem: "No PDF e na imagem, com as marcas de fala",
+
+  /** O tom do bloco no papel, ao lado do tempo ("tom: direto"), e a legenda curta do pé (o papel não abre a folha "Como ler as marcas"). */
+  tomNoPapel: (tom: "direto" | "perto" | "calmo" | "firme") => `tom: ${tom}`,
+  legendaDoPapel: { peso: "peso", a: "a", pausa: "pausa", pausaLonga: "pausa longa", devagar: "devagar", tomDesce: "tom desce", tomSobe: "tom sobe" },
+
   /** O título dos avisos que valem só para este roteiro (R-FALA-01, 04, 14 e 15), dentro de "Como ler as marcas". */
   paraEsteRoteiro: "Para este roteiro",
 
@@ -66,6 +73,9 @@ export const textosMarcasDeFala = {
     naoEncontrado: "Não achei este roteiro.",
     /** Story e vídeo sem fala não têm fala para marcar. */
     semFala: "Este vídeo não tem fala para marcar.",
+    /** O PDF e a imagem sempre saem: se as marcas pedidas não vieram (a IA caiu, o teto do dia), saem sem elas e o aviso diz isso em uma frase. */
+    pdfSemMarcas: "Não deu para marcar a fala agora. O PDF saiu sem as marcas.",
+    imagemSemMarcas: "Não deu para marcar a fala agora. A imagem saiu sem as marcas.",
     /** O limite de marcações do dia (laço ou abuso); sem número, a pessoa não vê contador. */
     limiteDoDia: "Você chegou ao limite de marcações de hoje. Amanhã a conta volta ao normal.",
     /** O roteiro foi editado enquanto as marcas eram escritas: a tela pede de novo. */

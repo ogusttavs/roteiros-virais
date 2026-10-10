@@ -7,6 +7,7 @@ import {
   consertarMarcas,
   contarPalavras,
   escreverPalavras,
+  fatiarMarcado,
   lerPalavras,
   marcadoParaOsParagrafos,
   marcasBemFormadas,
@@ -411,6 +412,28 @@ describe("trechosDaFala e paragrafosMarcados (a tela)", () => {
     expect(paragrafosMarcados(marcas, "gancho")).toEqual(["Oi.{//}"]);
     expect(paragrafosMarcados(marcas, "fechamento")).toBeNull();
     expect(paragrafosMarcados(null, "gancho")).toBeNull();
+  });
+});
+
+describe("fatiarMarcado: o parágrafo marcado nos mesmos pedaços do texto (a imagem 9:16 parte uma fala comprida)", () => {
+  it("o pedaço i do marcado tem as palavras do pedaço i do texto, com as marcas de cada um", () => {
+    const marcado = "Olha esta {p:almofada}.{//} Eu limpei semana passada e a mancha voltou.{v}{//} Você já {p:passou} por isso?{^}{//}";
+    const pedacos = ["Olha esta almofada.", "Eu limpei semana passada e a mancha voltou.", "Você já passou por isso?"];
+    const fatias = fatiarMarcado(marcado, pedacos);
+    expect(fatias).toEqual(["Olha esta {p:almofada}.{//}", "Eu limpei semana passada e a mancha voltou.{v}{//}", "Você já {p:passou} por isso?{^}{//}"]);
+    fatias!.forEach((fatia, i) => expect(textoSemMarcas(fatia)).toBe(pedacos[i]));
+  });
+
+  it("um trecho devagar partido entre dois pedaços vira dois trechos devagar", () => {
+    const fatias = fatiarMarcado("{d:um dois três quatro}.{//}", ["um dois", "três quatro."]);
+    expect(fatias).toEqual(["{d:um dois}", "{d:três quatro}.{//}"]);
+  });
+
+  it("as palavras não batem (o marcado não é deste texto): nulo", () => {
+    expect(fatiarMarcado("Um {p:dia}.{//}", ["Outro dia."])).toBeNull();
+    expect(fatiarMarcado("Um {p:dia}.{//} Dois.{//}", ["Um dia."])).toBeNull();
+    // As contagens batem, mas as palavras são outras: a trava por pedaço pega.
+    expect(fatiarMarcado("Um {p:dia}.{//}", ["Um mês."])).toBeNull();
   });
 });
 

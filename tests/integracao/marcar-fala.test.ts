@@ -10,6 +10,7 @@ import { briefings, clientes, geracoesIA, nichos, roteiros, user, type ConteudoR
 import * as cliente from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { config } from "@/lib/config";
+import { pedidoComMarcas, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
 import { blocosFalados, falaDoRoteiro, marcarBloco, marcarFalaDoRoteiro, marcasParaATela, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
 import { editarRoteiro, ErroRoteiro, roteiroPorId } from "@/servicos/roteiro";
@@ -489,6 +490,119 @@ describe("o que a tela recebe (E41 2b)", () => {
 
   it("marcasParaATela de nulo é nulo", () => {
     expect(marcasParaATela(null)).toBeNull();
+  });
+});
+
+describe("o PDF e a imagem com as marcas (E41 2c)", () => {
+  async function linhaDoRoteiro(id: number) {
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    return linha;
+  }
+  async function marcaDoTeste() {
+    const [c] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    return c;
+  }
+  const pedido = (marcas: boolean, cabecalhos: Record<string, string> = {}) =>
+    new Request(`http://localhost/api/roteiros/1/pdf${marcas ? "?marcas=1" : ""}`, { headers: cabecalhos });
+  const COM = { comMarcas: true, naoDeu: false };
+  const SEM = { comMarcas: false, naoDeu: false };
+  const NAO_DEU = { comMarcas: false, naoDeu: true };
+
+  it("sem ?marcas=1 não faz nada: nenhuma marca é escrita nem pedida", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(false), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(SEM);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+  });
+
+  it("com ?marcas=1 e sem marcas, escreve na hora (uma chamada) e diz que a folha vai com elas", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(COM);
+    expect(vi.mocked(cliente.gerarEstruturado)).toHaveBeenCalledTimes(1);
+    expect(await marcasGuardadas(id)).not.toBeNull();
+  });
+
+  it("com as marcas já guardadas, não chama a IA de novo", async () => {
+    const id = await criarRoteiro();
+    await marcarFalaDoRoteiro(clienteId, id);
+    vi.mocked(cliente.gerarEstruturado).mockClear();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(COM);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("no 'ver como' nada é escrito: sem marcas prontas o arquivo sai como sempre (e diz que não deu); com elas, vai com elas", async () => {
+    const id = await criarRoteiro();
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), true)).toEqual(NAO_DEU);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+    await marcarFalaDoRoteiro(clienteId, id);
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), true)).toEqual(COM);
+  });
+
+  it("Story e vídeo sem fala saem sem marcas, sem chamar a IA e sem aviso (não havia o que marcar)", async () => {
+    const story = await criarRoteiro({ formato: "story" });
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(story), await marcaDoTeste(), false)).toEqual(SEM);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("o PDF SEMPRE sai: a IA que cai vira 'não deu', sem erro", async () => {
+    const id = await criarRoteiro();
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async () => {
+      throw new ErroIA("erro da API (429): limite.");
+    });
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(NAO_DEU);
+    expect(await marcasGuardadas(id)).toBeNull();
+  });
+
+  it("o teto do dia também vira 'não deu', sem gastar a chamada", async () => {
+    const id = await criarRoteiro();
+    const teto = config.regras.roteirosPorDiaMax * 4;
+    await db()
+      .insert(geracoesIA)
+      .values(Array.from({ length: teto }, () => ({ tarefa: "marcarFala", versaoPrompt: "1.0.0", modelo: "mock", clienteId, entradas: {} })));
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(NAO_DEU);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+  });
+
+  it("um erro que não é da marcação continua subindo (não se esconde bug de verdade)", async () => {
+    const id = await criarRoteiro();
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async () => {
+      throw new TypeError("bug de verdade");
+    });
+    await expect(pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it("uma navegação que veio de outro site não escreve marcas: lê as que existem, e só (e diz que não deu)", async () => {
+    const id = await criarRoteiro();
+    const deOutroSite = pedido(true, { "sec-fetch-site": "cross-site" });
+    expect(await pedidoComMarcas(deOutroSite, await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(NAO_DEU);
+    expect(vi.mocked(cliente.gerarEstruturado)).not.toHaveBeenCalled();
+    expect(await marcasGuardadas(id)).toBeNull();
+    // A tela da própria pessoa (mesma origem) escreve; com as marcas já guardadas, a navegação de fora também vai com elas.
+    expect(await pedidoComMarcas(pedido(true, { "sec-fetch-site": "same-origin" }), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(COM);
+    expect(await pedidoComMarcas(deOutroSite, await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(COM);
+  });
+
+  it("se o texto mudou no meio da marcação, tenta de novo com o texto de agora em vez de sair sem as marcas", async () => {
+    const id = await criarRoteiro();
+    const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      await db().update(roteiros).set({ conteudo: conteudo({ gancho: "Um começo novo, escrito no meio." }), editadoEm: new Date() }).where(eq(roteiros.id, id));
+      return real(parametros);
+    });
+    expect(await pedidoComMarcas(pedido(true), await linhaDoRoteiro(id), await marcaDoTeste(), false)).toEqual(COM);
+    const guardadas = await marcasGuardadas(id);
+    expect(textoSemMarcas(guardadas!.blocos[0].marcado)).toBe("Um começo novo, escrito no meio.");
+  });
+
+  it("o endereço de impressão leva ?marcas=1 só quando a folha vai com as marcas", async () => {
+    const id = await criarRoteiro();
+    const linha = await linhaDoRoteiro(id);
+    const c = await marcaDoTeste();
+    expect(urlDeImpressao(linha, c, "a4")).not.toContain("marcas=1");
+    expect(urlDeImpressao(linha, c, "celular", false)).not.toContain("marcas=1");
+    expect(urlDeImpressao(linha, c, "a4", true)).toContain("&marcas=1");
+    expect(urlDeImpressao(linha, c, "celular", true)).toContain("formato=celular&marcas=1");
   });
 });
 

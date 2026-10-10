@@ -1,5 +1,7 @@
 import type { FolhaDoRoteiro, UnidadeDaFolha } from "@/servicos/folha-do-roteiro";
+import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
+import { FalaMarcada, MarcaDeDevagar, MarcaDePausa, MarcaDePeso, MarcaDeTom } from "@/ui/componentes/FalaMarcada";
 
 import styles from "./ImpressaoRoteiro.module.css";
 
@@ -12,6 +14,40 @@ function LinhaDeMostrar({ linha }: { linha: string }) {
       <b>{linha.slice(0, corte + 1)}</b> {linha.slice(corte + 2)}
     </p>
   );
+}
+
+/** A legenda curta das marcas, no pé da imagem: o papel não abre a folha "Como ler as marcas" (E41 2c; no PDF a mesma legenda vem no pé de cada página, escrita pelo Chromium). */
+function LegendaDasMarcas() {
+  const l = textosMarcasDeFala.legendaDoPapel;
+  return (
+    <span className={styles.legendaDasMarcas} data-legenda-das-marcas>
+      <MarcaDePeso>{l.peso}</MarcaDePeso>
+      <span>
+        {l.a}
+        <MarcaDePausa duracao="curta" />
+        {l.pausa}
+      </span>
+      <span>
+        {l.a}
+        <MarcaDePausa duracao="longa" />
+        {l.pausaLonga}
+      </span>
+      <MarcaDeDevagar>{l.devagar}</MarcaDeDevagar>
+      <span>
+        <MarcaDeTom direcao="desce" />
+        {l.tomDesce}
+      </span>
+      <span>
+        <MarcaDeTom direcao="sobe" />
+        {l.tomSobe}
+      </span>
+    </span>
+  );
+}
+
+/** A fala de uma unidade: com as marcas desenhadas quando a folha as leva (o texto que se lê é o mesmo, letra por letra), senão o texto. */
+function FalaDaUnidade({ unidade }: { unidade: UnidadeDaFolha }) {
+  return unidade.falaMarcada ? <FalaMarcada marcado={unidade.falaMarcada} /> : <>{unidade.fala}</>;
 }
 
 /** As unidades de cada bloco juntas, para a folha A4 (a imagem 9:16 usa as unidades soltas, para poder partir um bloco comprido). */
@@ -61,12 +97,13 @@ export function FolhaA4({ folha }: { folha: FolhaDoRoteiro }) {
                 <span className={styles.quando}>
                   {bloco[0].tempo ? <span className={styles.tempo}>{bloco[0].tempo}</span> : null}
                   {bloco[0].rotulo ? <span className={styles.rotulo}>{bloco[0].rotulo}</span> : null}
+                  {bloco[0].tom ? <span className={styles.tomDoBloco}>{textosMarcasDeFala.tomNoPapel(bloco[0].tom)}</span> : null}
                 </span>
               ) : null}
               {bloco.map((unidade, i) =>
                 unidade.fala ? (
                   <p key={i} className={styles.fala}>
-                    {unidade.fala}
+                    <FalaDaUnidade unidade={unidade} />
                   </p>
                 ) : null,
               )}
@@ -144,16 +181,22 @@ export function QuadroDoCelular({ folha }: { folha: FolhaDoRoteiro }) {
               {unidade.tempo || unidade.rotulo ? (
                 <span className={styles.quando}>
                   <span className={styles.tempo}>{unidade.tempo ?? unidade.rotulo}</span>
+                  {unidade.tom ? <span className={styles.tomDoBloco}>{textosMarcasDeFala.tomNoPapel(unidade.tom)}</span> : null}
                 </span>
               ) : null}
-              {unidade.fala ? <p className={styles.fala}>{unidade.fala}</p> : null}
+              {unidade.fala ? (
+                <p className={styles.fala}>
+                  <FalaDaUnidade unidade={unidade} />
+                </p>
+              ) : null}
               {unidade.mostrar.map((linha, i) => (
                 <LinhaDeMostrar key={i} linha={linha} />
               ))}
             </div>
           ))}
         </section>
-        <footer className={styles.pe} data-pe>
+        <footer className={[styles.pe, folha.comMarcas ? styles.peComLegenda : ""].filter(Boolean).join(" ")} data-pe>
+          {folha.comMarcas ? <LegendaDasMarcas /> : null}
           <span data-pe-texto>{folha.linhaDoPe ?? ""}</span>
           <span data-pe-pagina />
         </footer>
