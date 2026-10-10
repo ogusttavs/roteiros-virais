@@ -218,6 +218,11 @@ export const AGENDAMENTOS: Agendamento[] = [
       "despacha a leitura do site e das redes das marcas sem leitura ou com mais de 30 dias (E38 PR 2), todo dia as 01:30, antes da coleta das 03:00",
   },
   {
+    fila: FILAS.faxinaVersoes,
+    cron: "15 7 * * *",
+    descricao: "faxina das versoes do roteiro que ninguem escolheu, em grupos parados ha mais de 30 dias (E26 4c), todo dia as 07:15",
+  },
+  {
     fila: FILAS.emailAcompanhamento,
     cron: "0 8 * * *",
     descricao: "e-mail diario de acompanhamento da viagem para o Fable, todo dia as 08:00",

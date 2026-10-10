@@ -34,6 +34,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
@@ -149,6 +150,9 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.emailAcompanhamento, async () => {
     await executarComRegistro(FILAS.emailAcompanhamento, () => rodarEmailAcompanhamento());
+  });
+  await boss().work(FILAS.faxinaVersoes, async () => {
+    await executarComRegistro(FILAS.faxinaVersoes, () => rodarFaxinaDasVersoes());
   });
   /** Por evento (E27, parte 2, item 2): `reprovarERescrever` manda `{ clienteId }` ao enfileirar. */
   await boss().work<{ clienteId: number }>(FILAS.aprenderCliente, async (job) => {

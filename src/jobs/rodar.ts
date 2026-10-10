@@ -28,6 +28,7 @@ import { rodarExtrair } from "./extrair";
 import { rodarExtrairAgora } from "./extrair-agora";
 import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
+import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
 import { rodarLembrete } from "./lembrete";
 import { rodarMetaContas } from "./meta-contas";
@@ -104,6 +105,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.lembrete]: () => rodarLembrete(),
   [FILAS.curvaCliente]: () => rodarCurvaCliente(),
   [FILAS.emailAcompanhamento]: () => rodarEmailAcompanhamento(),
+  [FILAS.faxinaVersoes]: () => rodarFaxinaDasVersoes(),
   /**
    * Por evento, nao por horario, sempre para um cliente so (E27, parte 2,
    * item 2): sem um "todos os clientes" que faca sentido, o disparo manual

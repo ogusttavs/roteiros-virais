@@ -349,6 +349,37 @@ export async function gruposEmAberto(clienteId: number, limite = 5): Promise<Gru
   return grupos.slice(0, limite);
 }
 
+export type ResumoDaFaxinaDeVersoes = {
+  /** Os grupos de que alguma versão saiu. */
+  gruposLimpos: number;
+  /** As versões apagadas (as que ninguém escolheu, de grupos parados há mais de `dias` dias). */
+  versoesApagadas: number;
+  /** As versões que viraram roteiro e ficam (o link do roteiro para as outras já não tem o que mostrar, mas o roteiro continua inteiro). */
+  versoesMantidasPorEscolha: number;
+  dias: number;
+};
+
+/**
+ * A faxina diária das versões (E26 4c): o grupo cuja última versão tem mais de `dias` dias (padrão 30) perde as versões que ninguém escolheu, sejam de um grupo resolvido ou abandonado
+ * ("Gerar outra" depois de um tempo adia o grupo inteiro, porque conta a versão mais nova). A versão que virou roteiro fica: é a linha que liga o roteiro ao grupo, e é pequena. Quando
+ * o roteiro dela é apagado (a chave estrangeira volta nula), a versão passa a ser "sem escolha" e sai na faxina seguinte. Uma só consulta de apagar, escopo global (todas as marcas).
+ */
+export async function faxinarVersoes(agora = new Date(), dias = config.regras.diasDasVersoesGuardadas): Promise<ResumoDaFaxinaDeVersoes> {
+  const limite = new Date(agora.getTime() - dias * 86_400_000);
+  const gruposParados = sql`(select grupo from versoes_do_roteiro group by grupo having max(criado_em) < ${limite})`;
+
+  const apagadas = await db()
+    .delete(versoesDoRoteiro)
+    .where(and(isNull(versoesDoRoteiro.roteiroId), sql`${versoesDoRoteiro.grupo} in ${gruposParados}`))
+    .returning({ grupo: versoesDoRoteiro.grupo });
+  const [{ mantidas }] = await db()
+    .select({ mantidas: sql<number>`count(*)::int` })
+    .from(versoesDoRoteiro)
+    .where(sql`${versoesDoRoteiro.roteiroId} is not null and ${versoesDoRoteiro.grupo} in ${gruposParados}`);
+
+  return { gruposLimpos: new Set(apagadas.map((a) => a.grupo)).size, versoesApagadas: apagadas.length, versoesMantidasPorEscolha: mantidas, dias };
+}
+
 /**
  * "Ficar com esta": a versão vira o roteiro (a linha de `roteiros` é a que já estava pronta, copiada). Vale uma vez só por versão: escolher de novo devolve o mesmo roteiro, e dois pedidos
  * ao mesmo tempo criam um roteiro só (o primeiro reivindica a versão, o outro lê o resultado). As outras versões do grupo continuam guardadas, para "ver as outras versões", e a pessoa pode
