@@ -311,6 +311,17 @@
   color: var(--cor-texto-suave);
 }
 
+.linkVersoes {
+  min-height: var(--altura-toque);
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-acao);
+  text-decoration: none;
+}
+
 /** E40, item 2: "o que este vídeo precisa comunicar", no alto, quando a pessoa escreveu (design v2, `.recado`). */
 .recado {
   display: grid;

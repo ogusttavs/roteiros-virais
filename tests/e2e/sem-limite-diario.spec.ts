@@ -30,6 +30,8 @@ import {
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
+
 const SENHA = "ExemploSenha123";
 
 async function entrar(page: Page, email: string) {
@@ -94,6 +96,7 @@ async function escolherTemaEGerar(page: Page, tituloTema: string) {
   // este teste prova o destaque de Reels da Agenda.
   await page.getByRole("radio", { name: /Que muita gente veja/ }).click();
   await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+  await ficarComAPrimeiraVersao(page);
   await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 }
 

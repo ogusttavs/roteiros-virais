@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { rotuloParaQue } from "@/config/fichas";
 import { config, hojeISO } from "@/lib/config";
 import {
   classificarMultiplo,
@@ -16,10 +17,11 @@ import { videoSubindoParaAviso } from "@/servicos/curva";
 import { cartaoEmAltaSemFalha } from "@/servicos/em-alta";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
 import { agendaDoDia, atrasados, proximoDiaMarcado, somarDiasISO, semanaDaAgenda } from "@/servicos/roteiro";
+import { grupoEmAberto } from "@/servicos/versoes";
 import { textosHoje } from "@/textos/hoje";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
-import { HojeTela, type AindaValeAgenda, type AvisoBriefingAgenda, type ProximoMarcado } from "./HojeTela";
+import { HojeTela, type AindaValeAgenda, type AvisoBriefingAgenda, type ProximoMarcado, type VersoesProntasHoje } from "./HojeTela";
 
 function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null {
   if (!resumo) return null;
@@ -90,7 +92,7 @@ export default async function Hoje({ searchParams }: Props) {
   const diaVisualizado = validarDiaDaUrl(dia, hoje);
   const ehHoje = diaVisualizado === hoje;
 
-  const [semana, agendaDoDiaTodo, videoSubindo, briefing, atrasadosDoDia, emAlta] = await Promise.all([
+  const [semana, agendaDoDiaTodo, videoSubindo, briefing, atrasadosDoDia, emAlta, grupoAbertoBruto] = await Promise.all([
     semanaDaAgenda(cliente.id, diaVisualizado),
     agendaDoDia(cliente.id, diaVisualizado),
     videoSubindoParaAviso(cliente.id),
@@ -98,7 +100,20 @@ export default async function Hoje({ searchParams }: Props) {
     ehHoje ? atrasados(cliente.id, hoje) : Promise.resolve([]),
     // E55 PR 2: o assunto em alta hoje, só em hoje. Uma falha aqui nunca derruba a agenda (o cartão só não aparece, e a falha vai para o log).
     ehHoje ? cartaoEmAltaSemFalha(cliente, hoje) : Promise.resolve(null),
+    // E26 4b: as versões que a pessoa pediu e ainda não escolheu (só o grupo mais novo; os outros ficam guardados). Uma falha aqui nunca derruba a agenda.
+    ehHoje ? grupoEmAberto(cliente.id).catch(() => null) : Promise.resolve(null),
   ]);
+
+  // Enquanto o servidor ainda escreve as versões, não há cartão: ele aparece quando as três ficam prontas.
+  const grupoAberto = grupoAbertoBruto && !grupoAbertoBruto.emEscrita ? grupoAbertoBruto : null;
+  const versoesProntas: VersoesProntasHoje | null = grupoAberto
+    ? {
+        grupo: grupoAberto.grupo,
+        tema: grupoAberto.tema,
+        quantidade: grupoAberto.quantidade,
+        paraQue: rotuloParaQue({ ficha: grupoAberto.ficha, objetivo: grupoAberto.objetivo, formato: grupoAberto.formato === "story" ? "story" : "reels" }),
+      }
+    : null;
 
   // O roteiro que a marca já criou do assunto em alta mora dentro do cartão "Em alta hoje", não em "Reels de hoje" (dúvida 4 do passo 21).
   // O roteiro do cartão pode ser um Reels ou um Story (o Criar deixa escolher), então sai das duas listas.
@@ -173,6 +188,7 @@ export default async function Hoje({ searchParams }: Props) {
       avisoBriefing={avisoBriefing}
       avisoVideoSubindo={avisoVideoSubindo}
       emAlta={emAlta}
+      versoesProntas={versoesProntas}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}

@@ -10,10 +10,10 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gte, isNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { roteiros, versoesDoRoteiro, type ConteudoRoteiro, type NotasDaVersao, type Objetivo, type VersaoDoRoteiro } from "@/db/schema";
+import { roteiros, versoesDoRoteiro, type ConteudoRoteiro, type Ficha, type NotasDaVersao, type Objetivo, type VersaoDoRoteiro } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
 import * as notaIA from "@/ia/prompts/notaDaVersao";
 import { registrarGeracao } from "@/ia/registro";
@@ -25,8 +25,10 @@ import { textosRoteiro } from "@/textos/roteiro";
 
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { temposDosBlocosReels } from "./folha-do-roteiro";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import {
+  blocosParaLeitura,
   ErroRoteiro,
   montarRoteiro,
   resolverTemaDoPedido,
@@ -53,6 +55,8 @@ export type VersaoDoGrupo = {
   ordem: number;
   tema: string;
   objetivo: Objetivo;
+  /** A ficha do "para que é este vídeo" (só Reels falado); nula no Story e no sem fala. */
+  ficha: Ficha | null;
   formato: string;
   estilo: string;
   conteudo: ConteudoRoteiro;
@@ -70,6 +74,7 @@ function paraVersaoDoGrupo(linha: VersaoDoRoteiro): VersaoDoGrupo {
     ordem: linha.ordem,
     tema: valores.tema,
     objetivo: valores.objetivo,
+    ficha: valores.ficha ?? null,
     formato: valores.formato ?? "reels",
     estilo: valores.estilo ?? "falado",
     conteudo: valores.conteudo,
@@ -80,11 +85,63 @@ function paraVersaoDoGrupo(linha: VersaoDoRoteiro): VersaoDoGrupo {
   };
 }
 
-/** Qual das três notas ordena a lista, pelo objetivo que a pessoa escolheu (o "te chamem" é a de te chamarem, "lembrem de você" a de lembrarem, "mais gente te conheça" a de viralizar). */
+/** Um bloco do roteiro como a tela de comparar o lê: o tempo ("0 a 3 s", só no Reels falado), o nome do bloco e as linhas (a fala; sem fala, o que mostrar). */
+export type BlocoDaVersao = { tempo: string | null; rotulo: string; linhas: string[] };
+
+/** Uma versão como o cliente da tela recebe: sem nada de banco, só o que se desenha. */
+export type VersaoParaTela = {
+  id: number;
+  ordem: number;
+  /** O título do roteiro: é o nome da versão na tela. */
+  nome: string;
+  duracaoS: number;
+  notas: NotasDaVersao | null;
+  /** Sem nota, mas escrita há pouco: o juiz ainda está trabalhando (a tela diz "a nota está sendo calculada", não "não deu"). */
+  notaEmAndamento: boolean;
+  blocos: BlocoDaVersao[];
+  /** Quando a pessoa já ficou com esta versão: o roteiro em que ela virou. */
+  roteiroId: number | null;
+};
+
+function blocosDaVersao(v: VersaoDoGrupo): BlocoDaVersao[] {
+  const formato = v.formato === "story" ? "story" : "reels";
+  const estilo = v.estilo === "sem_fala" ? "sem_fala" : "falado";
+  const blocos = blocosParaLeitura({ conteudo: v.conteudo, formato, estilo });
+  const tempos = formato === "reels" && estilo === "falado" ? temposDosBlocosReels(v.conteudo.duracaoS) : null;
+  return blocos.map((bloco, i) => ({
+    tempo: tempos?.[i] ?? null,
+    rotulo: bloco.rotulo,
+    // Reels sem fala não tem fala: o que a pessoa lê é o que mostrar, e o que está na tela.
+    linhas: bloco.paragrafos.length > 0 ? bloco.paragrafos : (bloco.mostrar ?? []),
+  }));
+}
+
+export function paraVersaoDaTela(v: VersaoDoGrupo, agora = new Date()): VersaoParaTela {
+  return {
+    id: v.id,
+    ordem: v.ordem,
+    nome: v.conteudo.titulo,
+    duracaoS: v.conteudo.duracaoS,
+    notas: v.notas,
+    notaEmAndamento: v.notas === null && agora.getTime() - v.criadoEm.getTime() < MINUTOS_DA_NOTA_EM_ANDAMENTO * 60_000,
+    blocos: blocosDaVersao(v),
+    roteiroId: v.roteiroId,
+  };
+}
+
+/** As três notas de uma versão, pelo nome que a tela usa. */
+export type ChaveDaNota = "viralizar" | "chamarem" | "lembrarem";
+
+/** Qual das três notas é a do objetivo que a pessoa escolheu (o "te chamem" é a de te chamarem, "lembrem de você" a de lembrarem, "mais gente te conheça" a de viralizar). */
+export function chaveDaNotaDoObjetivo(objetivo: Objetivo): ChaveDaNota {
+  if (objetivo === "conversao") return "chamarem";
+  if (objetivo === "engajamento") return "lembrarem";
+  return "viralizar";
+}
+
+/** A nota do objetivo escolhido: a que ordena a lista. */
 export function notaDoObjetivo(notas: NotasDaVersao, objetivo: Objetivo): number {
-  if (objetivo === "conversao") return notas.chamarem;
-  if (objetivo === "engajamento") return notas.lembrarem;
-  return notas.viralizar;
+  return notas[chaveDaNotaDoObjetivo(objetivo)];
 }
 
 /**
@@ -311,6 +368,41 @@ export async function gerarOutraVersao(clienteId: number, grupo: string): Promis
   return paraVersaoDoGrupo({ ...linha, notas });
 }
 
+/** O pedido que escreveu o grupo (o tema e o resto como vieram), escopado pela marca; nulo quando o grupo não é desta marca. */
+export async function pedidoDoGrupo(clienteId: number, grupo: string): Promise<ParametrosGerarRoteiro | null> {
+  const [linha] = await db()
+    .select({ parametros: versoesDoRoteiro.parametros })
+    .from(versoesDoRoteiro)
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, grupo)))
+    .orderBy(asc(versoesDoRoteiro.ordem))
+    .limit(1);
+  return linha ? (linha.parametros as unknown as ParametrosDaVersao).pedido : null;
+}
+
+/**
+ * Para onde "Trocar o objetivo" leva: a tela do objetivo com o mesmo tema (e a notícia, o assunto em alta e o dia, quando havia). Um tema do dia volta pelo índice, ou pela chave quando era um
+ * assunto em alta (a lista do dia muda); o que a tela do objetivo não sabe reconstruir volta ao Criar.
+ */
+export function enderecoParaTrocarOObjetivo(pedido: ParametrosGerarRoteiro, grupo: { tema: string; criadoEm: Date }): string {
+  const consulta = new URLSearchParams();
+  if (pedido.origem === "livre") {
+    consulta.set("livre", pedido.textoTema);
+    if (pedido.assuntoEmAlta) consulta.set("alta", pedido.assuntoEmAlta);
+    if (pedido.noticiaId) consulta.set("noticiaId", String(pedido.noticiaId));
+    if (pedido.noticiaAssuntoId) consulta.set("noticiaAssuntoId", String(pedido.noticiaAssuntoId));
+  } else if (pedido.origem === "sugerido") {
+    if (pedido.temaChave) consulta.set("momento", pedido.temaChave);
+    // O índice é o da lista do dia em que o grupo foi escrito: de outro dia, ele apontaria para outro tema, e o tema é que a pessoa quer de volta.
+    else if (hojeISO(grupo.criadoEm) === hojeISO()) consulta.set("tema", String(pedido.temaIndice));
+    else consulta.set("livre", grupo.tema);
+  } else {
+    return "/criar";
+  }
+  // Um dia que já passou não volta (a tela do objetivo recusa data no passado).
+  if (pedido.data && pedido.data >= hojeISO()) consulta.set("data", pedido.data);
+  return `/criar/objetivo?${consulta.toString()}`;
+}
+
 /** As versões de um grupo, na ordem em que foram escritas; escopadas pela marca (o grupo de outra marca nunca vem). */
 export async function versoesDoGrupo(clienteId: number, grupo: string): Promise<VersaoDoGrupo[]> {
   const linhas = await db()
@@ -321,32 +413,90 @@ export async function versoesDoGrupo(clienteId: number, grupo: string): Promise<
   return linhas.map(paraVersaoDoGrupo);
 }
 
-/** Um grupo de versões que a pessoa ainda não resolveu: o que o Hoje precisa para mostrar "suas versões estão prontas", sem depender de a tela que pediu ainda estar aberta. */
-export type GrupoEmAberto = { grupo: string; tema: string; objetivo: Objetivo; formato: string; estilo: string; quantidade: number; criadoEm: Date };
+/**
+ * O grupo de versões de que um roteiro nasceu ("Ficar com esta"), com quantas versões ele tem: para o roteiro dizer que as outras continuam guardadas e levar de volta a elas. Nulo quando o
+ * roteiro não veio de uma comparação (momento, plano, os de antes das versões). Escopado pela marca.
+ */
+export async function grupoDoRoteiro(clienteId: number, roteiroId: number): Promise<{ grupo: string; total: number } | null> {
+  const [origem] = await db()
+    .select({ grupo: versoesDoRoteiro.grupo })
+    .from(versoesDoRoteiro)
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.roteiroId, roteiroId)))
+    .limit(1);
+  if (!origem) return null;
+  const [{ total }] = await db()
+    .select({ total: sql<number>`count(*)::int` })
+    .from(versoesDoRoteiro)
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, origem.grupo)));
+  return { grupo: origem.grupo, total };
+}
+
+/**
+ * O grupo de versões que a pessoa pediu e ainda não resolveu, com o que o Hoje e a recuperação precisam: o tema, o pedido e se ainda está sendo escrito. Sem depender de a tela que pediu
+ * ainda estar aberta.
+ */
+export type GrupoEmAberto = {
+  grupo: string;
+  tema: string;
+  objetivo: Objetivo;
+  ficha: Ficha | null;
+  formato: string;
+  estilo: string;
+  quantidade: number;
+  /** Quando a primeira versão ficou pronta (o começo do grupo). */
+  inicio: Date;
+  /** Ainda faltam versões e a última é de agora: o servidor continua escrevendo (uma geração que falhou no meio deixa de ser "em escrita" depois de alguns minutos). */
+  emEscrita: boolean;
+};
 
 /** Janela dentro da qual um grupo ainda é "em aberto" para o Hoje: o dia em que foi escrito e o seguinte (quem gerou à noite escolhe de manhã). */
 const DIAS_DO_GRUPO_EM_ABERTO = 2;
+/** Depois de quanto tempo sem uma versão nova um grupo incompleto deixa de ser dado como "ainda escrevendo" (a segunda versão falhou: o grupo ficou com as que deram certo). */
+const MINUTOS_DE_UM_GRUPO_EM_ESCRITA = 5;
+/** Quanto tempo a nota de uma versão pode estar a caminho (o juiz roda enquanto a seguinte é escrita): passado isso, a versão sem nota é "o juiz falhou". */
+const MINUTOS_DA_NOTA_EM_ANDAMENTO = 4;
 
 /**
- * Os grupos da marca em que nenhuma versão virou roteiro ainda, do mais novo para o mais antigo. A geração grava cada versão assim que fica pronta; se a resposta da tela se perde (rede
- * ruim, aba fechada), o grupo continua aqui para a pessoa retomar, sem ela saber id nenhum.
+ * O grupo mais novo da marca, se a pessoa ainda não ficou com nenhuma versão dele (os mais velhos, não resolvidos, foram abandonados: quem pediu outro tema ou trocou o objetivo não precisa
+ * vê-los de volta). Conta pelo grupo inteiro, não pela janela: um grupo resolvido que ganhou "Gerar outra" depois não volta como aberto. `agora` só existe para os testes.
  */
-export async function gruposEmAberto(clienteId: number, limite = 5): Promise<GrupoEmAberto[]> {
-  const desde = new Date(Date.now() - DIAS_DO_GRUPO_EM_ABERTO * 86_400_000);
-  const linhas = await db()
+export async function grupoEmAberto(clienteId: number, agora = new Date()): Promise<GrupoEmAberto | null> {
+  const desde = new Date(agora.getTime() - DIAS_DO_GRUPO_EM_ABERTO * 86_400_000);
+  const [novo] = await db()
+    .select({
+      grupo: versoesDoRoteiro.grupo,
+      inicio: sql<Date>`min(${versoesDoRoteiro.criadoEm})`,
+      fim: sql<Date>`max(${versoesDoRoteiro.criadoEm})`,
+      total: sql<number>`count(*)::int`,
+      resolvido: sql<boolean>`bool_or(${versoesDoRoteiro.roteiroId} is not null)`,
+    })
+    .from(versoesDoRoteiro)
+    .where(eq(versoesDoRoteiro.clienteId, clienteId))
+    .groupBy(versoesDoRoteiro.grupo)
+    .having(sql`min(${versoesDoRoteiro.criadoEm}) >= ${desde}`)
+    .orderBy(sql`min(${versoesDoRoteiro.criadoEm}) desc`)
+    .limit(1);
+  if (!novo || novo.resolvido) return null;
+
+  const [primeira] = await db()
     .select()
     .from(versoesDoRoteiro)
-    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), gte(versoesDoRoteiro.criadoEm, desde)))
-    .orderBy(desc(versoesDoRoteiro.criadoEm), asc(versoesDoRoteiro.ordem));
-  const porGrupo = new Map<string, VersaoDoRoteiro[]>();
-  for (const linha of linhas) porGrupo.set(linha.grupo, [...(porGrupo.get(linha.grupo) ?? []), linha]);
-  const grupos: GrupoEmAberto[] = [];
-  for (const [grupo, versoes] of porGrupo) {
-    if (versoes.some((v) => v.roteiroId !== null)) continue;
-    const primeira = paraVersaoDoGrupo([...versoes].sort((a, b) => a.ordem - b.ordem)[0]);
-    grupos.push({ grupo, tema: primeira.tema, objetivo: primeira.objetivo, formato: primeira.formato, estilo: primeira.estilo, quantidade: versoes.length, criadoEm: versoes[0].criadoEm });
-  }
-  return grupos.slice(0, limite);
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, novo.grupo)))
+    .orderBy(asc(versoesDoRoteiro.ordem))
+    .limit(1);
+  const base = paraVersaoDoGrupo(primeira);
+  const fim = new Date(novo.fim);
+  return {
+    grupo: novo.grupo,
+    tema: base.tema,
+    objetivo: base.objetivo,
+    ficha: base.ficha,
+    formato: base.formato,
+    estilo: base.estilo,
+    quantidade: novo.total,
+    inicio: new Date(novo.inicio),
+    emEscrita: novo.total < VERSOES_POR_GERACAO && agora.getTime() - fim.getTime() < MINUTOS_DE_UM_GRUPO_EM_ESCRITA * 60_000,
+  };
 }
 
 /**

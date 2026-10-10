@@ -10,6 +10,7 @@ import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
 import { videoPorId } from "@/servicos/pesquisa";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
+import { grupoDoRoteiro } from "@/servicos/versoes";
 
 import { RoteiroTela } from "./RoteiroTela";
 
@@ -40,13 +41,16 @@ export default async function Roteiro({ params }: Props) {
   }
 
   const preferencias = await preferenciasDoUsuario(sessao.user.id);
-  const [video, versoes, momento] = await Promise.all([
+  const [video, versoes, momento, grupoDeVersoes] = await Promise.all([
     roteiro.referenciaVideoId ? videoPorId(roteiro.referenciaVideoId) : Promise.resolve(null),
     versoesDoRoteiro(roteiroId),
     // E55 PR 2b: o roteiro que nasceu de um assunto em alta diz se o assunto ainda está em alta (selo e linha de prazo) ou já passou (selo neutro e aviso). Uma falha aqui só tira o selo.
     roteiro.temaDoMomento
       ? momentoDoRoteiro({ data: roteiro.data, temaDoMomento: roteiro.temaDoMomento }, hojeISO()).catch(() => null)
       : Promise.resolve(null),
+    // E26 4b: se o roteiro nasceu de uma comparação de versões, as outras continuam guardadas e a tela leva a elas. Uma falha aqui só tira o link.
+    // Um grupo de uma versão só não tem "outras" para mostrar.
+    grupoDoRoteiro(cliente.id, roteiroId).then((g) => (g && g.total > 1 ? g : null)).catch(() => null),
   ]);
 
   // E53 (parte 3): de onde o roteiro veio, quando nasceu de uma notícia: a de um assunto da marca (a cópia que o roteiro guardou) ou a do setor (a linha da tabela). O link é revalidado (só https).
@@ -71,6 +75,7 @@ export default async function Roteiro({ params }: Props) {
       video={video}
       versoes={versoes}
       momento={momento}
+      grupoDeVersoes={grupoDeVersoes}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}

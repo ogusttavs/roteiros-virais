@@ -1,19 +1,20 @@
 /**
- * `gerarRoteiroAction` (etapa 11; V9c, item 1: `formato` do controle segmentado): a Server Action
- * de verdade que `/criar/objetivo` chama, contra o Postgres real e a sessão mockada (mesmo padrão de
- * `momento-acoes.test.ts` e `plano-acoes.test.ts`).
+ * `gerarVersoesAction` (etapa 11; V9c, item 1: `formato` do controle segmentado; E26 4b: o botão "escrever o roteiro" escreve as três versões): a Server Action de verdade que
+ * `/criar/objetivo` chama, contra o Postgres real e a sessão mockada (mesmo padrão de `momento-acoes.test.ts` e `plano-acoes.test.ts`). Os roteiros só existem depois de "Ficar com esta":
+ * os testes escolhem a primeira versão do grupo e conferem a linha que nasce.
  */
-import { eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, membrosMarca, nichos, roteiros, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, membrosMarca, nichos, roteiros, user, versoesDoRoteiro, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
+import { ficarComVersao } from "@/servicos/versoes";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
-import { gerarRoteiroAction } from "../../src/app/(painel)/(completo)/criar/objetivo/acoes";
+import { gerarVersoesAction } from "../../src/app/(painel)/(completo)/criar/objetivo/acoes";
 
 const PERFIL: PerfilCompilado = {
   fatos: {
@@ -59,28 +60,53 @@ afterAll(async () => {
   await getPool().end();
 });
 
-describe("gerarRoteiroAction", () => {
-  it("com formato valido, gera o roteiro nesse formato", async () => {
+/** A primeira versão do grupo vira o roteiro (o "Ficar com esta" do serviço) e devolve a linha de `roteiros`. */
+async function roteiroDaPrimeiraVersao(clienteId: number, grupo: string) {
+  const [primeira] = await db()
+    .select()
+    .from(versoesDoRoteiro)
+    .where(and(eq(versoesDoRoteiro.clienteId, clienteId), eq(versoesDoRoteiro.grupo, grupo)))
+    .orderBy(asc(versoesDoRoteiro.ordem))
+    .limit(1);
+  return ficarComVersao(clienteId, primeira.id);
+}
+
+describe("gerarVersoesAction", () => {
+  it("escreve as três versões do mesmo tema e nenhuma é roteiro até a pessoa escolher", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const roteirosAntes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+
+    const resultado = await gerarVersoesAction({ origem: "livre", textoTema: "mancha de tinta no sofa" }, "conversao");
+
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const versoes = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.grupo, resultado.dado.grupo));
+    expect(versoes).toHaveLength(3);
+    expect(new Set(versoes.map((v) => v.clienteId))).toEqual(new Set([marcaA.id]));
+    const roteirosDepois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    expect(roteirosDepois).toHaveLength(roteirosAntes.length);
+  });
+
+  it("com formato valido, escreve a versao nesse formato", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
 
-    const resultado = await gerarRoteiroAction(
+    const resultado = await gerarVersoesAction(
       { origem: "livre", textoTema: "mancha de vinho no sofa" },
       "conversao",
       "story",
     );
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
     expect(roteiro.formato).toBe("story");
   });
 
-  it("sem formato, gera reels (o padrao)", async () => {
+  it("sem formato, escreve reels (o padrao)", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
 
-    const resultado = await gerarRoteiroAction({ origem: "livre", textoTema: "cheiro de bicho no sofa" }, "alcance");
+    const resultado = await gerarVersoesAction({ origem: "livre", textoTema: "cheiro de bicho no sofa" }, "alcance");
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
     expect(roteiro.formato).toBe("reels");
   });
 
@@ -91,16 +117,16 @@ describe("gerarRoteiroAction", () => {
    */
   it("com formato invalido, erro como resultado, sem gerar", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
-    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    const antes = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marcaA.id));
 
-    const resultado = await gerarRoteiroAction(
+    const resultado = await gerarVersoesAction(
       { origem: "livre", textoTema: "produto novo" },
       "engajamento",
       "carrossel",
     );
 
     expect(resultado).toEqual({ ok: false, erro: "formato de roteiro invalido." });
-    const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    const depois = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marcaA.id));
     expect(depois.length).toBe(antes.length);
   });
 });
@@ -110,7 +136,7 @@ describe("gerarRoteiroAction", () => {
  * de OUTRA marca passava sem conferir a posse: `marcaCitadaPorId` põe o perfil compilado dessa marca no prompt de quem chamou. Agora só as duas origens da tela do objetivo valem,
  * reconstruídas campo a campo, e o que sobra no objeto é ignorado.
  */
-describe("gerarRoteiroAction com o que o navegador manda", () => {
+describe("gerarVersoesAction com o que o navegador manda", () => {
   async function marcaDeOutraPessoa() {
     const [nicho] = await db().select().from(nichos).limit(1);
     await db().insert(user).values({ id: "objetivo-b-forja", name: "[teste] Outra pessoa", email: "b@objetivo-acoes.teste" });
@@ -123,13 +149,13 @@ describe("gerarRoteiroAction com o que o navegador manda", () => {
   it("a origem 'momento' com a marca de outra pessoa é recusada antes de gastar uma geração", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const outra = await marcaDeOutraPessoa();
-    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    const antes = await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marcaA.id));
     const forjada = { origem: "momento", momento: { onde: "x", oQueEstaAcontecendo: "y", oQueDaParaMostrar: "z", marcaId: outra.id } };
 
-    const resultado = await gerarRoteiroAction(forjada as never, "alcance");
+    const resultado = await gerarVersoesAction(forjada as never, "alcance");
 
     expect(resultado).toEqual({ ok: false, erro: "origem de roteiro invalida." });
-    expect(await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id))).toHaveLength(antes.length);
+    expect(await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marcaA.id))).toHaveLength(antes.length);
   });
 
   it("o que sobra no objeto de uma origem válida é ignorado: a marca citada de outra pessoa não entra no roteiro", async () => {
@@ -137,10 +163,10 @@ describe("gerarRoteiroAction com o que o navegador manda", () => {
     const outra = await marcaDeOutraPessoa().catch(async () => (await db().select().from(clientes).where(eq(clientes.usuarioId, "objetivo-b-forja")))[0]);
     const comSobra = { origem: "livre", textoTema: "tema com sobra no objeto", momento: { marcaId: outra.id }, marcaId: outra.id };
 
-    const resultado = await gerarRoteiroAction(comSobra as never, "alcance");
+    const resultado = await gerarVersoesAction(comSobra as never, "alcance");
 
     if (!resultado.ok) throw new Error(resultado.erro);
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, resultado.dado.grupo);
     expect(roteiro.clienteId).toBe(marcaA.id);
     expect(roteiro.origem).toBe("livre");
     expect(roteiro.momento).toBeNull();
@@ -149,32 +175,32 @@ describe("gerarRoteiroAction com o que o navegador manda", () => {
   it("um objetivo fora da lista, ou um índice que não é um número, também é recusado", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
 
-    expect(await gerarRoteiroAction({ origem: "livre", textoTema: "x" }, "vendas" as never)).toEqual({ ok: false, erro: "objetivo de roteiro invalido." });
-    expect(await gerarRoteiroAction({ origem: "sugerido", temaIndice: "0" as never }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
-    expect(await gerarRoteiroAction({ origem: "sugerido", temaIndice: -1 }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
-    expect(await gerarRoteiroAction(null as never, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await gerarVersoesAction({ origem: "livre", textoTema: "x" }, "vendas" as never)).toEqual({ ok: false, erro: "objetivo de roteiro invalido." });
+    expect(await gerarVersoesAction({ origem: "sugerido", temaIndice: "0" as never }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await gerarVersoesAction({ origem: "sugerido", temaIndice: -1 }, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
+    expect(await gerarVersoesAction(null as never, "alcance")).toEqual({ ok: false, erro: "origem de roteiro invalida." });
   });
 });
 
 /** E49 PR 1: as cinco fichas decidem o objetivo que se grava, valem só no Reels, e a reescrita mantém a ficha. */
-describe("gerarRoteiroAction com ficha", () => {
+describe("gerarVersoesAction com ficha", () => {
   let contador = 0;
   // Cada geração numa marca nova: o mock do tipo de abertura não acompanha muitos roteiros seguidos da mesma marca.
-  async function marcaNova(): Promise<string> {
+  async function marcaNova(): Promise<{ id: string; clienteId: number }> {
     const id = `objetivo-ficha-${++contador}`;
     const [nicho] = await db().select().from(nichos).limit(1);
     await db().insert(user).values({ id, name: `[teste] ${id}`, email: `${id}@objetivo-acoes.teste` });
     const [m] = await db().insert(clientes).values({ usuarioId: id, nome: `[teste] ${id}`, nichoId: nicho.id }).returning();
     await db().insert(membrosMarca).values({ usuarioId: id, clienteId: m.id, papel: "dono" });
     await db().insert(briefings).values({ clienteId: m.id, completo: true, perfil: PERFIL });
-    return id;
+    return { id, clienteId: m.id };
   }
   async function gerar(ficha: string | undefined, formato = "reels", objetivo: "alcance" | "engajamento" | "conversao" = "alcance") {
-    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(await marcaNova()));
-    const r = await gerarRoteiroAction({ origem: "livre", textoTema: `tema numero ${++contador} da ficha ${ficha ?? "sem"} ${formato}` }, objetivo, formato, undefined, undefined, undefined, undefined, undefined, undefined, ficha);
+    const marca = await marcaNova();
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marca.id));
+    const r = await gerarVersoesAction({ origem: "livre", textoTema: `tema numero ${++contador} da ficha ${ficha ?? "sem"} ${formato}` }, objetivo, formato, undefined, undefined, undefined, undefined, undefined, undefined, ficha);
     if (!r.ok) throw new Error(r.erro);
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, r.dado.id));
-    return roteiro;
+    return roteiroDaPrimeiraVersao(marca.clienteId, r.dado.grupo);
   }
 
   it("a ficha vira o objetivo que se grava (guardem conta em lembrarem de você, mesmo se a tela mandou outro)", async () => {
@@ -206,10 +232,11 @@ describe("gerarRoteiroAction com ficha", () => {
   });
 
   it("no vídeo sem fala a ficha também é ignorada (a estrutura dela pressupõe fala)", async () => {
-    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(await marcaNova()));
-    const r = await gerarRoteiroAction({ origem: "livre", textoTema: "tema sem fala com ficha" }, "alcance", "reels", "sem_fala", undefined, undefined, undefined, undefined, undefined, "comentem");
+    const marca = await marcaNova();
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marca.id));
+    const r = await gerarVersoesAction({ origem: "livre", textoTema: "tema sem fala com ficha" }, "alcance", "reels", "sem_fala", undefined, undefined, undefined, undefined, undefined, "comentem");
     if (!r.ok) throw new Error(r.erro);
-    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, r.dado.id));
+    const roteiro = await roteiroDaPrimeiraVersao(marca.clienteId, r.dado.grupo);
     expect(roteiro.estilo).toBe("sem_fala");
     expect(roteiro.ficha).toBeNull();
   });

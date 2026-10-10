@@ -7,6 +7,7 @@
 import { expect, test } from "@playwright/test";
 
 import { entrar, limparTendencias, prepararMarca, TITULO_DO_TEMA } from "./ajudas-em-alta";
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
 
 const MARCADOR_NOTA_ALTA = "aprova este tema de teste sem ressalva";
 
@@ -86,6 +87,7 @@ test.describe("o assunto em alta no Criar", () => {
     // Sem tema do dia, nenhuma ficha vem marcada (a recomendação é pelo que a pessoa tem postado): escolhe uma.
     await page.locator("[data-fichas]").getByRole("radio", { name: /Que me chamem/ }).click();
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 60_000 });
 
     await expect(page.locator("[data-selo-momento='vivo']")).toContainText("Assunto do momento");

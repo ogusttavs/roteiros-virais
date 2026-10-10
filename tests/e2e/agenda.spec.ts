@@ -26,6 +26,8 @@ import {
 } from "../../src/db/schema";
 import { hojeISO } from "../../src/lib/config";
 
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
+
 const SENHA = "ExemploSenha123";
 
 async function entrar(page: Page, email: string) {
@@ -201,6 +203,7 @@ test.describe("/hoje, a Agenda", () => {
     await expect(page.getByLabel("Escolher a data")).toHaveValue(dia);
 
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
 
     const [roteiroCriado] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaId));
@@ -339,6 +342,7 @@ test.describe("/hoje, a Agenda", () => {
     await expect(page.getByText("Ele vai ser escrito com o que está subindo hoje.")).toBeVisible();
 
     await page.getByRole("button", { name: "escrever o roteiro" }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/);
 
     const [roteiroCriado] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaId));

@@ -13,6 +13,8 @@ import { account, assuntosDaMarca, briefings, clientes, membrosMarca, nichos, no
 import { inicioDoDiaEmSaoPaulo } from "../../src/servicos/noticias-do-dia";
 import { textosNav } from "../../src/textos/nav";
 
+import { ficarComAPrimeiraVersao } from "./ajudas-versoes";
+
 const SENHA = "ExemploSenha123";
 const EMAIL = "e2e-noticias@exemplo.teste";
 const NOME_MARCA_UM = "[teste] Notícias Um";
@@ -374,6 +376,7 @@ test.describe("/noticias", () => {
     await expect(page).toHaveURL(/\/criar\/objetivo\?livre=.*noticiaAssuntoId=\d+/);
     await page.getByRole("radio", { name: /Que me chamem/ }).click();
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await ficarComAPrimeiraVersao(page);
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
     const origem = page.locator("[data-noticia-de-origem]");
@@ -415,6 +418,7 @@ test.describe("/noticias", () => {
     await expect(page).toHaveURL(/\/criar\/objetivo\?livre=.*noticiaId=\d+/);
     await page.getByRole("radio", { name: /Que me chamem/ }).click();
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await ficarComAPrimeiraVersao(page);
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
