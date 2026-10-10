@@ -3,10 +3,12 @@ import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { NOME_DA_FILA, ROTINAS, quandoDoCron, type Rotina } from "@/config/rotinas";
 import { AGENDAMENTOS } from "@/jobs/agenda";
 import { FILAS, FILAS_POR_EVENTO, FILAS_POR_RAMO } from "@/jobs/fila";
+import { hojeISO } from "@/lib/config";
 import { exigirAdmin } from "@/lib/sessao";
 import { listarExecucoesRecentes, taxaDeAcertoPorExecucao, type ExecucaoResumo } from "@/servicos/admin-coleta";
 import { inicioDoAdmin, type ProxyParado } from "@/servicos/admin-inicio";
 import { ultimosDisparos } from "@/servicos/admin-rotinas";
+import { assuntosDoMomentoPorRamoSemFalha } from "@/servicos/em-alta";
 import { quandoPorExtenso, textosInicioAdmin as tc } from "@/textos/admin-contas";
 import { textosRotinasAdmin as t } from "@/textos/admin-custos";
 import { fraseDoErro } from "@/textos/rotinas";
@@ -62,13 +64,14 @@ function estadoDaRotina(ultimas: (ExecucaoResumo | undefined)[], agora: Date): E
 }
 
 /** O resultado em uma frase: o erro, ou os três primeiros números do resumo da execução. */
-function resultadoEmFrase(e: ExecucaoResumo | undefined, proxy: ProxyParado | null): string {
+function resultadoEmFrase(e: ExecucaoResumo | undefined, proxy: ProxyParado | null, ramosComTemaDoMomento = 0): string {
   if (!e) return t.rotinas.semExecucao;
   if (e.status === "erro") return fraseDoErro(e.erro);
   // Os temas do dia só saem para ramo em uso (alguma marca gerou roteiro nos últimos 3 dias): o cartão diz quantos ramos tiveram tema e quantos ficaram sem uso.
   if (e.nome === "temas-do-dia" && typeof e.resumo?.semUso === "number" && typeof e.resumo?.nichos === "number") {
     const sem = e.resumo.semUso;
-    return `${t.rotinas.temasDoDia(e.resumo.nichos, sem)}${sem > 0 ? `: ${t.rotinas.semTemaPorFaltaDeUso}` : ""}`;
+    // E55 PR 2c: o tema do momento nasce depois da leitura do que está em alta e entra no dia do ramo: o fim da frase diz quantos ramos o têm hoje.
+    return `${t.rotinas.temasDoDia(e.resumo.nichos, sem)}${sem > 0 ? `: ${t.rotinas.semTemaPorFaltaDeUso}` : ""}${ramosComTemaDoMomento > 0 ? `. ${t.rotinas.temasDoMomento(ramosComTemaDoMomento)}` : ""}`;
   }
   // A rotina da Meta que parou no limite do aplicativo não é erro: o resumo diz que continua na hora seguinte.
   if (e.resumo?.pausadoPorLimite === true) return t.rotinas.paradoNoLimite;
@@ -92,6 +95,8 @@ export default async function Rotinas() {
   await exigirAdmin();
   const inicio = await inicioDoAdmin();
   const { madrugada } = inicio;
+  // E55 PR 2c: quantos ramos têm tema do momento hoje (leitura do banco): o fim da frase da rotina que monta os temas.
+  const ramosComTemaDoMomento = (await assuntosDoMomentoPorRamoSemFalha(hojeISO())).size;
   const todasAsFilas = ROTINAS.flatMap((r) => r.filas);
   const recentes = new Map(await Promise.all(todasAsFilas.map(async (nome) => [nome, await listarExecucoesRecentes(nome, 3)] as const)));
   const idsPagos = [...recentes.entries()].filter(([nome]) => FILAS_DE_COLETA_PAGA.has(nome)).flatMap(([, lista]) => lista.map((e) => e.id));
@@ -210,7 +215,7 @@ export default async function Rotinas() {
                   <div>
                     <dt>{t.rotinas.resultado}</dt>
                     <dd data-resultado={falhou ? "falhou" : "ultima"}>
-                      {falhou ? t.rotinas.falhouEm(NOME_DA_FILA[falhou.nome] ?? falhou.nome, quandoPorExtenso(falhou.iniciadoEm, inicio.agora), fraseDoErro(falhou.erro)) : resultadoEmFrase(maisRecente, inicio.atencao.proxy)}
+                      {falhou ? t.rotinas.falhouEm(NOME_DA_FILA[falhou.nome] ?? falhou.nome, quandoPorExtenso(falhou.iniciadoEm, inicio.agora), fraseDoErro(falhou.erro)) : resultadoEmFrase(maisRecente, inicio.atencao.proxy, ramosComTemaDoMomento)}
                     </dd>
                   </div>
                 </dl>

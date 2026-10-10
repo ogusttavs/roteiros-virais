@@ -178,8 +178,10 @@ export async function resumoHistorico(clienteId: number): Promise<ResumoHistoric
 export async function temasDoDiaOuRecente(
   nichoId: number,
   data: string,
+  /** O relógio da conta do tema do momento (a lista de agora): injetável, para quem roda com outro "agora" (o lembrete e os testes) não olhar o relógio de verdade. */
+  agora: Date = new Date(),
 ): Promise<{ temas: TemaDoDia[]; dataUsada: string } | null> {
-  const [linha] = await db()
+  const linhas = await db()
     .select({ data: temasDia.data, temas: temasDia.temas })
     .from(temasDia)
     .where(
@@ -194,14 +196,16 @@ export async function temasDoDiaOuRecente(
       ),
     )
     .orderBy(desc(temasDia.data))
-    .limit(1);
+    .limit(DIAS_REGRA_ESTABILIDADE + 1);
 
-  if (!linha) return null;
   // E55: o tema do momento é para o mesmo dia e só vale enquanto o assunto segue na lista do que está em alta; o de um dia que já passou nunca vale, e o de hoje some quando o assunto sai.
-  const lista = linha.data === hojeISO() ? await listaDeTendenciasDeAgora() : null;
-  const temas = temasQueAindaValem(linha.temas, lista);
-  if (temas.length === 0) return null;
-  return { temas, dataUsada: linha.data };
+  // Se o dia só tinha o tema do momento e ele deixou de valer, a linha fica vazia: vale o dia mais recente que ainda tem tema (a regra de estabilidade), não nenhum.
+  const lista = linhas.some((l) => l.data === data) ? await listaDeTendenciasDeAgora(agora) : null;
+  for (const linha of linhas) {
+    const temas = temasQueAindaValem(linha.temas, linha.data === data ? lista : null);
+    if (temas.length > 0) return { temas, dataUsada: linha.data };
+  }
+  return null;
 }
 
 /**

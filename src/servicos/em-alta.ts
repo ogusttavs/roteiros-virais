@@ -6,12 +6,12 @@
 import { and, desc, eq, gte } from "drizzle-orm";
 
 import { db } from "@/db";
-import { tendenciasAvaliadas, tendenciasBrasil, type Cliente, type FonteDaTendencia, type TemaDoMomentoGuardado } from "@/db/schema";
+import { temasDia, tendenciasAvaliadas, tendenciasBrasil, type Cliente, type FonteDaTendencia, type TemaDoMomentoGuardado } from "@/db/schema";
 import { logger } from "@/lib/log";
 
 import { roteiroDoMomentoDeHoje, somarDiasISO } from "./roteiro";
 import { temasParaCliente } from "./temas";
-import { assuntoSegueEmAlta, listaDeTendenciasDeAgora, type ListaDeAgora } from "./tendencias";
+import { assuntoSegueEmAlta, listaDeTendenciasDeAgora, temasQueAindaValem, type ListaDeAgora } from "./tendencias";
 
 const FUSO = "America/Sao_Paulo";
 const HORA_MS = 60 * 60 * 1000;
@@ -100,6 +100,35 @@ async function rodadasRecentes(agora: Date): Promise<{ coletadaEm: Date; assunto
  */
 function assuntoDeAgora(doMomento: AssuntoDaRodada, lista: ListaDeAgora) {
   return lista.assuntos.find((a) => a.chave === doMomento.chave) ?? lista.assuntos.find((a) => assuntoSegueEmAlta(doMomento, [a])) ?? null;
+}
+
+/**
+ * Os assuntos do momento de cada ramo hoje, para o admin e para o aviso da manhã: o tema do momento que o setor tem nos temas de hoje, enquanto o assunto dele segue na lista de agora (o mesmo filtro
+ * que o Hoje e o Criar usam, `temasQueAindaValem`). Só quem tem tema do momento aparece no mapa. Leitura do banco, sem custo de modelo.
+ */
+export async function assuntosDoMomentoPorRamo(hoje: string, agora: Date = new Date()): Promise<Map<number, string[]>> {
+  const [linhas, lista] = await Promise.all([
+    db().select({ nichoId: temasDia.nichoId, temas: temasDia.temas }).from(temasDia).where(eq(temasDia.data, hoje)),
+    listaDeTendenciasDeAgora(agora),
+  ]);
+  const porRamo = new Map<number, string[]>();
+  for (const linha of linhas) {
+    const assuntos = temasQueAindaValem(linha.temas, lista)
+      .filter((tema) => tema.doMomento !== undefined)
+      .map((tema) => tema.doMomento!.assunto);
+    if (assuntos.length > 0) porRamo.set(linha.nichoId, assuntos);
+  }
+  return porRamo;
+}
+
+/** Os assuntos do momento por ramo para as telas do admin: uma falha ao montá-los nunca derruba a página (o mapa vem vazio), mas vai para o log, para não parecer um zero de verdade. */
+export async function assuntosDoMomentoPorRamoSemFalha(hoje: string): Promise<Map<number, string[]>> {
+  try {
+    return await assuntosDoMomentoPorRamo(hoje);
+  } catch (erro) {
+    logger.warn({ err: erro }, "em-alta: os assuntos do momento por ramo nao saíram");
+    return new Map();
+  }
 }
 
 /** Das fontes de um assunto: se vem do Google, do YouTube, e o número de buscas do Google já escrito. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { List } from "lucide-react";
+import { List, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -82,7 +82,16 @@ export function ListaNichos({ nichos, pedidos }: { nichos: NichoComContagem[]; p
                     </td>
                     <td className={styles.mono}>{totalVideos.toLocaleString("pt-BR")}</td>
                     <td className={styles.mono}>{nicho.contasVigiadas}</td>
-                    <td className={styles.mono}>{formatarData(nicho.ultimaLeitura)}</td>
+                    <td className={styles.mono}>
+                      {formatarData(nicho.ultimaLeitura)}
+                      {/* E55 PR 2c: o ramo que ganhou tema do momento hoje diz qual, na mesma célula (uma coluna a mais estourava a tabela a 1280). */}
+                      {nicho.assuntosDoMomento.length > 0 ? (
+                        <span className={styles.linhaMomento} data-do-momento>
+                          <TrendingUp size={14} strokeWidth={1.75} aria-hidden="true" />
+                          {t.doMomento(nicho.assuntosDoMomento)}
+                        </span>
+                      ) : null}
+                    </td>
                     <td>
                       <span
                         className={[styles.ponto, nicho.ativo ? styles.pontoPositivo : styles.pontoErro].join(" ")}

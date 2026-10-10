@@ -57,7 +57,7 @@ import {
 } from "@/servicos/push";
 import { agendaDoDia, atrasados } from "@/servicos/roteiro";
 import { temasDoDiaOuRecente } from "@/servicos/temas";
-import { textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
+import { marcasComAssuntoDoMomento, textosEmail, type ItemAgendaPendente, type MarcaPendente } from "@/textos/email";
 import { textosPush } from "@/textos/push";
 
 /**
@@ -101,13 +101,19 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       })
       .from(membrosMarca)
       .innerJoin(clientes, eq(clientes.id, membrosMarca.clienteId))
-      .where(eq(membrosMarca.usuarioId, candidato.usuarioId));
+      .where(eq(membrosMarca.usuarioId, candidato.usuarioId))
+      // Estável: o aviso fala da primeira marca com o assunto do momento, e a ordem do banco sem ORDER BY muda de um dia para o outro.
+      .orderBy(clientes.nome, clientes.id);
+    const variasMarcas = marcasDoCandidato.filter((marca) => marca.ativo).length > 1;
 
     const nomesPendentes: MarcaPendente[] = [];
     for (const marca of marcasDoCandidato) {
       if (!marca.ativo) continue;
       if (acessouHoje(marca.ultimoAcessoEm, agora)) continue;
-      if (!marca.nichoId || !(await temasDoDiaOuRecente(marca.nichoId, hoje))) continue;
+      const temasDaMarca = marca.nichoId ? await temasDoDiaOuRecente(marca.nichoId, hoje, agora) : null;
+      if (!temasDaMarca) continue;
+      // E55 PR 2c: o tema do momento só existe no dia dele (`temasDoDiaOuRecente` já tirou o que o assunto deixou de valer): é o que o aviso põe na frente.
+      const temaDoMomento = temasDaMarca.dataUsada === hoje ? temasDaMarca.temas.find((tema) => tema.doMomento !== undefined) : undefined;
       const [planoHoje, agendaHoje, atrasadosDaMarca] = await Promise.all([
         planoDoDia(marca.id, hoje),
         agendaDoDia(marca.id, hoje),
@@ -119,6 +125,7 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       }));
       nomesPendentes.push({
         nome: marca.nome,
+        emAlta: temaDoMomento?.doMomento ? { assunto: assuntoSemQuebra(temaDoMomento.doMomento.assunto), tituloDoTema: temaDoMomento.titulo } : null,
         atrasados: atrasadosDaMarca.map((item) => item.titulo),
         planoHoje: planoHoje.map((item) => ({ lugar: item.lugar, situacao: item.situacao })),
         agendaHoje: itensAgenda,
@@ -138,13 +145,13 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
       try {
         // E48 PR 2: quem tem aparelho inscrito recebe o push; o e-mail só sai para quem não tem inscrição ativa, ou quando nenhum push foi aceito
         // (a inscrição que falhou já foi apagada ou contada, e a pessoa não fica sem o lembrete do dia).
-        const chegouPorPush = await mandarPush(candidato.usuarioId, nomesPendentes, agora);
+        const chegouPorPush = await mandarPush(candidato.usuarioId, nomesPendentes, agora, variasMarcas);
         if (chegouPorPush) {
           enviadosPorPush += 1;
         } else {
           await enviarEmail({
             para: candidato.email,
-            assunto: textosEmail.assuntoLembrete,
+            assunto: textosEmail.assuntoDoLembrete(nomesPendentes),
             html: textosEmail.corpoLembrete(nomesPendentes),
           });
         }
@@ -172,20 +179,30 @@ export async function rodarLembrete(agora = new Date()): Promise<Record<string, 
   };
 }
 
+/** O assunto do momento vem de um feed público: quebra de linha e caractere de controle no meio viram espaço (ele vai no assunto do e-mail e no título do push). */
+function assuntoSemQuebra(assunto: string): string {
+  return assunto.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 /**
  * O push do lembrete para os aparelhos inscritos da pessoa (E48 PR 2). O texto: "O seu roteiro de hoje está pronto" quando alguma marca dela tem roteiro marcado
  * na agenda do dia, senão "Os temas de hoje chegaram"; o toque abre `/hoje`. 404 e 410 apagam a inscrição na hora; outra falha conta uma vez e a segunda seguida
  * apaga. Devolve se algum aparelho aceitou o aviso (se nenhum aceitou, quem chama manda o e-mail).
  */
-async function mandarPush(usuarioId: string, marcas: MarcaPendente[], agora: Date): Promise<boolean> {
+async function mandarPush(usuarioId: string, marcas: MarcaPendente[], agora: Date, variasMarcas: boolean): Promise<boolean> {
   const inscricoes = await inscricoesDaPessoa(usuarioId);
   if (inscricoes.length === 0) return false;
   const temRoteiroNaAgenda = marcas.some((marca) => marca.agendaHoje.length > 0);
-  const aviso = {
-    titulo: config.appName,
-    corpo: temRoteiroNaAgenda ? textosPush.roteiroPronto : textosPush.temasChegaram,
-    url: "/hoje",
-  };
+  // E55 PR 2c: o assunto do momento vem na frente do que estiver marcado: o título é o assunto (a notícia do dia, não o nome do app) e o toque abre o Hoje, com o cartão no alto.
+  // Quem cuida de mais de uma marca abre o Hoje da marca ativa, que pode não ser a do assunto: o corpo diz de qual marca é.
+  const [comAlta] = marcasComAssuntoDoMomento(marcas);
+  const aviso = comAlta
+    ? { titulo: textosPush.emAlta.titulo(comAlta.emAlta.assunto), corpo: variasMarcas ? textosPush.emAlta.corpoDaMarca(comAlta.nome) : textosPush.emAlta.corpo, url: "/hoje" }
+    : {
+        titulo: config.appName,
+        corpo: temRoteiroNaAgenda ? textosPush.roteiroPronto : textosPush.temasChegaram,
+        url: "/hoje",
+      };
   let algumAceitou = false;
   for (const inscricao of inscricoes) {
     const resultado = await enviarPush(inscricao, aviso);
