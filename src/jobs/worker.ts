@@ -23,6 +23,7 @@ import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
@@ -126,6 +127,10 @@ async function main(): Promise<void> {
   });
   await boss().work(FILAS.analisarVisual, async () => {
     await executarComRegistro(FILAS.analisarVisual, rodarAnalisarVisual);
+  });
+  /** E28: sem `nichoId`, todo setor ativo (o cron semanal); com, só aquele setor. */
+  await boss().work<{ nichoId?: number }>(FILAS.comentariosSemana, async (job) => {
+    await executarComRegistro(FILAS.comentariosSemana, () => rodarComentariosSemana(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   /** M3, item 2: sem `nichoId`, roda para todo setor ativo que aceita "vídeo sem fala vale" (o cron diário). */
   await boss().work<{ nichoId?: number; soFicha?: boolean }>(FILAS.extrairSemFala, async (job) => {

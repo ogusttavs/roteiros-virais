@@ -18,6 +18,7 @@ import { rodarColetaApify } from "./coleta-apify";
 import { rodarColetaMeioDia } from "./coleta-meio-dia";
 import { rodarColetaNoticias } from "./coleta-noticias";
 import { rodarColetaYoutube } from "./coleta-youtube";
+import { rodarComentariosSemana } from "./comentarios-semana";
 import { rodarContasBase } from "./contas-base";
 import { rodarCurvaCliente } from "./curva-cliente";
 import { rodarDescobertaInstagram } from "./descoberta-instagram";
@@ -82,6 +83,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
     return rodarExtrairAgora(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
   },
   [FILAS.analisarVisual]: () => rodarAnalisarVisual(),
+  /** E28: com um número na linha de comando, só aquele setor; sem, todo setor ativo (o cron semanal). */
+  [FILAS.comentariosSemana]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarComentariosSemana(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
   [FILAS.extrairSemFala]: () => {
     const nichoIdArg = process.argv[3];
     return rodarExtrairSemFala(nichoIdArg === undefined || nichoIdArg.startsWith("--") ? undefined : Number(nichoIdArg), process.argv.includes("--so-ficha"));

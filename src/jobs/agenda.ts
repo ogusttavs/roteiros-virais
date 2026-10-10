@@ -187,6 +187,11 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "busca o resultado do lote de extracao quando pronto, de hora em hora, aos 20",
   },
   {
+    fila: FILAS.comentariosSemana,
+    cron: "45 4 * * 0",
+    descricao: "comentarios dos videos mais vistos do setor (so YouTube) e as vozes do publico, todo domingo as 04:45, antes da analise visual",
+  },
+  {
     fila: FILAS.analisarVisual,
     cron: "0 5 * * 0",
     descricao: "analise visual dos dez melhores da semana, todo domingo as 05:00",

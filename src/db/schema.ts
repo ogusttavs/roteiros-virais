@@ -135,6 +135,12 @@ export const nichos = pgTable("nichos", {
    * existe: nasce quando a primeira marca escolhe o ramo (`garantirNichoDoRamo`, `servicos/ramos.ts`), e é aí que a pesquisa começa.
    */
   ramoCatalogo: text("ramo_catalogo"),
+  /**
+   * E28: "as vozes do público" do setor, o que o público mais pergunta, reclama e pede nos comentários dos vídeos mais vistos da
+   * semana (`jobs/comentarios-semana.ts`). Uma só, refeita toda semana; `vozesEm` é de quando. Nulo até a primeira leitura.
+   */
+  vozes: jsonb("vozes").$type<VozesDoSetor>(),
+  vozesEm: timestamp("vozes_em", { withTimezone: true }),
 },
 (t) => [uniqueIndex("nichos_ramo_catalogo_unico").on(t.ramoCatalogo).where(sql`${t.ramoCatalogo} is not null`)]);
 
@@ -1079,6 +1085,39 @@ export type VideoAudio = {
   original?: boolean;
 };
 
+/** E28: uma coisa que o público disse nos comentários de um vídeo, reescrita por nós, com quantos comentários diziam isso (contado por código, nunca pelo modelo). */
+export type ItemDoPublico = { texto: string; vezes: number };
+
+/**
+ * E28: o que o público disse nos comentários de UM vídeo (`videos.comentarios_analise`). Nunca guarda quem disse: o texto é nosso,
+ * reescrito, e `frasesDoPublico` são trechos curtos conferidos letra por letra contra um comentário, sem @ nem endereço.
+ * `lidos` é quantos comentários (depois da limpeza) o modelo leu.
+ */
+export type ComentariosAnalise = {
+  duvidas: ItemDoPublico[];
+  objecoes: ItemDoPublico[];
+  pedidos: ItemDoPublico[];
+  oQueElogiaram: ItemDoPublico[];
+  frasesDoPublico: string[];
+  sentimento: "mais_positivo" | "dividido" | "mais_negativo";
+  lidos: number;
+};
+
+/** E28: uma voz do público de um setor: a mesma pergunta (ou reclamação, ou pedido) vista em vários vídeos, com a soma dos comentários e os vídeos de onde veio. */
+export type VozDoPublico = { texto: string; vezes: number; videos: number[] };
+
+/**
+ * E28: "as vozes do público" de um setor (`nichos.vozes`), refeita uma vez por semana. `videos` e `comentarios` dizem quantos
+ * vídeos e comentários entraram, para a frase da tela contar a verdade. Substitui a anterior; `nichos.vozes_em` diz de quando é.
+ */
+export type VozesDoSetor = {
+  duvidas: VozDoPublico[];
+  objecoes: VozDoPublico[];
+  pedidos: VozDoPublico[];
+  videos: number;
+  comentarios: number;
+};
+
 export const videos = pgTable(
   "videos",
   {
@@ -1191,6 +1230,14 @@ export const videos = pgTable(
     transcritoEm: timestamp("transcrito_em", { withTimezone: true }),
     analiseVisualEm: timestamp("analise_visual_em", { withTimezone: true }),
     /**
+     * E28: o que o público disse nos comentários deste vídeo (a quarta camada de análise, só dos vídeos mais vistos da semana de
+     * cada setor, só do YouTube: a API da Meta não devolve o texto dos comentários de vídeo de outra conta). `comentariosColetadosEm`
+     * é de quando a leitura foi tentada: preenchida também quando os comentários estão desligados ou não vieram, para o mesmo vídeo
+     * não gastar cota toda semana. `comentariosAnalise` fica nula nesse caso.
+     */
+    comentariosAnalise: jsonb("comentarios_analise").$type<ComentariosAnalise>(),
+    comentariosColetadosEm: timestamp("comentarios_coletados_em", { withTimezone: true }),
+    /**
      * Idioma do video (V2b, item 1, escopo 5.11: o Brasil primeiro), nulo
      * quando nao da para saber. Detectado por codigo na coleta a partir do
      * titulo e da descricao (`detectarIdioma`, `src/config/idioma.ts`) e
@@ -1288,6 +1335,29 @@ export const videos = pgTable(
     index("videos_analise_visual_em").on(t.analiseVisualEm),
   ],
 );
+
+/**
+ * E28: os comentários que o público deixou num vídeo muito visto do setor (só texto, curtidas e data). **Nunca** quem escreveu: nem
+ * nome, nem foto, nem endereço de perfil, nem o id do autor; o texto sai limpo de @, de endereço e de e-mail antes de gravar
+ * (`lib/comentarios.ts`). É conteúdo público, mas o produto guarda o padrão, não a pessoa. `idExterno` é o id do comentário na
+ * plataforma, só para não gravar o mesmo duas vezes.
+ */
+export const comentariosVideo = pgTable(
+  "comentarios_video",
+  {
+    id: id(),
+    videoId: integer("video_id")
+      .notNull()
+      .references(() => videos.id, { onDelete: "cascade" }),
+    idExterno: text("id_externo").notNull(),
+    texto: text("texto").notNull(),
+    curtidas: integer("curtidas").notNull().default(0),
+    publicadoEm: timestamp("publicado_em", { withTimezone: true }),
+    coletadoEm: timestamp("coletado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("comentarios_video_unico").on(t.videoId, t.idExterno)],
+);
+export type ComentarioVideo = typeof comentariosVideo.$inferSelect;
 
 export const noticias = pgTable("noticias", {
   id: id(),
