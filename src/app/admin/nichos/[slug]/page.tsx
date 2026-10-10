@@ -22,11 +22,13 @@ import {
 } from "@/servicos/admin-coleta";
 import { listarPerfisIndicados } from "@/servicos/perfis-analisados";
 import { estatisticasDoSetor, foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
+import { vozesParaOAdmin, vozesValidas } from "@/servicos/vozes-do-publico";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import styles from "./page.module.css";
 import { PainelNicho } from "./PainelNicho";
+import { idsDeVideoDasVozes, VozesDoPublico } from "./VozesDoPublico";
 
 const t = textosAdmin.nichoDetalhe;
 
@@ -113,11 +115,17 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const idsEvidenciaNoticias = [
     ...new Set((temasHoje ?? []).flatMap((tema) => tema.evidenciasNoticias ?? [])),
   ];
-  const [evidencias, evidenciasNoticias] = await Promise.all([
+  // E28, parte 4: as vozes do público do setor como estão no banco (a seção diz de quando são e se ainda valem).
+  const vozesDoSetor = vozesParaOAdmin(nicho.vozes);
+  const idsVideosDasVozes = idsDeVideoDasVozes(vozesDoSetor);
+  const [evidencias, evidenciasNoticias, videosDasVozes] = await Promise.all([
     videosPorId(idsEvidencia),
     noticiasPorId(idsEvidenciaNoticias),
+    videosPorId(idsVideosDasVozes),
   ]);
   const videoPorId = new Map(evidencias.map((v) => [v.id, v]));
+  const videoDaVoz = new Map(videosDasVozes.map((v) => [v.id, { titulo: v.titulo, url: v.url }]));
+  const vozesVigentes = vozesValidas(nicho.vozes, nicho.vozesEm) !== null;
   const noticiaPorId = new Map(evidenciasNoticias.map((n) => [n.id, n]));
 
   const jobsColeta = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias].map((nome) => ({
@@ -247,6 +255,26 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
           <TabelaVideos videos={foraDaCurva} colunaNumero="foraDaCurva" />
         )}
       </section>
+
+      <VozesDoPublico
+        duvidas={vozesDoSetor.duvidas}
+        objecoes={vozesDoSetor.objecoes}
+        pedidos={vozesDoSetor.pedidos}
+        leitura={
+          nicho.vozes && nicho.vozesEm
+            ? {
+                comentarios: Number(nicho.vozes.comentarios) || 0,
+                videos: Number(nicho.vozes.videos) || 0,
+                plataformas: Array.isArray(nicho.vozes.plataformas) ? nicho.vozes.plataformas : [],
+                lidaEm: nicho.vozesEm,
+              }
+            : null
+        }
+        vale={vozesVigentes}
+        validaAte={nicho.vozesEm ? new Date(nicho.vozesEm.getTime() + config.regras.vozesValidasPorDias * 24 * 60 * 60 * 1000) : null}
+        piso={config.regras.vozesMinimoDeComentarios}
+        videos={videoDaVoz}
+      />
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>

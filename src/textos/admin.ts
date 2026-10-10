@@ -139,6 +139,38 @@ export const textosAdmin = {
     verVideo: "ver vídeo",
     semDado: "sem dado ainda",
     vazioForaDaCurva: "nenhum vídeo fora da curva ainda; o job pontuar roda todo dia, depois das coletas.",
+    /** E28, parte 4: o que o público do setor disse nos comentários dos vídeos mais vistos da semana (a leitura roda no domingo, só no YouTube neste primeiro corte). */
+    vozes: {
+      titulo: "vozes do público",
+      /** "de 840 comentários de 12 vídeos do YouTube, lidos em 11 de outubro". */
+      leitura: (comentarios: number, videos: number, plataformas: string, dia: string) =>
+        `de ${comentarios.toLocaleString("pt-BR")} comentário${comentarios === 1 ? "" : "s"} de ${videos} vídeo${videos === 1 ? "" : "s"} do ${plataformas}, lidos em ${dia}`,
+      aindaVale: (ate: string) => `vale até ${ate}; depois disso não entra mais nos temas nem no roteiro`,
+      /** A rotina rodou e não juntou nenhuma voz que se repita: diferente de "nunca rodou". */
+      vazioComLeitura: "a leitura rodou e não juntou nenhuma pergunta, reclamação ou pedido que se repita; os temas e o roteiro seguem como antes.",
+      velha: (dia: string) => `leitura velha, de ${dia}: já não entra nos temas nem no roteiro, e a próxima rodada é no domingo`,
+      vazio: "ainda sem vozes neste ramo: a leitura dos comentários roda uma vez por semana, no domingo, e só conta vídeos do YouTube com comentários suficientes. Um ramo pequeno pode fechar a semana sem nenhuma, e tudo segue como antes.",
+      ajuda: "passou do piso: pode entrar na tela do cliente (as 3 mais repetidas) e nos prompts dos temas e do roteiro (3 dúvidas, 2 objeções e 2 pedidos), enquanto a leitura vale, como dado datado e com a plataforma de origem, nunca como fato do setor. abaixo do piso: fica de fora, só aparece aqui.",
+      duvidasTitulo: "dúvidas mais repetidas",
+      objecoesTitulo: "objeções",
+      pedidosTitulo: "pedidos",
+      nenhumaNaLista: "nenhuma nesta leitura",
+      colunaTexto: "o que o público disse",
+      colunaComentarios: "comentários",
+      colunaPlataforma: "plataforma",
+      colunaVideos: "vídeos",
+      colunaSituacao: "situação",
+      emVideos: (n: number) => `em ${n} vídeo${n === 1 ? "" : "s"}`,
+      /** O link da linha é só o número do vídeo; o nome acessível diz qual é. */
+      verVideoN: (n: number, titulo: string | null) => (titulo ? `ver vídeo ${n}: ${titulo}` : `ver vídeo ${n}`),
+      passouDoPiso: "passou do piso",
+      /** Passou do piso, mas a leitura é velha: nem a tela nem os prompts a usam mais. */
+      passouComLeituraVelha: "passou do piso, leitura velha",
+      abaixoDoPiso: (piso: number) => `abaixo do piso de ${piso}`,
+      /** O título da lista corta no que o job guarda; diz quantas aparecem de quantas. */
+      mostrando: (n: number, total: number) => `${n} de ${total}`,
+      semPlataforma: "sem plataforma",
+    },
     vazioSubindoHoje: "nada subindo agora; volte em algumas horas.",
     vazioVigilancia: "nenhuma conta vigiada ainda; adicione uma conta semente ou espere o job vigilancia, que roda todo domingo.",
     verModelo: "modelo do ramo",

@@ -124,3 +124,9 @@
   text-transform: uppercase;
   color: var(--cor-texto-dica);
 }
+
+/* "Vozes do público": a frase do público é longa, então a primeira coluna quebra linha em vez de empurrar a tabela para o lado. */
+.tabelaVozes td:first-child {
+  white-space: normal;
+  min-width: 12rem;
+}

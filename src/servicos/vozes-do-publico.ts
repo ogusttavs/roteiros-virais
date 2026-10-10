@@ -53,6 +53,11 @@ export function vozesValidas(vozes: VozesDoSetor | null, vozesEm: Date | null, a
   return vozes;
 }
 
+/** Devolve só o que tem a forma esperada: lista que falta vira vazia, e a voz sem frase ou sem número sai (o que está no banco pode vir de uma leitura velha ou malformada). */
+function inteiras(lista: VozDoPublico[] | undefined): VozDoPublico[] {
+  return Array.isArray(lista) ? lista.filter((v) => typeof v?.texto === "string" && Number.isFinite(v?.vezes)) : [];
+}
+
 /** As vozes de um setor e de quando foram lidas. */
 export type VozesLidas = { vozes: VozesDoSetor; em: Date };
 
@@ -66,8 +71,6 @@ export async function vozesDoSetor(nichoId: number, agora: Date = new Date()): P
     const [linha] = await db().select({ vozes: nichos.vozes, vozesEm: nichos.vozesEm }).from(nichos).where(eq(nichos.id, nichoId));
     const vozes = vozesValidas(linha?.vozes ?? null, linha?.vozesEm ?? null, agora);
     if (!vozes || !linha?.vozesEm) return null;
-    // Devolve só o que tem a forma esperada: listas que faltam viram vazias, e a voz sem frase ou sem número sai.
-    const inteiras = (lista: VozDoPublico[] | undefined) => (Array.isArray(lista) ? lista.filter((v) => typeof v?.texto === "string" && Number.isFinite(v?.vezes)) : []);
     return { vozes: { ...vozes, duvidas: inteiras(vozes.duvidas), objecoes: inteiras(vozes.objecoes), pedidos: inteiras(vozes.pedidos) }, em: linha.vozesEm };
   } catch (erro) {
     logger.warn({ err: erro, nichoId }, "nao foi possivel ler as vozes do publico do setor; segue sem elas");
@@ -75,30 +78,66 @@ export async function vozesDoSetor(nichoId: number, agora: Date = new Date()): P
   }
 }
 
+const PLATAFORMAS_VALIDAS: Plataforma[] = ["youtube", "instagram", "tiktok"];
+
+/** As plataformas de uma voz como estão no banco: só as três que existem, sem repetir; o que não é lista vira vazio (uma leitura antiga ou malformada não derruba a tela). */
+function plataformasDaVoz(valor: unknown): Plataforma[] {
+  return Array.isArray(valor) ? [...new Set(valor.filter((p): p is Plataforma => PLATAFORMAS_VALIDAS.includes(p as Plataforma)))] : [];
+}
+
+/** Os ids de vídeo de uma voz como estão no banco: só números inteiros, sem repetir, do menor para o maior. */
+function videosDaVoz(valor: unknown): number[] {
+  return Array.isArray(valor) ? [...new Set(valor.filter((id): id is number => Number.isInteger(id)))].sort((a, b) => a - b) : [];
+}
+
 function comChave(tipo: TipoDaVoz, v: VozDoPublico): VozComChave {
-  return { chave: chaveDaVoz(tipo, v.texto), tipo, texto: v.texto, vezes: v.vezes, plataformas: v.plataformas ?? [] };
+  return { chave: chaveDaVoz(tipo, v.texto), tipo, texto: v.texto, vezes: v.vezes, plataformas: plataformasDaVoz(v.plataformas) };
 }
 
 /**
- * Das três listas, só o que passou do piso de comentários iguais (a pergunta de um comentário só nunca aparece), do mais repetido para o menos. Duas vozes de mesma chave (a mesma
- * frase, que o modelo deixou em grupos separados) somam antes de olhar o piso: a soma dividida não pode derrubar uma pergunta que passaria.
+ * Das listas pedidas, as vozes agrupadas por chave, do mais repetido para o menos. Duas vozes de mesma chave (a mesma frase, que o modelo deixou em grupos separados) somam antes de
+ * olhar o piso: a soma dividida não pode derrubar uma pergunta que passaria.
  */
-function passaramDoPiso(vozes: VozesDoSetor, tipos: TipoDaVoz[]): VozComChave[] {
-  const lista: VozComChave[] = [];
-  if (tipos.includes("duvida")) lista.push(...(vozes.duvidas ?? []).map((v) => comChave("duvida", v)));
-  if (tipos.includes("objecao")) lista.push(...(vozes.objecoes ?? []).map((v) => comChave("objecao", v)));
-  if (tipos.includes("pedido")) lista.push(...(vozes.pedidos ?? []).map((v) => comChave("pedido", v)));
-  const porChave = new Map<string, VozComChave>();
+function agruparVozes(vozes: VozesDoSetor, tipos: TipoDaVoz[]): (VozComChave & { videos: number[] })[] {
+  const lista: (VozComChave & { videos: number[] })[] = [];
+  const entra = (tipo: TipoDaVoz, origem: VozDoPublico[] | undefined) => {
+    if (tipos.includes(tipo)) lista.push(...inteiras(origem).map((v) => ({ ...comChave(tipo, v), videos: videosDaVoz(v.videos) })));
+  };
+  entra("duvida", vozes.duvidas);
+  entra("objecao", vozes.objecoes);
+  entra("pedido", vozes.pedidos);
+  const porChave = new Map<string, VozComChave & { videos: number[] }>();
   for (const v of lista) {
     const atual = porChave.get(v.chave);
     if (atual) {
       atual.vezes += v.vezes;
       atual.plataformas = [...new Set([...atual.plataformas, ...v.plataformas])].sort();
+      atual.videos = [...new Set([...atual.videos, ...v.videos])].sort((x, y) => x - y);
     } else {
       porChave.set(v.chave, { ...v, plataformas: [...v.plataformas] });
     }
   }
-  return [...porChave.values()].filter((v) => v.vezes >= config.regras.vozesMinimoDeComentarios).sort((a, b) => b.vezes - a.vezes || a.texto.localeCompare(b.texto));
+  return [...porChave.values()].sort((a, b) => b.vezes - a.vezes || a.texto.localeCompare(b.texto));
+}
+
+/** Das listas pedidas, só o que passou do piso de comentários iguais (a pergunta de um comentário só nunca aparece). */
+function passaramDoPiso(vozes: VozesDoSetor, tipos: TipoDaVoz[]): VozComChave[] {
+  return agruparVozes(vozes, tipos)
+    .filter((v) => v.vezes >= config.regras.vozesMinimoDeComentarios)
+    .map((v) => ({ chave: v.chave, tipo: v.tipo, texto: v.texto, vezes: v.vezes, plataformas: v.plataformas }));
+}
+
+/** Uma voz como o admin a mostra: tudo o que foi lido, com os vídeos de onde veio e se passou do piso (a tela e os prompts só usam o que passou, e dentro do que passou, as mais repetidas). */
+export type VozDoAdmin = VozComChave & { videos: number[]; passouDoPiso: boolean };
+
+/**
+ * Para a seção "Vozes do público" do admin do setor: as três listas como a tela as agrupa (a mesma frase em dois grupos soma), do mais repetido para o menos, SEM cortar abaixo do piso, para
+ * quem ajusta o piso ver o que ficou de fora. Lê o que está no banco como está, sem a validade de 14 dias: a seção diz de quando é a leitura e se ela ainda vale.
+ */
+export function vozesParaOAdmin(vozes: VozesDoSetor | null): { duvidas: VozDoAdmin[]; objecoes: VozDoAdmin[]; pedidos: VozDoAdmin[] } {
+  const lista = (tipo: TipoDaVoz): VozDoAdmin[] =>
+    vozes ? agruparVozes(vozes, [tipo]).map((v) => ({ ...v, passouDoPiso: v.vezes >= config.regras.vozesMinimoDeComentarios })) : [];
+  return { duvidas: lista("duvida"), objecoes: lista("objecao"), pedidos: lista("pedido") };
 }
 
 /**
