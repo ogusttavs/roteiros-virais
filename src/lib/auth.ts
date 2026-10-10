@@ -22,6 +22,12 @@ export const auth = betterAuth({
   database: drizzleAdapter(db(), { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,
+    /**
+     * Ninguém se cadastra sozinho (o admin cria a conta e dá o acesso; a criação é por insert direto, `criarUsuarioComSenhaGerada`, não por este endpoint). Sem isto o
+     * `POST /api/auth/sign-up/email` ficava aberto: um estranho com e-mail pré-registrado virava o dono da marca quando o admin desse acesso àquele e-mail, e qualquer
+     * conta com sessão alcançava as ações que gastam IA sem marca. O mesmo `disableSignUp` do link mágico, logo abaixo.
+     */
+    disableSignUp: true,
   },
   /**
    * `enabled: undefined` preserva o padrão do pacote (ligado só em

@@ -121,6 +121,22 @@ describe("aceitarPlanoAction e pularPlanoAction", () => {
     expect(linha).toBeUndefined();
   });
 
+  it("com um objetivo fora da lista (um POST forjado), recusa antes de gerar e o item continua sugerido", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const [item] = await criarPlanoAction([{ data: hojeMais(3), lugar: "oficina", compromissos: ["peca nova"] }]);
+
+    const resultado = await aceitarPlanoAction(item.id, {
+      onde: "na oficina",
+      oQueEstaAcontecendo: "peca nova",
+      oQueDaParaMostrar: "a peca",
+      objetivo: "vendas" as never,
+    });
+
+    expect(resultado).toEqual({ ok: false, erro: "objetivo de roteiro invalido." });
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+    expect(linha).toBeUndefined();
+  });
+
   it("com os tres campos preenchidos, aceita e devolve o id do roteiro", async () => {
     vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
     const [item] = await criarPlanoAction([{ data: hojeMais(2), lugar: "fabrica", compromissos: ["visita ao fornecedor"] }]);

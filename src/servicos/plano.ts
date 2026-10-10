@@ -12,6 +12,7 @@
  * sessão.
  */
 import { and, asc, eq, gte, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 import { db } from "@/db";
 import {
@@ -40,6 +41,18 @@ import { gerarRoteiro, roteiroPorId, type RoteiroLinha } from "./roteiro";
 export class ErroPlano extends Error {}
 
 export type DiaAgenda = { data: string; lugar: string; compromissos: string[] };
+
+/** No máximo um mês de agenda e o que cabe numa linha de agenda: o plano gasta uma chamada de IA por dia. */
+const MAXIMO_DE_DIAS_NA_AGENDA = 31;
+const agendaDoNavegadorSchema = z
+  .array(
+    z.object({
+      data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      lugar: z.string().max(200),
+      compromissos: z.array(z.string().max(500)).max(30),
+    }),
+  )
+  .max(MAXIMO_DE_DIAS_NA_AGENDA);
 
 /**
  * V9d, item 4: um dia cuja referência `resolverDataRelativa` não entendeu ("na volta", por
@@ -198,7 +211,14 @@ export async function limparPlano(clienteId: number, apartirDe: string): Promise
  * de integração em `tests/integracao/plano.test.ts`, "modelo falha no
  * segundo dia".
  */
-export async function criarPlano(cliente: Cliente, dias: DiaAgenda[], hoje = hojeISO()): Promise<ItemPlano[]> {
+export async function criarPlano(cliente: Cliente, diasBrutos: DiaAgenda[], hoje = hojeISO()): Promise<ItemPlano[]> {
+  // A lista chega do navegador (a folha "Colar a agenda" a devolve revisada): forma e teto conferidos aqui, antes de gastar uma chamada de IA por dia.
+  const dias = agendaDoNavegadorSchema.safeParse(diasBrutos);
+  if (!dias.success) throw new ErroPlano("a agenda enviada nao tem o formato esperado.");
+  return criarPlanoDeDiasValidos(cliente, dias.data, hoje);
+}
+
+async function criarPlanoDeDiasValidos(cliente: Cliente, dias: DiaAgenda[], hoje: string): Promise<ItemPlano[]> {
   if (!cliente.nichoId) {
     throw new ErroPlano("esta marca ainda nao tem um nicho definido.");
   }
