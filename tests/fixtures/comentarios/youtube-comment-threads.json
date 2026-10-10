@@ -734,8 +734,8 @@
           "snippet": {
             "channelId": "UCcanalDeTeste",
             "videoId": "videoDeTeste01",
-            "textDisplay": "Isso &amp; aquilo &quot;funciona&quot; mesmo?",
-            "textOriginal": "Isso &amp; aquilo &quot;funciona&quot; mesmo?",
+            "textDisplay": "Gostei <3 e custa < 50, funciona mesmo?",
+            "textOriginal": "Gostei <3 e custa < 50, funciona mesmo?",
             "authorDisplayName": "Autor de teste g1",
             "authorProfileImageUrl": "https://exemplo.invalido/foto/g1.jpg",
             "authorChannelUrl": "http://www.youtube.com/channel/UCautorg1",

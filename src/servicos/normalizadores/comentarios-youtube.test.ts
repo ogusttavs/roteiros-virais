@@ -33,7 +33,7 @@ describe("normalizarComentariosYoutube", () => {
     expect(textos).toContain("você viu isso? Quanto tempo tem que esperar para secar?");
     expect(textos).toContain("Quanto tempo tem que esperar para secar? Me chama no");
     expect(textos).toContain("Quanto tempo tem que esperar para secar? Veja em ou ligue");
-    expect(textos).toContain('Isso & aquilo "funciona" mesmo?');
+    expect(textos).toContain("Gostei <3 e custa < 50, funciona mesmo?");
     for (const t of textos) {
       expect(t).not.toMatch(/https?:|www\.|@|\d{8}/);
     }
@@ -49,6 +49,16 @@ describe("normalizarComentariosYoutube", () => {
     const textos = normalizarComentariosYoutube(resposta).map((c) => c.texto.toLowerCase().replace(/[^\p{L} ]/gu, ""));
     // cinco pessoas diferentes + a que colou três vezes (uma só): seis cópias, não oito
     expect(textos.filter((t) => t === "serve em tecido de camurça").length).toBe(6);
+  });
+
+  it("com o conjunto da rodada, a mesma pessoa colando o mesmo texto em outro vídeo não conta de novo", () => {
+    const vistos = new Set<string>();
+    const primeiro = normalizarComentariosYoutube(resposta, 100, vistos);
+    const segundo = normalizarComentariosYoutube(resposta, 100, vistos);
+    expect(primeiro.length).toBeGreaterThan(10);
+    expect(segundo).toEqual([]);
+    // sem o conjunto, cada vídeo é lido sozinho
+    expect(normalizarComentariosYoutube(resposta)).toHaveLength(primeiro.length);
   });
 
   it("guarda as curtidas e a data, e respeita o máximo", () => {

@@ -10,7 +10,7 @@
  * 2. `conferirVozes`: o SETOR. Os itens de todos os vídeos da semana entram numerados; o modelo junta os que dizem o mesmo; a soma
  *    das vezes e os vídeos de origem são nossos. O que o modelo deixou de fora volta como grupo de um item só: nada se perde.
  */
-import type { ComentariosAnalise, ItemDoPublico, VozDoPublico, VozesDoSetor } from "@/db/schema";
+import type { ComentariosAnalise, ItemDoPublico, Plataforma, VozDoPublico, VozesDoSetor } from "@/db/schema";
 import type { SaidaJuntarVozes } from "@/ia/prompts/juntarVozes";
 import type { SaidaLerComentarios } from "@/ia/prompts/lerComentarios";
 import { formaDeComparar, limparComentario, limparTextoDoModelo } from "@/lib/comentarios";
@@ -72,18 +72,18 @@ export function conferirLeitura(saida: SaidaLerComentarios, comentarios: Comenta
 }
 
 /** Um item da leitura de um vídeo, pronto para entrar na junção do setor. */
-export type ItemDoVideo = { numero: number; tipo: TipoDeVoz; texto: string; vezes: number; videoId: number };
+export type ItemDoVideo = { numero: number; tipo: TipoDeVoz; texto: string; vezes: number; videoId: number; plataforma: Plataforma };
 
 /** Os itens de dúvida, objeção e pedido das leituras da semana, numerados de 1, na ordem em que vieram. */
-export function itensParaJuntar(leituras: { videoId: number; analise: ComentariosAnalise }[]): ItemDoVideo[] {
+export function itensParaJuntar(leituras: { videoId: number; plataforma: Plataforma; analise: ComentariosAnalise }[]): ItemDoVideo[] {
   const itens: ItemDoVideo[] = [];
-  const empilhar = (videoId: number, tipo: TipoDeVoz, lista: ItemDoPublico[]) => {
-    for (const i of lista) itens.push({ numero: itens.length + 1, tipo, texto: i.texto, vezes: i.vezes, videoId });
+  const empilhar = (videoId: number, plataforma: Plataforma, tipo: TipoDeVoz, lista: ItemDoPublico[]) => {
+    for (const i of lista) itens.push({ numero: itens.length + 1, tipo, texto: i.texto, vezes: i.vezes, videoId, plataforma });
   };
-  for (const { videoId, analise } of leituras) {
-    empilhar(videoId, "duvida", analise.duvidas);
-    empilhar(videoId, "objecao", analise.objecoes);
-    empilhar(videoId, "pedido", analise.pedidos);
+  for (const { videoId, plataforma, analise } of leituras) {
+    empilhar(videoId, plataforma, "duvida", analise.duvidas);
+    empilhar(videoId, plataforma, "objecao", analise.objecoes);
+    empilhar(videoId, plataforma, "pedido", analise.pedidos);
   }
   return itens;
 }
@@ -93,6 +93,7 @@ function montarGrupo(membros: ItemDoVideo[], texto: string): VozDoPublico {
     texto,
     vezes: membros.reduce((soma, m) => soma + m.vezes, 0),
     videos: [...new Set(membros.map((m) => m.videoId))].sort((a, b) => a - b),
+    plataformas: [...new Set(membros.map((m) => m.plataforma))].sort(),
   };
 }
 
@@ -140,6 +141,16 @@ export function conferirVozes(saida: SaidaJuntarVozes, itens: ItemDoVideo[]): Re
 }
 
 /** "As vozes do público" de um setor, a partir do que já foi juntado e de quantos vídeos e comentários entraram. */
-export function montarVozes(juntas: Record<TipoDeVoz, VozDoPublico[]>, totais: { videos: number; comentarios: number }): VozesDoSetor {
-  return { duvidas: juntas.duvida, objecoes: juntas.objecao, pedidos: juntas.pedido, videos: totais.videos, comentarios: totais.comentarios };
+export function montarVozes(
+  juntas: Record<TipoDeVoz, VozDoPublico[]>,
+  totais: { videos: number; comentarios: number; plataformas: Plataforma[] },
+): VozesDoSetor {
+  return {
+    duvidas: juntas.duvida,
+    objecoes: juntas.objecao,
+    pedidos: juntas.pedido,
+    videos: totais.videos,
+    comentarios: totais.comentarios,
+    plataformas: [...new Set(totais.plataformas)].sort(),
+  };
 }

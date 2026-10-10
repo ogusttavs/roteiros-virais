@@ -30,8 +30,13 @@ type ThreadCrua = {
   };
 };
 
-export function normalizarComentariosYoutube(resposta: { items?: unknown[] }, maximo = 100): ComentarioNormalizado[] {
-  const vistos = new Set<string>();
+/**
+ * `vistosEntreVideos`: o conjunto que o job passa e reaproveita entre os vídeos da mesma rodada, para a mesma pessoa colando o mesmo
+ * texto em vários vídeos contar uma vez só (o spam de bot que repete a frase em dez vídeos não chega ao piso de cinco da tela).
+ * Fica só na memória do job: chaves de quem escreveu nunca são gravadas nem devolvidas.
+ */
+export function normalizarComentariosYoutube(resposta: { items?: unknown[] }, maximo = 100, vistosEntreVideos?: Set<string>): ComentarioNormalizado[] {
+  const vistos = vistosEntreVideos ?? new Set<string>();
   const saida: ComentarioNormalizado[] = [];
 
   for (const bruto of resposta.items ?? []) {

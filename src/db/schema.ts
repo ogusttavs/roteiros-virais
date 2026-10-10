@@ -1103,8 +1103,12 @@ export type ComentariosAnalise = {
   lidos: number;
 };
 
-/** E28: uma voz do público de um setor: a mesma pergunta (ou reclamação, ou pedido) vista em vários vídeos, com a soma dos comentários e os vídeos de onde veio. */
-export type VozDoPublico = { texto: string; vezes: number; videos: number[] };
+/**
+ * E28: uma voz do público de um setor: a mesma pergunta (ou reclamação, ou pedido) vista em vários vídeos, com a soma dos comentários,
+ * os vídeos de onde veio e as plataformas deles. A plataforma vai junto de cada achado porque o público de um vídeo longo do YouTube
+ * não é o do Reels: nenhuma tela nem prompt diz "o público pergunta X" sem dizer onde.
+ */
+export type VozDoPublico = { texto: string; vezes: number; videos: number[]; plataformas: Plataforma[] };
 
 /**
  * E28: "as vozes do público" de um setor (`nichos.vozes`), refeita uma vez por semana. `videos` e `comentarios` dizem quantos
@@ -1114,8 +1118,10 @@ export type VozesDoSetor = {
   duvidas: VozDoPublico[];
   objecoes: VozDoPublico[];
   pedidos: VozDoPublico[];
+  /** Quantos vídeos entraram, de quais plataformas e quantos comentários foram lidos (para a frase da tela dizer a verdade). */
   videos: number;
   comentarios: number;
+  plataformas: Plataforma[];
 };
 
 export const videos = pgTable(

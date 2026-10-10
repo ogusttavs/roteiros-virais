@@ -136,8 +136,8 @@ function analise(parcial: Partial<ComentariosAnalise>): ComentariosAnalise {
 }
 
 const LEITURAS = [
-  { videoId: 10, analise: analise({ duvidas: [{ texto: "Serve em tecido de camurça?", vezes: 6 }], objecoes: [{ texto: "A mancha voltou depois de secar", vezes: 3 }] }) },
-  { videoId: 11, analise: analise({ duvidas: [{ texto: "Posso usar em sofá de camurça?", vezes: 4 }, { texto: "Quanto tempo tem que esperar?", vezes: 2 }], pedidos: [{ texto: "Mostrar no colchão", vezes: 2 }] }) },
+  { videoId: 10, plataforma: "youtube" as const, analise: analise({ duvidas: [{ texto: "Serve em tecido de camurça?", vezes: 6 }], objecoes: [{ texto: "A mancha voltou depois de secar", vezes: 3 }] }) },
+  { videoId: 11, plataforma: "youtube" as const, analise: analise({ duvidas: [{ texto: "Posso usar em sofá de camurça?", vezes: 4 }, { texto: "Quanto tempo tem que esperar?", vezes: 2 }], pedidos: [{ texto: "Mostrar no colchão", vezes: 2 }] }) },
 ];
 
 describe("itensParaJuntar", () => {
@@ -161,14 +161,14 @@ describe("conferirVozes", () => {
       { grupos: [{ tipo: "duvida", texto: "Serve em tecido de camurça?", itens: [1, 3] }] },
       itens,
     );
-    expect(juntas.duvida[0]).toEqual({ texto: "Serve em tecido de camurça?", vezes: 10, videos: [10, 11] });
+    expect(juntas.duvida[0]).toEqual({ texto: "Serve em tecido de camurça?", vezes: 10, videos: [10, 11], plataformas: ["youtube"] });
   });
 
   it("o item que o modelo esqueceu vira um grupo de um item só: nada se perde", () => {
     const juntas = conferirVozes({ grupos: [{ tipo: "duvida", texto: "Serve em tecido de camurça?", itens: [1, 3] }] }, itens);
     expect(juntas.duvida.map((v) => v.texto)).toContain("Quanto tempo tem que esperar?");
-    expect(juntas.objecao).toEqual([{ texto: "A mancha voltou depois de secar", vezes: 3, videos: [10] }]);
-    expect(juntas.pedido).toEqual([{ texto: "Mostrar no colchão", vezes: 2, videos: [11] }]);
+    expect(juntas.objecao).toEqual([{ texto: "A mancha voltou depois de secar", vezes: 3, videos: [10], plataformas: ["youtube"] }]);
+    expect(juntas.pedido).toEqual([{ texto: "Mostrar no colchão", vezes: 2, videos: [11], plataformas: ["youtube"] }]);
   });
 
   it("não deixa um item contar em dois grupos, nem juntar tipos diferentes", () => {
@@ -182,7 +182,7 @@ describe("conferirVozes", () => {
       itens,
     );
     // o item 2 é objeção: fica fora do grupo de dúvida e volta sozinho; o 1 não conta duas vezes
-    expect(juntas.duvida.find((v) => v.texto === "Serve em camurça?")).toEqual({ texto: "Serve em camurça?", vezes: 10, videos: [10, 11] });
+    expect(juntas.duvida.find((v) => v.texto === "Serve em camurça?")).toEqual({ texto: "Serve em camurça?", vezes: 10, videos: [10, 11], plataformas: ["youtube"] });
     expect(juntas.duvida.find((v) => v.texto === "Outra frase para o mesmo item")).toBeUndefined();
     expect(juntas.objecao[0].vezes).toBe(3);
   });
@@ -195,7 +195,7 @@ describe("conferirVozes", () => {
   it("ordena do mais repetido para o menos e respeita o máximo de cada tipo", () => {
     const muitos: SaidaJuntarVozes = { grupos: [] };
     const base = itensParaJuntar([
-      { videoId: 1, analise: analise({ duvidas: Array.from({ length: 14 }, (_, i) => ({ texto: `Pergunta número ${i + 1} do público`, vezes: i + 1 })) }) },
+      { videoId: 1, plataforma: "youtube" as const, analise: analise({ duvidas: Array.from({ length: 14 }, (_, i) => ({ texto: `Pergunta número ${i + 1} do público`, vezes: i + 1 })) }) },
     ]);
     const juntas = conferirVozes(muitos, base);
     expect(juntas.duvida).toHaveLength(10);
@@ -207,20 +207,20 @@ describe("conferirVozes", () => {
 describe("vozesSemOModelo", () => {
   it("junta só o que está escrito igual, sem olhar acento, maiúscula nem pontuação", () => {
     const itens = itensParaJuntar([
-      { videoId: 1, analise: analise({ duvidas: [{ texto: "Serve em tecido de camurça?", vezes: 5 }] }) },
-      { videoId: 2, analise: analise({ duvidas: [{ texto: "serve em tecido de camurca", vezes: 4 }, { texto: "Posso usar em sofá de camurça?", vezes: 3 }] }) },
+      { videoId: 1, plataforma: "youtube" as const, analise: analise({ duvidas: [{ texto: "Serve em tecido de camurça?", vezes: 5 }] }) },
+      { videoId: 2, plataforma: "youtube" as const, analise: analise({ duvidas: [{ texto: "serve em tecido de camurca", vezes: 4 }, { texto: "Posso usar em sofá de camurça?", vezes: 3 }] }) },
     ]);
     const juntas = vozesSemOModelo(itens);
     expect(juntas.duvida).toEqual([
-      { texto: "Serve em tecido de camurça?", vezes: 9, videos: [1, 2] },
-      { texto: "Posso usar em sofá de camurça?", vezes: 3, videos: [2] },
+      { texto: "Serve em tecido de camurça?", vezes: 9, videos: [1, 2], plataformas: ["youtube"] },
+      { texto: "Posso usar em sofá de camurça?", vezes: 3, videos: [2], plataformas: ["youtube"] },
     ]);
   });
 });
 
 describe("montarVozes", () => {
   it("põe os tipos nas listas certas e diz quantos vídeos e comentários entraram", () => {
-    const vozes = montarVozes({ duvida: [{ texto: "a", vezes: 1, videos: [1] }], objecao: [], pedido: [] }, { videos: 7, comentarios: 640 });
-    expect(vozes).toEqual({ duvidas: [{ texto: "a", vezes: 1, videos: [1] }], objecoes: [], pedidos: [], videos: 7, comentarios: 640 });
+    const vozes = montarVozes({ duvida: [{ texto: "a", vezes: 1, videos: [1], plataformas: ["youtube"] }], objecao: [], pedido: [] }, { videos: 7, comentarios: 640, plataformas: ["youtube", "youtube"] });
+    expect(vozes).toEqual({ duvidas: [{ texto: "a", vezes: 1, videos: [1], plataformas: ["youtube"] }], objecoes: [], pedidos: [], videos: 7, comentarios: 640, plataformas: ["youtube"] });
   });
 });

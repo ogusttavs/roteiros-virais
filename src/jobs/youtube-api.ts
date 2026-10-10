@@ -249,12 +249,13 @@ export async function buscarComentariosDoVideo(videoId: string, maximo = 100): P
 
 /**
  * Por que a leitura dos comentários de um vídeo falhou (E28): "desligados" (o canal desligou, ou o vídeo saiu do ar: não adianta
- * tentar de novo), "cota" (a cota do dia acabou: para o job inteiro) ou "outro" (rede, 5xx: o vídeo fica para a semana seguinte).
+ * tentar de novo), "cota" (a cota do DIA acabou: para o job inteiro) ou "outro" (rede, 5xx, limite por segundo, vídeo ainda
+ * processando: tem uma segunda tentativa na rodada, e o vídeo não é marcado).
  */
 export function motivoDaFalhaDosComentarios(erro: unknown): "desligados" | "cota" | "outro" {
   if (!(erro instanceof ErroYoutubeApi)) return "outro";
-  if (/quotaExceeded|dailyLimitExceeded|rateLimitExceeded/.test(erro.message)) return "cota";
+  if (/quotaExceeded|dailyLimitExceeded/.test(erro.message)) return "cota";
   if (erro.status === 403 && /commentsDisabled/.test(erro.message)) return "desligados";
-  if (erro.status === 404 || /videoNotFound|processingFailure/.test(erro.message)) return "desligados";
+  if (erro.status === 404 || /videoNotFound/.test(erro.message)) return "desligados";
   return "outro";
 }
