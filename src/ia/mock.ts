@@ -77,6 +77,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockFiltrarEvidenciaPorMarca(entrada);
     case "aindaValeRoteiro":
       return mockAindaValeRoteiro(entrada);
+    case "notaDaVersao":
+      return mockNotaDaVersao(entrada);
     case "analisarPerfilCitado":
       return mockAnalisarPerfilCitado(entrada);
     case "entenderMarca":
@@ -924,6 +926,36 @@ function mockAindaValeRoteiro(entrada: string) {
     return { valeAinda: true, videoId: null, motivo: "nada mais forte apareceu desde que o roteiro foi escrito" };
   }
   return { valeAinda: false, videoId: maisForte.id, motivo: `${maisForte.assunto} esta subindo mais forte agora` };
+}
+
+/**
+ * E26 (4b): o juiz das versões do roteiro, determinístico por entrada, sem chave real. As três notas saem de um hash do texto (entre 5,0 e 9,4, uma casa), então versões diferentes têm notas
+ * diferentes e a mesma versão sempre a mesma; um teste que precise de notas exatas escreve `[notas 9.1 8.2 7.6]` no texto do roteiro (viralizar, te chamarem, lembrarem).
+ */
+function mockNotaDaVersao(entrada: string) {
+  const marcada = /\[notas ([\d.]+) ([\d.]+) ([\d.]+)\]/.exec(entrada);
+  if (marcada) {
+    return {
+      viralizar: Number(marcada[1]),
+      chamarem: Number(marcada[2]),
+      lembrarem: Number(marcada[3]),
+      fraseDoObjetivo: "responde uma dúvida que aparece bem antes da compra.",
+      jeitoDiferente: "começa pelo problema e só explica depois que a pessoa já o viu.",
+    };
+  }
+  let h = 2166136261;
+  for (let i = 0; i < entrada.length; i += 1) {
+    h ^= entrada.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  const nota = (deslocamento: number) => 5 + ((h >>> deslocamento) % 45) / 10;
+  return {
+    viralizar: nota(0),
+    chamarem: nota(7),
+    lembrarem: nota(14),
+    fraseDoObjetivo: "responde uma dúvida que aparece bem antes da compra.",
+    jeitoDiferente: "começa pelo problema e só explica depois que a pessoa já o viu.",
+  };
 }
 
 function mockAprenderCliente(entrada: string) {

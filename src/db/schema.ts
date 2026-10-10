@@ -2116,6 +2116,47 @@ export type Conta = typeof contas.$inferSelect;
 export type Video = typeof videos.$inferSelect;
 export type Noticia = typeof noticias.$inferSelect;
 export type Roteiro = typeof roteiros.$inferSelect;
+
+/**
+ * E26 (4b): as três notas de uma versão do roteiro, escritas por um juiz separado (`ia/prompts/notaDaVersao.ts`). `viralizar`, `chamarem` e `lembrarem` vão de 0 a 10, uma casa; a do objetivo
+ * que a pessoa escolheu ordena as versões. `fraseDoObjetivo` é o porquê dessa nota, e `jeitoDiferente` o jeito próprio de contar desta versão.
+ */
+export type NotasDaVersao = {
+  viralizar: number;
+  chamarem: number;
+  lembrarem: number;
+  fraseDoObjetivo: string;
+  jeitoDiferente: string;
+};
+
+/**
+ * E26 (4b): uma VERSÃO de roteiro ainda não escolhida. A pessoa recebe três jeitos de gravar o mesmo tema, lê cada um inteiro e fica com um ("Ficar com esta"); só aí nasce o roteiro de
+ * verdade (a linha de `roteiros`), com a mesma cópia do que foi gerado. Por isso as versões moram numa tabela própria e não em `roteiros`: três linhas de roteiro a cada geração entrariam na
+ * agenda do Hoje, no Histórico, no planejador, no lembrete e na curva sem ninguém ter escolhido nenhuma.
+ *
+ * `grupo` junta as versões escritas para o mesmo tema e o mesmo objetivo (um texto, não uma chave: nasce com a primeira). `parametros` é o pedido de geração como veio (para "Gerar outra" escrever
+ * mais uma igual: o pedido e o tema já resolvido uma vez, `{ pedido, tema }`, ver `ParametrosDaVersao`), `valores` é a linha de `roteiros` pronta, sem a marca. `notas` é nulo enquanto o juiz não respondeu (ou quando falhou: a tela mostra a versão sem nota e ordena pela ordem de
+ * escrita). `escolhidaEm` e `roteiroId` dizem que esta versão virou o roteiro do dia.
+ */
+export const versoesDoRoteiro = pgTable(
+  "versoes_do_roteiro",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    grupo: text("grupo").notNull(),
+    ordem: integer("ordem").notNull(),
+    parametros: jsonb("parametros").$type<Record<string, unknown>>().notNull(),
+    valores: jsonb("valores").$type<Record<string, unknown>>().notNull(),
+    notas: jsonb("notas").$type<NotasDaVersao>(),
+    escolhidaEm: timestamp("escolhida_em", { withTimezone: true }),
+    roteiroId: integer("roteiro_id").references(() => roteiros.id, { onDelete: "set null" }),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("versoes_do_roteiro_grupo_ordem").on(t.grupo, t.ordem), index("versoes_do_roteiro_cliente").on(t.clienteId, t.criadoEm)],
+);
+export type VersaoDoRoteiro = typeof versoesDoRoteiro.$inferSelect;
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;
