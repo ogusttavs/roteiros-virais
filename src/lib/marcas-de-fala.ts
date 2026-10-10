@@ -25,9 +25,6 @@ export type TomDoBloco = (typeof TONS_DO_BLOCO)[number];
 /** O tom de cada bloco quando o modelo não diz um (ou diz um que não existe). */
 export const TOM_PADRAO_DO_BLOCO: Record<BlocoFalado, TomDoBloco> = { gancho: "direto", corpo: "perto", fechamento: "calmo", chamadaFinal: "firme" };
 
-/** As regras que o modelo pode citar numa marca (`R-FALA-01` a `R-FALA-24`): uma que não existe sai da lista. */
-export const IDS_DAS_REGRAS_DE_FALA: string[] = Array.from({ length: 24 }, (_, i) => `R-FALA-${String(i + 1).padStart(2, "0")}`);
-
 /** Uma palavra do texto, com o que está marcado nela. */
 export type Palavra = {
   texto: string;

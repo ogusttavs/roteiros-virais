@@ -123,7 +123,6 @@ describe("marcar a fala de um roteiro", () => {
       // A trava: o texto sem as marcas é o texto do roteiro, palavra por palavra.
       expect(textoSemMarcas(b.marcado)).toBe(normalizar(original[b.bloco]));
       expect(textoIdentico(original[b.bloco], b.marcado)).toBe(true);
-      expect(b.original).toBe(original[b.bloco]);
     }
     expect(r.marcas.blocos.map((b) => b.tom)).toEqual(["direto", "perto", "calmo", "firme"]);
     expect(r.marcas.semModelo).toEqual([]);
@@ -162,10 +161,30 @@ describe("marcar a fala de um roteiro", () => {
 
   it("dois pedidos ao mesmo tempo esperam a mesma chamada", async () => {
     const id = await criarRoteiro();
-    const [a, b] = await Promise.all([marcarFalaDoRoteiro(clienteId, id), marcarFalaDoRoteiro(clienteId, id)]);
+    // A IA espera um portão: assim o segundo pedido chega com o primeiro ainda no meio da chamada, sem depender da velocidade do banco.
+    const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      await portao;
+      return real(parametros);
+    });
+
+    const primeiro = marcarFalaDoRoteiro(clienteId, id);
+    const segundo = marcarFalaDoRoteiro(clienteId, id);
+    await vi.waitFor(() => expect(vi.mocked(cliente.gerarEstruturado).mock.calls.length).toBeGreaterThanOrEqual(1));
+    // Tempo para o segundo pedido ler o roteiro e chegar ao mesmo ponto (sem o mapa em andamento, ele chamaria a IA também).
+    await new Promise((resolver) => setTimeout(resolver, 150));
+    liberar();
+
+    const [a, b] = await Promise.all([primeiro, segundo]);
     expect(a.ok && b.ok).toBe(true);
     expect(vi.mocked(cliente.gerarEstruturado)).toHaveBeenCalledTimes(1);
     expect(await chamadasDeMarcarFala()).toBe(1);
+    // Os dois recebem as mesmas marcas.
+    expect(a.ok && b.ok && a.marcas).toEqual(b.ok && b.marcas);
   });
 
   it("Story e vídeo sem fala não têm fala para marcar, e nada é chamado nem guardado", async () => {

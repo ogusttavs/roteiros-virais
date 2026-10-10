@@ -23,7 +23,6 @@ import {
   contarPalavras,
   escreverPalavras,
   lerPalavras,
-  normalizar,
   publicoMaisVelho,
   temChaveNoTexto,
   textoIdentico,
@@ -59,8 +58,8 @@ export function motivoDeNaoMarcar(roteiro: { formato: string; estilo: string; co
 }
 
 /**
- * As marcas guardadas valem para o texto de agora? Só se cada bloco falado de agora for o mesmo de que elas saíram e o texto sem as marcas continuar idêntico a ele. É a segunda trava: uma
- * edição que não passou por `editarRoteiro` (um conserto no banco, uma corrida entre a edição e a marcação) não deixa marca velha sobre texto novo.
+ * As marcas guardadas valem para o texto de agora? Só se tiver um bloco marcado para cada bloco falado de agora, na mesma ordem, e o texto sem as marcas de cada um for idêntico ao texto
+ * de agora. É a segunda trava: uma edição que não passou por `editarRoteiro` (um conserto no banco, uma corrida entre a edição e a marcação) não deixa marca velha sobre texto novo.
  */
 export function marcasValidas(marcas: MarcasDeFala | null | undefined, conteudo: ConteudoRoteiro): MarcasDeFala | null {
   if (!marcas) return null;
@@ -69,7 +68,6 @@ export function marcasValidas(marcas: MarcasDeFala | null | undefined, conteudo:
   for (let i = 0; i < atuais.length; i += 1) {
     const guardado = marcas.blocos[i];
     if (guardado.bloco !== atuais[i].bloco) return null;
-    if (normalizar(guardado.original) !== normalizar(atuais[i].texto)) return null;
     if (!textoIdentico(atuais[i].texto, guardado.marcado)) return null;
   }
   return marcas;
@@ -242,7 +240,7 @@ async function escreverMarcas(clienteId: number, roteiro: NonNullable<Awaited<Re
   for (const { bloco, texto } of blocos) {
     const devolvido = doModelo.get(bloco);
     const r = marcarBloco(texto, devolvido?.texto ?? null, { chamadaFinal: bloco === "chamadaFinal", maisDevagar });
-    marcas.blocos.push({ bloco, original: texto, marcado: r.marcado, tom: tomValido(devolvido?.tom, bloco) });
+    marcas.blocos.push({ bloco, marcado: r.marcado, tom: tomValido(devolvido?.tom, bloco) });
     marcas.correcoes.push(...r.correcoes);
     if (!r.usouModelo) marcas.semModelo.push(bloco);
     sem[bloco] = textoSemMarcas(r.marcado);

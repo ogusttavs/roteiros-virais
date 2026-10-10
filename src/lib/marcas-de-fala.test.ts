@@ -7,7 +7,6 @@ import {
   consertarMarcas,
   contarPalavras,
   escreverPalavras,
-  IDS_DAS_REGRAS_DE_FALA,
   lerPalavras,
   marcasBemFormadas,
   MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS,
@@ -18,6 +17,8 @@ import {
   temChaveNoTexto,
   textoIdentico,
   textoSemMarcas,
+  TOM_PADRAO_DO_BLOCO,
+  TONS_DO_BLOCO,
 } from "./marcas-de-fala";
 
 /** O texto marcado depois da leitura e da escrita: a marca nunca pode mudar o que se diz. */
@@ -74,6 +75,17 @@ describe("a trava: o texto sem as marcas é o original", () => {
     expect(textoIdentico("a casa", "a {p:casa}}")).toBe(false);
     expect(marcasBemFormadas("a {p:casa}{//}")).toBe(true);
     expect(marcasBemFormadas("a {p:casa")).toBe(false);
+  });
+
+  it("a chave solta no próprio texto não passa, mesmo quando o texto marcado é igual ao original", () => {
+    // Sem a conferência da sintaxe, "a {p:casa" (sem fechar) seria igual a ele mesmo.
+    expect(textoIdentico("a {p:casa", "a {p:casa")).toBe(false);
+    expect(textoIdentico("a {x}casa", "a {x}casa")).toBe(false);
+  });
+
+  it("maiúscula e minúscula são textos diferentes", () => {
+    expect(textoIdentico("A mancha voltou", "a mancha voltou")).toBe(false);
+    expect(textoIdentico("A mancha voltou", "A {p:mancha} voltou")).toBe(true);
   });
 
   it("o texto de um roteiro com chave não é marcado", () => {
@@ -180,6 +192,12 @@ describe("consertarMarcas: o que as regras que conferem por código põem e tira
     const pesos = lerPalavras(longa).filter((p) => p.peso);
     expect(pesos).toHaveLength(2);
     expect(pesos.map((p) => p.texto)).toEqual(["mancha", "produto"]);
+  });
+
+  it("R-FALA-05: duas palavras de peso coladas numa frase comprida ficam com a primeira", () => {
+    // 13 palavras: cabem dois pesos, mas nunca colados.
+    const { texto } = consertarMarcas("Quando a {p:mancha} {p:antiga} chegou na clínica eu pensei que seria impossível tirar.");
+    expect(lerPalavras(texto).filter((p) => p.peso).map((p) => p.texto)).toEqual(["mancha"]);
   });
 
   it("R-FALA-09: o tom só sobe em pergunta de verdade, no fim dela", () => {
@@ -301,11 +319,10 @@ describe("conferirFala: o que vira texto de apoio, nunca marca", () => {
 });
 
 describe("o resto da biblioteca", () => {
-  it("as 24 regras e os quatro blocos", () => {
-    expect(IDS_DAS_REGRAS_DE_FALA).toHaveLength(24);
-    expect(IDS_DAS_REGRAS_DE_FALA[0]).toBe("R-FALA-01");
-    expect(IDS_DAS_REGRAS_DE_FALA[23]).toBe("R-FALA-24");
+  it("os quatro blocos têm os nomes do conteúdo do roteiro e cada um tem o seu tom padrão", () => {
     expect(BLOCOS_FALADOS).toEqual(["gancho", "corpo", "fechamento", "chamadaFinal"]);
+    expect(Object.keys(TOM_PADRAO_DO_BLOCO)).toEqual([...BLOCOS_FALADOS]);
+    expect(TONS_DO_BLOCO).toContain(TOM_PADRAO_DO_BLOCO.chamadaFinal);
   });
 
   it("o simulador põe peso na palavra mais comprida de cada frase e não muda o texto", () => {
