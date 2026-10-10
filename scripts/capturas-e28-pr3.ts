@@ -47,7 +47,9 @@ async function limparTela(page: Page): Promise<void> {
   await esconderPortal(page);
   await page.evaluate(() => {
     for (const el of document.querySelectorAll<HTMLElement>("body *")) {
-      if (getComputedStyle(el).position === "fixed") el.style.visibility = "hidden";
+      const posicao = getComputedStyle(el).position;
+      // A barra do alto é "sticky": numa captura de página inteira ela cobre o título, e não existe na tela de verdade.
+      if (posicao === "fixed" || posicao === "sticky") el.style.visibility = "hidden";
     }
   });
 }

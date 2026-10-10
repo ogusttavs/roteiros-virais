@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { VozDoPublico, VozesDoSetor } from "@/db/schema";
 
-import { chaveDaVoz, linhasDasVozes, listaDePlataformas, perguntasDoPublico, plataformasDasVozes, vozesParaOPrompt, vozesValidas, vozPelaChave } from "./vozes-do-publico";
+import { chaveDaVoz, linhasDasVozes, listaDePlataformas, perguntasDoPublico, plataformasDasVozes, vozesParaOAdmin, vozesParaOPrompt, vozesValidas, vozPelaChave } from "./vozes-do-publico";
 
 const voz = (texto: string, vezes: number, plataformas: VozDoPublico["plataformas"] = ["youtube"]): VozDoPublico => ({ texto, vezes, videos: [1, 2], plataformas });
 
@@ -140,5 +140,75 @@ describe("listaDePlataformas", () => {
     expect(listaDePlataformas(["youtube", "instagram"])).toBe("YouTube e Instagram");
     expect(listaDePlataformas(["youtube", "instagram", "tiktok"])).toBe("YouTube, Instagram e TikTok");
     expect(listaDePlataformas([])).toBe("");
+  });
+});
+
+describe("vozesParaOAdmin (a seção do admin)", () => {
+  it("sem leitura, as três listas vêm vazias", () => {
+    expect(vozesParaOAdmin(null)).toEqual({ duvidas: [], objecoes: [], pedidos: [] });
+  });
+
+  it("mostra tudo o que foi lido, do mais repetido para o menos, marcando o que ficou abaixo do piso de cinco", () => {
+    const { duvidas, objecoes, pedidos } = vozesParaOAdmin(VOZES);
+    expect(duvidas.map((v) => [v.texto, v.vezes, v.passouDoPiso])).toEqual([
+      ["Serve em tecido de camurça?", 14, true],
+      ["Quanto tempo tem que esperar?", 9, true],
+      ["Tem em galão de cinco litros?", 6, true],
+      ["Pergunta de cinco comentários?", 5, true],
+      ["Pergunta de quatro comentários?", 4, false],
+    ]);
+    expect(objecoes.map((v) => [v.vezes, v.passouDoPiso])).toEqual([
+      [7, true],
+      [5, true],
+      [3, false],
+    ]);
+    // o pedido também vem (a tela não o usa, mas o admin vê o que foi lido)
+    expect(pedidos.map((v) => [v.texto, v.passouDoPiso])).toEqual([
+      ["Mostrar o passo a passo no colchão", true],
+      ["Um sobre cortina", false],
+    ]);
+    expect(duvidas[0]).toMatchObject({ tipo: "duvida", plataformas: ["youtube"], videos: [1, 2] });
+  });
+
+  it("a mesma frase em dois grupos soma antes do piso, junta as plataformas e os vídeos", () => {
+    const dividida: VozesDoSetor = {
+      ...VOZES,
+      duvidas: [
+        { texto: "Serve em camurça?", vezes: 3, videos: [4, 2], plataformas: ["youtube"] },
+        { texto: "serve em camurça", vezes: 3, videos: [9, 2], plataformas: ["instagram"] },
+      ],
+      objecoes: [],
+      pedidos: [],
+    };
+    const { duvidas } = vozesParaOAdmin(dividida);
+    expect(duvidas).toHaveLength(1);
+    expect(duvidas[0]).toMatchObject({ vezes: 6, passouDoPiso: true, plataformas: ["instagram", "youtube"], videos: [2, 4, 9] });
+  });
+
+  it("o que está malformado no banco sai em vez de derrubar a seção", () => {
+    const quebrada = { duvidas: [{ texto: "Boa?", vezes: 6 }, { vezes: 9 }, null, { texto: "Sem número" }], objecoes: "x", pedidos: undefined, videos: 1, comentarios: 1 } as unknown as VozesDoSetor;
+    const { duvidas, objecoes, pedidos } = vozesParaOAdmin(quebrada);
+    expect(duvidas.map((v) => v.texto)).toEqual(["Boa?"]);
+    expect(duvidas[0]).toMatchObject({ plataformas: [], videos: [] });
+    expect(objecoes).toEqual([]);
+    expect(pedidos).toEqual([]);
+  });
+
+  it("plataformas e vídeos de uma voz saem limpos: só as plataformas que existem, só ids inteiros, sem repetir e em ordem", () => {
+    const suja = {
+      ...VOZES,
+      duvidas: [
+        { texto: "Suja?", vezes: 6, videos: [9, 3, 3, "7", null, 1.5, { id: 2 }, 4], plataformas: ["youtube", "youtube", "orkut", 7, "instagram"] },
+        { texto: "Plataformas que não são lista?", vezes: 6, videos: "1,2", plataformas: "youtube" },
+        { texto: "Número no lugar da lista?", vezes: 6, videos: 12, plataformas: 5 },
+      ],
+      objecoes: [],
+      pedidos: [],
+    } as unknown as VozesDoSetor;
+    const { duvidas } = vozesParaOAdmin(suja);
+    expect(duvidas.find((v) => v.texto === "Suja?")).toMatchObject({ videos: [3, 4, 9], plataformas: ["youtube", "instagram"] });
+    for (const texto of ["Plataformas que não são lista?", "Número no lugar da lista?"]) {
+      expect(duvidas.find((v) => v.texto === texto)).toMatchObject({ videos: [], plataformas: [] });
+    }
   });
 });

@@ -20,7 +20,8 @@ export type TipoDeVoz = "duvida" | "objecao" | "pedido";
 
 const TEXTO_MAXIMO = 140;
 const POR_LISTA_NO_VIDEO = 8;
-const POR_TIPO_NO_SETOR: Record<TipoDeVoz, number> = { duvida: 10, objecao: 5, pedido: 5 };
+/** Quantas vozes de cada tipo o job guarda por setor (o admin do setor mostra no máximo isto, e a seção usa a mesma constante). */
+export const POR_TIPO_NO_SETOR: Record<TipoDeVoz, number> = { duvida: 10, objecao: 5, pedido: 5 };
 
 function conferirLista(lista: { texto: string; comentarios: number[] }[], validos: Set<number>): ItemDoPublico[] {
   const usados = new Set<number>();
