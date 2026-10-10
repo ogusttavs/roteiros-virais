@@ -178,6 +178,19 @@ export const config = {
      */
     orcamentoTranscreverTotalMin: envNumero("ORCAMENTO_TRANSCREVER_TOTAL_MIN", 210),
     visuaisPorSemana: 10,
+    /**
+     * E28, os comentários do público: quantos vídeos do YouTube de cada setor têm os comentários lidos por semana (1 unidade da cota
+     * de cada um; o desenho do passo 25 diz "20 vídeos"), quantos dias de idade o vídeo pode ter para entrar, o mínimo de comentários
+     * que ele precisa ter para valer a leitura e quantos comentários se leem de cada (a primeira página da API, pela relevância).
+     */
+    comentariosVideosPorSemana: 20,
+    comentariosJanelaDias: 7,
+    comentariosMinimoNoVideo: 20,
+    comentariosPorVideo: 100,
+    /** E28: com quantos comentários iguais uma pergunta, reclamação ou pedido aparece na tela (a hipótese do passo 25, dúvida 7). */
+    vozesMinimoDeComentarios: 5,
+    /** E28: depois de quantos dias "as vozes do público" de um setor deixam de valer (a rodada é semanal; passou de duas semanas, a rotina não rodou). */
+    vozesValidasPorDias: 14,
     /** Teto de vídeos com análise usados como evidência do modelo do nicho (etapa 9, decisão 2 do PROXIMO.md: "30 a 60"). */
     videosParaModeloNicho: 60,
     /** Piso de vídeos usados como evidência do modelo do nicho (etapa 10, ajuste da revisão da etapa 9): abaixo de `limiarForaDaCurva`, completa até aqui em vez de modelar com pouca evidência. */

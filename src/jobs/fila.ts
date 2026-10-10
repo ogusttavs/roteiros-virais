@@ -36,6 +36,8 @@ export const FILAS = {
   /** M1, item 1: setor com menos de 20 vídeos analisados não espera o lote. */
   extrairAgora: "extrair-agora",
   analisarVisual: "analisar-visual",
+  /** E28: os comentários dos vídeos mais vistos do setor (YouTube), a leitura barata deles e as vozes do público; semanal, domingo antes da análise visual. */
+  comentariosSemana: "comentarios-semana",
   /** M3, item 2: vídeo sem fala (quadros + legenda), diário, só para setor que aceita. */
   extrairSemFala: "extrair-sem-fala",
   modeloNicho: "modelo-nicho",
@@ -88,6 +90,7 @@ export const FILAS_POR_RAMO = new Set<string>([
   FILAS.transcrever,
   FILAS.extrairAgora,
   FILAS.extrairSemFala,
+  FILAS.comentariosSemana,
   FILAS.temasDoDia,
   FILAS.pesquisaDeSetor,
 ]);

@@ -27,6 +27,13 @@ export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<Result
   if (params.tarefa === "marcarFala" && params.entrada.includes("[mock:marcar-fora]")) {
     throw new ErroIA("erro da API (402): saldo insuficiente.");
   }
+  // E28: os marcadores no título do vídeo ou no nome do setor derrubam a leitura dos comentários ou a junção das vozes (a API da IA fora).
+  if (params.tarefa === "lerComentarios" && params.entrada.includes("[mock:ler-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
+  if (params.tarefa === "juntarVozes" && params.entrada.includes("[mock:juntar-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   const dados = params.schema.parse(construirSaidaMock(params.tarefa, params.entrada, params.sistemaEstavel));
   return { dados, modelo: "mock", ...USO_ZERO };
 }
@@ -93,6 +100,10 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockEntenderMarca(entrada);
     case "agruparTendencias":
       return mockAgruparTendencias(entrada);
+    case "lerComentarios":
+      return mockLerComentarios(entrada);
+    case "juntarVozes":
+      return mockJuntarVozes(entrada);
     case "temaDoMomento":
       return mockTemaDoMomento(entrada);
     default: {
@@ -466,6 +477,63 @@ function mockAgruparTendencias(entrada: string) {
       return { assunto: palavras.join(" ") || "assunto", termos: palavras.slice(0, 2), itens: [Number(m[1])], sensivel: false };
     });
   return { assuntos };
+}
+
+/**
+ * E28: lê os comentários numerados ("n | k curtidas | texto"): o que termina em "?" é dúvida, o que fala de "não funcionou" ou
+ * "caro" é objeção, o que pede "faz um" ou "mostra" é pedido; iguais (sem maiúscula nem pontuação) viram um item só. A primeira
+ * frase literal é copiada do primeiro comentário. Determinístico, para o teste conferir a contagem.
+ */
+function mockLerComentarios(entrada: string) {
+  const bloco = /<comentarios>\n([\s\S]*?)\n<\/comentarios>/.exec(entrada)?.[1] ?? "";
+  const comentarios = bloco
+    .split("\n")
+    .map((linha) => /^(\d+) \| \d+ curtidas \| (.*)$/.exec(linha))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => ({ numero: Number(m[1]), texto: m[2].trim() }));
+
+  const agrupar = (servem: (texto: string) => boolean, escrever: (texto: string) => string) => {
+    const grupos = new Map<string, { texto: string; comentarios: number[] }>();
+    for (const c of comentarios.filter((x) => servem(x.texto))) {
+      const chave = c.texto.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+      const atual = grupos.get(chave) ?? { texto: escrever(c.texto), comentarios: [] };
+      atual.comentarios.push(c.numero);
+      grupos.set(chave, atual);
+    }
+    return [...grupos.values()].slice(0, 8);
+  };
+
+  const duvidas = agrupar((t) => t.trim().endsWith("?"), (t) => t.trim());
+  const objecoes = agrupar((t) => /não funcion|\bcaro\b|estragou/i.test(t), () => "Não funcionou ou ficou caro para mim.");
+  const pedidos = agrupar((t) => /\bfaz um\b|\bmostra\b/i.test(t), () => "Pediram para mostrar o passo a passo.");
+  const elogios = agrupar((t) => /\bamei\b|\bfuncionou muito\b|\bexcelente\b/i.test(t), () => "Disseram que funcionou muito bem.");
+  const primeiro = comentarios[0];
+  return {
+    duvidas,
+    objecoes,
+    pedidos,
+    oQueElogiaram: elogios,
+    frasesDoPublico: primeiro && primeiro.texto.length >= 8 ? [{ comentario: primeiro.numero, trecho: primeiro.texto.slice(0, 120) }] : [],
+    sentimento: objecoes.length > 0 && elogios.length > 0 ? "dividido" : objecoes.length > 0 ? "mais_negativo" : "mais_positivo",
+  };
+}
+
+/** E28: junta os itens ("n | tipo | texto") que são iguais sem maiúscula, acento nem pontuação; o texto do grupo é o do primeiro. */
+function mockJuntarVozes(entrada: string) {
+  const bloco = /<itens_do_publico>\n([\s\S]*?)\n<\/itens_do_publico>/.exec(entrada)?.[1] ?? "";
+  const itens = bloco
+    .split("\n")
+    .map((linha) => /^(\d+) \| (duvida|objecao|pedido) \| (.*)$/.exec(linha))
+    .filter((m): m is RegExpExecArray => m !== null)
+    .map((m) => ({ numero: Number(m[1]), tipo: m[2] as "duvida" | "objecao" | "pedido", texto: m[3].trim() }));
+  const grupos = new Map<string, { tipo: "duvida" | "objecao" | "pedido"; texto: string; itens: number[] }>();
+  for (const i of itens) {
+    const chave = `${i.tipo}|${i.texto.toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim()}`;
+    const atual = grupos.get(chave) ?? { tipo: i.tipo, texto: i.texto, itens: [] };
+    atual.itens.push(i.numero);
+    grupos.set(chave, atual);
+  }
+  return { grupos: [...grupos.values()].slice(0, 30) };
 }
 
 /** E55: escolhe o primeiro assunto que não é sensível, com encaixe 8; o marcador SEM_ENCAIXE_TESTE na lista devolve nenhum. */

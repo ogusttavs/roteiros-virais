@@ -22,6 +22,8 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   extrairVideo: "Analisar os vídeos",
   extrairVideoSemFala: "Analisar os vídeos sem fala",
   analisarVisual: "Analisar os vídeos (imagem)",
+  lerComentarios: "Ler os comentários do público",
+  juntarVozes: "Juntar o que o público diz",
   modeloNicho: "Montar o modelo do ramo",
   filtrarNoticias: "Escolher as notícias",
   resumirNoticia: "Resumir as notícias dos assuntos",
