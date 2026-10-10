@@ -9,6 +9,7 @@ import {
   Eye,
   HelpCircle,
   History,
+  ImageDown,
   Music,
   Pencil,
   Play,
@@ -39,6 +40,7 @@ import { seloDoTipo } from "@/config/formatos";
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
@@ -294,6 +296,20 @@ export function RoteiroTela({
   /** A frase de falha de "Copiar texto" e "Baixar em PDF" quando o menu está aberto: sai dentro dele. */
   const [erroMenu, setErroMenu] = useState<string | null>(null);
   const [baixandoPdf, setBaixandoPdf] = useState(false);
+  /** E26 (passo 23): o PDF pronto, com o endereço para "Abrir" (a pessoa que não viu o download cair, no iPad), e a imagem 9:16 sendo gerada ou já guardada. */
+  const [toastPdf, setToastPdf] = useState(false);
+  const enderecoDoPdf = useRef<string | null>(null);
+  const [guardandoImagem, setGuardandoImagem] = useState(false);
+  const [imagemPronta, setImagemPronta] = useState(false);
+  /** As imagens prontas que esperam o segundo toque ("Guardar"), quando o aparelho só deixa compartilhar logo depois de um toque (o iPhone). */
+  const [imagensParaGuardar, setImagensParaGuardar] = useState<File[] | null>(null);
+  // O endereço do PDF pronto vive enquanto a tela estiver aberta (o "Abrir" do toast pode ser tocado depois do download) e é solto ao sair.
+  useEffect(
+    () => () => {
+      if (enderecoDoPdf.current) URL.revokeObjectURL(enderecoDoPdf.current);
+    },
+    [],
+  );
   /** E40, item 1: liga o modo de edição; `draft` só existe enquanto ele está ligado. */
   const [editando, setEditando] = useState(false);
   /** "Como editar" (e, junto dele, "Por que assim") na caixa do lado: só no Reels falado em leitura; em Story, sem fala e em edição, "Por que assim" fica sozinho depois da legenda. */
@@ -595,21 +611,14 @@ export function RoteiroTela({
     setErroMenu(null);
     setErroToast(null);
     try {
-      const resposta = await fetch(`/api/roteiros/${roteiro.id}/pdf`);
       // Login vencido volta como a página de entrada com status 200: só serve o que veio como PDF de verdade.
-      if (!resposta.ok || !resposta.headers.get("content-type")?.includes("application/pdf")) {
-        throw new Error("o pdf nao veio");
-      }
-      const endereco = URL.createObjectURL(await resposta.blob());
-      const link = document.createElement("a");
-      link.href = endereco;
+      const pdf = await pedirPdfDoRoteiro(roteiro.id);
       // Mesmo nome que a rota manda em `Content-Disposition`.
-      link.download = `roteiro-${roteiro.data}.pdf`;
-      document.body.append(link);
-      link.click();
-      link.remove();
-      // Soltar o endereço logo depois do clique cancela o download em alguns navegadores (o Safari, por exemplo).
-      setTimeout(() => URL.revokeObjectURL(endereco), 10000);
+      baixarArquivo(pdf, `roteiro-${roteiro.data}.pdf`);
+      // E26 (passo 23): o toast "PDF do roteiro pronto, Abrir" fica para quem não viu o download cair (o iPad abre o arquivo em outra aba).
+      if (enderecoDoPdf.current) URL.revokeObjectURL(enderecoDoPdf.current);
+      enderecoDoPdf.current = URL.createObjectURL(pdf);
+      setToastPdf(true);
       avisarRedeOk();
       if (painelAbertoRef.current === "menu") fechar();
     } catch (erro) {
@@ -619,6 +628,31 @@ export function RoteiroTela({
       else setErroToast(frase);
     } finally {
       setBaixandoPdf(false);
+    }
+  }
+
+  /** E26 (passo 23): "Guardar como imagem no celular", o roteiro inteiro em 9:16 (a rota `/imagem` gera, o aparelho decide entre a folha de compartilhar e o download). */
+  async function guardarImagem() {
+    if (guardandoImagem || semConexao) return;
+    setGuardandoImagem(true);
+    setErroMenu(null);
+    setErroToast(null);
+    try {
+      const arquivos = await pedirImagensDoRoteiro(roteiro.id);
+      avisarRedeOk();
+      if (painelAbertoRef.current === "menu") fechar();
+      // O "gerando" acaba aqui: a folha de compartilhar pode ficar aberta o quanto a pessoa quiser, e o menu não deve dizer "Gerando a imagem" enquanto isso.
+      setGuardandoImagem(false);
+      // Compartilhar: a própria folha do aparelho é o aviso; só o download pede o toast, e o aparelho que exige um toque novo recebe o toast com "Guardar".
+      const resultado = await guardarImagens(arquivos);
+      if (resultado === "baixado") setImagemPronta(true);
+      if (resultado === "precisaDeToque") setImagensParaGuardar(arquivos);
+    } catch (erro) {
+      const frase = tratarFalha(erro, textosRoteiro.erroImagem, textosRoteiro.erroImagemSemRede);
+      if (painelAbertoRef.current === "menu") setErroMenu(frase);
+      else setErroToast(frase);
+    } finally {
+      setGuardandoImagem(false);
     }
   }
 
@@ -940,7 +974,7 @@ export function RoteiroTela({
               className={styles.linkReprovar}
             >
               <Copy size={16} strokeWidth={1.5} aria-hidden="true" />
-              {textosRoteiro.menu.copiar}
+              {textosRoteiro.menu.copiarLegenda}
             </button>
           </section>
         ) : null}
@@ -1161,6 +1195,20 @@ export function RoteiroTela({
           {baixandoPdf ? textosRoteiro.gerandoPdf : textosRoteiro.menu.baixarPdf}
           <MotivoSemRede className={styles.motivoItem} />
         </button>
+        <button
+          type="button"
+          role="menuitem"
+          onClick={guardarImagem}
+          disabled={guardandoImagem || semConexao}
+          aria-busy={guardandoImagem || undefined}
+          aria-describedby={descricaoSemRede}
+          className={styles.itemMenu}
+          data-guardar-imagem
+        >
+          <ImageDown size={20} strokeWidth={1.5} aria-hidden="true" />
+          {guardandoImagem ? textosRoteiro.gerandoImagem : textosRoteiro.menu.guardarImagem}
+          <MotivoSemRede className={styles.motivoItem} />
+        </button>
         {versoes.length > 1 ? (
           <button
             type="button"
@@ -1355,6 +1403,28 @@ export function RoteiroTela({
       </PainelFlutuante>
 
       <Toast texto={textosRoteiro.textoCopiado} aberto={toast} onFechar={() => setToast(false)} />
+      {/* E26 (passo 23): o PDF pronto, com "Abrir" (o iPad não mostra o download caindo), e a imagem guardada por download. */}
+      <Toast
+        texto={textosRoteiro.pdfPronto}
+        aberto={toastPdf}
+        onFechar={() => setToastPdf(false)}
+        duracaoMs={6000}
+        acao={{ rotulo: textosRoteiro.abrirPdf, onClique: () => enderecoDoPdf.current && window.open(enderecoDoPdf.current, "_blank", "noopener") }}
+      />
+      <Toast texto={textosRoteiro.imagemPronta} aberto={imagemPronta} onFechar={() => setImagemPronta(false)} />
+      <Toast
+        texto={textosRoteiro.imagemParaGuardar}
+        aberto={imagensParaGuardar !== null}
+        onFechar={() => setImagensParaGuardar(null)}
+        duracaoMs={20000}
+        acao={{
+          rotulo: textosRoteiro.guardarImagemAgora,
+          // A folha de compartilhar tem de abrir DENTRO deste toque: nada de `await` antes (o `guardarImagens` chama o `share` na primeira linha).
+          onClique: () => {
+            if (imagensParaGuardar) void guardarImagens(imagensParaGuardar, true).then((resultado) => resultado === "baixado" && setImagemPronta(true));
+          },
+        }}
+      />
       <Toast
         texto={erroToast ?? ""}
         variante="erro"

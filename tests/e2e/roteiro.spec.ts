@@ -307,7 +307,7 @@ test.describe("roteiro pela tela", () => {
       await expect(menu).toBeVisible();
       await expect(menu).toBeInViewport();
       await expect(page.getByRole("menuitem", { name: "Reprovar" })).toBeVisible();
-      await expect(page.getByRole("menuitem", { name: "copiar texto" })).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "copiar o texto do roteiro" })).toBeVisible();
 
       /**
        * Ajuste da revisão do PR #33, item 1: o véu cobre a tela inteira e

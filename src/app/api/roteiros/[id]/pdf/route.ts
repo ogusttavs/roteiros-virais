@@ -2,99 +2,23 @@ import * as Sentry from "@sentry/node";
 import { NextResponse } from "next/server";
 import { chromium } from "playwright";
 
-import { idDaRotaOuNulo } from "@/lib/id-rota";
+import { comLimiteDeChromium, comTempoLimite, conferirPaginaDeImpressao, ErroFilaCheia, rodapeDoPdf, TEMPO_LIMITE_MS } from "@/lib/chromium-de-impressao";
+import { roteiroDeQuemPediu, urlDeImpressao } from "@/lib/impressao-de-roteiro";
 import { logger } from "@/lib/log";
-import { criarTokenImpressao } from "@/lib/tokenImpressao";
-import { sessaoDoPainel } from "@/lib/ver-como";
-import { clienteAtivoDoUsuario } from "@/servicos/clientes";
-import { roteiroPorId } from "@/servicos/roteiro";
+import { dataPorExtenso } from "@/servicos/folha-do-roteiro";
 
 /**
- * O roteiro em PDF (`PROXIMO.md`, acabamento do iPad, item 5): a mesma
- * checagem de sessão e posse das outras rotas de `/roteiros/[id]`, depois o
- * Playwright abre `/roteiros/[id]/imprimir` num navegador sem sessão de
- * verdade (o token de `tokenImpressao.ts` resolve isso) e vira a página em
- * PDF. Escolhido em vez de `@react-pdf/renderer` porque a página de
- * impressão reaproveita `RoteiroTexto` e `BlocoEdicao`, os mesmos
- * componentes e os mesmos tokens do painel: o react-pdf teria que
- * reescrever o layout inteiro com os próprios primitivos (Document, Page,
- * Text, View), sem nada em comum com o HTML existente. O custo registrado
- * em `TODO.md`: a imagem do app ganha o Chromium do Playwright.
+ * O roteiro em PDF (`PROXIMO.md`, acabamento do iPad, item 5; a folha nova é o passo 23 do Opus, E26): a mesma checagem de sessão e posse das outras rotas de `/roteiros/[id]`, depois o
+ * Playwright abre `/roteiros/[id]/imprimir` num navegador sem sessão de verdade (o token de `tokenImpressao.ts` resolve isso) e vira a página em PDF. Escolhido em vez de
+ * `@react-pdf/renderer` porque a página de impressão usa o mesmo HTML, os mesmos tokens e as mesmas fontes do painel: o react-pdf teria que reescrever o layout inteiro com os próprios
+ * primitivos (Document, Page, Text, View), sem nada em comum com o HTML existente. O custo registrado em `TODO.md`: a imagem do app ganha o Chromium do Playwright.
  *
- * Guarda no Chromium (ajuste da revisão do PR #33, item 4): sem limite, dois
- * cliques seguidos (ou dois clientes ao mesmo tempo) abrem dois navegadores
- * num container que já divide a memória com o Next. `comLimiteDeChromium`
- * deixa no máximo `MAX_CHROMIUM_SIMULTANEO` rodando; o resto espera a vez,
- * no próprio processo (uma instância do servidor, sem fila externa). Os dois
- * `timeout` (`goto` e `pdf`) existem porque o padrão do Playwright (30 s)
- * seguraria a requisição, e quem clicou "baixar" o tempo todo, demais.
+ * O pé de cada página ("Roteiro de <marca>, <data>" e "página 1 de 2") é o do próprio Chromium (`footerTemplate`): só ele sabe em que página está.
  */
-const MAX_CHROMIUM_SIMULTANEO = 2;
-const TEMPO_LIMITE_MS = 15_000;
-
-let chromiumEmUso = 0;
-const filaDeEspera: (() => void)[] = [];
-
-async function comLimiteDeChromium<T>(tarefa: () => Promise<T>): Promise<T> {
-  if (chromiumEmUso >= MAX_CHROMIUM_SIMULTANEO) {
-    await new Promise<void>((resolve) => filaDeEspera.push(resolve));
-  }
-  chromiumEmUso += 1;
-  try {
-    return await tarefa();
-  } finally {
-    chromiumEmUso -= 1;
-    filaDeEspera.shift()?.();
-  }
-}
-
-function comTempoLimite<T>(promessa: Promise<T>, mensagem: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const temporizador = setTimeout(() => reject(new Error(mensagem)), TEMPO_LIMITE_MS);
-    promessa.then(
-      (valor) => {
-        clearTimeout(temporizador);
-        resolve(valor);
-      },
-      (erro) => {
-        clearTimeout(temporizador);
-        reject(erro);
-      },
-    );
-  });
-}
-
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const sessao = await sessaoDoPainel();
-  if (!sessao) {
-    return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
-  }
-
-  const cliente = await clienteAtivoDoUsuario(sessao.user.id);
-  if (!cliente) {
-    return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
-  }
-
-  const { id } = await params;
-  const roteiroId = idDaRotaOuNulo(id);
-  if (roteiroId === null) {
-    return NextResponse.json({ erro: "roteiro invalido" }, { status: 404 });
-  }
-
-  const roteiro = await roteiroPorId(roteiroId, cliente.id);
-  if (!roteiro) {
-    return NextResponse.json({ erro: "roteiro nao encontrado" }, { status: 404 });
-  }
-
-  const token = criarTokenImpressao(roteiro.id, cliente.id);
-  /**
-   * `127.0.0.1:PORT`, nunca `config.appUrl` (achado testando a imagem de
-   * produção): o Playwright roda dentro do próprio processo do servidor, e
-   * `APP_URL` é o endereço público, atrás do proxy. Navegar para ele faria
-   * o container sair para a internet só para voltar nele mesmo, e falha
-   * quando o endereço público não resolve de dentro da rede da VPS.
-   */
-  const url = `http://127.0.0.1:${process.env.PORT ?? 3000}/roteiros/${roteiro.id}/imprimir?token=${encodeURIComponent(token)}`;
+  const doRoteiro = await roteiroDeQuemPediu(params);
+  if (doRoteiro instanceof NextResponse) return doRoteiro;
+  const { roteiro, cliente } = doRoteiro;
 
   try {
     const pdf = await comLimiteDeChromium(async () => {
@@ -102,12 +26,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       try {
         const pagina = await navegador.newPage();
         await pagina.emulateMedia({ colorScheme: "light" });
-        await pagina.goto(url, { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
+        // O token nasce aqui, dentro da vaga: depois de esperar na fila ele já podia estar vencido (vale 60 s).
+        const resposta = await pagina.goto(urlDeImpressao(roteiro, cliente, "a4"), { waitUntil: "networkidle", timeout: TEMPO_LIMITE_MS });
+        conferirPaginaDeImpressao(resposta);
         return await comTempoLimite(
           pagina.pdf({
             format: "A4",
             printBackground: true,
-            margin: { top: "12mm", bottom: "12mm", left: "12mm", right: "12mm" },
+            displayHeaderFooter: true,
+            headerTemplate: "<div></div>",
+            footerTemplate: rodapeDoPdf(cliente.nome, dataPorExtenso(roteiro.data)),
+            margin: { top: "14mm", bottom: "18mm", left: "16mm", right: "16mm" },
           }),
           "tempo esgotado gerando o pdf",
         );
@@ -124,13 +53,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       },
     });
   } catch (erro) {
+    if (erro instanceof ErroFilaCheia) {
+      return NextResponse.json({ erro: "muitos pedidos agora, tente de novo em instantes" }, { status: 503 });
+    }
     /**
-     * Sem isso, um PDF que falha (timeout, container sem memória, o que
-     * for) some sem deixar rastro (achado da revisão do PR #33, item 0b):
-     * o cliente só via "tente de novo", e ninguém saberia que aconteceu.
-     * `logger.error` primeiro (E6 parte 3, segunda rodada, item 0a): o
-     * Sentry ainda não está ligado em produção (sem DSN é silêncio), então
-     * sem isso o erro não deixava rastro nenhum lugar que alguém olhasse.
+     * Sem isso, um PDF que falha (timeout, container sem memória, o que for) some sem deixar rastro (achado da revisão do PR #33, item 0b): o cliente só via "tente de novo", e ninguém
+     * saberia que aconteceu. `logger.error` primeiro (E6 parte 3, segunda rodada, item 0a): o Sentry ainda não está ligado em produção (sem DSN é silêncio), então sem isso o erro não
+     * deixava rastro nenhum lugar que alguém olhasse.
      */
     logger.error({ err: erro, roteiroId: roteiro.id, clienteId: cliente.id }, "nao foi possivel gerar o pdf");
     Sentry.captureException(erro, {

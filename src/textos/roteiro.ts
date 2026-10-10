@@ -29,6 +29,20 @@ export const textosRoteiro = {
   },
   ondeGravar: "Onde gravar e o que mostrar",
   comoEditar: "Como editar",
+  /** E26 (passo 23): "O recado deste vídeo: ..." no alto do PDF, o que a pessoa disse que o vídeo precisa comunicar. */
+  recadoDoVideo: "O recado deste vídeo:",
+  /** E26 (passo 23): os títulos da folha do PDF e da imagem. */
+  folha: {
+    oRoteiro: "O roteiro",
+    deOndeVeio: "De onde veio",
+    /** Os chips do alto da folha: o formato e a duração (o "para quê" e o tipo vêm da ficha e do vídeo de referência). */
+    formato: { reels: "Reels", reelsSemFala: "Reels sem fala", story: "Story" },
+    segundos: (n: number) => `${n} segundos`,
+    /** O pé do PDF, que é do Chromium: "Roteiro de <marca>, <data>" e "página 1 de 2". */
+    peEsquerda: (marca: string, data: string) => `Roteiro de ${marca}, ${data}`,
+    pePagina: "página",
+    peDe: "de",
+  },
   /** E40, item 1: o botão que libera o texto de cada bloco para a pessoa editar, sem chamar IA. */
   editar: "Editar",
   editando: {
@@ -119,15 +133,27 @@ export const textosRoteiro = {
     reprovar: "Reprovar",
     /** O roteiro nasceu do que a pessoa contou (o momento): volta ao Criar com o texto dela preenchido, para reescrever. */
     reescreverMomento: "Reescrever o que contei",
-    copiar: "Copiar texto",
+    copiar: "Copiar o texto do roteiro",
+    /** O botão do cartão da legenda (vídeo sem fala e Story): copia só a legenda, não o roteiro inteiro. */
+    copiarLegenda: "Copiar a legenda",
     versoes: "Versões",
     baixarPdf: "Baixar em PDF",
+    /** E26 (passo 23): a imagem 9:16 do roteiro inteiro, para ler com o celular na mão antes de gravar. */
+    guardarImagem: "Guardar como imagem no celular",
   },
   /** aria-label do botão só de ícone na barra de ações do desktop (achado do primeiro uso no iPad, item 5). */
   baixarPdf: "Baixar em PDF",
   textoCopiado: "Texto copiado",
   /** Enquanto o PDF é gerado (leva alguns segundos), no lugar de "Baixar em PDF" (V7, item 4 do PROXIMO.md). */
   gerandoPdf: "Gerando o PDF",
+  /** E26 (passo 23): o toast depois do PDF e da imagem, e o que a pessoa lê enquanto a imagem é gerada. */
+  pdfPronto: "PDF do roteiro pronto",
+  abrirPdf: "Abrir",
+  gerandoImagem: "Gerando a imagem",
+  imagemPronta: "Imagem do roteiro pronta",
+  /** O iPhone só abre a folha de compartilhar logo depois de um toque: a imagem ficou pronta, e o segundo toque é "Guardar". */
+  imagemParaGuardar: "A imagem do roteiro está pronta",
+  guardarImagemAgora: "Guardar",
   versao: (a: number, b: number) => `Versão ${a} de ${b}`,
   versaoAntiga: (a: number, b: number) => `Versão ${a}; a atual é a ${b}`,
   verAtual: "Ver a atual",
@@ -146,6 +172,8 @@ export const textosRoteiro = {
   erroCopiar: "Não conseguimos copiar o texto agora. Tente de novo.",
   erroPdf: "Não conseguimos gerar o PDF agora. Tente de novo em alguns instantes.",
   erroPdfSemRede: "Sem conexão agora. Toque em Baixar em PDF de novo quando a rede voltar.",
+  erroImagem: "Não conseguimos gerar a imagem agora. Tente de novo em alguns instantes.",
+  erroImagemSemRede: "Sem conexão agora. Toque em Guardar como imagem de novo quando a rede voltar.",
   sair: "Sair",
   modoGravacao: "Modo gravação",
   maisOpcoes: "Mais opções",

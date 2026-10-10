@@ -1,16 +1,19 @@
 "use client";
 
-import { Ellipsis, X } from "lucide-react";
+import { Archive, CalendarClock, Download, Ellipsis, RefreshCw, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
+import { baixarArquivo, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { dadoOuErro } from "@/lib/resultado-acao";
 import { textosComuns } from "@/textos/comuns";
 import { textosHoje } from "@/textos/hoje";
+import { textosRoteiro } from "@/textos/roteiro";
 import { ConfirmarMoverDia } from "@/ui/componentes/ConfirmarMoverDia";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
-import { useTratarFalha } from "@/ui/ConexaoContext";
+import { Toast } from "@/ui/componentes/Toast";
+import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { reprovarERescreverAction } from "../roteiros/[id]/acoes";
@@ -69,6 +72,47 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
   const [ocupado, iniciarTransicao] = useTransition();
   const [movendo, iniciarMover] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
+  /** E26 (passo 23): "Baixar em PDF" também do menu da agenda, sem abrir o roteiro. O endereço do arquivo vive enquanto o item estiver na tela (o "Abrir" do toast) e é solto ao sair. */
+  const [baixandoPdf, setBaixandoPdf] = useState(false);
+  const [toastPdf, setToastPdf] = useState(false);
+  const enderecoDoPdf = useRef<string | null>(null);
+  const montado = useRef(true);
+  /** A falha do PDF aparece dentro do menu se ele ainda está aberto (foi de lá que a pessoa tocou); se ela já o fechou durante os segundos da geração, num Toast de erro. */
+  const [erroToast, setErroToast] = useState<string | null>(null);
+  const menuAbertoRef = useRef(false);
+  menuAbertoRef.current = menuAberto;
+  const { semConexao } = useConexao();
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+      if (enderecoDoPdf.current) URL.revokeObjectURL(enderecoDoPdf.current);
+    };
+  }, []);
+
+  async function baixarPdf() {
+    if (baixandoPdf || semConexao) return;
+    setErro(null);
+    setErroToast(null);
+    setBaixandoPdf(true);
+    try {
+      const pdf = await pedirPdfDoRoteiro(roteiroId);
+      // O item pode ter saído da lista enquanto o arquivo vinha (arquivar, mudar de dia): sem tela, não há o que avisar nem endereço a guardar.
+      if (!montado.current) return;
+      baixarArquivo(pdf, `roteiro-${data}.pdf`);
+      if (enderecoDoPdf.current) URL.revokeObjectURL(enderecoDoPdf.current);
+      enderecoDoPdf.current = URL.createObjectURL(pdf);
+      fecharMenu();
+      setToastPdf(true);
+    } catch (falha) {
+      const frase = tratarFalha(falha, textosRoteiro.erroPdf, textosRoteiro.erroPdfSemRede);
+      if (!montado.current) return;
+      if (menuAbertoRef.current) setErro(frase);
+      else setErroToast(frase);
+    } finally {
+      if (montado.current) setBaixandoPdf(false);
+    }
+  }
 
   function naoVouGravarHoje() {
     fecharMenu();
@@ -148,14 +192,22 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
         </div>
         {doMomento ? null : (
           <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoVouGravarHoje}>
+            <CalendarClock size={20} strokeWidth={1.5} aria-hidden="true" />
             {textosHoje.agenda.menu.naoVouGravarHoje}
           </button>
         )}
-        <button type="button" role="menuitem" className={styles.itemMenu} onClick={arquivar} disabled={ocupado}>
-          {textosHoje.agenda.menu.arquivar}
+        {/* E26 (passo 23, Hoje.dc.html `agendaMenu`): o PDF entre "Não vou gravar hoje" e "Não gostei, quero outro"; "Arquivar" por último. */}
+        <button type="button" role="menuitem" className={styles.itemMenu} onClick={baixarPdf} disabled={baixandoPdf || semConexao} aria-busy={baixandoPdf || undefined}>
+          <Download size={20} strokeWidth={1.5} aria-hidden="true" />
+          {baixandoPdf ? textosRoteiro.gerandoPdf : textosRoteiro.menu.baixarPdf}
         </button>
         <button type="button" role="menuitem" className={styles.itemMenu} onClick={naoGosteiQueroOutro}>
+          <RefreshCw size={20} strokeWidth={1.5} aria-hidden="true" />
           {textosHoje.agenda.menu.naoGosteiQueroOutro}
+        </button>
+        <button type="button" role="menuitem" className={styles.itemMenu} onClick={arquivar} disabled={ocupado}>
+          <Archive size={20} strokeWidth={1.5} aria-hidden="true" />
+          {textosHoje.agenda.menu.arquivar}
         </button>
         {doMomento ? (
           <p id={idDaNota} className={styles.notaMomento}>
@@ -189,6 +241,15 @@ export function MenuAcoesAgenda({ roteiroId, titulo, data, variante = "linha", a
         aoFechar={() => setFolhaReprovarAberta(false)}
         aoReprovar={reprovar}
       />
+
+      <Toast
+        texto={textosRoteiro.pdfPronto}
+        aberto={toastPdf}
+        onFechar={() => setToastPdf(false)}
+        duracaoMs={6000}
+        acao={{ rotulo: textosRoteiro.abrirPdf, onClique: () => enderecoDoPdf.current && window.open(enderecoDoPdf.current, "_blank", "noopener") }}
+      />
+      <Toast texto={erroToast ?? ""} variante="erro" aberto={erroToast !== null} onFechar={() => setErroToast(null)} />
     </>
   );
 }
