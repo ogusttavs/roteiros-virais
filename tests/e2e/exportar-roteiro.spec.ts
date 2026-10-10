@@ -110,9 +110,11 @@ test.describe("exportar o roteiro", () => {
     if (existenteVideo) {
       videoId = existenteVideo.id;
     } else {
+      // O vídeo de referência mora num setor só dele: no setor da limpeza ele entraria na conta de "vídeos fora da curva" que `referencias.spec.ts` confere (dois, e este seria o terceiro).
+      const [setorDoVideo] = await db().insert(nichos).values({ slug: "e2e-exportar-setor-do-video", nome: "[teste] Exportar, setor do vídeo" }).returning();
       const [video] = await db()
         .insert(videos)
-        .values({ plataforma: "instagram", idExterno: "e2e-exportar-video", url: "https://www.instagram.com/reel/e2e-exportar/", nichoId: nicho.id, titulo: "mancha", foraDaCurva: "4.1", publicadoEm: new Date(), analise: { porQueFuncionou: "Mostrou o problema antes de explicar." } as never })
+        .values({ plataforma: "instagram", idExterno: "e2e-exportar-video", url: "https://www.instagram.com/reel/e2e-exportar/", nichoId: setorDoVideo.id, titulo: "mancha", foraDaCurva: "4.1", publicadoEm: new Date(), analise: { porQueFuncionou: "Mostrou o problema antes de explicar." } as never })
         .returning({ id: videos.id });
       videoId = video.id;
     }
