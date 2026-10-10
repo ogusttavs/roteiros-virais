@@ -73,27 +73,41 @@ export function FalaMarcada({ marcado }: Props) {
     const trecho = trechos[i];
     let fim = i + 1;
     while (fim < trechos.length && (trechos[fim].tipo === "pausa" || trechos[fim].tipo === "tom")) fim += 1;
-    const marcas = trecho.tipo === "pausa" || trecho.tipo === "tom" ? [] : trechos.slice(i + 1, fim);
+    if (trecho.tipo === "pausa" || trecho.tipo === "tom") {
+      // Uma marca sem palavra antes (o começo do parágrafo): fica solta.
+      nos.push(desenhar(trecho, `t${i}`));
+      i += 1;
+      continue;
+    }
+    const marcas = trechos.slice(i + 1, fim);
     if (marcas.length === 0) {
       nos.push(desenhar(trecho, `t${i}`));
       i += 1;
       continue;
     }
     const desenhadas = marcas.map((m, k) => desenhar(m, `t${i}-${k}`));
-    if (trecho.tipo === "texto") {
-      // Só a última palavra do texto fica na caixa; o resto continua solto para a linha quebrar onde quiser.
-      const partes = /^([\s\S]*?)(\S*)$/.exec(trecho.texto);
-      if (partes?.[1]) nos.push(partes[1]);
+    // Só a última palavra do trecho fica na caixa; o resto continua solto para a linha quebrar onde quiser (um trecho devagar de oito palavras não vira uma linha só).
+    const texto = trecho.texto;
+    const partes = /^([\s\S]*?)(\S*)$/.exec(texto);
+    const cabeca = partes?.[1] ?? "";
+    const ultima = partes?.[2] ?? "";
+    if (ultima === "") {
+      // O trecho termina em espaço: não há palavra para prender, as marcas ficam soltas.
+      nos.push(desenhar(trecho, `t${i}`), ...desenhadas);
+    } else if (trecho.tipo === "texto") {
+      if (cabeca) nos.push(cabeca);
       nos.push(
         <span key={`t${i}`} className={styles.junto}>
-          {partes?.[2] ?? trecho.texto}
+          {ultima}
           {desenhadas}
         </span>,
       );
     } else {
+      const Marca = trecho.tipo === "peso" ? MarcaDePeso : MarcaDeDevagar;
+      if (cabeca) nos.push(<Marca key={`t${i}-c`}>{cabeca}</Marca>);
       nos.push(
         <span key={`t${i}`} className={styles.junto}>
-          {desenhar(trecho, `t${i}-0`)}
+          <Marca>{ultima}</Marca>
           {desenhadas}
         </span>,
       );

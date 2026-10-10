@@ -7,7 +7,7 @@ import { useEffect, useId, useState, useTransition } from "react";
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
 import { useMarcasDeFala } from "@/app/(painel)/(completo)/roteiros/[id]/useMarcasDeFala";
 import { iniciaisDe } from "@/lib/iniciais";
-import { BLOCOS_FALADOS, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
+import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
@@ -70,16 +70,19 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca, 
   const [marcasLigadas, setMarcasLigadas] = useState(true);
   const chaveDoTexto = JSON.stringify(blocos.map((b) => b.paragrafos));
   const { marcas: marcasProntas, estado: estadoMarcas, erro: erroMarcas, pedir: pedirMarcas } = useMarcasDeFala(roteiroId, fala, chaveDoTexto);
+  // A memória só vale depois de lida (no navegador): sem isso o pedido das marcas saía com o padrão "ligadas" antes de a escolha lembrada chegar, e gastava uma chamada de quem desligou.
+  const [memoriaLida, setMemoriaLida] = useState(false);
   useEffect(() => {
     try {
       if (window.localStorage.getItem(chaveDaMemoria(marcaId)) === "desligadas") setMarcasLigadas(false);
     } catch {
       // Sem armazenamento (janela privada, dados bloqueados): fica no padrão, ligadas.
     }
+    setMemoriaLida(true);
   }, [marcaId]);
   useEffect(() => {
-    if (marcasLigadas) pedirMarcas();
-  }, [marcasLigadas, pedirMarcas, chaveDoTexto]);
+    if (memoriaLida && marcasLigadas) pedirMarcas();
+  }, [memoriaLida, marcasLigadas, pedirMarcas, chaveDoTexto]);
   function trocarMarcas(ligar: boolean) {
     setMarcasLigadas(ligar);
     try {
@@ -138,8 +141,7 @@ export function GravacaoTela({ roteiroId, titulo, blocos, jaGravado, nomeMarca, 
   const bloco = blocos[passo];
   // O Reels falado tem os quatro blocos na ordem de `BLOCOS_FALADOS`; o bloco marcado é o de mesmo nome (e só vale se tiver o mesmo número de parágrafos).
   const nomeDoBloco = fala.podeMarcar && blocos.length === BLOCOS_FALADOS.length ? BLOCOS_FALADOS[passo] : undefined;
-  const marcadoDoBloco = mostrarMarcas && nomeDoBloco ? paragrafosMarcados(marcasProntas, nomeDoBloco) : null;
-  const paragrafosMarcadosDoBloco = marcadoDoBloco && marcadoDoBloco.length === bloco.paragrafos.length ? marcadoDoBloco : null;
+  const paragrafosMarcadosDoBloco = mostrarMarcas && nomeDoBloco ? marcadoParaOsParagrafos(bloco.paragrafos, paragrafosMarcados(marcasProntas, nomeDoBloco)) : null;
   const tomDoBloco = paragrafosMarcadosDoBloco && nomeDoBloco ? marcasProntas?.blocos.find((b) => b.bloco === nomeDoBloco)?.tom : undefined;
   const proximo = blocos[passo + 1] ?? null;
   const primeiroParagrafoProximo = proximo?.paragrafos[0] ?? null;

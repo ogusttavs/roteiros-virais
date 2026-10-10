@@ -126,6 +126,16 @@ test.describe("E41 2b: as marcas de fala na tela", () => {
     await expect(page.getByText("Tom: firme.")).toBeVisible();
     await expect(page.getByRole("img", { name: "tom desce" }).first()).toBeVisible();
 
+    // O registro do conserto e o que o modelo errou não vão para o navegador. Com as marcas já guardadas, a página nova traz a carga do servidor com o roteiro: ela não pode levá-las.
+    await page.reload();
+    await expect(page.getByRole("switch", { name: "Marcas de fala" })).toBeVisible();
+    const html = await page.content();
+    expect(html).toContain("A mancha voltou depois da limpeza"); // a carga do servidor está na página
+    expect(html).not.toContain("semModelo");
+    expect(html).not.toContain("correcoes");
+    await chave.click();
+    await expect(page.getByRole("img", { name: "pausa longa" }).first()).toBeVisible();
+
     // O texto lido é o mesmo, sem uma letra a mais: o gancho inteiro continua na tela.
     await expect(page.locator("article").filter({ hasText: "A mancha voltou depois da limpeza e ninguém te conta o porquê." }).first()).toBeVisible();
 
@@ -182,6 +192,23 @@ test.describe("E41 2b: as marcas de fala na tela", () => {
     await expect(page.getByRole("img", { name: "pausa longa" }).first()).toBeVisible();
     await page.reload();
     await expect(page.getByRole("switch", { name: "Marcas de fala" })).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("com a escolha de desligar lembrada, o modo gravação não pede as marcas (não gasta)", async ({ page }) => {
+    const id = await criarRoteiro();
+    await entrar(page);
+    // A memória do aparelho vale por marca: a chave do `localStorage` é a do modo gravação desta marca.
+    await page.addInitScript((marca) => window.localStorage.setItem(`marcas-de-fala:gravacao:${marca}`, "desligadas"), clienteId);
+    await page.goto(`/roteiros/${id}/gravar`);
+    await expect(page.getByRole("switch", { name: "Marcas de fala" })).toHaveAttribute("aria-checked", "false");
+    await page.waitForTimeout(2500);
+    const [linha] = await db().select({ marcas: roteiros.marcasDeFala }).from(roteiros).where(eq(roteiros.id, id));
+    expect(linha.marcas).toBeNull();
+    await expect(page.getByRole("img", { name: "pausa longa" })).toHaveCount(0);
+
+    // Ligar a chave pede e mostra.
+    await page.getByRole("switch", { name: "Marcas de fala" }).click();
+    await expect(page.getByRole("img", { name: "pausa longa" }).first()).toBeVisible({ timeout: 20_000 });
   });
 
   test("Story não tem a chave", async ({ page }) => {

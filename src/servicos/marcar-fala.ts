@@ -193,7 +193,8 @@ export async function marcarFalaDoRoteiro(clienteId: number, roteiroId: number):
   const guardadas = marcasValidas(roteiro.marcasDeFala, roteiro.conteudo);
   if (guardadas) return { ok: true, marcas: guardadas, novas: false };
 
-  const chave = `${clienteId}:${roteiroId}`;
+  // Por texto também: quem editou no meio não herda o resultado do texto antigo (`editado_no_meio`), pede o seu.
+  const chave = `${clienteId}:${roteiroId}:${JSON.stringify(blocosFalados(roteiro.conteudo).map((b) => b.texto))}`;
   const emAndamento = EM_ANDAMENTO.get(chave);
   if (emAndamento) return emAndamento;
   const trabalho = escreverMarcas(clienteId, roteiroId).finally(() => EM_ANDAMENTO.delete(chave));

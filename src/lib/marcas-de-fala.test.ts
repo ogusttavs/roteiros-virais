@@ -8,6 +8,7 @@ import {
   contarPalavras,
   escreverPalavras,
   lerPalavras,
+  marcadoParaOsParagrafos,
   marcasBemFormadas,
   MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS,
   MAXIMO_DE_PALAVRAS_ENTRE_PAUSAS_MAIS_DEVAGAR,
@@ -410,6 +411,29 @@ describe("trechosDaFala e paragrafosMarcados (a tela)", () => {
     expect(paragrafosMarcados(marcas, "gancho")).toEqual(["Oi.{//}"]);
     expect(paragrafosMarcados(marcas, "fechamento")).toBeNull();
     expect(paragrafosMarcados(null, "gancho")).toBeNull();
+  });
+});
+
+describe("marcadoParaOsParagrafos: a trava, repetida na hora de desenhar", () => {
+  it("devolve o marcado quando o texto e a quantidade de parágrafos batem", () => {
+    const marcado = ["Um {p:dia}.{//}", "Dois.{//}"];
+    expect(marcadoParaOsParagrafos(["Um dia.", "Dois."], marcado)).toEqual(marcado);
+  });
+
+  it("recusa marca de texto velho: o texto da tela é outro", () => {
+    expect(marcadoParaOsParagrafos(["Outro dia.", "Dois."], ["Um {p:dia}.{//}", "Dois.{//}"])).toBeNull();
+    expect(marcadoParaOsParagrafos(["Um dia.", "Dois."], null)).toBeNull();
+    expect(marcadoParaOsParagrafos(["Um dia."], [])).toBeNull();
+  });
+
+  it("a tela mostra um parágrafo só e o servidor dividiu por quebra de linha: junta com espaço, como o HTML faria", () => {
+    expect(marcadoParaOsParagrafos(["A mancha voltou. Ninguém conta."], ["A mancha voltou.{//}", "Ninguém conta.{//}"])).toEqual([
+      "A mancha voltou.{//} Ninguém conta.{//}",
+    ]);
+  });
+
+  it("a quantidade de parágrafos não bate e a tela mostra mais de um: recusa", () => {
+    expect(marcadoParaOsParagrafos(["Um.", "Dois.", "Três."], ["Um.{//}", "Dois. Três.{//}"])).toBeNull();
   });
 });
 

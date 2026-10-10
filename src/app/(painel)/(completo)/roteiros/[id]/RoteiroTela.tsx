@@ -43,7 +43,7 @@ import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import { BLOCOS_FALADOS, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
+import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -357,10 +357,8 @@ export function RoteiroTela({
   const blocosVisiveis: BlocoRoteiro[] = mostrarMarcas
     ? blocos.map((bloco, indice) => {
         const nome = BLOCOS_FALADOS[indice];
-        const marcado = nome ? paragrafosMarcados(marcasProntas, nome) : null;
-        return marcado && marcado.length === bloco.paragrafos.length
-          ? { ...bloco, marcado, tom: marcasProntas.blocos.find((b) => b.bloco === nome)?.tom }
-          : bloco;
+        const marcado = nome ? marcadoParaOsParagrafos(bloco.paragrafos, paragrafosMarcados(marcasProntas, nome)) : null;
+        return marcado ? { ...bloco, marcado, tom: marcasProntas.blocos.find((b) => b.bloco === nome)?.tom } : bloco;
       })
     : blocos;
   const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);

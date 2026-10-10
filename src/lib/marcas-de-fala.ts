@@ -201,6 +201,19 @@ export function paragrafosMarcados(marcas: MarcasParaATela | null, bloco: BlocoF
   return achado.marcado.split("\n").filter((p) => p.trim() !== "");
 }
 
+/**
+ * Os parágrafos marcados que a tela pode desenhar no lugar dos parágrafos que ela mostra, ou nulo. A trava, repetida na hora de desenhar: só vale se o texto sem as marcas é o texto
+ * que a tela mostra (espaço de lado), e se a quantidade de parágrafos bate, ou se a tela mostra um só (aí as quebras viram espaço, como o HTML já faz com a quebra de linha). Marca
+ * velha sobre texto novo, de outra aba ou de outro aparelho, nunca é desenhada.
+ */
+export function marcadoParaOsParagrafos(paragrafos: string[], marcado: string[] | null): string[] | null {
+  if (!marcado || marcado.length === 0) return null;
+  if (normalizar(paragrafos.join(" ")) !== normalizar(marcado.map(textoSemMarcas).join(" "))) return null;
+  if (marcado.length === paragrafos.length) return marcado;
+  if (paragrafos.length === 1) return [marcado.join(" ")];
+  return null;
+}
+
 /** Um pedaço do texto marcado, na ordem, para a tela desenhar (E41 parte 2b). */
 export type TrechoDaFala =
   | { tipo: "texto"; texto: string }

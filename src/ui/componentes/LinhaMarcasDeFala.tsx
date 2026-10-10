@@ -32,7 +32,7 @@ export function LinhaMarcasDeFala({ variante, ligadas, aoTrocar, marcando, erro,
         <span id={idRotulo}>{textosMarcasDeFala.chave}</span>
         <ChaveLiga ligada={ligadas} rotuladaPor={idRotulo} aoTrocar={aoTrocar} />
       </span>
-      {ligadas ? (
+      {ligadas || variante === "gravacao" ? (
         <ComoLerAsMarcas
           rotulo={variante === "roteiro" ? textosMarcasDeFala.comoLer : textosMarcasDeFala.comoLerCurto}
           pequeno={variante === "gravacao"}

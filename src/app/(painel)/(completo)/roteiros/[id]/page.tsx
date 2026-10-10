@@ -69,7 +69,8 @@ export default async function Roteiro({ params }: Props) {
 
   return (
     <RoteiroTela
-      roteiro={roteiro}
+      // As marcas guardadas (com o registro do conserto) ficam no servidor: a tela recebe só `fala`.
+      roteiro={{ ...roteiro, marcasDeFala: null }}
       noticiaDeOrigem={noticiaDeOrigem}
       corpo={corpoDoRoteiro(roteiro)}
       blocos={blocosParaLeitura(roteiro)}

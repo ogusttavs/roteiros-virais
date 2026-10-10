@@ -195,6 +195,34 @@ describe("marcar a fala de um roteiro", () => {
     expect(a.ok && b.ok && a.marcas).toEqual(b.ok && b.marcas);
   });
 
+  it("quem editou o texto no meio da marcação não herda o resultado do texto antigo: pede o seu", async () => {
+    const id = await criarRoteiro();
+    const real = (await vi.importActual<typeof import("@/ia/cliente")>("@/ia/cliente")).gerarEstruturado;
+    let liberar!: () => void;
+    const portao = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    vi.mocked(cliente.gerarEstruturado).mockImplementationOnce(async (parametros) => {
+      await portao;
+      return real(parametros);
+    });
+
+    const antigo = marcarFalaDoRoteiro(clienteId, id);
+    await vi.waitFor(() => expect(vi.mocked(cliente.gerarEstruturado).mock.calls.length).toBeGreaterThanOrEqual(1));
+    // O texto muda enquanto o primeiro pedido espera na IA; o segundo pedido é do texto novo.
+    await db().update(roteiros).set({ conteudo: conteudo({ gancho: "Um começo novo, escrito agora." }), editadoEm: new Date() }).where(eq(roteiros.id, id));
+    const novo = marcarFalaDoRoteiro(clienteId, id);
+    const resultadoNovo = await novo;
+    liberar();
+    const resultadoAntigo = await antigo;
+
+    expect(resultadoNovo.ok).toBe(true);
+    if (resultadoNovo.ok) expect(textoSemMarcas(resultadoNovo.marcas.blocos[0].marcado)).toBe("Um começo novo, escrito agora.");
+    // O pedido do texto antigo termina como "editado no meio": o texto de agora já tem as suas marcas.
+    expect(resultadoAntigo).toEqual({ ok: false, motivo: "editado_no_meio" });
+    expect(vi.mocked(cliente.gerarEstruturado)).toHaveBeenCalledTimes(2);
+  });
+
   it("Story e vídeo sem fala não têm fala para marcar, e nada é chamado nem guardado", async () => {
     const story = await criarRoteiro({ formato: "story" });
     const semFala = await criarRoteiro({ estilo: "sem_fala" });

@@ -54,6 +54,17 @@ describe("FalaMarcada", () => {
     expect(screen.getByTestId("fala").textContent).toBe("Você já passou por isso? Primeiro aplica.");
   });
 
+  it("um trecho devagar ou de peso com várias palavras só prende a última palavra: o resto quebra onde a linha quiser", () => {
+    dentroDeParagrafo("{d:Chame agora no WhatsApp e peça o seu orçamento}{/} sem compromisso.{v}{//}");
+    // A caixa que não quebra tem só a última palavra do trecho, com a pausa que vem logo depois dela.
+    const caixa = screen.getByText("orçamento", { selector: "span > span" });
+    expect(caixa.textContent).toBe("orçamento");
+    expect(caixa.parentElement?.querySelector('[aria-label="pausa curta"]')).not.toBeNull();
+    // A cabeça continua um trecho devagar solto, com as outras palavras.
+    expect(screen.getByText("Chame agora no WhatsApp e peça o seu")).toBeTruthy();
+    expect(screen.getByTestId("fala").textContent).toBe("Chame agora no WhatsApp e peça o seu orçamento sem compromisso.");
+  });
+
   it("um texto sem marcas sai igual", () => {
     dentroDeParagrafo("Só uma frase simples.");
     expect(screen.getByTestId("fala").textContent).toBe("Só uma frase simples.");
@@ -89,6 +100,13 @@ describe("RoteiroTexto com as marcas", () => {
     expect(screen.queryByRole("img")).toBeNull();
     expect(container.textContent).toContain("Um.");
     expect(container.textContent).toContain("Dois.");
+  });
+});
+
+describe("LinhaMarcasDeFala no modo gravação", () => {
+  it("'Como ler' continua à mão com a chave desligada (o desenho mantém o botão no estado sem marcas)", () => {
+    render(<LinhaMarcasDeFala variante="gravacao" ligadas={false} aoTrocar={() => {}} marcando={false} erro={null} avisos={[]} />);
+    expect(screen.getByRole("button", { name: textosMarcasDeFala.comoLerCurto })).toBeTruthy();
   });
 });
 

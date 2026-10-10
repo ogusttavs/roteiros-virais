@@ -119,6 +119,47 @@ describe("useMarcasDeFala", () => {
     await waitFor(() => expect(result.current.marcas).toEqual(OUTRAS));
   });
 
+  it("depois de editar um texto que tinha marcas, no mesmo quadro as marcas velhas saem e dá para pedir as novas", async () => {
+    marcarFalaAction.mockResolvedValueOnce({ ok: true, dado: { marcas: OUTRAS, motivo: null, novas: true } });
+    const { result, rerender } = renderHook(({ chave, f }) => useMarcasDeFala(7, f, chave), { initialProps: { chave: "texto-antigo", f: fala({ marcas: MARCAS }) } });
+    expect(result.current.marcas).toEqual(MARCAS);
+
+    rerender({ chave: "texto-novo", f: fala({ marcas: null }) });
+    // Nem um quadro com as marcas do texto antigo sobre o texto novo.
+    expect(result.current.marcas).toBeNull();
+    act(() => result.current.pedir({ emSegundoPlano: true }));
+    expect(marcarFalaAction).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(result.current.marcas).toEqual(OUTRAS));
+  });
+
+  it("as marcas que chegaram por um pedido valem só para o texto de que saíram", async () => {
+    marcarFalaAction.mockResolvedValueOnce({ ok: true, dado: { marcas: MARCAS, motivo: null, novas: true } });
+    const { result, rerender } = renderHook(({ chave }) => useMarcasDeFala(7, fala(), chave), { initialProps: { chave: "texto-antigo" } });
+    act(() => result.current.pedir());
+    await waitFor(() => expect(result.current.marcas).toEqual(MARCAS));
+
+    // O texto mudou: as marcas que tinham chegado não valem para o texto novo, nem por um quadro.
+    rerender({ chave: "texto-novo" });
+    expect(result.current.marcas).toBeNull();
+    // E voltando ao texto de antes (um "desfazer"), elas voltam a valer: são as dele.
+    rerender({ chave: "texto-antigo" });
+    expect(result.current.marcas).toEqual(MARCAS);
+  });
+
+  it("a chave ligada com o pedido de segundo plano ainda correndo: a espera e o erro passam a ser dela", async () => {
+    const pendente = pedidoPendente();
+    marcarFalaAction.mockReturnValueOnce(pendente.promessa);
+    const { result } = renderHook(() => useMarcasDeFala(7, fala(), "t"));
+    act(() => result.current.pedir({ emSegundoPlano: true }));
+    act(() => result.current.pedir());
+    expect(marcarFalaAction).toHaveBeenCalledTimes(1);
+    expect(result.current.estado).toBe("marcando");
+
+    await act(async () => pendente.resolver({ ok: false, erro: "Não consegui marcar a fala agora." }));
+    await waitFor(() => expect(result.current.erro).toBe("Não consegui marcar a fala agora."));
+    expect(result.current.estado).toBe("ociosa");
+  });
+
   it("as marcas do texto antigo saem de cena quando o texto muda e o servidor manda o roteiro sem marcas", () => {
     const { result, rerender } = renderHook(({ chave, f }) => useMarcasDeFala(7, f, chave), { initialProps: { chave: "texto-antigo", f: fala({ marcas: MARCAS }) } });
     expect(result.current.marcas).toEqual(MARCAS);
