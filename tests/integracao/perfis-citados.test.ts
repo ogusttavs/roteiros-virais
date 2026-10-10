@@ -80,6 +80,16 @@ describe("adicionarPerfilCitado / perfisCitadosDoCliente", () => {
     expect(concorrentes.filter((p) => p.handle === "oficinaderro")).toHaveLength(1);
   });
 
+  it("um tipo que não é um dos dois (um POST forjado) é recusado: o teto de dez por lista não some e nada é enfileirado", async () => {
+    const antes = await db().select().from(perfisCitados).where(eq(perfisCitados.clienteId, clienteId));
+
+    for (const tipoForjado of ["a1", "outro", "", "Concorrente"]) {
+      await expect(adicionarPerfilCitado(clienteId, tipoForjado as never, { rede: "instagram", handle: "perfil.forjado" })).rejects.toThrow(ErroPerfilCitado);
+    }
+
+    expect(await db().select().from(perfisCitados).where(eq(perfisCitados.clienteId, clienteId))).toHaveLength(antes.length);
+  });
+
   it("recusa handle vazio", async () => {
     await expect(adicionarPerfilCitado(clienteId, "admira", { rede: "instagram", handle: "   " })).rejects.toThrow();
   });

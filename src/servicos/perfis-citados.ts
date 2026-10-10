@@ -52,6 +52,8 @@ export async function adicionarPerfilCitado(
   tipo: TipoPerfilCitado,
   dadosBrutos: unknown,
 ): Promise<PerfilCitado> {
+  // O tipo chega como texto livre do navegador e é a chave do teto de dez por lista: com um tipo qualquer o teto sumia, e cada linha nova enfileira uma análise (Meta, YouTube e uma chamada de IA).
+  if (tipo !== "concorrente" && tipo !== "admira") throw new ErroPerfilCitado("tipo de perfil invalido.");
   const dados = adicionarSchema.parse(dadosBrutos);
   const handle = limparCampoPerfil(dados.handle, dados.rede);
   if (!handle) throw new ErroPerfilCitado("escreva o nome do perfil.");

@@ -1191,6 +1191,9 @@ describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
       completo: true,
       perfil: { ...PERFIL_PADRAO, resumo: "vende cera automotiva artesanal" },
     });
+    // A pessoa que grava também é membro da marca que citou (é o que `garantirMembroDaMarca` confere na Server Action, e o serviço confere de novo).
+    const [ativa] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
+    await db().insert(membrosMarca).values({ usuarioId: ativa.usuarioId!, clienteId: marcaCitada.id, papel: "membro" });
 
     const roteiro = await gerarRoteiro(clienteId, {
       origem: "momento",
@@ -1204,6 +1207,29 @@ describe("V9a, o momento (item 1, 2 e 4 do PROXIMO.md)", () => {
     expect(entrada).toContain("Marca citada por quem está gravando");
     expect(entrada).toContain("Marca Citada");
     expect(entrada).toContain("vende cera automotiva artesanal");
+  });
+
+  it("marca citada de OUTRA pessoa (um POST forjado, ou acesso que foi tirado): o perfil dela nunca entra no prompt, e o roteiro sai sem a camada secundária", async () => {
+    const clienteId = await criarCliente();
+    contadorUsuario += 1;
+    const usuarioIdB = `roteiro-teste-marca-alheia-${contadorUsuario}`;
+    await db().insert(user).values({ id: usuarioIdB, name: "[teste] dono da marca alheia", email: `${usuarioIdB}@roteiro.teste` });
+    const [alheia] = await db().insert(clientes).values({ usuarioId: usuarioIdB, nome: "[teste] Marca Alheia", nichoId }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: usuarioIdB, clienteId: alheia.id, papel: "dono" });
+    await db().insert(briefings).values({ clienteId: alheia.id, completo: true, perfil: { ...PERFIL_PADRAO, resumo: "segredo da marca alheia: vende cera blindada" } });
+
+    const roteiro = await gerarRoteiro(clienteId, { origem: "momento", momento: { ...MOMENTO_1, marcaId: alheia.id }, objetivo: "conversao" });
+
+    const [geracao] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, roteiro.geracaoId!));
+    const entrada = (geracao.entradas as { entrada: string }).entrada;
+    expect(entrada).not.toContain("Marca citada por quem está gravando");
+    expect(entrada).not.toContain("Marca Alheia");
+    expect(entrada).not.toContain("segredo da marca alheia");
+
+    // A reescrita herda o mesmo momento (com o marcaId gravado): a posse é conferida de novo, e o perfil continua fora.
+    const nova = await reprovarERescrever(roteiro.id, ["muito_longo"]);
+    const [geracaoNova] = await db().select().from(geracoesIA).where(eq(geracoesIA.id, nova.geracaoId!));
+    expect((geracaoNova.entradas as { entrada: string }).entrada).not.toContain("segredo da marca alheia");
   });
 
   it("marca citada inexistente: gera mesmo assim, sem a camada secundaria (nunca derruba a geracao por isso)", async () => {
