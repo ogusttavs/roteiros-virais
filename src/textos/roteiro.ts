@@ -31,6 +31,15 @@ export const textosRoteiro = {
   comoEditar: "Como editar",
   /** E26 (passo 23): "O recado deste vídeo: ..." no alto do PDF, o que a pessoa disse que o vídeo precisa comunicar. */
   recadoDoVideo: "O recado deste vídeo:",
+  /** E26 (4b): as versões do roteiro. */
+  versoes: {
+    /** O teto de segurança do dia, só para quem chega nele (sem número: a pessoa não vê contador). */
+    tetoDoDia: "Você chegou ao limite de versões de hoje. Amanhã a conta volta ao normal.",
+    /** A versão pedida não existe (ou é de outra marca). */
+    naoEncontrada: "Não achei esta versão. Peça as versões de novo.",
+    /** Dois toques quase juntos em "Ficar com esta": o segundo espera o primeiro terminar. */
+    jaSendoEscolhida: "Esta versão já está sendo escolhida. Tente de novo em instantes.",
+  },
   /** E26 (passo 23): os títulos da folha do PDF e da imagem. */
   folha: {
     oRoteiro: "O roteiro",

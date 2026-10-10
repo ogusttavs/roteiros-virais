@@ -714,6 +714,16 @@ async function resolverTema(
   return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null };
 }
 
+/** O tema de um pedido, já resolvido: o título, as evidências que o tema do dia validou e, quando nasceu de um assunto em alta, o assunto. */
+export type TemaResolvido = Awaited<ReturnType<typeof resolverTema>>;
+
+/** Resolve o tema do pedido uma vez (E26, 4b: as versões de um grupo repartem o mesmo resultado, a de agora e as de "Gerar outra" depois). */
+export async function resolverTemaDoPedido(clienteId: number, params: ParametrosGerarRoteiro): Promise<TemaResolvido> {
+  const cliente = await clientePorId(clienteId);
+  if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
+  return resolverTema(cliente, params);
+}
+
 /** O que o roteiro guarda do assunto em alta (o `doMomento` do tema sem o encaixe, que só serve para escolher), mais a ligação com o ramo que o modelo escreveu. */
 function guardarTemaDoMomento(doMomento: NonNullable<TemaDoDia["doMomento"]>, ligacao: string | null): TemaDoMomentoGuardado {
   const { chave, assunto, termos, fonte, url, coletadaEm } = doMomento;
@@ -880,7 +890,15 @@ type MontarERoteiroDados = {
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
   /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
   temaDoMomento?: boolean;
+  /**
+   * E26 (4b): as versões do MESMO tema que já foram escritas agora e ainda não são roteiro (moram em `versoes_do_roteiro`), para esta não repetir o gancho nem o tipo de abertura delas. Entram
+   * no que o prompt já recebe como "roteiros recentes" e nas listas que o verificador já confere (ganchos e tipo de abertura), sem mudar o prompt do roteiro.
+   */
+  versoesDoMesmoTema?: VersaoJaEscrita[];
 };
+
+/** O que uma versão já escrita conta para a próxima do mesmo tema: o título, o objetivo, o gancho e o tipo de abertura. */
+export type VersaoJaEscrita = { tema: string; objetivo: Objetivo; gancho: string; tipoAbertura: TipoAbertura | null };
 
 /** O miolo comum a `gerarRoteiro` e `outroAngulo`: busca contexto, chama a IA, monta o conteúdo. */
 async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
@@ -913,9 +931,9 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     daBusca,
     prevista,
     modeloNichoLinha,
-    roteirosRecentes,
+    roteirosRecentesDoBanco,
     regrasCliente,
-    ultimosRoteiros,
+    ultimosRoteirosDoBanco,
     marcaCitada,
   ] = await Promise.all([
     // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
@@ -929,6 +947,16 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId),
   ]);
+
+  // E26 (4b): as versões deste mesmo tema já escritas agora entram na frente do que o banco lembra (elas ainda não são roteiro), a mais recente primeiro, como as listas do banco: o
+  // `[0]` é o "roteiro anterior" que o verificador confere. Só as últimas 5, como o banco: o verificador reprova gancho que abre com a mesma palavra de qualquer item da lista, e um grupo de
+  // vinte versões não pode fechar todas as portas para a vigésima primeira.
+  const versoesJaEscritas = (dados.versoesDoMesmoTema ?? []).slice(-ULTIMOS_ROTEIROS_PARA_ABERTURA).reverse();
+  const roteirosRecentes: RoteiroRecente[] = [
+    ...versoesJaEscritas.map((v) => ({ tema: v.tema, objetivo: v.objetivo, status: "outra versão deste mesmo tema, escrita agora", gancho: v.gancho, origem: "livre" as const })),
+    ...roteirosRecentesDoBanco,
+  ];
+  const ultimosRoteiros = [...versoesJaEscritas.map((v) => ({ tipoAbertura: v.tipoAbertura, gancho: v.gancho })), ...ultimosRoteirosDoBanco];
 
   const { proporcaoBrasil } = await reguaDoSetor(nichoId);
   const perfilCompilado = formatarPerfilCompilado(perfil);
@@ -1224,19 +1252,38 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   };
 }
 
+/** A linha de `roteiros` pronta para gravar, sem a marca (a marca vem de quem grava): é o que `gerarRoteiro` insere e o que `versoes_do_roteiro` guarda até a pessoa escolher a versão. */
+export type ValoresDoRoteiro = Omit<typeof roteiros.$inferInsert, "clienteId">;
+
 /**
  * Gera o roteiro do dia (etapa 11, decisão 1 do `PROXIMO.md`): resolve o
  * tema (sugerido ou livre), monta o contexto, chama a IA com o verificador,
  * e grava a versão 1.
  */
-export async function gerarRoteiro(
+export async function gerarRoteiro(clienteId: number, params: ParametrosGerarRoteiro): Promise<RoteiroLinha> {
+  const valores = await montarRoteiro(clienteId, params);
+  const [roteiro] = await db()
+    .insert(roteiros)
+    .values({ clienteId, ...valores })
+    .returning();
+  return roteiro;
+}
+
+/**
+ * Tudo o que `gerarRoteiro` faz antes de gravar (E26, 4b): resolve o tema, monta o contexto e chama a IA com o verificador, e devolve a linha pronta. Quem grava decide onde: `gerarRoteiro` em
+ * `roteiros`, as versões em `versoes_do_roteiro`. `versoesDoMesmoTema` faz a versão nova não repetir o gancho nem a abertura das que já foram escritas.
+ */
+export async function montarRoteiro(
   clienteId: number,
   params: ParametrosGerarRoteiro,
-): Promise<RoteiroLinha> {
+  opcoes: { versoesDoMesmoTema?: VersaoJaEscrita[]; temaResolvido?: TemaResolvido } = {},
+): Promise<ValoresDoRoteiro> {
+  const { versoesDoMesmoTema } = opcoes;
   const cliente = await clientePorId(clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
-  const { tema, evidenciasPrevistas, doMomento } = await resolverTema(cliente, params);
+  // As versões de um mesmo grupo recebem o tema já resolvido uma vez (E26, 4b): "sugerido" é um índice na lista do dia, que muda de um instante para o outro, e "outra versão" tem de ser do mesmo tema.
+  const { tema, evidenciasPrevistas, doMomento } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
   if (doMomento && params.data && params.data !== hojeISO()) {
     throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
@@ -1269,12 +1316,10 @@ export async function gerarRoteiro(
     momento,
     noticia,
     temaDoMomento: doMomento !== null,
+    versoesDoMesmoTema,
   });
 
-  const [roteiro] = await db()
-    .insert(roteiros)
-    .values({
-      clienteId,
+  return {
       data: params.data ?? hojeISO(),
       momentoDoDia: params.momentoDoDia ?? null,
       // V9a, item 1: com momento, o tema de verdade é o que o modelo devolveu (temaCurto), não o provisório.
@@ -1300,10 +1345,7 @@ export async function gerarRoteiro(
       geracaoId,
       status: "gerado",
       tipoAbertura,
-    })
-    .returning();
-
-  return roteiro;
+  };
 }
 
 /**

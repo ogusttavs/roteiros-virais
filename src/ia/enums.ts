@@ -56,6 +56,16 @@ export const AJUDA_OBJETIVO: Record<Objetivo, string> = {
   conversao: "para quem está quase decidindo",
 };
 
+/**
+ * O objetivo como o juiz das versões do roteiro (E26, 4b) o lê: mesma razão de `NOME_OBJETIVO` estar aqui, fora do `checar-texto`. Diz também qual das três notas é a que importa nesta
+ * rodada, que é o que o juiz precisa saber para escrever a frase do objetivo.
+ */
+export const OBJETIVO_PARA_O_JUIZ: Record<Objetivo, string> = {
+  alcance: "que mais gente te conheça (a nota que importa é a de viralizar)",
+  engajamento: "que lembrem de você (a nota que importa é a de lembrarem de você)",
+  conversao: "que te chamem para comprar (a nota que importa é a de te chamarem)",
+};
+
 /** As três opções de objetivo, na ordem fixa em que a tela mostra (etapa 11). */
 export const OBJETIVOS_EM_ORDEM: Objetivo[] = ["alcance", "engajamento", "conversao"];
 
