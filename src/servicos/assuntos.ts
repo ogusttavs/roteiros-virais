@@ -7,9 +7,10 @@ import { and, desc, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { DIAS_DA_NOTICIA_COMO_FONTE, DIAS_SEM_ABRIR_PARA_EXPIRAR, MAXIMO_DE_ASSUNTOS_POR_MARCA } from "@/config/fontes-noticias";
 import { db } from "@/db";
-import { assuntosDaMarca, clientes, noticiasDoAssunto, type AssuntoDaMarca } from "@/db/schema";
+import { assuntosDaMarca, clientes, noticiasDoAssunto, type AssuntoDaMarca, type NoticiaDeOrigemGuardada, type NoticiaDoAssunto } from "@/db/schema";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 
-import { casaComAssunto, diaPorExtenso, normalizarTexto, termosDoAssunto } from "./noticias-assuntos";
+import { LIMITE_DO_TITULO, LIMITE_DO_VEICULO, casaComAssunto, diaPorExtenso, enderecoHttpsSeguro, limparParaPrompt, normalizarTexto, termosDoAssunto } from "./noticias-assuntos";
 
 export class ErroAssunto extends Error {}
 
@@ -90,6 +91,49 @@ export async function registrarAberturaDeNoticia(clienteId: number, noticiaId: n
   if (!linha) throw new ErroAssunto("essa notícia não é desta marca.");
   await db().update(noticiasDoAssunto).set({ abertaEm: agora }).where(eq(noticiasDoAssunto.id, noticiaId));
   await db().update(assuntosDaMarca).set({ ultimoAbertoEm: agora }).where(eq(assuntosDaMarca.id, linha.assuntoId));
+}
+
+/** A notícia de um assunto DESTA marca (nunca a de outra), para virar o ponto de partida de um roteiro; nula se não for dela ou não existir mais. */
+export async function noticiaDoAssuntoDaMarca(clienteId: number, noticiaId: number): Promise<NoticiaDoAssunto | null> {
+  if (idDoBancoOuNulo(noticiaId) === null) return null;
+  const [linha] = await db()
+    .select({ noticia: noticiasDoAssunto })
+    .from(noticiasDoAssunto)
+    .innerJoin(assuntosDaMarca, eq(assuntosDaMarca.id, noticiasDoAssunto.assuntoId))
+    .where(and(eq(noticiasDoAssunto.id, noticiaId), eq(assuntosDaMarca.clienteId, clienteId)));
+  return linha?.noticia ?? null;
+}
+
+/**
+ * A notícia de um assunto como ponto de partida do roteiro e da avaliação do tema (a mesma forma da notícia do setor, sem ângulo): o título e o resumo nosso vêm de fora, então entram no prompt
+ * limpos como dado (sem quebra de linha nem `<` `>`, com limite).
+ */
+export function noticiaDoAssuntoComoPontoDePartida(noticia: { titulo: string; resumoNosso: string | null; veiculo: string; publicadoEm: Date | null }): PontoDePartidaDeNoticiaDeAssunto {
+  return {
+    titulo: limparParaPrompt(noticia.titulo, LIMITE_DO_TITULO),
+    resumo: limparParaPrompt(noticia.resumoNosso, 300) || null,
+    angulo: null,
+    veiculo: limparParaPrompt(noticia.veiculo, LIMITE_DO_VEICULO),
+    dia: noticia.publicadoEm ? diaPorExtenso(noticia.publicadoEm) : "",
+  };
+}
+
+/** O ponto de partida vindo de uma notícia de assunto: a forma da notícia do setor mais o veículo e o dia, que o roteiro e a nota do tema precisam para citar a fonte ("segundo o G1, ontem"). */
+export type PontoDePartidaDeNoticiaDeAssunto = { titulo: string; resumo: string | null; angulo: null; veiculo: string; dia: string };
+
+/**
+ * A notícia que a pessoa prendeu entra SEMPRE na lista de notícias de assunto do roteiro (e da nota do tema), na frente, mesmo que o texto do tema não toque o assunto: é a que ela leu e quis
+ * fazer vídeo. Assim ela chega com o veículo, o dia e o aviso de "texto de terceiros" do bloco das notícias, e não só como o título solto. Sem repetir a mesma manchete (comparada sem acento).
+ */
+export function comANoticiaPresa<T extends { titulo: string }>(presa: T | null, casadas: T[], limite = 5): T[] {
+  if (!presa) return casadas;
+  const chave = normalizarTexto(presa.titulo);
+  return [presa, ...casadas.filter((n) => normalizarTexto(n.titulo) !== chave)].slice(0, limite);
+}
+
+/** A cópia que o roteiro guarda da notícia de origem: só título, veículo, link (revalidado: só https) e dia. Nunca o resumo nem o texto da matéria. */
+export function noticiaDeOrigemGuardada(noticia: NoticiaDoAssunto): NoticiaDeOrigemGuardada {
+  return { id: noticia.id, titulo: noticia.titulo, veiculo: noticia.veiculo, url: enderecoHttpsSeguro(noticia.url), publicadoEm: noticia.publicadoEm ? noticia.publicadoEm.toISOString() : null };
 }
 
 /**

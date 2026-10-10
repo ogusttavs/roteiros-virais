@@ -11,6 +11,7 @@ import {
   History,
   ImageDown,
   Music,
+  Newspaper,
   Pencil,
   Play,
   RotateCcw,
@@ -244,6 +245,8 @@ type Props = {
   versoes: VersaoRoteiro[];
   /** E55 PR 2b: o assunto em alta de onde o roteiro nasceu (nulo nos outros): o selo, a linha de prazo ou o aviso de que passou, e o "De onde veio" próprio. */
   momento?: MomentoDoRoteiro | null;
+  /** E53 (parte 3): a notícia de onde o roteiro veio (do setor ou de um assunto da marca), com o link revalidado; nula nos outros. */
+  noticiaDeOrigem?: { titulo: string; veiculo: string; url: string | null; dia: string | null } | null;
   /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
@@ -264,6 +267,7 @@ export function RoteiroTela({
   video,
   versoes,
   momento = null,
+  noticiaDeOrigem = null,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -774,6 +778,23 @@ export function RoteiroTela({
                 {textosRoteiro.doMomento.verTemas}
               </Link>
             </div>
+          ) : null}
+          {/* E53 (parte 3): de qual notícia o roteiro veio (do setor ou de um assunto que a marca acompanha), com o veículo e o dia; o título abre o original numa aba. */}
+          {noticiaDeOrigem ? (
+            <p className={styles.linhaNoticia} data-noticia-de-origem>
+              <Newspaper size={16} strokeWidth={1.75} aria-hidden="true" />
+              <span>
+                {textosRoteiro.daNoticia.veio}{" "}
+                {noticiaDeOrigem.url ? (
+                  <a href={noticiaDeOrigem.url} target="_blank" rel="noopener noreferrer">
+                    {noticiaDeOrigem.titulo}
+                  </a>
+                ) : (
+                  noticiaDeOrigem.titulo
+                )}
+                {noticiaDeOrigem.veiculo || noticiaDeOrigem.dia ? <span className={styles.dadoDaNoticia}>{[noticiaDeOrigem.veiculo, noticiaDeOrigem.dia].filter(Boolean).join(", ")}</span> : null}
+              </span>
+            </p>
           ) : null}
           {/* Passo 19 do Opus, estado `refeito`: o roteiro novo diz por que foi refeito (os motivos da versão anterior e, se a pessoa escreveu, o que ela disse). */}
           {versaoReprovada ? (

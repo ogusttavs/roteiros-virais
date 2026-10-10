@@ -68,7 +68,7 @@ type MarcaResumo = { id: number; nome: string };
  * já vem pronta do servidor (`formatarTempoRelativo`), para o cliente nunca calcular relativo ao
  * próprio relógio (evita divergir do que o servidor mostrou na lista de Notícias).
  */
-type NoticiaOrigem = { id: number; titulo: string; fonteEData: string };
+type NoticiaOrigem = { id: number; titulo: string; fonteEData: string; /** De onde é a notícia: do setor (`noticias`) ou de um assunto que a marca acompanha (E53, parte 3). */ origem: "setor" | "assunto" };
 
 /** E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela ("Trazer para o meu ramo"); `linha` já vem pronta do servidor (de onde vem e desde quando). */
 type AssuntoEmAltaPreso = { chave: string; assunto: string; linha: string };
@@ -149,8 +149,9 @@ export function TemaLivreTela({
   const abrindoEste = (chave: string) => abrindo && destino === chave;
   // E43: a notícia segue até o roteiro só enquanto a pessoa não a tirou (`noticiaPresa`), não `comNoticia`
   // (que também exige `fase === "proposta"`; aqui a tela já pode estar em "naMeta").
-  const noticiaIdParaEnviar = noticiaPresa ? noticia?.id : undefined;
-  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}`;
+  const noticiaIdParaEnviar = noticiaPresa && noticia?.origem === "setor" ? noticia.id : undefined;
+  const noticiaAssuntoIdParaEnviar = noticiaPresa && noticia?.origem === "assunto" ? noticia.id : undefined;
+  const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${noticiaAssuntoIdParaEnviar ? `&noticiaAssuntoId=${noticiaAssuntoIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}`;
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -212,7 +213,7 @@ export function TemaLivreTela({
     setFase("esperando");
     // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
-    avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar)
+    avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar, noticiaAssuntoIdParaEnviar)
       .then((dados) => {
         avisarRedeOk();
         setTexto(limpo);

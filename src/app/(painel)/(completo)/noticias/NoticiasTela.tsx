@@ -68,8 +68,8 @@ export function NoticiasTela({ dataPorExtenso, nomeDoSetor, deHoje, deOntem, ass
 
   function criarRoteiro(noticia: NoticiaNaTela) {
     abrir(noticia);
-    // A do setor vai presa pelo id (`comNoticia`); a de assunto vai pelo título, e o roteiro já usa as notícias do assunto quando o texto o toca.
-    router.push(noticia.tipo === "setor" ? `/criar/tema-livre?noticiaId=${noticia.noticiaId}` : `/criar/tema-livre?tema=${encodeURIComponent(noticia.titulo)}`);
+    // As duas vão presas pelo id (`comNoticia`): a do setor por `noticiaId`, a de um assunto da marca por `noticiaAssuntoId` (E53, parte 3), para o roteiro guardar de onde veio.
+    router.push(noticia.tipo === "setor" ? `/criar/tema-livre?noticiaId=${noticia.noticiaId}` : `/criar/tema-livre?noticiaAssuntoId=${noticia.noticiaId}`);
   }
 
   const pilulas: { chave: Filtro; rotulo: string }[] = [

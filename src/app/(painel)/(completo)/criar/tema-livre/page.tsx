@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 
 import { config, hojeISO } from "@/lib/config";
 import { formatarFonteEData } from "@/lib/formatarNumero";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
+import { noticiaDoAssuntoDaMarca } from "@/servicos/assuntos";
 import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
 import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
@@ -11,7 +13,7 @@ import { textosHoje } from "@/textos/hoje";
 
 import { TemaLivreTela } from "./TemaLivreTela";
 
-type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string; alta?: string }> };
+type Props = { searchParams: Promise<{ tema?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string }> };
 
 /**
  * `?tema=<assunto>` vem de `/referencias`, "usar como referência" (etapa 12,
@@ -33,7 +35,7 @@ export default async function TemaLivre({ searchParams }: Props) {
   }
 
   const cliente = await clienteDaSessaoAtual();
-  const [{ tema, data, noticiaId, alta }, rascunho, marcas, resultadoTemas] = await Promise.all([
+  const [{ tema, data, noticiaId, noticiaAssuntoId, alta }, rascunho, marcas, resultadoTemas] = await Promise.all([
     searchParams,
     rascunhoTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
@@ -46,18 +48,26 @@ export default async function TemaLivre({ searchParams }: Props) {
   // Decisão pendente 5, revisão do Fable no PR #90: veio de "Criar roteiro" num dia vazio.
   const dataInicial = data && /^\d{4}-\d{2}-\d{2}$/.test(data) ? data : undefined;
 
-  const noticiaIdNumero = Number(noticiaId);
-  const noticiaLinha =
-    noticiaId && Number.isInteger(noticiaIdNumero) && cliente.nichoId
-      ? await noticiaPorId(noticiaIdNumero, cliente.nichoId)
-      : null;
+  const noticiaIdBanco = idDoBancoOuNulo(noticiaId);
+  const noticiaLinha = noticiaIdBanco && cliente.nichoId ? await noticiaPorId(noticiaIdBanco, cliente.nichoId) : null;
+  // E53 (parte 3): "Criar roteiro com esta notícia" numa notícia de um assunto da marca (`?noticiaAssuntoId=`): escopada pela marca da sessão (a notícia de outra marca nunca vem), a mesma folha de "A notícia".
+  const noticiaDoAssuntoId = idDoBancoOuNulo(noticiaAssuntoId);
+  const noticiaDoAssunto = !noticiaLinha && noticiaDoAssuntoId ? await noticiaDoAssuntoDaMarca(cliente.id, noticiaDoAssuntoId) : null;
   const noticia = noticiaLinha
     ? {
         id: noticiaLinha.id,
+        origem: "setor" as const,
         titulo: noticiaLinha.titulo,
         fonteEData: formatarFonteEData(noticiaLinha.fonte, noticiaLinha.publicadoEm),
       }
-    : undefined;
+    : noticiaDoAssunto
+      ? {
+          id: noticiaDoAssunto.id,
+          origem: "assunto" as const,
+          titulo: noticiaDoAssunto.titulo,
+          fonteEData: formatarFonteEData(noticiaDoAssunto.veiculo, noticiaDoAssunto.publicadoEm),
+        }
+      : undefined;
 
   const hoje = hojeISO();
   const assuntoPreso = alta && !noticia && (!dataInicial || dataInicial === hoje) ? await assuntoPresoDaLista(alta, hoje).catch(() => null) : null;

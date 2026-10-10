@@ -221,6 +221,11 @@ export const textosRoteiro = {
     motivosLinha: (motivos: string, data: string) => `Você reprovou por: ${motivos}, em ${data}`,
   },
 
+  /** E53 (parte 3): a linha de onde o roteiro veio, quando nasceu de "Criar roteiro com esta notícia" (do setor ou de um assunto que a marca acompanha). */
+  daNoticia: {
+    veio: "Veio de uma notícia:",
+  },
+
   /**
    * E55 PR 2b (passo 21 do Opus, `Roteiro.dc.html`, estados `doMomento` e `momentoPassou`): o roteiro que nasceu de um assunto em alta. O selo e a linha de prazo dizem que o vídeo é do dia; o
    * "De onde veio" mostra as duas fontes do assunto no lugar do vídeo de referência; quando o assunto sai da lista, o selo vira neutro e entra o aviso.

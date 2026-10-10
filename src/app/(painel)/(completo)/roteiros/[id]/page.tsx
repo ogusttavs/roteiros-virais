@@ -6,6 +6,8 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
+import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
+import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
 import { videoPorId } from "@/servicos/pesquisa";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId, versoesDoRoteiro } from "@/servicos/roteiro";
 
@@ -47,9 +49,23 @@ export default async function Roteiro({ params }: Props) {
       : Promise.resolve(null),
   ]);
 
+  // E53 (parte 3): de onde o roteiro veio, quando nasceu de uma notícia: a de um assunto da marca (a cópia que o roteiro guardou) ou a do setor (a linha da tabela). O link é revalidado (só https).
+  const noticiaDoSetor = !roteiro.noticiaDoAssunto && roteiro.noticiaId ? await noticiaDeOrigemDoRoteiro(roteiro.noticiaId) : null;
+  const noticiaDeOrigem = roteiro.noticiaDoAssunto
+    ? {
+        titulo: roteiro.noticiaDoAssunto.titulo,
+        veiculo: roteiro.noticiaDoAssunto.veiculo,
+        url: enderecoHttpsSeguro(roteiro.noticiaDoAssunto.url),
+        dia: roteiro.noticiaDoAssunto.publicadoEm ? diaPorExtenso(new Date(roteiro.noticiaDoAssunto.publicadoEm)) : null,
+      }
+    : noticiaDoSetor
+      ? { titulo: noticiaDoSetor.titulo, veiculo: noticiaDoSetor.fonte ?? "", url: enderecoHttpsSeguro(noticiaDoSetor.url), dia: noticiaDoSetor.publicadoEm ? diaPorExtenso(noticiaDoSetor.publicadoEm) : null }
+      : null;
+
   return (
     <RoteiroTela
       roteiro={roteiro}
+      noticiaDeOrigem={noticiaDeOrigem}
       corpo={corpoDoRoteiro(roteiro)}
       blocos={blocosParaLeitura(roteiro)}
       video={video}

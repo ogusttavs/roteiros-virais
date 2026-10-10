@@ -9,7 +9,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { account, assuntosDaMarca, briefings, clientes, membrosMarca, nichos, noticias, noticiasDoAssunto, preferenciasUsuario, user } from "../../src/db/schema";
+import { account, assuntosDaMarca, briefings, clientes, membrosMarca, nichos, noticias, noticiasDoAssunto, preferenciasUsuario, roteiros, user } from "../../src/db/schema";
 import { inicioDoDiaEmSaoPaulo } from "../../src/servicos/noticias-do-dia";
 import { textosNav } from "../../src/textos/nav";
 
@@ -22,6 +22,7 @@ const MARCADOR_NOTA_ALTA = "aprova este tema de teste sem ressalva";
 const TITULO_SETOR_HOJE = "[teste] venda de produto multiuso cresce no trimestre";
 const TITULO_SETOR_ONTEM = "[teste] notícia de ontem, só aparece embaixo";
 const TITULO_ANTIGO = "[teste] notícia de três semanas atrás, nunca aparece";
+const TITULO_SETOR_FOTO = "[teste] setor com foto do portal, vinda do RSS direto";
 const TITULO_ASSUNTO_FOTO = "[teste] debate esquenta a eleição e divide os candidatos";
 const TITULO_ASSUNTO_INSEGURO = "[teste] eleição: notícia com endereço que não é seguro";
 
@@ -168,6 +169,19 @@ test.describe("/noticias", () => {
             angulo: "Mostre a sua rotina usando o produto e explique o que faz ele render mais.",
           },
           {
+            // E53 (foto do setor): a notícia do setor com a foto que o RSS direto do portal trouxe, e o crédito.
+            nichoId: nicho.id,
+            titulo: TITULO_SETOR_FOTO,
+            url: "https://exemplo.invalido/e2e-noticias-setor-foto",
+            fonte: "[teste] Jornal Exemplo",
+            publicadoEm: new Date(hoje().getTime() - 2 * 60 * 60 * 1000),
+            resumo: "Uma notícia do setor com a foto do veículo.",
+            relevante: true,
+            angulo: null,
+            imagemUrl: "https://exemplo.invalido/e2e-noticias-setor-foto.jpg",
+            imagemCredito: "Foto: [teste] Jornal Exemplo",
+          },
+          {
             nichoId: nicho.id,
             titulo: TITULO_SETOR_ONTEM,
             url: "https://exemplo.invalido/e2e-noticias-setor-ontem",
@@ -237,6 +251,12 @@ test.describe("/noticias", () => {
     await expect(doSetor.getByText("[teste] Notícias", { exact: true })).toBeVisible();
     await expect(doSetor.locator("img")).toHaveCount(0);
     await expect(doSetor.getByRole("link", { name: TITULO_SETOR_HOJE })).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-setor-hoje");
+
+    // A do setor com a foto do portal (RSS direto): a imagem e o crédito aparecem no cartão, sem `referer`.
+    const doSetorComFoto = page.locator("article", { hasText: TITULO_SETOR_FOTO });
+    await expect(doSetorComFoto.locator("img")).toHaveAttribute("src", "https://exemplo.invalido/e2e-noticias-setor-foto.jpg");
+    await expect(doSetorComFoto.locator("img")).toHaveAttribute("referrerpolicy", "no-referrer");
+    await expect(doSetorComFoto.getByText("Foto: [teste] Jornal Exemplo")).toBeVisible();
 
     // O endereço que não é https nunca vira link, e a foto que não é https nunca vira imagem.
     const inseguro = page.locator("article", { hasText: TITULO_ASSUNTO_INSEGURO });
@@ -320,7 +340,7 @@ test.describe("/noticias", () => {
     await expect.poll(async () => (await db().select().from(assuntosDaMarca).where(eq(assuntosDaMarca.id, antes.id)))[0].ultimoAbertoEm).not.toBeNull();
   });
 
-  test("criar roteiro com esta notícia: a do setor vai presa pelo id, a de assunto leva o título ao Tema livre", async ({ page }) => {
+  test("criar roteiro com esta notícia: a do setor vai presa pelo id, a de assunto vai presa pelo id do assunto", async ({ page }) => {
     await entrar(page);
     await page.goto("/noticias");
 
@@ -332,8 +352,48 @@ test.describe("/noticias", () => {
 
     await page.goto("/noticias");
     await page.locator("article[data-noticia^='a-']").first().getByRole("button", { name: "Criar roteiro com esta notícia" }).click();
-    await expect(page).toHaveURL(/\/criar\/tema-livre\?tema=/);
-    await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(TITULO_ASSUNTO_FOTO);
+    // E53 (parte 3): a notícia de um assunto da marca também vai presa (a folha "A notícia"), em vez de o título virar o texto do campo.
+    await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaAssuntoId=\d+/);
+    await expect(page.getByRole("heading", { name: "Criar vídeo com esta notícia" })).toBeVisible();
+    await expect(page.getByText(TITULO_ASSUNTO_FOTO)).toBeVisible();
+    await expect(page.getByLabel("O que você pensou?")).toHaveValue("");
+  });
+
+  test("a notícia de um assunto até o roteiro: o roteiro guarda de onde veio e a tela mostra o veículo, o dia e o link", async ({ page }) => {
+    test.setTimeout(90_000);
+    await entrar(page);
+    await page.goto("/noticias");
+
+    await page.locator("article[data-noticia^='a-']").first().getByRole("button", { name: "Criar roteiro com esta notícia" }).click();
+    await expect(page).toHaveURL(/\/criar\/tema-livre\?noticiaAssuntoId=\d+/);
+    await page.getByLabel("O que você pensou?").fill(`Aqui na loja a gente comenta isso toda semana. ${MARCADOR_NOTA_ALTA}`);
+    await page.getByRole("button", { name: "Avaliar o tema" }).click();
+    await expect(page.getByRole("heading", { name: "Pode gravar esse" })).toBeVisible();
+    await page.getByRole("button", { name: "Escrever o roteiro" }).click();
+
+    await expect(page).toHaveURL(/\/criar\/objetivo\?livre=.*noticiaAssuntoId=\d+/);
+    await page.getByRole("radio", { name: /Que me chamem/ }).click();
+    await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
+
+    const origem = page.locator("[data-noticia-de-origem]");
+    await expect(origem).toContainText("Veio de uma notícia:");
+    await expect(origem).toContainText("[teste] Diário Exemplo");
+    const link = origem.getByRole("link", { name: TITULO_ASSUNTO_FOTO });
+    await expect(link).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-eleicao");
+    await expect(link).toHaveAttribute("target", "_blank");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+
+    // O roteiro guarda a cópia (título, veículo, link), não a chave do assunto: ela some com o assunto, o "De onde veio" não.
+    const id = Number(new URL(page.url()).pathname.split("/").pop());
+    const [guardado] = await db().select({ origem: roteiros.noticiaDoAssunto, noticiaId: roteiros.noticiaId }).from(roteiros).where(eq(roteiros.id, id));
+    expect(guardado.noticiaId).toBeNull();
+    expect(guardado.origem).toMatchObject({ titulo: TITULO_ASSUNTO_FOTO, veiculo: "[teste] Diário Exemplo", url: "https://exemplo.invalido/e2e-noticias-eleicao" });
+
+    // Tirar o assunto da marca não apaga o "De onde veio" do roteiro.
+    await db().delete(assuntosDaMarca).where(eq(assuntosDaMarca.clienteId, marcaUmId));
+    await page.reload();
+    await expect(page.locator("[data-noticia-de-origem]")).toContainText(TITULO_ASSUNTO_FOTO);
   });
 
   test("fluxo inteiro: notícia até o roteiro, e a notícia volta marcada 'virou roteiro' só para esta marca", async ({ page }) => {
@@ -358,6 +418,11 @@ test.describe("/noticias", () => {
 
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });
 
+    // E53 (parte 3): a tela do roteiro diz de qual notícia do setor ele veio, com o link do original.
+    const origemDoSetor = page.locator("[data-noticia-de-origem]");
+    await expect(origemDoSetor).toContainText("Veio de uma notícia:");
+    await expect(origemDoSetor.getByRole("link", { name: TITULO_SETOR_HOJE })).toHaveAttribute("href", "https://exemplo.invalido/e2e-noticias-setor-hoje");
+
     // De volta a Notícias, a marca que gerou o roteiro vê "virou roteiro" com o link certo.
     await page.goto("/noticias");
     const cartao = page.locator("article", { hasText: TITULO_SETOR_HOJE });
@@ -376,5 +441,15 @@ test.describe("/noticias", () => {
     await expect(cartaoOutraMarca.getByRole("button", { name: "Criar roteiro com esta notícia" })).toBeVisible();
     await expect(page.getByText(TITULO_ASSUNTO_FOTO)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Acompanhe um assunto" })).toBeVisible();
+
+    // E53 (parte 3): o id de uma notícia de assunto da OUTRA marca no endereço não vale (nem prende, nem aparece): a folha "A notícia" não abre.
+    const [daOutraMarca] = await db()
+      .select({ id: noticiasDoAssunto.id })
+      .from(noticiasDoAssunto)
+      .innerJoin(assuntosDaMarca, eq(assuntosDaMarca.id, noticiasDoAssunto.assuntoId))
+      .where(and(eq(assuntosDaMarca.clienteId, marcaUmId), eq(noticiasDoAssunto.titulo, TITULO_ASSUNTO_FOTO)));
+    await page.goto(`/criar/tema-livre?noticiaAssuntoId=${daOutraMarca.id}`);
+    await expect(page.getByRole("heading", { name: "Criar vídeo com esta notícia" })).toHaveCount(0);
+    await expect(page.getByText(TITULO_ASSUNTO_FOTO)).toHaveCount(0);
   });
 });
