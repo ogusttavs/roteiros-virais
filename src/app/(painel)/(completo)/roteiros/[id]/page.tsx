@@ -6,6 +6,7 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
 import { videoPorId } from "@/servicos/pesquisa";
@@ -76,6 +77,7 @@ export default async function Roteiro({ params }: Props) {
       versoes={versoes}
       momento={momento}
       grupoDeVersoes={grupoDeVersoes}
+      fala={falaDoRoteiro(roteiro, sessao.verComo != null)}
       marcaAtiva={cliente}
       marcas={marcas}
       nomePessoa={sessao.user.name}

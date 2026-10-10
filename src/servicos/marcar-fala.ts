@@ -32,6 +32,8 @@ import {
   TONS_DO_BLOCO,
   type BlocoFalado,
   type ConferenciaDeFala,
+  type FalaDoRoteiro,
+  type MarcasParaATela,
   type TomDoBloco,
 } from "@/lib/marcas-de-fala";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
@@ -122,6 +124,25 @@ export function marcarBloco(
     return { marcado: paragrafos.join("\n"), correcoes: [], usouModelo: false };
   }
   return { marcado, correcoes, usouModelo: candidato !== null };
+}
+
+/** O que a tela recebe das marcas (sem a auditoria do conserto): ver `MarcasParaATela`. */
+export function marcasParaATela(marcas: MarcasDeFala | null): MarcasParaATela | null {
+  if (!marcas) return null;
+  return {
+    blocos: marcas.blocos.map((b) => ({ bloco: b.bloco, marcado: b.marcado, tom: b.tom })),
+    avisos: marcas.avisos.map((a) => ({ regra: a.regra, texto: a.texto })),
+  };
+}
+
+/**
+ * O que a tela do roteiro e o modo gravação precisam da fala marcada, lido no servidor: se o roteiro tem fala para marcar (Reels falado), se a conta só olha ("ver como" não escreve) e as
+ * marcas que já existem E ainda valem para o texto de agora (`marcasValidas`).
+ */
+export function falaDoRoteiro(roteiro: { formato: string; estilo: string; conteudo: ConteudoRoteiro; marcasDeFala: MarcasDeFala | null }, somenteLeitura: boolean): FalaDoRoteiro {
+  const podeMarcar = motivoDeNaoMarcar(roteiro) === null;
+  const validas = podeMarcar ? marcasValidas(roteiro.marcasDeFala, roteiro.conteudo) : null;
+  return { podeMarcar, somenteLeitura, marcas: marcasParaATela(validas) };
 }
 
 function textoDoAviso(conferencia: ConferenciaDeFala): string {

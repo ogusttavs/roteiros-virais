@@ -1,0 +1,52 @@
+/*
+ * As seis marcas de fala desenhadas (seção 10.1 das rubricas; `base.css` do passo 24, `.f-peso`, `.f-pausa`, `.f-devagar`, `.f-tom`). Medidas em "em", para crescerem junto com a letra
+ * do teleprompter. A pausa fica entre as palavras sem tirar o espaço do texto (o texto que se lê é o do roteiro, nenhum espaço sai), por isso a margem é menor que a do desenho.
+ */
+.peso {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  background: var(--cor-selecao-suave);
+  box-shadow: inset 0 -0.14em 0 var(--cor-selecao-borda);
+  padding: 0 0.15em;
+  border-radius: 0.2em;
+}
+
+.pausa {
+  display: inline-block;
+  width: 0.19em;
+  height: 0.95em;
+  margin: 0 0.12em;
+  vertical-align: -0.12em;
+  border-radius: 1px;
+  background: var(--cor-texto-suave);
+}
+
+.pausaLonga {
+  width: 0.62em;
+  background: linear-gradient(90deg, var(--cor-texto-suave) 0 30%, transparent 30% 70%, var(--cor-texto-suave) 70% 100%);
+}
+
+.devagar {
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: var(--cor-acao);
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.28em;
+}
+
+.tom {
+  display: inline-grid;
+  vertical-align: -0.12em;
+  margin-left: 0.15em;
+  color: var(--cor-texto-suave);
+}
+
+.tom svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* A última palavra, a pausa e o tom que vêm logo depois dela: não quebram a linha entre si. */
+.junto {
+  white-space: nowrap;
+}

@@ -3,12 +3,12 @@
 import { redirect } from "next/navigation";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
-import type { MarcasDeFala } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import type { MarcasParaATela } from "@/lib/marcas-de-fala";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
-import { marcarFalaDoRoteiro, type MotivoSemMarcas } from "@/servicos/marcar-fala";
+import { marcarFalaDoRoteiro, marcasParaATela, type MotivoSemMarcas } from "@/servicos/marcar-fala";
 import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
   avaliarRoteiro,
@@ -83,7 +83,7 @@ export async function salvarEdicaoAction(
  * geração. O roteiro é conferido por dono dentro do serviço (`roteiroPorId(id, clienteId)`); "ver como" não escreve (a leitura das marcas já guardadas é da tela). O erro esperado volta
  * como resultado, para a frase chegar inteira (Next.js troca a mensagem de uma exceção por um texto genérico em produção).
  */
-export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao<{ marcas: MarcasDeFala | null; motivo: MotivoSemMarcas | null; novas: boolean }>> {
+export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao<{ marcas: MarcasParaATela | null; motivo: MotivoSemMarcas | null; novas: boolean }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
@@ -91,7 +91,7 @@ export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao
   if (!Number.isInteger(roteiroId) || roteiroId <= 0 || roteiroId > 2_147_483_647) return { ok: false, erro: textosMarcasDeFala.erros.naoEncontrado };
   try {
     const r = await marcarFalaDoRoteiro(cliente.id, roteiroId);
-    return r.ok ? { ok: true, dado: { marcas: r.marcas, motivo: null, novas: r.novas } } : { ok: true, dado: { marcas: null, motivo: r.motivo, novas: false } };
+    return r.ok ? { ok: true, dado: { marcas: marcasParaATela(r.marcas), motivo: null, novas: r.novas } } : { ok: true, dado: { marcas: null, motivo: r.motivo, novas: false } };
   } catch (falha) {
     if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };

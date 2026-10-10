@@ -11,7 +11,7 @@ import * as cliente from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
 import { config } from "@/lib/config";
 import { normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
-import { blocosFalados, marcarBloco, marcarFalaDoRoteiro, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
+import { blocosFalados, falaDoRoteiro, marcarBloco, marcarFalaDoRoteiro, marcasParaATela, marcasValidas, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
 import { editarRoteiro, ErroRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
 
@@ -410,6 +410,57 @@ describe("editar o texto apaga as marcas", () => {
     if (!r.ok) throw new Error("devia marcar");
     expect(r.novas).toBe(true);
     expect(textoSemMarcas(r.marcas.blocos[3].marcado)).toContain("R$ 99");
+  });
+});
+
+describe("o que a tela recebe (E41 2b)", () => {
+  async function linhaDoRoteiro(id: number) {
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    return linha;
+  }
+
+  it("sem marcas: pode marcar e não tem marcas; só olhar vale no 'ver como'", async () => {
+    const id = await criarRoteiro();
+    const fala = falaDoRoteiro(await linhaDoRoteiro(id), false);
+    expect(fala).toEqual({ podeMarcar: true, somenteLeitura: false, marcas: null });
+    expect(falaDoRoteiro(await linhaDoRoteiro(id), true).somenteLeitura).toBe(true);
+  });
+
+  it("com marcas válidas: manda só os blocos marcados, o tom e os avisos (nunca o registro do conserto)", async () => {
+    const id = await criarRoteiro({ conteudo: conteudo({ gancho: "Então, a mancha voltou depois da limpeza e ninguém te conta o porquê." }) });
+    await marcarFalaDoRoteiro(clienteId, id);
+    const fala = falaDoRoteiro(await linhaDoRoteiro(id), false);
+    expect(fala.podeMarcar).toBe(true);
+    expect(fala.marcas?.blocos.map((b) => Object.keys(b).sort())).toEqual([
+      ["bloco", "marcado", "tom"],
+      ["bloco", "marcado", "tom"],
+      ["bloco", "marcado", "tom"],
+      ["bloco", "marcado", "tom"],
+    ]);
+    expect(Object.keys(fala.marcas ?? {}).sort()).toEqual(["avisos", "blocos"]);
+    expect(fala.marcas?.avisos.map((a) => a.regra)).toEqual(["R-FALA-01"]);
+    expect(JSON.stringify(fala)).not.toContain("correcoes");
+    expect(JSON.stringify(fala)).not.toContain("semModelo");
+  });
+
+  it("marcas velhas (o texto mudou por outro caminho) não chegam à tela", async () => {
+    const id = await criarRoteiro();
+    await marcarFalaDoRoteiro(clienteId, id);
+    await db().update(roteiros).set({ conteudo: conteudo({ gancho: "Outro começo." }) }).where(eq(roteiros.id, id));
+    const fala = falaDoRoteiro(await linhaDoRoteiro(id), false);
+    expect(fala.podeMarcar).toBe(true);
+    expect(fala.marcas).toBeNull();
+  });
+
+  it("Story e vídeo sem fala não têm o que marcar, e as marcas guardadas nunca chegam", async () => {
+    const story = await criarRoteiro({ formato: "story" });
+    expect(falaDoRoteiro(await linhaDoRoteiro(story), false)).toEqual({ podeMarcar: false, somenteLeitura: false, marcas: null });
+    const semFala = await criarRoteiro({ estilo: "sem_fala" });
+    expect(falaDoRoteiro(await linhaDoRoteiro(semFala), false).podeMarcar).toBe(false);
+  });
+
+  it("marcasParaATela de nulo é nulo", () => {
+    expect(marcasParaATela(null)).toBeNull();
   });
 });
 

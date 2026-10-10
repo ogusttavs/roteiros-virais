@@ -43,6 +43,7 @@ import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
+import { BLOCOS_FALADOS, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
@@ -59,6 +60,7 @@ import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { CartaoDeOndeVeio } from "@/ui/componentes/CartaoDeOndeVeio";
 import chipStyles from "@/ui/componentes/Chips.module.css";
 import { ConviteInstalar } from "@/ui/componentes/ConviteInstalar";
+import { LinhaMarcasDeFala } from "@/ui/componentes/LinhaMarcasDeFala";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
 import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
@@ -77,6 +79,7 @@ import {
   salvarEdicaoAction,
 } from "./acoes";
 import styles from "./RoteiroTela.module.css";
+import { useMarcasDeFala } from "./useMarcasDeFala";
 
 function formatarData(dataISO: string): string {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -249,6 +252,11 @@ type Props = {
   grupoDeVersoes?: { grupo: string; total: number } | null;
   /** E53 (parte 3): a notícia de onde o roteiro veio (do setor ou de um assunto da marca), com o link revalidado; nula nos outros. */
   noticiaDeOrigem?: { titulo: string; veiculo: string; url: string | null; dia: string | null } | null;
+  /**
+   * E41 parte 2b: a fala marcada. `podeMarcar` é falso em Story e em vídeo sem fala (nada para marcar); `somenteLeitura` é o "ver como" (mostra as marcas que já existem, não escreve);
+   * `marcas` são as que já existem e ainda valem para o texto de agora.
+   */
+  fala: FalaDoRoteiro;
   /** O seletor de marca na barra do topo, só no celular (V3, item 3, Roteiro.dc.html). */
   marcaAtiva: MarcaResumo;
   marcas: MarcaResumo[];
@@ -271,6 +279,7 @@ export function RoteiroTela({
   momento = null,
   grupoDeVersoes = null,
   noticiaDeOrigem = null,
+  fala,
   marcaAtiva,
   marcas,
   nomePessoa,
@@ -331,6 +340,30 @@ export function RoteiroTela({
   const [salvandoEdicao, iniciarSalvarEdicao] = useTransition();
   const { semConexao, avisarRedeOk } = useConexao();
   const tratarFalha = useTratarFalha();
+
+  // E41 parte 2b: as marcas de fala. Desligadas por padrão no roteiro (a chave do aparelho); ao abrir, o pedido das marcas corre em segundo plano para o modo gravação encontrá-las
+  // prontas, sem a pessoa esperar nada. Ligar a chave sem as marcas prontas mostra a claquete e "Marcando a fala", com o texto à vista.
+  const [marcasLigadas, setMarcasLigadas] = useState(false);
+  const chaveDoTexto = [corpo.gancho, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\u0001");
+  const { marcas: marcasProntas, estado: estadoMarcas, erro: erroMarcas, pedir: pedirMarcas } = useMarcasDeFala(roteiro.id, fala, chaveDoTexto);
+  useEffect(() => {
+    pedirMarcas({ emSegundoPlano: true });
+  }, [pedirMarcas, chaveDoTexto]);
+  function trocarMarcas(ligar: boolean) {
+    setMarcasLigadas(ligar);
+    if (ligar) pedirMarcas();
+  }
+  const mostrarMarcas = marcasLigadas && marcasProntas !== null;
+  const blocosVisiveis: BlocoRoteiro[] = mostrarMarcas
+    ? blocos.map((bloco, indice) => {
+        const nome = BLOCOS_FALADOS[indice];
+        const marcado = nome ? paragrafosMarcados(marcasProntas, nome) : null;
+        return marcado && marcado.length === bloco.paragrafos.length
+          ? { ...bloco, marcado, tom: marcasProntas.blocos.find((b) => b.bloco === nome)?.tom }
+          : bloco;
+      })
+    : blocos;
+  const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);
   /** Igual a `reescrevendo`, mas lido na hora nos fechamentos e solto antes de navegar (o estado só solta no fim). */
   const reescritaEmCursoRef = useRef(false);
   /** Qual painel está aberto agora: uma ação que termina depois precisa saber se o painel dela ainda está na tela. */
@@ -935,7 +968,21 @@ export function RoteiroTela({
         ) : (
           <>
             <article className={styles.blocos}>
-              <RoteiroTexto blocos={blocos} comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"} />
+              {temChaveDeMarcas ? (
+                <LinhaMarcasDeFala
+                  variante="roteiro"
+                  ligadas={marcasLigadas}
+                  aoTrocar={trocarMarcas}
+                  marcando={estadoMarcas === "marcando" && marcasProntas === null}
+                  erro={marcasLigadas ? erroMarcas : null}
+                  avisos={marcasProntas?.avisos ?? []}
+                />
+              ) : null}
+              <RoteiroTexto
+                blocos={blocosVisiveis}
+                comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"}
+                comMarcas={mostrarMarcas}
+              />
               {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
               <p className={styles.julgar}>
                 {textosRoteiro.reprovar.naoFicouBom}{" "}

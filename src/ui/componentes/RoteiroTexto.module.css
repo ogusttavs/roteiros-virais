@@ -113,3 +113,24 @@
   line-height: var(--altura-gravacao);
   color: var(--cor-titulo);
 }
+
+/* E41 parte 2b: "Tom: calmo." e o que fazer com ele, embaixo da fala marcada (`.como-falar` do design, passo 24). */
+.comoFalar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  line-height: var(--altura-corpo);
+  color: var(--cor-texto-suave);
+}
+
+.comoFalar svg {
+  flex: none;
+  margin-top: 0.2em;
+}
+
+.comoFalar b {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}

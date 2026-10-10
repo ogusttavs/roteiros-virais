@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 
 import { GravacaoTela } from "./GravacaoTela";
@@ -49,6 +50,8 @@ export default async function Gravar({ params }: Props) {
         jaGravado={roteiro.gravadoEm !== null}
         blocos={blocosParaLeitura(roteiro)}
         nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
+        fala={falaDoRoteiro(roteiro, sessao.verComo != null)}
+        marcaId={cliente.id}
       />
     </>
   );

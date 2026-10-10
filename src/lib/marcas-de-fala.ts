@@ -178,6 +178,52 @@ export function contarPalavras(texto: string): number {
   return n === "" ? 0 : n.split(" ").length;
 }
 
+/**
+ * O que a tela recebe das marcas guardadas (E41 parte 2b): os blocos marcados, o tom de cada um e os avisos. Sem o registro do conserto (`correcoes`) nem o que o modelo errou
+ * (`semModelo`): isso é auditoria, não vai para o navegador.
+ */
+export type MarcasParaATela = {
+  blocos: { bloco: BlocoFalado; marcado: string; tom: TomDoBloco }[];
+  avisos: { regra: string; texto: string }[];
+};
+
+/** O que a tela de roteiro e o modo gravação sabem da fala marcada: se este roteiro tem fala para marcar, se a conta só olha (ver como) e as marcas que já existem. */
+export type FalaDoRoteiro = {
+  podeMarcar: boolean;
+  somenteLeitura: boolean;
+  marcas: MarcasParaATela | null;
+};
+
+/** Os parágrafos marcados de um bloco (a quebra de parágrafo do roteiro volta como "\n"), ou nulo se o bloco não tem marcas. */
+export function paragrafosMarcados(marcas: MarcasParaATela | null, bloco: BlocoFalado): string[] | null {
+  const achado = marcas?.blocos.find((b) => b.bloco === bloco);
+  if (!achado) return null;
+  return achado.marcado.split("\n").filter((p) => p.trim() !== "");
+}
+
+/** Um pedaço do texto marcado, na ordem, para a tela desenhar (E41 parte 2b). */
+export type TrechoDaFala =
+  | { tipo: "texto"; texto: string }
+  | { tipo: "peso"; texto: string }
+  | { tipo: "devagar"; texto: string }
+  | { tipo: "pausa"; duracao: "curta" | "longa" }
+  | { tipo: "tom"; direcao: "desce" | "sobe" };
+
+/**
+ * O texto marcado em pedaços, para a tela desenhar cada marca. Os pedaços de texto, de peso e de devagar, lidos em sequência, são EXATAMENTE o texto sem as marcas (nenhum espaço é
+ * tirado nem posto: o que está entre uma marca e a palavra fica no pedaço de texto), então o que a pessoa lê é o texto do roteiro, e as marcas só ficam entre as palavras.
+ */
+export function trechosDaFala(marcado: string): TrechoDaFala[] {
+  return eventos(marcado).map((evento): TrechoDaFala => {
+    if (evento.tipo === "texto") return { tipo: "texto", texto: evento.valor };
+    if (evento.tipo === "peso") return { tipo: "peso", texto: evento.valor };
+    if (evento.tipo === "devagar") return { tipo: "devagar", texto: evento.valor };
+    if (evento.valor === "v") return { tipo: "tom", direcao: "desce" };
+    if (evento.valor === "^") return { tipo: "tom", direcao: "sobe" };
+    return { tipo: "pausa", duracao: evento.valor === "/" ? "curta" : "longa" };
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------------------------
 // O conserto mecânico (as regras que "conferem por código")
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -447,7 +493,10 @@ export function conferirFala(textos: Partial<Record<BlocoFalado, string>>, conte
   return lista;
 }
 
-/** A palavra de peso mais provável de um texto sem nada marcado, só para o simulador (`ia/mock.ts`): a mais comprida de cada frase (com pelo menos 5 letras). */
+/**
+ * O que o simulador (`ia/mock.ts`) faz no lugar do modelo, num texto sem nada marcado: peso na palavra mais comprida de cada frase (com pelo menos 5 letras) e o tom que sobe no fim
+ * de cada pergunta. As pausas, o devagar e o tom que desce ficam para o conserto por código, como com o modelo de verdade.
+ */
 export function pesoPelaMaisComprida(texto: string): string {
   const palavras = lerPalavras(texto);
   for (const { de, ate } of frases(palavras)) {
@@ -461,6 +510,7 @@ export function pesoPelaMaisComprida(texto: string): string {
       }
     }
     if (melhor >= 0) palavras[melhor].peso = true;
+    if (PERGUNTA.test(palavras[ate].texto)) palavras[ate].tom = "sobe";
   }
   return escreverPalavras(palavras);
 }
