@@ -1,0 +1,227 @@
+/**
+ * O cartão "Em alta hoje" (E55 PR 2, passo 21 do Opus, `entrega/telas/base.css`, bloco "O assunto do momento"). O contorno na cor de seleção é o único da tela: é a única coisa que tem prazo.
+ * Do tablet deitado para cima, o assunto fica à esquerda e o tema do ramo à direita.
+ */
+.cartao {
+  position: relative;
+  display: grid;
+  gap: var(--espaco-4);
+  padding: var(--espaco-5);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-lg);
+  background: var(--cor-superficie);
+}
+
+.topo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.origem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.origem svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--cor-destaque);
+}
+
+.selo {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  margin-left: auto;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  line-height: 1.2;
+}
+
+/* O botão "Mais opções" fica ao lado do selo, sem empurrar a linha para baixo. */
+.topo > button {
+  margin: calc(var(--espaco-2) * -1) calc(var(--espaco-3) * -1) calc(var(--espaco-2) * -1) 0;
+}
+
+.oQue {
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+}
+
+.assunto {
+  margin: 0;
+  font-size: var(--tamanho-titulo-2);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.fonte {
+  margin: 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.4;
+  color: var(--cor-texto-dica);
+}
+
+.prova {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.noSeuRamo {
+  display: grid;
+  gap: var(--espaco-2);
+  align-content: start;
+  padding: var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+}
+
+.rotuloRamo {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  text-transform: uppercase;
+  letter-spacing: var(--espacamento-legenda);
+  color: var(--cor-texto-suave);
+}
+
+.noSeuRamo h4 {
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+  line-height: 1.25;
+  color: var(--cor-titulo);
+}
+
+.facil {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.estado {
+  justify-self: start;
+  padding: 0 var(--espaco-2);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-medio);
+  line-height: 1.6;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+  margin-top: var(--espaco-2);
+}
+
+.botaoPrimario,
+.botaoSecundario {
+  min-height: var(--altura-toque-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--espaco-2);
+  padding: 0 var(--espaco-6);
+  border: var(--largura-borda) solid transparent;
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  text-align: center;
+  cursor: pointer;
+}
+
+.botaoPrimario {
+  background: var(--cor-acao);
+  color: var(--cor-acao-texto);
+}
+
+.botaoPrimario:hover:not(:disabled) {
+  background: var(--cor-acao-hover);
+}
+
+.botaoSecundario {
+  background: transparent;
+  color: var(--cor-titulo);
+  border-color: var(--cor-borda-forte);
+}
+
+.botaoSecundario:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.botaoPrimario:focus-visible,
+.botaoSecundario:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.botaoPrimario:disabled,
+.botaoSecundario:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.botaoPrimario[aria-busy="true"]:disabled,
+.botaoSecundario[aria-busy="true"]:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.vale {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.vale svg {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 767px) {
+  .botaoPrimario,
+  .botaoSecundario {
+    width: 100%;
+  }
+}
+
+@media (min-width: 1024px) {
+  .cartao {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    column-gap: var(--espaco-6);
+  }
+
+  .topo,
+  .vale {
+    grid-column: 1 / -1;
+  }
+}

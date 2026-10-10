@@ -11,10 +11,11 @@ import {
   fraseDiasAtras,
   rotuloMultiploConta,
 } from "@/lib/formatarNumero";
+import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { evidenciaResumoPorIds, type EvidenciaResumo } from "@/servicos/pesquisa";
-import { arquivarRoteiro, conferirAindaVale, desarquivarRoteiro, mudarDataRoteiro, roteiroPorId } from "@/servicos/roteiro";
+import { arquivarRoteiro, conferirAindaVale, desarquivarRoteiro, ErroRoteiro, mudarDataRoteiro, roteiroPorId } from "@/servicos/roteiro";
 import type { EvidenciaTema } from "@/ui/componentes/TemaCartao";
 
 /**
@@ -56,12 +57,21 @@ export async function desarquivarAction(roteiroId: number): Promise<void> {
   revalidarAgenda();
 }
 
-/** E39b, item (b): "Mudar o dia" e "Gravar hoje" (o cliente manda a data de hoje nesse caso). */
-export async function mudarDataAtrasadoAction(roteiroId: number, novaData: string): Promise<void> {
+/**
+ * E39b, item (b): "Mudar o dia" e "Gravar hoje" (o cliente manda a data de hoje nesse caso). E55 PR 2: devolve o resultado em vez de lançar, porque o roteiro do tema do momento não muda de dia e a frase da
+ * recusa ("Não muda de dia: ...") precisa chegar inteira (em produção o Next troca a mensagem de uma exceção por um texto genérico).
+ */
+export async function mudarDataAtrasadoAction(roteiroId: number, novaData: string): Promise<ResultadoAcao<null>> {
   await exigirForaDoVerComo();
   await roteiroDoClienteOuFalha(roteiroId);
-  await mudarDataRoteiro(roteiroId, novaData);
+  try {
+    await mudarDataRoteiro(roteiroId, novaData);
+  } catch (erro) {
+    if (erro instanceof ErroRoteiro) return { ok: false, erro: erro.message };
+    throw erro;
+  }
   revalidarAgenda();
+  return { ok: true, dado: null };
 }
 
 function paraEvidenciaTema(resumo: EvidenciaResumo | null): EvidenciaTema | null {

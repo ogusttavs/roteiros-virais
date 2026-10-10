@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition, type DragEvent } from "react";
 
 import type { FormatoRoteiro } from "@/db/schema";
+import { dadoOuErro, ErroDeAcao } from "@/lib/resultado-acao";
 import { textosHoje } from "@/textos/hoje";
 
 import { mudarDataAtrasadoAction } from "../hoje/agenda-acoes";
@@ -70,10 +71,11 @@ export function useMoverDeDia() {
     setErro(null);
     iniciarTransicao(async () => {
       try {
-        await mudarDataAtrasadoAction(item.id, paraData);
+        dadoOuErro(await mudarDataAtrasadoAction(item.id, paraData));
         router.refresh();
-      } catch {
-        setErro(textosHoje.agenda.planejador.erroMover);
+      } catch (falha) {
+        // A frase de recusa do servidor ("Não muda de dia: ...") chega inteira; qualquer outra falha cai no texto de sempre.
+        setErro(falha instanceof ErroDeAcao ? falha.message : textosHoje.agenda.planejador.erroMover);
       }
     });
   }

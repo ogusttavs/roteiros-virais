@@ -30,6 +30,7 @@ import {
   membrosMarca,
   nichos,
   preferenciasUsuario,
+  rascunhosTemaLivre,
   user,
   videos,
 } from "../../src/db/schema";
@@ -47,6 +48,46 @@ async function entrar(page: Page) {
   await page.getByLabel("Senha").fill(SENHA);
   await page.getByRole("button", { name: "entrar", exact: true }).click();
   await expect(page).toHaveURL(/\/hoje/);
+}
+
+const CAMPO = "Sobre o que você quer falar?";
+
+/**
+ * O estado de partida de cada teste (e de cada tentativa: o Playwright repete na CI, e o banco não volta ao que era). Os testes pressupõem que a marca que abre ao
+ * entrar, sem cookie ainda, é a Um. Mas `marcaPadrao` (`servicos/clientes.ts`) escolhe a de acesso mais recente, e só depois a criada por último; e o acesso é gravado
+ * uma vez por dia por marca. Duas coisas derrubavam `:206` e `:294` só na CI (PR #145, 09/10: 25 minutos de CI cada vez): (1) as duas marcas criadas no mesmo
+ * milissegundo empatam em `criadoEm`, e o empate cai na ordem do nome, "Dois" antes de "Um"; (2) o teste das marcas visita a Dois, que passa a ser a de acesso mais
+ * recente para qualquer tentativa seguinte. Aqui a Um é a de acesso mais recente e a Dois nunca foi acessada, sempre; e os rascunhos de um teste não vazam para o outro.
+ */
+async function restaurarEstadoDeSaida() {
+  const marcas = await db().select({ id: clientes.id, nome: clientes.nome }).from(clientes).where(eq(clientes.usuarioId, "e2e-tema-livre"));
+  for (const marca of marcas) {
+    await db()
+      .update(clientes)
+      .set({ ultimoAcessoEm: marca.nome === NOME_MARCA_UM ? new Date() : null })
+      .where(eq(clientes.id, marca.id));
+  }
+  await db().delete(rascunhosTemaLivre).where(eq(rascunhosTemaLivre.usuarioId, "e2e-tema-livre"));
+}
+
+/** Abre o Tema livre e espera a tela assentar antes de digitar (a mesma precaução de `agenda.spec.ts`: digitar e clicar logo depois do `goto` é o que oscila sob carga). */
+async function abrirTemaLivre(page: Page) {
+  await page.goto("/criar/tema-livre");
+  await expect(page.getByLabel(CAMPO)).toBeVisible();
+  await page.waitForLoadState("networkidle");
+}
+
+/** O Hoje assentado antes de abrir a folha das marcas (a mesma precaução de `abrirTemaLivre`). */
+async function abrirHoje(page: Page) {
+  await page.goto("/hoje");
+  await page.waitForLoadState("networkidle");
+}
+
+/** A resposta da ação que grava o rascunho (um POST para a própria página): esperar por ela vale mais que um tempo fixo, que na CI pode não bastar. */
+function esperarRascunhoGravado(page: Page) {
+  return page.waitForResponse(
+    (resposta) => resposta.request().method() === "POST" && new URL(resposta.url()).pathname === "/criar/tema-livre",
+  );
 }
 
 function briefingCompletoExemplo() {
@@ -98,8 +139,8 @@ test.describe("tema livre pela tela, os cinco estados", () => {
       });
     await db().insert(preferenciasUsuario).values({ usuarioId: "e2e-tema-livre", aceitouTermosEm: new Date() });
 
-    // Dois primeiro, Um depois: marcaPadrao (sem cookie ainda) usa a de criacao mais recente,
-    // e os testes abaixo pressupoe que a marca ativa no primeiro login ja tem os videos de prova.
+    // Os testes abaixo pressupoem que a marca ativa no primeiro login (sem cookie ainda) e a Um, que tem os videos de prova.
+    // Quem garante isso e o `beforeEach` (`restaurarEstadoDeSaida`); a ordem de criacao aqui nao basta, pode empatar no milissegundo.
     const [marcaDois] = await db()
       .insert(clientes)
       .values({ usuarioId: "e2e-tema-livre", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id })
@@ -182,18 +223,20 @@ test.describe("tema livre pela tela, os cinco estados", () => {
       ]);
   });
 
+  test.beforeEach(restaurarEstadoDeSaida);
+
   // O pool do Postgres fecha uma vez so, no globalTeardown (playwright.config.ts).
 
   test("proposta: campo vazio reprova antes de avaliar", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
     await expect(page.getByText("escreva um assunto antes de avaliar")).toBeVisible();
   });
 
   test("sem evidencia no banco: cai em 'dá para melhorar' sem o cartão de ângulo", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await page.getByLabel("Sobre o que você quer falar?").fill("um assunto qualquer sem nenhuma evidencia no banco");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
@@ -205,7 +248,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("com prova suficiente: o cartão do ângulo sugerido aparece com os dois caminhos", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await page
       .getByLabel("Sobre o que você quer falar?")
       .fill("como tirar mancha de sofa de camurca sem estragar o tecido");
@@ -218,7 +261,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("editar o texto volta para a proposta com o texto preservado", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await page.getByLabel("Sobre o que você quer falar?").fill("um assunto para editar depois");
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
     await expect(page.getByText("Editar o texto")).toBeVisible();
@@ -230,7 +273,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("nota na meta: mostra 'pode gravar esse' e o botão único de escrever o roteiro", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await page.getByLabel("Sobre o que você quer falar?").fill(MARCADOR_NOTA_ALTA);
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
 
@@ -245,7 +288,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
   test("erro na avaliação: mostra o aviso, o texto continua guardado, e tentar de novo funciona", async ({ page }) => {
     await entrar(page);
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
 
     await page.route("**/criar/tema-livre", async (route) => {
       if (route.request().method() === "POST") {
@@ -271,21 +314,22 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     // viagem, com rede ruim, quem recebe uma nota abaixo da meta, sai e volta, precisa achar o
     // texto lá.
     await entrar(page);
-    await page.goto("/criar/tema-livre");
-    await page
-      .getByLabel("Sobre o que você quer falar?")
-      .fill("assunto avaliado que precisa sobreviver a sair e voltar");
-    // Espera o debounce de 800ms do rascunho terminar antes de avaliar: sem isto, o clique
+    await abrirTemaLivre(page);
+    // Espera o servidor gravar o rascunho (o debounce de 800ms mais a resposta) antes de avaliar: sem isto, o clique
     // acontece rápido demais (o mock responde antes do debounce disparar) e o `page.goto`
     // seguinte, um reload completo, cancela o timer pendente antes dele salvar nada (achado
     // escrevendo este teste; não reflete o uso real, onde a chamada de verdade demora mais que
-    // 800ms).
-    await page.waitForTimeout(1200);
+    // 800ms). Esperar a resposta, e não um tempo fixo, é o que não depende da velocidade da CI.
+    const gravou = esperarRascunhoGravado(page);
+    await page
+      .getByLabel(CAMPO)
+      .fill("assunto avaliado que precisa sobreviver a sair e voltar");
+    await gravou;
     await page.getByRole("button", { name: "Avaliar o tema" }).click();
     await expect(page.getByText("Editar o texto")).toBeVisible();
 
     await page.goto("/hoje");
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(
       "assunto avaliado que precisa sobreviver a sair e voltar",
     );
@@ -299,14 +343,15 @@ test.describe("tema livre pela tela, os cinco estados", () => {
 
     // A marca ativa no primeiro login e a de criacao mais recente (marcaPadrao, sem cookie
     // ainda): Marca Um, criada depois da Dois neste fixture. Confirma antes de assumir.
-    await page.goto("/hoje");
+    await abrirHoje(page);
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();
 
-    await page.goto("/criar/tema-livre");
-    await page.getByLabel("Sobre o que você quer falar?").fill("rascunho exclusivo da marca ativa");
-    await page.waitForTimeout(1200); // debounce de 800ms do salvamento do rascunho
+    await abrirTemaLivre(page);
+    const gravou = esperarRascunhoGravado(page);
+    await page.getByLabel(CAMPO).fill("rascunho exclusivo da marca ativa");
+    await gravou; // o debounce de 800ms mais a resposta do salvamento do rascunho
 
-    await page.goto("/hoje");
+    await abrirHoje(page);
     const pilula = page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) });
     await pilula.click();
     const folha = page.getByRole("dialog", { name: textosNav.suasMarcas });
@@ -321,11 +366,11 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) })).toBeVisible();
 
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue("");
 
     // /criar/tema-livre tem a propria BarraTopo, sem o seletor de marca: volta para /hoje antes.
-    await page.goto("/hoje");
+    await abrirHoje(page);
     await page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_DOIS) }).click();
     const folhaDeVolta = page.getByRole("dialog", { name: textosNav.suasMarcas });
     await expect(folhaDeVolta).toBeVisible();
@@ -336,7 +381,7 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await page.waitForLoadState("networkidle");
     await expect(page.getByRole("button", { name: textosNav.trocarDeMarcaRotulo(NOME_MARCA_UM) })).toBeVisible();
 
-    await page.goto("/criar/tema-livre");
+    await abrirTemaLivre(page);
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue("rascunho exclusivo da marca ativa");
   });
 });

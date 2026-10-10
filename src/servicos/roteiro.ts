@@ -34,6 +34,8 @@ import {
   type Objetivo,
   type Plataforma,
   type QuemGrava,
+  type TemaDoDia,
+  type TemaDoMomentoGuardado,
   type TipoAbertura,
 } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
@@ -49,6 +51,7 @@ import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { comArroba } from "@/lib/perfil-redes";
+import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { regrasAtivasDoCliente } from "./aprendizado";
@@ -666,9 +669,9 @@ function combinarEvidencias(
 async function resolverTema(
   cliente: Cliente,
   params: ParametrosGerarRoteiro,
-): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: boolean }> {
+): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: TemaDoMomentoGuardado | null }> {
   if (params.origem === "livre") {
-    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: false };
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: null };
   }
 
   /**
@@ -680,7 +683,7 @@ async function resolverTema(
    */
   if (params.origem === "momento") {
     const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
-    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: false };
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null };
   }
 
   const resultado = await temasParaCliente(cliente);
@@ -691,7 +694,13 @@ async function resolverTema(
   if (!tema) {
     throw new ErroRoteiro("tema nao encontrado para o indice pedido.");
   }
-  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento !== undefined };
+  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento) : null };
+}
+
+/** O que o roteiro guarda do assunto em alta (o `doMomento` do tema sem o encaixe, que só serve para escolher). */
+function guardarTemaDoMomento(doMomento: NonNullable<TemaDoDia["doMomento"]>): TemaDoMomentoGuardado {
+  const { chave, assunto, termos, fonte, url, coletadaEm } = doMomento;
+  return { chave, assunto, termos: [...termos], fonte, url, coletadaEm };
 }
 
 /**
@@ -1203,7 +1212,7 @@ export async function gerarRoteiro(
   const { tema, evidenciasPrevistas, doMomento } = await resolverTema(cliente, params);
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
   if (doMomento && params.data && params.data !== hojeISO()) {
-    throw new ErroRoteiro("Tendência é para hoje: grave este vídeo hoje, enquanto o assunto está em alta.");
+    throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
   }
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
@@ -1232,7 +1241,7 @@ export async function gerarRoteiro(
     evidenciasPrevistas,
     momento,
     noticia,
-    temaDoMomento: doMomento,
+    temaDoMomento: doMomento !== null,
   });
 
   const [roteiro] = await db()
@@ -1255,6 +1264,8 @@ export async function gerarRoteiro(
       quemAparece: params.quemAparece ?? null,
       // E43: só quando a notícia foi de fato encontrada no setor do cliente (nunca um id solto).
       noticiaId: noticiaLinha?.id ?? null,
+      // E55 PR 2: o assunto em alta de onde o tema nasceu, para o resto do produto saber (selo, "já passou", Histórico, recusa de mudar de dia, reescrita).
+      temaDoMomento: doMomento,
       conteudo,
       referenciaVideoId,
       geracaoId,
@@ -1333,6 +1344,8 @@ export async function reprovarERescrever(
     },
     momento,
     noticia,
+    // E55 PR 2 (a decisão 272 do PR 1): a reescrita de um roteiro do momento continua sendo do momento, com o mesmo pedido de ser curto e fácil de gravar hoje.
+    temaDoMomento: atual.temaDoMomento !== null,
   });
 
   const [novaVersao] = await db()
@@ -1353,6 +1366,8 @@ export async function reprovarERescrever(
       quemAparece: atual.quemAparece,
       // E43: idem, a reescrita mantém a notícia de origem.
       noticiaId: atual.noticiaId,
+      // E55 PR 2: idem, a reescrita mantém o assunto em alta de origem.
+      temaDoMomento: atual.temaDoMomento,
       conteudo,
       referenciaVideoId,
       versao: proximaVersao,
@@ -1660,8 +1675,16 @@ export async function versoesDoRoteiro(roteiroId: number): Promise<VersaoRoteiro
   });
 }
 
-/** Só a ponta de cada série (sem versão mais nova apontando `versaoDe` para ela). */
-const SEM_VERSAO_MAIS_NOVA = sql`not exists (select 1 from roteiros mais_novo where mais_novo.versao_de = roteiros.id)`;
+/**
+ * Só a ponta de cada série: nenhuma versão da mesma série (todas apontam `versaoDe` para a raiz, a v1) com número maior, e no empate de número (linha inserida sem `versao`) a de id maior.
+ * Com três versões ou mais, "ninguém aponta para este id"
+ * deixava a v2 na lista ao lado da v3 (achado da revisão do PR 2a da E55).
+ */
+const SEM_VERSAO_MAIS_NOVA = sql`not exists (
+  select 1 from roteiros mais_novo
+  where mais_novo.versao_de = coalesce(roteiros.versao_de, roteiros.id)
+    and (mais_novo.versao > roteiros.versao or (mais_novo.versao = roteiros.versao and mais_novo.id > roteiros.id))
+)`;
 
 /**
  * O roteiro mais recente gerado hoje para o cliente (etapa 11, decisão 6:
@@ -1803,6 +1826,24 @@ export async function proximoDiaMarcado(clienteId: number, apartirDe: string): P
   return linha ?? null;
 }
 
+/**
+ * E55 PR 2: o roteiro que a marca já criou hoje a partir de um assunto em alta (a ponta da série, a versão mais nova), ou nulo. Inclui o arquivado, para o cartão "Em alta hoje" saber que a pessoa
+ * já decidiu ("Arquivar" é a saída do assunto do momento: o cartão não volta a oferecer o mesmo assunto no mesmo dia).
+ */
+export async function roteiroDoMomentoDeHoje(
+  clienteId: number,
+  hoje: string,
+  chave: string,
+): Promise<{ id: number; status: "gerado" | "gravado" | "postado"; arquivado: boolean } | null> {
+  const [linha] = await db()
+    .select({ id: roteiros.id, status: roteiros.status, arquivadoEm: roteiros.arquivadoEm })
+    .from(roteiros)
+    .where(and(eq(roteiros.clienteId, clienteId), eq(roteiros.data, hoje), sql`${roteiros.temaDoMomento}->>'chave' = ${chave}`, SEM_VERSAO_MAIS_NOVA))
+    .orderBy(desc(roteiros.criadoEm))
+    .limit(1);
+  return linha ? { id: linha.id, status: linha.status, arquivado: linha.arquivadoEm !== null } : null;
+}
+
 export type ItemAgendaDoDia = {
   id: number;
   tema: string;
@@ -1818,6 +1859,8 @@ export type ItemAgendaDoDia = {
   criadoEm: Date;
   /** E39b, item (a): nulo até a pessoa tocar em "Conferir" (só preenchido no destaque do Reels). */
   aindaValeResultado: AindaValeResultado | null;
+  /** E55 PR 2: nasceu do tema do momento (um assunto em alta hoje). Esse item não muda de dia: o menu não oferece "Não vou gravar hoje" e o arrasto não começa. */
+  doMomento: boolean;
 };
 export type AgendaDoDia = { reels: ItemAgendaDoDia[]; stories: ItemAgendaDoDia[] };
 
@@ -1837,6 +1880,7 @@ function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
     duracaoS: corpoDoRoteiro(linha).duracaoS,
     criadoEm: linha.criadoEm,
     aindaValeResultado: aindaValeDeHoje(linha),
+    doMomento: linha.temaDoMomento !== null,
   };
 }
 
@@ -1920,6 +1964,9 @@ export async function desarquivarRoteiro(roteiroId: number): Promise<void> {
 export async function mudarDataRoteiro(roteiroId: number, novaData: string): Promise<void> {
   const validada = validarData(novaData);
   if (!validada) throw new ErroRoteiro("data invalida.");
+  // E55 PR 2: o roteiro do tema do momento é para hoje (o assunto está em alta hoje): a tela nem oferece trocar o dia, e o servidor recusa mesmo assim. Trazer para hoje continua valendo.
+  const [linha] = await db().select({ temaDoMomento: roteiros.temaDoMomento }).from(roteiros).where(eq(roteiros.id, roteiroId));
+  if (linha?.temaDoMomento && validada !== hojeISO()) throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
   await db().update(roteiros).set({ data: validada }).where(eq(roteiros.id, roteiroId));
 }
 
@@ -2121,6 +2168,8 @@ export type ItemSemanaPlano = {
   objetivo: Objetivo;
   /** E49 PR 1: a ficha do roteiro já escrito; o item sugerido do plano só guarda o objetivo (`null`). */
   ficha: Ficha | null;
+  /** E55 PR 2: o roteiro do tema do momento não arrasta para outro dia nem tem "Não vou gravar hoje". */
+  doMomento: boolean;
 };
 export type DiaSemanaPlano = {
   data: string;
@@ -2183,6 +2232,7 @@ export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: str
       status: linha.status,
       objetivo: linha.objetivo,
       ficha: linha.formato === "story" ? null : linha.ficha,
+      doMomento: linha.temaDoMomento !== null,
     });
     porDia.set(linha.data, atual);
   }
@@ -2198,6 +2248,7 @@ export async function semanaPlanoDaAgenda(clienteId: number, dataReferencia: str
       status: "gerado",
       objetivo: linha.objetivo,
       ficha: null,
+      doMomento: false,
     });
     porDia.set(linha.dia, atual);
   }

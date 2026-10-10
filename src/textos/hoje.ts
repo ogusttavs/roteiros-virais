@@ -317,4 +317,28 @@ export const textosHoje = {
       },
     },
   },
+  /**
+   * E55 PR 2 (passo 21 do Opus): o assunto do momento, o que está em alta no Brasil hoje trazido para o ramo da pessoa. Vale só no dia; o cartão diz de onde o assunto veio, desde quando e que
+   * não muda de dia, e some sozinho quando o assunto sai do que está em alta. Nunca a palavra "tendência" na tela.
+   */
+  emAlta: {
+    titulo: "Em alta hoje",
+    origem: "Em alta no Brasil",
+    paraHoje: "Para hoje",
+    noSeuRamo: "No seu ramo",
+    criarRoteiro: "Criar o roteiro",
+    abrirRoteiro: "Abrir o roteiro",
+    queroEsse: "Quero esse",
+    valeEnquanto: "Vale enquanto o assunto estiver em alta. Não muda de dia.",
+    /** A nota do menu do item do momento, e a frase que o servidor devolve se alguém tentar mudar o dia mesmo assim. */
+    naoMudaDeDia: "Não muda de dia: o assunto do momento é para hoje. Se não der para gravar, arquive.",
+    /** De onde vem o assunto: as buscas do Google, os vídeos do YouTube, ou os dois. */
+    fonte: (google: boolean, youtube: boolean) =>
+      google && youtube ? "Buscas do Google e vídeos do YouTube no Brasil" : youtube ? "Vídeos do YouTube no Brasil" : "Buscas do Google no Brasil",
+    /** "em alta desde hoje, 5h": a hora da primeira rodada em que o assunto apareceu (a leitura é de manhã cedo e ao meio-dia, então a hora nunca é mais exata do que isso). */
+    desde: (dia: "hoje" | "ontem" | "antes", hora: number) => (dia === "antes" ? "em alta desde antes de ontem" : `em alta desde ${dia}, ${hora}h`),
+    /** Só quando o Google trouxe o número; sem ele, o cartão não inventa. */
+    buscas: (numero: string) => `Mais de ${numero} buscas no Google hoje.`,
+    soYoutube: "Entre os vídeos mais vistos do YouTube no Brasil hoje.",
+  },
 };

@@ -222,8 +222,8 @@ export function MesConteudo({
                     className={[hojeStyles.linhaComMenu, mover.itemArrastando?.id === item.id ? styles.linhaArrastando : ""]
                       .filter(Boolean)
                       .join(" ")}
-                    draggable={podeArrastar}
-                    onDragStart={(evento) => podeArrastar && mover.aoComecarArrasto(evento, { id: item.id, tipo, titulo: item.titulo }, diaSelecionado)}
+                    draggable={podeArrastar && !item.doMomento}
+                    onDragStart={(evento) => podeArrastar && !item.doMomento && mover.aoComecarArrasto(evento, { id: item.id, tipo, titulo: item.titulo }, diaSelecionado)}
                     onDragEnd={mover.aoTerminarArrasto}
                   >
                     <button
@@ -245,6 +245,7 @@ export function MesConteudo({
                         titulo={item.titulo}
                         data={diaSelecionado}
                         aoArquivar={arquivarComDesfazer}
+                        doMomento={item.doMomento}
                         perguntaSeConflito={(novaData) => perguntaSeConflitoMes(dias, tipo, item.titulo, novaData)}
                       />
                     ) : null}

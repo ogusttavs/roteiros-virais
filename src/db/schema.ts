@@ -1450,6 +1450,12 @@ export type TemaDoDia = {
   };
 };
 
+/**
+ * E55 PR 2: o que o roteiro guarda do assunto em alta de onde nasceu (a cópia do `doMomento` do tema, sem o encaixe, no instante de criar). O tema some de `temas_dia` quando o assunto sai da
+ * lista, então só o roteiro lembra: é daqui que vêm o selo "Assunto do momento", o "já passou", o selo do Histórico, a recusa de mudar de dia e o pedido de "mais fácil de gravar hoje" na reescrita.
+ */
+export type TemaDoMomentoGuardado = Pick<NonNullable<TemaDoDia["doMomento"]>, "chave" | "assunto" | "termos" | "fonte" | "url" | "coletadaEm">;
+
 export const temasDia = pgTable(
   "temas_dia",
   {
@@ -1800,6 +1806,8 @@ export const roteiros = pgTable(
      * marca do mesmo setor).
      */
     noticiaId: integer("noticia_id").references(() => noticias.id),
+    /** E55 PR 2: nulo, salvo no roteiro que nasceu do tema do momento (ver `TemaDoMomentoGuardado`). */
+    temaDoMomento: jsonb("tema_do_momento").$type<TemaDoMomentoGuardado>(),
     criadoEm: criadoEm(),
   },
   (t) => [index("roteiros_cliente_data").on(t.clienteId, t.data), index("roteiros_data").on(t.data)],

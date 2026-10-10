@@ -128,13 +128,15 @@ test.describe("trocar de marca pela tela", () => {
 
     // Marca Compartilhada e Marca Dois primeiro, Marca Um por ultimo:
     // marcaPadrao desempata por criadoEm desc (servicos/clientes.ts), entao a
-    // Um e a marca ativa no primeiro login, sem cookie nenhum ainda. A
+    // Um e a marca ativa no primeiro login, sem cookie nenhum ainda. As duas
+    // mais velhas levam um criadoEm explicito (dois e um minuto atras): marcas criadas em
+    // seguida podem empatar no milissegundo, e o empate cai na ordem do nome. A
     // Compartilhada fica de fora do teste de troca (item abaixo): tem
     // roteiro de hoje, e /hoje mostraria "seu roteiro esta pronto" em vez do
     // seletor de tema se ela fosse a Um ou a Dois.
     const [marcaCompartilhada] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-marcas-a", nome: NOME_MARCA_COMPARTILHADA, nichoId: nichoUm.id })
+      .values({ usuarioId: "e2e-marcas-a", nome: NOME_MARCA_COMPARTILHADA, nichoId: nichoUm.id, criadoEm: new Date(Date.now() - 120_000) })
       .returning();
     await db()
       .insert(membrosMarca)
@@ -143,7 +145,7 @@ test.describe("trocar de marca pela tela", () => {
 
     const [marcaDois] = await db()
       .insert(clientes)
-      .values({ usuarioId: "e2e-marcas-a", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id })
+      .values({ usuarioId: "e2e-marcas-a", nome: NOME_MARCA_DOIS, nichoId: nichoDois.id, criadoEm: new Date(Date.now() - 60_000) })
       .returning();
     await db().insert(membrosMarca).values({ usuarioId: "e2e-marcas-a", clienteId: marcaDois.id, papel: "dono" });
     await db().insert(briefings).values({ clienteId: marcaDois.id, ...briefingCompletoExemplo() });

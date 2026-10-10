@@ -526,6 +526,13 @@
       "when": 1791306956914,
       "tag": "0074_tendencias-brasil",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1791574064660,
+      "tag": "0075_tema-do-momento-no-roteiro",
+      "breakpoints": true
     }
   ]
 }

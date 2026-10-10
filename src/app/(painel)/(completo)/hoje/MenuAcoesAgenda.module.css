@@ -144,3 +144,13 @@
   font-size: var(--tamanho-secundario);
   color: var(--cor-erro);
 }
+
+/* E55 PR 2: a linha que diz por que o item do momento não tem "Não vou gravar hoje". */
+.notaMomento {
+  margin: 0;
+  padding: var(--espaco-2) var(--espaco-3);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}

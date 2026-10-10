@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { rotuloParaQue } from "@/config/fichas";
+import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAtrasado } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
+import { CartaoEmAlta } from "@/ui/componentes/CartaoEmAlta";
 
 import {
   AindaValeBloco,
@@ -36,6 +38,8 @@ type Props = {
   proximoMarcado: ProximoMarcado | null;
   avisoBriefing: AvisoBriefingAgenda | null;
   avisoVideoSubindo: string | null;
+  /** E55 PR 2: o mesmo cartão "Em alta hoje" da aba Hoje (só em hoje). */
+  emAlta: DadosEmAlta | null;
 };
 
 const FORMATAR_DIA_DA_SEMANA_COMPLETO = new Intl.DateTimeFormat("pt-BR", { weekday: "long" });
@@ -64,6 +68,7 @@ export function DiaConteudo({
   proximoMarcado,
   avisoBriefing,
   avisoVideoSubindo,
+  emAlta,
 }: Props) {
   const router = useRouter();
   const aoAbrirContarAgenda = useAbrirContarAgenda();
@@ -92,7 +97,7 @@ export function DiaConteudo({
     setAgenda((atual) => ({ ...atual, reels: [item] }));
   }
 
-  const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0;
+  const diaVazio = agenda.reels.length === 0 && agenda.stories.length === 0 && !emAlta?.roteiro;
 
   const [atrasadosResolvidos, setAtrasadosResolvidos] = useState<Set<number>>(new Set());
   const atrasadosVisiveis = atrasados.filter((item) => !atrasadosResolvidos.has(item.id));
@@ -156,6 +161,30 @@ export function DiaConteudo({
         </p>
       </section>
 
+      {ehHoje && emAlta ? (
+        <section className={styles.secaoDia} aria-labelledby="t-em-alta">
+          <h2 id="t-em-alta">{textosHoje.emAlta.titulo}</h2>
+          <CartaoEmAlta
+            cartao={emAlta}
+            destaque={diaVazio && !emAlta.roteiro && atrasadosVisiveis.length === 0 ? "principal" : "secundario"}
+            ocupado={ocupado && acao === "em-alta"}
+            aoClicar={() => ir("em-alta", emAlta.roteiro ? `/roteiros/${emAlta.roteiro.id}` : `/criar/objetivo?tema=${emAlta.tema.indice}`)}
+            estado={emAlta.roteiro ? textosHoje.agenda.estadoReels[emAlta.roteiro.status] : undefined}
+            menu={
+              emAlta.roteiro ? (
+                <MenuAcoesAgenda
+                  roteiroId={emAlta.roteiro.id}
+                  titulo={emAlta.tema.titulo}
+                  data={diaVisualizado}
+                  aoArquivar={arquivarComDesfazer}
+                  doMomento
+                />
+              ) : undefined
+            }
+          />
+        </section>
+      ) : null}
+
       {ehHoje && atrasadosVisiveis.length > 0 ? (
         <section className={styles.secaoDia} aria-labelledby="t-atrasado">
           <h2 id="t-atrasado">{textosHoje.agenda.atrasado.titulo}</h2>
@@ -193,6 +222,8 @@ export function DiaConteudo({
         </section>
       ) : (
         <div className={styles.diaColunas}>
+          {/* O Reels do dia que está dentro do cartão "Em alta hoje" não deixa a coluna dizer "Nada marcado" logo abaixo dele. */}
+          {agenda.reels.length === 0 && emAlta?.roteiro ? null : (
           <section className={styles.secaoDia} aria-labelledby="t-reels">
             <h2 id="t-reels">{ehHoje ? textosHoje.agenda.reels.hoje : textosHoje.agenda.reels.outroDia}</h2>
             {agenda.reels.length > 0 ? (
@@ -221,6 +252,7 @@ export function DiaConteudo({
                       data={diaVisualizado}
                       variante="destaque"
                       aoArquivar={arquivarComDesfazer}
+                      doMomento={agenda.reels[0].doMomento}
                     />
                   </div>
                 </article>
@@ -239,7 +271,7 @@ export function DiaConteudo({
                             <span className={styles.tituloItem}>{item.titulo}</span>
                             <EstadoItem item={item} ehHoje={ehHoje} />
                           </button>
-                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
+                          <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} doMomento={item.doMomento} />
                         </li>
                       ))}
                     </ol>
@@ -250,6 +282,7 @@ export function DiaConteudo({
               <p className={styles.semItemNaColuna}>{textosHoje.agenda.semNadaNaColuna}</p>
             )}
           </section>
+          )}
 
           <section className={styles.secaoDia} aria-labelledby="t-stories">
             <h2 id="t-stories">{ehHoje ? textosHoje.agenda.stories.hoje : textosHoje.agenda.stories.outroDia}</h2>
@@ -268,7 +301,7 @@ export function DiaConteudo({
                         <span className={styles.tituloItem}>{item.titulo}</span>
                         <EstadoItem item={item} ehHoje={ehHoje} />
                       </button>
-                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} />
+                      <MenuAcoesAgenda roteiroId={item.id} titulo={item.titulo} data={diaVisualizado} aoArquivar={arquivarComDesfazer} doMomento={item.doMomento} />
                     </li>
                   ))}
                 </ol>

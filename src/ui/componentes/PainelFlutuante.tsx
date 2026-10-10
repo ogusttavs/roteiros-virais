@@ -21,6 +21,8 @@ type Props = {
   aoFechar: () => void;
   /** "menu" para uma lista de acoes (role="menuitem" nos filhos); "dialog" para formulario ou lista. */
   role?: "menu" | "dialog";
+  /** O id de um texto dentro do painel que explica o painel (lido junto com o nome, sem estar na lista de ações). */
+  descricaoId?: string;
   /**
    * Rodapé que não rola com o resto (V7, item 3: o botão principal precisa
    * ficar dentro da área visível mesmo com a viewport reduzida). Só o painel
@@ -68,7 +70,7 @@ type Props = {
  * regra global de `base.css` lê para travar a rolagem da página de trás
  * enquanto uma folha está aberta.
  */
-export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rodape, lateral = false, children }: Props) {
+export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", descricaoId, rodape, lateral = false, children }: Props) {
   const arrasto = usePuxarParaFechar(aoFechar);
   const painelRef = arrasto.folhaRef;
   const { montada, saindo } = useFolhaAnimada(aberto);
@@ -113,6 +115,7 @@ export function PainelFlutuante({ titulo, aberto, aoFechar, role = "dialog", rod
         role={role}
         aria-modal={role === "dialog" ? true : undefined}
         aria-label={titulo}
+        aria-describedby={descricaoId}
         tabIndex={-1}
         data-folha-aberta=""
         data-saindo={saindo ? "" : undefined}
