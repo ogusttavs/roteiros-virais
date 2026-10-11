@@ -1132,3 +1132,155 @@
   font-weight: var(--peso-medio);
   line-height: 1.2;
 }
+
+/* ---------- E54 (parte 3, passo 22): o roteiro escrito com pesquisa ---------- */
+
+.seloPesquisa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  line-height: 1.2;
+}
+
+/* O "Atenção" antes dos blocos: cor de atenção só na barra do lado e no título; o texto é conversa. */
+.atencaoRoteiro {
+  display: grid;
+  gap: var(--espaco-2);
+  margin-block: var(--espaco-4);
+  padding: var(--espaco-4) var(--espaco-5);
+  border-left: 3px solid var(--cor-atencao);
+  border-radius: 0 var(--raio-md) var(--raio-md) 0;
+  background: var(--cor-superficie-recuada);
+}
+
+.tituloAtencao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-atencao);
+}
+
+.atencaoRoteiro ul {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding-left: var(--espaco-5);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.respostasPesquisa,
+.fontesPesquisa {
+  display: grid;
+  gap: var(--espaco-3);
+  margin-block: var(--espaco-3);
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.respostasPesquisa h2,
+.fontesPesquisa h2 {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.ajudaPesquisa {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.respostasPesquisa dl {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+}
+
+.respostasPesquisa dt {
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}
+
+.respostasPesquisa dd {
+  margin: var(--espaco-1) 0 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.fontesPesquisa ol {
+  display: grid;
+  gap: var(--espaco-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* O número da fonte é o mesmo que a fala usa ao lado da frase (`data-fonte-numero`); `display: grid` tira o marcador da lista, então ele é desenhado aqui. */
+.fontesPesquisa li {
+  position: relative;
+  display: grid;
+  gap: var(--espaco-1);
+  padding-left: var(--espaco-8);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.fontesPesquisa li::before {
+  content: attr(data-fonte-numero);
+  position: absolute;
+  left: 0;
+  top: 0.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-texto-suave);
+}
+
+.quemPublicou {
+  font-family: var(--fonte-mono);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-dica);
+}
+
+.quemPublicou b {
+  color: var(--cor-texto);
+  font-weight: var(--peso-semibold);
+}
+
+.dadoDaFonte {
+  overflow-wrap: anywhere;
+}
+
+.abrirFontePesquisa {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: var(--altura-toque);
+  justify-self: start;
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-rodape);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

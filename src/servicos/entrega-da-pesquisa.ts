@@ -6,12 +6,14 @@
  *   depois do código. O modelo escreve a parte que depende do assunto; o que é regra (dado antigo, premissa mantida, saúde, preço, política) o código
  *   escreve, e o que o modelo escreveu passa pelas mesmas travas do roteiro: o item que falha SAI, em vez de derrubar o roteiro por um item secundário.
  */
-import type { EntregaDaPesquisa, PesquisaDeOrigemGuardada } from "@/db/schema";
+import type { AchadoDaPesquisa, EntregaDaPesquisa, PesquisaDeOrigemGuardada } from "@/db/schema";
 import type { PesquisaNaEntrada, SaidaRoteiro } from "@/ia/prompts/roteiro";
 import { encontrarProblemas } from "@/lib/regras-de-texto";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { dadosForaDasFontes, ehPrevisaoDePublico, limparLinha, semAcento, tokensNumericos } from "./conferencia-da-pesquisa";
+import { enderecoHttpsSeguro } from "./noticias-assuntos";
+
 
 const GANCHOS_NO_MAXIMO = 3;
 const OBJECOES_NO_MAXIMO = 4;
@@ -85,17 +87,83 @@ function textoLimpo(texto: string): boolean {
   return encontrarProblemas(texto).length === 0 && !/https?:\/\/|www\.|@/i.test(texto);
 }
 
-/** Os dados que o texto do roteiro usou, por código: o número do dado (com unidade e escala) ou o nome da fonte aparece no texto. */
-function idsUsadosPorCodigo(pesquisa: PesquisaDeOrigemGuardada, textoDoRoteiro: string): number[] {
-  const chavesDoTexto = new Set(tokensNumericos(textoDoRoteiro).map((t) => t.chave));
-  const normalizado = semAcento(textoDoRoteiro);
-  return pesquisa.dados
+/** Os dados que um texto usou, por código: o número do dado (com unidade e escala) ou o nome da fonte aparece no texto. */
+export function idsUsadosNoTexto(dados: AchadoDaPesquisa[], texto: string): number[] {
+  const chavesDoTexto = new Set(tokensNumericos(texto).map((t) => t.chave));
+  const normalizado = semAcento(texto);
+  return dados
     .filter((d) => {
       const numeros = tokensNumericos(d.texto).map((t) => t.chave);
       if (numeros.some((n) => chavesDoTexto.has(n))) return true;
-      return normalizado.includes(semAcento(d.fonteNome));
+      return citaOLugar(normalizado, semAcento(d.fonteNome));
     })
     .map((d) => d.id);
+}
+
+/** O nome da fonte aparece no texto como palavra inteira ("Exame" não está em "exames"). Os dois já sem acento e em minúscula. */
+function citaOLugar(textoNormalizado: string, nome: string): boolean {
+  const limpo = nome.trim();
+  if (limpo === "") return false;
+  const escapado = limpo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escapado}(?![\\p{L}\\p{N}])`, "u").test(textoNormalizado);
+}
+
+function idsUsadosPorCodigo(pesquisa: PesquisaDeOrigemGuardada, textoDoRoteiro: string): number[] {
+  return idsUsadosNoTexto(pesquisa.dados, textoDoRoteiro);
+}
+
+const PREFIXO_DO_OUTRO_LADO = /^\s*do outro lado:\s*/i;
+
+/** A frase do dado como a pessoa a lê: sem o "Do outro lado:" da busca, com a primeira letra maiúscula. */
+export function fraseDoDado(achado: Pick<AchadoDaPesquisa, "texto">): { dado: string; outroLado: boolean } {
+  const outroLado = PREFIXO_DO_OUTRO_LADO.test(achado.texto);
+  const limpo = achado.texto.replace(PREFIXO_DO_OUTRO_LADO, "").trim();
+  return { dado: limpo.charAt(0).toUpperCase() + limpo.slice(1), outroLado };
+}
+
+/** Uma fonte da lista "Fontes" do roteiro: o número pequeno que a fala usa, quem publicou, quando, a frase e o endereço (só https). */
+export type FonteDoRoteiro = { numero: number; id: number; fonte: string; data: string | null; dado: string; url: string | null };
+
+/** O que o roteiro com pesquisa mostra além do roteiro: o selo, o "Atenção", o "pode aparecer" e as fontes. */
+export type PesquisaDoRoteiro = {
+  dados: number;
+  atencao: string[];
+  respostas: { objecao: string; resposta: string }[];
+  fontes: FonteDoRoteiro[];
+};
+
+/**
+ * A pesquisa como a tela do roteiro a lê (E54, parte 3): as fontes são as que a entrega declarou (as do modelo mais as que o código achou no texto), numeradas pela ordem em que a
+ * pessoa as viu na pesquisa; sem entrega (roteiro de antes, ou a entrega que o modelo não devolveu), valem todos os dados que ela marcou.
+ */
+export function pesquisaDoRoteiro(pesquisa: PesquisaDeOrigemGuardada, entrega: EntregaDaPesquisa | null): PesquisaDoRoteiro {
+  const ids = new Set(entrega && entrega.fontes.length > 0 ? entrega.fontes : pesquisa.dados.map((d) => d.id));
+  const fontes = pesquisa.dados
+    .filter((d) => ids.has(d.id))
+    .map((d, indice): FonteDoRoteiro => {
+      const { dado } = fraseDoDado(d);
+      return {
+        numero: indice + 1,
+        id: d.id,
+        fonte: d.fonteNome,
+        data: dataPorExtensoDaPagina(d.dataDaPagina),
+        dado,
+        url: enderecoHttpsSeguro(d.url),
+      };
+    });
+  return { dados: pesquisa.dados.length, atencao: entrega?.atencao ?? [], respostas: entrega?.oQueVaoTeResponder ?? [], fontes };
+}
+
+/**
+ * Para cada parágrafo, os números das fontes que ele usa (por código: o número do dado ou o nome da fonte aparece na frase). Vazio quando o parágrafo não usa nenhuma. O roteiro
+ * da pessoa pode ter sido editado: o que vale é o texto de agora.
+ */
+export function fontesDosParagrafos(paragrafos: string[], pesquisa: PesquisaDeOrigemGuardada, fontes: FonteDoRoteiro[]): number[][] {
+  const numeroPorId = new Map(fontes.map((f) => [f.id, f.numero]));
+  return paragrafos.map((paragrafo) => {
+    const ids = idsUsadosNoTexto(pesquisa.dados, paragrafo);
+    return ids.map((id) => numeroPorId.get(id)).filter((n): n is number => n !== undefined);
+  });
 }
 
 export type ContextoDaEntrega = {

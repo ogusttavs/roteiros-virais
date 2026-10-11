@@ -23,10 +23,13 @@ import {
   lerRascunhoDoMomento,
   rascunhoEstaVazio,
 } from "@/lib/rascunho-momento";
+import type { DadosDoCampoDePesquisa, Profundidade } from "@/servicos/pesquisa-na-hora";
 import { textosMomento } from "@/textos/momento";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { Botao } from "@/ui/componentes/Botao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
+import { CampoPesquisar } from "@/ui/componentes/CampoPesquisar";
 import { Chips } from "@/ui/componentes/Chips";
 import { Folha } from "@/ui/componentes/Folha";
 import { GravadorDeAudio } from "@/ui/componentes/GravadorDeAudio";
@@ -35,6 +38,8 @@ import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/Pergu
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useGravadorDeAudio } from "@/ui/componentes/useGravadorDeAudio";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+
+import { pedirPesquisaAction } from "../criar/pesquisa/acoes";
 
 import { roteiroRecenteDesdeAction } from "./acoes";
 import styles from "./FolhaGravarAgora.module.css";
@@ -96,6 +101,11 @@ type Props = {
    * no aparelho (sessionStorage, por marca) até gerar o roteiro ou limpar.
    */
   marcaAtivaId?: number;
+  /**
+   * E54 (parte 3): o dia da marca para o campo "Pesquisar antes de escrever" dizer a verdade (quantas pesquisas já usou, o teto, o custo). Ausente, o campo não aparece. Também não aparece
+   * vindo de um item do plano (`planoItemId`): aquele caminho liga o roteiro ao item e não leva pesquisa (anotado como lacuna).
+   */
+  pesquisa?: DadosDoCampoDePesquisa;
 };
 
 /**
@@ -118,6 +128,7 @@ export function FolhaGravarAgora({
   quemGravaPadrao,
   dataInicial,
   marcaAtivaId,
+  pesquisa,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -164,6 +175,17 @@ export function FolhaGravarAgora({
     const indice = marcas.findIndex((marca) => marca.id === valoresIniciais.marcaId);
     return indice >= 0 ? indice + 1 : 0;
   });
+
+  // E54 (parte 3): "Pesquisar antes de escrever", opcional, no fim da folha. O que a pessoa contou fica guardado no servidor junto da pesquisa: a tela dela escreve o roteiro depois.
+  const comCampoDePesquisa = pesquisa !== undefined && planoItemId === undefined;
+  const [pesquisaAberta, setPesquisaAberta] = useState(false);
+  const [pedidoDePesquisa, setPedidoDePesquisa] = useState("");
+  const [profundidade, setProfundidade] = useState<Profundidade>("normal");
+  const [pedindoPesquisa, setPedindoPesquisa] = useState(false);
+  const [erroDaPesquisa, setErroDaPesquisa] = useState<string | null>(null);
+  /** O teto do dia dito pelo servidor (a página estava velha): um aviso calmo ao lado do campo, nunca erro dele. */
+  const [avisoDaPesquisa, setAvisoDaPesquisa] = useState<string | null>(null);
+  const vaiPesquisar = comCampoDePesquisa && pesquisaAberta && pesquisa.usadasHoje < pesquisa.teto;
 
   const [camposFaltando, setCamposFaltando] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -300,6 +322,65 @@ export function FolhaGravarAgora({
     }
   }
 
+  /** "Pesquisar e escrever": cria a pesquisa com o que a pessoa contou e leva para a tela dela; o roteiro é escrito lá, com os dados que ela marcar. */
+  async function pesquisarEEscrever() {
+    if (!validarCampos() || !objetivo) {
+      setCamposFaltando(true);
+      return;
+    }
+    if (pedidoDePesquisa.trim().length < 8) {
+      setErroDaPesquisa(textosPesquisa.campo.pedidoCurto);
+      return;
+    }
+    setCamposFaltando(false);
+    setErroDaPesquisa(null);
+    setAvisoDaPesquisa(null);
+    setErroEnvio(null);
+    setPedindoPesquisa(true);
+    try {
+      const marcaId = marcaIndice !== null && marcaIndice > 0 ? marcas[marcaIndice - 1]?.id : undefined;
+      const resultado = await pedirPesquisaAction({
+        pedido: pedidoDePesquisa,
+        profundidade,
+        destino: {
+          tipo: "momento",
+          onde,
+          oQueEstaAcontecendo,
+          oQueDaParaMostrar,
+          objetivo,
+          ficha: perguntaDasFichas ? (ficha ?? undefined) : undefined,
+          formato,
+          estilo,
+          marcaId,
+          transcricao: transcricao ?? undefined,
+          objetivoDoVideo: objetivoDoVideo.trim() || undefined,
+          quemAparece: quemAparece || undefined,
+          data,
+          momentoDoDia: formato === "story" ? (momentoDoDia ?? undefined) : undefined,
+        },
+      });
+      if (saiuRef.current) return;
+      if (!resultado.ok) {
+        if (resultado.calma) {
+          setAvisoDaPesquisa(resultado.erro);
+          // A página estava com o dia velho: lê de novo, e o campo passa a dizer o que sobra.
+          router.refresh();
+        } else {
+          setErroDaPesquisa(resultado.erro);
+        }
+        return;
+      }
+      // O rascunho fica: quem volta da pesquisa com "Mudar o pedido" reabre a folha com o que tinha contado. A entrada da folha no histórico vira a da pesquisa (`replace`, o contrato de
+      // `useFolhaNoHistorico`): o Voltar da pesquisa não cai num Criar idêntico ao de antes.
+      fecharENavegar(() => router.replace(`/criar/pesquisa/${resultado.dado.id}`));
+    } catch (falha) {
+      if (saiuRef.current) return;
+      setErroDaPesquisa(tratarFalha(falha, textosPesquisa.campo.erroPedir));
+    } finally {
+      if (!saiuRef.current) setPedindoPesquisa(false);
+    }
+  }
+
   function voltarDepois() {
     saiuRef.current = true;
     aoFechar();
@@ -314,8 +395,14 @@ export function FolhaGravarAgora({
         aberto={!enviando}
         aoFechar={aoFechar}
         rodape={
-          <Botao variante="primario" tamanho="lg" precisaDeRede carregando={enviando} onClick={escrever}>
-            {enviando ? textosMomento.escrevendo : textosMomento.escreverRoteiro}
+          <Botao
+            variante="primario"
+            tamanho="lg"
+            precisaDeRede
+            carregando={enviando || pedindoPesquisa}
+            onClick={vaiPesquisar ? () => void pesquisarEEscrever() : escrever}
+          >
+            {enviando ? textosMomento.escrevendo : vaiPesquisar ? textosPesquisa.campo.pesquisarEEscrever : textosMomento.escreverRoteiro}
           </Botao>
         }
       >
@@ -475,6 +562,33 @@ export function FolhaGravarAgora({
               onChange={setMarcaIndice}
             />
             <p className={styles.falarDeAjuda}>{textosMomento.falarDeAjuda}</p>
+          </div>
+        ) : null}
+
+        {comCampoDePesquisa ? (
+          <div className={styles.campoPesquisar}>
+            <CampoPesquisar
+              dados={pesquisa}
+              aberto={pesquisaAberta}
+              aoAbrir={() => setPesquisaAberta(true)}
+              aoTirar={() => {
+                setPesquisaAberta(false);
+                setErroDaPesquisa(null);
+              }}
+              pedido={pedidoDePesquisa}
+              aoMudarPedido={(valor) => {
+                setPedidoDePesquisa(valor);
+                setErroDaPesquisa(null);
+                setAvisoDaPesquisa(null);
+              }}
+              profundidade={profundidade}
+              aoMudarProfundidade={setProfundidade}
+              erro={erroDaPesquisa}
+              aviso={avisoDaPesquisa}
+              nomeArquivo="momento-pesquisa"
+              disabled={pedindoPesquisa}
+            />
+            {vaiPesquisar ? <p className={styles.formatoAjuda}>{textosPesquisa.campo.primeiroAPesquisaMomento}</p> : null}
           </div>
         ) : null}
 

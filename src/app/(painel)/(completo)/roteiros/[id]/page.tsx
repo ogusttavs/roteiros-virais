@@ -6,6 +6,7 @@ import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario, preferenciasDoUsuario } from "@/servicos/clientes";
 import { momentoDoRoteiro } from "@/servicos/em-alta";
+import { fontesDosParagrafos, pesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { noticiaDeOrigemDoRoteiro } from "@/servicos/noticias";
 import { diaPorExtenso, enderecoHttpsSeguro } from "@/servicos/noticias-assuntos";
@@ -67,13 +68,20 @@ export default async function Roteiro({ params }: Props) {
       ? { titulo: noticiaDoSetor.titulo, veiculo: noticiaDoSetor.fonte ?? "", url: enderecoHttpsSeguro(noticiaDoSetor.url), dia: noticiaDoSetor.publicadoEm ? diaPorExtenso(noticiaDoSetor.publicadoEm) : null }
       : null;
 
+  // E54 (parte 3): o roteiro escrito com a pesquisa na hora: o "Atenção", o "pode aparecer" e as fontes saem da cópia que o roteiro guardou (nunca da pesquisa viva), e cada parágrafo
+  // diz, por código, quais fontes usa.
+  const pesquisa = roteiro.pesquisaNaHora ? pesquisaDoRoteiro(roteiro.pesquisaNaHora, corpoDoRoteiro(roteiro).entregaDaPesquisa ?? null) : null;
+  const guardada = roteiro.pesquisaNaHora;
+  const blocos = blocosParaLeitura(roteiro).map((bloco) => (pesquisa && guardada ? { ...bloco, fontes: fontesDosParagrafos(bloco.paragrafos, guardada, pesquisa.fontes) } : bloco));
+
   return (
     <RoteiroTela
       // As marcas guardadas (com o registro do conserto) ficam no servidor: a tela recebe só `fala`.
       roteiro={{ ...roteiro, marcasDeFala: null }}
       noticiaDeOrigem={noticiaDeOrigem}
       corpo={corpoDoRoteiro(roteiro)}
-      blocos={blocosParaLeitura(roteiro)}
+      blocos={blocos}
+      pesquisa={pesquisa}
       video={video}
       versoes={versoes}
       momento={momento}

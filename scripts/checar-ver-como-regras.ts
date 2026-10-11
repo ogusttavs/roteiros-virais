@@ -13,6 +13,7 @@ export const PADRAO = "src/app/**/*.{ts,tsx}";
 export const LEITURA_LIVRE: Record<string, string> = {
   "src/app/(painel)/(completo)/criar/objetivo/acoes.ts:exemplosDaFichaAction": "só lê os exemplos do setor",
   "src/app/(painel)/(completo)/criar/objetivo/acoes.ts:sugerirEstiloAction": "só lê a sugestão de estilo pela evidência",
+  "src/app/(painel)/(completo)/criar/pesquisa/acoes.ts:lerPesquisaAction": "só lê a pesquisa da própria marca (a espera da tela a repete); fechar a que ficou presa é limpeza do sistema, não um ato da pessoa",
   "src/app/(painel)/(completo)/hoje/acoes.ts:roteiroRecenteDesdeAction": "só lê se há roteiro recente",
   "src/app/(painel)/(completo)/hoje/acoes.ts:grupoRecenteDesdeAction": "só lê se há versões recentes",
   "src/app/(painel)/_briefing/acoes.ts:listarPerfisCitadosAction": "só lê os perfis citados",

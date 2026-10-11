@@ -1,0 +1,161 @@
+/**
+ * "Pesquisar antes de escrever" (E54, parte 3; design v2, `entrega/telas/base.css`, `.pesquisar-fechado`, `.pesquisar-antes`, `.custo-pesquisa`): fechado é uma linha tracejada que
+ * não pesa; aberto é o pedido, o tamanho e o que isso custa em língua de gente.
+ */
+.fechado {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  width: 100%;
+  min-height: var(--altura-toque-lg);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) dashed var(--cor-borda-forte);
+  border-radius: var(--raio-lg);
+  background: transparent;
+  color: var(--cor-titulo);
+  text-align: left;
+  font-family: var(--fonte-texto);
+  cursor: pointer;
+}
+
+.fechado:hover:not(:disabled) {
+  background: var(--cor-superficie-hover);
+}
+
+.fechado:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.fechado > svg {
+  color: var(--cor-texto-suave);
+}
+
+.oQue {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oQue b {
+  font-weight: var(--peso-semibold);
+  font-size: var(--tamanho-secundario);
+}
+
+.oQue span {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.cartao {
+  display: grid;
+  gap: var(--espaco-3);
+  align-content: start;
+  min-width: 0;
+  padding: var(--espaco-5);
+  background: var(--cor-superficie);
+  border: var(--largura-borda) solid var(--cor-borda);
+  border-radius: var(--raio-lg);
+}
+
+.aberto {
+  border-color: var(--cor-selecao-borda);
+}
+
+.topo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--espaco-3);
+}
+
+.topo h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  margin: 0;
+  font-size: var(--tamanho-cabecalho);
+  color: var(--cor-titulo);
+}
+
+.topo h3 svg {
+  color: var(--cor-destaque);
+}
+
+.tirar {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-3);
+  border: 0;
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.ajuda {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto-suave);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco-2);
+}
+
+.chip {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.chip[aria-checked="true"] {
+  border-color: var(--cor-selecao-borda);
+  background: var(--cor-selecao-suave);
+}
+
+.chip:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}
+
+.chip:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.custo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--espaco-2);
+  align-items: start;
+  margin: 0;
+  padding: var(--espaco-3);
+  border-radius: var(--raio-sm);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto);
+}
+
+.custo svg {
+  margin-top: 1px;
+  color: var(--cor-texto-suave);
+}
+
+.custo b {
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+}

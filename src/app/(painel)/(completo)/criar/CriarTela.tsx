@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronRight, Mic, Pencil, UserRound, Zap } from "lucide-react";
+import { CalendarDays, ChevronRight, Mic, Pencil, Search, UserRound, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -8,11 +8,13 @@ import { useEffect, useState, useTransition } from "react";
 import { rotuloParaQue } from "@/config/fichas";
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import type { AssuntoSemEncaixe, CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
+import type { DadosDoCampoDePesquisa, PesquisaEmAberto } from "@/servicos/pesquisa-na-hora";
 import type { ItemPlano } from "@/servicos/plano";
 import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { textosPlano } from "@/textos/plano";
 import { textosVozes } from "@/textos/vozes-do-publico";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -59,6 +61,10 @@ type Props = {
   semEncaixe?: AssuntoSemEncaixe[];
   /** E28 (parte 3b): as perguntas do público desta semana (a quinta porta); nulo no setor sem leitura, e a porta mostra o estado calmo de "ainda sem perguntas". */
   perguntas?: PerguntasDaTela | null;
+  /** E54 (parte 3): o dia da marca para o campo "Pesquisar antes de escrever" da folha do momento. */
+  pesquisa?: DadosDoCampoDePesquisa;
+  /** E54 (parte 3): a pesquisa que a pessoa deixou com "Voltar depois" (rodando, ou pronta e esperando os dados serem marcados). */
+  pesquisaEmAberto?: PesquisaEmAberto | null;
 };
 
 /**
@@ -84,6 +90,8 @@ export function CriarTela({
   emAlta = null,
   semEncaixe = [],
   perguntas = null,
+  pesquisa,
+  pesquisaEmAberto = null,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -185,6 +193,19 @@ export function CriarTela({
             <h1>{textosCriar.titulo}</h1>
             <p>{textosCriar.subtitulo}</p>
           </div>
+
+          {/* E54 (parte 3): a pesquisa que ficou para depois. Uma linha calma, antes de tudo: é o que a pessoa já pediu e está esperando por ela. */}
+          {pesquisaEmAberto ? (
+            <section className={styles.pesquisaEmAberto} aria-label={textosPesquisa.emAberto.aria} data-pesquisa-em-aberto={pesquisaEmAberto.estado}>
+              <Search size={20} strokeWidth={1.75} aria-hidden="true" />
+              <span className={styles.pesquisaEmAbertoTexto}>
+                {textosPesquisa.emAberto[pesquisaEmAberto.estado](pesquisaEmAberto.pedido)}
+              </span>
+              <button type="button" className={styles.trocar} disabled={ocupado} onClick={() => ir("pesquisa-em-aberto", `/criar/pesquisa/${pesquisaEmAberto.id}`)}>
+                {pesquisaEmAberto.estado === "pesquisando" ? textosPesquisa.emAberto.verAPesquisa : textosPesquisa.emAberto.verOQueAchou}
+              </button>
+            </section>
+          ) : null}
 
           {/* E55 PR 2b: o assunto do momento no alto da oficina, antes dos caminhos: é a única coisa do Criar que tem prazo. Aqui o botão é o principal da tela. */}
           {emAlta ? (
@@ -372,6 +393,7 @@ export function CriarTela({
           dataInicial={itemPlanoParaFolha ? undefined : dataInicial}
           marcaAtivaId={marcaAtiva.id}
           formatoInicial={abrirEmStory ? "story" : undefined}
+          pesquisa={pesquisa}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
           valoresIniciais={

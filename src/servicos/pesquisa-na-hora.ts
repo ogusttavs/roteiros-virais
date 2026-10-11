@@ -9,13 +9,22 @@
  * mesma busca), qualquer queda vira "erro" com o custo que já houve, e uma que ficou presa é encerrada depois de 15 minutos.
  */
 import * as Sentry from "@sentry/node";
-import { and, count, eq, gt, gte, inArray, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, lt, ne, or, sql } from "drizzle-orm";
 
 import { CAMBIO_USD_BRL } from "@/config/dinheiro";
 import { dominiosPermitidos } from "@/config/fontes-pesquisa";
 import { PRECO_BUSCA_WEB_USD, PRECOS_POR_NIVEL, TOKENS_DE_ENTRADA_POR_BUSCA } from "@/config/precos-ia";
 import { db } from "@/db";
-import { pesquisasNaHora, type PerguntaDePosicao, type PesquisaDeOrigemGuardada, type PesquisaNaHora, type PremissaDaPesquisa } from "@/db/schema";
+import {
+  pesquisasNaHora,
+  type AchadoDaPesquisa,
+  type DestinoDaPesquisa,
+  type PerguntaDePosicao,
+  type PesquisaDeOrigemGuardada,
+  type PesquisaNaHora,
+  type PremissaDaPesquisa,
+  type StatusDaPesquisa,
+} from "@/db/schema";
 import { buscarNaWeb, ErroDaBusca, type RespostaDaBusca } from "@/ia/busca-na-web";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
@@ -25,15 +34,20 @@ import { calcularCustoUsd, registrarGeracao } from "@/ia/registro";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
+import { reaisEmLinguagemDeGente } from "@/textos/pesquisa";
 
 import { type DescartesDaPesquisa, marcadosDeInicio, montarAchados, SEM_DESCARTES, sanearConferencia } from "./conferencia-da-pesquisa";
-import { limparParaPrompt } from "./noticias-assuntos";
+import { dataPorExtensoDaPagina, fraseDoDado } from "./entrega-da-pesquisa";
+import { enderecoHttpsSeguro, limparParaPrompt } from "./noticias-assuntos";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 
 /** Erro que a pessoa pode ler: a frase já vem pronta, em língua de gente. */
 export class ErroPesquisa extends Error {}
 
 export type Profundidade = "normal" | "aprofundada";
+
+/** Quantas das pesquisas do dia uma de cada tamanho usa: a "Mais a fundo" custa o dobro e conta como duas (desenho do passo 22). */
+export const PESO_DA_PROFUNDIDADE: Record<Profundidade, number> = { normal: 1, aprofundada: 2 };
 
 const PEDIDO_MINIMO = 8;
 const PEDIDO_MAXIMO = 300;
@@ -85,6 +99,9 @@ export async function encerrarPesquisasParadas(clienteId: number | null = null, 
     );
 }
 
+/** A soma do que as pesquisas do dia usaram do teto (a "Mais a fundo" conta como duas). Os pesos são constantes do código, nunca texto de fora. */
+const SOMA_DOS_PESOS = sql<number>`coalesce(sum(case when ${pesquisasNaHora.profundidade} = 'aprofundada' then ${sql.raw(String(PESO_DA_PROFUNDIDADE.aprofundada))} else ${sql.raw(String(PESO_DA_PROFUNDIDADE.normal))} end), 0)::int`;
+
 function pesquisasQueGastaramHoje(clienteId: number, agora: Date) {
   return and(
     eq(pesquisasNaHora.clienteId, clienteId),
@@ -94,24 +111,45 @@ function pesquisasQueGastaramHoje(clienteId: number, agora: Date) {
   );
 }
 
-/** Pesquisas que gastaram nesta marca desde o começo do dia. */
+/** Quanto do teto do dia esta marca já usou (a pesquisa "Mais a fundo" conta como duas). */
 export async function pesquisasDeHoje(clienteId: number, agora: Date = new Date()): Promise<number> {
   await encerrarPesquisasParadas(clienteId, agora);
-  const [linha] = await db().select({ n: count() }).from(pesquisasNaHora).where(pesquisasQueGastaramHoje(clienteId, agora));
+  const [linha] = await db()
+    .select({ n: SOMA_DOS_PESOS })
+    .from(pesquisasNaHora)
+    .where(pesquisasQueGastaramHoje(clienteId, agora));
   return Number(linha?.n ?? 0);
 }
 
-function frasePorTeto(): string {
+/**
+ * O teto do dia, quando o pedido não cabe. É um aviso, não uma falha: `soCabeRapida` diz que ainda sobra uma pesquisa (a "Mais a fundo" usa duas e não cabe, a rápida cabe), e a
+ * tela oferece a rápida em vez de dizer que acabou.
+ */
+export class ErroDoTeto extends ErroPesquisa {
+  constructor(
+    mensagem: string,
+    readonly soCabeRapida: boolean,
+  ) {
+    super(mensagem);
+  }
+}
+
+function erroPorTeto(usadas: number): ErroDoTeto {
   const teto = config.regras.pesquisasNaHoraPorMarcaPorDia;
-  return `Você já fez ${teto} ${teto === 1 ? "pesquisa" : "pesquisas"} hoje. Amanhã tem mais; hoje dá para escrever com o que a gente já sabe do seu setor.`;
+  const sobram = Math.max(0, teto - usadas);
+  if (sobram === 0) {
+    return new ErroDoTeto(`Você já usou as ${teto} ${teto === 1 ? "pesquisa" : "pesquisas"} de hoje. Amanhã tem mais; hoje dá para escrever com o que a gente já sabe do seu setor.`, false);
+  }
+  return new ErroDoTeto(`Hoje só sobra ${sobram} ${sobram === 1 ? "pesquisa" : "pesquisas"}, e a "Mais a fundo" usa 2. A rápida cabe.`, true);
 }
 
-/** O teto por marca por dia. Lança `ErroPesquisa` com a frase pronta. */
-export async function exigirFolgaDaPesquisa(clienteId: number, agora: Date = new Date()): Promise<void> {
-  if ((await pesquisasDeHoje(clienteId, agora)) >= config.regras.pesquisasNaHoraPorMarcaPorDia) throw new ErroPesquisa(frasePorTeto());
+/** O teto por marca por dia. Lança `ErroDoTeto` (um `ErroPesquisa`) com a frase pronta. */
+export async function exigirFolgaDaPesquisa(clienteId: number, agora: Date = new Date(), profundidade: Profundidade = "normal"): Promise<void> {
+  const usadas = await pesquisasDeHoje(clienteId, agora);
+  if (usadas + PESO_DA_PROFUNDIDADE[profundidade] > config.regras.pesquisasNaHoraPorMarcaPorDia) throw erroPorTeto(usadas);
 }
 
-export type PedidoDePesquisa = { pedido: string; tema?: string | null; profundidade?: Profundidade };
+export type PedidoDePesquisa = { pedido: string; tema?: string | null; profundidade?: Profundidade; destino?: DestinoDaPesquisa | null };
 
 /**
  * Manda a pesquisa para a fila (por evento: a pessoa pediu). Uma chave por pesquisa evita que o toque duplo rode a mesma duas vezes; a
@@ -141,11 +179,15 @@ export async function criarPesquisa(
   await encerrarPesquisasParadas(clienteId, agora);
   const linha = await db().transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(${TRAVA_DA_E54}, ${clienteId})`);
-    const [{ n }] = await tx.select({ n: count() }).from(pesquisasNaHora).where(pesquisasQueGastaramHoje(clienteId, agora));
-    if (Number(n) >= config.regras.pesquisasNaHoraPorMarcaPorDia) throw new ErroPesquisa(frasePorTeto());
+    const profundidade: Profundidade = dados.profundidade === "aprofundada" ? "aprofundada" : "normal";
+    const [{ n }] = await tx
+      .select({ n: SOMA_DOS_PESOS })
+      .from(pesquisasNaHora)
+      .where(pesquisasQueGastaramHoje(clienteId, agora));
+    if (Number(n) + PESO_DA_PROFUNDIDADE[profundidade] > config.regras.pesquisasNaHoraPorMarcaPorDia) throw erroPorTeto(Number(n));
     const [nova] = await tx
       .insert(pesquisasNaHora)
-      .values({ clienteId, pedido, tema: tema || null, profundidade: dados.profundidade === "aprofundada" ? "aprofundada" : "normal" })
+      .values({ clienteId, pedido, tema: tema || null, profundidade, destino: dados.destino ?? null })
       .returning();
     return nova;
   });
@@ -217,6 +259,200 @@ export async function decidirPremissa(clienteId: number, pesquisaId: number, dec
   const pesquisa = await lerPesquisa(clienteId, pesquisaId);
   if (!pesquisa || pesquisa.premissa?.situacao !== "nao_confere") throw new ErroPesquisa("Essa pesquisa não tem um aviso para você decidir.");
   await db().update(pesquisasNaHora).set({ decisaoDaPremissa: decisao }).where(eq(pesquisasNaHora.id, pesquisa.id));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// A tela (parte 3): o que a pessoa lê, em língua de gente, sem nada que o navegador precise decidir
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Um dado como a tela o mostra: a frase, o trecho da própria fonte, quem publicou, quando, o endereço (só https) e as etiquetas que o código acha. */
+export type AchadoDaTela = {
+  id: number;
+  dado: string;
+  trecho: string;
+  fonte: string;
+  tipo: "oficial" | "imprensa";
+  /** A data da página por extenso; nula quando a página não disse (ou não deu para ler). */
+  data: string | null;
+  url: string | null;
+  antigo: boolean;
+  /** A frase não tem dígito: o número, se houver, está por extenso, e a pessoa confere o trecho. */
+  semNumero: boolean;
+  /** O melhor argumento do outro lado (a busca o marca com "Do outro lado:"). */
+  outroLado: boolean;
+  marcado: boolean;
+};
+
+export type PesquisaDaTela = {
+  id: number;
+  /** `executando` é `pesquisando` para quem lê. */
+  status: "pesquisando" | "pronta" | "sem_achados" | "erro";
+  pedido: string;
+  profundidade: Profundidade;
+  motivo: string | null;
+  achados: AchadoDaTela[];
+  /** Quantos veículos e órgãos diferentes: "6 dados em 4 fontes". */
+  fontes: number;
+  /** Só quando a premissa da pessoa não bate com as fontes (`nao_confere`). */
+  premissa: { aviso: string; anguloSugerido: string | null } | null;
+  decisao: "fontes" | "mudar" | "manter" | null;
+  /** A pergunta de posição, quando o assunto divide opinião e a pessoa ainda não respondeu. */
+  pergunta: PerguntaDePosicao | null;
+  posicao: string | null;
+  /** Quanto do teto do dia já foi usado e qual é o teto. */
+  usadasHoje: number;
+  tetoPorDia: number;
+  destino: DestinoDaPesquisa | null;
+  confirmada: boolean;
+};
+
+/** Os dados da pesquisa como a tela os lê. Puro e testado por tabela. */
+export function achadosParaATela(achados: AchadoDaPesquisa[], marcados: number[]): AchadoDaTela[] {
+  return achados.map((a) => {
+    const { dado, outroLado } = fraseDoDado(a);
+    return {
+      id: a.id,
+      dado,
+      trecho: a.citacao,
+      fonte: a.fonteNome,
+      tipo: a.fonteTipo,
+      // O que a ferramenta devolveu e não deu para ler ("2 days ago") não é a data da página: fica "sem data", e a pessoa decide.
+      data: dataPorExtensoDaPagina(a.dataDaPagina),
+      url: enderecoHttpsSeguro(a.url),
+      antigo: a.antigo,
+      semNumero: !/\d/.test(dado),
+      outroLado,
+      marcado: marcados.includes(a.id),
+    };
+  });
+}
+
+/**
+ * A pesquisa como a tela da pesquisa a lê: nunca a linha crua (o `executando` vira `pesquisando`, os dados vêm com data por extenso e etiquetas, o aviso da premissa só existe
+ * quando ela não bate, a pergunta de posição some depois de respondida). Nula quando não é da marca.
+ */
+export async function pesquisaParaATela(clienteId: number, pesquisaId: number, agora: Date = new Date()): Promise<PesquisaDaTela | null> {
+  const linha = await lerPesquisa(clienteId, pesquisaId, agora);
+  if (!linha) return null;
+  const status: PesquisaDaTela["status"] = linha.status === "executando" ? "pesquisando" : (linha.status as Exclude<StatusDaPesquisa, "executando">);
+  const naoBate = linha.premissa?.situacao === "nao_confere" && linha.premissa.aviso;
+  return {
+    id: linha.id,
+    status,
+    pedido: linha.pedido,
+    profundidade: linha.profundidade,
+    motivo: linha.motivo,
+    achados: achadosParaATela(linha.achados, linha.selecionados),
+    fontes: new Set(linha.achados.map((a) => a.fonteNome)).size,
+    premissa: naoBate && linha.premissa ? { aviso: linha.premissa.aviso ?? "", anguloSugerido: linha.premissa.anguloSugerido } : null,
+    decisao: linha.decisaoDaPremissa ?? null,
+    pergunta: linha.posicaoDaPessoa ? null : (linha.perguntaDePosicao ?? null),
+    posicao: linha.posicaoDaPessoa,
+    usadasHoje: await pesquisasDeHoje(clienteId, agora),
+    tetoPorDia: config.regras.pesquisasNaHoraPorMarcaPorDia,
+    destino: linha.destino ?? null,
+    confirmada: linha.confirmadaEm !== null,
+  };
+}
+
+/** O que o campo "Pesquisar antes de escrever" precisa do dia da marca: quanto do teto já foi usado, o teto e o custo estimado de cada tamanho em língua de gente. */
+export type DadosDoCampoDePesquisa = { usadasHoje: number; teto: number; rapida: string; aFundo: string };
+
+export async function dadosDoCampoDePesquisa(clienteId: number, agora: Date = new Date()): Promise<DadosDoCampoDePesquisa> {
+  return {
+    usadasHoje: await pesquisasDeHoje(clienteId, agora),
+    teto: config.regras.pesquisasNaHoraPorMarcaPorDia,
+    rapida: reaisEmLinguagemDeGente(estimarPesquisa("normal").reais),
+    aFundo: reaisEmLinguagemDeGente(estimarPesquisa("aprofundada").reais),
+  };
+}
+
+/** O que a tela pede para seguir: os dados marcados, a decisão sobre a premissa (se há) e a posição (se há pergunta). */
+export type ConfirmacaoDaPesquisa = { ids: number[]; decisao?: (typeof DECISOES)[number] | null; posicao?: string | null };
+
+/**
+ * "Escrever com estes N": guarda o que a pessoa marcou, o que ela decidiu diante do aviso da premissa e a posição dela, e carimba a confirmação. Devolve o destino. Lança
+ * `ErroPesquisa` com frase pronta: pesquisa que não está pronta, nenhum dado marcado, ou pergunta de posição sem resposta. Pode ser chamada de novo (idempotente).
+ */
+export async function confirmarPesquisa(clienteId: number, pesquisaId: number, confirmacao: ConfirmacaoDaPesquisa): Promise<{ destino: DestinoDaPesquisa | null }> {
+  const pesquisa = await lerPesquisa(clienteId, pesquisaId);
+  if (!pesquisa || pesquisa.status !== "pronta") throw new ErroPesquisa("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+  // Tudo é conferido ANTES de gravar qualquer coisa: uma falha no meio não deixa os dados marcados sem a confirmação.
+  const idsValidos = new Set(pesquisa.achados.map((a) => a.id));
+  const marcar = [...new Set(confirmacao.ids)].filter((id) => idsValidos.has(id));
+  if (marcar.length === 0) throw new ErroPesquisa("Marque pelo menos um dado para escrever com a pesquisa, ou escreva sem ela.");
+  const posicao = typeof confirmacao.posicao === "string" ? confirmacao.posicao.trim() : "";
+  if (posicao === "" && pesquisa.perguntaDePosicao && !pesquisa.posicaoDaPessoa) {
+    throw new ErroPesquisa('Diga qual é a sua posição, ou escolha "Prefiro não dar opinião".');
+  }
+
+  await marcarAchados(clienteId, pesquisaId, marcar);
+  if (pesquisa.premissa?.situacao === "nao_confere") {
+    await decidirPremissa(clienteId, pesquisaId, confirmacao.decisao ?? "fontes");
+  }
+  if (posicao !== "") await registrarPosicao(clienteId, pesquisaId, posicao);
+  await db().update(pesquisasNaHora).set({ confirmadaEm: new Date() }).where(eq(pesquisasNaHora.id, pesquisaId));
+  return { destino: pesquisa.destino ?? null };
+}
+
+/** Até quando uma pesquisa que a pessoa deixou para depois ainda aparece no Criar. */
+const JANELA_DA_PESQUISA_EM_ABERTO_MS = 3 * 60 * 60 * 1000;
+
+export type PesquisaEmAberto = { id: number; pedido: string; estado: "pesquisando" | "pronta" | "sem_achados" | "erro" };
+
+/**
+ * A pesquisa que a pessoa deixou com "Voltar depois" (ou saiu da tela): a mais recente das últimas horas, rodando, pronta, ou terminada sem dado ou em erro, e que a pessoa ainda não
+ * viu terminar nem confirmou. Serve para o Criar dizer que ela está lá. A que terminou mal e que a pessoa já viu (a tela da pesquisa a marca com `registrarVistaDoFim`) não volta.
+ */
+export async function pesquisaEmAberto(clienteId: number, agora: Date = new Date()): Promise<PesquisaEmAberto | null> {
+  await encerrarPesquisasParadas(clienteId, agora);
+  const [linha] = await db()
+    .select({ id: pesquisasNaHora.id, pedido: pesquisasNaHora.pedido, status: pesquisasNaHora.status })
+    .from(pesquisasNaHora)
+    .where(
+      and(
+        eq(pesquisasNaHora.clienteId, clienteId),
+        gte(pesquisasNaHora.criadoEm, new Date(agora.getTime() - JANELA_DA_PESQUISA_EM_ABERTO_MS)),
+        inArray(pesquisasNaHora.status, ["pesquisando", "executando", "pronta", "sem_achados", "erro"]),
+        sql`${pesquisasNaHora.confirmadaEm} is null`,
+        sql`${pesquisasNaHora.destino} is not null`,
+      ),
+    )
+    .orderBy(sql`${pesquisasNaHora.criadoEm} desc`)
+    .limit(1);
+  if (!linha) return null;
+  const estado = linha.status === "executando" ? "pesquisando" : (linha.status as PesquisaEmAberto["estado"]);
+  return { id: linha.id, pedido: linha.pedido, estado };
+}
+
+/**
+ * A pessoa viu o fim da pesquisa que não deu dado ou deu erro (a tela da pesquisa abriu): ela deixa de aparecer no Criar. Só mexe nessas duas, e só uma vez. Limpeza de aviso, não ato da
+ * pessoa: por isso o "ver como" pode chamar.
+ */
+export async function registrarVistaDoFim(clienteId: number, pesquisaId: number): Promise<void> {
+  await db()
+    .update(pesquisasNaHora)
+    .set({ confirmadaEm: new Date() })
+    .where(
+      and(
+        eq(pesquisasNaHora.id, pesquisaId),
+        eq(pesquisasNaHora.clienteId, clienteId),
+        inArray(pesquisasNaHora.status, ["sem_achados", "erro"]),
+        sql`${pesquisasNaHora.confirmadaEm} is null`,
+      ),
+    );
+}
+
+/** "Pesquisar de novo" e "Tentar de novo": a mesma pesquisa (pedido, assunto, tamanho e destino) numa linha nova, que passa pelo teto do dia como qualquer outra. */
+export async function pesquisarDeNovo(
+  clienteId: number,
+  pesquisaId: number,
+  deps: { enfileirar?: (pesquisaId: number) => Promise<void>; agora?: Date; profundidade?: Profundidade } = {},
+): Promise<PesquisaNaHora> {
+  const antiga = await lerPesquisa(clienteId, pesquisaId, deps.agora);
+  if (!antiga) throw new ErroPesquisa("Pesquisa não encontrada.");
+  // `profundidade` é o que a pessoa escolheu agora (a rápida, quando só ela cabe); sem escolha, o tamanho da pesquisa de antes.
+  return criarPesquisa(clienteId, { pedido: antiga.pedido, tema: antiga.tema, profundidade: deps.profundidade ?? antiga.profundidade, destino: antiga.destino }, deps);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

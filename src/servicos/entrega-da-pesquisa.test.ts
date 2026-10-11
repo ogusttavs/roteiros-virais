@@ -4,7 +4,16 @@ import { describe, expect, it } from "vitest";
 import type { AchadoDaPesquisa, PesquisaDeOrigemGuardada } from "@/db/schema";
 import { textosRoteiro } from "@/textos/roteiro";
 
-import { dataPorExtensoDaPagina, detectarCuidados, montarEntregaDaPesquisa, paraEntradaDaPesquisa, type ContextoDaEntrega } from "./entrega-da-pesquisa";
+import {
+  dataPorExtensoDaPagina,
+  detectarCuidados,
+  fontesDosParagrafos,
+  fraseDoDado,
+  montarEntregaDaPesquisa,
+  paraEntradaDaPesquisa,
+  pesquisaDoRoteiro,
+  type ContextoDaEntrega,
+} from "./entrega-da-pesquisa";
 
 const dado = (id: number, extra: Partial<AchadoDaPesquisa> = {}): AchadoDaPesquisa => ({
   id,
@@ -269,5 +278,66 @@ describe("montarEntregaDaPesquisa", () => {
     )!;
     expect(r.atencao).toEqual(["Confira o horário, hoje."]);
     expect(r.ganchos[0].texto).toBe("Gancho, um");
+  });
+});
+
+describe("fraseDoDado", () => {
+  it("tira o 'Do outro lado:' da busca, marca e põe a primeira letra maiúscula", () => {
+    expect(fraseDoDado({ texto: "Do outro lado: os fabricantes dizem que foi o frete." })).toEqual({ dado: "Os fabricantes dizem que foi o frete.", outroLado: true });
+    expect(fraseDoDado({ texto: "  os produtos subiram 9,4%." })).toEqual({ dado: "Os produtos subiram 9,4%.", outroLado: false });
+  });
+});
+
+describe("pesquisaDoRoteiro", () => {
+  const base = pesquisa({
+    dados: [dado(1, { texto: "a inflação ficou em 4,5% em 12 meses.", fonteNome: "IBGE" }), dado(3, { fonteNome: "G1", url: "http://127.0.0.1/x", dataDaPagina: null }), dado(5, { fonteNome: "Folha" })],
+  });
+  const entrega = { ganchos: [], oQueVaoTeResponder: [{ objecao: "Pode aparecer: é caro.", resposta: "Compare pelo litro." }], fontes: [5, 1], atencao: ["Confira o horário."] };
+
+  it("numera as fontes pela ordem em que a pessoa as viu, só as que a entrega declarou, com data por extenso e link só https", () => {
+    const r = pesquisaDoRoteiro(base, entrega);
+    expect(r.dados).toBe(3);
+    expect(r.fontes.map((f) => [f.numero, f.id, f.fonte])).toEqual([
+      [1, 1, "IBGE"],
+      [2, 5, "Folha"],
+    ]);
+    expect(r.fontes[0]).toMatchObject({ data: "31 de agosto de 2026", dado: "A inflação ficou em 4,5% em 12 meses.", url: "https://www.ibge.gov.br/1" });
+    expect(r.atencao).toEqual(["Confira o horário."]);
+    expect(r.respostas).toHaveLength(1);
+  });
+
+  it("sem entrega (roteiro de antes) valem todos os dados que ela marcou; o dado sem data e o endereço inseguro não quebram", () => {
+    const r = pesquisaDoRoteiro(base, null);
+    expect(r.fontes.map((f) => f.id)).toEqual([1, 3, 5]);
+    expect(r.fontes[1]).toMatchObject({ data: null, url: null });
+    expect(r.atencao).toEqual([]);
+    expect(r.respostas).toEqual([]);
+  });
+});
+
+describe("fontesDosParagrafos", () => {
+  const base = pesquisa({ dados: [dado(1, { texto: "a inflação ficou em 4,5% em 12 meses.", fonteNome: "IBGE" }), dado(3, { texto: "41% trocaram de marca.", fonteNome: "Diário Nacional" })] });
+  const fontes = pesquisaDoRoteiro(base, null).fontes;
+
+  it("cada parágrafo diz quais fontes usa, pelo número do dado ou pelo nome da fonte", () => {
+    const r = fontesDosParagrafos(["A inflação foi de 4,5% no ano.", "Segundo o Diário Nacional, a troca existe.", "Grave com calma.", "Foram 4,5% e 41%."], base, fontes);
+    expect(r).toEqual([[1], [2], [], [1, 2]]);
+  });
+
+  it("o número parecido com unidade diferente não conta (12% não é 12 meses)", () => {
+    expect(fontesDosParagrafos(["Foram 12 meses de espera."], pesquisa({ dados: [dado(1, { texto: "subiu 12%." })] }), pesquisaDoRoteiro(pesquisa({ dados: [dado(1, { texto: "subiu 12%." })] }), null).fontes)).toEqual([[]]);
+  });
+});
+
+describe("o nome da fonte no texto é palavra inteira", () => {
+  const base = pesquisa({ dados: [dado(1, { texto: "Os exames subiram.", fonteNome: "Exame" }), dado(3, { texto: "Outro dado.", fonteNome: "G1" })] });
+  const fontes = pesquisaDoRoteiro(base, null).fontes;
+
+  it("'Exame' não está em 'exames' (um vídeo de dentista fala de exames sem citar a revista)", () => {
+    expect(fontesDosParagrafos(["Faça os exames de rotina.", "Segundo a Exame, é assim.", "Segundo o G1, é assim."], base, fontes)).toEqual([[], [1], [2]]);
+  });
+
+  it("maiúscula, acento e pontuação em volta não atrapalham", () => {
+    expect(fontesDosParagrafos(["(Exame), diz."], base, fontes)).toEqual([[1]]);
   });
 });

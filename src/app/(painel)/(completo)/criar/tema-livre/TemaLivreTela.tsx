@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import type { DadosDoCampoDePesquisa, Profundidade } from "@/servicos/pesquisa-na-hora";
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
 import { textosMomento } from "@/textos/momento";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { textosTemaLivre } from "@/textos/tema-livre";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { Botao } from "@/ui/componentes/Botao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
+import { CampoPesquisar } from "@/ui/componentes/CampoPesquisar";
 import { EsperaEtapas } from "@/ui/componentes/EsperaEtapas";
 import { faixaMeta } from "@/ui/componentes/notaFaixaMeta";
 import { NotasLinha } from "@/ui/componentes/NotaLinha";
@@ -19,6 +22,7 @@ import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { FolhaGravarAgora } from "../../hoje/FolhaGravarAgora";
+import { pedirPesquisaAction } from "../pesquisa/acoes";
 
 import { avaliarTemaAction, salvarRascunhoAction } from "./acoes";
 import styles from "./TemaLivreTela.module.css";
@@ -98,6 +102,8 @@ type Props = {
   pergunta?: PerguntaPreso;
   /** O rascunho do momento é por marca (a folha "Gravar agora" guarda o que a pessoa escreveu no aparelho). */
   marcaAtivaId?: number;
+  /** E54 (parte 3): o dia da marca para o campo "Pesquisar antes de escrever" dizer a verdade (quantas pesquisas já usou, o teto, o custo). Ausente (a consulta falhou), o campo não aparece. */
+  pesquisa?: DadosDoCampoDePesquisa;
 };
 
 /**
@@ -119,6 +125,7 @@ export function TemaLivreTela({
   emAlta,
   pergunta,
   marcaAtivaId,
+  pesquisa,
 }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
@@ -139,6 +146,14 @@ export function TemaLivreTela({
   const comPergunta = fase === "proposta" && perguntaPresa && pergunta !== undefined;
   const perguntaParaEnviar = perguntaPresa ? pergunta?.chave : undefined;
   const textosPergunta = textosTemaLivre.comPergunta;
+  // E54 (parte 3): "Pesquisar antes de escrever", depois que o tema passou na nota. O pedido nasce vazio (a pessoa diz o que quer saber); a pesquisa roda na fila e a tela dela leva adiante.
+  const [pesquisaAberta, setPesquisaAberta] = useState(false);
+  const [pedidoDePesquisa, setPedidoDePesquisa] = useState("");
+  const [profundidade, setProfundidade] = useState<Profundidade>("normal");
+  const [pedindoPesquisa, setPedindoPesquisa] = useState(false);
+  const [erroDaPesquisa, setErroDaPesquisa] = useState<string | null>(null);
+  /** O teto do dia dito pelo servidor (a página estava velha): um aviso calmo ao lado do campo, nunca erro dele. */
+  const [avisoDaPesquisa, setAvisoDaPesquisa] = useState<string | null>(null);
   const [folhaMomentoAberta, setFolhaMomentoAberta] = useState(false);
   const { fechar: fecharFolhaMomento, fecharENavegar: fecharFolhaMomentoENavegar } = useFolhaNoHistorico(
     folhaMomentoAberta,
@@ -166,6 +181,47 @@ export function TemaLivreTela({
   const noticiaIdParaEnviar = noticiaPresa && noticia?.origem === "setor" ? noticia.id : undefined;
   const noticiaAssuntoIdParaEnviar = noticiaPresa && noticia?.origem === "assunto" ? noticia.id : undefined;
   const urlObjetivo = `/criar/objetivo?livre=${encodeURIComponent(texto)}${dataInicial ? `&data=${dataInicial}` : ""}${noticiaIdParaEnviar ? `&noticiaId=${noticiaIdParaEnviar}` : ""}${noticiaAssuntoIdParaEnviar ? `&noticiaAssuntoId=${noticiaAssuntoIdParaEnviar}` : ""}${chaveParaEnviar ? `&alta=${encodeURIComponent(chaveParaEnviar)}` : ""}${perguntaParaEnviar ? `&pergunta=${encodeURIComponent(perguntaParaEnviar)}` : ""}`;
+
+  async function pesquisarEEscrever() {
+    if (pedindoPesquisa || abrindo) return;
+    if (pedidoDePesquisa.trim().length < 8) {
+      setErroDaPesquisa(textosPesquisa.campo.pedidoCurto);
+      return;
+    }
+    setErroDaPesquisa(null);
+    setAvisoDaPesquisa(null);
+    setPedindoPesquisa(true);
+    try {
+      const resultado = await pedirPesquisaAction({
+        pedido: pedidoDePesquisa,
+        profundidade,
+        destino: {
+          tipo: "objetivo",
+          livre: texto,
+          data: dataInicial,
+          noticiaId: noticiaIdParaEnviar,
+          noticiaAssuntoId: noticiaAssuntoIdParaEnviar,
+          alta: chaveParaEnviar,
+          pergunta: perguntaParaEnviar,
+        },
+      });
+      if (!resultado.ok) {
+        if (resultado.calma) {
+          setAvisoDaPesquisa(resultado.erro);
+          // A página estava com o dia velho (outra aba ou outro aparelho gastou a pesquisa): lê de novo, e o campo passa a dizer o que sobra.
+          router.refresh();
+        } else {
+          setErroDaPesquisa(resultado.erro);
+        }
+        setPedindoPesquisa(false);
+        return;
+      }
+      router.push(`/criar/pesquisa/${resultado.dado.id}`);
+    } catch (falha) {
+      setErroDaPesquisa(tratarFalha(falha, textosPesquisa.campo.erroPedir));
+      setPedindoPesquisa(false);
+    }
+  }
 
   function abrir(chave: string, url: string) {
     if (abrindo) return;
@@ -468,16 +524,50 @@ export function TemaLivreTela({
 
         {fase === "naMeta" ? (
           <div className={styles.acaoUnica}>
-            <Botao
-              variante="primario"
-              tamanho="lg"
-              precisaDeRede
-              disabled={abrindo}
-              onClick={() => abrir("objetivo", urlObjetivo)}
-            >
-              {abrindoEste("objetivo") ? textosTemaLivre.abrindo : textosTemaLivre.escreverRoteiro}
-            </Botao>
-            <p className={styles.notaRodape}>{textosTemaLivre.proximaTelaObjetivo}</p>
+            {/* E54 (parte 3, passo 22): opcional e depois da nota, porque a nota não precisa da pesquisa e ninguém gasta pesquisa num tema que não passou. */}
+            <div className={styles.campoPesquisar} hidden={pesquisa === undefined}>
+              <CampoPesquisar
+                dados={pesquisa ?? { usadasHoje: 0, teto: 0, rapida: "", aFundo: "" }}
+                aberto={pesquisaAberta}
+                aoAbrir={() => setPesquisaAberta(true)}
+                aoTirar={() => {
+                  setPesquisaAberta(false);
+                  setErroDaPesquisa(null);
+                }}
+                pedido={pedidoDePesquisa}
+                aoMudarPedido={(valor) => {
+                  setPedidoDePesquisa(valor);
+                  setErroDaPesquisa(null);
+                }}
+                profundidade={profundidade}
+                aoMudarProfundidade={setProfundidade}
+                erro={erroDaPesquisa}
+                aviso={avisoDaPesquisa}
+                nomeArquivo="tema-livre-pesquisa"
+                disabled={pedindoPesquisa}
+              />
+            </div>
+            {pesquisa !== undefined && pesquisaAberta && pesquisa.usadasHoje < pesquisa.teto ? (
+              <>
+                <Botao variante="primario" tamanho="lg" precisaDeRede carregando={pedindoPesquisa} disabled={abrindo} onClick={() => void pesquisarEEscrever()}>
+                  {textosPesquisa.campo.pesquisarEEscrever}
+                </Botao>
+                <p className={styles.notaRodape}>{textosPesquisa.campo.primeiroAPesquisaObjetivo}</p>
+              </>
+            ) : (
+              <>
+                <Botao
+                  variante="primario"
+                  tamanho="lg"
+                  precisaDeRede
+                  disabled={abrindo}
+                  onClick={() => abrir("objetivo", urlObjetivo)}
+                >
+                  {abrindoEste("objetivo") ? textosTemaLivre.abrindo : textosTemaLivre.escreverRoteiro}
+                </Botao>
+                <p className={styles.notaRodape}>{textosTemaLivre.proximaTelaObjetivo}</p>
+              </>
+            )}
           </div>
         ) : null}
 
@@ -567,6 +657,7 @@ export function TemaLivreTela({
           quemGravaPadrao={quemGravaPadrao}
           dataInicial={dataInicial}
           marcaAtivaId={marcaAtivaId}
+          pesquisa={pesquisa}
         />
       ) : null}
     </div>

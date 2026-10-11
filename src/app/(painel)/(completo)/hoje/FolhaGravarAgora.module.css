@@ -91,6 +91,12 @@
   gap: var(--espaco-2);
 }
 
+/* E54 (parte 3): o campo "Pesquisar antes de escrever" ocupa a largura da folha. */
+.campoPesquisar {
+  display: grid;
+  gap: var(--espaco-2);
+}
+
 .erro {
   font-size: var(--tamanho-legenda);
   color: var(--cor-erro);

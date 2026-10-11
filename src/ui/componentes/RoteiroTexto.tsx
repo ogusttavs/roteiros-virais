@@ -2,6 +2,7 @@ import { Mic } from "lucide-react";
 
 import type { TomDoBloco } from "@/lib/marcas-de-fala";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { FalaMarcada } from "./FalaMarcada";
@@ -18,6 +19,8 @@ export type BlocoRoteiro = {
   mostrar?: string[];
   /** A cena deste bloco (Reels): onde gravar e o que mostrar, junto da fala. */
   cenas?: { momento: string; oQueFazer: string }[];
+  /** E54 (parte 3): os números das fontes que cada parágrafo usa (um array por parágrafo, vazio quando não usa nenhuma): o número pequeno que leva às "Fontes". */
+  fontes?: number[][];
 };
 
 type Props = {
@@ -47,6 +50,12 @@ export function RoteiroTexto({ blocos, modoGravacao = false, comCenas = false, c
             {bloco.paragrafos.map((paragrafo, i) => (
               <p key={i} className={indice === 0 && !modoGravacao ? styles.gancho : styles.paragrafo}>
                 {comMarcas && bloco.marcado && bloco.marcado.length === bloco.paragrafos.length ? <FalaMarcada marcado={bloco.marcado[i]} /> : paragrafo}
+                {bloco.fontes?.[i]?.length ? (
+                  <span className={styles.refFonte} data-ref-fonte>
+                    <span aria-hidden="true">{bloco.fontes[i].join(", ")}</span>
+                    <span className="so-leitor">{textosPesquisa.roteiro.fonteAria(bloco.fontes[i])}</span>
+                  </span>
+                ) : null}
               </p>
             ))}
             {comMarcas && bloco.marcado && bloco.tom ? (

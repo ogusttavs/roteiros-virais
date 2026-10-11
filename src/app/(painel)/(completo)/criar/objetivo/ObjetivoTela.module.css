@@ -97,6 +97,21 @@
   color: var(--cor-texto-suave);
 }
 
+/* E54 (parte 3): o selo "Com pesquisa: 3 dados" ao lado do tema (o mesmo do roteiro). */
+.comPesquisa {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  line-height: 1.2;
+}
+
 .tema {
   font-size: var(--tamanho-secundario);
   font-weight: 500;

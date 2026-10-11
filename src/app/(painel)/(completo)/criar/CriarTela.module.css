@@ -137,6 +137,26 @@
   cursor: not-allowed;
 }
 
+/* E54 (parte 3): a pesquisa que ficou para depois. */
+.pesquisaEmAberto {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--espaco-3);
+  padding: var(--espaco-3) var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-md);
+  background: var(--cor-selecao-suave);
+}
+
+.pesquisaEmAbertoTexto {
+  min-width: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Os quatro caminhos ---------- */
 
 .caminhos {

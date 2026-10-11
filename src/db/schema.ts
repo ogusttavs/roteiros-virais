@@ -1401,6 +1401,32 @@ export type PremissaDaPesquisa = {
 /** E54: a pergunta, em uma frase, que a pesquisa faz quando falta a posição da pessoa sobre o tema (nunca inventar a opinião dela). */
 export type PerguntaDePosicao = { pergunta: string; opcoes: string[] };
 
+/**
+ * E54 (parte 3): para onde a pesquisa leva quando a pessoa marca os dados e escreve. O pedido que a pessoa estava fazendo fica guardado AQUI (no servidor), para o "Voltar depois" funcionar
+ * em outro aparelho e para a tela da pesquisa não depender do que o navegador lembra. `objetivo` é o Tema livre (a próxima tela é a do objetivo, com o tema e o que veio preso a ele);
+ * `momento` é "Contar o momento" e "Gravar agora" (a tela da pesquisa escreve o roteiro com o que a pessoa contou).
+ */
+export type DestinoDaPesquisa =
+  | { tipo: "objetivo"; consulta: { livre: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; pergunta?: string } }
+  | {
+      tipo: "momento";
+      dados: {
+        onde: string;
+        oQueEstaAcontecendo: string;
+        oQueDaParaMostrar: string;
+        objetivo: Objetivo;
+        ficha?: string;
+        formato?: string;
+        estilo?: string;
+        marcaId?: number;
+        transcricao?: string;
+        objetivoDoVideo?: string;
+        quemAparece?: string;
+        data?: string;
+        momentoDoDia?: string;
+      };
+    };
+
 /** `pesquisando` está na fila; `executando` foi reivindicada por um worker (uma segunda execução não paga de novo). */
 export type StatusDaPesquisa = "pesquisando" | "executando" | "pronta" | "sem_achados" | "erro";
 
@@ -1437,6 +1463,10 @@ export const pesquisasNaHora = pgTable(
     custoUsd: numeric("custo_usd", { precision: 10, scale: 6 }).notNull().default("0"),
     /** Em língua de gente, quando a pesquisa não deu dado ou não terminou. */
     motivo: text("motivo"),
+    /** E54 (parte 3): para onde a pesquisa leva depois de marcar os dados (ver `DestinoDaPesquisa`). Nulo nas pesquisas pedidas só pelo motor (parte 1). */
+    destino: jsonb("destino").$type<DestinoDaPesquisa>(),
+    /** E54 (parte 3): quando a pessoa marcou os dados e seguiu para escrever. Pesquisa pronta e ainda sem isto é "pronta para ver" no Criar. */
+    confirmadaEm: timestamp("confirmada_em", { withTimezone: true }),
     criadoEm: timestamp("criado_em", { withTimezone: true }).notNull().defaultNow(),
     terminadoEm: timestamp("terminado_em", { withTimezone: true }),
   },
