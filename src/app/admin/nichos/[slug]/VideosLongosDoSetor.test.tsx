@@ -22,6 +22,8 @@ const longo = (id: number, parcial: Partial<VideoLongoDoSetor> = {}): VideoLongo
   capitulos: [],
   temTranscricao: false,
   proximaTentativaTranscricao: null,
+  temAnaliseLonga: false,
+  proximaTentativaAnaliseLonga: null,
   ...parcial,
 });
 
@@ -38,7 +40,7 @@ function montar(sobre: Partial<Parameters<typeof VideosLongosDoSetor>[0]> = {}) 
     <VideosLongosDoSetor
       medida={MEDIDA}
       lista={[
-        longo(1, { capitulos: [{ inicioS: 0, titulo: "A" }, { inicioS: 100, titulo: "B" }, { inicioS: 200, titulo: "C" }], temTranscricao: true }),
+        longo(1, { capitulos: [{ inicioS: 0, titulo: "A" }, { inicioS: 100, titulo: "B" }, { inicioS: 200, titulo: "C" }], temTranscricao: true, temAnaliseLonga: true }),
         longo(2, { titulo: null }),
       ]}
       totalNaLista={2}
@@ -102,11 +104,18 @@ describe("VideosLongosDoSetor", () => {
     expect(primeira.textContent).toContain("9 min");
     expect(primeira.textContent).toContain("120.001");
     expect(primeira.textContent).toContain("3 capítulos");
-    expect(primeira.textContent).toContain("transcrito");
+    expect(primeira.textContent).toContain("transcrito e lido");
     const segunda = linhas[1] as HTMLElement;
     expect(within(segunda).getByRole("link", { name: "v2" })).toBeTruthy();
     expect(segunda.textContent).toContain("sem lista");
     expect(segunda.textContent).toContain("ainda não");
+  });
+
+  it("o longo só transcrito diz isso, sem dizer que a estrutura foi lida", () => {
+    const { container } = montar({ lista: [longo(5, { temTranscricao: true })], totalNaLista: 1 });
+    const linha = container.querySelector("[data-longo]") as HTMLElement;
+    expect(linha.textContent).toContain("transcrito");
+    expect(linha.textContent).not.toContain("transcrito e lido");
   });
 
   it("o endereço que não é https não vira link, e a lista cortada diz quantos aparecem de quantos", () => {

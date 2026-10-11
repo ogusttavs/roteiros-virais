@@ -25,6 +25,8 @@ export type TarefaIA =
   | "compilarPerfil"
   | "extrairVideo"
   | "extrairVideoSemFala"
+  /** E52 (PR 2): a estrutura de um vídeo longo do YouTube (a abertura que promete, os capítulos, os laços, onde a pessoa sairia), pela transcrição com marcas de tempo aproximadas. */
+  | "extrairVideoLongo"
   | "analisarVisual"
   | "modeloNicho"
   | "filtrarNoticias"

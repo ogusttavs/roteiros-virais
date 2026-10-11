@@ -1064,6 +1064,34 @@ export type AnaliseVideo = {
   serveDeModelo?: boolean;
 };
 
+/**
+ * E52 (PR 2), a leitura de um vídeo longo do YouTube (`jobs/ler-longos.ts`): a estrutura de um vídeo de alguns minutos, que a ficha de um curto (`AnaliseVideo`) não descreve. Fica
+ * numa coluna própria (`videos.analise_longa`) de propósito: `videos.analise` é a ficha que Referências, temas e evidência leem, e o longo está fora deles pelo teto de duração.
+ *
+ * Os tempos são em segundos. Quando os capítulos vêm da descrição (`origemDosCapitulos: "descricao"`) os tempos são os que o dono escreveu, exatos; quando o modelo os propõe a
+ * partir do texto (`"leitura"`) são aproximados, porque a transcrição entra sem o tempo de cada fala (só a posição no texto, na proporção da duração). A retenção de verdade
+ * é dado privado do dono do vídeo: `ondeSairia` é leitura do modelo, nunca número da plataforma.
+ */
+export type AnaliseVideoLonga = {
+  versaoPrompt: string;
+  origemDosCapitulos: "descricao" | "leitura";
+  assunto: string;
+  /** O que o título promete, em que segundo a abertura entrega (nulo se não entrega) e como o vídeo abre. */
+  abertura: { promessa: string; entregaAteS: number | null; tipo: TipoAbertura };
+  capitulos: {
+    inicioS: number;
+    nome: string;
+    oQueFaz: string;
+    /** O que segura a pessoa até o próximo capítulo (uma pergunta deixada aberta, uma promessa, uma virada); nulo no último. */
+    gancho: string | null;
+  }[];
+  /** Laços: o que o vídeo promete mais adiante e onde paga (nulo quando não paga). */
+  lacos: { abertoEmS: number; pagoEmS: number | null; oQue: string }[];
+  ondeSairia: { segundo: number; porQue: string }[];
+  fechamento: { oQueFaz: string; apontaParaProximoVideo: boolean };
+  porQueFuncionou: string;
+};
+
 export type AnaliseVisual = {
   falaParaCamera: boolean;
   textoNaTela: { quando: string; onde: string; oQue: string }[];
@@ -1148,6 +1176,14 @@ export const videos = pgTable(
     velocidadeRelativa: numeric("velocidade_relativa", { precision: 10, scale: 3 }),
     transcricao: text("transcricao"),
     analise: jsonb("analise").$type<AnaliseVideo>(),
+    /** E52 (PR 2): a leitura de um vídeo longo, separada de `analise` (ver `AnaliseVideoLonga`). Nula em todo curto e no longo ainda não lido. */
+    analiseLonga: jsonb("analise_longa").$type<AnaliseVideoLonga>(),
+    analiseLongaEm: timestamp("analise_longa_em", { withTimezone: true }),
+    /**
+     * E52 (PR 2): a leitura do longo falhou (a IA fora, a saída que o código recusou): nenhuma nova tentativa antes desta data (agora mais 7 dias, o mesmo raciocínio de
+     * `proximaTentativaTranscricao`). Sem isto, o mesmo longo ruim ocuparia a vaga da semana em toda rodada.
+     */
+    proximaTentativaAnaliseLonga: timestamp("proxima_tentativa_analise_longa", { withTimezone: true }),
     analiseVisual: jsonb("analise_visual").$type<AnaliseVisual>(),
     audio: jsonb("audio").$type<VideoAudio>(),
     /** Palavras-chave da extracao (etapa 8), usadas em filtro e evidencia. */

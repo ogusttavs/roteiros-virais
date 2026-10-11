@@ -238,6 +238,11 @@ export const config = {
     /** E52 (PR 1): quantos vídeos longos por setor, por semana, ganham leitura (a transcrição de um longo custa dez vezes a de um curto). */
     longosParaLerPorSemana: envNumero("LONGOS_PARA_LER_POR_SEMANA", 5),
     /**
+     * E52 (PR 2): o teto de duração transcrita por ramo por semana, em minutos de vídeo (pedido do Fable: um longo de até 40 minutos custa e demora bem mais que um curto,
+     * e o áudio passa pelo proxy, que se paga por gigabyte). Cinco longos de 18 minutos cabem; o que não cabe espera a semana seguinte. `LONGOS_MINUTOS_POR_SEMANA` ajusta.
+     */
+    longosMinutosPorSemana: envNumero("LONGOS_MINUTOS_POR_SEMANA", 90),
+    /**
      * M2, item 2: filtro de "tem alcance" do job `pesquisa-de-setor`, mediana de views dos
      * últimos vídeos do candidato. Bem mais baixo que `pisoViewsReferencia` (o piso de um vídeo
      * VIRAR referência): aqui é só "essa conta tem audiência de verdade", não "todo vídeo dela

@@ -25,6 +25,7 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   aprenderCliente: "IA: aprender com as reprovações",
   extrairVideo: "Analisar os vídeos",
   extrairVideoSemFala: "Analisar os vídeos sem fala",
+  extrairVideoLongo: "Ler a estrutura dos vídeos longos",
   analisarVisual: "Analisar os vídeos (imagem)",
   lerComentarios: "Ler os comentários do público",
   juntarVozes: "Juntar o que o público diz",

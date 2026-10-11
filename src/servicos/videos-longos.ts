@@ -26,7 +26,13 @@ import { classificarBrasil, contaEhBrasileira, type ClassificacaoBrasil } from "
 import { MAX_POR_CONTA } from "./selecionar-transcricao";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
-const SEMANA_MS = 7 * DIA_MS;
+/**
+ * A janela do que "já foi lido na semana". Seis dias, e não sete: a rotina é semanal (domingo de manhã) e o cron nasce segundos antes ou depois da hora da rodada anterior, então
+ * com sete dias o que a rodada de domingo transcreveu ainda cairia dentro da janela da rodada do domingo seguinte e a semana renderia metade (achado da revisão do PR 2).
+ */
+const JANELA_DA_SEMANA_MS = 6 * DIA_MS;
+/** A folga na data da nova tentativa: o vídeo que espera "até domingo que vem" volta no domingo que vem, mesmo que o cron nasça algumas horas antes da hora marcada. */
+const FOLGA_DA_NOVA_TENTATIVA_MS = 6 * 60 * 60 * 1000;
 
 /**
  * Acima do teto de duração dos curtos e até o limite do longo. Vídeo sem duração conhecida nunca é longo (o contrário do teto dos curtos, que o deixa passar): não dá
@@ -49,6 +55,9 @@ export type VideoLongoDoSetor = {
   capitulos: CapituloDaDescricao[];
   temTranscricao: boolean;
   proximaTentativaTranscricao: Date | null;
+  /** A leitura da estrutura (`videos.analise_longa`, E52 PR 2) já existe. */
+  temAnaliseLonga: boolean;
+  proximaTentativaAnaliseLonga: Date | null;
 };
 
 type OpcoesDosLongos = {
@@ -94,6 +103,8 @@ export async function longosDoSetor(nichoId: number, opcoes: OpcoesDosLongos = {
       contaIdiomaPrincipal: contas.idiomaPrincipal,
       temTranscricao: sql<boolean>`${videos.transcricao} is not null`,
       proximaTentativaTranscricao: videos.proximaTentativaTranscricao,
+      temAnaliseLonga: sql<boolean>`${videos.analiseLonga} is not null`,
+      proximaTentativaAnaliseLonga: videos.proximaTentativaAnaliseLonga,
     })
     .from(videos)
     .leftJoin(contas, eq(contas.id, videos.contaId))
@@ -118,6 +129,8 @@ export async function longosDoSetor(nichoId: number, opcoes: OpcoesDosLongos = {
       capitulos: lerCapitulosDaDescricao(l.descricao, duracaoS),
       temTranscricao: l.temTranscricao,
       proximaTentativaTranscricao: l.proximaTentativaTranscricao,
+      temAnaliseLonga: l.temAnaliseLonga,
+      proximaTentativaAnaliseLonga: l.proximaTentativaAnaliseLonga,
     };
   });
 }
@@ -211,51 +224,58 @@ export async function medidaDosLongos(nichoId: number, agora: Date = new Date())
 /**
  * Pura: dos longos (já ordenados por prioridade), os que ganham leitura agora. Fora quem já tem transcrição, quem espera a nova tentativa e o que é "outro" (a mesma
  * regra da fila dos curtos, sem a proporção do Brasil); no máximo `MAX_POR_CONTA` por conta; no máximo o que sobra do orçamento da semana (`porSemana` menos o que já foi lido
- * nos últimos sete dias).
+ * nos últimos sete dias). `tetoDeMinutos`, quando dado, é o teto de duração transcrita na semana (a transcrição de um longo de 40 minutos custa e demora): o longo que não cabe no
+ * que sobra fica de fora e o seguinte da fila, mais curto, pode caber.
  */
-export function escolherLongosParaLer(longos: VideoLongoDoSetor[], lidos: LidosNaSemana, porSemana: number, agora: Date): number[] {
+export function escolherLongosParaLer(longos: VideoLongoDoSetor[], lidos: LidosNaSemana, porSemana: number, agora: Date, tetoDeMinutos?: number): number[] {
   const vagas = Math.max(0, porSemana - lidos.total);
   if (vagas === 0) return [];
   const escolhidos: number[] = [];
+  let minutos = lidos.minutos;
   // O teto por conta é da semana, não da rodada: quem já foi lido nos últimos sete dias gasta a vaga da conta dele (senão a mesma conta ganharia duas vagas novas por dia).
   const porConta = new Map(lidos.porConta);
   for (const v of longos) {
     if (escolhidos.length >= vagas) break;
     if (v.temTranscricao || v.classificacao === "outro") continue;
-    if (v.proximaTentativaTranscricao && v.proximaTentativaTranscricao > agora) continue;
+    if (v.proximaTentativaTranscricao && v.proximaTentativaTranscricao.getTime() > agora.getTime() + FOLGA_DA_NOVA_TENTATIVA_MS) continue;
+    const duracaoMin = v.duracaoS / 60;
+    if (tetoDeMinutos !== undefined && minutos + duracaoMin > tetoDeMinutos) continue;
     if (v.contaId !== null) {
       const usadas = porConta.get(v.contaId) ?? 0;
       if (usadas >= MAX_POR_CONTA) continue;
       porConta.set(v.contaId, usadas + 1);
     }
+    minutos += duracaoMin;
     escolhidos.push(v.id);
   }
   return escolhidos;
 }
 
-/** O que já gastou do orçamento da semana: quantos longos do setor ganharam transcrição nos últimos sete dias, e de quais contas. */
-export type LidosNaSemana = { total: number; porConta: Map<number, number> };
+/** O que já gastou do orçamento da semana: quantos longos do setor ganharam transcrição nos últimos seis dias, de quais contas e quantos minutos de vídeo. */
+export type LidosNaSemana = { total: number; porConta: Map<number, number>; minutos: number };
 
 export async function longosLidosNaSemana(nichoId: number, agora: Date = new Date()): Promise<LidosNaSemana> {
   const condicoes = [
     eq(videos.nichoId, nichoId),
     eq(videos.plataforma, "youtube"),
     CONDICAO_DE_VIDEO_LONGO,
-    gte(videos.transcritoEm, new Date(agora.getTime() - SEMANA_MS)),
+    gte(videos.transcritoEm, new Date(agora.getTime() - JANELA_DA_SEMANA_MS)),
   ];
   if (!incluirSeed()) condicoes.push(ne(videos.origem, "seed"));
   const linhas = await db()
-    .select({ contaId: videos.contaId, n: sql<number>`count(*)::int` })
+    .select({ contaId: videos.contaId, n: sql<number>`count(*)::int`, segundos: sql<number>`coalesce(sum(${videos.duracaoS}), 0)::int` })
     .from(videos)
     .where(and(...condicoes))
     .groupBy(videos.contaId);
   const porConta = new Map<number, number>();
   let total = 0;
+  let segundos = 0;
   for (const l of linhas) {
     total += l.n;
+    segundos += l.segundos;
     if (l.contaId !== null) porConta.set(l.contaId, l.n);
   }
-  return { total, porConta };
+  return { total, porConta, minutos: segundos / 60 };
 }
 
 /** Os ids dos longos do setor que a rodada desta semana deve transcrever, no máximo o que sobra de `longosParaLerPorSemana`. */
@@ -263,5 +283,5 @@ export async function longosParaLer(nichoId: number, agora: Date = new Date()): 
   const lidos = await longosLidosNaSemana(nichoId, agora);
   if (lidos.total >= config.regras.longosParaLerPorSemana) return [];
   const longos = await longosDoSetor(nichoId, { agora });
-  return escolherLongosParaLer(longos, lidos, config.regras.longosParaLerPorSemana, agora);
+  return escolherLongosParaLer(longos, lidos, config.regras.longosParaLerPorSemana, agora, config.regras.longosMinutosPorSemana);
 }

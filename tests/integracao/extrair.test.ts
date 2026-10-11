@@ -267,3 +267,27 @@ describe("rodarExtrair mais rodarExtrairColeta", () => {
     expect(resumoSegunda.lotesConcluidos).toBe(0);
   });
 });
+
+describe("o vídeo longo fica fora do lote dos curtos (E52, PR 2)", () => {
+  it("o longo transcrito pelo `ler-longos` não vira ficha de curto: tem a leitura dele, a própria", async () => {
+    await criarVideo("curto-transcrito", { transcricao: TRANSCRICAO_BOA });
+    const [longo] = await db()
+      .insert(videos)
+      .values({
+        plataforma: "youtube",
+        idExterno: "longo-transcrito",
+        url: "https://exemplo.invalido/longo-transcrito",
+        nichoId,
+        titulo: "[exemplo] vídeo longo",
+        views: 100,
+        duracaoS: 900,
+        transcricao: TRANSCRICAO_BOA,
+      })
+      .returning();
+
+    const resumo = await rodarExtrair();
+    expect(resumo.videosNoLote).toBe(1);
+    const [lote] = await db().select().from(lotesIa);
+    expect(lote.videoIds).not.toContain(longo.id);
+  });
+});

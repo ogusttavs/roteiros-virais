@@ -204,7 +204,8 @@ async function candidatosDoNicho(nichoId: number, tetoDiario: number) {
   return { selecionados, porId };
 }
 
-type ResultadoVideo =
+/** O que a transcrição de um vídeo deu (exportada: `ler-longos.ts`, E52, transcreve os longos do YouTube pelo mesmo caminho). */
+export type ResultadoVideo =
   | { tipo: "legenda" }
   | { tipo: "pulado" }
   | { tipo: "groq"; duracaoS: number | null }
@@ -228,7 +229,7 @@ function idiomaParaForcar(idioma: string | null): "pt" | "en" | "es" | undefined
   return idioma === "pt" || idioma === "en" || idioma === "es" ? idioma : undefined;
 }
 
-async function transcreverUm(
+export async function transcreverUm(
   videoId: number,
   url: string,
   plataforma: Plataforma,

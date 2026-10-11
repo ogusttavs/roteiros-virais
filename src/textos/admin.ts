@@ -195,9 +195,11 @@ export const textosAdmin = {
       minutos: (min: number) => `${min} min`,
       capitulos: (n: number) => (n === 0 ? "sem lista" : `${n} capítulos`),
       lido: "transcrito",
+      /** A transcrição e a leitura da estrutura (E52, PR 2) já foram feitas. */
+      lidoEEstruturado: "transcrito e lido",
       naoLido: "ainda não",
       mostrando: (n: number, total: number) => `${n} de ${total}`,
-      ajuda: "Tudo daqui vem do que a coleta já grava: título, descrição, duração e visualizações. A lista de capítulos é a que quem postou escreveu na descrição; nem todo vídeo tem. Ainda não há transcrição dos longos.",
+      ajuda: "A duração e a lista de capítulos vêm do que a coleta já grava: título, descrição, duração e visualizações. A lista de capítulos é a que quem postou escreveu na descrição; nem todo vídeo tem. Uma vez por semana, os poucos melhores de cada ramo são transcritos e têm a estrutura lida (abertura, capítulos, onde a pessoa sairia).",
     },
     vazioSubindoHoje: "nada subindo agora; volte em algumas horas.",
     vazioVigilancia: "nenhuma conta vigiada ainda; adicione uma conta semente ou espere o job vigilancia, que roda todo domingo.",
