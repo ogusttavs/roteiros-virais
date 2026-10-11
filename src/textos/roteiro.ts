@@ -285,4 +285,14 @@ export const textosRoteiro = {
     pesquisadaEmSemDados: "A pesquisa não trouxe dado para este vídeo.",
     naoEncontrada: "Não achamos essa pesquisa. Volte, faça a pesquisa de novo ou escreva sem ela.",
   },
+  /**
+   * E52 (PR 3): as recusas do vídeo longo. A duração dele vem da medida de vídeos longos reais do ramo; sem medida a gente não escreve uma duração inventada, e a tela diz isso em vez de
+   * devolver um roteiro com um número que ninguém mediu.
+   */
+  longo: {
+    semLongos:
+      "Ainda não temos vídeos longos suficientes do seu ramo para medir quanto dura e como se divide um vídeo longo dele. Por enquanto, escolha o vídeo curto; assim que a medida existir, o longo aparece aqui.",
+    soVideoFalado: "O vídeo longo é para o YouTube e é falado: não vale para Story nem para vídeo sem fala.",
+    comPesquisa: "O vídeo longo ainda não usa a pesquisa na hora. Escolha o vídeo curto com a pesquisa, ou o longo sem ela.",
+  },
 };

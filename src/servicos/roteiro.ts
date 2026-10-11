@@ -16,6 +16,7 @@ import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprov
 import { db } from "@/db";
 import {
   clientes,
+  DURACOES_DO_VIDEO,
   ESTILOS_ROTEIRO,
   FORMATOS_ROTEIRO,
   geracoesIA,
@@ -28,6 +29,7 @@ import {
   type AindaValeResultado,
   type Cliente,
   type ConteudoRoteiro,
+  type DuracaoDoVideo,
   type EstiloRoteiro,
   type FormatoRoteiro,
   type Momento,
@@ -84,6 +86,7 @@ import {
   preferirRedePrincipal,
 } from "./proporcao-brasil";
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
+import { conferirQueOLongoSai, ErroDoRoteiroLongo, gerarConteudoLongo } from "./roteiro-longo";
 import { temasParaCliente } from "./temas";
 import { assuntoEmAltaDaLista, type AssuntoEmAlta } from "./tendencias";
 import { perguntaDoPublicoPelaChave, vozesDoSetor, vozesParaOPrompt } from "./vozes-do-publico";
@@ -127,6 +130,20 @@ export function validarOrigemDaTelaDoObjetivo(valor: unknown): OrigemDaTelaDoObj
 export function validarObjetivo(valor: unknown): Objetivo {
   if (valor === "alcance" || valor === "engajamento" || valor === "conversao") return valor;
   throw new ErroRoteiro("objetivo de roteiro invalido.");
+}
+
+/** E52 (PR 3): "curto" ou "longo"; qualquer outra coisa (inclusive nada) é indefinida, e `montarRoteiro` trata como "curto". */
+export function validarDuracao(valor: string | undefined): DuracaoDoVideo | undefined {
+  return DURACOES_DO_VIDEO.find((d) => d === valor);
+}
+
+/**
+ * E52 (PR 3): o que o vídeo longo não aceita, dito antes de qualquer gasto. É um vídeo falado do YouTube: Story, sem fala e a pesquisa na hora têm o seu próprio caminho e não se misturam
+ * com ele (a recusa é do servidor, não só da tela).
+ */
+function recusarSeNaoCabeNoLongo(formato: FormatoRoteiro, estilo: EstiloRoteiro, temPesquisa: boolean): void {
+  if (formato !== "reels" || estilo !== "falado") throw new ErroRoteiro(textosRoteiro.longo.soVideoFalado);
+  if (temPesquisa) throw new ErroRoteiro(textosRoteiro.longo.comPesquisa);
 }
 
 /** M4, item 2: mesmo cuidado de `validarFormato`, para o estilo que chega como texto livre do navegador. */
@@ -389,6 +406,8 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
   formato?: FormatoRoteiro;
   /** M4, item 2: "falado" (padrão) se ausente. */
   estilo?: EstiloRoteiro;
+  /** E52 (PR 3): "curto" (padrão) se ausente; "longo" é um vídeo do YouTube de mais de 3 minutos, por capítulos (só Reels, só falado). */
+  duracao?: DuracaoDoVideo;
   /** E39a: para quando é, ISO (hoje, padrão, se ausente). */
   data?: string;
   /** E39a: em que momento do dia, só para Story. */
@@ -944,6 +963,8 @@ type MontarERoteiroDados = {
   formato: FormatoRoteiro;
   /** M4, item 2: "falado" ou "sem_fala", ortogonal ao formato; troca o bloco de estrutura e o verificador. */
   estilo: EstiloRoteiro;
+  /** E52 (PR 3): "curto" (o de sempre) ou "longo" (YouTube, por capítulos: `servicos/roteiro-longo.ts`). */
+  duracao: DuracaoDoVideo;
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional; entra no prompt acima do tema. */
   objetivoDoVideo?: string;
   /** V12c, item 3, a E37b: override deste roteiro; `undefined` usa o `quemGrava` do cliente. */
@@ -1015,6 +1036,10 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     throw new ErroRoteiro("o briefing deste cliente ainda nao foi compilado.");
   }
 
+  // E52 (PR 3): as recusas do longo já foram ditas em `montarRoteiro`, antes de gastar; a reescrita e as versões chegam aqui direto, então a conferência fica também na porta do miolo.
+  const ehLongo = dados.duracao === "longo";
+  if (ehLongo) recusarSeNaoCabeNoLongo(dados.formato, dados.estilo, Boolean(dados.pesquisa));
+
   const ehMomento = dados.momento !== undefined;
   const alternativos = ehMomento ? [] : (await ramosAlternativosDaMarca(dados.clienteId)).map((a) => a.nichoId);
   // E44 PR 1: só vídeo de formato ligado para a marca serve de referência.
@@ -1031,8 +1056,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     vozesDoSetorAtual,
   ] = await Promise.all([
     // E45 PR 3: a evidência olha o ramo principal e os alternativos da marca (o modelo do nicho, abaixo, continua sendo o do principal).
-    ehMomento ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos, formatosDaMarca),
-    ehMomento ? Promise.resolve([]) : // A evidência prevista (a que sustentou o tema do dia) não é cortada pelas chaves da marca: o tema já nasceu dela, e cortá-la na hora do roteiro o deixaria
+    ehMomento || ehLongo ? Promise.resolve([]) : evidenciaParaRoteiro(nichoId, dados.tema, LIMITE_EVIDENCIA, alternativos, formatosDaMarca),
+    ehMomento || ehLongo ? Promise.resolve([]) : // A evidência prevista (a que sustentou o tema do dia) não é cortada pelas chaves da marca: o tema já nasceu dela, e cortá-la na hora do roteiro o deixaria
     // sem a prova que o motivou. Só o corte duro `serve_de_modelo` vale (decisão 106, E44 PR 2).
     evidenciaPorIds(dados.evidenciasPrevistas),
     modeloNichoAtual(nichoId),
@@ -1056,7 +1081,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
 
   const { proporcaoBrasil } = await reguaDoSetor(nichoId);
   const perfilCompilado = formatarPerfilCompilado(perfil);
-  const evidenciasCombinadas = ehMomento
+  // E52 (PR 3): o longo tem as suas referências (os vídeos longos do ramo, lidos em `roteiro-longo.ts`); a evidência dos curtos e o filtro dela (uma chamada de IA) não rodam.
+  const evidenciasCombinadas = ehMomento || ehLongo
     ? []
     : combinarEvidencias(
         prevista,
@@ -1066,7 +1092,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         dados.cliente.redePrincipal,
         dados.estilo,
       );
-  const evidencias = ehMomento
+  const evidencias = ehMomento || ehLongo
     ? []
     : await filtrarEvidenciaPelaMarca(
         evidenciasCombinadas,
@@ -1185,6 +1211,50 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       : undefined,
     pesquisa: pesquisaNaEntrada,
   });
+
+  if (ehLongo) {
+    try {
+      const longo = await gerarConteudoLongo({
+        clienteId: dados.clienteId,
+        nichoId,
+        tipo: dados.cliente.tipo,
+        persona: dados.cliente.persona,
+        quemAparece: quemApareceResolvido,
+        perfilCompilado,
+        camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
+        modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
+        regrasCliente,
+        proibicoes: perfil.fatos.proibicoes,
+        tema: dados.tema,
+        objetivo: dados.objetivo,
+        objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+        observacao: dados.observacao,
+        fontesDosFatos,
+        roteirosRecentes,
+        ganchosUltimos5: ultimosRoteiros.map((r) => r.gancho),
+        anguloParaEvitar: dados.anguloParaEvitar
+          ? { gancho: dados.anguloParaEvitar.gancho, motivos: dados.anguloParaEvitar.motivosIds.map(rotuloDoMotivo), motivoTexto: dados.anguloParaEvitar.motivoTexto }
+          : undefined,
+        momento: dados.momento
+          ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
+          : undefined,
+        marcaCitada,
+        noticia: dados.noticia,
+        noticiasDoAssunto,
+        temaDoMomento: dados.temaDoMomento,
+        vozesDoPublico,
+        lidasEm,
+        perguntaPresa: dados.perguntaPresa
+          ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
+          : undefined,
+      });
+      return { ...longo, quemAparece: quemApareceResolvido };
+    } catch (erro) {
+      // O erro do longo traz a frase pronta para a pessoa (por exemplo, o ramo sem vídeos longos medidos); o resto segue como era.
+      if (erro instanceof ErroDoRoteiroLongo) throw new ErroRoteiro(erro.message);
+      throw erro;
+    }
+  }
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -1407,6 +1477,19 @@ export async function montarRoteiro(
   const cliente = await clientePorId(clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
+  // E52 (PR 3): o vídeo longo se recusa ANTES de gastar (o tema do dia pode custar uma chamada de IA): o que ele não aceita, e o ramo sem a medida dos longos.
+  if (params.duracao === "longo") {
+    recusarSeNaoCabeNoLongo(params.formato ?? "reels", params.estilo ?? "falado", params.pesquisaId !== undefined);
+    if (cliente.nichoId) {
+      try {
+        await conferirQueOLongoSai(cliente.nichoId);
+      } catch (erro) {
+        if (erro instanceof ErroDoRoteiroLongo) throw new ErroRoteiro(erro.message);
+        throw erro;
+      }
+    }
+  }
+
   // As versões de um mesmo grupo recebem o tema já resolvido uma vez (E26, 4b): "sugerido" é um índice na lista do dia, que muda de um instante para o outro, e "outra versão" tem de ser do mesmo tema.
   const { tema, evidenciasPrevistas, doMomento, pergunta, pesquisa } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
@@ -1416,6 +1499,7 @@ export async function montarRoteiro(
   const momento = params.origem === "momento" ? params.momento : undefined;
   const formato = params.formato ?? "reels";
   const estilo = params.estilo ?? "falado";
+  const duracao = params.duracao ?? "curto";
   // E49 PR 1: só o Reels tem ficha; ela decide o objetivo que se grava.
   const ficha = formato === "reels" && estilo === "falado" && params.ficha ? params.ficha : null;
   const objetivo = ficha ? objetivoDaFicha(ficha) : params.objetivo;
@@ -1437,6 +1521,7 @@ export async function montarRoteiro(
     ficha,
     formato,
     estilo,
+    duracao,
     objetivoDoVideo: params.objetivoDoVideo,
     quemAparece: params.quemAparece,
     observacao: params.observacao,
@@ -1460,6 +1545,7 @@ export async function montarRoteiro(
       ficha,
       formato,
       estilo,
+      duracaoDoVideo: duracao,
       // E40, item 2: da origem momento, o mesmo campo que já está dentro de `momento`.
       objetivoDoVideo: params.objetivoDoVideo ?? momento?.objetivoDoVideo,
       // V12c, item 3: só grava quando é diferente do padrão do cliente, para a troca por vídeo nunca sobrescrever o briefing.
@@ -1543,6 +1629,8 @@ export async function reprovarERescrever(
     formato: atual.formato,
     // M4, item 2: idem para o estilo ("mantém o estilo do roteiro de origem").
     estilo: atual.estilo,
+    // E52 (PR 3): idem, a reescrita de um vídeo longo continua longa, com a duração medida de novo.
+    duracao: atual.duracaoDoVideo,
     // E40, item 2: idem, a reescrita mantém o recado do vídeo da versão anterior.
     objetivoDoVideo: atual.objetivoDoVideo ?? undefined,
     // V12c, item 3: idem, a reescrita mantém quem aparece da versão anterior.
@@ -1579,6 +1667,7 @@ export async function reprovarERescrever(
       ficha: atual.ficha,
       formato: atual.formato,
       estilo: atual.estilo,
+      duracaoDoVideo: atual.duracaoDoVideo,
       objetivoDoVideo: atual.objetivoDoVideo,
       quemAparece: atual.quemAparece,
       // E43: idem, a reescrita mantém a notícia de origem.

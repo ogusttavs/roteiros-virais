@@ -123,6 +123,22 @@ Imprime cada cena gerada (o que falar, que precisa sair vazio, o que mostrar, o 
 tela), a legenda do post, e quantos casos o verificador de produção (checagem com
 `estilo: "sem_fala"` mais `verificarTexto`) reprovaria.
 
+## Formato de `roteiros-longos.json` e `roteiros-longos.exemplo.json` (E52 PR 3)
+
+O roteiro longo do YouTube não tem nota de 0 a 10: o que dá para medir por código é conferido, e o resto fica impresso para leitura humana. Cada caso é origem "tema" ou "momento", nunca
+os dois, e traz o que o servidor leria do banco: `duracaoDoRamo` (os percentis, a amostra e a `forca`, "regra" ou "indicio"; a duração do roteiro é a mediana arredondada a 30 segundos,
+pela mesma função do servidor), `estruturaDoRamo` (a lista de capítulos típica, ou `null`), `titulosDoRamo`, `referencias` (a leitura da estrutura de até três vídeos longos, com `id`) e
+os opcionais de sempre (`roteirosRecentes`, `regrasCliente`, `tipo`). `GOLDEN_SET_DIR/roteiros-longos.json` é o real; sem ele, roda com `roteiros-longos.exemplo.json`, seis casos
+fictícios (limpeza, clínica odontológica, personal trainer, cafeteria no momento, confeitaria com regra firme e oficina mecânica).
+
+```bash
+npm run avaliar:roteiros-longos
+```
+
+Imprime cada capítulo (o nome, o início calculado, a duração, os pontos, o que a câmera mostra, o gancho para o próximo), o "Copiar os capítulos" e quantos casos o verificador de produção
+(os capítulos conferidos por código, R-YT-VIDEO-05 a 08, mais `verificarTexto`) reprovaria. Conta também o que o formato do capítulo promete: quantos ganchos vieram inteiros (de 4 a 40
+palavras) e quantos pontos passam de 20 palavras. Sob o simulador (`AI_PROVIDER=mock`) não custa nada e prova o que o código confere; o que o modelo escreve só a rodada com chave mede.
+
 ## Formato de `entender-marca.json` e `entender-marca.exemplo.json` (E38 PR 2)
 
 A tarefa `entenderMarca` ("o que entendemos da sua marca") também não tem nota de 0 a 10: o que dá para

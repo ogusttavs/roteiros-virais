@@ -16,6 +16,7 @@ import {
   REGRAS_SHORT,
   REGRAS_STORY,
   REGRAS_TIKTOK,
+  REGRAS_YT_CAPITULOS,
   REGRAS_YT_VIDEO,
   regrasDoReels,
 } from "./regras-formato";
@@ -31,7 +32,7 @@ function numerosDaSecao9(): string[] {
   return [...encontradas].map((m) => m[1]);
 }
 
-describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", () => {
+describe("as 56 regras de plataforma (45 da E36 e as 11 dos capítulos, E52), código contra a seção 9 das rubricas", () => {
   const existe = existsSync(CAMINHO_RUBRICAS);
 
   it.skipIf(!existe)("todo número da seção 9 existe no código, e todo número do código existe na seção 9", () => {
@@ -42,6 +43,7 @@ describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", 
       ...REGRAS_TIKTOK,
       ...REGRAS_SHORT,
       ...REGRAS_YT_VIDEO,
+      ...REGRAS_YT_CAPITULOS,
     ].map((r) => r.numero));
 
     const faltamNoCodigo = [...daSecao9].filter((n) => !doCodigo.has(n));
@@ -49,7 +51,7 @@ describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", 
 
     expect(faltamNoCodigo).toEqual([]);
     expect(sobramNoCodigo).toEqual([]);
-    expect(daSecao9.size).toBe(45);
+    expect(daSecao9.size).toBe(56);
   });
 
   if (!existe) {

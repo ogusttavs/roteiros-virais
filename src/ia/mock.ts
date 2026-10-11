@@ -54,6 +54,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockAvaliarTema(entrada);
     case "roteiro":
       return mockRoteiro(entrada, sistemaEstavel);
+    case "roteiroLongo":
+      return mockRoteiroLongo(entrada);
     case "verificarTexto":
       return mockVerificarTexto(entrada);
     case "temasDoDia":
@@ -508,6 +510,91 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
     evidencias: ids,
     tipoAbertura,
     entregaDaPesquisa: mockEntregaDaPesquisa(dadosDaPesquisa, tema, entrada, segundaTentativa),
+  };
+}
+
+/**
+ * E52 (PR 3): o roteiro longo do mock. A duração vem da própria entrada ("Duração do vídeo: N segundos"), os capítulos somam essa duração e cada um tem 10 segundos ou mais; o último
+ * não tem gancho. Marcadores de teste (valem só na primeira tentativa; com "-sempre" valem em toda): `[mock:capitulo-curto]` (um capítulo de 4 s), `[mock:soma-errada]` (a soma 40% acima
+ * da duração), `[mock:dois-capitulos]` (só dois), `[mock:sem-gancho]` (o primeiro capítulo sem o gancho para o próximo), `[mock:ponto-longo]` (um ponto de mais de 20 palavras),
+ * `[mock:sem-evidencia]` (nenhuma referência citada), `[mock:travessao]` (um travessão num ponto: o código corrige, sem segunda tentativa) e `[mock:gancho-fora-da-cena]` (um gancho que
+ * não cita nada do momento descrito).
+ */
+function mockRoteiroLongo(entrada: string) {
+  const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
+  const tema = ehMomento ? extrairCampo(entrada, "O que está acontecendo:") || "momento simulado" : extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
+  const reprovado = entrada.includes("reprovou a versão anterior");
+  const ids = extrairIds(entrada);
+  const segundaTentativa = entrada.includes("A tentativa anterior foi reprovada.");
+  const marcado = (nome: string) => entrada.includes(`[mock:${nome}-sempre]`) || (entrada.includes(`[mock:${nome}]`) && !segundaTentativa);
+
+  const duracaoAlvo = Number(/Duração do vídeo: (\d+) segundos/.exec(entrada)?.[1] ?? 600);
+  const quantidade = marcado("dois-capitulos") ? 2 : Math.min(6, Math.max(3, Math.floor(duracaoAlvo / 60)));
+  const base = Math.floor(duracaoAlvo / quantidade);
+  const duracoes = Array.from({ length: quantidade }, (_, i) => (i === quantidade - 1 ? duracaoAlvo - base * (quantidade - 1) : base));
+  if (marcado("capitulo-curto") && quantidade >= 3) {
+    duracoes[quantidade - 1] += duracoes[1] - 4;
+    duracoes[1] = 4;
+  }
+  if (marcado("soma-errada")) duracoes.forEach((_, i) => (duracoes[i] = Math.round(duracoes[i] * 1.4)));
+
+  const nomes = ["O problema de verdade", "Por que isso acontece", "O passo a passo", "O que costuma dar errado", "Como conferir", "O que fazer agora"];
+  // O gancho abre com uma palavra que nenhum roteiro recente (nem a versão reprovada) usou: sem uma lista de tipos para instruir, o simulador obedece à regra do prompt do jeito que um modelo deveria.
+  const jaUsadas = new Set<string>();
+  const primeiraPalavraDe = (texto: string) => texto.trim().split(/[\s,]+/)[0]?.toLowerCase() ?? "";
+  for (const m of entrada.matchAll(/gancho: "([^"]+)"/g)) jaUsadas.add(primeiraPalavraDe(m[1]));
+  const reprovadaAbreCom = /A versão reprovada abre com: "([^"]+)"/.exec(entrada);
+  if (reprovadaAbreCom) jaUsadas.add(primeiraPalavraDe(reprovadaAbreCom[1]));
+  const escolhida = (Object.entries(PRIMEIRA_PALAVRA_MOCK_POR_TIPO) as [(typeof TIPOS_ABERTURA_MOCK)[number], string][]).find(([, palavra]) => !jaUsadas.has(palavra));
+  const tipoAbertura = escolhida?.[0] ?? "outro";
+  const primeiraPalavra = escolhida?.[1] ?? "olha";
+  const pontoLongo = "este ponto tem de propósito muitas palavras para passar do limite de vinte palavras que o roteiro longo aceita em cada ponto curto de um capítulo qualquer";
+
+  return {
+    titulo: reprovado ? `${tema}: outro jeito de resolver` : `${tema}: o passo a passo completo`,
+    miniatura: `A pessoa no local, com o tema em duas palavras: ${tema}`,
+    gancho: marcado("gancho-fora-da-cena")
+      ? `${primeiraPalavra}, um assunto qualquer que ninguém ligou a nada do que se vê`
+      : reprovado
+        ? `${primeiraPalavra}, outra forma de contar ${tema} nos primeiros 30 segundos`
+        : `${primeiraPalavra}, o que ${tema} ensina nos primeiros 30 segundos`,
+    capitulos: duracoes.map((duracaoS, i) => {
+      const ultimo = i === quantidade - 1;
+      return {
+        nome: i === 0 ? `${nomes[0]}: ${tema}`.slice(0, 80) : nomes[i % nomes.length],
+        duracaoS,
+        tom: "direto",
+        pontos: [
+          i === 1 && marcado("ponto-longo") ? pontoLongo : `O que mostrar no capítulo ${i + 1}`,
+          i === 2 && marcado("travessao") ? `O que dizer sobre ${tema} \u2014 sem rodeio` : `O que dizer sobre ${tema}`,
+        ],
+        naImagem: "o local do negócio de verdade",
+        ganchoParaOProximo: ultimo || (i === 0 && marcado("sem-gancho")) ? null : `E o que vem a seguir muda a forma de olhar para ${tema}, no capítulo ${i + 2}.`,
+        comoEditar: "corte seco, texto curto na tela",
+      };
+    }),
+    chamadaFinal: "comenta qual capítulo ajudou mais",
+    ondeGravar: "no próprio local do negócio, com a luz da janela",
+    edicao: {
+      textoNaTela: [{ quando: "abertura", oQue: tema, onde: "topo da tela" }],
+      ritmoDeCorte: "moderado",
+      recursos: [],
+      audio: null,
+      // O marcador simula o modelo alucinando um id fora das referências da entrada (o código descarta, nunca troca por outro).
+      referencia: entrada.includes("simule um id de referencia fora da lista de evidencia")
+        ? { videoId: 999999, segundo: 9, oQueOlhar: "video fora das referencias disponiveis" }
+        : ids[0] !== undefined
+          ? { videoId: ids[0], segundo: 0, oQueOlhar: "como o vídeo divide os capítulos" }
+          : null,
+    },
+    // O marcador simula o modelo que não cita nenhuma das referências da entrada (o verificador exige ao menos uma quando elas existem).
+    evidencias: marcado("sem-evidencia") ? [] : ids,
+    porQueAssim: [
+      { regra: "R-YT-VIDEO-01", motivo: "os primeiros 30 segundos já entregam o que o título prometeu" },
+      { regra: "R-YT-VIDEO-13", motivo: "cada capítulo é uma parte que se entende sozinha" },
+    ],
+    temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
+    tipoAbertura,
   };
 }
 

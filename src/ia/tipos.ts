@@ -39,6 +39,8 @@ export type TarefaIA =
   | "temasDoDia"
   | "avaliarTema"
   | "roteiro"
+  /** E52 (PR 3): o roteiro longo do YouTube, por capítulos (a duração-alvo vem da medida dos longos do ramo). */
+  | "roteiroLongo"
   | "verificarTexto"
   | "aprenderCliente"
   | "classificarAbertura"

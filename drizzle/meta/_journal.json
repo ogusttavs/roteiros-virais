@@ -603,6 +603,13 @@
       "when": 1791692937771,
       "tag": "0085_leitura-dos-longos",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1791700619525,
+      "tag": "0086_roteiro-longo",
+      "breakpoints": true
     }
   ]
 }

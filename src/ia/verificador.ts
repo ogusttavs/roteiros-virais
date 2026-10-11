@@ -698,6 +698,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
   /**
+   * E52 (PR 3): conferências por código de uma saída que só uma tarefa conhece (os capítulos do roteiro longo, R-YT-VIDEO-05 a 08, `lib/capitulos-do-roteiro.ts`). Cada motivo reprova a
+   * tentativa como os locais, e vai para a segunda tentativa; vazio aprova. Vale nas duas tentativas.
+   */
+  verificarExtra?: (dados: T) => string[];
+  /**
    * Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação (quando a tarefa tem
    * um) precisa continuar sendo a última linha da entrada mesmo na segunda tentativa; antes,
    * `gerarComVerificacao` colava o motivo da reprovação depois da entrada inteira (que já vinha
@@ -810,7 +815,13 @@ async function tentarGerarEVerificar<T>(
   let dados = resultado.dados;
   let campos = params.extrairCampos(dados);
   let evidencias = params.extrairEvidencias?.(dados) ?? [];
-  let local = verificarLocalmente(campos, opcoesVerificacaoLocal(params, dados));
+  // As conferências locais de sempre mais as da tarefa (`verificarExtra`); a correção mecânica abaixo é conferida pelas duas, nunca só pelas de sempre.
+  const conferirLocalmente = (camposDaTentativa: Record<string, string>, dadosDaTentativa: T) => {
+    const base = verificarLocalmente(camposDaTentativa, opcoesVerificacaoLocal(params, dadosDaTentativa));
+    const extras = params.verificarExtra?.(dadosDaTentativa) ?? [];
+    return extras.length > 0 ? { aprovado: false, motivos: [...base.motivos, ...extras] } : base;
+  };
+  let local = conferirLocalmente(campos, dados);
 
   /**
    * M5b, achado 10 da revisão do motor (01/10/2026): quando a única coisa que reprovou é
@@ -824,7 +835,7 @@ async function tentarGerarEVerificar<T>(
   if (!local.aprovado && local.motivos.every(ehMotivoMecanico)) {
     const corrigidos = corrigirMecanicamente(dados);
     const camposCorrigidos = params.extrairCampos(corrigidos);
-    const localCorrigido = verificarLocalmente(camposCorrigidos, opcoesVerificacaoLocal(params, corrigidos));
+    const localCorrigido = conferirLocalmente(camposCorrigidos, corrigidos);
     if (localCorrigido.aprovado) {
       dados = corrigidos;
       campos = camposCorrigidos;

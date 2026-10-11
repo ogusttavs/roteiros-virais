@@ -1,7 +1,7 @@
 /**
- * Roda os nove golden sets em sequencia (etapa 18, decisao 4 do
+ * Roda os dez golden sets em sequencia (etapa 18, decisao 4 do
  * `PROXIMO.md`; momentos desde a V9a, agendas desde a V9b, stories desde a V9c, roteiros sem
- * fala desde a M4, o que entendemos da marca desde a E38 PR 2) e grava o resultado num JSON, porque a CI nao tem chave de producao
+ * fala desde a M4, o que entendemos da marca desde a E38 PR 2, roteiros longos desde a E52 PR 3) e grava o resultado num JSON, porque a CI nao tem chave de producao
  * (etapa 13) e cada rodada custa credito: o PR que muda um prompt traz esse arquivo (ou o
  * resumo dele) no corpo, em vez da CI rodar de novo. Grava em `<GOLDEN_SET_DIR ou
  * ../avaliacoes-privadas>/resultados/<AAAA-MM-DD>-<sha curto>.json`, criando a pasta se nao
@@ -17,6 +17,7 @@ import { avaliarBriefing } from "./avaliar-briefing";
 import { avaliarEntenderMarca } from "./avaliar-entender-marca";
 import { avaliarMomentos } from "./avaliar-momentos";
 import { avaliarRoteiros } from "./avaliar-roteiros";
+import { avaliarRoteirosLongos } from "./avaliar-roteiros-longos";
 import { avaliarRoteirosSemFala } from "./avaliar-roteiros-sem-fala";
 import { avaliarStories } from "./avaliar-stories";
 import { avaliarTemaDoMomento } from "./avaliar-tema-do-momento";
@@ -52,6 +53,9 @@ async function avaliarTudo() {
   console.log("\n=== roteiros sem fala ===\n");
   const roteirosSemFala = await avaliarRoteirosSemFala();
 
+  console.log("\n=== roteiros longos ===\n");
+  const roteirosLongos = await avaliarRoteirosLongos();
+
   console.log("\n=== o que entendemos da marca ===\n");
   const entenderMarca = await avaliarEntenderMarca();
 
@@ -68,6 +72,7 @@ async function avaliarTudo() {
     agendas,
     stories,
     roteirosSemFala,
+    roteirosLongos,
     entenderMarca,
     temaDoMomento,
   };

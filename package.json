@@ -45,6 +45,7 @@
     "avaliar:agendas": "tsx scripts/avaliar-agendas.ts",
     "avaliar:stories": "tsx scripts/avaliar-stories.ts",
     "avaliar:roteiros-sem-fala": "tsx scripts/avaliar-roteiros-sem-fala.ts",
+    "avaliar:roteiros-longos": "tsx scripts/avaliar-roteiros-longos.ts",
     "avaliar:entender-marca": "tsx scripts/avaliar-entender-marca.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",

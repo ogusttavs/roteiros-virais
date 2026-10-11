@@ -1,0 +1,178 @@
+[
+  {
+    "nome": "produtos de limpeza, tema direto, duas leituras de estrutura",
+    "tema": "como tirar mancha de vinho do sofá sem estragar o tecido",
+    "objetivo": "alcance",
+    "tipo": "negocio",
+    "perfilCompilado": "Marca de produtos de limpeza para casa. Vende um kit tira-mancha a partir de 89 reais. O cliente ideal mora em apartamento e tem medo de estragar o sofá. Frases que o dono usa: 'mancha não é sentença de morte', 'teste num cantinho escondido primeiro'. Cenas que a câmera pode ver: a bancada da loja, o sofá de demonstração, a mancha antes e depois.",
+    "camadaExclusiva": "Cidade: Campinas. Concorrentes que o cliente cita: duas lojas de bairro.",
+    "modeloNicho": "Os vídeos curtos do ramo abrem com o antes e depois e fecham com uma pergunta para os comentários.",
+    "duracaoDoRamo": { "p25": 480, "mediana": 600, "p75": 780, "amostra": 12, "forca": "indicio" },
+    "estruturaDoRamo": { "videosComLista": 7, "quantidadeMediana": 5, "tamanhoMedianoS": 120, "forca": "indicio" },
+    "titulosDoRamo": ["Como tirar mancha de sofá em casa", "5 erros ao limpar sofá que estragam o tecido"],
+    "referencias": [
+      {
+        "id": 9001,
+        "titulo": "Como tirar mancha de sofá em casa",
+        "duracaoS": 610,
+        "abertura": { "promessa": "mostra o antes e o depois da mancha", "entregaAteS": 20 },
+        "capitulos": [
+          { "inicioS": 0, "nome": "O antes e o depois", "oQueFaz": "mostra o resultado primeiro", "gancho": "mas o erro que estraga o tecido vem a seguir" },
+          { "inicioS": 90, "nome": "O que usar", "oQueFaz": "lista o que precisa", "gancho": "e o passo que ninguém conta" },
+          { "inicioS": 240, "nome": "O passo a passo", "oQueFaz": "faz ao vivo", "gancho": null }
+        ],
+        "lacos": [{ "oQue": "promete mostrar o erro mais comum" }],
+        "fechamento": { "oQueFaz": "pede o comentário com a dúvida", "apontaParaProximoVideo": true },
+        "tempos": "exatos"
+      },
+      {
+        "id": 9002,
+        "titulo": "5 erros ao limpar sofá que estragam o tecido",
+        "duracaoS": 540,
+        "abertura": { "promessa": "promete os cinco erros", "entregaAteS": 15 },
+        "capitulos": [
+          { "inicioS": 0, "nome": "Erro 1 e 2", "oQueFaz": "mostra os dois primeiros", "gancho": "o terceiro erro é o que mais gente comete" },
+          { "inicioS": 180, "nome": "Erro 3", "oQueFaz": "explica o erro principal", "gancho": null }
+        ],
+        "lacos": [],
+        "fechamento": { "oQueFaz": "resume e chama para seguir", "apontaParaProximoVideo": false },
+        "tempos": "aproximados"
+      }
+    ],
+    "roteirosRecentes": [],
+    "regrasCliente": [],
+    "pontoPrincipal": "o caso comum: ramo medido, estrutura típica, duas referências, objetivo de alcance"
+  },
+  {
+    "nome": "clínica odontológica, objetivo de chamar para comprar, amostra de regra",
+    "tema": "o que fazer quando um dente quebra e como evitar perder o dente",
+    "objetivo": "conversao",
+    "tipo": "negocio",
+    "perfilCompilado": "Clínica odontológica de bairro com três dentistas. Atende urgência no mesmo dia. Consulta de avaliação a partir de 120 reais. O cliente ideal tem medo de dentista e adia o tratamento. Frases que a dona usa: 'a dor não passa sozinha', 'aqui ninguém vai te julgar'. Cenas que a câmera pode ver: a recepção, a sala de atendimento vazia, a bancada de materiais.",
+    "camadaExclusiva": "Cidade: Sorocaba. Perfil que admira: um dentista que explica procedimentos com bonecos.",
+    "modeloNicho": "Os vídeos curtos do ramo mostram um procedimento em 30 segundos e terminam chamando para o WhatsApp.",
+    "duracaoDoRamo": { "p25": 660, "mediana": 780, "p75": 960, "amostra": 34, "forca": "regra" },
+    "estruturaDoRamo": { "videosComLista": 31, "quantidadeMediana": 6, "tamanhoMedianoS": 130, "forca": "regra" },
+    "titulosDoRamo": ["O que fazer quando o dente quebra", "Dente quebrado: urgência ou pode esperar"],
+    "referencias": [
+      {
+        "id": 9101,
+        "titulo": "O que fazer quando o dente quebra",
+        "duracaoS": 790,
+        "abertura": { "promessa": "diz o que fazer nos primeiros minutos", "entregaAteS": 30 },
+        "capitulos": [
+          { "inicioS": 0, "nome": "O que fazer agora", "oQueFaz": "dá os três passos de urgência", "gancho": "e o que nunca fazer vem no capítulo seguinte" },
+          { "inicioS": 150, "nome": "O que nunca fazer", "oQueFaz": "lista os erros comuns", "gancho": "mas quando é caso de urgência de verdade" },
+          { "inicioS": 330, "nome": "Quando ir ao dentista", "oQueFaz": "separa urgência de espera", "gancho": null }
+        ],
+        "lacos": [{ "oQue": "promete dizer quando é urgência" }],
+        "fechamento": { "oQueFaz": "chama para agendar a avaliação", "apontaParaProximoVideo": false },
+        "tempos": "exatos"
+      }
+    ],
+    "roteirosRecentes": [{ "tema": "clareamento dental, vale a pena", "objetivo": "alcance", "status": "gravado", "gancho": "Será que clarear o dente estraga o esmalte" }],
+    "regrasCliente": [],
+    "pontoPrincipal": "objetivo de comprar: chamada para agendar no último capítulo, uma só, e o capítulo de urgência sem prometer resultado"
+  },
+  {
+    "nome": "pessoa, primeira pessoa, ramo sem estrutura medida e sem leitura",
+    "tema": "por que você treina todo dia e o corpo não muda",
+    "objetivo": "engajamento",
+    "tipo": "pessoa",
+    "perfilCompilado": "Personal trainer que atende online e na academia do bairro. Treina mulheres acima de 40 anos. O cliente ideal já tentou várias dietas e se frustra com a balança. Frases que a pessoa usa: 'o corpo não é uma conta de somar', 'descanso também é treino'. Cenas que a câmera pode ver: a academia, o tapete de treino em casa, a pessoa explicando de frente para o espelho.",
+    "camadaExclusiva": "Cidade: Ribeirão Preto.",
+    "modeloNicho": "Os vídeos curtos do ramo mostram um exercício em 20 segundos com texto na tela.",
+    "duracaoDoRamo": { "p25": 420, "mediana": 480, "p75": 600, "amostra": 6, "forca": "indicio" },
+    "estruturaDoRamo": null,
+    "titulosDoRamo": ["Por que o corpo não muda mesmo treinando"],
+    "referencias": [],
+    "roteirosRecentes": [],
+    "regrasCliente": [],
+    "pontoPrincipal": "marca do tipo pessoa: tudo em primeira pessoa do singular, sem referência e sem estrutura medida, sem afirmar que existe vídeo ou número"
+  },
+  {
+    "nome": "momento descrito pela pessoa, cena como única fonte",
+    "momento": {
+      "onde": "na cozinha da cafeteria, antes de abrir",
+      "oQueEstaAcontecendo": "estou regulando o moedor e provando o primeiro café do dia",
+      "oQueDaParaMostrar": "o moedor, a xícara, o barista provando e fazendo careta"
+    },
+    "objetivo": "alcance",
+    "tipo": "negocio",
+    "perfilCompilado": "Cafeteria de bairro com torra própria. O cliente ideal é quem trabalha por perto e quer um café bom sem fila. Frases que o dono usa: 'café bom não precisa de pose', 'o primeiro café do dia é o teste'. Cenas que a câmera pode ver: o balcão, o moedor, a torra.",
+    "camadaExclusiva": "Cidade: Belo Horizonte.",
+    "modeloNicho": "Os vídeos curtos do ramo mostram o preparo e terminam com o nome da casa.",
+    "duracaoDoRamo": { "p25": 360, "mediana": 420, "p75": 540, "amostra": 5, "forca": "indicio" },
+    "estruturaDoRamo": null,
+    "titulosDoRamo": [],
+    "referencias": [],
+    "roteirosRecentes": [],
+    "regrasCliente": [],
+    "pontoPrincipal": "o gancho nasce da cena de agora; o tema curto sai preenchido; nada além da cena vira fato"
+  },
+  {
+    "nome": "confeitaria com roteiros recentes e regra firme do cliente",
+    "tema": "quanto cobrar por um bolo de aniversário sem perder dinheiro",
+    "objetivo": "conversao",
+    "tipo": "negocio",
+    "perfilCompilado": "Confeitaria artesanal que faz bolos por encomenda. Bolo de aniversário a partir de 180 reais. O cliente ideal é quem encomenda para festa em casa. Frases que a dona usa: 'bolo bom não se apressa', 'cada bolo tem a sua conta'. Cenas que a câmera pode ver: a bancada de confeitar, a balança, a caderneta de preços.",
+    "camadaExclusiva": "Cidade: Curitiba. Concorrentes que o cliente cita: uma confeitaria de shopping.",
+    "modeloNicho": "Os vídeos curtos do ramo mostram a decoração de um bolo em 30 segundos.",
+    "duracaoDoRamo": { "p25": 720, "mediana": 900, "p75": 1080, "amostra": 15, "forca": "indicio" },
+    "estruturaDoRamo": { "videosComLista": 4, "quantidadeMediana": 7, "tamanhoMedianoS": 120, "forca": "indicio" },
+    "titulosDoRamo": ["Quanto cobrar por bolo de aniversário"],
+    "referencias": [
+      {
+        "id": 9301,
+        "titulo": "Quanto cobrar por bolo de aniversário",
+        "duracaoS": 905,
+        "abertura": { "promessa": "promete a conta completa", "entregaAteS": 40 },
+        "capitulos": [
+          { "inicioS": 0, "nome": "A conta que ninguém faz", "oQueFaz": "mostra o erro de cobrar só o ingrediente", "gancho": "e a primeira parte da conta é a que mais some" },
+          { "inicioS": 140, "nome": "Ingredientes e embalagem", "oQueFaz": "soma o custo direto", "gancho": "agora a parte que quase ninguém conta" },
+          { "inicioS": 420, "nome": "O seu tempo", "oQueFaz": "põe o tempo na conta", "gancho": null }
+        ],
+        "lacos": [{ "oQue": "promete o valor final no fim" }],
+        "fechamento": { "oQueFaz": "mostra o valor final e chama para encomendar", "apontaParaProximoVideo": false },
+        "tempos": "exatos"
+      }
+    ],
+    "roteirosRecentes": [
+      { "tema": "como decorar bolo com chantilly", "objetivo": "alcance", "status": "gravado", "gancho": "Olha como o chantilly fica firme em dez minutos" },
+      { "tema": "bolo de pote vende mais que bolo grande", "objetivo": "conversao", "status": "gravado", "gancho": "Escuta esta conta antes de vender bolo de pote" }
+    ],
+    "regrasCliente": [{ "regra": "não prometer preço fixo sem dizer que depende do bolo", "contagem": 3 }],
+    "pontoPrincipal": "regra firme do cliente, dois roteiros recentes com ganchos diferentes: o gancho novo não repete a primeira palavra deles"
+  },
+  {
+    "nome": "oficina mecânica, vídeo de 25 minutos, oito capítulos",
+    "tema": "o que conferir no carro antes de pegar a estrada nas férias",
+    "objetivo": "alcance",
+    "tipo": "negocio",
+    "perfilCompilado": "Oficina mecânica de bairro, três mecânicos. Revisão completa a partir de 380 reais. O cliente ideal viaja de carro nas férias e não entende de mecânica. Frases que o dono usa: 'carro não avisa, ele reclama baixo', 'olhar custa nada'. Cenas que a câmera pode ver: o elevador, o cofre do motor, a bancada de ferramentas.",
+    "camadaExclusiva": "Cidade: Goiânia.",
+    "modeloNicho": "Os vídeos curtos do ramo mostram uma peça gasta e o que ela causa.",
+    "duracaoDoRamo": { "p25": 1200, "mediana": 1500, "p75": 1800, "amostra": 31, "forca": "regra" },
+    "estruturaDoRamo": { "videosComLista": 18, "quantidadeMediana": 8, "tamanhoMedianoS": 185, "forca": "indicio" },
+    "titulosDoRamo": ["Checklist para viajar de carro", "O que conferir antes de viajar"],
+    "referencias": [
+      {
+        "id": 9401,
+        "titulo": "Checklist para viajar de carro",
+        "duracaoS": 1510,
+        "abertura": { "promessa": "promete o checklist completo", "entregaAteS": 30 },
+        "capitulos": [
+          { "inicioS": 0, "nome": "Pneus", "oQueFaz": "mostra como conferir", "gancho": "e o item que mais dá problema é o próximo" },
+          { "inicioS": 200, "nome": "Óleo e água", "oQueFaz": "mostra o nível", "gancho": "mas tem uma luz do painel que você não pode ignorar" },
+          { "inicioS": 420, "nome": "Luzes do painel", "oQueFaz": "explica as principais", "gancho": null }
+        ],
+        "lacos": [{ "oQue": "promete o item que mais dá problema" }],
+        "fechamento": { "oQueFaz": "chama para a revisão", "apontaParaProximoVideo": true },
+        "tempos": "exatos"
+      }
+    ],
+    "roteirosRecentes": [],
+    "regrasCliente": [],
+    "pontoPrincipal": "o vídeo mais longo, de 25 minutos: vários capítulos, cada um com o gancho inteiro e o resto em pontos, e a soma na duração"
+  }
+]
