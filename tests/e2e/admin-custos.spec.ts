@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { eq } from "drizzle-orm";
 
 import { db } from "../../src/db";
-import { configuracaoAdmin, custosExternos, custosFixos, execucoesJob, geracoesIA, nichos } from "../../src/db/schema";
+import { clientes, configuracaoAdmin, custosExternos, custosFixos, execucoesJob, geracoesIA, nichos, pesquisasNaHora } from "../../src/db/schema";
 
 const EMAIL_ADMIN = "admin@exemplo.teste";
 const SENHA = "ExemploSenha123";
@@ -139,6 +139,97 @@ test.describe("custos e rotinas", () => {
     } finally {
       await db().delete(execucoesJob).where(eq(execucoesJob.id, falhou.id));
       await db().delete(execucoesJob).where(eq(execucoesJob.id, deuCerto.id));
+    }
+  });
+
+  test("Custos: a seção das pesquisas na hora tem uma linha por pesquisa, com a marca, o tamanho, as buscas, o custo e como terminou, e o estimado ao lado do medido", async ({ page }) => {
+    const [marca] = await db().insert(clientes).values({ nome: "[teste e2e] Marca das Pesquisas" }).returning();
+    const achados = [1, 2, 3].map((id) => ({
+      id,
+      texto: `Dado ${id}.`,
+      fonteNome: "IBGE",
+      fonteTipo: "oficial" as const,
+      url: `https://www.ibge.gov.br/${id}`,
+      titulo: null,
+      dataDaPagina: "2026-08-31",
+      dataTexto: null,
+      antigo: false,
+      citacao: `Trecho ${id}.`,
+    }));
+    const base = { clienteId: marca.id, pedido: "quanto subiu o preço dos produtos de limpeza", status: "pronta" as const, achados, selecionados: [1, 2], confirmadaEm: new Date() };
+    const agora = Date.now();
+    try {
+      const [rapida, aFundo, erro, vazia] = await db()
+        .insert(pesquisasNaHora)
+        .values([
+          { ...base, buscas: 4, custoUsd: "0.080000", criadoEm: new Date(agora - 40_000), terminadoEm: new Date(agora - 40_000 + 25_000) },
+          {
+            ...base,
+            pedido: "o que mudou na regra da embalagem",
+            profundidade: "aprofundada",
+            buscas: 9,
+            custoUsd: "0.200000",
+            criadoEm: new Date(agora - 30_000),
+            terminadoEm: new Date(agora - 30_000 + 52_000),
+            premissa: { situacao: "nao_confere", aviso: "O que você escreveu não bate com as fontes: x.", anguloSugerido: null, achadoIds: [1] },
+            decisaoDaPremissa: "manter",
+            perguntaDePosicao: { pergunta: "De quem é a culpa?", opcoes: ["Do fabricante", "Prefiro não dar opinião"] },
+            posicaoDaPessoa: "Dos dois",
+          },
+          { ...base, status: "erro", achados: [], selecionados: [], confirmadaEm: null, buscas: 0, custoUsd: "0", motivo: "A pesquisa não terminou.", criadoEm: new Date(agora - 20_000), terminadoEm: new Date(agora - 19_000) },
+          { ...base, status: "sem_achados", achados: [], selecionados: [], confirmadaEm: null, buscas: 2, custoUsd: "0.040000", criadoEm: new Date(agora - 10_000), terminadoEm: new Date(agora - 10_000 + 18_000) },
+        ])
+        .returning({ id: pesquisasNaHora.id });
+
+      await entrarAdmin(page);
+      await page.goto("/admin/custos");
+      const secao = page.locator('[data-bloco="pesquisas-na-hora"]');
+      await expect(secao.getByRole("heading", { name: "Pesquisas na hora" })).toBeVisible();
+
+      const linhaRapida = secao.locator(`[data-pesquisa="${rapida.id}"]`);
+      await expect(linhaRapida).toHaveAttribute("data-status", "pronta");
+      await expect(linhaRapida).toContainText("[teste e2e] Marca das Pesquisas");
+      await expect(linhaRapida).toContainText("quanto subiu o preço dos produtos de limpeza");
+      await expect(linhaRapida).toContainText("Rápida");
+      await expect(linhaRapida).toContainText("R$ 0,44");
+      await expect(linhaRapida).toContainText("25 s");
+      await expect(linhaRapida).toContainText("Pronta, 2 de 3 dados marcados, ainda sem roteiro");
+      await expect(linhaRapida.getByRole("link", { name: "[teste e2e] Marca das Pesquisas" })).toHaveAttribute("href", `/admin/clientes/${marca.id}`);
+
+      const linhaAFundo = secao.locator(`[data-pesquisa="${aFundo.id}"]`);
+      await expect(linhaAFundo).toContainText("Mais a fundo");
+      await expect(linhaAFundo).toContainText("R$ 1,10");
+      await expect(linhaAFundo).toContainText("a premissa não batia, seguiu com o que escreveu, perguntou a posição");
+
+      const linhaErro = secao.locator(`[data-pesquisa="${erro.id}"]`);
+      await expect(linhaErro).toHaveAttribute("data-status", "erro");
+      await expect(linhaErro).toContainText("Não terminou");
+      // o motivo vem por extenso (não só numa dica), e o erro não mostra o tempo
+      await expect(linhaErro).toContainText("A pesquisa não terminou.");
+      await expect(linhaErro.locator("td").nth(6)).toHaveText("-");
+      await expect(secao.locator(`[data-pesquisa="${vazia.id}"]`)).toContainText("Sem dado confiável");
+
+      // a mais recente primeiro
+      const ordem = await secao.locator("[data-pesquisa]").evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-pesquisa"))));
+      expect(ordem.indexOf(vazia.id)).toBeLessThan(ordem.indexOf(erro.id));
+      expect(ordem.indexOf(erro.id)).toBeLessThan(ordem.indexOf(aFundo.id));
+      expect(ordem.indexOf(aFundo.id)).toBeLessThan(ordem.indexOf(rapida.id));
+
+      // o estimado que a tela diz ao lado do medido, por tamanho
+      await expect(secao.locator('[data-tamanho="normal"]')).toContainText(/Rápida: \d+ pesquisas? que gast/);
+      await expect(secao.locator('[data-tamanho="normal"]')).toContainText("A tela diz uns R$ 0,50 (estimativa do motor R$ 0,48");
+      await expect(secao.locator('[data-tamanho="aprofundada"]')).toContainText(/Mais a fundo: \d+ pesquisas? que gast/);
+      await expect(secao.locator('[data-tamanho="aprofundada"]')).toContainText("A tela diz uns R$ 0,90");
+      await expect(secao.locator("[data-resumo-das-pesquisas]")).toContainText(/[1-9]\d* sem dado confiável/);
+      await expect(secao).toContainText("Cada marca pode fazer 3 pesquisas por dia, e a \"Mais a fundo\" conta como 2");
+
+      for (const largura of [1280, 390]) {
+        await page.setViewportSize({ width: largura, height: 800 });
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      }
+    } finally {
+      await db().delete(pesquisasNaHora).where(eq(pesquisasNaHora.clienteId, marca.id));
+      await db().delete(clientes).where(eq(clientes.id, marca.id));
     }
   });
 

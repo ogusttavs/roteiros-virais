@@ -119,6 +119,18 @@
   color: var(--cor-texto-dica);
 }
 
+/* O pedido e o desfecho da pesquisa se leem por inteiro (a tabela já rola de lado): quebram a linha em vez de cortar com reticências. */
+.pedidoDaPesquisa {
+  min-width: 13rem;
+  max-width: 24rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pedidoDaPesquisa .detalheCusto {
+  display: block;
+}
+
 .fixos {
   display: grid;
   gap: var(--espaco-3);

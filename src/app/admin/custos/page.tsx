@@ -1,9 +1,10 @@
 import Link from "next/link";
 
 import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, usdParaBrl } from "@/config/dinheiro";
-import { DATA_PRECO_APIFY, DATA_PRECO_PROXY, PRECO_PROXY_USD_POR_GB } from "@/config/precos-ia";
+import { DATA_PRECO_APIFY, DATA_PRECO_PROXY, PRECO_BUSCA_WEB_USD, PRECO_PROXY_USD_POR_GB } from "@/config/precos-ia";
+import { logger } from "@/lib/log";
 import { exigirAdmin } from "@/lib/sessao";
-import { custosDoAdmin } from "@/servicos/admin-custos";
+import { custosDoAdmin, desfechoDaPesquisa, pesquisasNaHoraDoAdmin } from "@/servicos/admin-custos";
 import { dolares, reais } from "@/textos/admin-contas";
 import { textosCustosAdmin as t } from "@/textos/admin-custos";
 
@@ -14,6 +15,8 @@ import { FixosAdmin, type FixoNaTela } from "./FixosAdmin";
 import { TetoAdmin } from "./TetoAdmin";
 
 const styles = { ...comum, ...proprio };
+
+const DIA_E_HORA = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 
 function Barra({ pct, atencao }: { pct: number; atencao?: boolean }) {
   return (
@@ -26,7 +29,14 @@ function Barra({ pct, atencao }: { pct: number; atencao?: boolean }) {
 /** `/admin/custos`: o que o sistema gasta, em reais com o dólar ao lado (E46 PR 3, `AdminCustos.dc.html`). */
 export default async function CustosDoAdmin() {
   await exigirAdmin();
-  const c = await custosDoAdmin();
+  // A seção das pesquisas é nova e lê a tabela do motor: se ela falhar, o resto da aba (e o teto) continua de pé.
+  const [c, pesquisas] = await Promise.all([
+    custosDoAdmin(),
+    pesquisasNaHoraDoAdmin().catch((erro: unknown) => {
+      logger.error({ err: erro }, "admin custos: nao foi possivel ler as pesquisas na hora");
+      return null;
+    }),
+  ]);
   const hojeBrl = usdParaBrl(c.hoje.usd);
   const pctTeto = c.tetoBrl > 0 ? (hojeBrl / c.tetoBrl) * 100 : 0;
   const variaMes = usdParaBrl(c.ultimos30Usd + c.foraDaIA.totalUsd);
@@ -229,6 +239,104 @@ export default async function CustosDoAdmin() {
           <p className={styles.nota}>{t.foraDaIA.nota(`${diaApify}/${mesApify}/${anoApify}`, `${diaProxy}/${mesProxy}/${anoProxy}`, PRECO_PROXY_USD_POR_GB)}</p>
         </section>
       </div>
+
+      {/* E54 (parte 4): uma linha por pesquisa na hora, para a prova com a chave real ter onde olhar (o estimado que a tela diz, o medido, o desfecho). */}
+      <section className={styles.cartao} aria-labelledby="t-pesquisas" data-bloco="pesquisas-na-hora">
+        <div className={styles.tabelaTitulo}>
+          <h2 id="t-pesquisas">{t.pesquisas.titulo}</h2>
+          <span className={styles.quantos}>{t.pesquisas.legenda}</span>
+        </div>
+        {pesquisas === null ? (
+          <p className={styles.semDado} role="status" data-pesquisas-indisponiveis>
+            {t.pesquisas.indisponivel}
+          </p>
+        ) : pesquisas.resumo.total === 0 ? (
+          <p className={styles.semDado}>{t.pesquisas.vazio}</p>
+        ) : (
+          <>
+            <ul className={styles.lista} data-resumo-das-pesquisas>
+              <li className={styles.itemCusto}>
+                <span className={styles.nomeCusto}>
+                  {t.pesquisas.resumo(pesquisas.resumo.total, pesquisas.resumo.marcas)}
+                  <span className={styles.detalheCusto}>
+                    {t.pesquisas.desfechos(pesquisas.resumo.prontas, pesquisas.resumo.semAchados, pesquisas.resumo.erros, pesquisas.resumo.rodando)}; {t.pesquisas.viraramRoteiro(pesquisas.resumo.comRoteiro)}
+                  </span>
+                </span>
+                <span className={styles.valorCusto}>
+                  {reais(usdParaBrl(pesquisas.resumo.custoUsd))}
+                  <span className={styles.detalheCusto}>{t.pesquisas.gasto(pesquisas.resumo.buscas, dolares(pesquisas.resumo.custoUsd))}</span>
+                  {pesquisas.resumo.custoMedioUsd === null ? null : (
+                    <span className={styles.detalheCusto}>{t.pesquisas.media(reais(usdParaBrl(pesquisas.resumo.custoMedioUsd)))}</span>
+                  )}
+                </span>
+                <span />
+              </li>
+              {pesquisas.resumo.porTamanho.map((tam) => (
+                <li key={tam.profundidade} className={styles.itemCusto} data-tamanho={tam.profundidade}>
+                  <span className={styles.nomeCusto}>
+                    {t.pesquisas.porTamanho(
+                      t.pesquisas.tamanhoNome[tam.profundidade],
+                      tam.pesquisas,
+                      tam.custoMedioUsd === null ? null : reais(usdParaBrl(tam.custoMedioUsd)),
+                      tam.buscasMedias,
+                      tam.estimadoDito,
+                      reais(usdParaBrl(tam.estimadoUsd)),
+                      tam.estimadoBuscas,
+                    )}
+                  </span>
+                  <span className={styles.valorCusto}>{tam.custoMedioUsd === null ? "-" : dolares(tam.custoMedioUsd)}</span>
+                  <span />
+                </li>
+              ))}
+            </ul>
+            <div className={styles.tabelaArea}>
+              <table className={styles.tabela} data-tabela-das-pesquisas>
+                <thead>
+                  <tr>
+                    <th scope="col">{t.pesquisas.colunas.quando}</th>
+                    <th scope="col">{t.pesquisas.colunas.marca}</th>
+                    <th scope="col">{t.pesquisas.colunas.pedido}</th>
+                    <th scope="col">{t.pesquisas.colunas.tamanho}</th>
+                    <th scope="col" className={styles.num}>
+                      {t.pesquisas.colunas.buscas}
+                    </th>
+                    <th scope="col" className={styles.num}>
+                      {t.pesquisas.colunas.custo}
+                    </th>
+                    <th scope="col" className={styles.num}>
+                      {t.pesquisas.colunas.tempo}
+                    </th>
+                    <th scope="col">{t.pesquisas.colunas.desfecho}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pesquisas.linhas.map((l) => (
+                    <tr key={l.id} data-pesquisa={l.id} data-status={l.status}>
+                      <td>{DIA_E_HORA.format(l.criadoEm)}</td>
+                      <td>
+                        <Link href={`/admin/clientes/${l.clienteId}`}>{l.marca}</Link>
+                      </td>
+                      <td className={styles.pedidoDaPesquisa}>{l.pedido}</td>
+                      <td>{t.pesquisas.tamanhoNome[l.profundidade]}</td>
+                      <td className={styles.num}>{l.buscas}</td>
+                      <td className={styles.num} title={dolares(l.custoUsd)}>
+                        {reais(usdParaBrl(l.custoUsd))}
+                      </td>
+                      <td className={styles.num}>{l.duracaoS === null ? "-" : t.pesquisas.segundos(l.duracaoS)}</td>
+                      <td className={styles.pedidoDaPesquisa}>
+                        {desfechoDaPesquisa(l)}
+                        {l.status === "erro" && l.motivo ? <span className={styles.detalheCusto}>{l.motivo}</span> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {pesquisas.cortadas ? <p className={styles.nota}>{t.pesquisas.cortada(pesquisas.linhas.length)}</p> : null}
+          </>
+        )}
+        {pesquisas === null ? null : <p className={styles.nota}>{t.pesquisas.nota(pesquisas.resumo.tetoPorMarcaPorDia, pesquisas.resumo.pesoAFundo, dolares(PRECO_BUSCA_WEB_USD))}</p>}
+      </section>
 
       <section className={styles.cartao} aria-labelledby="t-fixos" data-bloco="fixos">
         <div className={styles.tabelaTitulo}>

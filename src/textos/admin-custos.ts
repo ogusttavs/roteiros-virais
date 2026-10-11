@@ -54,6 +54,43 @@ export const textosCustosAdmin = {
     nota: (dataApify: string, dataProxy: string, usdPorGbDoProxy: number) => `Transcrição: US$ 0,04 por hora de áudio, com o mínimo de 10 segundos por pedido. Busca de vídeos: o que o Apify informa por execução; quando ele não informa, o preço do ator (tabela de ${dataApify}). Proxy do YouTube: US$ ${usdPorGbDoProxy.toLocaleString("pt-BR")} por gigabyte (pacote do DataImpulse, preço de ${dataProxy}), estimado pelo tamanho dos áudios baixados; é um piso, porque a legenda e as páginas que o proxy também carrega não entram na conta, e o painel do DataImpulse é o número de verdade. O teto do dia continua contando só a IA.`,
   },
   ondeVai: { titulo: "Por onde o dinheiro vai", legenda: "30 dias, o que varia", vazio: "Nada ainda.", vezes: (n: number) => (n === 1 ? "1 vez" : `${n} vezes`), semRegistro: "Só a IA entra nesta lista; o que se paga por uso fora dela está em Fora da IA." },
+  /** E54 (parte 4): uma linha por pesquisa na hora, com a estimativa que a tela diz para a pessoa ao lado do que se mediu. */
+  pesquisas: {
+    titulo: "Pesquisas na hora",
+    legenda: "30 dias, com hoje",
+    vazio: "Nenhuma pesquisa na hora nos últimos 30 dias. Quando alguém pesquisar antes de escrever, cada pesquisa aparece aqui, com o que custou e como terminou.",
+    resumo: (total: number, marcas: number) => `${total} ${total === 1 ? "pesquisa" : "pesquisas"}, ${marcas === 1 ? "1 marca" : `${marcas} marcas`}`,
+    desfechos: (prontas: number, semAchados: number, erros: number, rodando: number) =>
+      `${prontas} ${prontas === 1 ? "pronta" : "prontas"}, ${semAchados} sem dado confiável, ${erros} com erro${rodando > 0 ? `, ${rodando} rodando` : ""}`,
+    gasto: (buscas: number, valor: string) => `${buscas} ${buscas === 1 ? "busca" : "buscas"}, ${valor}`,
+    media: (valor: string) => `${valor} por pesquisa que gastou`,
+    viraramRoteiro: (n: number) => (n === 0 ? "nenhuma virou roteiro" : n === 1 ? "1 virou roteiro" : `${n} viraram roteiro`),
+    tamanhoNome: { normal: "Rápida", aprofundada: "Mais a fundo" } as const,
+    /** Uma linha por tamanho: o medido (só das que gastaram) e o que a tela diz para a pessoa, ao lado da estimativa exata do motor. */
+    porTamanho: (nome: string, gastaram: number, medido: string | null, buscas: number | null, dito: string, exato: string, estimadoBuscas: number) => {
+      const estimativa = `A tela diz ${dito} (estimativa do motor ${exato}, até ${estimadoBuscas} buscas).`;
+      if (gastaram === 0 || medido === null || buscas === null) return `${nome}: ainda sem pesquisa medida. ${estimativa}`;
+      const buscasMedias = buscas.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+      return `${nome}: ${gastaram} ${gastaram === 1 ? "pesquisa que gastou" : "pesquisas que gastaram"}, ${medido} em média e ${buscasMedias} ${buscas === 1 ? "busca" : "buscas"}. ${estimativa}`;
+    },
+    colunas: { quando: "Quando", marca: "Marca", pedido: "Pedido", tamanho: "Tamanho", buscas: "Buscas", custo: "Custo", tempo: "Tempo", desfecho: "Como terminou" },
+    desfecho: {
+      rodando: "Rodando",
+      erro: "Não terminou",
+      semAchados: "Sem dado confiável",
+      prontaSemMarcar: (dados: number) => `Pronta, ${dados} ${dados === 1 ? "dado" : "dados"}, a pessoa ainda não marcou`,
+      pronta: (marcados: number, dados: number) => `Pronta, ${marcados} de ${dados} ${dados === 1 ? "dado marcado" : "dados marcados"}`,
+      virouRoteiro: (n: number) => (n === 1 ? "virou roteiro" : `virou ${n} roteiros`),
+      semRoteiro: "ainda sem roteiro",
+      premissa: { fontes: "a premissa não batia, seguiu as fontes", mudar: "a premissa não batia, a pessoa foi mudar o que escreveu", manter: "a premissa não batia, seguiu com o que escreveu", semDecisao: "a premissa não batia" },
+      posicao: "perguntou a posição",
+    },
+    segundos: (s: number) => (s < 90 ? `${s} s` : `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, "0")} s`),
+    nota: (teto: number, peso: number, precoDaBusca: string) =>
+      `Cada marca pode fazer ${teto} ${teto === 1 ? "pesquisa" : "pesquisas"} por dia, e a "Mais a fundo" conta como ${peso}. O custo medido de uma pesquisa soma as buscas (${precoDaBusca} cada), a leitura do que foi achado e a conferência da premissa. A estimativa do motor é a conta feita antes de pesquisar, e a prova com a chave real diz se ela fica acima ou abaixo do medido. Uma pesquisa encerrada por passar do prazo aparece com custo zero, mesmo que a busca tenha sido paga: o gasto dela está em "Por onde o dinheiro vai".`,
+    cortada: (n: number) => `Mostrando as ${n} mais recentes; os totais acima são da janela inteira.`,
+    indisponivel: "Não foi possível ler as pesquisas agora. O resto da aba continua valendo; tente de novo em instantes.",
+  },
   fixos: {
     titulo: "Os fixos",
     legenda: "o que se paga todo mês, sem depender do uso",

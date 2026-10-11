@@ -2,8 +2,12 @@ import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle
 
 import { CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, TETO_DIARIO_BRL, usdParaBrl } from "@/config/dinheiro";
 import { db } from "@/db";
-import { clientes, configuracaoAdmin, custosExternos, custosFixos, geracoesIA, nichos, roteiros, type CustoFixo } from "@/db/schema";
-import { hojeISO } from "@/lib/config";
+import { clientes, configuracaoAdmin, custosExternos, custosFixos, geracoesIA, nichos, pesquisasNaHora, roteiros, type CustoFixo, type StatusDaPesquisa } from "@/db/schema";
+import { config, hojeISO } from "@/lib/config";
+import { textosCustosAdmin } from "@/textos/admin-custos";
+import { reaisEmLinguagemDeGente } from "@/textos/pesquisa";
+
+import { encerrarPesquisasParadas, estimarPesquisa, PESO_DA_PROFUNDIDADE, type Profundidade } from "./pesquisa-na-hora";
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 const CHAVE_TETO = "teto_diario_brl";
@@ -250,5 +254,181 @@ export async function custosDoAdmin(agora: Date = new Date()): Promise<CustosDoA
     foraDaIA: { linhas: foraLinhas, totalUsd: foraLinhas.reduce((a, l) => a + l.usd, 0) },
     porOndeVai: linhas(tarefas30),
     fixos: { lista: listaFixos, totalPorMesBrl: listaFixos.reduce((a, f) => a + f.porMesBrl, 0), cadastrados: listaFixos.length > 0 },
+  };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// A pesquisa na hora (E54, parte 4): uma linha por pesquisa, para a prova com a chave real ter onde olhar
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Uma pesquisa na hora como o admin a lê: quem pediu, o quê, quanto custou e como terminou. */
+export type LinhaDePesquisaNaHora = {
+  id: number;
+  criadoEm: Date;
+  clienteId: number;
+  marca: string;
+  pedido: string;
+  profundidade: Profundidade;
+  status: StatusDaPesquisa;
+  buscas: number;
+  custoUsd: number;
+  /** Quantos dados voltaram e quantos a pessoa marcou. */
+  dados: number;
+  marcados: number;
+  premissa: "sem_premissa" | "confere" | "nao_confere";
+  /** O que a pessoa decidiu diante do aviso (nulo sem aviso ou sem decisão). */
+  decisao: "fontes" | "mudar" | "manter" | null;
+  perguntouPosicao: boolean;
+  respondeuPosicao: boolean;
+  /** A pessoa marcou os dados e seguiu (a tela estampa a confirmação). */
+  confirmada: boolean;
+  /** Quantos roteiros nasceram desta pesquisa (a cópia que o roteiro guarda aponta para ela); as versões de um roteiro contam como um só. */
+  roteiros: number;
+  motivo: string | null;
+  /** Do pedido ao fim, em segundos; nulo enquanto roda e nulo no erro (a que passou do prazo é fechada na hora em que alguém abre a página, então o tempo seria o da espera, não o da pesquisa). */
+  duracaoS: number | null;
+};
+
+export type ResumoDasPesquisasNaHora = {
+  total: number;
+  prontas: number;
+  semAchados: number;
+  erros: number;
+  rodando: number;
+  buscas: number;
+  custoUsd: number;
+  /** A média só das que gastaram alguma coisa (o erro que caiu sem busca não entra). */
+  custoMedioUsd: number | null;
+  marcas: number;
+  comRoteiro: number;
+  /** Estimado (o que a tela diz para a pessoa) e medido, por tamanho. */
+  porTamanho: {
+    profundidade: Profundidade;
+    /** Só as que gastaram (a base da média). */
+    pesquisas: number;
+    custoMedioUsd: number | null;
+    buscasMedias: number | null;
+    estimadoUsd: number;
+    estimadoBuscas: number;
+    /** O que a tela diz para a pessoa ("uns R$ 0,50"), arredondado como ela, ao lado da estimativa exata do motor. */
+    estimadoDito: string;
+  }[];
+  /** Quantas pesquisas por marca por dia o teto deixa (a "Mais a fundo" conta como `pesoAFundo`). */
+  tetoPorMarcaPorDia: number;
+  pesoAFundo: number;
+};
+
+/** Como a pesquisa terminou, numa frase (E54 parte 4): o estado, o que a pessoa fez com os dados e o que a premissa pediu. */
+export function desfechoDaPesquisa(l: Pick<LinhaDePesquisaNaHora, "status" | "dados" | "marcados" | "confirmada" | "roteiros" | "premissa" | "decisao" | "perguntouPosicao">): string {
+  const d = textosCustosAdmin.pesquisas.desfecho;
+  if (l.status === "pesquisando" || l.status === "executando") return d.rodando;
+  if (l.status === "erro") return d.erro;
+  if (l.status === "sem_achados") return d.semAchados;
+  const partes: string[] = [];
+  // Os dados já vêm pré-marcados pelo motor: só vale como "a pessoa marcou" depois que ela seguiu (ou que um roteiro já saiu da pesquisa).
+  if (!l.confirmada && l.roteiros === 0) {
+    partes.push(d.prontaSemMarcar(l.dados));
+  } else {
+    partes.push(d.pronta(l.marcados, l.dados));
+    partes.push(l.roteiros > 0 ? d.virouRoteiro(l.roteiros) : d.semRoteiro);
+  }
+  if (l.premissa === "nao_confere") partes.push(d.premissa[l.decisao ?? "semDecisao"]);
+  if (l.perguntouPosicao) partes.push(d.posicao);
+  return partes.join(", ");
+}
+
+export type PesquisasNaHoraDoAdmin = { resumo: ResumoDasPesquisasNaHora; linhas: LinhaDePesquisaNaHora[]; desde: Date; cortadas: boolean };
+
+/**
+ * As pesquisas na hora dos últimos 30 dias, com hoje (a mais recente primeiro), e o resumo da janela inteira, mesmo quando a lista é cortada em `limite`. Fecha antes as que ficaram
+ * presas (a mesma limpeza que a tela da pessoa faz), para uma pesquisa que o worker perdeu não aparecer como "rodando" para sempre.
+ */
+export async function pesquisasNaHoraDoAdmin(agora: Date = new Date(), limite = 100): Promise<PesquisasNaHoraDoAdmin> {
+  await encerrarPesquisasParadas(null, agora);
+  const desde = new Date(inicioDoDia(hojeISO(agora)).getTime() - 30 * DIA_MS);
+  const linhasDoBanco = await db()
+    .select({
+      id: pesquisasNaHora.id,
+      criadoEm: pesquisasNaHora.criadoEm,
+      terminadoEm: pesquisasNaHora.terminadoEm,
+      clienteId: pesquisasNaHora.clienteId,
+      marca: clientes.nome,
+      pedido: pesquisasNaHora.pedido,
+      profundidade: pesquisasNaHora.profundidade,
+      status: pesquisasNaHora.status,
+      buscas: pesquisasNaHora.buscas,
+      custoUsd: pesquisasNaHora.custoUsd,
+      dados: sql<number>`jsonb_array_length(${pesquisasNaHora.achados})::int`,
+      marcados: sql<number>`jsonb_array_length(${pesquisasNaHora.selecionados})::int`,
+      premissa: sql<string | null>`${pesquisasNaHora.premissa}->>'situacao'`,
+      decisao: pesquisasNaHora.decisaoDaPremissa,
+      perguntou: sql<boolean>`${pesquisasNaHora.perguntaDePosicao} is not null`,
+      respondeu: sql<boolean>`${pesquisasNaHora.posicaoDaPessoa} is not null`,
+      confirmada: sql<boolean>`${pesquisasNaHora.confirmadaEm} is not null`,
+      roteiros: sql<number>`(select count(distinct coalesce(r.versao_de, r.id))::int from ${roteiros} r where r.cliente_id = ${pesquisasNaHora.clienteId} and (r.pesquisa_na_hora->>'pesquisaId') = ${pesquisasNaHora.id}::text)`,
+      motivo: pesquisasNaHora.motivo,
+    })
+    .from(pesquisasNaHora)
+    .innerJoin(clientes, eq(clientes.id, pesquisasNaHora.clienteId))
+    .where(gte(pesquisasNaHora.criadoEm, desde))
+    .orderBy(desc(pesquisasNaHora.criadoEm), desc(pesquisasNaHora.id));
+
+  const todas: LinhaDePesquisaNaHora[] = linhasDoBanco.map((l) => ({
+    id: l.id,
+    criadoEm: l.criadoEm,
+    clienteId: l.clienteId,
+    marca: l.marca,
+    pedido: l.pedido,
+    profundidade: l.profundidade,
+    status: l.status,
+    buscas: l.buscas,
+    custoUsd: Number(l.custoUsd),
+    dados: l.dados,
+    marcados: l.marcados,
+    premissa: l.premissa === "nao_confere" || l.premissa === "confere" ? l.premissa : "sem_premissa",
+    decisao: l.decisao ?? null,
+    perguntouPosicao: l.perguntou,
+    respondeuPosicao: l.respondeu,
+    confirmada: l.confirmada,
+    roteiros: l.roteiros,
+    motivo: l.motivo,
+    duracaoS: l.terminadoEm && l.status !== "erro" ? Math.max(0, Math.round((l.terminadoEm.getTime() - l.criadoEm.getTime()) / 1000)) : null,
+  }));
+
+  const gastaram = todas.filter((l) => l.buscas > 0 || l.custoUsd > 0);
+  const media = (lista: LinhaDePesquisaNaHora[], campo: "custoUsd" | "buscas") => (lista.length > 0 ? lista.reduce((a, l) => a + l[campo], 0) / lista.length : null);
+  const porTamanho = (["normal", "aprofundada"] as const).map((profundidade) => {
+    const dessas = gastaram.filter((l) => l.profundidade === profundidade);
+    const estimativa = estimarPesquisa(profundidade);
+    return {
+      profundidade,
+      pesquisas: dessas.length,
+      custoMedioUsd: media(dessas, "custoUsd"),
+      buscasMedias: media(dessas, "buscas"),
+      estimadoUsd: estimativa.usd,
+      estimadoBuscas: estimativa.buscas,
+      estimadoDito: reaisEmLinguagemDeGente(estimativa.reais),
+    };
+  });
+
+  return {
+    resumo: {
+      total: todas.length,
+      prontas: todas.filter((l) => l.status === "pronta").length,
+      semAchados: todas.filter((l) => l.status === "sem_achados").length,
+      erros: todas.filter((l) => l.status === "erro").length,
+      rodando: todas.filter((l) => l.status === "pesquisando" || l.status === "executando").length,
+      buscas: todas.reduce((a, l) => a + l.buscas, 0),
+      custoUsd: todas.reduce((a, l) => a + l.custoUsd, 0),
+      custoMedioUsd: media(gastaram, "custoUsd"),
+      marcas: new Set(todas.map((l) => l.clienteId)).size,
+      comRoteiro: todas.filter((l) => l.roteiros > 0).length,
+      porTamanho,
+      tetoPorMarcaPorDia: config.regras.pesquisasNaHoraPorMarcaPorDia,
+      pesoAFundo: PESO_DA_PROFUNDIDADE.aprofundada,
+    },
+    linhas: todas.slice(0, limite),
+    desde,
+    cortadas: todas.length > limite,
   };
 }
