@@ -517,12 +517,22 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * E52 (PR 3): o roteiro longo do mock. A duração vem da própria entrada ("Duração do vídeo: N segundos"), os capítulos somam essa duração e cada um tem 10 segundos ou mais; o último
  * não tem gancho. Marcadores de teste (valem só na primeira tentativa; com "-sempre" valem em toda): `[mock:capitulo-curto]` (um capítulo de 4 s), `[mock:soma-errada]` (a soma 40% acima
  * da duração), `[mock:dois-capitulos]` (só dois), `[mock:sem-gancho]` (o primeiro capítulo sem o gancho para o próximo), `[mock:ponto-longo]` (um ponto de mais de 20 palavras),
- * `[mock:sem-evidencia]` (nenhuma referência citada), `[mock:travessao]` (um travessão num ponto: o código corrige, sem segunda tentativa) e `[mock:gancho-fora-da-cena]` (um gancho que
- * não cita nada do momento descrito).
+ * `[mock:sem-evidencia]` (nenhuma referência citada), `[mock:travessao]` (um travessão num ponto: o código corrige, sem segunda tentativa), `[mock:gancho-fora-da-cena]` (um gancho que
+ * não cita nada do momento descrito), `[mock:gancho-curto]` (o gancho do segundo capítulo vem como rótulo), `[mock:nome-com-tempo]` (um nome que começa com um tempo, que a lista da
+ * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
 function mockRoteiroLongo(entrada: string) {
   const ehMomento = entrada.includes("O momento que a pessoa descreveu agora:");
-  const tema = ehMomento ? extrairCampo(entrada, "O que está acontecendo:") || "momento simulado" : extrairCampo(entrada, "Tema escolhido:") || "tema simulado";
+  // Os marcadores de teste podem vir no tema; o que o simulador escreve (título, nomes, ganchos) nunca os leva, como um modelo não levaria.
+  const semMarcadores = (texto: string): string => {
+    let saida = texto;
+    for (let i = saida.indexOf("[mock:"); i !== -1; i = saida.indexOf("[mock:")) {
+      const fim = saida.indexOf("]", i);
+      saida = saida.slice(0, i) + saida.slice(fim === -1 ? saida.length : fim + 1);
+    }
+    return saida.trim();
+  };
+  const tema = semMarcadores(ehMomento ? extrairCampo(entrada, "O que está acontecendo:") || "momento simulado" : extrairCampo(entrada, "Tema escolhido:") || "tema simulado") || "tema simulado";
   const reprovado = entrada.includes("reprovou a versão anterior");
   const ids = extrairIds(entrada);
   const segundaTentativa = entrada.includes("A tentativa anterior foi reprovada.");
@@ -545,9 +555,7 @@ function mockRoteiroLongo(entrada: string) {
   for (const m of entrada.matchAll(/gancho: "([^"]+)"/g)) jaUsadas.add(primeiraPalavraDe(m[1]));
   const reprovadaAbreCom = /A versão reprovada abre com: "([^"]+)"/.exec(entrada);
   if (reprovadaAbreCom) jaUsadas.add(primeiraPalavraDe(reprovadaAbreCom[1]));
-  const escolhida = (Object.entries(PRIMEIRA_PALAVRA_MOCK_POR_TIPO) as [(typeof TIPOS_ABERTURA_MOCK)[number], string][]).find(([, palavra]) => !jaUsadas.has(palavra));
-  const tipoAbertura = escolhida?.[0] ?? "outro";
-  const primeiraPalavra = escolhida?.[1] ?? "olha";
+  const primeiraPalavra = Object.values(PRIMEIRA_PALAVRA_MOCK_POR_TIPO).find((palavra) => !jaUsadas.has(palavra)) ?? "olha";
   const pontoLongo = "este ponto tem de propósito muitas palavras para passar do limite de vinte palavras que o roteiro longo aceita em cada ponto curto de um capítulo qualquer";
 
   return {
@@ -561,7 +569,14 @@ function mockRoteiroLongo(entrada: string) {
     capitulos: duracoes.map((duracaoS, i) => {
       const ultimo = i === quantidade - 1;
       return {
-        nome: i === 0 ? `${nomes[0]}: ${tema}`.slice(0, 80) : nomes[i % nomes.length],
+        nome:
+          i === 1 && marcado("nome-com-tempo")
+            ? "10:30 da manhã"
+            : i === 1 && marcado("nome-com-colchete")
+              ? "O passo a [diga o número]"
+              : i === 0
+                ? `${nomes[0]}: ${tema}`.slice(0, 80)
+                : nomes[i % nomes.length],
         duracaoS,
         tom: "direto",
         pontos: [
@@ -569,14 +584,18 @@ function mockRoteiroLongo(entrada: string) {
           i === 2 && marcado("travessao") ? `O que dizer sobre ${tema} \u2014 sem rodeio` : `O que dizer sobre ${tema}`,
         ],
         naImagem: "o local do negócio de verdade",
-        ganchoParaOProximo: ultimo || (i === 0 && marcado("sem-gancho")) ? null : `E o que vem a seguir muda a forma de olhar para ${tema}, no capítulo ${i + 2}.`,
+        ganchoParaOProximo: ultimo || (i === 0 && marcado("sem-gancho"))
+          ? null
+          : i === 1 && marcado("gancho-curto")
+            ? "O preço real"
+            : `E o que vem a seguir muda a forma de olhar para ${tema}, no capítulo ${i + 2}.`,
         comoEditar: "corte seco, texto curto na tela",
       };
     }),
     chamadaFinal: "comenta qual capítulo ajudou mais",
     ondeGravar: "no próprio local do negócio, com a luz da janela",
     edicao: {
-      textoNaTela: [{ quando: "abertura", oQue: tema, onde: "topo da tela" }],
+      textoNaTela: [{ quando: "0 segundos", oQue: tema, onde: "topo da tela" }],
       ritmoDeCorte: "moderado",
       recursos: [],
       audio: null,
@@ -594,7 +613,6 @@ function mockRoteiroLongo(entrada: string) {
       { regra: "R-YT-VIDEO-13", motivo: "cada capítulo é uma parte que se entende sozinha" },
     ],
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
-    tipoAbertura,
   };
 }
 

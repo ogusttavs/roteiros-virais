@@ -279,41 +279,47 @@ export const REGRAS_YT_VIDEO: RegraFormato[] = [
 export const REGRAS_YT_CAPITULOS: RegraFormato[] = [
   {
     numero: "R-YT-VIDEO-05",
-    texto: "Para o vídeo ganhar capítulos escritos por nós, a descrição leva uma lista de marcações de tempo, cada uma com o seu título.",
+    texto: `Para o vídeo ganhar capítulos escritos por nós, a descrição leva uma lista de marcações de tempo, cada uma com o seu título.`,
   },
-  { numero: "R-YT-VIDEO-06", texto: "A primeira marcação da lista é 00:00." },
-  { numero: "R-YT-VIDEO-07", texto: "A lista tem pelo menos três marcações de tempo, em ordem crescente." },
+  {
+    numero: "R-YT-VIDEO-06",
+    texto: `A primeira marcação da lista é 00:00.`,
+  },
+  {
+    numero: "R-YT-VIDEO-07",
+    texto: `A lista tem pelo menos três marcações de tempo, em ordem crescente.`,
+  },
   {
     numero: "R-YT-VIDEO-08",
-    texto: "Cada capítulo dura no mínimo 10 segundos: a distância entre uma marcação e a seguinte não pode ser menor que isso.",
+    texto: `Cada capítulo dura no mínimo 10 segundos: a distância entre uma marcação e a seguinte não pode ser menor que isso.`,
   },
   {
     numero: "R-YT-VIDEO-09",
-    texto: "Capítulos escritos na descrição substituem os capítulos automáticos do mesmo vídeo; quem escreve os seus não precisa desligar os automáticos.",
+    texto: `Capítulos escritos na descrição substituem os capítulos automáticos do mesmo vídeo; quem escreve os seus não precisa desligar os automáticos.`,
   },
   {
     numero: "R-YT-VIDEO-10",
-    texto:
-      "O YouTube também pode gerar capítulos sozinho, mas nem todo vídeo recebe capítulos automáticos; por isso o roteiro não conta com os automáticos: se queremos capítulos, entregamos a lista.",
+    texto: `O YouTube também pode gerar capítulos sozinho. Nos envios novos a caixa "Permitir capítulos automáticos" já vem marcada, mas nem todo vídeo recebe capítulos automáticos, e canal com avisos ativos ou conteúdo inadequado para alguns espectadores não os tem. Por isso o roteiro não deve contar com os automáticos: se queremos capítulos, entregamos a lista.`,
   },
   {
     numero: "R-YT-VIDEO-11",
-    texto: 'Para desligar os capítulos automáticos de um vídeo: YouTube Studio, Conteúdo, o vídeo, MOSTRAR MAIS, desmarcar "Permitir capítulos automáticos", SALVAR.',
+    texto: `Como desligar os capítulos automáticos, em vídeo específico: YouTube Studio, Conteúdo, o vídeo, MOSTRAR MAIS, desmarcar "Permitir capítulos automáticos", SALVAR. A página também cita o desligamento em massa (sem detalhar os passos).`,
   },
   {
     numero: "R-YT-VIDEO-12",
-    texto:
-      'Para desligar para todos os envios futuros: YouTube Studio, Configurações, Padrões de envio, Configurações avançadas, desmarcar "Permitir capítulos automáticos (quando disponível)", SALVAR.',
+    texto: `Como desligar para todos os envios futuros: YouTube Studio, Configurações, Padrões de envio, Configurações avançadas, desmarcar "Permitir capítulos automáticos (quando disponível)", SALVAR.`,
   },
   {
     numero: "R-YT-VIDEO-13",
-    texto:
-      "Capítulos dividem o vídeo em seções, cada uma com prévia própria, e facilitam achar e rever certas partes; cada capítulo deve ser uma parte que se entende e se acha sozinha (uma etapa, uma pergunta respondida).",
+    texto: `Para que serve: capítulos dividem o vídeo em seções, cada uma com prévia própria, dão informação e contexto sobre cada parte e facilitam achar e rever certas partes. Por isso cada capítulo deve ser uma parte que se entende e se acha sozinha (uma etapa, uma pergunta respondida).`,
   },
-  { numero: "R-YT-VIDEO-14", texto: "Os capítulos podem aparecer nas transcrições do vídeo." },
+  {
+    numero: "R-YT-VIDEO-14",
+    texto: `Os capítulos podem aparecer nas transcrições do vídeo.`,
+  },
   {
     numero: "R-YT-VIDEO-15",
-    texto: "Se o cliente ainda não vê a opção de capítulos, a página manda solicitar acesso aos recursos avançados do canal.",
+    texto: `Se o cliente ainda não vê a opção de capítulos, a página manda solicitar acesso aos recursos avançados do canal.`,
   },
 ];
 

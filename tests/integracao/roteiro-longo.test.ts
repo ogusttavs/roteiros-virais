@@ -7,7 +7,8 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, contas, geracoesIA, nichos, roteiros, user, videos, type AnaliseVideoLonga } from "@/db/schema";
+import { briefings, clientes, contas, geracoesIA, modelosNicho, nichos, roteiros, user, videos, type AnaliseVideoLonga, type ModeloNicho } from "@/db/schema";
+import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import * as verificador from "@/ia/verificador";
 import { lerCapitulosDaDescricao } from "@/lib/capitulos-da-descricao";
@@ -152,6 +153,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db().delete(roteiros);
+  await db().delete(modelosNicho);
   await db().delete(geracoesIA);
   await db().delete(videos);
   await db().update(nichos).set({ pisoViews: null });
@@ -189,7 +191,7 @@ describe("a duração-alvo vem da medida do ramo", () => {
     expect(await db().select().from(roteiros)).toHaveLength(0);
   });
 
-  it("a recusa vem ANTES de resolver o tema do dia (que pode custar uma chamada de IA): o tema sugerido de um ramo sem medida recebe a frase do longo, não a do tema", async () => {
+  it("a recusa vem ANTES de resolver o tema do dia: o tema sugerido de um ramo sem medida recebe a frase do longo, não a do tema", async () => {
     await semearLongo({ duracaoS: 600 });
     await expect(gerarRoteiro(clienteId, { origem: "sugerido", temaIndice: 0, objetivo: "alcance", duracao: "longo" })).rejects.toThrow(textosRoteiro.longo.semLongos);
     // o mesmo pedido sem a duração longa vai até o tema do dia (e diz que não há tema), o que prova a ordem
@@ -250,7 +252,7 @@ describe("o roteiro longo escrito", () => {
 
     const capitulos = roteiro.conteudo.capitulos!;
     expect(roteiro.conteudo.cenas).toHaveLength(capitulos.length);
-    expect(roteiro.conteudo.cenas[0].momento).toBe("00:00");
+    expect(roteiro.conteudo.cenas[0].momento).toBe("0 segundos");
     // o corpo é o resumo de capítulos (gancho, corpo e fechamento seguem lidos pelo resto do produto)
     expect(roteiro.conteudo.corpo).toContain(`1. ${capitulos[0].nome}`);
     expect(roteiro.conteudo.gancho).toBeTruthy();
@@ -377,7 +379,7 @@ describe("o verificador confere os capítulos por código", () => {
 
   it("a soma errada, menos de três capítulos e o gancho que falta também reprovam a primeira e passam na segunda", async () => {
     await medirORamo();
-    for (const marcador of ["[mock:soma-errada]", "[mock:dois-capitulos]", "[mock:sem-gancho]", "[mock:ponto-longo]"]) {
+    for (const marcador of ["[mock:soma-errada]", "[mock:dois-capitulos]", "[mock:sem-gancho]", "[mock:ponto-longo]", "[mock:gancho-curto]", "[mock:nome-com-tempo]", "[mock:nome-com-colchete]"]) {
       await db().delete(roteiros);
       await db().delete(geracoesIA);
       const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: marcador });
@@ -402,6 +404,98 @@ describe("o verificador confere os capítulos por código", () => {
     const texto = JSON.stringify(roteiro.conteudo.capitulos);
     expect(texto).not.toContain("\u2014");
     expect(texto).toContain("sem rodeio");
+  });
+
+  it("na segunda tentativa a soma que vier vale (a duração do roteiro é a soma real), desde que seja a de um vídeo longo", async () => {
+    await medirORamo();
+    // a duração do ramo é 570 s; o simulador escreve 40% a mais nas duas tentativas (798 s): a primeira reprova pela soma, a segunda é aceita
+    const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: "[mock:soma-errada-sempre]" });
+    expect(await geracoesDa("roteiroLongo")).toHaveLength(2);
+    expect(roteiro.conteudo.duracaoS).toBeGreaterThan(570 * 1.15);
+    expect(roteiro.conteudo.duracaoS).toBe(somaDosCapitulos(roteiro.conteudo.capitulos!));
+  });
+
+  it("mas a segunda tentativa que passa do limite do vídeo longo reprova: nada de roteiro longo de uma hora", async () => {
+    await semearLongo({ duracaoS: 2300, comLeitura: true });
+    await semearLongo({ duracaoS: 2350, comLeitura: true });
+    await semearLongo({ duracaoS: 2400, comLeitura: true });
+    await expect(
+      gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: "[mock:soma-errada-sempre]" }),
+    ).rejects.toBeInstanceOf(ErroIA);
+    expect(await geracoesDa("roteiroLongo")).toHaveLength(2);
+    expect(await db().select().from(roteiros)).toHaveLength(0);
+  });
+
+  it("o longo não grava tipo de abertura (a rotação de aberturas é do curto) e guarda a ficha só para escolher o objetivo", async () => {
+    await medirORamo();
+    const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", ficha: "guardem" });
+    expect(roteiro.tipoAbertura).toBeNull();
+    // a ficha "que guardem para depois" escolhe o objetivo de engajamento, mas não é gravada: o prompt do longo não a segue
+    expect(roteiro.ficha).toBeNull();
+    expect(roteiro.objetivo).toBe(OBJETIVOS_EM_ORDEM[1]);
+  });
+
+  it("o modelo do nicho que o longo lê não traz a duração nem as estruturas dos vídeos curtos (o curto continua trazendo)", async () => {
+    const modelo: ModeloNicho = {
+      resumo: "Vídeos curtos de limpeza que mostram o antes e o depois.",
+      ganchos: [{ tipo: "resultado", exemplo: "olha essa mancha saindo", frequencia: "alta" }],
+      duracaoTipicaS: { min: 20, max: 45 },
+      estruturas: ["gancho, demonstracao, fechamento"],
+      fechamentos: ["mostra o resultado"],
+      chamadasFinais: ["comenta se ja passou por isso"],
+      formatos: [{ formato: "fala_para_camera", participacao: "70%" }],
+      edicao: { textoNaTela: "pouco", ritmoDeCorte: "rapido", recursos: [], audio: null },
+      assuntosQuentes: [],
+      baseadoEm: 12,
+      acimaDoLimiar: 12,
+    };
+    await db().insert(modelosNicho).values({ nichoId, semana: "2026-08-31", modelo });
+    await medirORamo();
+
+    // o curto primeiro: o longo que vem depois escolhe uma primeira palavra de gancho que o curto não usou
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+    const doCurto = String(chamadasDoCurto()[chamadasDoCurto().length - 1][0].sistemaEstavel);
+    expect(doCurto).toContain("Duração típica: de 20 a 45 segundos.");
+    expect(doCurto).toContain("Estruturas que funcionam");
+
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: `${TEMA} de novo`, objetivo: "alcance", duracao: "longo" });
+    const doLongo = ultimaChamadaDoLongo().sistema;
+    expect(doLongo).toContain("Vídeos curtos de limpeza que mostram o antes e o depois.");
+    expect(doLongo).not.toContain("Duração típica");
+    expect(doLongo).not.toContain("Estruturas que funcionam");
+  });
+
+  it("o Brasil primeiro: das referências com leitura, o vídeo em português vem antes do internacional, mesmo que o de fora esteja mais fora da curva", async () => {
+    const de1 = await semearLongo({ duracaoS: 540, comLeitura: true });
+    const de2 = await semearLongo({ duracaoS: 600, comLeitura: true });
+    const de3 = await semearLongo({ duracaoS: 660, comLeitura: true });
+    const deFora = await semearLongo({ duracaoS: 700, comLeitura: true, idioma: "en", foraDaCurva: "9.000" });
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+
+    const { entrada } = ultimaChamadaDoLongo();
+    for (const v of [de1, de2, de3]) expect(entrada).toContain(`id ${v.id}:`);
+    expect(entrada).not.toContain(`id ${deFora.id}:`);
+  });
+
+  it("sem brasileiro com leitura, o internacional serve de referência (o Brasil primeiro não esvazia a lista)", async () => {
+    await semearLongo({ duracaoS: 540 });
+    await semearLongo({ duracaoS: 600 });
+    const deFora = await semearLongo({ duracaoS: 700, comLeitura: true, idioma: "en" });
+    // um vídeo de outro idioma (que o produto não trata) com a leitura e a maior curva: seria o primeiro da fila se o corte do idioma não valesse
+    const deOutroIdioma = await semearLongo({ duracaoS: 720, comLeitura: true, idioma: "outro", foraDaCurva: "9.000" });
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+    const { entrada } = ultimaChamadaDoLongo();
+    expect(entrada).toContain(`id ${deFora.id}:`);
+    expect(entrada).not.toContain(`id ${deOutroIdioma.id}:`);
+  });
+
+  it("um nome de capítulo que a lista da descrição leria errado reprova a primeira tentativa, com o capítulo dito", async () => {
+    await medirORamo();
+    await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: "[mock:nome-com-tempo]" });
+    const tentativas = await geracoesDa("roteiroLongo");
+    expect(tentativas).toHaveLength(2);
+    expect(JSON.stringify(tentativas[0].saida)).toContain("10:30 da manhã");
+    expect(JSON.stringify(tentativas[1].saida)).not.toContain("10:30 da manhã");
   });
 
   it("reprovar nas duas tentativas é erro de IA e nada é gravado", async () => {
@@ -471,6 +565,18 @@ describe("o momento e a reescrita", () => {
     expect(tentativas).toHaveLength(2);
     expect((tentativas[0].saida as { gancho: string }).gancho).toContain("assunto qualquer");
     expect(roteiro.conteudo.gancho).toContain("mancha");
+  });
+
+  it("a reescrita de um longo cujo ramo perdeu a medida diz a frase do longo e a versão anterior continua inteira", async () => {
+    await medirORamo();
+    const v1 = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+    // os longos saem da janela (ou do banco): a medida some, e a reescrita não passa pela porta de `montarRoteiro`
+    await db().update(videos).set({ publicadoEm: new Date(Date.now() - 400 * DIA_MS) });
+    await expect(reprovarERescrever(v1.id, ["gancho_fraco"])).rejects.toThrow(textosRoteiro.longo.semLongos);
+    await expect(reprovarERescrever(v1.id, ["gancho_fraco"])).rejects.toBeInstanceOf(ErroRoteiro);
+    const [depois] = await db().select().from(roteiros).where(eq(roteiros.id, v1.id));
+    expect(depois.reprovadoEm).toBeNull();
+    expect(await db().select().from(roteiros)).toHaveLength(1);
   });
 
   it("a reescrita também recusa um longo que deixou de ser vídeo falado (a porta do miolo vale para quem chega sem passar por montarRoteiro)", async () => {

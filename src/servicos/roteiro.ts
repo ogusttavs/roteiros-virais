@@ -1222,7 +1222,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         quemAparece: quemApareceResolvido,
         perfilCompilado,
         camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
-        modeloNicho: formatarModeloNicho(modeloNichoLinha?.modelo ?? null),
+        // O modelo do nicho é dos vídeos CURTOS: a duração típica e as estruturas dele contradiriam a duração e a estrutura do longo, que vêm da medida dos longos (na entrada).
+        modeloNicho: formatarModeloNicho(modeloNichoLinha ? { ...modeloNichoLinha.modelo, duracaoTipicaS: null, estruturas: [] } : null),
         regrasCliente,
         proibicoes: perfil.fatos.proibicoes,
         tema: dados.tema,
@@ -1477,7 +1478,8 @@ export async function montarRoteiro(
   const cliente = await clientePorId(clienteId);
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
-  // E52 (PR 3): o vídeo longo se recusa ANTES de gastar (o tema do dia pode custar uma chamada de IA): o que ele não aceita, e o ramo sem a medida dos longos.
+  // E52 (PR 3): o vídeo longo se recusa ANTES de resolver o tema do dia (e antes de qualquer chamada de IA): o que ele não aceita, e o ramo sem a medida dos longos; a pessoa lê o motivo
+  // do longo, não o de um tema que talvez nem exista.
   if (params.duracao === "longo") {
     recusarSeNaoCabeNoLongo(params.formato ?? "reels", params.estilo ?? "falado", params.pesquisaId !== undefined);
     if (cliente.nichoId) {
@@ -1501,8 +1503,10 @@ export async function montarRoteiro(
   const estilo = params.estilo ?? "falado";
   const duracao = params.duracao ?? "curto";
   // E49 PR 1: só o Reels tem ficha; ela decide o objetivo que se grava.
-  const ficha = formato === "reels" && estilo === "falado" && params.ficha ? params.ficha : null;
-  const objetivo = ficha ? objetivoDaFicha(ficha) : params.objetivo;
+  const fichaDoPedido = formato === "reels" && estilo === "falado" && params.ficha ? params.ficha : null;
+  // E52 (PR 3): no vídeo longo a ficha só escolhe o objetivo; a estrutura dele é a dos capítulos, então ela não é guardada (a linha não pode dizer que o roteiro a segue).
+  const ficha = duracao === "longo" ? null : fichaDoPedido;
+  const objetivo = fichaDoPedido ? objetivoDaFicha(fichaDoPedido) : params.objetivo;
   // E43: escopada pelo nicho do cliente, nunca confiando num id de outro setor vindo do client.
   const noticiaLinha =
     params.noticiaId && cliente.nichoId ? await noticiaPorId(params.noticiaId, cliente.nichoId) : null;

@@ -23,7 +23,14 @@ import * as roteiroLongoIA from "../src/ia/prompts/roteiroLongo";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { palavrasDeConteudo, verificarLocalmente } from "../src/ia/verificador";
 import { lerCapitulosDaDescricao } from "../src/lib/capitulos-da-descricao";
-import { capitulosParaCopiar, iniciosDosCapitulos, somaDosCapitulos } from "../src/lib/capitulos-do-roteiro";
+import {
+  capitulosParaCopiar,
+  iniciosDosCapitulos,
+  PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO,
+  PALAVRAS_MAX_POR_PONTO,
+  PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO,
+  somaDosCapitulos,
+} from "../src/lib/capitulos-do-roteiro";
 import { camposDoRoteiroLongo, duracaoAlvoDaMedida, motivosDoRoteiroLongo } from "../src/servicos/roteiro-longo";
 
 import { linhaDoResumo, resumirProducao, rodarComoEmProducao } from "./golden-producao";
@@ -160,7 +167,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
             momento: caso.momento,
           }),
         }),
-        local: (saida) => {
+        local: (saida, tentativa) => {
           const campos = camposDoRoteiroLongo(saida);
           const local = verificarLocalmente(campos, {
             exigeEvidencia: caso.referencias.length > 0,
@@ -172,7 +179,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
             porQueAssim: saida.porQueAssim.filter((item) => NUMEROS_REGRAS_ROTEIRO_LONGO.has(item.regra)),
             numerosRegrasPlataforma: NUMEROS_REGRAS_ROTEIRO_LONGO,
           });
-          const extras = motivosDoRoteiroLongo(saida, duracaoAlvoS);
+          const extras = motivosDoRoteiroLongo(saida, duracaoAlvoS, tentativa);
           return extras.length > 0 ? { aprovado: false, motivos: [...local.motivos, ...extras] } : local;
         },
         campos: (saida) => camposDoRoteiroLongo(saida),
@@ -216,7 +223,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
       console.log(`CAPITULO ${i + 1}: ${c.nome} (${inicios[i]}s, ${c.duracaoS}s, tom ${c.tom})`);
       c.pontos.forEach((p) => {
         pontos += 1;
-        if (palavras(p) > 20) pontosAcimaDoLimite += 1;
+        if (palavras(p) > PALAVRAS_MAX_POR_PONTO) pontosAcimaDoLimite += 1;
         console.log(`  - ${p}`);
       });
       console.log(`  na imagem: ${c.naImagem}`);
@@ -224,7 +231,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
       if (!ultimo) {
         capitulosComGancho += 1;
         const gancho = (c.ganchoParaOProximo ?? "").trim();
-        const inteiro = palavras(gancho) >= 4 && palavras(gancho) <= 40;
+        const inteiro = palavras(gancho) >= PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO && palavras(gancho) <= PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO;
         if (inteiro) ganchosInteiros += 1;
         console.log(`  gancho para o proximo${inteiro ? "" : " (NAO VEIO INTEIRO)"}: ${gancho || "(vazio)"}`);
       }

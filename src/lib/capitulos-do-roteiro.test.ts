@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { lerCapitulosDaDescricao } from "./capitulos-da-descricao";
 import {
   capitulosParaCopiar,
+  nomeNaoVoltaDaLista,
   DURACAO_MINIMA_DO_CAPITULO_S,
   FOLGA_DA_DURACAO,
   iniciosDosCapitulos,
@@ -170,5 +171,58 @@ describe("capitulosParaCopiar", () => {
         });
       }
     }
+  });
+});
+
+describe("o nome do capítulo tem de voltar igual da lista da descrição", () => {
+  it("um nome que começa com um tempo, só com número, com pontuação no começo ou longo demais não volta", () => {
+    expect(nomeNaoVoltaDaLista("10:30 da manhã")).toBe(true);
+    expect(nomeNaoVoltaDaLista("2026")).toBe(true);
+    expect(nomeNaoVoltaDaLista("100%")).toBe(true);
+    expect(nomeNaoVoltaDaLista("- e agora")).toBe(true);
+    expect(nomeNaoVoltaDaLista(": começo")).toBe(true);
+    expect(nomeNaoVoltaDaLista("3:15 minutos para secar")).toBe(true);
+    expect(nomeNaoVoltaDaLista("a".repeat(101))).toBe(true);
+  });
+
+  it("um nome de gente volta igual, com número no meio, dois-pontos e acento", () => {
+    for (const nome of ["O problema de verdade", "Passo 2: a mistura", "Por que 3 produtos bastam", "Erro número 1", "Cuidado com o pH", "a".repeat(100)]) {
+      expect(nomeNaoVoltaDaLista(nome), nome).toBe(false);
+    }
+  });
+
+  it("verificarCapitulos reprova o nome que não volta, dizendo qual capítulo é, e o nome com espaço marcado", () => {
+    const lista = [
+      { nome: "O problema", duracaoS: 200 },
+      { nome: "10:30 da manhã", duracaoS: 200 },
+      { nome: "O passo a [diga o número]", duracaoS: 200 },
+    ];
+    const motivos = verificarCapitulos(lista, 600);
+    expect(motivos).toHaveLength(2);
+    expect(motivos[0]).toContain("capitulo 2");
+    expect(motivos[0]).toContain("nao volta igual");
+    expect(motivos[1]).toContain("capitulo 3");
+    expect(motivos[1]).toContain("colchetes");
+  });
+});
+
+describe("verificarCapitulos com as opções da segunda tentativa", () => {
+  const tres = (soma: number) => capitulos([Math.floor(soma / 3), Math.floor(soma / 3), soma - 2 * Math.floor(soma / 3)]);
+
+  it("sem exigir a soma, qualquer soma serve, desde que continue sendo de um vídeo longo", () => {
+    const limites = { exigirSoma: false, somaMaiorQueS: 180, somaAteS: 2400 };
+    expect(verificarCapitulos(tres(900), 600, limites)).toEqual([]);
+    expect(verificarCapitulos(tres(900), 600)).toHaveLength(1);
+  });
+
+  it("a soma nunca sai do que é um vídeo longo: acima do teto dos curtos e até o limite do longo, nas duas tentativas", () => {
+    const limites = { somaMaiorQueS: 180, somaAteS: 2400 };
+    // o alvo de 210 s aceita 178,5 s pela folga de 15%, que já é um vídeo curto
+    expect(verificarCapitulos(tres(180), 210, limites)).toHaveLength(1);
+    expect(verificarCapitulos(tres(181), 210, limites)).toEqual([]);
+    // o alvo de 2400 s aceita 2760 s pela folga, que passa do limite do longo
+    expect(verificarCapitulos(tres(2400), 2400, limites)).toEqual([]);
+    expect(verificarCapitulos(tres(2401), 2400, limites)).toHaveLength(1);
+    expect(verificarCapitulos(tres(2700), 2400, { ...limites, exigirSoma: false })[0]).toContain("maximo");
   });
 });

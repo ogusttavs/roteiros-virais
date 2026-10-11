@@ -54,6 +54,19 @@ describe("as 56 regras de plataforma (45 da E36 e as 11 dos capítulos, E52), c�
     expect(daSecao9.size).toBe(56);
   });
 
+  it.skipIf(!existe)("as onze regras dos capítulos (R-YT-VIDEO-05 a 15) têm o texto da seção 9.4, copiado e não reescrito", () => {
+    const texto = readFileSync(CAMINHO_RUBRICAS, "utf8");
+    const doDocumento = new Map<string, string>();
+    for (const linha of texto.split(String.fromCharCode(10))) {
+      const m = /^\|\s*(R-YT-VIDEO-(?:0[5-9]|1[0-5]))\s*\|\s*(.*?)\s*\|\s*(?:forte|média|fraca)/.exec(linha);
+      if (m) doDocumento.set(m[1], m[2]);
+    }
+    expect([...doDocumento.keys()].sort()).toEqual(REGRAS_YT_CAPITULOS.map((r) => r.numero).sort());
+    for (const regra of REGRAS_YT_CAPITULOS) {
+      expect(regra.texto, regra.numero).toBe(doDocumento.get(regra.numero));
+    }
+  });
+
   if (!existe) {
     console.warn(
       `regras-formato.test.ts: ${CAMINHO_RUBRICAS} não encontrado (normal na CI, que só tem o checkout de plataforma/); a conferência contra a seção 9 não rodou.`,

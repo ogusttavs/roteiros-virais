@@ -5,6 +5,7 @@ import * as roteiroLongoIA from "@/ia/prompts/roteiroLongo";
 import { verificarLocalmente } from "@/ia/verificador";
 import { config } from "@/lib/config";
 
+import { cenasDoBloco } from "./roteiro";
 import { camposDoRoteiroLongo, conteudoDoRoteiroLongo, duracaoAlvoDaMedida, motivosDoRoteiroLongo } from "./roteiro-longo";
 import type { MedidaDosLongos } from "./videos-longos";
 
@@ -86,6 +87,28 @@ describe("motivosDoRoteiroLongo", () => {
     expect(motivosDoRoteiroLongo({ ...base, capitulos: somaErrada }, 600).some((m) => m.includes("somar a duracao do video"))).toBe(true);
   });
 
+  it("na segunda tentativa a soma não é exigida, mas a regra do YouTube e a faixa do vídeo longo continuam duras", () => {
+    const base = saidaBase(600);
+    const dobrada = { ...base, capitulos: base.capitulos.map((c) => ({ ...c, duracaoS: c.duracaoS * 1.4 })) };
+    expect(motivosDoRoteiroLongo(dobrada, 600, 1).some((m) => m.includes("somar a duracao do video"))).toBe(true);
+    expect(motivosDoRoteiroLongo(dobrada, 600, 2)).toEqual([]);
+    // o que é regra segue duro na segunda: um capítulo de 4 segundos
+    const curto = { ...dobrada, capitulos: dobrada.capitulos.map((c, i) => (i === 1 ? { ...c, duracaoS: 4 } : c)) };
+    expect(motivosDoRoteiroLongo(curto, 600, 2).some((m) => m.includes("R-YT-VIDEO-08"))).toBe(true);
+    // e a soma de um vídeo curto ou maior que o limite do longo reprova também na segunda
+    const tudoPouco = { ...base, capitulos: base.capitulos.map((c) => ({ ...c, duracaoS: 20 })) };
+    expect(motivosDoRoteiroLongo(tudoPouco, 600, 2).some((m) => m.includes("video curto"))).toBe(true);
+    const demais = { ...base, capitulos: base.capitulos.map((c) => ({ ...c, duracaoS: 600 })) };
+    expect(motivosDoRoteiroLongo(demais, 600, 2).some((m) => m.includes("maximo"))).toBe(true);
+  });
+
+  it("título com espaço marcado, miniatura vazia e onde gravar vazio reprovam", () => {
+    const base = saidaBase();
+    expect(motivosDoRoteiroLongo({ ...base, titulo: "Como fazer em [diga o lugar]" }, 600)[0]).toContain("colchetes");
+    expect(motivosDoRoteiroLongo({ ...base, miniatura: " " }, 600)[0]).toContain("miniatura: vazia");
+    expect(motivosDoRoteiroLongo({ ...base, ondeGravar: "" }, 600)[0]).toContain("ondeGravar: vazio");
+  });
+
   it("o gancho de cada capítulo vem inteiro: vazio, só um rótulo ou longo demais reprova; o último capítulo não precisa de gancho", () => {
     const base = saidaBase();
     const comGancho = (i: number, gancho: string | null) => base.capitulos.map((c, j) => (j === i ? { ...c, ganchoParaOProximo: gancho } : c));
@@ -164,7 +187,11 @@ describe("conteudoDoRoteiroLongo", () => {
       esperado += Math.round(base.capitulos[i].duracaoS);
     });
     expect(conteudo.duracaoS).toBe(esperado);
-    expect(conteudo.cenas.map((c) => c.momento)[0]).toBe("00:00");
+    // o momento em segundos, a forma que os leitores do roteiro (página, modo gravação, PDF, imagem) leem: nenhuma cena se perde e a primeira abre o vídeo
+    expect(conteudo.cenas.map((c) => c.momento)).toEqual(capitulos.map((c) => `${c.inicioS} segundos`));
+    const blocos = (["abertura", "meio", "fechamento", "chamada"] as const).map((bloco) => cenasDoBloco(conteudo.cenas, conteudo.duracaoS, bloco));
+    expect(blocos.flat()).toHaveLength(capitulos.length);
+    expect(blocos[0].map((c) => c.momento)).toEqual(["0 segundos"]);
   });
 
   it("o último capítulo nunca guarda gancho, mesmo que o modelo escreva um", () => {
@@ -215,9 +242,9 @@ describe("conteudoDoRoteiroLongo", () => {
     expect(conteudo.semEvidencia).toBe(false);
     expect(conteudo.forcaEvidencia).toBe("media");
 
-    const certa = conteudoDoRoteiroLongo({ ...modelo, edicao: { ...base.edicao, referencia: { videoId: 22, segundo: -5, oQueOlhar: "o inicio" } } }, [11, 22]);
+    const certa = conteudoDoRoteiroLongo({ ...modelo, edicao: { ...base.edicao, referencia: { videoId: 22, segundo: 275, oQueOlhar: "o inicio" } } }, [11, 22]);
     expect(certa.referenciaVideoId).toBe(22);
-    // o segundo nunca é negativo
+    // o modelo escolhe QUAL vídeo, nunca o segundo: o longo não tem momento-chave medido, e o segundo dele seria inventado (o mesmo cuidado do curto, PR #88)
     expect(certa.conteudo.edicao.referencia?.segundo).toBe(0);
   });
 

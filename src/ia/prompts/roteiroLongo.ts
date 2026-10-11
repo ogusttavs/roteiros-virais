@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-import { TIPOS_ABERTURA, type Objetivo } from "@/db/schema";
+import type { Objetivo } from "@/db/schema";
+import {
+  LIMITE_DO_TITULO_DO_VIDEO,
+  MAXIMO_DE_CAPITULOS_DO_ROTEIRO,
+  MINIMO_DE_CAPITULOS_DO_YOUTUBE,
+  PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO,
+  PALAVRAS_MAX_POR_PONTO,
+  PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO,
+  PONTOS_MAX_POR_CAPITULO,
+  PONTOS_MIN_POR_CAPITULO,
+} from "@/lib/capitulos-do-roteiro";
 import { TONS_DO_BLOCO } from "@/lib/marcas-de-fala";
 import type { VozNumerada } from "@/servicos/vozes-do-publico";
 
@@ -81,7 +91,6 @@ export const schema = z.object({
   porQueAssim: z.array(z.object({ regra: z.string(), motivo: z.string() })),
   /** Só preenchido com o bloco do momento; uma linha curta que vira o tema. */
   temaCurto: z.string().nullable(),
-  tipoAbertura: z.enum(TIPOS_ABERTURA).nullable(),
 });
 
 export type SaidaRoteiroLongo = z.infer<typeof schema>;
@@ -128,8 +137,9 @@ próximo. Regras duras:
    do público ou nos dados que a entrada traz. O que o roteiro precisaria e não tem, você não
    inventa: deixa um espaço marcado entre colchetes, com a instrução para quem grava, como
    "[diga aqui onde você está]" ou "[o número real do seu preço]". Isso inclui COMO a pessoa
-   trabalha e o que ela oferece: se o perfil não disse, vira um espaço marcado. Nunca invente cena
-   para dar vida ao texto. Os vídeos de referência abaixo mostram a FORMA (a estrutura, a duração,
+   trabalha e o que ela oferece: se o perfil não disse, vira um espaço marcado. O espaço marcado
+   fica nos pontos, nunca no título nem no nome de um capítulo (esses vão direto para o YouTube).
+   Nunca invente cena para dar vida ao texto. Os vídeos de referência abaixo mostram a FORMA (a estrutura, a duração,
    como nomeiam os capítulos); o que eles afirmam sobre o assunto nunca é fato deste roteiro.
 3. Use as frases que o cliente disse de verdade (estão no perfil) e nunca fira uma proibição dele.
 4. ${regraVoz}${regraQuemAparece}${regraPersona}
@@ -137,26 +147,30 @@ próximo. Regras duras:
    (uma folga de uns 15% é aceita, mais que isso é reprovado). Essa duração vem da medida de vídeos
    longos reais do ramo, não de um número inventado; a entrada diz também quantos capítulos e de que
    tamanho os vídeos desse ramo costumam ter: use como guia, sem copiar.
-6. Cada capítulo dura pelo menos 10 segundos, e são de 3 a 12 capítulos. O primeiro começa em
+6. Cada capítulo dura pelo menos 10 segundos, e são de ${MINIMO_DE_CAPITULOS_DO_YOUTUBE} a ${MAXIMO_DE_CAPITULOS_DO_ROTEIRO} capítulos. O primeiro começa em
    zero (você escreve só as durações; o início de cada um é calculado). Cada capítulo é uma parte
    que se entende e se acha sozinha: uma etapa, uma pergunta respondida (R-YT-VIDEO-13). O nome do
    capítulo é curto e usa as palavras que a pessoa pesquisaria; é ele que vai para a lista da
-   descrição do vídeo.
-7. O gancho de cada capítulo (ganchoParaOProximo) é UMA frase inteira, escrita do jeito que a
-   pessoa fala, que deixa uma pergunta aberta, uma promessa ou uma virada para o capítulo seguinte;
-   o último capítulo não tem gancho (null), ele fecha com a chamada final. O resto de cada capítulo
-   NÃO é fala escrita: são de dois a quatro pontos curtos (no máximo 20 palavras cada) do que falar
-   e do que mostrar, para a pessoa falar com as próprias palavras. Só o gancho do vídeo (campo
-   gancho, os primeiros 30 segundos) e o gancho de cada capítulo vêm como frase inteira.
-8. O título do vídeo tem as palavras que a pessoa pesquisaria, sem caixa alta nem exclamações em
-   série, e descreve com precisão o que o vídeo entrega (R-YT-VIDEO-03). Nada de promessa que o
+   descrição do vídeo, então começa por uma palavra (nunca por tempo, número ou pontuação, como
+   "10:30 da manhã" ou "2026"), tem até ${LIMITE_DO_TITULO_DO_VIDEO} caracteres e não leva colchetes.
+7. O gancho de cada capítulo (ganchoParaOProximo) é UMA frase inteira de ${PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO} a ${PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO} palavras, escrita do jeito que a
+   pessoa fala (nunca um rótulo de assunto), que deixa uma pergunta aberta, uma promessa ou uma
+   virada para o capítulo seguinte; o último capítulo não tem gancho (null), ele fecha com a
+   chamada final. O resto de cada capítulo NÃO é fala escrita: são de ${PONTOS_MIN_POR_CAPITULO} a ${PONTOS_MAX_POR_CAPITULO} pontos curtos
+   (no máximo ${PALAVRAS_MAX_POR_PONTO} palavras cada) do que falar e do que mostrar, para a pessoa falar com as próprias
+   palavras. Só o gancho do vídeo (campo gancho, os primeiros 30 segundos) e o gancho de cada
+   capítulo vêm como frase inteira.
+8. O título do vídeo tem até ${LIMITE_DO_TITULO_DO_VIDEO} caracteres, as palavras que a pessoa pesquisaria, sem caixa alta nem exclamações
+   em série, e descreve com precisão o que o vídeo entrega (R-YT-VIDEO-03). Nada de promessa que o
    vídeo não cumpre: os primeiros 30 segundos entregam o que o título prometeu (R-YT-VIDEO-01) e o
    momento mais forte vem cedo (R-YT-VIDEO-02).
 9. Todo vídeo diz onde gravar e o que mostrar, usando as cenas que o cliente disse que a câmera
    pode ver; cada capítulo diz o que a câmera mostra (naImagem) e como editar aquele capítulo
-   (comoEditar). A referência (edicao.referencia) é UM dos vídeos de referência que você de fato
-   usou como modelo de estrutura (videoId, segundo 0, e uma frase do que vale olhar); sem
-   referência de fato, deixe nulo. Referência errada é pior que referência nenhuma.
+   (comoEditar). O "quando" de cada texto na tela (edicao.textoNaTela) é em segundos desde o
+   início do vídeo, como "95 segundos". A referência (edicao.referencia) é UM dos vídeos de
+   referência que você de fato usou como modelo de estrutura (videoId, segundo 0, e uma frase do
+   que vale olhar); sem referência de fato, deixe nulo. Referência errada é pior que referência
+   nenhuma.
 10. O roteiro cita em evidencias os ids dos vídeos de referência que sustentam a estrutura (só os
     que você usou). Sem referência na entrada, a lista é vazia e você não afirma que existe vídeo.
 11. O tom de cada capítulo é UMA palavra desta lista: ${TONS_DO_BLOCO.join(", ")}.

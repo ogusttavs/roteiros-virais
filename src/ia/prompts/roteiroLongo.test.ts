@@ -50,7 +50,11 @@ describe("o prompt do roteiro longo", () => {
   it("diz o formato do capítulo: o gancho vem inteiro e o resto em pontos curtos, o último sem gancho", () => {
     const texto = sistema();
     expect(texto).toContain("UMA frase inteira");
-    expect(texto).toContain("dois a quatro pontos curtos");
+    expect(texto).toContain("de 2 a 4 pontos curtos");
+    expect(texto).toContain("de 4 a 40 palavras");
+    // os limites que o verificador impõe estão ditos ao modelo, com os mesmos números
+    expect(texto).toContain("O título do vídeo tem até 100 caracteres");
+    expect(texto).toContain("não leva colchetes");
     expect(texto).toContain("no máximo 20 palavras cada");
     expect(texto).toContain("o último capítulo não tem gancho");
     expect(texto).toContain("Só o gancho do vídeo");

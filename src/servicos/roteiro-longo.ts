@@ -21,9 +21,14 @@ import * as roteiroLongoIA from "@/ia/prompts/roteiroLongo";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import {
   iniciosDosCapitulos,
+  LIMITE_DO_TITULO_DO_VIDEO,
   MAXIMO_DE_CAPITULOS_DO_ROTEIRO,
+  PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO,
+  PALAVRAS_MAX_POR_PONTO,
+  PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO,
+  PONTOS_MAX_POR_CAPITULO,
+  PONTOS_MIN_POR_CAPITULO,
   somaDosCapitulos,
-  tempoParaADescricao,
   verificarCapitulos,
 } from "@/lib/capitulos-do-roteiro";
 import { config } from "@/lib/config";
@@ -38,11 +43,6 @@ export class ErroDoRoteiroLongo extends Error {}
 
 /** O arredondamento da duração-alvo: de 30 em 30 segundos, para a pessoa ler "9 minutos e meio" e não "9 minutos e 17 segundos". */
 const PASSO_DA_DURACAO_S = 30;
-const LIMITE_DO_TITULO_DO_VIDEO = 100;
-const PALAVRAS_MAX_POR_PONTO = 20;
-const PALAVRAS_MAX_NO_GANCHO_DO_CAPITULO = 40;
-/** Uma frase inteira, não um rótulo de assunto ("o preço real"): abaixo disso o gancho do capítulo veio como ponto, que é o formato do resto e não o dele. */
-const PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO = 4;
 const MAXIMO_DE_REFERENCIAS = 3;
 
 /**
@@ -58,8 +58,8 @@ export function duracaoAlvoDaMedida(medida: MedidaDosLongos): number | null {
 }
 
 /**
- * Diz, ANTES de qualquer gasto (o tema do dia pode custar uma chamada de IA), se o ramo tem a medida que o roteiro longo pede: sem ela, a frase que a tela mostra. Não devolve a duração
- * (`gerarConteudoLongo` a calcula de novo, numa leitura só dela): é só a porta.
+ * Diz, ANTES de resolver o tema do dia e de qualquer chamada de IA, se o ramo tem a medida que o roteiro longo pede: sem ela, a frase que a tela mostra (e não a de "não há tema do dia",
+ * que seria outro assunto). Não devolve a duração (`gerarConteudoLongo` a calcula de novo, numa leitura só dela): é só a porta.
  */
 export async function conferirQueOLongoSai(nichoId: number, agora: Date = new Date()): Promise<void> {
   const longos = await longosDoSetor(nichoId, { agora, dias: config.regras.longosMedidaJanelaDias });
@@ -70,25 +70,36 @@ function palavras(texto: string): number {
   return texto.trim().split(/\s+/).filter(Boolean).length;
 }
 
-/** Tudo o que o modelo pode errar no roteiro longo e o código sabe conferir (além dos capítulos: o título, o gancho do vídeo, os pontos curtos e o gancho inteiro de cada capítulo). */
-export function motivosDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, duracaoAlvoS: number): string[] {
+/**
+ * Tudo o que o modelo pode errar no roteiro longo e o código sabe conferir (além dos capítulos: o título, o gancho do vídeo, os pontos curtos e o gancho inteiro de cada capítulo).
+ * `tentativa` 2 não exige que a soma chegue perto da duração pedida (a duração do roteiro é a soma que vier, como a faixa de duração dos curtos, que nunca derruba a geração sozinha),
+ * mas a soma continua tendo de ser a de um vídeo longo: acima do teto dos curtos e até o limite do longo. As regras do YouTube (capítulos, 10 segundos) valem nas duas.
+ */
+export function motivosDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, duracaoAlvoS: number, tentativa: 1 | 2 = 1): string[] {
   const motivos = verificarCapitulos(
     saida.capitulos.map((c) => ({ nome: c.nome, duracaoS: c.duracaoS })),
     duracaoAlvoS,
+    { exigirSoma: tentativa === 1, somaMaiorQueS: config.regras.tetoDuracaoReferenciaS, somaAteS: config.regras.videoLongoMaxS },
   );
 
   if (!saida.titulo.trim()) motivos.push("titulo: vazio");
   else if (Array.from(saida.titulo).length > LIMITE_DO_TITULO_DO_VIDEO) {
     motivos.push(`titulo: ${Array.from(saida.titulo).length} caracteres, o limite e ${LIMITE_DO_TITULO_DO_VIDEO}`);
+  } else if (saida.titulo.includes("[") || saida.titulo.includes("]")) {
+    motivos.push("titulo: leva espaco marcado entre colchetes; o titulo vai direto para o YouTube, o espaco marcado fica nos pontos");
   }
   if (!saida.gancho.trim()) motivos.push("gancho: vazio, os primeiros 30 segundos entregam o que o titulo prometeu (R-YT-VIDEO-01)");
   if (!saida.chamadaFinal.trim()) motivos.push("chamadaFinal: vazia, o ultimo capitulo fecha com a chamada final");
+  if (!saida.miniatura.trim()) motivos.push("miniatura: vazia, diga o que aparece nela e o texto curto, se houver");
+  if (!saida.ondeGravar.trim()) motivos.push("ondeGravar: vazio, todo video diz onde gravar");
 
   saida.capitulos.forEach((c, i) => {
     const n = i + 1;
     const ultimo = i === saida.capitulos.length - 1;
     const pontos = c.pontos.map((p) => p.trim()).filter(Boolean);
-    if (pontos.length < 2 || pontos.length > 4) motivos.push(`capitulo ${n}: ${pontos.length} pontos, o capitulo tem de 2 a 4 pontos curtos do que falar e mostrar`);
+    if (pontos.length < PONTOS_MIN_POR_CAPITULO || pontos.length > PONTOS_MAX_POR_CAPITULO) {
+      motivos.push(`capitulo ${n}: ${pontos.length} pontos, o capitulo tem de ${PONTOS_MIN_POR_CAPITULO} a ${PONTOS_MAX_POR_CAPITULO} pontos curtos do que falar e mostrar`);
+    }
     pontos.forEach((p, j) => {
       if (palavras(p) > PALAVRAS_MAX_POR_PONTO) motivos.push(`capitulo ${n}, ponto ${j + 1}: ${palavras(p)} palavras passam de ${PALAVRAS_MAX_POR_PONTO}; e ponto curto, nao fala escrita`);
     });
@@ -139,8 +150,9 @@ type ReferenciaDoRamo = roteiroLongoIA.ReferenciaLongaNaEntrada;
 
 /** Os vídeos longos do ramo que já têm a leitura da estrutura (`analise_longa`), os mais fora da curva primeiro, para o modelo ver como o ramo estrutura um vídeo longo. */
 async function referenciasDoRamo(nichoId: number, doSetor: VideoLongoDoSetor[]): Promise<ReferenciaDoRamo[]> {
-  const ids = doSetor
-    .filter((v) => v.temAnaliseLonga && v.classificacao !== "outro")
+  // O Brasil primeiro (E31): entre os que têm leitura, o vídeo brasileiro vem antes do internacional, e dentro de cada grupo a ordem de sempre (os mais fora da curva).
+  const comLeitura = doSetor.filter((v) => v.temAnaliseLonga && v.classificacao !== "outro");
+  const ids = [...comLeitura.filter((v) => v.classificacao === "brasileiro"), ...comLeitura.filter((v) => v.classificacao !== "brasileiro")]
     .slice(0, MAXIMO_DE_REFERENCIAS)
     .map((v) => v.id);
   if (ids.length === 0) return [];
@@ -200,10 +212,12 @@ export function conteudoDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, 
   }));
   const duracaoS = somaDosCapitulos(capitulos);
 
+  // O modelo escolhe QUAL vídeo serve de referência, nunca o segundo: o vídeo longo não tem momento-chave medido, e um segundo escrito pelo modelo mandaria a pessoa para um trecho
+  // inventado (o mesmo cuidado do curto, PR #88). O segundo é sempre o começo.
   const referenciaDoModelo = saida.edicao.referencia;
   const referenciaEscolhida =
     referenciaDoModelo && referenciaDoModelo.videoId !== null && idsPermitidos.has(referenciaDoModelo.videoId)
-      ? { videoId: referenciaDoModelo.videoId, segundo: Math.max(0, Math.round(referenciaDoModelo.segundo ?? 0)), oQueOlhar: referenciaDoModelo.oQueOlhar }
+      ? { videoId: referenciaDoModelo.videoId, segundo: 0, oQueOlhar: referenciaDoModelo.oQueOlhar }
       : null;
   const semEvidencia = idsDasReferencias.length === 0;
 
@@ -217,7 +231,8 @@ export function conteudoDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, 
     chamadaFinal: saida.chamadaFinal.trim(),
     cartoes: null,
     porQueAssim: regrasCitadasQueExistem(saida.porQueAssim),
-    cenas: capitulos.map((c) => ({ momento: tempoParaADescricao(c.inicioS), oQueFazer: c.naImagem })),
+    // O momento em segundos ("95 segundos"), a forma que os leitores do roteiro (a página, o modo gravação, o PDF e a imagem) leem; a tela do longo usa `capitulos`, com o tempo da lista.
+    cenas: capitulos.map((c) => ({ momento: `${c.inicioS} segundos`, oQueFazer: c.naImagem })),
     ondeGravar: saida.ondeGravar,
     edicao: {
       textoNaTela: saida.edicao.textoNaTela,
@@ -272,7 +287,8 @@ export type ConteudoLongoGerado = {
   conteudo: ConteudoRoteiro;
   geracaoId: number;
   referenciaVideoId: number | null;
-  tipoAbertura: roteiroLongoIA.SaidaRoteiroLongo["tipoAbertura"];
+  /** Sempre nulo: a rotação de tipos de abertura é do Reels (`escolherTipoAbertura`); o longo não instrui nem grava tipo, como o Story e o sem fala. */
+  tipoAbertura: null;
   temaCurto: string | null;
 };
 
@@ -345,8 +361,7 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
     extrairPorQueAssim: (d) => regrasCitadasQueExistem(d.porQueAssim),
     extrairCampos: camposDoRoteiroLongo,
     extrairEvidencias: (d) => d.evidencias,
-    extrairTipoAbertura: (d) => d.tipoAbertura,
-    verificarExtra: (d) => motivosDoRoteiroLongo(d, duracaoAlvoS),
+    verificarExtra: (d, tentativa) => motivosDoRoteiroLongo(d, duracaoAlvoS, tentativa),
   });
 
   const { conteudo, referenciaVideoId } = conteudoDoRoteiroLongo(saida, idsDasReferencias);
@@ -355,7 +370,7 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
     conteudo,
     geracaoId,
     referenciaVideoId,
-    tipoAbertura: saida.tipoAbertura,
+    tipoAbertura: null,
     temaCurto: saida.temaCurto,
   };
 }
