@@ -6,6 +6,7 @@ import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -24,6 +25,7 @@ import {
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
 import { gerarVersoes } from "@/servicos/versoes";
+import { textosRoteiro } from "@/textos/roteiro";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
@@ -59,10 +61,15 @@ export async function gerarVersoesAction(
   noticiaAssuntoId?: number,
   /** E28 (parte 3): a chave da pergunta do público (Tema livre `?pergunta=`); só 12 caracteres hexadecimais valem, e `gerarRoteiro` a acha de novo nas vozes do setor da marca. */
   perguntaChave?: string,
+  /** E54 (parte 2): o id da pesquisa na hora que a pessoa aprovou para este vídeo; só um id de linha vale (um valor que não vale é erro explícito, não "sem pesquisa"), e `gerarVersoes` confere que é desta marca e que está pronta. */
+  pesquisaId?: number,
 ): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const cliente = await clienteDaSessaoAtual();
+  // Um id que veio e não vale não vira "sem pesquisa" em silêncio: a pessoa pediu a pesquisa, e o roteiro sairia sem ela.
+  const pesquisaValida = pesquisaId === undefined || pesquisaId === null ? undefined : idDoBancoOuNulo(pesquisaId);
+  if (pesquisaValida === null) return { ok: false, erro: textosRoteiro.pesquisa.naoEncontrada };
   try {
     // O que chega do navegador é texto livre: a origem é reconstruída campo a campo (nunca espalhada, `validarOrigemDaTelaDoObjetivo`: "momento" é da folha "Gravar agora", que confere
     // a marca citada) e o objetivo é um dos três.
@@ -81,6 +88,7 @@ export async function gerarVersoesAction(
       assuntoEmAlta: origemValida.origem === "livre" ? assuntoEmAlta : undefined,
       noticiaAssuntoId: origemValida.origem === "livre" ? noticiaAssuntoId : undefined,
       perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
+      pesquisaId: pesquisaValida,
     });
     return { ok: true, dado: { grupo } };
   } catch (falha) {

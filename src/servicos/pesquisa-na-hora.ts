@@ -15,7 +15,7 @@ import { CAMBIO_USD_BRL } from "@/config/dinheiro";
 import { dominiosPermitidos } from "@/config/fontes-pesquisa";
 import { PRECO_BUSCA_WEB_USD, PRECOS_POR_NIVEL, TOKENS_DE_ENTRADA_POR_BUSCA } from "@/config/precos-ia";
 import { db } from "@/db";
-import { pesquisasNaHora, type PerguntaDePosicao, type PesquisaNaHora, type PremissaDaPesquisa } from "@/db/schema";
+import { pesquisasNaHora, type PerguntaDePosicao, type PesquisaDeOrigemGuardada, type PesquisaNaHora, type PremissaDaPesquisa } from "@/db/schema";
 import { buscarNaWeb, ErroDaBusca, type RespostaDaBusca } from "@/ia/busca-na-web";
 import { gerarEstruturado } from "@/ia/cliente";
 import { ErroIA } from "@/ia/erro";
@@ -187,6 +187,26 @@ export async function registrarPosicao(clienteId: number, pesquisaId: number, po
   const texto = limparParaPrompt(typeof posicao === "string" ? posicao : "", 300);
   if (texto === "") throw new ErroPesquisa('Diga qual é a sua posição, ou escolha "Prefiro não dar opinião".');
   await db().update(pesquisasNaHora).set({ posicaoDaPessoa: texto }).where(eq(pesquisasNaHora.id, pesquisa.id));
+}
+
+/**
+ * E54 (parte 2): a pesquisa como o roteiro a usa: a cópia do que a pessoa aprovou (os dados que ela MARCOU, a posição, a decisão sobre a premissa), de uma pesquisa DELA que está
+ * pronta. Lança `ErroPesquisa` com a frase pronta quando não está pronta ou não tem dado marcado: o roteiro nunca é escrito em silêncio sem os dados que a pessoa aprovou.
+ */
+export async function pesquisaParaORoteiro(clienteId: number, pesquisaId: number, agora: Date = new Date()): Promise<PesquisaDeOrigemGuardada> {
+  const pesquisa = await lerPesquisa(clienteId, pesquisaId, agora);
+  if (!pesquisa || pesquisa.status !== "pronta") throw new ErroPesquisa("Essa pesquisa não está pronta. Espere ela terminar, ou escreva sem pesquisa.");
+  const dados = pesquisa.achados.filter((a) => pesquisa.selecionados.includes(a.id));
+  if (dados.length === 0) throw new ErroPesquisa("Marque pelo menos um dado para escrever com a pesquisa, ou escreva sem ela.");
+  const avisa = pesquisa.premissa?.situacao === "nao_confere";
+  return {
+    pesquisaId: pesquisa.id,
+    dados,
+    posicaoDaPessoa: pesquisa.posicaoDaPessoa,
+    decisaoDaPremissa: avisa ? (pesquisa.decisaoDaPremissa ?? "fontes") : null,
+    avisoDaPremissa: avisa ? (pesquisa.premissa?.aviso ?? null) : null,
+    pesquisadaEm: (pesquisa.terminadoEm ?? pesquisa.criadoEm).toISOString(),
+  };
 }
 
 const DECISOES = ["fontes", "mudar", "manter"] as const;

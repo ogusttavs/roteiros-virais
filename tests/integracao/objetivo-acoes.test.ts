@@ -11,7 +11,9 @@ vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 import { db, getPool } from "@/db";
 import { briefings, clientes, membrosMarca, nichos, roteiros, user, versoesDoRoteiro, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
+import { criarPesquisa, executarPesquisa } from "@/servicos/pesquisa-na-hora";
 import { ficarComVersao } from "@/servicos/versoes";
+import { textosRoteiro } from "@/textos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { gerarVersoesAction } from "../../src/app/(painel)/(completo)/criar/objetivo/acoes";
@@ -247,5 +249,64 @@ describe("gerarVersoesAction com ficha", () => {
     const nova = await reprovarERescrever(original.id, ["muito_longo"]);
     expect(nova.ficha).toBe("comentem");
     expect(nova.objetivo).toBe("engajamento");
+  });
+});
+
+/**
+ * E54 (parte 2): o `pesquisaId` que chega do navegador. Um id que veio e não vale é erro explícito (nunca "sem pesquisa" em silêncio: a pessoa pediu a pesquisa e o roteiro sairia
+ * sem ela); a pesquisa de outra marca ou que ainda não está pronta é recusada pelo servidor; a pronta escreve com os dados que a pessoa marcou.
+ */
+describe("gerarVersoesAction com a pesquisa na hora", () => {
+  const enfileirar = async () => {};
+  const chamar = (pesquisaId: number | undefined, tema = "o preco dos produtos de limpeza subiu") =>
+    gerarVersoesAction({ origem: "livre", textoTema: tema }, "alcance", undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, pesquisaId);
+
+  async function contarVersoes() {
+    return (await db().select().from(versoesDoRoteiro).where(eq(versoesDoRoteiro.clienteId, marcaA.id))).length;
+  }
+
+  it("um id que não é de linha do banco volta como erro explícito, sem gerar", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const antes = await contarVersoes();
+    for (const invalido of [0, -3, 1.5, 99_999_999_999, Number.NaN]) {
+      expect(await chamar(invalido)).toEqual({ ok: false, erro: textosRoteiro.pesquisa.naoEncontrada });
+    }
+    expect(await contarVersoes()).toBe(antes);
+  });
+
+  it("a pesquisa de outra marca é recusada, sem gerar", async () => {
+    const id =`objetivo-pesquisa-${Date.now()}`;
+    const [nicho] = await db().select().from(nichos).limit(1);
+    await db().insert(user).values({ id, name: `[teste] ${id}`, email: `${id}@objetivo-acoes.teste` });
+    const [m] = await db().insert(clientes).values({ usuarioId: id, nome: `[teste] ${id}`, nichoId: nicho.id }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: id, clienteId: m.id, papel: "dono" });
+    const dela = await criarPesquisa(m.id, { pedido: "dados de 2026 sobre o preco dos produtos de limpeza", tema: null }, { enfileirar });
+    await executarPesquisa(dela.id);
+
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const antes = await contarVersoes();
+    const r = await chamar(dela.id);
+    expect(r.ok).toBe(false);
+    expect(await contarVersoes()).toBe(antes);
+  });
+
+  it("a pesquisa pronta da própria marca escreve com os dados, e o roteiro guarda a cópia", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const criada = await criarPesquisa(marcaA.id, { pedido: "dados de 2026 sobre o preco dos produtos de limpeza", tema: null }, { enfileirar });
+    await executarPesquisa(criada.id);
+
+    const r = await chamar(criada.id);
+    if (!r.ok) throw new Error(r.erro);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, r.dado.grupo);
+    expect(roteiro.pesquisaNaHora).toMatchObject({ pesquisaId: criada.id });
+    expect(roteiro.pesquisaNaHora!.dados.length).toBeGreaterThan(0);
+  });
+
+  it("sem o id, o roteiro sai sem pesquisa, como sempre", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const r = await chamar(undefined, "um tema sem pesquisa nenhuma");
+    if (!r.ok) throw new Error(r.erro);
+    const roteiro = await roteiroDaPrimeiraVersao(marcaA.id, r.dado.grupo);
+    expect(roteiro.pesquisaNaHora).toBeNull();
   });
 });

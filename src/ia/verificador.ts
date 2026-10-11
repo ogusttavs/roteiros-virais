@@ -8,6 +8,7 @@
 import type { CartaoStory, EstiloRoteiro, Ficha, FormatoRoteiro, TipoAbertura } from "@/db/schema";
 import { PALAVRAS_VAZIAS } from "@/lib/palavras-vazias";
 import { EMOJI, encontrarProblemas, MOTIVO_EMOJI, MOTIVO_TRAVESSAO } from "@/lib/regras-de-texto";
+import { dadosForaDasFontes } from "@/servicos/conferencia-da-pesquisa";
 
 import { gerarEstruturado, type ParametrosGeracao } from "./cliente";
 import { ErroIA } from "./erro";
@@ -208,6 +209,12 @@ export function verificarLocalmente(
      */
     numerosRegrasPlataforma?: Set<string>;
     /**
+     * E54 (parte 2): o roteiro nasceu de uma pesquisa na hora. O texto das fontes dos fatos (as mesmas `fontesDosFatos`: perfil, tema, os dados marcados com o trecho, a posição da pessoa):
+     * todo número com cara de dado no roteiro (porcentagem, valor em dinheiro, ano e quantidade de mil para cima) tem de estar escrito lá, com a MESMA unidade e escala, a mesma trava que o
+     * motor aplicou ao dado. Sem isto o roteiro reabriria a porta que a pesquisa fechou. Também exige que "o que pode aparecer" (`pesquisaObjecao*`) seja possibilidade e nunca previsão.
+     */
+    fontesDosNumeros?: string;
+    /**
      * V9d, item 1: os valores brutos de `gancho`, `corpo` e `chamadaFinal`, antes do filtro de
      * `extrairCamposRoteiro` (que já tira do `campos` qualquer um vazio ou nulo, em qualquer
      * formato). Sem isto, um roteiro em Reels que saísse com `gancho` nulo (o schema 2.0.0 aceita,
@@ -369,6 +376,20 @@ export function verificarLocalmente(
     }
     if (opcoes.ficha === "guardem" && corpo?.trim() && !temAlgoParaGuardar(corpo)) {
       motivos.push("corpo: a ficha 'que guardem para depois' pede passo a passo, lista ou algo para copiar, e o corpo nao tem nenhum (E49 PR 1)");
+    }
+  }
+
+  if (opcoes.fontesDosNumeros !== undefined) {
+    // O que a pesquisa entrega além da fala (ganchos alternativos, objeções, atenção) não passa por aqui: `montarEntregaDaPesquisa` tira, por código, o que falha, e o roteiro não cai por
+    // um item secundário. Aqui valem os campos do roteiro de verdade.
+    for (const [nomeCampo, valor] of Object.entries(campos)) {
+      if (nomeCampo.startsWith("pesquisa")) continue;
+      const fora = dadosForaDasFontes(valor, opcoes.fontesDosNumeros);
+      if (fora.length > 0) {
+        motivos.push(
+          `${nomeCampo}: tem ${fora.map((f) => `"${f}"`).join(", ")} que não está nas fontes (os dados da pesquisa, o perfil, o tema); use só os números e as quantidades dos dados, do mesmo jeito, e escreva "por exemplo" no que for exemplo`,
+        );
+      }
     }
   }
 
@@ -664,6 +685,8 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   extrairPorQueAssim?: (dados: T) => { regra: string; motivo: string }[];
   /** R1, item 2: os números válidos para `porQueAssim` deste roteiro específico (ver `verificarLocalmente`). */
   numerosRegrasPlataforma?: Set<string>;
+  /** E54 (parte 2): confere os números com cara de dado (porcentagem, valor, ano) contra as `fontesDosFatos`, com a mesma unidade e escala (ver `verificarLocalmente`). */
+  conferirNumerosNasFontes?: boolean;
   /** M4, item 4: a legenda do post, só no estilo sem fala. */
   extrairLegenda?: (dados: T) => string | null;
   /** V9d, item 1: gancho, corpo e chamadaFinal brutos, para `verificarLocalmente` reprovar um Reels vazio (ver lá). */
@@ -772,6 +795,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
     legenda: params.extrairLegenda?.(dados),
     porQueAssim: params.extrairPorQueAssim?.(dados),
     numerosRegrasPlataforma: params.numerosRegrasPlataforma,
+    fontesDosNumeros: params.conferirNumerosNasFontes ? (params.fontesDosFatos ?? "") : undefined,
     narrativa: params.extrairNarrativa?.(dados),
   };
 }

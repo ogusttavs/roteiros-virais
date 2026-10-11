@@ -18,7 +18,8 @@ describe("fonteDoEndereco", () => {
     expect(fonteDoEndereco("https://www.ibge.gov.br/a")?.nome).toBe("IBGE");
     expect(fonteDoEndereco("https://agenciadenoticias.ibge.gov.br/a")?.nome).toBe("IBGE");
     expect(fonteDoEndereco("https://www1.folha.uol.com.br/a")?.nome).toBe("Folha de S.Paulo");
-    expect(fonteDoEndereco("https://noticias.uol.com.br/a")?.nome).toBe("UOL");
+    expect(fonteDoEndereco("https://noticias.uol.com.br/a")?.nome).toBe("UOL Notícias");
+    expect(fonteDoEndereco("https://economia.uol.com.br/a")?.nome).toBe("UOL Economia");
     expect(fonteDoEndereco("https://g1.globo.com/economia/a")).toMatchObject({ nome: "G1", tipo: "imprensa" });
   });
 
@@ -31,6 +32,10 @@ describe("fonteDoEndereco", () => {
       "https://exemplo.invalido/g1.globo.com",
       "https://globo.com/a",
       "https://uol.com.br.exemplo.invalido/a",
+      // o UOL amplo saiu da lista: blog e página de terceiros sob a mesma marca
+      "https://blog.uol.com.br/a",
+      "https://uol.com.br/a",
+      "https://tilt.uol.com.br/a",
     ]) {
       expect(fonteDoEndereco(url), url).toBeNull();
     }
@@ -48,8 +53,8 @@ describe("dominiosPermitidos", () => {
     expect(dominios).toContain("gov.br");
     expect(dominios).not.toContain("ibge.gov.br");
     expect(dominios).toContain("g1.globo.com");
-    expect(dominios).toContain("uol.com.br");
-    expect(dominios).not.toContain("folha.uol.com.br");
+    expect(dominios).not.toContain("uol.com.br");
+    expect(dominios).toEqual(expect.arrayContaining(["noticias.uol.com.br", "economia.uol.com.br", "folha.uol.com.br"]));
     expect(new Set(dominios).size).toBe(dominios.length);
   });
 

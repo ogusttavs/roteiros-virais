@@ -269,4 +269,20 @@ export const textosRoteiro = {
     dadoYoutube: "Entre os vídeos mais vistos do YouTube no Brasil",
     ligacao: (frase: string) => `A ligação com o seu ramo é nossa: ${frase}`,
   },
+  /**
+   * E54 (parte 2): o "Atenção" do roteiro que nasceu de uma pesquisa na hora. As frases de regra são nossas, escritas por código (o modelo escreve só o que depende do
+   * assunto): o que a pessoa confere ou decide antes de postar. A tela (parte 3) mostra com o título do desenho.
+   */
+  pesquisa: {
+    cuidado: {
+      saude: "Assunto de saúde: confira com um profissional da área antes de postar e não prometa resultado.",
+      preco: "Preço muda: confira se os valores ainda valem no dia em que você for postar.",
+      politica: "Assunto de política: fale de pauta e de princípio, nunca de ataque a quem você citar. Vídeo de eleição não deve ser impulsionado com verba.",
+    },
+    premissaMantida: (aviso: string) => `As fontes dizem outra coisa do que você escreveu: ${aviso} Você decidiu seguir com o que escreveu: confira antes de postar.`,
+    dadoAntigo: (fonte: string, data: string) => `O dado (${fonte}) é de ${data}: confira se ainda vale antes de citar.`,
+    dadoSemData: (fonte: string) => `A página (${fonte}) não diz a data: confira quando foi publicada antes de citar.`,
+    pesquisadaEmSemDados: "A pesquisa não trouxe dado para este vídeo.",
+    naoEncontrada: "Não achamos essa pesquisa. Volte, faça a pesquisa de novo ou escreva sem ela.",
+  },
 };

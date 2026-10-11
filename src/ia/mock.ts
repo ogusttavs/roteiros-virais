@@ -438,6 +438,22 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
 
   // E53: com notícias do assunto na entrada, o mock cita o veículo e o dia da primeira (o roteiro de verdade faz o mesmo: "segundo o G1, ontem").
   const noticiaDoAssunto = /Notícias de hoje do assunto que a pessoa acompanha[^\n]*:\n([^,\n]+), ([^:\n]+): ([^\n]+)/.exec(entrada) ?? /Notícias de hoje de um assunto que a pessoa acompanha[^\n]*\n(?:<noticias_do_assunto>\n)?- ([^,\n]+), ([^:\n]+): ([^\n]+)/.exec(entrada);
+  // E54 (parte 2): com o bloco `<dados_da_pesquisa>` na entrada, o mock cita a fonte e o ano do primeiro dado (como o roteiro de verdade) e devolve a entrega da pesquisa.
+  const blocoDaPesquisa = /<dados_da_pesquisa>\n([\s\S]*?)\n<\/dados_da_pesquisa>/.exec(entrada);
+  const dadosDaPesquisa = blocoDaPesquisa
+    ? [...blocoDaPesquisa[1].matchAll(/^dado (\d+) \| ([^|]*)\| ([^|]*)\| ([^|]*)\| trecho: (.*)$/gm)].map((m) => ({ id: Number(m[1]), fonte: m[2].trim(), data: m[3].trim(), texto: m[4].trim() }))
+    : [];
+  const segundaTentativa = entrada.includes("A tentativa anterior foi reprovada.");
+  const citacaoDaPesquisa = dadosDaPesquisa[0]
+    ? ` Segundo ${dadosDaPesquisa[0].fonte}${/\d{4}/.exec(dadosDaPesquisa[0].data) ? `, em ${/\d{4}/.exec(dadosDaPesquisa[0].data)![0]}` : ""}, ${dadosDaPesquisa[0].texto.replace(/\.$/, "")}.`
+    : "";
+  // Marcadores de teste: um número que as fontes não têm (só na primeira tentativa, ou sempre) e uma objeção escrita como previsão. `numero-solto` vale sem pesquisa também:
+  // é o que prova que o roteiro de antes não é conferido por número (só o com pesquisa é).
+  const numeroFora =
+    (dadosDaPesquisa.length > 0 && (entrada.includes("[mock:numero-fora-das-fontes-sempre]") || (entrada.includes("[mock:numero-fora-das-fontes]") && !segundaTentativa))) ||
+    (entrada.includes("[mock:numero-solto]") && !segundaTentativa)
+      ? " O preço subiu 37% desde 2019."
+      : "";
   const citacaoDaNoticia = noticiaDoAssunto ? ` Segundo o ${noticiaDoAssunto[1]}, em ${noticiaDoAssunto[2]}, ${noticiaDoAssunto[3].split(". ")[0].replace(/\.$/, "")}.` : "";
 
   const narrativa = ehSemFala
@@ -452,8 +468,8 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
           corpo: entrada.includes("Ficha do vídeo: Que guardem para depois")
             ? `Passo 1: separe o que precisa. Passo 2: faça na ordem certa sobre ${tema}. Passo 3: confira o resultado.`
             : reprovado
-              ? `Outro angulo sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}`
-              : `Explicacao direta sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}`,
+              ? `Outro angulo sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}${citacaoDaPesquisa}${numeroFora}`
+              : `Explicacao direta sobre ${tema}, com uma cena real do negocio.${citacaoDaNoticia}${citacaoDaPesquisa}${numeroFora}`,
           fechamento: "resumo do que foi mostrado",
           chamadaFinal: "comenta se você já passou por isso",
           cartoes: null,
@@ -489,6 +505,32 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
     },
     evidencias: ids,
     tipoAbertura,
+    entregaDaPesquisa: mockEntregaDaPesquisa(dadosDaPesquisa, tema, entrada, segundaTentativa),
+  };
+}
+
+/** E54 (parte 2): a entrega da pesquisa do mock: null sem dados; com dados, três ganchos, objeções como possibilidade, os ids dos dois primeiros dados, um item de atenção e o cuidado do assunto. */
+function mockEntregaDaPesquisa(dados: { id: number; fonte: string; data: string; texto: string }[], tema: string, entrada: string, segundaTentativa: boolean) {
+  if (dados.length === 0) return null;
+  const minusculo = tema.toLowerCase();
+  const cuidado = /elei[cç][aã]o|politic|partid/.test(minusculo) ? "politica" : /sa[uú]de|doen[cç]a|rem[eé]dio/.test(minusculo) ? "saude" : /pre[cç]o|valor|custo/.test(minusculo) ? "preco" : "nenhum";
+  const comPrevisao = entrada.includes("[mock:previsao-de-publico]") && !segundaTentativa;
+  return {
+    ganchos: [
+      { texto: `Antes de falar de ${tema}, olhe este dado: ${dados[0].texto.replace(/\.$/, "")}.`, recomendado: true },
+      { texto: `O que quase ninguém conta sobre ${tema}.`, recomendado: false },
+      { texto: `${tema}: o que muda para o seu negócio.`, recomendado: false },
+    ],
+    oQueVaoTeResponder: [
+      {
+        objecao: comPrevisao ? "Vão dizer que isso não vale para o caso deles." : "Pode aparecer: isso não vale para o meu caso.",
+        resposta: "Depende do seu cenário, e os dados do vídeo mostram o ponto de partida.",
+      },
+      { objecao: "Pode aparecer: a fonte está desatualizada.", resposta: `A própria fonte diz: ${dados[0].texto.replace(/\.$/, "")}. A data está na lista, para você conferir.` },
+    ],
+    fontes: dados.slice(0, 2).map((d) => d.id),
+    atencao: ["Confira a data de cada fonte antes de postar."],
+    cuidado,
   };
 }
 

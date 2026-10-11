@@ -35,6 +35,7 @@ import {
   type Ficha,
   type Objetivo,
   type PerguntaDeOrigemGuardada,
+  type PesquisaDeOrigemGuardada,
   type Plataforma,
   type QuemGrava,
   type TemaDoDia,
@@ -62,6 +63,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
 import { diaPorExtenso } from "./noticias-assuntos";
@@ -75,6 +77,7 @@ import {
   subindoHojeComAnalise,
   type VideoEvidenciaRoteiro,
 } from "./pesquisa";
+import { ErroPesquisa, pesquisaParaORoteiro } from "./pesquisa-na-hora";
 import {
   aplicarProporcaoBrasil,
   classificarBrasil,
@@ -424,6 +427,11 @@ export type ParametrosGerarRoteiro = OrigemRoteiro & {
    * marca (nunca confiando no texto que veio do navegador) e só enquanto passa do piso; chave que não acha nada é um tema livre comum. O roteiro guarda a cópia (`roteiros.pergunta_do_publico`).
    */
   perguntaChave?: string;
+  /**
+   * E54 (parte 2): a pesquisa na hora que a pessoa pediu e marcou para este vídeo (`pesquisas_na_hora.id`, da marca). Resolvida UMA vez, junto do tema (a cópia do que ela aprovou
+   * vai com o tema resolvido: as versões e o "Gerar outra" escrevem com os mesmos dados). Pesquisa que não está pronta ou sem dado marcado é erro, nunca um roteiro sem os dados.
+   */
+  pesquisaId?: number;
 };
 
 /**
@@ -740,14 +748,30 @@ function combinarEvidencias(
 async function resolverTema(
   cliente: Cliente,
   params: ParametrosGerarRoteiro,
-): Promise<{ tema: string; evidenciasPrevistas: number[]; doMomento: TemaDoMomentoGuardado | null; pergunta: PerguntaDeOrigemGuardada | null }> {
+): Promise<{
+  tema: string;
+  evidenciasPrevistas: number[];
+  doMomento: TemaDoMomentoGuardado | null;
+  pergunta: PerguntaDeOrigemGuardada | null;
+  pesquisa: PesquisaDeOrigemGuardada | null;
+}> {
+  // E54 (parte 2): a pesquisa que a pessoa aprovou, para qualquer origem (o tema livre, o do dia e o momento), resolvida uma vez.
+  let pesquisa: PesquisaDeOrigemGuardada | null = null;
+  if (params.pesquisaId !== undefined) {
+    try {
+      pesquisa = await pesquisaParaORoteiro(cliente.id, params.pesquisaId);
+    } catch (erro) {
+      if (erro instanceof ErroPesquisa) throw new ErroRoteiro(erro.message);
+      throw erro;
+    }
+  }
   if (params.origem === "livre") {
     // E55 PR 2b: o assunto em alta que a pessoa trouxe para o ramo dela: o roteiro nasce do momento só se o assunto ainda está na lista de agora.
     const assunto = params.assuntoEmAlta ? await assuntoEmAltaDaLista(params.assuntoEmAlta) : null;
     // E28 (parte 3): a pergunta do público que a pessoa prendeu, achada de novo nas vozes do setor da marca (a chave do navegador sozinha não vale) UMA vez, junto do tema: as versões de um
     // grupo e as de "Gerar outra" depois são da mesma pergunta, mesmo que a leitura da semana mude no meio (o tema resolvido é o que as versões guardam).
     const pergunta = await perguntaDoPublicoPelaChave(cliente.nichoId, params.perguntaChave);
-    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null, pergunta };
+    return { tema: params.textoTema, evidenciasPrevistas: [], doMomento: assunto ? guardarAssuntoDaLista(assunto) : null, pergunta, pesquisa };
   }
 
   /**
@@ -759,7 +783,7 @@ async function resolverTema(
    */
   if (params.origem === "momento") {
     const resumo = params.momento.oQueEstaAcontecendo.trim().slice(0, 80);
-    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null, pergunta: null };
+    return { tema: resumo || "o momento que você descreveu", evidenciasPrevistas: [], doMomento: null, pergunta: null, pesquisa };
   }
 
   const resultado = await temasParaCliente(cliente);
@@ -770,7 +794,13 @@ async function resolverTema(
   if (!tema) {
     throw new ErroRoteiro(params.temaChave ? textosHoje.emAlta.saiuNaHora : "tema nao encontrado para o indice pedido.");
   }
-  return { tema: tema.titulo, evidenciasPrevistas: tema.evidencias, doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null, pergunta: null };
+  return {
+    tema: tema.titulo,
+    evidenciasPrevistas: tema.evidencias,
+    doMomento: tema.doMomento ? guardarTemaDoMomento(tema.doMomento, tema.porQue) : null,
+    pergunta: null,
+    pesquisa,
+  };
 }
 
 /** O tema de um pedido, já resolvido: o título, as evidências que o tema do dia validou e, quando nasceu de um assunto em alta, o assunto. */
@@ -949,6 +979,8 @@ type MontarERoteiroDados = {
   noticia?: { titulo: string; resumo: string | null; angulo: string | null; veiculo?: string; dia?: string };
   /** E28 (parte 3): a pergunta do público que o roteiro responde, como a vimos (a do Tema livre, ou a cópia guardada na reescrita); entra na entrada e nas fontes dos fatos. */
   perguntaPresa?: PerguntaDeOrigemGuardada;
+  /** E54 (parte 2): a pesquisa na hora que a pessoa aprovou (a cópia dos dados marcados); entra na entrada, nas fontes dos fatos e na conferência dos números. */
+  pesquisa?: PesquisaDeOrigemGuardada;
   /** E55: o tema é do momento (um assunto em alta no Brasil); o roteiro pede o formato mais fácil de gravar hoje. */
   temaDoMomento?: boolean;
   /**
@@ -1129,6 +1161,30 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
   // Com a pergunta presa (a pessoa quer responder UMA), o bloco geral das vozes não entra: o roteiro é sobre aquela.
   const vozesDoPublico = dados.perguntaPresa ? [] : vozesParaOPrompt(vozesDoSetorAtual?.vozes ?? null);
   const lidasEm = vozesDoSetorAtual && vozesDoPublico.length > 0 ? diaPorExtenso(vozesDoSetorAtual.em) : undefined;
+  // E54 (parte 2): os dados da pesquisa que a pessoa marcou, na forma da entrada (a data por extenso).
+  const pesquisaNaEntrada = dados.pesquisa ? paraEntradaDaPesquisa(dados.pesquisa) : undefined;
+
+  // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto. É também o texto contra o qual a entrega da pesquisa é conferida.
+  const fontesDosFatos = roteiroIA.montarFontesDosFatos({
+    perfilCompilado,
+    camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
+    tema: dados.momento ? undefined : dados.tema,
+    momento: dados.momento
+      ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
+      : undefined,
+    objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
+    observacao: dados.observacao,
+    noticia: dados.noticia,
+    marcaCitada,
+    noticiasDoAssunto,
+    evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
+    vozesDoPublico,
+    lidasEm,
+    perguntaPresa: dados.perguntaPresa
+      ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
+      : undefined,
+    pesquisa: pesquisaNaEntrada,
+  });
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiro",
@@ -1200,27 +1256,11 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       perguntaPresa: dados.perguntaPresa
         ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
         : undefined,
+      pesquisa: pesquisaNaEntrada,
     }),
-    // O roteiro não inventa fato: o que vale como fato, para o verificador reprovar o que o roteiro afirmar fora disto.
-    fontesDosFatos: roteiroIA.montarFontesDosFatos({
-      perfilCompilado,
-      camadaExclusiva: formatarCamadaExclusiva(dados.cliente, leiturasPerfis),
-      tema: dados.momento ? undefined : dados.tema,
-      momento: dados.momento
-        ? { onde: dados.momento.onde, oQueEstaAcontecendo: dados.momento.oQueEstaAcontecendo, oQueDaParaMostrar: dados.momento.oQueDaParaMostrar }
-        : undefined,
-      objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
-      observacao: dados.observacao,
-      noticia: dados.noticia,
-      marcaCitada,
-      noticiasDoAssunto,
-      evidencias: evidencias.map((v) => ({ assunto: v.assunto, gancho: v.gancho, estrutura: v.estrutura, fechamento: v.fechamento, chamadaFinal: v.chamadaFinal })),
-      vozesDoPublico,
-      lidasEm,
-      perguntaPresa: dados.perguntaPresa
-        ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
-        : undefined,
-    }),
+    fontesDosFatos,
+    // E54 (parte 2): com pesquisa, todo número com cara de dado do roteiro (porcentagem, valor, ano) tem de estar nas fontes acima, com a mesma unidade e escala.
+    conferirNumerosNasFontes: Boolean(pesquisaNaEntrada),
     // Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação vem por aqui, não mais
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
     lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
@@ -1319,6 +1359,12 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     // nunca mais fixa em 0,7.
     forcaEvidencia: ehMomento ? "media" : semEvidencia ? null : forcaDaEvidencia(evidenciasCitadas, undefined, proporcaoBrasil),
     legenda: saida.legenda,
+    // E54 (parte 2): os três ganchos, o que pode aparecer, as fontes e o "Atenção", depois do código; ausente em todo roteiro sem pesquisa.
+    entregaDaPesquisa: montarEntregaDaPesquisa(saida.entregaDaPesquisa, dados.pesquisa, {
+      fontes: fontesDosFatos,
+      textoDoRoteiro: Object.values(extrairCamposRoteiro(saida)).join(" "),
+      gancho: saida.gancho ?? "",
+    }),
   };
 
   return {
@@ -1362,7 +1408,7 @@ export async function montarRoteiro(
   if (!cliente) throw new ErroRoteiro("cliente nao encontrado.");
 
   // As versões de um mesmo grupo recebem o tema já resolvido uma vez (E26, 4b): "sugerido" é um índice na lista do dia, que muda de um instante para o outro, e "outra versão" tem de ser do mesmo tema.
-  const { tema, evidenciasPrevistas, doMomento, pergunta } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
+  const { tema, evidenciasPrevistas, doMomento, pergunta, pesquisa } = opcoes.temaResolvido ?? (await resolverTema(cliente, params));
   // E55: tendência é para o mesmo dia ("não adianta pegar uma tendência e fazer daqui a uma semana"): o tema do momento não vai para outro dia, e a recusa é do servidor.
   if (doMomento && params.data && params.data !== hojeISO()) {
     throw new ErroRoteiro(textosHoje.emAlta.naoMudaDeDia);
@@ -1398,6 +1444,7 @@ export async function montarRoteiro(
     momento,
     noticia,
     perguntaPresa: perguntaPresa ?? undefined,
+    pesquisa: pesquisa ?? undefined,
     temaDoMomento: doMomento !== null,
     versoesDoMesmoTema,
   });
@@ -1423,6 +1470,7 @@ export async function montarRoteiro(
       noticiaDoAssunto: noticiaDoAssuntoLinha ? noticiaDeOrigemGuardada(noticiaDoAssuntoLinha) : null,
       // E28 (parte 3): a pergunta do público de onde o roteiro nasceu, copiada (a leitura de amanhã pode não ter mais a mesma).
       perguntaDoPublico: perguntaPresa,
+      pesquisaNaHora: pesquisa,
       // E55 PR 2: o assunto em alta de onde o tema nasceu, para o resto do produto saber (selo, "já passou", Histórico, recusa de mudar de dia, reescrita).
       temaDoMomento: doMomento,
       conteudo,
@@ -1511,6 +1559,8 @@ export async function reprovarERescrever(
     noticia,
     // E28 (parte 3): a reescrita mantém a pergunta do público de origem, a cópia guardada (as vozes de hoje podem não ter mais a mesma).
     perguntaPresa: atual.perguntaDoPublico ?? undefined,
+    // E54 (parte 2): a reescrita usa a cópia dos dados que a pessoa aprovou, não relê a pesquisa.
+    pesquisa: atual.pesquisaNaHora ?? undefined,
     // E55 PR 2 (a decisão 272 do PR 1): a reescrita de um roteiro do momento continua sendo do momento, com o mesmo pedido de ser curto e fácil de gravar hoje.
     temaDoMomento: atual.temaDoMomento !== null,
   });
@@ -1536,6 +1586,7 @@ export async function reprovarERescrever(
       noticiaDoAssunto: atual.noticiaDoAssunto,
       // E28 (parte 3): idem, a reescrita mantém a pergunta do público de origem.
       perguntaDoPublico: atual.perguntaDoPublico,
+      pesquisaNaHora: atual.pesquisaNaHora,
       // E55 PR 2: idem, a reescrita mantém o assunto em alta de origem.
       temaDoMomento: atual.temaDoMomento,
       conteudo,
@@ -1663,6 +1714,20 @@ export async function editarRoteiro(
         : conteudoAtual.cartoes,
     legenda: campos.legenda !== undefined ? campoEditadoOuAtual(campos.legenda, conteudoAtual.legenda ?? "") : conteudoAtual.legenda,
   };
+
+  // E54 (parte 2): o primeiro gancho da entrega da pesquisa é o do próprio roteiro (o recomendado, com o qual o vídeo abre). Se a pessoa reescreveu o gancho, a lista não pode seguir
+  // mostrando o antigo como "o recomendado": o primeiro passa a ser o dela e os outros ficam, sem repetir.
+  const entregaDaPesquisa = conteudoAtual.entregaDaPesquisa;
+  const ganchoNovo = novoConteudo.gancho.trim();
+  if (entregaDaPesquisa && entregaDaPesquisa.ganchos.length > 0 && conteudoAtual.gancho.trim() !== "" && ganchoNovo !== "" && ganchoNovo !== conteudoAtual.gancho.trim()) {
+    novoConteudo.entregaDaPesquisa = {
+      ...entregaDaPesquisa,
+      ganchos: [
+        { texto: ganchoNovo.slice(0, 300), recomendado: true },
+        ...entregaDaPesquisa.ganchos.slice(1).filter((g) => g.texto.trim() !== ganchoNovo).map((g) => ({ ...g, recomendado: false })),
+      ],
+    };
+  }
 
   // E41 (2a): as marcas de fala valem para o texto de que saíram. Mudou algum dos quatro blocos falados, elas se apagam (refeitas na próxima vez que a pessoa ligar "Marcas de fala").
   const falaMudou = BLOCOS_FALADOS.some((bloco) => (novoConteudo[bloco] ?? "").trim() !== (conteudoAtual[bloco] ?? "").trim());

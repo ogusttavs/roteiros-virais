@@ -1,0 +1,1 @@
+ALTER TABLE "roteiros" ADD COLUMN "pesquisa_na_hora" jsonb;

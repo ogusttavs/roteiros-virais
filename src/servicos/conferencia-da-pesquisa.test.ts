@@ -5,14 +5,18 @@ import type { LinhaDaBusca, PaginaDaBusca } from "@/ia/busca-na-web";
 import { buscaSimulada } from "@/ia/mock-busca";
 
 import {
+  dadosForaDasFontes,
   ehAntigo,
+  ehPrevisaoDePublico,
   lerDataDaPagina,
   marcadosDeInicio,
   montarAchados,
   motivoDeNaoBater,
+  numeroComCaraDeDado,
   numerosDoTexto,
   numerosForaDoTrecho,
   OPCAO_SEM_OPINIAO,
+  tokensNumericos,
   sanearConferencia,
 } from "./conferencia-da-pesquisa";
 
@@ -411,5 +415,108 @@ describe("sanearConferencia", () => {
   it("'sem premissa' e 'confere' nunca levam aviso nem dado", () => {
     const { premissa } = sanearConferencia({ premissa: { situacao: "sem_premissa", aviso: "ignorado", anguloSugerido: "ignorado", achadoIds: [1] }, perguntaDePosicao: null }, achados);
     expect(premissa).toEqual({ situacao: "sem_premissa", aviso: null, anguloSugerido: null, achadoIds: [] });
+  });
+});
+
+describe("numeroComCaraDeDado (o que o roteiro com pesquisa tem de provar nas fontes)", () => {
+  const tem = (texto: string) => tokensNumericos(texto).some((tk) => numeroComCaraDeDado(tk));
+
+  it.each([
+    ["alta de 4,5%", true],
+    ["custa R$ 89", true],
+    ["custa 89 reais", true],
+    ["US$ 12", true],
+    ["são 5.000 clientes", true],
+    ["desde 2019", true],
+    ["chegou a 10k seguidores", true],
+    ["chegou a 10 mil seguidores", true],
+    ["chegou a 2mi de views", true],
+    ["em 3 passos", false],
+    ["por 15 minutos", false],
+    ["são 999 clientes", false],
+    ["são 1000 clientes", true],
+    ["em 12 meses", false],
+    ["grave em 1080p", false],
+    ["resolução 1080x1920", false],
+    ["ligue (11) 98765-4321", false],
+    ["grave em 4k", false],
+    ["grave em 8k", false],
+  ])("%s", (texto, esperado) => {
+    expect(tem(texto)).toBe(esperado);
+  });
+
+  it("o número que não deu para ler conta como dado (nunca some em silêncio)", () => {
+    expect(tem("de 1,2,3 em diante")).toBe(true);
+  });
+});
+
+describe("tokensNumericos: as escalas coladas", () => {
+  it.each([
+    ["10k", "10000|"],
+    ["2,5 mi", "2500000|"],
+    ["1 bi", "1000000000|"],
+    ["R$ 3k", "3000|brl"],
+  ])("%s", (texto, chave) => {
+    expect(tokensNumericos(texto).map((tk) => tk.chave)).toEqual([chave]);
+  });
+});
+
+describe("dadosForaDasFontes", () => {
+  const FONTES = "Perfil: vende por 89 reais. IBGE: a inflação foi de 4,5% em 12 meses e 1,25 mil reais por mês. Folha: a alta foi de 6,2%.";
+
+  it("confere: o que está nas fontes, do mesmo jeito, não volta", () => {
+    expect(dadosForaDasFontes("A inflação foi de 4,5% e o kit custa R$ 89.", FONTES)).toEqual([]);
+    expect(dadosForaDasFontes("São R$ 1.250 por mês.", FONTES)).toEqual([]);
+  });
+
+  it("devolve cada número como a pessoa o leu, sem repetir", () => {
+    expect(dadosForaDasFontes("Subiu 37%, depois 37%, e custa R$ 120 em 2019.", FONTES)).toEqual(["37%", "R$ 120", "2019"]);
+  });
+
+  it("a quantidade por extenso volta quando as fontes não têm a palavra", () => {
+    expect(dadosForaDasFontes("Trinta por cento dos clientes dobraram o gasto.", FONTES)).toEqual(expect.arrayContaining(["por cento", "trinta", "dobraram"]));
+    expect(dadosForaDasFontes("Metade das lojas faz isso.", `${FONTES} Metade das lojas faz isso.`)).toEqual([]);
+  });
+
+  it("o 'mil' que acompanha o dígito é escala, não quantidade por extenso", () => {
+    expect(dadosForaDasFontes("São 1,25 mil reais por mês.", FONTES)).toEqual([]);
+    // o número com a escala, escrito como a pessoa o leu, é o que volta (e a palavra "milhões" não volta de novo como extenso)
+    expect(dadosForaDasFontes("São 5 milhões de pessoas.", FONTES)).toEqual(["5 milhões"]);
+    expect(dadosForaDasFontes("Chegou a 10k seguidores.", FONTES)).toEqual(["10k"]);
+    expect(dadosForaDasFontes("Faturou R$ 2,5 milhões.", FONTES)).toEqual(["R$ 2,5 milhões"]);
+  });
+
+  it("'em cada' e 'por cento' sem fonte voltam, com fonte não", () => {
+    expect(dadosForaDasFontes("7 em cada 10 donos concordam.", FONTES)).toContain("em cada");
+    expect(dadosForaDasFontes("7 em cada 10 donos concordam.", `${FONTES} 7 em cada 10 donos concordam.`)).toEqual([]);
+  });
+
+  it("dois a dez por extenso são passos, não dado", () => {
+    expect(dadosForaDasFontes("Faça em três passos e repita duas vezes, dez minutos.", FONTES)).toEqual([]);
+  });
+});
+
+describe("ehPrevisaoDePublico", () => {
+  it.each([
+    "Vão dizer que é caro.",
+    "O público vai reclamar do preço.",
+    "As pessoas vão te perguntar o motivo.",
+    "Os seguidores vão comentar.",
+    "Vão te responder que não funciona.",
+    "A galera vai duvidar.",
+    "Os clientes vão cobrar o prazo.",
+    "Vocês vão dizer isso.",
+  ])("previsão: %s", (texto) => {
+    expect(ehPrevisaoDePublico(texto)).toBe(true);
+  });
+
+  it.each([
+    "Vai funcionar no meu caso?",
+    "Isso vale para mim?",
+    "Quanto custa por mês?",
+    "Pode aparecer a dúvida sobre o prazo.",
+    "A loja vai abrir cedo.",
+  ])("não é previsão: %s", (texto) => {
+    expect(ehPrevisaoDePublico(texto)).toBe(false);
   });
 });
