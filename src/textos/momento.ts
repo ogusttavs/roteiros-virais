@@ -56,6 +56,9 @@ export const textosMomento = {
   duracaoLongaIndisponivel:
     "Ainda não temos vídeos longos suficientes do seu ramo para medir quanto dura e como se divide um vídeo longo dele. Assim que tivermos, essa opção abre aqui; por enquanto, o vídeo é de até 60 segundos.",
   duracaoLongaMedida: (minutos: number) => `No seu ramo, um vídeo longo costuma ter uns ${minutos} minutos.`,
+  /** A espera do vídeo longo (E52, PR 4): escrever por capítulos leva mais que um roteiro curto; o prazo dito é o do longo. */
+  esperaLongoTitulo: "Escrevendo o seu vídeo longo, capítulo por capítulo",
+  esperaLongoDuracao: "Pode levar até 5 minutos",
   /** A pesquisa antes de escrever ainda não vale para o vídeo longo (o servidor recusa); o campo some e esta linha diz por quê. */
   duracaoLongaSemPesquisa: "O vídeo longo ainda não usa a pesquisa antes de escrever.",
   /** M4, item 2: o segundo controle segmentado, Falando/Sem fala; sem sugestão aqui (o momento não busca evidência). */

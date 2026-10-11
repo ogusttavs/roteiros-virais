@@ -71,10 +71,16 @@ describe("VideosLongosDoSetor", () => {
   it("diz a parte brasileira da amostra, e que a duração conta também os de fora quando há", () => {
     const { container } = montar();
     expect(container.querySelector("[data-longos-brasileiros]")!.textContent).toBe(
-      "em português: 9 de 12; a duração acima conta também os de fora, e a prova com a chave real decide se deve contar só os brasileiros",
+      "brasileiros: 9 de 12; a duração acima conta também os de fora, e a prova com a chave real decide se deve contar só os brasileiros",
     );
     const todos = montar({ medida: { ...MEDIDA, brasileiros: 12 } });
-    expect(todos.container.querySelector("[data-longos-brasileiros]")!.textContent).toBe("em português: 12 de 12");
+    expect(todos.container.querySelector("[data-longos-brasileiros]")!.textContent).toBe("brasileiros: 12 de 12");
+    // sem a linha de duração (menos de 3 vídeos), a frase não aponta para uma linha que não existe
+    const poucos = montar({ medida: { ...MEDIDA, amostra: 2, brasileiros: 1, forca: "nenhuma", duracaoS: null, capitulos: null } });
+    expect(poucos.container.querySelector("[data-longos-brasileiros]")!.textContent).toBe("brasileiros: 1 de 2");
+    // sem nenhum vídeo da amostra (só de outro idioma), a linha nem aparece
+    const nenhum = montar({ medida: { ...MEDIDA, amostra: 0, brasileiros: 0, forca: "nenhuma", duracaoS: null, capitulos: null } });
+    expect(nenhum.container.querySelector("[data-longos-brasileiros]")).toBeNull();
   });
 
   it("a duração e a estrutura típicas, e quantos foram lidos na semana", () => {

@@ -123,9 +123,11 @@ test.describe("Gravar agora: o vídeo longo", () => {
     // no vídeo curto a linha "Pesquisar antes de escrever" está lá; com o longo ela some (o servidor recusa o longo com pesquisa)
     const linhaDePesquisa = folha.getByRole("button", { name: /Pesquisar antes de escrever/ });
     await expect(linhaDePesquisa).toHaveCount(1);
-    // o rótulo comprido cabe na largura do celular: nada passa da borda
+    // o rótulo comprido cabe dentro da folha, no celular: o chip termina antes da borda da própria folha (e a página não ganha rolagem de lado)
     const caixa = await longa.boundingBox();
-    expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(390);
+    const caixaDaFolha = await folha.boundingBox();
+    expect(caixa!.x + caixa!.width).toBeLessThanOrEqual(caixaDaFolha!.x + caixaDaFolha!.width - 8);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await longa.click();
     await expect(longa).toHaveAttribute("aria-pressed", "true");
     // a medida do ramo dita: mediana de 10 minutos
@@ -150,6 +152,52 @@ test.describe("Gravar agora: o vídeo longo", () => {
     expect(roteiro.duracaoDoVideo).toBe("longo");
     expect(roteiro.conteudo.capitulos?.length ?? 0).toBeGreaterThanOrEqual(3);
     expect(roteiro.conteudo.capitulos?.[0].inicioS).toBe(0);
+  });
+
+  test("escolheu o longo e trocou para Story: o roteiro sai Story e curto, e voltar a Vídeo retoma o longo", async ({ page }) => {
+    const marca = await criarMarca("e2e-longo-troca-story", [8, 10, 12]);
+    await entrar(page, "e2e-longo-troca-story");
+    const folha = await abrirGravarAgora(page);
+
+    const longa = folha.getByRole("button", { name: "Mais de 3 minutos, para o YouTube" });
+    await longa.click();
+    await folha.getByRole("tab", { name: "Story" }).click();
+    await expect(folha.getByText("Quanto tempo?")).toHaveCount(0);
+    await folha.getByRole("tab", { name: "Vídeo" }).click();
+    await expect(longa).toHaveAttribute("aria-pressed", "true");
+    await folha.getByRole("tab", { name: "Story" }).click();
+
+    await folha.getByLabel("Onde você está").fill("Na oficina, de manhã");
+    await folha.getByLabel("O que está acontecendo").fill("Estou chegando para abrir a oficina");
+    await folha.getByLabel("O que dá para mostrar").fill("A porta abrindo e a luz acendendo");
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 60_000 });
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marca));
+    expect(roteiro.formato).toBe("story");
+    expect(roteiro.duracaoDoVideo).toBe("curto");
+    expect(roteiro.conteudo.capitulos ?? null).toBeNull();
+  });
+
+  test("escolheu o longo e trocou para sem fala: a pergunta some e o roteiro sai sem fala e curto", async ({ page }) => {
+    const marca = await criarMarca("e2e-longo-troca-sem-fala", [8, 10, 12]);
+    await entrar(page, "e2e-longo-troca-sem-fala");
+    const folha = await abrirGravarAgora(page);
+
+    await folha.getByRole("button", { name: "Mais de 3 minutos, para o YouTube" }).click();
+    await folha.getByRole("tab", { name: "Sem fala" }).click();
+    await expect(folha.getByText("Quanto tempo?")).toHaveCount(0);
+
+    await folha.getByLabel("Onde você está").fill("Na oficina, de manhã");
+    await folha.getByLabel("O que está acontecendo").fill("Estou limpando uma peça sem falar nada");
+    await folha.getByLabel("O que dá para mostrar").fill("A peça antes e depois da limpeza");
+    await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
+
+    await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 60_000 });
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.clienteId, marca));
+    expect(roteiro.estilo).toBe("sem_fala");
+    expect(roteiro.duracaoDoVideo).toBe("curto");
+    expect(roteiro.conteudo.capitulos ?? null).toBeNull();
   });
 
   test("o Story não tem a pergunta de duração", async ({ page }) => {

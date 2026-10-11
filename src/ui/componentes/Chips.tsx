@@ -19,6 +19,8 @@ type Props = {
   onChange: (indice: number) => void;
   /** Os indices que aparecem mas nao se escolhem (E52, PR 4: o video longo num ramo sem a medida); a tela diz o porque ao lado, com calma. */
   desabilitadas?: number[];
+  /** O id da frase que explica as desabilitadas: o leitor de tela le o porque junto do chip (`aria-describedby`). */
+  descricaoDasDesabilitadas?: string;
 };
 
 /**
@@ -26,21 +28,26 @@ type Props = {
  * Uma tela com varios grupos (ReferenciasTela) compoe varias instancias lado
  * a lado, com um separador entre elas.
  */
-export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChange, desabilitadas = [] }: Props) {
+export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChange, desabilitadas = [], descricaoDasDesabilitadas }: Props) {
   const ativos = chipsAtivos(opcoes.length, selecionado);
 
   const grupo = (
     <div role="group" aria-label={rotuloGrupo} className={styles.grupo}>
       {opcoes.map((rotulo, indice) => {
         const ativo = ativos[indice];
+        // `aria-disabled` e nao `disabled`: o chip continua na ordem do Tab e o leitor de tela le a frase que explica (um botao desabilitado nativo some do foco).
+        const apagada = desabilitadas.includes(indice);
         return (
           <button
             key={rotulo}
             type="button"
             aria-pressed={ativo}
-            disabled={desabilitadas.includes(indice)}
-            onClick={() => onChange(indice)}
-            className={[styles.chip, ativo ? styles.ativo : ""].filter(Boolean).join(" ")}
+            aria-disabled={apagada ? true : undefined}
+            aria-describedby={apagada ? descricaoDasDesabilitadas : undefined}
+            onClick={() => {
+              if (!apagada) onChange(indice);
+            }}
+            className={[styles.chip, ativo ? styles.ativo : "", apagada ? styles.apagada : ""].filter(Boolean).join(" ")}
           >
             {rotulo}
           </button>

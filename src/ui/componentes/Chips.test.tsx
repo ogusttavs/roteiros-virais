@@ -20,17 +20,30 @@ describe("Chips", () => {
     const aoMudar = vi.fn();
     render(<Chips rotuloGrupo="Quanto tempo?" opcoes={["Até 60 segundos", "Mais de 3 minutos"]} selecionado={0} onChange={aoMudar} desabilitadas={[1]} />);
     const longa = screen.getByRole("button", { name: "Mais de 3 minutos" }) as HTMLButtonElement;
-    expect(longa.disabled).toBe(true);
+    expect(longa.getAttribute("aria-disabled")).toBe("true");
+    // continua no foco do teclado (não é `disabled` nativo): o leitor de tela chega nele e lê a frase ligada
+    expect(longa.disabled).toBe(false);
     fireEvent.click(longa);
     expect(aoMudar).not.toHaveBeenCalled();
     const curta = screen.getByRole("button", { name: "Até 60 segundos" }) as HTMLButtonElement;
-    expect(curta.disabled).toBe(false);
+    expect(curta.getAttribute("aria-disabled")).toBeNull();
     fireEvent.click(curta);
     expect(aoMudar).toHaveBeenCalledWith(0);
   });
 
   it("sem a lista de desabilitadas nada muda (o uso de sempre)", () => {
     render(<Chips rotuloGrupo="Filtro" opcoes={["A", "B", "C"]} selecionado={null} onChange={() => {}} />);
-    for (const nome of ["A", "B", "C"]) expect((screen.getByRole("button", { name: nome }) as HTMLButtonElement).disabled).toBe(false);
+    for (const nome of ["A", "B", "C"]) expect(screen.getByRole("button", { name: nome }).getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("a opção apagada aponta para a frase que explica (aria-describedby), e só ela", () => {
+    render(
+      <>
+        <Chips rotuloGrupo="Quanto tempo?" opcoes={["Curto", "Longo"]} selecionado={0} onChange={() => {}} desabilitadas={[1]} descricaoDasDesabilitadas="porque-longo" />
+        <p id="porque-longo">Ainda não temos vídeos longos suficientes.</p>
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "Longo" }).getAttribute("aria-describedby")).toBe("porque-longo");
+    expect(screen.getByRole("button", { name: "Curto" }).getAttribute("aria-describedby")).toBeNull();
   });
 });

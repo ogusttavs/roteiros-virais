@@ -11,6 +11,7 @@ import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import { dadosDoCampoDePesquisa } from "@/servicos/pesquisa-na-hora";
+import { longoDoRamo } from "@/servicos/roteiro-longo";
 import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
@@ -45,7 +46,7 @@ export default async function TemaLivre({ searchParams }: Props) {
   }
 
   const cliente = await clienteDaSessaoAtual();
-  const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas, dadosDaPesquisa] = await Promise.all([
+  const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas, dadosDaPesquisa, longo] = await Promise.all([
     searchParams,
     rascunhoTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
@@ -53,6 +54,8 @@ export default async function TemaLivre({ searchParams }: Props) {
     // E54 (parte 3): quantas pesquisas do dia a marca já usou, para o campo "Pesquisar antes de escrever" dizer a verdade.
     // Uma falha da consulta opcional só tira o campo: o Tema livre abre do mesmo jeito.
     dadosDoCampoDePesquisa(cliente.id).catch(() => undefined),
+    // E52 (PR 4): o vídeo longo do ramo para o "Quanto tempo?" da folha. Uma falha aqui só tira a pergunta.
+    longoDoRamo(cliente.nichoId).catch(() => undefined),
   ]);
 
   // V9a, item 3 e 4: a mesma folha "Gravar agora" de `/hoje`, com "Estou num momento".
@@ -118,6 +121,7 @@ export default async function TemaLivre({ searchParams }: Props) {
       pergunta={perguntaPreso}
       marcaAtivaId={cliente.id}
       pesquisa={dadosDaPesquisa}
+      longo={longo}
     />
   );
 }

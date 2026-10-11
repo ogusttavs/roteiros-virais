@@ -14,6 +14,7 @@ import {
   ROTULO_FORMATO_ROTEIRO,
 } from "@/ia/enums";
 import { hojeISO } from "@/lib/config";
+import { fichaInicialDaFolha } from "@/lib/ficha-inicial";
 import { ehFalhaDeRede } from "@/lib/offline";
 import {
   apagarRascunhoDoMomento,
@@ -48,6 +49,9 @@ import { gerarRoteiroMomentoAction, lerMomentoDeTextoAction } from "./momento/ac
 import { aceitarPlanoAction } from "./plano/acoes";
 
 type MarcaResumo = { id: number; nome: string };
+
+/** O id da frase calma do vídeo longo, para o chip apagado apontar para ela (`aria-describedby`). */
+const ID_DA_FRASE_DO_LONGO = "duracao-longa-indisponivel";
 
 /** V9b, item 3: o que um item do plano já sugeriu, para a folha abrir preenchida. */
 export type ValoresIniciaisMomento = {
@@ -155,9 +159,8 @@ export function FolhaGravarAgora({
   const [oQueEstaAcontecendo, setOQueEstaAcontecendo] = useState(valoresIniciais?.oQueEstaAcontecendo ?? rascunhoInicial?.oQueEstaAcontecendo ?? "");
   const [oQueDaParaMostrar, setOQueDaParaMostrar] = useState(valoresIniciais?.oQueDaParaMostrar ?? rascunhoInicial?.oQueDaParaMostrar ?? "");
   // E49 PR 1 (passo 18b): o formato vem ANTES da pergunta; no Reels, as cinco fichas em chips só pelo nome, a recomendada marcada; no Story, nenhuma pergunta.
-  const objetivoInicial = valoresIniciais?.objetivo ?? objetivoRecomendado;
   const fichaRecomendada: Ficha | null = objetivoRecomendado ? fichaPadraoDoObjetivo(objetivoRecomendado) : null;
-  const [ficha, setFicha] = useState<Ficha | null>(valoresIniciais?.ficha !== undefined ? valoresIniciais.ficha : objetivoInicial ? fichaPadraoDoObjetivo(objetivoInicial) : null);
+  const [ficha, setFicha] = useState<Ficha | null>(() => fichaInicialDaFolha(valoresIniciais, objetivoRecomendado));
   // Vindo de um item do plano, o formato começa no que `planejarDia` já sugeriu; senão, o da porta que abriu a folha, ou Reels.
   const [formato, setFormato] = useState<FormatoRoteiro>(valoresIniciais?.formato ?? formatoInicial ?? "reels");
   /**
@@ -518,6 +521,7 @@ export function FolhaGravarAgora({
               selecionado={duracaoEscolhida === "longo" ? 1 : 0}
               onChange={(indice) => setDuracao(indice === 1 ? "longo" : "curto")}
               desabilitadas={longo.disponivel ? [] : [1]}
+              descricaoDasDesabilitadas={ID_DA_FRASE_DO_LONGO}
             />
             {longo.disponivel ? (
               <p className={styles.formatoAjuda}>
@@ -525,7 +529,7 @@ export function FolhaGravarAgora({
                 {vaiLongo && longo.duracaoS ? ` ${textosMomento.duracaoLongaMedida(Math.max(1, Math.round(longo.duracaoS / 60)))}` : ""}
               </p>
             ) : (
-              <p className={styles.formatoAjuda} data-duracao-indisponivel>
+              <p className={styles.formatoAjuda} id={ID_DA_FRASE_DO_LONGO} data-duracao-indisponivel>
                 {textosMomento.duracaoLongaIndisponivel}
               </p>
             )}
@@ -609,11 +613,14 @@ export function FolhaGravarAgora({
           </div>
         ) : null}
 
-        {campoDePesquisaDaFolha && vaiLongo ? (
-          <p className={styles.formatoAjuda} data-duracao-sem-pesquisa>
-            {textosMomento.duracaoLongaSemPesquisa}
-          </p>
-        ) : null}
+        {/* Região viva: quem escolhe o longo é avisado de que a pesquisa saiu da folha (a linha dela some no mesmo instante). */}
+        <div aria-live="polite">
+          {campoDePesquisaDaFolha && vaiLongo ? (
+            <p className={styles.formatoAjuda} data-duracao-sem-pesquisa>
+              {textosMomento.duracaoLongaSemPesquisa}
+            </p>
+          ) : null}
+        </div>
 
         {comCampoDePesquisa ? (
           <div className={styles.campoPesquisar}>
@@ -657,6 +664,8 @@ export function FolhaGravarAgora({
         aberto={enviando}
         fraseDemorando={textosMomento.demorando}
         aoVoltarDepois={voltarDepois}
+        titulo={vaiLongo ? textosMomento.esperaLongoTitulo : undefined}
+        duracao={vaiLongo ? textosMomento.esperaLongoDuracao : undefined}
       />
     </>
   );

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import type { DadosDoCampoDePesquisa, Profundidade } from "@/servicos/pesquisa-na-hora";
+import type { DadosDoLongo } from "@/servicos/roteiro-longo";
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
 import { textosComuns } from "@/textos/comuns";
 import { textosMomento } from "@/textos/momento";
@@ -104,6 +105,8 @@ type Props = {
   marcaAtivaId?: number;
   /** E54 (parte 3): o dia da marca para o campo "Pesquisar antes de escrever" dizer a verdade (quantas pesquisas já usou, o teto, o custo). Ausente (a consulta falhou), o campo não aparece. */
   pesquisa?: DadosDoCampoDePesquisa;
+  /** E52 (PR 4): o vídeo longo do ramo, para o "Quanto tempo?" da folha "Gravar agora"; ausente, a pergunta não aparece. */
+  longo?: DadosDoLongo;
 };
 
 /**
@@ -126,6 +129,7 @@ export function TemaLivreTela({
   pergunta,
   marcaAtivaId,
   pesquisa,
+  longo,
 }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
@@ -658,6 +662,7 @@ export function TemaLivreTela({
           dataInicial={dataInicial}
           marcaAtivaId={marcaAtivaId}
           pesquisa={pesquisa}
+          longo={longo}
         />
       ) : null}
     </div>
