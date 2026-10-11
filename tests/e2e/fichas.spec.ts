@@ -130,7 +130,7 @@ test.describe("as cinco fichas", () => {
     await expect(page.locator("[data-story-sem-pergunta]")).toContainText("No Story, a conversa é com quem já te segue");
     await expect(page.getByRole("button", { name: "escrever o roteiro" })).toBeEnabled();
     // Volta ao Reels: as fichas voltam.
-    await page.getByRole("tab", { name: "Reels" }).click();
+    await page.getByRole("tab", { name: "Vídeo" }).click();
     await expect(page.locator("[data-fichas]")).toBeVisible();
     await page.getByRole("tab", { name: "Story" }).click();
     await page.getByRole("button", { name: "escrever o roteiro" }).click();

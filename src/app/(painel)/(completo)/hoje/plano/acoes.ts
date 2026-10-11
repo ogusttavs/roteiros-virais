@@ -17,7 +17,7 @@ import {
   type ItemPlano,
   type ResultadoLerAgenda,
 } from "@/servicos/plano";
-import { ErroRoteiro, validarEstilo, validarFormato, validarMomentoDoDia, validarObjetivo, validarQuemAparece } from "@/servicos/roteiro";
+import { ErroRoteiro, validarDuracao, validarEstilo, validarFormato, validarMomentoDoDia, validarObjetivo, validarQuemAparece } from "@/servicos/roteiro";
 
 /**
  * "Colar a agenda" (V9b, item 1): separa o texto (digitado ou transcrito
@@ -63,6 +63,8 @@ export type DadosAceitarPlano = {
   formato?: string;
   /** M4, item 2: o que a pessoa escolheu no segundo controle segmentado da folha; falado se ausente. */
   estilo?: string;
+  /** E52 (PR 4): "Quanto tempo?", curto se ausente; texto livre do navegador, `validarDuracao` confere. */
+  duracao?: string;
   marcaId?: number;
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
   objetivoDoVideo?: string;
@@ -114,6 +116,7 @@ export async function aceitarPlanoAction(
       ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
+      duracao: validarDuracao(dados.duracao),
       marcaId: dados.marcaId,
       objetivoDoVideo: dados.objetivoDoVideo,
       quemAparece: validarQuemAparece(dados.quemAparece),

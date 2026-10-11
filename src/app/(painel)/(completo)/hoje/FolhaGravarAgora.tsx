@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
 import { FICHAS_EM_ORDEM, NOME_DA_FICHA, fichaPadraoDoObjetivo, objetivoDaFicha, OBJETIVO_DO_SEM_FALA, OBJETIVO_DO_STORY } from "@/config/fichas";
-import type { EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import type { DuracaoDoVideo, EstiloRoteiro, Ficha, FormatoRoteiro, MomentoDoDia, Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import {
   DESCRICAO_ESTILO_ROTEIRO,
   ESTILOS_ROTEIRO_EM_ORDEM,
@@ -24,6 +24,7 @@ import {
   rascunhoEstaVazio,
 } from "@/lib/rascunho-momento";
 import type { DadosDoCampoDePesquisa, Profundidade } from "@/servicos/pesquisa-na-hora";
+import type { DadosDoLongo } from "@/servicos/roteiro-longo";
 import { textosMomento } from "@/textos/momento";
 import { textosPesquisa } from "@/textos/pesquisa";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
@@ -63,6 +64,8 @@ export type ValoresIniciaisMomento = {
   ficha?: Ficha | null;
   quemAparece?: QuemGrava | null;
   transcricao?: string | null;
+  /** E52 (PR 4): o "Quanto tempo?" que a pessoa tinha escolhido; vale só se o ramo ainda tem a medida dos longos. */
+  duracao?: DuracaoDoVideo;
 };
 
 type Props = {
@@ -106,6 +109,11 @@ type Props = {
    * vindo de um item do plano (`planoItemId`): aquele caminho liga o roteiro ao item e não leva pesquisa (anotado como lacuna).
    */
   pesquisa?: DadosDoCampoDePesquisa;
+  /**
+   * E52 (PR 4): o vídeo longo do ramo (pode ser escrito agora? com quantos segundos?), para o "Quanto tempo?". Ausente, a pergunta não aparece (as telas que ainda não a trazem); presente
+   * e indisponível, a opção longa aparece apagada com a frase calma de que o ramo ainda não tem vídeos longos suficientes, antes de a pessoa escrever.
+   */
+  longo?: DadosDoLongo;
 };
 
 /**
@@ -129,6 +137,7 @@ export function FolhaGravarAgora({
   dataInicial,
   marcaAtivaId,
   pesquisa,
+  longo,
 }: Props) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
@@ -157,9 +166,17 @@ export function FolhaGravarAgora({
    * começa em "falado" e a pessoa troca se quiser.
    */
   const [estilo, setEstilo] = useState<EstiloRoteiro>(valoresIniciais?.estilo ?? "falado");
+  /**
+   * E52 (PR 4): "Quanto tempo?". Só no vídeo falado (o Story e o sem fala não têm duração para escolher) e só quando a tela trouxe os dados do longo. O que vale é `duracaoEscolhida`:
+   * a escolha de uma opção que o ramo ainda não tem (ou que o formato escondeu) nunca vai para o servidor.
+   */
+  const [duracao, setDuracao] = useState<DuracaoDoVideo>(valoresIniciais?.duracao === "longo" && longo?.disponivel ? "longo" : "curto");
   // A pergunta das fichas só existe no Reels falado: o Story não pergunta e o sem fala segue o roteiro de cenas. Story grava o objetivo de falar com quem já segue; o sem fala, o de mais gente te conhecer.
   const perguntaDasFichas = formato === "reels" && estilo === "falado";
   const objetivo: Objetivo | null = formato === "story" ? OBJETIVO_DO_STORY : !perguntaDasFichas ? OBJETIVO_DO_SEM_FALA : ficha ? objetivoDaFicha(ficha) : null;
+  const perguntaDeDuracao = longo !== undefined && perguntaDasFichas;
+  const duracaoEscolhida: DuracaoDoVideo = perguntaDeDuracao && longo.disponivel ? duracao : "curto";
+  const vaiLongo = duracaoEscolhida === "longo";
   /** E40, item 2: "o que este vídeo precisa comunicar?", opcional, até 200 caracteres. */
   const [objetivoDoVideo, setObjetivoDoVideo] = useState(valoresIniciais?.objetivoDoVideo ?? rascunhoInicial?.objetivoDoVideo ?? "");
   /** V12c, item 3: nasce no padrão do cliente; a pessoa troca só para este vídeo. */
@@ -177,7 +194,9 @@ export function FolhaGravarAgora({
   });
 
   // E54 (parte 3): "Pesquisar antes de escrever", opcional, no fim da folha. O que a pessoa contou fica guardado no servidor junto da pesquisa: a tela dela escreve o roteiro depois.
-  const comCampoDePesquisa = pesquisa !== undefined && planoItemId === undefined;
+  // E52 (PR 4): o vídeo longo ainda não usa a pesquisa (o servidor recusa): o campo sai e uma linha diz por quê.
+  const campoDePesquisaDaFolha = pesquisa !== undefined && planoItemId === undefined;
+  const comCampoDePesquisa = campoDePesquisaDaFolha && !vaiLongo;
   const [pesquisaAberta, setPesquisaAberta] = useState(false);
   const [pedidoDePesquisa, setPedidoDePesquisa] = useState("");
   const [profundidade, setProfundidade] = useState<Profundidade>("normal");
@@ -264,6 +283,7 @@ export function FolhaGravarAgora({
               ficha: perguntaDasFichas ? (ficha ?? undefined) : undefined,
               formato,
               estilo,
+              duracao: duracaoEscolhida,
               marcaId,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
               quemAparece: quemAparece || undefined,
@@ -277,6 +297,7 @@ export function FolhaGravarAgora({
               ficha: perguntaDasFichas ? (ficha ?? undefined) : undefined,
               formato,
               estilo,
+              duracao: duracaoEscolhida,
               marcaId,
               transcricao: transcricao ?? undefined,
               objetivoDoVideo: objetivoDoVideo.trim() || undefined,
@@ -488,6 +509,29 @@ export function FolhaGravarAgora({
           <p className={styles.formatoAjuda}>{textosMomento.formatoAjuda[formato]}</p>
         </div>
 
+        {perguntaDeDuracao ? (
+          <div className={styles.grupoFormato} data-duracao>
+            <span className={styles.rotuloGrupo}>{textosMomento.duracao}</span>
+            <Chips
+              rotuloGrupo={textosMomento.duracao}
+              opcoes={[textosMomento.duracaoCurta, textosMomento.duracaoLonga]}
+              selecionado={duracaoEscolhida === "longo" ? 1 : 0}
+              onChange={(indice) => setDuracao(indice === 1 ? "longo" : "curto")}
+              desabilitadas={longo.disponivel ? [] : [1]}
+            />
+            {longo.disponivel ? (
+              <p className={styles.formatoAjuda}>
+                {textosMomento.duracaoAjuda}
+                {vaiLongo && longo.duracaoS ? ` ${textosMomento.duracaoLongaMedida(Math.max(1, Math.round(longo.duracaoS / 60)))}` : ""}
+              </p>
+            ) : (
+              <p className={styles.formatoAjuda} data-duracao-indisponivel>
+                {textosMomento.duracaoLongaIndisponivel}
+              </p>
+            )}
+          </div>
+        ) : null}
+
         {perguntaDasFichas ? (
           <div className={styles.grupoObjetivo} data-fichas>
             <span className={styles.rotuloGrupo}>{textosMomento.objetivo}</span>
@@ -563,6 +607,12 @@ export function FolhaGravarAgora({
             />
             <p className={styles.falarDeAjuda}>{textosMomento.falarDeAjuda}</p>
           </div>
+        ) : null}
+
+        {campoDePesquisaDaFolha && vaiLongo ? (
+          <p className={styles.formatoAjuda} data-duracao-sem-pesquisa>
+            {textosMomento.duracaoLongaSemPesquisa}
+          </p>
         ) : null}
 
         {comCampoDePesquisa ? (

@@ -7,6 +7,7 @@ import { assuntosSemEncaixeSemFalha, cartaoEmAltaSemFalha } from "@/servicos/em-
 import { dadosDoCampoDePesquisa, pesquisaEmAberto } from "@/servicos/pesquisa-na-hora";
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { roteiroPorId } from "@/servicos/roteiro";
+import { longoDoRamo } from "@/servicos/roteiro-longo";
 import { temasParaCliente } from "@/servicos/temas";
 import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 
@@ -58,12 +59,13 @@ export default async function Criar({ searchParams }: Props) {
           estilo: roteiroDoMomento.estilo,
           ficha: roteiroDoMomento.ficha,
           quemAparece: roteiroDoMomento.quemAparece,
+          duracao: roteiroDoMomento.duracaoDoVideo,
         }
       : null;
 
   // E55 PR 2b: o assunto em alta hoje é para hoje: quem veio criar para outro dia (`?data=`) não o vê, nem a lista do que não coube no ramo.
   const paraHoje = !dataInicial || dataInicial === hoje;
-  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe, perguntas, dadosDaPesquisa, pesquisaDeixadaParaDepois] = await Promise.all([
+  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe, perguntas, dadosDaPesquisa, pesquisaDeixadaParaDepois, longo] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
     planoDoDia(cliente.id, hoje),
     planoQueVem(cliente.id, hoje),
@@ -76,6 +78,8 @@ export default async function Criar({ searchParams }: Props) {
     // E54 (parte 3): o dia da marca para o campo "Pesquisar antes de escrever" e a pesquisa que ela deixou para depois. Uma falha aqui só tira o campo e a linha: o Criar abre do mesmo jeito.
     dadosDoCampoDePesquisa(cliente.id).catch(() => undefined),
     pesquisaEmAberto(cliente.id).catch(() => null),
+    // E52 (PR 4): o vídeo longo do ramo para o "Quanto tempo?" da folha. Uma falha aqui só tira a pergunta: o Criar abre do mesmo jeito.
+    longoDoRamo(cliente.nichoId).catch(() => undefined),
   ]);
   const objetivoRecomendado = resultadoTemas?.status === "ok" ? resultadoTemas.objetivoRecomendado : null;
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
@@ -100,6 +104,7 @@ export default async function Criar({ searchParams }: Props) {
       perguntas={perguntas}
       pesquisa={dadosDaPesquisa}
       pesquisaEmAberto={pesquisaDeixadaParaDepois}
+      longo={longo}
     />
   );
 }

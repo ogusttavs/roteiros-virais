@@ -17,6 +17,8 @@ type Props = {
   /** Indice da opcao marcada, ou nulo se nenhuma (grupo de filtro opcional). */
   selecionado: number | null;
   onChange: (indice: number) => void;
+  /** Os indices que aparecem mas nao se escolhem (E52, PR 4: o video longo num ramo sem a medida); a tela diz o porque ao lado, com calma. */
+  desabilitadas?: number[];
 };
 
 /**
@@ -24,7 +26,7 @@ type Props = {
  * Uma tela com varios grupos (ReferenciasTela) compoe varias instancias lado
  * a lado, com um separador entre elas.
  */
-export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChange }: Props) {
+export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChange, desabilitadas = [] }: Props) {
   const ativos = chipsAtivos(opcoes.length, selecionado);
 
   const grupo = (
@@ -36,6 +38,7 @@ export function Chips({ rotuloGrupo, rotuloVisivel, opcoes, selecionado, onChang
             key={rotulo}
             type="button"
             aria-pressed={ativo}
+            disabled={desabilitadas.includes(indice)}
             onClick={() => onChange(indice)}
             className={[styles.chip, ativo ? styles.ativo : ""].filter(Boolean).join(" ")}
           >

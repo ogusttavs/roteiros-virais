@@ -29,6 +29,7 @@ const longo = (id: number, parcial: Partial<VideoLongoDoSetor> = {}): VideoLongo
 
 const MEDIDA: MedidaDosLongos = {
   amostra: 12,
+  brasileiros: 9,
   forca: "indicio",
   duracaoS: { p25: 420, mediana: 540, p75: 780 },
   capitulos: { videosComLista: 7, quantidadeMediana: 6, tamanhoMedianoS: 100, forca: "indicio" },
@@ -65,6 +66,15 @@ describe("VideosLongosDoSetor", () => {
     expect(container.querySelector("[data-longos-medida]")!.textContent).toBe(
       "12 vídeos longos nos últimos 90 dias, acima de 50.000 visualizações: ainda é indício (de 3 a 29 vídeos): não vale como regra",
     );
+  });
+
+  it("diz a parte brasileira da amostra, e que a duração conta também os de fora quando há", () => {
+    const { container } = montar();
+    expect(container.querySelector("[data-longos-brasileiros]")!.textContent).toBe(
+      "em português: 9 de 12; a duração acima conta também os de fora, e a prova com a chave real decide se deve contar só os brasileiros",
+    );
+    const todos = montar({ medida: { ...MEDIDA, brasileiros: 12 } });
+    expect(todos.container.querySelector("[data-longos-brasileiros]")!.textContent).toBe("em português: 12 de 12");
   });
 
   it("a duração e a estrutura típicas, e quantos foram lidos na semana", () => {
@@ -126,14 +136,14 @@ describe("VideosLongosDoSetor", () => {
   });
 
   it("sem nenhum longo, mostra o que entra com os números de verdade e nenhuma tabela", () => {
-    const { container } = montar({ medida: { amostra: 0, forca: "nenhuma", duracaoS: null, capitulos: null, titulos: [] }, lista: [], totalNaLista: 0 });
+    const { container } = montar({ medida: { amostra: 0, brasileiros: 0, forca: "nenhuma", duracaoS: null, capitulos: null, titulos: [] }, lista: [], totalNaLista: 0 });
     expect(container.querySelector("[data-longos-do-setor]")!.getAttribute("data-longos-do-setor")).toBe("nenhuma");
     expect(screen.getByText(/mais de 3 minutos e até 40 minutos, do ramo, com mais de 50\.000 visualizações/)).toBeTruthy();
     expect(screen.queryByRole("table")).toBeNull();
   });
 
   it("o que é longo vem da configuração: o mínimo dito é o teto dos curtos, não um número fixo no texto", () => {
-    montar({ medida: { amostra: 0, forca: "nenhuma", duracaoS: null, capitulos: null, titulos: [] }, lista: [], totalNaLista: 0, tetoS: 300, maximoS: 3600 });
+    montar({ medida: { amostra: 0, brasileiros: 0, forca: "nenhuma", duracaoS: null, capitulos: null, titulos: [] }, lista: [], totalNaLista: 0, tetoS: 300, maximoS: 3600 });
     expect(screen.getByText(/mais de 5 minutos e até 60 minutos/)).toBeTruthy();
   });
 

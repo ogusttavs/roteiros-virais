@@ -181,6 +181,9 @@ export const textosAdmin = {
         `${amostra} vídeo${amostra === 1 ? "" : "s"} longo${amostra === 1 ? "" : "s"} nos últimos ${dias} dias, acima de ${piso.toLocaleString("pt-BR")} visualizações`,
       forca: { regra: "vale como regra (30 vídeos ou mais)", indicio: "ainda é indício (de 3 a 29 vídeos): não vale como regra", nenhuma: "poucos vídeos para medir (menos de 3)" },
       duracao: (p25: number, mediana: number, p75: number) => `duração típica: de ${p25} a ${p75} minutos, a mediana é ${mediana}`,
+      /** A parte brasileira da amostra: a duração acima conta também os de fora (decisão do Fable em 11/10, E52 PR 3); a prova com chave decide se deve contar só os em português. */
+      brasileiros: (brasileiros: number, amostra: number) =>
+        `em português: ${brasileiros} de ${amostra}${brasileiros < amostra ? "; a duração acima conta também os de fora, e a prova com a chave real decide se deve contar só os brasileiros" : ""}`,
       /** A força da estrutura é a dela (quantos têm a lista), não a da duração: 30 longos com 3 listas medem a duração como regra e a estrutura como indício. */
       estrutura: (comLista: number, amostra: number, quantidade: number, tamanhoMin: number, forca: "regra" | "indicio") =>
         `${comLista} de ${amostra} têm a lista de capítulos na descrição: em geral ${quantidade} capítulos, de uns ${tamanhoMin} minuto${tamanhoMin === 1 ? "" : "s"} cada (${forca === "regra" ? "vale como regra" : "ainda é indício"})`,

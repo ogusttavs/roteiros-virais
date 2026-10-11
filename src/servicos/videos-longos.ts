@@ -147,6 +147,8 @@ export const AMOSTRA_MINIMA = 3;
 
 export type MedidaDosLongos = {
   amostra: number;
+  /** Quantos dos `amostra` vídeos são em português (a classificação do Brasil primeiro, E31): o admin mostra a parte brasileira da amostra, e a prova com chave decide se a medida deve contar só eles. */
+  brasileiros: number;
   forca: ForcaDaMedida;
   /** Percentis 25, 50 e 75 da duração, em segundos; nulo sem amostra mínima. */
   duracaoS: { p25: number; mediana: number; p75: number } | null;
@@ -185,7 +187,9 @@ export function medirOsLongos(longos: VideoLongoDoSetor[]): MedidaDosLongos {
     .filter((t) => t !== "")
     .slice(0, 8);
 
-  if (forca === "nenhuma") return { amostra, forca, duracaoS: null, capitulos: null, titulos };
+  const brasileiros = doSetor.filter((v) => v.classificacao === "brasileiro").length;
+
+  if (forca === "nenhuma") return { amostra, brasileiros, forca, duracaoS: null, capitulos: null, titulos };
 
   const duracoes = doSetor.map((v) => v.duracaoS).sort((a, b) => a - b);
   const duracaoS = { p25: percentil(duracoes, 0.25), mediana: percentil(duracoes, 0.5), p75: percentil(duracoes, 0.75) };
@@ -208,7 +212,7 @@ export function medirOsLongos(longos: VideoLongoDoSetor[]): MedidaDosLongos {
     };
   }
 
-  return { amostra, forca, duracaoS, capitulos, titulos };
+  return { amostra, brasileiros, forca, duracaoS, capitulos, titulos };
 }
 
 /** A medida dos longos do setor na janela larga (`longosMedidaJanelaDias`): a amostra é pequena, então olha mais para trás que a lista. */

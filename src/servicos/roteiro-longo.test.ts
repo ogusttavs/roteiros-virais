@@ -11,6 +11,7 @@ import type { MedidaDosLongos } from "./videos-longos";
 
 const medida = (mediana: number, forca: MedidaDosLongos["forca"] = "indicio"): MedidaDosLongos => ({
   amostra: forca === "regra" ? 30 : forca === "indicio" ? 5 : 1,
+  brasileiros: 0,
   forca,
   duracaoS: forca === "nenhuma" ? null : { p25: mediana - 60, mediana, p75: mediana + 60 },
   capitulos: null,

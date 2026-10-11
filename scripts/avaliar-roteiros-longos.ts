@@ -124,6 +124,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
   const duracaoAlvoDe = (caso: z.infer<typeof casoSchema>): number => {
     const alvo = duracaoAlvoDaMedida({
       amostra: caso.duracaoDoRamo.amostra,
+      brasileiros: caso.duracaoDoRamo.amostra,
       forca: caso.duracaoDoRamo.forca,
       duracaoS: { p25: caso.duracaoDoRamo.p25, mediana: caso.duracaoDoRamo.mediana, p75: caso.duracaoDoRamo.p75 },
       capitulos: null,

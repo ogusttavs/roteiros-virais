@@ -54,6 +54,9 @@ export function VideosLongosDoSetor({ medida, lista, totalNaLista, piso, lidosNa
               {t.duracao(emMinutos(medida.duracaoS.p25), emMinutos(medida.duracaoS.mediana), emMinutos(medida.duracaoS.p75))}
             </p>
           ) : null}
+          <p className={styles.contagem} data-longos-brasileiros>
+            {t.brasileiros(medida.brasileiros, medida.amostra)}
+          </p>
           <p className={styles.contagem} data-longos-estrutura>
             {medida.capitulos
               ? t.estrutura(medida.capitulos.videosComLista, medida.amostra, medida.capitulos.quantidadeMediana, emMinutos(medida.capitulos.tamanhoMedianoS), medida.capitulos.forca)
