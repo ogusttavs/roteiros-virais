@@ -400,6 +400,8 @@ export function enderecoParaTrocarOObjetivo(pedido: ParametrosGerarRoteiro, grup
   } else {
     return "/criar";
   }
+  // E54 (parte 2): a pesquisa que a pessoa aprovou para este vídeo volta presa ao tema (o servidor confere de novo que é da marca e que está pronta).
+  if (pedido.pesquisaId) consulta.set("pesquisa", String(pedido.pesquisaId));
   // Um dia que já passou não volta (a tela do objetivo recusa data no passado).
   if (pedido.data && pedido.data >= hojeISO()) consulta.set("data", pedido.data);
   return `/criar/objetivo?${consulta.toString()}`;

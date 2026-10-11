@@ -1514,6 +1514,40 @@ export type PerguntaDeOrigemGuardada = {
 };
 
 /**
+ * E54 (parte 2): a pesquisa na hora de que um roteiro nasceu, como a pessoa a aprovou: os dados que ela MARCOU (cada um com fonte, data da
+ * página, trecho e link), a posição dela, o que decidiu diante do aviso de premissa e o dia da pesquisa. Cópia de propósito, como a pergunta
+ * do público: o roteiro reescrito, o "Gerar outra" e o "Fontes" do roteiro continuam com o que a pessoa aprovou, mesmo que a pesquisa seja
+ * refeita. Dado de terceiros: entra no roteiro sempre como dado datado com a fonte, nunca como prova de viralizar nem como fato do setor.
+ */
+export type PesquisaDeOrigemGuardada = {
+  pesquisaId: number;
+  /** Os dados marcados, na ordem da pesquisa (com o `id` que o roteiro cita em `entregaDaPesquisa.fontes`). */
+  dados: AchadoDaPesquisa[];
+  /** A resposta da pessoa à "uma pergunta antes de escrever"; nula quando a pesquisa não perguntou. */
+  posicaoDaPessoa: string | null;
+  /** O que a pessoa decidiu diante de "as fontes dizem outra coisa"; nulo quando não houve aviso. */
+  decisaoDaPremissa: "fontes" | "mudar" | "manter" | null;
+  /** O aviso da premissa (só quando houve), para o "Atenção" do roteiro quando a pessoa seguiu com o que escreveu. */
+  avisoDaPremissa: string | null;
+  /** O dia da pesquisa (ISO). */
+  pesquisadaEm: string;
+};
+
+/**
+ * E54 (parte 2): o que o roteiro entrega ALÉM da fala quando nasceu de uma pesquisa (o método do Gustavo para responder o assunto do dia):
+ * três opções de gancho (a primeira é a recomendada), as objeções que PODEM aparecer (nunca "vão dizer": é uma lista de objeções prováveis,
+ * a partir dos dados e das vozes do setor), os dados usados (os ids de `PesquisaDeOrigemGuardada.dados`, de onde sai "Fontes" com nome e
+ * link) e o "Atenção" (o que a pessoa confere ou decide antes de postar; parte escrita por código: dado antigo, premissa mantida, saúde,
+ * preço, política).
+ */
+export type EntregaDaPesquisa = {
+  ganchos: { texto: string; recomendado: boolean }[];
+  oQueVaoTeResponder: { objecao: string; resposta: string }[];
+  fontes: number[];
+  atencao: string[];
+};
+
+/**
  * E53: a notícia de um assunto. NUNCA o texto da matéria: o título, o veículo, a hora, o link para o original, a foto do veículo com o crédito (do RSS ou do `og:image` da página) e o resumo
  * NOSSO de duas linhas. Uma por assunto e por endereço.
  */
@@ -1864,6 +1898,11 @@ export type ConteudoRoteiro = {
    * com copiar (item 5).
    */
   legenda?: string | null;
+  /**
+   * E54 (parte 2): só no roteiro que nasceu de uma pesquisa na hora (os três ganchos, o que pode aparecer, as fontes e o "Atenção"). Opcional,
+   * como `legenda`, para não reescrever fixture de teste; ausente ou nulo em todo roteiro comum.
+   */
+  entregaDaPesquisa?: EntregaDaPesquisa | null;
 };
 
 /**
@@ -2025,6 +2064,8 @@ export const roteiros = pgTable(
     noticiaDoAssunto: jsonb("noticia_do_assunto").$type<NoticiaDeOrigemGuardada>(),
     /** E28 (parte 3): nulo, salvo no roteiro que nasceu de "Responder em vídeo" uma pergunta do público (ver `PerguntaDeOrigemGuardada`). */
     perguntaDoPublico: jsonb("pergunta_do_publico").$type<PerguntaDeOrigemGuardada>(),
+    /** E54 (parte 2): nulo, salvo no roteiro que nasceu de uma pesquisa na hora (ver `PesquisaDeOrigemGuardada`). */
+    pesquisaNaHora: jsonb("pesquisa_na_hora").$type<PesquisaDeOrigemGuardada>(),
     /**
      * E41 (2a): as marcas de fala (peso, pausa, devagar, tom), escritas na primeira vez que a pessoa liga "Marcas de fala" ou abre o modo gravação (nunca na geração, nunca nas versões que
      * ninguém escolheu). Nulo até lá, em Story, em vídeo sem fala e depois de uma edição do texto (a edição apaga as marcas; elas são refeitas na próxima vez que a pessoa ligar).

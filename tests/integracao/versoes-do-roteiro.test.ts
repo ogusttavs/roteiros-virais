@@ -538,6 +538,14 @@ describe("enderecoParaTrocarOObjetivo", () => {
     );
   });
 
+  it("a pesquisa aprovada volta presa ao tema, no tema livre e no do dia (E54, parte 2); sem ela, o endereço é o de antes", () => {
+    const livre = { origem: "livre" as const, textoTema: "mancha", objetivo: "conversao" as const };
+    expect(enderecoParaTrocarOObjetivo({ ...livre, pesquisaId: 7 }, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha&pesquisa=7");
+    expect(enderecoParaTrocarOObjetivo({ ...livre, pesquisaId: 7, data: hojeISO() }, { tema: "mancha", criadoEm: hoje })).toBe(`/criar/objetivo?livre=mancha&pesquisa=7&data=${hojeISO()}`);
+    expect(enderecoParaTrocarOObjetivo({ origem: "sugerido", temaIndice: 1, objetivo: "conversao", pesquisaId: 7 }, { tema: "x", criadoEm: hoje })).toBe("/criar/objetivo?tema=1&pesquisa=7");
+    expect(enderecoParaTrocarOObjetivo(livre, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha");
+  });
+
   it("o dia que já passou não vai para a tela do objetivo (ela recusa data no passado); o de hoje ou de depois vai", () => {
     const livre = { origem: "livre" as const, textoTema: "mancha", objetivo: "conversao" as const };
     expect(enderecoParaTrocarOObjetivo({ ...livre, data: "2020-01-01" }, { tema: "mancha", criadoEm: hoje })).toBe("/criar/objetivo?livre=mancha");

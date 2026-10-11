@@ -7,7 +7,7 @@
  * A lista inicial é a dos portais da E53 mais os órgãos oficiais. Mudou a lista, atualiza a data. Quem mantém é o Gustavo (uma fonte
  * que a pessoa pede e falta entra aqui, nunca por pesquisa).
  */
-export const DATA_DA_LISTA_DE_FONTES = "2026-10-06";
+export const DATA_DA_LISTA_DE_FONTES = "2026-10-10";
 
 export type TipoDeFonte = "oficial" | "imprensa";
 
@@ -35,7 +35,9 @@ export const FONTES_DE_PESQUISA: FonteDePesquisa[] = [
   { dominio: "g1.globo.com", nome: "G1", tipo: "imprensa" },
   { dominio: "folha.uol.com.br", nome: "Folha de S.Paulo", tipo: "imprensa" },
   { dominio: "estadao.com.br", nome: "Estadão", tipo: "imprensa" },
-  { dominio: "uol.com.br", nome: "UOL", tipo: "imprensa" },
+  // O UOL hospeda blog e página de terceiros sob a mesma marca: só as editorias de notícia e economia entram (decisão do Fable, 10/10/2026).
+  { dominio: "noticias.uol.com.br", nome: "UOL Notícias", tipo: "imprensa" },
+  { dominio: "economia.uol.com.br", nome: "UOL Economia", tipo: "imprensa" },
   { dominio: "cnnbrasil.com.br", nome: "CNN Brasil", tipo: "imprensa" },
   { dominio: "exame.com", nome: "Exame", tipo: "imprensa" },
   { dominio: "valor.globo.com", nome: "Valor Econômico", tipo: "imprensa" },

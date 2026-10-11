@@ -33,7 +33,7 @@ export function semAcento(texto: string): string {
 // Números com unidade e escala
 // ---------------------------------------------------------------------------------------------------------------------
 
-const ESCALAS: Record<string, number> = { mil: 1e3, milhao: 1e6, milhoes: 1e6, bilhao: 1e9, bilhoes: 1e9, trilhao: 1e12, trilhoes: 1e12 };
+const ESCALAS: Record<string, number> = { mil: 1e3, milhao: 1e6, milhoes: 1e6, bilhao: 1e9, bilhoes: 1e9, trilhao: 1e12, trilhoes: 1e12, k: 1e3, mi: 1e6, bi: 1e9 };
 const UNIDADES_DE_TEMPO: Record<string, string> = {
   ano: "ano", anos: "ano", mes: "mes", meses: "mes", dia: "dia", dias: "dia", semana: "semana", semanas: "semana", hora: "hora", horas: "hora",
   minuto: "minuto", minutos: "minuto", trimestre: "trimestre", trimestres: "trimestre", semestre: "semestre", semestres: "semestre",
@@ -45,8 +45,13 @@ export type TokenNumerico = {
   valor: string;
   classe: string;
   bruto: string;
+  /** O número como a pessoa o escreveu, com a escala colada ou por extenso ("10k", "2,5 milhões"), para o motivo dizer qual foi. */
+  escrito: string;
   /** Os poucos caracteres antes do número, sem acento (para saber se "2026" vem depois de "em"). */
   antes: string;
+  /** Os dois caracteres colados antes e os três colados depois, crus: "1080p", "98765-4321" e "1080x1920" não são dado. */
+  antesImediato: string;
+  depoisImediato: string;
 };
 
 /** O valor de um número escrito do jeito do Brasil ("1.250,75", "4,5", "12.5"); `null` quando não dá para ler sem chutar ("1,2,3", "10.05.2026"). */
@@ -81,18 +86,22 @@ export function tokensNumericos(texto: string): TokenNumerico[] {
     const fim = inicio + bruto.length;
     const antes = semAcento(texto.slice(Math.max(0, inicio - 9), inicio));
     const depois = semAcento(texto.slice(fim, fim + 28));
+    const antesImediato = texto.slice(Math.max(0, inicio - 2), inicio);
+    const depoisImediato = texto.slice(fim, fim + 3);
     const valor = valorCanonico(bruto);
     if (valor === null) {
-      tokens.push({ chave: `${bruto}|?`, valor: bruto, classe: "?", bruto, antes });
+      tokens.push({ chave: `${bruto}|?`, valor: bruto, classe: "?", bruto, escrito: bruto, antes, antesImediato, depoisImediato });
       continue;
     }
 
     let resto = depois;
     let valorFinal = valor;
-    const escala = /^\s*(mil|milhao|milhoes|bilhao|bilhoes|trilhao|trilhoes)\b/.exec(resto);
+    let escrito = bruto;
+    const escala = /^\s*(mil|milhao|milhoes|bilhao|bilhoes|trilhao|trilhoes|k|mi|bi)\b/.exec(resto);
     if (escala) {
       valorFinal = String(Number((Number(valor) * ESCALAS[escala[1]]).toPrecision(12)));
       resto = resto.slice(escala[0].length);
+      escrito = `${bruto}${texto.slice(fim, fim + escala[0].length)}`;
     }
 
     let classe = "";
@@ -109,7 +118,7 @@ export function tokensNumericos(texto: string): TokenNumerico[] {
         if (tempo) classe = `t:${UNIDADES_DE_TEMPO[tempo[1]] ?? tempo[1]}`;
       }
     }
-    tokens.push({ chave: `${valorFinal}|${classe}`, valor: valorFinal, classe, bruto, antes });
+    tokens.push({ chave: `${valorFinal}|${classe}`, valor: valorFinal, classe, bruto, escrito, antes, antesImediato, depoisImediato });
   }
   return tokens;
 }
@@ -121,6 +130,75 @@ export function numerosDoTexto(texto: string): string[] {
 
 function pareceAno(valor: string): boolean {
   return /^\d{4}$/.test(valor) && Number(valor) >= 1990 && Number(valor) <= 2100;
+}
+
+/**
+ * O que conta como "número com cara de dado" no roteiro (E54, parte 2): porcentagem, dinheiro, quantidade de mil para cima (os anos entram) e o que não
+ * deu para ler. "3 passos", "15 minutos" e "5 segundos" não são dado. Um número colado a letra ("1080p", "3x") ou a outro por hífen, "x" ou barra ("98765-4321",
+ * "1080x1920") é código, telefone ou resolução, não dado. A escala colada ("10k", "2mi") é dado, menos "4k" e "8k", que são resolução.
+ */
+export function numeroComCaraDeDado(token: Pick<TokenNumerico, "classe" | "valor" | "antesImediato" | "depoisImediato">): boolean {
+  // "10k seguidores" é dado (a escala vem colada); "4k" e "8k" são a resolução do vídeo, que um roteiro de gravação cita.
+  const escalaColada = /^(k|mil|mi|bi)\b/i.test(token.depoisImediato);
+  if (escalaColada && token.classe === "" && ["2000", "4000", "8000"].includes(token.valor)) return false;
+  if (!escalaColada && /^[a-z]/i.test(token.depoisImediato) && token.classe === "") return false;
+  if (/^[-x×:/]\d/i.test(token.depoisImediato) || /\d[-x×:/]$/i.test(token.antesImediato)) return false;
+  if (token.classe === "?" || token.classe === "%" || token.classe === "brl" || token.classe === "usd" || token.classe === "eur") return true;
+  return token.classe === "" && Number(token.valor) >= 1000;
+}
+
+/** O número como a pessoa o leu, com a unidade, para o motivo da reprovação dizer qual foi ("37%", "R$ 89"). */
+function numeroComoEscrito(token: Pick<TokenNumerico, "classe" | "escrito">): string {
+  const numero = token.escrito.trim();
+  if (token.classe === "%") return `${numero}%`;
+  if (token.classe === "brl") return `R$ ${numero}`;
+  if (token.classe === "usd") return `US$ ${numero}`;
+  if (token.classe === "eur") return `€ ${numero}`;
+  return numero;
+}
+
+/** Quantidade por extenso que carrega um fato sem dígito: "trinta por cento", "metade", "dobrou", "quinhentos clientes". "dois" a "dez" ficam de fora (passos). */
+const PALAVRAS_DE_DADO_POR_EXTENSO = new Set([
+  "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa", "cem", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos",
+  "setecentos", "oitocentos", "novecentos", "mil", "milhao", "milhoes", "bilhao", "bilhoes", "metade", "dobro", "dobrou", "dobraram", "triplo", "triplicou", "terco",
+  "dezenas", "centenas", "milhares",
+]);
+
+/**
+ * Tudo o que um texto afirma como dado e que as fontes não têm: o número com unidade e escala (dígito), a quantidade por extenso, "por cento" e "em cada". Devolve cada
+ * um como a pessoa o leu (vazio = confere). É a MESMA trava que o motor aplicou ao dado, agora sobre o que o roteiro escreveu: o texto das fontes são os dados que a
+ * pessoa marcou, o perfil e o tema.
+ */
+export function dadosForaDasFontes(texto: string, fontes: string): string[] {
+  const permitidos = new Set(numerosDoTexto(fontes));
+  const fora: string[] = [];
+  for (const token of tokensNumericos(texto)) {
+    if (!numeroComCaraDeDado(token) || permitidos.has(token.chave)) continue;
+    const como = numeroComoEscrito(token);
+    if (!fora.includes(como)) fora.push(como);
+  }
+  const doTexto = semAcento(texto);
+  const dasFontes = semAcento(fontes);
+  for (const frase of ["por cento", "em cada"]) {
+    if (doTexto.includes(frase) && !dasFontes.includes(frase)) fora.push(frase);
+  }
+  // "1,25 mil" e "3 milhões" já foram conferidos como número (com a escala): a palavra que acompanha o dígito não conta como quantidade por extenso.
+  const semEscalaDeDigito = (t: string) => t.replace(/\d[\d.,]*\s*(?:mil(?![\p{L}])|milh\p{L}*|bilh\p{L}*|trilh\p{L}*)/giu, " ");
+  const palavrasDasFontes = palavrasSoltas(semEscalaDeDigito(fontes));
+  for (const palavra of palavrasSoltas(semEscalaDeDigito(texto))) {
+    if (PALAVRAS_DE_DADO_POR_EXTENSO.has(palavra) && !palavrasDasFontes.has(palavra)) fora.push(palavra);
+  }
+  return fora;
+}
+
+/**
+ * Previsão de público ("vão dizer", "o público vai reclamar", "as pessoas vão te perguntar"): a lista de "o que pode aparecer" nunca prevê, só aponta o que pode
+ * aparecer. Normalizado, sem acento. "Vai funcionar no meu caso?" (uma pergunta do público) não é previsão: o sujeito tem de ser o público.
+ */
+export function ehPrevisaoDePublico(texto: string): boolean {
+  const t = semAcento(texto);
+  if (/\bvao (te |lhe )?(dizer|responder|comentar|perguntar|falar|reclamar|duvidar|cobrar|achar|criticar|questionar|pedir|pensar)\b/.test(t)) return true;
+  return /\b(o publico|as pessoas|os seguidores|seu publico|a galera|a gente|os clientes|voces?)\s+(?:\w+\s+)?(vai|vao)\b/.test(t) || /\bvai(m)? (te |lhe )?(dizer|responder|comentar|perguntar|falar|reclamar|duvidar|cobrar)\b/.test(t);
 }
 
 /**
@@ -326,7 +404,7 @@ export const SEM_DESCARTES: DescartesDaPesquisa = {
 const TRAVESSOES = new RegExp(`[${String.fromCharCode(0x2014, 0x2013)}]`, "g");
 
 /** A frase do modelo como a pessoa a lê: sem marcador de lista, sem negrito, sem travessão (regra do projeto). */
-function limparLinha(texto: string): string {
+export function limparLinha(texto: string): string {
   return limparParaPrompt(texto.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, "").replace(/\*\*/g, ""), 400)
     .replace(new RegExp(`\\s+[${String.fromCharCode(0x2014, 0x2013)}]\\s+`, "g"), ", ")
     .replace(TRAVESSOES, "-")
