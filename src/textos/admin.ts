@@ -171,6 +171,34 @@ export const textosAdmin = {
       mostrando: (n: number, total: number) => `${n} de ${total}`,
       semPlataforma: "sem plataforma",
     },
+    /** E52 (PR 1): os vídeos longos do YouTube do ramo (acima de 3 minutos), medidos só com o que a coleta já traz: título, descrição, duração e visualizações. */
+    longos: {
+      titulo: "vídeos longos do YouTube",
+      /** O que entra, dito com os números de verdade (o limite e o piso são configuração). */
+      vazio: (piso: number, minimoMin: number, maximoMin: number, dias: number) =>
+        `ainda sem vídeo longo neste ramo nos últimos ${dias} dias. Só entra vídeo do YouTube com mais de ${minimoMin} minutos e até ${maximoMin} minutos, do ramo, com mais de ${piso.toLocaleString("pt-BR")} visualizações.`,
+      medida: (amostra: number, dias: number, piso: number) =>
+        `${amostra} vídeo${amostra === 1 ? "" : "s"} longo${amostra === 1 ? "" : "s"} nos últimos ${dias} dias, acima de ${piso.toLocaleString("pt-BR")} visualizações`,
+      forca: { regra: "vale como regra (30 vídeos ou mais)", indicio: "ainda é indício (de 3 a 29 vídeos): não vale como regra", nenhuma: "poucos vídeos para medir (menos de 3)" },
+      duracao: (p25: number, mediana: number, p75: number) => `duração típica: de ${p25} a ${p75} minutos, a mediana é ${mediana}`,
+      /** A força da estrutura é a dela (quantos têm a lista), não a da duração: 30 longos com 3 listas medem a duração como regra e a estrutura como indício. */
+      estrutura: (comLista: number, amostra: number, quantidade: number, tamanhoMin: number, forca: "regra" | "indicio") =>
+        `${comLista} de ${amostra} têm a lista de capítulos na descrição: em geral ${quantidade} capítulos, de uns ${tamanhoMin} minuto${tamanhoMin === 1 ? "" : "s"} cada (${forca === "regra" ? "vale como regra" : "ainda é indício"})`,
+      semEstrutura: "menos de 3 vídeos com a lista de capítulos na descrição: ainda sem estrutura típica",
+      lidos: (lidos: number, porSemana: number) => `lidos por transcrição nesta semana: ${lidos}; o limite é de ${porSemana} por semana neste ramo (a transcrição de um longo custa dez vezes a de um curto)`,
+      nenhumNaLista: (dias: number) => `nenhum longo acima do piso nos últimos ${dias} dias; a medida acima olha mais para trás.`,
+      colunaTitulo: "vídeo",
+      colunaDuracao: "duração",
+      colunaVisualizacoes: "visualizações",
+      colunaCapitulos: "capítulos",
+      colunaLeitura: "leitura",
+      minutos: (min: number) => `${min} min`,
+      capitulos: (n: number) => (n === 0 ? "sem lista" : `${n} capítulos`),
+      lido: "transcrito",
+      naoLido: "ainda não",
+      mostrando: (n: number, total: number) => `${n} de ${total}`,
+      ajuda: "Tudo daqui vem do que a coleta já grava: título, descrição, duração e visualizações. A lista de capítulos é a que quem postou escreveu na descrição; nem todo vídeo tem. Ainda não há transcrição dos longos.",
+    },
     vazioSubindoHoje: "nada subindo agora; volte em algumas horas.",
     vazioVigilancia: "nenhuma conta vigiada ainda; adicione uma conta semente ou espere o job vigilancia, que roda todo domingo.",
     verModelo: "modelo do ramo",
