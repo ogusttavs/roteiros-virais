@@ -38,6 +38,7 @@ import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { boss, FILAS, garantirFilas } from "./fila";
 import { rodarLembrete } from "./lembrete";
+import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
@@ -132,6 +133,10 @@ async function main(): Promise<void> {
   /** E28: sem `nichoId`, todo setor ativo (o cron semanal); com, só aquele setor. */
   await boss().work<{ nichoId?: number }>(FILAS.comentariosSemana, async (job) => {
     await executarComRegistro(FILAS.comentariosSemana, () => rodarComentariosSemana(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
+  });
+  /** E52 (PR 2): sem `nichoId`, todo setor ativo (o cron semanal); com, só aquele setor. */
+  await boss().work<{ nichoId?: number }>(FILAS.lerLongos, async (job) => {
+    await executarComRegistro(FILAS.lerLongos, () => rodarLerLongos(job[0]?.data?.nichoId), { ramoId: job[0]?.data?.nichoId ?? null });
   });
   /** M3, item 2: sem `nichoId`, roda para todo setor ativo que aceita "vídeo sem fala vale" (o cron diário). */
   await boss().work<{ nichoId?: number; soFicha?: boolean }>(FILAS.extrairSemFala, async (job) => {

@@ -95,7 +95,7 @@ export function VideosLongosDoSetor({ medida, lista, totalNaLista, piso, lidosNa
                         <td className={styles.mono}>{t.minutos(emMinutos(v.duracaoS))}</td>
                         <td className={styles.mono}>{v.views.toLocaleString("pt-BR")}</td>
                         <td>{t.capitulos(v.capitulos.length)}</td>
-                        <td>{v.temTranscricao ? t.lido : t.naoLido}</td>
+                        <td>{v.temAnaliseLonga ? t.lidoEEstruturado : v.temTranscricao ? t.lido : t.naoLido}</td>
                       </tr>
                     );
                   })}

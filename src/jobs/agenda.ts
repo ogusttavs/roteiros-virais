@@ -192,6 +192,12 @@ export const AGENDAMENTOS: Agendamento[] = [
     descricao: "comentarios dos videos mais vistos do setor (so YouTube) e as vozes do publico, todo domingo as 04:45, antes da analise visual",
   },
   {
+    fila: FILAS.lerLongos,
+    cron: "0 8 * * 0",
+    descricao:
+      "leitura dos videos longos do YouTube de cada setor (a transcricao dos poucos da semana e a estrutura de cada um), todo domingo as 08:00, depois do transcrever diario (que pode ir ate as 07:30 e usa o mesmo proxy)",
+  },
+  {
     fila: FILAS.analisarVisual,
     cron: "0 5 * * 0",
     descricao: "analise visual dos dez melhores da semana, todo domingo as 05:00",

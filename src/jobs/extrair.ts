@@ -16,6 +16,7 @@ import { db } from "@/db";
 import { contas, lotesIa, nichos, videos } from "@/db/schema";
 import { criarLote, type ItemLote } from "@/ia/lote";
 import * as extrairVideo from "@/ia/prompts/extrairVideo";
+import { DENTRO_DO_TETO_DE_DURACAO } from "@/servicos/pesquisa";
 
 import { idsEmLotePendente, precisaAgendarNovaTentativa, TAMANHO_MINIMO_TRANSCRICAO } from "./extracao-comum";
 import { rodarExtrairAgora } from "./extrair-agora";
@@ -27,7 +28,9 @@ export async function rodarExtrair(): Promise<Record<string, unknown>> {
 
   const pendentes = await idsEmLotePendente("extrairVideo");
 
-  const condicoes = [isNotNull(videos.transcricao), isNull(videos.analise)];
+  // E52 (PR 2): o vídeo longo transcrito (`ler-longos`) tem a leitura dele, a própria (`analise_longa`); a ficha de um curto em cima de quarenta minutos de texto custaria o que
+  // o curto não custa e entraria numa coluna que Referências e temas leem. Fora, pelo mesmo teto de duração que o resto do motor.
+  const condicoes = [isNotNull(videos.transcricao), isNull(videos.analise), DENTRO_DO_TETO_DE_DURACAO];
   if (pendentes.size > 0) condicoes.push(notInArray(videos.id, [...pendentes]));
 
   const candidatos = await db()

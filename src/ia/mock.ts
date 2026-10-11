@@ -62,6 +62,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockExtrairVideo(entrada);
     case "extrairVideoSemFala":
       return mockExtrairVideoSemFala(entrada);
+    case "extrairVideoLongo":
+      return mockExtrairVideoLongo(entrada);
     case "analisarVisual":
       return mockAnalisarVisual();
     case "modeloNicho":
@@ -743,6 +745,43 @@ function fichaCatalogoMock(texto: string, formato: string): string {
   if (formato === "humor_e_meme" || /pov|aquela pessoa|todo mundo/.test(minusculo)) return "mandem";
   if (["antes_e_depois", "emUso", "em_uso", "bastidor", "produto_em_uso"].includes(formato) || /preço|valor|orçamento/.test(minusculo)) return "me_chamem";
   return "veja";
+}
+
+/**
+ * E52 (PR 2): a leitura de um vídeo longo, simulada. Lê da entrada o que a entrada real traz: a duração e, se o dono escreveu, a lista de capítulos da descrição (os mesmos tempos
+ * viram os capítulos da saída). Sem lista, quatro capítulos nos quartos da duração. Os laços e o ponto de saída ficam em proporções fixas, para o teste conferir.
+ */
+function mockExtrairVideoLongo(entrada: string) {
+  const titulo = extrairCampo(entrada, "Titulo:") || "video longo simulado";
+  const duracaoS = Number(/Duracao: (\d+) segundos/.exec(entrada)?.[1] ?? 600);
+  const linhas = entrada.split("\n");
+  const inicioDaLista = linhas.findIndex((l) => l.startsWith("Capítulos que o dono escreveu na descrição (tempos exatos):"));
+  const daDescricao: { inicioS: number; nome: string }[] = [];
+  if (inicioDaLista >= 0) {
+    for (const linha of linhas.slice(inicioDaLista + 1)) {
+      const achou = /^(?:(\d+):)?(\d+):(\d{2}) (.+)$/.exec(linha);
+      if (!achou) break;
+      daDescricao.push({ inicioS: Number(achou[1] ?? 0) * 3600 + Number(achou[2]) * 60 + Number(achou[3]), nome: achou[4] });
+    }
+  }
+  const base =
+    daDescricao.length >= 3
+      ? daDescricao
+      : ["Abertura", "O problema", "Como resolver", "Fechamento"].map((nome, i) => ({ inicioS: Math.round((duracaoS * i) / 4), nome }));
+  return {
+    assunto: titulo,
+    abertura: { promessa: `mostra ${titulo} em passos`, entregaAteS: Math.min(30, duracaoS), tipo: "resultado" as const },
+    capitulos: base.map((c, i) => ({
+      inicioS: c.inicioS,
+      nome: c.nome,
+      oQueFaz: `entrega: ${c.nome.toLowerCase()}`,
+      gancho: i === base.length - 1 ? null : `daqui a pouco: ${base[i + 1].nome.toLowerCase()}`,
+    })),
+    lacos: [{ abertoEmS: Math.round(duracaoS * 0.1), pagoEmS: Math.round(duracaoS * 0.6), oQue: "o erro que mais custa caro" }],
+    ondeSairia: [{ segundo: Math.round(duracaoS * 0.45), porQue: "a explicação repete o que já foi dito" }],
+    fechamento: { oQueFaz: "resume e chama para o próximo", apontaParaProximoVideo: true },
+    porQueFuncionou: "cada capítulo deixa uma pergunta aberta para o seguinte",
+  };
 }
 
 function mockExtrairVideo(entrada: string) {

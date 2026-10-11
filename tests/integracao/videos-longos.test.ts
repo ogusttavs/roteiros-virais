@@ -47,6 +47,8 @@ type Semente = {
   pertence?: boolean;
   transcricao?: string | null;
   transcritoDiasAtras?: number;
+  /** A hora exata da transcrição (para a cadência semanal, que não cai em dia inteiro). */
+  transcritoEm?: Date;
   proximaTentativa?: Date | null;
   origem?: "coleta" | "seed";
   semPublicacao?: boolean;
@@ -70,7 +72,7 @@ async function semear(s: Semente) {
       idioma: s.idioma === undefined ? "pt" : s.idioma,
       analise: s.pertence === false ? ({ pertenceAoNicho: false } as never) : undefined,
       transcricao: s.transcricao ?? null,
-      transcritoEm: s.transcritoDiasAtras === undefined ? null : new Date(AGORA.getTime() - s.transcritoDiasAtras * DIA_MS),
+      transcritoEm: s.transcritoEm ?? (s.transcritoDiasAtras === undefined ? null : new Date(AGORA.getTime() - s.transcritoDiasAtras * DIA_MS)),
       proximaTentativaTranscricao: s.proximaTentativa ?? null,
       origem: s.origem ?? "coleta",
     })
@@ -162,6 +164,8 @@ describe("longosDoSetor", () => {
       classificacao: "brasileiro",
       temTranscricao: true,
       proximaTentativaTranscricao: null,
+      temAnaliseLonga: false,
+      proximaTentativaAnaliseLonga: null,
     });
     expect(achado.publicadoEm).toBeInstanceOf(Date);
     expect(achado.foraDaCurva).toBeTypeOf("number");
@@ -189,8 +193,8 @@ describe("longosDoSetor", () => {
   });
 });
 
-/** O que a semana já gastou, para os testes puros: o total e quantos por conta. */
-const lidos = (total = 0, porConta: [number, number][] = []): LidosNaSemana => ({ total, porConta: new Map(porConta) });
+/** O que a semana já gastou, para os testes puros: o total, quantos por conta e quantos minutos de vídeo. */
+const lidos = (total = 0, porConta: [number, number][] = [], minutos = 0): LidosNaSemana => ({ total, porConta: new Map(porConta), minutos });
 
 function longo(parcial: Partial<VideoLongoDoSetor> & { id: number }): VideoLongoDoSetor {
   return {
@@ -206,6 +210,8 @@ function longo(parcial: Partial<VideoLongoDoSetor> & { id: number }): VideoLongo
     capitulos: [],
     temTranscricao: false,
     proximaTentativaTranscricao: null,
+    temAnaliseLonga: false,
+    proximaTentativaAnaliseLonga: null,
     ...parcial,
   };
 }
@@ -323,6 +329,21 @@ describe("escolherLongosParaLer", () => {
     expect(escolherLongosParaLer(longos, lidos(1, [[100, 1]]), 5, AGORA)).toEqual([1, 5, 6]);
   });
 
+  it("o teto de minutos da semana: o que não cabe fica de fora e o seguinte, mais curto, ainda pode caber", () => {
+    const longos = [
+      longo({ id: 1, duracaoS: 2400, contaId: 1 }),
+      longo({ id: 2, duracaoS: 2400, contaId: 2 }),
+      longo({ id: 3, duracaoS: 2400, contaId: 3 }),
+      longo({ id: 4, duracaoS: 600, contaId: 4 }),
+    ];
+    // 90 minutos: 40 + 40 = 80; o terceiro de 40 passaria; o de 10 cabe (80 + 10 = 90, no limite)
+    expect(escolherLongosParaLer(longos, lidos(), 5, AGORA, 90)).toEqual([1, 2, 4]);
+    // 50 minutos já lidos na semana: sobram 40
+    expect(escolherLongosParaLer(longos, lidos(2, [], 50), 5, AGORA, 90)).toEqual([1]);
+    // sem teto de minutos, só valem as vagas e as contas
+    expect(escolherLongosParaLer(longos, lidos(), 5, AGORA)).toEqual([1, 2, 3, 4]);
+  });
+
   it("vídeo sem conta conta sozinho, nunca no teto por conta", () => {
     const longos = [1, 2, 3].map((id) => longo({ id, contaId: null }));
     expect(escolherLongosParaLer(longos, lidos(), 5, AGORA)).toEqual([1, 2, 3]);
@@ -346,6 +367,8 @@ describe("longosParaLer (o orçamento da semana, no banco)", () => {
 
     const jaLidos = await longosLidosNaSemana(nichoId, AGORA);
     expect(jaLidos.total).toBe(2);
+    // os minutos de vídeo lidos na semana (dois longos de 10 minutos)
+    expect(jaLidos.minutos).toBe(20);
     expect(jaLidos.porConta.get(contaA)).toBe(1);
     expect(jaLidos.porConta.get(contaB)).toBe(1);
     expect(jaLidos.porConta.get(contaC)).toBeUndefined();
@@ -354,6 +377,28 @@ describe("longosParaLer (o orçamento da semana, no banco)", () => {
     const ids = await longosParaLer(nichoId, AGORA);
     const porId = new Map((await db().select({ id: videos.id, idExterno: videos.idExterno }).from(videos)).map((v) => [v.id, v.idExterno]));
     expect(ids.map((id) => porId.get(id))).toEqual(["novo1", "novo4", "novo5"]);
+  });
+
+  it("a cadência semanal: o que a rodada de domingo transcreveu não gasta a vaga da rodada do domingo seguinte (a semana renderia metade)", async () => {
+    // a rodada anterior foi há sete dias: os vídeos saíram de 1 a 10 minutos depois do começo dela
+    const contasDaRodada = [contaA, contaB, contaC, contaA, contaB];
+    for (const [i, conta] of contasDaRodada.entries()) {
+      await semear({ idExterno: `rodada-anterior-${i}`, transcricao: "texto", transcritoEm: new Date(AGORA.getTime() - 7 * DIA_MS + (i + 1) * 60_000), conta });
+    }
+    for (const [i, conta] of [contaC, contaB, contaA, contaC, contaB].entries()) await semear({ idExterno: `novo-${i}`, conta, foraDaCurva: String(9 - i) + ".000" });
+
+    const jaLidos = await longosLidosNaSemana(nichoId, AGORA);
+    expect(jaLidos.total).toBe(0);
+    expect(jaLidos.minutos).toBe(0);
+    expect((await longosParaLer(nichoId, AGORA)).length).toBe(config.regras.longosParaLerPorSemana);
+  });
+
+  it("a nova tentativa que vence daqui a poucas horas já vale (o cron nasce antes da hora marcada)", async () => {
+    await semear({ idExterno: "espera-pouco", proximaTentativa: new Date(AGORA.getTime() + 60 * 60_000) });
+    await semear({ idExterno: "espera-muito", proximaTentativa: new Date(AGORA.getTime() + 2 * DIA_MS), conta: contaB });
+    const ids = await longosParaLer(nichoId, AGORA);
+    const porId = new Map((await db().select({ id: videos.id, idExterno: videos.idExterno }).from(videos)).map((v) => [v.id, v.idExterno]));
+    expect(ids.map((id) => porId.get(id))).toEqual(["espera-pouco"]);
   });
 
   it("zera quando o orçamento da semana acabou", async () => {

@@ -91,6 +91,22 @@ export const textosCustosAdmin = {
     cortada: (n: number) => `Mostrando as ${n} mais recentes; os totais acima são da janela inteira.`,
     indisponivel: "Não foi possível ler as pesquisas agora. O resto da aba continua valendo; tente de novo em instantes.",
   },
+  /** E52 (PR 2): o que a leitura dos vídeos longos do YouTube gastou. Já está somado nas outras contas da aba; aqui só aparece separado. */
+  longos: {
+    titulo: "Vídeos longos",
+    legenda: "30 dias, com hoje",
+    vazio: (porSemana: number) => `A leitura dos vídeos longos ainda não rodou. Ela roda uma vez por semana, no domingo de manhã, e lê no máximo ${porSemana} ${porSemana === 1 ? "vídeo" : "vídeos"} por ramo.`,
+    resumo: (execucoes: number, lidos: number) =>
+      `${execucoes} ${execucoes === 1 ? "rodada" : "rodadas"}, ${lidos} ${lidos === 1 ? "vídeo lido" : "vídeos lidos"}`,
+    minutos: (n: number) => `${n.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} min de áudio transcritos pela Groq (a legenda do YouTube não custa)`,
+    proxy: (mb: number) => `${mb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} MB de áudio pelo proxy`,
+    ia: (usd: string, chamadas: number) => `leitura da estrutura pela IA: ${usd} em ${chamadas} ${chamadas === 1 ? "chamada" : "chamadas"}`,
+    /** Uma linha por ramo: o que leu e quantos minutos de áudio transcreveu (a legenda do YouTube não entra). */
+    porRamo: (lidos: number, minutos: number) =>
+      `${lidos} ${lidos === 1 ? "vídeo lido" : "vídeos lidos"}, ${minutos.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} min de áudio transcritos`,
+    nota: (videosPorSemana: number, minutosPorSemana: number) =>
+      `Por ramo, no máximo ${videosPorSemana} ${videosPorSemana === 1 ? "vídeo" : "vídeos"} e ${minutosPorSemana} minutos de vídeo por semana. O custo daqui também está somado em "Por ramo", em "Fora da IA" e em "Por onde o dinheiro vai", que vão até ontem; este bloco inclui hoje.`,
+  },
   fixos: {
     titulo: "Os fixos",
     legenda: "o que se paga todo mês, sem depender do uso",

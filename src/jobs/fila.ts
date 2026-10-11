@@ -38,6 +38,11 @@ export const FILAS = {
   analisarVisual: "analisar-visual",
   /** E28: os comentários dos vídeos mais vistos do setor (YouTube), a leitura barata deles e as vozes do público; semanal, domingo antes da análise visual. */
   comentariosSemana: "comentarios-semana",
+  /**
+   * E52 (PR 2): a leitura dos vídeos longos do YouTube de cada setor (a transcrição dos poucos da semana e a leitura da estrutura); semanal, domingo de manhã. Job longo de
+   * propósito (fora de `FILAS_CURTAS`): cada vídeo passa pelo proxy e pela Groq, um de cada vez.
+   */
+  lerLongos: "ler-longos",
   /** M3, item 2: vídeo sem fala (quadros + legenda), diário, só para setor que aceita. */
   extrairSemFala: "extrair-sem-fala",
   modeloNicho: "modelo-nicho",
@@ -96,6 +101,7 @@ export const FILAS_POR_RAMO = new Set<string>([
   FILAS.extrairAgora,
   FILAS.extrairSemFala,
   FILAS.comentariosSemana,
+  FILAS.lerLongos,
   FILAS.temasDoDia,
   FILAS.pesquisaDeSetor,
 ]);

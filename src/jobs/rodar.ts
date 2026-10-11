@@ -32,6 +32,7 @@ import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
 import { rodarLembrete } from "./lembrete";
+import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
 import { rodarMetaHashtags } from "./meta-hashtags";
 import { rodarModeloNicho } from "./modelo-nicho";
@@ -88,6 +89,11 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.comentariosSemana]: () => {
     const nichoIdArg = process.argv[3];
     return rodarComentariosSemana(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
+  },
+  /** E52 (PR 2): com um número na linha de comando, só aquele setor; sem, todo setor ativo (o cron semanal). */
+  [FILAS.lerLongos]: () => {
+    const nichoIdArg = process.argv[3];
+    return rodarLerLongos(nichoIdArg === undefined ? undefined : Number(nichoIdArg));
   },
   [FILAS.extrairSemFala]: () => {
     const nichoIdArg = process.argv[3];

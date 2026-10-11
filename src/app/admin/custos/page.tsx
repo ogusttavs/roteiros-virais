@@ -2,9 +2,11 @@ import Link from "next/link";
 
 import { CAMBIO_DATA_TEXTO, CAMBIO_USD_BRL, CUSTO_FIXO_MENSAL_BRL, usdParaBrl } from "@/config/dinheiro";
 import { DATA_PRECO_APIFY, DATA_PRECO_PROXY, PRECO_BUSCA_WEB_USD, PRECO_PROXY_USD_POR_GB } from "@/config/precos-ia";
+import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { exigirAdmin } from "@/lib/sessao";
 import { custosDoAdmin, desfechoDaPesquisa, pesquisasNaHoraDoAdmin } from "@/servicos/admin-custos";
+import { custosDosLongos } from "@/servicos/custos-dos-longos";
 import { dolares, reais } from "@/textos/admin-contas";
 import { textosCustosAdmin as t } from "@/textos/admin-custos";
 
@@ -37,6 +39,11 @@ export default async function CustosDoAdmin() {
       return null;
     }),
   ]);
+  // E52 (PR 2): uma seção nova de leitura; se ela falhar, o resto da aba (e o teto) continua de pé.
+  const longos = await custosDosLongos().catch((erro: unknown) => {
+    logger.warn({ err: erro }, "admin custos: nao foi possivel ler o custo dos videos longos");
+    return null;
+  });
   const hojeBrl = usdParaBrl(c.hoje.usd);
   const pctTeto = c.tetoBrl > 0 ? (hojeBrl / c.tetoBrl) * 100 : 0;
   const variaMes = usdParaBrl(c.ultimos30Usd + c.foraDaIA.totalUsd);
@@ -238,6 +245,54 @@ export default async function CustosDoAdmin() {
           )}
           <p className={styles.nota}>{t.foraDaIA.nota(`${diaApify}/${mesApify}/${anoApify}`, `${diaProxy}/${mesProxy}/${anoProxy}`, PRECO_PROXY_USD_POR_GB)}</p>
         </section>
+
+        {longos ? (
+          <section className={styles.cartao} aria-labelledby="t-longos" data-bloco="longos">
+            <div className={styles.tabelaTitulo}>
+              <h2 id="t-longos">{t.longos.titulo}</h2>
+              <span className={styles.quantos}>{t.longos.legenda}</span>
+            </div>
+            {longos.execucoes === 0 && longos.lidos === 0 ? (
+              <p className={styles.semDado}>{t.longos.vazio(config.regras.longosParaLerPorSemana)}</p>
+            ) : (
+              <>
+                <ul className={styles.lista} data-resumo-dos-longos>
+                  <li className={styles.itemCusto}>
+                    <span className={styles.nomeCusto}>
+                      {t.longos.resumo(longos.execucoes, longos.lidos)}
+                      <span className={styles.detalheCusto}>{t.longos.minutos(longos.minutos)}</span>
+                      <span className={styles.detalheCusto}>{t.longos.proxy(longos.proxyMb)}</span>
+                      <span className={styles.detalheCusto}>{t.longos.ia(dolares(longos.iaUsd), longos.chamadasDeIA)}</span>
+                    </span>
+                    <span className={styles.valorCusto}>
+                      {reais(usdParaBrl(longos.totalUsd))}
+                      <span className={styles.detalheCusto}>{dolares(longos.totalUsd)}</span>
+                    </span>
+                    <span />
+                  </li>
+                </ul>
+                {longos.porRamo.length > 0 ? (
+                  <ul className={styles.lista} data-lista-dos-longos>
+                    {longos.porRamo.map((r) => (
+                      <li key={r.ramoId ?? "sem"} className={styles.itemCusto} data-ramo-dos-longos={r.ramoId ?? "sem"}>
+                        <span className={styles.nomeCusto}>
+                          {r.nome}
+                          <span className={styles.detalheCusto}>{t.longos.porRamo(r.lidos, r.minutos)}</span>
+                        </span>
+                        <span className={styles.valorCusto}>
+                          {reais(usdParaBrl(r.usd))}
+                          <span className={styles.detalheCusto}>{dolares(r.usd)}</span>
+                        </span>
+                        <span />
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </>
+            )}
+            <p className={styles.nota}>{t.longos.nota(config.regras.longosParaLerPorSemana, config.regras.longosMinutosPorSemana)}</p>
+          </section>
+        ) : null}
       </div>
 
       {/* E54 (parte 4): uma linha por pesquisa na hora, para a prova com a chave real ter onde olhar (o estimado que a tela diz, o medido, o desfecho). */}
