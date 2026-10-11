@@ -119,6 +119,51 @@
   color: var(--cor-texto-dica);
 }
 
+/* O pedido, a marca e o desfecho da pesquisa se leem por inteiro: quebram a linha em vez de cortar com reticências (o `table td` vence o `nowrap` do `.tabela td` do admin). */
+table td.pedidoDaPesquisa {
+  min-width: 10rem;
+  max-width: 14rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+table td.marcaDaPesquisa {
+  min-width: 6rem;
+  max-width: 9rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.pedidoDaPesquisa .detalheCusto {
+  display: block;
+}
+
+/* As linhas do resumo das pesquisas: o nome e o valor lado a lado, e empilhados na tela estreita (o valor comprido espremia o nome a uma palavra por linha). */
+.linhaDaPesquisa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--espaco-1) var(--espaco-4);
+  align-items: baseline;
+}
+
+.valorDaPesquisa {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  font: var(--peso-semibold) var(--tamanho-secundario) / 1.2 var(--fonte-mono);
+  color: var(--cor-titulo);
+}
+
+@media (max-width: 36rem) {
+  .linhaDaPesquisa {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .valorDaPesquisa {
+    justify-items: start;
+  }
+}
+
 .fixos {
   display: grid;
   gap: var(--espaco-3);
