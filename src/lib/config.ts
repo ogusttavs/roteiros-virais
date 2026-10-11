@@ -226,6 +226,18 @@ export const config = {
      */
     tetoDuracaoReferenciaS: envNumero("TETO_DURACAO_REFERENCIA_S", 180),
     /**
+     * E52 (PR 1), o vídeo longo do YouTube: acima do teto de 180 s até este limite o vídeo é "longo" (`servicos/videos-longos.ts`).
+     * Fica de fora o que passa disto (transmissão ao vivo, podcast de horas, aula inteira): não é o modelo de um roteiro de uns
+     * dez minutos. `VIDEO_LONGO_MAX_S` ajusta; hipótese do Sonnet, 40 minutos.
+     */
+    videoLongoMaxS: envNumero("VIDEO_LONGO_MAX_S", 2400),
+    /** E52 (PR 1): a janela dos longos que a lista e a fila de transcrição olham (o vídeo longo fora da curva é raro no setor, então 30 dias, e não 7). */
+    longosJanelaDias: envNumero("LONGOS_JANELA_DIAS", 30),
+    /** E52 (PR 1): a janela de onde saem a duração e a estrutura típicas dos longos (mais larga que a da lista: a amostra é pequena). */
+    longosMedidaJanelaDias: envNumero("LONGOS_MEDIDA_JANELA_DIAS", 90),
+    /** E52 (PR 1): quantos vídeos longos por setor, por semana, ganham leitura (a transcrição de um longo custa dez vezes a de um curto). */
+    longosParaLerPorSemana: envNumero("LONGOS_PARA_LER_POR_SEMANA", 5),
+    /**
      * M2, item 2: filtro de "tem alcance" do job `pesquisa-de-setor`, mediana de views dos
      * últimos vídeos do candidato. Bem mais baixo que `pisoViewsReferencia` (o piso de um vídeo
      * VIRAR referência): aqui é só "essa conta tem audiência de verdade", não "todo vídeo dela

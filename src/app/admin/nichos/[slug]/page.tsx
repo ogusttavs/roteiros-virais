@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ROTULO_TEMA_CARTAO } from "@/ia/enums";
 import { FILAS } from "@/jobs/fila";
 import { config } from "@/lib/config";
+import { logger } from "@/lib/log";
 import { exigirAdmin } from "@/lib/sessao";
 import {
   listarContasSemente,
@@ -21,16 +22,21 @@ import {
   videosPorId,
 } from "@/servicos/admin-coleta";
 import { listarPerfisIndicados } from "@/servicos/perfis-analisados";
-import { estatisticasDoSetor, foraDaCurvaDoNicho, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
+import { estatisticasDoSetor, foraDaCurvaDoNicho, reguaDoSetor, subindoHoje, type VideoRankeado } from "@/servicos/pesquisa";
+import { longosDoSetor, longosLidosNaSemana, medidaDosLongos } from "@/servicos/videos-longos";
 import { vozesParaOAdmin, vozesValidas } from "@/servicos/vozes-do-publico";
 import { textosAdmin } from "@/textos/admin";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
 import styles from "./page.module.css";
 import { PainelNicho } from "./PainelNicho";
+import { VideosLongosDoSetor } from "./VideosLongosDoSetor";
 import { idsDeVideoDasVozes, VozesDoPublico } from "./VozesDoPublico";
 
 const t = textosAdmin.nichoDetalhe;
+
+/** Quantos vídeos longos a seção lista (o resto fica na contagem: a medida é de todos). */
+const LONGOS_NA_LISTA = 10;
 
 function formatarNumero(valor: number | null, casas = 1): string {
   if (valor === null) return t.semDado;
@@ -126,6 +132,16 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
   const videoPorId = new Map(evidencias.map((v) => [v.id, v]));
   const videoDaVoz = new Map(videosDasVozes.map((v) => [v.id, { titulo: v.titulo, url: v.url }]));
   const vozesVigentes = vozesValidas(nicho.vozes, nicho.vozesEm) !== null;
+  // E52 (PR 1): os vídeos longos do ramo. Uma seção nova de leitura: se a consulta falhar, o resto da página continua e a seção some.
+  const longos = await Promise.all([
+    medidaDosLongos(nicho.id),
+    longosDoSetor(nicho.id),
+    longosLidosNaSemana(nicho.id),
+    reguaDoSetor(nicho.id),
+  ]).catch((erro: unknown) => {
+    logger.error({ err: erro, nicho: nicho.slug }, "admin do setor: nao foi possivel ler os videos longos");
+    return null;
+  });
   const noticiaPorId = new Map(evidenciasNoticias.map((n) => [n.id, n]));
 
   const jobsColeta = [FILAS.coletaYoutube, FILAS.coletaApify, FILAS.coletaNoticias].map((nome) => ({
@@ -275,6 +291,21 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         piso={config.regras.vozesMinimoDeComentarios}
         videos={videoDaVoz}
       />
+
+      {longos ? (
+        <VideosLongosDoSetor
+          medida={longos[0]}
+          lista={longos[1].filter((v) => v.classificacao !== "outro").slice(0, LONGOS_NA_LISTA)}
+          totalNaLista={longos[1].filter((v) => v.classificacao !== "outro").length}
+          piso={longos[3].pisoViews}
+          lidosNaSemana={longos[2].total}
+          porSemana={config.regras.longosParaLerPorSemana}
+          tetoS={config.regras.tetoDuracaoReferenciaS}
+          maximoS={config.regras.videoLongoMaxS}
+          janelaDaListaDias={config.regras.longosJanelaDias}
+          janelaDaMedidaDias={config.regras.longosMedidaJanelaDias}
+        />
+      ) : null}
 
       <section className={styles.secao}>
         <div className={styles.tituloComContagem}>
