@@ -23,8 +23,11 @@
  * (Instagram é o padrão do produto, sem rede escolhida); YouTube soma as regras de vídeo longo
  * às de Short quando a duração típica do nicho passa de 60s, porque as duas se aplicam ao mesmo
  * vídeo nesse caso. Versao 1.2.0.
+ *
+ * E52 (PR 3, o roteiro longo): entram as onze regras dos capítulos do YouTube (R-YT-VIDEO-05 a 15, seção 9.4 das rubricas, da página oficial de ajuda baixada na base de plataformas) e o
+ * conjunto que o roteiro longo recebe. O que o Reels e o Story recebem não muda. Versao 1.3.0.
  */
-export const versao = "1.2.0";
+export const versao = "1.3.0";
 
 export type RegraFormato = { numero: string; texto: string };
 
@@ -267,6 +270,70 @@ export const REGRAS_YT_VIDEO: RegraFormato[] = [
     texto: "Série: o vídeo novo aponta para o anterior.",
   },
 ];
+
+/**
+ * `estrategia/briefing-e-rubricas.md`, seção 9.4 (E52, PR 3): os capítulos de um vídeo do YouTube, da página oficial de ajuda
+ * (`pesquisa/plataformas/docs/youtube/capitulos-de-video.md`, baixada em 11/10/2026). As quatro primeiras (05 a 08) são as fortes e conferíveis por código (`lib/capitulos-do-roteiro.ts`);
+ * as outras são informação para a tela de ajuda e para o que o prompt não pode inventar (a nota da seção 9.4: limite de capítulos, tamanho do título, formato além do 00:00).
+ */
+export const REGRAS_YT_CAPITULOS: RegraFormato[] = [
+  {
+    numero: "R-YT-VIDEO-05",
+    texto: `Para o vídeo ganhar capítulos escritos por nós, a descrição leva uma lista de marcações de tempo, cada uma com o seu título.`,
+  },
+  {
+    numero: "R-YT-VIDEO-06",
+    texto: `A primeira marcação da lista é 00:00.`,
+  },
+  {
+    numero: "R-YT-VIDEO-07",
+    texto: `A lista tem pelo menos três marcações de tempo, em ordem crescente.`,
+  },
+  {
+    numero: "R-YT-VIDEO-08",
+    texto: `Cada capítulo dura no mínimo 10 segundos: a distância entre uma marcação e a seguinte não pode ser menor que isso.`,
+  },
+  {
+    numero: "R-YT-VIDEO-09",
+    texto: `Capítulos escritos na descrição substituem os capítulos automáticos do mesmo vídeo; quem escreve os seus não precisa desligar os automáticos.`,
+  },
+  {
+    numero: "R-YT-VIDEO-10",
+    texto: `O YouTube também pode gerar capítulos sozinho. Nos envios novos a caixa "Permitir capítulos automáticos" já vem marcada, mas nem todo vídeo recebe capítulos automáticos, e canal com avisos ativos ou conteúdo inadequado para alguns espectadores não os tem. Por isso o roteiro não deve contar com os automáticos: se queremos capítulos, entregamos a lista.`,
+  },
+  {
+    numero: "R-YT-VIDEO-11",
+    texto: `Como desligar os capítulos automáticos, em vídeo específico: YouTube Studio, Conteúdo, o vídeo, MOSTRAR MAIS, desmarcar "Permitir capítulos automáticos", SALVAR. A página também cita o desligamento em massa (sem detalhar os passos).`,
+  },
+  {
+    numero: "R-YT-VIDEO-12",
+    texto: `Como desligar para todos os envios futuros: YouTube Studio, Configurações, Padrões de envio, Configurações avançadas, desmarcar "Permitir capítulos automáticos (quando disponível)", SALVAR.`,
+  },
+  {
+    numero: "R-YT-VIDEO-13",
+    texto: `Para que serve: capítulos dividem o vídeo em seções, cada uma com prévia própria, dão informação e contexto sobre cada parte e facilitam achar e rever certas partes. Por isso cada capítulo deve ser uma parte que se entende e se acha sozinha (uma etapa, uma pergunta respondida).`,
+  },
+  {
+    numero: "R-YT-VIDEO-14",
+    texto: `Os capítulos podem aparecer nas transcrições do vídeo.`,
+  },
+  {
+    numero: "R-YT-VIDEO-15",
+    texto: `Se o cliente ainda não vê a opção de capítulos, a página manda solicitar acesso aos recursos avançados do canal.`,
+  },
+];
+
+/**
+ * O que o roteiro longo segue: as quatro regras de vídeo longo de sempre, as quatro fortes dos capítulos e a que diz para que um capítulo serve (a 13, fraca, é leitura nossa da página).
+ * As de ajuda ao cliente (09 a 12, 14 e 15) não entram no prompt: não mudam o que se escreve.
+ */
+export const REGRAS_ROTEIRO_LONGO: RegraFormato[] = [
+  ...REGRAS_YT_VIDEO,
+  ...REGRAS_YT_CAPITULOS.filter((r) => ["R-YT-VIDEO-05", "R-YT-VIDEO-06", "R-YT-VIDEO-07", "R-YT-VIDEO-08", "R-YT-VIDEO-13"].includes(r.numero)),
+];
+
+/** Os números válidos para o `porQueAssim` do roteiro longo: o verificador descarta citação de regra que não esteja aqui. */
+export const NUMEROS_REGRAS_ROTEIRO_LONGO = new Set(REGRAS_ROTEIRO_LONGO.map((r) => r.numero));
 
 /** O texto das regras, uma por linha, com o número na frente (o que entra no bloco estável do prompt). */
 export function textoRegras(regras: RegraFormato[]): string {

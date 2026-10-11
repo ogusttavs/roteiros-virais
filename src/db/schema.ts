@@ -1028,6 +1028,13 @@ export const ESTILOS_ROTEIRO = ["falado", "sem_fala"] as const;
 export type EstiloRoteiro = (typeof ESTILOS_ROTEIRO)[number];
 
 /**
+ * E52 (PR 3): quanto o vídeo dura, ortogonal ao formato e ao estilo. "curto" é o de sempre (o Reels de até um minuto, o padrão); "longo" é o vídeo do YouTube de mais de 3 minutos, por
+ * capítulos (`ConteudoRoteiro.capitulos`, `servicos/roteiro-longo.ts`), com a duração-alvo medida nos vídeos longos do próprio ramo.
+ */
+export const DURACOES_DO_VIDEO = ["curto", "longo"] as const;
+export type DuracaoDoVideo = (typeof DURACOES_DO_VIDEO)[number];
+
+/**
  * E39a: em que parte do dia um Story acontece, pergunta só para Story (um Reels não tem "quando
  * no dia", só "quando no calendário"). A pessoa completa o rótulo com as próprias palavras ("Manhã,
  * saindo de casa"); estas quatro chaves são só a parte fixa, do jeito que o desenho do Opus
@@ -1896,6 +1903,23 @@ export const FIGURINHAS_STORY = [
 ] as const;
 export type FigurinhaStory = (typeof FIGURINHAS_STORY)[number];
 
+/**
+ * E52 (PR 3): um capítulo do roteiro longo. A duração é o que o modelo escreve; o início é calculado (a soma das durações antes, `lib/capitulos-do-roteiro.ts`), então o primeiro é sempre
+ * 0 e a lista cresce por construção. `ganchoParaOProximo` é a frase INTEIRA que segura a pessoa até o capítulo seguinte (nula no último, que fecha com a chamada); `pontos` é o resto,
+ * em pontos curtos: ler dez minutos de texto escrito soa lido, e a tese é a pessoa falando do jeito dela.
+ */
+export type CapituloDoRoteiro = {
+  nome: string;
+  inicioS: number;
+  duracaoS: number;
+  /** O tom em uma palavra (a lista curta e fixa do roteiro). */
+  tom: string;
+  pontos: string[];
+  naImagem: string;
+  ganchoParaOProximo: string | null;
+  comoEditar: string;
+};
+
 /** Um cartão de Story (V9c, item 2, `R-IG-STORY-03`): o que falar, o que mostrar, o texto fixo e a figurinha. */
 export type CartaoStory = {
   oQueFalar: string;
@@ -1964,6 +1988,13 @@ export type ConteudoRoteiro = {
    * com copiar (item 5).
    */
   legenda?: string | null;
+  /**
+   * E52 (PR 3): só no roteiro longo (`roteiros.duracao_do_video = "longo"`): os capítulos, em ordem, que somam `duracaoS`. Nulo ou ausente em todo outro roteiro. Opcional pelo mesmo motivo
+   * de `legenda`: não reescrever toda fixture de teste.
+   */
+  capitulos?: CapituloDoRoteiro[] | null;
+  /** E52 (PR 3): a miniatura descrita (o que aparece e o texto curto nela); só no roteiro longo. */
+  miniatura?: string | null;
   /**
    * E54 (parte 2): só no roteiro que nasceu de uma pesquisa na hora (os três ganchos, o que pode aparecer, as fontes e o "Atenção"). Opcional,
    * como `legenda`, para não reescrever fixture de teste; ausente ou nulo em todo roteiro comum.
@@ -2038,6 +2069,8 @@ export const roteiros = pgTable(
     formato: text("formato").$type<FormatoRoteiro>().notNull().default("reels"),
     /** M4, item 2: "falado" (padrão) ou "sem_fala", ortogonal ao formato; reescrever mantém o estilo da versão anterior. */
     estilo: text("estilo").$type<EstiloRoteiro>().notNull().default("falado"),
+    /** E52 (PR 3): "curto" (padrão) ou "longo"; reescrever mantém a duração da versão anterior. Só o longo tem `conteudo.capitulos`. */
+    duracaoDoVideo: text("duracao_do_video").$type<DuracaoDoVideo>().notNull().default("curto"),
     /**
      * E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto que a pessoa
      * escreve no tema livre, na folha do momento ou no dia do plano (mesmo nome em

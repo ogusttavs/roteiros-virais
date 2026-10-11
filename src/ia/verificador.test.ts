@@ -1002,3 +1002,109 @@ describe("E49 PR 1, a ficha 'que guardem para depois'", () => {
     expect(temAlgoParaGuardar("Eu gosto muito disso")).toBe(false);
   });
 });
+
+describe("verificarExtra (E52 PR 3, a conferência que só a tarefa conhece)", () => {
+  afterEach(() => {
+    gerarEstruturadoMock.mockReset();
+    registrarGeracaoMock.mockClear();
+  });
+
+  const base = {
+    tarefa: "roteiro" as const,
+    nivel: "forte" as const,
+    schema: z.object({ corpo: z.string(), capitulos: z.number() }),
+    sistemaEstavel: "sistema estavel",
+    versaoPrompt: "1.0.0",
+    extrairCampos: (dados: { corpo: string; capitulos: number }) => ({ corpo: dados.corpo }),
+    entrada: "entrada original",
+    verificarExtra: (dados: { corpo: string; capitulos: number }) => (dados.capitulos < 3 ? [`capitulos: ${dados.capitulos}, o YouTube pede pelo menos 3 (R-YT-VIDEO-07)`] : []),
+  };
+
+  const aprovado = { dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero };
+
+  it("reprova a primeira tentativa pelo motivo da tarefa, manda o motivo para a segunda e aceita a segunda", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo", capitulos: 2 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo de novo", capitulos: 4 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce(aprovado);
+
+    const resultado = await gerarComVerificacao(base);
+
+    expect(resultado.dados).toEqual({ corpo: "texto limpo de novo", capitulos: 4 });
+    const segunda = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
+    expect(segunda.entrada).toContain(MARCADOR_SEGUNDA_TENTATIVA);
+    expect(segunda.entrada).toContain("R-YT-VIDEO-07");
+    // a conferência de texto (a IA) só roda na que passou: a primeira nem chegou nela
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+    expect((gerarEstruturadoMock.mock.calls[0][0] as { tarefa: string }).tarefa).toBe("roteiro");
+    expect((gerarEstruturadoMock.mock.calls[2][0] as { tarefa: string }).tarefa).toBe("verificarTexto");
+  });
+
+  it("reprovar nas duas tentativas é ErroIA, com as duas registradas e a conferência de texto nunca chamada", async () => {
+    gerarEstruturadoMock.mockResolvedValue({ dados: { corpo: "texto limpo", capitulos: 1 }, modelo: "mock", ...usoZero });
+
+    await expect(gerarComVerificacao(base)).rejects.toThrow(ErroIA);
+
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+    expect(registrarGeracaoMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("junta o motivo da tarefa com os motivos de sempre", async () => {
+    gerarEstruturadoMock.mockResolvedValue({ dados: { corpo: "isso aumenta o alcance", capitulos: 1 }, modelo: "mock", ...usoZero });
+
+    await expect(gerarComVerificacao(base)).rejects.toThrow(ErroIA);
+
+    // a segunda tentativa recebe os dois: o jargão da conferência de sempre e o número de capítulos da tarefa
+    const segunda = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
+    expect(segunda.entrada).toContain("alcance");
+    expect(segunda.entrada).toContain("R-YT-VIDEO-07");
+  });
+
+  it("a correção mecânica não esconde o motivo da tarefa: travessão mais capítulos faltando continua reprovado", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto \u2014 com travessao", capitulos: 2 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo", capitulos: 5 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce(aprovado);
+
+    const resultado = await gerarComVerificacao(base);
+
+    // sem a conferência da tarefa depois da correção, a primeira tentativa (travessão corrigido por código, mas com 2 capítulos) passaria
+    expect(resultado.dados).toEqual({ corpo: "texto limpo", capitulos: 5 });
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("a correção mecânica só vale se a conferência da tarefa continua satisfeita com o texto corrigido", async () => {
+    // uma conferência que depende do próprio texto: a tarefa exige o marcador (o travessão, aqui) que a correção tira
+    const exigeOTravessao = { ...base, verificarExtra: (dados: { corpo: string; capitulos: number }) => (dados.corpo.includes("\u2014") ? [] : ["corpo: precisa do marcador"]) };
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto \u2014 com marcador", capitulos: 4 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "texto \u2014 de novo, com marcador", capitulos: 4 }, modelo: "mock", ...usoZero });
+
+    // sem a conferência da tarefa na correção, a primeira tentativa (travessão tirado por código) passaria; com ela, reprova e a segunda também (o marcador é o travessão)
+    await expect(gerarComVerificacao(exigeOTravessao)).rejects.toThrow(ErroIA);
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("só o travessão, com a tarefa satisfeita: a correção mecânica segue valendo, sem segunda tentativa", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto \u2014 com travessao", capitulos: 4 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce(aprovado);
+
+    const resultado = await gerarComVerificacao(base);
+
+    expect(resultado.dados.capitulos).toBe(4);
+    expect(resultado.dados.corpo).not.toContain("\u2014");
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("sem verificarExtra nada muda (a entrada e as chamadas são as de sempre)", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "texto limpo", capitulos: 1 }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce(aprovado);
+
+    const resultado = await gerarComVerificacao({ ...base, verificarExtra: undefined });
+
+    expect(resultado.dados.capitulos).toBe(1);
+    expect(gerarEstruturadoMock).toHaveBeenCalledTimes(2);
+  });
+});

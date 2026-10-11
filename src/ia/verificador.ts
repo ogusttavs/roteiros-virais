@@ -698,6 +698,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   extrairCampos: (dados: T) => Record<string, string>;
   extrairEvidencias?: (dados: T) => number[];
   /**
+   * E52 (PR 3): conferências por código de uma saída que só uma tarefa conhece (os capítulos do roteiro longo, R-YT-VIDEO-05 a 08, `lib/capitulos-do-roteiro.ts`). Cada motivo reprova a
+   * tentativa como os locais, e vai para a segunda tentativa; vazio aprova. Vale nas duas tentativas; `tentativa` diz qual é, para a tarefa relaxar o que é preferência (a faixa de
+   * duração dos curtos faz o mesmo) e manter duro o que é regra.
+   */
+  verificarExtra?: (dados: T, tentativa: 1 | 2) => string[];
+  /**
    * Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação (quando a tarefa tem
    * um) precisa continuar sendo a última linha da entrada mesmo na segunda tentativa; antes,
    * `gerarComVerificacao` colava o motivo da reprovação depois da entrada inteira (que já vinha
@@ -757,7 +763,7 @@ export async function gerarComVerificacao<T>(
     // E49 PR 1: a heurística da ficha "que guardem" vale só na primeira tentativa, como a faixa de duração: nunca derruba a geração sozinha.
     ficha: undefined,
     entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
-  });
+  }, 2);
   if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
 
   throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
@@ -802,6 +808,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
 
 async function tentarGerarEVerificar<T>(
   params: ParametrosGeracaoVerificada<T>,
+  tentativa: 1 | 2 = 1,
 ): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number }> {
   const inicio = Date.now();
   const resultado = await gerarEstruturado(params);
@@ -810,7 +817,13 @@ async function tentarGerarEVerificar<T>(
   let dados = resultado.dados;
   let campos = params.extrairCampos(dados);
   let evidencias = params.extrairEvidencias?.(dados) ?? [];
-  let local = verificarLocalmente(campos, opcoesVerificacaoLocal(params, dados));
+  // As conferências locais de sempre mais as da tarefa (`verificarExtra`); a correção mecânica abaixo é conferida pelas duas, nunca só pelas de sempre.
+  const conferirLocalmente = (camposDaTentativa: Record<string, string>, dadosDaTentativa: T) => {
+    const base = verificarLocalmente(camposDaTentativa, opcoesVerificacaoLocal(params, dadosDaTentativa));
+    const extras = params.verificarExtra?.(dadosDaTentativa, tentativa) ?? [];
+    return extras.length > 0 ? { aprovado: false, motivos: [...base.motivos, ...extras] } : base;
+  };
+  let local = conferirLocalmente(campos, dados);
 
   /**
    * M5b, achado 10 da revisão do motor (01/10/2026): quando a única coisa que reprovou é
@@ -824,7 +837,7 @@ async function tentarGerarEVerificar<T>(
   if (!local.aprovado && local.motivos.every(ehMotivoMecanico)) {
     const corrigidos = corrigirMecanicamente(dados);
     const camposCorrigidos = params.extrairCampos(corrigidos);
-    const localCorrigido = verificarLocalmente(camposCorrigidos, opcoesVerificacaoLocal(params, corrigidos));
+    const localCorrigido = conferirLocalmente(camposCorrigidos, corrigidos);
     if (localCorrigido.aprovado) {
       dados = corrigidos;
       campos = camposCorrigidos;

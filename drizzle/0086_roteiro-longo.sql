@@ -1,0 +1,1 @@
+ALTER TABLE "roteiros" ADD COLUMN "duracao_do_video" text DEFAULT 'curto' NOT NULL;

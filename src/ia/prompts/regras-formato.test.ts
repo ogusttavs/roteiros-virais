@@ -16,6 +16,7 @@ import {
   REGRAS_SHORT,
   REGRAS_STORY,
   REGRAS_TIKTOK,
+  REGRAS_YT_CAPITULOS,
   REGRAS_YT_VIDEO,
   regrasDoReels,
 } from "./regras-formato";
@@ -31,7 +32,7 @@ function numerosDaSecao9(): string[] {
   return [...encontradas].map((m) => m[1]);
 }
 
-describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", () => {
+describe("as 56 regras de plataforma (45 da E36 e as 11 dos capítulos, E52), código contra a seção 9 das rubricas", () => {
   const existe = existsSync(CAMINHO_RUBRICAS);
 
   it.skipIf(!existe)("todo número da seção 9 existe no código, e todo número do código existe na seção 9", () => {
@@ -42,6 +43,7 @@ describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", 
       ...REGRAS_TIKTOK,
       ...REGRAS_SHORT,
       ...REGRAS_YT_VIDEO,
+      ...REGRAS_YT_CAPITULOS,
     ].map((r) => r.numero));
 
     const faltamNoCodigo = [...daSecao9].filter((n) => !doCodigo.has(n));
@@ -49,7 +51,20 @@ describe("as 45 regras de plataforma, código contra a seção 9 das rubricas", 
 
     expect(faltamNoCodigo).toEqual([]);
     expect(sobramNoCodigo).toEqual([]);
-    expect(daSecao9.size).toBe(45);
+    expect(daSecao9.size).toBe(56);
+  });
+
+  it.skipIf(!existe)("as onze regras dos capítulos (R-YT-VIDEO-05 a 15) têm o texto da seção 9.4, copiado e não reescrito", () => {
+    const texto = readFileSync(CAMINHO_RUBRICAS, "utf8");
+    const doDocumento = new Map<string, string>();
+    for (const linha of texto.split(String.fromCharCode(10))) {
+      const m = /^\|\s*(R-YT-VIDEO-(?:0[5-9]|1[0-5]))\s*\|\s*(.*?)\s*\|\s*(?:forte|média|fraca)/.exec(linha);
+      if (m) doDocumento.set(m[1], m[2]);
+    }
+    expect([...doDocumento.keys()].sort()).toEqual(REGRAS_YT_CAPITULOS.map((r) => r.numero).sort());
+    for (const regra of REGRAS_YT_CAPITULOS) {
+      expect(regra.texto, regra.numero).toBe(doDocumento.get(regra.numero));
+    }
   });
 
   if (!existe) {

@@ -15,6 +15,7 @@ const CHAVE_TETO = "teto_diario_brl";
 /** O que cada tarefa de IA é, em língua de gente, para "Por onde o dinheiro vai". O que não está aqui aparece pelo nome da tarefa. */
 export const ROTULO_DA_TAREFA: Record<string, string> = {
   roteiro: "IA: escrever os roteiros",
+  roteiroLongo: "IA: escrever os roteiros longos",
   verificarTexto: "IA: conferir o que foi escrito",
   temasDoDia: "IA: temas do dia",
   avaliarTema: "IA: notas dos temas",
