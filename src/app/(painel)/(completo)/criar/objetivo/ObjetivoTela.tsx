@@ -19,6 +19,7 @@ import { ehFalhaDeRede } from "@/lib/offline";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosObjetivo } from "@/textos/objetivo";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { BarraAcao } from "@/ui/componentes/BarraAcao";
 import { CampoComFala } from "@/ui/componentes/CampoComFala";
 import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
@@ -53,6 +54,8 @@ type Props = {
   assuntoEmAlta?: string;
   /** E28 (parte 3): a chave da pergunta do público que a pessoa trouxe presa ao Tema livre; vai ao servidor junto, para o roteiro responder a ela. */
   perguntaChave?: string;
+  /** E54 (parte 3): a pesquisa que a pessoa aprovou para este vídeo (`?pesquisa=`), com quantos dados ela marcou; o id vai ao servidor junto, que confere de novo que é desta marca. */
+  pesquisa?: { id: number; dados: number };
 };
 
 /** `/criar/objetivo` (etapa 11, brief-frontend.md 6.3; `ObjetivoFluxo.dc.html`). */
@@ -69,6 +72,7 @@ export function ObjetivoTela({
   paraHoje = false,
   assuntoEmAlta,
   perguntaChave,
+  pesquisa,
 }: Props) {
   // V12c, item 3: pessoa tem "quem aparece" fixo (config/briefing.ts); o controle nem aparece.
   const opcoesQuemAparece = dadosFixosDoBriefing(tipo).quemGrava;
@@ -173,6 +177,7 @@ export function ObjetivoTela({
           assuntoEmAlta,
           noticiaAssuntoId,
           perguntaChave,
+          pesquisa?.id,
         );
         if (saiuRef.current) return;
         if (!resultado.ok) {
@@ -233,6 +238,7 @@ export function ObjetivoTela({
           <div className={styles.temaEscolhido}>
             <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
             <span className={styles.tema}>{temaEscolhidoTexto}</span>
+            {pesquisa ? <span className={styles.comPesquisa}>{textosPesquisa.objetivo.comPesquisa(pesquisa.dados)}</span> : null}
           </div>
           {pergunta && ficha ? (
             <div className={styles.temaEscolhido}>
@@ -263,6 +269,7 @@ export function ObjetivoTela({
       <div className={styles.temaEscolhido}>
         <span className={styles.rotulo}>{textosObjetivo.temaEscolhido}</span>
         <span className={styles.tema}>{temaEscolhidoTexto}</span>
+        {pesquisa ? <span className={styles.comPesquisa}>{textosPesquisa.objetivo.comPesquisa(pesquisa.dados)}</span> : null}
       </div>
       <div className={styles.colunaPrincipal}>
       <h1 className={styles.pergunta}>{formato === "story" ? textosObjetivo.storyTitulo : pergunta ? textosObjetivo.pergunta : textosObjetivo.semFalaTitulo}</h1>

@@ -134,3 +134,20 @@
   font-weight: var(--peso-semibold);
   color: var(--cor-titulo);
 }
+
+/* E54 (parte 3): o número pequeno depois da frase que usa um dado; leva às "Fontes". */
+.refFonte {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 0.25em;
+  padding: 0 0.4em;
+  min-height: 1.2em;
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  font-family: var(--fonte-mono);
+  font-size: 0.65em;
+  font-weight: var(--peso-semibold);
+  line-height: 1;
+  color: var(--cor-texto-suave);
+  vertical-align: 0.35em;
+}

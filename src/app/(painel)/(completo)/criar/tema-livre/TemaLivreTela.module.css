@@ -349,6 +349,12 @@
   justify-items: start;
 }
 
+/* E54 (parte 3): o campo "Pesquisar antes de escrever" ocupa a largura inteira, não só a do botão. */
+.campoPesquisar {
+  justify-self: stretch;
+  width: 100%;
+}
+
 /* ---------- abaixoDaMeta: o ângulo sugerido ---------- */
 
 .recomendacao {

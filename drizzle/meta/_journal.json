@@ -589,6 +589,13 @@
       "when": 1791674522415,
       "tag": "0083_pesquisa-na-hora-no-roteiro",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1791679970327,
+      "tag": "0084_pesquisa-na-hora-destino",
+      "breakpoints": true
     }
   ]
 }

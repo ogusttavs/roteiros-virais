@@ -1,29 +1,6 @@
 "use client";
 
-import {
-  ArrowLeft,
-  Copy,
-  Check,
-  Download,
-  Ellipsis,
-  Eye,
-  HelpCircle,
-  History,
-  ImageDown,
-  Mic,
-  Music,
-  Newspaper,
-  Pencil,
-  Play,
-  RotateCcw,
-  Scissors,
-  Search,
-  Sparkles,
-  TrendingUp,
-  Type,
-  Video,
-  X,
-} from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, Download, Ellipsis, ExternalLink, Eye, HelpCircle, History, ImageDown, Mic, Music, Newspaper, Pencil, Play, RotateCcw, Scissors, Search, Sparkles, TrendingUp, Type, Video, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -47,12 +24,14 @@ import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/li
 import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
+import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
 import type { VideoParaEmbed } from "@/servicos/pesquisa";
 import type { RoteiroLinha, VersaoRoteiro } from "@/servicos/roteiro";
 import { textosComuns } from "@/textos/comuns";
 import { textosConexao } from "@/textos/conexao";
 import { textosGravacao } from "@/textos/gravacao";
 import { textosMarcasDeFala } from "@/textos/marcas-de-fala";
+import { textosPesquisa } from "@/textos/pesquisa";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -255,6 +234,8 @@ type Props = {
   grupoDeVersoes?: { grupo: string; total: number } | null;
   /** E53 (parte 3): a notícia de onde o roteiro veio (do setor ou de um assunto da marca), com o link revalidado; nula nos outros. */
   noticiaDeOrigem?: { titulo: string; veiculo: string; url: string | null; dia: string | null } | null;
+  /** E54 (parte 3): a pesquisa na hora de que o roteiro nasceu (a cópia guardada): o selo, o "Atenção", o "pode aparecer" e as fontes; nula nos outros. */
+  pesquisa?: PesquisaDoRoteiro | null;
   /**
    * E41 parte 2b: a fala marcada. `podeMarcar` é falso em Story e em vídeo sem fala (nada para marcar); `somenteLeitura` é o "ver como" (mostra as marcas que já existem, não escreve);
    * `marcas` são as que já existem e ainda valem para o texto de agora.
@@ -282,6 +263,7 @@ export function RoteiroTela({
   momento = null,
   grupoDeVersoes = null,
   noticiaDeOrigem = null,
+  pesquisa = null,
   fala,
   marcaAtiva,
   marcas,
@@ -788,6 +770,13 @@ export function RoteiroTela({
                 {momento.estado === "vivo" ? textosRoteiro.doMomento.selo : momento.estado === "outroDia" ? textosRoteiro.doMomento.seloOutroDia : textosRoteiro.doMomento.seloPassou}
               </span>
             ) : null}
+            {/* E54 (parte 3): "Com pesquisa: 3 dados", antes do tipo. */}
+            {pesquisa ? (
+              <span className={styles.seloPesquisa} data-selo-pesquisa>
+                <Search size={14} strokeWidth={1.75} aria-hidden="true" />
+                {textosPesquisa.roteiro.selo(pesquisa.dados)}
+              </span>
+            ) : null}
             {/* E44 PR 2: "Tipo: erro comum", o tipo do vídeo de referência (não aparece em Story nem sem referência classificada). */}
             {seloDoTipo(video?.formatoCatalogo) && roteiro.formato !== "story" ? <span className={styles.seloTipo} data-selo-tipo>{seloDoTipo(video?.formatoCatalogo)}</span> : null}
             {/* E49 PR 1: "Para que te chamem" ao lado do tipo; no Story a linha sai (ele não pergunta para que é o vídeo). */}
@@ -854,6 +843,21 @@ export function RoteiroTela({
             </p>
           ) : null}
         </div>
+
+        {/* E54 (parte 3, passo 22): o "Atenção" vem ANTES dos blocos, para ser lido antes de gravar, não depois; não trava o modo gravação. */}
+        {pesquisa && pesquisa.atencao.length > 0 && !editando ? (
+          <div className={styles.atencaoRoteiro} role="note" aria-labelledby="t-atencao-pesquisa" data-atencao-da-pesquisa>
+            <span className={styles.tituloAtencao} id="t-atencao-pesquisa">
+              <CircleAlert size={18} strokeWidth={1.75} aria-hidden="true" />
+              {textosPesquisa.roteiro.atencaoTitulo}
+            </span>
+            <ul>
+              {pesquisa.atencao.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         {roteiro.objetivoDoVideo ? (
           <p className={styles.recado}>
@@ -1009,6 +1013,44 @@ export function RoteiroTela({
                 <MotivoSemRede className={styles.motivoJulgar} />
               </p>
             </article>
+
+            {/* E54 (parte 3): "O que pode aparecer" logo depois do roteiro: dúvida ou discordância que pode vir nos comentários, com a resposta pronta; e as "Fontes" de cada número da fala. */}
+            {pesquisa && pesquisa.respostas.length > 0 ? (
+              <section className={styles.respostasPesquisa} aria-labelledby="t-respostas-pesquisa" data-respostas-da-pesquisa>
+                <h2 id="t-respostas-pesquisa">{textosPesquisa.roteiro.respostasTitulo}</h2>
+                <p className={styles.ajudaPesquisa}>{textosPesquisa.roteiro.respostasAjuda}</p>
+                <dl>
+                  {pesquisa.respostas.map((r) => (
+                    <div key={r.objecao}>
+                      <dt>{r.objecao}</dt>
+                      <dd>{r.resposta}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null}
+            {pesquisa && pesquisa.fontes.length > 0 ? (
+              <section className={styles.fontesPesquisa} aria-labelledby="t-fontes-pesquisa" data-fontes-da-pesquisa>
+                <h2 id="t-fontes-pesquisa">{textosPesquisa.roteiro.fontesTitulo}</h2>
+                <ol>
+                  {pesquisa.fontes.map((f) => (
+                    <li key={f.id} value={f.numero} data-fonte-numero={f.numero}>
+                      <span className={styles.quemPublicou}>
+                        <b>{f.fonte}</b> · {f.data ?? textosPesquisa.roteiro.semData}
+                      </span>
+                      <span className={styles.dadoDaFonte}>{f.dado}</span>
+                      {f.url ? (
+                        <a href={f.url} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className={styles.abrirFontePesquisa}>
+                          <ExternalLink size={14} strokeWidth={1.75} aria-hidden="true" />
+                          {textosPesquisa.roteiro.abrirAFonte}
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+                <p className={styles.ajudaPesquisa}>{textosPesquisa.roteiro.fontesNota(pesquisa.fontes.length, pesquisa.dados)}</p>
+              </section>
+            ) : null}
 
             {/* Em Reels falado a cena de cada bloco já está junto da fala (`RoteiroTexto comCenas`); a seção separada só continua onde o bloco não a traz (Story e sem fala). */}
             {roteiro.formato === "story" || roteiro.estilo === "sem_fala" ? <BlocoCenas titulo={textosRoteiro.ondeGravar} cenas={corpo.cenas} /> : null}

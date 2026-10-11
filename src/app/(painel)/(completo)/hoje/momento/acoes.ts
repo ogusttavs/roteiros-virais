@@ -3,6 +3,7 @@
 import { ehFicha } from "@/config/fichas";
 import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado, clienteDaSessaoAtual, garantirMembroDaMarca } from "@/servicos/clientes";
@@ -17,6 +18,7 @@ import {
   validarObjetivo,
   validarQuemAparece,
 } from "@/servicos/roteiro";
+import { textosPesquisa } from "@/textos/pesquisa";
 
 /**
  * V9b, item 1: o caminho por áudio da folha agora passa por aqui depois de
@@ -60,6 +62,8 @@ export type DadosMomento = {
   data?: string;
   /** E39a: "em que momento do dia?", só quando o formato é Story. */
   momentoDoDia?: string;
+  /** E54 (parte 3): o id da pesquisa na hora que a pessoa aprovou para este vídeo; um id que veio e não vale volta como erro (nunca "sem pesquisa" em silêncio). */
+  pesquisaId?: number;
 };
 
 function textoObrigatorio(valor: string): string {
@@ -98,6 +102,12 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
     }
 
     const cliente = await clienteDaSessaoAtual();
+    let pesquisaId: number | undefined;
+    if (dados.pesquisaId !== undefined && dados.pesquisaId !== null) {
+      const valido = idDoBancoOuNulo(dados.pesquisaId);
+      if (valido === null) throw new ErroRoteiro(textosPesquisa.tela.erroGenerico);
+      pesquisaId = valido;
+    }
     const roteiro = await gerarRoteiro(cliente.id, {
       origem: "momento",
       momento: {
@@ -116,6 +126,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
       quemAparece: validarQuemAparece(dados.quemAparece),
       data: validarData(dados.data),
       momentoDoDia: validarMomentoDoDia(dados.momentoDoDia),
+      pesquisaId,
     });
 
     return { ok: true, dado: { id: roteiro.id } };

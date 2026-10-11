@@ -5,6 +5,7 @@ import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
+import { lerPesquisa } from "@/servicos/pesquisa-na-hora";
 import type { OrigemRoteiro } from "@/servicos/roteiro";
 import { temasParaCliente } from "@/servicos/temas";
 import { assuntoEmAltaDaLista } from "@/servicos/tendencias";
@@ -12,7 +13,9 @@ import { perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 
 import { ObjetivoTela } from "./ObjetivoTela";
 
-type Props = { searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string; pergunta?: string }> };
+type Props = {
+  searchParams: Promise<{ tema?: string; livre?: string; data?: string; noticiaId?: string; noticiaAssuntoId?: string; alta?: string; momento?: string; pergunta?: string; pesquisa?: string }>;
+};
 
 /**
  * `/criar/objetivo` (etapa 11, decisão 6 do `PROXIMO.md`; E39a: migrado de `/hoje/objetivo`, a
@@ -32,7 +35,7 @@ export default async function Objetivo({ searchParams }: Props) {
     redirect("/entrar");
   }
 
-  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta } = await searchParams;
+  const { tema, livre, data, noticiaId, noticiaAssuntoId, alta, momento, pergunta, pesquisa } = await searchParams;
   const resultado = await temasParaCliente(cliente);
   const objetivoRecomendado = resultado.status === "ok" ? resultado.objetivoRecomendado : null;
   // E49 PR 1: com tema do dia, a ficha recomendada vem do `puxaPara` e do texto dele; sem tema (tema livre), vem da linha editorial ("pelo que você tem postado").
@@ -44,6 +47,18 @@ export default async function Objetivo({ searchParams }: Props) {
   const noticiaIdValida = idDoBancoOuNulo(noticiaId) ?? undefined;
   // E53 (parte 3): idem para a notícia de um assunto da marca; `gerarRoteiro` confere de novo que ela é desta marca.
   const noticiaAssuntoIdValida = idDoBancoOuNulo(noticiaAssuntoId) ?? undefined;
+
+  // E54 (parte 3): `?pesquisa=<id>` vem da tela da pesquisa, depois de a pessoa marcar os dados. A pesquisa é conferida na marca da sessão; uma que ainda não está pronta (ou sem dado marcado)
+  // leva de volta à tela dela, para a pessoa nunca escrever sem os dados achando que escreveu com eles. `gerarVersoes` confere tudo de novo ao escrever.
+  let pesquisaDoRoteiro: { id: number; dados: number } | undefined;
+  const pesquisaId = idDoBancoOuNulo(pesquisa);
+  if (pesquisaId !== null) {
+    const linha = await lerPesquisa(cliente.id, pesquisaId);
+    if (linha) {
+      if (linha.status !== "pronta" || linha.selecionados.length === 0) redirect(`/criar/pesquisa/${linha.id}`);
+      pesquisaDoRoteiro = { id: linha.id, dados: linha.selecionados.length };
+    }
+  }
 
   let origem: OrigemRoteiro;
   let temaEscolhidoTexto: string;
@@ -91,6 +106,7 @@ export default async function Objetivo({ searchParams }: Props) {
       paraHoje={paraHoje}
       assuntoEmAlta={assuntoEmAlta}
       perguntaChave={perguntaChave}
+      pesquisa={pesquisaDoRoteiro}
     />
   );
 }

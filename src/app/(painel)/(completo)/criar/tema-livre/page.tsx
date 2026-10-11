@@ -10,6 +10,7 @@ import { clienteDaSessaoAtual, marcasDoUsuario } from "@/servicos/clientes";
 import { assuntoPresoDaLista } from "@/servicos/em-alta";
 import { noticiaPorId } from "@/servicos/noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
+import { dadosDoCampoDePesquisa } from "@/servicos/pesquisa-na-hora";
 import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
@@ -44,11 +45,14 @@ export default async function TemaLivre({ searchParams }: Props) {
   }
 
   const cliente = await clienteDaSessaoAtual();
-  const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas] = await Promise.all([
+  const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas, dadosDaPesquisa] = await Promise.all([
     searchParams,
     rascunhoTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
     temasParaCliente(cliente),
+    // E54 (parte 3): quantas pesquisas do dia a marca já usou, para o campo "Pesquisar antes de escrever" dizer a verdade.
+    // Uma falha da consulta opcional só tira o campo: o Tema livre abre do mesmo jeito.
+    dadosDoCampoDePesquisa(cliente.id).catch(() => undefined),
   ]);
 
   // V9a, item 3 e 4: a mesma folha "Gravar agora" de `/hoje`, com "Estou num momento".
@@ -113,6 +117,7 @@ export default async function TemaLivre({ searchParams }: Props) {
       emAlta={emAlta}
       pergunta={perguntaPreso}
       marcaAtivaId={cliente.id}
+      pesquisa={dadosDaPesquisa}
     />
   );
 }
