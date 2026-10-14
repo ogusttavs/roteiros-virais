@@ -1,0 +1,124 @@
+/* E52 (PR 5, passo 26): o que o modo gravação do vídeo longo tem a mais que o de sempre (`GravacaoTela.module.css` dá o resto). Só tokens. */
+.nomeCapitulo {
+  margin: 0;
+  font-size: var(--tamanho-titulo-1);
+  line-height: 1.15;
+  font-weight: var(--peso-semibold);
+  color: var(--cor-titulo);
+  letter-spacing: -0.02em;
+}
+
+/* Os pontos do capítulo: curtos e numerados, para bater o olho entre uma tomada e outra; menores que a fala (são direção, não letra a ler). */
+.pontos {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding-left: var(--espaco-6);
+  font-size: var(--tamanho-corpo);
+  line-height: 1.4;
+  color: var(--cor-texto);
+}
+
+.naImagem {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  line-height: 1.4;
+  color: var(--cor-texto-suave);
+}
+
+.naImagem b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+/* A frase que se diz como está escrita, na letra grande de sempre, com o rótulo em cima. */
+.segurar {
+  display: grid;
+  gap: var(--espaco-2);
+  padding-top: var(--espaco-4);
+  border-top: var(--largura-borda) solid var(--cor-divisor);
+}
+
+.ajudaFim {
+  margin: 0;
+  font-size: var(--tamanho-corpo);
+  line-height: 1.45;
+  color: var(--cor-texto-suave);
+}
+
+.gravados {
+  display: grid;
+  gap: var(--espaco-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-texto);
+}
+
+.gravados li {
+  display: flex;
+  align-items: center;
+  gap: var(--espaco-3);
+  min-width: 0;
+}
+
+.gravados li svg {
+  flex: none;
+  color: var(--cor-positivo);
+}
+
+.gravados li b {
+  flex: none;
+  min-width: 3.5rem;
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.gravados li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.copiar {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque-lg);
+  padding: 0 var(--espaco-6);
+  border-radius: var(--raio-pill);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  background: transparent;
+  color: var(--cor-titulo);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-corpo);
+  font-weight: var(--peso-medio);
+  cursor: pointer;
+}
+
+.copiar:focus-visible {
+  outline: none;
+  box-shadow: var(--sombra-foco);
+}
+
+.statusCopia {
+  min-height: 1em;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+/*
+ * O capítulo passa da altura de um celular em pé: com `align-content: center` a grade do palco cortava o começo (o tom e o nome) sem deixar rolar até ele. Aqui o palco é uma coluna que
+ * rola, e o conteúdo se centra quando sobra espaço (margem automática) e começa no alto quando não sobra.
+ */
+main.palcoCapitulo {
+  display: flex;
+  flex-direction: column;
+  align-content: normal;
+}
+
+main.palcoCapitulo > div {
+  margin-block: auto;
+}

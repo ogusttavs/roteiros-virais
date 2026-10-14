@@ -5,6 +5,7 @@ import {
   camposCorridosDosCapitulos,
   capitulosParaCopiar,
   minutosDoVideo,
+  primeiroCapituloQueFalta,
   tempoNaTela,
   textoDoRoteiroLongo,
   nomeNaoVoltaDaLista,
@@ -273,5 +274,23 @@ describe("E52 PR 4b: o tempo na tela, o texto corrido e o texto para copiar", ()
     expect(partes[2].split(Q)).toEqual(["0:00 A mancha que volta", "Fica até o fim que eu te mostro", "- Mostre o sofá", "- Conte o que fez"]);
     expect(partes[4].split(Q)).toEqual(["2:40 O que fazer amanhã", "- Resuma", "- Peça a mensagem", "Manda a foto da sua mancha."]);
     expect(texto.match(/Manda a foto/g)).toHaveLength(1);
+  });
+});
+
+describe("E52 PR 5: o primeiro capítulo que falta gravar", () => {
+  it("devolve o primeiro sem marca a partir do ponto pedido, dando a volta no fim da lista", () => {
+    expect(primeiroCapituloQueFalta(new Set(), 4)).toBe(0);
+    expect(primeiroCapituloQueFalta(new Set([0, 1]), 4)).toBe(2);
+    expect(primeiroCapituloQueFalta(new Set([2]), 4, 2)).toBe(3);
+    expect(primeiroCapituloQueFalta(new Set([2, 3]), 4, 2)).toBe(0);
+    expect(primeiroCapituloQueFalta(new Set([0, 2, 3]), 4, 3)).toBe(1);
+  });
+
+  it("devolve nulo quando todos estão marcados, e aceita um ponto de partida fora da lista", () => {
+    expect(primeiroCapituloQueFalta(new Set([0, 1, 2]), 3)).toBeNull();
+    expect(primeiroCapituloQueFalta(new Set([0, 1, 2]), 3, 7)).toBeNull();
+    expect(primeiroCapituloQueFalta(new Set([1]), 3, 5)).toBe(2);
+    expect(primeiroCapituloQueFalta(new Set([1]), 3, -1)).toBe(2);
+    expect(primeiroCapituloQueFalta(new Set(), 0)).toBeNull();
   });
 });

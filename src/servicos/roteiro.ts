@@ -58,7 +58,7 @@ import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
-import { BLOCOS_FALADOS } from "@/lib/marcas-de-fala";
+import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
 import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
@@ -1863,7 +1863,10 @@ export async function editarRoteiro(
   }
 
   // E41 (2a): as marcas de fala valem para o texto de que saíram. Mudou algum dos quatro blocos falados, elas se apagam (refeitas na próxima vez que a pessoa ligar "Marcas de fala").
-  const falaMudou = BLOCOS_FALADOS.some((bloco) => (novoConteudo[bloco] ?? "").trim() !== (conteudoAtual[bloco] ?? "").trim());
+  // No longo o texto falado é o gancho do vídeo, a frase de cada capítulo e a chamada final (`blocosFaladosDoConteudo`); editar os pontos de um capítulo não mexe em fala.
+  const falaMudou = temCapitulos(conteudoAtual) || temCapitulos(novoConteudo)
+    ? JSON.stringify(blocosFaladosDoConteudo(novoConteudo)) !== JSON.stringify(blocosFaladosDoConteudo(conteudoAtual))
+    : BLOCOS_FALADOS.some((bloco) => (novoConteudo[bloco] ?? "").trim() !== (conteudoAtual[bloco] ?? "").trim());
 
   const [roteiro] = await db()
     .update(roteiros)

@@ -18,6 +18,7 @@ import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import {
   ambienteComBarulho,
+  blocosFaladosDoConteudo,
   BLOCOS_FALADOS,
   conferirFala,
   consertarMarcas,
@@ -28,6 +29,7 @@ import {
   temChaveNoTexto,
   textoIdentico,
   textoSemMarcas,
+  temCapitulos,
   TOM_PADRAO_DO_BLOCO,
   TONS_DO_BLOCO,
   type BlocoFalado,
@@ -42,21 +44,19 @@ import { perfilDoCliente } from "./briefing";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import { ErroRoteiro, roteiroPorId } from "./roteiro";
 
-export type MotivoSemMarcas = "story" | "sem_fala" | "longo" | "sem_texto" | "chave_no_texto" | "editado_no_meio";
+export type MotivoSemMarcas = "story" | "sem_fala" | "sem_texto" | "chave_no_texto" | "editado_no_meio";
 
 export type ResultadoDaMarcacao = { ok: true; marcas: MarcasDeFala; novas: boolean } | { ok: false; motivo: MotivoSemMarcas };
 
 /** Os blocos falados do conteúdo, na ordem do vídeo, sem os vazios. */
 export function blocosFalados(conteudo: ConteudoRoteiro): { bloco: BlocoFalado; texto: string }[] {
-  return BLOCOS_FALADOS.map((bloco) => ({ bloco, texto: (conteudo[bloco] ?? "").trim() })).filter((b) => b.texto !== "");
+  return blocosFaladosDoConteudo(conteudo);
 }
 
 /** Story e vídeo sem fala não têm fala; texto sem palavra ou com chave (a sintaxe das marcas) não se marca. */
 export function motivoDeNaoMarcar(roteiro: { formato: string; estilo: string; conteudo: ConteudoRoteiro }): MotivoSemMarcas | null {
   if (roteiro.formato === "story") return "story";
   if (roteiro.estilo === "sem_fala") return "sem_fala";
-  // E52 (PR 4b): o roteiro longo é por capítulos, com a frase que segura até o próximo e pontos; as marcas por capítulo são do PR 5 (o modo gravação do passo 26).
-  if (roteiro.conteudo.capitulos && roteiro.conteudo.capitulos.length > 0) return "longo";
   const blocos = blocosFalados(roteiro.conteudo);
   if (blocos.length === 0) return "sem_texto";
   if (blocos.some((b) => temChaveNoTexto(b.texto))) return "chave_no_texto";
@@ -303,10 +303,20 @@ async function escreverMarcas(clienteId: number, roteiroId: number): Promise<Res
   marcas.avisos = conferirFala(sem, { ambienteComBarulho: barulho, publicoMaisVelho: velho }).map((c) => ({ regra: c.regra, texto: textoDoAviso(c) }));
 
   // Só grava se o texto falado continua o de que as marcas saíram (a edição dos quatro blocos apaga as marcas; a de uma legenda ou de uma cena não precisa derrubar a marcação em curso).
-  const mesmoTexto = sql.join(
-    BLOCOS_FALADOS.map((bloco) => sql`coalesce(${roteiros.conteudo}->>${sql.raw(`'${bloco}'`)}, '') = ${conteudo[bloco] ?? ""}`),
-    sql` and `,
-  );
+  // No longo (E52, PR 5) o texto de que as marcas saíram é o gancho do vídeo, a frase de cada capítulo e a chamada final.
+  const mesmoTexto = temCapitulos(conteudo)
+    ? sql.join(
+        [
+          sql`coalesce(${roteiros.conteudo}->>'gancho', '') = ${conteudo.gancho ?? ""}`,
+          sql`coalesce(${roteiros.conteudo}->>'chamadaFinal', '') = ${conteudo.chamadaFinal ?? ""}`,
+          ...(conteudo.capitulos ?? []).map((c, i) => sql`coalesce(${roteiros.conteudo}#>>${`{capitulos,${i},ganchoParaOProximo}`}, '') = ${c.ganchoParaOProximo ?? ""}`),
+        ],
+        sql` and `,
+      )
+    : sql.join(
+        BLOCOS_FALADOS.map((bloco) => sql`coalesce(${roteiros.conteudo}->>${sql.raw(`'${bloco}'`)}, '') = ${conteudo[bloco] ?? ""}`),
+        sql` and `,
+      );
   const gravadas = await db()
     .update(roteiros)
     .set({ marcasDeFala: marcas })
