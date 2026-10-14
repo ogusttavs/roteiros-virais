@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import type { IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import { ErroIA } from "@/ia/erro";
+import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import type { MarcasParaATela } from "@/lib/marcas-de-fala";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
@@ -93,7 +94,7 @@ export async function marcarFalaAction(roteiroId: number): Promise<ResultadoAcao
     const r = await marcarFalaDoRoteiro(cliente.id, roteiroId);
     return r.ok ? { ok: true, dado: { marcas: marcasParaATela(r.marcas), motivo: null, novas: r.novas } } : { ok: true, dado: { marcas: null, motivo: r.motivo, novas: false } };
   } catch (falha) {
-    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
     throw falha;
   }

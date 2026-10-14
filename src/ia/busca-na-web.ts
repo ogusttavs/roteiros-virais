@@ -18,7 +18,8 @@ import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 import { config } from "@/lib/config";
 
 import { anthropic, traduzirErro } from "./cliente";
-import { ErroIA } from "./erro";
+import { type CausaDoErroIA, ErroIA } from "./erro";
+import { registrarFalhaDaIA } from "./falha-da-ia";
 import { buscaSimulada } from "./mock-busca";
 import type { UsoTokens } from "./registro";
 
@@ -130,8 +131,8 @@ function somar(a: UsoTokens, b: Partial<UsoTokens>): UsoTokens {
 export class ErroDaBusca extends ErroIA {
   readonly usoParcial: UsoTokens;
 
-  constructor(mensagemTecnica: string, usoParcial: UsoTokens, mensagemCliente?: string) {
-    super(mensagemTecnica, mensagemCliente);
+  constructor(mensagemTecnica: string, usoParcial: UsoTokens, mensagemCliente?: string, causa?: CausaDoErroIA | null) {
+    super(mensagemTecnica, mensagemCliente, causa ?? null);
     this.name = "ErroDaBusca";
     this.usoParcial = usoParcial;
   }
@@ -158,7 +159,9 @@ export async function buscarNaWeb(params: ParametrosDaBusca): Promise<RespostaDa
 
   const falhar = (erro: unknown): never => {
     const base = erro instanceof ErroIA ? erro : traduzirErro(erro, "pesquisaNaHora");
-    throw new ErroDaBusca(base.message, uso, base.mensagemCliente);
+    // A causa conhecida (crédito, sobrecarga, chave) também fica anotada para o Início do admin; a anotação nunca muda o erro que sobe.
+    if (base.causa) void registrarFalhaDaIA(base.causa, "pesquisaNaHora");
+    throw new ErroDaBusca(base.message, uso, base.mensagemCliente, base.causa);
   };
 
   for (let volta = 0; volta < MAXIMO_DE_VOLTAS; volta += 1) {

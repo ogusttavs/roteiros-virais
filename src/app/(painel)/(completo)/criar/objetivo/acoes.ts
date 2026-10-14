@@ -6,6 +6,7 @@ import type { EstiloRoteiro, Objetivo } from "@/db/schema";
 import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
+import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo } from "@/lib/ver-como";
@@ -92,7 +93,7 @@ export async function gerarVersoesAction(
     });
     return { ok: true, dado: { grupo } };
   } catch (falha) {
-    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
     throw falha;
   }
