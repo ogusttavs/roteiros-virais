@@ -285,6 +285,8 @@ test.describe("painel sem rede", () => {
     await esperarGuardado(page, "/hoje");
     await page.goto(`/roteiros/${roteiroUmId}`);
     await expect(page.getByRole("heading", { name: TITULO_ROTEIRO, level: 1 })).toBeVisible();
+    // O worker guarda a página DEPOIS de ela assentar; sair do roteiro antes disso deixava o guardado de "/roteiros/N/gravar" para a próxima espera (que cai no tempo da CI).
+    await page.waitForLoadState("networkidle");
     await esperarGuardado(page, `/roteiros/${roteiroUmId}`);
     await esperarGuardado(page, `/roteiros/${roteiroUmId}/gravar`);
     await expect(faixaSemConexao(page)).toHaveCount(0);
@@ -490,10 +492,13 @@ test.describe("painel sem rede", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-d");
     await page.goto("/criar/tema-livre");
+    // Digitar logo depois do `goto` chegava antes da hidratação e o texto se perdia (a mesma precaução de `tema-livre.spec.ts`): espera a tela assentar e confere o que foi digitado.
+    await page.waitForLoadState("networkidle");
 
     const assunto = "Uma cliente perguntou se o produto serve em sofa de camurca";
     const campo = page.getByRole("textbox");
     await campo.fill(assunto);
+    await expect(campo).toHaveValue(assunto);
 
     await cortarRedeNaProximaAcao(page);
     await page.getByRole("button", { name: textosTemaLivre.avaliar }).click();
@@ -515,7 +520,15 @@ test.describe("painel sem rede", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await entrar(page, "e2e-semrede-c");
     await page.goto("/criar/objetivo?tema=0");
-    await page.getByRole("radio", { name: /Que me chamem/ }).click();
+    // O clique na escolha logo depois do `goto` chegava antes da hidratação e se perdia: "escrever o roteiro" ficava desabilitado para sempre (DoD do #140). Espera a tela assentar e só segue
+    // com a escolha de fato marcada.
+    await page.waitForLoadState("networkidle");
+    const escolha = page.getByRole("radio", { name: /Que me chamem/ });
+    await expect(async () => {
+      await escolha.click();
+      await expect(escolha).toBeChecked({ timeout: 2_000 });
+    }).toPass({ timeout: 15_000 });
+    await expect(page.getByRole("button", { name: "escrever o roteiro", exact: true })).toBeEnabled();
 
     await cortarRedeNaProximaAcao(page);
     await page.getByRole("button", { name: "escrever o roteiro", exact: true }).click();
