@@ -76,6 +76,16 @@ describe("GravacaoLongaTela", () => {
     expect(marcarGravadoAction).not.toHaveBeenCalled();
   });
 
+  it("'Já gravei este' passa ao capítulo seguinte ao da vez, não ao primeiro que falta desde o começo", async () => {
+    montar();
+    await waitFor(() => expect(palco().textContent).toContain("Capítulo 1 de 3"));
+    // passa o 1 sem marcar, marca o 2: segue para o 3, e o 1 só volta depois
+    fireEvent.click(screen.getByRole("button", { name: "Próximo capítulo, sem marcar" }));
+    await waitFor(() => expect(palco().textContent).toContain("Capítulo 2 de 3"));
+    fireEvent.click(jaGravei());
+    await waitFor(() => expect(palco().textContent).toContain("Capítulo 3 de 3"));
+  });
+
   it("a seta da direita passa sem marcar", async () => {
     montar();
     await waitFor(() => expect(palco().textContent).toContain("Capítulo 1 de 3"));
@@ -198,6 +208,13 @@ describe("GravacaoLongaTela", () => {
     window.localStorage.setItem("capitulos-gravados:42", "{não é json");
     montar();
     await waitFor(() => expect(palco().textContent).toContain("Capítulo 1 de 3"));
+  });
+
+  it("um índice fora da lista na memória não conta como capítulo gravado: o fim diz quantos de verdade", async () => {
+    window.localStorage.setItem("capitulos-gravados:42", JSON.stringify([0, 1, 2, 99]));
+    montar();
+    await waitFor(() => expect(document.querySelector("[data-gravacao-longa-fim]")).not.toBeNull());
+    expect(document.querySelector("[data-gravacao-longa-fim]")?.textContent).toContain("3 de 3 gravados");
   });
 
   it("do fim, a seta do anterior volta ao último capítulo", async () => {
