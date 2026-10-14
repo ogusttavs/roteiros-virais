@@ -30,6 +30,7 @@ import { db } from "../../src/db";
 import {
   account,
   avaliacoesTema,
+  geracoesIA,
   briefings,
   clientes,
   membrosMarca,
@@ -213,6 +214,9 @@ test.describe("painel sem rede", () => {
       // As avaliações de tema apontam para a marca: sem apagá-las antes, uma falha de um teste derrubaria a limpeza do seguinte.
       await db().delete(avaliacoesTema).where(inArray(avaliacoesTema.clienteId, idsMarcas));
       await db().delete(roteiros).where(inArray(roteiros.clienteId, idsMarcas));
+      // As gerações dos testes que escrevem um roteiro ("gerar as versões") também apontam para a marca: sem apagá-las, a repetição automática da CI refazia este `beforeAll` com a marca da tentativa
+      // anterior ainda presa a uma geração, a limpeza caía na chave estrangeira e o PRIMEIRO teste do arquivo morria no gancho, sem culpa dele (o `:273` que "caiu uma vez").
+      await db().delete(geracoesIA).where(inArray(geracoesIA.clienteId, idsMarcas));
       await db().delete(briefings).where(inArray(briefings.clienteId, idsMarcas));
     }
     await db().delete(user).where(inArray(user.id, IDS_USUARIO));
