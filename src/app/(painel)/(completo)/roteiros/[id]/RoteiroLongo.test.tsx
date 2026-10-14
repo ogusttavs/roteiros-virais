@@ -129,6 +129,15 @@ describe("RoteiroLongo", () => {
     expect((screen.getByLabelText("O que falar (um ponto por linha)") as HTMLTextAreaElement).value).toBe("Meu texto");
   });
 
+  it("sem nenhum ponto sobrando a tela diz a frase e nada vai ao servidor", () => {
+    const { salvar } = montar();
+    fireEvent.click(screen.getByRole("button", { name: "Editar o capítulo A mancha que volta" }));
+    fireEvent.change(screen.getByLabelText("O que falar (um ponto por linha)"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar o capítulo" }));
+    expect(screen.getByRole("alert").textContent).toContain("Deixe de 1 a 8 pontos");
+    expect(salvar).not.toHaveBeenCalled();
+  });
+
   it("'Cancelar' fecha o cartão sem salvar", () => {
     const { salvar } = montar();
     fireEvent.click(screen.getByRole("button", { name: "Editar o capítulo A mancha que volta" }));

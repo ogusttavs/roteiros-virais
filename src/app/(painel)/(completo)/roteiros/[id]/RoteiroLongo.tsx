@@ -120,6 +120,12 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
       .split(QUEBRA)
       .map((p) => p.trim())
       .filter(Boolean);
+    // Nenhum ponto sobrando: a frase certa aparece aqui mesmo (o servidor também recusa, mas a exceção dele chega à tela como a frase genérica).
+    if (pontos.length === 0) {
+      setSalvando(false);
+      setErro(textosRoteiro.editando.pontosDoCapitulo(8));
+      return;
+    }
     const falha = await salvar(indice, {
       pontos,
       ...(ehOPrimeiro ? { gancho: rascunho.gancho } : {}),
