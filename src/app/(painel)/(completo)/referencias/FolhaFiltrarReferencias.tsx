@@ -9,6 +9,7 @@ import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltrave
 import { textosReferencias } from "@/textos/referencias";
 import { Folha } from "@/ui/componentes/Folha";
 
+import type { DuracaoReferencias } from "./duracao";
 import styles from "./FolhaFiltrarReferencias.module.css";
 
 const PLATAFORMAS_EM_ORDEM: { valor: Plataforma; rotulo: string }[] = [
@@ -32,6 +33,7 @@ export type FiltrosAplicados = {
   comFala: boolean | undefined;
   brasil: boolean | undefined;
   tiposConteudo: TipoConteudoFiltravel[];
+  duracao: DuracaoReferencias;
 };
 
 type Props = {
@@ -44,6 +46,9 @@ type Props = {
   comFala: boolean | undefined;
   brasil: boolean | undefined;
   tiposConteudo: TipoConteudoFiltravel[];
+  /** E52 (PR 4c): a duração escolhida e quantos vídeos longos o ramo tem agora. */
+  duracao: DuracaoReferencias;
+  longosDisponiveis: number;
   contagens: ContagensFiltroReferencias;
   /** O total já carregado (não recalcula ao marcar/desmarcar; atualiza de verdade ao aplicar e recarregar). */
   totalAtual: number;
@@ -59,17 +64,20 @@ function OpcaoFiltro({
   rotulo,
   quantos,
   marcada,
+  desabilitada = false,
   onClick,
 }: {
   rotulo: string;
   quantos: number;
   marcada: boolean;
+  desabilitada?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
       aria-pressed={marcada}
+      disabled={desabilitada}
       onClick={onClick}
       className={[styles.opcao, marcada ? styles.marcada : ""].filter(Boolean).join(" ")}
     >
@@ -120,6 +128,8 @@ export function FolhaFiltrarReferencias({
   comFala,
   brasil,
   tiposConteudo,
+  duracao,
+  longosDisponiveis,
   contagens,
   totalAtual,
   onAplicar,
@@ -131,6 +141,7 @@ export function FolhaFiltrarReferencias({
   const [comFalaLocal, setComFalaLocal] = useState<boolean | undefined>(comFala);
   const [brasilLocal, setBrasilLocal] = useState<boolean | undefined>(brasil);
   const [tiposConteudoLocal, setTiposConteudoLocal] = useState<TipoConteudoFiltravel[]>(tiposConteudo);
+  const [duracaoLocal, setDuracaoLocal] = useState<DuracaoReferencias>(duracao);
 
   function alternarPlataforma(valor: Plataforma) {
     setPlataformas((atual) => (atual.includes(valor) ? atual.filter((p) => p !== valor) : [...atual, valor]));
@@ -151,6 +162,7 @@ export function FolhaFiltrarReferencias({
       comFala: comFalaLocal,
       brasil: brasilLocal,
       tiposConteudo: tiposConteudoLocal,
+      duracao: duracaoLocal,
     });
   }
 
@@ -176,6 +188,7 @@ export function FolhaFiltrarReferencias({
                 comFala: undefined,
                 brasil: undefined,
                 tiposConteudo: [],
+                duracao: "curtos",
               })
             }
           >
@@ -256,6 +269,19 @@ export function FolhaFiltrarReferencias({
             onClick={() => alternarTipoConteudo(t)}
           />
         ))}
+      </div>
+
+      <div className={styles.grupo}>
+        <span className={styles.rotuloGrupo}>{textosReferencias.duracao.rotulo}</span>
+        <OpcaoFiltroSemContagem rotulo={textosReferencias.duracao.curtos} marcada={duracaoLocal === "curtos"} onClick={() => setDuracaoLocal("curtos")} />
+        <OpcaoFiltro
+          rotulo={textosReferencias.duracao.longos}
+          quantos={longosDisponiveis}
+          marcada={duracaoLocal === "longos"}
+          desabilitada={longosDisponiveis === 0 && duracaoLocal !== "longos"}
+          onClick={() => setDuracaoLocal("longos")}
+        />
+        {longosDisponiveis === 0 ? <p className={styles.semLongos}>{textosReferencias.duracao.semLongos}</p> : null}
       </div>
 
       <div className={styles.grupo}>

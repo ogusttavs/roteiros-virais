@@ -9,8 +9,10 @@ import { formatoPorChave } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo, Ficha, Plataforma } from "@/db/schema";
 import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
+import { tempoNaTela } from "@/lib/capitulos-do-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
+import type { LongoParaATela } from "@/servicos/referencias-longas";
 import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
 import { textosReferencias } from "@/textos/referencias";
@@ -18,11 +20,13 @@ import { textosVozes } from "@/textos/vozes-do-publico";
 import { Botao } from "@/ui/componentes/Botao";
 import { BlocoDePerguntas } from "@/ui/componentes/PerguntasDoPublico";
 import { ReferenciaCartao, type VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
+import { ReferenciaLongoCartao, type LongoFormatado } from "@/ui/componentes/ReferenciaLongoCartao";
 import { Toast } from "@/ui/componentes/Toast";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
 import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { desfavoritarAction, favoritarAction } from "./acoes";
+import type { DuracaoReferencias } from "./duracao";
 import { FolhaDetalhesVideo } from "./FolhaDetalhesVideo";
 import { FolhaFiltrarReferencias } from "./FolhaFiltrarReferencias";
 import { PilulaDeRamo } from "./PilulaDeRamo";
@@ -62,6 +66,12 @@ type Props = {
   feitoPara?: Ficha;
   /** E28 (parte 3b): as perguntas do público do setor desta semana; nulo no setor sem leitura (a linha nem aparece). */
   perguntas?: PerguntasDaTela | null;
+  /** E52 (PR 4c): a pílula "Duração". Com "longos" a lista é a dos vídeos longos do ramo (`longos`), não a dos curtos (`videos`). */
+  duracao?: DuracaoReferencias;
+  longos?: LongoParaATela[];
+  totalLongos?: number;
+  /** Quantos longos o ramo tem agora, sem filtro: zero deixa "Mais de 3 min" apagada com a frase calma. */
+  longosDisponiveis?: number;
 };
 
 const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
@@ -108,6 +118,67 @@ function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<number, str
   };
 }
 
+/** O cartão do vídeo longo: o tempo de cada capítulo em frases, e a marca do capítulo que interessa no trilho do vídeo inteiro (posição e largura em porcentagem da duração). */
+function formatarLongo(v: LongoParaATela, nomesDosAlternativos: Map<number, string>): LongoFormatado {
+  const faixa = classificarMultiplo(v.foraDaCurva);
+  const capitulo = v.capituloQueInteressa;
+  return {
+    id: v.id,
+    multiplo: formatarMultiplo(v.foraDaCurva),
+    rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
+    faixaMultiplo: faixa,
+    views: v.views,
+    medianaConta: v.medianaConta,
+    contaNome: v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada,
+    plataformaData: v.publicadoEm ? `${ROTULO_PLATAFORMA.youtube}, ${FORMATAR_DATA.format(v.publicadoEm)}` : ROTULO_PLATAFORMA.youtube,
+    titulo: v.titulo,
+    capaUrl: v.capaUrl,
+    duracaoTexto: tempoNaTela(v.duracaoS),
+    capitulos: v.capitulos.map((c) => ({ tempo: tempoNaTela(c.inicioS), titulo: c.titulo })),
+    maisCapitulos: Math.max(0, v.totalDeCapitulos - v.capitulos.length),
+    capituloQueInteressa: capitulo
+      ? {
+          inicioS: capitulo.inicioS,
+          de: tempoNaTela(capitulo.inicioS),
+          ate: tempoNaTela(capitulo.fimS),
+          nome: capitulo.nome,
+          promessa: capitulo.promessa,
+          esquerdaPct: Math.round((capitulo.inicioS / v.duracaoS) * 1000) / 10,
+          larguraPct: Math.max(1, Math.round(((capitulo.fimS - capitulo.inicioS) / v.duracaoS) * 1000) / 10),
+        }
+      : null,
+    ramoNome: v.nichoId === null ? undefined : nomesDosAlternativos.get(v.nichoId),
+  };
+}
+
+/** A folha de detalhes é a de sempre (a prévia do passo 14): o longo entra nela com a leitura da estrutura, quando existe, e o segundo que "Ver o capítulo" pediu. */
+function longoComoVideoFormatado(v: LongoParaATela, segundo: number | null): VideoFormatado {
+  const faixa = classificarMultiplo(v.foraDaCurva);
+  return {
+    id: v.id,
+    url: v.url,
+    multiplo: formatarMultiplo(v.foraDaCurva),
+    rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
+    faixaMultiplo: faixa,
+    views: v.views,
+    medianaConta: v.medianaConta,
+    velocidade: null,
+    contaNome: v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada,
+    plataformaData: v.publicadoEm ? `${ROTULO_PLATAFORMA.youtube}, ${FORMATAR_DATA.format(v.publicadoEm)}` : ROTULO_PLATAFORMA.youtube,
+    titulo: v.titulo,
+    assunto: "",
+    gancho: v.leitura?.gancho ?? "",
+    estrutura: v.leitura?.estrutura ?? "",
+    porQueFuncionou: v.leitura?.porQueFuncionou ?? "",
+    capaUrl: v.capaUrl,
+    semFala: false,
+    segundoChave: segundo,
+    abaixoDaRegua: false,
+    tipoConteudo: null,
+    videoLongo: true,
+  };
+}
+
 /** "no Instagram", "no Instagram e no YouTube", "no Instagram, no YouTube e no TikTok". */
 function juntarPlataformas(plataformas: Plataforma[]): string {
   const nomes = plataformas.map((p) => `no ${ROTULO_PLATAFORMA[p]}`);
@@ -133,6 +204,8 @@ type Filtros = {
   ramo?: number;
   /** E49 PR 2: a pílula "Parece feito para"; `undefined` é todas. */
   feitoPara?: Ficha;
+  /** E52 (PR 4c): "curtos" é o padrão e não vai para a URL. */
+  duracao: DuracaoReferencias;
 };
 
 /** "sim"/"nao" na URL, mesma codificação de `page.tsx`. */
@@ -166,6 +239,7 @@ function montarUrl(filtros: Filtros): string {
   if (filtros.tiposConteudo.length > 0) params.set("tipo", filtros.tiposConteudo.join(","));
   if (filtros.ramo !== undefined) params.set("ramo", String(filtros.ramo));
   if (filtros.feitoPara) params.set("feitoPara", filtros.feitoPara);
+  if (filtros.duracao === "longos") params.set("duracao", "longos");
   if (filtros.segmento === "todos" && filtros.quantidade !== TAMANHO_PAGINA_TODOS_PADRAO) {
     params.set("quantidade", String(filtros.quantidade));
   }
@@ -206,6 +280,10 @@ export function ReferenciasTela({
   ramoAtivo,
   feitoPara,
   perguntas = null,
+  duracao = "curtos",
+  longos = [],
+  totalLongos = 0,
+  longosDisponiveis = 0,
 }: Props) {
   const router = useRouter();
   /** E28 (parte 3b): a linha das perguntas do público abre na lista; ao responder, a chave que está abrindo o Tema livre. */
@@ -273,6 +351,7 @@ export function ReferenciasTela({
   const [tiposConteudoExibidos, setTiposConteudoOtimista] = useOptimistic(tiposConteudo);
   const [quantidadeExibida, setQuantidadeOtimista] = useOptimistic(quantidade);
   const [feitoParaExibido, setFeitoParaOtimista] = useOptimistic(feitoPara);
+  const [duracaoExibida, setDuracaoOtimista] = useOptimistic(duracao);
   const urlPendente = useRef<string | null>(null);
   /**
    * F1, ajuste A da revisão do PR #71: a rede de segurança do item 2 (mais abaixo, em `navegar`) nunca
@@ -315,6 +394,8 @@ export function ReferenciasTela({
       tiposConteudo,
       quantidade,
       ramo: ramoAtivo,
+      feitoPara,
+      duracao,
     });
     if (urlPendente.current === urlConfirmada) {
       urlPendente.current = null;
@@ -334,6 +415,7 @@ export function ReferenciasTela({
     quantidade,
     ramoAtivo,
     feitoPara,
+    duracao,
     limparRedeDeSeguranca,
   ]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
@@ -351,21 +433,26 @@ export function ReferenciasTela({
     const nomes = new Map((ramos ?? []).filter((r) => !r.principal).map((r) => [r.id, r.nome] as const));
     return videos.map((v) => formatarVideo(v, nomes));
   }, [videos, ramos]);
-  const videoDetalhe = formatados.find((v) => v.id === videoDetalheId) ?? null;
-  const urlDetalhe = videos.find((v) => v.id === videoDetalheId)?.url ?? null;
+  // E52 (PR 4c): "Ver o capítulo" abre a prévia de sempre no segundo do capítulo (ou no começo); o vídeo longo vem da lista dos longos, não da dos curtos.
+  const [segundoDetalhe, setSegundoDetalhe] = useState<number | null>(null);
+  const longosFormatados = useMemo(() => {
+    const nomes = new Map((ramos ?? []).filter((r) => !r.principal).map((r) => [r.id, r.nome] as const));
+    return longos.map((v) => formatarLongo(v, nomes));
+  }, [longos, ramos]);
+  const longoDetalhe = longos.find((v) => v.id === videoDetalheId) ?? null;
+  const videoDetalhe = longoDetalhe ? longoComoVideoFormatado(longoDetalhe, segundoDetalhe) : (formatados.find((v) => v.id === videoDetalheId) ?? null);
+  const urlDetalhe = longoDetalhe?.url ?? videos.find((v) => v.id === videoDetalheId)?.url ?? null;
 
   /**
    * R2b, item 2: a ordem não conta aqui (não é um filtro, é como a lista é ordenada; o desenho só
    * conta o que de fato reduz quantos vídeos aparecem).
    */
+  const emLongos = duracaoExibida === "longos";
+  // E52 (PR 4c): nos longos só valem a busca, as views, "Brasil ou fora" e a ordem; rede, tipo, fala e "parece feito para" são da análise dos curtos, então não contam nem aparecem como ficha.
   const quantosFiltrosAtivos =
-    plataformasExibidas.length +
-    formatosExibidos.length +
-    tiposConteudoExibidos.length +
+    (emLongos ? 1 : plataformasExibidas.length + formatosExibidos.length + tiposConteudoExibidos.length + (comFalaExibido !== undefined ? 1 : 0) + (feitoParaExibido ? 1 : 0)) +
     (viewsMinExibido !== undefined ? 1 : 0) +
-    (comFalaExibido !== undefined ? 1 : 0) +
-    (brasilExibido !== undefined ? 1 : 0) +
-    (feitoParaExibido ? 1 : 0);
+    (brasilExibido !== undefined ? 1 : 0);
 
   /**
    * R2b, item 4 (revisão do Fable no PR #100, `.fichas-filtro` do desenho): uma ficha por filtro
@@ -374,7 +461,7 @@ export function ReferenciasTela({
    * rodada não construiu as pílulas (documentado no PR), as fichas ficam em qualquer largura de
    * tela, único jeito de ver e tirar um filtro sem reabrir a folha "Filtrar".
    */
-  const fichasAtivas = [
+  const fichasDosCurtos = [
     ...plataformasExibidas.map((p) => ({
       chave: `plataforma-${p}`,
       rotulo: ROTULO_PLATAFORMA[p],
@@ -427,9 +514,15 @@ export function ReferenciasTela({
         ]
       : []),
   ];
+  const fichasAtivas = emLongos
+    ? [
+        { chave: "duracao", rotulo: textosReferencias.duracao.fichaLonga, aoRemover: () => navegar({ duracao: "curtos" }) },
+        ...fichasDosCurtos.filter((f) => f.chave === "views" || f.chave === "brasil"),
+      ]
+    : fichasDosCurtos;
 
   function tirarOsFiltros() {
-    navegar({ plataformas: [], formatos: [], ordem: undefined, viewsMin: undefined, comFala: undefined, brasil: undefined, tiposConteudo: [], feitoPara: undefined });
+    navegar({ plataformas: [], formatos: [], ordem: undefined, viewsMin: undefined, comFala: undefined, brasil: undefined, tiposConteudo: [], feitoPara: undefined, duracao: "curtos" });
   }
 
   /**
@@ -474,6 +567,7 @@ export function ReferenciasTela({
       quantidade: TAMANHO_PAGINA_TODOS_PADRAO,
       ramo: ramoAtivo,
       feitoPara: feitoParaExibido,
+      duracao: duracaoExibida,
       ...mudanca,
     };
     const url = montarUrl(filtros);
@@ -494,6 +588,7 @@ export function ReferenciasTela({
       setTiposConteudoOtimista(filtros.tiposConteudo);
       setQuantidadeOtimista(filtros.quantidade);
       setFeitoParaOtimista(filtros.feitoPara);
+      setDuracaoOtimista(filtros.duracao);
       // `substituir` é a folha "Filtrar" fechando: troca a entrada que ela empurrou (useFolhaNoHistorico,
       // `fecharENavegar`), não empurra mais uma. Fora dali, cada filtro pelo topo da tela é a própria
       // navegação da pessoa e continua entrando no histórico como sempre.
@@ -600,6 +695,7 @@ export function ReferenciasTela({
     comFala: boolean | undefined;
     brasil: boolean | undefined;
     tiposConteudo: TipoConteudoFiltravel[];
+    duracao: DuracaoReferencias;
   }) {
     // Sem rede a folha continua aberta, com o que foi marcado. Um segundo toque antes de a folha sair é
     // ignorado pelo próprio gancho do histórico (`fecharENavegar` é idempotente).
@@ -702,6 +798,8 @@ export function ReferenciasTela({
             comFala={comFalaExibido}
             brasil={brasilExibido}
             tiposConteudo={tiposConteudoExibidos}
+            duracao={duracaoExibida}
+            longosDisponiveis={longosDisponiveis}
             contagens={contagensFiltro}
             pilulaAberta={pilulaAberta}
             onAbrir={setPilulaAberta}
@@ -791,7 +889,7 @@ export function ReferenciasTela({
         )
       ) : null}
 
-      {redePrincipalSemVideo && segmento !== "salvos" && !navegando ? (
+      {redePrincipalSemVideo && segmento !== "salvos" && !navegando && duracao !== "longos" ? (
         <p className={styles.avisoRedePrincipal} role="status">
           {textosReferencias.semVideoRedePrincipal(ROTULO_PLATAFORMA[redePrincipalSemVideo])}
         </p>
@@ -803,7 +901,69 @@ export function ReferenciasTela({
         </p>
       ) : null}
 
-      {formatados.length === 0 ? (
+      {duracao === "longos" ? (
+        longos.length === 0 ? (
+          <div className={styles.blocoVazio} data-longos-vazio>
+            <h3>{textosReferencias.duracao.vazioTitulo}</h3>
+            <p>{longosDisponiveis === 0 ? textosReferencias.duracao.semLongos : textosReferencias.duracao.vazioTexto}</p>
+            <div className={styles.blocoVazioAcoes}>
+              <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ duracao: "curtos" })}>
+                {textosReferencias.duracao.verCurtos}
+              </Botao>
+              {longosDisponiveis > 0 ? (
+                <Botao
+                  variante="secundario"
+                  tamanho="lg"
+                  carregando={navegando}
+                  onClick={() => {
+                    setCampoBusca("");
+                    navegar({ busca: "", viewsMin: undefined, brasil: undefined, ordem: undefined });
+                  }}
+                >
+                  {textosReferencias.limparFiltros}
+                </Botao>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <>
+            {navegando ? null : (
+              <div className={styles.linhaContagem}>
+                <p className={styles.contagem}>
+                  {textosReferencias.duracao.contagem(totalLongos, Math.max(periodoDias, 30))}
+                  <span className={styles.ordemSufixo}>{`, ${textosReferencias.ordemSufixo[ordemExibida ?? "multiplo"]}`}</span>
+                </p>
+                <span className={styles.ladoContagem}>
+                  <PilulaOrdem
+                    ordem={ordemExibida ?? "multiplo"}
+                    pilulaAberta={pilulaAberta}
+                    onAbrir={setPilulaAberta}
+                    onFechar={() => setPilulaAberta(null)}
+                    onMudar={(mudanca) => navegar(mudanca)}
+                  />
+                </span>
+              </div>
+            )}
+            <p className={styles.contagem}>{textosReferencias.duracao.ajudaDaLista}</p>
+            <div className={styles.grade}>
+              {longosFormatados.map((video) => (
+                <ReferenciaLongoCartao
+                  key={video.id}
+                  video={video}
+                  salvo={favoritos.has(video.id)}
+                  salvando={idsPendentes.has(video.id)}
+                  semRede={semConexao}
+                  onVer={(segundo) => {
+                    setSegundoDetalhe(segundo);
+                    setVideoDetalheId(video.id);
+                  }}
+                  onSalvar={() => alternarFavorito(video.id)}
+                />
+              ))}
+            </div>
+          </>
+        )
+      ) : formatados.length === 0 ? (
         segmento === "salvos" ? (
           <div className={styles.blocoVazio}>
             <h3>{textosReferencias.vazioTituloSalvos}</h3>
@@ -953,8 +1113,10 @@ export function ReferenciasTela({
           comFala={comFalaExibido}
           brasil={brasilExibido}
           tiposConteudo={tiposConteudoExibidos}
+          duracao={duracaoExibida}
+          longosDisponiveis={longosDisponiveis}
           contagens={contagensFiltro}
-          totalAtual={total}
+          totalAtual={duracao === "longos" ? totalLongos : total}
           onAplicar={aplicarFiltros}
         />
       ) : null}

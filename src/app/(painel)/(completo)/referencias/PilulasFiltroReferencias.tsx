@@ -5,6 +5,7 @@ import { FORMATOS_EM_ORDEM, ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL, TIPO
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel } from "@/servicos/pesquisa";
 import { textosReferencias } from "@/textos/referencias";
 
+import type { DuracaoReferencias } from "./duracao";
 import { ItemMenuCheckbox, ItemMenuRadio, PilulaFiltro } from "./PilulaFiltro";
 import styles from "./PilulasFiltroReferencias.module.css";
 
@@ -32,6 +33,7 @@ type MudancaFiltro = Partial<{
   comFala: boolean | undefined;
   brasil: boolean | undefined;
   tiposConteudo: TipoConteudoFiltravel[];
+  duracao: DuracaoReferencias;
 }>;
 
 /** "Fala" e "De onde" não têm opção "os dois" própria: marcar de novo o que já estava marcado desmarca. */
@@ -54,6 +56,10 @@ type PropsComuns = {
   comFala: boolean | undefined;
   brasil: boolean | undefined;
   tiposConteudo: TipoConteudoFiltravel[];
+  /** E52 (PR 4c): "Curtos" (o de sempre) ou "Mais de 3 min" (os longos do ramo). */
+  duracao: DuracaoReferencias;
+  /** Quantos vídeos longos o ramo tem agora; zero deixa "Mais de 3 min" apagada. */
+  longosDisponiveis: number;
   contagens: ContagensFiltroReferencias;
   pilulaAberta: string | null;
   onAbrir: (id: string) => void;
@@ -76,6 +82,8 @@ export function PilulasFiltroReferencias({
   comFala,
   brasil,
   tiposConteudo,
+  duracao,
+  longosDisponiveis,
   contagens,
   pilulaAberta,
   onAbrir,
@@ -193,6 +201,26 @@ export function PilulasFiltroReferencias({
             onClick={() => onMudar({ tiposConteudo: tiposConteudo.includes(t) ? tiposConteudo.filter((v) => v !== t) : [...tiposConteudo, t] })}
           />
         ))}
+      </PilulaFiltro>
+
+      <PilulaFiltro
+        id="duracao"
+        rotulo={duracao === "longos" ? textosReferencias.duracao.longos : textosReferencias.duracao.rotulo}
+        ativa={duracao === "longos"}
+        menuRotulo={textosReferencias.duracao.menu}
+        pilulaAberta={pilulaAberta}
+        onAbrir={onAbrir}
+        onFechar={onFechar}
+      >
+        <ItemMenuRadio rotulo={textosReferencias.duracao.curtos} marcado={duracao === "curtos"} onClick={() => onMudar({ duracao: "curtos" })} />
+        <ItemMenuRadio
+          rotulo={textosReferencias.duracao.longos}
+          quantos={longosDisponiveis}
+          marcado={duracao === "longos"}
+          desabilitado={longosDisponiveis === 0 && duracao !== "longos"}
+          onClick={() => onMudar({ duracao: "longos" })}
+        />
+        {longosDisponiveis === 0 ? <p className={styles.semLongos}>{textosReferencias.duracao.semLongos}</p> : null}
       </PilulaFiltro>
 
       <PilulaFiltro

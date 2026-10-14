@@ -1,0 +1,104 @@
+/* E52 (PR 4c): o que o cartão do vídeo longo tem a mais que o do curto (`ReferenciaCartao.module.css` dá o resto). Só tokens. */
+.longo {
+  grid-column: span 1;
+}
+
+/* A capa deitada (16:9), com a duração no canto, no lugar da vertical do curto. */
+.capaLonga {
+  position: relative;
+  width: 8rem;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  border: var(--largura-borda) solid var(--cor-borda);
+  color: var(--cor-texto-dica);
+}
+
+.duracaoNaCapa {
+  position: absolute;
+  right: var(--espaco-1);
+  bottom: var(--espaco-1);
+  padding: 0 var(--espaco-1);
+  border-radius: var(--raio-sm);
+  background: var(--cor-video);
+  color: var(--cor-video-texto);
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.4 var(--fonte-mono);
+}
+
+.capitulos {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.rotuloCapitulos {
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  color: var(--cor-texto-suave);
+}
+
+.capitulos ol {
+  display: grid;
+  gap: var(--espaco-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.capitulos li {
+  display: flex;
+  gap: var(--espaco-3);
+  min-width: 0;
+}
+
+.capitulos li b {
+  flex: 0 0 auto;
+  min-width: 3rem;
+  font-family: var(--fonte-mono);
+  font-weight: var(--peso-medio);
+  color: var(--cor-titulo);
+}
+
+.capitulos li span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.maisCapitulos {
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.capituloQueInteressa {
+  display: grid;
+  gap: var(--espaco-2);
+  font-size: var(--tamanho-secundario);
+  color: var(--cor-texto);
+}
+
+.promessa {
+  color: var(--cor-texto-suave);
+}
+
+/* O trilho do vídeo inteiro com a marca do capítulo: a posição e a largura vêm do tempo do capítulo sobre a duração. */
+.trilho {
+  position: relative;
+  display: block;
+  height: 0.5rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie-recuada);
+  border: var(--largura-borda) solid var(--cor-borda);
+}
+
+.trilho i {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  min-width: 0.25rem;
+  border-radius: var(--raio-pill);
+  background: var(--cor-acao);
+}
