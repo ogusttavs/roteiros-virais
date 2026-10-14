@@ -126,20 +126,20 @@ test.describe("o modo gravação do vídeo longo", () => {
     await expect(page.locator("[data-passo-gravado]")).toHaveCount(0);
 
     // "Já gravei este" marca o 2 e passa ao 3, marca o 3 e passa ao 4, marca o 4: o 1 ainda falta, então a tela volta a ele (o fim não aparece)
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
     await expect(palco).toContainText("Capítulo 3 de 4");
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
     await expect(palco).toContainText("Capítulo 4 de 4");
     // o último troca a frase que segura pela chamada final
     await expect(palco.locator("[data-segurar]")).toHaveCount(0);
     await expect(palco.locator("[data-chamada-final]")).toContainText("Me manda a foto da sua mancha");
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
     await expect(palco).toContainText("Capítulo 1 de 4");
     await expect(page.locator("[data-gravacao-longa-fim]")).toHaveCount(0);
     expect((await db().select().from(roteiros).where(eq(roteiros.id, id)))[0].status).toBe("gerado");
 
     // o último que falta: o fim aparece, com a lista e "Copiar os capítulos"
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
     const fim = page.locator("[data-gravacao-longa-fim]");
     await expect(fim).toBeVisible();
     await expect(fim).toContainText("Os quatro capítulos estão gravados");
@@ -164,8 +164,8 @@ test.describe("o modo gravação do vídeo longo", () => {
     await page.goto(`/roteiros/${id}/gravar`);
     const palco = page.locator("[data-capitulo-da-vez]");
     await expect(palco).toContainText("Capítulo 1 de 4");
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
-    await page.getByRole("button", { name: /^Já gravei o capítulo/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
+    await page.getByRole("button", { name: /^Já gravei este/ }).click();
     await expect(palco).toContainText("Capítulo 3 de 4");
 
     await page.reload();
@@ -186,7 +186,7 @@ test.describe("o modo gravação do vídeo longo", () => {
     await page.goto(`/roteiros/${id}/gravar`);
     await expect(page.locator("[data-capitulo-da-vez]")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    const botao = await page.getByRole("button", { name: /^Já gravei o capítulo/ }).boundingBox();
+    const botao = await page.getByRole("button", { name: /^Já gravei este/ }).boundingBox();
     expect(botao!.y + botao!.height).toBeLessThanOrEqual(844);
   });
 

@@ -2,7 +2,7 @@
 
 import { Check, ChevronLeft, ChevronRight, Copy, Eye, Mic, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { marcarGravadoAction } from "@/app/(painel)/(completo)/roteiros/[id]/acoes";
 import { useMarcasDeFala } from "@/app/(painel)/(completo)/roteiros/[id]/useMarcasDeFala";
@@ -89,13 +89,30 @@ export function GravacaoLongaTela({ roteiroId, titulo, capitulos, gancho, chamad
 
   // A memória do aparelho só vale depois de lida (no navegador): quem já gravou capítulos volta ao primeiro que falta, e com todos marcados volta ao fim.
   const [memoriaLida, setMemoriaLida] = useState(false);
+  /** Marca o roteiro como gravado no servidor uma vez só: ao marcar o último capítulo, ou ao voltar com todos já marcados no aparelho e o servidor ainda sem saber (a primeira tentativa pode ter caído sem rede). */
+  const marcouNoServidor = useRef(jaGravado);
+  function marcarRoteiroGravado() {
+    if (marcouNoServidor.current) return;
+    marcouNoServidor.current = true;
+    setMarcandoServidor(true);
+    marcarGravadoAction(roteiroId)
+      .then(() => setGravadoNoServidor(true))
+      .catch((falha) => {
+        marcouNoServidor.current = false;
+        setAvisoErro(tratarFalha(falha, textosGravacao.erroMarcar, textosGravacao.erroMarcarSemRede));
+      })
+      .finally(() => setMarcandoServidor(false));
+  }
   useEffect(() => {
     const lidos = lerGravados(roteiroId, total);
     setGravados(lidos);
     const falta = primeiroCapituloQueFalta(lidos, total);
-    if (falta === null) setVendoFim(true);
-    else setIndice(falta);
+    if (falta === null) {
+      setVendoFim(true);
+      marcarRoteiroGravado();
+    } else setIndice(falta);
     setMemoriaLida(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir (ou ao trocar de roteiro): a função lê estado que muda depois
   }, [roteiroId, total]);
 
   // As marcas de fala: LIGADAS por padrão aqui (é onde a marca importa) e a escolha de desligar é lembrada por marca neste aparelho, a mesma do modo gravação de sempre. Só as frases ditas como
@@ -152,12 +169,7 @@ export function GravacaoLongaTela({ roteiroId, titulo, capitulos, gancho, chamad
       return;
     }
     setVendoFim(true);
-    if (gravadoNoServidor || marcandoServidor) return;
-    setMarcandoServidor(true);
-    marcarGravadoAction(roteiroId)
-      .then(() => setGravadoNoServidor(true))
-      .catch((falha) => setAvisoErro(tratarFalha(falha, textosGravacao.erroMarcar, textosGravacao.erroMarcarSemRede)))
-      .finally(() => setMarcandoServidor(false));
+    marcarRoteiroGravado();
   }
 
   /** A seta da direita passa sem marcar; no último capítulo volta ao primeiro que ainda falta (ou ao fim, se não falta nenhum). */
@@ -230,7 +242,7 @@ export function GravacaoLongaTela({ roteiroId, titulo, capitulos, gancho, chamad
         <span className={styles.contagem}>{textosGravacao.contagem(mostrandoFim ? total : indice + 1, total)}</span>
       </header>
 
-      <main className={styles.palco}>
+      <main className={`${styles.palco} ${stylesLongo.palcoCapitulo}`}>
         {mostrandoFim ? (
           <div className={styles.palcoCentro} data-gravacao-longa-fim>
             <span className={styles.blocoTempo}>{t.quantosGravados(gravados.size, total)}</span>

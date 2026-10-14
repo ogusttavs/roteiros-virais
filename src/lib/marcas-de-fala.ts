@@ -30,7 +30,10 @@ export function temCapitulos(conteudo: Pick<ConteudoRoteiro, "capitulos">): bool
  * (dúvida 1 do passo 26), e nunca é marcado. O `indice` é o do capítulo; o último capítulo não tem (a chamada final vem no lugar).
  */
 export function ganchosDosCapitulos(conteudo: Pick<ConteudoRoteiro, "capitulos">): { indice: number; texto: string }[] {
-  return (conteudo.capitulos ?? []).flatMap((c, indice) => {
+  const capitulos = conteudo.capitulos ?? [];
+  return capitulos.flatMap((c, indice) => {
+    // O último capítulo não segura até nenhum próximo: o que a chamada final diz é o bloco dela, nunca uma frase de capítulo.
+    if (indice === capitulos.length - 1) return [];
     const texto = (c.ganchoParaOProximo ?? "").replace(/\s+/g, " ").trim();
     return texto === "" ? [] : [{ indice, texto }];
   });

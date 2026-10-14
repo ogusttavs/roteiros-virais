@@ -108,3 +108,17 @@
   font-size: var(--tamanho-rodape);
   color: var(--cor-texto-suave);
 }
+
+/*
+ * O capítulo passa da altura de um celular em pé: com `align-content: center` a grade do palco cortava o começo (o tom e o nome) sem deixar rolar até ele. Aqui o palco é uma coluna que
+ * rola, e o conteúdo se centra quando sobra espaço (margem automática) e começa no alto quando não sobra.
+ */
+main.palcoCapitulo {
+  display: flex;
+  flex-direction: column;
+  align-content: normal;
+}
+
+main.palcoCapitulo > div {
+  margin-block: auto;
+}

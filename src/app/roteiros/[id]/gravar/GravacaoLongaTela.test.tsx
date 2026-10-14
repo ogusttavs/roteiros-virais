@@ -30,7 +30,7 @@ function montar(extra: Partial<React.ComponentProps<typeof GravacaoLongaTela>> =
 }
 
 const palco = () => document.querySelector("main") as HTMLElement;
-const jaGravei = () => screen.getByRole("button", { name: /^Já gravei o capítulo/ });
+const jaGravei = () => screen.getByRole("button", { name: /^Já gravei este/ });
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -164,6 +164,19 @@ describe("GravacaoLongaTela", () => {
     expect((screen.getByRole("button", { name: "Próximo capítulo" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Voltar ao roteiro" }));
     await waitFor(() => expect(push).toHaveBeenCalledWith("/roteiros/42?gravado=1"));
+  });
+
+  it("voltar com todos os capítulos marcados no aparelho e o servidor sem saber marca o roteiro, uma vez", async () => {
+    window.localStorage.setItem("capitulos-gravados:42", JSON.stringify([0, 1, 2]));
+    montar();
+    await waitFor(() => expect(document.querySelector("[data-gravacao-longa-fim]")).not.toBeNull());
+    await waitFor(() => expect(marcarGravadoAction).toHaveBeenCalledTimes(1));
+    cleanup();
+    // e se o roteiro já estava gravado no servidor, nada é pedido
+    marcarGravadoAction.mockClear();
+    montar({ jaGravado: true });
+    await waitFor(() => expect(document.querySelector("[data-gravacao-longa-fim]")).not.toBeNull());
+    expect(marcarGravadoAction).not.toHaveBeenCalled();
   });
 
   it("o roteiro que já estava gravado não é marcado de novo no servidor", async () => {

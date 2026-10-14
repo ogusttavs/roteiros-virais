@@ -37,12 +37,11 @@ export const textosGravacao = {
     chamada: "A chamada final",
     depoisVemCapitulo: (n: number, de: string, ate: string) => `Depois vem o capítulo ${n}, de ${de} a ${ate}`,
     jaGravei: "Já gravei este",
-    jaGraveiAria: (nome: string) => `Já gravei o capítulo ${nome}`,
+    jaGraveiAria: (nome: string) => `Já gravei este, capítulo ${nome}`,
     capituloAnterior: "Capítulo anterior",
     proximoSemMarcar: "Próximo capítulo, sem marcar",
     proximoCapitulo: "Próximo capítulo",
     voltarAoRoteiro: "Voltar ao roteiro",
-    gravadoNoAparelho: "Gravado neste aparelho",
     quantosGravados: (n: number, total: number) => `${n} de ${total} gravados`,
     fimTitulo: (total: number) => {
       const palavras = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze"];
