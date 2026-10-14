@@ -155,7 +155,10 @@ test.describe("o modo gravação do vídeo longo", () => {
 
     // "Voltar ao roteiro" leva ao roteiro com o aviso de gravado
     await page.getByRole("button", { name: "Voltar ao roteiro" }).click();
-    await expect(page).toHaveURL(new RegExp(`/roteiros/${id}\\?gravado=1`));
+    // A página do roteiro limpa o `?gravado=1` da URL assim que chega (mostra o toast e faz `router.replace`): conferir a URL COM o parâmetro corria contra essa limpeza e oscilava na CI (main em aaa7b80).
+    // O que prova que o modo gravação mandou para o roteiro com o aviso é o toast; a URL é a final, sem o parâmetro.
+    await expect(page.getByText("Gravado. Quando postar, marque em Histórico.")).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/roteiros/${id}$`));
   });
 
   test("a memória do aparelho: ao voltar, o modo gravação abre no primeiro capítulo que falta, e a seta do anterior sai do fim", async ({ page }, info) => {
