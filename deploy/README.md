@@ -75,9 +75,14 @@ Ordem que aconteceu de verdade em 05/09/2026, com o painel indo ao ar em
 ## Deploys seguintes
 
 ```bash
-deploy/deploy.sh            # latest
-deploy/deploy.sh <sha>      # voltar para um commit especifico
+deploy/deploy.sh <sha>      # sempre com o sha do commit que passou na CI (7 a 40 hexadecimais)
 ```
+
+O script **exige o sha**: sem argumento, com `latest` ou com qualquer coisa que nao seja um sha,
+recusa (codigo 2) antes de tocar na VPS. Voltar para uma versao anterior e o mesmo comando com o
+sha dela (`acessos/DEPLOYS.md` guarda a lista). A regra existe desde 10/10/2026: um comentario de PR
+com uma crase em aspas duplas executou o script sem argumento e subiu `latest` em producao.
+`deploy/deploy.sh --conferir <sha>` so valida o argumento e sai.
 
 ## Editar o Caddyfile compartilhado
 
