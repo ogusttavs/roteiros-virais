@@ -18,7 +18,21 @@ const USO_ZERO = {
   tokensCacheEscrita: 0,
 };
 
+/**
+ * "[mock:erro-credito]", "[mock:erro-sobrecarga]" e "[mock:erro-chave]" em qualquer texto que entra na chamada (o momento que a pessoa conta, o tema livre): a API da IA recusa pela causa
+ * dita, como a real faria (o erro leva a causa; só o admin a lê na tela). Só no mock, nunca em produção (o provedor real nem passa por aqui).
+ */
+function erroDeCausaSimulado(entrada: string): ErroIA | null {
+  if (entrada.includes("[mock:erro-credito]")) return new ErroIA("erro da API (400): Your credit balance is too low to access the Anthropic API (simulado).", undefined, "credito");
+  if (entrada.includes("[mock:erro-sobrecarga]")) return new ErroIA("erro da API (529): Overloaded (simulado).", undefined, "sobrecarga");
+  if (entrada.includes("[mock:erro-chave]")) return new ErroIA("erro da API (401): invalid x-api-key (simulado).", undefined, "chave");
+  return null;
+}
+
 export async function gerarMock<T>(params: ParametrosGeracao<T>): Promise<ResultadoGeracao<T>> {
+  const simulado = erroDeCausaSimulado(`${params.entrada}
+${params.sistemaVariavel ?? ""}`);
+  if (simulado) throw simulado;
   // "[mock:api-fora]" na leitura da marca: a API da IA falha (saldo, limite, fora do ar), que não é o mesmo que o verificador reprovar.
   if (params.tarefa === "entenderMarca" && params.entrada.includes("[mock:api-fora]")) {
     throw new ErroIA("erro da API (402): saldo insuficiente.");

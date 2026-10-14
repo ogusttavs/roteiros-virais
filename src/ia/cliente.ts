@@ -9,7 +9,8 @@ import type { z } from "zod";
 
 import { config } from "@/lib/config";
 
-import { ErroIA } from "./erro";
+import { causaDoErroDaApi, ErroIA, FRASE_GENERICA_DO_CLIENTE } from "./erro";
+import { registrarFalhaDaIA } from "./falha-da-ia";
 import { gerarMock } from "./mock";
 import type { EsforcoIA, ImagemEntrada, NivelIA, ResultadoGeracao, TarefaIA } from "./tipos";
 
@@ -41,10 +42,14 @@ export type ParametrosGeracao<T> = {
 export async function gerarEstruturado<T>(
   params: ParametrosGeracao<T>,
 ): Promise<ResultadoGeracao<T>> {
-  if (config.ia.provedor === "mock") {
-    return gerarMock(params);
+  try {
+    if (config.ia.provedor === "mock") return await gerarMock(params);
+    return await gerarReal(params);
+  } catch (erro) {
+    // A causa conhecida (crédito, sobrecarga, chave) fica anotada para o Início do admin; a anotação nunca muda o erro que sobe.
+    if (erro instanceof ErroIA && erro.causa) await registrarFalhaDaIA(erro.causa, params.tarefa);
+    throw erro;
   }
-  return gerarReal(params);
 }
 
 async function gerarReal<T>(params: ParametrosGeracao<T>): Promise<ResultadoGeracao<T>> {
@@ -121,13 +126,13 @@ async function gerarReal<T>(params: ParametrosGeracao<T>): Promise<ResultadoGera
 /** Exportado para `busca-na-web.ts`: o mesmo texto de erro das outras tarefas. */
 export function traduzirErro(erro: unknown, tarefa: TarefaIA): ErroIA {
   if (erro instanceof RateLimitError) {
-    return new ErroIA(`limite de taxa da API na tarefa "${tarefa}": ${erro.message}`);
+    return new ErroIA(`limite de taxa da API na tarefa "${tarefa}": ${erro.message}`, FRASE_GENERICA_DO_CLIENTE, causaDoErroDaApi(erro.status, erro.message) ?? "sobrecarga");
   }
   if (erro instanceof APIConnectionError) {
     return new ErroIA(`falha de rede com a API na tarefa "${tarefa}": ${erro.message}`);
   }
   if (erro instanceof APIError) {
-    return new ErroIA(`erro da API (${erro.status}) na tarefa "${tarefa}": ${erro.message}`);
+    return new ErroIA(`erro da API (${erro.status}) na tarefa "${tarefa}": ${erro.message}`, FRASE_GENERICA_DO_CLIENTE, causaDoErroDaApi(erro.status, erro.message));
   }
   return new ErroIA(`erro inesperado na tarefa "${tarefa}": ${String(erro)}`);
 }

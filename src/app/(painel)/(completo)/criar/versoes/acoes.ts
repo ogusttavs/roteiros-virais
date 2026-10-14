@@ -1,6 +1,7 @@
 "use server";
 
 import { ErroIA } from "@/ia/erro";
+import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, ErroAcessoNegado, garantirMembroDaMarca } from "@/servicos/clientes";
@@ -32,7 +33,7 @@ export async function gerarOutraVersaoAction(grupo: string): Promise<ResultadoAc
     const versao = await gerarOutraVersao(cliente.id, grupo);
     return { ok: true, dado: { versao: paraVersaoDaTela(versao) } };
   } catch (falha) {
-    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
     throw falha;
   }

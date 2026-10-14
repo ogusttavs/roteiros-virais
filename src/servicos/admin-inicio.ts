@@ -5,6 +5,7 @@ import { rotuloDoMotivo } from "@/config/motivos-reprovacao";
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { briefings, clientes, execucoesJob, geracoesIA, nichos, roteiros, temasDia, videos } from "@/db/schema";
+import { faltaDeCreditoDaIA } from "@/ia/falha-da-ia";
 import { FILAS } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { estadoPorDia, NOMES_JOB_COLETA, type EstadoAgregado } from "@/servicos/admin-acompanhamento";
@@ -98,7 +99,7 @@ export type InicioAdmin = {
   dinheiro: { saiuHojeUsd: number; saiu30dUsd: number; saiu30dComFixosBrl: number; fixosBrl: number; fixosCadastrados: number; tetoBrl: number; passouDoTeto: boolean };
   contas: { ativas: number; usaramOntem: number; pararam: number; briefingIncompleto: number; novasNaSemana: number };
   produto: { escritos: number; gravados: number; postados: number; reprovados: number; motivoMaisComum: { rotulo: string; vezes: number } | null };
-  atencao: { pedidosDeRamo: number; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null };
+  atencao: { pedidosDeRamo: number; /** A API da IA recusou por falta de crédito e nenhuma geração boa veio depois (E-pequena de 05/10/2026), ou nulo. */ creditoDaIA: { desde: Date; tarefa: string } | null; /** O proxy do YouTube parado na última noite que tentou baixar (hotfix do proxy), ou nulo. */ proxy: ProxyParado | null };
 };
 
 /** Depois desta hora (Brasil) um ramo sem tema do dia já é problema; antes, a madrugada ainda pode estar rodando. */
@@ -249,6 +250,6 @@ async function contas(agora: Date): Promise<InicioAdmin["contas"]> {
 
 /** Tudo o que o Início do admin mostra (E46 PR 1), de uma vez. */
 export async function inicioDoAdmin(agora: Date = new Date()): Promise<InicioAdmin> {
-  const [m, e, d, c, p, pedidos, proxy] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), proxyDoYoutubeParado()]);
-  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, proxy } };
+  const [m, e, d, c, p, pedidos, proxy, semCredito] = await Promise.all([madrugada(agora), erros(agora), dinheiro(agora), contas(agora), produto(agora), contarPedidosAbertos(), proxyDoYoutubeParado(), faltaDeCreditoDaIA()]);
+  return { agora, madrugada: m, erros: e, dinheiro: d, contas: c, produto: p, atencao: { pedidosDeRamo: pedidos, creditoDaIA: semCredito ? { desde: semCredito.em, tarefa: semCredito.tarefa } : null, proxy } };
 }

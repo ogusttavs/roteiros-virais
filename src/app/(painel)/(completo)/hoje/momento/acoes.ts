@@ -3,6 +3,7 @@
 import { ehFicha } from "@/config/fichas";
 import type { Objetivo } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
+import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
@@ -135,7 +136,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
 
     return { ok: true, dado: { id: roteiro.id } };
   } catch (falha) {
-    if (falha instanceof ErroIA) return { ok: false, erro: falha.mensagemCliente };
+    if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
     if (falha instanceof ErroRoteiro) return { ok: false, erro: falha.message };
     throw falha;
   }
