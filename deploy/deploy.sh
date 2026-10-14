@@ -10,11 +10,39 @@
 #   5. roda as migracoes pelo container do worker (tem tsx e a pasta drizzle)
 #   6. sobe tudo (app, worker, backup) e confere /api/saude por dentro da rede
 #
-# Uso: deploy/deploy.sh [tag]   (padrao: latest). Nao faz build, nao mexe no
-# proxy, nao toca fora de /srv/roteiros. Domínio e .env ja precisam existir.
+# Uso: deploy/deploy.sh <sha>   (o sha curto ou inteiro do commit que passou na CI: 7 a
+# 40 caracteres hexadecimais). Sem argumento, ou com `latest`, ou com qualquer outra coisa,
+# recusa: `latest` sobe o que a `main` tiver na hora, nao o que foi testado (regra de
+# 10/10/2026, depois de um comentario com crase executar o script sem argumento e subir
+# `latest` em producao). `--conferir <sha>` so valida o argumento e sai (usado nos testes).
+# Nao faz build, nao mexe no proxy, nao toca fora de /srv/roteiros. Dominio e .env ja
+# precisam existir.
 set -euo pipefail
 
-TAG="${1:-latest}"
+USO="uso: deploy/deploy.sh <sha>   (sha do commit que passou na CI, 7 a 40 caracteres hexadecimais; nunca 'latest')"
+SO_CONFERIR=0
+if [ "${1:-}" = "--conferir" ]; then
+  SO_CONFERIR=1
+  shift
+fi
+if [ "$#" -ne 1 ]; then
+  echo "$USO" >&2
+  exit 2
+fi
+TAG="$1"
+# `case` e nao `=~ ^...$`: o `$` do regex do bash casa antes de uma quebra de linha no fim, e um sha com quebra no fim passaria.
+SO_HEX=1
+case "$TAG" in *[!0-9a-fA-F]*) SO_HEX=0 ;; esac
+if [ "$SO_HEX" != "1" ] || [ "${#TAG}" -lt 7 ] || [ "${#TAG}" -gt 40 ]; then
+  echo "tag recusada: '$TAG' nao e um sha de 7 a 40 caracteres hexadecimais." >&2
+  echo "$USO" >&2
+  exit 2
+fi
+if [ "$SO_CONFERIR" = "1" ]; then
+  echo "sha ok: $TAG"
+  exit 0
+fi
+
 ALIAS=getorbita-vps
 DIR=/srv/roteiros
 AQUI="$(cd "$(dirname "$0")" && pwd)"
