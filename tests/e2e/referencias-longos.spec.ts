@@ -59,7 +59,7 @@ async function criarMarca(usuarioId: string, comLongos: boolean): Promise<{ nich
         referencias: [],
       },
     });
-  const [conta] = await db().insert(contas).values({ plataforma: "youtube", handle: `${usuarioId}-conta`, nome: "Casa Limpa Vídeos", nichoId: nicho.id, pais: "BR", idiomaPrincipal: "pt", medianaViews: 89_500, medianaOrigem: "conta" }).returning();
+  const [conta] = await db().insert(contas).values({ plataforma: "youtube", handle: `${usuarioId}-conta`, nome: "Casa Limpa Vídeos", nichoId: nicho.id, pais: "BR", idiomaPrincipal: "pt", medianaViews: "89500", medianaOrigem: "conta" }).returning();
   let n = 0;
   const semear = async (titulo: string, opcoes: { duracaoS: number; analiseLonga?: AnaliseVideoLonga; descricao?: string; views?: number; foraDaCurva?: string; analiseCurto?: boolean }) => {
     n += 1;
@@ -205,6 +205,22 @@ test.describe("Referências: a pílula Duração e os vídeos longos", () => {
     await page.goto("/referencias?duracao=longos&periodo=30&plataforma=todas&busca=erros");
     await expect(page.locator("[data-cartao-longo]")).toHaveCount(1);
     await expect(page.getByText("os 4 erros que estragam o sofá")).toBeVisible();
+  });
+
+  test("ao entrar nos longos, os filtros que só valem para os curtos (fala, tipo, rede) saem da URL; as views e o Brasil ficam", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await entrar(page, COM_LONGOS);
+    await page.goto("/referencias?periodo=30&plataforma=youtube&fala=sim&formato=fala_para_camera&views=100000&brasil=sim");
+    await page.getByRole("button", { name: /^Duração/ }).click();
+    await page.getByRole("menuitemradio", { name: /Mais de 3 min/ }).click();
+    await expect(page).toHaveURL(/duracao=longos/);
+    const url = new URL(page.url());
+    expect(url.searchParams.get("fala")).toBeNull();
+    expect(url.searchParams.get("formato")).toBeNull();
+    expect(url.searchParams.get("plataforma")).toBe("todas");
+    expect(url.searchParams.get("views")).toBe("100000");
+    expect(url.searchParams.get("brasil")).toBe("sim");
+    await expect(page.locator("[data-cartao-longo]")).toHaveCount(3);
   });
 
   test("no celular, a folha 'Filtrar' tem o grupo Duração e 'Ver os vídeos' leva à lista dos longos, sem rolagem de lado", async ({ page }) => {

@@ -74,7 +74,7 @@ beforeAll(async () => {
   const [nicho] = await db().insert(nichos).values({ slug: "ref-longo", nome: "Produtos de limpeza", termos: ["limpeza"], pisoViews: 50_000 }).returning();
   outroNichoId = outro.id;
   nichoId = nicho.id;
-  const [br] = await db().insert(contas).values({ plataforma: "youtube", handle: "ref-longo-br", nome: "Casa Limpa Vídeos", nichoId, pais: "BR", idiomaPrincipal: "pt", medianaViews: 89_500, medianaOrigem: "conta" }).returning();
+  const [br] = await db().insert(contas).values({ plataforma: "youtube", handle: "ref-longo-br", nome: "Casa Limpa Vídeos", nichoId, pais: "BR", idiomaPrincipal: "pt", medianaViews: "89500", medianaOrigem: "conta" }).returning();
   const [fora] = await db().insert(contas).values({ plataforma: "youtube", handle: "ref-longo-fora", nome: "Clean Home", nichoId, pais: "US", idiomaPrincipal: "en" }).returning();
   const [outraConta] = await db().insert(contas).values({ plataforma: "youtube", handle: "ref-longo-outro", nome: "Dentista Dicas", nichoId: outroNichoId, pais: "BR", idiomaPrincipal: "pt" }).returning();
   contaBr = br.id;
@@ -84,7 +84,7 @@ beforeAll(async () => {
   // com leitura que entrega aos 200 s (cai no capítulo "Segundo erro", de 3:00 a 5:00), com capítulos na descrição
   await semear("comLeitura", { titulo: "os 4 erros que estragam o sofá", descricao: NOVE_CAPITULOS, analise: analise(200), views: 412_000, foraDaCurva: "4.600", duracaoS: 662 });
   // com leitura, mas a abertura não entrega: não há capítulo que interesse
-  await semear("naoEntrega", { titulo: "limpeza profunda do estofado", analise: analise(null), views: 150_000, foraDaCurva: "2.000" });
+  await semear("naoEntrega", { titulo: "limpeza profunda do estofado", analise: analise(null), views: 480_000, foraDaCurva: "2.000" });
   // sem leitura: "Ver desde o começo"
   await semear("semLeitura", { titulo: "organizar o armário da cozinha", views: 90_000, foraDaCurva: "1.500", diasAtras: 2 });
   // de fora do Brasil
@@ -152,7 +152,10 @@ describe("os filtros que valem para o longo", () => {
 
   it("a ordem padrão é a dos mais acima do normal da conta; 'views' e 'recentes' reordenam; só os salvos entram quando pedidos", async () => {
     expect(idsDe(await longosParaAsReferencias({ nichoIds: [nichoId] }))).toEqual([ids.deFora, ids.comLeitura, ids.naoEntrega, ids.semLeitura]);
-    expect(idsDe(await longosParaAsReferencias({ nichoIds: [nichoId], ordem: "views" }))).toEqual([ids.deFora, ids.comLeitura, ids.naoEntrega, ids.semLeitura]);
+    // por views, "naoEntrega" (480 mil) passa "comLeitura" (412 mil), que é mais acima do normal da conta: as duas ordens se distinguem
+    expect(idsDe(await longosParaAsReferencias({ nichoIds: [nichoId], ordem: "views" }))).toEqual([ids.deFora, ids.naoEntrega, ids.comLeitura, ids.semLeitura]);
+    // "views por hora" não existe para o longo: vale como "mais views"
+    expect(idsDe(await longosParaAsReferencias({ nichoIds: [nichoId], ordem: "velocidade" }))).toEqual([ids.deFora, ids.naoEntrega, ids.comLeitura, ids.semLeitura]);
     // o mais recente primeiro: "semLeitura" é de 2 dias atrás, os outros de 5
     expect((await longosParaAsReferencias({ nichoIds: [nichoId], ordem: "recentes" })).videos[0].id).toBe(ids.semLeitura);
     expect(idsDe(await longosParaAsReferencias({ nichoIds: [nichoId], apenasIds: [ids.semLeitura, ids.outroSetor] }))).toEqual([ids.semLeitura]);

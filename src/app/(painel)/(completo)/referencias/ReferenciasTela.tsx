@@ -439,6 +439,8 @@ export function ReferenciasTela({
     const nomes = new Map((ramos ?? []).filter((r) => !r.principal).map((r) => [r.id, r.nome] as const));
     return longos.map((v) => formatarLongo(v, nomes));
   }, [longos, ramos]);
+  // "Views por hora" é medida dos curtos (só nos primeiros dias): nos longos a ordem pedida assim vale como "mais views", e a pílula diz isso. Sem ordem escolhida, os mais acima do normal primeiro.
+  const ordemDosLongos: OrdemReferencias = ordemExibida === "velocidade" ? "views" : (ordemExibida ?? "multiplo");
   const longoDetalhe = longos.find((v) => v.id === videoDetalheId) ?? null;
   const videoDetalhe = longoDetalhe ? longoComoVideoFormatado(longoDetalhe, segundoDetalhe) : (formatados.find((v) => v.id === videoDetalheId) ?? null);
   const urlDetalhe = longoDetalhe?.url ?? videos.find((v) => v.id === videoDetalheId)?.url ?? null;
@@ -570,6 +572,15 @@ export function ReferenciasTela({
       duracao: duracaoExibida,
       ...mudanca,
     };
+    // E52 (PR 4c): nos longos só valem a busca, as views, "Brasil ou fora" e a ordem. Rede, tipo, fala e "parece feito para" são da análise dos curtos: ao entrar nos longos (ou ao mexer
+    // neles estando lá) são limpos, em vez de ficarem na URL sem efeito e reaparecerem ao voltar para os curtos.
+    if (filtros.duracao === "longos") {
+      filtros.plataformas = [];
+      filtros.formatos = [];
+      filtros.tiposConteudo = [];
+      filtros.comFala = undefined;
+      filtros.feitoPara = undefined;
+    }
     const url = montarUrl(filtros);
     // Toque duplo, ou Enter seguido do onBlur, enquanto o mesmo pedido ainda não chegou: um pedido só.
     if (navegando && urlPendente.current === url) return;
@@ -904,8 +915,8 @@ export function ReferenciasTela({
       {duracao === "longos" ? (
         longos.length === 0 ? (
           <div className={styles.blocoVazio} data-longos-vazio>
-            <h3>{textosReferencias.duracao.vazioTitulo}</h3>
-            <p>{longosDisponiveis === 0 ? textosReferencias.duracao.semLongos : textosReferencias.duracao.vazioTexto}</p>
+            <h3>{segmento === "salvos" ? textosReferencias.vazioTituloSalvos : textosReferencias.duracao.vazioTitulo}</h3>
+            <p>{segmento === "salvos" ? textosReferencias.vazioTextoSalvos : longosDisponiveis === 0 ? textosReferencias.duracao.semLongos : textosReferencias.duracao.vazioTexto}</p>
             <div className={styles.blocoVazioAcoes}>
               <Botao variante="primario" tamanho="lg" carregando={navegando} onClick={() => navegar({ duracao: "curtos" })}>
                 {textosReferencias.duracao.verCurtos}
@@ -931,11 +942,11 @@ export function ReferenciasTela({
               <div className={styles.linhaContagem}>
                 <p className={styles.contagem}>
                   {textosReferencias.duracao.contagem(totalLongos, Math.max(periodoDias, 30))}
-                  <span className={styles.ordemSufixo}>{`, ${textosReferencias.ordemSufixo[ordemExibida ?? "multiplo"]}`}</span>
+                  <span className={styles.ordemSufixo}>{`, ${textosReferencias.ordemSufixo[ordemDosLongos]}`}</span>
                 </p>
                 <span className={styles.ladoContagem}>
                   <PilulaOrdem
-                    ordem={ordemExibida ?? "multiplo"}
+                    ordem={ordemDosLongos}
                     pilulaAberta={pilulaAberta}
                     onAbrir={setPilulaAberta}
                     onFechar={() => setPilulaAberta(null)}
