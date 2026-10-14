@@ -14,6 +14,7 @@ import { CHAVES_DAS_FALHAS_DA_IA, chaveDaFalhaDaIA } from "../../src/ia/falha-da
 const SENHA = "ExemploSenha123";
 const ADMIN = "e2e-erro-ia-admin";
 const COMUM = "e2e-erro-ia-comum";
+const TAREFA_DO_TESTE = "e2e-erro-ia-geracao-boa";
 const GENERICA = "Não conseguimos fazer isso agora. Tente de novo em um minuto.";
 
 function email(id: string): string {
@@ -72,7 +73,8 @@ test.describe("o erro da IA dito pelo nome", () => {
 
   test.beforeEach(async () => {
     await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DAS_FALHAS_DA_IA));
-    await db().delete(geracoesIA);
+    // Só as linhas que este arquivo põe: as gerações das outras specs têm roteiro apontando para elas (chave estrangeira).
+    await db().delete(geracoesIA).where(eq(geracoesIA.tarefa, TAREFA_DO_TESTE));
   });
 
   test.use({ viewport: { width: 390, height: 844 } });
@@ -115,7 +117,7 @@ test.describe("o erro da IA dito pelo nome", () => {
     await expect(admin.getByText(/nenhuma geração sai enquanto isso/)).toBeVisible();
 
     // uma geração que deu certo depois apaga o aviso
-    await db().insert(geracoesIA).values({ tarefa: "roteiro", versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
+    await db().insert(geracoesIA).values({ tarefa: TAREFA_DO_TESTE, versaoPrompt: "1", modelo: "mock", entradas: {}, criadoEm: new Date(Date.now() + 5_000) });
     await admin.reload();
     await expect(admin.getByText("A API da IA está sem crédito")).toHaveCount(0);
     await contextoAdmin.close();
