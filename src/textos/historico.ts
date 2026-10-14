@@ -9,6 +9,8 @@ export const textosHistorico = {
   origemMomento: "momento",
   /** V9c, item 4: só aparece para `formato === "story"`, ao lado da data, como `origemMomento`. */
   formatoStory: "story",
+  /** E52 (PR 4b): só aparece para o vídeo longo do YouTube, ao lado da data: "vídeo longo, uns 10 min". */
+  videoLongo: (duracaoS: number | null) => `vídeo longo${duracaoS ? `, uns ${Math.max(1, Math.round(duracaoS / 60))} min` : ""}`,
   pontoCurva: (views: string, horas: number) => `${views} views em ${horas}h`,
   /** E49 PR 2: só aparece quando a rede devolveu o número; sem número, a frase some. */
   guardadoMandado: (guardado: number | null, mandado: number | null) =>

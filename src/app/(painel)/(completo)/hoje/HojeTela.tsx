@@ -11,6 +11,7 @@ import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAgendaDoDia, ItemAtrasado } fr
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
 import { textosNav } from "@/textos/nav";
+import { textosRoteiro } from "@/textos/roteiro";
 import { textosVersoesNoHoje } from "@/textos/versoes";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
@@ -706,7 +707,7 @@ export function HojeTela({
                     <article className={styles.reelsDia}>
                       <div className={styles.linhaTopo}>
                         <span className={styles.objetivoDoDia}>
-                          {rotuloParaQue(agenda.reels[0])} · {agenda.reels[0].duracaoS} segundos
+                          {rotuloParaQue(agenda.reels[0])} · {textosRoteiro.capitulos.duracaoNaLista(agenda.reels[0].duracaoDoVideo, agenda.reels[0].duracaoS)}
                         </span>
                         <EstadoItem item={agenda.reels[0]} ehHoje={ehHoje} />
                       </div>

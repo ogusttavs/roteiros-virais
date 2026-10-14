@@ -42,7 +42,7 @@ import { perfilDoCliente } from "./briefing";
 import { inicioDoDiaEmSaoPaulo } from "./noticias-do-dia";
 import { ErroRoteiro, roteiroPorId } from "./roteiro";
 
-export type MotivoSemMarcas = "story" | "sem_fala" | "sem_texto" | "chave_no_texto" | "editado_no_meio";
+export type MotivoSemMarcas = "story" | "sem_fala" | "longo" | "sem_texto" | "chave_no_texto" | "editado_no_meio";
 
 export type ResultadoDaMarcacao = { ok: true; marcas: MarcasDeFala; novas: boolean } | { ok: false; motivo: MotivoSemMarcas };
 
@@ -55,6 +55,8 @@ export function blocosFalados(conteudo: ConteudoRoteiro): { bloco: BlocoFalado; 
 export function motivoDeNaoMarcar(roteiro: { formato: string; estilo: string; conteudo: ConteudoRoteiro }): MotivoSemMarcas | null {
   if (roteiro.formato === "story") return "story";
   if (roteiro.estilo === "sem_fala") return "sem_fala";
+  // E52 (PR 4b): o roteiro longo é por capítulos, com a frase que segura até o próximo e pontos; as marcas por capítulo são do PR 5 (o modo gravação do passo 26).
+  if (roteiro.conteudo.capitulos && roteiro.conteudo.capitulos.length > 0) return "longo";
   const blocos = blocosFalados(roteiro.conteudo);
   if (blocos.length === 0) return "sem_texto";
   if (blocos.some((b) => temChaveNoTexto(b.texto))) return "chave_no_texto";

@@ -9,6 +9,7 @@ import type { CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { AgendaDoDia, DiaDaSemanaAgenda, ItemAtrasado } from "@/servicos/roteiro";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlano } from "@/textos/plano";
+import { textosRoteiro } from "@/textos/roteiro";
 import { CartaoEmAlta, destinoDoCartao } from "@/ui/componentes/CartaoEmAlta";
 
 import {
@@ -231,7 +232,7 @@ export function DiaConteudo({
                 <article className={styles.reelsDia}>
                   <div className={styles.linhaTopo}>
                     <span className={styles.objetivoDoDia}>
-                      {rotuloParaQue(agenda.reels[0])} · {agenda.reels[0].duracaoS} segundos
+                      {rotuloParaQue(agenda.reels[0])} · {textosRoteiro.capitulos.duracaoNaLista(agenda.reels[0].duracaoDoVideo, agenda.reels[0].duracaoS)}
                     </span>
                     <EstadoItem item={agenda.reels[0]} ehHoje={ehHoje} />
                   </div>

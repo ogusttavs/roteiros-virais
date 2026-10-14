@@ -20,6 +20,7 @@ import type { NoticiaDoAssuntoNaEntrada, PerguntaPresaNaEntrada } from "@/ia/pro
 import * as roteiroLongoIA from "@/ia/prompts/roteiroLongo";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import {
+  camposCorridosDosCapitulos,
   iniciosDosCapitulos,
   LIMITE_DO_TITULO_DO_VIDEO,
   MAXIMO_DE_CAPITULOS_DO_ROTEIRO,
@@ -222,6 +223,7 @@ export function conteudoDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, 
     comoEditar: c.comoEditar.trim(),
   }));
   const duracaoS = somaDosCapitulos(capitulos);
+  const corridos = camposCorridosDosCapitulos(capitulos);
 
   // O modelo escolhe QUAL vídeo serve de referência, nunca o segundo: o vídeo longo não tem momento-chave medido, e um segundo escrito pelo modelo mandaria a pessoa para um trecho
   // inventado (o mesmo cuidado do curto, PR #88). O segundo é sempre o começo.
@@ -237,13 +239,13 @@ export function conteudoDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, 
     duracaoS,
     gancho: saida.gancho.trim(),
     // O resumo dos capítulos em texto corrido: o que o resto do produto que ainda lê gancho, corpo e fechamento (a reescrita, a edição, o texto para colar) enxerga.
-    corpo: capitulos.map((c, i) => `${i + 1}. ${c.nome}: ${c.pontos.join("; ")}`).join("\n"),
-    fechamento: capitulos[capitulos.length - 1]?.pontos.join("; ") ?? "",
+    corpo: corridos.corpo,
+    fechamento: corridos.fechamento,
     chamadaFinal: saida.chamadaFinal.trim(),
     cartoes: null,
     porQueAssim: regrasCitadasQueExistem(saida.porQueAssim),
     // O momento em segundos ("95 segundos"), a forma que os leitores do roteiro (a página, o modo gravação, o PDF e a imagem) leem; a tela do longo usa `capitulos`, com o tempo da lista.
-    cenas: capitulos.map((c) => ({ momento: `${c.inicioS} segundos`, oQueFazer: c.naImagem })),
+    cenas: corridos.cenas,
     ondeGravar: saida.ondeGravar,
     edicao: {
       textoNaTela: saida.edicao.textoNaTela,

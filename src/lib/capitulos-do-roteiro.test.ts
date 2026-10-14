@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { lerCapitulosDaDescricao } from "./capitulos-da-descricao";
 import {
+  camposCorridosDosCapitulos,
   capitulosParaCopiar,
+  minutosDoVideo,
+  tempoNaTela,
+  textoDoRoteiroLongo,
   nomeNaoVoltaDaLista,
   DURACAO_MINIMA_DO_CAPITULO_S,
   FOLGA_DA_DURACAO,
@@ -224,5 +228,50 @@ describe("verificarCapitulos com as opções da segunda tentativa", () => {
     expect(verificarCapitulos(tres(2400), 2400, limites)).toEqual([]);
     expect(verificarCapitulos(tres(2401), 2400, limites)).toHaveLength(1);
     expect(verificarCapitulos(tres(2700), 2400, { ...limites, exigirSoma: false })[0]).toContain("maximo");
+  });
+});
+
+describe("E52 PR 4b: o tempo na tela, o texto corrido e o texto para copiar", () => {
+  const caps = [
+    { nome: "A mancha que volta", inicioS: 0, duracaoS: 50, pontos: ["Mostre o sofá", "Conte o que fez"], naImagem: "o sofá com a mancha", ganchoParaOProximo: "Fica até o fim que eu te mostro" },
+    { nome: "Erro 1: esfregar", inicioS: 50, duracaoS: 110, pontos: ["Aplique", "Espere"], naImagem: "o relógio", ganchoParaOProximo: "E o erro 2 é pior" },
+    { nome: "O que fazer amanhã", inicioS: 160, duracaoS: 50, pontos: ["Resuma", "Peça a mensagem"], naImagem: "você olhando para a câmera", ganchoParaOProximo: null },
+  ];
+  const Q = String.fromCharCode(10);
+
+  it("o tempo da tela não leva zero à esquerda nos minutos e passa a mostrar a hora quando o vídeo passa de uma hora", () => {
+    expect(tempoNaTela(0)).toBe("0:00");
+    expect(tempoNaTela(50)).toBe("0:50");
+    expect(tempoNaTela(160)).toBe("2:40");
+    expect(tempoNaTela(3725)).toBe("1:02:05");
+    expect(tempoNaTela(-5)).toBe("0:00");
+  });
+
+  it("os minutos do selo arredondam e nunca são menos de um", () => {
+    expect(minutosDoVideo(570)).toBe(10);
+    expect(minutosDoVideo(200)).toBe(3);
+    expect(minutosDoVideo(10)).toBe(1);
+  });
+
+  it("o texto corrido sai dos capítulos: o corpo numerado, o fechamento é o último capítulo e há uma cena por capítulo no início dele", () => {
+    const c = camposCorridosDosCapitulos(caps);
+    expect(c.corpo.split(Q)).toEqual(["1. A mancha que volta: Mostre o sofá; Conte o que fez", "2. Erro 1: esfregar: Aplique; Espere", "3. O que fazer amanhã: Resuma; Peça a mensagem"]);
+    expect(c.fechamento).toBe("Resuma; Peça a mensagem");
+    expect(c.cenas).toEqual([
+      { momento: "0 segundos", oQueFazer: "o sofá com a mancha" },
+      { momento: "50 segundos", oQueFazer: "o relógio" },
+      { momento: "160 segundos", oQueFazer: "você olhando para a câmera" },
+    ]);
+    expect(camposCorridosDosCapitulos([])).toEqual({ corpo: "", fechamento: "", cenas: [] });
+  });
+
+  it("o texto para copiar leva o título, o gancho do vídeo e, por capítulo, o tempo, o nome, o que segura até o próximo e os pontos; a chamada só no último", () => {
+    const texto = textoDoRoteiroLongo({ titulo: "Os erros da mancha", gancho: "Se a mancha volta, o problema não é o produto.", chamadaFinal: "Manda a foto da sua mancha.", capitulos: caps });
+    const partes = texto.split(Q + Q);
+    expect(partes[0]).toBe("Os erros da mancha");
+    expect(partes[1]).toBe("Se a mancha volta, o problema não é o produto.");
+    expect(partes[2].split(Q)).toEqual(["0:00 A mancha que volta", "Fica até o fim que eu te mostro", "- Mostre o sofá", "- Conte o que fez"]);
+    expect(partes[4].split(Q)).toEqual(["2:40 O que fazer amanhã", "- Resuma", "- Peça a mensagem", "Manda a foto da sua mancha."]);
+    expect(texto.match(/Manda a foto/g)).toHaveLength(1);
   });
 });

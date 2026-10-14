@@ -19,6 +19,7 @@ import { seloDoTipo } from "@/config/formatos";
 import { MOTIVOS_REPROVACAO, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
 import type { CartaoStory, ConteudoRoteiro } from "@/db/schema";
 import { ROTULO_FIGURINHA } from "@/ia/enums";
+import { textoDoRoteiroLongo, minutosDoVideo } from "@/lib/capitulos-do-roteiro";
 import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
@@ -60,6 +61,7 @@ import {
   reprovarERescreverAction,
   salvarEdicaoAction,
 } from "./acoes";
+import { RoteiroLongo, type EdicaoDoCapitulo } from "./RoteiroLongo";
 import styles from "./RoteiroTela.module.css";
 import { useMarcasDeFala } from "./useMarcasDeFala";
 
@@ -311,6 +313,8 @@ export function RoteiroTela({
     },
     [],
   );
+  /** E52 (PR 4b): o roteiro do vídeo longo do YouTube, por capítulos. Cada capítulo se edita sozinho, no próprio cartão; o "Editar" do roteiro inteiro não existe nele. */
+  const ehLongo = roteiro.duracaoDoVideo === "longo" && (corpo.capitulos?.length ?? 0) > 0;
   /** E40, item 1: liga o modo de edição; `draft` só existe enquanto ele está ligado. */
   const [editando, setEditando] = useState(false);
   /** "Como editar" (e, junto dele, "Por que assim") na caixa do lado: só no Reels falado em leitura; em Story, sem fala e em edição, "Por que assim" fica sozinho depois da legenda. */
@@ -609,12 +613,29 @@ export function RoteiroTela({
     fecharENavegar(() => router.replace(`/roteiros/${id}`));
   }
 
+  /** E52 (PR 4b): salva UM capítulo (o gancho e os pontos); o servidor refaz o texto corrido. Devolve a frase de falha, ou nulo. */
+  async function salvarCapitulo(indice: number, edicao: EdicaoDoCapitulo): Promise<string | null> {
+    try {
+      await salvarEdicaoAction(roteiro.id, {
+        ...(edicao.gancho !== undefined ? { gancho: edicao.gancho } : {}),
+        ...(edicao.chamadaFinal !== undefined ? { chamadaFinal: edicao.chamadaFinal } : {}),
+        capitulo: { indice, pontos: edicao.pontos, ...(edicao.ganchoParaOProximo !== undefined ? { ganchoParaOProximo: edicao.ganchoParaOProximo } : {}) },
+      });
+      avisarRedeOk();
+      setToastSalvo(true);
+      router.refresh();
+      return null;
+    } catch (erro) {
+      return tratarFalha(erro, textosRoteiro.editando.erro, textosConexao.conexaoCaiuNoMeio);
+    }
+  }
+
   async function copiarTexto() {
     setErroMenu(null);
     try {
       // A cópia é do aparelho e não chama o servidor: funciona sem rede, e um erro aqui nunca é de rede
       // (por isso a frase fixa em vez de `tratarFalha`, que trataria "sem rede" como falha de conexão).
-      await navigator.clipboard.writeText(textoParaCopiar(blocos));
+      await navigator.clipboard.writeText(ehLongo ? textoDoRoteiroLongo({ titulo: corpo.titulo, gancho: corpo.gancho, chamadaFinal: corpo.chamadaFinal, capitulos: corpo.capitulos ?? [] }) : textoParaCopiar(blocos));
       fechar();
       setToast(true);
     } catch {
@@ -756,7 +777,7 @@ export function RoteiroTela({
         <div className={styles.cabecalhoTela}>
           <div className={styles.topoRoteiro}>
             <h1>{corpo.titulo}</h1>
-            {!editando ? (
+            {!editando && !ehLongo ? (
               <button type="button" onClick={iniciarEdicao} className={styles.botaoEditar}>
                 {textosRoteiro.editar}
               </button>
@@ -781,7 +802,15 @@ export function RoteiroTela({
             {seloDoTipo(video?.formatoCatalogo) && roteiro.formato !== "story" ? <span className={styles.seloTipo} data-selo-tipo>{seloDoTipo(video?.formatoCatalogo)}</span> : null}
             {/* E49 PR 1: "Para que te chamem" ao lado do tipo; no Story a linha sai (ele não pergunta para que é o vídeo). */}
             {roteiro.formato !== "story" ? <span data-ficha-do-roteiro>{ROTULO_PARA_QUE[fichaDoRoteiro(roteiro)]}</span> : null}
-            <span className={styles.num}>{corpo.duracaoS} s</span>
+            {ehLongo ? (
+              <>
+                <span className={styles.seloTipo} data-selo-video-longo>{textosRoteiro.capitulos.chipYoutube}</span>
+                <span className={styles.num} data-duracao-do-video>{textosRoteiro.capitulos.selo(minutosDoVideo(corpo.duracaoS))}</span>
+                <span className={styles.num}>{textosRoteiro.capitulos.quantosCapitulos(corpo.capitulos?.length ?? 0)}</span>
+              </>
+            ) : (
+              <span className={styles.num}>{corpo.duracaoS} s</span>
+            )}
             <span className={styles.num}>{formatarData(roteiro.data)}</span>
             {versoes.length > 1 ? (
               <button
@@ -982,7 +1011,7 @@ export function RoteiroTela({
           </div>
         ) : (
           <>
-            <article className={styles.blocos}>
+            <article className={ehLongo ? styles.blocosLongos : styles.blocos}>
               {temChaveDeMarcas ? (
                 <LinhaMarcasDeFala
                   variante="roteiro"
@@ -993,11 +1022,15 @@ export function RoteiroTela({
                   avisos={marcasProntas?.avisos ?? []}
                 />
               ) : null}
-              <RoteiroTexto
-                blocos={blocosVisiveis}
-                comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"}
-                comMarcas={mostrarMarcas}
-              />
+              {ehLongo ? (
+                <RoteiroLongo corpo={corpo} somenteLeitura={fala.somenteLeitura} semConexao={semConexao} salvar={salvarCapitulo} />
+              ) : (
+                <RoteiroTexto
+                  blocos={blocosVisiveis}
+                  comCenas={roteiro.formato !== "story" && roteiro.estilo !== "sem_fala"}
+                  comMarcas={mostrarMarcas}
+                />
+              )}
               {/* Só no celular (design v2, ".julgar"): do tablet para cima "Reprovar" já está na barra de ações. */}
               <p className={styles.julgar}>
                 {textosRoteiro.reprovar.naoFicouBom}{" "}
@@ -1079,7 +1112,7 @@ export function RoteiroTela({
                */
               <div className={styles.ladoGrudado}>
                 <div className={styles.pilhaDoLado}>
-                  <BlocoEdicao titulo={textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
+                  <BlocoEdicao titulo={ehLongo ? textosRoteiro.capitulos.comoEditarOVideoInteiro : textosRoteiro.comoEditar} itens={itensEdicao(corpo.edicao)} />
                   {/* Hotfix de 05/10/2026: no Reels falado "Por que assim" vem junto de "Como editar", na MESMA caixa do lado (eram dois `.ladoGrudado` na mesma área da grade, uma por cima da outra). */}
                   {corpo.porQueAssim.length > 0 ? <BlocoEdicao titulo={textosRoteiro.porQueAssim} itens={itensPorQueAssim(corpo.porQueAssim)} /> : null}
                 </div>
@@ -1327,6 +1360,8 @@ export function RoteiroTela({
           {baixandoPdf ? textosRoteiro.gerandoPdf : textosRoteiro.menu.baixarPdf}
           <MotivoSemRede className={styles.motivoItem} />
         </button>
+        {/* E52 (PR 4b): dez minutos de vídeo por capítulos não cabem num 9:16; no longo a saída para fora é o PDF. */}
+        {ehLongo ? null : (
         <button
           type="button"
           role="menuitem"
@@ -1341,6 +1376,7 @@ export function RoteiroTela({
           {guardandoImagem ? textosRoteiro.gerandoImagem : textosRoteiro.menu.guardarImagem}
           <MotivoSemRede className={styles.motivoItem} />
         </button>
+        )}
         {temChaveDeMarcas ? (
           <button
             type="button"

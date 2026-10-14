@@ -49,12 +49,12 @@ export const textosMomento = {
    * 11/10: sem "médio"), e uma opção que não muda nada seria mentira na tela.
    */
   duracao: "Quanto tempo?",
-  duracaoCurta: "Até 60 segundos",
+  duracaoCurta: "Curto, até um minuto e meio",
   duracaoLonga: "Mais de 3 minutos, para o YouTube",
   duracaoAjuda: "Vídeo longo vira capítulos: cada um com o seu gancho para segurar quem assiste até o próximo, e a edição de cada um. Fica melhor no YouTube; no Instagram e no TikTok, até 60 segundos rende mais.",
   /** O estado calmo (contraponto do Fable): o ramo ainda não tem a medida dos vídeos longos; dito aqui, antes de a pessoa escrever o tema, e não como erro depois. */
   duracaoLongaIndisponivel:
-    "Ainda não temos vídeos longos suficientes do seu ramo para medir quanto dura e como se divide um vídeo longo dele. Assim que tivermos, essa opção abre aqui; por enquanto, o vídeo é de até 60 segundos.",
+    "Ainda não temos vídeos longos suficientes do seu ramo para medir quanto dura e como se divide um vídeo longo dele. Assim que tivermos, essa opção abre aqui; por enquanto, o vídeo é curto.",
   duracaoLongaMedida: (minutos: number) => `No seu ramo, um vídeo longo costuma ter uns ${minutos} minutos.`,
   /** A espera do vídeo longo (E52, PR 4): escrever por capítulos leva mais que um roteiro curto; o prazo dito é o do longo. */
   esperaLongoTitulo: "Escrevendo o seu vídeo longo, capítulo por capítulo",

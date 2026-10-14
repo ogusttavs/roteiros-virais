@@ -4,6 +4,8 @@
  */
 import { fichaDoRoteiro, ROTULO_PARA_QUE } from "@/config/fichas";
 import { seloDoTipo } from "@/config/formatos";
+import type { ConteudoRoteiro } from "@/db/schema";
+import { iniciosDosCapitulos, capitulosParaCopiar, tempoNaTela, minutosDoVideo } from "@/lib/capitulos-do-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import { BLOCOS_FALADOS, fatiarMarcado, marcadoParaOsParagrafos, paragrafosMarcados, type MarcasParaATela, type TomDoBloco } from "@/lib/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
@@ -27,6 +29,8 @@ export type UnidadeDaFolha = {
   mostrar: string[];
   /** A última unidade do bloco: leva o filete embaixo. */
   fimDoBloco: boolean;
+  /** E52 (PR 4b): o bloco começa numa página nova (a lista de capítulos para colar, a última página do PDF do vídeo longo). */
+  novaPagina?: boolean;
 };
 
 export type FolhaDoRoteiro = {
@@ -130,14 +134,47 @@ function primeiraFrase(texto: string, limite = 90): string | null {
   return `${frase.slice(0, limite - 1).trimEnd()}…`;
 }
 
+/**
+ * E52 (PR 4b): as unidades do roteiro longo, uma seção por capítulo com o tempo no título ("0:50 a 2:40") e o nome, a frase que segura até o próximo, os pontos e o que mostrar; e, no fim, numa
+ * página nova, a lista para colar na descrição do vídeo. Sem marcas de fala (são do PR 5).
+ */
+function unidadesDoLongo(corpo: ConteudoRoteiro): UnidadeDaFolha[] {
+  const capitulos = corpo.capitulos ?? [];
+  const inicios = iniciosDosCapitulos(capitulos);
+  const unidades: UnidadeDaFolha[] = [];
+  capitulos.forEach((c, i) => {
+    const falas = [i === 0 ? corpo.gancho : null, c.ganchoParaOProximo, ...c.pontos].filter((f): f is string => !!f && f.trim() !== "");
+    const mostrar = [c.naImagem, c.comoEditar].filter((m) => m.trim() !== "").map((m, j) => (j === 0 ? textosRoteiro.mostrar.oQueMostrar(m) : `${textosRoteiro.capitulos.comoEditarCapitulo}: ${m}`));
+    if (i === capitulos.length - 1 && corpo.chamadaFinal.trim()) falas.push(corpo.chamadaFinal.trim());
+    falas.forEach((fala, k) => {
+      unidades.push({
+        tempo: k === 0 ? `${tempoNaTela(inicios[i])} a ${tempoNaTela(inicios[i] + c.duracaoS)}` : null,
+        rotulo: k === 0 ? c.nome : null,
+        fala,
+        falaMarcada: null,
+        tom: null,
+        mostrar: k === falas.length - 1 ? mostrar : [],
+        fimDoBloco: k === falas.length - 1,
+      });
+    });
+  });
+  const linhas = capitulosParaCopiar(capitulos).split(String.fromCharCode(10));
+  linhas.forEach((linha, k) => {
+    unidades.push({ tempo: null, rotulo: k === 0 ? textosRoteiro.capitulos.paraColar : null, fala: linha, falaMarcada: null, tom: null, mostrar: [], fimDoBloco: k === linhas.length - 1, novaPagina: k === 0 });
+  });
+  return unidades;
+}
+
 export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: VideoParaEmbed | null, marcas: MarcasParaATela | null = null): FolhaDoRoteiro {
   const corpo = corpoDoRoteiro(roteiro);
+  const ehLongo = roteiro.duracaoDoVideo === "longo" && (corpo.capitulos?.length ?? 0) > 0;
   const ehStory = roteiro.formato === "story";
   const reelsFalado = !ehStory && roteiro.estilo !== "sem_fala";
-  const tempos = reelsFalado ? temposDosBlocosReels(corpo.duracaoS) : null;
+  const tempos = reelsFalado && !ehLongo ? temposDosBlocosReels(corpo.duracaoS) : null;
 
   const unidades: UnidadeDaFolha[] = [];
-  blocosParaLeitura(roteiro).forEach((bloco, indice) => {
+  if (ehLongo) unidades.push(...unidadesDoLongo(corpo));
+  (ehLongo ? [] : blocosParaLeitura(roteiro)).forEach((bloco, indice) => {
     const mostrar = [...(bloco.mostrar ?? []), ...(bloco.cenas ?? []).map((cena) => textosRoteiro.mostrar.oQueMostrar(`${cena.momento}, ${cena.oQueFazer}`))];
     // Cada pedaço da fala é uma unidade (um parágrafo, ou uma parte dele quando é comprido): a imagem 9:16 parte um bloco entre dois quadros sem cortar uma frase no meio.
     // Com as marcas (E41 2c), cada pedaço leva o seu marcado: o parágrafo marcado é partido nas mesmas palavras; um bloco cujo marcado não bate com o texto sai sem marcas.
@@ -176,7 +213,7 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
     });
   });
   // Story e vídeo sem fala: "Onde gravar e o que mostrar" (as cenas) não está nos blocos de cada cartão, e o PDF antigo e a tela mostram. Entra no fim, em unidades de até quatro linhas.
-  if (!reelsFalado && corpo.cenas.length > 0) {
+  if (!ehLongo && !reelsFalado && corpo.cenas.length > 0) {
     const linhas = corpo.cenas.map((cena) => `${cena.momento}: ${cena.oQueFazer}`);
     for (let i = 0; i < linhas.length; i += LINHAS_DE_MOSTRAR_POR_UNIDADE) {
       unidades.push({
@@ -192,7 +229,9 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
   }
 
   const formatos = textosRoteiro.folha.formato;
-  const chips = [ehStory ? formatos.story : roteiro.estilo === "sem_fala" ? formatos.reelsSemFala : formatos.reels, textosRoteiro.folha.segundos(corpo.duracaoS)];
+  const chips = ehLongo
+    ? [textosRoteiro.capitulos.chipYoutube, textosRoteiro.capitulos.selo(minutosDoVideo(corpo.duracaoS)), textosRoteiro.capitulos.quantosCapitulos(corpo.capitulos?.length ?? 0)]
+    : [ehStory ? formatos.story : roteiro.estilo === "sem_fala" ? formatos.reelsSemFala : formatos.reels, textosRoteiro.folha.segundos(corpo.duracaoS)];
   if (!ehStory) {
     chips.push(ROTULO_PARA_QUE[fichaDoRoteiro(roteiro)]);
     const tipo = seloDoTipo(video?.formatoCatalogo);
@@ -200,7 +239,7 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
   }
 
   const edicao = corpo.edicao;
-  const comoEditar = reelsFalado
+  const comoEditar = reelsFalado || ehLongo
     ? [
         {
           rotulo: textosRoteiro.edicao.texto,
