@@ -236,6 +236,18 @@ describe("editar um roteiro longo marcado", () => {
 });
 
 describe("o PDF do roteiro longo com as marcas", () => {
+  it("a marca da frase vai na unidade do capítulo certo mesmo quando o primeiro capítulo não tem frase", async () => {
+    const c = conteudoLongo({ capitulos: CAPITULOS.map((x, i) => (i === 0 ? { ...x, ganchoParaOProximo: null } : x)) });
+    const id = await criarLongo(c);
+    const r = await marcarFalaDoRoteiro(clienteId, id);
+    if (!r.ok) throw new Error("sem marcas");
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    const folha = folhaDoRoteiro(linha, "Marca", null, falaDoRoteiro(linha, false).marcas);
+    const marcadas = folha.unidades.filter((u) => u.falaMarcada !== null).map((u) => u.fala);
+    expect(marcadas).toEqual([c.gancho, CAPITULOS[1].ganchoParaOProximo, CAPITULOS[2].ganchoParaOProximo, c.chamadaFinal]);
+    for (const u of folha.unidades.filter((x) => x.falaMarcada !== null)) expect(textoSemMarcas(u.falaMarcada!)).toBe(normalizar(u.fala!));
+  });
+
   it("as marcas vão só nas frases ditas como estão escritas (o gancho do vídeo, a de cada capítulo, a chamada); os pontos saem sem marca e o texto é o do roteiro", async () => {
     const id = await criarLongo();
     const r = await marcarFalaDoRoteiro(clienteId, id);

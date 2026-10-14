@@ -192,6 +192,8 @@ describe("GravacaoLongaTela", () => {
     window.localStorage.setItem("capitulos-gravados:42", JSON.stringify([9, "a", -1, 1.5]));
     montar();
     await waitFor(() => expect(palco().textContent).toContain("Capítulo 1 de 3"));
+    // o índice fora da lista e o que não é número não viram capítulo gravado
+    expect(document.querySelectorAll("[data-passo-gravado]")).toHaveLength(0);
     cleanup();
     window.localStorage.setItem("capitulos-gravados:42", "{não é json");
     montar();
@@ -234,6 +236,22 @@ describe("GravacaoLongaTela", () => {
     // os pontos ficam como estão, sem nenhuma marca
     expect(palco().querySelector("ol [aria-label='pausa curta']")).toBeNull();
     expect(palco().querySelector("ol b")).toBeNull();
+  });
+
+  it("a marca da frase de um capítulo vai no capítulo certo mesmo quando o anterior não tem frase (a ordem é a das frases, não a dos capítulos)", async () => {
+    const semGanchoNoPrimeiro = CAPITULOS.map((c, i) => (i === 0 ? { ...c, ganchoParaOProximo: null } : c));
+    const marcas = {
+      blocos: [{ bloco: "corpo" as const, marcado: "E o erro 2 é o que quase todo mundo comete.{//}", tom: "perto" as const }],
+      avisos: [],
+    };
+    montar({ capitulos: semGanchoNoPrimeiro, fala: { podeMarcar: true, somenteLeitura: false, marcas } });
+    await waitFor(() => expect(palco().textContent).toContain("Capítulo 1 de 3"));
+    // o primeiro capítulo não tem frase: nada para marcar nele
+    expect(palco().querySelector("[data-segurar]")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Próximo capítulo, sem marcar" }));
+    await waitFor(() => expect(palco().textContent).toContain("Capítulo 2 de 3"));
+    expect(palco().querySelector("[data-segurar] p")?.textContent).toBe("E o erro 2 é o que quase todo mundo comete.");
+    expect(palco().querySelector("[data-segurar] [aria-label='pausa longa']")).not.toBeNull();
   });
 
   it("marca de outro texto (que não bate com o roteiro) não é desenhada: a frase volta como está", async () => {
