@@ -14,9 +14,43 @@
  * que sobe em afirmação).
  */
 
+import type { ConteudoRoteiro } from "@/db/schema";
+
 /** Os quatro blocos de um Reels falado, com os nomes de `ConteudoRoteiro`. */
 export const BLOCOS_FALADOS = ["gancho", "corpo", "fechamento", "chamadaFinal"] as const;
 export type BlocoFalado = (typeof BLOCOS_FALADOS)[number];
+
+/** O roteiro do vídeo longo do YouTube: por capítulos (E52). */
+export function temCapitulos(conteudo: Pick<ConteudoRoteiro, "capitulos">): boolean {
+  return (conteudo.capitulos?.length ?? 0) > 0;
+}
+
+/**
+ * As frases que a pessoa diz COMO ESTÃO ESCRITAS no roteiro longo, uma por capítulo que tem a que segura até o próximo (E52, PR 5): o resto do capítulo são pontos, direção e não fala
+ * (dúvida 1 do passo 26), e nunca é marcado. O `indice` é o do capítulo; o último capítulo não tem (a chamada final vem no lugar).
+ */
+export function ganchosDosCapitulos(conteudo: Pick<ConteudoRoteiro, "capitulos">): { indice: number; texto: string }[] {
+  return (conteudo.capitulos ?? []).flatMap((c, indice) => {
+    const texto = (c.ganchoParaOProximo ?? "").replace(/\s+/g, " ").trim();
+    return texto === "" ? [] : [{ indice, texto }];
+  });
+}
+
+/**
+ * Os blocos que se marcam, na ordem do vídeo, sem os vazios: num Reels falado são os quatro blocos de sempre; no longo são o gancho do vídeo, as frases que seguram até o próximo (juntas
+ * no bloco "corpo", um parágrafo por capítulo, na ordem) e a chamada final. A marcação, a trava e a conferência de texto passam todas por aqui: uma fonte só.
+ */
+export function blocosFaladosDoConteudo(conteudo: ConteudoRoteiro): { bloco: BlocoFalado; texto: string }[] {
+  if (temCapitulos(conteudo)) {
+    const juntas = ganchosDosCapitulos(conteudo).map((g) => g.texto).join(String.fromCharCode(10));
+    return [
+      { bloco: "gancho" as BlocoFalado, texto: (conteudo.gancho ?? "").trim() },
+      { bloco: "corpo" as BlocoFalado, texto: juntas },
+      { bloco: "chamadaFinal" as BlocoFalado, texto: (conteudo.chamadaFinal ?? "").trim() },
+    ].filter((b) => b.texto !== "");
+  }
+  return BLOCOS_FALADOS.map((bloco) => ({ bloco, texto: (conteudo[bloco] ?? "").trim() })).filter((b) => b.texto !== "");
+}
 
 /** O tom do bloco numa palavra (R-FALA-10 e 11): uma lista curta e fixa, para o modelo não inventar tom de teatro. */
 export const TONS_DO_BLOCO = ["direto", "perto", "calmo", "firme"] as const;

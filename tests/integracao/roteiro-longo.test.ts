@@ -724,8 +724,8 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
     expect(folha.comoEditar).not.toBeNull();
   });
 
-  it("não há marcas de fala no longo (são do PR 5): a tela não oferece a chave", async () => {
+  it("o roteiro longo tem fala para marcar (o gancho do vídeo, a frase de cada capítulo e a chamada final)", async () => {
     const roteiro = await longoPronto();
-    expect(falaDoRoteiro(roteiro, false).podeMarcar).toBe(false);
+    expect(falaDoRoteiro(roteiro, false).podeMarcar).toBe(true);
   });
 });
