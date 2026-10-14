@@ -23,4 +23,34 @@ export const textosGravacao = {
    */
   terminei: "Terminei de gravar",
   gravadoToast: "Gravado. Quando postar, marque em Histórico.",
+
+  /**
+   * E52 (PR 5, passo 26): o modo gravação do vídeo longo, um capítulo por vez. "Capítulo" é a palavra do YouTube e da pessoa; a seta da direita passa sem marcar (só "Já gravei este" marca).
+   */
+  longo: {
+    gruposAria: "Os capítulos do vídeo",
+    capitulo: (n: number, total: number, de: string, ate: string) => `Capítulo ${n} de ${total} · ${de} a ${ate}`,
+    pontosAria: "O que falar e mostrar",
+    naImagem: "Na imagem",
+    ganchoDoVideo: "O gancho do vídeo",
+    segurar: "Para segurar até o próximo",
+    chamada: "A chamada final",
+    depoisVemCapitulo: (n: number, de: string, ate: string) => `Depois vem o capítulo ${n}, de ${de} a ${ate}`,
+    jaGravei: "Já gravei este",
+    jaGraveiAria: (nome: string) => `Já gravei este, capítulo ${nome}`,
+    capituloAnterior: "Capítulo anterior",
+    proximoSemMarcar: "Próximo capítulo, sem marcar",
+    proximoCapitulo: "Próximo capítulo",
+    voltarAoRoteiro: "Voltar ao roteiro",
+    quantosGravados: (n: number, total: number) => `${n} de ${total} gravados`,
+    fimTitulo: (total: number) => {
+      const palavras = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove", "dez", "onze", "doze"];
+      return `${total === 1 ? "O capítulo está gravado" : `Os ${palavras[total] || total} capítulos estão gravados`}`;
+    },
+    fimAjuda: "Na edição, junte na ordem. Depois cole os capítulos na descrição do vídeo: o YouTube mostra na barra, e quem assiste pula para o que quer. Os tempos são os do roteiro; confira depois de editar.",
+    listaAria: "Os capítulos, com o tempo",
+    copiarCapitulos: "Copiar os capítulos",
+    copiado: "Capítulos copiados",
+    erroCopiar: "Não deu para copiar. Selecione a lista e copie à mão.",
+  },
 };

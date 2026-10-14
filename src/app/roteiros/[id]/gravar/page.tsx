@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { FaixaDoModo } from "@/app/(painel)/_casca/FaixaVerComo";
+import { temCapitulos } from "@/lib/marcas-de-fala";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario, marcasDoUsuario } from "@/servicos/clientes";
 import { falaDoRoteiro } from "@/servicos/marcar-fala";
 import { blocosParaLeitura, corpoDoRoteiro, roteiroPorId } from "@/servicos/roteiro";
 
+import { GravacaoLongaTela } from "./GravacaoLongaTela";
 import { GravacaoTela } from "./GravacaoTela";
 
 type Props = { params: Promise<{ id: string }> };
@@ -40,6 +42,26 @@ export default async function Gravar({ params }: Props) {
   }
 
   const corpo = corpoDoRoteiro(roteiro);
+
+  // E52 (PR 5, passo 26): o roteiro do vídeo longo tem o modo gravação por capítulo; o curto e o Story seguem o de sempre.
+  if (roteiro.duracaoDoVideo === "longo" && temCapitulos(corpo)) {
+    return (
+      <>
+        <FaixaDoModo verComo={sessao.verComo} pessoa={sessao.user.name} conta={cliente.nome} />
+        <GravacaoLongaTela
+          roteiroId={roteiro.id}
+          titulo={corpo.titulo}
+          capitulos={corpo.capitulos ?? []}
+          gancho={corpo.gancho}
+          chamadaFinal={corpo.chamadaFinal}
+          jaGravado={roteiro.gravadoEm !== null}
+          nomeMarca={marcas.length > 1 ? cliente.nome : undefined}
+          fala={falaDoRoteiro(roteiro, sessao.verComo != null)}
+          marcaId={cliente.id}
+        />
+      </>
+    );
+  }
 
   return (
     <>

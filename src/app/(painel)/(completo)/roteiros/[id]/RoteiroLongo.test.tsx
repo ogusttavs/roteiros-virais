@@ -138,6 +138,36 @@ describe("RoteiroLongo", () => {
     expect(salvar).not.toHaveBeenCalled();
   });
 
+  it("as marcas de fala vão só nas frases ditas como estão escritas, no capítulo certo, e nunca nos pontos", () => {
+    const semGanchoNoPrimeiro = { ...corpo, capitulos: capitulos.map((c, i) => (i === 0 ? { ...c, ganchoParaOProximo: null } : c)) } as unknown as ConteudoRoteiro;
+    const marcas = {
+      blocos: [
+        { bloco: "gancho" as const, marcado: "Se a mancha volta dois dias depois,{/} o problema não é o produto.{//}", tom: "direto" as const },
+        { bloco: "corpo" as const, marcado: "E o erro 2 é o que quase todo mundo{/} comete{//}", tom: "perto" as const },
+        { bloco: "chamadaFinal" as const, marcado: "Manda a foto da sua mancha{/} que eu digo o que usar.{v}{//}", tom: "firme" as const },
+      ],
+      avisos: [],
+    };
+    montar({ corpo: semGanchoNoPrimeiro, marcas });
+    const primeiro = screen.getByRole("region", { name: "A mancha que volta" });
+    const segundo = screen.getByRole("region", { name: "Erro 1: esfregar antes" });
+    const ultimo = screen.getByRole("region", { name: "O que fazer amanhã" });
+    // o gancho do vídeo (primeiro capítulo) e a chamada (último) levam as suas marcas; o texto que se lê é o do roteiro
+    expect(primeiro.querySelector("[aria-label='pausa curta']")).not.toBeNull();
+    expect(ultimo.querySelector("[aria-label='pausa curta']")).not.toBeNull();
+    // a frase do segundo capítulo leva a marca dela (a primeira frase do bloco, mesmo com o primeiro capítulo sem frase)
+    expect(segundo.querySelector("dd [aria-label='pausa curta']")).not.toBeNull();
+    expect(segundo.textContent).toContain("E o erro 2 é o que quase todo mundo comete");
+    // os pontos nunca
+    for (const lista of document.querySelectorAll("ul")) expect(lista.querySelector("[aria-label]")).toBeNull();
+  });
+
+  it("marca que não bate com o texto do roteiro não é desenhada", () => {
+    const marcas = { blocos: [{ bloco: "gancho" as const, marcado: "Outro texto qualquer.{//}", tom: "direto" as const }], avisos: [] };
+    montar({ marcas });
+    expect(screen.getByRole("region", { name: "A mancha que volta" }).querySelector("[aria-label='pausa longa']")).toBeNull();
+  });
+
   it("'Cancelar' fecha o cartão sem salvar", () => {
     const { salvar } = montar();
     fireEvent.click(screen.getByRole("button", { name: "Editar o capítulo A mancha que volta" }));

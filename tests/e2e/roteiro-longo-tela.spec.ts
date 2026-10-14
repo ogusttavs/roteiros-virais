@@ -139,9 +139,9 @@ test.describe("o roteiro longo na tela", () => {
     await expect(page.getByRole("region", { name: "A mancha que volta" }).getByText("O gancho do vídeo")).toBeVisible();
     await expect(page.getByRole("region", { name: "O que fazer amanhã" }).getByText("Para segurar até o próximo")).toHaveCount(0);
 
-    // o longo não oferece o "Editar" do roteiro inteiro, nem a chave das marcas; "Como editar o vídeo inteiro" está no lado
+    // o longo não oferece o "Editar" do roteiro inteiro (cada capítulo se edita no cartão); a chave das marcas de fala existe (E52 PR 5: só as frases ditas as levam); "Como editar o vídeo inteiro" está no lado
     await expect(page.getByRole("button", { name: "Editar", exact: true })).toHaveCount(0);
-    await expect(page.getByText("Marcas de fala")).toHaveCount(0);
+    await expect(page.getByText("Marcas de fala").first()).toBeVisible();
     await expect(page.getByText("Como editar o vídeo inteiro")).toBeVisible();
     // e a imagem 9:16 não está no menu: dez minutos de vídeo não cabem num quadro
     await page.getByRole("button", { name: "Mais opções" }).click();

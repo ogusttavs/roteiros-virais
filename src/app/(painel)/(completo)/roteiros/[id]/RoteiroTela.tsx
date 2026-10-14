@@ -22,7 +22,7 @@ import { ROTULO_FIGURINHA } from "@/ia/enums";
 import { textoDoRoteiroLongo, minutosDoVideo } from "@/lib/capitulos-do-roteiro";
 import { baixarArquivo, guardarImagens, pedirImagensDoRoteiro, pedirPdfDoRoteiro } from "@/lib/exportar-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import { BLOCOS_FALADOS, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
+import { BLOCOS_FALADOS, blocosFaladosDoConteudo, marcadoParaOsParagrafos, paragrafosMarcados, type FalaDoRoteiro } from "@/lib/marcas-de-fala";
 import { ehFalhaDeRede } from "@/lib/offline";
 import type { MomentoDoRoteiro } from "@/servicos/em-alta";
 import type { PesquisaDoRoteiro } from "@/servicos/entrega-da-pesquisa";
@@ -333,7 +333,7 @@ export function RoteiroTela({
   // E41 parte 2b: as marcas de fala. Desligadas por padrão no roteiro (a chave do aparelho); ao abrir, o pedido das marcas corre em segundo plano para o modo gravação encontrá-las
   // prontas, sem a pessoa esperar nada. Ligar a chave sem as marcas prontas mostra a claquete e "Marcando a fala", com o texto à vista.
   const [marcasLigadas, setMarcasLigadas] = useState(false);
-  const chaveDoTexto = [corpo.gancho, corpo.corpo, corpo.fechamento, corpo.chamadaFinal].join("\u0001");
+  const chaveDoTexto = JSON.stringify(blocosFaladosDoConteudo(corpo));
   const { marcas: marcasProntas, estado: estadoMarcas, erro: erroMarcas, pedir: pedirMarcas } = useMarcasDeFala(roteiro.id, fala, chaveDoTexto);
   useEffect(() => {
     pedirMarcas({ emSegundoPlano: true });
@@ -1023,7 +1023,7 @@ export function RoteiroTela({
                 />
               ) : null}
               {ehLongo ? (
-                <RoteiroLongo corpo={corpo} somenteLeitura={fala.somenteLeitura} semConexao={semConexao} salvar={salvarCapitulo} />
+                <RoteiroLongo corpo={corpo} somenteLeitura={fala.somenteLeitura} semConexao={semConexao} marcas={mostrarMarcas ? marcasProntas : null} salvar={salvarCapitulo} />
               ) : (
                 <RoteiroTexto
                   blocos={blocosVisiveis}
