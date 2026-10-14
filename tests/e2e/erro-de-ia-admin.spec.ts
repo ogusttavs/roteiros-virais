@@ -71,6 +71,11 @@ test.describe("o erro da IA dito pelo nome", () => {
     await criarPessoaComMarca(COMUM, "cliente");
   });
 
+  test.afterAll(async () => {
+    await db().delete(geracoesIA).where(eq(geracoesIA.tarefa, TAREFA_DO_TESTE));
+    await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DAS_FALHAS_DA_IA));
+  });
+
   test.beforeEach(async () => {
     await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DAS_FALHAS_DA_IA));
     // Só as linhas que este arquivo põe: as gerações das outras specs têm roteiro apontando para elas (chave estrangeira).
