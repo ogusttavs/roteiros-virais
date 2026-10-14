@@ -5,11 +5,11 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { db } from "../../src/db";
 import { account, briefings, clientes, configuracaoAdmin, geracoesIA, membrosMarca, nichos, preferenciasUsuario, user } from "../../src/db/schema";
-import { CHAVE_DA_ULTIMA_FALHA_DA_IA } from "../../src/ia/falha-da-ia";
+import { CHAVES_DAS_FALHAS_DA_IA, chaveDaFalhaDaIA } from "../../src/ia/falha-da-ia";
 
 const SENHA = "ExemploSenha123";
 const ADMIN = "e2e-erro-ia-admin";
@@ -71,7 +71,7 @@ test.describe("o erro da IA dito pelo nome", () => {
   });
 
   test.beforeEach(async () => {
-    await db().delete(configuracaoAdmin).where(eq(configuracaoAdmin.chave, CHAVE_DA_ULTIMA_FALHA_DA_IA));
+    await db().delete(configuracaoAdmin).where(inArray(configuracaoAdmin.chave, CHAVES_DAS_FALHAS_DA_IA));
     await db().delete(geracoesIA);
   });
 
@@ -105,7 +105,7 @@ test.describe("o erro da IA dito pelo nome", () => {
     const paginaComum = await contextoComum.newPage();
     await entrar(paginaComum, COMUM, /\/hoje/);
     await pedirRoteiroComMarcador(paginaComum, "[mock:erro-credito]");
-    await expect.poll(async () => (await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, CHAVE_DA_ULTIMA_FALHA_DA_IA))).length, { timeout: 30_000 }).toBe(1);
+    await expect.poll(async () => (await db().select().from(configuracaoAdmin).where(eq(configuracaoAdmin.chave, chaveDaFalhaDaIA("credito")))).length, { timeout: 30_000 }).toBe(1);
     await contextoComum.close();
 
     const contextoAdmin = await browser.newContext({ viewport: { width: 1280, height: 900 } });

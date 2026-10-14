@@ -19,11 +19,11 @@ export const FRASE_DA_CAUSA_PARA_ADMIN: Record<CausaDoErroIA, string> = {
 
 /**
  * A causa de um erro da API pelo status e pela mensagem. O credito vem primeiro: a Anthropic devolve "credit balance is too low" com status 400 (e outros produtos, 402), entao a
- * mensagem manda antes do numero. 401 e 403 sao a chave recusada; 429 e 529 sao limite ou sobrecarga. O resto (400 de schema, 500, rede) nao tem causa para o admin.
+ * mensagem manda antes do numero. 401 e a chave recusada (o 403 e permissao: modelo ou ferramenta sem acesso, nao a chave, e fica sem causa); 429 e 529 sao limite ou sobrecarga. O resto (400 de schema, 500, rede) nao tem causa para o admin.
  */
 export function causaDoErroDaApi(status: number | undefined, mensagem: string): CausaDoErroIA | null {
-  if (/credit balance|insufficient (funds|credit)|billing|plans & billing/i.test(mensagem) || status === 402) return "credito";
-  if (status === 401 || status === 403) return "chave";
+  if (/credit balance|insufficient (funds|credit)|plans & billing/i.test(mensagem) || status === 402) return "credito";
+  if (status === 401) return "chave";
   if (status === 429 || status === 529 || /overloaded/i.test(mensagem)) return "sobrecarga";
   return null;
 }

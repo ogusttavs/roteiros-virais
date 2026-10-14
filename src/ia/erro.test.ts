@@ -2,7 +2,7 @@
  * A causa do erro da API da IA (achado de 05/10/2026): crédito, sobrecarga e chave recusada são ditos pelo nome ao admin e só a ele; o cliente comum e o erro sem causa ficam com a frase genérica.
  */
 import { APIError, AuthenticationError, RateLimitError } from "@anthropic-ai/sdk";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { traduzirErro } from "./cliente";
 import { causaDoErroDaApi, ErroIA, FRASE_DA_CAUSA_PARA_ADMIN, FRASE_GENERICA_DO_CLIENTE, fraseDoErroDaIA } from "./erro";
@@ -17,7 +17,6 @@ describe("causaDoErroDaApi", () => {
     ["o status 402", 402, "payment required", "credito"],
     ["fundos insuficientes", 400, "Insufficient funds", "credito"],
     ["a chave recusada (401)", 401, "invalid x-api-key", "chave"],
-    ["a permissão negada (403)", 403, "permission denied", "chave"],
     ["o limite de taxa (429)", 429, "rate limit", "sobrecarga"],
     ["a API sobrecarregada (529)", 529, "Overloaded", "sobrecarga"],
     ["a mensagem de sobrecarga sem status", undefined, "Overloaded", "sobrecarga"],
@@ -35,6 +34,8 @@ describe("causaDoErroDaApi", () => {
     ["um 500", 500, "internal server error"],
     ["um 404", 404, "not found"],
     ["sem status e sem causa", undefined, "algo deu errado"],
+    ["um 403 de permissão (modelo ou ferramenta sem acesso), que não é a chave", 403, "permission denied"],
+    ["um 400 que só cita a palavra billing", 400, "invalid parameter: billing_address"],
   ])("%s não tem causa para o admin", (_nome, status, mensagem) => {
     expect(causaDoErroDaApi(status, mensagem)).toBeNull();
   });
@@ -89,6 +90,22 @@ describe("fraseDoErroDaIA", () => {
       expect(frase).not.toMatch(/[—–]/);
       expect(frase).not.toMatch(/\p{Extended_Pictographic}/u);
       expect(frase).not.toMatch(/x-api-key|credit balance|status|\b\d{3}\b/i);
+    }
+  });
+});
+
+describe("os marcadores do simulador", () => {
+  it("valem fora de produção, e em produção só com o modo e2e: um texto de cliente nunca aciona a falha num app que caiu no mock por omissão", async () => {
+    const { erroDeCausaSimulado } = await import("./mock");
+    expect(erroDeCausaSimulado("o momento [mock:erro-credito]")?.causa).toBe("credito");
+    expect(erroDeCausaSimulado("o momento [mock:erro-sobrecarga]")?.causa).toBe("sobrecarga");
+    expect(erroDeCausaSimulado("o momento [mock:erro-chave]")?.causa).toBe("chave");
+    expect(erroDeCausaSimulado("um momento qualquer")).toBeNull();
+    vi.stubEnv("NODE_ENV", "production");
+    try {
+      expect(erroDeCausaSimulado("o momento [mock:erro-credito]")).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
     }
   });
 });

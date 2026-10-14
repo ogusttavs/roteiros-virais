@@ -5,6 +5,7 @@
  * mesmo schema Zod que a chamada real usaria, entao um mock mal formado
  * quebra o teste que o usa, não passa disfarcado.
  */
+import { config } from "@/lib/config";
 import { pesoPelaMaisComprida, TOM_PADRAO_DO_BLOCO, type BlocoFalado, type TomDoBloco } from "@/lib/marcas-de-fala";
 
 import type { ParametrosGeracao } from "./cliente";
@@ -22,7 +23,9 @@ const USO_ZERO = {
  * "[mock:erro-credito]", "[mock:erro-sobrecarga]" e "[mock:erro-chave]" em qualquer texto que entra na chamada (o momento que a pessoa conta, o tema livre): a API da IA recusa pela causa
  * dita, como a real faria (o erro leva a causa; só o admin a lê na tela). Só no mock, nunca em produção (o provedor real nem passa por aqui).
  */
-function erroDeCausaSimulado(entrada: string): ErroIA | null {
+export function erroDeCausaSimulado(entrada: string): ErroIA | null {
+  // Num app em produção (que, sem a chave, cairia no mock por omissão) um texto digitado por um cliente nunca aciona o marcador; a suíte e2e roda em produção com `MODO_E2E`.
+  if (process.env.NODE_ENV === "production" && !config.modoE2E) return null;
   if (entrada.includes("[mock:erro-credito]")) return new ErroIA("erro da API (400): Your credit balance is too low to access the Anthropic API (simulado).", undefined, "credito");
   if (entrada.includes("[mock:erro-sobrecarga]")) return new ErroIA("erro da API (529): Overloaded (simulado).", undefined, "sobrecarga");
   if (entrada.includes("[mock:erro-chave]")) return new ErroIA("erro da API (401): invalid x-api-key (simulado).", undefined, "chave");
