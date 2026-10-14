@@ -121,8 +121,8 @@ export const textosHoje = {
 
   /** V12, item 2: a pergunta das duas portas, antes de qualquer tema (design v2, `Hoje.dc.html`, estado `portas`). */
   pergunta: "O que você quer gravar agora?",
-  portaReels: "Reels ou vídeo curto",
-  portaReelsAjuda: "para Instagram, TikTok e YouTube",
+  portaReels: "Vídeo",
+  portaReelsAjuda: "Reels, TikTok e Shorts, ou um vídeo longo para o YouTube",
   portaStory: "Story",
   portaStoryAjuda: "um vídeo com o que está acontecendo agora",
 

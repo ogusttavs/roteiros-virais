@@ -57,6 +57,17 @@ export function duracaoAlvoDaMedida(medida: MedidaDosLongos): number | null {
   return Math.min(Math.max(arredondada, piso), config.regras.videoLongoMaxS);
 }
 
+/** O que a tela do "Quanto tempo?" precisa saber do ramo: se o vídeo longo pode ser escrito agora e, se pode, com quantos segundos (a duração-alvo, a mesma que o roteiro vai pedir). */
+export type DadosDoLongo = { disponivel: boolean; duracaoS: number | null };
+
+/** O longo do ramo para a tela: sem ramo ou sem a medida (menos de três vídeos longos), indisponível; o que a tela diz com calma, antes de a pessoa escrever o tema. */
+export async function longoDoRamo(nichoId: number | null, agora: Date = new Date()): Promise<DadosDoLongo> {
+  if (!nichoId) return { disponivel: false, duracaoS: null };
+  const longos = await longosDoSetor(nichoId, { agora, dias: config.regras.longosMedidaJanelaDias });
+  const duracaoS = duracaoAlvoDaMedida(medirOsLongos(longos));
+  return { disponivel: duracaoS !== null, duracaoS };
+}
+
 /**
  * Diz, ANTES de resolver o tema do dia e de qualquer chamada de IA, se o ramo tem a medida que o roteiro longo pede: sem ela, a frase que a tela mostra (e não a de "não há tema do dia",
  * que seria outro assunto). Não devolve a duração (`gerarConteudoLongo` a calcula de novo, numa leitura só dela): é só a porta.

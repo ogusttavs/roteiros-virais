@@ -19,6 +19,7 @@ import {
   planoGravacoes,
   type Cliente,
   type EstadoPlano,
+  type DuracaoDoVideo,
   type EstiloRoteiro,
   type Ficha,
   type FormatoRoteiro,
@@ -352,6 +353,8 @@ export async function aceitar(
     formato?: FormatoRoteiro;
     /** M4, item 2: o que a pessoa confirmou na folha; sem isto, cai em "falado" (sem evidência no momento para sugerir). */
     estilo?: EstiloRoteiro;
+    /** E52 (PR 4): "Quanto tempo?" confirmado na folha; sem isto, curto. */
+    duracao?: DuracaoDoVideo;
     marcaId?: number;
     /** E40, item 2: "o que este vídeo precisa comunicar?", confirmado na folha. */
     objetivoDoVideo?: string;
@@ -384,6 +387,7 @@ export async function aceitar(
     ficha: dados.ficha,
     formato,
     estilo,
+    duracao: dados.duracao,
     quemAparece: dados.quemAparece,
     // E39a: o dia já vem do próprio item do plano, nunca hoje por padrão.
     data: item.dia,

@@ -15,6 +15,7 @@ import { lerCapitulosDaDescricao } from "@/lib/capitulos-da-descricao";
 import { capitulosParaCopiar, iniciosDosCapitulos, somaDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { criarPesquisa, executarPesquisa } from "@/servicos/pesquisa-na-hora";
 import { ErroRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
+import { longoDoRamo } from "@/servicos/roteiro-longo";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
@@ -237,6 +238,22 @@ describe("a duração-alvo vem da medida do ramo", () => {
       if (i > 0) expect(c.inicioS).toBeGreaterThan(capitulos[i - 1].inicioS);
     });
     expect(roteiro.conteudo.miniatura).toBeTruthy();
+  });
+});
+
+describe("longoDoRamo (o que a tela do 'Quanto tempo?' lê)", () => {
+  it("sem ramo, ou com menos de três vídeos longos, o longo não está disponível e a tela diz isso com calma", async () => {
+    expect(await longoDoRamo(null)).toEqual({ disponivel: false, duracaoS: null });
+    await semearLongo({ duracaoS: 600 });
+    await semearLongo({ duracaoS: 700 });
+    expect(await longoDoRamo(nichoId)).toEqual({ disponivel: false, duracaoS: null });
+  });
+
+  it("com a medida, diz a duração que o roteiro vai pedir (a mesma do roteiro, de 30 em 30 segundos), só com os vídeos do ramo", async () => {
+    await medirORamo();
+    await semearLongo({ duracaoS: 2300, nicho: outroNichoId, conta: outraContaId });
+    expect(await longoDoRamo(nichoId)).toEqual({ disponivel: true, duracaoS: 570 });
+    expect(await longoDoRamo(outroNichoId)).toEqual({ disponivel: false, duracaoS: null });
   });
 });
 

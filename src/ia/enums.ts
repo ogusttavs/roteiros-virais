@@ -123,7 +123,8 @@ export const INSTRUCAO_TIPO_ABERTURA: Record<TipoAbertura, string> = {
 
 /** V9c, item 1: o rótulo do controle segmentado (Objetivo, Gravar agora, o item do plano). */
 export const ROTULO_FORMATO_ROTEIRO: Record<FormatoRoteiro, string> = {
-  reels: "Reels",
+  // "Vídeo" e "Story" (decisão do Fable no passo 25, dúvida 1): a duração diz o resto; "Reels" fica como palavra nas frases de ajuda.
+  reels: "Vídeo",
   story: "Story",
 };
 

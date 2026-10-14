@@ -41,9 +41,26 @@ export const textosMomento = {
   /** V9c, item 1: o controle segmentado Reels/Story, abaixo do objetivo (`sugerirFormatoPeloObjetivo`). */
   formato: "Formato",
   formatoAjuda: {
-    reels: "Para o Instagram, o TikTok e o Shorts.",
+    reels: "Reels, TikTok e Shorts, ou um vídeo longo para o YouTube.",
     story: "No Story não tem a pergunta do que o vídeo deve fazer: ele segue o seu dia e fala com quem já te segue.",
   },
+  /**
+   * E52 (PR 4, passo 25): "Quanto tempo?", só no vídeo falado (nem no Story nem no sem fala). Duas opções, não as três do desenho: o servidor tem o curto e o longo (decisão do Fable de
+   * 11/10: sem "médio"), e uma opção que não muda nada seria mentira na tela.
+   */
+  duracao: "Quanto tempo?",
+  duracaoCurta: "Até 60 segundos",
+  duracaoLonga: "Mais de 3 minutos, para o YouTube",
+  duracaoAjuda: "Vídeo longo vira capítulos: cada um com o seu gancho para segurar quem assiste até o próximo, e a edição de cada um. Fica melhor no YouTube; no Instagram e no TikTok, até 60 segundos rende mais.",
+  /** O estado calmo (contraponto do Fable): o ramo ainda não tem a medida dos vídeos longos; dito aqui, antes de a pessoa escrever o tema, e não como erro depois. */
+  duracaoLongaIndisponivel:
+    "Ainda não temos vídeos longos suficientes do seu ramo para medir quanto dura e como se divide um vídeo longo dele. Assim que tivermos, essa opção abre aqui; por enquanto, o vídeo é de até 60 segundos.",
+  duracaoLongaMedida: (minutos: number) => `No seu ramo, um vídeo longo costuma ter uns ${minutos} minutos.`,
+  /** A espera do vídeo longo (E52, PR 4): escrever por capítulos leva mais que um roteiro curto; o prazo dito é o do longo. */
+  esperaLongoTitulo: "Escrevendo o seu vídeo longo, capítulo por capítulo",
+  esperaLongoDuracao: "Pode levar até 5 minutos",
+  /** A pesquisa antes de escrever ainda não vale para o vídeo longo (o servidor recusa); o campo some e esta linha diz por quê. */
+  duracaoLongaSemPesquisa: "O vídeo longo ainda não usa a pesquisa antes de escrever.",
   /** M4, item 2: o segundo controle segmentado, Falando/Sem fala; sem sugestão aqui (o momento não busca evidência). */
   estilo: "Como você aparece",
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto. */

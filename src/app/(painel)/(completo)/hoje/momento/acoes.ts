@@ -12,6 +12,7 @@ import {
   ErroRoteiro,
   gerarRoteiro,
   validarData,
+  validarDuracao,
   validarEstilo,
   validarFormato,
   validarMomentoDoDia,
@@ -54,6 +55,8 @@ export type DadosMomento = {
   formato?: string;
   /** M4, item 2: o segundo controle segmentado da folha (Falando/Sem fala); falado se ausente. */
   estilo?: string;
+  /** E52 (PR 4): "Quanto tempo?", curto se ausente; texto livre do navegador, `validarDuracao` confere (qualquer coisa fora de "curto" e "longo" vale como curto). */
+  duracao?: string;
   /** E40, item 2: "o que este vídeo precisa comunicar?", campo opcional e curto da folha. */
   objetivoDoVideo?: string;
   /** V12c, item 3, a E37b: troca só deste vídeo; chega como texto livre, `validarQuemAparece` confere. */
@@ -123,6 +126,7 @@ export async function gerarRoteiroMomentoAction(dados: DadosMomento): Promise<Re
       ficha: ehFicha(dados.ficha) ? dados.ficha : undefined,
       formato: validarFormato(dados.formato),
       estilo: validarEstilo(dados.estilo),
+      duracao: validarDuracao(dados.duracao),
       quemAparece: validarQuemAparece(dados.quemAparece),
       data: validarData(dados.data),
       momentoDoDia: validarMomentoDoDia(dados.momentoDoDia),

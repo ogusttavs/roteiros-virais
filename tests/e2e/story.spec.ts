@@ -169,7 +169,7 @@ test.describe("V9c, Story como formato", () => {
     await folha.getByRole("button", { name: "Que muita gente veja" }).click();
 
     const controleFormato = folha.getByRole("tablist", { name: "Formato" });
-    await expect(controleFormato.getByRole("tab", { name: "Reels" })).toHaveAttribute("aria-selected", "true");
+    await expect(controleFormato.getByRole("tab", { name: "Vídeo" })).toHaveAttribute("aria-selected", "true");
 
     await folha.getByRole("button", { name: "Escrever o roteiro" }).click();
     await expect(page).toHaveURL(/\/roteiros\/\d+/, { timeout: 15_000 });

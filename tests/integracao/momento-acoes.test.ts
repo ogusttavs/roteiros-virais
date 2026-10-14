@@ -11,9 +11,10 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, membrosMarca, nichos, roteiros, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, contas, membrosMarca, nichos, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
+import { textosRoteiro } from "@/textos/roteiro";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 import { gerarRoteiroMomentoAction } from "../../src/app/(painel)/(completo)/hoje/momento/acoes";
@@ -46,6 +47,7 @@ function sessaoDe(usuarioId: string) {
 
 let marcaA: { id: number; usuarioId: string };
 let marcaB: { id: number; usuarioId: string };
+let nichoDoTeste: number;
 
 beforeAll(async () => {
   await resetarSchema(db());
@@ -74,6 +76,7 @@ beforeAll(async () => {
     { clienteId: b.id, completo: true, perfil: PERFIL },
   ]);
 
+  nichoDoTeste = nicho.id;
   marcaA = { id: a.id, usuarioId: a.usuarioId! };
   marcaB = { id: b.id, usuarioId: b.usuarioId! };
 }, 30_000);
@@ -166,5 +169,85 @@ describe("gerarRoteiroMomentoAction", () => {
     expect(resultado).toEqual({ ok: false, erro: "formato de roteiro invalido." });
     const depois = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
     expect(depois.length).toBe(antes.length);
+  });
+});
+
+describe("gerarRoteiroMomentoAction: a duração (E52, PR 4)", () => {
+  /** Três vídeos longos do ramo (a medida mínima), de 8, 10 e 12 minutos. */
+  async function medirORamo() {
+    const [conta] = await db().insert(contas).values({ plataforma: "youtube", handle: "momento-acoes-longos", nichoId: nichoDoTeste, pais: "BR", idiomaPrincipal: "pt" }).returning();
+    for (const [indice, minutos] of [8, 10, 12].entries()) {
+      await db().insert(videos).values({
+        plataforma: "youtube",
+        idExterno: `momento-acoes-longo-${indice}`,
+        url: `https://exemplo.invalido/momento-acoes-longo-${indice}`,
+        nichoId: nichoDoTeste,
+        contaId: conta.id,
+        titulo: `[exemplo] longo ${indice}`,
+        views: 400_000,
+        foraDaCurva: "3.000",
+        duracaoS: minutos * 60,
+        publicadoEm: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        idioma: "pt",
+      });
+    }
+  }
+
+  it("no ramo sem a medida, o longo volta como resultado com a frase calma, e nada é gravado", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const antes = await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id));
+
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", duracao: "longo" });
+
+    expect(resultado).toEqual({ ok: false, erro: textosRoteiro.longo.semLongos });
+    expect((await db().select().from(roteiros).where(eq(roteiros.clienteId, marcaA.id))).length).toBe(antes.length);
+  });
+
+  it("com a medida, o longo escreve por capítulos e guarda a duração", async () => {
+    await medirORamo();
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", duracao: "longo" });
+
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    expect(roteiro.duracaoDoVideo).toBe("longo");
+    expect(roteiro.conteudo.capitulos?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+
+  it("texto fora de curto e longo vale como curto, nunca derruba nem vira um valor estranho no banco", async () => {
+    // a marca B: a A já gastou as gerações da janela do limite de taxa nos testes de cima
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaB.usuarioId));
+
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", duracao: "medio" });
+
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    expect(roteiro.duracaoDoVideo).toBe("curto");
+    expect(roteiro.conteudo.capitulos ?? null).toBeNull();
+  });
+
+  it("Story com duração longa é recusado com a frase do motivo, antes de gastar uma geração", async () => {
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaA.usuarioId));
+    const resultado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", formato: "story", duracao: "longo" });
+    expect(resultado).toEqual({ ok: false, erro: textosRoteiro.longo.soVideoFalado });
+  });
+
+  it("num ramo SEM a medida, Story com longo recebe a frase do que o longo não aceita (a recusa do formato vem antes da do ramo), e nada é escrito nem gasto", async () => {
+    const [semMedida] = await db().insert(nichos).values({ slug: "momento-acoes-sem-medida", nome: "Sem medida" }).returning();
+    await db().insert(user).values({ id: "momento-c", name: "[teste] Momento C", email: "c@momento-acoes.teste" });
+    const [c] = await db().insert(clientes).values({ usuarioId: "momento-c", nome: "[teste] Marca C", nichoId: semMedida.id }).returning();
+    await db().insert(membrosMarca).values({ usuarioId: "momento-c", clienteId: c.id, papel: "dono" });
+    await db().insert(briefings).values({ clienteId: c.id, completo: true, perfil: PERFIL });
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe("momento-c"));
+
+    const story = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", formato: "story", duracao: "longo" });
+    expect(story).toEqual({ ok: false, erro: textosRoteiro.longo.soVideoFalado });
+    const semFala = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", estilo: "sem_fala", duracao: "longo" });
+    expect(semFala).toEqual({ ok: false, erro: textosRoteiro.longo.soVideoFalado });
+    // e o vídeo falado longo, no mesmo ramo, recebe a frase calma do ramo
+    const falado = await gerarRoteiroMomentoAction({ ...MOMENTO, objetivo: "engajamento", duracao: "longo" });
+    expect(falado).toEqual({ ok: false, erro: textosRoteiro.longo.semLongos });
+    expect(await db().select().from(roteiros).where(eq(roteiros.clienteId, c.id))).toHaveLength(0);
   });
 });

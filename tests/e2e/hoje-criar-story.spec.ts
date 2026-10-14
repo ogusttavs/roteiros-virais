@@ -118,7 +118,7 @@ test.describe("Hoje: Criar um Story para hoje", () => {
     const folha = page.getByRole("dialog", { name: "Gravar agora" });
     await expect(folha).toBeVisible();
     await expect(folha.getByRole("tab", { name: "Story" })).toHaveAttribute("aria-selected", "true");
-    await expect(folha.getByRole("tab", { name: "Reels" })).toHaveAttribute("aria-selected", "false");
+    await expect(folha.getByRole("tab", { name: "Vídeo" })).toHaveAttribute("aria-selected", "false");
   });
 
   test("só com um Reels marcado, a coluna de Stories troca o 'Nada marcado' pelo botão", async ({ page }) => {

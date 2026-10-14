@@ -10,7 +10,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, membrosMarca, nichos, planoGravacoes, roteiros, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, contas, membrosMarca, nichos, planoGravacoes, roteiros, user, videos, type PerfilCompilado } from "@/db/schema";
 import { sessaoAtual } from "@/lib/sessao";
 import { ErroAcessoNegado } from "@/servicos/clientes";
 
@@ -53,6 +53,7 @@ function sessaoDe(usuarioId: string) {
 
 let marcaA: { id: number; usuarioId: string };
 let marcaB: { id: number; usuarioId: string };
+let nichoDoTeste: number;
 
 beforeAll(async () => {
   await resetarSchema(db());
@@ -77,6 +78,7 @@ beforeAll(async () => {
     { clienteId: b.id, completo: true, perfil: PERFIL },
   ]);
 
+  nichoDoTeste = nicho.id;
   marcaA = { id: a.id, usuarioId: a.usuarioId! };
   marcaB = { id: b.id, usuarioId: b.usuarioId! };
 }, 30_000);
@@ -150,6 +152,40 @@ describe("aceitarPlanoAction e pularPlanoAction", () => {
 
     if (!resultado.ok) throw new Error(resultado.erro);
     expect(typeof resultado.dado.id).toBe("number");
+  });
+
+  it("a duração longa (E52, PR 4) chega ao roteiro do item: capítulos e a duração guardada, quando o ramo tem a medida", async () => {
+    const [conta] = await db().insert(contas).values({ plataforma: "youtube", handle: "plano-acoes-longos", nichoId: nichoDoTeste, pais: "BR", idiomaPrincipal: "pt" }).returning();
+    for (const [indice, minutos] of [8, 10, 12].entries()) {
+      await db().insert(videos).values({
+        plataforma: "youtube",
+        idExterno: `plano-acoes-longo-${indice}`,
+        url: `https://exemplo.invalido/plano-acoes-longo-${indice}`,
+        nichoId: nichoDoTeste,
+        contaId: conta.id,
+        titulo: `[exemplo] longo ${indice}`,
+        views: 400_000,
+        foraDaCurva: "3.000",
+        duracaoS: minutos * 60,
+        publicadoEm: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
+        idioma: "pt",
+      });
+    }
+    vi.mocked(sessaoAtual).mockResolvedValue(sessaoDe(marcaB.usuarioId));
+    const [item] = await criarPlanoAction([{ data: hojeMais(5), lugar: "estudio", compromissos: ["gravar o passo a passo inteiro"] }]);
+
+    const resultado = await aceitarPlanoAction(item.id, {
+      onde: "no estudio",
+      oQueEstaAcontecendo: "gravando o passo a passo inteiro",
+      oQueDaParaMostrar: "a bancada e o resultado",
+      objetivo: "engajamento",
+      duracao: "longo",
+    });
+
+    if (!resultado.ok) throw new Error(resultado.erro);
+    const [roteiro] = await db().select().from(roteiros).where(eq(roteiros.id, resultado.dado.id));
+    expect(roteiro.duracaoDoVideo).toBe("longo");
+    expect(roteiro.conteudo.capitulos?.length ?? 0).toBeGreaterThanOrEqual(3);
   });
 
   /**

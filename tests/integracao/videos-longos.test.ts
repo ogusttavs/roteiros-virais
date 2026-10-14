@@ -272,6 +272,19 @@ describe("medirOsLongos", () => {
     expect(m.titulos).not.toContain("[exemplo] de outra língua");
   });
 
+  it("diz quantos da amostra são em português: o internacional entra na medida, mas conta à parte, e o de outro idioma não conta em nenhum dos dois", () => {
+    const m = medirOsLongos([
+      longo({ id: 1 }),
+      longo({ id: 2 }),
+      longo({ id: 3, classificacao: "internacional" }),
+      longo({ id: 4, classificacao: "internacional" }),
+      longo({ id: 5, classificacao: "outro" }),
+    ]);
+    expect(m.amostra).toBe(4);
+    expect(m.brasileiros).toBe(2);
+    expect(medirOsLongos([longo({ id: 1 })])).toMatchObject({ amostra: 1, brasileiros: 1, forca: "nenhuma" });
+  });
+
   it("os títulos vêm dos mais vistos, no máximo oito, sem os vazios", () => {
     const m = medirOsLongos([
       ...Array.from({ length: 10 }, (_, i) => longo({ id: i + 1, views: 1000 * (i + 1) })),

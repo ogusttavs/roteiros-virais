@@ -79,3 +79,13 @@
   background: var(--cor-borda-forte);
   margin: 0 var(--espaco-1);
 }
+
+/** Uma opcao que aparece mas nao se escolhe (E52, PR 4): mais apagada, sem o gesto de aperto nem o realce do mouse, com o alvo de toque de sempre. */
+.apagada,
+.apagada:hover,
+.apagada:active {
+  opacity: 0.55;
+  cursor: default;
+  background: transparent;
+  transform: none;
+}

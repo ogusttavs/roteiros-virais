@@ -10,6 +10,7 @@ import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
 import type { AssuntoSemEncaixe, CartaoEmAlta as DadosEmAlta } from "@/servicos/em-alta";
 import type { DadosDoCampoDePesquisa, PesquisaEmAberto } from "@/servicos/pesquisa-na-hora";
 import type { ItemPlano } from "@/servicos/plano";
+import type { DadosDoLongo } from "@/servicos/roteiro-longo";
 import type { PerguntasDaTela } from "@/servicos/vozes-do-publico";
 import { textosCriar } from "@/textos/criar";
 import { textosHoje } from "@/textos/hoje";
@@ -65,6 +66,8 @@ type Props = {
   pesquisa?: DadosDoCampoDePesquisa;
   /** E54 (parte 3): a pesquisa que a pessoa deixou com "Voltar depois" (rodando, ou pronta e esperando os dados serem marcados). */
   pesquisaEmAberto?: PesquisaEmAberto | null;
+  /** E52 (PR 4): o vídeo longo do ramo (pode ser escrito agora? com quantos segundos?), para o "Quanto tempo?" da folha "Gravar agora"; ausente, a pergunta não aparece. */
+  longo?: DadosDoLongo;
 };
 
 /**
@@ -92,6 +95,7 @@ export function CriarTela({
   perguntas = null,
   pesquisa,
   pesquisaEmAberto = null,
+  longo,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -394,6 +398,7 @@ export function CriarTela({
           marcaAtivaId={marcaAtiva.id}
           formatoInicial={abrirEmStory ? "story" : undefined}
           pesquisa={pesquisa}
+          longo={longo}
           tipo={tipo}
           quemGravaPadrao={quemGravaPadrao}
           valoresIniciais={
