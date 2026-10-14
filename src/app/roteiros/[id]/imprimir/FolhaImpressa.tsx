@@ -92,7 +92,7 @@ export function FolhaA4({ folha }: { folha: FolhaDoRoteiro }) {
         <section className={styles.blocos} aria-label={textosRoteiro.folha.oRoteiro}>
           <span className={styles.rotulo}>{textosRoteiro.folha.oRoteiro}</span>
           {agruparEmBlocos(folha.unidades).map((bloco, indice) => (
-            <div key={indice} className={styles.bloco} data-bloco-da-folha>
+            <div key={indice} className={styles.bloco} data-bloco-da-folha style={bloco[0].novaPagina ? { breakBefore: "page" } : undefined}>
               {bloco[0].tempo || bloco[0].rotulo ? (
                 <span className={styles.quando}>
                   {bloco[0].tempo ? <span className={styles.tempo}>{bloco[0].tempo}</span> : null}

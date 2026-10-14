@@ -130,3 +130,51 @@ export function capitulosParaCopiar(capitulos: { nome: string; duracaoS: number 
   const inicios = iniciosDosCapitulos(capitulos);
   return capitulos.map((c, i) => `${tempoParaADescricao(inicios[i])} ${c.nome.replace(/\s+/g, " ").trim()}`).join("\n");
 }
+
+/** "0:50", "2:40", "1:02:03": o tempo como a tela mostra (sem o zero à esquerda nos minutos, diferente da lista da descrição). */
+export function tempoNaTela(segundos: number): string {
+  const total = Math.max(0, Math.round(segundos));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return h > 0 ? `${h}:${dois(m)}:${dois(s)}` : `${m}:${dois(s)}`;
+}
+
+/** Os minutos de um vídeo longo para o selo ("uns 10 min"): arredondado, nunca menos de 1. */
+export function minutosDoVideo(duracaoS: number): number {
+  return Math.max(1, Math.round(duracaoS / 60));
+}
+
+type CapituloComTexto = { nome: string; inicioS: number; duracaoS: number; pontos: string[]; naImagem: string };
+
+/**
+ * O texto corrido que o resto do produto lê (a reescrita, o texto para colar, o histórico, o aprendizado) e as cenas, refeitos a partir dos capítulos. É a única função que os escreve: o
+ * servidor a usa ao gerar o roteiro e ao editar um capítulo; a tela nunca monta o texto corrido.
+ */
+export function camposCorridosDosCapitulos(capitulos: CapituloComTexto[]): { corpo: string; fechamento: string; cenas: { momento: string; oQueFazer: string }[] } {
+  return {
+    corpo: capitulos.map((c, i) => `${i + 1}. ${c.nome}: ${c.pontos.join("; ")}`).join("\n"),
+    fechamento: capitulos[capitulos.length - 1]?.pontos.join("; ") ?? "",
+    cenas: capitulos.map((c) => ({ momento: `${c.inicioS} segundos`, oQueFazer: c.naImagem })),
+  };
+}
+
+/** O roteiro longo inteiro em texto, para "Copiar o texto" do menu: o título, o gancho do vídeo e, por capítulo, o tempo e o nome, o que segura até o próximo e os pontos. */
+export function textoDoRoteiroLongo(conteudo: {
+  titulo: string;
+  gancho: string;
+  chamadaFinal: string;
+  capitulos: (CapituloComTexto & { ganchoParaOProximo: string | null })[];
+}): string {
+  const quebra = String.fromCharCode(10);
+  const partes: string[] = [conteudo.titulo, conteudo.gancho];
+  conteudo.capitulos.forEach((c, i) => {
+    const linhas = [`${tempoNaTela(c.inicioS)} ${c.nome}`];
+    if (c.ganchoParaOProximo) linhas.push(c.ganchoParaOProximo);
+    for (const ponto of c.pontos) linhas.push(`- ${ponto}`);
+    if (i === conteudo.capitulos.length - 1 && conteudo.chamadaFinal.trim()) linhas.push(conteudo.chamadaFinal.trim());
+    partes.push(linhas.join(quebra));
+  });
+  return partes.join(quebra + quebra);
+}

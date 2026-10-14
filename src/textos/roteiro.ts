@@ -71,6 +71,38 @@ export const textosRoteiro = {
     /** E37a, item 0: teto por campo da edição manual (2.000 caracteres). */
     textoMuitoLongo: (limite: number) => `Esse texto passou de ${limite} caracteres. Encurte um pouco e tente de novo.`,
     listaMaiorQueOriginal: "Não deu para salvar: a lista veio com mais itens do que o roteiro tinha. Recarregue a tela e tente de novo.",
+    /** E52 (PR 4b): a edição de um capítulo do roteiro longo. */
+    capituloInexistente: "Não achei esse capítulo. Recarregue a tela e tente de novo.",
+    pontosDoCapitulo: (maximo: number) => `Deixe de 1 a ${maximo} pontos neste capítulo, um por linha.`,
+  },
+  /**
+   * E52 (PR 4b, passo 25): o roteiro do vídeo longo do YouTube, por capítulos. "Capítulo" é a palavra do YouTube e da pessoa; a lista com o tempo é a que se cola na descrição do vídeo.
+   */
+  capitulos: {
+    selo: (minutos: number) => `Vídeo longo, uns ${minutos} min`,
+    /** A duração de um roteiro numa linha de lista (Hoje, plano): "40 segundos" no curto, o selo no longo. */
+    duracaoNaLista: (duracaoDoVideo: string, duracaoS: number) =>
+      duracaoDoVideo === "longo" ? `Vídeo longo, uns ${Math.max(1, Math.round(duracaoS / 60))} min` : `${duracaoS} segundos`,
+    chipYoutube: "YouTube, vídeo longo",
+    quantosCapitulos: (n: number) => (n === 1 ? "1 capítulo" : `${n} capítulos`),
+    indiceTitulo: "Os capítulos",
+    indiceAjuda: "Cole na descrição do vídeo: o YouTube mostra os capítulos na barra, e quem assiste pula para o que quer.",
+    copiarCapitulos: "Copiar os capítulos",
+    copiado: "Capítulos copiados",
+    erroCopiar: "Não deu para copiar os capítulos. Selecione a lista e copie à mão.",
+    capitulo: (n: number, de: string, ate: string) => `Capítulo ${n} · ${de} a ${ate}`,
+    ganchoDoVideo: "O gancho do vídeo",
+    ganchoParaOProximo: "Para segurar até o próximo",
+    oQueFalarEMostrar: "O que falar e mostrar",
+    naImagem: "Na imagem",
+    comoEditarCapitulo: "Como editar este capítulo",
+    chamada: "A chamada final",
+    comoEditarOVideoInteiro: "Como editar o vídeo inteiro",
+    editarCapitulo: (nome: string) => `Editar o capítulo ${nome}`,
+    pontosRotulo: "O que falar (um ponto por linha)",
+    salvarCapitulo: "Salvar o capítulo",
+    /** Na folha do PDF: a última seção, a lista para colar na descrição. */
+    paraColar: "Para colar na descrição do vídeo",
   },
   /** E40, item 2: "o que este vídeo precisa comunicar?", no topo da tela quando a pessoa escreveu algo. */
   recado: "O recado deste vídeo",

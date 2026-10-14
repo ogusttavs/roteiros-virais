@@ -27,6 +27,7 @@ import {
   VALORES_QUEM_GRAVA,
   videosCliente,
   type AindaValeResultado,
+  type CapituloDoRoteiro,
   type Cliente,
   type ConteudoRoteiro,
   type DuracaoDoVideo,
@@ -54,6 +55,7 @@ import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
+import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS } from "@/lib/marcas-de-fala";
@@ -1746,6 +1748,11 @@ export type CamposEditaveisRoteiro = {
   chamadaFinal?: string;
   cartoes?: { oQueFalar: string; oQueMostrar: string; textoNaTela: string }[];
   legenda?: string;
+  /**
+   * E52 (PR 4b): no roteiro longo, a edição de UM capítulo por vez: o que segura até o próximo e os pontos do que falar. O texto corrido (`corpo`, `fechamento`, `cenas`) é refeito aqui, a partir
+   * dos capítulos; a tela nunca o monta. Em roteiro que não é longo, ou com índice fora da lista, é erro (nada é gravado calado).
+   */
+  capitulo?: { indice: number; ganchoParaOProximo?: string; pontos?: string[] };
 };
 
 /** E37a, item 0 (resto da revisão do PR #82): teto por campo da edição manual, sem exceção. */
@@ -1758,6 +1765,32 @@ function campoEditadoOuAtual(novo: string | undefined, atual: string): string {
     throw new ErroRoteiro(textosRoteiro.editando.textoMuitoLongo(LIMITE_CARACTERES_EDICAO));
   }
   return aparado;
+}
+
+/** O teto de pontos que a pessoa pode deixar num capítulo: o do produto (o modelo escreve 2 a 4), com folga para quem acrescenta um. */
+const PONTOS_MAXIMOS_NA_EDICAO = 8;
+
+/**
+ * E52 (PR 4b): aplica a edição de um capítulo e refaz o texto corrido. Só muda o que a pessoa mandou (o gancho e os pontos) do capítulo pedido; os outros ficam como estão. O último capítulo não
+ * tem gancho (é a chamada), então o que chegar para ele nesse campo é ignorado.
+ */
+function editarUmCapitulo(
+  conteudo: ConteudoRoteiro,
+  edicao: NonNullable<CamposEditaveisRoteiro["capitulo"]>,
+): { capitulos: CapituloDoRoteiro[]; corpo: string; fechamento: string; cenas: { momento: string; oQueFazer: string }[] } {
+  const atuais = conteudo.capitulos;
+  if (!atuais || atuais.length === 0) throw new ErroRoteiro(textosRoteiro.editando.capituloInexistente);
+  if (!Number.isInteger(edicao.indice) || edicao.indice < 0 || edicao.indice >= atuais.length) throw new ErroRoteiro(textosRoteiro.editando.capituloInexistente);
+  if (edicao.pontos && (edicao.pontos.length > PONTOS_MAXIMOS_NA_EDICAO || edicao.pontos.length === 0)) throw new ErroRoteiro(textosRoteiro.editando.pontosDoCapitulo(PONTOS_MAXIMOS_NA_EDICAO));
+  const ehOUltimo = edicao.indice === atuais.length - 1;
+  const capitulos = atuais.map((c, i) => {
+    if (i !== edicao.indice) return c;
+    const pontos = edicao.pontos ? edicao.pontos.map((p) => campoEditadoOuAtual(p, "")).filter((p) => p !== "") : c.pontos;
+    if (pontos.length === 0) throw new ErroRoteiro(textosRoteiro.editando.pontosDoCapitulo(PONTOS_MAXIMOS_NA_EDICAO));
+    const gancho = ehOUltimo ? null : edicao.ganchoParaOProximo === undefined ? c.ganchoParaOProximo : campoEditadoOuAtual(edicao.ganchoParaOProximo, c.ganchoParaOProximo ?? "") || null;
+    return { ...c, pontos, ganchoParaOProximo: gancho };
+  });
+  return { capitulos, ...camposCorridosDosCapitulos(capitulos) };
 }
 
 /**
@@ -1788,11 +1821,15 @@ export async function editarRoteiro(
     throw new ErroRoteiro(textosRoteiro.editando.listaMaiorQueOriginal);
   }
 
+  const capitulosEditados = campos.capitulo ? editarUmCapitulo(conteudoAtual, campos.capitulo) : null;
+
   const novoConteudo: ConteudoRoteiro = {
     ...conteudoAtual,
+    ...(capitulosEditados ?? {}),
     gancho: campoEditadoOuAtual(campos.gancho, conteudoAtual.gancho),
-    corpo: campoEditadoOuAtual(campos.corpo, conteudoAtual.corpo),
-    fechamento: campoEditadoOuAtual(campos.fechamento, conteudoAtual.fechamento),
+    // No roteiro longo o texto corrido é sempre o dos capítulos (refeito acima); o `corpo` e o `fechamento` que chegam de fora não valem.
+    corpo: conteudoAtual.capitulos ? (capitulosEditados?.corpo ?? conteudoAtual.corpo) : campoEditadoOuAtual(campos.corpo, conteudoAtual.corpo),
+    fechamento: conteudoAtual.capitulos ? (capitulosEditados?.fechamento ?? conteudoAtual.fechamento) : campoEditadoOuAtual(campos.fechamento, conteudoAtual.fechamento),
     chamadaFinal: campoEditadoOuAtual(campos.chamadaFinal, conteudoAtual.chamadaFinal),
     // A figurinha nao se edita (e escolha da IA, nao um campo de texto); so os tres campos de
     // texto do cartao trocam, por indice, a mesma ordem que a tela recebeu.
@@ -2188,6 +2225,8 @@ export type ItemAgendaDoDia = {
   /** E49 PR 1: o formato, para o rótulo dizer "Com quem já segue" no Story (que grava o objetivo mas não tem ficha). */
   formato: FormatoRoteiro;
   duracaoS: number;
+  /** E52 (PR 4b): "longo" é o vídeo do YouTube por capítulos; o cartão do Hoje diz o selo no lugar dos segundos. */
+  duracaoDoVideo: DuracaoDoVideo;
   criadoEm: Date;
   /** E39b, item (a): nulo até a pessoa tocar em "Conferir" (só preenchido no destaque do Reels). */
   aindaValeResultado: AindaValeResultado | null;
@@ -2210,6 +2249,7 @@ function linhaParaItemAgenda(linha: RoteiroLinha): ItemAgendaDoDia {
     ficha: linha.ficha,
     formato: linha.formato,
     duracaoS: corpoDoRoteiro(linha).duracaoS,
+    duracaoDoVideo: linha.duracaoDoVideo,
     criadoEm: linha.criadoEm,
     aindaValeResultado: aindaValeDeHoje(linha),
     doMomento: linha.temaDoMomento !== null,
@@ -2642,6 +2682,10 @@ export type RoteiroHistoricoLinha = {
   origem: OrigemRoteiro["origem"];
   /** V9c, item 4: `HistoricoTela` mostra "· story" ao lado da data, como "· momento". */
   formato: FormatoRoteiro;
+  /** E52 (PR 4b): "longo" mostra o selo "Vídeo longo, uns N min" ao lado da data. */
+  duracaoDoVideo: DuracaoDoVideo;
+  /** Os minutos do vídeo, para o selo (só do longo). */
+  duracaoS: number | null;
   /** E55 PR 2b: o nome do assunto em alta de onde o roteiro nasceu (o selo "do momento: ..."); nulo nos outros. */
   assuntoDoMomento: string | null;
 };
@@ -2665,6 +2709,8 @@ export async function roteirosDoCliente(
       postadoEm: roteiros.postadoEm,
       origem: roteiros.origem,
       formato: roteiros.formato,
+      duracaoDoVideo: roteiros.duracaoDoVideo,
+      duracaoS: sql<number | null>`${roteiros.conteudo}->>'duracaoS'`.mapWith((v) => (v === null || v === undefined ? null : Number(v))),
       // E55 PR 2b: o selo "do momento: <assunto>" do Histórico (o nome do assunto fica gravado no roteiro mesmo depois que ele sai da lista).
       assuntoDoMomento: sql<string | null>`${roteiros.temaDoMomento}->>'assunto'`,
     })

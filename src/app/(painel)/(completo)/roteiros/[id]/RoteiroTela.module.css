@@ -1284,3 +1284,8 @@
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* E52 (PR 4b): o roteiro longo usa a largura de leitura inteira também no celular (os cartões dos capítulos não são a coluna estreita dos quatro blocos). */
+.blocosLongos {
+  max-width: var(--largura-leitura);
+}

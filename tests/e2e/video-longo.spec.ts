@@ -105,7 +105,7 @@ test.describe("Gravar agora: o vídeo longo", () => {
     const folha = await abrirGravarAgora(page);
 
     await expect(folha.getByText("Quanto tempo?")).toBeVisible();
-    await expect(folha.getByRole("button", { name: "Até 60 segundos" })).toHaveAttribute("aria-pressed", "true");
+    await expect(folha.getByRole("button", { name: "Curto, até um minuto e meio" })).toHaveAttribute("aria-pressed", "true");
     const longa = folha.getByRole("button", { name: "Mais de 3 minutos, para o YouTube" });
     await expect(longa).toBeDisabled();
     await expect(folha.locator("[data-duracao-indisponivel]")).toContainText("Ainda não temos vídeos longos suficientes do seu ramo");
@@ -136,7 +136,7 @@ test.describe("Gravar agora: o vídeo longo", () => {
     await expect(folha.locator("[data-duracao-sem-pesquisa]")).toBeVisible();
     await expect(linhaDePesquisa).toHaveCount(0);
     // e voltar ao curto traz a linha de volta
-    await folha.getByRole("button", { name: "Até 60 segundos" }).click();
+    await folha.getByRole("button", { name: "Curto, até um minuto e meio" }).click();
     await expect(linhaDePesquisa).toHaveCount(1);
     await longa.click();
 

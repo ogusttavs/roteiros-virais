@@ -22,6 +22,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const doRoteiro = await roteiroDeQuemPediu(params);
   if (doRoteiro instanceof NextResponse) return doRoteiro;
   const { roteiro, cliente, somenteLeitura } = doRoteiro;
+  // E52 (PR 4b): dez minutos de vídeo por capítulos não cabem num quadro 9:16 (o PDF é a saída do longo); a tela nem oferece, e o servidor recusa o pedido feito à mão.
+  if (roteiro.duracaoDoVideo === "longo") return NextResponse.json({ erro: "a imagem nao existe para o video longo, use o PDF" }, { status: 400, headers: { "Cache-Control": "private, no-store" } });
 
   try {
     // E41 2c: com `?marcas=1` as marcas de fala são escritas aqui, antes da vaga do Chromium.

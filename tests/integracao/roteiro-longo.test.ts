@@ -14,7 +14,9 @@ import * as verificador from "@/ia/verificador";
 import { lerCapitulosDaDescricao } from "@/lib/capitulos-da-descricao";
 import { capitulosParaCopiar, iniciosDosCapitulos, somaDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { criarPesquisa, executarPesquisa } from "@/servicos/pesquisa-na-hora";
-import { ErroRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
+import { editarRoteiro, ErroRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
+import { folhaDoRoteiro } from "@/servicos/folha-do-roteiro";
 import { longoDoRamo } from "@/servicos/roteiro-longo";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -617,5 +619,100 @@ describe("o momento e a reescrita", () => {
     expect(entrada).toContain(`A versão reprovada abre com: "${v1.conteudo.gancho}"`);
     expect(v2.conteudo.gancho).not.toBe(v1.conteudo.gancho);
     expect((await geracoesDa("roteiroLongo")).length).toBe(2);
+  });
+});
+
+describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => {
+  async function longoPronto() {
+    await medirORamo();
+    return gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo" });
+  }
+
+  it("editar um capítulo muda só ele (o gancho e os pontos) e refaz o texto corrido, as cenas e o fechamento a partir dos capítulos", async () => {
+    const antes = await longoPronto();
+    const caps = antes.conteudo.capitulos!;
+    const depois = await editarRoteiro(antes.id, { capitulo: { indice: 1, ganchoParaOProximo: "E o erro seguinte é o que ninguém percebe até ser tarde", pontos: ["Primeiro ponto novo", "Segundo ponto novo"] } });
+
+    const novos = depois.conteudo.capitulos!;
+    expect(novos).toHaveLength(caps.length);
+    expect(novos[1].ganchoParaOProximo).toBe("E o erro seguinte é o que ninguém percebe até ser tarde");
+    expect(novos[1].pontos).toEqual(["Primeiro ponto novo", "Segundo ponto novo"]);
+    // os outros capítulos ficam como estavam, inclusive os tempos
+    novos.forEach((c, i) => {
+      if (i !== 1) expect(c).toEqual(caps[i]);
+    });
+    expect(novos[1].nome).toBe(caps[1].nome);
+    expect(novos[1].inicioS).toBe(caps[1].inicioS);
+    expect(novos[1].naImagem).toBe(caps[1].naImagem);
+    // o texto corrido acompanha: o corpo tem os pontos novos, as cenas seguem uma por capítulo
+    expect(depois.conteudo.corpo).toContain("2. " + novos[1].nome + ": Primeiro ponto novo; Segundo ponto novo");
+    expect(depois.conteudo.cenas).toEqual(antes.conteudo.cenas);
+    expect(depois.conteudo.fechamento).toBe(antes.conteudo.fechamento);
+    expect(depois.conteudo.duracaoS).toBe(antes.conteudo.duracaoS);
+    // o original fica guardado e a edição é da pessoa
+    expect(depois.editadoPelaPessoa).toBe(true);
+    expect(depois.conteudoOriginal?.capitulos?.[1].pontos).toEqual(caps[1].pontos);
+  });
+
+  it("editar o último capítulo refaz o fechamento, e o gancho que chega para ele é ignorado (a chamada não segura até nenhum próximo)", async () => {
+    const antes = await longoPronto();
+    const ultimo = antes.conteudo.capitulos!.length - 1;
+    const depois = await editarRoteiro(antes.id, { capitulo: { indice: ultimo, ganchoParaOProximo: "Isto não vale", pontos: ["Resuma o que viu", "Peça a mensagem"] } });
+    expect(depois.conteudo.capitulos![ultimo].ganchoParaOProximo).toBeNull();
+    expect(depois.conteudo.fechamento).toBe("Resuma o que viu; Peça a mensagem");
+  });
+
+  it("o corpo e o fechamento que chegam de fora não valem num roteiro longo: o texto corrido é sempre o dos capítulos", async () => {
+    const antes = await longoPronto();
+    const depois = await editarRoteiro(antes.id, { corpo: "texto solto que não é dos capítulos", fechamento: "outro texto solto", gancho: "Um gancho novo para o vídeo inteiro" });
+    expect(depois.conteudo.corpo).toBe(antes.conteudo.corpo);
+    expect(depois.conteudo.fechamento).toBe(antes.conteudo.fechamento);
+    expect(depois.conteudo.gancho).toBe("Um gancho novo para o vídeo inteiro");
+  });
+
+  it("índice fora da lista, nenhum ponto ou pontos demais é recusado com a frase, e nada é gravado", async () => {
+    const antes = await longoPronto();
+    const total = antes.conteudo.capitulos!.length;
+    await expect(editarRoteiro(antes.id, { capitulo: { indice: total, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+    await expect(editarRoteiro(antes.id, { capitulo: { indice: -1, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: [] } })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: ["   ", ""] } })).rejects.toThrow(ErroRoteiro);
+    await expect(editarRoteiro(antes.id, { capitulo: { indice: 0, pontos: Array.from({ length: 9 }, (_, i) => `ponto ${i}`) } })).rejects.toThrow(ErroRoteiro);
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, antes.id));
+    expect(linha.editadoPelaPessoa).toBe(false);
+    expect(linha.conteudo.capitulos).toEqual(antes.conteudo.capitulos);
+  });
+
+  it("um roteiro curto não aceita a edição por capítulo", async () => {
+    const curto = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
+    await expect(editarRoteiro(curto.id, { capitulo: { indice: 0, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
+  });
+
+  it("a folha do PDF do longo tem uma seção por capítulo, com o tempo no título, e termina com a lista para colar na descrição, numa página nova", async () => {
+    const roteiro = await longoPronto();
+    const folha = folhaDoRoteiro(roteiro, "Marca", null);
+    const caps = roteiro.conteudo.capitulos!;
+    const inicios = iniciosDosCapitulos(caps);
+    // o nome de cada capítulo abre uma seção, com o tempo "de a ate" ao lado
+    const aberturas = folha.unidades.filter((u) => u.rotulo !== null && u.tempo !== null);
+    expect(aberturas.map((u) => u.rotulo)).toEqual(caps.map((c) => c.nome));
+    expect(aberturas[0].tempo).toMatch(/^0:00 a \d+:\d{2}$/);
+    // a lista para colar é a última seção, em página nova, e é exatamente o texto do "Copiar os capítulos"
+    const colar = folha.unidades.filter((u) => u.rotulo === textosRoteiro.capitulos.paraColar || u.novaPagina);
+    expect(colar[0].novaPagina).toBe(true);
+    const linhasFinais = folha.unidades.slice(folha.unidades.indexOf(colar[0])).map((u) => u.fala);
+    expect(linhasFinais.join(String.fromCharCode(10))).toBe(capitulosParaCopiar(caps));
+    expect(folha.unidades[folha.unidades.length - 1].fimDoBloco).toBe(true);
+    expect(inicios[0]).toBe(0);
+    // os chips dizem que é vídeo longo, sem "segundos"
+    expect(folha.chips[0]).toBe(textosRoteiro.capitulos.chipYoutube);
+    expect(folha.chips.some((c) => /segundos/.test(c))).toBe(false);
+    // e o "Como editar o vídeo inteiro" continua na folha
+    expect(folha.comoEditar).not.toBeNull();
+  });
+
+  it("não há marcas de fala no longo (são do PR 5): a tela não oferece a chave", async () => {
+    const roteiro = await longoPronto();
+    expect(falaDoRoteiro(roteiro, false).podeMarcar).toBe(false);
   });
 });

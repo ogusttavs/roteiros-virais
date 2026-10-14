@@ -103,6 +103,7 @@ export function HistoricoTela({ resumo, grupos }: Props) {
                       {formatarData(item.data)}
                       {item.origem === "momento" ? ` · ${textosHistorico.origemMomento}` : ""}
                       {item.formato === "story" ? ` · ${textosHistorico.formatoStory}` : ""}
+                      {item.duracaoDoVideo === "longo" ? ` · ${textosHistorico.videoLongo(item.duracaoS)}` : ""}
                     </span>
                     <span className={styles.itemTema}>{item.tema}</span>
                     {/* E55 PR 2b: o roteiro que nasceu de um assunto em alta; no Histórico o assunto sempre já passou, então o selo é o neutro. */}
