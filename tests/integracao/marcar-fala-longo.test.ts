@@ -11,6 +11,7 @@ import { briefings, clientes, geracoesIA, nichos, roteiros, user, type CapituloD
 import * as cliente from "@/ia/cliente";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { blocosFaladosDoConteudo, ganchosDosCapitulos, normalizar, textoIdentico, textoSemMarcas } from "@/lib/marcas-de-fala";
+import { folhaDoRoteiro } from "@/servicos/folha-do-roteiro";
 import { falaDoRoteiro, marcarFalaDoRoteiro, motivoDeNaoMarcar } from "@/servicos/marcar-fala";
 import { editarRoteiro } from "@/servicos/roteiro";
 
@@ -231,5 +232,26 @@ describe("editar um roteiro longo marcado", () => {
     const r = await marcarFalaDoRoteiro(clienteId, id);
     expect(r).toEqual({ ok: false, motivo: "editado_no_meio" });
     expect(await marcasGuardadas(id)).toBeNull();
+  });
+});
+
+describe("o PDF do roteiro longo com as marcas", () => {
+  it("as marcas vão só nas frases ditas como estão escritas (o gancho do vídeo, a de cada capítulo, a chamada); os pontos saem sem marca e o texto é o do roteiro", async () => {
+    const id = await criarLongo();
+    const r = await marcarFalaDoRoteiro(clienteId, id);
+    if (!r.ok) throw new Error("sem marcas");
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, id));
+    const marcas = falaDoRoteiro(linha, false).marcas;
+    const folha = folhaDoRoteiro(linha, "Marca", null, marcas);
+    const marcadas = folha.unidades.filter((u) => u.falaMarcada !== null);
+    // o gancho do vídeo, as três frases de capítulo e a chamada final
+    expect(marcadas.map((u) => u.fala)).toEqual([conteudoLongo().gancho, ...CAPITULOS.slice(0, 3).map((c) => c.ganchoParaOProximo), conteudoLongo().chamadaFinal]);
+    for (const u of marcadas) expect(textoSemMarcas(u.falaMarcada!)).toBe(normalizar(u.fala!));
+    // nenhum ponto leva marca
+    const pontos = new Set(CAPITULOS.flatMap((c) => c.pontos));
+    for (const u of folha.unidades.filter((x) => x.fala && pontos.has(x.fala))) expect(u.falaMarcada).toBeNull();
+    expect(folha.comMarcas).toBe(true);
+    // sem as marcas pedidas, nenhuma unidade as leva
+    expect(folhaDoRoteiro(linha, "Marca", null, null).comMarcas).toBe(false);
   });
 });

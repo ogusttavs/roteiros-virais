@@ -141,6 +141,18 @@ export function tempoNaTela(segundos: number): string {
   return h > 0 ? `${h}:${dois(m)}:${dois(s)}` : `${m}:${dois(s)}`;
 }
 
+/**
+ * O primeiro capítulo ainda sem marcar como gravado, a partir de `de` e dando a volta no fim da lista (o "Já gravei este" do modo gravação do longo e a seta da direita no último capítulo);
+ * nulo quando todos estão marcados.
+ */
+export function primeiroCapituloQueFalta(gravados: ReadonlySet<number>, total: number, de = 0): number | null {
+  for (let passo = 0; passo < total; passo += 1) {
+    const i = (((de + passo) % total) + total) % total;
+    if (!gravados.has(i)) return i;
+  }
+  return null;
+}
+
 /** Os minutos de um vídeo longo para o selo ("uns 10 min"): arredondado, nunca menos de 1. */
 export function minutosDoVideo(duracaoS: number): number {
   return Math.max(1, Math.round(duracaoS / 60));

@@ -40,7 +40,7 @@ export function ganchosDosCapitulos(conteudo: Pick<ConteudoRoteiro, "capitulos">
  * Os blocos que se marcam, na ordem do vídeo, sem os vazios: num Reels falado são os quatro blocos de sempre; no longo são o gancho do vídeo, as frases que seguram até o próximo (juntas
  * no bloco "corpo", um parágrafo por capítulo, na ordem) e a chamada final. A marcação, a trava e a conferência de texto passam todas por aqui: uma fonte só.
  */
-export function blocosFaladosDoConteudo(conteudo: ConteudoRoteiro): { bloco: BlocoFalado; texto: string }[] {
+export function blocosFaladosDoConteudo(conteudo: Pick<ConteudoRoteiro, "gancho" | "corpo" | "fechamento" | "chamadaFinal" | "capitulos">): { bloco: BlocoFalado; texto: string }[] {
   if (temCapitulos(conteudo)) {
     const juntas = ganchosDosCapitulos(conteudo).map((g) => g.texto).join(String.fromCharCode(10));
     return [

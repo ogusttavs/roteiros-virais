@@ -5,8 +5,10 @@ import { useState } from "react";
 
 import type { CapituloDoRoteiro, ConteudoRoteiro } from "@/db/schema";
 import { capitulosParaCopiar, iniciosDosCapitulos, tempoNaTela } from "@/lib/capitulos-do-roteiro";
+import { ganchosDosCapitulos, marcadoParaOsParagrafos, paragrafosMarcados, type MarcasParaATela } from "@/lib/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
+import { FalaMarcada } from "@/ui/componentes/FalaMarcada";
 
 import styles from "./RoteiroLongo.module.css";
 
@@ -18,6 +20,8 @@ type Props = {
   /** "Ver como" só olha: sem o botão de editar. */
   somenteLeitura: boolean;
   semConexao: boolean;
+  /** As marcas de fala, quando a chave está ligada e elas existem; só as frases ditas como estão escritas (o gancho do vídeo, a de cada capítulo e a chamada) as levam, os pontos nunca. */
+  marcas?: MarcasParaATela | null;
   /** Salva um capítulo; devolve a frase de falha, ou nulo quando salvou. */
   salvar: (indice: number, edicao: EdicaoDoCapitulo) => Promise<string | null>;
 };
@@ -25,9 +29,17 @@ type Props = {
 const QUEBRA = String.fromCharCode(10);
 
 /** O roteiro do vídeo longo do YouTube (E52, PR 4b, passo 25): a lista de capítulos para colar na descrição e um cartão por capítulo, cada um editável sozinho. */
-export function RoteiroLongo({ corpo, somenteLeitura, semConexao, salvar }: Props) {
+export function RoteiroLongo({ corpo, somenteLeitura, semConexao, marcas = null, salvar }: Props) {
   const capitulos = corpo.capitulos ?? [];
   const inicios = iniciosDosCapitulos(capitulos);
+  // Cada marcado só vale se o texto sem as marcas é o texto que a tela mostra (a trava, repetida na hora de desenhar).
+  const ganchos = ganchosDosCapitulos(corpo);
+  const marcadosDosCapitulos = marcadoParaOsParagrafos(
+    ganchos.map((g) => g.texto),
+    paragrafosMarcados(marcas, "corpo"),
+  );
+  const marcadoDoGancho = marcadoParaOsParagrafos([(corpo.gancho ?? "").trim()], paragrafosMarcados(marcas, "gancho"))?.[0] ?? null;
+  const marcadoDaChamada = marcadoParaOsParagrafos([(corpo.chamadaFinal ?? "").trim()], paragrafosMarcados(marcas, "chamadaFinal"))?.[0] ?? null;
   const [copiado, setCopiado] = useState<"sim" | "erro" | null>(null);
   const [editando, setEditando] = useState<number | null>(null);
 
@@ -72,6 +84,9 @@ export function RoteiroLongo({ corpo, somenteLeitura, semConexao, salvar }: Prop
           ehOUltimo={i === capitulos.length - 1}
           gancho={corpo.gancho}
           chamadaFinal={corpo.chamadaFinal}
+          marcadoDoGancho={marcadoDoGancho}
+          marcadoDaChamada={marcadoDaChamada}
+          marcadoDoCapitulo={marcadosDosCapitulos ? (marcadosDosCapitulos[ganchos.findIndex((g) => g.indice === i)] ?? null) : null}
           editando={editando === i}
           podeEditar={!somenteLeitura && editando === null}
           semConexao={semConexao}
@@ -92,6 +107,10 @@ type PropsDoCartao = {
   ehOUltimo: boolean;
   gancho: string;
   chamadaFinal: string;
+  /** As mesmas frases com as marcas de fala, ou nulo (chave desligada, sem marcas, ou texto que mudou). */
+  marcadoDoGancho: string | null;
+  marcadoDaChamada: string | null;
+  marcadoDoCapitulo: string | null;
   editando: boolean;
   podeEditar: boolean;
   semConexao: boolean;
@@ -100,7 +119,7 @@ type PropsDoCartao = {
   salvar: Props["salvar"];
 };
 
-function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, gancho, chamadaFinal, editando, podeEditar, semConexao, aoEditar, aoFechar, salvar }: PropsDoCartao) {
+function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, gancho, chamadaFinal, marcadoDoGancho, marcadoDaChamada, marcadoDoCapitulo, editando, podeEditar, semConexao, aoEditar, aoFechar, salvar }: PropsDoCartao) {
   const idTitulo = `cap-${indice + 1}`;
   const [rascunho, setRascunho] = useState({ gancho, chamadaFinal, ganchoParaOProximo: capitulo.ganchoParaOProximo ?? "", pontos: capitulo.pontos.join(QUEBRA) });
   const [salvando, setSalvando] = useState(false);
@@ -177,19 +196,19 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
           {ehOPrimeiro ? (
             <div>
               <dt>{textosRoteiro.capitulos.ganchoDoVideo}</dt>
-              <dd className={styles.gancho}>{gancho}</dd>
+              <dd className={styles.gancho}>{marcadoDoGancho ? <FalaMarcada marcado={marcadoDoGancho} /> : gancho}</dd>
             </div>
           ) : null}
           {capitulo.ganchoParaOProximo ? (
             <div>
               <dt>{textosRoteiro.capitulos.ganchoParaOProximo}</dt>
-              <dd className={styles.gancho}>{capitulo.ganchoParaOProximo}</dd>
+              <dd className={styles.gancho}>{marcadoDoCapitulo ? <FalaMarcada marcado={marcadoDoCapitulo} /> : capitulo.ganchoParaOProximo}</dd>
             </div>
           ) : null}
           {ehOUltimo && chamadaFinal.trim() ? (
             <div>
               <dt>{textosRoteiro.capitulos.chamada}</dt>
-              <dd className={styles.gancho}>{chamadaFinal}</dd>
+              <dd className={styles.gancho}>{marcadoDaChamada ? <FalaMarcada marcado={marcadoDaChamada} /> : chamadaFinal}</dd>
             </div>
           ) : null}
           <div>

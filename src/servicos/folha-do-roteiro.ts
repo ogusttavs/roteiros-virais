@@ -7,7 +7,7 @@ import { seloDoTipo } from "@/config/formatos";
 import type { ConteudoRoteiro } from "@/db/schema";
 import { iniciosDosCapitulos, capitulosParaCopiar, tempoNaTela, minutosDoVideo } from "@/lib/capitulos-do-roteiro";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
-import { BLOCOS_FALADOS, fatiarMarcado, marcadoParaOsParagrafos, paragrafosMarcados, type MarcasParaATela, type TomDoBloco } from "@/lib/marcas-de-fala";
+import { BLOCOS_FALADOS, fatiarMarcado, ganchosDosCapitulos, marcadoParaOsParagrafos, paragrafosMarcados, type MarcasParaATela, type TomDoBloco } from "@/lib/marcas-de-fala";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import type { VideoParaEmbed } from "./pesquisa";
@@ -138,23 +138,34 @@ function primeiraFrase(texto: string, limite = 90): string | null {
  * E52 (PR 4b): as unidades do roteiro longo, uma seção por capítulo com o tempo no título ("0:50 a 2:40") e o nome, a frase que segura até o próximo, os pontos e o que mostrar; e, no fim, numa
  * página nova, a lista para colar na descrição do vídeo. Sem marcas de fala (são do PR 5).
  */
-function unidadesDoLongo(corpo: ConteudoRoteiro): UnidadeDaFolha[] {
+function unidadesDoLongo(corpo: ConteudoRoteiro, marcas: MarcasParaATela | null): UnidadeDaFolha[] {
   const capitulos = corpo.capitulos ?? [];
   const inicios = iniciosDosCapitulos(capitulos);
   const unidades: UnidadeDaFolha[] = [];
+  // As marcas só valem no que se diz como está escrito (o gancho do vídeo, a frase de cada capítulo e a chamada final); os pontos ficam sem marca. Cada uma só se desenha se o texto sem as
+  // marcas é o texto da folha (`marcadoParaOsParagrafos`).
+  const ganchosMarcados = marcadoParaOsParagrafos(ganchosDosCapitulos(corpo).map((g) => g.texto), paragrafosMarcados(marcas, "corpo"));
+  const marcadoDoGancho = marcadoParaOsParagrafos([(corpo.gancho ?? "").trim()], paragrafosMarcados(marcas, "gancho"))?.[0] ?? null;
+  const marcadoDaChamada = marcadoParaOsParagrafos([(corpo.chamadaFinal ?? "").trim()], paragrafosMarcados(marcas, "chamadaFinal"))?.[0] ?? null;
+  const ordemDosGanchos = ganchosDosCapitulos(corpo).map((g) => g.indice);
   capitulos.forEach((c, i) => {
-    const falas = [i === 0 ? corpo.gancho : null, c.ganchoParaOProximo, ...c.pontos].filter((f): f is string => !!f && f.trim() !== "");
+    const marcadoDoCapitulo = ganchosMarcados ? (ganchosMarcados[ordemDosGanchos.indexOf(i)] ?? null) : null;
+    const itens: { texto: string; marcado: string | null }[] = [
+      ...(i === 0 && corpo.gancho?.trim() ? [{ texto: corpo.gancho, marcado: marcadoDoGancho }] : []),
+      ...(c.ganchoParaOProximo?.trim() ? [{ texto: c.ganchoParaOProximo, marcado: marcadoDoCapitulo }] : []),
+      ...c.pontos.filter((p) => p.trim() !== "").map((p) => ({ texto: p, marcado: null })),
+      ...(i === capitulos.length - 1 && corpo.chamadaFinal.trim() ? [{ texto: corpo.chamadaFinal.trim(), marcado: marcadoDaChamada }] : []),
+    ];
     const mostrar = [c.naImagem, c.comoEditar].filter((m) => m.trim() !== "").map((m, j) => (j === 0 ? textosRoteiro.mostrar.oQueMostrar(m) : `${textosRoteiro.capitulos.comoEditarCapitulo}: ${m}`));
-    if (i === capitulos.length - 1 && corpo.chamadaFinal.trim()) falas.push(corpo.chamadaFinal.trim());
-    falas.forEach((fala, k) => {
+    itens.forEach((item, k) => {
       unidades.push({
         tempo: k === 0 ? `${tempoNaTela(inicios[i])} a ${tempoNaTela(inicios[i] + c.duracaoS)}` : null,
         rotulo: k === 0 ? c.nome : null,
-        fala,
-        falaMarcada: null,
+        fala: item.texto,
+        falaMarcada: item.marcado,
         tom: null,
-        mostrar: k === falas.length - 1 ? mostrar : [],
-        fimDoBloco: k === falas.length - 1,
+        mostrar: k === itens.length - 1 ? mostrar : [],
+        fimDoBloco: k === itens.length - 1,
       });
     });
   });
@@ -173,7 +184,7 @@ export function folhaDoRoteiro(roteiro: RoteiroLinha, marca: string, video: Vide
   const tempos = reelsFalado && !ehLongo ? temposDosBlocosReels(corpo.duracaoS) : null;
 
   const unidades: UnidadeDaFolha[] = [];
-  if (ehLongo) unidades.push(...unidadesDoLongo(corpo));
+  if (ehLongo) unidades.push(...unidadesDoLongo(corpo, marcas));
   (ehLongo ? [] : blocosParaLeitura(roteiro)).forEach((bloco, indice) => {
     const mostrar = [...(bloco.mostrar ?? []), ...(bloco.cenas ?? []).map((cena) => textosRoteiro.mostrar.oQueMostrar(`${cena.momento}, ${cena.oQueFazer}`))];
     // Cada pedaço da fala é uma unidade (um parágrafo, ou uma parte dele quando é comprido): a imagem 9:16 parte um bloco entre dois quadros sem cortar uma frase no meio.
