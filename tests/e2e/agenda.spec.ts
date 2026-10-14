@@ -304,9 +304,12 @@ test.describe("/hoje, a Agenda", () => {
 
     for (const semanas of [1, 2, 3]) {
       await page.getByRole("button", { name: "Próximos 7 dias", exact: true }).click();
-      await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7 * semanas)}`));
+      // Ancorada no fim: a data sozinha casava com uma URL que já andou mais de uma semana (um clique contado duas vezes, DoD do #148), e o teste só falhava lá na frente.
+      await expect(page).toHaveURL(new RegExp(`dia=${somarDias(hoje, 7 * semanas)}$`));
+      // A tela nova assentada antes do clique seguinte: o botão do clique anterior ainda podia estar na página que ia sair.
+      await page.waitForLoadState("networkidle");
     }
-    await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}`));
+    await expect(page).toHaveURL(new RegExp(`dia=${diaDaquiA21Dias}$`));
 
     await page.getByRole("button", { name: "Ver o mês" }).click();
     await expect(page).toHaveURL(new RegExp(`/planejamento\\?visao=mes&dia=${diaDaquiA21Dias}`));
@@ -321,6 +324,7 @@ test.describe("/hoje, a Agenda", () => {
     for (const semanas of [2, 1, 0]) {
       await page.getByRole("button", { name: "7 dias anteriores" }).click();
       await expect(page).toHaveURL(semanas === 0 ? new RegExp(`dia=${hoje}$`) : new RegExp(`dia=${somarDias(hoje, 7 * semanas)}$`));
+      await page.waitForLoadState("networkidle");
     }
     await expect(page).toHaveURL(new RegExp(`dia=${hoje}$`));
   });
