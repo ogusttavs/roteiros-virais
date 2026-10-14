@@ -89,3 +89,15 @@
   outline: none;
   box-shadow: var(--sombra-foco);
 }
+
+/* E52 (PR 4c): a frase calma do grupo "Duração" quando o ramo ainda não tem vídeo longo. */
+.semLongos {
+  margin: 0;
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto-suave);
+}
+
+.opcao:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

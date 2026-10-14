@@ -105,22 +105,29 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
               ? textosReferencias.viewsContraNormal(formatarViewsExato(video.views), formatarViewsExato(video.medianaConta))
               : textosReferencias.viewsRotulo(formatarViewsExato(video.views))}
           </span>
-          <span>{linhaVelocidade(video.velocidade)}</span>
+          {video.videoLongo ? null : <span>{linhaVelocidade(video.velocidade)}</span>}
         </div>
 
+        {/* E52 (PR 4c): o vídeo longo sem a leitura da estrutura não traz as três partes; cada uma só aparece quando tem texto. */}
         <div className={styles.analise}>
-          <div>
-            <strong>{textosReferencias.analise.comecou}</strong>
-            <p>{video.gancho}</p>
-          </div>
-          <div>
-            <strong>{textosReferencias.analise.construiu}</strong>
-            <p>{video.estrutura}</p>
-          </div>
-          <div>
-            <strong>{textosReferencias.analise.funcionou}</strong>
-            <p>{video.porQueFuncionou}</p>
-          </div>
+          {video.gancho ? (
+            <div>
+              <strong>{textosReferencias.analise.comecou}</strong>
+              <p>{video.gancho}</p>
+            </div>
+          ) : null}
+          {video.estrutura ? (
+            <div>
+              <strong>{textosReferencias.analise.construiu}</strong>
+              <p>{video.estrutura}</p>
+            </div>
+          ) : null}
+          {video.porQueFuncionou ? (
+            <div>
+              <strong>{textosReferencias.analise.funcionou}</strong>
+              <p>{video.porQueFuncionou}</p>
+            </div>
+          ) : null}
         </div>
       </div>
     </Folha>

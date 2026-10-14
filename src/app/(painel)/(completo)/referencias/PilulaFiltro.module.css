@@ -97,3 +97,8 @@
   font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-mono);
   color: var(--cor-texto-dica);
 }
+
+.item:disabled {
+  opacity: var(--opacidade-desabilitado);
+  cursor: not-allowed;
+}

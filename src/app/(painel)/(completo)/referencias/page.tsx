@@ -20,10 +20,12 @@ import {
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { favoritosDoCliente } from "@/servicos/referencias";
+import { longosParaAsReferencias, quantosLongosTemOsRamos } from "@/servicos/referencias-longas";
 import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 import { textosReferencias } from "@/textos/referencias";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
+import { duracaoDaUrl } from "./duracao";
 import { ReferenciasTela, type Segmento } from "./ReferenciasTela";
 
 const PERIODOS_VALIDOS = new Set([7, 30, 90]);
@@ -51,6 +53,8 @@ type SearchParams = {
   ramo?: string;
   /** E49 PR 2: "Parece feito para" (a ficha lida pela extração); texto que não é ficha é ignorado. */
   feitoPara?: string;
+  /** E52 (PR 4c): "longos" liga a pílula "Duração" em "Mais de 3 min"; qualquer outro valor é "curtos". */
+  duracao?: string;
 };
 
 function listaValida<T extends string>(valor: string | undefined, validos: Set<T>): T[] {
@@ -163,16 +167,29 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
     formatosDaMarca,
   };
 
+  // E52 (PR 4c): a pílula "Duração". "Mais de 3 min" troca a lista pela dos vídeos longos do ramo (só YouTube, acima do piso, 30 dias ou mais), com os filtros que valem para eles: a busca,
+  // as views, "Brasil ou fora" e a ordem. O ramo da pílula "Ramo" vale; em "Salvos" só entram os que a pessoa salvou.
+  const duracao = duracaoDaUrl(params.duracao);
+  const nichosDosLongos = ramoAtivo !== undefined ? [ramoAtivo] : ramos.map((r) => r.id);
+  const diasDosLongos = Math.max(periodoDias, 30);
+  const longosDisponiveis = await quantosLongosTemOsRamos(nichosDosLongos, diasDosLongos);
+  const longosDaTela =
+    duracao === "longos"
+      ? await longosParaAsReferencias({ nichoIds: nichosDosLongos, dias: diasDosLongos, busca, viewsMin, brasil, ordem, apenasIds })
+      : { videos: [], total: 0 };
+
   const resultado =
-    segmento === "todos"
-      ? await todosOsVideosDoNicho(cliente.nichoId, { ...filtrosBase, limite: quantidade }, 0)
-      : await referenciasDoNicho(cliente.nichoId, filtrosBase);
+    duracao === "longos"
+      ? { videos: [], total: 0 }
+      : segmento === "todos"
+        ? await todosOsVideosDoNicho(cliente.nichoId, { ...filtrosBase, limite: quantidade }, 0)
+        : await referenciasDoNicho(cliente.nichoId, filtrosBase);
 
   /**
    * M1, item 5: só consulta quando o resultado já está vazio, e não na aba "Salvos" (fica vazia por
    * não ter favorito nenhum, o que não tem relação com a análise do setor).
    */
-  const aindaLendo = segmento !== "salvos" && resultado.total === 0 ? await setorAindaLendo(cliente.nichoId) : false;
+  const aindaLendo = duracao !== "longos" && segmento !== "salvos" && resultado.total === 0 ? await setorAindaLendo(cliente.nichoId) : false;
   // E28 (parte 3b): o que o público do setor perguntou nos comentários esta semana (nulo, sem erro, no setor sem leitura); o segmento de salvos não o mostra.
   const perguntas = segmento === "salvos" ? null : await perguntasDaTelaSemFalha(cliente.nichoId);
 
@@ -199,6 +216,10 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       ramos={ramos.length > 1 ? ramos : undefined}
       ramoAtivo={ramoAtivo}
       perguntas={perguntas}
+      duracao={duracao}
+      longos={longosDaTela.videos}
+      totalLongos={longosDaTela.total}
+      longosDisponiveis={longosDisponiveis}
     />
   );
 }

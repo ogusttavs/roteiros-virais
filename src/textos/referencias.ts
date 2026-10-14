@@ -154,4 +154,33 @@ export const textosReferencias = {
 
   /** V12b, item 8: a rede principal escolhida em "Onde você posta mais?" não tem vídeo no período; mostra todas em vez de abrir vazio. */
   semVideoRedePrincipal: (rede: string) => `Sem vídeo do ${rede} neste período; mostrando as outras redes.`,
+
+  /**
+   * E52 (PR 4c, passo 25): a pílula "Duração" e o vídeo longo. "Curtos" é a lista de sempre (até 3 minutos); "Mais de 3 min" é a dos longos do ramo, só do YouTube, que ensinam a estrutura
+   * de um capítulo. Sem longo no ramo a opção fica apagada, com a frase calma, nunca uma lista vazia sem explicação.
+   */
+  duracao: {
+    rotulo: "Duração",
+    menu: "Duração do vídeo",
+    curtos: "Curtos",
+    longos: "Mais de 3 min",
+    /** A ficha do filtro ligado e o nome do tirar. */
+    fichaLonga: "Mais de 3 minutos",
+    semLongos: "Ainda não temos vídeos longos do seu ramo para mostrar. Assim que tivermos, essa opção abre aqui.",
+    ajudaDaLista: "Vídeo longo ensina a estrutura de um capítulo: o que segurou quem assistia está marcado no tempo.",
+    contagem: (n: number, dias: number) => `${n} ${n === 1 ? "vídeo longo fora da curva" : "vídeos longos fora da curva"} nos últimos ${dias} dias`,
+    vazioTitulo: "Nenhum vídeo longo com esses filtros",
+    vazioTexto: "Tire um filtro, ou volte para os vídeos curtos.",
+    verCurtos: "Ver os vídeos curtos",
+    capitulosDaDescricao: "Capítulos que o dono marcou",
+    maisCapitulos: (n: number) => `e mais ${n}`,
+    capituloQueInteressa: "O capítulo que interessa:",
+    promete: (promessa: string) => `O título promete: ${promessa}`,
+    verOCapitulo: "Ver o capítulo",
+    verDesdeOComeco: "Ver desde o começo",
+    verOCapituloAria: (conta: string) => `Ver o capítulo de referência do vídeo de ${conta}`,
+    verDesdeOComecoAria: (conta: string) => `Ver o vídeo de ${conta} desde o começo`,
+    trilhoAria: (de: string, ate: string, total: string) => `O capítulo de referência, de ${de} a ${ate}, num vídeo de ${total}`,
+    seloVideoLongo: "Vídeo longo",
+  },
 };

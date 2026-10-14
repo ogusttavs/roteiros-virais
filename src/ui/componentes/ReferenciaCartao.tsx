@@ -47,6 +47,8 @@ export type VideoFormatado = {
   tipoDeVideo?: string;
   /** E49 PR 2: o nome curto da ficha ("Que guardem"), ao lado do tipo; ausente se a extração ainda não leu. */
   feitoPara?: string;
+  /** E52 (PR 4c): o vídeo longo da lista "Mais de 3 min": a folha de detalhes não mostra "views por hora" (a medida é dos curtos) e esconde as partes da análise que ainda não existem. */
+  videoLongo?: boolean;
 };
 
 type Props = {

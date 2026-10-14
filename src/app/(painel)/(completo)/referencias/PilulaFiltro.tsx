@@ -62,6 +62,8 @@ type PropsItem = {
   rotulo: string;
   marcado: boolean;
   quantos?: number;
+  /** E52 (PR 4c): a opção fica apagada e não responde ao toque ("Mais de 3 min" num ramo sem vídeo longo). */
+  desabilitado?: boolean;
   onClick: () => void;
 };
 
@@ -69,6 +71,7 @@ function ItemMenu({
   rotulo,
   marcado,
   quantos,
+  desabilitado = false,
   onClick,
   fechaAoEscolher,
   role,
@@ -79,6 +82,7 @@ function ItemMenu({
       type="button"
       role={role}
       aria-checked={marcado}
+      disabled={desabilitado}
       className={[styles.item, marcado ? styles.itemMarcado : ""].filter(Boolean).join(" ")}
       onClick={() => {
         onClick();
