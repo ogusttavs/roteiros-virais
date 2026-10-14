@@ -1778,6 +1778,9 @@ function editarUmCapitulo(
   conteudo: ConteudoRoteiro,
   edicao: NonNullable<CamposEditaveisRoteiro["capitulo"]>,
 ): { capitulos: CapituloDoRoteiro[]; corpo: string; fechamento: string; cenas: { momento: string; oQueFazer: string }[] } {
+  // Uma Server Action não confere tipo em tempo de execução: o que chega forjado (pontos que não é lista de texto, gancho nulo ou número) é recusado com a frase, nunca vira um erro 500.
+  const tiposOk = (edicao.pontos === undefined || (Array.isArray(edicao.pontos) && edicao.pontos.every((p) => typeof p === "string"))) && (edicao.ganchoParaOProximo === undefined || typeof edicao.ganchoParaOProximo === "string");
+  if (!tiposOk) throw new ErroRoteiro(textosRoteiro.editando.capituloInexistente);
   const atuais = conteudo.capitulos;
   if (!atuais || atuais.length === 0) throw new ErroRoteiro(textosRoteiro.editando.capituloInexistente);
   if (!Number.isInteger(edicao.indice) || edicao.indice < 0 || edicao.indice >= atuais.length) throw new ErroRoteiro(textosRoteiro.editando.capituloInexistente);

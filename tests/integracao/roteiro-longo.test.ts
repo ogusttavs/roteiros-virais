@@ -13,10 +13,10 @@ import { ErroIA } from "@/ia/erro";
 import * as verificador from "@/ia/verificador";
 import { lerCapitulosDaDescricao } from "@/lib/capitulos-da-descricao";
 import { capitulosParaCopiar, iniciosDosCapitulos, somaDosCapitulos } from "@/lib/capitulos-do-roteiro";
-import { criarPesquisa, executarPesquisa } from "@/servicos/pesquisa-na-hora";
-import { falaDoRoteiro } from "@/servicos/marcar-fala";
-import { editarRoteiro, ErroRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
 import { folhaDoRoteiro } from "@/servicos/folha-do-roteiro";
+import { falaDoRoteiro } from "@/servicos/marcar-fala";
+import { criarPesquisa, executarPesquisa } from "@/servicos/pesquisa-na-hora";
+import { editarRoteiro, ErroRoteiro, gerarRoteiro, reprovarERescrever } from "@/servicos/roteiro";
 import { longoDoRamo } from "@/servicos/roteiro-longo";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -683,6 +683,17 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
     expect(linha.conteudo.capitulos).toEqual(antes.conteudo.capitulos);
   });
 
+  it("pontos que não são uma lista de texto, ou um gancho que não é texto (chamada forjada), são recusados com a frase e nada é gravado", async () => {
+    const antes = await longoPronto();
+    const forjado = (capitulo: unknown) => editarRoteiro(antes.id, { capitulo } as never);
+    await expect(forjado({ indice: 0, pontos: "abc" })).rejects.toThrow(ErroRoteiro);
+    await expect(forjado({ indice: 0, pontos: [1, 2] })).rejects.toThrow(ErroRoteiro);
+    await expect(forjado({ indice: 0, pontos: ["a"], ganchoParaOProximo: null })).rejects.toThrow(ErroRoteiro);
+    await expect(forjado({ indice: 0, pontos: ["a"], ganchoParaOProximo: 5 })).rejects.toThrow(ErroRoteiro);
+    const [linha] = await db().select().from(roteiros).where(eq(roteiros.id, antes.id));
+    expect(linha.conteudo.capitulos).toEqual(antes.conteudo.capitulos);
+  });
+
   it("um roteiro curto não aceita a edição por capítulo", async () => {
     const curto = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance" });
     await expect(editarRoteiro(curto.id, { capitulo: { indice: 0, pontos: ["a"] } })).rejects.toThrow(textosRoteiro.editando.capituloInexistente);
@@ -696,6 +707,8 @@ describe("a edição de um capítulo e o que sai para fora (E52, PR 4b)", () => 
     // o nome de cada capítulo abre uma seção, com o tempo "de a ate" ao lado
     const aberturas = folha.unidades.filter((u) => u.rotulo !== null && u.tempo !== null);
     expect(aberturas.map((u) => u.rotulo)).toEqual(caps.map((c) => c.nome));
+    // o gancho do vídeo abre o primeiro capítulo
+    expect(folha.unidades.find((u) => u.rotulo === caps[0].nome)?.fala).toBe(roteiro.conteudo.gancho);
     expect(aberturas[0].tempo).toMatch(/^0:00 a \d+:\d{2}$/);
     // a lista para colar é a última seção, em página nova, e é exatamente o texto do "Copiar os capítulos"
     const colar = folha.unidades.filter((u) => u.rotulo === textosRoteiro.capitulos.paraColar || u.novaPagina);
