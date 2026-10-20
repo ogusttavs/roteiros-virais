@@ -86,6 +86,19 @@ describe("R-CONF-04: pesquisa e percentual sem fonte", () => {
   it("reprova 'estudo' com número e sem fonte dita", () => {
     expect(com(reprovam({ corpo: "Um estudo mostra que 3 de 4 pessoas limpam errado." }), "R-CONF-04")).toBe(true);
   });
+  it("100% natural, 50% de desconto e 'estudo 3 horas por dia' são da oferta ou da pessoa, não pesquisa", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " O produto é 100% natural. Hoje tem 50% de desconto. Eu estudo 3 horas por dia para isso." }), "R-CONF-04")).toBe(false);
+    expect(com(reprovam({ corpo: BOM.corpo + " Fiz uma pesquisa de preço em 5 lojas." }), "R-CONF-04")).toBe(false);
+  });
+  it("'3 segundos' não é atribuição", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Em 3 segundos, 80% das pessoas já desistem." }), "R-CONF-04")).toBe(true);
+  });
+  it("na segunda tentativa o R-CONF-04 vira aviso e a R-CONF-03 segue reprovando", () => {
+    const r = verificarRegrasCopyRoteiro(entrada({ tentativa: 2, corpo: "Um estudo mostra que 3 de 4 pessoas limpam errado.", gancho: "Orçamento grátis do box de 5 mil." }));
+    expect(com(r.reprovam, "R-CONF-04")).toBe(false);
+    expect(com(r.avisos, "R-CONF-04")).toBe(true);
+    expect(com(r.reprovam, "R-CONF-03")).toBe(true);
+  });
   it("passa com a fonte dita na fala", () => {
     expect(com(reprovam({ corpo: "Segundo o IBGE, em 2025, 80% das casas têm box de vidro." }), "R-CONF-04")).toBe(false);
   });
@@ -102,11 +115,18 @@ describe("R-CONF-07: ramo de saúde", () => {
     expect(com(reprovam({ ramoSaude: true, chamadaFinal: "Resultado garantido, me chama no WhatsApp." }), "R-CONF-07")).toBe(true);
   });
   it("reprova 'cura' e '100%' no gancho", () => {
-    expect(com(reprovam({ ramoSaude: true, gancho: "A cura da dor de dente em 5 minutos." }), "R-CONF-07")).toBe(true);
+    expect(com(reprovam({ ramoSaude: true, gancho: "Cura garantida da dor de dente em 5 minutos." }), "R-CONF-07")).toBe(true);
     expect(com(reprovam({ ramoSaude: true, gancho: "Clareamento 100% seguro em 5 sessões." }), "R-CONF-07")).toBe(true);
   });
   it("fora da saúde a mesma frase não reprova", () => {
     expect(com(reprovam({ ramoSaude: false, chamadaFinal: "Resultado garantido, me chama no WhatsApp." }), "R-CONF-07")).toBe(false);
+  });
+  it("conversa honesta de clínica não reprova: 'tem cura?', 'o diagnóstico precoce', 'faço o diagnóstico na avaliação'", () => {
+    const corpo = BOM.corpo + " Gengivite tem cura? Tem, se pegar cedo. O diagnóstico precoce muda tudo e eu faço o diagnóstico na avaliação.";
+    expect(com(reprovam({ ramoSaude: true, corpo }), "R-CONF-07")).toBe(false);
+  });
+  it("diagnóstico à distância reprova", () => {
+    expect(com(reprovam({ ramoSaude: true, chamadaFinal: "Manda a foto no WhatsApp que eu faço o diagnóstico por foto." }), "R-CONF-07")).toBe(true);
   });
   it("'curar' não pega 'curado' nem 'procura'", () => {
     expect(com(reprovam({ ramoSaude: true, corpo: BOM.corpo + " Quem procura um dentista de confiança já chega melhor." }), "R-CONF-07")).toBe(false);
@@ -145,6 +165,9 @@ describe("R-COPY-01: vocativo coletivo", () => {
     expect(com(reprovam({ gancho: "Pessoal, olha esse truque do box de vidro." }), "R-COPY-01")).toBe(true);
     expect(com(reprovam({ gancho: "Fala galera, olha esse truque do box de vidro." }), "R-COPY-01")).toBe(true);
   });
+  it("só o vocativo no começo da frase reprova", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Muita gente, quando vê a mancha, esfrega. Eu tenho 10 mil seguidores, e nenhum erra." }), "R-COPY-01")).toBe(false);
+  });
   it("'você' no gancho nunca reprova", () => {
     expect(com(reprovam({ gancho: "Você sabe tirar a mancha do box de vidro em 5 minutos?" }), "R-COPY-01")).toBe(false);
   });
@@ -160,6 +183,10 @@ describe("R-COPY-02: propaganda e adjetivo empilhado", () => {
   });
   it("reprova três adjetivos vagos na mesma frase", () => {
     expect(com(reprovam({ corpo: BOM.corpo + " O resultado fica lindo, perfeito e maravilhoso." }), "R-COPY-02")).toBe(true);
+  });
+  it("'não perca tempo' é pedido legítimo, 'não perca' a oferta é propaganda", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Não perca tempo esfregando." }), "R-COPY-02")).toBe(false);
+    expect(com(reprovam({ corpo: BOM.corpo + " Não perca essa oferta." }), "R-COPY-02")).toBe(true);
   });
   it("dois adjetivos soltos em frases diferentes não reprovam", () => {
     expect(com(reprovam({ corpo: BOM.corpo + " O vidro fica lindo. O trabalho é perfeito." }), "R-COPY-02")).toBe(false);
@@ -190,6 +217,10 @@ describe("R-COPY-08: fato específico no lugar de superlativo", () => {
     });
     expect(com(r, "R-COPY-08")).toBe(false);
   });
+  it("'erro número 1' e 'o melhor de tudo' não são superlativo comercial", () => {
+    expect(com(reprovam({ corpo: BOM.corpo + " Esse é o erro número 1. O melhor de tudo é que dura." }), "R-COPY-08")).toBe(false);
+    expect(com(reprovam({ corpo: BOM.corpo + " Somos o número 1 do Brasil." }), "R-COPY-08")).toBe(true);
+  });
   it("'o melhor jeito' (sem a lista) não reprova", () => {
     expect(com(reprovam({ corpo: BOM.corpo + " O melhor jeito de começar é molhar o vidro." }), "R-COPY-08")).toBe(false);
   });
@@ -206,6 +237,9 @@ describe("R-COPY-23: autoelogio e ataque", () => {
 describe("R-COPY-25: uma só ação", () => {
   it("reprova dois canais na chamada", () => {
     expect(com(reprovam({ chamadaFinal: "Me chama no WhatsApp ou liga no telefone da loja." }), "R-COPY-25")).toBe(true);
+  });
+  it("'Comente QUERO que eu te mando no Direct' é uma ação só", () => {
+    expect(com(reprovam({ chamadaFinal: "Comente QUERO que eu te mando no Direct." }), "R-COPY-25")).toBe(false);
   });
   it("reprova quando só manda comprar", () => {
     expect(com(reprovam({ chamadaFinal: "Compre já o seu." }), "R-COPY-25")).toBe(true);
@@ -231,6 +265,15 @@ describe("R-ROTEIRO-01, 14 e 15 (só no Reels falado)", () => {
     expect(com(reprovam({ chamadaFinal: "Então é isso, me chama no WhatsApp." }), "R-ROTEIRO-14")).toBe(true);
     expect(com(reprovam({ chamadaFinal: "Valeu, me chama no WhatsApp." }), "R-ROTEIRO-14")).toBe(true);
   });
+  it("R-ROTEIRO-14 aceita pedidos comuns: 'Faça seu orçamento', 'Garanta o seu', 'Link na bio'", () => {
+    for (const c of ["Faça seu orçamento no WhatsApp.", "Garanta o seu antes que acabe.", "Link na bio."]) {
+      expect(com(reprovam({ chamadaFinal: c }), "R-ROTEIRO-14"), c).toBe(false);
+    }
+  });
+  it("R-ROTEIRO-14 não confunde 'conteúdo' com 'conte' nem 'É isso que eu faço' com encerramento", () => {
+    expect(com(reprovam({ chamadaFinal: "O conteúdo fica claro." }), "R-ROTEIRO-14")).toBe(true);
+    expect(com(reprovam({ chamadaFinal: "É isso que eu faço: me chama no WhatsApp." }), "R-ROTEIRO-14")).toBe(false);
+  });
   it("R-ROTEIRO-14 reprova último bloco sem ação nem pergunta", () => {
     expect(com(reprovam({ chamadaFinal: "O box fica transparente." }), "R-ROTEIRO-14")).toBe(true);
   });
@@ -246,6 +289,8 @@ describe("R-ROTEIRO-01, 14 e 15 (só no Reels falado)", () => {
     expect(com(reprovam({ fechamento: longo }), "R-ROTEIRO-15")).toBe(true);
     expect(com(reprovam({ fechamento: "Ficou limpo. Ficou claro. Ficou novo." }), "R-ROTEIRO-15")).toBe(true);
     expect(com(reprovam({ fechamento: "Ficou limpo. Ficou claro." }), "R-ROTEIRO-15")).toBe(false);
+    // ponto dentro de número não divide a frase
+    expect(com(reprovam({ fechamento: "Saiu por R$ 1.500 e ficou novo. Ficou claro." }), "R-ROTEIRO-15")).toBe(false);
   });
   it("em Story e sem fala nenhuma das três roda", () => {
     const r = reprovam({ estrutura: "cartoes", fechamento: "", chamadaFinal: "Obrigado por assistir." });

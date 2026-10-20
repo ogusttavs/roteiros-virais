@@ -57,7 +57,7 @@ function emUmaLinha(texto: string): string {
 
 function frases(texto: string): string[] {
   return emUmaLinha(texto)
-    .split(/[.!?;]+/)
+    .split(/[.!?;]+(?=[ ]|$)/)
     .map((f) => f.trim())
     .filter(Boolean);
 }
@@ -89,9 +89,21 @@ function confGratis(e: EntradaCopyRoteiro): string | null {
   return `R-CONF-03: o ${e.estrutura === "reels_falado" ? "gancho ou a chamada" : "primeiro ou o último cartão"} diz "${achado.replace(/^[^a-z]+/, "")}" e a ficha não diz que não há custo nenhum; tire a palavra ou diga a condição`;
 }
 
-const PALAVRA_DE_PESQUISA = COM_FRONTEIRA(["pesquisas?", "estudos?", "estatisticas?", "levantamentos?", "estudos cientificos"]);
+/** "uma pesquisa", "o estudo", "estatística": o substantivo de dado, nunca o verbo ("estudo 3 horas por dia") nem "pesquisa de preço". */
+const PALAVRA_DE_PESQUISA = COM_FRONTEIRA([
+  "(uma|a|as|essa|esta|nova|novas|outra) pesquisas?(?! de preco)",
+  "pesquisas? (mostra|mostram|diz|dizem|aponta|apontam|revela|revelam|feita|realizada)",
+  "(um|o|os|esse|este|novo|novos|outro) estudos?",
+  "estudos (mostra|mostram|diz|dizem|aponta|apontam|revela|revelam)",
+  "estatisticas?",
+  "levantamentos?",
+]);
+/** O percentual só é dado de pesquisa quando fala de um grupo ("das pessoas", "8 em cada 10"); "100% natural" e "50% de desconto" são da oferta. */
+const GRUPO_ESTATISTICO = /(das|dos) (pessoas|brasileiros|brasileiras|clientes|casas|empresas|consumidores|donos|mulheres|homens|criancas|pacientes|familias)|(em|de) cada (dois|tres|quatro|cinco|seis|sete|oito|nove|dez|cem|[0-9]+)|[0-9]+ (em|de) cada/;
+const PERCENTUAL_DA_OFERTA = /(de desconto|off|de juros|a vista|de entrada|de comissao|de lucro|natural|algodao|puro|pura)/;
 const PERCENTUAL = /[0-9]+([.,][0-9]+)?[ ]?(%|por cento)/;
-const ATRIBUICAO = /segundo|de acordo com|conforme|divulgad|publicad|realizad|feita pel|feito pel|minha experiencia|na minha pratica|o que eu vejo/;
+const NUMERO_NA_FRASE = /[0-9]/;
+const ATRIBUICAO = /(^|[^a-z0-9])(segundo (o|a|os|as|um|uma|dados|pesquisa|estudo)|de acordo com|conforme|divulgad|publicad|realizad|feita pel|feito pel|minha experiencia|na minha pratica|o que eu vejo)/;
 
 /**
  * R-CONF-04 (corpo): número apresentado como pesquisa, estudo ou estatística vem com a fonte dita na
@@ -104,31 +116,29 @@ function confPesquisaSemFonte(e: EntradaCopyRoteiro): string | null {
     const n = normalizar(frase);
     const percentual = PERCENTUAL.exec(n)?.[0];
     const pesquisa = PALAVRA_DE_PESQUISA.test(n);
-    if (!percentual && !pesquisa) continue;
+    const percentualDeDado = Boolean(percentual) && GRUPO_ESTATISTICO.test(n) && !PERCENTUAL_DA_OFERTA.test(n);
+    if (!percentualDeDado && !(pesquisa && NUMERO_NA_FRASE.test(n))) continue;
     if (ATRIBUICAO.test(n)) continue;
-    if (percentual && fontes.includes(percentual.replace(/[ ]/g, ""))) continue;
-    if (pesquisa && !percentual && !/[0-9]/.test(n)) continue; // "uma pesquisa" sem número nenhum não apresenta dado
+    const comoNasFontes = (percentual ?? "").split("por cento").join("%").split(" ").join("");
+    if (percentual && fontes.split(" ").join("").includes(comoNasFontes)) continue;
     return `R-CONF-04: o corpo apresenta ${percentual ? `"${percentual}"` : "um dado de pesquisa"} sem dizer a fonte na fala ("segundo ..., em ...") e sem que esteja na ficha; diga a fonte ou troque por "na minha experiência"`;
   }
   return null;
 }
 
+/** A promessa, não a palavra solta: "tem cura?", "faço o diagnóstico na avaliação" e "o diagnóstico precoce" são conversa honesta de clínica. */
 const PALAVRAS_DE_SAUDE = COM_FRONTEIRA([
-  "cura",
-  "curar",
-  "curamos",
-  "cure",
-  "garantido",
-  "garantida",
-  "garantidos",
-  "garantidas",
+  "garantid[oa]s?",
   "garantimos",
   "garanto",
-  "100%",
-  "sem risco",
-  "sem riscos",
-  "diagnostico",
-  "diagnosticos",
+  "cura (garantida|definitiva|total|certa|rapida|imediata)",
+  "(garantimos|prometo|prometemos) a cura",
+  "(vou|vamos|posso|podemos|conseguimos|consigo) curar",
+  "curamos",
+  "te curo",
+  "100% (seguro|segura|garantid[oa]|eficaz|sem dor|certo|de sucesso|de resultado)",
+  "sem riscos?",
+  "diagnostico (a distancia|online|por (whatsapp|zap|direct|mensagem|video|foto|chat)|pelo (whatsapp|zap|direct|celular|video|chat)|pela (foto|internet))",
 ]);
 
 /** R-CONF-07 (gancho, corpo, chamada), só nos ramos de saúde. */
@@ -167,7 +177,8 @@ function confCalao(e: EntradaCopyRoteiro): string | null {
 
 // --- R-COPY e R-ROTEIRO (reprovam só na primeira tentativa) -----------------------------------
 
-const VOCATIVO_COLETIVO = /(^|[^a-z])(?<!\ba )(pessoal|galera|turma|gente|meninas|meninos|amigos|amigas|seguidores)[ ]*[,!]/;
+const VOCATIVO_COLETIVO = /(^|[.!?][ ]+)(pessoal|galera|turma|gente|meninas|meninos|amigos|amigas|seguidores)[ ]*[,!]/;
+// O vocativo só vale no começo da frase: "a gente, aqui na loja," e "muita gente, quando" não são vocativos.
 const SAUDACAO_COM_COLETIVO = /\b(oi|ola|ei|fala|e ai|bom dia|boa tarde|boa noite)[ ,]+(pessoal|galera|turma|gente|meninas|meninos|amigos|amigas|seguidores)\b/;
 
 /** R-COPY-01 (todos): "você" no singular, nunca "pessoal", "galera", "turma". */
@@ -191,7 +202,7 @@ const PROPAGANDA = COM_FRONTEIRA([
   "sensacional",
   "espetacular",
   "oportunidade unica",
-  "nao perca",
+  "nao perca(?! tempo)",
   "alta qualidade",
   "qualidade superior",
   "qualidade incomparavel",
@@ -228,10 +239,11 @@ function copyPropaganda(e: EntradaCopyRoteiro): string | null {
 }
 
 const SUPERLATIVO = COM_FRONTEIRA([
-  "(o|a|os|as) melhor(es)? (do|da|dos|das|de|preco|custo|marca|qualidade|produto|servico|mercado|regiao|brasil|cidade)",
+  "(o|a|os|as) melhor(es)? (do|da|dos|das|de) (mercado|regiao|brasil|cidade|mundo|bairro|ramo|setor)",
+  "(o|a|os|as) melhor(es)? (preco|custo|marca|qualidade|produto|servico|atendimento)",
   "(o|a) mais (barato|barata|em conta)",
   "(o|a) maior (do|da|de)",
-  "numero (1|um)",
+  "numero (1|um) (do|da|de|no|na) (brasil|mercado|regiao|cidade|bairro|ramo)",
   "lider (do|da|de) (mercado|regiao|setor|segmento|cidade)",
   "melhor (que|do que) (os |as )?(outros|outras|concorrentes)",
 ]);
@@ -295,15 +307,67 @@ const CANAIS: { nome: string; padrao: RegExp }[] = [
   { nome: "site", padrao: COM_FRONTEIRA(["site", "acesse"]) },
   { nome: "seguir", padrao: COM_FRONTEIRA(["siga", "me segue", "segue a gente", "segue o perfil"]) },
 ];
-const SO_COMPRAR = /compre|compra|comprar|adquira|adquirir/;
-const OUTRO_VERBO_DE_ACAO =
-  /chame|chama|manda|mande|ligue|liga|comente|comenta|siga|segue|salve|salva|compartilhe|compartilha|marque|marca|venha|vem|agende|agenda|visite|clique|acesse|peca|pede|baixe|responda|responde|vote|vota|conte|conta|escreva|escreve|fale|fala|experimente|teste|testa|reserve|confira|veja|pergunte|pergunta/;
+const SO_COMPRAR = COM_FRONTEIRA(["compre", "compra", "comprar", "adquira", "adquirir"]);
+const OUTRO_VERBO_DE_ACAO = COM_FRONTEIRA([
+  "chame",
+  "chama",
+  "manda",
+  "mande",
+  "ligue",
+  "comente",
+  "comenta",
+  "siga",
+  "segue",
+  "salve",
+  "salva",
+  "compartilhe",
+  "compartilha",
+  "marque",
+  "marca",
+  "venha",
+  "vem",
+  "agende",
+  "agenda",
+  "visite",
+  "clique",
+  "acesse",
+  "peca",
+  "pede",
+  "baixe",
+  "responda",
+  "responde",
+  "vote",
+  "vota",
+  "conte",
+  "conta",
+  "escreva",
+  "escreve",
+  "fale",
+  "fala",
+  "experimente",
+  "teste",
+  "testa",
+  "reserve",
+  "confira",
+  "veja",
+  "pergunte",
+  "pergunta",
+  "faca",
+  "garanta",
+  "aproveite",
+  "entre",
+  "cadastre",
+  "chamar",
+  "link na bio",
+]);
 
 /** R-COPY-25 (chamada): uma só ação, um canal, e "compre" não é o único verbo. */
 function copyChamada(e: EntradaCopyRoteiro): string | null {
   if (e.estrutura !== "reels_falado" || !e.chamadaFinal.trim()) return null;
   const n = normalizar(emUmaLinha(e.chamadaFinal));
-  const canais = CANAIS.filter((c) => c.padrao.test(n)).map((c) => c.nome);
+  let canais = CANAIS.filter((c) => c.padrao.test(n)).map((c) => c.nome);
+  // "Comente QUERO que eu te mando no Direct" é uma ação só: o comentário é o gatilho do mesmo canal.
+  if (canais.includes("comentário") && (canais.includes("Direct") || canais.includes("WhatsApp"))) canais = canais.filter((c) => c !== "comentário");
   if (canais.length >= 2) {
     return `R-COPY-25: a chamada pede mais de um caminho (${canais.join(" e ")}); escolha uma só ação, a mais fácil, num canal só`;
   }
@@ -326,7 +390,7 @@ function roteiroPreenchido(e: EntradaCopyRoteiro): string | null {
   return faltam.length > 0 ? `R-ROTEIRO-01: o roteiro não tem ${faltam.join(", ")}; o vídeo precisa de começo, meio e fim` : null;
 }
 
-const ENCERRAMENTO_VAZIO = /^(entao e isso|e isso( ai)?|obrigad[oa]( por assistir| por ver)?|valeu|tchau|ate a proxima|ate logo|e e isso|por hoje e so|fico por aqui)/;
+const ENCERRAMENTO_VAZIO = /^(entao e isso|e isso( ai)?|obrigad[oa]( por assistir| por ver)?|valeu|tchau|ate a proxima|ate logo|por hoje e so|fico por aqui)[ ]*($|[,.!?;:])/;
 
 /** R-ROTEIRO-14 (fechamento, chamada, só Reels falado): o último bloco não começa com encerramento vazio e traz ação ou pergunta. */
 function roteiroUltimoBloco(e: EntradaCopyRoteiro): string | null {
@@ -432,7 +496,9 @@ export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): Resulta
   const avisos: string[] = [];
   for (const c of CONFORMIDADE) {
     const motivo = c.roda(entrada);
-    if (motivo) reprovam.push(motivo);
+    if (!motivo) continue;
+    // Na segunda tentativa a lei e o calão seguem duros; o R-CONF-04 (percentual e pesquisa lidos por frase, a mais heurística) vira aviso.
+    (entrada.tentativa === 2 && c.regra === "R-CONF-04" ? avisos : reprovam).push(motivo);
   }
   for (const c of DEMAIS) {
     const motivo = c.roda(entrada);
