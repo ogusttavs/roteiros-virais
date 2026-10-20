@@ -69,10 +69,11 @@ export function textoRegrasCopyRoteiro(): string {
     "acima, depois as regras de fala, depois estas. As de conformidade abaixo não entram nessa fila: vêm antes de todas, porque um roteiro",
     "que quebra a lei ou o código de autorregulação da publicidade não vai para o ar, por mais que renda.",
     "",
-    "Conformidade (leitura de quem não é advogado: não afirme ao cliente que algo é obrigatório por lei, apenas siga):",
-    ...conformidade.map((r) => linha(r, visiveis)),
     "Pendência para ramos de saúde, como dentista: a resolução do conselho da profissão sobre publicidade ainda não foi lida. Até lá,",
     'em roteiro de saúde nunca use "antes e depois" de tratamento e deixe a conferência com o conselho como item de atenção para a pessoa.',
+    "Conformidade (leitura de quem não é advogado: não afirme ao cliente que algo é obrigatório por lei, apenas siga):",
+    ...conformidade.map((r) => linha(r, visiveis)),
+    "Número, pesquisa ou estatística só com dado que está na ficha, no momento, nas fontes da entrada ou na evidência; sem isso, deixe o espaço entre colchetes.",
     "",
     "Texto e persuasão (cada regra vale para os blocos entre parênteses):",
     ...copy.map((r) => linha(r, visiveis)),
@@ -80,6 +81,8 @@ export function textoRegrasCopyRoteiro(): string {
     "Estrutura (cada regra vale para os blocos entre parênteses):",
     ...roteiro.map((r) => linha(r, visiveis)),
     "",
+    "Onde uma regra pede declarar algo (a seção de atenção, quem vai ver, a ideia em uma frase) e o roteiro não tem campo para isso, não escreva a declaração na fala nem na tela: apenas siga a regra.",
+    "No Story, onde a regra fala de gancho, corpo e fechamento, vale para o primeiro story, os do meio e o último; os tempos de segundo valem para a fala do primeiro story.",
     "Estas regras são para você seguir ao escrever. Não as cite no porQueAssim: ele continua citando só as regras de plataforma listadas acima.",
   ].join(String.fromCharCode(10));
 }
