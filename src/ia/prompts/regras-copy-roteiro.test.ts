@@ -8,9 +8,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { lerTabelaDaSecao11, montarArquivoGerado } from "../../../scripts/gerar-regras-copy-roteiro-lib";
+import { VERSAO_DAS_REGRAS, lerTabelaDaSecao11, montarArquivoGerado } from "../../../scripts/gerar-regras-copy-roteiro-lib";
 
-import { REGRAS_COPY_ROTEIRO } from "./regras-copy-roteiro";
+import { REGRAS_COPY_ROTEIRO, versao } from "./regras-copy-roteiro";
 import {
   NUMEROS_REGRAS_COPY_ROTEIRO,
   codigosEscondidosNoTexto,
@@ -36,6 +36,12 @@ describe("a tabela gerada das 53 regras (seção 11)", () => {
     expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(53);
   });
 
+  it("o arquivo gerado tem versão (o checar-versao-prompt exige quando ele muda) e ela é a do gerador", () => {
+    expect(versao).toBe(VERSAO_DAS_REGRAS);
+    expect(versao).toMatch(/^[0-9]+[.][0-9]+[.][0-9]+$/);
+    expect(montarArquivoGerado(REGRAS_COPY_ROTEIRO)).toContain(`export const versao = "${VERSAO_DAS_REGRAS}";`);
+  });
+
   it("nenhuma regra sem fonte, sem texto, sem por quê ou sem bloco", () => {
     for (const r of REGRAS_COPY_ROTEIRO) {
       expect(r.fonte.length, `${r.numero} fonte`).toBeGreaterThan(2);
@@ -58,7 +64,10 @@ describe("a tabela gerada das 53 regras (seção 11)", () => {
   it("a força e a coluna 'confere por código' foram lidas do começo da célula", () => {
     const porNumero = new Map(REGRAS_COPY_ROTEIRO.map((r) => [r.numero, r]));
     expect(porNumero.get("R-ROTEIRO-05")?.forca).toBe("forte");
-    expect(porNumero.get("R-COPY-21")?.forca).toBe("media");
+    expect(porNumero.get("R-COPY-25")?.forca).toBe("media");
+    // Decisão do Fable de 20/10/2026: o banco tem 28 vídeos (menos de 30), então indício.
+    expect(porNumero.get("R-COPY-21")?.forca).toBe("indicio");
+    expect(porNumero.get("R-COPY-21")?.conferePorCodigo).toBe("so_avisa");
     expect(porNumero.get("R-COPY-03")?.forca).toBe("indicio");
     expect(porNumero.get("R-COPY-03")?.conferePorCodigo).toBe("so_avisa");
     expect(porNumero.get("R-CONF-07")?.conferePorCodigo).toBe("sim");
@@ -116,11 +125,12 @@ describe("o gerador (lógica pura)", () => {
 describe("o que o prompt recebe", () => {
   it("só as de força forte e média entram; as de indício ficam fora", () => {
     const entram = regrasQueEntramNoPrompt();
-    expect(entram).toHaveLength(28);
+    expect(entram).toHaveLength(27);
     expect(entram.every((r) => r.forca !== "indicio")).toBe(true);
     const texto = textoRegrasCopyRoteiro();
     expect(texto).toContain("R-ROTEIRO-05");
-    expect(texto).toContain("R-COPY-21");
+    expect(texto).toContain("R-COPY-25");
+    expect(texto).not.toContain("R-COPY-21");
     expect(texto).not.toContain("R-COPY-03 ");
     expect(texto).not.toContain("R-ROTEIRO-19");
     expect(texto).not.toContain("R-COPY-04 ");

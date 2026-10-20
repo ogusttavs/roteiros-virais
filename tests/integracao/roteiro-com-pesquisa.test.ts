@@ -211,11 +211,10 @@ describe("o verificador local do roteiro com pesquisa", () => {
     expect(geracoes).toHaveLength(1);
   });
 
-  it("sem pesquisa, o número solto não é conferido por esta trava (o comportamento de antes): uma geração, com o número", async () => {
+  it("sem pesquisa, esta trava não confere o número solto, mas o R-CONF-04 (E50 parte 2) o derruba: percentual sem fonte dita na fala", async () => {
     const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: `${TEMA} [mock:numero-solto]`, objetivo: "alcance" });
-    expect(roteiro.conteudo.corpo).toContain("37%");
-    expect(chamadasDoRoteiro()).toHaveLength(1);
-    expect(await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "roteiro"))).toHaveLength(1);
+    expect(roteiro.conteudo.corpo).not.toContain("37%");
+    expect((await db().select().from(geracoesIA).where(eq(geracoesIA.tarefa, "roteiro"))).length).toBeGreaterThanOrEqual(2);
   });
 
   it("com pesquisa, o mesmo número solto derruba a primeira tentativa", async () => {

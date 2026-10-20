@@ -9,6 +9,9 @@ const QUEBRA = String.fromCharCode(10);
 const RETORNO = String.fromCharCode(13);
 const PADRAO_LINHA = /^[|][ ]*(R-(?:COPY|ROTEIRO|CONF)-[0-9]{2})[ ]*[|]/;
 
+/** A versão das regras (o `checar-versao-prompt` exige versão nova quando um arquivo de `src/ia/prompts/` muda). Subir junto com qualquer mudança da seção 11. 1.0.0: as 53 regras (PR 1); 1.1.0: R-COPY-21 como indício (PR 2). */
+export const VERSAO_DAS_REGRAS = "1.1.0";
+
 export const TOTAL_ESPERADO = { COPY: 25, ROTEIRO: 19, CONF: 9 } as const;
 
 function forcaDe(celula: string): RegraCopyRoteiro["forca"] {
@@ -84,6 +87,8 @@ export function montarArquivoGerado(regras: RegraCopyRoteiro[]): string {
     " * e de conformidade (R-CONF, 9). `texto` é o que o prompt recebe; `porQue` é a frase para a pessoa,",
     " * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.",
     " */",
+    "",
+    `export const versao = "${VERSAO_DAS_REGRAS}";`,
     "",
     'export type RegraCopyRoteiro = {',
     "  numero: string;",

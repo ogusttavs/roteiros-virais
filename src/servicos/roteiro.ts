@@ -13,6 +13,7 @@ import { objetivoDaFicha } from "@/config/fichas";
 import { forcaDaEvidencia } from "@/config/forca-evidencia";
 import { formatoPorChave } from "@/config/formatos";
 import { rotuloDoMotivo, type IdMotivoReprovacao } from "@/config/motivos-reprovacao";
+import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import {
   clientes,
@@ -54,6 +55,7 @@ import * as roteiroIA from "@/ia/prompts/roteiro";
 import type { InstrucaoAbertura } from "@/ia/prompts/roteiro";
 import { registrarGeracao } from "@/ia/registro";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
+import { montarEntradaCopyRoteiro, type SaidaParaCopyRoteiro, verificarRegrasCopyRoteiro } from "@/ia/verificar-copy-roteiro";
 import { boss, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { camposCorridosDosCapitulos } from "@/lib/capitulos-do-roteiro";
 import { hojeISO } from "@/lib/config";
@@ -87,6 +89,7 @@ import {
   classificarBrasil,
   preferirRedePrincipal,
 } from "./proporcao-brasil";
+import { ramoAtualDoCliente } from "./ramos";
 import { ramosAlternativosDaMarca } from "./ramos-da-conta";
 import { conferirQueOLongoSai, ErroDoRoteiroLongo, gerarConteudoLongo } from "./roteiro-longo";
 import { temasParaCliente } from "./temas";
@@ -1120,6 +1123,18 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         .map((r) => ({ tema: r.tema, gancho: r.gancho }))
     : undefined;
 
+  // E50 parte 2 (PR 2): o ramo de saúde liga as conferências do R-CONF-07; ramo fora do catálogo não é saúde (só o ramo principal da marca conta).
+  const ramoDaMarca = await ramoAtualDoCliente(nichoId);
+  const ramoSaude = ramoPorSlug(ramoDaMarca?.ramoSlug)?.grupo === "saude";
+  const entradaCopy = (d: SaidaParaCopyRoteiro, tentativa: 1 | 2) =>
+    montarEntradaCopyRoteiro(d, {
+      fontes: fontesDosFatos,
+      ramoSaude,
+      nomeDaMarca: dados.cliente.nome,
+      palavrasDoTema: palavrasDeConteudo(dados.tema),
+      tentativa,
+    });
+
   const palavrasDoMomento = dados.momento
     ? palavrasDeConteudo(`${dados.momento.onde} ${dados.momento.oQueEstaAcontecendo}`)
     : undefined;
@@ -1259,7 +1274,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     }
   }
 
-  const { dados: saida, geracaoId } = await gerarComVerificacao({
+  const { dados: saida, geracaoId, avisos } = await gerarComVerificacao({
     tarefa: "roteiro",
     nivel: roteiroIA.nivel,
     effort: roteiroIA.esforco,
@@ -1378,9 +1393,15 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     extrairLegenda: (d) => d.legenda,
     extrairPorQueAssim: (d) => porQueAssimValido(d.porQueAssim),
     extrairNarrativa: (d) => ({ gancho: d.gancho, corpo: d.corpo, chamadaFinal: d.chamadaFinal }),
+    // E50 parte 2 (PR 2): as regras "sim" da seção 11 reprovam, as de indício e as "só avisa" viram aviso (R-CONF antes de todas; ver `verificar-copy-roteiro.ts`).
+    verificarExtra: (d, tentativa) => verificarRegrasCopyRoteiro(entradaCopy(d, tentativa)).reprovam,
+    avisarExtra: (d, tentativa) => verificarRegrasCopyRoteiro(entradaCopy(d, tentativa)).avisos,
     extrairCampos: (d) => extrairCamposRoteiro({ ...d, porQueAssim: porQueAssimValido(d.porQueAssim) }),
     extrairEvidencias: (d) => d.evidencias,
   });
+
+  // E50 parte 2 (PR 2): o que a seção 11 só avisa (regra de indício, ou de calibração na segunda tentativa) fica no log; a tela entra no PR 4.
+  if (avisos.length > 0) logger.info({ clienteId: dados.clienteId, geracaoId, avisos }, "roteiro: avisos das regras de copy e de roteiro");
 
   const referenciaEscolhida = validarReferenciaDoModelo(saida.edicao.referencia, evidencias);
   const duracaoS = saida.duracaoS;
