@@ -137,6 +137,7 @@ async function main(): Promise<void> {
         await page.getByLabel("E-mail").fill(EMAIL);
         await page.getByLabel("Senha").fill(SENHA_SEED);
         await page.getByRole("button", { name: "entrar", exact: true }).click();
+        await page.waitForURL(/\/(hoje|comecar)/, { timeout: 90_000 });
         await page.waitForLoadState("networkidle");
         const sufixo = `${tamanho.rotulo}.${modo.rotulo}`;
 

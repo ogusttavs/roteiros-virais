@@ -15,12 +15,12 @@ import { regrasQueEntramNoPrompt } from "@/ia/prompts/regras-copy-roteiro-uso";
 export const PARA_QUE = ["fiquem", "confiem", "guardem", "chamem"] as const;
 export type ParaQue = (typeof PARA_QUE)[number];
 
-/** O texto do "Para" (a lista é fixa, o modelo só escolhe uma): que fiquem, confiem, guardem, chamem. */
+/** O texto do "Para" (a lista é fixa, o modelo só escolhe uma), que continua o rótulo "Para:" da tela: que fiquem, confiem, guardem, chamem. */
 export const TEXTO_DO_PARA: Record<ParaQue, string> = {
-  fiquem: "Para a pessoa ficar até o fim.",
-  confiem: "Para a pessoa confiar em você.",
-  guardem: "Para a pessoa guardar e usar depois.",
-  chamem: "Para a pessoa te chamar.",
+  fiquem: "Que a pessoa fique até o fim.",
+  confiem: "Que a pessoa confie em você.",
+  guardem: "Que a pessoa guarde e use depois.",
+  chamem: "Que a pessoa te chame.",
 };
 
 /** O que o modelo devolve por bloco (o schema do prompt). */

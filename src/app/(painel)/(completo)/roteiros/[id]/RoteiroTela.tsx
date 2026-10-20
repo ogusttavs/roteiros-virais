@@ -1033,7 +1033,7 @@ export function RoteiroTela({
                   avisos={marcasProntas?.avisos ?? []}
                 />
               ) : null}
-              {corpo.porQueDosBlocos && corpo.porQueDosBlocos.length > 0 ? (
+              {corpo.porQueDosBlocos?.some((i) => i.regras.length > 0) ? (
                 <div className={styles.linhaPorques}>
                   <VerOsPorques />
                 </div>

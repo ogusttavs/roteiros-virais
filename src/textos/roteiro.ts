@@ -151,6 +151,7 @@ export const textosRoteiro = {
     para: "Para:",
     verOsPorques: "Ver os porquês",
     fecharOsPorques: "Fechar os porquês",
+    verOVideoSimples: "Ver o vídeo",
     verOVideo: (tempo: string) => `Ver o vídeo, a partir de ${tempo}`,
     doVideo: (conta: string | null, vezes: number | null) =>
       `O vídeo${conta ? ` de ${conta}` : ""}${vezes !== null ? `, ${vezes.toFixed(1).replace(".", ",")}x acima do normal da conta` : ""}.`,

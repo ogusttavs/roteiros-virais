@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { REGRAS_COPY_ROTEIRO } from "@/ia/prompts/regras-copy-roteiro";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
-import { PorQueAberto, PorQueBotao, PorQuesProvider, VerOsPorques } from "./PorQue";
+import { enderecoNoSegundo, PorQueAberto, PorQueBotao, PorQuesProvider, VerOsPorques } from "./PorQue";
 
 afterEach(cleanup);
 
@@ -58,10 +58,11 @@ describe("PorQue", () => {
     expect(botao.getAttribute("aria-expanded")).toBe("true");
     expect(screen.getByText(frase("R-COPY-05"), { exact: false })).toBeTruthy();
     expect(screen.getByText("O vídeo de @limpeza_da_casa, 4,1x acima do normal da conta.")).toBeTruthy();
-    const link = screen.getByRole("link", { name: "Ver o vídeo, a partir de 1:23" });
+    // fora do YouTube o link abre o vídeo e o texto não promete o segundo
+    const link = screen.getByRole("link", { name: "Ver o vídeo" });
     expect(link.getAttribute("href")).toBe("https://exemplo.test/v/7");
     expect(link.getAttribute("rel")).toContain("noopener");
-    expect(screen.getByText("Para a pessoa ficar até o fim.", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Que a pessoa fique até o fim.", { exact: false })).toBeTruthy();
     fireEvent.click(botao);
     expect(botao.getAttribute("aria-expanded")).toBe("false");
     expect(screen.queryByText("O que faz:")).toBeNull();
@@ -78,6 +79,53 @@ describe("PorQue", () => {
     expect(painel.textContent).toContain("uma regra de escrita para vídeo");
     expect(painel.textContent).not.toMatch(/R-[A-Z]+-[0-9]/);
     expect(screen.queryByRole("link")).toBeNull();
+  });
+
+  it("no YouTube o link leva ao segundo e o texto diz o tempo", () => {
+    render(
+      <PorQuesProvider itens={[ITENS[0]]} videos={{ 7: { url: "https://www.youtube.com/watch?v=abc", conta: "@c", vezes: null } }}>
+        <PorQueBotao chaves={["gancho"]} id="pq-gancho" rotuloDoBloco="Abertura" />
+        <PorQueAberto chaves={["gancho"]} id="pq-gancho" />
+      </PorQuesProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Por quê: Abertura" }));
+    const link = screen.getByRole("link", { name: "Ver o vídeo, a partir de 1:23" });
+    expect(link.getAttribute("href")).toBe("https://www.youtube.com/watch?v=abc&t=83s");
+  });
+
+  it("enderecoNoSegundo: só o YouTube com segundo maior que zero ganha o tempo", () => {
+    expect(enderecoNoSegundo("https://youtu.be/abc", 12)).toEqual({ href: "https://youtu.be/abc?t=12s", comSegundo: true });
+    expect(enderecoNoSegundo("https://www.youtube.com/watch?v=abc", 0)).toEqual({ href: "https://www.youtube.com/watch?v=abc", comSegundo: false });
+    expect(enderecoNoSegundo("https://www.instagram.com/reel/x/", 30)).toEqual({ href: "https://www.instagram.com/reel/x/", comSegundo: false });
+    expect(enderecoNoSegundo("sem endereco", 30).comSegundo).toBe(false);
+  });
+
+  it("vídeo que não veio do servidor: a linha 'Com base em' some em vez de ficar vazia", () => {
+    render(
+      <PorQuesProvider itens={[ITENS[0]]} videos={{}}>
+        <PorQueBotao chaves={["gancho"]} id="pq-gancho" rotuloDoBloco="Abertura" />
+        <PorQueAberto chaves={["gancho"]} id="pq-gancho" />
+      </PorQuesProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Por quê: Abertura" }));
+    expect(screen.getByText("O que faz:")).toBeTruthy();
+    expect(screen.queryByText("Com base em:")).toBeNull();
+  });
+
+  it("com 'Ver os porquês' ligado, o botão de um bloco o fecha e abre de novo; aria-controls só quando aberto", () => {
+    render(<Tela />);
+    const botao = screen.getByRole("button", { name: "Por quê: Abertura" });
+    expect(botao.getAttribute("aria-controls")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Ver os porquês" }));
+    expect(botao.getAttribute("aria-controls")).toBe("pq-gancho");
+    fireEvent.click(botao);
+    expect(botao.getAttribute("aria-expanded")).toBe("false");
+    expect(document.querySelector('[data-porque-aberto="pq-gancho"]')).toBeNull();
+    expect(screen.getAllByText("O que faz:").length).toBe(3);
+    fireEvent.click(botao);
+    expect(botao.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Fechar os porquês" }));
+    expect(screen.queryByText("O que faz:")).toBeNull();
   });
 
   it("as frases na tela: um botão, uma seção por frase", () => {

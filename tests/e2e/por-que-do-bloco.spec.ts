@@ -125,7 +125,7 @@ test.describe("E50 2 PR 4: o por quê de cada bloco", () => {
     await expect(page.getByText("O que faz:")).toHaveCount(1);
     await expect(page.getByText("Com base em:")).toHaveCount(1);
     await expect(page.getByText("uma regra de escrita para vídeo")).toBeVisible();
-    await expect(page.getByText("Para a pessoa ficar até o fim.")).toBeVisible();
+    await expect(page.getByText("Que a pessoa fique até o fim.")).toBeVisible();
     // nunca o código da regra
     await expect(page.getByText(/R-COPY-[0-9]+/)).toHaveCount(0);
 
