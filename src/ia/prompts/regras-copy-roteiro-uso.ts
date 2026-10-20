@@ -6,6 +6,9 @@
  */
 import { REGRAS_COPY_ROTEIRO, type RegraCopyRoteiro } from "./regras-copy-roteiro";
 
+/** 1.1.0 (E50 parte 2, PR 3): `textoRegrasCopyRoteiro` ganha o escopo "longo" (o roteiro longo recebe a conformidade e o texto, sem a estrutura do vídeo curto). */
+export const versao = "1.1.0";
+
 /** As regras que o prompt recebe: força forte ou média, na ordem do documento (R-COPY, R-ROTEIRO, R-CONF). */
 export function regrasQueEntramNoPrompt(): RegraCopyRoteiro[] {
   return REGRAS_COPY_ROTEIRO.filter((r) => r.forca === "forte" || r.forca === "media");
@@ -57,12 +60,12 @@ export function numerosVisiveisNoPrompt(): Set<string> {
  * (11.0 e 11.3 das rubricas), mais as linhas geradas da tabela. Nada aqui muda de um roteiro
  * para outro, para o cache do prompt continuar valendo.
  */
-export function textoRegrasCopyRoteiro(): string {
+export function textoRegrasCopyRoteiro(escopo: "curto" | "longo" = "curto"): string {
   const entram = regrasQueEntramNoPrompt();
   const visiveis = numerosVisiveisNoPrompt();
   const conformidade = entram.filter((r) => r.grupo === "CONF");
   const copy = entram.filter((r) => r.grupo === "COPY");
-  const roteiro = entram.filter((r) => r.grupo === "ROTEIRO");
+  const roteiro = escopo === "curto" ? entram.filter((r) => r.grupo === "ROTEIRO") : [];
   return [
     "Regras de texto e de estrutura do roteiro (valem para a fala e, em roteiro sem fala, para o texto na tela).",
     "Se duas regras se chocarem, vale esta ordem: primeiro o que a evidência do banco mostra para este nicho, depois as regras da plataforma",
@@ -78,11 +81,13 @@ export function textoRegrasCopyRoteiro(): string {
     "Texto e persuasão (cada regra vale para os blocos entre parênteses):",
     ...copy.map((r) => linha(r, visiveis)),
     "",
-    "Estrutura (cada regra vale para os blocos entre parênteses):",
-    ...roteiro.map((r) => linha(r, visiveis)),
-    "",
+    ...(roteiro.length > 0
+      ? ["Estrutura (cada regra vale para os blocos entre parênteses):", ...roteiro.map((r) => linha(r, visiveis)), ""]
+      : []),
     "Onde uma regra pede declarar algo (a seção de atenção, quem vai ver, a ideia em uma frase) e o roteiro não tem campo para isso, não escreva a declaração na fala nem na tela: apenas siga a regra.",
-    "No Story, onde a regra fala de gancho, corpo e fechamento, vale para o primeiro story, os do meio e o último; os tempos de segundo valem para a fala do primeiro story.",
+    ...(escopo === "curto"
+      ? ["No Story, onde a regra fala de gancho, corpo e fechamento, vale para o primeiro story, os do meio e o último; os tempos de segundo valem para a fala do primeiro story."]
+      : ["No roteiro longo, as regras valem para a fala do gancho, de cada capítulo e da chamada final."]),
     "Estas regras são para você seguir ao escrever. Não as cite no porQueAssim: ele continua citando só as regras de plataforma listadas acima.",
   ].join(String.fromCharCode(10));
 }

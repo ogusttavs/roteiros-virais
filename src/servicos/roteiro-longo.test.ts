@@ -195,6 +195,22 @@ describe("conteudoDoRoteiroLongo", () => {
     expect(blocos[0].map((c) => c.momento)).toEqual(["0 segundos"]);
   });
 
+  it("o por quê (E50 parte 2, PR 3): gancho, cada capítulo e a chamada; o vídeo só se for uma referência; regra de estrutura do curto, bloco e regra inventados caem", () => {
+    const base = saidaBase();
+    base.porQueDosBlocos = [
+      { bloco: "gancho", regras: ["R-COPY-05"], videoId: 7, para: "fiquem" },
+      { bloco: "capitulo:0", regras: ["R-COPY-13", "R-ROTEIRO-05", "R-COPY-NAO-EXISTE"], videoId: 8, para: null },
+      { bloco: "capitulo:99", regras: ["R-COPY-13"], videoId: null, para: null },
+      { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" },
+    ];
+    const { conteudo } = conteudoDoRoteiroLongo(base, [7]);
+    expect(conteudo.porQueDosBlocos).toEqual([
+      { bloco: "gancho", regras: ["R-COPY-05"], video: { videoId: 7, segundo: 0 }, para: "fiquem" },
+      { bloco: "capitulo:0", regras: ["R-COPY-13"] },
+      { bloco: "chamada", regras: ["R-COPY-25"], para: "chamem" },
+    ]);
+  });
+
   it("o último capítulo nunca guarda gancho, mesmo que o modelo escreva um", () => {
     const base = saidaBase();
     const ultimo = base.capitulos.length - 1;

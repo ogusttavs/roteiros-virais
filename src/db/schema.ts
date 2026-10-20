@@ -24,6 +24,8 @@ import {
   type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 
+import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
+
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
@@ -1954,6 +1956,12 @@ export type ConteudoRoteiro = {
    * estável por formato ainda não existe para Reels).
    */
   porQueAssim: { regra: string; motivo: string }[];
+  /**
+   * E50 parte 2, PR 3: o "por quê" de cada bloco (gancho, corpo, fechamento, chamada, cada frase na tela, cada cartão ou capítulo): os NÚMEROS das regras que o modelo seguiu, o vídeo da
+   * evidência que serviu de modelo e o "para quê". O texto que a pessoa lê sai da tabela por código (`lib/por-que-do-bloco.ts`). Opcional: roteiro gravado antes desta coluna não tem, e a tela
+   * então não mostra a palavra "Por quê".
+   */
+  porQueDosBlocos?: PorQueDoBloco[];
   cenas: { momento: string; oQueFazer: string }[];
   /** Por que este roteiro so funciona com a pessoa de verdade (tese do produto) */
   ondeGravar: string;

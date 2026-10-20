@@ -24,6 +24,7 @@ import { verificarLocalmente } from "../src/ia/verificador";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
 import type { PedidoGolden } from "./golden-lote";
+import { imprimirPorQueDosBlocos } from "./golden-por-que";
 import { linhaDoResumo, resumirProducao, rodarComoEmProducao } from "./golden-producao";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
@@ -339,6 +340,18 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     }
     console.log(
       `\nevidencias citadas: ${saida.evidencias.length > 0 ? saida.evidencias.join(", ") : "nenhuma"}`,
+    );
+
+    // E50 parte 2, PR 3: o por quê de cada bloco, como a tela vai mostrar, e a coluna "o por quê está certo?" (o simulador preenche; com a chave real fica para ler).
+    console.log();
+    imprimirPorQueDosBlocos(
+      saida.porQueDosBlocos,
+      {
+        forma: saida.cartoes ? { tipo: "cartoes", cartoes: saida.cartoes.length } : { tipo: "reels", telas: saida.edicao.textoNaTela.length },
+        escopo: "curto",
+        segundoDosVideos: new Map(caso.evidencias.map((v) => [v.id, 0])),
+      },
+      process.env.AI_PROVIDER === "mock",
     );
 
     /**

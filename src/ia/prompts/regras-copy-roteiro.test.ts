@@ -20,6 +20,7 @@ import {
   textoRegrasCopyRoteiro,
 } from "./regras-copy-roteiro-uso";
 import { montarSistemaEstavel } from "./roteiro";
+import { montarSistemaEstavel as montarSistemaEstavelLongo } from "./roteiroLongo";
 
 const CAMINHO_RUBRICAS = path.resolve(process.cwd(), "../estrategia/briefing-e-rubricas.md");
 const CAMINHO_GERADO = path.resolve(process.cwd(), "src/ia/prompts/regras-copy-roteiro.ts");
@@ -184,6 +185,32 @@ describe("o que o prompt recebe", () => {
     expect(textoDaRegraParaOPrompt("O número é pedido por `R-TT-VIDEO-07` e `R-YT-SHORT-05`.", visiveis)).toBe(
       "O número é pedido pelas regras da plataforma.",
     );
+  });
+});
+
+describe("o pedido do por quê de cada bloco (PR 3)", () => {
+  const BASE = { perfilCompilado: "p", modeloNicho: "m", camadaExclusiva: "c", tipo: "negocio" as const, regrasCliente: [] };
+  it("o roteiro curto pede as chaves certas por formato", () => {
+    const reelsFalado = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado" });
+    expect(reelsFalado).toContain("porQueDosBlocos");
+    expect(reelsFalado).toContain('"gancho", "corpo", "fechamento", "chamada"');
+    expect(reelsFalado).toContain('"tela:N"');
+    expect(montarSistemaEstavel({ ...BASE, formato: "story", estilo: "falado" })).toContain('"cartao:N"');
+    expect(montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "sem_fala" })).toContain('"cartao:N"');
+  });
+  it("pede só números, uma lista fechada de para quê, e nunca texto de explicação nem o segundo", () => {
+    const texto = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado" });
+    expect(texto).toContain('"fiquem", "confiem", "guardem", "chamem"');
+    expect(texto).toContain("Neste campo não escreva nenhum texto de explicação");
+    expect(texto).toContain("nunca o segundo");
+  });
+  it("o roteiro longo recebe conformidade e texto (sem a estrutura do curto) e pede os blocos do longo", () => {
+    const longo = montarSistemaEstavelLongo({ ...BASE, regrasCliente: [] });
+    expect(longo).toContain("R-CONF-03");
+    expect(longo).toContain("R-COPY-13");
+    expect(longo).not.toContain("R-ROTEIRO-05");
+    expect(longo).toContain('"capitulo:N"');
+    expect(longo).toContain("porQueDosBlocos");
   });
 });
 

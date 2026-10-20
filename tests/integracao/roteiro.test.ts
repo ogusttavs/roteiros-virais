@@ -239,6 +239,48 @@ describe("gerarRoteiro", () => {
     expect(cliente.nichoId).toBe(nichoId);
   });
 
+  /** E50 parte 2, PR 3: o "por quê" de cada bloco chega ao roteiro gravado, só com números; o que não existe é descartado por código. */
+  describe("o por quê de cada bloco (E50 parte 2, PR 3)", () => {
+    it("Reels falado: guarda gancho, corpo, fechamento, chamada e a frase na tela, com o vídeo da evidência e o segundo do banco", async () => {
+      const clienteId = await criarCliente();
+      const videoId = await criarVideoEvidencia("ev-por-que-reels", "mancha de vinho no estofado");
+      const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "mancha de vinho no estofado", objetivo: "conversao" });
+      const itens = roteiro.conteudo.porQueDosBlocos ?? [];
+      expect(itens.map((i) => i.bloco)).toEqual(["gancho", "corpo", "fechamento", "chamada", "tela:0"]);
+      const gancho = itens.find((i) => i.bloco === "gancho");
+      expect(gancho?.regras).toEqual(["R-COPY-05"]);
+      expect(gancho?.video?.videoId).toBe(videoId);
+      expect(gancho?.para).toBe("fiquem");
+      // só números e listas fixas: nenhuma frase escrita pelo modelo no que se grava
+      expect(JSON.stringify(itens)).not.toMatch(/motivo/);
+    });
+
+    it("descarta o bloco que não existe, a regra inventada, a que não vale para o bloco e o vídeo fora da evidência", async () => {
+      const clienteId = await criarCliente();
+      await criarVideoEvidencia("ev-por-que-invalido", "mancha de vinho no estofado");
+      const roteiro = await gerarRoteiro(clienteId, {
+        origem: "livre",
+        textoTema: "mancha de vinho no estofado [mock:por-que-invalido]",
+        objetivo: "conversao",
+      });
+      const itens = roteiro.conteudo.porQueDosBlocos ?? [];
+      expect(itens.some((i) => i.bloco === "capitulo:3")).toBe(false);
+      const corpo = itens.filter((i) => i.bloco === "corpo");
+      expect(corpo).toHaveLength(1);
+      expect(corpo[0].regras).toEqual(["R-COPY-13"]);
+      expect(JSON.stringify(itens)).not.toMatch(/999999|R-IG-REEL|R-NAO-EXISTE|R-CONF-03/);
+    });
+
+    it("Story e sem fala: um por quê por cartão, o último pela regra da chamada", async () => {
+      const clienteId = await criarCliente();
+      await criarVideoEvidencia("ev-por-que-cartoes", "mancha de vinho no estofado");
+      const sem = await gerarRoteiro(clienteId, { origem: "livre", textoTema: "mancha de vinho no estofado", objetivo: "conversao", estilo: "sem_fala" });
+      const itens = sem.conteudo.porQueDosBlocos ?? [];
+      expect(itens.map((i) => i.bloco)).toEqual((sem.conteudo.cartoes ?? []).map((_, i) => `cartao:${i}`));
+      expect(itens[itens.length - 1].regras).toEqual(["R-COPY-25"]);
+    });
+  });
+
   /**
    * M5b, achado 4 da revisão do motor (01/10/2026): antes, uma duração fora da faixa do modelo
    * do nicho era silenciosamente encaixada (`respeitarDuracaoDoNicho`, removida); agora reprova
