@@ -142,6 +142,21 @@ export const textosRoteiro = {
     textoNaTelaComQuando: (quando: string, oQue: string) => `Na tela (${quando}): "${oQue}"`,
     figurinha: (rotulo: string) => `Figurinha: ${rotulo}`,
   },
+  /** E50 parte 2, PR 4 (passo 24 do Opus): o "Por quê" de cada bloco. */
+  porQue: {
+    botao: "Por quê",
+    botaoAria: (bloco: string) => `Por quê: ${bloco}`,
+    oQueFaz: "O que faz:",
+    comBaseEm: "Com base em:",
+    para: "Para:",
+    verOsPorques: "Ver os porquês",
+    fecharOsPorques: "Fechar os porquês",
+    verOVideoSimples: "Ver o vídeo",
+    verOVideo: (tempo: string) => `Ver o vídeo, a partir de ${tempo}`,
+    doVideo: (conta: string | null, vezes: number | null) =>
+      `O vídeo${conta ? ` de ${conta}` : ""}${vezes !== null ? `, ${vezes.toFixed(1).replace(".", ",")}x acima do normal da conta` : ""}.`,
+    fraseNaTela: (n: number) => `Frase ${n} na tela`,
+  },
   /** V9c, item 4: por que o roteiro saiu assim, uma linha por regra aplicada (`porQueAssim` do prompt). */
   porQueAssim: "Por que assim",
   referencia: "Referência",

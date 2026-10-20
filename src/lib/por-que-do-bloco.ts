@@ -15,12 +15,12 @@ import { regrasQueEntramNoPrompt } from "@/ia/prompts/regras-copy-roteiro-uso";
 export const PARA_QUE = ["fiquem", "confiem", "guardem", "chamem"] as const;
 export type ParaQue = (typeof PARA_QUE)[number];
 
-/** O texto do "Para" (a lista é fixa, o modelo só escolhe uma): que fiquem, confiem, guardem, chamem. */
+/** O texto do "Para" (a lista é fixa, o modelo só escolhe uma), que continua o rótulo "Para:" da tela: que fiquem, confiem, guardem, chamem. */
 export const TEXTO_DO_PARA: Record<ParaQue, string> = {
-  fiquem: "Para a pessoa ficar até o fim.",
-  confiem: "Para a pessoa confiar em você.",
-  guardem: "Para a pessoa guardar e usar depois.",
-  chamem: "Para a pessoa te chamar.",
+  fiquem: "Que a pessoa fique até o fim.",
+  confiem: "Que a pessoa confie em você.",
+  guardem: "Que a pessoa guarde e use depois.",
+  chamem: "Que a pessoa te chame.",
 };
 
 /** O que o modelo devolve por bloco (o schema do prompt). */
@@ -95,6 +95,8 @@ export function regraValeParaOBloco(regra: RegraCopyRoteiro, chave: string, tota
 }
 
 export const MAXIMO_DE_REGRAS_POR_BLOCO = 3;
+/** "O que faz" junta as frases das primeiras regras do bloco, no máximo duas. */
+export const MAXIMO_DE_FRASES_NO_O_QUE_FAZ = 2;
 
 export type ContextoDaLimpeza = {
   forma: FormaDoRoteiro;
@@ -146,7 +148,7 @@ const RAIZ_DA_REGRA: Record<RegraCopyRoteiro["grupo"], string> = {
 };
 
 export type TextosDoPorQue = {
-  /** "O que faz": a frase da tabela da primeira regra, mais a das outras separadas por espaço. */
+  /** "O que faz": a frase da tabela da primeira regra e, se houver, a da segunda (no máximo duas). */
   oQueFaz: string;
   /** "Com base em": o vídeo do banco (com o segundo) ou, sem vídeo, o tipo de regra pelo nome que a pessoa entende (nunca o código). */
   comBaseEm: { tipo: "video"; videoId: number; segundo: number } | { tipo: "regra"; texto: string } | null;
@@ -158,7 +160,8 @@ export type TextosDoPorQue = {
 export function textosDoPorQue(item: PorQueDoBloco): TextosDoPorQue {
   const porNumero = new Map(REGRAS_COPY_ROTEIRO.map((r) => [r.numero, r]));
   const regras = item.regras.map((n) => porNumero.get(n)).filter((r): r is RegraCopyRoteiro => Boolean(r));
-  const oQueFaz = regras.map((r) => r.porQue).join(" ");
+  // No máximo duas frases, a da primeira regra primeiro (decisão do Fable de 20/10/2026): com três regras a terceira fica de fora do texto, e os códigos seguem guardados.
+  const oQueFaz = regras.slice(0, MAXIMO_DE_FRASES_NO_O_QUE_FAZ).map((r) => r.porQue).join(" ");
   let comBaseEm: TextosDoPorQue["comBaseEm"] = null;
   if (item.video) comBaseEm = { tipo: "video", videoId: item.video.videoId, segundo: item.video.segundo };
   else if (regras.length > 0) comBaseEm = { tipo: "regra", texto: [...new Set(regras.map((r) => RAIZ_DA_REGRA[r.grupo]))].join("; ") };

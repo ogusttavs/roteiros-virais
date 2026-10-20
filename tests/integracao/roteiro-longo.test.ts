@@ -517,6 +517,21 @@ describe("o verificador confere os capítulos por código", () => {
     expect(JSON.stringify(tentativas[1].saida)).not.toContain("10:30 da manhã");
   });
 
+  it("a R-CONF-03 vale no longo: 'grátis' sem a ficha dizer derruba a primeira tentativa, e a segunda sai limpa (E50 parte 2, PR 4)", async () => {
+    await medirORamo();
+    const roteiro = await gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: "[mock:oferta-de-graca]" });
+    expect(await geracoesDa("roteiroLongo")).toHaveLength(2);
+    expect(roteiro.conteudo.gancho).not.toMatch(/gr[aá]tis/i);
+  });
+
+  it("e reprova também na segunda tentativa: a conformidade não afrouxa, nada é gravado", async () => {
+    await medirORamo();
+    await expect(
+      gerarRoteiro(clienteId, { origem: "livre", textoTema: TEMA, objetivo: "alcance", duracao: "longo", observacao: "[mock:oferta-de-graca-sempre]" }),
+    ).rejects.toBeInstanceOf(ErroIA);
+    expect(await db().select().from(roteiros)).toHaveLength(0);
+  });
+
   it("reprovar nas duas tentativas é erro de IA e nada é gravado", async () => {
     await medirORamo();
     await expect(

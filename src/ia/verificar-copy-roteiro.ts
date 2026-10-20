@@ -490,6 +490,38 @@ const DEMAIS: Conferencia[] = [
 
 export const REGRAS_QUE_REPROVAM = [...CONFORMIDADE, ...DEMAIS].map((c) => c.regra);
 
+/** O que a saída do roteiro longo precisa ter para a conformidade (R-CONF) olhar: o gancho do vídeo, cada capítulo (nome, pontos, gancho para o próximo, na imagem), a chamada e a tela. */
+export type SaidaLongaParaConformidade = {
+  gancho: string;
+  chamadaFinal: string;
+  capitulos: { nome: string; pontos: string[]; ganchoParaOProximo: string | null; naImagem: string }[];
+  edicao: { textoNaTela: { oQue: string }[] };
+};
+
+/**
+ * E50 parte 2, PR 4: as R-CONF no roteiro longo (decisão do Fable de 20/10/2026: a conformidade vale
+ * em qualquer roteiro). Só elas, e reprovam nas duas tentativas. O corpo é a fala dos capítulos
+ * (pontos e gancho para o próximo); as regras de estrutura e de texto do vídeo curto não rodam aqui.
+ */
+export function verificarConformidadeDoLongo(saida: SaidaLongaParaConformidade, contexto: { fontes: string; ramoSaude: boolean }): string[] {
+  const frasesNaTela = saida.edicao.textoNaTela.map((t) => t.oQue).filter((t) => t.trim());
+  const corpo = saida.capitulos.flatMap((c) => [...c.pontos, c.ganchoParaOProximo ?? ""]).filter((t) => t.trim()).join(". ");
+  const nomes = saida.capitulos.map((c) => c.nome).join(". ");
+  const entrada: EntradaCopyRoteiro = {
+    estrutura: "reels_falado",
+    gancho: saida.gancho,
+    corpo,
+    fechamento: "",
+    chamadaFinal: saida.chamadaFinal,
+    textoTodo: [saida.gancho, nomes, corpo, saida.chamadaFinal, ...frasesNaTela].join(". "),
+    frasesNaTela,
+    fontes: contexto.fontes,
+    ramoSaude: contexto.ramoSaude,
+    tentativa: 1,
+  };
+  return CONFORMIDADE.map((c) => c.roda(entrada)).filter((m): m is string => Boolean(m));
+}
+
 export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): ResultadoCopyRoteiro {
   const reprovam: string[] = [];
   const avisos: string[] = [];

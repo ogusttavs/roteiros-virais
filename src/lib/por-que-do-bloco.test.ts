@@ -114,7 +114,12 @@ describe("textosDoPorQue", () => {
     const t = textosDoPorQue({ bloco: "corpo", regras: ["R-COPY-13"], para: "guardem" });
     expect(t.oQueFaz).toBe(regra("R-COPY-13").porQue);
     expect(t.comBaseEm).toEqual({ tipo: "regra", texto: "uma regra de escrita para vídeo" });
-    expect(t.para).toBe("Para a pessoa guardar e usar depois.");
+    expect(t.para).toBe("Que a pessoa guarde e use depois.");
+  });
+  it("com duas ou três regras, 'O que faz' junta no máximo duas frases, a primeira regra primeiro", () => {
+    const t = textosDoPorQue({ bloco: "corpo", regras: ["R-COPY-12", "R-COPY-13", "R-COPY-01"] });
+    expect(t.oQueFaz).toBe(`${regra("R-COPY-12").porQue} ${regra("R-COPY-13").porQue}`);
+    expect(t.oQueFaz).not.toContain(regra("R-COPY-01").porQue);
   });
   it("com vídeo, 'Com base em' é o vídeo no segundo", () => {
     expect(textosDoPorQue({ bloco: "gancho", regras: ["R-COPY-05"], video: { videoId: 7, segundo: 12 } }).comBaseEm).toEqual({ tipo: "video", videoId: 7, segundo: 12 });

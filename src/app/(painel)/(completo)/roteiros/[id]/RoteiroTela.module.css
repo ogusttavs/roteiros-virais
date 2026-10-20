@@ -1289,3 +1289,9 @@
 .blocosLongos {
   max-width: var(--largura-leitura);
 }
+
+/* E50 parte 2, PR 4: "Ver os porquês" no alto do roteiro, à direita da linha das chaves. */
+.linhaPorques {
+  display: flex;
+  justify-content: flex-end;
+}

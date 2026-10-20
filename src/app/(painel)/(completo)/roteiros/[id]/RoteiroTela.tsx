@@ -46,6 +46,7 @@ import { ConviteInstalar } from "@/ui/componentes/ConviteInstalar";
 import { LinhaMarcasDeFala } from "@/ui/componentes/LinhaMarcasDeFala";
 import { MotivoSemRede } from "@/ui/componentes/MotivoSemRede";
 import { PainelFlutuante } from "@/ui/componentes/PainelFlutuante";
+import { PorQuesProvider, VerOsPorques, type VideoDoPorQue } from "@/ui/componentes/PorQue";
 import { RoteiroTexto, type BlocoRoteiro } from "@/ui/componentes/RoteiroTexto";
 import { TelaReescrevendo } from "@/ui/componentes/TelaReescrevendo";
 import { Toast } from "@/ui/componentes/Toast";
@@ -103,6 +104,7 @@ function listaComE(itens: string[]): string {
 }
 
 function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
+  const chavesDasTelas = edicao.textoNaTela.map((_, i) => `tela:${i}`);
   const textoNaTela =
     edicao.textoNaTela.length > 0
       ? edicao.textoNaTela.map((item) => `${item.quando}, "${item.oQue}", ${item.onde}`).join("; ")
@@ -111,7 +113,7 @@ function itensEdicao(edicao: ConteudoRoteiro["edicao"]): ItemEdicao[] {
     edicao.recursos.length > 0 ? edicao.recursos.join("; ") : textosRoteiro.edicao.semRecurso;
 
   return [
-    { icone: Type, rotulo: textosRoteiro.edicao.texto, texto: textoNaTela },
+    { icone: Type, rotulo: textosRoteiro.edicao.texto, texto: textoNaTela, porQueChaves: chavesDasTelas },
     { icone: Scissors, rotulo: textosRoteiro.edicao.corte, texto: edicao.ritmoDeCorte },
     { icone: Eye, rotulo: textosRoteiro.edicao.recursos, texto: recursos },
     {
@@ -229,6 +231,8 @@ type Props = {
   /** Os blocos de leitura, já montados no servidor (`blocosParaLeitura`, `servicos/roteiro.ts`): reels ou story. */
   blocos: BlocoRoteiro[];
   video: VideoParaEmbed | null;
+  /** E50 parte 2, PR 4: os vídeos do banco que o "Por quê" cita, já resolvidos no servidor (o link só https). */
+  videosDoPorQue?: Record<number, VideoDoPorQue>;
   versoes: VersaoRoteiro[];
   /** E55 PR 2b: o assunto em alta de onde o roteiro nasceu (nulo nos outros): o selo, a linha de prazo ou o aviso de que passou, e o "De onde veio" próprio. */
   momento?: MomentoDoRoteiro | null;
@@ -261,6 +265,7 @@ export function RoteiroTela({
   corpo,
   blocos,
   video,
+  videosDoPorQue,
   versoes,
   momento = null,
   grupoDeVersoes = null,
@@ -343,13 +348,19 @@ export function RoteiroTela({
     if (ligar) pedirMarcas();
   }
   const mostrarMarcas = marcasLigadas && marcasProntas !== null;
-  const blocosVisiveis: BlocoRoteiro[] = mostrarMarcas
+  const blocosDaTela: BlocoRoteiro[] = mostrarMarcas
     ? blocos.map((bloco, indice) => {
         const nome = BLOCOS_FALADOS[indice];
         const marcado = nome ? marcadoParaOsParagrafos(bloco.paragrafos, paragrafosMarcados(marcasProntas, nome)) : null;
         return marcado ? { ...bloco, marcado, tom: marcasProntas.blocos.find((b) => b.bloco === nome)?.tom } : bloco;
       })
     : blocos;
+  // E50 parte 2, PR 4: a chave de cada bloco no "Por quê": Reels falado tem quatro (gancho, corpo, fechamento, chamada); Story e sem fala, um cartão por bloco.
+  const ehPorCartao = roteiro.formato === "story" || roteiro.estilo === "sem_fala";
+  const blocosVisiveis: BlocoRoteiro[] = blocosDaTela.map((bloco, indice) => ({
+    ...bloco,
+    porQueChave: ehPorCartao ? `cartao:${indice}` : (["gancho", "corpo", "fechamento", "chamada"] as const)[indice],
+  }));
   const temChaveDeMarcas = fala.podeMarcar && (!fala.somenteLeitura || fala.marcas !== null);
   // E41 2c: "No PDF e na imagem, com as marcas de fala", no menu "Mais opções": desligada por padrão, vale para o PDF e para a imagem (as marcas que ainda não existem são escritas na hora do pedido).
   const [exportarComMarcas, setExportarComMarcas] = useState(false);
@@ -1010,7 +1021,7 @@ export function RoteiroTela({
             ) : null}
           </div>
         ) : (
-          <>
+          <PorQuesProvider itens={corpo.porQueDosBlocos} videos={videosDoPorQue}>
             <article className={ehLongo ? styles.blocosLongos : styles.blocos}>
               {temChaveDeMarcas ? (
                 <LinhaMarcasDeFala
@@ -1021,6 +1032,11 @@ export function RoteiroTela({
                   erro={marcasLigadas ? erroMarcas : null}
                   avisos={marcasProntas?.avisos ?? []}
                 />
+              ) : null}
+              {corpo.porQueDosBlocos?.some((i) => i.regras.length > 0) ? (
+                <div className={styles.linhaPorques}>
+                  <VerOsPorques />
+                </div>
               ) : null}
               {ehLongo ? (
                 <RoteiroLongo corpo={corpo} somenteLeitura={fala.somenteLeitura} semConexao={semConexao} marcas={mostrarMarcas ? marcasProntas : null} salvar={salvarCapitulo} />
@@ -1118,7 +1134,7 @@ export function RoteiroTela({
                 </div>
               </div>
             )}
-          </>
+          </PorQuesProvider>
         )}
 
         {!editando && corpo.legenda ? (

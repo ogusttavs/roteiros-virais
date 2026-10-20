@@ -6,6 +6,7 @@ import { textosPesquisa } from "@/textos/pesquisa";
 import { textosRoteiro } from "@/textos/roteiro";
 
 import { FalaMarcada } from "./FalaMarcada";
+import { PorQueAberto, PorQueBotao } from "./PorQue";
 import styles from "./RoteiroTexto.module.css";
 
 export type BlocoRoteiro = {
@@ -21,6 +22,8 @@ export type BlocoRoteiro = {
   cenas?: { momento: string; oQueFazer: string }[];
   /** E54 (parte 3): os números das fontes que cada parágrafo usa (um array por parágrafo, vazio quando não usa nenhuma): o número pequeno que leva às "Fontes". */
   fontes?: number[][];
+  /** E50 parte 2, PR 4: a chave deste bloco no "Por quê" (`gancho`, `corpo`, `fechamento`, `chamada` ou `cartao:N`); sem ela, ou sem por quê, nada aparece. */
+  porQueChave?: string;
 };
 
 type Props = {
@@ -45,7 +48,10 @@ export function RoteiroTexto({ blocos, modoGravacao = false, comCenas = false, c
     <article className={[styles.roteiro, modoGravacao ? styles.gravacao : ""].filter(Boolean).join(" ")}>
       {blocos.map((bloco, indice) => (
         <div key={bloco.rotulo} className={[styles.bloco, comCenas && (bloco.cenas?.length || bloco.mostrar?.length) ? styles.comCena : ""].filter(Boolean).join(" ")} data-bloco-de-fala>
-          <span className={styles.rotulo}>{bloco.rotulo}</span>
+          <span className={styles.rotuloELinha}>
+            <span className={styles.rotulo}>{bloco.rotulo}</span>
+            {bloco.porQueChave ? <PorQueBotao chaves={[bloco.porQueChave]} id={`pq-${bloco.porQueChave.split(":").join("-")}`} rotuloDoBloco={bloco.rotulo} /> : null}
+          </span>
           <div className={styles.fala}>
             {bloco.paragrafos.map((paragrafo, i) => (
               <p key={i} className={indice === 0 && !modoGravacao ? styles.gancho : styles.paragrafo}>
@@ -82,6 +88,7 @@ export function RoteiroTexto({ blocos, modoGravacao = false, comCenas = false, c
               ))}
             </div>
           ) : null}
+          {bloco.porQueChave ? <PorQueAberto chaves={[bloco.porQueChave]} id={`pq-${bloco.porQueChave.split(":").join("-")}`} /> : null}
         </div>
       ))}
     </article>

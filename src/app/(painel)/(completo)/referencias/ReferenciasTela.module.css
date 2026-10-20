@@ -187,10 +187,16 @@
   gap: var(--espaco-2);
 }
 
+/*
+ * A classe repetida de propósito (E50 parte 2, PR 4: o e2e `referencias-pilulas` caiu quando o
+ * grafo de CSS do build mudou): o `.botao` de `Botao.module.css` também põe `display`, com a mesma
+ * especificidade, e quem ganha é a ordem em que o build junta os arquivos de CSS, que muda sempre
+ * que um componente novo importa outro. Com a classe duas vezes, o "esconder" ganha em qualquer ordem.
+ */
 @media (min-width: 1024px) {
-  .seletorPeriodo,
-  .botaoFiltrar,
-  .fichas {
+  .seletorPeriodo.seletorPeriodo,
+  .botaoFiltrar.botaoFiltrar,
+  .fichas.fichas {
     display: none;
   }
 }

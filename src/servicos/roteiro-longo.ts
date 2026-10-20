@@ -13,12 +13,14 @@
  */
 import { and, eq, inArray } from "drizzle-orm";
 
+import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
 import { videos, type ConteudoRoteiro, type Objetivo } from "@/db/schema";
 import { NUMEROS_REGRAS_ROTEIRO_LONGO } from "@/ia/prompts/regras-formato";
 import type { NoticiaDoAssuntoNaEntrada, PerguntaPresaNaEntrada } from "@/ia/prompts/roteiro";
 import * as roteiroLongoIA from "@/ia/prompts/roteiroLongo";
 import { gerarComVerificacao, palavrasDeConteudo } from "@/ia/verificador";
+import { verificarConformidadeDoLongo } from "@/ia/verificar-copy-roteiro";
 import {
   camposCorridosDosCapitulos,
   iniciosDosCapitulos,
@@ -38,6 +40,7 @@ import { limparParaPromptSemAspas } from "@/servicos/noticias-assuntos";
 import type { VozNumerada } from "@/servicos/vozes-do-publico";
 import { textosRoteiro } from "@/textos/roteiro";
 
+import { ramoAtualDoCliente } from "./ramos";
 import { longosDoSetor, type MedidaDosLongos, medirOsLongos, type VideoLongoDoSetor } from "./videos-longos";
 
 /** Erro do roteiro longo com frase pronta para a pessoa; `roteiro.ts` o converte em `ErroRoteiro`. */
@@ -324,6 +327,8 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
 
   const referencias = await referenciasDoRamo(dados.nichoId, longos);
   const idsDasReferencias = referencias.map((r) => r.id);
+  // E50 parte 2, PR 4: o ramo de saúde liga o R-CONF-07 também no longo.
+  const ramoSaude = ramoPorSlug((await ramoAtualDoCliente(dados.nichoId))?.ramoSlug)?.grupo === "saude";
 
   const { dados: saida, geracaoId } = await gerarComVerificacao({
     tarefa: "roteiroLongo",
@@ -381,7 +386,8 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
     extrairPorQueAssim: (d) => regrasCitadasQueExistem(d.porQueAssim),
     extrairCampos: camposDoRoteiroLongo,
     extrairEvidencias: (d) => d.evidencias,
-    verificarExtra: (d, tentativa) => motivosDoRoteiroLongo(d, duracaoAlvoS, tentativa),
+    // E50 parte 2, PR 4: as R-CONF (e só elas) valem também no longo, nas duas tentativas.
+    verificarExtra: (d, tentativa) => [...verificarConformidadeDoLongo(d, { fontes: dados.fontesDosFatos, ramoSaude }), ...motivosDoRoteiroLongo(d, duracaoAlvoS, tentativa)],
   });
 
   const { conteudo, referenciaVideoId } = conteudoDoRoteiroLongo(saida, idsDasReferencias);
