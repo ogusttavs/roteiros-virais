@@ -227,6 +227,10 @@ describe("R-ROTEIRO-01, 14 e 15 (só no Reels falado)", () => {
     expect(com(reprovam({ chamadaFinal: "Então é isso, gente, obrigado por assistir." }), "R-ROTEIRO-14")).toBe(true);
     expect(com(reprovam({ chamadaFinal: "Obrigado por assistir." }), "R-ROTEIRO-14")).toBe(true);
   });
+  it("R-ROTEIRO-14 reprova o encerramento vazio mesmo quando o resto da frase traz um verbo de ação", () => {
+    expect(com(reprovam({ chamadaFinal: "Então é isso, me chama no WhatsApp." }), "R-ROTEIRO-14")).toBe(true);
+    expect(com(reprovam({ chamadaFinal: "Valeu, me chama no WhatsApp." }), "R-ROTEIRO-14")).toBe(true);
+  });
   it("R-ROTEIRO-14 reprova último bloco sem ação nem pergunta", () => {
     expect(com(reprovam({ chamadaFinal: "O box fica transparente." }), "R-ROTEIRO-14")).toBe(true);
   });
@@ -237,7 +241,8 @@ describe("R-ROTEIRO-01, 14 e 15 (só no Reels falado)", () => {
     expect(com(reprovam({ chamadaFinal: "", fechamento: "Obrigado por assistir." }), "R-ROTEIRO-14")).toBe(true);
   });
   it("R-ROTEIRO-15 reprova fechamento longo ou com mais de duas frases", () => {
-    const longo = Array.from({ length: TETO_PALAVRAS_FECHAMENTO + 5 }, () => "palavra").join(" ");
+    const longo = Array.from({ length: 50 }, () => "palavra").join(" ");
+    expect(TETO_PALAVRAS_FECHAMENTO).toBe(45);
     expect(com(reprovam({ fechamento: longo }), "R-ROTEIRO-15")).toBe(true);
     expect(com(reprovam({ fechamento: "Ficou limpo. Ficou claro. Ficou novo." }), "R-ROTEIRO-15")).toBe(true);
     expect(com(reprovam({ fechamento: "Ficou limpo. Ficou claro." }), "R-ROTEIRO-15")).toBe(false);
