@@ -11,6 +11,7 @@ import {
   REGRAS_QUE_REPROVAM,
   TETO_PALAVRAS_FECHAMENTO,
   montarEntradaCopyRoteiro,
+  verificarConformidadeDoLongo,
   verificarRegrasCopyRoteiro,
 } from "./verificar-copy-roteiro";
 
@@ -330,6 +331,34 @@ describe("os avisos (nunca reprovam)", () => {
     const r = avisos({ gancho: abertura, corpo: "corpo curto aqui", fechamento: "fim curto", chamadaFinal: "chama aqui" });
     expect(com(r, "R-ROTEIRO-16")).toBe(true);
     expect(com(avisos({ gancho: "a b", corpo: "c d", fechamento: "e", chamadaFinal: "f" }), "R-ROTEIRO-16")).toBe(false);
+  });
+});
+
+describe("verificarConformidadeDoLongo (PR 4): as R-CONF no roteiro longo", () => {
+  const longo = {
+    gancho: "Em 5 minutos eu mostro como tirar a mancha do sofá da Neusa.",
+    chamadaFinal: "Me manda a foto da sua mancha no WhatsApp.",
+    capitulos: [
+      { nome: "A mancha que volta", pontos: ["Mostre o sofá", "Conte o que fez"], ganchoParaOProximo: "No próximo capítulo eu mostro o erro mais comum.", naImagem: "o sofá" },
+      { nome: "O erro", pontos: ["Aplique e espere dez minutos"], ganchoParaOProximo: null, naImagem: "o relógio" },
+    ],
+    edicao: { textoNaTela: [{ oQue: "a mancha voltou?" }] },
+  };
+  const ctx = { fontes: "perfil: limpeza de sofás", ramoSaude: false };
+  it("um longo limpo não reprova", () => {
+    expect(verificarConformidadeDoLongo(longo, ctx)).toEqual([]);
+  });
+  it("R-CONF-03 no gancho, R-CONF-04 num ponto, R-CONF-09 no nome do capítulo e R-CONF-07 em ramo de saúde", () => {
+    expect(verificarConformidadeDoLongo({ ...longo, gancho: "Orçamento grátis para o seu sofá." }, ctx).some((m) => m.startsWith("R-CONF-03"))).toBe(true);
+    expect(verificarConformidadeDoLongo({ ...longo, capitulos: [{ ...longo.capitulos[0], pontos: ["Oito em cada dez erram, 80% das pessoas"] }, longo.capitulos[1]] }, ctx).some((m) => m.startsWith("R-CONF-04"))).toBe(true);
+    expect(verificarConformidadeDoLongo({ ...longo, capitulos: [{ ...longo.capitulos[0], nome: "Que porra de mancha" }, longo.capitulos[1]] }, ctx).some((m) => m.startsWith("R-CONF-09"))).toBe(true);
+    const saude = { ...longo, chamadaFinal: "Resultado garantido, me chama." };
+    expect(verificarConformidadeDoLongo(saude, { ...ctx, ramoSaude: true }).some((m) => m.startsWith("R-CONF-07"))).toBe(true);
+    expect(verificarConformidadeDoLongo(saude, ctx).some((m) => m.startsWith("R-CONF-07"))).toBe(false);
+  });
+  it("só as R-CONF: palavra de propaganda, vocativo e fechamento vazio no longo não reprovam aqui", () => {
+    const m = verificarConformidadeDoLongo({ ...longo, gancho: "Pessoal, uma oportunidade única.", capitulos: [longo.capitulos[0], { ...longo.capitulos[1], pontos: ["Então é isso"] }] }, ctx);
+    expect(m).toEqual([]);
   });
 });
 

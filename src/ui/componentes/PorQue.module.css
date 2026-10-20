@@ -1,0 +1,91 @@
+/* O "Por quê" de cada bloco (E50 parte 2, PR 4; design v2, passo 24, `base.css` .porque-botao e .porque-aberto). Fechado, só a palavra, discreta; aberto, o fundo recuado do "De onde veio". */
+.botao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-1);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  margin-block: calc(var(--espaco-3) * -1);
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  font: var(--peso-medio) var(--tamanho-rodape) / 1 var(--fonte-texto);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--cor-texto-suave);
+  cursor: pointer;
+}
+
+.botao svg {
+  transition: transform var(--duracao-troca) var(--curva-padrao);
+}
+
+.botao[aria-expanded="true"] {
+  color: var(--cor-titulo);
+}
+
+.botao[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.botao:focus-visible,
+.verTodos:focus-visible {
+  outline: 2px solid var(--cor-foco);
+  outline-offset: 2px;
+}
+
+.aberto {
+  display: grid;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-2);
+  padding: var(--espaco-3) var(--espaco-4);
+  border-radius: var(--raio-md);
+  background: var(--cor-superficie-recuada);
+  font-size: var(--tamanho-rodape);
+  color: var(--cor-texto);
+}
+
+.secao {
+  display: grid;
+  gap: var(--espaco-1);
+}
+
+.secao p {
+  margin: 0;
+}
+
+.aberto b {
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+}
+
+.aberto a {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--altura-toque);
+  margin-block: calc(var(--espaco-2) * -1);
+  color: var(--cor-titulo);
+  font-weight: var(--peso-semibold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.frase {
+  font: var(--peso-medio) var(--tamanho-rodape) / 1.3 var(--fonte-mono);
+  color: var(--cor-texto-dica);
+}
+
+.verTodos {
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-2);
+  margin-left: auto;
+  border: 0;
+  border-radius: var(--raio-sm);
+  background: transparent;
+  font: var(--peso-medio) var(--tamanho-secundario) / 1 var(--fonte-texto);
+  color: var(--cor-titulo);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

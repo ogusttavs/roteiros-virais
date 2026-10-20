@@ -55,6 +55,16 @@ export default async function Roteiro({ params }: Props) {
     grupoDoRoteiro(cliente.id, roteiroId).then((g) => (g && g.total > 1 ? g : null)).catch(() => null),
   ]);
 
+  // E50 parte 2, PR 4: os vídeos do banco que o "Por quê" cita (o link só https, a conta e quantas vezes acima do normal). Uma falha em um vídeo só tira o link dele.
+  const idsDosPorQues = [...new Set((corpoDoRoteiro(roteiro).porQueDosBlocos ?? []).flatMap((i) => (i.video ? [i.video.videoId] : [])))].slice(0, 8);
+  const videosDoPorQue = Object.fromEntries(
+    (await Promise.all(idsDosPorQues.map((id) => videoPorId(id).catch(() => null)))).flatMap((v) =>
+      v
+        ? [[v.id, { url: enderecoHttpsSeguro(v.url), conta: v.contaHandle ? `@${v.contaHandle.replace(/^@/, "")}` : v.contaNome, vezes: v.foraDaCurva > 0 ? v.foraDaCurva : null }] as const]
+        : [],
+    ),
+  );
+
   // E53 (parte 3): de onde o roteiro veio, quando nasceu de uma notícia: a de um assunto da marca (a cópia que o roteiro guardou) ou a do setor (a linha da tabela). O link é revalidado (só https).
   const noticiaDoSetor = !roteiro.noticiaDoAssunto && roteiro.noticiaId ? await noticiaDeOrigemDoRoteiro(roteiro.noticiaId) : null;
   const noticiaDeOrigem = roteiro.noticiaDoAssunto
@@ -83,6 +93,7 @@ export default async function Roteiro({ params }: Props) {
       blocos={blocos}
       pesquisa={pesquisa}
       video={video}
+      videosDoPorQue={videosDoPorQue}
       versoes={versoes}
       momento={momento}
       grupoDeVersoes={grupoDeVersoes}

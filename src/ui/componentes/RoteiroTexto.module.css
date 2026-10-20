@@ -95,9 +95,12 @@
     align-items: start;
   }
 
-  .comCena > .rotulo {
+  .comCena > .rotuloELinha {
     grid-column: 1 / -1;
-    justify-self: start;
+  }
+
+  .comCena > :global([data-porque-aberto]) {
+    grid-column: 1 / -1;
   }
 }
 
@@ -150,4 +153,13 @@
   line-height: 1;
   color: var(--cor-texto-suave);
   vertical-align: 0.35em;
+}
+
+/* E50 parte 2, PR 4: o chip do bloco e, ao lado, a palavra "Por quê" (só quando há por quê). */
+.rotuloELinha {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--espaco-1) var(--espaco-2);
 }

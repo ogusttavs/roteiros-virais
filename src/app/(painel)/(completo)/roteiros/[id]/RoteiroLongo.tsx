@@ -9,6 +9,7 @@ import { ganchosDosCapitulos, marcadoParaOsParagrafos, paragrafosMarcados, type 
 import { textosRoteiro } from "@/textos/roteiro";
 import { AreaTexto } from "@/ui/componentes/AreaTexto";
 import { FalaMarcada } from "@/ui/componentes/FalaMarcada";
+import { PorQueAberto, PorQueBotao } from "@/ui/componentes/PorQue";
 
 import styles from "./RoteiroLongo.module.css";
 
@@ -160,6 +161,7 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
       <div className={styles.cabeca}>
         <span className={styles.tempo}>{textosRoteiro.capitulos.capitulo(indice + 1, tempoNaTela(inicioS), tempoNaTela(inicioS + capitulo.duracaoS))}</span>
         <h3 id={idTitulo}>{capitulo.nome}</h3>
+        <PorQueBotao chaves={[`capitulo:${indice}`]} id={`pq-capitulo-${indice}`} rotuloDoBloco={capitulo.nome} />
         {podeEditar ? (
           <button type="button" className={styles.botaoTexto} onClick={abrir} aria-label={textosRoteiro.capitulos.editarCapitulo(capitulo.nome)} data-editar-capitulo>
             <Pencil size={14} strokeWidth={1.5} aria-hidden="true" />
@@ -195,8 +197,14 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
         <dl>
           {ehOPrimeiro ? (
             <div>
-              <dt>{textosRoteiro.capitulos.ganchoDoVideo}</dt>
-              <dd className={styles.gancho}>{marcadoDoGancho ? <FalaMarcada marcado={marcadoDoGancho} /> : gancho}</dd>
+              <dt>
+                {textosRoteiro.capitulos.ganchoDoVideo}
+                <PorQueBotao chaves={["gancho"]} id="pq-gancho" rotuloDoBloco={textosRoteiro.capitulos.ganchoDoVideo} />
+              </dt>
+              <dd className={styles.gancho}>
+                {marcadoDoGancho ? <FalaMarcada marcado={marcadoDoGancho} /> : gancho}
+                <PorQueAberto chaves={["gancho"]} id="pq-gancho" />
+              </dd>
             </div>
           ) : null}
           {capitulo.ganchoParaOProximo ? (
@@ -207,8 +215,14 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
           ) : null}
           {ehOUltimo && chamadaFinal.trim() ? (
             <div>
-              <dt>{textosRoteiro.capitulos.chamada}</dt>
-              <dd className={styles.gancho}>{marcadoDaChamada ? <FalaMarcada marcado={marcadoDaChamada} /> : chamadaFinal}</dd>
+              <dt>
+                {textosRoteiro.capitulos.chamada}
+                <PorQueBotao chaves={["chamada"]} id="pq-chamada" rotuloDoBloco={textosRoteiro.capitulos.chamada} />
+              </dt>
+              <dd className={styles.gancho}>
+                {marcadoDaChamada ? <FalaMarcada marcado={marcadoDaChamada} /> : chamadaFinal}
+                <PorQueAberto chaves={["chamada"]} id="pq-chamada" />
+              </dd>
             </div>
           ) : null}
           <div>
@@ -234,6 +248,7 @@ function CartaoDoCapitulo({ indice, capitulo, inicioS, ehOPrimeiro, ehOUltimo, g
           ) : null}
         </dl>
       )}
+      <PorQueAberto chaves={[`capitulo:${indice}`]} id={`pq-capitulo-${indice}`} />
     </section>
   );
 }
