@@ -58,7 +58,10 @@ describe("a tabela gerada das 53 regras (seção 11)", () => {
   it("a força e a coluna 'confere por código' foram lidas do começo da célula", () => {
     const porNumero = new Map(REGRAS_COPY_ROTEIRO.map((r) => [r.numero, r]));
     expect(porNumero.get("R-ROTEIRO-05")?.forca).toBe("forte");
-    expect(porNumero.get("R-COPY-21")?.forca).toBe("media");
+    expect(porNumero.get("R-COPY-25")?.forca).toBe("media");
+    // Decisão do Fable de 20/10/2026: o banco tem 28 vídeos (menos de 30), então indício.
+    expect(porNumero.get("R-COPY-21")?.forca).toBe("indicio");
+    expect(porNumero.get("R-COPY-21")?.conferePorCodigo).toBe("so_avisa");
     expect(porNumero.get("R-COPY-03")?.forca).toBe("indicio");
     expect(porNumero.get("R-COPY-03")?.conferePorCodigo).toBe("so_avisa");
     expect(porNumero.get("R-CONF-07")?.conferePorCodigo).toBe("sim");
@@ -116,11 +119,12 @@ describe("o gerador (lógica pura)", () => {
 describe("o que o prompt recebe", () => {
   it("só as de força forte e média entram; as de indício ficam fora", () => {
     const entram = regrasQueEntramNoPrompt();
-    expect(entram).toHaveLength(28);
+    expect(entram).toHaveLength(27);
     expect(entram.every((r) => r.forca !== "indicio")).toBe(true);
     const texto = textoRegrasCopyRoteiro();
     expect(texto).toContain("R-ROTEIRO-05");
-    expect(texto).toContain("R-COPY-21");
+    expect(texto).toContain("R-COPY-25");
+    expect(texto).not.toContain("R-COPY-21");
     expect(texto).not.toContain("R-COPY-03 ");
     expect(texto).not.toContain("R-ROTEIRO-19");
     expect(texto).not.toContain("R-COPY-04 ");

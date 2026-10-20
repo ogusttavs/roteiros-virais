@@ -286,7 +286,7 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * (leitura de não advogado, com a pendência do conselho de odontologia), depois as de copy e de estrutura de força forte e média; as de indício ficam fora. O bloco é fixo, vale para Reels, Story
  * e sem fala (neste, para o texto na tela) e não entra no `porQueAssim`, que segue citando só as regras de plataforma. Não vai para produção antes da prova pequena com chave real.
  */
-export const versao = "2.17.0";
+export const versao = "2.18.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 

@@ -704,6 +704,11 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
    */
   verificarExtra?: (dados: T, tentativa: 1 | 2) => string[];
   /**
+   * E50 parte 2 (PR 2): avisos que nunca reprovam (regra de força "indício", ou regra de calibração na segunda tentativa): o que `verificarExtra` não pega e vale registrar. Saem em
+   * `ResultadoVerificacao.avisos` da tentativa aprovada.
+   */
+  avisarExtra?: (dados: T, tentativa: 1 | 2) => string[];
+  /**
    * Achado 11 da revisão do motor (01/10/2026): o lembrete de acentuação (quando a tarefa tem
    * um) precisa continuar sendo a última linha da entrada mesmo na segunda tentativa; antes,
    * `gerarComVerificacao` colava o motivo da reprovação depois da entrada inteira (que já vinha
@@ -723,6 +728,8 @@ export type ResultadoVerificacao<T> = {
    * linha depois, sem precisar buscar de novo por tarefa e cliente.
    */
   geracaoId: number;
+  /** E50 parte 2 (PR 2): os avisos da tentativa aprovada (`avisarExtra`); vazio quando a tarefa não os pede. */
+  avisos: string[];
 };
 
 /**
@@ -748,7 +755,7 @@ export async function gerarComVerificacao<T>(
     params.lembreteFinal ? `${entrada}\n\n${params.lembreteFinal}` : entrada;
 
   const primeira = await tentarGerarEVerificar({ ...params, entrada: comLembrete(params.entrada) });
-  if (primeira.aprovado) return { dados: primeira.dados, geracaoId: primeira.geracaoId };
+  if (primeira.aprovado) return { dados: primeira.dados, geracaoId: primeira.geracaoId, avisos: primeira.avisos };
 
   /**
    * Revisão do Fable no PR #102 (M5b, achado 4): a faixa de duração do nicho reprova a primeira
@@ -764,7 +771,7 @@ export async function gerarComVerificacao<T>(
     ficha: undefined,
     entrada: comLembrete(`${params.entrada}\n\n${MARCADOR_SEGUNDA_TENTATIVA} Motivo: ${primeira.motivos.join("; ")}. Corrija isso.`),
   }, 2);
-  if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId };
+  if (segunda.aprovado) return { dados: segunda.dados, geracaoId: segunda.geracaoId, avisos: segunda.avisos };
 
   throw new ErroIA(`tarefa "${params.tarefa}" reprovada duas vezes: ${segunda.motivos.join("; ")}`);
 }
@@ -809,7 +816,7 @@ function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados
 async function tentarGerarEVerificar<T>(
   params: ParametrosGeracaoVerificada<T>,
   tentativa: 1 | 2 = 1,
-): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number }> {
+): Promise<{ aprovado: boolean; dados: T; motivos: string[]; geracaoId: number; avisos: string[] }> {
   const inicio = Date.now();
   const resultado = await gerarEstruturado(params);
   const duracaoMs = Date.now() - inicio;
@@ -821,7 +828,11 @@ async function tentarGerarEVerificar<T>(
   const conferirLocalmente = (camposDaTentativa: Record<string, string>, dadosDaTentativa: T) => {
     const base = verificarLocalmente(camposDaTentativa, opcoesVerificacaoLocal(params, dadosDaTentativa));
     const extras = params.verificarExtra?.(dadosDaTentativa, tentativa) ?? [];
-    return extras.length > 0 ? { aprovado: false, motivos: [...base.motivos, ...extras] } : base;
+    if (extras.length === 0) return base;
+    // E50 parte 2 (PR 2): as de conformidade (R-CONF) vêm antes de todas as outras no que a tentativa seguinte lê.
+    const todos = [...base.motivos, ...extras];
+    const conformidade = todos.filter((m) => m.startsWith("R-CONF-"));
+    return { aprovado: false, motivos: [...conformidade, ...todos.filter((m) => !m.startsWith("R-CONF-"))] };
   };
   let local = conferirLocalmente(campos, dados);
 
@@ -911,7 +922,7 @@ async function tentarGerarEVerificar<T>(
     duracaoMs,
   });
 
-  return { aprovado, dados, motivos, geracaoId };
+  return { aprovado, dados, motivos, geracaoId, avisos: params.avisarExtra?.(dados, tentativa) ?? [] };
 }
 
 /**

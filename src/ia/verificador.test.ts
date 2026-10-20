@@ -760,7 +760,7 @@ describe("gerarComVerificacao", () => {
 
     const resultado = await gerarComVerificacao({ ...parametrosBase, entrada: "entrada original" });
 
-    expect(resultado).toEqual({ dados: { corpo: "texto limpo" }, geracaoId: 1 });
+    expect(resultado).toEqual({ dados: { corpo: "texto limpo" }, geracaoId: 1, avisos: [] });
     expect(gerarEstruturadoMock).toHaveBeenCalledTimes(3);
 
     const segundaChamada = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
@@ -772,6 +772,25 @@ describe("gerarComVerificacao", () => {
 
     // as duas tentativas da tarefa real ficam registradas, mais a chamada de verificarTexto
     expect(registrarGeracaoMock).toHaveBeenCalledTimes(3);
+  });
+
+  /** E50 parte 2 (PR 2): `verificarExtra` reprova, o motivo de conformidade (R-CONF) vai antes dos outros na segunda tentativa, e `avisarExtra` chega no resultado da tentativa aprovada. */
+  it("as R-CONF vêm primeiro no motivo da segunda tentativa, e os avisos da tentativa aprovada voltam", async () => {
+    gerarEstruturadoMock
+      .mockResolvedValueOnce({ dados: { corpo: "ruim" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { corpo: "bom" }, modelo: "mock", ...usoZero })
+      .mockResolvedValueOnce({ dados: { aprovado: true, motivo: null }, modelo: "mock", ...usoZero });
+
+    const resultado = await gerarComVerificacao({
+      ...parametrosBase,
+      entrada: "entrada original",
+      verificarExtra: (d) => (d.corpo === "ruim" ? ["R-COPY-01: grupo", "R-CONF-03: grátis"] : []),
+      avisarExtra: (d, tentativa) => [`aviso ${d.corpo} ${tentativa}`],
+    });
+
+    expect(resultado.avisos).toEqual(["aviso bom 2"]);
+    const segunda = gerarEstruturadoMock.mock.calls[1][0] as { entrada: string };
+    expect(segunda.entrada.indexOf("R-CONF-03")).toBeLessThan(segunda.entrada.indexOf("R-COPY-01"));
   });
 
   /**

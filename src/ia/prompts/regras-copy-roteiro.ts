@@ -272,10 +272,10 @@ export const REGRAS_COPY_ROTEIRO: RegraCopyRoteiro[] = [
     "texto": "Nunca prova genérica: \"milhões\", \"estudos mostram\", \"todo mundo faz\", \"a maioria\" sem número e fonte. Dado de gente parecida (mesmo ramo ou bairro) só se estiver na ficha ou no momento, com a referência mais próxima possível; usar é opção, não obrigação.",
     "porQue": "Frase vaga como \"todo mundo faz\" soa falsa; um fato verdadeiro e próximo soa honesto.",
     "bloco": "corpo, chamada",
-    "forca": "media",
-    "forcaNoDocumento": "média (banco: indício, 28 vídeos)",
-    "conferePorCodigo": "sim",
-    "confereNoDocumento": "sim (lista de expressões genéricas reprova sem fonte da ficha ou da E54; o número citado precisa existir na ficha ou no momento)",
+    "forca": "indicio",
+    "forcaNoDocumento": "indício (banco: 28 vídeos, menos de 30; decisão do Fable de 20/10/2026, o banco manda pela precedência da 11.0)",
+    "conferePorCodigo": "so_avisa",
+    "confereNoDocumento": "só avisa, nunca reprova (lista de expressões genéricas sem fonte da ficha ou da E54; o número citado precisa existir na ficha ou no momento)",
     "fonte": "F09-1, F09-2 (A, n06); F08-6 (B, n06); F26-3, F26-9 (A, n19)"
   },
   {
