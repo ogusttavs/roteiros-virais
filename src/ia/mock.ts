@@ -559,7 +559,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
  * E52 (PR 3): o roteiro longo do mock. A duração vem da própria entrada ("Duração do vídeo: N segundos"), os capítulos somam essa duração e cada um tem 10 segundos ou mais; o último
  * não tem gancho. Marcadores de teste (valem só na primeira tentativa; com "-sempre" valem em toda): `[mock:capitulo-curto]` (um capítulo de 4 s), `[mock:soma-errada]` (a soma 40% acima
  * da duração), `[mock:dois-capitulos]` (só dois), `[mock:sem-gancho]` (o primeiro capítulo sem o gancho para o próximo), `[mock:ponto-longo]` (um ponto de mais de 20 palavras),
- * `[mock:sem-evidencia]` (nenhuma referência citada), `[mock:travessao]` (um travessão num ponto: o código corrige, sem segunda tentativa), `[mock:gancho-fora-da-cena]` (um gancho que
+ * `[mock:sem-evidencia]` (nenhuma referência citada), `[mock:travessao]` (um travessão num ponto: o código corrige, sem segunda tentativa), `[mock:oferta-de-graca]` (um gancho que oferece "grátis", que a ficha não diz: R-CONF-03), `[mock:gancho-fora-da-cena]` (um gancho que
  * não cita nada do momento descrito), `[mock:gancho-curto]` (o gancho do segundo capítulo vem como rótulo), `[mock:nome-com-tempo]` (um nome que começa com um tempo, que a lista da
  * descrição lê errado) e `[mock:nome-com-colchete]` (um espaço marcado dentro do nome).
  */
@@ -605,7 +605,9 @@ function mockRoteiroLongo(entrada: string) {
     miniatura: `A pessoa no local, com o tema em duas palavras: ${tema}`,
     gancho: marcado("gancho-fora-da-cena")
       ? `${primeiraPalavra}, um assunto qualquer que ninguém ligou a nada do que se vê`
-      : reprovado
+      : marcado("oferta-de-graca")
+        ? `${primeiraPalavra}, orçamento grátis para ${tema} nos primeiros 30 segundos`
+        : reprovado
         ? `${primeiraPalavra}, outra forma de contar ${tema} nos primeiros 30 segundos`
         : `${primeiraPalavra}, o que ${tema} ensina nos primeiros 30 segundos`,
     capitulos: duracoes.map((duracaoS, i) => {
