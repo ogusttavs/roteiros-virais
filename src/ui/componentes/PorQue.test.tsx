@@ -1,10 +1,13 @@
 /** O "Por quê" de cada bloco (E50 parte 2, PR 4; passo 24): fechado é só a palavra, aberto traz "O que faz", "Com base em" e "Para"; "Ver os porquês" abre todos; roteiro antigo não mostra a palavra. */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { Type } from "lucide-react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { REGRAS_COPY_ROTEIRO } from "@/ia/prompts/regras-copy-roteiro";
 import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 
+
+import { BlocoEdicao } from "./BlocoEdicao";
 import { enderecoNoSegundo, PorQueAberto, PorQueBotao, PorQuesProvider, VerOsPorques } from "./PorQue";
 
 afterEach(cleanup);
@@ -126,6 +129,36 @@ describe("PorQue", () => {
     expect(botao.getAttribute("aria-expanded")).toBe("true");
     fireEvent.click(screen.getByRole("button", { name: "Fechar os porquês" }));
     expect(screen.queryByText("O que faz:")).toBeNull();
+  });
+
+  it("fechar um bloco com todos abertos, fechar todos e abrir todos de novo: o bloco volta aberto (a escolha de um a um não fica)", () => {
+    render(<Tela />);
+    const botao = screen.getByRole("button", { name: "Por quê: Abertura" });
+    fireEvent.click(screen.getByRole("button", { name: "Ver os porquês" }));
+    fireEvent.click(botao);
+    expect(botao.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(screen.getByRole("button", { name: "Fechar os porquês" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ver os porquês" }));
+    expect(botao.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("o Como editar (BlocoEdicao) mostra o botão no item das frases na tela, e só quando há por quê", () => {
+    const itens = [{ icone: Type, rotulo: "Texto na tela", texto: "a mancha voltou?", porQueChaves: ["tela:0"] }];
+    render(
+      <PorQuesProvider itens={[ITENS[2]]}>
+        <BlocoEdicao titulo="Como editar" itens={itens} />
+      </PorQuesProvider>,
+    );
+    const botao = screen.getByRole("button", { name: "Por quê: Texto na tela" });
+    fireEvent.click(botao);
+    expect(screen.getByText("O que faz:")).toBeTruthy();
+    cleanup();
+    render(
+      <PorQuesProvider itens={[]}>
+        <BlocoEdicao titulo="Como editar" itens={itens} />
+      </PorQuesProvider>,
+    );
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("as frases na tela: um botão, uma seção por frase", () => {
