@@ -19,6 +19,7 @@ import {
   textoDaRegraParaOPrompt,
   textoRegrasCopyRoteiro,
 } from "./regras-copy-roteiro-uso";
+import { montarSistemaEstavel } from "./roteiro";
 
 const CAMINHO_RUBRICAS = path.resolve(process.cwd(), "../estrategia/briefing-e-rubricas.md");
 const CAMINHO_GERADO = path.resolve(process.cwd(), "src/ia/prompts/regras-copy-roteiro.ts");
@@ -173,5 +174,37 @@ describe("o que o prompt recebe", () => {
     expect(textoDaRegraParaOPrompt("O número é pedido por `R-TT-VIDEO-07` e `R-YT-SHORT-05`.", visiveis)).toBe(
       "O número é pedido pelas regras da plataforma.",
     );
+  });
+});
+
+describe("o bloco no sistema estável do roteiro", () => {
+  const BASE = {
+    perfilCompilado: "perfil do cliente",
+    modeloNicho: "modelo do nicho",
+    camadaExclusiva: "camada exclusiva",
+    tipo: "negocio" as const,
+    regrasCliente: [],
+  };
+  const casos = [
+    { nome: "Reels falado", dados: { ...BASE, formato: "reels" as const, estilo: "falado" as const } },
+    { nome: "Reels sem fala", dados: { ...BASE, formato: "reels" as const, estilo: "sem_fala" as const } },
+    { nome: "Story", dados: { ...BASE, formato: "story" as const, estilo: "falado" as const } },
+  ];
+
+  for (const caso of casos) {
+    it(`${caso.nome}: leva o bloco inteiro, as de conformidade antes das de copy, e nenhuma de indício`, () => {
+      const sistema = montarSistemaEstavel(caso.dados);
+      expect(sistema).toContain(textoRegrasCopyRoteiro());
+      expect(sistema.indexOf("R-CONF-01")).toBeLessThan(sistema.indexOf("R-COPY-01"));
+      expect(sistema).not.toContain("R-COPY-03 ");
+    });
+  }
+
+  it("o bloco é o mesmo em qualquer rede e formato (o cache do sistema estável não varia por causa dele)", () => {
+    const a = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado", redePrincipal: "tiktok" });
+    const b = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado", redePrincipal: "youtube" });
+    const pedaco = (t: string) => t.slice(t.indexOf("Regras de texto e de estrutura do roteiro"), t.indexOf("Perfil do cliente:"));
+    expect(pedaco(a)).toBe(pedaco(b));
+    expect(pedaco(a).length).toBeGreaterThan(3000);
   });
 });
