@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "checar-texto": "tsx scripts/checar-texto.ts",
+    "gerar:regras-copy-roteiro": "tsx scripts/gerar-regras-copy-roteiro.ts",
     "checar-tokens": "tsx scripts/checar-tokens.ts",
     "checar-versao-prompt": "tsx scripts/checar-versao-prompt.ts",
     "checar-admin-protegido": "tsx scripts/checar-admin-protegido.ts",

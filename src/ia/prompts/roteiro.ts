@@ -21,6 +21,7 @@ import { linhasDasVozes, listaDePlataformas, plataformasDasVozes, type VozNumera
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
 
 /**
@@ -280,7 +281,12 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * ganchos, o que PODE aparecer nos comentários, os dados usados e o "Atenção"). Os dados também entram nas fontes dos fatos, e o verificador local reprova número com unidade que não esteja
  * nelas. O sistema não mudou: sem pesquisa a entrada e as fontes são as de antes, e `entregaDaPesquisa` vem nulo.
  */
-export const versao = "2.16.0";
+/**
+ * 2.17.0 (E50 parte 2, PR 1): o SISTEMA ganha o bloco das regras de texto e de estrutura da seção 11 das rubricas (`regras-copy-roteiro-uso.ts`, gerado da tabela): as de conformidade primeiro
+ * (leitura de não advogado, com a pendência do conselho de odontologia), depois as de copy e de estrutura de força forte e média; as de indício ficam fora. O bloco é fixo, vale para Reels, Story
+ * e sem fala (neste, para o texto na tela) e não entra no `porQueAssim`, que segue citando só as regras de plataforma. Não vai para produção antes da prova pequena com chave real.
+ */
+export const versao = "2.17.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -627,6 +633,8 @@ Quando a entrada traz a linha "Ficha do vídeo", ela manda: o começo, o jeito d
 você pede no fim seguem a estrutura dela, no lugar da lista acima.
 
 ${blocoEstrutura}
+
+${textoRegrasCopyRoteiro()}
 
 Perfil do cliente:
 ${dados.perfilCompilado}${blocoRegrasCliente}
