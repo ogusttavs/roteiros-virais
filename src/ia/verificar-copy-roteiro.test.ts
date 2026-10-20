@@ -93,10 +93,10 @@ describe("R-CONF-04: pesquisa e percentual sem fonte", () => {
   it("'3 segundos' não é atribuição", () => {
     expect(com(reprovam({ corpo: BOM.corpo + " Em 3 segundos, 80% das pessoas já desistem." }), "R-CONF-04")).toBe(true);
   });
-  it("na segunda tentativa o R-CONF-04 vira aviso e a R-CONF-03 segue reprovando", () => {
+  it("na segunda tentativa o R-CONF-04 e a R-CONF-03 seguem reprovando (conformidade não afrouxa)", () => {
     const r = verificarRegrasCopyRoteiro(entrada({ tentativa: 2, corpo: "Um estudo mostra que 3 de 4 pessoas limpam errado.", gancho: "Orçamento grátis do box de 5 mil." }));
-    expect(com(r.reprovam, "R-CONF-04")).toBe(false);
-    expect(com(r.avisos, "R-CONF-04")).toBe(true);
+    expect(com(r.reprovam, "R-CONF-04")).toBe(true);
+    expect(com(r.avisos, "R-CONF-04")).toBe(false);
     expect(com(r.reprovam, "R-CONF-03")).toBe(true);
   });
   it("passa com a fonte dita na fala", () => {

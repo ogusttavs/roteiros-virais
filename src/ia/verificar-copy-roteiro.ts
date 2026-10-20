@@ -98,8 +98,7 @@ const PALAVRA_DE_PESQUISA = COM_FRONTEIRA([
   "estatisticas?",
   "levantamentos?",
 ]);
-/** O percentual só é dado de pesquisa quando fala de um grupo ("das pessoas", "8 em cada 10"); "100% natural" e "50% de desconto" são da oferta. */
-const GRUPO_ESTATISTICO = /(das|dos) (pessoas|brasileiros|brasileiras|clientes|casas|empresas|consumidores|donos|mulheres|homens|criancas|pacientes|familias)|(em|de) cada (dois|tres|quatro|cinco|seis|sete|oito|nove|dez|cem|[0-9]+)|[0-9]+ (em|de) cada/;
+/** Percentual sem fonte reprova, exceto o da oferta ("100% natural", "50% de desconto"). */
 const PERCENTUAL_DA_OFERTA = /(de desconto|off|de juros|a vista|de entrada|de comissao|de lucro|natural|algodao|puro|pura)/;
 const PERCENTUAL = /[0-9]+([.,][0-9]+)?[ ]?(%|por cento)/;
 const NUMERO_NA_FRASE = /[0-9]/;
@@ -116,7 +115,7 @@ function confPesquisaSemFonte(e: EntradaCopyRoteiro): string | null {
     const n = normalizar(frase);
     const percentual = PERCENTUAL.exec(n)?.[0];
     const pesquisa = PALAVRA_DE_PESQUISA.test(n);
-    const percentualDeDado = Boolean(percentual) && GRUPO_ESTATISTICO.test(n) && !PERCENTUAL_DA_OFERTA.test(n);
+    const percentualDeDado = Boolean(percentual) && !PERCENTUAL_DA_OFERTA.test(n);
     if (!percentualDeDado && !(pesquisa && NUMERO_NA_FRASE.test(n))) continue;
     if (ATRIBUICAO.test(n)) continue;
     const comoNasFontes = (percentual ?? "").split("por cento").join("%").split(" ").join("");
@@ -497,8 +496,8 @@ export function verificarRegrasCopyRoteiro(entrada: EntradaCopyRoteiro): Resulta
   for (const c of CONFORMIDADE) {
     const motivo = c.roda(entrada);
     if (!motivo) continue;
-    // Na segunda tentativa a lei e o calão seguem duros; o R-CONF-04 (percentual e pesquisa lidos por frase, a mais heurística) vira aviso.
-    (entrada.tentativa === 2 && c.regra === "R-CONF-04" ? avisos : reprovam).push(motivo);
+    // Conformidade não afrouxa (11.0): roteiro que inventa dado não vai para o ar, nas duas tentativas.
+    reprovam.push(motivo);
   }
   for (const c of DEMAIS) {
     const motivo = c.roda(entrada);
