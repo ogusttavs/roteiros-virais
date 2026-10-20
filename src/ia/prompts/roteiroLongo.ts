@@ -17,6 +17,8 @@ import type { VozNumerada } from "@/servicos/vozes-do-publico";
 import { NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
+import { pedidoPorQueDosBlocos, porQueDoBlocoSchema } from "./por-que-dos-blocos";
+import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { REGRAS_ROTEIRO_LONGO, textoRegras } from "./regras-formato";
 import {
   blocoDaPerguntaPresa,
@@ -39,7 +41,11 @@ import {
  * O código confere o que o modelo pode errar (`lib/capitulos-do-roteiro.ts`: três ou mais capítulos, cada um com 10 segundos ou mais, a soma na duração pedida; R-YT-VIDEO-05 a 08);
  * os tempos de início de cada capítulo são calculados lá, o modelo só escreve as durações.
  */
-export const versao = "1.0.0";
+/**
+ * 1.1.0 (E50 parte 2, PR 3): o roteiro longo recebe as regras de conformidade e de texto da seção 11 (sem as de estrutura do vídeo curto, que não valem para capítulos) e devolve
+ * `porQueDosBlocos` (o gancho, cada capítulo, a chamada e cada frase na tela), só números; o texto sai da tabela por código. O verificador das regras (PR 2) ainda não roda no longo.
+ */
+export const versao = "1.1.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -89,6 +95,8 @@ export const schema = z.object({
   evidencias: z.array(z.number()),
   /** As regras que o modelo seguiu de fato (R-YT-VIDEO-nn), com o motivo em português de gente. */
   porQueAssim: z.array(z.object({ regra: z.string(), motivo: z.string() })),
+  /** E50 parte 2, PR 3: o "por quê" de cada bloco (o gancho, cada capítulo, a chamada e cada frase na tela), só números (ver `por-que-dos-blocos.ts`). */
+  porQueDosBlocos: z.array(porQueDoBlocoSchema),
   /** Só preenchido com o bloco do momento; uma linha curta que vira o tema. */
   temaCurto: z.string().nullable(),
 });
@@ -195,6 +203,10 @@ ${textoRegras(REGRAS_ROTEIRO_LONGO)}
 Depois de escrever, preencha porQueAssim: uma entrada para cada regra da lista acima que você de
 fato seguiu (o número dela, ex. "R-YT-VIDEO-01", e o motivo em português de gente, sem jargão e
 sem citar o número dentro do motivo). Nunca cite uma regra que não está na lista acima.
+
+${textoRegrasCopyRoteiro("longo")}
+
+${pedidoPorQueDosBlocos("longo")}
 
 Perfil do cliente:
 ${dados.perfilCompilado}${blocoRegrasCliente}

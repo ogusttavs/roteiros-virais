@@ -33,6 +33,7 @@ import {
   verificarCapitulos,
 } from "@/lib/capitulos-do-roteiro";
 import { config } from "@/lib/config";
+import { limparPorQueDosBlocos } from "@/lib/por-que-do-bloco";
 import { limparParaPromptSemAspas } from "@/servicos/noticias-assuntos";
 import type { VozNumerada } from "@/servicos/vozes-do-publico";
 import { textosRoteiro } from "@/textos/roteiro";
@@ -244,6 +245,12 @@ export function conteudoDoRoteiroLongo(saida: roteiroLongoIA.SaidaRoteiroLongo, 
     chamadaFinal: saida.chamadaFinal.trim(),
     cartoes: null,
     porQueAssim: regrasCitadasQueExistem(saida.porQueAssim),
+    // E50 parte 2, PR 3: o "por quê" do gancho, de cada capítulo, da chamada e de cada frase na tela; o vídeo é só um dos de referência (o segundo é sempre o começo, como na referência de edição).
+    porQueDosBlocos: limparPorQueDosBlocos(saida.porQueDosBlocos, {
+      forma: { tipo: "longo", capitulos: capitulos.length, telas: saida.edicao.textoNaTela.length },
+      escopo: "longo",
+      segundoDosVideos: new Map(idsDasReferencias.map((id) => [id, 0])),
+    }),
     // O momento em segundos ("95 segundos"), a forma que os leitores do roteiro (a página, o modo gravação, o PDF e a imagem) leem; a tela do longo usa `capitulos`, com o tempo da lista.
     cenas: corridos.cenas,
     ondeGravar: saida.ondeGravar,

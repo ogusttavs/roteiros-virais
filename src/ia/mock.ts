@@ -510,6 +510,7 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       ? { videoId: ids[0], segundo: 4, oQueOlhar: "o gancho" }
       : null;
 
+  const totalDeCartoes = (narrativa as { cartoes?: unknown[] | null }).cartoes?.length ?? 0;
   return {
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
     titulo: tema,
@@ -525,6 +526,30 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       referencia,
     },
     evidencias: ids,
+    // E50 parte 2, PR 3: o "por quê" por bloco, só números. O marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe, regra inventada, regra que não vale para o bloco
+    // (R-CONF-03 é do gancho e da chamada) e vídeo fora da evidência.
+    porQueDosBlocos: [
+      ...(ehSemFala || ehStory
+        ? Array.from({ length: totalDeCartoes }, (_, i) => ({
+            bloco: `cartao:${i}`,
+            regras: i === totalDeCartoes - 1 ? ["R-COPY-25"] : ["R-COPY-13"],
+            videoId: i === 0 ? (ids[0] ?? null) : null,
+            para: i === 0 ? ("fiquem" as const) : null,
+          }))
+        : [
+            { bloco: "gancho", regras: ["R-COPY-05"], videoId: ids[0] ?? null, para: "fiquem" as const },
+            { bloco: "corpo", regras: ["R-COPY-13"], videoId: null, para: "confiem" as const },
+            { bloco: "fechamento", regras: ["R-ROTEIRO-15"], videoId: null, para: "guardem" as const },
+            { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" as const },
+            { bloco: "tela:0", regras: ["R-COPY-12"], videoId: null, para: null },
+          ]),
+      ...(entrada.includes("[mock:por-que-invalido]")
+        ? [
+            { bloco: "capitulo:3", regras: ["R-COPY-13"], videoId: null, para: null },
+            { bloco: "corpo", regras: ["R-NAO-EXISTE-99", "R-CONF-03", "R-IG-REEL-01"], videoId: 999999, para: null },
+          ]
+        : []),
+    ],
     tipoAbertura,
     entregaDaPesquisa: mockEntregaDaPesquisa(dadosDaPesquisa, tema, entrada, segundaTentativa),
   };
@@ -628,6 +653,18 @@ function mockRoteiroLongo(entrada: string) {
     porQueAssim: [
       { regra: "R-YT-VIDEO-01", motivo: "os primeiros 30 segundos já entregam o que o título prometeu" },
       { regra: "R-YT-VIDEO-13", motivo: "cada capítulo é uma parte que se entende sozinha" },
+    ],
+    // E50 parte 2, PR 3: o "por quê" por bloco, só números (o marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe, regra inventada, regra de estrutura que o longo não recebe, vídeo fora da entrada).
+    porQueDosBlocos: [
+      { bloco: "gancho", regras: ["R-COPY-05"], videoId: ids[0] ?? null, para: "fiquem" as const },
+      ...Array.from({ length: quantidade }, (_, i) => ({ bloco: `capitulo:${i}`, regras: ["R-COPY-13"], videoId: null, para: "guardem" as const })),
+      { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" as const },
+      ...(entrada.includes("[mock:por-que-invalido]")
+        ? [
+            { bloco: "capitulo:99", regras: ["R-COPY-13"], videoId: null, para: null },
+            { bloco: "tela:0", regras: ["R-NAO-EXISTE-99", "R-ROTEIRO-05"], videoId: 999999, para: null },
+          ]
+        : []),
     ],
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
   };

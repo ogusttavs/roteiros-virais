@@ -33,6 +33,7 @@ import {
 } from "../src/lib/capitulos-do-roteiro";
 import { camposDoRoteiroLongo, duracaoAlvoDaMedida, motivosDoRoteiroLongo } from "../src/servicos/roteiro-longo";
 
+import { imprimirPorQueDosBlocos } from "./golden-por-que";
 import { linhaDoResumo, resumirProducao, rodarComoEmProducao } from "./golden-producao";
 
 const objetivoSchema = z.enum(["alcance", "engajamento", "conversao"]);
@@ -247,6 +248,17 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
     console.log(`COPIAR OS CAPITULOS${volta ? "" : " (A LEITURA NAO DEVOLVE OS MESMOS CAPITULOS)"} [soma ${duracaoS}s]\n${copiar}\n`);
     console.log(`chamada final: ${saida.chamadaFinal}`);
     console.log(`onde gravar: ${saida.ondeGravar}\n`);
+
+    // E50 parte 2, PR 3: o por quê do gancho, de cada capítulo e da chamada, como a tela vai mostrar, e a coluna "o por quê está certo?" (o simulador preenche; com a chave real fica para ler).
+    imprimirPorQueDosBlocos(
+      saida.porQueDosBlocos,
+      {
+        forma: { tipo: "longo", capitulos: saida.capitulos.length, telas: saida.edicao.textoNaTela.length },
+        escopo: "longo",
+        segundoDosVideos: new Map(saida.evidencias.map((id) => [id, 0])),
+      },
+      process.env.AI_PROVIDER === "mock",
+    );
 
     if (prod.falhou) {
       casosFalhos += 1;

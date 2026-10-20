@@ -62,6 +62,7 @@ import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { BLOCOS_FALADOS, blocosFaladosDoConteudo, temCapitulos } from "@/lib/marcas-de-fala";
 import { comArroba } from "@/lib/perfil-redes";
+import { limparPorQueDosBlocos } from "@/lib/por-que-do-bloco";
 import { textosHoje } from "@/textos/hoje";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -1424,6 +1425,12 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     chamadaFinal: saida.chamadaFinal ?? "",
     cartoes: saida.cartoes,
     porQueAssim: porQueAssimValido(saida.porQueAssim),
+    // E50 parte 2, PR 3: o "por quê" de cada bloco, só o que existe (bloco, regra que o prompt mostrou e vale para o bloco, vídeo da evidência); o texto sai da tabela por código.
+    porQueDosBlocos: limparPorQueDosBlocos(saida.porQueDosBlocos, {
+      forma: saida.cartoes ? { tipo: "cartoes", cartoes: saida.cartoes.length } : { tipo: "reels", telas: saida.edicao.textoNaTela.length },
+      escopo: "curto",
+      segundoDosVideos: new Map(evidencias.map((v) => [v.id, v.analiseVisual?.momentoChave?.segundo ?? 0])),
+    }),
     cenas: saida.cenas,
     ondeGravar: saida.ondeGravar,
     edicao: {
