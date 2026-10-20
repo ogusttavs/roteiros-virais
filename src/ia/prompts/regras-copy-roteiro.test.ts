@@ -69,7 +69,8 @@ describe("a tabela gerada das 53 regras (seção 11)", () => {
   it.skipIf(!existe)("o arquivo gerado é exatamente o que o gerador produz da seção 11 de hoje", () => {
     const doDocumento = lerTabelaDaSecao11(readFileSync(CAMINHO_RUBRICAS, "utf8"));
     expect(doDocumento).toEqual(REGRAS_COPY_ROTEIRO);
-    expect(readFileSync(CAMINHO_GERADO, "utf8")).toBe(montarArquivoGerado(doDocumento));
+    // O checkout no Windows pode trazer CRLF; o que importa é o texto.
+    expect(readFileSync(CAMINHO_GERADO, "utf8").split(String.fromCharCode(13)).join("")).toBe(montarArquivoGerado(doDocumento));
   });
   if (!existe) {
     console.warn(`regras-copy-roteiro.test.ts: ${CAMINHO_RUBRICAS} não encontrado (normal na CI); a conferência contra o documento não rodou.`);
