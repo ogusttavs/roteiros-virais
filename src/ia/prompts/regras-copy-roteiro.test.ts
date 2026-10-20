@@ -8,9 +8,9 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { lerTabelaDaSecao11, montarArquivoGerado } from "../../../scripts/gerar-regras-copy-roteiro-lib";
+import { VERSAO_DAS_REGRAS, lerTabelaDaSecao11, montarArquivoGerado } from "../../../scripts/gerar-regras-copy-roteiro-lib";
 
-import { REGRAS_COPY_ROTEIRO } from "./regras-copy-roteiro";
+import { REGRAS_COPY_ROTEIRO, versao } from "./regras-copy-roteiro";
 import {
   NUMEROS_REGRAS_COPY_ROTEIRO,
   codigosEscondidosNoTexto,
@@ -34,6 +34,12 @@ describe("a tabela gerada das 53 regras (seção 11)", () => {
     expect(por("ROTEIRO")).toBe(19);
     expect(por("CONF")).toBe(9);
     expect(NUMEROS_REGRAS_COPY_ROTEIRO.size).toBe(53);
+  });
+
+  it("o arquivo gerado tem versão (o checar-versao-prompt exige quando ele muda) e ela é a do gerador", () => {
+    expect(versao).toBe(VERSAO_DAS_REGRAS);
+    expect(versao).toMatch(/^[0-9]+[.][0-9]+[.][0-9]+$/);
+    expect(montarArquivoGerado(REGRAS_COPY_ROTEIRO)).toContain(`export const versao = "${VERSAO_DAS_REGRAS}";`);
   });
 
   it("nenhuma regra sem fonte, sem texto, sem por quê ou sem bloco", () => {
