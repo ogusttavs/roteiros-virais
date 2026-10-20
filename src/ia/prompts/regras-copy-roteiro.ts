@@ -8,6 +8,8 @@
  * que a tela mostrará por código (PR 3), nunca escrita pelo modelo.
  */
 
+export const versao = "1.1.0";
+
 export type RegraCopyRoteiro = {
   numero: string;
   grupo: "COPY" | "ROTEIRO" | "CONF";
