@@ -85,8 +85,8 @@ describe("limparPorQueDosBlocos", () => {
     expect(limparPorQueDosBlocos([bruto({ bloco: "corpo", regras: ["R-COPY-13"], videoId: 99 })], reels)).toEqual([{ bloco: "corpo", regras: ["R-COPY-13"] }]);
     expect(limparPorQueDosBlocos([bruto({ bloco: "corpo", regras: ["R-XXX-01"], videoId: 99 })], reels)).toEqual([]);
   });
-  it("só um vídeo válido já basta para o bloco entrar", () => {
-    expect(limparPorQueDosBlocos([bruto({ bloco: "corpo", videoId: 7 })], reels)).toEqual([{ bloco: "corpo", regras: [], video: { videoId: 7, segundo: 12 } }]);
+  it("um vídeo sozinho não basta: sem regra válida não há o que faz", () => {
+    expect(limparPorQueDosBlocos([bruto({ bloco: "corpo", videoId: 7 })], reels)).toEqual([]);
   });
   it("bloco repetido fica com a primeira entrada; no máximo três regras; regra repetida conta uma vez", () => {
     const r = limparPorQueDosBlocos(
@@ -113,7 +113,7 @@ describe("textosDoPorQue", () => {
   it("'O que faz' é a frase da tabela, por código; 'Com base em' é o tipo de regra; 'Para' é a lista fixa", () => {
     const t = textosDoPorQue({ bloco: "corpo", regras: ["R-COPY-13"], para: "guardem" });
     expect(t.oQueFaz).toBe(regra("R-COPY-13").porQue);
-    expect(t.comBaseEm).toEqual({ tipo: "regra", texto: "uma regra de escrita para vídeo curto" });
+    expect(t.comBaseEm).toEqual({ tipo: "regra", texto: "uma regra de escrita para vídeo" });
     expect(t.para).toBe("Para a pessoa guardar e usar depois.");
   });
   it("com vídeo, 'Com base em' é o vídeo no segundo", () => {
@@ -133,10 +133,10 @@ describe("textosDoPorQue", () => {
 });
 
 describe("temPorQue", () => {
-  it("só quando há regra ou vídeo", () => {
+  it("só quando há regra", () => {
     expect(temPorQue(undefined)).toBe(false);
     expect(temPorQue({ bloco: "corpo", regras: [] })).toBe(false);
     expect(temPorQue({ bloco: "corpo", regras: ["R-COPY-13"] })).toBe(true);
-    expect(temPorQue({ bloco: "corpo", regras: [], video: { videoId: 1, segundo: 0 } })).toBe(true);
+    expect(temPorQue({ bloco: "corpo", regras: [], video: { videoId: 1, segundo: 0 } })).toBe(false);
   });
 });

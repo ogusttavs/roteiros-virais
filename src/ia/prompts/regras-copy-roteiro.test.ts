@@ -201,7 +201,7 @@ describe("o pedido do por quê de cada bloco (PR 3)", () => {
   it("pede só números, uma lista fechada de para quê, e nunca texto de explicação nem o segundo", () => {
     const texto = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado" });
     expect(texto).toContain('"fiquem", "confiem", "guardem", "chamem"');
-    expect(texto).toContain("Não escreva nenhum texto de explicação");
+    expect(texto).toContain("Neste campo não escreva nenhum texto de explicação");
     expect(texto).toContain("nunca o segundo");
   });
   it("o roteiro longo recebe conformidade e texto (sem a estrutura do curto) e pede os blocos do longo", () => {

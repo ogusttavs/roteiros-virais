@@ -32,6 +32,6 @@ export function pedidoPorQueDosBlocos(forma: FormaParaOPedido): string {
     'Em "regras", os números (por exemplo "R-COPY-08") das regras daquela lista que você de fato seguiu naquele bloco, no máximo três, só as que valem para aquele bloco (o que está entre parênteses na regra), nunca uma regra que não está na lista acima e nunca as regras de plataforma.',
     'Em "videoId", o id de um vídeo da evidência que você de fato usou como modelo para aquele bloco, ou nulo; nunca o segundo.',
     `Em "para", o que o bloco busca em quem assiste, uma destas palavras: ${PARA_QUE.map((p) => `"${p}"`).join(", ")} (continuem assistindo, confiem, guardem para usar depois, chamem), ou nulo.`,
-    "Não escreva nenhum texto de explicação: o texto que a pessoa lê sai da tabela, pelo número. Bloco em que você não seguiu regra nenhuma fica de fora; sem nenhuma, devolva a lista vazia.",
+    "Neste campo não escreva nenhum texto de explicação: o texto que a pessoa lê sai da tabela, pelo número. Bloco em que você não seguiu regra nenhuma fica de fora; sem nenhuma, devolva a lista vazia.",
   ].join(String.fromCharCode(10));
 }

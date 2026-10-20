@@ -107,7 +107,7 @@ export type ContextoDaLimpeza = {
  * Da resposta do modelo para o que se guarda: bloco que não existe, número que o prompt não mostrou,
  * regra que não vale para aquele bloco, vídeo fora da evidência e "para" fora da lista são
  * descartados (nunca derrubam a geração); um bloco repetido fica com a primeira entrada; um bloco
- * sem regra nem vídeo válidos não entra.
+ * sem nenhuma regra válida não entra (o vídeo sozinho não basta: sem regra não há "o que faz").
  */
 export function limparPorQueDosBlocos(brutos: PorQueBruto[], contexto: ContextoDaLimpeza): PorQueDoBloco[] {
   const chaves = chavesDeBlocos(contexto.forma);
@@ -128,7 +128,8 @@ export function limparPorQueDosBlocos(brutos: PorQueBruto[], contexto: ContextoD
       if (regras.length >= MAXIMO_DE_REGRAS_POR_BLOCO) break;
     }
     const segundo = bruto.videoId === null ? undefined : contexto.segundoDosVideos.get(bruto.videoId);
-    if (regras.length === 0 && segundo === undefined) continue;
+    // Sem nenhuma regra válida o bloco não tem "o que faz" para mostrar; um vídeo sozinho não basta.
+    if (regras.length === 0) continue;
     vistos.add(bloco);
     const item: PorQueDoBloco = { bloco, regras };
     if (bruto.videoId !== null && segundo !== undefined) item.video = { videoId: bruto.videoId, segundo };
@@ -139,7 +140,7 @@ export function limparPorQueDosBlocos(brutos: PorQueBruto[], contexto: ContextoD
 }
 
 const RAIZ_DA_REGRA: Record<RegraCopyRoteiro["grupo"], string> = {
-  COPY: "uma regra de escrita para vídeo curto",
+  COPY: "uma regra de escrita para vídeo",
   ROTEIRO: "uma regra de como montar o roteiro",
   CONF: "uma regra de publicidade honesta",
 };
@@ -164,7 +165,7 @@ export function textosDoPorQue(item: PorQueDoBloco): TextosDoPorQue {
   return { oQueFaz, comBaseEm, para: item.para ? TEXTO_DO_PARA[item.para] : null };
 }
 
-/** O que a tela precisa para decidir se mostra "Por quê" em um bloco: tem o que dizer (regra ou vídeo)? */
+/** O que a tela precisa para decidir se mostra "Por quê" em um bloco: tem ao menos uma regra a explicar? */
 export function temPorQue(item: PorQueDoBloco | undefined): boolean {
-  return Boolean(item && (item.regras.length > 0 || item.video));
+  return Boolean(item && item.regras.length > 0);
 }

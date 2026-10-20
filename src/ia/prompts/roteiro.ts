@@ -332,7 +332,7 @@ export const schema = z.object({
   /** As regras que o modelo seguiu de fato, com o motivo em português de gente; vazio em Reels nesta rodada. */
   porQueAssim: z.array(porQueAssimItem),
   /** E50 parte 2, PR 3: o "por quê" de cada bloco, só números (ver `por-que-dos-blocos.ts`); o servidor confere tudo e o texto vem da tabela. */
-  porQueDosBlocos: z.array(porQueDoBlocoSchema),
+  porQueDosBlocos: z.array(porQueDoBlocoSchema).catch([]),
   cenas: z.array(cena),
   /** Por que este roteiro so funciona com a pessoa de verdade (a tese, na tela). */
   ondeGravar: z.string(),

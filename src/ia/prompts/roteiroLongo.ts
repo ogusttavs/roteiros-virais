@@ -96,7 +96,7 @@ export const schema = z.object({
   /** As regras que o modelo seguiu de fato (R-YT-VIDEO-nn), com o motivo em português de gente. */
   porQueAssim: z.array(z.object({ regra: z.string(), motivo: z.string() })),
   /** E50 parte 2, PR 3: o "por quê" de cada bloco (o gancho, cada capítulo, a chamada e cada frase na tela), só números (ver `por-que-dos-blocos.ts`). */
-  porQueDosBlocos: z.array(porQueDoBlocoSchema),
+  porQueDosBlocos: z.array(porQueDoBlocoSchema).catch([]),
   /** Só preenchido com o bloco do momento; uma linha curta que vira o tema. */
   temaCurto: z.string().nullable(),
 });
