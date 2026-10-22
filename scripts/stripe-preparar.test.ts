@@ -9,7 +9,7 @@ import { PLANO } from "../src/config/assinatura";
 import { ErroDePreparo, prepararStripe, PRODUTO_ID, type StripeLike } from "./stripe-preparar-logica";
 
 type Produto = { id: string; metadata: Record<string, string>; name?: string };
-type Preco = { id: string; product: string; unit_amount: number; currency: string; lookup_key: string | null; metadata: Record<string, string>; recurring: { interval: string; interval_count: number } };
+type Preco = { id: string; active?: boolean; product: string; unit_amount: number; currency: string; lookup_key: string | null; metadata: Record<string, string>; recurring: { interval: string; interval_count: number } };
 
 function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[] } = {}) {
   const produtos = new Map<string, Produto>((inicial.produtos ?? []).map((p) => [p.id, p]));
@@ -85,6 +85,15 @@ describe("prepararStripe", () => {
     const f = stripeDeMentira({ precos: [{ id: "price_alheio", product: "prod_x", unit_amount: 7990, currency: "brl", lookup_key: PLANO.lookupKey, metadata: {}, recurring: { interval: "month", interval_count: 1 } }] });
     await expect(prepararStripe(f.stripe)).rejects.toBeInstanceOf(ErroDePreparo);
     expect(f.chamadas.some((c) => c.endsWith("create"))).toBe(false);
+  });
+
+  it("preco nosso arquivado: para com erro (o app so usa preco ativo) e nao cria outro", async () => {
+    const f = stripeDeMentira({
+      produtos: [{ id: PRODUTO_ID, metadata: { produto: "roteiros" } }],
+      precos: [{ id: "price_arquivado", active: false, product: PRODUTO_ID, unit_amount: 119_100, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
+    });
+    await expect(prepararStripe(f.stripe)).rejects.toThrow(/arquivado/);
+    expect(f.precos).toHaveLength(1);
   });
 
   it("preco nosso com valor diferente do plano: para com erro e nao cria outro", async () => {

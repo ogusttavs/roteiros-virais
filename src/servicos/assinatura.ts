@@ -10,7 +10,7 @@
  *
  * Sessão e posse ficam na Server Action (como em todo serviço deste projeto): as funções daqui recebem a marca já resolvida, nunca leem a sessão.
  */
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { DIAS_DE_FOLGA_DA_RENOVACAO, METADATA_PRODUTO } from "@/config/assinatura";
 import { db } from "@/db";
@@ -109,7 +109,7 @@ export async function iniciarAssinatura(usuario: { id: string; email: string }, 
       // Reaproveita o cliente do Stripe de uma assinatura antiga da mesma marca (cartão e histórico já lá).
       stripeClienteId: lista[0]?.stripeClienteId ?? null,
       email: usuario.email,
-      urlDeSucesso: `${config.appUrl}/hoje?assinou=1`,
+      urlDeSucesso: `${config.appUrl}/assinar?assinou=1`,
       urlDeCancelar: `${config.appUrl}/assinar`,
     });
   } catch (erro) {
@@ -193,6 +193,8 @@ export type MudancaDeAssinatura = {
   periodoInicio?: Date | null;
   periodoFim?: Date | null;
   cancelaNoFimDoPeriodo?: boolean;
+  /** Se vier, o `status` só muda quando o status atual da linha estiver nesta lista (a fatura que falhou só rebaixa quem já era assinante). */
+  soSobreStatus?: StatusAssinatura[];
 };
 
 export type LeituraDoEvento =
@@ -279,8 +281,14 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
   if (!stripeAssinaturaId) return { tipo: "ignorar", motivo: "fatura sem assinatura" };
   const metadata = detalhes?.metadata;
   const pago = evento.type === "invoice.paid";
-  const linha = objeto((Array.isArray(objeto(obj.lines)?.data) ? (objeto(obj.lines)!.data as unknown[]) : [])[0]);
-  const periodo = objeto(linha?.period);
+  // A fatura pode trazer mais de uma linha (crédito ou ajuste de um período anterior antes da assinatura): vale o período que termina mais tarde.
+  const linhas = Array.isArray(objeto(obj.lines)?.data) ? (objeto(obj.lines)!.data as unknown[]) : [];
+  let periodo: Objeto | null = null;
+  for (const bruta of linhas) {
+    const candidato = objeto(objeto(bruta)?.period);
+    const fim = dataDeSegundos(candidato?.end);
+    if (candidato && fim && (!periodo || fim > (dataDeSegundos(periodo.end) ?? new Date(0)))) periodo = candidato;
+  }
   return {
     tipo: "tratar",
     // Fatura que não traz a nossa marca só vale se a assinatura já é nossa (está no banco).
@@ -290,8 +298,10 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
       stripeClienteId: idDe(obj.customer),
       clienteId: clienteIdDoAviso(metadata),
       status: pago ? "active" : "past_due",
-      // Fatura que falha para uma assinatura que ainda não conhecemos não pode abrir o acesso: só `active` abre, e o `past_due` só vale para quem já era assinante.
+      // Fatura que falha para uma assinatura que ainda não conhecemos não pode abrir o acesso: só `active` abre, e o `past_due` só vale para quem já era assinante
+      // (`soSobreStatus`: uma assinatura ainda `incomplete`, com o primeiro pagamento em curso, não vira `past_due` e ganha acesso).
       statusSeNova: pago ? "active" : "incomplete",
+      ...(pago ? {} : { soSobreStatus: ["active", "trialing", "past_due"] as StatusAssinatura[] }),
       ...(pago ? { periodoInicio: dataDeSegundos(periodo?.start), periodoFim: dataDeSegundos(periodo?.end) } : {}),
     },
   };
@@ -303,7 +313,7 @@ export function lerEvento(evento: EventoDoStripe): LeituraDoEvento {
 
 export type ResultadoDoEvento = "tratado" | "repetido" | "ignorado";
 
-type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update">;
+type Executor = Pick<ReturnType<typeof db>, "select" | "insert" | "update" | "execute">;
 
 async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Date, eventoId: string): Promise<void> {
   const [atual] = await tx.select().from(assinaturas).where(eq(assinaturas.stripeAssinaturaId, m.stripeAssinaturaId));
@@ -336,13 +346,21 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
     return;
   }
 
+  // `canceled` e `incomplete_expired` são finais: reassinar cria OUTRA assinatura no Stripe, nunca reabre a antiga. Um evento atrasado, ou do mesmo segundo, não a ressuscita.
+  if (atual.status === "canceled" || atual.status === "incomplete_expired") return;
   // Evento mais velho que o último que escreveu aqui: o mais novo já valeu.
   if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) return;
+
+  // O `created` do Stripe tem resolução de um segundo, então dois eventos do mesmo segundo (o cadastro: assinatura criada `incomplete`, fatura paga `active`) podem chegar em qualquer ordem.
+  // Quem já saiu de `incomplete` nunca volta a ele (o Stripe não faz isso), e o desempate fica sem depender da ordem de chegada.
+  let status = m.status;
+  if (status === "incomplete" && atual.status !== "incomplete") status = undefined;
+  if (status !== undefined && m.soSobreStatus && !m.soSobreStatus.includes(atual.status)) status = undefined;
 
   await tx
     .update(assinaturas)
     .set({
-      ...(m.status !== undefined ? { status: m.status } : {}),
+      ...(status !== undefined ? { status } : {}),
       ...(m.stripeClienteId ? { stripeClienteId: m.stripeClienteId } : {}),
       ...(m.stripePrecoId ? { stripePrecoId: m.stripePrecoId } : {}),
       ...(m.periodoInicio ? { periodoInicio: m.periodoInicio } : {}),
@@ -364,6 +382,9 @@ export async function tratarEventoDoStripe(evento: EventoDoStripe): Promise<Resu
   const eventoEm = new Date(evento.created * 1000);
 
   return db().transaction(async (tx) => {
+    // Os avisos de um cadastro (checkout, assinatura criada, fatura paga) chegam quase juntos e em pedidos diferentes: sem isto, dois deles veem "não existe" ao mesmo tempo, um grava e o
+    // outro, que perdeu a corrida, registra o id e some sem aplicar nada. O cadeado é por assinatura e dura até o fim da transação; os avisos da mesma assinatura passam um de cada vez.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${leitura.mudanca.stripeAssinaturaId}))`);
     if (leitura.verificar) {
       const [conhecida] = await tx.select({ id: assinaturas.id }).from(assinaturas).where(eq(assinaturas.stripeAssinaturaId, leitura.mudanca.stripeAssinaturaId));
       if (!conhecida) return "ignorado" as const;

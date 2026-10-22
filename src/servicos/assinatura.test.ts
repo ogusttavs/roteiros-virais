@@ -204,6 +204,15 @@ describe("lerEvento: o que e nosso e o que cada evento muda", () => {
     }
   });
 
+  it("fatura com mais de uma linha: o periodo e o da linha que termina mais tarde (um credito antigo na frente nao encolhe o acesso)", () => {
+    const e = eventoDeFatura("invoice.paid", { clienteId: 5, inicio: 100, fim: 200 });
+    (e.data.object.lines as { data: unknown[] }).data = [{ period: { start: 10, end: 20 } }, { period: { start: 100, end: 200 } }, { period: { start: 50, end: 60 } }];
+    const l = lerEvento(e);
+    if (l.tipo !== "tratar") throw new Error("devia tratar");
+    expect(l.mudanca.periodoInicio?.getTime()).toBe(100_000);
+    expect(l.mudanca.periodoFim?.getTime()).toBe(200_000);
+  });
+
   it("fatura sem a nossa marca so vale se a assinatura ja estiver no banco (verificar)", () => {
     const l = lerEvento(eventoDeFatura("invoice.paid", { metadata: {} }));
     expect(l).toMatchObject({ tipo: "tratar", verificar: true });
@@ -217,7 +226,7 @@ describe("lerEvento: o que e nosso e o que cada evento muda", () => {
 
   it("fatura que falhou vira past_due para quem ja e assinante e incomplete (sem acesso) se a assinatura for nova", () => {
     const l = lerEvento(eventoDeFatura("invoice.payment_failed", { clienteId: 5 }));
-    expect(l).toMatchObject({ tipo: "tratar", mudanca: { status: "past_due", statusSeNova: "incomplete" } });
+    expect(l).toMatchObject({ tipo: "tratar", mudanca: { status: "past_due", statusSeNova: "incomplete", soSobreStatus: ["active", "trialing", "past_due"] } });
   });
 });
 

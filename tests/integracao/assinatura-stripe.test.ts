@@ -244,12 +244,40 @@ describe("o tratamento de cada evento", () => {
   });
 
   it("evento mais velho nao desfaz o mais novo (fora de ordem)", async () => {
-    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_ord", status: "canceled", criadoEm: T0 + 100 }));
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_ord", status: "past_due", criadoEm: T0 + 100 }));
     await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_ord", status: "active", criadoEm: T0 + 50 }));
-    expect((await linhas())[0].status).toBe("canceled");
+    expect((await linhas())[0].status).toBe("past_due");
     // O evento do mesmo instante ou mais novo vale.
     await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_ord", status: "active", criadoEm: T0 + 100 }));
     expect((await linhas())[0].status).toBe("active");
+  });
+
+  it("cancelada e final: nenhum evento depois, nem do mesmo segundo, ressuscita (reassinar cria outra assinatura no Stripe)", async () => {
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.deleted", { clienteId: marcaA, assinaturaId: "sub_final", criadoEm: T0 + 100 }));
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.updated", { clienteId: marcaA, assinaturaId: "sub_final", status: "active", criadoEm: T0 + 100 }));
+    await tratarEventoDoStripe(eventoDeFatura("invoice.paid", { clienteId: marcaA, assinaturaId: "sub_final", criadoEm: T0 + 200 }));
+    expect((await linhas())[0].status).toBe("canceled");
+  });
+
+  it("do mesmo segundo, 'incomplete' que chega por ultimo nao derruba quem ja esta active (cadastro)", async () => {
+    await tratarEventoDoStripe(eventoDeFatura("invoice.paid", { clienteId: marcaA, assinaturaId: "sub_cad", criadoEm: T0 }));
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { clienteId: marcaA, assinaturaId: "sub_cad", status: "incomplete", criadoEm: T0 }));
+    expect((await linhas())[0].status).toBe("active");
+  });
+
+  it("os avisos de um cadastro chegando ao mesmo tempo, em pedidos diferentes, deixam a linha completa (nenhum se perde)", async () => {
+    const sub = "sub_cadastro_junto";
+    const eventosDoCadastro = [
+      eventoDeCheckout({ clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_junto", criadoEm: T0 }),
+      eventoDeAssinatura("customer.subscription.created", { clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_junto", status: "active", criadoEm: T0, precoId: "price_junto", inicio: T0, fim: T0 + 90 * SEGUNDOS.DIA }),
+      eventoDeFatura("invoice.paid", { clienteId: marcaA, assinaturaId: sub, clienteStripeId: "cus_junto", criadoEm: T0, inicio: T0, fim: T0 + 90 * SEGUNDOS.DIA }),
+    ];
+    const resultados = await Promise.all(eventosDoCadastro.map((e) => tratarEventoDoStripe(e)));
+    expect(resultados).toEqual(["tratado", "tratado", "tratado"]);
+    const todas = (await linhas()).filter((l) => l.stripeAssinaturaId === sub);
+    expect(todas).toHaveLength(1);
+    expect(todas[0]).toMatchObject({ status: "active", stripeClienteId: "cus_junto", stripePrecoId: "price_junto" });
+    expect(todas[0].periodoFim?.getTime()).toBe((T0 + 90 * SEGUNDOS.DIA) * 1000);
   });
 
   it("fatura que falhou muda o status para past_due e a marca continua com acesso (o Stripe ainda tenta)", async () => {
@@ -257,6 +285,13 @@ describe("o tratamento de cada evento", () => {
     await tratarEventoDoStripe(eventoDeFatura("invoice.payment_failed", { clienteId: marcaA, assinaturaId: "sub_pd", criadoEm: T0 + 7 * SEGUNDOS.DIA }));
     expect((await linhas())[0].status).toBe("past_due");
     expect(await marcaPrecisaAssinar({ id: marcaA, cortesia: false }, new Date((T0 + 8 * SEGUNDOS.DIA) * 1000), true)).toBe(false);
+  });
+
+  it("fatura que falhou NAO eleva uma assinatura 'incomplete' (primeiro pagamento em curso) a past_due, que daria acesso", async () => {
+    await tratarEventoDoStripe(eventoDeAssinatura("customer.subscription.created", { clienteId: marcaA, assinaturaId: "sub_inc", status: "incomplete", criadoEm: T0 }));
+    await tratarEventoDoStripe(eventoDeFatura("invoice.payment_failed", { clienteId: marcaA, assinaturaId: "sub_inc", criadoEm: T0 + 10 }));
+    expect((await linhas())[0].status).toBe("incomplete");
+    expect(await marcaPrecisaAssinar({ id: marcaA, cortesia: false }, new Date((T0 + 20) * 1000), true)).toBe(true);
   });
 
   it("fatura paga volta para active e leva o periodo novo", async () => {
@@ -313,7 +348,7 @@ describe("comecar a assinar e o portal", () => {
     expect(r.url).toContain("/assinar?simulado=checkout");
     const checkout = chamadasSimuladas.find((c) => c.metodo === "criarCheckout")!.pedido as Record<string, unknown>;
     expect(checkout).toMatchObject({ clienteId: marcaA, email: dono.email, precoId: "price_simulado", stripeClienteId: null });
-    expect(String(checkout.urlDeSucesso)).toMatch(/\/hoje\?assinou=1$/);
+    expect(String(checkout.urlDeSucesso)).toMatch(/\/assinar\?assinou=1$/);
     expect(String(checkout.urlDeCancelar)).toMatch(/\/assinar$/);
     expect(chamadasSimuladas.find((c) => c.metodo === "precoDoPlano")?.pedido).toBe("roteiros_trimestral");
   });

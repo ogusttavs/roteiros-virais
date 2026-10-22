@@ -119,4 +119,25 @@ test.describe("assinatura pelo Stripe", () => {
     await page.getByRole("button", { name: "Assinar", exact: true }).click();
     await expect(page).toHaveURL(/\/assinar\?simulado=checkout/);
   });
+
+  test("voltando do pagamento sem o aviso ainda: 'estamos confirmando', sem o botao de assinar; com o aviso, segue para o Hoje", async ({ page }) => {
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+    await entrar(page, DONO_EMAIL, /\/(hoje|comecar)/);
+    await page.goto("/assinar?assinou=1");
+    await expect(page.getByText("Estamos confirmando o seu pagamento.", { exact: false })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Assinar", exact: true })).toHaveCount(0);
+
+    const agora = new Date();
+    await db().insert(assinaturas).values({
+      clienteId: marca,
+      status: "active",
+      stripeClienteId: "cus_e2e_confirmando",
+      stripeAssinaturaId: "sub_e2e_confirmando",
+      periodoFim: new Date(agora.getTime() + 90 * 86400 * 1000),
+      ultimoEventoEm: agora,
+    });
+    await page.goto("/assinar?assinou=1");
+    await expect(page).toHaveURL(/\/(hoje|comecar)/);
+    await db().delete(assinaturas).where(eq(assinaturas.clienteId, marca));
+  });
 });

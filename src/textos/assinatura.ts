@@ -12,4 +12,6 @@ export const textosAssinatura = {
   semPermissao: "Só quem criou a conta pode assinar. Peça para essa pessoa abrir esta página.",
   erroGenerico: "Não deu para abrir o pagamento agora. Tente de novo daqui a pouco.",
   voltarParaHoje: "Ir para o Hoje",
+  confirmando: "Estamos confirmando o seu pagamento. Isso leva alguns segundos; esta página se atualiza sozinha.",
+  confirmandoDemora: "A confirmação está demorando mais do que o normal. Não pague de novo: volte daqui a pouco, ou fale com a gente.",
 };

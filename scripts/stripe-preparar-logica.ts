@@ -59,6 +59,9 @@ export async function prepararStripe(stripe: StripeLike): Promise<Relatorio> {
     if (!ehNosso(existente.metadata)) {
       throw new ErroDePreparo(`O preco com a chave ${PLANO.lookupKey} ja existe, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
     }
+    if (existente.active === false) {
+      throw new ErroDePreparo(`O preco ${existente.id} (chave ${PLANO.lookupKey}) existe mas esta arquivado. O app so usa preco ativo: reative-o no Stripe ou decida criar outro. Nada foi alterado.`);
+    }
     const diferente =
       existente.unit_amount !== PLANO.valorEmCentavos ||
       existente.currency !== PLANO.moeda ||
