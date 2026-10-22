@@ -150,7 +150,7 @@ export const textosAdmin = {
       vazioComLeitura: "a leitura rodou e não juntou nenhuma pergunta, reclamação ou pedido que se repita; os temas e o roteiro seguem como antes.",
       velha: (dia: string) => `leitura velha, de ${dia}: já não entra nos temas nem no roteiro, e a próxima rodada é no domingo`,
       vazio: "ainda sem vozes neste ramo: a leitura dos comentários roda uma vez por semana, no domingo, e só conta vídeos do YouTube com comentários suficientes. Um ramo pequeno pode fechar a semana sem nenhuma, e tudo segue como antes.",
-      ajuda: "passou do piso: pode entrar na tela do cliente (as 3 mais repetidas) e nos prompts dos temas e do roteiro (3 dúvidas, 2 objeções e 2 pedidos), enquanto a leitura vale, como dado datado e com a plataforma de origem, nunca como fato do setor. abaixo do piso: fica de fora, só aparece aqui.",
+      ajuda: "passou dos pisos (comentários iguais e vídeos diferentes): pode entrar na tela do cliente (as 3 mais repetidas) e nos prompts dos temas e do roteiro (3 dúvidas, 2 objeções e 2 pedidos), enquanto a leitura vale, como dado datado e com a plataforma de origem, nunca como fato do setor. abaixo de um dos pisos: fica de fora, só aparece aqui.",
       duvidasTitulo: "dúvidas mais repetidas",
       objecoesTitulo: "objeções",
       pedidosTitulo: "pedidos",
@@ -167,6 +167,8 @@ export const textosAdmin = {
       /** Passou do piso, mas a leitura é velha: nem a tela nem os prompts a usam mais. */
       passouComLeituraVelha: "passou do piso, leitura velha",
       abaixoDoPiso: (piso: number) => `abaixo do piso de ${piso}`,
+      /** Tem comentários suficientes, mas de um vídeo só: pode ser o público daquele vídeo, não o do ramo (e o vídeo pode nem ser do ramo). */
+      poucosVideos: (minimo: number) => `de menos de ${minimo} vídeos diferentes: fica de fora`,
       /** O título da lista corta no que o job guarda; diz quantas aparecem de quantas. */
       mostrando: (n: number, total: number) => `${n} de ${total}`,
       semPlataforma: "sem plataforma",

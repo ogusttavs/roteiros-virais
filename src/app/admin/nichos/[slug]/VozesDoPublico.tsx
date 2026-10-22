@@ -29,6 +29,8 @@ type Props = Listas & {
   vale: boolean;
   validaAte: Date | null;
   piso: number;
+  /** Em quantos vídeos diferentes a voz precisa aparecer (hotfix de 22/10/2026). */
+  pisoVideos: number;
   videos: Map<number, VideoLinkavelDaVoz>;
 };
 
@@ -38,6 +40,7 @@ function Lista({
   itens,
   limite,
   piso,
+  pisoVideos,
   vale,
   videos,
 }: {
@@ -46,6 +49,7 @@ function Lista({
   itens: VozDoAdmin[];
   limite: number;
   piso: number;
+  pisoVideos: number;
   vale: boolean;
   videos: Map<number, VideoLinkavelDaVoz>;
 }) {
@@ -93,7 +97,7 @@ function Lista({
                     })}
                   </td>
                   <td className={voz.passouDoPiso && vale ? undefined : styles.aviso}>
-                    {!voz.passouDoPiso ? t.abaixoDoPiso(piso) : vale ? t.passouDoPiso : t.passouComLeituraVelha}
+                    {!voz.passouDoPiso ? (voz.foraPorUmVideoSo ? t.poucosVideos(pisoVideos) : t.abaixoDoPiso(piso)) : vale ? t.passouDoPiso : t.passouComLeituraVelha}
                   </td>
                 </tr>
               ))}
@@ -109,7 +113,7 @@ function Lista({
  * E28, parte 4: "Vozes do público" no admin do setor (desenho do passo 25, `AdminNicho`): o que o público do setor disse nos comentários dos vídeos mais vistos da semana, com de quando é a
  * leitura e se ainda vale, e o que ficou abaixo do piso (que a tela e os prompts não usam). Só leitura: a rotina é a semanal, em Rotinas.
  */
-export function VozesDoPublico({ duvidas, objecoes, pedidos, leitura, vale, validaAte, piso, videos }: Props) {
+export function VozesDoPublico({ duvidas, objecoes, pedidos, leitura, vale, validaAte, piso, pisoVideos, videos }: Props) {
   const total = duvidas.length + objecoes.length + pedidos.length;
   const frase = leitura ? t.leitura(leitura.comentarios, leitura.videos, listaDePlataformas(leitura.plataformas) || "YouTube", diaPorExtenso(leitura.lidaEm)) : null;
   // "sem": o setor nunca teve leitura; "vazia": a rotina rodou e não juntou nenhuma voz; "vale" e "velha": há vozes, e a leitura ainda vale ou já passou.
@@ -137,9 +141,9 @@ export function VozesDoPublico({ duvidas, objecoes, pedidos, leitura, vale, vali
           <p className={vale ? styles.contagem : styles.aviso} data-vozes-validade>
             {vale && validaAte ? t.aindaVale(diaPorExtenso(validaAte)) : t.velha(diaPorExtenso(leitura.lidaEm))}
           </p>
-          <Lista id="t-vozes-duvidas" titulo={t.duvidasTitulo} itens={duvidas} limite={LIMITES.duvidas} piso={piso} vale={vale} videos={videos} />
-          <Lista id="t-vozes-objecoes" titulo={t.objecoesTitulo} itens={objecoes} limite={LIMITES.objecoes} piso={piso} vale={vale} videos={videos} />
-          <Lista id="t-vozes-pedidos" titulo={t.pedidosTitulo} itens={pedidos} limite={LIMITES.pedidos} piso={piso} vale={vale} videos={videos} />
+          <Lista id="t-vozes-duvidas" titulo={t.duvidasTitulo} itens={duvidas} limite={LIMITES.duvidas} piso={piso} pisoVideos={pisoVideos} vale={vale} videos={videos} />
+          <Lista id="t-vozes-objecoes" titulo={t.objecoesTitulo} itens={objecoes} limite={LIMITES.objecoes} piso={piso} pisoVideos={pisoVideos} vale={vale} videos={videos} />
+          <Lista id="t-vozes-pedidos" titulo={t.pedidosTitulo} itens={pedidos} limite={LIMITES.pedidos} piso={piso} pisoVideos={pisoVideos} vale={vale} videos={videos} />
           <p className={styles.contagem}>{t.ajuda}</p>
         </>
       )}

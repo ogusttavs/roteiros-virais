@@ -204,6 +204,12 @@ export const config = {
     comentariosPorVideo: 100,
     /** E28: com quantos comentários iguais uma pergunta, reclamação ou pedido aparece na tela (a hipótese do passo 25, dúvida 7). */
     vozesMinimoDeComentarios: 5,
+    /**
+     * Hotfix de 22/10/2026 (achado do Gustavo em produção, no Criar): uma voz só aparece se aparece em pelo menos tantos vídeos DIFERENTES do
+     * setor. Uma pergunta dita 41 vezes nos comentários de um vídeo só (uma árvore de pêssego no setor de empreendedorismo) não é o que
+     * o público do setor pergunta, é o que o público daquele vídeo perguntou.
+     */
+    vozesMinimoDeVideos: 2,
     /** E28: depois de quantos dias "as vozes do público" de um setor deixam de valer (a rodada é semanal; passou de duas semanas, a rotina não rodou). */
     vozesValidasPorDias: 14,
     /** Teto de vídeos com análise usados como evidência do modelo do nicho (etapa 9, decisão 2 do PROXIMO.md: "30 a 60"). */

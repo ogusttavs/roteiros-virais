@@ -30,6 +30,7 @@ export const ROTULO_DA_TAREFA: Record<string, string> = {
   analisarVisual: "Analisar os vídeos (imagem)",
   lerComentarios: "Ler os comentários do público",
   juntarVozes: "Juntar o que o público diz",
+  conferirVideoDoSetor: "Conferir se o vídeo é do ramo",
   modeloNicho: "Montar o modelo do ramo",
   filtrarNoticias: "Escolher as notícias",
   resumirNoticia: "Resumir as notícias dos assuntos",

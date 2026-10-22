@@ -48,6 +48,10 @@ ${params.sistemaVariavel ?? ""}`);
   if (params.tarefa === "lerComentarios" && params.entrada.includes("[mock:ler-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
+  // Hotfix de 22/10/2026: a conferência "o vídeo é do setor?" falha (a API da IA fora); o vídeo fica sem resposta e sem os comentários lidos.
+  if (params.tarefa === "conferirVideoDoSetor" && params.entrada.includes("[mock:conferir-fora]")) {
+    throw new ErroIA("erro da API (529): sobrecarregada.");
+  }
   if (params.tarefa === "juntarVozes" && params.entrada.includes("[mock:juntar-fora]")) {
     throw new ErroIA("erro da API (529): sobrecarregada.");
   }
@@ -125,6 +129,8 @@ export function construirSaidaMock(tarefa: TarefaIA, entrada: string, sistemaEst
       return mockLerComentarios(entrada);
     case "juntarVozes":
       return mockJuntarVozes(entrada);
+    case "conferirVideoDoSetor":
+      return mockConferirVideoDoSetor(entrada);
     case "temaDoMomento":
       return mockTemaDoMomento(entrada);
     case "conferirPremissa":
@@ -743,6 +749,24 @@ function mockLerComentarios(entrada: string) {
     frasesDoPublico: primeiro && primeiro.texto.length >= 8 ? [{ comentario: primeiro.numero, trecho: primeiro.texto.slice(0, 120) }] : [],
     sentimento: objecoes.length > 0 && elogios.length > 0 ? "dividido" : objecoes.length > 0 ? "mais_negativo" : "mais_positivo",
   };
+}
+
+/**
+ * Hotfix de 22/10/2026: a conferência "o vídeo é do setor?". Determinística para o teste: o vídeo cuja linha tem "[mock:fora-do-setor]"
+ * (no título, na descrição ou na fala) não é do setor, e "[mock:sem-resposta]" some da resposta (o modelo esqueceu o vídeo). O resto é do setor.
+ */
+function mockConferirVideoDoSetor(entrada: string) {
+  const bloco = entrada.split("<videos>")[1]?.split("</videos>")[0] ?? "";
+  const videos = bloco
+    .split(String.fromCharCode(10))
+    .map((linha) => ({ m: /^([0-9]+) [|] /.exec(linha), linha }))
+    .filter((x): x is { m: RegExpExecArray; linha: string } => x.m !== null)
+    .filter((x) => !x.linha.includes("[mock:sem-resposta]"))
+    .map((x) => {
+      const fora = x.linha.includes("[mock:fora-do-setor]");
+      return { numero: Number(x.m[1]), pertence: !fora, motivo: fora ? "o assunto do vídeo é outro" : "o vídeo fala do assunto do setor" };
+    });
+  return { videos };
 }
 
 /** E28: junta os itens ("n | tipo | texto") que são iguais sem maiúscula, acento nem pontuação; o texto do grupo é o do primeiro. */

@@ -440,3 +440,166 @@ describe("rodarComentariosSemana (E28)", () => {
     expect(chamadas.map((c) => c.videoId)).toEqual(["bom1"]);
   });
 });
+
+describe("o vídeo é do setor? (hotfix de 22/10/2026)", () => {
+  const conferencias = async () =>
+    (await db().select({ tarefa: geracoesIA.tarefa }).from(geracoesIA)).filter(
+      (g) => g.tarefa === "conferirVideoDoSetor",
+    );
+
+  it("o meme e a árvore saem sem ter os comentários lidos (e sem gastar cota); o vídeo de empreendedorismo fica", async () => {
+    await db()
+      .update(nichos)
+      .set({
+        nome: "Empreendedorismo e Construção de Marcas",
+        termos: ["branding", "marca própria"],
+      })
+      .where(eq(nichos.id, nichoId));
+    await semear({
+      idExterno: "arvore",
+      titulo:
+        "Ela Cuidou Dessa Árvore por 5 Anos e Descobriu uma Surpresa Incrível! [mock:fora-do-setor]",
+      views: 503_000,
+    });
+    await semear({
+      idExterno: "meme",
+      titulo: "PETER TA EMPRESARIANDO QUAGMIRE #familyguy #trabalhoduro [mock:fora-do-setor]",
+      views: 418_000,
+    });
+    await semear({
+      idExterno: "marca",
+      titulo: "Como registrar a sua marca no INPI",
+      views: 200_000,
+    });
+
+    const { deps: d, chamadas } = deps();
+    const resumo = await rodarComentariosSemana(nichoId, d);
+
+    expect(chamadas.map((c) => c.videoId)).toEqual(["marca"]);
+    expect(resumo).toMatchObject({ lidos: 1, foraDoSetor: 2, falhas: 0 });
+    const [consumo] = await db().select().from(consumoApi).where(eq(consumoApi.fonte, "youtube"));
+    expect(consumo.unidades).toBe(1);
+    // o que ficou de fora não tem comentário guardado nem leitura, e não foi marcado como lido: se for do setor numa conferência futura, volta
+    for (const fora of ["arvore", "meme"]) {
+      const v = await videoPorIdExterno(fora);
+      expect(v.comentariosAnalise).toBeNull();
+      expect(v.comentariosColetadosEm).toBeNull();
+      expect(v.conferenciaSetor).toMatchObject({ pertence: false, versao: "1.0.0" });
+      expect(
+        await db().select().from(comentariosVideo).where(eq(comentariosVideo.videoId, v.id)),
+      ).toHaveLength(0);
+    }
+    expect((await videoPorIdExterno("marca")).conferenciaSetor).toMatchObject({ pertence: true });
+    // e as vozes do setor só trazem o que veio do vídeo do setor
+    const [nicho] = await db()
+      .select({ vozes: nichos.vozes })
+      .from(nichos)
+      .where(eq(nichos.id, nichoId));
+    expect(nicho.vozes!.videos).toBe(1);
+  });
+
+  it("uma chamada para o lote todo, guardada: a segunda rodada não pergunta de novo sobre o mesmo vídeo", async () => {
+    await semear({
+      idExterno: "fora1",
+      titulo: "outro assunto [mock:fora-do-setor]",
+      views: 300_000,
+    });
+    await semear({
+      idExterno: "fora2",
+      titulo: "mais outro assunto [mock:fora-do-setor]",
+      views: 250_000,
+    });
+    await semear({ idExterno: "dentro1", views: 200_000 });
+    await rodarComentariosSemana(nichoId, deps().deps);
+    expect(await conferencias()).toHaveLength(1);
+
+    await semear({ idExterno: "dentro2", views: 150_000 });
+    const segunda = deps();
+    await rodarComentariosSemana(nichoId, segunda.deps);
+    // só o vídeo novo foi perguntado (uma chamada a mais); os dois de fora continuam fora sem nova pergunta
+    expect(await conferencias()).toHaveLength(2);
+    expect(segunda.chamadas.map((c) => c.videoId)).toEqual(["dentro2"]);
+  });
+
+  it("a análise que já marcou o vídeo como do setor vale: não pergunta de novo", async () => {
+    const v = await semear({
+      idExterno: "analisado",
+      titulo: "[mock:fora-do-setor] mas a análise leu a fala inteira",
+    });
+    await db()
+      .update(videos)
+      .set({ analise: { pertenceAoNicho: true } as never })
+      .where(eq(videos.id, v.id));
+    const { deps: d, chamadas } = deps();
+    await rodarComentariosSemana(nichoId, d);
+    expect(chamadas.map((c) => c.videoId)).toEqual(["analisado"]);
+    expect(await conferencias()).toHaveLength(0);
+  });
+
+  it("uma conferência feita por uma versão antiga do prompt é refeita", async () => {
+    const v = await semear({ idExterno: "antigo" });
+    await db()
+      .update(videos)
+      .set({
+        conferenciaSetor: {
+          pertence: false,
+          motivo: "versão velha",
+          versao: "0.9.0",
+          em: "2026-09-01T00:00:00.000Z",
+        },
+      })
+      .where(eq(videos.id, v.id));
+    const { deps: d, chamadas } = deps();
+    await rodarComentariosSemana(nichoId, d);
+    expect(chamadas.map((c) => c.videoId)).toEqual(["antigo"]);
+    expect((await videoPorIdExterno("antigo")).conferenciaSetor).toMatchObject({
+      pertence: true,
+      versao: "1.0.0",
+    });
+  });
+
+  it("o vídeo que o modelo esqueceu na resposta não é lido nesta rodada e não é marcado como fora", async () => {
+    await semear({ idExterno: "esquecido", titulo: "[mock:sem-resposta] video", views: 300_000 });
+    await semear({ idExterno: "normal", views: 200_000 });
+    const { deps: d, chamadas } = deps();
+    await rodarComentariosSemana(nichoId, d);
+    expect(chamadas.map((c) => c.videoId)).toEqual(["normal"]);
+    const v = await videoPorIdExterno("esquecido");
+    expect(v.conferenciaSetor).toBeNull();
+    expect(v.comentariosColetadosEm).toBeNull();
+  });
+
+  it("a IA fora na conferência: nenhum vídeo sem conferência é lido, a falha é dita e o resto da rodada não cai", async () => {
+    await semear({ idExterno: "sem-saber", titulo: "[mock:conferir-fora] video" });
+    const { deps: d, chamadas } = deps();
+    const resumo = await rodarComentariosSemana(nichoId, d);
+    expect(chamadas).toEqual([]);
+    expect(resumo).toMatchObject({ lidos: 0, falhas: 1 });
+    expect(String((resumo.erros as string[])[0])).toContain("conferencia do setor");
+    expect((await videoPorIdExterno("sem-saber")).conferenciaSetor).toBeNull();
+
+    // na rodada seguinte, com a IA de volta, o mesmo vídeo é conferido e lido
+    await db()
+      .update(videos)
+      .set({ titulo: "video normal" })
+      .where(eq(videos.idExterno, "sem-saber"));
+    const segunda = deps();
+    await rodarComentariosSemana(nichoId, segunda.deps);
+    expect(segunda.chamadas.map((c) => c.videoId)).toEqual(["sem-saber"]);
+  });
+
+  it("confere em lotes de 25 e para quando já há os 20 vídeos do setor da semana", async () => {
+    for (let i = 0; i < 60; i += 1)
+      await semear({ idExterno: `v${String(i).padStart(2, "0")}`, views: 1_000_000 - i });
+    const { deps: d, chamadas } = deps();
+    await rodarComentariosSemana(nichoId, d);
+    expect(chamadas).toHaveLength(config.regras.comentariosVideosPorSemana);
+    // 20 aprovados saem do primeiro lote de 25: uma chamada só, e os 35 mais abaixo da lista nem foram perguntados
+    expect(await conferencias()).toHaveLength(1);
+    const conferidos = await db()
+      .select({ id: videos.id })
+      .from(videos)
+      .where(sql`conferencia_setor is not null`);
+    expect(conferidos).toHaveLength(25);
+  });
+});

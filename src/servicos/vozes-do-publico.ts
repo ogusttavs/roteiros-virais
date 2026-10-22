@@ -120,15 +120,23 @@ function agruparVozes(vozes: VozesDoSetor, tipos: TipoDaVoz[]): (VozComChave & {
   return [...porChave.values()].sort((a, b) => b.vezes - a.vezes || a.texto.localeCompare(b.texto));
 }
 
-/** Das listas pedidas, só o que passou do piso de comentários iguais (a pergunta de um comentário só nunca aparece). */
+/**
+ * Uma voz vale quando passou dos dois pisos: comentários iguais (a pergunta de um comentário só nunca aparece) e vídeos diferentes
+ * (hotfix de 22/10/2026: 41 comentários de um vídeo fora do setor não são a voz do setor).
+ */
+function passouDosPisos(v: { vezes: number; videos: number[] }): boolean {
+  return v.vezes >= config.regras.vozesMinimoDeComentarios && v.videos.length >= config.regras.vozesMinimoDeVideos;
+}
+
+/** Das listas pedidas, só o que passou dos pisos (comentários iguais e vídeos diferentes). */
 function passaramDoPiso(vozes: VozesDoSetor, tipos: TipoDaVoz[]): VozComChave[] {
   return agruparVozes(vozes, tipos)
-    .filter((v) => v.vezes >= config.regras.vozesMinimoDeComentarios)
+    .filter(passouDosPisos)
     .map((v) => ({ chave: v.chave, tipo: v.tipo, texto: v.texto, vezes: v.vezes, plataformas: v.plataformas }));
 }
 
 /** Uma voz como o admin a mostra: tudo o que foi lido, com os vídeos de onde veio e se passou do piso (a tela e os prompts só usam o que passou, e dentro do que passou, as mais repetidas). */
-export type VozDoAdmin = VozComChave & { videos: number[]; passouDoPiso: boolean };
+export type VozDoAdmin = VozComChave & { videos: number[]; passouDoPiso: boolean; foraPorUmVideoSo: boolean };
 
 /**
  * Para a seção "Vozes do público" do admin do setor: as três listas como a tela as agrupa (a mesma frase em dois grupos soma), do mais repetido para o menos, SEM cortar abaixo do piso, para
@@ -136,7 +144,14 @@ export type VozDoAdmin = VozComChave & { videos: number[]; passouDoPiso: boolean
  */
 export function vozesParaOAdmin(vozes: VozesDoSetor | null): { duvidas: VozDoAdmin[]; objecoes: VozDoAdmin[]; pedidos: VozDoAdmin[] } {
   const lista = (tipo: TipoDaVoz): VozDoAdmin[] =>
-    vozes ? agruparVozes(vozes, [tipo]).map((v) => ({ ...v, passouDoPiso: v.vezes >= config.regras.vozesMinimoDeComentarios })) : [];
+    vozes
+      ? agruparVozes(vozes, [tipo]).map((v) => ({
+          ...v,
+          passouDoPiso: passouDosPisos(v),
+          // Comentários de sobra, mas de um vídeo só: o admin diz que foi esse o piso que deixou a voz de fora.
+          foraPorUmVideoSo: v.vezes >= config.regras.vozesMinimoDeComentarios && v.videos.length < config.regras.vozesMinimoDeVideos,
+        }))
+      : [];
   return { duvidas: lista("duvida"), objecoes: lista("objecao"), pedidos: lista("pedido") };
 }
 

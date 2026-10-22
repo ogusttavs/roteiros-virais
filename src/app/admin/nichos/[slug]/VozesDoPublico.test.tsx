@@ -17,6 +17,7 @@ const voz = (texto: string, vezes: number, extra: Partial<VozDoAdmin> = {}): Voz
   plataformas: ["youtube"],
   videos: [1, 2],
   passouDoPiso: vezes >= 5,
+  foraPorUmVideoSo: false,
   ...extra,
 });
 
@@ -37,6 +38,7 @@ function montar(sobre: Partial<Parameters<typeof VozesDoPublico>[0]> = {}) {
       vale
       validaAte={new Date("2026-10-25T07:45:00Z")}
       piso={5}
+      pisoVideos={2}
       videos={VIDEOS}
       {...sobre}
     />,
@@ -68,6 +70,14 @@ describe("VozesDoPublico", () => {
     expect(within(linhaFraca).getByText("abaixo do piso de 5")).toBeTruthy();
     // a lista que não tem nada diz isso, em vez de uma tabela vazia
     expect(screen.getByText("nenhuma nesta leitura")).toBeTruthy();
+  });
+
+  it("a voz com comentários de sobra, mas de um vídeo só, diz que ficou de fora por isso, e não por ter poucos comentários", () => {
+    montar({ duvidas: [voz("Que fruta é essa?", 41, { videos: [7], passouDoPiso: false, foraPorUmVideoSo: true })] });
+    const linha = screen.getByText("Que fruta é essa?").closest("tr")!;
+    expect(linha.getAttribute("data-voz-passou-do-piso")).toBe("nao");
+    expect(within(linha).getByText("de menos de 2 vídeos diferentes: fica de fora")).toBeTruthy();
+    expect(within(linha).queryByText(/abaixo do piso/)).toBeNull();
   });
 
   it("cada linha diz em quantos vídeos a voz apareceu e linka os primeiros, com o título quando há", () => {
