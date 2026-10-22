@@ -882,10 +882,12 @@ async function tentarGerarEVerificar<T>(
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
       sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos), Boolean(params.citarProibicaoVale)),
+      // Tema da própria pessoa: a proibição não chega ao verificador nem pela lista nem pela linha "Nunca diria ou faria" das fontes (prova com chave de 22/10/2026: com ela na entrada, o
+      // modelo barato reprovou a analogia com eleição em 2 de 3 roteiros, mesmo com o critério de aviso no sistema).
       entrada: verificarTexto.montarEntrada({
         texto: textoJunto,
-        proibicoes: params.proibicoes ?? [],
-        fontes: params.fontesDosFatos,
+        proibicoes: params.citarProibicaoVale ? [] : (params.proibicoes ?? []),
+        fontes: params.citarProibicaoVale && params.fontesDosFatos ? verificarTexto.fontesSemProibicoes(params.fontesDosFatos) : params.fontesDosFatos,
       }),
     });
     aprovado = verificacao.dados.aprovado;

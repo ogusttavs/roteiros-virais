@@ -80,8 +80,11 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * ficou girando; decisão dele no mesmo dia: quando o TEMA é da própria pessoa, as proibições do briefing são preferências e viram aviso, nunca bloqueio): o parâmetro `proibicaoEhAviso` troca o critério
  * da proibição por `CRITERIO_PROIBICAO_COMO_AVISO` (a avaliação do tema livre e o roteiro que sai dele). A conformidade (atacar ou ofender gente, prometer o que não pode, calão) continua barrando. Sem o
  * parâmetro (os temas sugeridos pelo sistema, o briefing, as regras do cliente), o critério é o de sempre. Versão 1.8.0.
+ *
+ * 1.8.1 (prova com chave de 22/10/2026: com o critério de aviso, o roteiro curto do tema da eleição ainda reprovou em 2 de 3, porque a entrada levava "Proibicoes do cliente: política" e a linha
+ * "Nunca diria ou faria" nas fontes): no tema da própria pessoa a entrada sai sem a lista e as fontes sem essa linha (`fontesSemProibicoes`). O sistema estável não muda. Versão 1.8.1.
  */
-export const versao = "1.8.0";
+export const versao = "1.8.1";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -198,6 +201,17 @@ Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisa
 Não repita o texto inteiro na resposta, só o motivo.
 
 Escreva em português do Brasil, com acentuação correta.`;
+}
+
+/**
+ * As fontes sem a linha das proibições do perfil ("Nunca diria ou faria: ...", de `formatarPerfilCompilado`), para o tema da própria pessoa: lá a proibição é aviso, e a linha nas fontes bastava
+ * para o modelo barato reprovar por ela (prova com chave de 22/10/2026). O resto das fontes fica igual.
+ */
+export function fontesSemProibicoes(fontes: string): string {
+  return fontes
+    .split("\n")
+    .filter((linha) => !linha.trimStart().startsWith("Nunca diria ou faria:"))
+    .join("\n");
 }
 
 export function montarEntrada(dados: { texto: string; proibicoes: string[]; fontes?: string }): string {
