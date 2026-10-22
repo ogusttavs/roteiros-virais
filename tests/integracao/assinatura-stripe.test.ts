@@ -147,11 +147,11 @@ describe("o webhook: idempotencia", () => {
     const evento = eventoDeAssinatura("customer.subscription.updated", { id: "evt_repetido", clienteId: marcaA, assinaturaId: "sub_rep", status: "active" });
     expect((await enviar(evento)).status).toBe(200);
     // Alguem (a cobranca, um admin) muda a linha depois; o reenvio do MESMO evento nao pode desfazer.
-    await db().update(assinaturas).set({ status: "canceled" }).where(eq(assinaturas.stripeAssinaturaId, "sub_rep"));
+    await db().update(assinaturas).set({ status: "past_due" }).where(eq(assinaturas.stripeAssinaturaId, "sub_rep"));
     expect((await enviar(evento)).status).toBe(200);
     expect((await enviar(evento)).status).toBe(200);
     const [l] = await linhas();
-    expect(l.status).toBe("canceled");
+    expect(l.status).toBe("past_due");
     expect(await linhas()).toHaveLength(1);
     expect(await eventos()).toHaveLength(1);
   });
