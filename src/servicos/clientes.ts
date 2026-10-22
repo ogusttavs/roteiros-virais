@@ -46,6 +46,7 @@ import { cancelarPedidoAberto, registrarPedidoDeRamo } from "@/servicos/pedidos-
 import { enfileirarAnaliseDaPropriaMarca } from "@/servicos/perfis-analisados";
 import { desligarSetorSeSemMarca, setorParaAMarca } from "@/servicos/ramos";
 import { tirarAlternativoQueViraPrincipal } from "@/servicos/ramos-da-conta";
+import { marcarSenhaProvisoria } from "@/servicos/senha";
 import { textosAdmin } from "@/textos/admin";
 
 /** Nome com mensagem para o cliente (plataforma/CLAUDE.md, convencao de erros). */
@@ -329,6 +330,8 @@ async function criarUsuarioComSenhaGerada(email: string, nome: string): Promise<
       userId: usuarioId,
       password: await hashPassword(senha),
     });
+  // E58: a senha do convite e provisoria; ate a pessoa escolher a dela, o painel pede a troca.
+  await marcarSenhaProvisoria(usuarioId);
   return { usuarioId, senha };
 }
 
@@ -547,6 +550,8 @@ export async function gerarSenhaNova(usuarioId: string): Promise<string> {
         password: senhaHash,
       });
   }
+  // E58: a senha gerada pelo admin e provisoria outra vez (a pessoa volta a escolher a dela no proximo acesso).
+  await marcarSenhaProvisoria(usuarioId);
   return senha;
 }
 

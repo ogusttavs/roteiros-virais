@@ -64,7 +64,8 @@
     "capturas:v9c-story": "AI_PROVIDER=mock tsx scripts/capturas-v9c-story.ts",
     "capturas:v12-portas": "AI_PROVIDER=mock tsx scripts/capturas-v12-portas.ts",
     "capturas:e38-pr2": "AI_PROVIDER=mock tsx scripts/capturas-e38-pr2.ts",
-    "capturas:e45-pr1": "AI_PROVIDER=mock tsx scripts/capturas-e45-pr1.ts"
+    "capturas:e45-pr1": "AI_PROVIDER=mock tsx scripts/capturas-e45-pr1.ts",
+    "capturas:e58": "AI_PROVIDER=mock tsx scripts/capturas-e58.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

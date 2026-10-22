@@ -105,6 +105,18 @@ export const verification = pgTable("verification", {
   updatedAt: timestamp("updatedAt", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Quem ainda usa a senha provisoria do convite (E58). Uma linha por pessoa: nasce quando o admin cria o acesso ou gera uma senha nova, some quando a pessoa escolhe a dela
+ * (primeiro acesso, Conta ou "esqueci a senha"). Enquanto existe, o painel leva a pessoa para a tela de trocar a senha antes do resto. Tabela a parte, e nao uma coluna em `user`,
+ * porque `user` e do better-auth e `schema.auth.test.ts` trava as colunas dela contra o pacote.
+ */
+export const senhasProvisorias = pgTable("senhas_provisorias", {
+  usuarioId: text("usuario_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  criadoEm: criadoEm(),
+});
+
 // ---------------------------------------------------------------------------
 // Pessoas e contas de acesso
 // ---------------------------------------------------------------------------

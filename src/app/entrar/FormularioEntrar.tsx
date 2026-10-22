@@ -11,7 +11,7 @@ import { useTratarFalha } from "@/ui/ConexaoContext";
 
 import styles from "./page.module.css";
 
-export function FormularioEntrar() {
+export function FormularioEntrar({ comecarEsquecendo = false }: { comecarEsquecendo?: boolean }) {
   const router = useRouter();
   const tratarFalha = useTratarFalha();
   const [email, setEmail] = useState("");
@@ -23,6 +23,11 @@ export function FormularioEntrar() {
   const [erroForma, setErroForma] = useState<string | null>(null);
   const [erroLink, setErroLink] = useState<string | null>(null);
   const [linkEnviadoPara, setLinkEnviadoPara] = useState<string | null>(null);
+  // E58, "esqueci a senha": a mesma tela troca o formulario; a resposta e a mesma exista ou nao a conta.
+  const [esquecendo, setEsquecendo] = useState(comecarEsquecendo);
+  const [mandandoRedefinicao, setMandandoRedefinicao] = useState(false);
+  const [redefinicaoEnviadaPara, setRedefinicaoEnviadaPara] = useState<string | null>(null);
+  const [erroRedefinicao, setErroRedefinicao] = useState<string | null>(null);
 
   /**
    * O cliente do better-auth REJEITA (TypeError) quando a rede cai em vez de devolver `{ error }`
@@ -100,6 +105,94 @@ export function FormularioEntrar() {
     }
   }
 
+  /**
+   * "Esqueci a senha" (E58): pede o link de redefinicao. O servidor responde igual para e-mail com conta e sem conta (a tela nao revela quem tem cadastro), entao so a
+   * falha de verdade (limite de pedidos, servidor, rede) vira erro; o sucesso sempre diz "se tiver uma conta".
+   */
+  async function pedirRedefinicao(evento?: FormEvent) {
+    evento?.preventDefault();
+    if (mandandoRedefinicao) return;
+    if (!email) {
+      setErroEmail(textosEntrar.erroSemEmail);
+      return;
+    }
+    setErroEmail(null);
+    setErroRedefinicao(null);
+    setMandandoRedefinicao(true);
+
+    try {
+      const { error } = await authClient.requestPasswordReset({ email, redirectTo: "/redefinir-senha" });
+      if (error) {
+        setErroRedefinicao(error.status === 429 ? textosEntrar.muitasTentativas : textosEntrar.esqueciErro);
+        return;
+      }
+      setRedefinicaoEnviadaPara(email);
+    } catch (falha) {
+      setErroRedefinicao(fraseDaFalha(falha, textosEntrar.esqueciErro, textosEntrar.esqueciSemConexao));
+    } finally {
+      setMandandoRedefinicao(false);
+    }
+  }
+
+  function voltarParaEntrar() {
+    setEsquecendo(false);
+    setRedefinicaoEnviadaPara(null);
+    setErroRedefinicao(null);
+    setErroEmail(null);
+  }
+
+  if (esquecendo) {
+    if (redefinicaoEnviadaPara) {
+      return (
+        <>
+          <p className={styles.confirmacao} role="status">
+            {textosEntrar.esqueciEnviado(redefinicaoEnviadaPara)}
+          </p>
+          <button type="button" className={styles.linkAcao} disabled={mandandoRedefinicao} onClick={() => void pedirRedefinicao()}>
+            {mandandoRedefinicao ? textosEntrar.esqueciMandando : textosEntrar.esqueciMandarDeNovo}
+          </button>
+          {erroRedefinicao ? (
+            <p className={styles.erroAviso} role="alert">
+              {erroRedefinicao}
+            </p>
+          ) : null}
+          <button type="button" className={styles.linkAcao} onClick={voltarParaEntrar}>
+            {textosEntrar.esqueciVoltar}
+          </button>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <p className={styles.confirmacao}>{textosEntrar.esqueciExplica}</p>
+        <form className={styles.forma} onSubmit={pedirRedefinicao}>
+          <Campo
+            rotulo={textosEntrar.campoEmail}
+            type="email"
+            name="email"
+            autoComplete="email"
+            required
+            value={email}
+            onChange={(evento) => setEmail(evento.target.value)}
+            erro={erroEmail ?? undefined}
+          />
+          {erroRedefinicao ? (
+            <p className={styles.erroAviso} role="alert">
+              {erroRedefinicao}
+            </p>
+          ) : null}
+          <Botao type="submit" tamanho="lg" carregando={mandandoRedefinicao}>
+            {mandandoRedefinicao ? textosEntrar.esqueciMandando : textosEntrar.esqueciBotao}
+          </Botao>
+        </form>
+        <button type="button" className={styles.linkAcao} onClick={voltarParaEntrar}>
+          {textosEntrar.esqueciVoltar}
+        </button>
+      </>
+    );
+  }
+
   if (linkEnviadoPara) {
     return (
       <>
@@ -155,6 +248,9 @@ export function FormularioEntrar() {
           {entrando ? textosEntrar.entrando : textosEntrar.botaoEntrar}
         </Botao>
       </form>
+      <button type="button" className={styles.linkAcao} onClick={() => setEsquecendo(true)}>
+        {textosEntrar.esqueciALink}
+      </button>
       <button
         type="button"
         className={styles.linkAcao}
