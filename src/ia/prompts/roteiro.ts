@@ -297,7 +297,25 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * mais o passava (medido: só um campo de texto cabia, e só com os ganchos em texto). O servidor lê o texto e descarta o que não vale, como antes. O texto do prompt é o mesmo, com o pedido
  * reescrito para o formato novo.
  */
-export const versao = "2.20.0";
+/**
+ * 2.21.0 (22/10/2026, decisão do Gustavo): quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing viram aviso na entrada (`blocoDasProibicoesComoAviso`): o roteiro é escrito sobre o
+ * tema que ela escolheu, com cuidado, em vez de ser barrado. A regra dura 3 continua valendo para os temas que o sistema sugere. Só a entrada muda, e só nesse caso; o sistema estável não muda.
+ */
+export const versao = "2.21.0";
+
+/**
+ * O aviso das proibições quando o tema é da própria pessoa (Tema livre): preferências dela, não barreira. Escreve-se sobre o tema escolhido, com o cuidado dito aqui; as regras de conformidade (nada de
+ * atacar gente, prometer o que não pode, calão, dado inventado) continuam valendo inteiras. Sem proibição, nada entra. Compartilhado com o roteiro longo.
+ */
+export function blocoDasProibicoesComoAviso(proibicoes: string[] | undefined): string | null {
+  const lista = (proibicoes ?? []).map((p) => p.trim()).filter(Boolean);
+  if (lista.length === 0) return null;
+  return (
+    `Aviso sobre o que a pessoa disse no briefing que não quer (${lista.join("; ")}): o tema acima é dela, ela o escolheu, então aqui isso é uma preferência, não uma proibição. ` +
+    "Escreva sobre o tema que ela escolheu, sem trocá-lo por outro. Se ele tocar em algum desses pontos (por exemplo, uma analogia com eleição quando ela não quer falar de política), trate só do que o tema pede e cuide: " +
+    "não cite candidato nem partido, não tome lado, não ataque ninguém, fique na vida do negócio dela. Isto é a única exceção à regra dura sobre proibição; as regras de conformidade continuam valendo inteiras."
+  );
+}
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -779,6 +797,8 @@ export function montarEntrada(dados: {
   perguntaPresa?: PerguntaPresaNaEntrada;
   /** E54 (parte 2): os dados da pesquisa na hora que a pessoa marcou. Vale também no momento: ela pediu a pesquisa para este vídeo. */
   pesquisa?: PesquisaNaEntrada;
+  /** 22/10/2026: as proibições do briefing, QUANDO o tema é da própria pessoa (Tema livre): entram como aviso, não como barreira (`blocoDasProibicoesComoAviso`). */
+  proibicoesComoAviso?: string[];
 }): string {
   const blocoEvidencia =
     dados.evidencias.length > 0
@@ -845,6 +865,7 @@ export function montarEntrada(dados: {
       ? `O que este vídeo precisa comunicar (acima de tudo o mais): ${dados.objetivoDoVideo}`
       : null,
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
+    dados.momento ? null : blocoDasProibicoesComoAviso(dados.proibicoesComoAviso),
     blocoNoticia,
     blocoNoticiasDoAssunto,
     blocoDoMomento,

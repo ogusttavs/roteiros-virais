@@ -4,11 +4,15 @@
  * tema): os temas do dia com a regra de estabilidade e o aviso da linha
  * editorial, e a nota em cinco pilares de um tema livre.
  */
+import { createHash } from "node:crypto";
+
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
   avaliacoesTema,
+  briefings,
+  clientes,
   nichos,
   rascunhosTemaLivre,
   roteiros,
@@ -18,7 +22,7 @@ import {
   type TemaDoDia,
 } from "@/db/schema";
 import * as avaliarTemaIA from "@/ia/prompts/avaliarTema";
-import { gerarComVerificacao } from "@/ia/verificador";
+import { acharTerceiraPessoa, gerarComVerificacao } from "@/ia/verificador";
 import { boss, existeJobPendente, FILAS, garantirBossPronto } from "@/jobs/fila";
 import { hojeISO } from "@/lib/config";
 import { logger } from "@/lib/log";
@@ -308,6 +312,16 @@ function extrairCamposAvaliarTema(dados: avaliarTemaIA.SaidaAvaliarTema): Record
   };
 }
 
+/** A terceira pessoa que sobra na nota do tema (um "ela vende" que pode ser de outra pessoa do tema): aviso para o registro, nunca reprovação (hotfix de 22/10/2026). */
+export function avisosDeTerceiraPessoa(campos: Record<string, string>): string[] {
+  const avisos: string[] = [];
+  for (const [nome, valor] of Object.entries(campos)) {
+    const trecho = acharTerceiraPessoa(valor);
+    if (trecho) avisos.push(`${nome}: terceira pessoa ("${trecho}")`);
+  }
+  return avisos;
+}
+
 /**
  * O rascunho de `/criar/tema-livre` (V5b, item 2; ajuste do item 0 da V6,
  * resto da revisão do PR #50): uma linha por pessoa e por marca, sem
@@ -324,12 +338,20 @@ export async function salvarRascunhoTemaLivre(usuarioId: string, clienteId: numb
     await apagarRascunhoTemaLivre(usuarioId, clienteId);
     return;
   }
+  const marca = marcaDoTexto(texto);
   await db()
     .insert(rascunhosTemaLivre)
     .values({ usuarioId, clienteId, texto, atualizadoEm: new Date() })
     .onConflictDoUpdate({
       target: [rascunhosTemaLivre.usuarioId, rascunhosTemaLivre.clienteId],
-      set: { texto, atualizadoEm: new Date() },
+      set: {
+        texto,
+        atualizadoEm: new Date(),
+        // Hotfix de 22/10/2026 (item 3): a nota só continua valendo para o MESMO texto; mudou, a nota antiga some e a pessoa avalia de novo.
+        avaliacao: sql`CASE WHEN ${rascunhosTemaLivre.avaliacaoMarca} = ${marca} THEN ${rascunhosTemaLivre.avaliacao} ELSE NULL END`,
+        avaliadaEm: sql`CASE WHEN ${rascunhosTemaLivre.avaliacaoMarca} = ${marca} THEN ${rascunhosTemaLivre.avaliadaEm} ELSE NULL END`,
+        avaliacaoMarca: sql`CASE WHEN ${rascunhosTemaLivre.avaliacaoMarca} = ${marca} THEN ${rascunhosTemaLivre.avaliacaoMarca} ELSE NULL END`,
+      },
     });
 }
 
@@ -345,6 +367,99 @@ export async function apagarRascunhoTemaLivre(usuarioId: string, clienteId: numb
   await db()
     .delete(rascunhosTemaLivre)
     .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+}
+
+/** Por quanto tempo a nota guardada vale: depois disso o banco de vídeos e as notícias já mudaram, e a nota pede para ser feita de novo. */
+export const VALIDADE_DA_NOTA_GUARDADA_MS = 72 * 60 * 60 * 1000;
+
+/**
+ * A marca do texto avaliado (hotfix de 22/10/2026, item 3): o hash do texto sem diferença de maiúscula, de espaço sobrando nem de acento solto. O mesmo texto dá a mesma marca; mudar uma palavra,
+ * não. É o que decide se a nota guardada ainda é DESTE texto.
+ */
+export function marcaDoTexto(texto: string): string {
+  const normalizado = texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+  return createHash("sha256").update(normalizado).digest("hex");
+}
+
+export type RascunhoComNota = { texto: string; nota: ResultadoAvaliarTema | null; avaliadaEm: Date | null };
+
+/** O que se grava em `rascunhos_tema_livre.avaliacao`: a nota e o contexto em que ela foi feita (ver `contextoDaNota`). */
+type NotaGuardada = { contexto: string; resultado: ResultadoAvaliarTema };
+
+/**
+ * O contexto de que a nota depende além do texto: o ramo principal da marca, os ramos alternativos que o admin ligou e a última vez que o briefing foi editado. Mudou qualquer um (o admin ligou um
+ * ramo, a pessoa editou uma resposta do briefing), a nota guardada deixa de valer e o texto é avaliado de novo: a nota nunca é mostrada como de um contexto que já não existe.
+ */
+export async function contextoDaNota(clienteId: number): Promise<string> {
+  const [[marca], alternativos, [briefing]] = await Promise.all([
+    db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId)),
+    ramosAlternativosDaMarca(clienteId),
+    db().select({ atualizadoEm: briefings.atualizadoEm }).from(briefings).where(eq(briefings.clienteId, clienteId)),
+  ]);
+  const ramos = alternativos.map((a) => a.nichoId).sort((a, b) => a - b);
+  return createHash("sha256")
+    .update(JSON.stringify([marca?.nichoId ?? null, ramos, briefing?.atualizadoEm?.toISOString() ?? null]))
+    .digest("hex");
+}
+
+/**
+ * O rascunho com a nota que ele guarda (item 3 do hotfix de 22/10/2026). A nota só vem se é DESTE texto (a marca bate com a do texto de agora), se foi feita no contexto de agora
+ * (`contextoDaNota`) e ainda vale (`VALIDADE_DA_NOTA_GUARDADA_MS`); senão, `nota` é nulo e a tela pede para avaliar. `agora` é injetável, para o teste não depender do relógio.
+ */
+export async function rascunhoComNotaTemaLivre(usuarioId: string, clienteId: number, agora: Date = new Date()): Promise<RascunhoComNota | null> {
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto, avaliacao: rascunhosTemaLivre.avaliacao, marca: rascunhosTemaLivre.avaliacaoMarca, avaliadaEm: rascunhosTemaLivre.avaliadaEm })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  if (!linha) return null;
+  const guardada = linha.avaliacao as NotaGuardada | null;
+  const dentroDoPrazo = linha.avaliadaEm !== null && agora.getTime() - linha.avaliadaEm.getTime() <= VALIDADE_DA_NOTA_GUARDADA_MS;
+  const vale = guardada !== null && dentroDoPrazo && linha.marca === marcaDoTexto(linha.texto) && guardada.contexto === (await contextoDaNota(clienteId));
+  return { texto: linha.texto, nota: vale ? guardada.resultado : null, avaliadaEm: vale ? linha.avaliadaEm : null };
+}
+
+/**
+ * A nota guardada para ESTE texto, ou nulo (outro texto, sem nota, ou nota velha). Quem pede a nota de novo do mesmo texto recebe esta, sem chamar a IA.
+ */
+export async function notaGuardadaDoTexto(usuarioId: string, clienteId: number, texto: string, agora: Date = new Date()): Promise<ResultadoAvaliarTema | null> {
+  const rascunho = await rascunhoComNotaTemaLivre(usuarioId, clienteId, agora);
+  if (!rascunho?.nota || marcaDoTexto(rascunho.texto) !== marcaDoTexto(texto)) return null;
+  return rascunho.nota;
+}
+
+/**
+ * Guarda a nota no rascunho, junto da marca do texto avaliado. Se o rascunho já anda por outro texto (a pessoa seguiu digitando durante a avaliação), não guarda: a nota seria de um texto que
+ * não é mais o dela. Sem rascunho ainda (o salvamento automático não chegou a rodar), cria a linha com o texto avaliado.
+ */
+export async function guardarNotaNoRascunho(usuarioId: string, clienteId: number, texto: string, nota: ResultadoAvaliarTema): Promise<void> {
+  const marca = marcaDoTexto(texto);
+  const guardada: NotaGuardada = { contexto: await contextoDaNota(clienteId), resultado: nota };
+  const [linha] = await db()
+    .select({ texto: rascunhosTemaLivre.texto })
+    .from(rascunhosTemaLivre)
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
+  if (linha && marcaDoTexto(linha.texto) !== marca) return;
+  const agora = new Date();
+  await db()
+    .insert(rascunhosTemaLivre)
+    .values({ usuarioId, clienteId, texto, atualizadoEm: agora, avaliacao: guardada, avaliacaoMarca: marca, avaliadaEm: agora })
+    .onConflictDoUpdate({
+      target: [rascunhosTemaLivre.usuarioId, rascunhosTemaLivre.clienteId],
+      set: { avaliacao: guardada, avaliacaoMarca: marca, avaliadaEm: agora },
+    });
+}
+
+/** O roteiro saiu deste tema: a nota guardada deixa de ser "onde a pessoa parou" (o texto continua no rascunho). Só apaga se a nota é deste mesmo texto. */
+export async function limparNotaDoRascunhoSeForDoTexto(usuarioId: string, clienteId: number, texto: string): Promise<void> {
+  await db()
+    .update(rascunhosTemaLivre)
+    .set({ avaliacao: null, avaliacaoMarca: null, avaliadaEm: null })
+    .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId), eq(rascunhosTemaLivre.avaliacaoMarca, marcaDoTexto(texto))));
 }
 
 /**
@@ -442,7 +557,7 @@ export async function avaliarTema(
   const assuntoPreso = assuntoEmAlta ? await assuntoEmAltaDaLista(assuntoEmAlta).catch(() => null) : null;
   const perguntaPresa = !noticia && !assuntoPreso ? await perguntaDoPublicoPelaChave(cliente.nichoId, perguntaChave) : null;
 
-  const { dados } = await gerarComVerificacao({
+  const { dados, avisos } = await gerarComVerificacao({
     tarefa: "avaliarTema",
     nivel: avaliarTemaIA.nivel,
     effort: avaliarTemaIA.esforco,
@@ -479,12 +594,18 @@ export async function avaliarTema(
     evidenciasFornecidas: evidencias.map((v) => v.id),
     // Achado do Gustavo (06/10/2026): nenhum id de vídeo solto no texto, e sempre "você".
     semIdInterno: true,
-    soSegundaPessoa: true,
+    // Hotfix de 22/10/2026: a terceira pessoa deixou de reprovar a nota (o "ela vende" era de OUTRA pessoa do tema, um falso positivo que, duas vezes, derrubou a avaliação e deixou a tela girando).
+    // O prompt segue mandando "você"; o que o código acha vira aviso no registro, nunca erro na tela. O roteiro continua como está.
+    avisarExtra: (d) => avisosDeTerceiraPessoa(extrairCamposAvaliarTema(d)),
+    // A avaliação pode comentar o risco do tema e citar a proibição do cliente ("este tema esbarra nela"); só o roteiro não pode feri-la.
+    citarProibicaoVale: true,
     // A recomendação traz instrução de gravação de propósito (29/09/2026, `verificarTexto.ts`, gênero "tema").
     generoTexto: "tema",
     extrairCampos: extrairCamposAvaliarTema,
     extrairEvidencias: (d) => d.evidencias,
   });
+
+  if (avisos.length > 0) logger.info({ clienteId: cliente.id, avisos }, "avaliarTema aprovada com aviso de terceira pessoa");
 
   const nota = mediaCincoPilares(dados.pilares);
 

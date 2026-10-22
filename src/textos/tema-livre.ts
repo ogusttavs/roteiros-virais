@@ -137,4 +137,8 @@ export const textosTemaLivre = {
   subtituloErro: "O que você escreveu está guardado.",
   textoErro: "A falha foi nossa, não sua. O seu texto continua guardado aqui em cima, é só tentar outra vez.",
   escolherTemaDoDia: "Escolher um dos temas de hoje",
+  /** Hotfix de 22/10/2026 (item 4): a avaliação passou do prazo (a tela não gira para sempre). */
+  demorouMuito: "Está demorando mais do que o normal. O seu texto continua guardado aqui em cima. Tente outra vez daqui a um minuto.",
+  /** Hotfix de 22/10/2026 (item 3): a nota que a pessoa vê ao voltar com o mesmo texto. */
+  notaGuardada: "Esta é a nota que ficou guardada de quando você avaliou este texto. Se você mudar uma palavra, a nota é feita de novo.",
 };

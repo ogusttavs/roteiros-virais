@@ -17,6 +17,8 @@ export const textosReferencias = {
   todosOsRamos: "Todos os ramos",
   ramoPrincipalSufixo: "(principal)",
   titulo: "O que está funcionando no seu setor",
+  /** Hotfix de 22/10/2026: quem veio do passo do objetivo do Criar volta ao roteiro por aqui. */
+  voltarParaOSeuRoteiro: "Voltar para o seu roteiro",
   linha: "Vídeos que passaram muito do normal da própria conta, e as notícias do seu setor. Os mais recentes primeiro.",
   /** R2b, item 5 (revisão do Fable no PR #100): o subtítulo próprio do segmento "Todos", no lugar do de "Fora da curva". */
   linhaTodos:

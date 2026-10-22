@@ -19,11 +19,16 @@ type Props = {
   aberto: boolean;
   /** O `fechar` do `useFolhaNoHistorico` de quem abre a folha (o botão Voltar do celular também fecha). */
   aoFechar: () => void;
-  salvo: boolean;
+  salvo?: boolean;
   /** A gravação deste vídeo está em andamento: o botão principal mostra o andamento e nenhum dos dois aceita toque duplo. */
   salvando?: boolean;
-  onUsarComoReferencia: () => void;
-  onSalvar: () => void;
+  onUsarComoReferencia?: () => void;
+  onSalvar?: () => void;
+  /**
+   * Hotfix de 22/10/2026: a MESMA prévia aberta de outro lugar (os exemplos do passo do objetivo, no Criar), só para ver. Sem salvar nem "usar como referência": o botão principal fecha a folha com
+   * este rótulo, e o link "Abrir na plataforma" continua.
+   */
+  soVer?: { rotuloFechar: string };
 };
 
 function linhaVelocidade(velocidade: number | null): string {
@@ -39,7 +44,7 @@ function linhaVelocidade(velocidade: number | null): string {
  * campo na `AnaliseVideo` de hoje: não entram nesta parte (E28, ver
  * Decisões pendentes).
  */
-export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvando = false, onUsarComoReferencia, onSalvar }: Props) {
+export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo = false, salvando = false, onUsarComoReferencia, onSalvar, soVer }: Props) {
   const { semConexao } = useConexao();
   if (!video || !url) return null;
 
@@ -50,9 +55,22 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
       aoFechar={aoFechar}
       largo
       rodape={
+        soVer ? (
+          <>
+            <Botao variante="primario" tamanho="lg" onClick={aoFechar}>
+              {soVer.rotuloFechar}
+            </Botao>
+            <div className={styles.linhaPe}>
+              <a href={url} target="_blank" rel="noopener noreferrer" className={styles.abrirNaPlataforma}>
+                <ExternalLink size={16} strokeWidth={1.5} aria-hidden="true" />
+                {textosReferencias.abrirNaPlataforma}
+              </a>
+            </div>
+          </>
+        ) : (
         <>
           {/* Já salvo, o botão só fecha a folha e avisa (sem chamar o servidor), então não precisa de rede. */}
-          <Botao variante="primario" tamanho="lg" carregando={salvando} precisaDeRede={!salvo} onClick={onUsarComoReferencia}>
+          <Botao variante="primario" tamanho="lg" carregando={salvando} precisaDeRede={!salvo} onClick={onUsarComoReferencia ?? aoFechar}>
             {textosReferencias.usarComoReferencia}
           </Botao>
           <div className={styles.linhaPe}>
@@ -75,6 +93,7 @@ export function FolhaDetalhesVideo({ video, url, aberto, aoFechar, salvo, salvan
           {/* Salvo, o botão principal não precisa de rede e não escreve o motivo; o de desfazer o salvo escreve aqui. */}
           {salvo ? <MotivoSemRede /> : null}
         </>
+        )
       }
     >
       <div className={styles.corpo}>

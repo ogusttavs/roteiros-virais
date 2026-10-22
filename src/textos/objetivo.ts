@@ -36,6 +36,9 @@ export const textosObjetivo = {
   exemplosTitulo: "Exemplos que fazem isso",
   exemplosFrase: (paraQue: string) => `Vídeos do seu setor que parecem feitos para ${paraQue}. É uma leitura nossa do vídeo, não um número da rede.`,
   verMaisEmReferencias: "Ver mais em Referências",
+  /** Hotfix de 22/10/2026: o exemplo abre a prévia do vídeo na própria tela, sem sair do passo. */
+  verOVideo: "Ver o vídeo",
+  voltarParaORoteiro: "Voltar para o roteiro",
   semExemplosTitulo: "Ainda não temos exemplos deste tipo no seu setor.",
   semExemplosTexto: "O roteiro sai do mesmo jeito: a gente usa o que as plataformas pedem para esse tipo de vídeo. Os exemplos aparecem aqui quando o seu setor tiver.",
   carregandoExemplos: "Procurando exemplos no seu setor",

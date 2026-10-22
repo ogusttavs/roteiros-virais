@@ -21,6 +21,40 @@
   }
 }
 
+/**
+ * Hotfix de 22/10/2026: "Voltar para o seu roteiro", fixo no alto quando a pessoa chegou do passo do objetivo do Criar. No celular gruda logo abaixo do cabeçalho da casca (56px mais a área do relógio);
+ * do tablet para cima não há cabeçalho acima e gruda no topo. O fundo é o da página, para a lista não aparecer por trás ao rolar.
+ */
+.voltarParaORoteiro {
+  position: sticky;
+  top: calc(56px + var(--area-topo));
+  z-index: 5;
+  margin-block: calc(-1 * var(--espaco-2));
+  padding-block: var(--espaco-2);
+  background: var(--cor-fundo);
+}
+
+@media (min-width: 768px) {
+  .voltarParaORoteiro {
+    top: var(--area-topo);
+  }
+}
+
+.voltarParaORoteiroLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--espaco-2);
+  min-height: var(--altura-toque);
+  padding: 0 var(--espaco-4);
+  border: var(--largura-borda) solid var(--cor-borda-forte);
+  border-radius: var(--raio-pill);
+  background: var(--cor-superficie);
+  color: var(--cor-titulo);
+  font-size: var(--tamanho-secundario);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+}
+
 .cabecalhoTela {
   display: grid;
   gap: var(--espaco-1);

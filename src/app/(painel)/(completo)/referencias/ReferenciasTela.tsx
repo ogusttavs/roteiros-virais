@@ -1,15 +1,16 @@
 "use client";
 
-import { Filter, Search, X } from "lucide-react";
+import { ArrowLeft, Filter, Search, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useOptimistic, useRef, useState, useTransition } from "react";
 
 import { NOME_CURTO_DA_FICHA, PARECE_FEITO_PARA } from "@/config/fichas";
-import { formatoPorChave } from "@/config/formatos";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo, Ficha, Plataforma } from "@/db/schema";
 import { ROTULO_FORMATO, ROTULO_TIPO_CONTEUDO_FILTRAVEL } from "@/ia/enums";
 import { tempoNaTela } from "@/lib/capitulos-do-roteiro";
+import { FORMATAR_DATA, formatarVideo, ROTULO_PLATAFORMA } from "@/lib/formatar-video-referencia";
 import { classificarMultiplo, formatarMultiplo, rotuloMultiploConta } from "@/lib/formatarNumero";
 import type { ContagensFiltroReferencias, OrdemReferencias, TipoConteudoFiltravel, VideoReferencia } from "@/servicos/pesquisa";
 import type { LongoParaATela } from "@/servicos/referencias-longas";
@@ -72,51 +73,9 @@ type Props = {
   totalLongos?: number;
   /** Quantos longos o ramo tem agora, sem filtro: zero deixa "Mais de 3 min" apagada com a frase calma. */
   longosDisponiveis?: number;
+  /** Hotfix de 22/10/2026: chegou do passo do objetivo do Criar (`?voltar=`, só um caminho de `/criar/`); mostra fixo no alto o botão que leva de volta ao roteiro. */
+  voltarPara?: string;
 };
-
-const ROTULO_PLATAFORMA: Record<Plataforma, string> = {
-  youtube: "YouTube",
-  tiktok: "TikTok",
-  instagram: "Instagram",
-};
-
-const FORMATAR_DATA = new Intl.DateTimeFormat("pt-BR", {
-  day: "numeric",
-  month: "long",
-  timeZone: "America/Sao_Paulo",
-});
-
-function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<number, string>): VideoFormatado {
-  const faixa = classificarMultiplo(v.foraDaCurva);
-  return {
-    id: v.id,
-    url: v.url,
-    multiplo: formatarMultiplo(v.foraDaCurva),
-    rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
-    faixaMultiplo: faixa,
-    views: v.views,
-    medianaConta: v.medianaConta,
-    velocidade: v.velocidade,
-    contaNome: v.contaNome ?? v.contaHandle ?? textosReferencias.contaNaoIdentificada,
-    plataformaData: v.publicadoEm
-      ? `${ROTULO_PLATAFORMA[v.plataforma]}, ${FORMATAR_DATA.format(v.publicadoEm)}`
-      : ROTULO_PLATAFORMA[v.plataforma],
-    titulo: v.titulo,
-    assunto: v.assunto,
-    gancho: v.gancho,
-    estrutura: v.estrutura,
-    porQueFuncionou: v.porQueFuncionou,
-    capaUrl: v.capaUrl,
-    semFala: v.semFala === true,
-    segundoChave: v.segundoChave,
-    abaixoDaRegua: v.abaixoDaRegua,
-    tipoConteudo: v.tipoConteudo,
-    ramoNome: v.nichoId === null ? undefined : nomesDosAlternativos.get(v.nichoId),
-    // E44 PR 2: o tipo de vídeo, só para os treze do cliente (recorte de outro, notícia, ao vivo e "outro" não ganham selo).
-    tipoDeVideo: formatoPorChave(v.formatoCatalogo)?.nome,
-    feitoPara: v.fichaCatalogo ? NOME_CURTO_DA_FICHA[v.fichaCatalogo] : undefined,
-  };
-}
 
 /** O cartão do vídeo longo: o tempo de cada capítulo em frases, e a marca do capítulo que interessa no trilho do vídeo inteiro (posição e largura em porcentagem da duração). */
 function formatarLongo(v: LongoParaATela, nomesDosAlternativos: Map<number, string>): LongoFormatado {
@@ -206,6 +165,8 @@ type Filtros = {
   feitoPara?: Ficha;
   /** E52 (PR 4c): "curtos" é o padrão e não vai para a URL. */
   duracao: DuracaoReferencias;
+  /** Hotfix de 22/10/2026: o caminho de onde a pessoa veio (já conferido em `page.tsx`); acompanha toda mudança de filtro, para o "Voltar para o seu roteiro" não se perder. */
+  voltar?: string;
 };
 
 /** "sim"/"nao" na URL, mesma codificação de `page.tsx`. */
@@ -240,6 +201,7 @@ function montarUrl(filtros: Filtros): string {
   if (filtros.ramo !== undefined) params.set("ramo", String(filtros.ramo));
   if (filtros.feitoPara) params.set("feitoPara", filtros.feitoPara);
   if (filtros.duracao === "longos") params.set("duracao", "longos");
+  if (filtros.voltar) params.set("voltar", filtros.voltar);
   if (filtros.segmento === "todos" && filtros.quantidade !== TAMANHO_PAGINA_TODOS_PADRAO) {
     params.set("quantidade", String(filtros.quantidade));
   }
@@ -284,6 +246,7 @@ export function ReferenciasTela({
   longos = [],
   totalLongos = 0,
   longosDisponiveis = 0,
+  voltarPara,
 }: Props) {
   const router = useRouter();
   /** E28 (parte 3b): a linha das perguntas do público abre na lista; ao responder, a chave que está abrindo o Tema livre. */
@@ -396,6 +359,7 @@ export function ReferenciasTela({
       ramo: ramoAtivo,
       feitoPara,
       duracao,
+      voltar: voltarPara,
     });
     if (urlPendente.current === urlConfirmada) {
       urlPendente.current = null;
@@ -416,6 +380,7 @@ export function ReferenciasTela({
     ramoAtivo,
     feitoPara,
     duracao,
+    voltarPara,
     limparRedeDeSeguranca,
   ]);
   // Qual vídeo está na folha agora, para um salvar que termina tarde não fechar a folha de outro (ou a de filtros).
@@ -570,6 +535,7 @@ export function ReferenciasTela({
       ramo: ramoAtivo,
       feitoPara: feitoParaExibido,
       duracao: duracaoExibida,
+      voltar: voltarPara,
       ...mudanca,
     };
     // E52 (PR 4c): nos longos só valem a busca, as views, "Brasil ou fora" e a ordem. Rede, tipo, fala e "parece feito para" são da análise dos curtos: ao entrar nos longos (ou ao mexer
@@ -716,6 +682,14 @@ export function ReferenciasTela({
 
   return (
     <div className={styles.pagina}>
+      {voltarPara ? (
+        <div className={styles.voltarParaORoteiro} data-voltar-para-o-roteiro>
+          <Link href={voltarPara} className={styles.voltarParaORoteiroLink}>
+            <ArrowLeft size={18} strokeWidth={1.75} aria-hidden="true" />
+            {textosReferencias.voltarParaOSeuRoteiro}
+          </Link>
+        </div>
+      ) : null}
       <div className={styles.cabecalhoTela}>
         <h1>{textosReferencias.titulo}</h1>
         {/* R2b, item 5 (revisão do Fable no PR #100): o subtítulo do "Todos" explica o segmento, não fala em "fora da curva". */}

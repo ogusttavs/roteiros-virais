@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ehFicha } from "@/config/fichas";
 import { TAMANHO_PAGINA_TODOS_PADRAO } from "@/config/referencias";
 import type { AnaliseVideo } from "@/db/schema";
+import { caminhoDeVoltaValido } from "@/lib/caminho-de-volta";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
@@ -55,6 +56,8 @@ type SearchParams = {
   feitoPara?: string;
   /** E52 (PR 4c): "longos" liga a pílula "Duração" em "Mais de 3 min"; qualquer outro valor é "curtos". */
   duracao?: string;
+  /** Hotfix de 22/10/2026: o caminho do passo do objetivo do Criar de onde a pessoa veio; só vale um caminho de `/criar/` (`caminhoDeVoltaValido`). */
+  voltar?: string;
 };
 
 function listaValida<T extends string>(valor: string | undefined, validos: Set<T>): T[] {
@@ -220,6 +223,7 @@ export default async function Referencias({ searchParams }: { searchParams: Prom
       longos={longosDaTela.videos}
       totalLongos={longosDaTela.total}
       longosDisponiveis={longosDisponiveis}
+      voltarPara={caminhoDeVoltaValido(params.voltar) ?? undefined}
     />
   );
 }

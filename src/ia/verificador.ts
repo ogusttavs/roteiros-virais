@@ -645,6 +645,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   /** A nota do tema: sem id solto e só em segunda pessoa (ver `verificarLocalmente`). */
   semIdInterno?: boolean;
   soSegundaPessoa?: boolean;
+  /**
+   * Decisão do Gustavo, 22/10/2026: quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing dela são preferências e viram aviso, nunca bloqueio, na avaliação do tema e no roteiro que
+   * sai dele. Ligado, a conferência local não reprova a proibição escrita no texto e o `verificarTexto` troca o critério da proibição pelo de aviso (continua barrando atacar ou ofender gente, prometer
+   * o que não pode cumprir e calão; as R-CONF do roteiro seguem em `verificarExtra`). Ausente (os temas sugeridos pelo sistema, o briefing, as regras do cliente), a proibição filtra como sempre.
+   */
+  citarProibicaoVale?: boolean;
   /** V4, item 5: o gancho dos últimos 5 roteiros do cliente, para a checagem de primeira palavra (ver `verificarLocalmente`). */
   ganchosUltimos5?: string[];
   /** V4, item 5: o tipo de abertura do roteiro anterior do cliente (ver `verificarLocalmente`). */
@@ -783,7 +789,7 @@ export async function gerarComVerificacao<T>(
  */
 function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados: T) {
   return {
-    proibicoes: params.proibicoes,
+    proibicoes: params.citarProibicaoVale ? undefined : params.proibicoes,
     evidencias: params.extrairEvidencias?.(dados) ?? [],
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,
@@ -875,11 +881,13 @@ async function tentarGerarEVerificar<T>(
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
-      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos)),
+      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos), Boolean(params.citarProibicaoVale)),
+      // Tema da própria pessoa: a proibição não chega ao verificador nem pela lista nem pela linha "Nunca diria ou faria" das fontes (prova com chave de 22/10/2026: com ela na entrada, o
+      // modelo barato reprovou a analogia com eleição em 2 de 3 roteiros, mesmo com o critério de aviso no sistema).
       entrada: verificarTexto.montarEntrada({
         texto: textoJunto,
-        proibicoes: params.proibicoes ?? [],
-        fontes: params.fontesDosFatos,
+        proibicoes: params.citarProibicaoVale ? [] : (params.proibicoes ?? []),
+        fontes: params.citarProibicaoVale && params.fontesDosFatos ? verificarTexto.fontesSemProibicoes(params.fontesDosFatos) : params.fontesDosFatos,
       }),
     });
     aprovado = verificacao.dados.aprovado;

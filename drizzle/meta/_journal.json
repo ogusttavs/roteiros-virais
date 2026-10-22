@@ -624,6 +624,13 @@
       "when": 1792700372422,
       "tag": "0088_conferencia-do-setor",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1792703161043,
+      "tag": "0089_rascunho-com-nota",
+      "breakpoints": true
     }
   ]
 }

@@ -75,8 +75,16 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.7.3 (revisão do PR #127, 05/10/2026): ainda reprovava na 1ª tentativa a frase que está literalmente no perfil ("nunca promete resultado", a "Frase que fala" do cliente, que no sem fala é como a frase
  * dita chega às fontes), o espaço marcado entre colchetes ("sempre faço [conte aqui como você faz isso]") e a pergunta (um Story comparando dois produtos foi lido como fato); viram exclusões e exemplos que APROVAM. Versão 1.7.3.
+ *
+ * 1.8.0 (achado do Gustavo em produção, 22/10/2026: a nota de um tema reprovou duas vezes porque "recomenda usar comparação com política como abertura, o que contraria a proibição" do briefing, e a tela
+ * ficou girando; decisão dele no mesmo dia: quando o TEMA é da própria pessoa, as proibições do briefing são preferências e viram aviso, nunca bloqueio): o parâmetro `proibicaoEhAviso` troca o critério
+ * da proibição por `CRITERIO_PROIBICAO_COMO_AVISO` (a avaliação do tema livre e o roteiro que sai dele). A conformidade (atacar ou ofender gente, prometer o que não pode, calão) continua barrando. Sem o
+ * parâmetro (os temas sugeridos pelo sistema, o briefing, as regras do cliente), o critério é o de sempre. Versão 1.8.0.
+ *
+ * 1.8.1 (prova com chave de 22/10/2026: com o critério de aviso, o roteiro curto do tema da eleição ainda reprovou em 2 de 3, porque a entrada levava "Proibicoes do cliente: política" e a linha
+ * "Nunca diria ou faria" nas fontes): no tema da própria pessoa a entrada sai sem a lista e as fontes sem essa linha (`fontesSemProibicoes`). O sistema estável não muda. Versão 1.8.1.
  */
-export const versao = "1.7.3";
+export const versao = "1.8.1";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -169,17 +177,41 @@ export const CRITERIO_FATOS =
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
   "perfil não traz);"
 
-export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false): string {
+/** O critério da proibição, como sempre: o texto nunca fere o que o cliente listou no briefing. */
+export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no briefing foi ferida.";
+
+/**
+ * O critério quando o TEMA é da própria pessoa (Tema livre: a avaliação do tema e o roteiro que sai dele; decisão do Gustavo em 22/10/2026). As proibições do briefing são preferências dela: viram aviso
+ * escrito no texto ("este tema esbarra no que você disse no briefing") e nunca reprovam. Só continuam barrando as regras de conformidade (atacar ou ofender gente, prometer o que não pode cumprir,
+ * calão), que valem para qualquer tema. Exportado para o teste conferir.
+ */
+export const CRITERIO_PROIBICAO_COMO_AVISO =
+  "o tema foi escolhido pela própria pessoa, então as proibições do briefing são preferências dela, não motivo de reprovação: citar ou tratar o assunto de uma proibição, dizer que o tema esbarra nela, " +
+  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Reprove apenas se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
+  "resultado que não pode cumprir ou tiver palavrão.";
+
+export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
 - ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}
-- nenhuma proibição que o cliente listou no briefing foi ferida.
+- ${proibicaoEhAviso ? CRITERIO_PROIBICAO_COMO_AVISO : CRITERIO_PROIBICAO}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
 Não repita o texto inteiro na resposta, só o motivo.
 
 Escreva em português do Brasil, com acentuação correta.`;
+}
+
+/**
+ * As fontes sem a linha das proibições do perfil ("Nunca diria ou faria: ...", de `formatarPerfilCompilado`), para o tema da própria pessoa: lá a proibição é aviso, e a linha nas fontes bastava
+ * para o modelo barato reprovar por ela (prova com chave de 22/10/2026). O resto das fontes fica igual.
+ */
+export function fontesSemProibicoes(fontes: string): string {
+  return fontes
+    .split("\n")
+    .filter((linha) => !linha.trimStart().startsWith("Nunca diria ou faria:"))
+    .join("\n");
 }
 
 export function montarEntrada(dados: { texto: string; proibicoes: string[]; fontes?: string }): string {

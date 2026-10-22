@@ -35,6 +35,8 @@ import { HojeCabecalho } from "../hoje/HojeCabecalho";
 import { pularPlanoAction } from "../hoje/plano/acoes";
 
 import styles from "./CriarTela.module.css";
+import { descartarTemaLivreAction } from "./tema-livre/acoes";
+
 
 type Props = {
   marcaAtiva: MarcaResumo;
@@ -68,6 +70,8 @@ type Props = {
   pesquisaEmAberto?: PesquisaEmAberto | null;
   /** E52 (PR 4): o vídeo longo do ramo (pode ser escrito agora? com quantos segundos?), para o "Quanto tempo?" da folha "Gravar agora"; ausente, a pergunta não aparece. */
   longo?: DadosDoLongo;
+  /** Hotfix de 22/10/2026 (item 3): o assunto seu que já recebeu nota e não foi descartado; a linha "Continuar de onde parou" leva direto a ele. */
+  temaLivreAvaliado?: { texto: string; nota: number } | null;
 };
 
 /**
@@ -96,6 +100,7 @@ export function CriarTela({
   pesquisa,
   pesquisaEmAberto = null,
   longo,
+  temaLivreAvaliado = null,
 }: Props) {
   const router = useRouter();
   const { trocando, marcaAlvo } = useTrocaMarca();
@@ -176,6 +181,26 @@ export function CriarTela({
     }
   }
 
+  // Hotfix de 22/10/2026 (item 3): "Descartar" apaga o rascunho do assunto seu (com a nota) e a linha some na hora; se a gravação falhar, a linha fica e diz.
+  const [descartado, setDescartado] = useState(false);
+  const [descartando, setDescartando] = useState(false);
+  const [erroAoDescartar, setErroAoDescartar] = useState(false);
+  async function descartarTemaLivre() {
+    if (descartando) return;
+    setDescartando(true);
+    setErroAoDescartar(false);
+    try {
+      await descartarTemaLivreAction();
+      setDescartado(true);
+      router.refresh();
+    } catch {
+      setErroAoDescartar(true);
+    } finally {
+      setDescartando(false);
+    }
+  }
+  const linhaContinuar = temaLivreAvaliado && !descartado ? temaLivreAvaliado : null;
+
   function planejarDeNovo() {
     fecharFolhaMeuPlanoEDepois(() => setFolhaPlanejarAberta(true));
   }
@@ -208,6 +233,39 @@ export function CriarTela({
               <button type="button" className={styles.trocar} disabled={ocupado} onClick={() => ir("pesquisa-em-aberto", `/criar/pesquisa/${pesquisaEmAberto.id}`)}>
                 {pesquisaEmAberto.estado === "pesquisando" ? textosPesquisa.emAberto.verAPesquisa : textosPesquisa.emAberto.verOQueAchou}
               </button>
+            </section>
+          ) : null}
+
+          {/* Hotfix de 22/10/2026 (item 3): o assunto seu que já tem nota. Uma linha calma, como a da pesquisa: é o que a pessoa já fez e não precisa pagar de novo. */}
+          {linhaContinuar ? (
+            <section className={styles.continuar} aria-label={textosCriar.continuar.aria} data-continuar-de-onde-parou>
+              <Pencil size={20} strokeWidth={1.75} aria-hidden="true" />
+              <span className={styles.continuarTexto}>
+                <span className={styles.continuarTitulo}>
+                  {textosCriar.continuar.titulo}
+                  <span className={styles.continuarNota}>{textosCriar.continuar.nota(linhaContinuar.nota.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }))}</span>
+                </span>
+                <span className={styles.continuarAssunto}>{linhaContinuar.texto}</span>
+                {erroAoDescartar ? (
+                  <span className={styles.continuarErro} role="alert">
+                    {textosCriar.continuar.erroAoDescartar}
+                  </span>
+                ) : null}
+              </span>
+              <span className={styles.continuarAcoes}>
+                <button type="button" className={styles.trocar} disabled={ocupado || descartando} onClick={() => ir("continuar", dataInicial ? `/criar/tema-livre?data=${dataInicial}` : "/criar/tema-livre")}>
+                  {ocupado && acao === "continuar" ? textosHoje.abrindo : textosCriar.continuar.continuar}
+                </button>
+                <button
+                  type="button"
+                  className={styles.trocar}
+                  aria-label={textosCriar.continuar.descartarAria(linhaContinuar.texto)}
+                  disabled={ocupado || descartando}
+                  onClick={() => void descartarTemaLivre()}
+                >
+                  {descartando ? textosCriar.continuar.descartando : textosCriar.continuar.descartar}
+                </button>
+              </span>
             </section>
           ) : null}
 

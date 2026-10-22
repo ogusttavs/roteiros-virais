@@ -12,7 +12,7 @@ import { noticiaPorId } from "@/servicos/noticias";
 import { diaPorExtenso } from "@/servicos/noticias-assuntos";
 import { dadosDoCampoDePesquisa } from "@/servicos/pesquisa-na-hora";
 import { longoDoRamo } from "@/servicos/roteiro-longo";
-import { rascunhoTemaLivre, temasParaCliente } from "@/servicos/temas";
+import { marcaDoTexto, rascunhoComNotaTemaLivre, temasParaCliente } from "@/servicos/temas";
 import { listaDePlataformas, perguntaDoPublicoPelaChave } from "@/servicos/vozes-do-publico";
 import { textosHoje } from "@/textos/hoje";
 import { textosTemaLivre } from "@/textos/tema-livre";
@@ -48,7 +48,7 @@ export default async function TemaLivre({ searchParams }: Props) {
   const cliente = await clienteDaSessaoAtual();
   const [{ tema, data, noticiaId, noticiaAssuntoId, alta, pergunta }, rascunho, marcas, resultadoTemas, dadosDaPesquisa, longo] = await Promise.all([
     searchParams,
-    rascunhoTemaLivre(sessao.user.id, cliente.id),
+    rascunhoComNotaTemaLivre(sessao.user.id, cliente.id),
     marcasDoUsuario(sessao.user.id),
     temasParaCliente(cliente),
     // E54 (parte 3): quantas pesquisas do dia a marca já usou, para o campo "Pesquisar antes de escrever" dizer a verdade.
@@ -107,10 +107,16 @@ export default async function TemaLivre({ searchParams }: Props) {
       }
     : undefined;
 
+  // Hotfix de 22/10/2026 (item 3): quem volta com o texto que já foi avaliado vê a nota que ficou guardada (sem chamar a IA); texto de outro lugar (`?tema=`), ou preso a uma notícia, a um assunto em alta ou a uma pergunta, nasce sem nota.
+  const preso = Boolean(noticia || emAlta || perguntaPreso);
+  const temaInicial = preso ? "" : (tema ?? rascunho?.texto ?? "");
+  const notaInicial = !preso && rascunho?.nota && marcaDoTexto(temaInicial) === marcaDoTexto(rascunho.texto) ? rascunho.nota : undefined;
+
   return (
     <TemaLivreTela
       notaMinima={config.regras.notaMinimaTema}
-      temaInicial={noticia || emAlta || perguntaPreso ? "" : (tema ?? rascunho ?? "")}
+      temaInicial={temaInicial}
+      notaInicial={notaInicial}
       objetivoRecomendado={objetivoRecomendado}
       outrasMarcas={outrasMarcas}
       tipo={cliente.tipo}

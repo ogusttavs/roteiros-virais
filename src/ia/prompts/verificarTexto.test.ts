@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CRITERIO_FATOS, montarEntrada, montarSistemaEstavel, motivoDaConferencia, schema, versao } from "./verificarTexto";
+import { CRITERIO_FATOS, CRITERIO_PROIBICAO, CRITERIO_PROIBICAO_COMO_AVISO, fontesSemProibicoes, montarEntrada, montarSistemaEstavel, motivoDaConferencia, schema, versao } from "./verificarTexto";
 
 /**
  * 29/09/2026, achado do Gustavo em produção: a recomendação de `avaliarTema`
@@ -14,6 +14,21 @@ describe("verificarTexto, gênero tema", () => {
     expect(sistema).toContain("recomendação sobre um tema");
     expect(sistema).toContain("Instrução de gravação é o formato certo deste gênero");
     expect(sistema).toContain("não um briefing interno");
+  });
+
+  it("com o tema da própria pessoa, a proibição vira aviso e nunca reprova (22/10/2026); a conformidade continua barrando; sem isso o critério é o de sempre", () => {
+    const aviso = montarSistemaEstavel("tema", false, true);
+    expect(aviso).toContain(CRITERIO_PROIBICAO_COMO_AVISO);
+    expect(aviso).toContain("nunca fere a proibição");
+    expect(aviso).toContain("atacar ou ofender uma pessoa, um candidato, um partido");
+    expect(aviso).not.toContain(CRITERIO_PROIBICAO);
+    for (const genero of ["padrao", "analise", "roteiro", "regra", "tema"] as const) {
+      const sistema = montarSistemaEstavel(genero);
+      expect(sistema).toContain(CRITERIO_PROIBICAO);
+      expect(sistema).not.toContain("nunca fere a proibição");
+    }
+    // O roteiro do tema livre usa o mesmo critério de aviso, com o gênero do roteiro.
+    expect(montarSistemaEstavel("roteiro", true, true)).toContain(CRITERIO_PROIBICAO_COMO_AVISO);
   });
 
   it("o gênero padrão continua sem essa explicação (só tom de pessoa falando com pessoa)", () => {
@@ -32,7 +47,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.7.3");
+    expect(versao).toBe("1.8.1");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -116,5 +131,28 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
     const reprovado = schema.parse({ aprovado: false, motivo: "inventou", fatoEspecifico: "o Uli está do meu lado", fonteMaisProxima: "nenhuma" });
     expect(motivoDaConferencia(reprovado)).toBe('o texto afirma "o Uli está do meu lado" e nada nas fontes o sustenta (fonte mais próxima: nenhuma)');
     expect(motivoDaConferencia(schema.parse({ aprovado: false, motivo: "tom exagerado", fatoEspecifico: null, fonteMaisProxima: null }))).toBe("tom exagerado");
+  });
+});
+
+describe("verificarTexto 1.8.1: tema da própria pessoa sem a proibição nas fontes", () => {
+  it("tira só a linha das proibições do perfil e deixa o resto das fontes igual", () => {
+    const fontes = [
+      "Perfil do cliente:",
+      "Lavagem de sofá.",
+      "Nunca diria ou faria: política; palavrão",
+      "Cenas que dá para filmar: o sofá antes",
+      "",
+      "Tema: a eleição do sofá",
+    ].join(String.fromCharCode(10));
+    const limpas = fontesSemProibicoes(fontes);
+    expect(limpas).not.toContain("Nunca diria ou faria");
+    expect(limpas).not.toContain("política");
+    expect(limpas).toContain("Lavagem de sofá.");
+    expect(limpas).toContain("Cenas que dá para filmar: o sofá antes");
+    expect(limpas).toContain("Tema: a eleição do sofá");
+  });
+
+  it("sem proibição na lista, a entrada diz que não há proibição registrada", () => {
+    expect(montarEntrada({ texto: "um texto", proibicoes: [] })).toContain("Proibicoes do cliente: nenhuma proibicao registrada");
   });
 });

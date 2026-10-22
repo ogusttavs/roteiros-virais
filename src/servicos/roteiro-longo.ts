@@ -286,6 +286,8 @@ export type DadosDoRoteiroLongo = {
   modeloNicho: string;
   regrasCliente: { regra: string; contagem: number }[];
   proibicoes: string[];
+  /** 22/10/2026: o tema é da própria pessoa (Tema livre): as proibições do briefing viram aviso, nunca bloqueio. */
+  temaDaPessoa?: boolean;
   tema: string;
   objetivo: Objetivo;
   objetivoDoVideo?: string;
@@ -373,10 +375,12 @@ export async function gerarConteudoLongo(dados: DadosDoRoteiroLongo): Promise<Co
       vozesDoPublico: dados.vozesDoPublico,
       lidasEm: dados.lidasEm,
       perguntaPresa: dados.perguntaPresa,
+      proibicoesComoAviso: dados.temaDaPessoa ? dados.proibicoes : undefined,
     }),
     fontesDosFatos: dados.fontesDosFatos,
     lembreteFinal: roteiroLongoIA.LEMBRETE_ACENTUACAO,
     proibicoes: dados.proibicoes,
+    citarProibicaoVale: dados.temaDaPessoa,
     exigeEvidencia: referencias.length > 0,
     evidenciasFornecidas: idsDasReferencias,
     palavrasDoMomento: dados.momento ? palavrasDeConteudo(`${dados.momento.onde} ${dados.momento.oQueEstaAcontecendo}`) : undefined,

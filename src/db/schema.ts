@@ -1885,6 +1885,14 @@ export const rascunhosTemaLivre = pgTable(
       .references(() => clientes.id, { onDelete: "cascade" }),
     texto: text("texto").notNull(),
     atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Hotfix de 22/10/2026 (item 3): a nota dos cinco pilares do texto guardado (o `ResultadoAvaliarTema` inteiro) e a marca do texto que foi avaliado (o hash do texto normalizado,
+     * `marcaDoTexto` em `servicos/temas.ts`). Cada avaliação é uma chamada de IA paga: quem volta com o mesmo texto vê a nota sem pagar de novo, e o texto que mudou apaga a nota. Nulos
+     * enquanto o texto não foi avaliado (e para o tema que veio preso a uma notícia, a um assunto em alta ou a uma pergunta do público, que nunca é guardado).
+     */
+    avaliacao: jsonb("avaliacao").$type<unknown>(),
+    avaliacaoMarca: text("avaliacao_marca"),
+    avaliadaEm: timestamp("avaliada_em", { withTimezone: true }),
   },
   (t) => [uniqueIndex("rascunhos_tema_livre_usuario_cliente").on(t.usuarioId, t.clienteId)],
 );
