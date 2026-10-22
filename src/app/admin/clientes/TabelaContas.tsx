@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import type { ContaAdmin, EstadoDoDia } from "@/servicos/admin-contas";
-import { textosContasAdmin as t } from "@/textos/admin-contas";
+import { rotuloDaCobranca, textosContasAdmin as t } from "@/textos/admin-contas";
 import { Botao } from "@/ui/componentes/Botao";
 import { EstadoVazio } from "@/ui/componentes/EstadoVazio";
 
@@ -186,6 +186,7 @@ export function TabelaContas({ contas, filtroInicial = "todas" }: Props) {
                 <th scope="col">{t.colunas.conta}</th>
                 <th scope="col">{t.colunas.pessoas}</th>
                 <th scope="col">{t.colunas.briefing}</th>
+                <th scope="col">{t.colunas.assinatura}</th>
                 <th scope="col">{t.colunas.ultimos7}</th>
                 <th scope="col">{t.colunas.ultimo}</th>
                 <th scope="col">{t.colunas.instalou}</th>
@@ -227,6 +228,9 @@ export function TabelaContas({ contas, filtroInicial = "todas" }: Props) {
                     </td>
                     <td>
                       <CelulaDoBriefing conta={conta} />
+                    </td>
+                    <td className={styles.mono} data-assinatura={conta.cobranca.cortesia ? "cortesia" : (conta.cobranca.assinatura?.status ?? "nenhuma")}>
+                      {rotuloDaCobranca(conta.cobranca)}
                     </td>
                     <td>
                       <SemanaDeUso conta={conta} />

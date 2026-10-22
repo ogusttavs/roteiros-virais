@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { config } from "@/lib/config";
 import { sessaoDoPainel } from "@/lib/ver-como";
+import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import {
   acessouHoje,
   briefingCompleto,
@@ -10,7 +11,6 @@ import {
   preferenciasDoUsuario,
   registrarAcessoHoje,
 } from "@/servicos/clientes";
-import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import { aparelhosSemFalha, pedidoDePushPodeAparecer } from "@/servicos/push";
 import { VERSAO_TERMOS_EM } from "@/textos/termos";
 import { PedidoDeAviso } from "@/ui/componentes/PedidoDeAviso";

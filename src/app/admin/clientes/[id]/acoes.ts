@@ -10,7 +10,7 @@ import type { Alcance, Cliente, PlanoMarca, TipoMarca } from "@/db/schema";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
 import { NOME_COOKIE_VER_COMO, DURACAO_VER_COMO_MS, opcoesCookieVerComo, valorCookieVerComo } from "@/lib/ver-como-cookie";
-import { trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
+import { trocarCortesiaDaConta, trocarPlanoDaConta, trocarPublicoDaConta, trocarRamoDaConta, trocarRedeDaConta, trocarTipoDaConta } from "@/servicos/admin-trocas";
 import { adicionarAssunto, ErroAssunto, fixarAssunto, removerAssunto } from "@/servicos/assuntos";
 import {
   clientePorId,
@@ -73,6 +73,16 @@ export async function definirPlanoAction(clienteId: number, plano: PlanoMarca): 
   if (!Number.isInteger(clienteId) || (plano !== "padrao" && plano !== "sem_limite")) throw new ErroCliente("pedido invalido.");
   await trocarPlanoDaConta(clienteId, plano, sessao!.user.id);
   revalidatePath(`/admin/clientes/${clienteId}`);
+}
+
+/** E22 PR 1: o interruptor de cortesia em `/admin/clientes/[id]` (a conta usa sem assinar quando o portão da cobrança está ligado). */
+export async function definirCortesiaAction(clienteId: number, cortesia: boolean): Promise<void> {
+  const sessao = await sessaoAtual();
+  garantirSessaoAdmin(sessao);
+  if (!Number.isInteger(clienteId) || typeof cortesia !== "boolean") throw new ErroCliente("pedido invalido.");
+  await trocarCortesiaDaConta(clienteId, cortesia, sessao!.user.id);
+  revalidatePath(`/admin/clientes/${clienteId}`);
+  revalidatePath("/admin/clientes");
 }
 
 /** P1, item 1: trocar o tipo de conteúdo em `/admin/clientes/[id]`; apaga o briefing (a tela já confirmou). */
