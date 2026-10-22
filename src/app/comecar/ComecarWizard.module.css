@@ -251,6 +251,34 @@
 }
 
 /**
+ * A barra da introdução (hotfix de 22/10/2026, achado do Gustavo num MacBook): ela é irmã de `.corpoIntro` na página, não filha, então no desktop o
+ * "Começar" ficava sozinho no canto inferior esquerdo da tela, longe da coluna do texto. A partir de 768 ela vira o fim da coluna: a mesma largura, o
+ * mesmo recuo e o mesmo alinhamento de `.corpoIntro` (esquerda entre 768 e 1023, centrada de 1024 para cima), logo depois das promessas. No celular
+ * nada muda: a barra continua de largura inteira, grudada no pé. `.corpo` (os outros passos) já leva a barra dentro da coluna, por isso só a
+ * introdução precisa disto.
+ */
+@media (min-width: 768px) {
+  .corpoIntro {
+    flex: none;
+    padding-bottom: var(--espaco-6);
+  }
+
+  .pagina > [data-barra-acoes-propria] {
+    width: 100%;
+    max-width: var(--largura-leitura);
+    margin: 0;
+    padding: 0 var(--espaco-10) var(--espaco-10);
+    box-sizing: border-box;
+  }
+}
+
+@media (min-width: 1024px) {
+  .pagina > [data-barra-acoes-propria] {
+    margin: 0 auto;
+  }
+}
+
+/**
  * 1180px, nao 768 (revisao do PR #28, medido no iPad em 800px: o cartao de
  * 320px espremia o formulario a 312px). Entre 768 e 1179 vale o
  * comportamento do celular (a barra fina de BarraNotaGeral, que so vira
