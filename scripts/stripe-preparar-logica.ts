@@ -3,8 +3,8 @@
  * fora, para provar com um Stripe de mentira (`stripe-preparar.test.ts`); o ponto de entrada de linha de comando é `stripe-preparar.ts`.
  *
  * A conta do Stripe é dividida com o OdontoTech (os preços de R$ 79,90 e R$ 29,90 que já existem nela são dele). Regras:
+ *  - o preço é achado primeiro, pela chave de busca (`lookup_key`, única na conta), só lendo: se ele já existe, nada é criado;
  *  - o produto tem um id fixo (`PRODUTO_ID`): achar é um `retrieve`, nunca uma busca (a busca do Stripe demora a refletir o que acabou de ser criado e duplicaria);
- *  - o preço é achado pela chave de busca (`lookup_key`), que é única na conta;
  *  - **nada que não traga `metadata.produto = roteiros` é lido como nosso, alterado ou reaproveitado**: se o produto de id fixo ou o preço da chave de busca existem sem a
  *    marca, o script para com erro e não toca em nada;
  *  - um preço nosso com valor, moeda ou período diferentes do plano também para com erro (preço do Stripe não muda; criar outro é decisão de quem lê o relatório).
@@ -52,7 +52,26 @@ function ehErroDeNaoEncontrado(erro: unknown): boolean {
 }
 
 export async function prepararStripe(stripe: StripeLike): Promise<Relatorio> {
-  // 1. O produto, pelo id fixo.
+  // 1. O preço primeiro, só lendo: se a chave de busca já é de outro produto (ou de um preço nosso diferente do plano), para antes de criar qualquer coisa.
+  const achados = await stripe.prices.list({ lookup_keys: [PLANO.lookupKey], limit: 1 });
+  const existente = achados.data[0];
+  if (existente) {
+    if (!ehNosso(existente.metadata)) {
+      throw new ErroDePreparo(`O preco com a chave ${PLANO.lookupKey} ja existe, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
+    }
+    const diferente =
+      existente.unit_amount !== PLANO.valorEmCentavos ||
+      existente.currency !== PLANO.moeda ||
+      existente.recurring?.interval !== PLANO.intervalo ||
+      existente.recurring?.interval_count !== PLANO.intervaloQuantidade ||
+      idDoProduto(existente.product) !== PRODUTO_ID;
+    if (diferente) {
+      throw new ErroDePreparo(`O preco ${existente.id} (chave ${PLANO.lookupKey}) existe com valor, moeda, periodo ou produto diferentes do plano. Preco do Stripe nao muda: decida se arquiva este e cria outro. Nada foi alterado.`);
+    }
+    return { produtoId: PRODUTO_ID, precoId: existente.id, criouProduto: false, criouPreco: false };
+  }
+
+  // 2. O produto, pelo id fixo (retrieve, nunca busca: a busca do Stripe demora a refletir o que acabou de ser criado).
   let criouProduto = false;
   let produto: ProdutoLike | null = null;
   try {
@@ -72,25 +91,7 @@ export async function prepararStripe(stripe: StripeLike): Promise<Relatorio> {
     criouProduto = true;
   }
 
-  // 2. O preço, pela chave de busca.
-  const achados = await stripe.prices.list({ lookup_keys: [PLANO.lookupKey], limit: 1 });
-  const existente = achados.data[0];
-  if (existente) {
-    if (!ehNosso(existente.metadata)) {
-      throw new ErroDePreparo(`O preco com a chave ${PLANO.lookupKey} ja existe, mas sem metadata.produto = roteiros. Nao e nosso: nada foi alterado.`);
-    }
-    const diferente =
-      existente.unit_amount !== PLANO.valorEmCentavos ||
-      existente.currency !== PLANO.moeda ||
-      existente.recurring?.interval !== PLANO.intervalo ||
-      existente.recurring?.interval_count !== PLANO.intervaloQuantidade ||
-      idDoProduto(existente.product) !== produto.id;
-    if (diferente) {
-      throw new ErroDePreparo(`O preco ${existente.id} (chave ${PLANO.lookupKey}) existe com valor, moeda, periodo ou produto diferentes do plano. Preco do Stripe nao muda: decida se arquiva este e cria outro. Nada foi alterado.`);
-    }
-    return { produtoId: produto.id, precoId: existente.id, criouProduto, criouPreco: false };
-  }
-
+  // 3. O preço.
   const preco = await stripe.prices.create(
     {
       product: produto.id,

@@ -32,7 +32,7 @@ main().catch((erro) => {
     console.error(`stripe-preparar: ${erro.message}`);
   } else {
     // So o tipo e a mensagem, e qualquer coisa com cara de chave do Stripe sai riscada (a mensagem de "chave invalida" do SDK cita um pedaco dela).
-    const mensagem = String(erro?.message ?? erro).replace(/(sk|rk|pk)_(test|live)_\w+/g, "[chave]");
+    const mensagem = String(erro?.message ?? erro).replace(/\b(sk|rk|pk)_(test|live)_\w+/g, "[chave]");
     console.error(`stripe-preparar: o Stripe respondeu com erro: ${erro?.type ?? "erro"}: ${mensagem}`);
   }
   process.exit(1);

@@ -39,6 +39,17 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/api/jobs/coleta-noticias")))).toBe(false);
   });
 
+  it("/api/webhooks/stripe passa sem cookie de sessao (autenticacao propria: a assinatura do corpo)", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/webhooks/stripe")))).toBe(false);
+  });
+
+  it("outra rota de webhooks, ou o prefixo parecido, continua protegida", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/api/webhooks/outro")))).toBe(true);
+    expect(foiRedirecionada(middleware(requisicao("/api/webhook")))).toBe(true);
+  });
+
   it("uma rota protegida sem cookie de sessao redireciona para /entrar", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     const resposta = middleware(requisicao("/admin/nichos"));

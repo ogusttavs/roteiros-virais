@@ -119,6 +119,14 @@ export default defineConfig({
       RESEND_API_KEY: "",
       SENTRY_DSN: "",
       ANTHROPIC_API_KEY: "",
+      /**
+       * E22 PR 1: o Stripe simulado no e2e (a chave de teste do `.env` nunca chega ao servidor) e o segredo do aviso só de teste, o mesmo que
+       * `tests/e2e/assinatura.spec.ts` usa para assinar o corpo. O portão da cobrança fica desligado, como em produção.
+       */
+      STRIPE_PROVIDER: "mock",
+      STRIPE_SECRET_KEY: "",
+      STRIPE_WEBHOOK_SECRET: "whsec_e2e_nao_e_um_segredo_de_verdade",
+      COBRANCA_ATIVA: "",
       GROQ_API_KEY: "",
       APIFY_TOKEN: "",
       YOUTUBE_API_KEY: "",
