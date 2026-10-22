@@ -294,7 +294,7 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
 /**
  * 2.20.0 (E50 parte 2, correção de 22/10/2026): `porQueDosBlocos` deixa de ser uma lista de objetos e vira um texto só, uma linha por bloco (`bloco | regras | vídeo | para`), e os ganchos da entrega da pesquisa passam de objetos a textos (o primeiro é sempre o recomendado, o código marca). Na prova com
  * chave, o schema do roteiro curto com a lista estourava o limite da API ("The compiled grammar is too large", modelo forte) em 22 de 22 casos: o schema já estava no limite e uma lista de objetos a
- * mais o passava (medido: só um campo de texto cabia, e só com os ganchos em texto). O servidor lê o texto e descarta o que não vale, como antes. O conteúdo do prompt é o mesmo, com o pedido
+ * mais o passava (medido: só um campo de texto cabia, e só com os ganchos em texto). O servidor lê o texto e descarta o que não vale, como antes. O texto do prompt é o mesmo, com o pedido
  * reescrito para o formato novo.
  */
 export const versao = "2.20.0";

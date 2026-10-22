@@ -87,11 +87,30 @@ describe("lerPorQueEmLinhas (o texto que o modelo devolve: bloco | regras | víd
       { bloco: "tela:0", regras: ["R-COPY-12"], videoId: null, para: null },
     ]);
   });
-  it("vídeo que não é número inteiro positivo vira nulo; para fora da lista vira nulo; texto vazio, lista vazia", () => {
+  it("vídeo sem número vira nulo; para fora da lista vira nulo; texto vazio, lista vazia", () => {
     expect(lerPorQueEmLinhas("gancho | R-COPY-05 | abc | vendam")[0]).toMatchObject({ videoId: null, para: null });
-    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | -3 | -")[0].videoId).toBeNull();
-    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | 1.5 | -")[0].videoId).toBeNull();
+    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | - | -")[0].videoId).toBeNull();
+    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | 0 | -")[0].videoId).toBeNull();
     expect(lerPorQueEmLinhas("")).toEqual([]);
+  });
+  it("tolera o que um modelo escreve por hábito: barra de tabela nas pontas, marcador de lista, crase, aspas, asteriscos, maiúscula, acento, CRLF", () => {
+    const R = String.fromCharCode(13);
+    const texto = [
+      "| gancho | R-COPY-05 | - | fiquem |",
+      "- **Corpo** | `R-COPY-13`, R-COPY-12. | video 12 | Confiem." + R,
+      '1. "capítulo:0" | R-COPY-13 | #7 | continuem assistindo',
+      "Cartão:2 | R-COPY-25 R-COPY-13 / R-COPY-25 | 12 (0:15) | chamem.",
+    ].join(String.fromCharCode(10));
+    expect(lerPorQueEmLinhas(texto)).toEqual([
+      { bloco: "gancho", regras: ["R-COPY-05"], videoId: null, para: "fiquem" },
+      { bloco: "corpo", regras: ["R-COPY-13", "R-COPY-12"], videoId: 12, para: "confiem" },
+      { bloco: "capitulo:0", regras: ["R-COPY-13"], videoId: 7, para: "fiquem" },
+      { bloco: "cartao:2", regras: ["R-COPY-25", "R-COPY-13"], videoId: 12, para: "chamem" },
+    ]);
+  });
+  it("cabeçalho e linha de separador de tabela caem depois, por não serem bloco (o servidor descarta)", () => {
+    const brutos = lerPorQueEmLinhas(["| bloco | regras | vídeo | para |", "|---|---|---|---|", "| gancho | R-COPY-05 | - | - |"].join(String.fromCharCode(10)));
+    expect(limparPorQueDosBlocos(brutos, reels)).toEqual([{ bloco: "gancho", regras: ["R-COPY-05"] }]);
   });
   it("hífen no lugar das regras é 'sem regra'", () => {
     expect(lerPorQueEmLinhas("gancho | - | 5 | fiquem")).toEqual([{ bloco: "gancho", regras: [], videoId: 5, para: "fiquem" }]);

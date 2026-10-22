@@ -47,7 +47,7 @@ import {
  */
 /**
  * 1.2.0 (22/10/2026): `porQueDosBlocos` vira um texto de uma linha por bloco, igual ao roteiro curto (que estourava a gramática da API com a lista; o longo ainda cabia, mas os dois seguem o mesmo
- * formato e a mesma leitura no servidor); e a regra dura 1 passa a dizer que o jargão vale também em "onde gravar" e "como editar" (a prova com chave pegou "alcance" em `ondeGravar`, 2 de 6 reprovados na 1ª tentativa) e a dar as palavras do cliente no lugar.
+ * formato e a mesma leitura no servidor); e a regra dura 1 passa a dizer que o jargão vale também em "onde gravar" e "como editar" (a prova com chave pegou, em `ondeGravar`, a palavra proibida de "mais gente te conhecer": 2 de 6 reprovados na 1ª tentativa) e a dar as palavras do cliente no lugar.
  */
 export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";

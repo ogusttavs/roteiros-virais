@@ -30,7 +30,7 @@ const BLOCOS: Record<FormaParaOPedido, string> = {
 export function pedidoPorQueDosBlocos(forma: FormaParaOPedido): string {
   return [
     "Depois de escrever, preencha também porQueDosBlocos: um texto com UMA LINHA para cada bloco em que você seguiu pelo menos uma das regras de texto e de estrutura listadas acima.",
-    'Cada linha tem quatro partes separadas por "|": bloco | regras | vídeo | para. Exemplo: gancho | R-COPY-05, R-COPY-13 | 12 | fiquem',
+    'Cada linha tem quatro partes separadas por "|": bloco | regras | vídeo | para. Exemplo: gancho | R-COPY-05 | - | fiquem',
     `Bloco: a chave do bloco: ${BLOCOS[forma]}.`,
     'Regras: os números (por exemplo "R-COPY-08") das regras daquela lista que você de fato seguiu naquele bloco, separados por vírgula, no máximo três, só as que valem para aquele bloco (o que está entre parênteses na regra), nunca uma regra que não está na lista acima e nunca as regras de plataforma.',
     'Vídeo: o id de um vídeo da evidência que você de fato usou como modelo para aquele bloco, ou "-"; nunca o segundo.',

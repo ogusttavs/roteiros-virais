@@ -43,18 +43,40 @@ export type PorQueDoBloco = {
 export function lerPorQueEmLinhas(texto: string): PorQueBruto[] {
   const saida: PorQueBruto[] = [];
   for (const linha of texto.split(String.fromCharCode(10))) {
-    const partes = linha.split("|").map((p) => p.trim());
-    if (partes.length < 2 || !partes[0]) continue;
-    const regras = partes[1]
-      .split(/[,;]|[ ]+e[ ]+/)
-      .map((r) => r.trim())
-      .filter((r) => r !== "" && r !== "-");
-    const id = Number(partes[2] ?? "");
-    const videoId = partes[2] && Number.isInteger(id) && id > 0 ? id : null;
-    const para = (partes[3] ?? "").toLowerCase();
-    saida.push({ bloco: partes[0], regras, videoId, para: (PARA_QUE as readonly string[]).includes(para) ? (para as ParaQue) : null });
+    // Tolera o que um modelo escreve por hábito: barra de tabela nas pontas, marcador de lista, crase, aspas e asteriscos.
+    const partes = linha
+      .trim()
+      .replace(/^[|]+/, "")
+      .replace(/[|]+$/, "")
+      .split("|")
+      .map((p) => p.trim());
+    if (partes.length < 2) continue;
+    const bloco = normalizarChave(partes[0]);
+    if (!bloco) continue;
+    const regras = [...new Set((partes[1].toUpperCase().match(/R-[A-Z]+-[0-9]+/g) ?? []).map((r) => r))];
+    const id = Number(/[0-9]+/.exec(partes[2] ?? "")?.[0] ?? "");
+    const videoId = Number.isInteger(id) && id > 0 ? id : null;
+    saida.push({ bloco, regras, videoId, para: lerPara(partes[3] ?? "") });
   }
   return saida;
+}
+
+/** "Gancho", "- gancho", "1. gancho", "`gancho`", "**gancho**", "capítulo:0": a chave como o código a guarda (minúscula, sem acento, sem enfeite). */
+function normalizarChave(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/^[ ]*([-*]|[0-9]+[.)])[ ]+/, "")
+    .replace(/[`"'*]/g, "")
+    .trim();
+}
+
+/** "fiquem", "Fiquem.", "continuem assistindo" (a glosa do pedido) viram uma das quatro palavras; o resto, nulo. */
+function lerPara(texto: string): ParaQue | null {
+  const palavra = texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  if (palavra.startsWith("continuem")) return "fiquem";
+  return PARA_QUE.find((p) => palavra.startsWith(p)) ?? null;
 }
 
 export type EscopoDasRegras = "curto" | "longo";
