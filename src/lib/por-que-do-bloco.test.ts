@@ -8,6 +8,7 @@ import { REGRAS_COPY_ROTEIRO } from "@/ia/prompts/regras-copy-roteiro";
 
 import {
   chavesDeBlocos,
+  lerPorQueEmLinhas,
   limparPorQueDosBlocos,
   numerosCitaveis,
   PARA_QUE,
@@ -66,6 +67,57 @@ describe("regraValeParaOBloco", () => {
   it("capítulo vale como corpo", () => {
     expect(regraValeParaOBloco(regra("R-COPY-13"), "capitulo:1", 0)).toBe(true);
     expect(regraValeParaOBloco(regra("R-COPY-06"), "capitulo:1", 0)).toBe(false);
+  });
+});
+
+describe("lerPorQueEmLinhas (o texto que o modelo devolve: bloco | regras | vídeo | para)", () => {
+  const Q = String.fromCharCode(10);
+  it("lê uma linha por bloco, com as regras, o vídeo e o para", () => {
+    const texto = ["gancho | R-COPY-05, R-COPY-13 | 12 | fiquem", "corpo | R-COPY-13 | - | -", "chamada | R-COPY-25 | - | chamem"].join(Q);
+    expect(lerPorQueEmLinhas(texto)).toEqual([
+      { bloco: "gancho", regras: ["R-COPY-05", "R-COPY-13"], videoId: 12, para: "fiquem" },
+      { bloco: "corpo", regras: ["R-COPY-13"], videoId: null, para: null },
+      { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" },
+    ]);
+  });
+  it("aceita ponto e vírgula, 'e', espaços e maiúsculas no para; ignora linha vazia ou sem o separador", () => {
+    const texto = ["", "capitulo:0 | R-COPY-13; R-COPY-12 e R-COPY-01 |  | GUARDEM", "isto não é uma linha do formato", "tela:0 | R-COPY-12"].join(Q);
+    expect(lerPorQueEmLinhas(texto)).toEqual([
+      { bloco: "capitulo:0", regras: ["R-COPY-13", "R-COPY-12", "R-COPY-01"], videoId: null, para: "guardem" },
+      { bloco: "tela:0", regras: ["R-COPY-12"], videoId: null, para: null },
+    ]);
+  });
+  it("vídeo sem número vira nulo; para fora da lista vira nulo; texto vazio, lista vazia", () => {
+    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | abc | vendam")[0]).toMatchObject({ videoId: null, para: null });
+    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | - | -")[0].videoId).toBeNull();
+    expect(lerPorQueEmLinhas("gancho | R-COPY-05 | 0 | -")[0].videoId).toBeNull();
+    expect(lerPorQueEmLinhas("")).toEqual([]);
+  });
+  it("tolera o que um modelo escreve por hábito: barra de tabela nas pontas, marcador de lista, crase, aspas, asteriscos, maiúscula, acento, CRLF", () => {
+    const R = String.fromCharCode(13);
+    const texto = [
+      "| gancho | R-COPY-05 | - | fiquem |",
+      "- **Corpo** | `R-COPY-13`, R-COPY-12. | video 12 | Confiem." + R,
+      '1. "capítulo:0" | R-COPY-13 | #7 | continuem assistindo',
+      "Cartão:2 | R-COPY-25 R-COPY-13 / R-COPY-25 | 12 (0:15) | chamem.",
+    ].join(String.fromCharCode(10));
+    expect(lerPorQueEmLinhas(texto)).toEqual([
+      { bloco: "gancho", regras: ["R-COPY-05"], videoId: null, para: "fiquem" },
+      { bloco: "corpo", regras: ["R-COPY-13", "R-COPY-12"], videoId: 12, para: "confiem" },
+      { bloco: "capitulo:0", regras: ["R-COPY-13"], videoId: 7, para: "fiquem" },
+      { bloco: "cartao:2", regras: ["R-COPY-25", "R-COPY-13"], videoId: 12, para: "chamem" },
+    ]);
+  });
+  it("cabeçalho e linha de separador de tabela caem depois, por não serem bloco (o servidor descarta)", () => {
+    const brutos = lerPorQueEmLinhas(["| bloco | regras | vídeo | para |", "|---|---|---|---|", "| gancho | R-COPY-05 | - | - |"].join(String.fromCharCode(10)));
+    expect(limparPorQueDosBlocos(brutos, reels)).toEqual([{ bloco: "gancho", regras: ["R-COPY-05"] }]);
+  });
+  it("hífen no lugar das regras é 'sem regra'", () => {
+    expect(lerPorQueEmLinhas("gancho | - | 5 | fiquem")).toEqual([{ bloco: "gancho", regras: [], videoId: 5, para: "fiquem" }]);
+  });
+  it("o que o servidor limpa depois é o de sempre: bloco e regra inventados caem", () => {
+    const brutos = lerPorQueEmLinhas(["gancho | R-COPY-05 | - | fiquem", "tela:9 | R-COPY-12 | - | -", "corpo | R-XXX-01 | - | -"].join(Q));
+    expect(limparPorQueDosBlocos(brutos, reels)).toEqual([{ bloco: "gancho", regras: ["R-COPY-05"], para: "fiquem" }]);
   });
 });
 

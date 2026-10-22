@@ -17,7 +17,7 @@ import type { VozNumerada } from "@/servicos/vozes-do-publico";
 import { NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
-import { pedidoPorQueDosBlocos, porQueDoBlocoSchema } from "./por-que-dos-blocos";
+import { pedidoPorQueDosBlocos, porQueDosBlocosSchema } from "./por-que-dos-blocos";
 import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { REGRAS_ROTEIRO_LONGO, textoRegras } from "./regras-formato";
 import {
@@ -45,7 +45,11 @@ import {
  * 1.1.0 (E50 parte 2, PR 3): o roteiro longo recebe as regras de conformidade e de texto da seção 11 (sem as de estrutura do vídeo curto, que não valem para capítulos) e devolve
  * `porQueDosBlocos` (o gancho, cada capítulo, a chamada e cada frase na tela), só números; o texto sai da tabela por código. O verificador das regras (PR 2) ainda não roda no longo.
  */
-export const versao = "1.1.0";
+/**
+ * 1.2.0 (22/10/2026): `porQueDosBlocos` vira um texto de uma linha por bloco, igual ao roteiro curto (que estourava a gramática da API com a lista; o longo ainda cabia, mas os dois seguem o mesmo
+ * formato e a mesma leitura no servidor); e a regra dura 1 passa a dizer que o jargão vale também em "onde gravar" e "como editar" (a prova com chave pegou, em `ondeGravar`, a palavra proibida de "mais gente te conhecer": 2 de 6 reprovados na 1ª tentativa) e a dar as palavras do cliente no lugar.
+ */
+export const versao = "1.2.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -96,7 +100,7 @@ export const schema = z.object({
   /** As regras que o modelo seguiu de fato (R-YT-VIDEO-nn), com o motivo em português de gente. */
   porQueAssim: z.array(z.object({ regra: z.string(), motivo: z.string() })),
   /** E50 parte 2, PR 3: o "por quê" de cada bloco (o gancho, cada capítulo, a chamada e cada frase na tela), só números (ver `por-que-dos-blocos.ts`). */
-  porQueDosBlocos: z.array(porQueDoBlocoSchema).catch([]),
+  porQueDosBlocos: porQueDosBlocosSchema,
   /** Só preenchido com o bloco do momento; uma linha curta que vira o tema. */
   temaCurto: z.string().nullable(),
 });
@@ -139,7 +143,10 @@ um dono de pequeno negócio gravar com a própria cara. Não é um vídeo curto 
 dividido em capítulos, cada um com a sua função, a sua duração e o gancho que segura a pessoa até o
 próximo. Regras duras:
 
-1. Sem travessão, sem emoji, sem jargão em nenhum campo de texto.
+1. Sem travessão, sem emoji, sem jargão em nenhum campo de texto, inclusive em "onde gravar" e em "como editar".
+   Palavra de agência de marketing (as de painel, de funil, de sigla) o verificador reprova: fale do objetivo
+   com as palavras do cliente, por exemplo "mais gente te conhecer", "gente te chamar para comprar",
+   "as pessoas lembrarem de você".
 2. Todo fato concreto (uma pessoa, um lugar, um número, uma data, uma coisa que aconteceu) tem de
    estar no perfil do cliente, no tema, no momento que a pessoa descreveu, na notícia, nas vozes
    do público ou nos dados que a entrada traz. O que o roteiro precisaria e não tem, você não

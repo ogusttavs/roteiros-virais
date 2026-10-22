@@ -21,7 +21,7 @@ import { linhasDasVozes, listaDePlataformas, plataformasDasVozes, type VozNumera
 import { INSTRUCAO_TIPO_ABERTURA, NOME_OBJETIVO } from "../enums";
 import type { EsforcoIA, NivelIA } from "../tipos";
 
-import { pedidoPorQueDosBlocos, porQueDoBlocoSchema } from "./por-que-dos-blocos";
+import { pedidoPorQueDosBlocos, porQueDosBlocosSchema } from "./por-que-dos-blocos";
 import { textoRegrasCopyRoteiro } from "./regras-copy-roteiro-uso";
 import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
 
@@ -291,7 +291,13 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * 2.19.0 (E50 parte 2, PR 3): o roteiro devolve também `porQueDosBlocos`, por bloco, só números: as regras da seção 11 que seguiu, o id de um vídeo da evidência e um "para quê" de uma lista fechada
  * (`por-que-dos-blocos.ts`). O texto que a pessoa lê sai da tabela por código; o servidor descarta o que não existe, o que o prompt não mostrou e a regra que não vale para o bloco.
  */
-export const versao = "2.19.0";
+/**
+ * 2.20.0 (E50 parte 2, correção de 22/10/2026): `porQueDosBlocos` deixa de ser uma lista de objetos e vira um texto só, uma linha por bloco (`bloco | regras | vídeo | para`), e os ganchos da entrega da pesquisa passam de objetos a textos (o primeiro é sempre o recomendado, o código marca). Na prova com
+ * chave, o schema do roteiro curto com a lista estourava o limite da API ("The compiled grammar is too large", modelo forte) em 22 de 22 casos: o schema já estava no limite e uma lista de objetos a
+ * mais o passava (medido: só um campo de texto cabia, e só com os ganchos em texto). O servidor lê o texto e descarta o que não vale, como antes. O texto do prompt é o mesmo, com o pedido
+ * reescrito para o formato novo.
+ */
+export const versao = "2.20.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -332,7 +338,7 @@ export const schema = z.object({
   /** As regras que o modelo seguiu de fato, com o motivo em português de gente; vazio em Reels nesta rodada. */
   porQueAssim: z.array(porQueAssimItem),
   /** E50 parte 2, PR 3: o "por quê" de cada bloco, só números (ver `por-que-dos-blocos.ts`); o servidor confere tudo e o texto vem da tabela. */
-  porQueDosBlocos: z.array(porQueDoBlocoSchema).catch([]),
+  porQueDosBlocos: porQueDosBlocosSchema,
   cenas: z.array(cena),
   /** Por que este roteiro so funciona com a pessoa de verdade (a tese, na tela). */
   ondeGravar: z.string(),
@@ -372,7 +378,8 @@ export const schema = z.object({
    */
   entregaDaPesquisa: z
     .object({
-      ganchos: z.array(z.object({ texto: z.string(), recomendado: z.boolean() })),
+      // Textos só (o primeiro é sempre o recomendado, o código marca): uma lista de objetos a menos na gramática da API (22/10/2026, ver a versão 2.20.0).
+      ganchos: z.array(z.string()),
       oQueVaoTeResponder: z.array(z.object({ objecao: z.string(), resposta: z.string() })),
       fontes: z.array(z.number().int()),
       atencao: z.array(z.string()),
@@ -892,7 +899,7 @@ const REGRAS_DOS_DADOS_DA_PESQUISA = [
   "- Sobre o futuro, escreva \"o risco é\"; nunca afirme o que vai acontecer.",
   "- Nunca ponha na boca de uma pessoa ou de um político uma posição que os dados não mostram. Pauta e princípio, nunca ataque a quem você citar.",
   "Além do roteiro, preencha o campo entregaDaPesquisa:",
-  "- ganchos: três opções de gancho para o início do vídeo; a primeira é a recomendada (recomendado true) e é com ela que o vídeo abre; as outras duas, recomendado false.",
+  "- ganchos: três opções de gancho para o início do vídeo, só o texto de cada uma; a primeira é a recomendada e é com ela que o vídeo abre.",
   "- oQueVaoTeResponder: de duas a quatro objeções que PODEM aparecer nos comentários, a partir destes dados e do que as pessoas do setor costumam questionar. Cada objeção começa por \"Pode aparecer: \" e a resposta tem uma frase. Nunca escreva que \"vão dizer\" nem \"o público vai\": é uma possibilidade, não uma previsão.",
   "- fontes: os números (id) dos dados que o roteiro de fato usou.",
   "- atencao: o que a pessoa precisa conferir ou decidir antes de postar, uma frase por item (pode ser vazio).",

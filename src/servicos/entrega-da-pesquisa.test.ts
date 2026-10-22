@@ -41,10 +41,10 @@ const pesquisa = (extra: Partial<PesquisaDeOrigemGuardada> = {}): PesquisaDeOrig
 
 const entrega = (extra: Record<string, unknown> = {}) => ({
   ganchos: [
-    { texto: "Gancho um.", recomendado: false },
-    { texto: "Gancho dois.", recomendado: true },
-    { texto: "Gancho três.", recomendado: false },
-    { texto: "Gancho quatro.", recomendado: false },
+    "Gancho um.",
+    "Gancho dois.",
+    "Gancho três.",
+    "Gancho quatro.",
   ],
   oQueVaoTeResponder: [{ objecao: "Pode aparecer: não vale para mim.", resposta: "Depende do cenário." }],
   fontes: [3],
@@ -111,11 +111,11 @@ describe("montarEntregaDaPesquisa", () => {
     const r = montarEntregaDaPesquisa(
       entrega({
         ganchos: [
-          { texto: "A", recomendado: false },
-          { texto: "A", recomendado: true },
-          { texto: "B", recomendado: true },
-          { texto: "C", recomendado: false },
-          { texto: "D", recomendado: false },
+          "A",
+          "A",
+          "B",
+          "C",
+          "D",
         ],
       }),
       pesquisa(),
@@ -137,7 +137,7 @@ describe("montarEntregaDaPesquisa", () => {
 
   it("o gancho alternativo com número que as fontes não têm sai; o do roteiro fica (ele já passou no verificador)", () => {
     const r = montarEntregaDaPesquisa(
-      entrega({ ganchos: [{ texto: "Você perde 40% do dinheiro.", recomendado: false }, { texto: "Gancho limpo.", recomendado: false }] }),
+      entrega({ ganchos: ["Você perde 40% do dinheiro.", "Gancho limpo."] }),
       pesquisa(),
       contexto({ gancho: "Gancho do roteiro." }),
     )!;
@@ -272,7 +272,7 @@ describe("montarEntregaDaPesquisa", () => {
   it("limpa travessão, marcador e negrito do que o modelo escreveu", () => {
     const travessao = String.fromCharCode(0x2014);
     const r = montarEntregaDaPesquisa(
-      entrega({ atencao: [`- **Confira o horário** ${travessao} hoje.`], ganchos: [{ texto: `Gancho ${travessao} um`, recomendado: true }] }),
+      entrega({ atencao: [`- **Confira o horário** ${travessao} hoje.`], ganchos: [`Gancho ${travessao} um`] }),
       pesquisa(),
       contexto(),
     )!;

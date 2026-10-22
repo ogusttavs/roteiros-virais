@@ -34,6 +34,51 @@ export type PorQueDoBloco = {
   para?: ParaQue;
 };
 
+/**
+ * O que o modelo devolve em `porQueDosBlocos`: UM texto, uma linha por bloco, `bloco | regras | vídeo | para`
+ * (por exemplo `gancho | R-COPY-05, R-COPY-13 | 12 | fiquem`; hífen onde não há vídeo ou "para"). Não é uma lista de objetos
+ * porque a gramática do schema do roteiro curto já estava no limite da API (E50, prova com chave de 22/10/2026: uma lista de
+ * objetos, até de strings, estourava "compiled grammar is too large"). Aqui o texto vira a mesma forma de antes; linha que não lê é ignorada.
+ */
+export function lerPorQueEmLinhas(texto: string): PorQueBruto[] {
+  const saida: PorQueBruto[] = [];
+  for (const linha of texto.split(String.fromCharCode(10))) {
+    // Tolera o que um modelo escreve por hábito: barra de tabela nas pontas, marcador de lista, crase, aspas e asteriscos.
+    const partes = linha
+      .trim()
+      .replace(/^[|]+/, "")
+      .replace(/[|]+$/, "")
+      .split("|")
+      .map((p) => p.trim());
+    if (partes.length < 2) continue;
+    const bloco = normalizarChave(partes[0]);
+    if (!bloco) continue;
+    const regras = [...new Set((partes[1].toUpperCase().match(/R-[A-Z]+-[0-9]+/g) ?? []).map((r) => r))];
+    const id = Number(/[0-9]+/.exec(partes[2] ?? "")?.[0] ?? "");
+    const videoId = Number.isInteger(id) && id > 0 ? id : null;
+    saida.push({ bloco, regras, videoId, para: lerPara(partes[3] ?? "") });
+  }
+  return saida;
+}
+
+/** "Gancho", "- gancho", "1. gancho", "`gancho`", "**gancho**", "capítulo:0": a chave como o código a guarda (minúscula, sem acento, sem enfeite). */
+function normalizarChave(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/^[ ]*([-*]|[0-9]+[.)])[ ]+/, "")
+    .replace(/[`"'*]/g, "")
+    .trim();
+}
+
+/** "fiquem", "Fiquem.", "continuem assistindo" (a glosa do pedido) viram uma das quatro palavras; o resto, nulo. */
+function lerPara(texto: string): ParaQue | null {
+  const palavra = texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]/g, "");
+  if (palavra.startsWith("continuem")) return "fiquem";
+  return PARA_QUE.find((p) => palavra.startsWith(p)) ?? null;
+}
+
 export type EscopoDasRegras = "curto" | "longo";
 
 /** Os números que o modelo pode citar: as que o prompt mostra. O roteiro longo recebe só as de conformidade e de texto, não as de estrutura do vídeo curto. */

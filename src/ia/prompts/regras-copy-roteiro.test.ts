@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { VERSAO_DAS_REGRAS, lerTabelaDaSecao11, montarArquivoGerado } from "../../../scripts/gerar-regras-copy-roteiro-lib";
 
+import { porQueDosBlocosSchema } from "./por-que-dos-blocos";
 import { REGRAS_COPY_ROTEIRO, versao } from "./regras-copy-roteiro";
 import {
   NUMEROS_REGRAS_COPY_ROTEIRO,
@@ -198,10 +199,18 @@ describe("o pedido do por quê de cada bloco (PR 3)", () => {
     expect(montarSistemaEstavel({ ...BASE, formato: "story", estilo: "falado" })).toContain('"cartao:N"');
     expect(montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "sem_fala" })).toContain('"cartao:N"');
   });
+  it("o campo do schema é um texto e um valor que não é texto vira vazio (nunca derruba a geração)", () => {
+    expect(porQueDosBlocosSchema.parse("gancho | R-COPY-05 | - | -")).toBe("gancho | R-COPY-05 | - | -");
+    expect(porQueDosBlocosSchema.parse(123)).toBe("");
+    expect(porQueDosBlocosSchema.parse(undefined)).toBe("");
+  });
   it("pede só números, uma lista fechada de para quê, e nunca texto de explicação nem o segundo", () => {
     const texto = montarSistemaEstavel({ ...BASE, formato: "reels", estilo: "falado" });
-    expect(texto).toContain('"fiquem", "confiem", "guardem", "chamem"');
+    expect(texto).toContain("fiquem, confiem, guardem, chamem");
     expect(texto).toContain("Neste campo não escreva nenhum texto de explicação");
+    // o formato novo: um texto, uma linha por bloco, quatro partes
+    expect(texto).toContain("UMA LINHA para cada bloco");
+    expect(texto).toContain("bloco | regras | vídeo | para");
     expect(texto).toContain("nunca o segundo");
   });
   it("o roteiro longo recebe conformidade e texto (sem a estrutura do curto) e pede os blocos do longo", () => {

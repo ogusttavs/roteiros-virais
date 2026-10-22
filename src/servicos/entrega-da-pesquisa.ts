@@ -204,7 +204,7 @@ export function montarEntregaDaPesquisa(
     ganchos.push({ texto: limpo, recomendado: false });
   };
   if (contexto.gancho.trim() !== "") poeGancho(contexto.gancho, true);
-  for (const g of entrega.ganchos) poeGancho(g.texto, false);
+  for (const g of entrega.ganchos) poeGancho(g, false);
   if (ganchos.length > 0) ganchos[0].recomendado = true;
 
   // O que pode aparecer: possibilidade, nunca previsão; sem número que as fontes não tenham.

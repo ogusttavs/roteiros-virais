@@ -26,6 +26,8 @@ npm run admin:criar        # cria o primeiro admin (ADMIN_EMAIL, ADMIN_NOME, ADM
 npm run lint && npm run typecheck && npm run test && npm run checar-texto && npm run checar-admin-protegido && npm run build
 npm run test:e2e           # Playwright contra `next build` mais `next start`; demora uns 2
                             # minutos; reusa um servidor já na porta 3000 fora de CI
+npm run medir:gramatica    # o schema de saída do roteiro (curto e longo) cabe na gramática da API? custa centavos;
+                            # rode antes de mexer em `schema` de roteiro.ts ou roteiroLongo.ts (E50, 22/10/2026: estourou 22 de 22)
 deploy/ensaio/ensaiar.sh   # ensaio do Compose de produção nesta máquina, antes de qualquer
                             # deploy (`deploy/README.md`)
 ```

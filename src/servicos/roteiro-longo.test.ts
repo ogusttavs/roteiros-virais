@@ -198,11 +198,11 @@ describe("conteudoDoRoteiroLongo", () => {
   it("o por quê (E50 parte 2, PR 3): gancho, cada capítulo e a chamada; o vídeo só se for uma referência; regra de estrutura do curto, bloco e regra inventados caem", () => {
     const base = saidaBase();
     base.porQueDosBlocos = [
-      { bloco: "gancho", regras: ["R-COPY-05"], videoId: 7, para: "fiquem" },
-      { bloco: "capitulo:0", regras: ["R-COPY-13", "R-ROTEIRO-05", "R-COPY-NAO-EXISTE"], videoId: 8, para: null },
-      { bloco: "capitulo:99", regras: ["R-COPY-13"], videoId: null, para: null },
-      { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" },
-    ];
+      "gancho | R-COPY-05 | 7 | fiquem",
+      "capitulo:0 | R-COPY-13, R-ROTEIRO-05, R-COPY-NAO-EXISTE | 8 | -",
+      "capitulo:99 | R-COPY-13 | - | -",
+      "chamada | R-COPY-25 | - | chamem",
+    ].join(String.fromCharCode(10));
     const { conteudo } = conteudoDoRoteiroLongo(base, [7]);
     expect(conteudo.porQueDosBlocos).toEqual([
       { bloco: "gancho", regras: ["R-COPY-05"], video: { videoId: 7, segundo: 0 }, para: "fiquem" },

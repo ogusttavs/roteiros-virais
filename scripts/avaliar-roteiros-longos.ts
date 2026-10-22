@@ -31,6 +31,7 @@ import {
   PALAVRAS_MIN_NO_GANCHO_DO_CAPITULO,
   somaDosCapitulos,
 } from "../src/lib/capitulos-do-roteiro";
+import { lerPorQueEmLinhas } from "../src/lib/por-que-do-bloco";
 import { camposDoRoteiroLongo, duracaoAlvoDaMedida, motivosDoRoteiroLongo } from "../src/servicos/roteiro-longo";
 
 import { imprimirPorQueDosBlocos } from "./golden-por-que";
@@ -251,7 +252,7 @@ export async function avaliarRoteirosLongos(): Promise<ResultadoAvaliarRoteirosL
 
     // E50 parte 2, PR 3: o por quê do gancho, de cada capítulo e da chamada, como a tela vai mostrar, e a coluna "o por quê está certo?" (o simulador preenche; com a chave real fica para ler).
     imprimirPorQueDosBlocos(
-      saida.porQueDosBlocos,
+      lerPorQueEmLinhas(saida.porQueDosBlocos),
       {
         forma: { tipo: "longo", capitulos: saida.capitulos.length, telas: saida.edicao.textoNaTela.length },
         escopo: "longo",

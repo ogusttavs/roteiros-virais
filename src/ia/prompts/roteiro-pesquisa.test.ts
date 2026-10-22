@@ -64,7 +64,7 @@ describe("a pesquisa na hora presa ao roteiro (E54, parte 2)", () => {
   it("pede a entrega: três ganchos (o primeiro recomendado), o que PODE aparecer e nunca previsão, as fontes usadas, a atenção e o cuidado", () => {
     const entrada = montarEntrada({ ...BASE, pesquisa: PESQUISA });
     expect(entrada).toContain("entregaDaPesquisa");
-    expect(entrada).toContain("três opções de gancho");
+    expect(entrada).toContain("só o texto de cada uma");
     expect(entrada).toContain("a primeira é a recomendada");
     expect(entrada).toContain("é com ela que o vídeo abre");
     expect(entrada).toContain('Cada objeção começa por "Pode aparecer: "');
@@ -144,6 +144,6 @@ describe("a pesquisa na hora presa ao roteiro (E54, parte 2)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("2.19.0");
+    expect(versao).toBe("2.20.0");
   });
 });
