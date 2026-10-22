@@ -8,7 +8,7 @@ import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { conferirSenhaNova } from "@/lib/senha-regras";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { ErroAcessoNegado } from "@/servicos/clientes";
-import { limparSenhaProvisoria } from "@/servicos/senha";
+import { encerrarOutrasSessoes, limparSenhaProvisoria } from "@/servicos/senha";
 import { textosSenha } from "@/textos/senha";
 
 /**
@@ -29,7 +29,9 @@ export async function trocarSenhaAction(dados: { atual: string; nova: string }):
   try {
     await auth.api.changePassword({
       headers: await headers(),
-      body: { currentPassword: dados.atual, newPassword: dados.nova, revokeOtherSessions: true },
+      // Sem `revokeOtherSessions`: ele apaga TODAS as sessoes (a de agora tambem) e cria outra, e o painel, que se refaz na mesma resposta da acao com o cookie velho, mandaria a pessoa para
+      // /entrar. As outras sessoes saem logo abaixo, mantendo esta.
+      body: { currentPassword: dados.atual, newPassword: dados.nova, revokeOtherSessions: false },
     });
   } catch (erro) {
     if (erro instanceof APIError) {
@@ -41,6 +43,7 @@ export async function trocarSenhaAction(dados: { atual: string; nova: string }):
     throw erro;
   }
 
+  await encerrarOutrasSessoes(sessao.user.id, sessao.session.token);
   await limparSenhaProvisoria(sessao.user.id);
   return { ok: true, dado: null };
 }

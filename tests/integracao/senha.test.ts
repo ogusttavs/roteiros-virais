@@ -175,20 +175,20 @@ describe("Trocar senha na Conta", () => {
     return login;
   }
 
-  it("troca com a senha de agora certa, encerra as outras sessões e apaga a marca de provisória", async () => {
+  it("troca com a senha de agora certa, encerra as outras sessões (a de agora fica) e apaga a marca de provisória", async () => {
     const pessoa = await criarPessoa({ provisoria: true });
     const outroAparelho = await entrar(pessoa.email, SENHA);
-    await comoPessoaLogada(pessoa);
+    const daqui = await comoPessoaLogada(pessoa);
 
     const resultado = await trocarSenhaAction({ atual: SENHA, nova: "senha-nova-da-conta" });
 
     expect(resultado).toEqual({ ok: true, dado: null });
     expect(await senhaEhProvisoria(pessoa.id)).toBe(false);
+    const tokens = (await db().select().from(session).where(eq(session.userId, pessoa.id))).map((s) => s.token);
+    expect(tokens).toEqual([daqui.token]);
+    expect(tokens).not.toContain(outroAparelho.token);
     expect((await entrar(pessoa.email, SENHA)).ok).toBe(false);
     expect((await entrar(pessoa.email, "senha-nova-da-conta")).ok).toBe(true);
-    // O outro aparelho foi desconectado: a sessão dele não existe mais (a de agora foi trocada por uma nova, e a do novo login acima é nova).
-    const tokens = (await db().select().from(session).where(eq(session.userId, pessoa.id))).map((s) => s.token);
-    expect(tokens).not.toContain(outroAparelho.token);
   });
 
   it("com a senha de agora errada, recusa com a frase certa e nada muda", async () => {
