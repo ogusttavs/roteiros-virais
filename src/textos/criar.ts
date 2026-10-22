@@ -27,6 +27,18 @@ export const textosCriar = {
   },
   notaAgenda: "Tudo o que você cria fica marcado no dia, em Hoje.",
 
+  /** Hotfix de 22/10/2026 (item 3): o assunto seu que já recebeu nota e ficou para continuar. */
+  continuar: {
+    aria: "Continuar de onde parou",
+    titulo: "Continuar de onde parou",
+    nota: (nota: string) => `Nota ${nota}`,
+    continuar: "Continuar",
+    descartar: "Descartar",
+    descartando: "Descartando",
+    descartarAria: (texto: string) => `Descartar o assunto: ${texto}`,
+    erroAoDescartar: "Não deu para descartar agora. Tente de novo.",
+  },
+
   /**
    * E55 PR 2b (passo 21 do Opus, `Criar.dc.html`, estados `inicioEmAlta` e `inicioSemEncaixe`): o cartão do assunto do momento no alto da oficina, e a lista dos assuntos que não couberam no
    * ramo. Nunca a palavra "tendência" na tela.

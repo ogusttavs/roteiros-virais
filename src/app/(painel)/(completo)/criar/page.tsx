@@ -8,7 +8,7 @@ import { dadosDoCampoDePesquisa, pesquisaEmAberto } from "@/servicos/pesquisa-na
 import { itemPlanoPorId, planoDoDia, planoQueVem } from "@/servicos/plano";
 import { roteiroPorId } from "@/servicos/roteiro";
 import { longoDoRamo } from "@/servicos/roteiro-longo";
-import { temasParaCliente } from "@/servicos/temas";
+import { rascunhoComNotaTemaLivre, temasParaCliente } from "@/servicos/temas";
 import { perguntasDaTelaSemFalha } from "@/servicos/vozes-do-publico";
 
 import { CriarTela } from "./CriarTela";
@@ -65,7 +65,7 @@ export default async function Criar({ searchParams }: Props) {
 
   // E55 PR 2b: o assunto em alta hoje é para hoje: quem veio criar para outro dia (`?data=`) não o vê, nem a lista do que não coube no ramo.
   const paraHoje = !dataInicial || dataInicial === hoje;
-  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe, perguntas, dadosDaPesquisa, pesquisaDeixadaParaDepois, longo] = await Promise.all([
+  const [resultadoTemas, planoDeHoje, planoOsDiasQueVem, itemPlanoInicial, emAltaECemEncaixe, perguntas, dadosDaPesquisa, pesquisaDeixadaParaDepois, longo, rascunhoDoAssunto] = await Promise.all([
     temasParaCliente(cliente).catch(() => null),
     planoDoDia(cliente.id, hoje),
     planoQueVem(cliente.id, hoje),
@@ -80,6 +80,8 @@ export default async function Criar({ searchParams }: Props) {
     pesquisaEmAberto(cliente.id).catch(() => null),
     // E52 (PR 4): o vídeo longo do ramo para o "Quanto tempo?" da folha. Uma falha aqui só tira a pergunta: o Criar abre do mesmo jeito.
     longoDoRamo(cliente.nichoId).catch(() => undefined),
+    // Hotfix de 22/10/2026 (item 3): o assunto seu que já recebeu nota e ficou para continuar ("Continuar de onde parou"). Uma falha aqui só tira a linha.
+    rascunhoComNotaTemaLivre(sessao.user.id, cliente.id).catch(() => null),
   ]);
   const objetivoRecomendado = resultadoTemas?.status === "ok" ? resultadoTemas.objetivoRecomendado : null;
   const outrasMarcas = marcas.filter((marca) => marca.id !== cliente.id);
@@ -105,6 +107,7 @@ export default async function Criar({ searchParams }: Props) {
       pesquisa={dadosDaPesquisa}
       pesquisaEmAberto={pesquisaDeixadaParaDepois}
       longo={longo}
+      temaLivreAvaliado={rascunhoDoAssunto?.nota ? { texto: rascunhoDoAssunto.texto, nota: rascunhoDoAssunto.nota.nota } : null}
     />
   );
 }

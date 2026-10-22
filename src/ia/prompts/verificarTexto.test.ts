@@ -16,6 +16,18 @@ describe("verificarTexto, gênero tema", () => {
     expect(sistema).toContain("não um briefing interno");
   });
 
+  it("no gênero tema, citar a proibição ou o risco do tema ao avaliá-lo não reprova (achado de 22/10/2026); nos outros gêneros a proibição fere como sempre", () => {
+    const tema = montarSistemaEstavel("tema");
+    expect(tema).toContain("nunca fere a proibição");
+    expect(tema).toContain("não reprove por isso");
+    expect(tema).toContain("A proibição vale para o roteiro, não para a conversa sobre o tema");
+    for (const genero of ["padrao", "analise", "roteiro", "regra"] as const) {
+      const sistema = montarSistemaEstavel(genero);
+      expect(sistema).toContain("nenhuma proibição que o cliente listou no briefing foi ferida");
+      expect(sistema).not.toContain("nunca fere a proibição");
+    }
+  });
+
   it("o gênero padrão continua sem essa explicação (só tom de pessoa falando com pessoa)", () => {
     const sistema = montarSistemaEstavel();
     expect(sistema).toContain("uma pessoa falando com outra pessoa");
@@ -32,7 +44,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.7.3");
+    expect(versao).toBe("1.8.0");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);

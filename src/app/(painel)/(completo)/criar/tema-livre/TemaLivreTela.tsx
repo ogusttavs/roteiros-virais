@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import type { Objetivo, QuemGrava, TipoMarca } from "@/db/schema";
+import { dadoOuErro } from "@/lib/resultado-acao";
 import type { DadosDoCampoDePesquisa, Profundidade } from "@/servicos/pesquisa-na-hora";
 import type { DadosDoLongo } from "@/servicos/roteiro-longo";
 import type { ResultadoAvaliarTema } from "@/servicos/temas";
@@ -84,9 +85,14 @@ type AssuntoEmAltaPreso = { chave: string; assunto: string; linha: string };
  */
 type PerguntaPreso = { chave: string; texto: string; linha: string; reclamacao: boolean };
 
+/** Hotfix de 22/10/2026 (item 4): a avaliação normal leva menos de 10 segundos; as duas tentativas com o verificador cabem em dois minutos. Passou disso, a tela para de girar e diz que está demorando (a nota, se vier, fica guardada). */
+const PRAZO_DA_AVALIACAO_MS = 120_000;
+
 type Props = {
   notaMinima: number;
   temaInicial?: string;
+  /** Hotfix de 22/10/2026 (item 3): a nota que ficou guardada para este MESMO texto (volta sem chamar a IA); ausente, a tela abre na proposta. */
+  notaInicial?: ResultadoAvaliarTema;
   /** V9a, item 3: "Estou num momento" abre a mesma folha "Gravar agora" de `/hoje`. */
   objetivoRecomendado: Objetivo | null;
   outrasMarcas: MarcaResumo[];
@@ -119,6 +125,7 @@ type Props = {
 export function TemaLivreTela({
   notaMinima,
   temaInicial = "",
+  notaInicial,
   objetivoRecomendado,
   outrasMarcas,
   tipo,
@@ -133,7 +140,9 @@ export function TemaLivreTela({
 }: Props) {
   const router = useRouter();
   const [texto, setTexto] = useState(temaInicial);
-  const [fase, setFase] = useState<Fase>("proposta");
+  const [fase, setFase] = useState<Fase>(notaInicial ? (notaInicial.nota >= notaMinima ? "naMeta" : "abaixoDaMeta") : "proposta");
+  /** A nota que está na tela veio do que ficou guardado (voltou com o mesmo texto), não de uma avaliação de agora. */
+  const [notaGuardada, setNotaGuardada] = useState(notaInicial !== undefined);
   /**
    * E43, dúvida 7: "Tirar a notícia" devolve o Tema livre comum, com o texto preservado (mesmo
    * estado `texto`, nunca recarrega a tela). Uma vez tirada, a notícia não entra mais na avaliação
@@ -163,7 +172,7 @@ export function TemaLivreTela({
     folhaMomentoAberta,
     () => setFolhaMomentoAberta(false),
   );
-  const [resultado, setResultado] = useState<ResultadoAvaliarTema | null>(null);
+  const [resultado, setResultado] = useState<ResultadoAvaliarTema | null>(notaInicial ?? null);
   const [campoVazio, setCampoVazio] = useState(false);
   // A frase da tela de erro: a de sempre (falha do servidor, "a falha foi nossa") ou a de rede (V7, item 4).
   const [fraseErro, setFraseErro] = useState(textosTemaLivre.textoErro);
@@ -173,6 +182,8 @@ export function TemaLivreTela({
   const textoAtualRef = useRef(temaInicial);
   const rascunhoPendenteRef = useRef(false);
   const botaoRef = useRef<HTMLDivElement>(null);
+  /** Uma avaliação está em curso (cada uma é uma chamada paga): toque repetido, antes de a tela trocar, não dispara outra. */
+  const avaliandoRef = useRef(false);
   const tratarFalha = useTratarFalha();
   const { avisarRedeOk } = useConexao();
   // Toque que só navega espera o servidor sem mostrar nada; "Abrindo" no botão tocado, os outros desabilitados
@@ -278,24 +289,45 @@ export function TemaLivreTela({
   }, [salvarRascunho]);
 
   function avaliar(textoParaAvaliar: string) {
+    if (avaliandoRef.current) return;
     const limpo = textoParaAvaliar.trim();
     if (!limpo) {
       setCampoVazio(true);
       return;
     }
     setCampoVazio(false);
+    avaliandoRef.current = true;
+    setNotaGuardada(false);
     setFase("esperando");
+    let terminou = false;
+    // O prazo: a tela nunca fica girando para sempre. Se a resposta chegar depois, é ignorada (o servidor guarda a nota, e "Tentar de novo" a traz sem pagar de novo).
+    const prazo = setTimeout(() => {
+      if (terminou) return;
+      terminou = true;
+      avaliandoRef.current = false;
+      setFraseErro(textosTemaLivre.demorouMuito);
+      setFase("erro");
+    }, PRAZO_DA_AVALIACAO_MS);
     // O rascunho não é mais apagado ao avaliar (item 0 da V6): o debounce pendente pode
     // continuar e gravar a versão mais recente, sem corrida com a avaliação.
     avaliarTemaAction(limpo, noticiaIdParaEnviar, chaveParaEnviar, noticiaAssuntoIdParaEnviar, perguntaParaEnviar)
+      .then(dadoOuErro)
       .then((dados) => {
+        if (terminou) return;
+        terminou = true;
+        clearTimeout(prazo);
+        avaliandoRef.current = false;
         avisarRedeOk();
         setTexto(limpo);
         setResultado(dados);
         setFase(dados.nota >= notaMinima ? "naMeta" : "abaixoDaMeta");
       })
       .catch((falha) => {
-        // Rede caída não é "falha nossa": a frase de rede diz o que aconteceu, e o texto continua na tela.
+        if (terminou) return;
+        terminou = true;
+        clearTimeout(prazo);
+        avaliandoRef.current = false;
+        // A frase que o servidor mandou (a falha da IA, dita com calma) vale mais que a de sempre; rede caída não é "falha nossa": a frase de rede diz o que aconteceu. O texto continua na tela.
         setFraseErro(tratarFalha(falha, textosTemaLivre.textoErro));
         setFase("erro");
       });
@@ -523,6 +555,12 @@ export function TemaLivreTela({
             </p>
             <div className={styles.divisor} />
             <NotasLinha pilares={pilares} />
+            {/* Hotfix de 22/10/2026 (item 3): a nota que ficou guardada de quando este mesmo texto foi avaliado; mudar o texto pede uma nota nova. */}
+            {notaGuardada ? (
+              <p className={styles.notaRodape} data-nota-guardada>
+                {textosTemaLivre.notaGuardada}
+              </p>
+            ) : null}
           </section>
         ) : null}
 

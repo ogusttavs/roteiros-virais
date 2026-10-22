@@ -75,8 +75,12 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.7.3 (revisão do PR #127, 05/10/2026): ainda reprovava na 1ª tentativa a frase que está literalmente no perfil ("nunca promete resultado", a "Frase que fala" do cliente, que no sem fala é como a frase
  * dita chega às fontes), o espaço marcado entre colchetes ("sempre faço [conte aqui como você faz isso]") e a pergunta (um Story comparando dois produtos foi lido como fato); viram exclusões e exemplos que APROVAM. Versão 1.7.3.
+ *
+ * 1.8.0 (achado do Gustavo em produção, 22/10/2026: a nota de um tema reprovou duas vezes porque "recomenda usar comparação com política como abertura, o que contraria a proibição" do briefing, e a tela
+ * ficou girando): no gênero "tema" a proibição do cliente pode ser CITADA ou comentada (dizer que o tema esbarra nela, que tem risco, sugerir outro ângulo para fugir dela); isso nunca fere a proibição, e o
+ * verificador não reprova por isso. A proibição continua valendo inteira para o roteiro e para os outros gêneros. Só o critério do gênero "tema" muda. Versão 1.8.0.
  */
-export const versao = "1.7.3";
+export const versao = "1.8.0";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -169,12 +173,23 @@ export const CRITERIO_FATOS =
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
   "perfil não traz);"
 
+/** O critério da proibição: igual em todo gênero, menos no "tema" (a avaliação de um tema pode falar do risco, o roteiro não pode quebrar a proibição). Exportado para o teste conferir. */
+export const CRITERIO_PROIBICAO: Record<GeneroTexto, string> = {
+  padrao: "nenhuma proibição que o cliente listou no briefing foi ferida.",
+  analise: "nenhuma proibição que o cliente listou no briefing foi ferida.",
+  roteiro: "nenhuma proibição que o cliente listou no briefing foi ferida.",
+  regra: "nenhuma proibição que o cliente listou no briefing foi ferida.",
+  tema:
+    "a avaliação não manda o dono do negócio gravar, de fato, o que ele proibiu no briefing. Citar ou comentar a proibição ou o risco do tema ao avaliá-lo (dizer que o tema esbarra nela, que é " +
+    "arriscado, que pede cuidado, sugerir outro ângulo para fugir dela) nunca fere a proibição, é parte da avaliação: não reprove por isso. A proibição vale para o roteiro, não para a conversa sobre o tema.",
+};
+
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false): string {
   return `Você confere um texto que vai para a tela de um dono de pequeno negócio. Aprove só
 se:
 - o tom é direto, calmo e de parceiro, sem exclamação e sem entusiasmo forçado;
 - ${CRITERIO_TOM[genero]}${comFontes ? CRITERIO_FATOS : ""}
-- nenhuma proibição que o cliente listou no briefing foi ferida.
+- ${CRITERIO_PROIBICAO[genero]}
 ${CONTEXTO_GENERO[genero] ?? ""}
 Reprove e diga o motivo em uma frase, sem travessão, quando alguma dessas coisas falhar.
 Não repita o texto inteiro na resposta, só o motivo.

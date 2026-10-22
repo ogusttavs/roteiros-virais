@@ -645,6 +645,12 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   /** A nota do tema: sem id solto e só em segunda pessoa (ver `verificarLocalmente`). */
   semIdInterno?: boolean;
   soSegundaPessoa?: boolean;
+  /**
+   * Hotfix de 22/10/2026: a AVALIAÇÃO de um tema (não o roteiro) pode citar uma proibição do cliente ou o risco do tema ao comentá-lo ("este tema esbarra na sua proibição de falar de
+   * política"). Ligado, a conferência local não reprova a proibição escrita no texto; quem confere o sentido é o `verificarTexto` (gênero "tema"), que também sabe disso. Ausente (o roteiro),
+   * nada muda: o texto que a pessoa grava nunca fere a proibição.
+   */
+  citarProibicaoVale?: boolean;
   /** V4, item 5: o gancho dos últimos 5 roteiros do cliente, para a checagem de primeira palavra (ver `verificarLocalmente`). */
   ganchosUltimos5?: string[];
   /** V4, item 5: o tipo de abertura do roteiro anterior do cliente (ver `verificarLocalmente`). */
@@ -783,7 +789,7 @@ export async function gerarComVerificacao<T>(
  */
 function opcoesVerificacaoLocal<T>(params: ParametrosGeracaoVerificada<T>, dados: T) {
   return {
-    proibicoes: params.proibicoes,
+    proibicoes: params.citarProibicaoVale ? undefined : params.proibicoes,
     evidencias: params.extrairEvidencias?.(dados) ?? [],
     exigeEvidencia: params.exigeEvidencia,
     evidenciasFornecidas: params.evidenciasFornecidas,

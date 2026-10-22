@@ -9,7 +9,7 @@ import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
-import { recusaDoVerComo } from "@/lib/ver-como";
+import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { filtroDeFormatosDaMarca } from "@/servicos/formatos";
 import { evidenciaParaRoteiro, exemplosPorFicha, setoresComPiso } from "@/servicos/pesquisa";
@@ -25,6 +25,7 @@ import {
   validarQuemAparece,
   type OrigemRoteiro,
 } from "@/servicos/roteiro";
+import { limparNotaDoRascunhoSeForDoTexto } from "@/servicos/temas";
 import { gerarVersoes } from "@/servicos/versoes";
 import { textosRoteiro } from "@/textos/roteiro";
 
@@ -91,6 +92,11 @@ export async function gerarVersoesAction(
       perguntaChave: origemValida.origem === "livre" ? chaveDeVozValida(perguntaChave) : undefined,
       pesquisaId: pesquisaValida,
     });
+    // Hotfix de 22/10/2026 (item 3): o roteiro saiu deste assunto seu; a nota guardada deixa de ser "onde a pessoa parou" (a linha "Continuar de onde parou" do Criar some). O texto continua no rascunho.
+    if (origemValida.origem === "livre") {
+      const sessao = await sessaoDoPainel();
+      if (sessao) await limparNotaDoRascunhoSeForDoTexto(sessao.user.id, cliente.id, origemValida.textoTema).catch(() => undefined);
+    }
     return { ok: true, dado: { grupo } };
   } catch (falha) {
     if (falha instanceof ErroIA) return { ok: false, erro: await fraseDoErroDaIAParaASessao(falha) };
