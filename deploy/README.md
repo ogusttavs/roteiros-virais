@@ -236,6 +236,16 @@ achado por `PPid` em `/proc/<pid>/status`, nunca por nome de processo: a imagem 
 sair sozinho e reinicia o container de verdade: o critério é `RestartCount` subindo (0
 para 1 ou mais) e o log mostrando "worker no ar" de novo.
 
+## A assinatura pelo Stripe (E22 PR 1)
+
+Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para `/assinar`, mesmo com o resto no ar.
+
+- **Variaveis** (`.env.example`, bloco "Assinatura pelo Stripe"): `STRIPE_SECRET_KEY` (chave restrita), `STRIPE_WEBHOOK_SECRET` e `COBRANCA_ATIVA`. Com `COBRANCA_ATIVA=1` em producao o app recusa subir sem as duas primeiras (`verificarSegredosDeProducao`).
+- **O produto e o preco** (uma vez por modo, teste e producao): `npm run stripe:preparar` com a chave do modo certo. Idempotente; so cria o que leva `metadata.produto = roteiros` (produto `roteiros_plano_trimestral`, preco com a chave de busca `roteiros_trimestral`: R$ 1.191,00 a cada 3 meses). A chave de producao pede `--producao`.
+- **O aviso (webhook)**: no painel do Stripe, um endpoint em `https://<endereco do app>/api/webhooks/stripe` para os eventos `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid` e `invoice.payment_failed`; o segredo dele (`whsec_`) vai em `STRIPE_WEBHOOK_SECRET`. A conta e dividida com o OdontoTech: os eventos dele chegam ao mesmo endpoint e sao ignorados (sem `metadata.produto = roteiros`).
+- **Ligar o portao**: marcar as cortesias em `/admin/clientes/<id>` (Ajustes, "Cortesia") antes de pôr `COBRANCA_ATIVA=1` e reiniciar o app.
+- **A prova ponta a ponta em modo teste, com a CLI do Stripe**: no PR da etapa.
+
 ## O que nunca fazer
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no
