@@ -34,6 +34,29 @@ export type PorQueDoBloco = {
   para?: ParaQue;
 };
 
+/**
+ * O que o modelo devolve em `porQueDosBlocos`: UM texto, uma linha por bloco, `bloco | regras | vídeo | para`
+ * (por exemplo `gancho | R-COPY-05, R-COPY-13 | 12 | fiquem`; hífen onde não há vídeo ou "para"). Não é uma lista de objetos
+ * porque a gramática do schema do roteiro curto já estava no limite da API (E50, prova com chave de 22/10/2026: uma lista de
+ * objetos, até de strings, estourava "compiled grammar is too large"). Aqui o texto vira a mesma forma de antes; linha que não lê é ignorada.
+ */
+export function lerPorQueEmLinhas(texto: string): PorQueBruto[] {
+  const saida: PorQueBruto[] = [];
+  for (const linha of texto.split(String.fromCharCode(10))) {
+    const partes = linha.split("|").map((p) => p.trim());
+    if (partes.length < 2 || !partes[0]) continue;
+    const regras = partes[1]
+      .split(/[,;]|[ ]+e[ ]+/)
+      .map((r) => r.trim())
+      .filter((r) => r !== "" && r !== "-");
+    const id = Number(partes[2] ?? "");
+    const videoId = partes[2] && Number.isInteger(id) && id > 0 ? id : null;
+    const para = (partes[3] ?? "").toLowerCase();
+    saida.push({ bloco: partes[0], regras, videoId, para: (PARA_QUE as readonly string[]).includes(para) ? (para as ParaQue) : null });
+  }
+  return saida;
+}
+
 export type EscopoDasRegras = "curto" | "longo";
 
 /** Os números que o modelo pode citar: as que o prompt mostra. O roteiro longo recebe só as de conformidade e de texto, não as de estrutura do vídeo curto. */

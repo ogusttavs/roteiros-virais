@@ -21,6 +21,7 @@ import * as roteiroIA from "../src/ia/prompts/roteiro";
 import { montarFontesDosFatos } from "../src/ia/prompts/roteiro";
 import * as verificarTextoIA from "../src/ia/prompts/verificarTexto";
 import { verificarLocalmente } from "../src/ia/verificador";
+import { lerPorQueEmLinhas } from "../src/lib/por-que-do-bloco";
 import { extrairCamposRoteiro } from "../src/servicos/roteiro";
 
 import type { PedidoGolden } from "./golden-lote";
@@ -345,7 +346,7 @@ export async function avaliarRoteiros(): Promise<ResultadoAvaliarRoteiros> {
     // E50 parte 2, PR 3: o por quê de cada bloco, como a tela vai mostrar, e a coluna "o por quê está certo?" (o simulador preenche; com a chave real fica para ler).
     console.log();
     imprimirPorQueDosBlocos(
-      saida.porQueDosBlocos,
+      lerPorQueEmLinhas(saida.porQueDosBlocos),
       {
         forma: saida.cartoes ? { tipo: "cartoes", cartoes: saida.cartoes.length } : { tipo: "reels", telas: saida.edicao.textoNaTela.length },
         escopo: "curto",

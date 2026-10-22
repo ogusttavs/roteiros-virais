@@ -526,30 +526,20 @@ function mockRoteiro(entrada: string, sistemaEstavel: string) {
       referencia,
     },
     evidencias: ids,
-    // E50 parte 2, PR 3: o "por quê" por bloco, só números. O marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe, regra inventada, regra que não vale para o bloco
-    // (R-CONF-03 é do gancho e da chamada) e vídeo fora da evidência.
+    // E50 parte 2, PR 3 (texto de uma linha por bloco desde 22/10/2026): o "por quê" por bloco, só números. O marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe,
+    // regra inventada, regra que não vale para o bloco (R-CONF-03 é do gancho e da chamada) e vídeo fora da evidência.
     porQueDosBlocos: [
       ...(ehSemFala || ehStory
-        ? Array.from({ length: totalDeCartoes }, (_, i) => ({
-            bloco: `cartao:${i}`,
-            regras: i === totalDeCartoes - 1 ? ["R-COPY-25"] : ["R-COPY-13"],
-            videoId: i === 0 ? (ids[0] ?? null) : null,
-            para: i === 0 ? ("fiquem" as const) : null,
-          }))
+        ? Array.from({ length: totalDeCartoes }, (_, i) => `cartao:${i} | ${i === totalDeCartoes - 1 ? "R-COPY-25" : "R-COPY-13"} | ${i === 0 ? (ids[0] ?? "-") : "-"} | ${i === 0 ? "fiquem" : "-"}`)
         : [
-            { bloco: "gancho", regras: ["R-COPY-05"], videoId: ids[0] ?? null, para: "fiquem" as const },
-            { bloco: "corpo", regras: ["R-COPY-13"], videoId: null, para: "confiem" as const },
-            { bloco: "fechamento", regras: ["R-ROTEIRO-15"], videoId: null, para: "guardem" as const },
-            { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" as const },
-            { bloco: "tela:0", regras: ["R-COPY-12"], videoId: null, para: null },
+            `gancho | R-COPY-05 | ${ids[0] ?? "-"} | fiquem`,
+            "corpo | R-COPY-13 | - | confiem",
+            "fechamento | R-ROTEIRO-15 | - | guardem",
+            "chamada | R-COPY-25 | - | chamem",
+            "tela:0 | R-COPY-12 | - | -",
           ]),
-      ...(entrada.includes("[mock:por-que-invalido]")
-        ? [
-            { bloco: "capitulo:3", regras: ["R-COPY-13"], videoId: null, para: null },
-            { bloco: "corpo", regras: ["R-NAO-EXISTE-99", "R-CONF-03", "R-IG-REEL-01"], videoId: 999999, para: null },
-          ]
-        : []),
-    ],
+      ...(entrada.includes("[mock:por-que-invalido]") ? ["capitulo:3 | R-COPY-13 | - | -", "corpo | R-NAO-EXISTE-99, R-CONF-03, R-IG-REEL-01 | 999999 | -"] : []),
+    ].join(String.fromCharCode(10)),
     tipoAbertura,
     entregaDaPesquisa: mockEntregaDaPesquisa(dadosDaPesquisa, tema, entrada, segundaTentativa),
   };
@@ -656,18 +646,14 @@ function mockRoteiroLongo(entrada: string) {
       { regra: "R-YT-VIDEO-01", motivo: "os primeiros 30 segundos já entregam o que o título prometeu" },
       { regra: "R-YT-VIDEO-13", motivo: "cada capítulo é uma parte que se entende sozinha" },
     ],
-    // E50 parte 2, PR 3: o "por quê" por bloco, só números (o marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe, regra inventada, regra de estrutura que o longo não recebe, vídeo fora da entrada).
+    // E50 parte 2, PR 3 (texto de uma linha por bloco desde 22/10/2026): o "por quê" por bloco, só números (o marcador `por-que-invalido` junta o que o servidor descarta: bloco que não existe, regra inventada,
+    // regra de estrutura que o longo não recebe, vídeo fora da entrada).
     porQueDosBlocos: [
-      { bloco: "gancho", regras: ["R-COPY-05"], videoId: ids[0] ?? null, para: "fiquem" as const },
-      ...Array.from({ length: quantidade }, (_, i) => ({ bloco: `capitulo:${i}`, regras: ["R-COPY-13"], videoId: null, para: "guardem" as const })),
-      { bloco: "chamada", regras: ["R-COPY-25"], videoId: null, para: "chamem" as const },
-      ...(entrada.includes("[mock:por-que-invalido]")
-        ? [
-            { bloco: "capitulo:99", regras: ["R-COPY-13"], videoId: null, para: null },
-            { bloco: "tela:0", regras: ["R-NAO-EXISTE-99", "R-ROTEIRO-05"], videoId: 999999, para: null },
-          ]
-        : []),
-    ],
+      `gancho | R-COPY-05 | ${ids[0] ?? "-"} | fiquem`,
+      ...Array.from({ length: quantidade }, (_, i) => `capitulo:${i} | R-COPY-13 | - | guardem`),
+      "chamada | R-COPY-25 | - | chamem",
+      ...(entrada.includes("[mock:por-que-invalido]") ? ["capitulo:99 | R-COPY-13 | - | -", "tela:0 | R-NAO-EXISTE-99, R-ROTEIRO-05 | 999999 | -"] : []),
+    ].join(String.fromCharCode(10)),
     temaCurto: ehMomento ? `sobre ${tema}`.slice(0, 60) : null,
   };
 }
@@ -679,11 +665,7 @@ function mockEntregaDaPesquisa(dados: { id: number; fonte: string; data: string;
   const cuidado = /elei[cç][aã]o|politic|partid/.test(minusculo) ? "politica" : /sa[uú]de|doen[cç]a|rem[eé]dio/.test(minusculo) ? "saude" : /pre[cç]o|valor|custo/.test(minusculo) ? "preco" : "nenhum";
   const comPrevisao = entrada.includes("[mock:previsao-de-publico]") && !segundaTentativa;
   return {
-    ganchos: [
-      { texto: `Antes de falar de ${tema}, olhe este dado: ${dados[0].texto.replace(/\.$/, "")}.`, recomendado: true },
-      { texto: `O que quase ninguém conta sobre ${tema}.`, recomendado: false },
-      { texto: `${tema}: o que muda para o seu negócio.`, recomendado: false },
-    ],
+    ganchos: [`Antes de falar de ${tema}, olhe este dado: ${dados[0].texto.replace(/\.$/, "")}.`, `O que quase ninguém conta sobre ${tema}.`, `${tema}: o que muda para o seu negócio.`],
     oQueVaoTeResponder: [
       {
         objecao: comPrevisao ? "Vão dizer que isso não vale para o caso deles." : "Pode aparecer: isso não vale para o meu caso.",

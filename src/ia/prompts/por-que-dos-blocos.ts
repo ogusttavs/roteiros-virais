@@ -9,12 +9,11 @@ import { z } from "zod";
 
 import { PARA_QUE } from "@/lib/por-que-do-bloco";
 
-export const porQueDoBlocoSchema = z.object({
-  bloco: z.string(),
-  regras: z.array(z.string()),
-  videoId: z.number().nullable(),
-  para: z.enum(PARA_QUE).nullable().catch(null),
-});
+/**
+ * Um texto só, uma linha por bloco (`bloco | regras | vídeo | para`); o servidor lê com `lerPorQueEmLinhas` (`lib/por-que-do-bloco.ts`). Texto e não lista de objetos porque a gramática do schema do
+ * roteiro curto estourava o limite da API com a lista (medido em 22/10/2026).
+ */
+export const porQueDosBlocosSchema = z.string().catch("");
 
 export type FormaParaOPedido = "reels" | "cartoes" | "longo";
 
@@ -27,11 +26,12 @@ const BLOCOS: Record<FormaParaOPedido, string> = {
 /** O pedido do `porQueDosBlocos`, fixo por formato (entra no sistema estável, com cache). */
 export function pedidoPorQueDosBlocos(forma: FormaParaOPedido): string {
   return [
-    "Depois de escrever, preencha também porQueDosBlocos: uma entrada para cada bloco em que você seguiu pelo menos uma das regras de texto e de estrutura listadas acima.",
-    `Em "bloco", escreva a chave do bloco: ${BLOCOS[forma]}.`,
-    'Em "regras", os números (por exemplo "R-COPY-08") das regras daquela lista que você de fato seguiu naquele bloco, no máximo três, só as que valem para aquele bloco (o que está entre parênteses na regra), nunca uma regra que não está na lista acima e nunca as regras de plataforma.',
-    'Em "videoId", o id de um vídeo da evidência que você de fato usou como modelo para aquele bloco, ou nulo; nunca o segundo.',
-    `Em "para", o que o bloco busca em quem assiste, uma destas palavras: ${PARA_QUE.map((p) => `"${p}"`).join(", ")} (continuem assistindo, confiem, guardem para usar depois, chamem), ou nulo.`,
-    "Neste campo não escreva nenhum texto de explicação: o texto que a pessoa lê sai da tabela, pelo número. Bloco em que você não seguiu regra nenhuma fica de fora; sem nenhuma, devolva a lista vazia.",
+    "Depois de escrever, preencha também porQueDosBlocos: um texto com UMA LINHA para cada bloco em que você seguiu pelo menos uma das regras de texto e de estrutura listadas acima.",
+    'Cada linha tem quatro partes separadas por "|": bloco | regras | vídeo | para. Exemplo: gancho | R-COPY-05, R-COPY-13 | 12 | fiquem',
+    `Bloco: a chave do bloco: ${BLOCOS[forma]}.`,
+    'Regras: os números (por exemplo "R-COPY-08") das regras daquela lista que você de fato seguiu naquele bloco, separados por vírgula, no máximo três, só as que valem para aquele bloco (o que está entre parênteses na regra), nunca uma regra que não está na lista acima e nunca as regras de plataforma.',
+    'Vídeo: o id de um vídeo da evidência que você de fato usou como modelo para aquele bloco, ou "-"; nunca o segundo.',
+    `Para: o que o bloco busca em quem assiste, uma destas palavras: ${PARA_QUE.join(", ")} (continuem assistindo, confiem, guardem para usar depois, chamem), ou "-".`,
+    "Neste campo não escreva nenhum texto de explicação: o texto que a pessoa lê sai da tabela, pelo número. Bloco em que você não seguiu regra nenhuma fica de fora; sem nenhuma, deixe o texto vazio.",
   ].join(String.fromCharCode(10));
 }
