@@ -7,7 +7,7 @@ export const textosSenha = {
   campoNova: "senha nova",
   campoRepetir: "repita a senha nova",
   ajudaMinimo: "Use pelo menos 8 caracteres.",
-  erroCurta: "use pelo menos 8 caracteres",
+  erroCurta: "a senha precisa de pelo menos 8 caracteres",
   erroLonga: "a senha pode ter no máximo 128 caracteres",
   erroNaoConferem: "as duas senhas não são iguais",
   erroDeServidor: "não conseguimos trocar a senha agora; tente de novo em um minuto",

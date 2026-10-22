@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { sessaoAtual } from "@/lib/sessao";
+import { recusaDoVerComo } from "@/lib/ver-como";
 import { ErroSenha, trocarSenhaDoPrimeiroAcesso } from "@/servicos/senha";
 import { textosSenha } from "@/textos/senha";
 
@@ -12,6 +13,9 @@ import { textosSenha } from "@/textos/senha";
  * não escolhe a senha de ninguém. O servidor confere que a conta ainda tem a marca de senha provisória e que a nova não é a provisória.
  */
 export async function trocarSenhaDoPrimeiroAcessoAction(dados: { nova: string }): Promise<ResultadoAcao<{ destino: string }>> {
+  // Com o "ver como" ligado o admin so olha: nada aqui muda a senha de ninguem (e o painel nunca leva a esta tela nesse modo).
+  const recusaVerComo = await recusaDoVerComo();
+  if (recusaVerComo) return { ok: false, erro: recusaVerComo };
   const sessao = await sessaoAtual();
   if (!sessao) redirect("/entrar");
 
