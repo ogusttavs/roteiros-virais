@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { CRITERIO_FATOS, CRITERIO_PROIBICAO, CRITERIO_PROIBICAO_COMO_AVISO, fontesSemProibicoes, montarEntrada, montarSistemaEstavel, motivoDaConferencia, schema, versao } from "./verificarTexto";
+import {
+  CRITERIO_FATOS,
+  CRITERIO_PROIBICAO,
+  CRITERIO_PROIBICAO_COMO_AVISO,
+  fontesSemProibicoes,
+  MARCADOR_DE_ESPACO,
+  montarEntrada,
+  montarSistemaEstavel,
+  motivoDaConferencia,
+  neutralizarColchetes,
+  schema,
+  versao,
+} from "./verificarTexto";
 
 /**
  * 29/09/2026, achado do Gustavo em produção: a recomendação de `avaliarTema`
@@ -47,7 +59,7 @@ describe("verificarTexto com fontes (o roteiro não inventa fato, 1.7.0: a defin
   });
 
   it("a versão subiu e fato é só o ESPECÍFICO sobre a pessoa, o negócio, o lugar, o momento ou um acontecimento", () => {
-    expect(versao).toBe("1.8.1");
+    expect(versao).toBe("1.8.2");
     expect(sistema).toContain("fato ESPECÍFICO");
     for (const exemplo of ["quem está junto", "onde está", "o que aconteceu", "quando", "quanto custa", "nome de produto, de cliente ou de cidade", "uma cena vivida"]) {
       expect(sistema).toContain(exemplo);
@@ -154,5 +166,37 @@ describe("verificarTexto 1.8.1: tema da própria pessoa sem a proibição nas fo
 
   it("sem proibição na lista, a entrada diz que não há proibição registrada", () => {
     expect(montarEntrada({ texto: "um texto", proibicoes: [] })).toContain("Proibicoes do cliente: nenhuma proibicao registrada");
+  });
+});
+
+describe("verificarTexto 1.8.2: o colchete não é fato e o medo do perfil dito ao público não é caso vivido", () => {
+  it("neutralizarColchetes troca cada espaço marcado pelo marcador e deixa o resto do texto inteiro", () => {
+    expect(neutralizarColchetes("então [conte aqui como você faz para a mancha não voltar] e grave")).toBe(`então ${MARCADOR_DE_ESPACO} e grave`);
+    expect(neutralizarColchetes("[diga onde está] e [diga quem está junto]")).toBe(`${MARCADOR_DE_ESPACO} e ${MARCADOR_DE_ESPACO}`);
+    expect(neutralizarColchetes("sem colchete nenhum")).toBe("sem colchete nenhum");
+    expect(neutralizarColchetes("o Uli está aqui do meu lado [diga o resto]")).toContain("o Uli está aqui do meu lado");
+  });
+
+  it("um colchete longo demais (mais de 200 caracteres) não esconde nada: fica à vista, para não virar jeito de passar um parágrafo de fato inventado", () => {
+    const longo = "[" + "um cliente meu, na semana passada, ".repeat(10) + "]";
+    expect(longo.length).toBeGreaterThan(200);
+    expect(neutralizarColchetes(longo)).toBe(longo);
+  });
+
+  it("colchete desbalanceado ou aninhado não quebra: só o par mais interno fechado é trocado", () => {
+    expect(neutralizarColchetes("abre [e nunca fecha")).toBe("abre [e nunca fecha");
+    expect(neutralizarColchetes("[fora [dentro] fim]")).toBe(`[fora ${MARCADOR_DE_ESPACO} fim]`);
+  });
+
+  it("o critério separa falar com o público sobre o medo do perfil (aprova) de contar um caso específico como acontecido (reprova)", () => {
+    const aprovam = CRITERIO_FATOS.slice(CRITERIO_FATOS.indexOf("Exemplos que APROVAM"), CRITERIO_FATOS.indexOf("Exemplos que REPROVAM"));
+    const reprovam = CRITERIO_FATOS.slice(CRITERIO_FATOS.indexOf("Exemplos que REPROVAM"));
+    expect(aprovam).toContain("Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado");
+    expect(aprovam).toContain("você já mandou lavar uma vez e o sofá voltou manchado?");
+    expect(aprovam).toContain("então [espaço para a pessoa completar]");
+    expect(reprovam).toContain("um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado");
+    expect(CRITERIO_FATOS).toContain("FALAR COM O PÚBLICO sobre um medo, uma dor ou uma situação que o perfil lista");
+    expect(CRITERIO_FATOS).toContain("CASO ESPECÍFICO como acontecido");
+    expect(CRITERIO_FATOS).toContain("[espaço para a pessoa completar]");
   });
 });
