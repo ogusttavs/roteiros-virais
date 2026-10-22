@@ -139,7 +139,16 @@ const FILAS_CURTAS = new Set<string>([
 
 const QUATRO_HORAS_S = 4 * 60 * 60;
 
-export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSeconds: number };
+/**
+ * Pulso do worker (22/10/2026): enquanto um job roda, o pg-boss avisa o banco a cada metade deste prazo. Se o
+ * processo morre no meio (kill -9, falta de memória, queda da máquina), o job fica `active` no banco; sem pulso,
+ * ele só vence no `expireInSeconds` (4 horas nas filas longas) e, enquanto isso, o "rodar agora" do admin
+ * recusa o disparo novo em silêncio, porque `existeJobPendente` conta o `active`. Com pulso, o monitor do
+ * pg-boss (a cada 60 s) dá o job como falho 3 a 4 minutos depois da morte.
+ */
+export const PULSO_DO_WORKER_S = 180;
+
+export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSeconds: number; heartbeatSeconds: number };
 
 /**
  * As opcoes de cada fila (hotfix de 01/10/2026). O prazo padrao do pg-boss para um job ativo e de
@@ -153,9 +162,9 @@ export type OpcoesFila = { retryLimit: number; retryBackoff: boolean; expireInSe
  */
 export function opcoesDaFila(nome: string): OpcoesFila {
   if (FILAS_CURTAS.has(nome)) {
-    return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60 };
+    return { retryLimit: 2, retryBackoff: true, expireInSeconds: 15 * 60, heartbeatSeconds: PULSO_DO_WORKER_S };
   }
-  return { retryLimit: 0, retryBackoff: false, expireInSeconds: QUATRO_HORAS_S };
+  return { retryLimit: 0, retryBackoff: false, expireInSeconds: QUATRO_HORAS_S, heartbeatSeconds: PULSO_DO_WORKER_S };
 }
 
 /**
