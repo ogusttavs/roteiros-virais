@@ -7,6 +7,9 @@
  */
 import { z } from "zod";
 
+/** 1.1.0 (22/10/2026): o campo vira um texto de uma linha por bloco (`bloco | regras | vídeo | para`); 1.0.0 era a lista de objetos. */
+export const versao = "1.1.0";
+
 import { PARA_QUE } from "@/lib/por-que-do-bloco";
 
 /**

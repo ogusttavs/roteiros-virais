@@ -93,6 +93,9 @@ describe("lerPorQueEmLinhas (o texto que o modelo devolve: bloco | regras | víd
     expect(lerPorQueEmLinhas("gancho | R-COPY-05 | 1.5 | -")[0].videoId).toBeNull();
     expect(lerPorQueEmLinhas("")).toEqual([]);
   });
+  it("hífen no lugar das regras é 'sem regra'", () => {
+    expect(lerPorQueEmLinhas("gancho | - | 5 | fiquem")).toEqual([{ bloco: "gancho", regras: [], videoId: 5, para: "fiquem" }]);
+  });
   it("o que o servidor limpa depois é o de sempre: bloco e regra inventados caem", () => {
     const brutos = lerPorQueEmLinhas(["gancho | R-COPY-05 | - | fiquem", "tela:9 | R-COPY-12 | - | -", "corpo | R-XXX-01 | - | -"].join(Q));
     expect(limparPorQueDosBlocos(brutos, reels)).toEqual([{ bloco: "gancho", regras: ["R-COPY-05"], para: "fiquem" }]);
