@@ -1,7 +1,8 @@
 "use client";
 
+import { Play } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import { dadosFixosDoBriefing } from "@/config/briefing";
@@ -26,11 +27,29 @@ import { OpcaoObjetivo } from "@/ui/componentes/OpcaoObjetivo";
 import { PerguntaMomentoDoDia, PerguntaParaQuando } from "@/ui/componentes/PerguntaAgendamento";
 import { TelaEscrevendo } from "@/ui/componentes/TelaEscrevendo";
 import { useConexao, useTratarFalha } from "@/ui/ConexaoContext";
+import { useFolhaNoHistorico } from "@/ui/useFolhaNoHistorico";
 
 import { grupoRecenteDesdeAction } from "../../hoje/acoes";
+import { FolhaDetalhesVideo } from "../../referencias/FolhaDetalhesVideo";
 
 import { exemplosDaFichaAction, gerarVersoesAction, sugerirEstiloAction, type ExemploDaFicha } from "./acoes";
+import { chaveDaEscolha, gravarEscolha, lerEscolha } from "./escolha-guardada";
 import styles from "./ObjetivoTela.module.css";
+
+/** A capa do exemplo: a miniatura da plataforma quando existe e carrega; senão o retângulo neutro com o ícone, como no cartão de Referências. */
+function CapaDoExemplo({ capaUrl }: { capaUrl: string | null }) {
+  const [comErro, setComErro] = useState(false);
+  return (
+    <span className={styles.exemploCapa} aria-hidden="true" data-capa={capaUrl !== null && !comErro ? "imagem" : "neutra"}>
+      {capaUrl !== null && !comErro ? (
+        // eslint-disable-next-line @next/next/no-img-element -- url externa (CDN da plataforma), sem otimizacao do Next
+        <img src={capaUrl} alt="" className={styles.exemploCapaImagem} onError={() => setComErro(true)} />
+      ) : (
+        <Play size={20} strokeWidth={1.5} aria-hidden="true" />
+      )}
+    </span>
+  );
+}
 
 type Props = {
   origem: OrigemRoteiro;
@@ -82,6 +101,14 @@ export function ObjetivoTela({
   // E49 PR 2: depois de ESCOLHER uma ficha (um toque), ela fica sozinha com "Ver as cinco de novo" e embaixo vêm os exemplos do setor; a recomendada já marcada não fecha a lista.
   const [compacta, setCompacta] = useState(false);
   const [exemplos, setExemplos] = useState<ExemploDaFicha[] | null>(null);
+  // Hotfix de 22/10/2026: o toque num exemplo abre a prévia do vídeo NA PRÓPRIA TELA (a mesma folha de Referências), sem sair do passo; o Voltar do aparelho fecha só a folha.
+  const [exemploAbertoId, setExemploAbertoId] = useState<number | null>(null);
+  const previa = useFolhaNoHistorico(exemploAbertoId !== null, () => setExemploAbertoId(null));
+  const exemploAberto = exemplos?.find((e) => e.id === exemploAbertoId) ?? null;
+  // O caminho de onde a pessoa está (com os parâmetros de agora): é o que "Ver mais em Referências" leva como `voltar`, para Referências poder trazê-la de volta.
+  const caminhoAtual = usePathname();
+  const parametrosAtuais = useSearchParams().toString();
+  const caminhoParaVoltar = parametrosAtuais ? `${caminhoAtual}?${parametrosAtuais}` : caminhoAtual;
   // Falha de rede não é "sem exemplos": a seção some em silêncio e o roteiro segue.
   const [exemplosFalharam, setExemplosFalharam] = useState(false);
   // O formato vem ANTES da pergunta (passo 18b): Reels é o padrão, e a pessoa escolhe Story se quiser.
@@ -120,6 +147,14 @@ export function ObjetivoTela({
   /** E39a: "para quando é?" (dúvida 10: nos temas de hoje e no assunto seu, depois do tema escolhido). */
   const [data, setData] = useState(() => (paraHoje ? hojeISO() : (dataInicial ?? hojeISO())));
   const [momentoDoDia, setMomentoDoDia] = useState<MomentoDoDia | null>(null);
+
+  /**
+   * Hotfix de 22/10/2026: o que a pessoa já escolheu aqui fica no `sessionStorage`, por tema; quem vai a Referências (ou recarrega) volta e acha tudo como deixou. Lê uma vez, depois de montar (o servidor
+   * não tem `sessionStorage`); só passa a gravar depois de ter lido, para o padrão da tela não apagar a escolha guardada.
+   */
+  const chaveDaEscolhaDoTema = chaveDaEscolha([origem.origem, temaEscolhidoTexto, noticiaId, noticiaAssuntoId, assuntoEmAlta, perguntaChave, pesquisa?.id]);
+  const [escolhaLida, setEscolhaLida] = useState(false);
+
   // A sugestão que chega depois de a pessoa já ter tocado no controle nunca sobrescreve a escolha dela.
   const estiloTocadoRef = useRef(false);
   // A frase que a tela de erro mostra (ou null, sem erro): falha do servidor e queda de rede dizem coisas diferentes.
@@ -134,6 +169,35 @@ export function ObjetivoTela({
    * clique, o sucesso (ou o erro) depois dela não navega nem escreve na tela mais.
    */
   const saiuRef = useRef(false);
+
+  useEffect(() => {
+    const guardada = lerEscolha(chaveDaEscolhaDoTema, hojeISO());
+    if (guardada) {
+      if (guardada.formato) setFormato(guardada.formato);
+      if (guardada.estiloTocado && guardada.estilo) {
+        // Marcado antes da sugestão chegar: a sugestão do tema nunca passa por cima do que a pessoa escolheu.
+        estiloTocadoRef.current = true;
+        setEstiloTocado(true);
+        setEstilo(guardada.estilo);
+      }
+      if (guardada.ficha) {
+        setFicha(guardada.ficha);
+        setCompacta(guardada.compacta === true);
+      }
+      if (guardada.objetivoDoVideo !== undefined) setObjetivoDoVideo(guardada.objetivoDoVideo);
+      if (guardada.quemAparece !== undefined && (guardada.quemAparece === "" || opcoesQuemAparece.opcoes.some((o) => o.valor === guardada.quemAparece))) setQuemAparece(guardada.quemAparece);
+      if (guardada.data && !paraHoje) setData(guardada.data);
+      if (guardada.momentoDoDia !== undefined) setMomentoDoDia(guardada.momentoDoDia);
+    }
+    setEscolhaLida(true);
+    // Só na montagem: a chave é do tema desta tela, que não muda sem a tela desmontar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!escolhaLida) return;
+    gravarEscolha(chaveDaEscolhaDoTema, { ficha, compacta, formato, estilo, estiloTocado, objetivoDoVideo, quemAparece, data, momentoDoDia });
+  }, [escolhaLida, chaveDaEscolhaDoTema, ficha, compacta, formato, estilo, estiloTocado, objetivoDoVideo, quemAparece, data, momentoDoDia]);
 
   /**
    * M4, item 2: busca a sugestão assim que a tela monta (o tema já está escolhido antes de chegar
@@ -338,16 +402,21 @@ export function ObjetivoTela({
                     <ul className={styles.listaExemplos}>
                       {exemplos.map((e) => (
                         <li key={e.id} className={styles.exemplo} data-exemplo={e.id}>
-                          <span className={styles.exemploTitulo}>{e.titulo}</span>
-                          <span className={styles.exemploConta}>
-                            {e.conta ? `${e.conta}, ` : ""}
-                            {e.plataforma}
-                          </span>
-                          {e.tipo ? <span className={styles.exemploSelo}>{e.tipo}</span> : null}
+                          <button type="button" className={styles.exemploBotao} aria-haspopup="dialog" onClick={() => setExemploAbertoId(e.id)}>
+                            <CapaDoExemplo capaUrl={e.video.capaUrl} />
+                            <span className={styles.exemploTexto}>
+                              <span className={styles.exemploTitulo}>{e.video.titulo}</span>
+                              <span className={styles.exemploConta}>
+                                {e.video.contaNome}, {e.video.plataformaData}
+                              </span>
+                              {e.tipo ? <span className={styles.exemploSelo}>{e.tipo}</span> : null}
+                              <span className={styles.exemploVer}>{textosObjetivo.verOVideo}</span>
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
-                    <Link className={styles.verMais} href={`/referencias?feitoPara=${ficha}&periodo=90`}>
+                    <Link className={styles.verMais} href={`/referencias?feitoPara=${ficha}&periodo=90&voltar=${encodeURIComponent(caminhoParaVoltar)}`}>
                       {textosObjetivo.verMaisEmReferencias}
                     </Link>
                   </>
@@ -430,6 +499,13 @@ export function ObjetivoTela({
         primaria={{ rotulo: textosObjetivo.escrever, onClick: escrever, disabled: pergunta && !ficha, precisaDeRede: true }}
       />
       </div>
+      <FolhaDetalhesVideo
+        video={exemploAberto?.video ?? null}
+        url={exemploAberto?.url ?? null}
+        aberto={exemploAbertoId !== null}
+        aoFechar={previa.fechar}
+        soVer={{ rotuloFechar: textosObjetivo.voltarParaORoteiro }}
+      />
     </div>
   );
 }

@@ -962,6 +962,8 @@ type MontarERoteiroDados = {
   clienteId: number;
   cliente: Cliente;
   tema: string;
+  /** 22/10/2026 (decisão do Gustavo): o tema é da PRÓPRIA pessoa (Tema livre); as proibições do briefing viram aviso, nunca bloqueio. Os temas que o sistema sugere seguem filtrando. */
+  temaDaPessoa?: boolean;
   objetivo: Objetivo;
   /** E49 PR 1: a ficha, só no Reels; dirige a estrutura do pedido e o verificador. */
   ficha?: Ficha | null;
@@ -1244,6 +1246,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         modeloNicho: formatarModeloNicho(modeloNichoLinha ? { ...modeloNichoLinha.modelo, duracaoTipicaS: null, estruturas: [] } : null),
         regrasCliente,
         proibicoes: perfil.fatos.proibicoes,
+        temaDaPessoa: dados.temaDaPessoa,
         tema: dados.tema,
         objetivo: dados.objetivo,
         objetivoDoVideo: dados.objetivoDoVideo ?? dados.momento?.objetivoDoVideo,
@@ -1346,6 +1349,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
         ? { texto: dados.perguntaPresa.texto, tipo: dados.perguntaPresa.tipo, vezes: dados.perguntaPresa.vezes, plataformas: dados.perguntaPresa.plataformas, lidaEm: diaPorExtenso(new Date(dados.perguntaPresa.lidaEm)) }
         : undefined,
       pesquisa: pesquisaNaEntrada,
+      proibicoesComoAviso: dados.temaDaPessoa ? perfil.fatos.proibicoes : undefined,
     }),
     fontesDosFatos,
     // E54 (parte 2): com pesquisa, todo número com cara de dado do roteiro (porcentagem, valor, ano) tem de estar nas fontes acima, com a mesma unidade e escala.
@@ -1354,6 +1358,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     // embutido em `montarEntrada`, para continuar sendo a última linha também na segunda tentativa.
     lembreteFinal: roteiroIA.LEMBRETE_ACENTUACAO,
     proibicoes: perfil.fatos.proibicoes,
+    // 22/10/2026: tema da própria pessoa: a proibição é aviso (a entrada o diz e o verificador não reprova por ela); as R-CONF seguem em `verificarExtra`.
+    citarProibicaoVale: dados.temaDaPessoa,
     exigeEvidencia: !semEvidencia,
     evidenciasFornecidas,
     palavrasDoMomento,
@@ -1566,6 +1572,7 @@ export async function montarRoteiro(
     pesquisa: pesquisa ?? undefined,
     temaDoMomento: doMomento !== null,
     versoesDoMesmoTema,
+    temaDaPessoa: params.origem === "livre",
   });
 
   return {

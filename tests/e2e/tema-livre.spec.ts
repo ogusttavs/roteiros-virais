@@ -329,7 +329,11 @@ test.describe("tema livre pela tela, os cinco estados", () => {
     await expect(page.getByText("Editar o texto")).toBeVisible();
 
     await page.goto("/hoje");
-    await abrirTemaLivre(page);
+    await page.goto("/criar/tema-livre");
+    // Hotfix de 22/10/2026 (item 3): o texto avaliado volta COM a nota que ficou guardada (sem avaliar de novo); o campo está a um toque, em "Editar o texto".
+    await expect(page.getByText("Editar o texto")).toBeVisible();
+    await expect(page.getByText("assunto avaliado que precisa sobreviver a sair e voltar")).toBeVisible();
+    await page.getByRole("button", { name: "Editar o texto" }).click();
     await expect(page.getByLabel("Sobre o que você quer falar?")).toHaveValue(
       "assunto avaliado que precisa sobreviver a sair e voltar",
     );

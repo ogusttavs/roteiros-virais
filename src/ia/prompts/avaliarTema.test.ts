@@ -65,7 +65,7 @@ describe("a nota do tema não pune o que está fora do setor (06/10/2026)", () =
 
   it("o sistema diz que sem vídeo no banco é só um fato, usa as notícias de hoje como sinal, fala em segunda pessoa e proíbe id no texto", () => {
     const sistema = montarSistemaEstavel({ ...BASE, regrasCliente: [] });
-    expect(versao).toBe("1.11.0");
+    expect(versao).toBe("1.12.0");
     expect(sistema).toContain("o banco de vídeos só cobre o setor da pessoa");
     expect(sistema).toContain("nunca baixe a nota por causa disso");
     // Os dois sentidos da ausência (1.9.1): do assunto do setor, a ausência é sinal; de fora, não diz nada.
@@ -167,6 +167,6 @@ describe("a pergunta do público presa ao Tema livre (E28, parte 3)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("1.11.0");
+    expect(versao).toBe("1.12.0");
   });
 });

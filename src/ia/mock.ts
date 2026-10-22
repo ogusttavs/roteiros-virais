@@ -274,7 +274,7 @@ const MARCADOR_NOTA_ALTA = "aprova este tema de teste sem ressalva";
  */
 const MARCADOR_TERCEIRA_PESSOA = "[mock:terceira-pessoa]";
 const MARCADOR_CITA_PROIBICAO = "[mock:cita-proibicao]";
-const FRASE_DA_PROIBICAO_CITADA = "este tema esbarra na proibição de falar de política";
+const FRASE_DA_PROIBICAO_CITADA = "este tema esbarra no que você disse no briefing";
 
 function mockAvaliarTema(entrada: string) {
   const tema = extrairCampo(entrada, "Tema proposto:");
@@ -307,7 +307,7 @@ function mockAvaliarTema(entrada: string) {
     recomendacao: tema.includes(MARCADOR_TERCEIRA_PESSOA)
       ? "Mostre como ela vende o produto no balcão, direto para o seu cliente."
       : tema.includes(MARCADOR_CITA_PROIBICAO)
-        ? `Cuidado: ${FRASE_DA_PROIBICAO_CITADA}; vale um ângulo mais seguro.`
+        ? `Atenção: ${FRASE_DA_PROIBICAO_CITADA}: não falar de política. Se usar a analogia de eleição, não cite candidato nem partido e não tome lado.`
         : aprovado
           ? "tema com evidencia suficiente"
           : "ajustar para um angulo com evidencia",
@@ -702,9 +702,13 @@ function mockEntregaDaPesquisa(dados: { id: number; fonte: string; data: string;
 
 function mockVerificarTexto(entrada: string, sistemaEstavel = "") {
   const texto = extrairCampo(entrada, "Texto a conferir:") || entrada;
-  // O verificador por IA antes reprovava a nota do tema que CITAVA a proibição do cliente (1.7.3); o gênero "tema" de agora (1.8.0) diz que citar não fere. O simulador reprova a menção só quando o pedido não traz essa frase.
+  // O verificador por IA antes reprovava a nota do tema que CITAVA a proibição do cliente (1.7.3); com o tema da própria pessoa (1.8.0) a proibição é aviso e citar não fere. O simulador reprova a menção só quando o pedido não traz essa frase.
   if (texto.includes(FRASE_DA_PROIBICAO_CITADA) && !sistemaEstavel.includes("nunca fere a proibição")) {
     return { aprovado: false, motivo: "a avaliação recomenda o que o briefing proíbe", fatoEspecifico: null, fonteMaisProxima: null };
+  }
+  // A conformidade continua barrando com a proibição como aviso: o marcador faz o simulador reprovar o texto que ataca gente (o verificador de verdade lê "atacar ou ofender" no critério).
+  if (texto.includes("[mock:ataque]") && sistemaEstavel.includes("atacar ou ofender")) {
+    return { aprovado: false, motivo: "o texto ataca uma pessoa", fatoEspecifico: null, fonteMaisProxima: null };
   }
   const gritando = /!{2,}/.test(texto) || texto === texto.toUpperCase();
   // O roteiro não inventa fato: com fontes na entrada, o marcador de teste faz o verificador reprovar o fato fora delas (só o mock; a prova de verdade é a chave real).

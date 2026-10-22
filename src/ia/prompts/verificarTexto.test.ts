@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { CRITERIO_FATOS, montarEntrada, montarSistemaEstavel, motivoDaConferencia, schema, versao } from "./verificarTexto";
+import { CRITERIO_FATOS, CRITERIO_PROIBICAO, CRITERIO_PROIBICAO_COMO_AVISO, montarEntrada, montarSistemaEstavel, motivoDaConferencia, schema, versao } from "./verificarTexto";
 
 /**
  * 29/09/2026, achado do Gustavo em produção: a recomendação de `avaliarTema`
@@ -16,16 +16,19 @@ describe("verificarTexto, gênero tema", () => {
     expect(sistema).toContain("não um briefing interno");
   });
 
-  it("no gênero tema, citar a proibição ou o risco do tema ao avaliá-lo não reprova (achado de 22/10/2026); nos outros gêneros a proibição fere como sempre", () => {
-    const tema = montarSistemaEstavel("tema");
-    expect(tema).toContain("nunca fere a proibição");
-    expect(tema).toContain("não reprove por isso");
-    expect(tema).toContain("A proibição vale para o roteiro, não para a conversa sobre o tema");
-    for (const genero of ["padrao", "analise", "roteiro", "regra"] as const) {
+  it("com o tema da própria pessoa, a proibição vira aviso e nunca reprova (22/10/2026); a conformidade continua barrando; sem isso o critério é o de sempre", () => {
+    const aviso = montarSistemaEstavel("tema", false, true);
+    expect(aviso).toContain(CRITERIO_PROIBICAO_COMO_AVISO);
+    expect(aviso).toContain("nunca fere a proibição");
+    expect(aviso).toContain("atacar ou ofender uma pessoa, um candidato, um partido");
+    expect(aviso).not.toContain(CRITERIO_PROIBICAO);
+    for (const genero of ["padrao", "analise", "roteiro", "regra", "tema"] as const) {
       const sistema = montarSistemaEstavel(genero);
-      expect(sistema).toContain("nenhuma proibição que o cliente listou no briefing foi ferida");
+      expect(sistema).toContain(CRITERIO_PROIBICAO);
       expect(sistema).not.toContain("nunca fere a proibição");
     }
+    // O roteiro do tema livre usa o mesmo critério de aviso, com o gênero do roteiro.
+    expect(montarSistemaEstavel("roteiro", true, true)).toContain(CRITERIO_PROIBICAO_COMO_AVISO);
   });
 
   it("o gênero padrão continua sem essa explicação (só tom de pessoa falando com pessoa)", () => {

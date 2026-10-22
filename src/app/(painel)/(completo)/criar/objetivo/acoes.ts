@@ -7,6 +7,7 @@ import { sugerirEstiloPelaEvidencia } from "@/ia/enums";
 import { ErroIA } from "@/ia/erro";
 import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
+import { formatarVideo, legendaSemHashtags } from "@/lib/formatar-video-referencia";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
@@ -28,6 +29,7 @@ import {
 import { limparNotaDoRascunhoSeForDoTexto } from "@/servicos/temas";
 import { gerarVersoes } from "@/servicos/versoes";
 import { textosRoteiro } from "@/textos/roteiro";
+import type { VideoFormatado } from "@/ui/componentes/ReferenciaCartao";
 
 /**
  * `/hoje/objetivo` (etapa 11; V9c, item 1: `formato` do controle segmentado; M4, item 2: `estilo`,
@@ -118,8 +120,11 @@ export async function sugerirEstiloAction(tema: string): Promise<EstiloRoteiro> 
   return sugerirEstiloPelaEvidencia(evidencias);
 }
 
-/** Um exemplo de "Exemplos que fazem isso" no Criar (E49 PR 2): o que o cartão mostra, já em texto. */
-export type ExemploDaFicha = { id: number; titulo: string; conta: string; plataforma: string; tipo: string | null; capaUrl: string | null };
+/**
+ * Um exemplo de "Exemplos que fazem isso" no Criar (E49 PR 2; hotfix de 22/10/2026: agora com o vídeo). `video` é o mesmo `VideoFormatado` do cartão e da folha de detalhes de Referências (a
+ * capa, a conta, a data, os números e a leitura), com o título já sem as hashtags; `url` abre a prévia na própria tela. Tudo vem da MESMA consulta que já trazia os exemplos.
+ */
+export type ExemploDaFicha = { id: number; url: string; tipo: string | null; video: VideoFormatado };
 
 /**
  * "Exemplos que fazem isso" (E49 PR 2): até três vídeos dos ramos da conta que a extração leu como feitos para a ficha escolhida, pelo filtro de tipo ligado da marca e o corte
@@ -129,15 +134,19 @@ export async function exemplosDaFichaAction(ficha: string): Promise<ExemploDaFic
   if (!ehFicha(ficha)) return [];
   const cliente = await clienteDaSessaoAtual();
   if (!cliente.nichoId) return [];
-  const alternativos = (await ramosAlternativosDaMarca(cliente.id)).map((a) => a.nichoId);
+  const alternativosDaMarca = await ramosAlternativosDaMarca(cliente.id);
+  const alternativos = alternativosDaMarca.map((a) => a.nichoId);
+  const nomesDosAlternativos = new Map(alternativosDaMarca.map((a) => [a.nichoId, a.nome] as const));
   const setores = await setoresComPiso([cliente.nichoId, ...alternativos]);
   const lista = await exemplosPorFicha(cliente.nichoId, ficha, { setores, formatosDaMarca: await filtroDeFormatosDaMarca(cliente.id) });
-  return lista.map((v) => ({
-    id: v.id,
-    titulo: v.titulo ?? v.assunto,
-    conta: v.contaNome ?? v.contaHandle ?? "",
-    plataforma: v.plataforma,
-    tipo: formatoPorChave(v.formatoCatalogo)?.nome ?? null,
-    capaUrl: v.capaUrl,
-  }));
+  return lista.map((v) => {
+    const video = formatarVideo(v, nomesDosAlternativos);
+    return {
+      id: v.id,
+      url: v.url,
+      tipo: formatoPorChave(v.formatoCatalogo)?.nome ?? null,
+      // O título do vídeo é a legenda do post; aqui sem as hashtags (se sobrar nada, o assunto que a extração leu).
+      video: { ...video, titulo: legendaSemHashtags(v.titulo, v.assunto) || null },
+    };
+  });
 }

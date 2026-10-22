@@ -646,9 +646,9 @@ export type ParametrosGeracaoVerificada<T> = ParametrosGeracao<T> & {
   semIdInterno?: boolean;
   soSegundaPessoa?: boolean;
   /**
-   * Hotfix de 22/10/2026: a AVALIAÇÃO de um tema (não o roteiro) pode citar uma proibição do cliente ou o risco do tema ao comentá-lo ("este tema esbarra na sua proibição de falar de
-   * política"). Ligado, a conferência local não reprova a proibição escrita no texto; quem confere o sentido é o `verificarTexto` (gênero "tema"), que também sabe disso. Ausente (o roteiro),
-   * nada muda: o texto que a pessoa grava nunca fere a proibição.
+   * Decisão do Gustavo, 22/10/2026: quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing dela são preferências e viram aviso, nunca bloqueio, na avaliação do tema e no roteiro que
+   * sai dele. Ligado, a conferência local não reprova a proibição escrita no texto e o `verificarTexto` troca o critério da proibição pelo de aviso (continua barrando atacar ou ofender gente, prometer
+   * o que não pode cumprir e calão; as R-CONF do roteiro seguem em `verificarExtra`). Ausente (os temas sugeridos pelo sistema, o briefing, as regras do cliente), a proibição filtra como sempre.
    */
   citarProibicaoVale?: boolean;
   /** V4, item 5: o gancho dos últimos 5 roteiros do cliente, para a checagem de primeira palavra (ver `verificarLocalmente`). */
@@ -881,7 +881,7 @@ async function tentarGerarEVerificar<T>(
       nivel: verificarTexto.nivel,
       effort: verificarTexto.esforco,
       schema: verificarTexto.schema,
-      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos)),
+      sistemaEstavel: verificarTexto.montarSistemaEstavel(params.generoTexto, Boolean(params.fontesDosFatos), Boolean(params.citarProibicaoVale)),
       entrada: verificarTexto.montarEntrada({
         texto: textoJunto,
         proibicoes: params.proibicoes ?? [],

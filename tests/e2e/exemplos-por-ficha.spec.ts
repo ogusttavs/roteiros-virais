@@ -13,6 +13,8 @@ import { hojeISO } from "../../src/lib/config";
 const SENHA = "ExemploSenha123";
 const ID = "e2e-exemplos-ficha";
 const EMAIL = `${ID}@exemplo.teste`;
+/** Um PNG de um pixel, em data URI: a capa que carrega. */
+const CAPA_DE_TESTE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 async function entrar(page: Page) {
   await page.goto("/entrar");
@@ -49,7 +51,9 @@ test.describe("exemplos por ficha", () => {
       plataforma: "tiktok",
       idExterno: "exemplos-ficha-1",
       url: "https://exemplo.invalido/exemplos-ficha-1",
-      titulo: "o passo a passo que todo mundo salva",
+      // A legenda do post traz as hashtags; o exemplo do Criar mostra o título sem elas. A capa é uma imagem de verdade (um pixel), para o teste ver a imagem e não o retângulo neutro.
+      titulo: "o passo a passo que todo mundo salva #limpeza #dica",
+      capaUrl: CAPA_DE_TESTE,
       contaId: conta.id,
       nichoId: nicho.id,
       views: 120_000,
@@ -79,7 +83,8 @@ test.describe("exemplos por ficha", () => {
     await expect(exemplos).toContainText("Exemplos que fazem isso");
     await expect(exemplos.locator("[data-exemplo]")).toHaveCount(1);
     await expect(exemplos).toContainText("o passo a passo que todo mundo salva");
-    await expect(exemplos.getByRole("link", { name: "Ver mais em Referências" })).toHaveAttribute("href", "/referencias?feitoPara=guardem&periodo=90");
+    // O link leva o caminho de volta (o passo do objetivo, com os parâmetros de agora), para Referências trazer a pessoa de volta ao roteiro.
+    await expect(exemplos.getByRole("link", { name: "Ver mais em Referências" })).toHaveAttribute("href", `/referencias?feitoPara=guardem&periodo=90&voltar=${encodeURIComponent("/criar/objetivo?tema=0")}`);
 
     await page.getByRole("button", { name: "Ver as cinco de novo" }).click();
     await expect(grupo.getByRole("radio")).toHaveCount(5);
@@ -89,6 +94,73 @@ test.describe("exemplos por ficha", () => {
     await expect(vazio).toContainText("Ainda não temos exemplos deste tipo no seu setor");
     // Sem exemplos, o roteiro sai do mesmo jeito.
     await expect(page.getByRole("button", { name: "escrever o roteiro" })).toBeEnabled();
+  });
+
+  test("Criar: o exemplo mostra a capa, o título sem hashtags, a conta e o selo; o toque abre a prévia do vídeo na própria tela e fecha sem sair do passo", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    await page.locator("[data-fichas]").getByRole("radio", { name: /Que guardem para depois/ }).click();
+    const exemplo = page.locator("[data-exemplo]").first();
+    await expect(exemplo).toBeVisible();
+    // A capa é a imagem do vídeo (a mesma do cartão de Referências), não o retângulo neutro.
+    await expect(exemplo.locator('[data-capa="imagem"] img')).toHaveCount(1);
+    await expect(exemplo).toContainText("o passo a passo que todo mundo salva");
+    await expect(exemplo).not.toContainText("#limpeza");
+    await expect(exemplo).toContainText("conta-exemplos-ficha");
+    await expect(exemplo).toContainText("TikTok");
+    await expect(exemplo.getByText("Passo a passo", { exact: true })).toBeVisible();
+
+    await exemplo.getByRole("button").click();
+    const previa = page.getByRole("dialog", { name: "Por que esse funcionou" });
+    await expect(previa).toBeVisible();
+    await expect(previa.getByRole("link", { name: "Abrir na plataforma" })).toBeVisible();
+    // Só ver: sem salvar nem "usar como referência".
+    await expect(previa.getByRole("button", { name: /^salvar$/i })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/criar\/objetivo\?tema=0/);
+    await previa.getByRole("button", { name: "Voltar para o roteiro" }).click();
+    await expect(previa).toHaveCount(0);
+    await expect(page).toHaveURL(/\/criar\/objetivo\?tema=0/);
+    // O Voltar do aparelho com a prévia aberta fecha só a prévia.
+    await exemplo.getByRole("button").click();
+    await expect(previa).toBeVisible();
+    await page.goBack();
+    await expect(previa).toHaveCount(0);
+    await expect(page).toHaveURL(/\/criar\/objetivo\?tema=0/);
+  });
+
+  test("Criar para Referências e de volta: o que a pessoa escolheu continua lá, pelo botão da tela e pelo Voltar do navegador", async ({ page }) => {
+    await entrar(page);
+    await page.goto("/criar/objetivo?tema=0");
+    const grupo = page.locator("[data-fichas]");
+    await grupo.getByRole("radio", { name: /Que guardem para depois/ }).click();
+    await page.getByLabel(/O que este vídeo precisa comunicar/).fill("o horário de sábado mudou");
+    await page.getByRole("link", { name: "Ver mais em Referências" }).click();
+    await expect(page).toHaveURL(/\/referencias\?.*voltar=/);
+    // O botão fixo no alto, que só existe com o caminho de volta.
+    const voltar = page.locator("[data-voltar-para-o-roteiro]").getByRole("link", { name: "Voltar para o seu roteiro" });
+    await expect(voltar).toBeVisible();
+    await voltar.click();
+    await expect(page).toHaveURL(/\/criar\/objetivo\?tema=0$/);
+    await expect(grupo.getByRole("radio")).toHaveCount(1);
+    await expect(grupo.getByRole("radio", { name: /Que guardem para depois/ })).toBeChecked();
+    await expect(page.getByLabel(/O que este vídeo precisa comunicar/)).toHaveValue("o horário de sábado mudou");
+
+    // E pelo Voltar do navegador: vai a Referências de novo e volta com o histórico.
+    await page.getByRole("link", { name: "Ver mais em Referências" }).click();
+    await expect(page).toHaveURL(/\/referencias/);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/criar\/objetivo\?tema=0$/);
+    await expect(grupo.getByRole("radio")).toHaveCount(1);
+    await expect(page.getByLabel(/O que este vídeo precisa comunicar/)).toHaveValue("o horário de sábado mudou");
+  });
+
+  test("Referências: o 'voltar' só vale com um caminho de /criar/ (outro endereço some, sem botão)", async ({ page }) => {
+    await entrar(page);
+    await page.goto(`/referencias?voltar=${encodeURIComponent("https://exemplo.com/criar/objetivo")}`);
+    await expect(page.getByRole("heading", { name: "O que está funcionando no seu setor" })).toBeVisible();
+    await expect(page.locator("[data-voltar-para-o-roteiro]")).toHaveCount(0);
+    await page.goto(`/referencias?voltar=${encodeURIComponent("/hoje")}`);
+    await expect(page.locator("[data-voltar-para-o-roteiro]")).toHaveCount(0);
   });
 
   test("Referências: a pílula, o selo no cartão, a contagem e o estado vazio com 'Ver todos'", async ({ page }) => {

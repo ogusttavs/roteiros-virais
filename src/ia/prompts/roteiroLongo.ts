@@ -25,6 +25,7 @@ import {
   blocoDasNoticiasDoAssunto,
   blocoDasVozesDoPublico,
   BLOCO_DO_TEMA_DO_MOMENTO,
+  blocoDasProibicoesComoAviso,
   type NoticiaDoAssuntoNaEntrada,
   type PerguntaPresaNaEntrada,
 } from "./roteiro";
@@ -49,7 +50,10 @@ import {
  * 1.2.0 (22/10/2026): `porQueDosBlocos` vira um texto de uma linha por bloco, igual ao roteiro curto (que estourava a gramática da API com a lista; o longo ainda cabia, mas os dois seguem o mesmo
  * formato e a mesma leitura no servidor); e a regra dura 1 passa a dizer que o jargão vale também em "onde gravar" e "como editar" (a prova com chave pegou, em `ondeGravar`, a palavra proibida de "mais gente te conhecer": 2 de 6 reprovados na 1ª tentativa) e a dar as palavras do cliente no lugar.
  */
-export const versao = "1.2.0";
+/**
+ * 1.3.0 (22/10/2026, decisão do Gustavo): o tema da própria pessoa (Tema livre) leva as proibições do briefing como aviso, não barreira (`blocoDasProibicoesComoAviso`, de `roteiro.ts`). Só a entrada muda.
+ */
+export const versao = "1.3.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -267,6 +271,8 @@ export function montarEntrada(dados: {
   vozesDoPublico?: VozNumerada[];
   lidasEm?: string;
   perguntaPresa?: PerguntaPresaNaEntrada;
+  /** 22/10/2026: as proibições do briefing, QUANDO o tema é da própria pessoa: aviso, não barreira. */
+  proibicoesComoAviso?: string[];
 }): string {
   const forca = (f: "regra" | "indicio") => (f === "regra" ? "regra do ramo" : "indício, de poucos vídeos");
   const d = dados.duracaoDoRamo;
@@ -315,6 +321,7 @@ export function montarEntrada(dados: {
   const partes = [
     dados.objetivoDoVideo ? `O que este vídeo precisa comunicar (acima de tudo o mais): ${dados.objetivoDoVideo}` : null,
     dados.momento ? null : `Tema escolhido: ${dados.tema}`,
+    dados.momento ? null : blocoDasProibicoesComoAviso(dados.proibicoesComoAviso),
     blocoNoticia,
     blocoDasNoticiasDoAssunto(dados.noticiasDoAssunto),
     dados.temaDoMomento ? BLOCO_DO_TEMA_DO_MOMENTO : null,

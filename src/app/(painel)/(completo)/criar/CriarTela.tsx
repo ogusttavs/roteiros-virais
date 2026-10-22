@@ -34,9 +34,9 @@ import { FolhaPlanejarDias } from "../hoje/FolhaPlanejarDias";
 import { HojeCabecalho } from "../hoje/HojeCabecalho";
 import { pularPlanoAction } from "../hoje/plano/acoes";
 
+import styles from "./CriarTela.module.css";
 import { descartarTemaLivreAction } from "./tema-livre/acoes";
 
-import styles from "./CriarTela.module.css";
 
 type Props = {
   marcaAtiva: MarcaResumo;

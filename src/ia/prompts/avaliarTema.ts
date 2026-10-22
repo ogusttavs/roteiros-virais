@@ -76,7 +76,13 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  * comentários. É sinal de que o assunto interessa a quem assiste (vale para "gerar cliente" e para o encaixe com a pergunta que a pessoa se propôs a responder), nunca prova de que vai viralizar: a
  * prova de "viralizar" continua sendo o vídeo fora da curva e o noticiário. Só a entrada muda; sem pergunta presa ela é a de antes.
  */
-export const versao = "1.11.0";
+/**
+ * 1.12.0 (22/10/2026, achado do Gustavo em produção e decisão dele): o tema é da PRÓPRIA pessoa, então uma proibição do briefing é uma preferência dela, não uma barreira. Uma avaliação que antes
+ * reprovava duas vezes ("recomenda usar comparação com política", "ela vende") agora passa: quando o tema esbarra no briefing, a justificativa de "encaixe" e a recomendação DIZEM isso em língua de
+ * gente ("este tema esbarra no que você disse no briefing: ...") e o que cuidar; o encaixe não despenca a 3 só por isso (a pessoa já escolheu o tema), vale 6 ou 7 com o aviso. Quem ataca ou ofende
+ * gente, promete o que não pode cumprir ou usa calão continua sem passar (o verificador). A regra do pilar "encaixe" sobre a lista "o que este cliente já reprovou" não muda.
+ */
+export const versao = "1.12.0";
 export const nivel: NivelIA = "forte";
 export const esforco: EsforcoIA | undefined = "high";
 
@@ -162,15 +168,25 @@ Os cinco pilares:
   gerar cliente significa fazer a pessoa ser procurada, seguida ou indicada: o vídeo que
   constrói isso vale 9 a 10, o que só entretém sem construir esse reconhecimento vale 6 ou
   menos.
-- Encaixe com você: usa a sua autoridade, fala com o seu cliente e cabe no seu tom. Fere
-  uma proibição do briefing vale 3 ou menos; cai numa regra firme da lista "o que este
-  cliente já reprovou" (abaixo, quando houver) vale 4 ou menos, e diga isso na
-  justificativa.
+- Encaixe com você: usa a sua autoridade, fala com o seu cliente e cabe no seu tom. Cai numa
+  regra firme da lista "o que este cliente já reprovou" (abaixo, quando houver) vale 4 ou
+  menos, e diga isso na justificativa. Esbarrar numa proibição do briefing não derruba o
+  encaixe: o tema é dela, então vale 6 ou 7 e você AVISA (ver "Quando o tema esbarra no
+  briefing", abaixo).
 - Novidade: o mesmo ângulo já apareceu três vezes ou mais na evidência vale 5 ou menos.
   Ângulo novo sobre assunto quente vale 9 a 10.
 - Facilidade de gravar: dá para gravar sozinho, no celular, hoje, no seu lugar vale 9 a
   10. Precisa de outra pessoa, objeto que ele não tem ou edição difícil cai
   proporcionalmente.
+
+Quando o tema esbarra no briefing: o tema é da própria pessoa, e o que ela disse no briefing que
+não quer é uma preferência, não uma proibição para esta nota. Se o tema toca num desses pontos
+(por exemplo, uma analogia com eleição quando ela não quer falar de política), a avaliação
+passa do mesmo jeito. Na justificativa de "encaixe" e na recomendação, diga em língua de gente:
+"este tema esbarra no que você disse no briefing: <o que ela disse>", e o que cuidar para
+seguir com ele (por exemplo: não cite candidato nem partido, não tome lado, fique no exemplo do
+seu dia a dia). Se existir um jeito de contar a mesma ideia sem esse ponto, sugira como
+alternativa, sem mandar trocar. Nunca recuse o tema nem baixe a nota a 3 por isso.
 
 Regras duras que valem aqui também: todo tema cita a evidência que sustenta ele; sem
 travessão, sem emoji, sem jargão na justificativa nem na recomendação.

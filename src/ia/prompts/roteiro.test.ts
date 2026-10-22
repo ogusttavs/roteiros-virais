@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { OBJETIVOS_EM_ORDEM } from "@/ia/enums";
 import { JARGAO } from "@/lib/regras-de-texto";
 
-import { LEMBRETE_ACENTUACAO, montarEntrada, montarFontesDosFatos, montarSistemaEstavel, type InstrucaoAbertura, versao } from "./roteiro";
+import { blocoDasProibicoesComoAviso, LEMBRETE_ACENTUACAO, montarEntrada, montarFontesDosFatos, montarSistemaEstavel, type InstrucaoAbertura, versao } from "./roteiro";
 
 // OBJETIVOS_EM_ORDEM[2] (nao o literal, checar-texto varre este diretorio): o objetivo
 // "gente me chamar para comprar" (`NOME_OBJETIVO`), o mesmo que a asserção abaixo confere.
@@ -430,7 +430,7 @@ describe("o roteiro não inventa fato (04/10/2026)", () => {
   const SISTEMA = montarSistemaEstavel({ perfilCompilado: "perfil", modeloNicho: "modelo", camadaExclusiva: "camada", regrasCliente: [], tipo: "negocio", formato: "reels", estilo: "falado" });
 
   it("a versão do prompt subiu e a regra dura está no sistema, com o espaço marcado entre colchetes", () => {
-    expect(versao).toBe("2.20.0");
+    expect(versao).toBe("2.21.0");
     expect(SISTEMA).toContain("Nenhum fato que ninguém contou");
     expect(SISTEMA).toContain("[diga aqui onde você está]");
     expect(SISTEMA).toContain("Nunca invente cena para dar vida ao texto");
@@ -525,7 +525,7 @@ describe("a pergunta do público presa ao roteiro (E28, parte 3)", () => {
   });
 
   it("a versão do prompt subiu", () => {
-    expect(versao).toBe("2.20.0");
+    expect(versao).toBe("2.21.0");
   });
 });
 
@@ -575,5 +575,25 @@ describe("as vozes do público no roteiro (E28)", () => {
     expect(fontes).toContain("Lido nos comentários de vídeos do YouTube do setor em 11 de outubro");
     expect(fontes).toContain("pergunta 1 | 14 comentários | YouTube | Serve em tecido de camurça?");
     expect(montarFontesDosFatos({ perfilCompilado: "perfil", camadaExclusiva: "", tema: "mancha em sofá" })).not.toContain("YouTube");
+  });
+});
+
+describe("as proibições do briefing como aviso quando o tema é da própria pessoa (22/10/2026)", () => {
+  it("sem proibição nada entra; com proibição, o aviso diz o que cuidar e que a conformidade continua valendo", () => {
+    expect(blocoDasProibicoesComoAviso(undefined)).toBeNull();
+    expect(blocoDasProibicoesComoAviso([" ", ""])).toBeNull();
+    const bloco = blocoDasProibicoesComoAviso(["política", "preço baixo"]) ?? "";
+    expect(bloco).toContain("política; preço baixo");
+    expect(bloco).toContain("uma preferência, não uma proibição");
+    expect(bloco).toContain("não cite candidato nem partido, não tome lado, não ataque ninguém");
+    expect(bloco).toContain("as regras de conformidade continuam valendo inteiras");
+  });
+
+  it("a entrada leva o aviso logo depois do tema só quando pedido (e nunca no roteiro do momento)", () => {
+    const base = { tema: "analogia de eleição", objetivo: "engajamento" as const, formato: "reels" as const, estilo: "falado" as const, evidencias: [], roteirosRecentes: [], instrucaoAbertura: { tipo: null, tiposProibidos: [] } };
+    const sem = montarEntrada(base);
+    const com = montarEntrada({ ...base, proibicoesComoAviso: ["política"] });
+    expect(sem).not.toContain("uma preferência, não uma proibição");
+    expect(com.indexOf("Tema escolhido: analogia de eleição")).toBeLessThan(com.indexOf("uma preferência, não uma proibição"));
   });
 });
