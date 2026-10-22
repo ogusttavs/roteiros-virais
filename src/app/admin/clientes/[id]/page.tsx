@@ -10,6 +10,7 @@ import { META_CUSTO_CLIENTE_USD, clienteDetalheAdmin } from "@/servicos/admin-co
 import { alteracoesDaConta, pessoasDaConta, usoDosUltimosDias } from "@/servicos/admin-contas";
 import { descreverPublico } from "@/servicos/admin-trocas";
 import { contarReprovacoes, regrasDoCliente } from "@/servicos/aprendizado";
+import { assinaturasDaMarca, resumirCobranca } from "@/servicos/assinatura";
 import { assuntosAtivosDaMarca, contarNoticiasPorAssunto } from "@/servicos/assuntos";
 import { clientePorId, membrosDaMarca, NOME_SEM_NOME_AINDA } from "@/servicos/clientes";
 import { fontesDoHistorico } from "@/servicos/curva";
@@ -19,13 +20,14 @@ import { ramosAlternativosDaMarca } from "@/servicos/ramos-da-conta";
 import { roteirosDoCliente } from "@/servicos/roteiro";
 import { pessoasVisiveis, ultimasEntradasVerComo } from "@/servicos/ver-como";
 import { textosAdmin } from "@/textos/admin";
-import { dolares, quandoPorExtenso, reais, textosContaAdmin as t } from "@/textos/admin-contas";
+import { dolares, quandoPorExtenso, reais, rotuloDaCobranca, textosContaAdmin as t } from "@/textos/admin-contas";
 import { textosHistorico } from "@/textos/historico";
 
 import comum from "../../comum.module.css";
 
 import { AssuntosAdmin } from "./AssuntosAdmin";
 import conta from "./conta.module.css";
+import { CortesiaAdmin } from "./CortesiaAdmin";
 import { IdentidadeAdmin } from "./IdentidadeAdmin";
 import antigo from "./page.module.css";
 import { QuemTemAcessoAdmin } from "./QuemTemAcessoAdmin";
@@ -77,6 +79,7 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
   const tiposDaMarca = await formatosDaMarcaComEstado(detalhe.id);
   const diaADia = await usoDosUltimosDias(detalhe.id, 14);
   const alteracoes = await alteracoesDaConta(detalhe.id, 8);
+  const cobranca = resumirCobranca(cliente.cortesia, await assinaturasDaMarca(detalhe.id));
   const diaPorExtenso = (d: Date) => new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long", timeZone: "America/Sao_Paulo" }).format(d);
   // Server Component: NOME_SEM_NOME_AINDA mora num arquivo que importa next/headers, que só pode ser importado aqui (o client component recebe só o booleano já calculado).
   const visiveis = new Set((await pessoasVisiveis(detalhe.id)).map((p) => p.usuarioId));
@@ -177,6 +180,14 @@ export default async function AdminContaDetalhe({ params }: { params: Promise<{ 
             <div className={conta.ajustes}>
               <div className={conta.linhaAjuste}>
                 <SeletorPlanoAdmin clienteId={detalhe.id} planoInicial={detalhe.plano} />
+              </div>
+              <div className={conta.linhaAjuste} data-ajuste="assinatura">
+                <span className={conta.rotuloAjuste}>{t.ajustes.assinatura}</span>
+                <span className={conta.valorAjuste} data-cobranca>
+                  {rotuloDaCobranca(cobranca)}
+                </span>
+                <CortesiaAdmin clienteId={detalhe.id} cortesiaInicial={cliente.cortesia} />
+                <p className={conta.notaDeAjuste}>{t.ajustes.cortesiaNota}</p>
               </div>
               <div className={conta.linhaAjuste} data-ajuste="teto">
                 <span className={conta.rotuloAjuste}>{t.ajustes.tetoDoMes}</span>

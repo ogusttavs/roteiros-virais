@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ErroConfiguracao, hojeISO, verificarSegredosDeProducao } from "./config";
+import { config, ErroConfiguracao, hojeISO, verificarSegredosDeProducao } from "./config";
 
 describe("hojeISO", () => {
   it("formata no fuso de Sao Paulo, sem hora", () => {
@@ -123,5 +123,32 @@ describe("verificarSegredosDeProducao", () => {
         BETTER_AUTH_URL: "https://app.srv1953618.hstgr.cloud",
       }),
     ).not.toThrow();
+  });
+
+  describe("E22: a cobranca ligada em producao", () => {
+    const base = { NODE_ENV: "production", ...segredosDeVerdade };
+    it("COBRANCA_ATIVA=1 sem STRIPE_SECRET_KEY recusa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, COBRANCA_ATIVA: "1", STRIPE_WEBHOOK_SECRET: "whsec_x" })).toThrow(/STRIPE_SECRET_KEY/);
+    });
+    it("COBRANCA_ATIVA=1 sem STRIPE_WEBHOOK_SECRET recusa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, COBRANCA_ATIVA: "1", STRIPE_SECRET_KEY: "rk_live_x" })).toThrow(/STRIPE_WEBHOOK_SECRET/);
+    });
+    it("COBRANCA_ATIVA=1 com as duas passa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, COBRANCA_ATIVA: "1", STRIPE_SECRET_KEY: "rk_live_x", STRIPE_WEBHOOK_SECRET: "whsec_x" })).not.toThrow();
+    });
+    it("desligada (ausente, vazia ou diferente de 1) nao exige nada", () => {
+      for (const valor of [undefined, "", "0", "true"]) {
+        expect(() => verificarSegredosDeProducao({ ...base, COBRANCA_ATIVA: valor })).not.toThrow();
+      }
+    });
+  });
+});
+
+describe("config.cobranca (o portao desligado por padrao e a porta de teste)", () => {
+  it("nos testes o provedor e sempre o simulado, mesmo com a chave do Stripe no .env", () => {
+    expect(config.cobranca.provedor).toBe("mock");
+  });
+  it("a chave de busca do preco e a do plano trimestral", () => {
+    expect(config.cobranca.precoLookupKey).toBe("roteiros_trimestral");
   });
 });

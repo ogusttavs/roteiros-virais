@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "checar-texto": "tsx scripts/checar-texto.ts",
     "medir:gramatica": "tsx scripts/medir-gramatica.ts",
+    "stripe:preparar": "tsx scripts/stripe-preparar.ts",
     "gerar:regras-copy-roteiro": "tsx scripts/gerar-regras-copy-roteiro.ts",
     "checar-tokens": "tsx scripts/checar-tokens.ts",
     "checar-versao-prompt": "tsx scripts/checar-versao-prompt.ts",
@@ -85,6 +86,7 @@
     "react-dom": "^19.2.8",
     "resend": "^6.25.0",
     "rss-parser": "^3.13.0",
+    "stripe": "23.0.0",
     "undici": "^7.30.0",
     "web-push": "^3.6.7",
     "zod": "^4.5.4"

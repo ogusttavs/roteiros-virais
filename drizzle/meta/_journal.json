@@ -610,6 +610,13 @@
       "when": 1791700619525,
       "tag": "0086_roteiro-longo",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1792691375476,
+      "tag": "0087_assinatura-stripe",
+      "breakpoints": true
     }
   ]
 }

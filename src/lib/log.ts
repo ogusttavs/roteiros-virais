@@ -32,12 +32,14 @@
 import pino from "pino";
 
 const PADRAO_TOKEN_META = /EAA[A-Za-z0-9]+/g;
+/** E22: chave do Stripe (`sk_`, `rk_` ou `pk_`, de teste ou de producao) e segredo do webhook (`whsec_`): nunca aparecem em log, nem numa mensagem de erro do SDK. */
+const PADRAO_CHAVE_STRIPE = /\b(?:sk|rk|pk)_(?:test|live)_[A-Za-z0-9]+|\bwhsec_[A-Za-z0-9]+/g;
 const PADRAO_CREDENCIAL_PROXY = /(:\/\/)[^/\s@]+:[^/\s@]+@/g;
 const MASCARA = "***token mascarado***";
 
 export function mascararSegredos(valor: unknown): unknown {
   if (typeof valor === "string") {
-    return valor.replace(PADRAO_TOKEN_META, MASCARA).replace(PADRAO_CREDENCIAL_PROXY, `$1${MASCARA}@`);
+    return valor.replace(PADRAO_TOKEN_META, MASCARA).replace(PADRAO_CHAVE_STRIPE, MASCARA).replace(PADRAO_CREDENCIAL_PROXY, `$1${MASCARA}@`);
   }
   if (Array.isArray(valor)) return valor.map(mascararSegredos);
   if (valor instanceof Error) {

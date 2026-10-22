@@ -436,6 +436,11 @@ export async function definirPlano(clienteId: number, plano: PlanoMarca): Promis
   await db().update(clientes).set({ plano }).where(eq(clientes.id, clienteId));
 }
 
+/** E22 PR 1: o admin liga ou desliga a cortesia de uma marca (usa sem assinar quando o portao da cobranca esta ligado). */
+export async function definirCortesia(clienteId: number, cortesia: boolean): Promise<void> {
+  await db().update(clientes).set({ cortesia }).where(eq(clientes.id, clienteId));
+}
+
 /**
  * Trocar o tipo de conteúdo de uma marca (P1, item 1): as doze perguntas do
  * negócio e as da pessoa têm o mesmo id, mas enunciados diferentes, então

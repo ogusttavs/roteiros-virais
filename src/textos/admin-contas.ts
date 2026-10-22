@@ -1,4 +1,5 @@
 import type { EstadoDoDia } from "@/servicos/admin-contas";
+import type { ResumoDaCobranca } from "@/servicos/assinatura";
 
 /**
  * Textos do Início, da lista de Contas e da página da conta no admin (E46 PR 1, passo 15 do Opus: `AdminInicio.dc.html`, `AdminClientes.dc.html`, `AdminCliente.dc.html`).
@@ -25,6 +26,23 @@ export function quandoPorExtenso(d: Date, agora: Date = new Date()): string {
   if (dia(d) === dia(new Date(agora.getTime() - 24 * 60 * 60 * 1000))) return `ontem às ${hora}`;
   const curto = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" }).format(d);
   return `${curto} às ${hora}`;
+}
+
+/** E22 PR 1: a frase curta do estado da cobrança de uma conta (a coluna "Assinatura" da lista e o bloco da página da conta). Cortesia vence; sem cortesia, vale o estado da assinatura que conta. */
+export function rotuloDaCobranca(c: ResumoDaCobranca): string {
+  const t = textosContasAdmin.assinatura;
+  if (c.cortesia) return t.cortesia;
+  const a = c.assinatura;
+  if (!a) return t.nenhuma;
+  const data = (d: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "2-digit" }).format(d);
+  if (a.vale) {
+    if (a.status === "past_due") return t.atrasada;
+    if (a.cancelaNoFimDoPeriodo && a.periodoFim) return t.cancelaEm(data(a.periodoFim));
+    return a.periodoFim ? t.ativaAte(data(a.periodoFim)) : t.ativa;
+  }
+  if (a.status === "canceled" || a.status === "paused") return t.cancelada;
+  if (a.status === "incomplete" || a.status === "incomplete_expired") return t.incompleta;
+  return t.atrasada;
 }
 
 export function reais(valor: number): string {
@@ -147,7 +165,18 @@ export const textosContasAdmin = {
     doQueParou: "nada há 4 dias ou mais",
     doQueNaoEntrou: "ninguém abriu o aplicativo",
   },
-  colunas: { conta: "Conta", pessoas: "Pessoas", briefing: "Briefing", ultimos7: "Últimos 7 dias", ultimo: "Último roteiro", instalou: "Instalou", push: "Push", abrir: "Abrir" },
+  colunas: { conta: "Conta", pessoas: "Pessoas", briefing: "Briefing", assinatura: "Assinatura", ultimos7: "Últimos 7 dias", ultimo: "Último roteiro", instalou: "Instalou", push: "Push", abrir: "Abrir" },
+  /** E22 PR 1: o estado da cobrança de uma conta na lista (cortesia, assinatura que vale, atrasada, cancelada). */
+  assinatura: {
+    cortesia: "Cortesia",
+    ativa: "Ativa",
+    ativaAte: (data: string) => `Ativa até ${data}`,
+    cancelaEm: (data: string) => `Cancela em ${data}`,
+    atrasada: "Pagamento atrasado",
+    cancelada: "Cancelada",
+    incompleta: "Não concluída",
+    nenhuma: "Sem assinatura",
+  },
   tipo: { negocio: "Empresa", pessoa: "Pessoal" } as const,
   semRamo: "sem ramo",
   semNota: "sem nota",
@@ -214,6 +243,11 @@ export const textosContaAdmin = {
     tetoDoMes: "Teto de custo do mês",
     tetoDoMesTexto: (usd: string, reaisTexto: string) => `${usd} (${reaisTexto}), igual para todas as contas`,
     tetoNota: "Hoje o teto é o mesmo para todas as contas; trocar por conta vem depois.",
+    cortesia: "Cortesia",
+    cortesiaNota: "Usa o aplicativo sem assinar. Só faz diferença quando a cobrança está ligada.",
+    cortesiaSalva: "Salvo",
+    cortesiaErro: "Não deu para salvar. A cortesia continua como estava.",
+    assinatura: "Assinatura",
   },
   trocar: {
     ramoTitulo: (nome: string) => `Trocar o ramo de ${nome}`,
@@ -246,7 +280,7 @@ export const textosContaAdmin = {
   registro: {
     titulo: "O que o admin trocou aqui",
     vazio: "Nenhuma troca registrada nesta conta.",
-    campo: { ramo: "Ramo", tipo: "Tipo", rede_principal: "Rede principal", publico: "Público", roteiros_por_dia: "Roteiros por dia" } as Record<string, string>,
+    campo: { ramo: "Ramo", tipo: "Tipo", rede_principal: "Rede principal", publico: "Público", roteiros_por_dia: "Roteiros por dia", cortesia: "Cortesia" } as Record<string, string>,
     frase: (campo: string, antes: string | null, depois: string | null) => `${campo}: de ${antes ?? "nada"} para ${depois ?? "nada"}`,
     quem: (nome: string | null) => nome ?? "alguém da equipe",
   },

@@ -2,10 +2,11 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 
 import { ramoPorSlug } from "@/config/ramos";
 import { db } from "@/db";
-import { alteracoesDoAdmin, type AlteracaoDoAdmin, briefings, clientes, membrosMarca, nichos, roteiros, session, user, type TipoMarca } from "@/db/schema";
+import { alteracoesDoAdmin, type AlteracaoDoAdmin, assinaturas, briefings, clientes, membrosMarca, nichos, roteiros, session, user, type TipoMarca } from "@/db/schema";
 import { hojeISO } from "@/lib/config";
 import { diasDoPeriodo } from "@/servicos/admin-acompanhamento";
 import { listarClientesAdmin, type ClienteAdmin } from "@/servicos/admin-coleta";
+import { resumirCobranca, type ResumoDaCobranca } from "@/servicos/assinatura";
 
 /** O que a conta fez em um dia (E46 PR 1, `AdminClientes.dc.html`): gravou, gerou roteiro, só entrou, ou nada. Vale o mais forte do dia. */
 export type EstadoDoDia = "gravou" | "gerou" | "entrou" | "nada";
@@ -26,6 +27,8 @@ export type ContaAdmin = ClienteAdmin & {
   /** O estado do briefing para a lista: sem ele, incompleto (quantas das 12 respondidas), completo com a nota acima ou abaixo do mínimo. */
   briefingEstado: { tipo: "sem" } | { tipo: "incompleto"; respondidas: number } | { tipo: "pronto"; nota: number; abaixo: boolean };
   ultimos7: { dia: string; estado: EstadoDoDia }[];
+  /** E22 PR 1: a cortesia e a assinatura que conta (a lista mostra o estado, o admin liga a cortesia na página da conta). */
+  cobranca: ResumoDaCobranca;
   /** Ninguém da conta abriu o aplicativo até hoje. */
   nuncaEntrou: boolean;
   usando: boolean;
@@ -92,9 +95,9 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
   const dias = diasDoPeriodo(7, agora);
   const desde = new Date(agora.getTime() - 8 * 24 * 60 * 60 * 1000);
 
-  const [detalhes, pessoas, roteirosDosDias, sessoes, briefingsDeTodos] = await Promise.all([
+  const [detalhes, pessoas, roteirosDosDias, sessoes, briefingsDeTodos, assinaturasDeTodas] = await Promise.all([
     db()
-      .select({ id: clientes.id, tipo: clientes.tipo, ultimoAcessoEm: clientes.ultimoAcessoEm, ramoCatalogo: nichos.ramoCatalogo, nichoNome: nichos.nome, criadoEm: clientes.criadoEm })
+      .select({ id: clientes.id, tipo: clientes.tipo, cortesia: clientes.cortesia, ultimoAcessoEm: clientes.ultimoAcessoEm, ramoCatalogo: nichos.ramoCatalogo, nichoNome: nichos.nome, criadoEm: clientes.criadoEm })
       .from(clientes)
       .leftJoin(nichos, eq(nichos.id, clientes.nichoId)),
     pessoasPorConta(),
@@ -123,6 +126,7 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
         respondidas: sql<number>`(select count(*)::int from jsonb_each_text(${briefings.respostas}) as r where btrim(r.value) <> '')`,
       })
       .from(briefings),
+    db().select().from(assinaturas).orderBy(desc(assinaturas.criadoEm), desc(assinaturas.id)),
   ]);
 
   const roteirosPorConta = new Map<number, Map<string, { gravado: boolean }>>();
@@ -174,6 +178,11 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
       tipo: detalhe?.tipo ?? "negocio",
       ramoNome: ramo?.nome ?? detalhe?.nichoNome ?? null,
       quemTemAcesso: gente,
+      cobranca: resumirCobranca(
+        detalhe?.cortesia ?? false,
+        assinaturasDeTodas.filter((a) => a.clienteId === conta.id),
+        agora,
+      ),
       briefingEstado,
       ultimos7,
       nuncaEntrou,
@@ -187,7 +196,7 @@ export async function listarContasAdmin(agora: Date = new Date()): Promise<Conta
 // O registro das trocas do admin
 // ---------------------------------------------------------------------------
 
-export type CampoAlterado = "ramo" | "tipo" | "rede_principal" | "publico" | "roteiros_por_dia";
+export type CampoAlterado = "ramo" | "tipo" | "rede_principal" | "publico" | "roteiros_por_dia" | "cortesia";
 
 /** Acrescenta uma linha ao registro (quem, o quê, quando). Nunca derruba a troca de quem chama: a troca já valeu, o registro que falhar deixa rastro no log. */
 export async function registrarAlteracao(dado: { clienteId: number; porUsuarioId: string | null; campo: CampoAlterado; antes: string | null; depois: string | null }): Promise<void> {

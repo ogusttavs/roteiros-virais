@@ -88,4 +88,16 @@ describe("mascararSegredos", () => {
   it("nao mexe numa url sem credencial nenhuma", () => {
     expect(mascararSegredos("http://proxy.dataimpulse.com:823")).toBe("http://proxy.dataimpulse.com:823");
   });
+
+  it("E22: mascara chave do Stripe (teste e producao, restrita ou secreta) e segredo de webhook, em qualquer lugar do texto", () => {
+    const texto = "Invalid API Key provided: rk_test_ABCdef123 e sk_live_XYZ789; whsec_Segredo123 tambem";
+    const saida = mascararSegredos(texto) as string;
+    expect(saida).not.toMatch(/rk_test_|sk_live_|whsec_/);
+    expect(saida).toContain("Invalid API Key provided: ***token mascarado***");
+    expect(mascararSegredos(new Error("falhou com pk_test_Zzz"))).toMatchObject({ mensagem: "falhou com ***token mascarado***" });
+  });
+
+  it("E22: nao mascara palavra que so parece (ask_test_x nao e chave)", () => {
+    expect(mascararSegredos("ask_test_x e task_live_y")).toBe("ask_test_x e task_live_y");
+  });
 });

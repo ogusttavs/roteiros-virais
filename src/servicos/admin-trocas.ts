@@ -1,7 +1,7 @@
 import type { Alcance, Plataforma, PlanoMarca, TipoMarca } from "@/db/schema";
 import { logger } from "@/lib/log";
 import { registrarAlteracao, type CampoAlterado } from "@/servicos/admin-contas";
-import { clientePorId, definirPlano, mudarTipoMarca, salvarOndeConta, salvarRamoConta, salvarRedePrincipal, ErroCliente } from "@/servicos/clientes";
+import { clientePorId, definirCortesia, definirPlano, mudarTipoMarca, salvarOndeConta, salvarRamoConta, salvarRedePrincipal, ErroCliente } from "@/servicos/clientes";
 import { ramoAtualDoCliente } from "@/servicos/ramos";
 
 /**
@@ -73,4 +73,12 @@ export async function trocarPlanoDaConta(clienteId: number, plano: PlanoMarca, p
   if (!antes) throw new ErroCliente("conta nao encontrada.");
   await definirPlano(clienteId, plano);
   await anotar(clienteId, porUsuarioId, "roteiros_por_dia", NOME_DO_PLANO[antes.plano], NOME_DO_PLANO[plano]);
+}
+
+/** E22 PR 1: liga ou desliga a cortesia da conta (usa o aplicativo sem assinar). Deixa uma linha no registro, como as outras trocas. */
+export async function trocarCortesiaDaConta(clienteId: number, cortesia: boolean, porUsuarioId: string): Promise<void> {
+  const antes = await clientePorId(clienteId);
+  if (!antes) throw new ErroCliente("conta nao encontrada.");
+  await definirCortesia(clienteId, cortesia);
+  await anotar(clienteId, porUsuarioId, "cortesia", antes.cortesia ? "sim" : "não", cortesia ? "sim" : "não");
 }
