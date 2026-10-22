@@ -29,6 +29,13 @@ import type { PorQueDoBloco } from "@/lib/por-que-do-bloco";
 const id = () => integer("id").primaryKey().generatedAlwaysAsIdentity();
 const criadoEm = () => timestamp("criado_em", { withTimezone: true }).notNull().defaultNow();
 
+/** Coluna bytea (Drizzle nao tem um tipo pronto para ela): a capa guardada do video (`capas_video`). */
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
 /** Coluna tsvector (Drizzle nao tem um tipo pronto para ela). */
 const tsvector = customType<{ data: string }>({
   dataType() {
@@ -2592,6 +2599,31 @@ export const eventosStripe = pgTable(
   (t) => [uniqueIndex("eventos_stripe_evento").on(t.eventoId)],
 );
 export type EventoStripe = typeof eventosStripe.$inferSelect;
+
+/**
+ * A capa do vídeo guardada do nosso lado (hotfix de 22/10/2026). O link da capa do Instagram (`videos.capa_url`) é um link assinado do CDN da Meta e vence em dias; um vídeo coletado em 01/10 já devolvia 403
+ * em 22/10 e a Referência virava um quadro preto. Aqui fica uma linha por vídeo: `guardada` com os bytes do JPEG como vieram (teto de 300 KB, `servicos/capas.ts`), ou `vencida` quando o link já não
+ * abre (sem bytes; a tela mostra o embed ou um quadro neutro, nunca preto); `grande` quando passou do teto e não coube (a tela usa o link enquanto ele vale); `tentando` quando a rede falhou e o job volta
+ * a tentar. Quando uma recoleta traz um link novo (`url_tentada` diferente do `capa_url`), o job tenta de novo, mesmo se a anterior venceu. Capa de vídeo é dado público da plataforma, igual para todas as marcas; a rota `/api/capa/<videoId>` só serve a quem está logado.
+ */
+export type SituacaoDaCapa = "guardada" | "vencida" | "grande" | "tentando";
+
+export const capasVideo = pgTable("capas_video", {
+  videoId: integer("video_id")
+    .primaryKey()
+    .references(() => videos.id, { onDelete: "cascade" }),
+  situacao: text("situacao").$type<SituacaoDaCapa>().notNull(),
+  /** O tipo da imagem como a plataforma devolveu ("image/jpeg"); nulo quando a capa venceu. */
+  tipo: text("tipo"),
+  bytes: bytea("bytes"),
+  /** O link que o job tentou por último; se o `capa_url` do vídeo mudar (recoleta com link novo), vale tentar de novo. */
+  urlTentada: text("url_tentada"),
+  /** Quantas vezes o link já foi tentado sem dar certo por motivo passageiro (rede, 5xx): depois do teto o job desiste e marca vencida. */
+  tentativas: integer("tentativas").notNull().default(0),
+  criadoEm: criadoEm(),
+  atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+});
+export type CapaVideo = typeof capasVideo.$inferSelect;
 
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;

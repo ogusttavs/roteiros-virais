@@ -27,6 +27,7 @@ export function formatarVideo(v: VideoReferencia, nomesDosAlternativos: Map<numb
   return {
     id: v.id,
     url: v.url,
+    plataforma: v.plataforma,
     multiplo: formatarMultiplo(v.foraDaCurva),
     rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
     faixaMultiplo: faixa,

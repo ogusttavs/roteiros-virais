@@ -116,6 +116,7 @@ function longoComoVideoFormatado(v: LongoParaATela, segundo: number | null): Vid
   return {
     id: v.id,
     url: v.url,
+    plataforma: "youtube",
     multiplo: formatarMultiplo(v.foraDaCurva),
     rotuloMultiplo: rotuloMultiploConta(faixa, v.contaMedianaOrigem),
     faixaMultiplo: faixa,

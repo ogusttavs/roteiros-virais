@@ -31,6 +31,7 @@ import { rodarExtrairColeta } from "./extrair-coleta";
 import { rodarExtrairSemFala } from "./extrair-sem-fala";
 import { rodarFaxinaDasVersoes } from "./faxina-versoes";
 import { FILAS } from "./fila";
+import { rodarGuardarCapas } from "./guardar-capas";
 import { rodarLembrete } from "./lembrete";
 import { rodarLerLongos } from "./ler-longos";
 import { rodarMetaContas } from "./meta-contas";
@@ -66,6 +67,7 @@ export const TAREFAS: Record<string, (execucaoId: number) => Promise<Record<stri
   [FILAS.metaContas]: () => rodarMetaContas(),
   [FILAS.metaHashtags]: () => rodarMetaHashtags(),
   [FILAS.descobertaInstagram]: () => rodarDescobertaInstagram(),
+  [FILAS.guardarCapas]: () => rodarGuardarCapas(),
   [FILAS.pontuar]: () => rodarPontuar(),
   [FILAS.vigilancia]: () => rodarVigilancia(),
   [FILAS.transcrever]: () => {
