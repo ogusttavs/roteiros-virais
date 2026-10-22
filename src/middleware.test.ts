@@ -34,6 +34,16 @@ describe("middleware", () => {
     expect(foiRedirecionada(middleware(requisicao("/dados")))).toBe(false);
   });
 
+  it("/redefinir-senha passa sem cookie de sessao (o link do e-mail de esqueci a senha, E58)", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/redefinir-senha?token=abc")))).toBe(false);
+  });
+
+  it("/trocar-senha exige sessao (E58: so quem entrou escolhe a senha do primeiro acesso)", () => {
+    vi.mocked(getSessionCookie).mockReturnValue(null);
+    expect(foiRedirecionada(middleware(requisicao("/trocar-senha")))).toBe(true);
+  });
+
   it("/api/jobs/[nome] passa sem cookie de sessao (autenticacao propria por x-jobs-key)", () => {
     vi.mocked(getSessionCookie).mockReturnValue(null);
     expect(foiRedirecionada(middleware(requisicao("/api/jobs/coleta-noticias")))).toBe(false);

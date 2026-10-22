@@ -96,3 +96,8 @@
 .linkAcao + .erroAviso {
   margin-top: var(--espaco-2);
 }
+
+/* Dois links de acao seguidos ("esqueci a senha" e "entrar sem senha"): o segundo cola no primeiro. */
+.linkAcao + .linkAcao {
+  margin-top: 0;
+}

@@ -1,0 +1,58 @@
+/** E58: o cartão "Senha" da Conta. Mesmo cartão e mesma letra de "Instalar no celular" (`InstalarNoCelular.module.css`). */
+
+.senha {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-3);
+  margin-top: var(--espaco-6);
+}
+
+.titulo {
+  margin: 0;
+  font-size: var(--tamanho-secundario);
+  font-weight: 600;
+  color: var(--cor-titulo);
+}
+
+.explica {
+  margin: 0;
+  color: var(--cor-texto-suave);
+  font-size: var(--tamanho-secundario);
+}
+
+.abrir {
+  align-self: flex-start;
+}
+
+.forma {
+  display: flex;
+  flex-direction: column;
+  gap: var(--espaco-5);
+  margin-top: var(--espaco-2);
+}
+
+.erro {
+  margin: 0;
+  color: var(--cor-erro);
+  font-size: var(--tamanho-secundario);
+  text-wrap: pretty;
+}
+
+.acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--espaco-4);
+}
+
+.cancelar {
+  padding: var(--espaco-2) 0;
+  min-height: var(--altura-toque);
+  background: none;
+  border: none;
+  color: var(--cor-acao);
+  font-family: var(--fonte-texto);
+  font-size: var(--tamanho-secundario);
+  text-decoration: underline;
+  cursor: pointer;
+}
