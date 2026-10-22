@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 
+import { reagirAErroDeTela } from "@/lib/versao";
 import { textosReferencias } from "@/textos/referencias";
 import { Botao } from "@/ui/componentes/Botao";
 
@@ -17,6 +18,8 @@ export default function ErroReferencias({ error, reset }: { error: Error & { dig
 
   useEffect(() => {
     captureException(error);
+    // Pagina de uma versao anterior depois de uma subida: recarrega sozinha (src/lib/versao.ts).
+    reagirAErroDeTela(error);
   }, [error]);
 
   return (

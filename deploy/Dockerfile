@@ -20,6 +20,11 @@ ENV AI_PROVIDER=mock
 # A coleta de paginas do build cria o pool do Postgres (sem conectar); precisa
 # de uma URL, qualquer uma. A de verdade so entra em runtime, pelo .env da VPS.
 ENV DATABASE_URL=postgres://build:build@localhost:5432/build
+# O sha do commit entra no JavaScript do navegador (next.config.ts, NEXT_PUBLIC_VERSAO): a pagina que
+# ficou aberta durante uma subida percebe que e de outra versao e se recarrega (src/lib/versao.ts). Fica
+# logo antes do build para nao invalidar o cache das camadas de cima.
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 # mkdir -p e so defesa (a pasta public/ existe de verdade desde a V5, a marca e os icones).
 RUN mkdir -p public && npm run build
 

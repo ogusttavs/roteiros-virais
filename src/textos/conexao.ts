@@ -14,6 +14,8 @@ export const textosConexao = {
   precisaDeConexao: "Precisa de conexão.",
   /** Uma acao que chamou o servidor e a rede caiu: o que foi digitado continua na tela. */
   falhaDeRede: "Sem conexão agora. O que você escreveu continua aqui; tente de novo quando a rede voltar.",
+  /** O aplicativo foi atualizado enquanto a pagina estava aberta: a pagina recarrega sozinha (nada do que ficou guardado se perde). */
+  versaoNova: "O aplicativo foi atualizado. Carregando a versão nova.",
   /**
    * Uma acao que CRIA algo (escrever o roteiro, reescrever, salvar o link do
    * video) e a conexao caiu: o servidor pode ter terminado antes de a resposta
