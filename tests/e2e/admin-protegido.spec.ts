@@ -200,4 +200,14 @@ test.describe("admin: as paginas conferem o papel antes de consultar", () => {
     expect(dados.ok).toBe(true);
     expect(typeof dados.marcasAtivas).toBe("number");
   });
+
+  // Hotfix de 22/10/2026: a pagina aberta pergunta aqui a versao do servidor (src/lib/versao.ts), sem sessao, e a rota so devolve o sha do commit.
+  test("versao: sem sessao devolve 200, sem cache, e so o sha", async ({ request }) => {
+    const resposta = await request.get("/api/versao");
+    expect(resposta.status()).toBe(200);
+    expect(resposta.headers()["cache-control"]).toContain("no-store");
+    const dados = await resposta.json();
+    expect(Object.keys(dados)).toEqual(["versao"]);
+    expect(typeof dados.versao).toBe("string");
+  });
 });

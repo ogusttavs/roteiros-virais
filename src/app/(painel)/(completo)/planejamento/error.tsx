@@ -5,6 +5,7 @@ import { AlertTriangle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useTransition } from "react";
 
+import { reagirAErroDeTela } from "@/lib/versao";
 import { textosHoje } from "@/textos/hoje";
 import { textosPlanejamento } from "@/textos/planejamento";
 import { BarraTopo } from "@/ui/componentes/BarraTopo";
@@ -73,6 +74,8 @@ export default function ErroPlanejamento({ error, reset }: { error: Error & { di
 
   useEffect(() => {
     captureException(error);
+    // Pagina de uma versao anterior depois de uma subida: recarrega sozinha (src/lib/versao.ts).
+    reagirAErroDeTela(error);
   }, [error]);
 
   function tentarDeNovo() {

@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext } from "react";
 
 import { ehFalhaDeRede } from "@/lib/offline";
 import { ErroDeAcao } from "@/lib/resultado-acao";
+import { ehSinalDeVersaoNova, recarregarPorVersaoNova } from "@/lib/versao";
 import { textosConexao } from "@/textos/conexao";
 
 /**
@@ -51,6 +52,11 @@ export function useTratarFalha(): (erro: unknown, padrao: string, aoCair?: strin
     (erro: unknown, padrao: string, aoCair: string = textosConexao.falhaDeRede) => {
       // A frase que o servidor mandou para a pessoa (`dadoOuErro`) vale mais que o texto genérico do lugar.
       if (erro instanceof ErroDeAcao) return erro.message;
+      // Versao nova do aplicativo (o servidor nao conhece a acao): a pagina recarrega, e isso nao e rede caida.
+      if (ehSinalDeVersaoNova(erro)) {
+        recarregarPorVersaoNova();
+        return textosConexao.versaoNova;
+      }
       if (!ehFalhaDeRede(erro)) return padrao;
       avisarFalhaDeRede();
       return aoCair;
