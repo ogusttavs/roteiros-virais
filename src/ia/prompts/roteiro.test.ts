@@ -590,7 +590,7 @@ describe("as proibições do briefing como aviso quando o tema é da própria pe
   });
 
   it("a entrada leva o aviso logo depois do tema só quando pedido (e nunca no roteiro do momento)", () => {
-    const base = { tema: "analogia de eleição", objetivo: "alcance" as const, formato: "reels" as const, estilo: "falado" as const, evidencias: [], roteirosRecentes: [], instrucaoAbertura: { tipo: null, tiposProibidos: [] } };
+    const base = { tema: "analogia de eleição", objetivo: OBJETIVOS_EM_ORDEM[0], formato: "reels" as const, estilo: "falado" as const, evidencias: [], roteirosRecentes: [], instrucaoAbertura: { tipo: null, tiposProibidos: [] } };
     const sem = montarEntrada(base);
     const com = montarEntrada({ ...base, proibicoesComoAviso: ["política"] });
     expect(sem).not.toContain("uma preferência, não uma proibição");
