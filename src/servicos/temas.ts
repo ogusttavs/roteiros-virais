@@ -11,6 +11,8 @@ import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   avaliacoesTema,
+  briefings,
+  clientes,
   nichos,
   rascunhosTemaLivre,
   roteiros,
@@ -386,9 +388,28 @@ export function marcaDoTexto(texto: string): string {
 
 export type RascunhoComNota = { texto: string; nota: ResultadoAvaliarTema | null; avaliadaEm: Date | null };
 
+/** O que se grava em `rascunhos_tema_livre.avaliacao`: a nota e o contexto em que ela foi feita (ver `contextoDaNota`). */
+type NotaGuardada = { contexto: string; resultado: ResultadoAvaliarTema };
+
 /**
- * O rascunho com a nota que ele guarda (item 3 do hotfix de 22/10/2026). A nota só vem se é DESTE texto (a marca bate com a do texto de agora) e ainda vale (`VALIDADE_DA_NOTA_GUARDADA_MS`);
- * senão, `nota` é nulo e a tela pede para avaliar. `agora` é injetável, para o teste não depender do relógio.
+ * O contexto de que a nota depende além do texto: o ramo principal da marca, os ramos alternativos que o admin ligou e a última vez que o briefing foi editado. Mudou qualquer um (o admin ligou um
+ * ramo, a pessoa editou uma resposta do briefing), a nota guardada deixa de valer e o texto é avaliado de novo: a nota nunca é mostrada como de um contexto que já não existe.
+ */
+export async function contextoDaNota(clienteId: number): Promise<string> {
+  const [[marca], alternativos, [briefing]] = await Promise.all([
+    db().select({ nichoId: clientes.nichoId }).from(clientes).where(eq(clientes.id, clienteId)),
+    ramosAlternativosDaMarca(clienteId),
+    db().select({ atualizadoEm: briefings.atualizadoEm }).from(briefings).where(eq(briefings.clienteId, clienteId)),
+  ]);
+  const ramos = alternativos.map((a) => a.nichoId).sort((a, b) => a - b);
+  return createHash("sha256")
+    .update(JSON.stringify([marca?.nichoId ?? null, ramos, briefing?.atualizadoEm?.toISOString() ?? null]))
+    .digest("hex");
+}
+
+/**
+ * O rascunho com a nota que ele guarda (item 3 do hotfix de 22/10/2026). A nota só vem se é DESTE texto (a marca bate com a do texto de agora), se foi feita no contexto de agora
+ * (`contextoDaNota`) e ainda vale (`VALIDADE_DA_NOTA_GUARDADA_MS`); senão, `nota` é nulo e a tela pede para avaliar. `agora` é injetável, para o teste não depender do relógio.
  */
 export async function rascunhoComNotaTemaLivre(usuarioId: string, clienteId: number, agora: Date = new Date()): Promise<RascunhoComNota | null> {
   const [linha] = await db()
@@ -396,8 +417,10 @@ export async function rascunhoComNotaTemaLivre(usuarioId: string, clienteId: num
     .from(rascunhosTemaLivre)
     .where(and(eq(rascunhosTemaLivre.usuarioId, usuarioId), eq(rascunhosTemaLivre.clienteId, clienteId)));
   if (!linha) return null;
-  const vale = linha.avaliacao !== null && linha.avaliadaEm !== null && linha.marca === marcaDoTexto(linha.texto) && agora.getTime() - linha.avaliadaEm.getTime() <= VALIDADE_DA_NOTA_GUARDADA_MS;
-  return { texto: linha.texto, nota: vale ? (linha.avaliacao as ResultadoAvaliarTema) : null, avaliadaEm: vale ? linha.avaliadaEm : null };
+  const guardada = linha.avaliacao as NotaGuardada | null;
+  const dentroDoPrazo = linha.avaliadaEm !== null && agora.getTime() - linha.avaliadaEm.getTime() <= VALIDADE_DA_NOTA_GUARDADA_MS;
+  const vale = guardada !== null && dentroDoPrazo && linha.marca === marcaDoTexto(linha.texto) && guardada.contexto === (await contextoDaNota(clienteId));
+  return { texto: linha.texto, nota: vale ? guardada.resultado : null, avaliadaEm: vale ? linha.avaliadaEm : null };
 }
 
 /**
@@ -415,6 +438,7 @@ export async function notaGuardadaDoTexto(usuarioId: string, clienteId: number, 
  */
 export async function guardarNotaNoRascunho(usuarioId: string, clienteId: number, texto: string, nota: ResultadoAvaliarTema): Promise<void> {
   const marca = marcaDoTexto(texto);
+  const guardada: NotaGuardada = { contexto: await contextoDaNota(clienteId), resultado: nota };
   const [linha] = await db()
     .select({ texto: rascunhosTemaLivre.texto })
     .from(rascunhosTemaLivre)
@@ -423,10 +447,10 @@ export async function guardarNotaNoRascunho(usuarioId: string, clienteId: number
   const agora = new Date();
   await db()
     .insert(rascunhosTemaLivre)
-    .values({ usuarioId, clienteId, texto, atualizadoEm: agora, avaliacao: nota, avaliacaoMarca: marca, avaliadaEm: agora })
+    .values({ usuarioId, clienteId, texto, atualizadoEm: agora, avaliacao: guardada, avaliacaoMarca: marca, avaliadaEm: agora })
     .onConflictDoUpdate({
       target: [rascunhosTemaLivre.usuarioId, rascunhosTemaLivre.clienteId],
-      set: { avaliacao: nota, avaliacaoMarca: marca, avaliadaEm: agora },
+      set: { avaliacao: guardada, avaliacaoMarca: marca, avaliadaEm: agora },
     });
 }
 

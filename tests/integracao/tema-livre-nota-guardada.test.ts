@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/sessao", () => ({ sessaoAtual: vi.fn() }));
 
 import { db, getPool } from "@/db";
-import { briefings, clientes, geracoesIA, membrosMarca, nichos, rascunhosTemaLivre, user, type PerfilCompilado } from "@/db/schema";
+import { briefings, clientes, geracoesIA, membrosMarca, nichos, ramosDaConta, rascunhosTemaLivre, user, type PerfilCompilado } from "@/db/schema";
 import { verificarLocalmente } from "@/ia/verificador";
 import { sessaoAtual } from "@/lib/sessao";
 import { limparNotaDoRascunhoSeForDoTexto, marcaDoTexto, notaGuardadaDoTexto, rascunhoComNotaTemaLivre, VALIDADE_DA_NOTA_GUARDADA_MS } from "@/servicos/temas";
@@ -153,6 +153,36 @@ describe("a nota do tema fica guardada com o rascunho (item 3)", () => {
     expect(await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id)).toBeNull();
     const linhas = await db().select({ id: rascunhosTemaLivre.id }).from(rascunhosTemaLivre).where(eq(rascunhosTemaLivre.clienteId, marca.id));
     expect(linhas).toHaveLength(0);
+  });
+
+  it("a nota é do contexto em que foi feita: o admin ligar um ramo alternativo, ou a pessoa editar o briefing, invalida a nota guardada (o Tema livre volta para o formulário e avalia de novo)", async () => {
+    await descartarTemaLivreAction();
+    const texto = "como montar um cardapio de marmita para a semana";
+    await salvarRascunhoAction(texto);
+    await avaliarTemaAction(texto);
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).not.toBeNull();
+
+    // O admin liga um ramo alternativo: a nota velha (sem a prova do ramo novo) deixa de valer.
+    const [outroRamo] = await db().insert(nichos).values({ slug: "nota-guardada-ramo-2", nome: "Outro ramo", termos: [] }).returning();
+    await db().insert(ramosDaConta).values({ clienteId: marca.id, nichoId: outroRamo.id });
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).toBeNull();
+    expect(await notaGuardadaDoTexto("nota-guardada-dono", marca.id, texto)).toBeNull();
+    // O texto continua lá, e avaliar de novo chama a IA e guarda a nota do contexto novo.
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.texto).toBe(texto);
+    const antes = await quantasAvaliacoes();
+    expect((await avaliarTemaAction(texto)).ok).toBe(true);
+    expect(await quantasAvaliacoes()).toBe(antes + 1);
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).not.toBeNull();
+
+    // A pessoa edita o briefing: idem.
+    await db().update(briefings).set({ atualizadoEm: new Date(Date.now() + 5_000) }).where(eq(briefings.clienteId, marca.id));
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).toBeNull();
+    await avaliarTemaAction(texto);
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).not.toBeNull();
+
+    // O ramo desligado volta ao contexto de antes do ramo: a nota de agora (com o ramo) também deixa de valer.
+    await db().delete(ramosDaConta).where(eq(ramosDaConta.clienteId, marca.id));
+    expect((await rascunhoComNotaTemaLivre("nota-guardada-dono", marca.id))?.nota).toBeNull();
   });
 
   it("a marca do texto ignora caixa, acento solto e espaço sobrando, mas não uma palavra a mais", () => {
