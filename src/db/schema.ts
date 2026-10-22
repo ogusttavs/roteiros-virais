@@ -279,6 +279,11 @@ export const clientes = pgTable("clientes", {
    * Referências.
    */
   redePrincipal: text("rede_principal").$type<Plataforma>(),
+  /**
+   * E22 PR 1 (22/10/2026): marca que usa sem pagar (a do Gustavo, a do Bruno, as de teste). Só vale quando o portão da cobrança está ligado
+   * (`COBRANCA_ATIVA`): ligado, a marca sem assinatura ativa e sem cortesia vai para `/assinar`. Quem liga e desliga é o admin, em `/admin/clientes/[id]`.
+   */
+  cortesia: boolean("cortesia").notNull().default(false),
   criadoEm: criadoEm(),
 });
 
@@ -2512,6 +2517,53 @@ export const versoesDoRoteiro = pgTable(
   (t) => [uniqueIndex("versoes_do_roteiro_grupo_ordem").on(t.grupo, t.ordem), index("versoes_do_roteiro_cliente").on(t.clienteId, t.criadoEm)],
 );
 export type VersaoDoRoteiro = typeof versoesDoRoteiro.$inferSelect;
+
+/**
+ * E22 PR 1: o estado da assinatura de uma marca no Stripe (plano trimestral, `escopo` 5.x / `PROXIMO.md`, E22). Uma linha por assinatura do Stripe (a marca pode ter uma cancelada
+ * e uma nova depois). Só guarda os ids e o estado que o webhook trouxe; nunca número de cartão. `ultimoEventoEm` é o `created` do evento que escreveu por último: um evento mais
+ * velho que ele não desfaz o mais novo (o Stripe não garante a ordem de entrega).
+ */
+export type StatusAssinatura = "incomplete" | "incomplete_expired" | "trialing" | "active" | "past_due" | "canceled" | "unpaid" | "paused";
+
+export const assinaturas = pgTable(
+  "assinaturas",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    status: text("status").$type<StatusAssinatura>().notNull(),
+    stripeClienteId: text("stripe_cliente_id").notNull(),
+    stripeAssinaturaId: text("stripe_assinatura_id").notNull(),
+    stripePrecoId: text("stripe_preco_id"),
+    periodoInicio: timestamp("periodo_inicio", { withTimezone: true }),
+    periodoFim: timestamp("periodo_fim", { withTimezone: true }),
+    /** A pessoa cancelou no portal e a assinatura vale até o fim do período já pago. */
+    cancelaNoFimDoPeriodo: boolean("cancela_no_fim_do_periodo").notNull().default(false),
+    ultimoEventoEm: timestamp("ultimo_evento_em", { withTimezone: true }).notNull(),
+    criadoEm: criadoEm(),
+    atualizadoEm: timestamp("atualizado_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("assinaturas_stripe_assinatura").on(t.stripeAssinaturaId), index("assinaturas_cliente").on(t.clienteId)],
+);
+export type Assinatura = typeof assinaturas.$inferSelect;
+
+/**
+ * E22 PR 1: os eventos do Stripe já tratados. O `eventoId` é único: o webhook insere aqui na mesma transação que trata o evento, e um evento repetido (o Stripe reenvia) bate
+ * no índice e não faz nada. Só entra evento nosso (com `metadata.produto = roteiros`); os do OdontoTech, que chegam na mesma conta, são ignorados sem deixar rastro.
+ */
+export const eventosStripe = pgTable(
+  "eventos_stripe",
+  {
+    id: id(),
+    eventoId: text("evento_id").notNull(),
+    tipo: text("tipo").notNull(),
+    recebidoEm: timestamp("recebido_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("eventos_stripe_evento").on(t.eventoId)],
+);
+export type EventoStripe = typeof eventosStripe.$inferSelect;
+
 export type AvaliacaoTema = typeof avaliacoesTema.$inferSelect;
 export type GeracaoIA = typeof geracoesIA.$inferSelect;
 export type ExecucaoJob = typeof execucoesJob.$inferSelect;

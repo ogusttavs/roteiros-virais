@@ -142,6 +142,21 @@ export const config = {
     privateKey: env("VAPID_PRIVATE_KEY"),
     subject: env("VAPID_SUBJECT"),
   },
+  /**
+   * E22 PR 1, a assinatura pelo Stripe (conta dividida com o OdontoTech: nunca tocar em produto, preço ou evento sem `metadata.produto = roteiros`).
+   * `ativa` é o portão: falso se a variável não for exatamente "1" (produção sobe desligada; quem liga é o Gustavo, depois de marcar as cortesias). Desligado,
+   * nada muda para ninguém, mas o webhook e o checkout continuam funcionando (dá para provar tudo antes de ligar).
+   * `provedor`: "mock" nos testes (vitest e Playwright forçam `STRIPE_PROVIDER=mock`) e sempre que o processo é do Vitest, mesmo com a chave de teste no `.env`;
+   * "stripe" só com `STRIPE_SECRET_KEY` preenchida. Nenhum teste chama o Stripe de verdade.
+   */
+  cobranca: {
+    ativa: env("COBRANCA_ATIVA") === "1",
+    provedor: (env("STRIPE_PROVIDER") === "mock" || process.env.VITEST ? "mock" : env("STRIPE_SECRET_KEY") ? "stripe" : "mock") as "stripe" | "mock",
+    stripeSecretKey: env("STRIPE_SECRET_KEY"),
+    webhookSecret: env("STRIPE_WEBHOOK_SECRET"),
+    /** A chave de busca do preço do plano trimestral no Stripe (criado por `scripts/stripe-preparar.ts`). */
+    precoLookupKey: "roteiros_trimestral",
+  },
   /** Contato mostrado em /termos e /privacidade (etapa 12, decisao 7). */
   emailContato: env("EMAIL_CONTATO", "contato@localhost"),
   /**
@@ -339,6 +354,9 @@ export function verificarSegredosDeProducao(
     MODO_E2E?: string;
     APP_URL?: string;
     BETTER_AUTH_URL?: string;
+    COBRANCA_ATIVA?: string;
+    STRIPE_SECRET_KEY?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
   } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
@@ -353,6 +371,19 @@ export function verificarSegredosDeProducao(
     throw new ErroConfiguracao(
       "JOBS_API_KEY ainda e o valor de exemplo do .env.example; gere uma chave de verdade antes de subir em producao.",
     );
+  }
+
+  /**
+   * E22 PR 1: o portão ligado sem a chave do Stripe ou sem o segredo do webhook mandaria toda marca sem cortesia para uma tela de pagar que não consegue cobrar (e
+   * recusaria todo evento). Melhor não subir do que subir assim.
+   */
+  if (env.COBRANCA_ATIVA === "1") {
+    if (!env.STRIPE_SECRET_KEY) {
+      throw new ErroConfiguracao("COBRANCA_ATIVA=1 exige STRIPE_SECRET_KEY; sem ela a tela de assinar nao consegue cobrar.");
+    }
+    if (!env.STRIPE_WEBHOOK_SECRET) {
+      throw new ErroConfiguracao("COBRANCA_ATIVA=1 exige STRIPE_WEBHOOK_SECRET; sem ele o webhook recusa todo evento e a assinatura nunca vira ativa.");
+    }
   }
 
   /**

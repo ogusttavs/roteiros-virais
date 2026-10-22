@@ -10,6 +10,7 @@ import {
   preferenciasDoUsuario,
   registrarAcessoHoje,
 } from "@/servicos/clientes";
+import { marcaPrecisaAssinar } from "@/servicos/assinatura";
 import { aparelhosSemFalha, pedidoDePushPodeAparecer } from "@/servicos/push";
 import { VERSAO_TERMOS_EM } from "@/textos/termos";
 import { PedidoDeAviso } from "@/ui/componentes/PedidoDeAviso";
@@ -33,6 +34,10 @@ import { ReinscreverAviso } from "../_casca/ReinscreverAviso";
  * ja tinha aceitado uma versao anterior (`aceitouTermosEm` mais antigo que
  * `VERSAO_TERMOS_EM`). Aceitar de novo so atualiza a data, nunca duplica a
  * linha (`aceitarTermos`, servicos/clientes.ts).
+ *
+ * E22 PR 1, o portao da cobranca: depois do briefing e dos termos (a pessoa conhece o produto e aceita os termos antes de pagar), a marca sem assinatura que
+ * vale e sem cortesia vai para `/assinar`. So com `COBRANCA_ATIVA=1`; desligado, `marcaPrecisaAssinar` devolve falso sem consultar o banco. O "ver como"
+ * nunca e barrado (o admin so le).
  */
 export default async function LayoutCompleto({ children }: { children: ReactNode }) {
   const sessao = await sessaoDoPainel();
@@ -56,6 +61,9 @@ export default async function LayoutCompleto({ children }: { children: ReactNode
   if (verComo) return <>{children}</>;
   if (!preferencias?.aceitouTermosEm || preferencias.aceitouTermosEm < VERSAO_TERMOS_EM) {
     return <FolhaAceiteTermos />;
+  }
+  if (await marcaPrecisaAssinar(cliente)) {
+    redirect("/assinar");
   }
 
   // E48 PR 2: o pedido de permissão do aviso de manhã (só aparece no aplicativo instalado, no celular, e uma vez: o navegador confere o resto). Só os aparelhos sem falha corrente contam (A2): a pessoa cuja inscrição já falha pode ser convidada a ligar de novo.

@@ -26,9 +26,11 @@ const ROTAS_PUBLICAS = ["/entrar", "/api/saude", "/termos", "/privacidade", "/da
  * cron, um servico externo ou uma Server Action do admin, nunca um navegador
  * logado. Achado rodando a etapa 6, parte 2, contra o servidor de verdade: os
  * testes chamam a funcao da rota direto, sem passar pelo middleware, entao
- * esse redirecionamento nunca tinha sido pego antes.
+ * esse redirecionamento nunca tinha sido pego antes. `/api/webhooks/stripe` (E22 PR 1)
+ * tambem: quem chama e o Stripe, sem cookie; a rota confere a assinatura do corpo com
+ * `STRIPE_WEBHOOK_SECRET` antes de qualquer coisa.
  */
-const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs"];
+const ROTAS_COM_AUTENTICACAO_PROPRIA = ["/api/jobs", "/api/webhooks/stripe"];
 
 /**
  * `/roteiros/[id]/imprimir` (roteiro em PDF, `PROXIMO.md`, acabamento do
