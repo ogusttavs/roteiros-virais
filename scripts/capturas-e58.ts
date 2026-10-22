@@ -64,6 +64,12 @@ async function fotografarPagina(page: Page, arquivo: string): Promise<void> {
 }
 
 async function fotografarElemento(page: Page, alvo: Locator, arquivo: string): Promise<void> {
+  // A barra de baixo e o que mais e fixo ficam por cima do recorte do celular: esconde.
+  await page.evaluate(() => {
+    for (const el of document.querySelectorAll<HTMLElement>("body *")) {
+      if (getComputedStyle(el).position === "fixed") el.style.visibility = "hidden";
+    }
+  });
   await alvo.scrollIntoViewIfNeeded();
   await page.waitForTimeout(250);
   await alvo.screenshot({ path: arquivo });

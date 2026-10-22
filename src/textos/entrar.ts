@@ -25,7 +25,6 @@ export const textosEntrar = {
    * E58, "esqueci a senha": a resposta é a mesma exista ou não a conta (a tela não revela quem tem cadastro), por isso a frase fala em "se esse e-mail tiver uma conta".
    */
   esqueciALink: "esqueci a senha",
-  esqueciTitulo: "Esqueceu a senha?",
   esqueciExplica: "Escreva o seu e-mail. Se ele tiver uma conta, mandamos um link para você escolher uma senha nova.",
   esqueciBotao: "mandar o link",
   esqueciMandando: "mandando o link",
