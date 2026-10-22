@@ -22,6 +22,9 @@ async function entrarComoAdmin(page: Page) {
   await expect(page).toHaveURL(/\/admin\/?$/);
 }
 
+/** O segundo vídeo de cada voz (o piso é de dois vídeos diferentes, hotfix de 22/10/2026); sem linha no banco, então só o primeiro tem link. */
+const VIDEO_QUE_NAO_EXISTE = 2_000_000_000;
+
 async function ramoComVideoDaVoz(opcoes: Parameters<typeof prepararMarcaComVozes>[0] = {}) {
   const preparo = await prepararMarcaComVozes(opcoes);
   const [nicho] = await db().select({ slug: nichos.slug, vozes: nichos.vozes }).from(nichos).where(eq(nichos.id, preparo.nichoId));
@@ -31,7 +34,7 @@ async function ramoComVideoDaVoz(opcoes: Parameters<typeof prepararMarcaComVozes
     .values({ plataforma: "youtube", idExterno: `e2e-vozes-admin-${sufixo}`, url: `https://exemplo.invalido/e2e-vozes-admin-${sufixo}`, nichoId: preparo.nichoId, titulo: `Vídeo das vozes ${sufixo}` })
     .returning();
   if (nicho.vozes) {
-    const comVideo: VozesDoSetor = { ...nicho.vozes, duvidas: nicho.vozes.duvidas.map((d) => ({ ...d, videos: [video.id] })) };
+    const comVideo: VozesDoSetor = { ...nicho.vozes, duvidas: nicho.vozes.duvidas.map((d) => ({ ...d, videos: [video.id, VIDEO_QUE_NAO_EXISTE] })) };
     await db().update(nichos).set({ vozes: comVideo }).where(eq(nichos.id, preparo.nichoId));
   }
   return { ...preparo, slug: nicho.slug, video, sufixo };

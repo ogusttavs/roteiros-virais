@@ -1050,6 +1050,9 @@ export type DuracaoDoVideo = (typeof DURACOES_DO_VIDEO)[number];
 export const MOMENTOS_DO_DIA = ["manha", "meio_dia", "fim_tarde", "noite"] as const;
 export type MomentoDoDia = (typeof MOMENTOS_DO_DIA)[number];
 
+/** O resultado da conferência "este vídeo é do setor?" (hotfix de 22/10/2026), com a versão do prompt que decidiu e de quando. */
+export type ConferenciaDoSetor = { pertence: boolean; motivo: string; versao: string; em: string };
+
 export type AnaliseVideo = {
   assunto: string;
   gancho: string;
@@ -1293,6 +1296,12 @@ export const videos = pgTable(
      */
     comentariosAnalise: jsonb("comentarios_analise").$type<ComentariosAnalise>(),
     comentariosColetadosEm: timestamp("comentarios_coletados_em", { withTimezone: true }),
+    /**
+     * Hotfix de 22/10/2026 (vozes do público): a conferência barata "este vídeo é do setor?", feita só para o vídeo que ainda não tem a
+     * análise com `pertenceAoNicho` (a coleta por termo e hashtag traz vídeo de outro assunto para o setor, e a análise só roda em 30 a
+     * 50 vídeos por dia). Guardada para o mesmo vídeo não ser perguntado de novo; vídeo marcado como fora do setor não tem os comentários lidos.
+     */
+    conferenciaSetor: jsonb("conferencia_setor").$type<ConferenciaDoSetor>(),
     /**
      * Idioma do video (V2b, item 1, escopo 5.11: o Brasil primeiro), nulo
      * quando nao da para saber. Detectado por codigo na coleta a partir do

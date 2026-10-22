@@ -289,6 +289,7 @@ export default async function AdminNichoDetalhe({ params }: { params: Promise<{ 
         vale={vozesVigentes}
         validaAte={nicho.vozesEm ? new Date(nicho.vozesEm.getTime() + config.regras.vozesValidasPorDias * 24 * 60 * 60 * 1000) : null}
         piso={config.regras.vozesMinimoDeComentarios}
+        pisoVideos={config.regras.vozesMinimoDeVideos}
         videos={videoDaVoz}
       />
 

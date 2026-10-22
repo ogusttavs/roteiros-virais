@@ -212,3 +212,95 @@ describe("vozesParaOAdmin (a seção do admin)", () => {
     }
   });
 });
+
+describe("o piso de vídeos diferentes (hotfix de 22/10/2026)", () => {
+  // O caso real do Criar: 41 comentários de UM vídeo fora do setor (uma árvore de pêssego) e 18 de outro (um meme), contra uma pergunta do setor em dois vídeos.
+  const deUmVideoSo: VozesDoSetor = {
+    duvidas: [
+      {
+        texto: "Que tipo de fruta é essa, pêssego ou nectarina?",
+        vezes: 41,
+        videos: [242953],
+        plataformas: ["youtube"],
+      },
+      {
+        texto: "Quanto custa registrar a marca?",
+        vezes: 6,
+        videos: [11, 12],
+        plataformas: ["youtube"],
+      },
+    ],
+    objecoes: [
+      {
+        texto: "O que significa as coisas alemãs do vídeo?",
+        vezes: 18,
+        videos: [241792],
+        plataformas: ["youtube"],
+      },
+    ],
+    pedidos: [
+      {
+        texto: "Mostra o passo a passo da logomarca",
+        vezes: 9,
+        videos: [241792],
+        plataformas: ["youtube"],
+      },
+    ],
+    videos: 20,
+    comentarios: 1498,
+    plataformas: ["youtube"],
+  };
+
+  it("a voz de um vídeo só não vai para a tela, mesmo com dezenas de comentários", () => {
+    expect(perguntasDoPublico(deUmVideoSo).map((p) => p.texto)).toEqual([
+      "Quanto custa registrar a marca?",
+    ]);
+  });
+
+  it("nem para os prompts dos temas e do roteiro, nem para o Tema livre", () => {
+    expect(vozesParaOPrompt(deUmVideoSo).map((v) => v.texto)).toEqual([
+      "Quanto custa registrar a marca?",
+    ]);
+    expect(
+      vozPelaChave(
+        deUmVideoSo,
+        chaveDaVoz("duvida", "Que tipo de fruta é essa, pêssego ou nectarina?"),
+      ),
+    ).toBeNull();
+    expect(
+      vozPelaChave(deUmVideoSo, chaveDaVoz("duvida", "Quanto custa registrar a marca?"))?.vezes,
+    ).toBe(6);
+  });
+
+  it("o admin ainda mostra a voz, dizendo que ficou de fora por ser de um vídeo só (e não por ter poucos comentários)", () => {
+    const { duvidas, objecoes } = vozesParaOAdmin(deUmVideoSo);
+    expect(duvidas.map((v) => [v.vezes, v.passouDoPiso, v.foraPorUmVideoSo])).toEqual([
+      [41, false, true],
+      [6, true, false],
+    ]);
+    expect(objecoes.map((v) => [v.passouDoPiso, v.foraPorUmVideoSo])).toEqual([[false, true]]);
+  });
+
+  it("a mesma frase em dois grupos de vídeos diferentes soma os vídeos antes do piso: duas partes de um vídeo cada passam juntas", () => {
+    const dividida: VozesDoSetor = {
+      ...deUmVideoSo,
+      duvidas: [
+        { texto: "Serve em camurça?", vezes: 3, videos: [4], plataformas: ["youtube"] },
+        { texto: "serve em camurça", vezes: 3, videos: [9], plataformas: ["youtube"] },
+      ],
+      objecoes: [],
+      pedidos: [],
+    };
+    expect(perguntasDoPublico(dividida).map((p) => p.vezes)).toEqual([6]);
+  });
+
+  it("a voz sem a lista de vídeos (leitura malformada ou velha) não passa", () => {
+    const sem = {
+      ...deUmVideoSo,
+      duvidas: [{ texto: "Sem lista de vídeos?", vezes: 12, plataformas: ["youtube"] }],
+      objecoes: [],
+      pedidos: [],
+    } as unknown as VozesDoSetor;
+    expect(perguntasDoPublico(sem)).toEqual([]);
+  });
+});

@@ -56,6 +56,8 @@ export type TarefaIA =
   | "notaDaVersao"
   /** E28: lê os comentários de um vídeo muito visto do setor e separa o que o público pergunta, reclama, pede e elogia. */
   | "lerComentarios"
+  /** Hotfix de 22/10/2026: confere, em lote e barato, se um vídeo é do setor antes de ler os comentários dele. */
+  | "conferirVideoDoSetor"
   /** E28: junta, entre os vídeos da semana, o que o público do setor disse de igual (as vozes do público). */
   | "juntarVozes"
   /** E41 (2a): as marcas de fala (peso, pausa, devagar, tom) de um roteiro Reels falado; o modelo só coloca marcas, o texto não muda. */

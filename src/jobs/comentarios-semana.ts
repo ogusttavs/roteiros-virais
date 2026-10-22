@@ -19,11 +19,12 @@
  * é semanal, então na semana seguinte o vídeo já saiu da janela. A rodada tem uma segunda tentativa curta para a rede; o resto
  * se refaz com "rodar agora" no admin (`FILAS_POR_RAMO`).
  */
-import { and, desc, eq, gte, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, ne, sql } from "drizzle-orm";
 
 import { db } from "@/db";
-import { comentariosVideo, contas, nichos, videos, type ComentariosAnalise, type Plataforma } from "@/db/schema";
+import { comentariosVideo, contas, nichos, videos, type ComentariosAnalise, type ConferenciaDoSetor, type Plataforma } from "@/db/schema";
 import { gerarEstruturado } from "@/ia/cliente";
+import * as conferirVideoDoSetorIA from "@/ia/prompts/conferirVideoDoSetor";
 import * as juntarVozesIA from "@/ia/prompts/juntarVozes";
 import * as lerComentariosIA from "@/ia/prompts/lerComentarios";
 import { registrarGeracao } from "@/ia/registro";
@@ -62,8 +63,89 @@ type DepsComentarios = {
 };
 
 type VideoParaLer = { id: number; idExterno: string; titulo: string | null };
+type SetorParaLer = { id: number; nome: string; descricao: string | null; termos: string[] };
 
-async function videosParaLer(nichoId: number, agora: Date): Promise<VideoParaLer[]> {
+/** O candidato com o que a base já sabe dele sobre o setor, para decidir se vale conferir. */
+type Candidato = VideoParaLer & {
+  descricao: string | null;
+  fala: string | null;
+  /** `analise.pertenceAoNicho`, quando a análise em lote já passou por ele: 'true' ou 'false' (o 'false' nem chega aqui, `PERTENCE_AO_NICHO`). */
+  analisePertence: string | null;
+  conferencia: ConferenciaDoSetor | null;
+};
+
+/** O que a base sabe: a análise do vídeo manda; senão, a conferência barata feita pela versão atual do prompt; senão, ainda não se sabe. */
+function pertenceSegundoABase(c: Candidato): boolean | undefined {
+  if (c.analisePertence === "true") return true;
+  if (c.analisePertence === "false") return false;
+  if (c.conferencia && c.conferencia.versao === conferirVideoDoSetorIA.versao) return c.conferencia.pertence;
+  return undefined;
+}
+
+/**
+ * Hotfix de 22/10/2026: o vídeo só tem os comentários lidos se for do setor. Os vídeos que a base ainda não sabe (a coleta por termo e
+ * hashtag põe de tudo no setor, e a análise em lote só passa por 30 a 50 por dia) vão numa chamada barata por lote de 25, dos mais vistos
+ * para os menos, até haver candidatos do setor para encher a semana. O resultado fica em `videos.conferencia_setor`, para o mesmo vídeo
+ * não ser perguntado de novo. Quem o modelo esqueceu, ou o lote em que a IA falhou, fica sem resposta: não é lido nesta rodada (na dúvida,
+ * fora) e a conferência volta na próxima.
+ */
+async function conferirDoSetor(setor: SetorParaLer, candidatos: Candidato[], agora: Date): Promise<{ pertence: Map<number, boolean>; erros: string[] }> {
+  const pertence = new Map<number, boolean>();
+  const erros: string[] = [];
+  for (const c of candidatos) {
+    const sabido = pertenceSegundoABase(c);
+    if (sabido !== undefined) pertence.set(c.id, sabido);
+  }
+  // Os que já passaram por uma chamada nesta rodada (com ou sem resposta) não entram em outra.
+  const tentados = new Set<number>(pertence.keys());
+  const aprovados = () => [...pertence.values()].filter(Boolean).length;
+
+  while (aprovados() < config.regras.comentariosVideosPorSemana) {
+    const lote = candidatos.filter((c) => !tentados.has(c.id)).slice(0, conferirVideoDoSetorIA.VIDEOS_POR_CHAMADA);
+    if (lote.length === 0) break;
+    for (const c of lote) tentados.add(c.id);
+    const numerados = lote.map((c, i) => ({ numero: i + 1, titulo: c.titulo, descricao: c.descricao, fala: c.fala }));
+    try {
+      const resultado = await gerarEstruturado({
+        tarefa: "conferirVideoDoSetor",
+        nivel: conferirVideoDoSetorIA.nivel,
+        effort: conferirVideoDoSetorIA.esforco,
+        schema: conferirVideoDoSetorIA.schema,
+        sistemaEstavel: conferirVideoDoSetorIA.montarSistemaEstavel(),
+        entrada: conferirVideoDoSetorIA.montarEntrada({ setor: setor.nome, descricaoDoSetor: setor.descricao, termos: setor.termos, videos: numerados }),
+      });
+      for (const resposta of resultado.dados.videos) {
+        const video = lote[resposta.numero - 1];
+        if (!video || pertence.has(video.id)) continue;
+        const conferencia: ConferenciaDoSetor = { pertence: resposta.pertence, motivo: resposta.motivo.slice(0, 200), versao: conferirVideoDoSetorIA.versao, em: agora.toISOString() };
+        await db().update(videos).set({ conferenciaSetor: conferencia }).where(eq(videos.id, video.id));
+        pertence.set(video.id, resposta.pertence);
+      }
+      await registrarGeracao({
+        tarefa: "conferirVideoDoSetor",
+        versaoPrompt: conferirVideoDoSetorIA.versao,
+        modelo: resultado.modelo,
+        nivel: conferirVideoDoSetorIA.nivel,
+        entradas: { nichoId: setor.id, videos: lote.map((c) => c.id) },
+        saida: resultado.dados,
+        uso: {
+          tokensEntrada: resultado.tokensEntrada,
+          tokensSaida: resultado.tokensSaida,
+          tokensCacheLeitura: resultado.tokensCacheLeitura,
+          tokensCacheEscrita: resultado.tokensCacheEscrita,
+        },
+      });
+    } catch (erro) {
+      // A IA fora: o resto do setor não insiste (seria a mesma falha por lote), e esses vídeos ficam sem leitura até a próxima rodada.
+      erros.push(`conferencia do setor "${setor.nome}": ${erro instanceof Error ? erro.message : String(erro)}`);
+      return { pertence, erros };
+    }
+  }
+  return { pertence, erros };
+}
+
+async function videosParaLer(setor: SetorParaLer, agora: Date): Promise<{ videos: VideoParaLer[]; foraDoSetor: number; erros: string[] }> {
+  const nichoId = setor.id;
   const regua = await reguaDoSetor(nichoId);
   const condicoes = [
     eq(videos.nichoId, nichoId),
@@ -81,6 +163,10 @@ async function videosParaLer(nichoId: number, agora: Date): Promise<VideoParaLer
       id: videos.id,
       idExterno: videos.idExterno,
       titulo: videos.titulo,
+      descricao: videos.descricao,
+      fala: sql<string | null>`left(${videos.transcricao}, 400)`,
+      analisePertence: sql<string | null>`${videos.analise} ->> 'pertenceAoNicho'`,
+      conferencia: videos.conferenciaSetor,
       idioma: videos.idioma,
       contaPais: contas.pais,
       contaIdiomaPrincipal: contas.idiomaPrincipal,
@@ -92,10 +178,18 @@ async function videosParaLer(nichoId: number, agora: Date): Promise<VideoParaLer
     .limit(config.regras.comentariosVideosPorSemana * FATOR_POOL);
 
   // Só brasileiro: as perguntas aparecem na tela do dono em português, e comentário de vídeo de fora não é o que o público dele diz.
-  return linhas
+  const brasileiros: Candidato[] = linhas
     .filter((l) => classificarBrasil(l.idioma, contaEhBrasileira(l.contaPais, l.contaIdiomaPrincipal)) === "brasileiro")
-    .slice(0, config.regras.comentariosVideosPorSemana)
-    .map((l) => ({ id: l.id, idExterno: l.idExterno, titulo: l.titulo }));
+    .map((l) => ({ id: l.id, idExterno: l.idExterno, titulo: l.titulo, descricao: l.descricao, fala: l.fala, analisePertence: l.analisePertence, conferencia: l.conferencia }));
+
+  // Só o que é do setor: o vídeo de outro assunto que a coleta por termo trouxe não tem os comentários lidos (e não gasta cota).
+  const { pertence, erros } = await conferirDoSetor(setor, brasileiros, agora);
+  const doSetor = brasileiros.filter((c) => pertence.get(c.id) === true);
+  return {
+    videos: doSetor.slice(0, config.regras.comentariosVideosPorSemana).map((c) => ({ id: c.id, idExterno: c.idExterno, titulo: c.titulo })),
+    foraDoSetor: brasileiros.filter((c) => pertence.get(c.id) === false).length,
+    erros,
+  };
 }
 
 type Desfecho = "lido" | "desligados" | "poucos" | "falhou" | "cota";
@@ -260,10 +354,10 @@ export async function rodarComentariosSemana(nichoId?: number, deps: DepsComenta
   }
 
   const condicao = nichoId ? and(eq(nichos.ativo, true), eq(nichos.id, nichoId)) : eq(nichos.ativo, true);
-  const nichosAtivos = await db().select({ id: nichos.id, slug: nichos.slug, nome: nichos.nome }).from(nichos).where(condicao);
+  const nichosAtivos = await db().select({ id: nichos.id, slug: nichos.slug, nome: nichos.nome, descricao: nichos.descricao, termos: nichos.termos }).from(nichos).where(condicao);
 
   const unidades = { usadas: await consumoDeHoje() };
-  const contagem = { lidos: 0, desligados: 0, poucos: 0, falhas: 0, comentariosGuardados: 0 };
+  const contagem = { lidos: 0, desligados: 0, poucos: 0, falhas: 0, comentariosGuardados: 0, foraDoSetor: 0 };
   const erros: string[] = [];
   const avisos: string[] = [];
   const vozes: Record<string, unknown>[] = [];
@@ -275,7 +369,13 @@ export async function rodarComentariosSemana(nichoId?: number, deps: DepsComenta
       const vistos = new Set<string>();
       let candidatos: VideoParaLer[] = [];
       try {
-        candidatos = await videosParaLer(nicho.id, agora);
+        const escolha = await videosParaLer({ id: nicho.id, nome: nicho.nome, descricao: nicho.descricao, termos: nicho.termos }, agora);
+        candidatos = escolha.videos;
+        contagem.foraDoSetor += escolha.foraDoSetor;
+        for (const erro of escolha.erros) {
+          contagem.falhas += 1;
+          erros.push(erro);
+        }
       } catch (erro) {
         contagem.falhas += 1;
         erros.push(`escolha dos videos do setor "${nicho.slug}": ${erro instanceof Error ? erro.message : String(erro)}`);
