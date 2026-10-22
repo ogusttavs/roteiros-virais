@@ -9,7 +9,7 @@
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
 
@@ -36,7 +36,7 @@ const CDN = "https://scontent-gru2-1.cdninstagram.com/v/t51/capa-vencida.jpg?oe=
 /** Um PNG de 1 pixel, de verdade: a rota entrega estes bytes e o navegador os desenha. */
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 const CAPTURAR = process.env.CAPTURAR_CAPAS === "1";
-const PASTA_CAPTURAS = path.join(__dirname, "..", "..", "..", "..", "entregaveis", "design", "capturas", "capas");
+const PASTA_CAPTURAS = path.join(__dirname, "..", "..", "..", "..", "..", "entregaveis", "design", "capturas", "capas");
 
 if (CAPTURAR) mkdirSync(PASTA_CAPTURAS, { recursive: true });
 
@@ -128,7 +128,7 @@ async function criarRoteiro(videoId: number): Promise<number> {
   return roteiro.id;
 }
 
-async function capturar(page: Page, nome: string) {
+async function capturar(page: Page, nome: string, alvo: Locator) {
   if (!CAPTURAR) return;
   for (const [largura, altura] of [
     [390, 844],
@@ -137,7 +137,9 @@ async function capturar(page: Page, nome: string) {
     for (const tema of ["light", "dark"] as const) {
       await page.setViewportSize({ width: largura, height: altura });
       await page.emulateMedia({ colorScheme: tema });
-      await page.waitForTimeout(400);
+      await alvo.scrollIntoViewIfNeeded();
+      await page.evaluate(() => window.scrollBy(0, -120));
+      await page.waitForTimeout(500);
       await page.screenshot({ path: path.join(PASTA_CAPTURAS, `${nome}-${largura}-${tema}.png`) });
     }
   }
@@ -170,7 +172,7 @@ test.describe("a capa do Instagram que vence", () => {
     await expect(secao.locator("iframe")).toHaveAttribute("src", `https://www.instagram.com/reel/${ID}recusada/embed`, { timeout: 15_000 });
     await expect(secao.getByRole("button", { name: /^Tocar / })).toHaveCount(0);
     await expect(secao.locator("img")).toHaveCount(0);
-    await capturar(page, "roteiro-capa-recusada");
+    await capturar(page, "roteiro-capa-recusada", secao);
   });
 
   test("roteiro: a capa marcada vencida monta o embed sem nem pedir a imagem ao CDN", async ({ page }) => {
@@ -202,6 +204,7 @@ test.describe("a capa do Instagram que vence", () => {
     await expect.poll(() => imagem.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
     await expect(secao.locator("iframe")).toHaveCount(0);
     expect(cdn.aoCdn()).toBe(0);
+    await capturar(page, "roteiro-capa-guardada", secao);
 
     // A rota é só para quem está logado: sem o cookie, o middleware manda para a entrada.
     const semSessao = await page.context().browser()!.newContext();
@@ -225,7 +228,7 @@ test.describe("a capa do Instagram que vence", () => {
     await expect(link).toHaveAttribute("href", `https://www.instagram.com/reel/${ID}lista/`);
     await expect(cartao.locator("img")).toHaveCount(0);
     await expect(page.locator("iframe")).toHaveCount(0);
-    await capturar(page, "referencias-capa-vencida");
+    await capturar(page, "referencias-capa-vencida", cartao);
 
     // Na folha de um vídeo só (a tela de um vídeo), o embed entra na hora.
     await page.setViewportSize({ width: 390, height: 844 });
