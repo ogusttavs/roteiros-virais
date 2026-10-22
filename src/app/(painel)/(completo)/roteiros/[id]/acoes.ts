@@ -10,9 +10,10 @@ import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
 import { marcarFalaDoRoteiro, marcasParaATela, type MotivoSemMarcas } from "@/servicos/marcar-fala";
-import { marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
+import { desmarcarGravado as desmarcarGravadoNoPlano, marcarGravado as marcarGravadoNoPlano } from "@/servicos/plano";
 import {
   avaliarRoteiro,
+  desmarcarGravado,
   editarRoteiro,
   ErroRoteiro,
   marcarGravado,
@@ -40,6 +41,17 @@ export async function marcarGravadoAction(roteiroId: number): Promise<void> {
   await marcarGravado(roteiroId);
   // V9b, item 3: fecha o círculo do plano quando este roteiro veio de um item aceito (sem-op sem plano).
   await marcarGravadoNoPlano(roteiroId);
+}
+
+/**
+ * "Ainda não gravei" / "Desfazer" do "Já gravei": volta o roteiro `gravado` para `gerado` (e o item do plano para aceito). A posse e o status entram na condição do serviço;
+ * um roteiro já postado nunca volta.
+ */
+export async function desmarcarGravadoAction(roteiroId: number): Promise<void> {
+  await exigirForaDoVerComo();
+  const roteiro = await roteiroDoClienteOuFalha(roteiroId);
+  await desmarcarGravado(roteiroId, roteiro.clienteId);
+  await desmarcarGravadoNoPlano(roteiroId);
 }
 
 export async function marcarPostadoAction(roteiroId: number, url: string): Promise<void> {

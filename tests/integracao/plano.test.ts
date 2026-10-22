@@ -20,6 +20,7 @@ import {
   ErroPlano,
   aceitar,
   criarPlano,
+  desmarcarGravado,
   lerAgendaDeTexto,
   limparPlano,
   marcarGravado,
@@ -440,6 +441,23 @@ describe("marcarGravado", () => {
 
     const [linha] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
     expect(linha.estado).toBe("gravado");
+  });
+
+  it("desmarcarGravado devolve o item gravado do plano para aceito", async () => {
+    const cliente = await criarCliente();
+    const [item] = await criarPlano(cliente, [{ data: HOJE, lugar: "feira", compromissos: ["fornecedor novo"] }], HOJE);
+    const roteiro = await aceitar(item.id, cliente, {
+      onde: "na feira",
+      oQueEstaAcontecendo: "fornecedor novo",
+      oQueDaParaMostrar: "as amostras",
+      objetivo: "engajamento",
+    });
+    await marcarGravado(roteiro.id);
+
+    await desmarcarGravado(roteiro.id);
+
+    const [linha] = await db().select().from(planoGravacoes).where(eq(planoGravacoes.id, item.id));
+    expect(linha.estado).toBe("aceito");
   });
 
   it("roteiro sem plano ligado: nao faz nada, nao lanca", async () => {
