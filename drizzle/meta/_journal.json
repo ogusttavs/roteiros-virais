@@ -666,6 +666,13 @@
       "when": 1792722911362,
       "tag": "0095_assinatura-restrict",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1792727301145,
+      "tag": "0096_busca-por-significado",
+      "breakpoints": true
     }
   ]
 }

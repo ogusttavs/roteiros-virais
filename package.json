@@ -24,6 +24,7 @@
     "checar-admin-protegido": "tsx scripts/checar-admin-protegido.ts",
     "checar-ver-como": "tsx scripts/checar-ver-como.ts",
     "checar-portao-cobranca": "tsx scripts/checar-portao-cobranca.ts",
+    "checar-marca": "tsx scripts/checar-marca.ts",
     "db:up": "docker compose -f compose.dev.yml up -d",
     "db:down": "docker compose -f compose.dev.yml down",
     "db:generate": "drizzle-kit generate",

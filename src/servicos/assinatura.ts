@@ -412,8 +412,18 @@ async function aplicarMudanca(tx: Executor, m: MudancaDeAssinatura, eventoEm: Da
 
   // `canceled` e `incomplete_expired` são finais: reassinar cria OUTRA assinatura no Stripe, nunca reabre a antiga. Um evento atrasado, ou do mesmo segundo, não a ressuscita.
   if (atual.status === "canceled" || atual.status === "incomplete_expired") return;
-  // Evento mais velho que o último que escreveu aqui: o mais novo já valeu.
-  if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) return;
+  // Evento mais velho que o último que escreveu aqui: o mais novo já valeu para o status, mas não pode ser jogado fora inteiro (o Stripe entrega em paralelo: o checkout, mais novo,
+  // pode chegar antes da assinatura e deixar a linha sem período e sem preço). Só preenche o que está vazio; nunca mexe no status nem em `ultimoEventoEm`.
+  if (eventoEm.getTime() < atual.ultimoEventoEm.getTime()) {
+    const vazios = {
+      ...(!atual.stripeClienteId && m.stripeClienteId ? { stripeClienteId: m.stripeClienteId } : {}),
+      ...(!atual.stripePrecoId && m.stripePrecoId ? { stripePrecoId: m.stripePrecoId } : {}),
+      ...(!atual.periodoInicio && m.periodoInicio ? { periodoInicio: m.periodoInicio } : {}),
+      ...(!atual.periodoFim && m.periodoFim ? { periodoFim: m.periodoFim } : {}),
+    };
+    if (Object.keys(vazios).length > 0) await tx.update(assinaturas).set({ ...vazios, atualizadoEm: new Date() }).where(eq(assinaturas.id, atual.id));
+    return;
+  }
 
   // O `created` do Stripe tem resolução de um segundo, então dois eventos do mesmo segundo (o cadastro: assinatura criada `incomplete`, fatura paga `active`) podem chegar em qualquer ordem.
   // Quem já saiu de `incomplete` nunca volta a ele (o Stripe não faz isso), e o desempate fica sem depender da ordem de chegada.

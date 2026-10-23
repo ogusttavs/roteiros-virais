@@ -301,7 +301,12 @@ import { regrasDoReels, textoRegras, textoRegrasStory } from "./regras-formato";
  * 2.21.0 (22/10/2026, decisão do Gustavo): quando o tema é da PRÓPRIA pessoa (Tema livre), as proibições do briefing viram aviso na entrada (`blocoDasProibicoesComoAviso`): o roteiro é escrito sobre o
  * tema que ela escolheu, com cuidado, em vez de ser barrado. A regra dura 3 continua valendo para os temas que o sistema sugere. Só a entrada muda, e só nesse caso; o sistema estável não muda.
  */
-export const versao = "2.21.0";
+/**
+ * 2.22.0 (E16, nível conta): o sistema estável ganha, quando a marca já tem pelo menos 8 vídeos postados e medidos, o bloco "O que funcionou nos vídeos que este cliente já postou" (`desempenhoDaConta`, `servicos/desempenho-da-conta.ts`):
+ * por objetivo, tipo de abertura, duração e horário, quanto rendeu em relação ao normal da própria conta. É tendência de uma marca só, só rótulo e número (nunca tema ou texto de roteiro), calculada por código. Sem o bloco (a conta sem
+ * dado suficiente, hoje todas) o sistema é idêntico ao da 2.21.0. O schema de saída não muda.
+ */
+export const versao = "2.22.0";
 
 /**
  * O aviso das proibições quando o tema é da própria pessoa (Tema livre): preferências dela, não barreira. Escreve-se sobre o tema escolhido, com o cuidado dito aqui; as regras de conformidade (nada de
@@ -424,6 +429,8 @@ export function montarSistemaEstavel(dados: {
   camadaExclusiva: string;
   /** A memória do cliente (E27, parte 2): `regrasAtivasDoCliente`, ordenada por contagem. Vazia sem nenhuma regra ainda. */
   regrasCliente: { regra: string; contagem: number }[];
+  /** E16, nível conta: o que rendeu mais ou menos nos vídeos já postados DESTA marca (`desempenhoDaConta`). Vazio ou ausente sem dado suficiente. */
+  desempenhoDaConta?: string;
   /** V9a, item 4: "negocio" (padrão) fala como a marca; "pessoa" fala em primeira pessoa do singular. */
   tipo: TipoMarca;
   /**
@@ -461,6 +468,12 @@ export function montarSistemaEstavel(dados: {
           .map((r) => `- ${r.regra} (${r.contagem >= 2 ? "firme" : "fraca"})`)
           .join("\n")}`
       : "";
+  const blocoDesempenhoDaConta = dados.desempenhoDaConta
+    ? `
+
+O que funcionou nos vídeos que este cliente já postou (medido contra o normal da própria conta dele). É tendência dele, não regra: use para pesar o jeito de abrir, a duração e o objetivo, sem repetir um roteiro que já deu certo e sem prometer que o próximo vai render igual. Nunca cite estes números, nem "o normal da conta", no texto do roteiro:
+${dados.desempenhoDaConta}`
+    : "";
   /** V12c, item 2, a E37b: quem escolheu "ficar conhecido" nunca fecha vendendo. */
   const regraPersonaConhecido =
     dados.persona === "conhecido"
@@ -671,7 +684,7 @@ ${textoRegrasCopyRoteiro()}
 ${pedidoPorQueDosBlocos(ehStory || ehSemFala ? "cartoes" : "reels")}
 
 Perfil do cliente:
-${dados.perfilCompilado}${blocoRegrasCliente}
+${dados.perfilCompilado}${blocoRegrasCliente}${blocoDesempenhoDaConta}
 
 O que só este cliente tem (cidade, concorrentes, perfis que admira; use quando fizer sentido
 no gancho ou na chamada final, nunca force):

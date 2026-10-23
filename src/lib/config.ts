@@ -57,6 +57,15 @@ export const config = {
     modeloForte: env("AI_MODEL_FORTE", "claude-opus-5"),
     modeloBarato: env("AI_MODEL_BARATO", "claude-haiku-4-5"),
   },
+  /**
+   * E17 parte 1 (refeita em 23/10/2026, ajustada pela medição com dados reais): a prova do Tema livre por significado. Desligada por padrão, até a Central ligar.
+   * Uma chave só: a busca nova sem o modelo traz mais prova sem relação (78% de lixo no ramo 5, contra 61% da busca antiga), então as duas partes andam juntas.
+   * Ligada, em toda busca do Tema livre o modelo barato lê o conjunto elegível do setor (até 200 vídeos, uns US$ 0,009 por tema no maior setor, com cache) e devolve só
+   * os que tratam do mesmo assunto; se ele não responde, vale a busca por palavra de sempre.
+   */
+  busca: {
+    porSignificado: env("BUSCA_POR_SIGNIFICADO") === "1",
+  },
   transcricao: {
     groqKey: env("GROQ_API_KEY"),
     groqModel: env("GROQ_MODEL", "whisper-large-v3-turbo"),

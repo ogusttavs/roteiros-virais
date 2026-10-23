@@ -70,6 +70,7 @@ import { regrasAtivasDoCliente } from "./aprendizado";
 import { comANoticiaPresa, noticiaDeOrigemGuardada, noticiaDoAssuntoComoPontoDePartida, noticiaDoAssuntoDaMarca, noticiaDoSetorComoPontoDePartida, noticiasDeHojeDosAssuntos } from "./assuntos";
 import { formatarPerfilCompilado, perfilDoCliente } from "./briefing";
 import { clientePorId } from "./clientes";
+import { desempenhoDaConta } from "./desempenho-da-conta";
 import { montarEntregaDaPesquisa, paraEntradaDaPesquisa } from "./entrega-da-pesquisa";
 import { filtroDeFormatosDaMarca } from "./formatos";
 import { noticiaPorId } from "./noticias";
@@ -1059,6 +1060,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoLinha,
     roteirosRecentesDoBanco,
     regrasCliente,
+    desempenhoMedido,
     ultimosRoteirosDoBanco,
     marcaCitada,
     vozesDoSetorAtual,
@@ -1071,6 +1073,8 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
     modeloNichoAtual(nichoId),
     historicoDeRoteiros(dados.clienteId, DIAS_HISTORICO),
     regrasAtivasDoCliente(dados.clienteId),
+    // E16, nível conta: o que rendeu nos vídeos já postados DESTA marca (vazio sem dado suficiente; o roteiro longo não recebe).
+    ehLongo ? Promise.resolve("") : desempenhoDaConta(dados.clienteId),
     ultimosRoteirosParaAbertura(dados.clienteId),
     marcaCitadaPorId(dados.momento?.marcaId, dados.clienteId),
     // E28: o que o público do setor perguntou nos comentários de vídeos do YouTube (sem leitura, com a leitura velha e no roteiro do momento: nada; a cena é a única fonte).
@@ -1293,6 +1297,7 @@ async function gerarConteudo(dados: MontarERoteiroDados): Promise<{
       redePrincipal: dados.cliente.redePrincipal,
       duracaoTipicaMaxS: modeloNichoLinha?.modelo.duracaoTipicaS?.max,
       regrasCliente,
+      desempenhoDaConta: desempenhoMedido,
       tipo: dados.cliente.tipo,
       persona: dados.cliente.persona,
       quemAparece: quemApareceResolvido,
