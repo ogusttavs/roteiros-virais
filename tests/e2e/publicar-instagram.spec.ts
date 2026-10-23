@@ -154,6 +154,20 @@ test.describe("Publicar no Instagram, no roteiro", () => {
     expect(await page.content()).not.toContain(TOKEN_LONGO_SIMULADO);
   });
 
+  test("um vídeo de 12 MB chega inteiro à Meta: o corpo grande não é cortado nos 10 MB que o Next.js guarda para o middleware", async ({ page }) => {
+    const id = await novoRoteiro("louça grande");
+    await entrar(page, DONO_EMAIL);
+    await ligarInstagram(page);
+    await abrirFolhaDePublicar(page, id);
+    const folha = page.locator("[data-parte='formulario']");
+    const doze = 12 * 1024 * 1024;
+    await folha.locator("input[type=file]").setInputFiles({ name: "grande.mp4", mimeType: "video/mp4", buffer: Buffer.alloc(doze, 3) });
+    await folha.getByRole("button", { name: t.publicar }).click();
+    await expect(page.getByText(t.publicada)).toBeVisible({ timeout: 60_000 });
+    const envio = meta.chamadas.find((x) => x.caminho.startsWith("/rupload/"));
+    expect(envio).toMatchObject({ bytes: doze, parametros: { offset: "0", file_size: String(doze) } });
+  });
+
   test("Story: a escolha tira o campo da legenda e a Meta recebe um Story sem legenda", async ({ page }) => {
     const id = await novoRoteiro("louça story", { formato: "story", conteudo: { ...CONTEUDO, cartoes: [{ oQueFalar: "Erro um", oQueMostrar: "A pia", textoNaTela: "Erro um", figurinha: "nenhuma" }] } });
     await entrar(page, DONO_EMAIL);

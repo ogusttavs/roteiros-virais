@@ -12,6 +12,8 @@ import { fraseDeFalha, textosPublicar, type CodigoDeFalha } from "@/textos/publi
 
 import { classificarFalha, legendaDoRoteiro } from "./publicar-instagram";
 
+const TRAVESSOS = new RegExp(`[${String.fromCharCode(0x2013)}${String.fromCharCode(0x2014)}]`);
+
 describe("classificarFalha: o erro da Meta vira o motivo que a pessoa entende", () => {
   const casos: [string, unknown, CodigoDeFalha][] = [
     ["formato do vídeo (2207026)", new ErroMetaLogin("x", 352, 2207026), "formato"],
@@ -51,7 +53,7 @@ describe("classificarFalha: o erro da Meta vira o motivo que a pessoa entende", 
       for (const tipo of ["reels", "story"] as const) {
         const frase = fraseDeFalha(codigo, tipo);
         expect(frase.length).toBeGreaterThan(20);
-        expect(frase).not.toMatch(/[–—]/);
+        expect(frase).not.toMatch(TRAVESSOS);
         expect(frase).not.toMatch(/token|API|OAuth|\{|\}/i);
       }
     }

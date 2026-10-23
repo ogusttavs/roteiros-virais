@@ -80,6 +80,10 @@ export function middleware(request: NextRequest) {
 }
 
 /**
+ * `api/publicar/` (E56 PR 1) tambem fica de fora, por outro motivo: o corpo do pedido de la e o VIDEO (ate 300 MB). Quando o middleware roda, o Next.js clona o corpo para ele e, passando de
+ * 10 MB (`experimental.middlewareClientMaxBodySize`), entrega a rota so os primeiros 10 MB, truncando o video em silencio; e o clone guardaria o video inteiro na memoria. A rota confere a
+ * sessao inteira sozinha (`sessaoAtual`, 401 sem ela), entao nada fica aberto: o cookie so servia para o redirecionamento a `/entrar`, que numa rota de API nem faz sentido.
+ *
  * Lista explicita dos arquivos estaticos, nunca exclusao por formato (achado
  * de seguranca em producao, 20/09/2026): a V5 (item 3) trocou por um tempo
  * para "qualquer caminho cujo ultimo segmento tenha um ponto", pensando em
@@ -93,6 +97,6 @@ export function middleware(request: NextRequest) {
  */
 export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|favicon-48\\.png|apple-touch-icon\\.png|icone-192\\.png|icone-512\\.png|icone-maskable-512\\.png|manifest\\.webmanifest|sw\\.js|offline\\.html|marca/).*)",
+    "/((?!api/auth|api/publicar/|_next/static|_next/image|favicon\\.ico|favicon\\.svg|favicon-16\\.png|favicon-32\\.png|favicon-48\\.png|apple-touch-icon\\.png|icone-192\\.png|icone-512\\.png|icone-maskable-512\\.png|manifest\\.webmanifest|sw\\.js|offline\\.html|marca/).*)",
   ],
 };
