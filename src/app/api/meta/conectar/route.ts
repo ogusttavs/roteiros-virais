@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { config } from "@/lib/config";
 import { NOME_COOKIE_STATE_META, opcoesCookieState } from "@/lib/meta-oauth";
+import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { sessaoAtual } from "@/lib/sessao";
 import { modoVerComoLigado } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -24,6 +25,9 @@ export async function GET() {
   const sessao = await sessaoAtual();
   if (!sessao) return NextResponse.redirect(new URL("/entrar", config.appUrl));
   if (await modoVerComoLigado()) return paraConta("sem-acesso");
+  // E22: ligar o Instagram e coisa de produto; a marca sem assinatura (cobranca ligada) nao comeca uma ligacao.
+  const recusaCobranca = await recusaDaCobranca();
+  if (recusaCobranca) return recusaCobranca;
 
   const cliente = await clienteAtivoDoUsuario(sessao.user.id);
   if (!cliente) return NextResponse.redirect(new URL("/hoje", config.appUrl));

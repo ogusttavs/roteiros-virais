@@ -673,6 +673,13 @@
       "when": 1792727301145,
       "tag": "0096_busca-por-significado",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1792747281815,
+      "tag": "0097_conta-conectada",
+      "breakpoints": true
     }
   ]
 }
