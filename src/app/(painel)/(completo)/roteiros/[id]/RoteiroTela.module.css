@@ -9,6 +9,8 @@
     calc(-1 * (64px + var(--espaco-6) + env(safe-area-inset-bottom, 0px)));
   /* Onde o Toast pousa: acima da barra de ações fixa (altura do botão mais o respiro dela, mais uma folga, mais a linha do motivo sem rede), V7, item 4 do PROXIMO.md. */
   --toast-base: calc(var(--altura-toque-lg) + var(--espaco-8) + var(--folga-motivo, 0px));
+  /* A altura da barra de ações fixa de baixo (o botão, o respiro de cima e de baixo, a borda e, sem conexão, a linha do motivo), sem a área segura do aparelho, que cada uso soma por conta própria. */
+  --altura-da-barra: calc(var(--altura-toque-lg) + var(--espaco-3) * 2 + var(--largura-borda) + var(--folga-motivo, 0px));
 }
 
 @media (min-width: 768px) {
@@ -70,8 +72,9 @@
 
 @media (min-width: 768px) {
   .miolo {
+    /* A área segura de baixo também vale do tablet para cima (o iPad instalado tem a barra do gesto): a barra de ações soma essa área ao próprio fundo, e o fim do conteúdo tem de acompanhar. */
     padding: var(--espaco-8) var(--espaco-6)
-      calc(var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px));
+      calc(var(--altura-toque-lg) + var(--espaco-9) + var(--folga-motivo, 0px) + env(safe-area-inset-bottom, 0px));
   }
 }
 
@@ -193,6 +196,14 @@
     position: sticky;
     top: var(--topo-lado-fixo);
     margin-top: var(--altura-de-onde-veio, 0px);
+    /*
+     * Achado do uso real no iPad deitado (22/10/2026): com os porquês abertos o cartão do lado fica mais alto que a tela, e a
+     * parte de baixo dele ficava atrás da barra de ações fixa, sem como rolar até ela (o cartão gruda e só solta no fim da grade).
+     * Agora ele nunca passa do que cabe entre o topo em que gruda e a barra; o que sobra rola dentro do próprio cartão. Cartão
+     * mais baixo que isso fica como sempre foi.
+     */
+    max-height: calc(100dvh - var(--topo-lado-fixo) - var(--altura-da-barra) - env(safe-area-inset-bottom, 0px) - var(--espaco-4));
+    overflow-y: auto;
   }
 }
 
