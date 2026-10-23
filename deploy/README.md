@@ -236,6 +236,15 @@ achado por `PPid` em `/proc/<pid>/status`, nunca por nome de processo: a imagem 
 sair sozinho e reinicia o container de verdade: o critério é `RestartCount` subindo (0
 para 1 ou mais) e o log mostrando "worker no ar" de novo.
 
+**O que o worker novo faz com o que o morto deixou (22/10/2026).** Um `kill -9` no meio de um
+job deixa a linha dele `active` no pg-boss e a execução "rodando" em `execucoes_job`. Ao subir,
+o worker (`src/jobs/orfaos.ts`) dá os `active` como falhos e fecha as execuções presas; isso
+vale porque existe um worker só (o Compose para o antigo antes de criar o novo): nunca suba
+um segundo `roteiros-worker`. Como segunda rede, toda fila tem pulso (`heartbeatSeconds` 180):
+sem pulso, o monitor do pg-boss dá o job como falho em 3 a 4 minutos. O disparo de fora
+(`POST /api/jobs/<nome>`, `src/jobs/disparo.ts`) só recusa quando já há um igual na fila ou
+rodando; não há janela de tempo, e o ensaio agora reprova um `202` com `"duplicado":true`.
+
 ## A assinatura pelo Stripe (E22 PR 1)
 
 Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para `/assinar`, mesmo com o resto no ar.
