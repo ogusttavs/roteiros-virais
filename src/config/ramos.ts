@@ -93,12 +93,12 @@ export const RAMOS_DO_CATALOGO: readonly RamoDoCatalogo[] = [
   ramo(35, "fotografia-e-video", "servicos-e-profissoes", "Fotografia e vídeo", "Fotógrafo, filmagem, estúdio.", "fotógrafo, fotografia, filmagem, vídeo, estúdio"),
   ramo(36, "eventos-e-festas", "servicos-e-profissoes", "Eventos e festas", "Buffet, decoração de festa, cerimonial, DJ, casamento.", "festa, evento, buffet, casamento, cerimonial, dj, decoração de festa"),
   ramo(37, "turismo-e-hospedagem", "servicos-e-profissoes", "Turismo e hospedagem", "Agência de viagem, pousada, guia, passeios.", "viagem, turismo, agência, pousada, hotel, guia, passeio"),
-  ramo(38, "tecnologia-e-automacao", "servicos-e-profissoes", "Tecnologia e automação", "Informática, sistemas, automação residencial, energia solar, segurança eletrônica.", "tecnologia, informática, sistema, software, automação, energia solar, câmera, segurança"),
-  ramo(39, "marketing-e-design", "servicos-e-profissoes", "Marketing e design", "Agência, social media, designer, gráfica.", "marketing, agência, social media, designer, gráfica, tráfego"),
+  ramo(38, "tecnologia-e-automacao", "servicos-e-profissoes", "Tecnologia e automação", "Informática, sistemas, automação residencial, energia solar, segurança eletrônica.", "tecnologia, informática, sistema, software, automação, energia solar, câmera, segurança, inteligência artificial, IA, ferramentas de IA, automação com IA"),
+  ramo(39, "marketing-e-design", "servicos-e-profissoes", "Marketing e design", "Agência, social media, designer, gráfica.", "marketing, agência, social media, designer, gráfica, tráfego, marketing digital, conteúdo, redes sociais, marketing com IA"),
   ramo(40, "agro-e-campo", "servicos-e-profissoes", "Agro e campo", "Produtor rural, máquinas, insumos, pecuária.", "agro, fazenda, produtor rural, gado, soja, máquinas agrícolas, apicultura, abelha"),
 
   // Perfil pessoal (quem é a marca)
-  ramo(41, "empreendedorismo-e-negocios", "perfil-pessoal", "Empreendedorismo e negócios", "Dono de empresa contando como constrói e decide.", "empreendedor, empresário, negócios, empreendedorismo, marca pessoal"),
+  ramo(41, "empreendedorismo-e-negocios", "perfil-pessoal", "Empreendedorismo e negócios", "Dono de empresa contando como constrói e decide.", "empreendedor, empresário, negócios, empreendedorismo, marca pessoal, abrir empresa, começar do zero, startup"),
   ramo(42, "carreira-e-desenvolvimento-pessoal", "perfil-pessoal", "Carreira e desenvolvimento pessoal", "Liderança, produtividade, vendas, comunicação.", "carreira, liderança, produtividade, vendas, comunicação, mentoria"),
   ramo(43, "viagem-e-estilo-de-vida", "perfil-pessoal", "Viagem e estilo de vida", "Viagens, morar fora, rotina, família.", "viagem, morar fora, estilo de vida, rotina, família, lifestyle"),
   ramo(44, "importacao-e-desenvolvimento-de-produto", "perfil-pessoal", "Importação e desenvolvimento de produto", "Fábrica, fornecedor, marca própria, comércio exterior.", "importação, fábrica, china, fornecedor, marca própria, produto"),
