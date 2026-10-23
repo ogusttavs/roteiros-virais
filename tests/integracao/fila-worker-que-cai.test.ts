@@ -8,7 +8,7 @@
  * 2. Um job `active` de um worker morto fica `active` até o prazo da fila (4 horas), e o disparo recusa
  *    enquanto houver um `active` do mesmo nome.
  */
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { db, getPool } from "@/db";
@@ -19,7 +19,8 @@ import { MOTIVO_ORFAO, recolherOrfaosDoWorkerAnterior } from "@/jobs/orfaos";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
-const LONGA = FILAS.coletaNoticias;
+// Filas que nenhum outro arquivo de teste usa: na CI os arquivos de integração dividem o mesmo banco e o pg-boss.
+const LONGA = FILAS.modeloNicho;
 const CURTA = FILAS.faxinaVersoes;
 
 async function estadoDoJob(nome: string, id: string): Promise<string | undefined> {
@@ -30,7 +31,7 @@ async function estadoDoJob(nome: string, id: string): Promise<string | undefined
 async function limpar(): Promise<void> {
   await boss().deleteAllJobs(LONGA);
   await boss().deleteAllJobs(CURTA);
-  await db().delete(execucoesJob);
+  await db().delete(execucoesJob).where(inArray(execucoesJob.nome, [LONGA, CURTA]));
 }
 
 beforeAll(async () => {
@@ -89,7 +90,7 @@ describe("o worker que sobe recolhe o que o anterior deixou", () => {
     expect(await existeJobPendente(LONGA)).toBe(true);
     expect(await enfileirarSemDuplicar(LONGA)).toBeNull(); // o sintoma do ensaio
 
-    const recolhidos = await recolherOrfaosDoWorkerAnterior();
+    const recolhidos = await recolherOrfaosDoWorkerAnterior({ filas: [LONGA, CURTA] });
 
     expect(recolhidos.jobs).toBe(1);
     expect(await estadoDoJob(LONGA, orfao!)).toBe("failed"); // fila longa: sem repetição à força
@@ -101,7 +102,7 @@ describe("o worker que sobe recolhe o que o anterior deixou", () => {
     const id = await boss().send(CURTA);
     await boss().fetch(CURTA);
 
-    await recolherOrfaosDoWorkerAnterior();
+    await recolherOrfaosDoWorkerAnterior({ filas: [LONGA, CURTA] });
 
     expect(await estadoDoJob(CURTA, id!)).toBe("retry");
   });
@@ -112,7 +113,7 @@ describe("o worker que sobe recolhe o que o anterior deixou", () => {
     const [j] = await boss().fetch(CURTA);
     await boss().complete(CURTA, j.id);
 
-    const recolhidos = await recolherOrfaosDoWorkerAnterior();
+    const recolhidos = await recolherOrfaosDoWorkerAnterior({ filas: [LONGA, CURTA] });
 
     expect(recolhidos.jobs).toBe(0);
     expect(await estadoDoJob(LONGA, naFila!)).toBe("created");
@@ -123,7 +124,7 @@ describe("o worker que sobe recolhe o que o anterior deixou", () => {
     const [presa] = await db().insert(execucoesJob).values({ nome: LONGA, status: "rodando" }).returning();
     const [boa] = await db().insert(execucoesJob).values({ nome: LONGA, status: "ok", terminadoEm: new Date() }).returning();
 
-    const recolhidos = await recolherOrfaosDoWorkerAnterior();
+    const recolhidos = await recolherOrfaosDoWorkerAnterior({ filas: [LONGA, CURTA] });
 
     expect(recolhidos.execucoes).toBe(1);
     const [depoisPresa] = await db().select().from(execucoesJob).where(eq(execucoesJob.id, presa.id));
