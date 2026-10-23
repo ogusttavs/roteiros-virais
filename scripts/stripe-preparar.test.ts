@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 
 import { PLANO } from "../src/config/assinatura";
 
-import { CONFIGURACAO_DO_PORTAL, ErroDePreparo, prepararStripe, PRODUTO_ID, type StripeLike } from "./stripe-preparar-logica";
+import { CONFIGURACAO_DO_PORTAL, descritorDaFatura, ErroDePreparo, prepararStripe, PRODUTO_ID, type StripeLike } from "./stripe-preparar-logica";
 
-type Produto = { id: string; metadata: Record<string, string>; name?: string };
+type Produto = { id: string; metadata: Record<string, string>; name?: string; statement_descriptor?: string | null };
 type Preco = { id: string; active?: boolean; product: string; unit_amount: number; currency: string; lookup_key: string | null; metadata: Record<string, string>; recurring: { interval: string; interval_count: number } };
 
 type Portal = { id: string; active?: boolean; metadata: Record<string, string>; features?: unknown };
@@ -28,8 +28,16 @@ function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[]; port
       },
       async create(params) {
         chamadas.push("products.create");
-        const p = { id: params.id as string, metadata: params.metadata as Record<string, string>, name: params.name as string };
+        const p = { id: params.id as string, metadata: params.metadata as Record<string, string>, name: params.name as string, statement_descriptor: (params.statement_descriptor as string | undefined) ?? null };
         produtos.set(p.id, p);
+        return p;
+      },
+      async update(id, params) {
+        chamadas.push(`products.update ${id}`);
+        const p = produtos.get(id);
+        if (!p) throw Object.assign(new Error("No such product"), { code: "resource_missing", statusCode: 404 });
+        // Como o Stripe: so troca o que veio; o resto fica.
+        if ("statement_descriptor" in params) p.statement_descriptor = params.statement_descriptor as string;
         return p;
       },
     },
@@ -74,7 +82,7 @@ function stripeDeMentira(inicial: { produtos?: Produto[]; precos?: Preco[]; port
 describe("prepararStripe", () => {
   it("numa conta sem nada cria o produto e o preco, os dois com metadata.produto = roteiros", async () => {
     const f = stripeDeMentira();
-    const r = await prepararStripe(f.stripe);
+    const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ produtoId: PRODUTO_ID, criouProduto: true, criouPreco: true });
     expect(f.produtos.get(PRODUTO_ID)?.metadata).toEqual({ produto: "roteiros" });
     expect(f.precos).toHaveLength(1);
@@ -83,7 +91,7 @@ describe("prepararStripe", () => {
 
   it("cria tambem a configuracao PROPRIA do portal, com a nossa marca, sem trocar de plano e cancelando no fim do periodo (item 0c)", async () => {
     const f = stripeDeMentira();
-    const r = await prepararStripe(f.stripe);
+    const r = await prepararStripe(f.stripe, "Klaki");
     expect(r.criouPortal).toBe(true);
     expect(f.portais).toHaveLength(1);
     expect(f.portais[0].metadata).toEqual({ produto: "roteiros" });
@@ -96,7 +104,7 @@ describe("prepararStripe", () => {
 
   it("a configuracao padrao da conta (a do OdontoTech, sem a marca) nunca e tomada por nossa: cria a nossa ao lado e nao mexe na dele", async () => {
     const f = stripeDeMentira({ portais: [{ id: "bpc_odonto", active: true, metadata: {} }, { id: "bpc_odonto2", active: true, metadata: { produto: "odontotech" } }] });
-    const r = await prepararStripe(f.stripe);
+    const r = await prepararStripe(f.stripe, "Klaki");
     expect(r).toMatchObject({ criouPortal: true });
     expect(r.portalId).not.toBe("bpc_odonto");
     expect(f.portais).toHaveLength(3);
@@ -105,16 +113,16 @@ describe("prepararStripe", () => {
 
   it("uma configuracao de portal nossa arquivada nao conta: cria outra", async () => {
     const f = stripeDeMentira({ portais: [{ id: "bpc_velha", active: false, metadata: { produto: "roteiros" } }] });
-    const r = await prepararStripe(f.stripe);
+    const r = await prepararStripe(f.stripe, "Klaki");
     expect(r.criouPortal).toBe(true);
     expect(r.portalId).not.toBe("bpc_velha");
   });
 
   it("rodar duas vezes nao cria nada na segunda (idempotente) e devolve os mesmos ids", async () => {
     const f = stripeDeMentira();
-    const primeira = await prepararStripe(f.stripe);
+    const primeira = await prepararStripe(f.stripe, "Klaki");
     f.chamadas.length = 0;
-    const segunda = await prepararStripe(f.stripe);
+    const segunda = await prepararStripe(f.stripe, "Klaki");
     expect(segunda).toEqual({ ...primeira, criouProduto: false, criouPreco: false, criouPortal: false });
     expect(f.chamadas.some((c) => c.endsWith("create"))).toBe(false);
     expect(f.precos).toHaveLength(1);
@@ -124,13 +132,13 @@ describe("prepararStripe", () => {
 
   it("produto com o nosso id mas sem a marca: para com erro e nao cria nada", async () => {
     const f = stripeDeMentira({ produtos: [{ id: PRODUTO_ID, metadata: { produto: "odontotech" } }] });
-    await expect(prepararStripe(f.stripe)).rejects.toBeInstanceOf(ErroDePreparo);
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toBeInstanceOf(ErroDePreparo);
     expect(f.chamadas.some((c) => c.endsWith("create"))).toBe(false);
   });
 
   it("preco com a nossa chave de busca mas sem a marca: para com erro e nao cria nada", async () => {
     const f = stripeDeMentira({ precos: [{ id: "price_alheio", product: "prod_x", unit_amount: 7990, currency: "brl", lookup_key: PLANO.lookupKey, metadata: {}, recurring: { interval: "month", interval_count: 1 } }] });
-    await expect(prepararStripe(f.stripe)).rejects.toBeInstanceOf(ErroDePreparo);
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toBeInstanceOf(ErroDePreparo);
     expect(f.chamadas.some((c) => c.endsWith("create"))).toBe(false);
   });
 
@@ -139,7 +147,7 @@ describe("prepararStripe", () => {
       produtos: [{ id: PRODUTO_ID, metadata: { produto: "roteiros" } }],
       precos: [{ id: "price_arquivado", active: false, product: PRODUTO_ID, unit_amount: 119_100, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
     });
-    await expect(prepararStripe(f.stripe)).rejects.toThrow(/arquivado/);
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toThrow(/arquivado/);
     expect(f.precos).toHaveLength(1);
   });
 
@@ -148,7 +156,7 @@ describe("prepararStripe", () => {
       produtos: [{ id: PRODUTO_ID, metadata: { produto: "roteiros" } }],
       precos: [{ id: "price_velho", product: PRODUTO_ID, unit_amount: 39_700, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
     });
-    await expect(prepararStripe(f.stripe)).rejects.toThrow(/diferentes do plano/);
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toThrow(/diferentes do plano/);
     expect(f.precos).toHaveLength(1);
   });
 
@@ -157,7 +165,7 @@ describe("prepararStripe", () => {
       produtos: [{ id: "prod_odonto", metadata: { produto: "odontotech" } }],
       precos: [{ id: "price_odonto", product: "prod_odonto", unit_amount: 7990, currency: "brl", lookup_key: "odontotech_mensal", metadata: { produto: "odontotech" }, recurring: { interval: "month", interval_count: 1 } }],
     });
-    await prepararStripe(f.stripe);
+    await prepararStripe(f.stripe, "Klaki");
     expect(f.precos.find((p) => p.id === "price_odonto")?.unit_amount).toBe(7990);
     expect(f.chamadas).toEqual([`prices.list ${JSON.stringify([PLANO.lookupKey])}`, `products.retrieve ${PRODUTO_ID}`, "products.create", "prices.create", "portal.list active=true", "portal.create"]);
   });
@@ -167,7 +175,107 @@ describe("prepararStripe", () => {
     f.stripe.products.retrieve = async () => {
       throw Object.assign(new Error("permissao negada"), { code: "permission_error", statusCode: 403 });
     };
-    await expect(prepararStripe(f.stripe)).rejects.toThrow(/permissao negada/);
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toThrow(/permissao negada/);
     expect(f.produtos.size).toBe(0);
+  });
+
+  it("o produto novo nasce com o descritor da fatura vindo do APP_NAME, em maiusculas (o nome que o cartao do cliente mostra)", async () => {
+    const f = stripeDeMentira();
+    const r = await prepararStripe(f.stripe, "Klaki");
+    expect(f.produtos.get(PRODUTO_ID)?.statement_descriptor).toBe("KLAKI");
+    expect(r).toMatchObject({ descritor: "KLAKI", criouProduto: true, atualizouDescritor: false });
+    expect(f.chamadas.some((c) => c.startsWith("products.update"))).toBe(false);
+  });
+
+  it("produto nosso que ja existia SEM descritor (o caso do modo teste de hoje): e atualizado, e so ele", async () => {
+    const f = stripeDeMentira({
+      produtos: [
+        { id: PRODUTO_ID, metadata: { produto: "roteiros" }, name: "Roteiros, plano trimestral" },
+        { id: "prod_odonto", metadata: { produto: "odontotech" }, statement_descriptor: "ODONTOTECH" },
+      ],
+      precos: [{ id: "price_nosso", product: PRODUTO_ID, unit_amount: 119_100, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
+    });
+    const r = await prepararStripe(f.stripe, "Klaki");
+    expect(r).toMatchObject({ criouProduto: false, criouPreco: false, atualizouDescritor: true, descritor: "KLAKI", precoId: "price_nosso" });
+    expect(f.produtos.get(PRODUTO_ID)).toMatchObject({ statement_descriptor: "KLAKI", name: "Roteiros, plano trimestral", metadata: { produto: "roteiros" } });
+    expect(f.produtos.get("prod_odonto")?.statement_descriptor).toBe("ODONTOTECH");
+    expect(f.chamadas.filter((c) => c.startsWith("products.update"))).toEqual([`products.update ${PRODUTO_ID}`]);
+    expect(f.precos).toHaveLength(1);
+  });
+
+  it("produto nosso sem preco ainda e com outro descritor: atualiza o descritor e cria o preco", async () => {
+    const f = stripeDeMentira({ produtos: [{ id: PRODUTO_ID, metadata: { produto: "roteiros" }, statement_descriptor: "OUTRO NOME" }] });
+    const r = await prepararStripe(f.stripe, "Klaki");
+    expect(r).toMatchObject({ criouProduto: false, criouPreco: true, atualizouDescritor: true });
+    expect(f.produtos.get(PRODUTO_ID)?.statement_descriptor).toBe("KLAKI");
+  });
+
+  it("com o descritor ja certo nao escreve nada (idempotente, tambem no caminho do preco existente)", async () => {
+    const f = stripeDeMentira();
+    await prepararStripe(f.stripe, "Klaki");
+    f.chamadas.length = 0;
+    const r = await prepararStripe(f.stripe, "Klaki");
+    expect(r.atualizouDescritor).toBe(false);
+    expect(f.chamadas.some((c) => c.startsWith("products.update") || c.endsWith("create"))).toBe(false);
+  });
+
+  it("trocar o APP_NAME e rodar de novo atualiza so o descritor do produto nosso", async () => {
+    const f = stripeDeMentira();
+    await prepararStripe(f.stripe, "Klaki");
+    const r = await prepararStripe(f.stripe, "Novo Nome");
+    expect(r).toMatchObject({ descritor: "NOVO NOME", atualizouDescritor: true, criouProduto: false, criouPreco: false });
+    expect(f.produtos.get(PRODUTO_ID)?.statement_descriptor).toBe("NOVO NOME");
+  });
+
+  it("produto de id fixo sem a marca: nem o descritor e tocado, mesmo com o preco da nossa chave existindo", async () => {
+    const f = stripeDeMentira({
+      produtos: [{ id: PRODUTO_ID, metadata: { produto: "odontotech" }, statement_descriptor: "ODONTOTECH" }],
+      precos: [{ id: "price_nosso", product: PRODUTO_ID, unit_amount: 119_100, currency: "brl", lookup_key: PLANO.lookupKey, metadata: { produto: "roteiros" }, recurring: { interval: "month", interval_count: 3 } }],
+    });
+    await expect(prepararStripe(f.stripe, "Klaki")).rejects.toBeInstanceOf(ErroDePreparo);
+    expect(f.produtos.get(PRODUTO_ID)?.statement_descriptor).toBe("ODONTOTECH");
+    expect(f.chamadas.some((c) => c.startsWith("products.update"))).toBe(false);
+  });
+
+  it("nome do app que nao da descritor valido para antes de qualquer chamada ao Stripe", async () => {
+    const f = stripeDeMentira();
+    await expect(prepararStripe(f.stripe, "")).rejects.toBeInstanceOf(ErroDePreparo);
+    await expect(prepararStripe(f.stripe, "Ab")).rejects.toThrow(/descritor/);
+    expect(f.chamadas).toEqual([]);
+  });
+});
+
+describe("descritorDaFatura (regra do Stripe: 5 a 22 caracteres latinos, ao menos uma letra, nenhum de < > \\ ' \" *)", () => {
+  it("o nome de trabalho vira KLAKI", () => {
+    expect(descritorDaFatura("Klaki")).toBe("KLAKI");
+  });
+
+  it("tira acento, poe em maiusculas e arruma os espacos", () => {
+    expect(descritorDaFatura("  Éclair   Roteiros ")).toBe("ECLAIR ROTEIROS");
+    expect(descritorDaFatura("Ação Máxima")).toBe("ACAO MAXIMA");
+  });
+
+  it("tira os caracteres proibidos e tudo que nao e letra, numero ou espaco", () => {
+    const d = descritorDaFatura("Kla<ki> *App' \"x\" \\ 2.0!");
+    expect(d).toBe("KLA KI APP X 2 0");
+    expect(d).toMatch(/^[A-Z0-9 ]+$/);
+    expect(d).not.toMatch(/[<>\\'"*]/);
+  });
+
+  it("corta em 22 caracteres sem deixar espaco no fim", () => {
+    expect(descritorDaFatura("Roteiros Para Pequenos Negocios Brasileiros")).toBe("ROTEIROS PARA PEQUENOS");
+    expect(descritorDaFatura("ABCDEFGHIJKLMNOPQRSTU V")).toBe("ABCDEFGHIJKLMNOPQRSTU");
+    expect(descritorDaFatura("ABCDEFGHIJKLMNOPQRSTUVWXYZ")).toHaveLength(22);
+  });
+
+  it("nunca devolve vazio, curto demais nem sem letra: lanca erro", () => {
+    for (const ruim of ["", "   ", "***", "<>", "Ab", "1234", "12345 678", null, undefined, "日本語の名前", "!!!!!!"]) {
+      expect(() => descritorDaFatura(ruim), String(ruim)).toThrow(ErroDePreparo);
+    }
+  });
+
+  it("aceita exatamente 5 caracteres (o minimo do Stripe) e numero junto de letras", () => {
+    expect(descritorDaFatura("Klaki")).toHaveLength(5);
+    expect(descritorDaFatura("Klaki 2")).toBe("KLAKI 2");
   });
 });

@@ -888,3 +888,38 @@
     display: none !important;
   }
 }
+
+/* E60: as datas do dia aberto (visão Dia e Mês do Planejar): o selo do tipo e o nome, uma linha por data. */
+.datasDoDia {
+  display: grid;
+  gap: var(--espaco-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.datasDoDia li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--espaco-2) var(--espaco-3);
+}
+
+.datasDoDia strong {
+  font-size: var(--tamanho-corpo);
+  color: var(--cor-titulo);
+}
+
+.seloData {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--espaco-2);
+  border: var(--largura-borda) solid var(--cor-selecao-borda);
+  border-radius: var(--raio-pill);
+  background: var(--cor-selecao-suave);
+  color: var(--cor-destaque);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  line-height: 1.2;
+}

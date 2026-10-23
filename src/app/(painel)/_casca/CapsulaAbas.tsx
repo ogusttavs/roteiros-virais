@@ -36,8 +36,10 @@ export function CapsulaAbas() {
     .join(" ");
 
   return (
-    <div className={classes}>
-      <CapsulaNav encolhida={encolhida} aoTocar={abrir} />
+    <div className={classes} data-capsula-abas="">
+      <div className={styles.capsula}>
+        <CapsulaNav encolhida={encolhida} aoTocar={abrir} />
+      </div>
     </div>
   );
 }

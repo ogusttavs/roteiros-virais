@@ -55,6 +55,7 @@
     "avaliar:entender-marca": "tsx scripts/avaliar-entender-marca.ts",
     "avaliar:tudo": "tsx scripts/avaliar-tudo.ts",
     "capturas": "AI_PROVIDER=mock tsx scripts/capturas.ts",
+    "capturas:e60": "AI_PROVIDER=mock tsx scripts/capturas-e60.ts",
     "capturas:v3-marcas": "AI_PROVIDER=mock tsx scripts/capturas-v3-marcas.ts",
     "capturas:v4-forca-evidencia": "AI_PROVIDER=mock tsx scripts/capturas-v4-forca-evidencia.ts",
     "capturas:v5-pele-nova": "AI_PROVIDER=mock tsx scripts/capturas-v5-pele-nova.ts",

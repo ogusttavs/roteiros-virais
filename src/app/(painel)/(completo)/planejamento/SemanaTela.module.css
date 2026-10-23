@@ -323,3 +323,14 @@
     border-color: var(--cor-acao);
   }
 }
+
+/* E60: o nome da data do dia (feriado, data que vende, dia do ramo), logo abaixo do número do dia. */
+.nomeDaData {
+  margin: 0;
+  padding-left: var(--espaco-1);
+  font-size: var(--tamanho-rodape);
+  font-weight: var(--peso-semibold);
+  line-height: 1.25;
+  color: var(--cor-destaque);
+  overflow-wrap: anywhere;
+}
