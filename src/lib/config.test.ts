@@ -142,6 +142,47 @@ describe("verificarSegredosDeProducao", () => {
       }
     });
   });
+
+  describe("E19: a ligacao do Instagram em producao", () => {
+    const base = { NODE_ENV: "production", ...segredosDeVerdade };
+    const chaveBase64 = Buffer.alloc(32, 7).toString("base64");
+    const chaveHex = Buffer.alloc(32, 9).toString("hex");
+    const completa = { META_APP_ID: "123", META_APP_SECRET: "segredo-do-app", META_LOGIN_CONFIG_ID: "456", META_TOKEN_CHAVE: chaveBase64 };
+
+    it("sem nenhum dos dados da ligacao, nao exige nada (desligada)", () => {
+      expect(() => verificarSegredosDeProducao(base)).not.toThrow();
+    });
+    it("com os quatro e a chave de 32 bytes em base64, passa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa })).not.toThrow();
+    });
+    it("com a chave em 64 caracteres hexadecimais, passa", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, ...completa, META_TOKEN_CHAVE: chaveHex })).not.toThrow();
+    });
+    it("com qualquer um dos quatro faltando, recusa", () => {
+      for (const faltando of ["META_APP_ID", "META_APP_SECRET", "META_LOGIN_CONFIG_ID", "META_TOKEN_CHAVE"] as const) {
+        const parcial = { ...completa, [faltando]: "" };
+        expect(() => verificarSegredosDeProducao({ ...base, ...parcial }), faltando).toThrow(/juntos/);
+      }
+    });
+    it("so a chave preenchida tambem recusa (a ligacao pela metade)", () => {
+      expect(() => verificarSegredosDeProducao({ ...base, META_TOKEN_CHAVE: chaveBase64 })).toThrow(/juntos/);
+    });
+    it("chave que nao tem 32 bytes recusa, sem repetir o valor na mensagem", () => {
+      for (const ruim of ["curta", Buffer.alloc(16, 1).toString("base64"), "z".repeat(64), Buffer.alloc(33, 1).toString("base64")]) {
+        let mensagem = "";
+        try {
+          verificarSegredosDeProducao({ ...base, ...completa, META_TOKEN_CHAVE: ruim });
+        } catch (erro) {
+          mensagem = (erro as Error).message;
+        }
+        expect(mensagem, ruim).toMatch(/META_TOKEN_CHAVE precisa ter 32 bytes/);
+        expect(mensagem).not.toContain(ruim);
+      }
+    });
+    it("fora de producao nao confere nada", () => {
+      expect(() => verificarSegredosDeProducao({ NODE_ENV: "development", META_TOKEN_CHAVE: "curta" })).not.toThrow();
+    });
+  });
 });
 
 describe("config.cobranca (o portao desligado por padrao e a porta de teste)", () => {

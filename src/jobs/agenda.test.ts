@@ -34,6 +34,10 @@ describe("AGENDAMENTOS", () => {
   });
 
   /** E26 4c: a faxina das versoes e leve (so apaga linhas), roda depois dos jobs pesados da madrugada e antes do e-mail das 08:00. */
+  it("renovarContasLigadas roda todo dia as 06:20", () => {
+    expect(cronDe(FILAS.renovarContasLigadas)).toBe("20 6 * * *");
+  });
+
   it("faxinaVersoes roda todo dia as 07:15", () => {
     expect(cronDe(FILAS.faxinaVersoes)).toBe("15 7 * * *");
   });

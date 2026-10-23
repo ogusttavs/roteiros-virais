@@ -2466,6 +2466,72 @@ export const hashtagsMetaUsadas = pgTable(
 );
 
 /**
+ * E19 PR 1: a conta de uma rede ligada pela própria pessoa (Login do Facebook para Empresas), uma linha por conta. Hoje só "instagram".
+ *
+ * O token de acesso NUNCA fica aqui em texto: `tokenCifrado` é AES-256-GCM (`lib/meta-token.ts`), amarrado à marca, à plataforma e à conta, de modo que um valor copiado para a linha de
+ * outra marca não decifra. Quem lê a conta de uma marca filtra SEMPRE por `clienteId` (`servicos/conta-conectada.ts`); uma marca nunca enxerga a conta de outra.
+ *
+ * `estado`: "ativa" é a conta que a curva usa (no máximo uma por marca e plataforma, e uma conta da rede em no máximo uma marca); "escolher" é uma conta que a Meta devolveu quando a pessoa
+ * liberou mais de uma Página e o produto ainda não sabe qual é a dela: ficam guardadas (com o mesmo token cifrado) por poucos minutos até a pessoa escolher, ou somem.
+ * `metaUsuarioId` é o id da pessoa no aplicativo da Meta: é o que o aviso de exclusão de dados traz, e é por ele que se apaga a ligação.
+ * `erro` é a frase curta do último problema (token que a Meta recusou, renovação que falhou), nunca com token; vazio quando está tudo bem.
+ */
+export type EstadoContaConectada = "ativa" | "escolher";
+
+export const contasConectadas = pgTable(
+  "contas_conectadas",
+  {
+    id: id(),
+    clienteId: integer("cliente_id")
+      .notNull()
+      .references(() => clientes.id, { onDelete: "cascade" }),
+    plataforma: text("plataforma").notNull().default("instagram"),
+    contaId: text("conta_id").notNull(),
+    nome: text("nome").notNull(),
+    paginaId: text("pagina_id"),
+    paginaNome: text("pagina_nome"),
+    metaUsuarioId: text("meta_usuario_id").notNull(),
+    estado: text("estado").$type<EstadoContaConectada>().notNull().default("ativa"),
+    tokenCifrado: text("token_cifrado").notNull(),
+    /** Quando o token vence (a Meta diz em segundos, na troca); nulo quando ela não disse. */
+    tokenExpiraEm: timestamp("token_expira_em", { withTimezone: true }),
+    conectadoPor: text("conectado_por").references(() => user.id, { onDelete: "set null" }),
+    conectadaEm: timestamp("conectada_em", { withTimezone: true }).notNull().defaultNow(),
+    renovadaEm: timestamp("renovada_em", { withTimezone: true }),
+    ultimaLeituraEm: timestamp("ultima_leitura_em", { withTimezone: true }),
+    erro: text("erro"),
+    erroEm: timestamp("erro_em", { withTimezone: true }),
+    /** Quando a pessoa foi avisada por e-mail de que a ligação não renova mais; evita avisar todo dia. */
+    avisadaEm: timestamp("avisada_em", { withTimezone: true }),
+    atualizadaEm: timestamp("atualizada_em", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("contas_conectadas_uma_ativa_por_marca").on(t.clienteId, t.plataforma).where(sql`${t.estado} = 'ativa'`),
+    uniqueIndex("contas_conectadas_uma_marca_por_conta").on(t.plataforma, t.contaId).where(sql`${t.estado} = 'ativa'`),
+    uniqueIndex("contas_conectadas_candidata_unica").on(t.clienteId, t.plataforma, t.contaId),
+    index("contas_conectadas_meta_usuario").on(t.metaUsuarioId),
+  ],
+);
+export type ContaConectada = typeof contasConectadas.$inferSelect;
+
+/**
+ * E19 PR 1: os pedidos de exclusão de dados que a Meta mandou (o aviso assinado de "a pessoa removeu o aplicativo e pediu para apagar"). O `codigo` é o que a Meta mostra à pessoa e
+ * o que a página pública de status lê (`/dados/exclusao?codigo=...`). Não guarda o id da pessoa nem de quem quer que seja: só que o pedido chegou, quando foi atendido e quantas ligações
+ * foram apagadas.
+ */
+export const exclusoesMeta = pgTable(
+  "exclusoes_meta",
+  {
+    id: id(),
+    codigo: text("codigo").notNull(),
+    recebidoEm: timestamp("recebido_em", { withTimezone: true }).notNull().defaultNow(),
+    concluidoEm: timestamp("concluido_em", { withTimezone: true }),
+    ligacoesApagadas: integer("ligacoes_apagadas").notNull().default(0),
+  },
+  (t) => [uniqueIndex("exclusoes_meta_codigo").on(t.codigo)],
+);
+
+/**
  * Como o cliente avaliou a geracao. "outro_angulo" e o nome antigo do fluxo
  * de reprovar (etapa 11); linhas gravadas antes da E27 continuam com esse
  * valor, nunca reescritas. "reprovado" e o fluxo novo (E27, parte 1),

@@ -142,6 +142,30 @@ export const config = {
     de: env("EMAIL_FROM", "painel@localhost"),
   },
   /**
+   * E19 PR 1, o Instagram ligado pela própria pessoa (Login do Facebook para Empresas, fluxo de código). `appId` e `appSecret` são do aplicativo da Meta; `loginConfigId` é o
+   * `config_id` da configuração de login criada no painel da Meta (define as permissões e os ativos pedidos); `tokenChave` cifra o token de cada conta ligada (AES-256-GCM,
+   * 32 bytes em base64 ou em 64 caracteres hexadecimais; `openssl rand -base64 32`). `redirectUri` é a URI cadastrada no aplicativo, exata. `ativa` só com os quatro dados: sem
+   * eles, ninguém consegue começar a ligação e a curva segue pelos outros dois caminhos, sem erro de boot.
+   */
+  metaConexao: {
+    appId: env("META_APP_ID"),
+    appSecret: env("META_APP_SECRET"),
+    loginConfigId: env("META_LOGIN_CONFIG_ID"),
+    tokenChave: env("META_TOKEN_CHAVE"),
+    redirectUri: env("META_REDIRECT_URI", `${env("APP_URL", "http://localhost:3000")}/api/meta/retorno`),
+    ativa: env("META_APP_ID") !== "" && env("META_APP_SECRET") !== "" && env("META_LOGIN_CONFIG_ID") !== "" && env("META_TOKEN_CHAVE") !== "",
+    /**
+     * E19 PR 2: `META_APP_APROVADO=1` quando a Meta aprovar o aplicativo para todo mundo. Enquanto não for, o aplicativo está em modo de desenvolvimento e só quem tem papel nele
+     * consegue passar pelo diálogo; a tela de Conta avisa isso com calma (`textos/conta-conectada.ts`, `tela.emTeste`).
+     */
+    aprovadoPelaMeta: env("META_APP_APROVADO") === "1",
+    /**
+     * E19 PR 2, só para o e2e: o endereço de um servidor local que faz o papel do diálogo e da Graph API da Meta. Só vale com `MODO_E2E=1` (que
+     * `verificarSegredosDeProducao` recusa fora de localhost); em qualquer outro caso fica vazio e as chamadas vão à Meta de verdade.
+     */
+    simuladorE2E: env("MODO_E2E") === "1" ? env("META_SIMULADOR_E2E") : "",
+  },
+  /**
    * E48 PR 2: as chaves VAPID do aviso por push (gerar com `npx web-push generate-vapid-keys`). Sem elas nenhum push sai e o lembrete continua por
    * e-mail para todo mundo. A chave pública também vai ao navegador (a tela a recebe do servidor, em tempo de execução: `NEXT_PUBLIC_*` pediria
    * a chave no build da imagem). `subject` é um `mailto:` ou uma URL do responsável.
@@ -359,6 +383,21 @@ export class ErroConfiguracao extends Error {}
  * esse passo de build do servidor rodando de verdade (etapa 4, achado ao
  * rodar `npm run build` local com o .env.example ainda no .env).
  */
+/** A chave que cifra o token das contas ligadas tem 32 bytes (base64 ou 64 caracteres hexadecimais)? Mora aqui para o carregamento da configuração conferir sem importar o módulo que cifra. */
+export function chaveDoTokenValida(valor: string | undefined): boolean {
+  return Boolean(valor) && bytesDaChaveDoToken(valor as string) !== null;
+}
+
+/** Os 32 bytes da chave, ou `null` quando o valor não é uma chave válida. */
+export function bytesDaChaveDoToken(valor: string): Buffer | null {
+  if (/^[0-9a-fA-F]{64}$/.test(valor)) return Buffer.from(valor, "hex");
+  if (/^[A-Za-z0-9+/_-]{42,43}={0,2}$/.test(valor)) {
+    const bytes = Buffer.from(valor.replaceAll("-", "+").replaceAll("_", "/"), "base64");
+    return bytes.length === 32 ? bytes : null;
+  }
+  return null;
+}
+
 /** `null` sem host valido (URL ausente ou malformada): tratado como reprovado por MODO_E2E. */
 function hostDeUrl(valor: string | undefined): string | null {
   if (!valor) return null;
@@ -381,6 +420,10 @@ export function verificarSegredosDeProducao(
     COBRANCA_ATIVA?: string;
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
+    META_APP_ID?: string;
+    META_APP_SECRET?: string;
+    META_LOGIN_CONFIG_ID?: string;
+    META_TOKEN_CHAVE?: string;
   } = process.env,
 ): void {
   if (env.NODE_ENV !== "production") return;
@@ -407,6 +450,21 @@ export function verificarSegredosDeProducao(
     }
     if (!env.STRIPE_WEBHOOK_SECRET) {
       throw new ErroConfiguracao("COBRANCA_ATIVA=1 exige STRIPE_WEBHOOK_SECRET; sem ele o webhook recusa todo evento e a assinatura nunca vira ativa.");
+    }
+  }
+
+  /**
+   * E19 PR 1: a ligação do Instagram guarda um token de acesso por conta. Qualquer um dos dados da ligação preenchido exige os quatro, e a chave que cifra o token precisa ter 32 bytes
+   * (base64 ou 64 caracteres hexadecimais): subir com a ligação pela metade deixaria a pessoa chegar ao diálogo da Meta e voltar sem poder guardar o token, ou, pior, guardar com uma chave
+   * fraca. Melhor não subir do que subir assim.
+   */
+  const dadosDaLigacao = [env.META_APP_ID, env.META_APP_SECRET, env.META_LOGIN_CONFIG_ID, env.META_TOKEN_CHAVE];
+  if (dadosDaLigacao.some(Boolean)) {
+    if (!dadosDaLigacao.every(Boolean)) {
+      throw new ErroConfiguracao("A ligacao do Instagram exige META_APP_ID, META_APP_SECRET, META_LOGIN_CONFIG_ID e META_TOKEN_CHAVE juntos; falta pelo menos um.");
+    }
+    if (!chaveDoTokenValida(env.META_TOKEN_CHAVE)) {
+      throw new ErroConfiguracao("META_TOKEN_CHAVE precisa ter 32 bytes (base64 de 32 bytes, p. ex. `openssl rand -base64 32`, ou 64 caracteres hexadecimais).");
     }
   }
 

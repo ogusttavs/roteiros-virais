@@ -250,6 +250,16 @@ Entra desligada: sem `COBRANCA_ATIVA=1` no `.env` da VPS ninguem e mandado para 
 - **O portao fora do layout**: toda Server Action do painel e toda rota `/api` chama `exigirAssinaturaValida` / `recusaDaCobranca` (`src/lib/portao-cobranca.ts`); `npm run checar-portao-cobranca` (na CI) reprova a que esquecer. Desligado, nada muda.
 - **Apagar uma marca**: so por `npm run marca:apagar -- <id> --confirmo` (cancela a assinatura no Stripe antes e so apaga se o Stripe confirmar). **Nunca apague a linha de `clientes` por SQL**: sem cancelar no Stripe antes, ele continua cobrando (desde a E22 PR 3 o banco recusa apagar a marca que ainda tem linha em `assinaturas`, `ON DELETE RESTRICT`).
 
+## O Instagram ligado pela propria pessoa (E19 PR 1)
+
+Entra desligado: sem os quatro dados abaixo no `.env` da VPS, ninguem consegue comecar a ligacao (o botao do PR 2 diz que ainda nao esta aberta) e a curva segue pelo usuario do sistema e pelo Apify, como antes.
+
+- **Variaveis** (`.env.example`, bloco "E19"): `META_APP_ID`, `META_APP_SECRET`, `META_LOGIN_CONFIG_ID` e `META_TOKEN_CHAVE` (mais `META_REDIRECT_URI`, opcional). Em producao, preencher algum e nao todos, ou uma chave que nao tenha 32 bytes, faz o app recusar subir (`verificarSegredosDeProducao`). O web e o worker leem o mesmo `.env`; os dois precisam da chave (o worker le a curva e renova os acessos).
+- **O aviso de aplicativo em teste** (E19 PR 2): `META_APP_APROVADO=1`, so quando a Meta aprovar o aplicativo para todo mundo. Sem ele, o cartao "Seu Instagram" da Conta avisa com calma que a ligacao direta ainda abre para poucas pessoas (so quem tem papel no aplicativo passa pelo dialogo da Meta em modo de desenvolvimento).
+- **A chave dos acessos** (`META_TOKEN_CHAVE`): `openssl rand -base64 32`. Cifra o acesso de cada conta ligada (AES-256-GCM). Perdeu ou trocou a chave: as contas ligadas nao abrem mais e cada pessoa precisa ligar de novo (nada quebra, a curva cai para os outros caminhos). Guarde uma copia fora da VPS e nunca reuse a de outro ambiente.
+- **No aplicativo da Meta** (so o Gustavo): a URI `<APP_URL>/api/meta/retorno` em URIs de redirecionamento OAuth validos; o dominio do app em Dominios do aplicativo; a URL `<APP_URL>/api/meta/exclusao` em "URL de solicitacao de exclusao de dados"; a configuracao de login (Login do Facebook para Empresas) com as quatro permissoes; o papel de quem vai testar. O passo a passo esta no corpo do PR.
+- **Rotina**: o job `renovar-contas-ligadas` roda todo dia as 06:20 (renova o que vence em menos de 15 dias e avisa o dono por e-mail, uma vez, quando nao da mais). Rodar uma vez: `npm run job -- renovar-contas-ligadas`.
+
 ## O que nunca fazer
 
 Build na VPS; publicar porta; mexer em `/srv/odontotech` ou no bloco do OdontoTech no
