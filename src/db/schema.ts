@@ -2596,6 +2596,26 @@ export const versoesDoRoteiro = pgTable(
   },
   (t) => [uniqueIndex("versoes_do_roteiro_grupo_ordem").on(t.grupo, t.ordem), index("versoes_do_roteiro_cliente").on(t.clienteId, t.criadoEm)],
 );
+/**
+ * E57a: quem preencheu o "Quero testar" da página de entrada (`/`). Não é conta nem cliente: é um contato que pediu para falar sobre o teste. Só o admin lê (lista em
+ * `/admin/interessados`). `email` é guardado em minúsculas e é único: inscrever o mesmo e-mail de novo não cria outra linha nem outro aviso (e a resposta é a mesma, para a
+ * página não revelar quem já está na lista). `whatsapp` são só dígitos, com DDD e sem o 55. `aceitouContatoEm` é o aceite do contato (LGPD): sem ele a linha não existe.
+ * Nenhum IP é guardado.
+ */
+export const interessados = pgTable(
+  "interessados",
+  {
+    id: id(),
+    nome: text("nome").notNull(),
+    email: text("email").notNull(),
+    whatsapp: text("whatsapp").notNull(),
+    ramo: text("ramo").notNull(),
+    aceitouContatoEm: timestamp("aceitou_contato_em", { withTimezone: true }).notNull(),
+    criadoEm: criadoEm(),
+  },
+  (t) => [uniqueIndex("interessados_email").on(t.email), index("interessados_criado_em").on(t.criadoEm)],
+);
+
 export type VersaoDoRoteiro = typeof versoesDoRoteiro.$inferSelect;
 
 /**
@@ -2699,3 +2719,4 @@ export type AprendizadoCliente = typeof aprendizadoCliente.$inferSelect;
 export type ContextoMarca = typeof contextoMarca.$inferSelect;
 export type ContextoMarcaItem = typeof contextoMarcaItens.$inferSelect;
 export type PedidoDeRamo = typeof pedidosDeRamo.$inferSelect;
+export type Interessado = typeof interessados.$inferSelect;

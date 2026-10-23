@@ -49,10 +49,19 @@ function ehImpressaoDeRoteiro(pathname: string): boolean {
   return pathname.startsWith("/roteiros/") && pathname.endsWith("/imprimir");
 }
 
+/**
+ * `/` (E57a): a pagina de vendas e de captura ("Quero testar"). So a raiz EXATA e publica; `startsWith("/")` em `ROTAS_PUBLICAS` abriria o aplicativo inteiro, entao a raiz tem a
+ * checagem propria. Quem ja esta com sessao e levado ao painel pela propria pagina (`src/app/page.tsx`). A Server Action do formulario chega por POST nesta mesma raiz.
+ */
+function ehPaginaDeEntrada(pathname: string): boolean {
+  return pathname === "/";
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (
+    ehPaginaDeEntrada(pathname) ||
     ROTAS_PUBLICAS.some((rota) => pathname.startsWith(rota)) ||
     ROTAS_COM_AUTENTICACAO_PROPRIA.some((rota) => pathname.startsWith(rota)) ||
     ehImpressaoDeRoteiro(pathname)
