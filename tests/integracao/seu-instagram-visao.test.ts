@@ -5,13 +5,13 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { montarVisaoSeuInstagram } from "@/app/(painel)/(completo)/conta/seu-instagram-visao";
 import { db, getPool } from "@/db";
 import { clientes, contasConectadas, membrosMarca, nichos, user } from "@/db/schema";
 import { cifrarToken, contextoDoToken } from "@/lib/meta-token";
 import { candidatasDaMarca, contaLigadaDaMarca, ehDonoDaMarca, VALIDADE_DA_ESCOLHA_MS } from "@/servicos/conta-conectada";
 import { textosLigacao } from "@/textos/conta-conectada";
 
-import { montarVisaoSeuInstagram } from "@/app/(painel)/(completo)/conta/seu-instagram-visao";
 
 import { resetarSchema } from "../../scripts/resetar-schema";
 
