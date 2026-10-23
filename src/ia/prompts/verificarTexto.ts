@@ -83,8 +83,16 @@ import type { EsforcoIA, NivelIA } from "../tipos";
  *
  * 1.8.1 (prova com chave de 22/10/2026: com o critério de aviso, o roteiro curto do tema da eleição ainda reprovou em 2 de 3, porque a entrada levava "Proibicoes do cliente: política" e a linha
  * "Nunca diria ou faria" nas fontes): no tema da própria pessoa a entrada sai sem a lista e as fontes sem essa linha (`fontesSemProibicoes`). O sistema estável não muda. Versão 1.8.1.
+ *
+ * 1.8.2 (prova com chave de 22/10/2026, dois falsos positivos que o prompt sozinho não segurou): (1) o espaço entre colchetes para a pessoa preencher ("então [conte aqui como você faz para a mancha
+ * não voltar]") era lido como prática do negócio inventada, apesar de a regra dizer desde a 1.7.3 que colchete não é fato; agora, por código, o verificador nunca vê o que está dentro do colchete
+ * (`neutralizarColchetes`: cada trecho de até 200 caracteres vira "[espaço para a pessoa completar]"; o resto do texto, onde um fato inventado apareceria, segue inteiro, e as conferências locais
+ * seguem lendo o texto original); (2) o medo do cliente ideal que o perfil lista ("Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado") dito ao público ("você já mandou lavar
+ * uma vez e o sofá voltou manchado?") foi lido como caso vivido. Agora o critério separa as duas coisas: falar COM o público sobre o medo ou a dor que o perfil lista, como pergunta ou como situação
+ * comum de quem assiste, não é fato; contar um caso específico como ACONTECIDO com um cliente, com a pessoa ou com o negócio ("um cliente meu, na semana passada, ...") continua sendo, e reprova.
+ * Versão 1.8.2.
  */
-export const versao = "1.8.1";
+export const versao = "1.8.2";
 export const nivel: NivelIA = "barato";
 export const esforco: EsforcoIA | undefined = undefined;
 
@@ -164,7 +172,7 @@ export const CRITERIO_FATOS =
   "gente\"), paráfrase ou reformulação de algo que está nas fontes (o mesmo número escrito de outro jeito, o mesmo lugar dito de outro jeito), inferência óbvia das fontes (clínica em um bairro " +
   "\"fica\" nesse bairro), repetir ou reformular o TEMA ou o momento (eles são fonte), a frase ou o assunto que o cliente pediu para dizer (\"o que o vídeo precisa comunicar\", o pedido), " +
   "hashtags, instruções de gravação (sugerir como ou onde gravar, mesmo mudando um detalhe do que o momento diz), perguntas (uma pergunta, mesmo comparando dois produtos, não afirma nada), frase que está " +
-  "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\") não é fato, é o " +
+  "literalmente nas fontes (o perfil traz \"nunca promete resultado\", \"Frase que fala: ...\" e o texto a repete) e o jeito de falar. FALAR COM O PÚBLICO sobre um medo, uma dor ou uma situação que o perfil lista para o cliente ideal (\"Medos do cliente: ...\"), como pergunta (\"você já mandou lavar e o sofá voltou manchado?\") ou como situação comum de quem assiste (\"se o seu sofá já voltou manchado de outro lugar, você sabe como é\"), também não é fato: é o assunto do perfil dito a quem assiste. O que continua sendo fato, e reprova, é contar um CASO ESPECÍFICO como acontecido com uma pessoa identificada, com um cliente do negócio ou com a própria pessoa (\"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\", \"ontem uma cliente me contou\"), porque o medo do perfil não diz que isso aconteceu. Um espaço marcado entre colchetes para a pessoa preencher (\"[diga aqui onde você está]\", ou o marcador \"[espaço para a pessoa completar]\") não é fato, é o " +
   "certo quando a fonte não traz a informação. NA DÚVIDA, APROVE. Só reprove por fato quando você consegue apontar o fato específico E afirmar que nada nas fontes o sustenta; nesse caso " +
   "preencha fatoEspecifico com o fato, fonteMaisProxima com a frase das fontes mais próxima dele (ou \"nenhuma\") e o motivo em uma frase.\n" +
   "  Exemplos que APROVAM: as fontes dizem \"R$ 89\" e o texto diz \"89 reais\"; as fontes dizem \"bairro Vila Sorriso, São Paulo\" e o texto diz \"a clínica fica na Vila Sorriso\"; o texto diz " +
@@ -172,10 +180,26 @@ export const CRITERIO_FATOS =
   "o tema é \"o sofá da cliente de ontem\" e o texto diz \"o sofá da cliente de ontem\"; o tema é \"o erro que apareceu em todo vídeo da semana\" e o texto diz \"você viu esse erro em vídeo atrás de " +
   "vídeo\" (repetição ou paráfrase do tema); o cliente pediu para comunicar \"o horário mudou\" e o texto diz que o horário mudou (a frase que ele pediu para falar); o perfil diz \"nunca promete resultado que não pode cumprir\" e o texto diz " +
   "\"eu nunca prometo resultado\"; o perfil traz \"Frase que fala: aqui a gente aplica igual fábrica, sem bolha\" e o texto diz essa frase (frase do cliente que está no perfil); o texto diz \"sempre faço " +
-  "[conte aqui como você faz isso]\" (o espaço marcado entre colchetes não afirma nada); o texto pergunta \"qual dura mais, o produto A ou o B?\" (pergunta, não afirmação).\n" +
+  "[conte aqui como você faz isso]\" (o espaço marcado entre colchetes não afirma nada); o texto pergunta \"qual dura mais, o produto A ou o B?\" (pergunta, não afirmação); o perfil traz \"Medos do cliente: já mandou fazer em outro lugar e o sofá ficou manchado\" e o texto diz \"você já mandou lavar uma vez e o sofá voltou manchado?\" (o medo do perfil dito ao público); o texto diz \"então [espaço para a pessoa completar]\" (espaço marcado).\n" +
   "  Exemplos que REPROVAM, quando as fontes não os trazem: \"o Uli está aqui do meu lado com a mochila nas costas\"; \"numa mesa de hotel com café já frio\"; \"um país quase caiu do roteiro " +
   "porque a feira repetia o que vejo no Brasil\"; \"uma parada ganhou dois dias a mais por causa da fábrica\"; \"testo antes de entrar no kit\" ou \"na nossa loja\" (prática ou loja que o " +
-  "perfil não traz);"
+  "perfil não traz); com o mesmo medo no perfil, \"um cliente meu, na semana passada, mandou lavar em outro lugar e o sofá voltou manchado\" (caso específico contado como acontecido);"
+
+/** O que o verificador lê no lugar do que está entre colchetes (1.8.2). */
+export const MARCADOR_DE_ESPACO = "[espaço para a pessoa completar]";
+
+/** Tamanho máximo do que um colchete esconde do verificador: um espaço para preencher é curto; um colchete longo seria um jeito de esconder um parágrafo de fato inventado, então fica à vista. */
+const MAXIMO_DENTRO_DO_COLCHETE = 200;
+const ENTRE_COLCHETES = new RegExp(`\\[[^\\[\\]]{0,${MAXIMO_DENTRO_DO_COLCHETE}}\\]`, "g");
+
+/**
+ * 1.8.2: troca cada espaço marcado entre colchetes ("[conte aqui como você faz isso]") por um marcador neutro antes de o texto ir ao verificador. O que a pessoa vai escrever ali é dela, nunca
+ * fato que o roteiro afirma, e o modelo barato lia a instrução dentro do colchete como prática inventada. Só o que está DENTRO do colchete some; tudo fora dele segue inteiro, então um fato
+ * inventado fora dos colchetes continua à vista. Pura; as conferências locais (travessão, emoji, proibição) seguem lendo o texto original.
+ */
+export function neutralizarColchetes(texto: string): string {
+  return texto.replace(ENTRE_COLCHETES, MARCADOR_DE_ESPACO);
+}
 
 /** O critério da proibição, como sempre: o texto nunca fere o que o cliente listou no briefing. */
 export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no briefing foi ferida.";
@@ -187,7 +211,7 @@ export const CRITERIO_PROIBICAO = "nenhuma proibição que o cliente listou no b
  */
 export const CRITERIO_PROIBICAO_COMO_AVISO =
   "o tema foi escolhido pela própria pessoa, então as proibições do briefing são preferências dela, não motivo de reprovação: citar ou tratar o assunto de uma proibição, dizer que o tema esbarra nela, " +
-  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Reprove apenas se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
+  "ou escrever sobre ele com cuidado nunca reprova, e nunca fere a proibição. Por este item, reprove só se o texto atacar ou ofender uma pessoa, um candidato, um partido, um concorrente ou um grupo, prometer " +
   "resultado que não pode cumprir ou tiver palavrão.";
 
 export function montarSistemaEstavel(genero: GeneroTexto = "padrao", comFontes = false, proibicaoEhAviso = false): string {
@@ -219,5 +243,8 @@ export function montarEntrada(dados: { texto: string; proibicoes: string[]; font
     dados.proibicoes.length > 0 ? dados.proibicoes.join("; ") : "nenhuma proibicao registrada";
   const blocoFontes = dados.fontes ? `\n\nFONTES (tudo o que foi dito ou escrito para este texto; só isto vale como fato):\n${dados.fontes}` : "";
 
-  return `Texto a conferir:\n${dados.texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
+  // 1.8.2: com a conferência de fatos (com fontes), o espaço marcado entre colchetes chega como um marcador neutro; vale para a produção e para os scripts de avaliação, que montam a entrada aqui.
+  const texto = dados.fontes ? neutralizarColchetes(dados.texto) : dados.texto;
+
+  return `Texto a conferir:\n${texto}\n\nProibicoes do cliente: ${listaProibicoes}${blocoFontes}`;
 }

@@ -9,6 +9,7 @@ import { chaveDeVozValida } from "@/lib/chave-da-voz";
 import { fraseDoErroDaIAParaASessao } from "@/lib/erro-ia-da-sessao";
 import { formatarVideo, legendaSemHashtags } from "@/lib/formatar-video-referencia";
 import { idDoBancoOuNulo } from "@/lib/id-rota";
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { type ResultadoAcao } from "@/lib/resultado-acao";
 import { recusaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual } from "@/servicos/clientes";
@@ -70,6 +71,7 @@ export async function gerarVersoesAction(
 ): Promise<ResultadoAcao<{ grupo: string }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida();
   const cliente = await clienteDaSessaoAtual();
   // Um id que veio e não vale não vira "sem pesquisa" em silêncio: a pessoa pediu a pesquisa, e o roteiro sairia sem ela.
   const pesquisaValida = pesquisaId === undefined || pesquisaId === null ? undefined : idDoBancoOuNulo(pesquisaId);

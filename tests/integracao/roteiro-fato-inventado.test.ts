@@ -28,7 +28,7 @@ function parametros(fontesDosFatos: string | undefined, marcador: boolean) {
     schema: roteiroIA.schema,
     sistemaEstavel: "sistema",
     entrada: "Tema escolhido: o erro que faz a mancha voltar",
-    extrairCampos: () => ({ gancho: marcador ? "o Uli está do meu lado [mock:fato-inventado]" : "olha o que acontece com a mancha", corpo: "texto do corpo" }),
+    extrairCampos: () => ({ gancho: marcador ? "o Uli está do meu lado {mock:fato-inventado}" : "olha o que acontece com a mancha", corpo: "texto do corpo" }),
     fontesDosFatos,
     generoTexto: "roteiro" as const,
   };

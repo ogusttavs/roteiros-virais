@@ -25,6 +25,7 @@ async function main() {
   console.log(`stripe-preparar (${ehProducao ? "PRODUCAO" : "modo teste"}):`);
   console.log(`  produto ${relatorio.produtoId}: ${relatorio.criouProduto ? "criado" : "ja existia"}`);
   console.log(`  preco ${relatorio.precoId}: ${relatorio.criouPreco ? "criado" : "ja existia"}`);
+  console.log(`  portal do cliente ${relatorio.portalId}: ${relatorio.criouPortal ? "criado" : "ja existia"}`);
 }
 
 main().catch((erro) => {

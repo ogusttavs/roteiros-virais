@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import { exigirForaDoVerComo, sessaoDoPainel } from "@/lib/ver-como";
 import { clienteDaSessaoAtual, ErroAcessoNegado, salvarRedePrincipal } from "@/servicos/clientes";
 import { roteiroMaisRecenteDesde } from "@/servicos/roteiro";
@@ -12,6 +13,7 @@ import { grupoEmAberto } from "@/servicos/versoes";
  */
 export async function salvarRedePrincipalAction(rede: string): Promise<void> {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida();
   const sessao = await sessaoDoPainel();
   if (!sessao) {
     throw new ErroAcessoNegado("E preciso entrar de novo.");

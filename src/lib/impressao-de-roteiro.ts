@@ -4,6 +4,7 @@ import type { Cliente } from "@/db/schema";
 import { ErroIA } from "@/ia/erro";
 import { idDaRotaOuNulo } from "@/lib/id-rota";
 import { logger } from "@/lib/log";
+import { recusaDaCobranca } from "@/lib/portao-cobranca";
 import { criarTokenImpressao } from "@/lib/tokenImpressao";
 import { sessaoDoPainel } from "@/lib/ver-como";
 import { clienteAtivoDoUsuario } from "@/servicos/clientes";
@@ -31,6 +32,9 @@ export async function roteiroDeQuemPediu(
   if (!cliente) {
     return NextResponse.json({ erro: "nao autenticado" }, { status: 401 });
   }
+  // E22 PR 2, item 0a: o PDF e a imagem (Chromium, e a IA das marcas de fala) são do produto pago: marca que precisa assinar recebe 402.
+  const recusaCobranca = await recusaDaCobranca();
+  if (recusaCobranca) return recusaCobranca;
 
   const { id } = await params;
   const roteiroId = idDaRotaOuNulo(id);

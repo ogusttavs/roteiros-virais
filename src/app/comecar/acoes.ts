@@ -1,5 +1,6 @@
 "use server";
 
+import { exigirAssinaturaValida } from "@/lib/portao-cobranca";
 import type { ResultadoAcao } from "@/lib/resultado-acao";
 import { exigirForaDoVerComo, recusaDoVerComo } from "@/lib/ver-como";
 import { avaliarResposta, salvarRascunho } from "@/servicos/briefing";
@@ -22,6 +23,7 @@ import { textosRamo } from "@/textos/ramo";
 export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<ResultadoAcao<{ limiteDeRamosNovos: boolean }>> {
   const recusaVerComo = await recusaDoVerComo();
   if (recusaVerComo) return { ok: false, erro: recusaVerComo };
+  await exigirAssinaturaValida({ soDepoisDoBriefing: true });
   const cliente = await clienteDaSessaoAtual();
   try {
     const { limiteDeRamosNovos } = await salvarDadosFixosComPedido(cliente.id, dadosBrutos);
@@ -34,12 +36,14 @@ export async function salvarDadosFixosAction(dadosBrutos: unknown): Promise<Resu
 
 export async function salvarRascunhoAction(perguntaId: string, resposta: string, transcricaoBruta?: string) {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida({ soDepoisDoBriefing: true });
   const cliente = await clienteDaSessaoAtual();
   await salvarRascunho(cliente.id, perguntaId, resposta, cliente.tipo, transcricaoBruta);
 }
 
 export async function avaliarRespostaAction(perguntaId: string, resposta: string) {
   await exigirForaDoVerComo();
+  await exigirAssinaturaValida({ soDepoisDoBriefing: true });
   const cliente = await clienteDaSessaoAtual();
   return avaliarResposta(cliente.id, perguntaId, resposta, cliente.tipo);
 }

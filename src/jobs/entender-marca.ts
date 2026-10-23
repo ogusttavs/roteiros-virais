@@ -47,6 +47,7 @@ import { gerarComVerificacao } from "@/ia/verificador";
 import { config } from "@/lib/config";
 import { logger } from "@/lib/log";
 import { limparCampoPerfil, perfilPareceValido } from "@/lib/perfil-redes";
+import { marcaPodeReceberTarefa, registrarMarcasPuladas, resumoDasMarcasPuladas, separarMarcasPorAssinatura } from "@/servicos/assinatura-tarefas";
 import { formatarPerfilCompilado, perfilDoCliente } from "@/servicos/briefing";
 import { enfileirarEntenderMarca, marcaTemFonteParaLer } from "@/servicos/contexto-marca";
 import {
@@ -204,7 +205,10 @@ async function despachar(agora: Date): Promise<Record<string, unknown>> {
     )
     .orderBy(sql`${contextoMarca.ultimaLeituraOkEm} asc nulls first`, asc(clientes.id));
 
-  const comFonte = candidatas.filter(marcaTemFonteParaLer);
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não entra na rodada; ela lê o site e o Instagram e gasta IA. Cobrança desligada: a lista de sempre.
+  const { liberadas, puladas } = await separarMarcasPorAssinatura(candidatas.map((marca) => marca.id));
+  registrarMarcasPuladas("entender-marca", puladas.length);
+  const comFonte = candidatas.filter(marcaTemFonteParaLer).filter((marca) => liberadas.has(marca.id));
   const dasRodada = comFonte.slice(0, config.regras.leiturasDeMarcaPorRodada);
 
   let enfileiradas = 0;
@@ -226,6 +230,7 @@ async function despachar(agora: Date): Promise<Record<string, unknown>> {
     enfileiradas,
     jaNaFila,
     ficaramParaAmanha: Math.max(0, comFonte.length - dasRodada.length),
+    ...resumoDasMarcasPuladas(puladas.length),
     custoDoMesUsd: gastoDoMes,
   };
 }
@@ -312,6 +317,11 @@ async function lerMarca(
   const [cliente] = await db().select().from(clientes).where(eq(clientes.id, clienteId));
   if (!cliente || !cliente.ativo) return { ...resumoBase, pulado: "marca_inativa" };
   if (!marcaTemFonteParaLer(cliente)) return { ...resumoBase, pulado: "sem_fontes" };
+  // E22 PR 3: marca sem assinatura (cobrança ligada) não é lida, nem por evento nem pelo despachante. O "ler agora" do admin (`forcar`) passa: é uma decisão dele, marca a marca.
+  if (!forcar && !(await marcaPodeReceberTarefa(clienteId))) {
+    registrarMarcasPuladas("entender-marca", 1);
+    return { ...resumoBase, pulado: "assinatura", ...resumoDasMarcasPuladas(1) };
+  }
 
   await db().insert(contextoMarca).values({ clienteId }).onConflictDoNothing();
   const [antes] = await db().select().from(contextoMarca).where(eq(contextoMarca.clienteId, clienteId));

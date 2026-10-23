@@ -652,6 +652,20 @@
       "when": 1792715333941,
       "tag": "0093_imagens-das-noticias",
       "breakpoints": true
+    },
+    {
+      "idx": 94,
+      "version": "7",
+      "when": 1792718818873,
+      "tag": "0094_checkouts-stripe",
+      "breakpoints": true
+    },
+    {
+      "idx": 95,
+      "version": "7",
+      "when": 1792722911362,
+      "tag": "0095_assinatura-restrict",
+      "breakpoints": true
     }
   ]
 }
